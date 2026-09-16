@@ -9,7 +9,7 @@ ALLOWED_ORIGINS = "https://arisweedler-at.github.io"
 TTL_SECONDS = "7200"
 
 # The TURN key's ID is not secret; the API token that pairs with it is.
-TURN_KEY_ID = "7436d257a985f5017a96e5aecae60311"
+TURN_KEY_ID = "acdb9db7a19e6f0d65998670bd779bbe"
 
 # Secret (set with `wrangler secret put TURN_KEY_API_TOKEN`, never commit it):
 #   TURN_KEY_API_TOKEN   — shown once when the TURN key is created (Realtime → TURN)
