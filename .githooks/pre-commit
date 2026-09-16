@@ -1,0 +1,9 @@
+#!/bin/sh
+# Chain to the template-installed hook (big-file + trailing-whitespace checks with y/n prompts).
+# core.hooksPath points here, so that hook would otherwise stop running. Use --git-dir, not
+# --git-path hooks: the latter returns .githooks once core.hooksPath is set.
+t="$(git rev-parse --git-dir)/hooks/pre-commit"
+[ -x "$t" ] || exit 0
+# The template hook reads answers from the terminal; hand it the tty when there is one.
+if ( : </dev/tty ) 2>/dev/null; then exec "$t" "$@" </dev/tty; fi
+exec "$t" "$@"
