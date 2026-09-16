@@ -7,7 +7,9 @@ Single-file web apps built in Hyperagent, hosted on GitHub Pages.
 | Gin Rummy | https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/ | `games/gin-rummy/index.html` |
 | Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/ | `games/fidice/index.html` |
 
-Each app is a fully self-contained `index.html`. Runtime dependencies are loaded from public CDNs (PeerJS for online play; Google Fonts in Fidice). No build step — edit the file, push, Pages redeploys.
+The same site is served at **https://games.sweedler.com** through the Cloudflare Worker in `infra/games-proxy/`: `games.sweedler.com/gin-rummy/` and `games.sweedler.com/fidice/` are the short URLs, `/games/<name>/` redirects to them, and `/shared/…` maps to the repo's `shared/` directory.
+
+Each app is a fully self-contained `index.html`. Runtime dependencies are loaded from public CDNs (PeerJS for online play; Google Fonts in Fidice). No build step — edit the file, push, Pages redeploys. `npm test` runs the node:test suites (the Workers' path mapping so far).
 
 ## Layout
 
@@ -16,6 +18,7 @@ games/gin-rummy/index.html   Gin Rummy
 games/fidice/index.html      Fidice
 shared/ice.js                ICE/TURN config loader shared by the games (window.HyperIce)
 infra/turn-worker/           Cloudflare Worker that mints short-lived TURN credentials (option B below)
+infra/games-proxy/           Cloudflare Worker serving the site at games.sweedler.com
 ```
 
 ## Online play (TURN relay)
