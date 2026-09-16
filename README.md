@@ -22,7 +22,7 @@ infra/turn-worker/           Cloudflare Worker that mints short-lived TURN crede
 
 **Why.** Online play is peer-to-peer over WebRTC (PeerJS only brokers the handshake). When both devices sit behind NAT (a phone on cellular and a laptop on corporate Wi-Fi, say) a direct path cannot be punched and a TURN relay is mandatory. The free anonymous relays the games used to rely on are gone: PeerJS's default `*.turn.peerjs.com` hosts no longer resolve, and `openrelay.metered.ca` rejects the old shared credentials. If no relay is configured the games fall back to STUN-only (works on the same network or behind friendly NATs), and the host's wait screen shows a warning that a relay is not configured.
 
-**Where to configure.** One constant: `ICE_CONFIG_URL` in `shared/ice.js`. For testing, append `?ice=<url>` to a game URL to override it without editing the file. The URL must return JSON, either a bare array of ICE servers or `{"iceServers":[...]}`, and must send CORS headers that allow the Pages origin (`https://arisweedler-at.github.io`). Results are cached for 10 minutes; fetch failures fall back to STUN-only.
+**Where to configure.** One constant: `ICE_CONFIG_URL` in `shared/ice.js`. This repo's copy points at `https://turn.sweedler.com`, the Cloudflare Worker from option B deployed on the sweedler.com zone. For testing, append `?ice=<url>` to a game URL to override it without editing the file. The URL must return JSON, either a bare array of ICE servers or `{"iceServers":[...]}`, and must send CORS headers that allow the Pages origin (`https://arisweedler-at.github.io`). Results are cached for 10 minutes; fetch failures fall back to STUN-only.
 
 ### Option A: Metered.ca (fastest, no server)
 
