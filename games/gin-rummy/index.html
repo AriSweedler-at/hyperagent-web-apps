@@ -10,6 +10,7 @@
     <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Gin Rummy</title>
+<script src="../../shared/ice.js"></script>
 <script>
   // Load PeerJS with a fallback CDN — some networks/ad-blockers block one host but not the
   // other. Every place that uses `Peer` already checks `typeof Peer === 'undefined'` first,
@@ -1204,20 +1205,16 @@
   const TAB_KEY = 'ginRummy_homeTab';
   const PLAYMODE_KEY = 'ginRummy_playMode';
   const PEER_PREFIX = 'ginrummy-ari-';
-  // STUN for discovery + public TURN relays so two phones behind carrier NAT can still connect.
-  const PEER_OPTS = {
-    debug: 0,
-    config: {
-      iceServers: [
-        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
-        { urls: 'stun:openrelay.metered.ca:80' },
-        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-      ],
-      sdpSemantics: 'unified-plan'
-    }
-  };
+  // No static ICE list works any more. PeerJS's default turn.peerjs.com hosts no longer
+  // resolve in DNS, and the openrelay.metered.ca relays once listed here now reject the
+  // shared 'openrelayproject' credentials. shared/ice.js fetches STUN + TURN at connect time.
+  const PEER_OPTS = { debug: 0 };
+  function peerOptsFor(ice) { return ice ? { debug: 0, config: HyperIce.peerConfig(ice) } : PEER_OPTS; }
+  const NO_RELAY_HINT = 'No relay configured — this only works when both devices are on the same network.';
+  function relayHint(ice) { return ice && ice.hasTurn === false ? ' ' + NO_RELAY_HINT : ''; }
+  const ICE_FAILED_MSG = "The two devices couldn't reach each other — a relay (TURN) is required when they're on different networks.";
+  // PeerJS reports an ICE failure as a peer-level 'webrtc' error or, on a DataConnection, as 'negotiation-failed'.
+  const NO_ROUTE_MSG = "WebRTC failed — the two devices couldn't reach each other (a relay is needed across networks).";
   function describePeerError(e) {
     const t = (e && e.type) || '';
     const map = {
@@ -1228,7 +1225,8 @@
       'server-error': 'The connection service is having trouble. Try again in a moment.',
       'peer-unavailable': 'Room not found — check the code.',
       'unavailable-id': 'That room code is taken.',
-      'webrtc': "WebRTC failed — the two phones couldn't reach each other.",
+      'webrtc': NO_ROUTE_MSG,
+      'negotiation-failed': NO_ROUTE_MSG,
       'disconnected': 'Disconnected from the connection service.',
       'ssl-unavailable': 'Secure connection unavailable.'
     };
@@ -1246,6 +1244,15 @@
       waited += 200;
       if (waited >= 8000) { clearInterval(iv); onFail(); }
     }, 200);
+  }
+  // onReady(ice) runs once PeerJS and the ICE servers from shared/ice.js are both in hand.
+  // ice is null when shared/ice.js did not load. PeerJS's built-in STUN still connects
+  // same-network devices, so the game degrades instead of breaking.
+  function whenTransportReady(onReady, onFail) {
+    whenPeerReady(() => {
+      if (!window.HyperIce) { onReady(null); return; }
+      HyperIce.load().then(onReady);
+    }, onFail);
   }
   function peerWatchdog(peer, ms, onTimeout) {
     let opened = false;
@@ -1267,6 +1274,18 @@
     peer.on('open', () => { tries = 0; clearTimeout(timer); });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !peer.destroyed && peer.disconnected) { clearTimeout(timer); attempt(); } });
     window.addEventListener('online', () => { if (!peer.destroyed && peer.disconnected) { clearTimeout(timer); attempt(); } });
+  }
+  // Tell the player whether the open channel is direct or goes through a TURN relay. The
+  // selected candidate pair can take a moment to settle after 'open', hence the delay.
+  function announcePath(conn) {
+    if (!window.HyperIce) return;
+    setTimeout(() => {
+      if (app.conn !== conn || !conn.open) return;
+      HyperIce.describe(conn.peerConnection).then((d) => {
+        if (d.path === 'direct') toast('Connected directly');
+        else if (d.path === 'relay') toast('Connected via relay');
+      });
+    }, 1500);
   }
   // Screen Wake Lock keeps the host phone from sleeping mid-lobby (silently ignored where unsupported).
   let wakeLock = null;
@@ -1711,22 +1730,28 @@
   }
 
   // ---------- PeerJS: host ----------
+  // whenTransportReady waits on a network fetch, so its callback can land after the player has
+  // cancelled and started over — possibly with the same role and code. Each attempt takes a
+  // ticket; cancel/leave invalidate it, and a stale callback returns before creating a Peer.
+  let netAttempt = 0;
   function startHost(resumeCode) {
     app.role = 'host';
     app.code = resumeCode || genCode();
+    const code = app.code;
+    const attempt = ++netAttempt;
     showScreen('hostWaitScreen');
     $('roomCode').textContent = app.code;
     $('hostWaitStatus').textContent = 'Opening room…';
     $('startGameBtn').classList.add('hidden');
-    whenPeerReady(() => {
-      if (app.role !== 'host' || app.code !== (resumeCode || app.code)) return; // user navigated away while we waited
-      const peer = new Peer(PEER_PREFIX + app.code, PEER_OPTS);
+    whenTransportReady((ice) => {
+      if (attempt !== netAttempt || app.role !== 'host' || app.code !== code) return; // user navigated away or restarted while we waited
+      const peer = new Peer(PEER_PREFIX + app.code, peerOptsFor(ice));
       app.peer = peer;
       holdWakeLock();
       peerWatchdog(peer, 10000, () => { $('hostWaitStatus').textContent = 'Still trying to open the room… Your network may be blocking the connection service (VPN / strict Wi-Fi). Try mobile data or another network.'; });
       keepPeerAlive(peer, (n) => { if (!app.oppConnected) $('hostWaitStatus').textContent = `Reconnecting to the connection service (attempt ${n})…`; });
       peer.on('open', () => {
-        if (!app.oppConnected) $('hostWaitStatus').textContent = app.game ? `Room ${app.code} reopened — waiting for ${app.oppName || 'your opponent'} to rejoin…` : 'Waiting for your opponent to join…';
+        if (!app.oppConnected) $('hostWaitStatus').textContent = (app.game ? `Room ${app.code} reopened — waiting for ${app.oppName || 'your opponent'} to rejoin…` : 'Waiting for your opponent to join…') + relayHint(ice);
         persist();
       });
       peer.on('error', (e) => {
@@ -1738,10 +1763,16 @@
       peer.on('connection', (conn) => {
         if (app.conn && app.conn.open) { conn.on('open', () => { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 300); }); return; }
         app.conn = conn;
-        conn.on('open', () => { conn.send({ t: 'welcome', hostName: app.myName, target: app.target }); });
+        conn.on('open', () => { conn.send({ t: 'welcome', hostName: app.myName, target: app.target }); announcePath(conn); });
         conn.on('data', (msg) => onGuestMsg(conn, msg));
         conn.on('close', () => { if (app.conn === conn) { app.oppConnected = false; onGuestGone(); } });
-        conn.on('error', () => { if (app.conn === conn) { app.oppConnected = false; onGuestGone(); } });
+        conn.on('error', (e) => {
+          if (app.conn !== conn) return;
+          app.oppConnected = false;
+          // ICE failed before the channel ever opened: nobody joined, so 'Opponent left' would be wrong.
+          if (!conn.open && e && e.type === 'negotiation-failed' && !app.game) { $('hostWaitStatus').textContent = ICE_FAILED_MSG + relayHint(ice); return; }
+          onGuestGone();
+        });
       });
     }, () => {
       $('hostWaitStatus').textContent = "The connection library didn't load. Check your internet and reload the page.";
@@ -1783,11 +1814,12 @@
   function startGuest(code) {
     app.role = 'guest';
     app.code = code;
+    const attempt = ++netAttempt;
     showScreen('guestWaitScreen');
     $('guestWaitStatus').textContent = `Connecting to room ${code}…`;
-    whenPeerReady(() => {
-      if (app.role !== 'guest' || app.code !== code) return; // user navigated away while we waited
-      const peer = new Peer(PEER_OPTS);
+    whenTransportReady((ice) => {
+      if (attempt !== netAttempt || app.role !== 'guest' || app.code !== code) return; // user navigated away or restarted while we waited
+      const peer = new Peer(peerOptsFor(ice));
       app.peer = peer;
       holdWakeLock();
       peerWatchdog(peer, 10000, () => { $('guestWaitStatus').textContent = 'Still trying to reach the connection service… Your network may be blocking it (VPN / strict Wi-Fi). Try mobile data or another network.'; });
@@ -1796,15 +1828,20 @@
       function tryJoin() {
         if (peer.destroyed || peer.disconnected) return;
         joinTries++;
-        $('guestWaitStatus').textContent = joinTries === 1 ? `Found the service — connecting to room ${code}…` : `Room ${code} isn't answering yet (the host's phone may be asleep or on another app). Retrying… (${joinTries})`;
+        $('guestWaitStatus').textContent = joinTries === 1 ? `Found the service — connecting to room ${code}…` + relayHint(ice) : `Room ${code} isn't answering yet (the host's phone may be asleep or on another app). Retrying… (${joinTries})`;
         const conn = peer.connect(PEER_PREFIX + code, { reliable: true });
         app.conn = conn;
-        let opened = false;
-        setTimeout(() => { if (!opened && app.conn === conn && !app.oppConnected) $('guestWaitStatus').textContent = `Room ${code} answered but the phones can't reach each other yet… still trying. If this persists, put both phones on the same Wi-Fi or both on mobile data.`; }, 12000);
-        conn.on('open', () => { opened = true; joinTries = 0; app.oppConnected = true; conn.send({ t: 'join', name: app.myName }); $('guestWaitStatus').textContent = 'Connected. Waiting for the host to start…'; persist(); });
+        let opened = false, failed = false;
+        setTimeout(() => { if (!opened && !failed && app.conn === conn && !app.oppConnected) $('guestWaitStatus').textContent = `Room ${code} answered but the phones can't reach each other yet… still trying. If this persists, put both phones on the same Wi-Fi or both on mobile data.` + relayHint(ice); }, 12000);
+        conn.on('open', () => { opened = true; joinTries = 0; app.oppConnected = true; conn.send({ t: 'join', name: app.myName }); $('guestWaitStatus').textContent = 'Connected. Waiting for the host to start…'; persist(); announcePath(conn); });
         conn.on('data', onHostMsg);
         conn.on('close', () => { if (app.conn !== conn) return; app.oppConnected = false; if (app.view && app.view.phase !== 'gameOver') { render(); toast('Lost connection to the host — reconnecting…', 4000); setTimeout(tryJoin, 1500); } else { $('guestWaitStatus').textContent = 'Disconnected from the host — reconnecting…'; showScreen('guestWaitScreen'); setTimeout(tryJoin, 1500); } });
-        conn.on('error', (e) => { toast(describePeerError(e), 5000); });
+        // PeerJS closes the RTCPeerConnection before it relays the ICE state, so this error is the
+        // only reliable signal that negotiation failed before the channel opened (no 'close' follows).
+        conn.on('error', (e) => {
+          if (e && e.type === 'negotiation-failed' && !opened && app.conn === conn) { failed = true; $('guestWaitStatus').textContent = ICE_FAILED_MSG + relayHint(ice); $('guestWaitStatus').classList.remove('pulse'); }
+          toast(describePeerError(e), 5000);
+        });
       }
       peer.on('open', tryJoin);
       peer.on('error', (e) => {
@@ -1835,7 +1872,7 @@
     if (!confirm(app.role === 'local' ? 'End this game? Scores will be cleared.' : 'Leave this game? The room will close.')) return;
     dropWakeLock();
     try { if (app.conn) app.conn.close(); if (app.peer) app.peer.destroy(); } catch (e) {}
-    app.role = null; app.game = null; app.view = null; app.conn = null; app.peer = null; app.oppConnected = false; app.code = null; app.revealed = null;
+    netAttempt++; app.role = null; app.game = null; app.view = null; app.conn = null; app.peer = null; app.oppConnected = false; app.code = null; app.revealed = null;
     clearSaved();
     $('roundResultOverlay').classList.add('hidden');
     $('curtainOverlay').classList.add('hidden');
@@ -1986,8 +2023,8 @@
       try { if (navigator.share) { await navigator.share({ title: 'Gin Rummy', text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
       try { await navigator.clipboard.writeText(text); toast('Invite copied to clipboard'); } catch (e) { toast('Room code: ' + app.code, 4000); }
     });
-    $('cancelHostBtn').addEventListener('click', () => { try { app.peer && app.peer.destroy(); } catch (e) {} app.role = null; clearSaved(); initHome(); });
-    $('cancelGuestBtn').addEventListener('click', () => { try { app.peer && app.peer.destroy(); } catch (e) {} app.role = null; clearSaved(); initHome(); });
+    $('cancelHostBtn').addEventListener('click', () => { try { app.peer && app.peer.destroy(); } catch (e) {} app.role = null; netAttempt++; clearSaved(); initHome(); });
+    $('cancelGuestBtn').addEventListener('click', () => { try { app.peer && app.peer.destroy(); } catch (e) {} app.role = null; netAttempt++; clearSaved(); initHome(); });
 
     // table interactions
     $('stockPile').addEventListener('click', () => { const v = app.view; if (v && v.isMyTurn && v.phase === 'draw') act({ type: 'drawStock' }); });

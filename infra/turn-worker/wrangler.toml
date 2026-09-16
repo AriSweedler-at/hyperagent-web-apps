@@ -1,0 +1,13 @@
+name = "hyperagent-web-apps-turn"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+# Comma-separated list of origins allowed to fetch credentials. Empty = allow any origin.
+ALLOWED_ORIGINS = "https://arisweedler-at.github.io"
+# Credential lifetime in seconds (300–86400). A game session should fit inside it.
+TTL_SECONDS = "7200"
+
+# Secrets (set with `wrangler secret put <NAME>`, never commit them):
+#   TURN_KEY_ID          — from Cloudflare dashboard → Realtime → TURN → your key
+#   TURN_KEY_API_TOKEN   — shown once when the TURN key is created

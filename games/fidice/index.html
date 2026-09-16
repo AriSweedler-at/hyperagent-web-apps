@@ -13,6 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="../../shared/ice.js"></script>
 <style>
 :root{
   /* Kezar Lake, Maine — pines, water, cabin wood, birch */
@@ -620,7 +621,7 @@ main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:22px 18px 40px}
       this.rememberToken = deps.rememberToken;
       this.token = opts.savedToken;
       const timeout = deps.clock.setTimeout(() => {
-        if (!this.conn) this.events.onClosed("Could not reach the host. Make sure their tab is still open, then try again.");
+        if (!this.conn) this.events.onClosed("Could not reach the host. Make sure their tab is still open, then try again \u2014 and if you're on a different network than the host, a relay (TURN) must be configured.");
       }, CONNECT_TIMEOUT_MS);
       this.transport.onOpen((c) => {
         deps.clock.clearTimeout(timeout);
@@ -634,6 +635,7 @@ main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:22px 18px 40px}
         if (kind === "peer-unavailable") this.events.onClosed("No lobby found with that code. Check the code with your host.");
         else if (!this.conn) this.events.onClosed(`Connection problem: ${kind}`);
       });
+      this.transport.onInfo?.((m) => this.events.onInfo(m));
     }
     act(action) {
       this.send({ t: "act", action });
@@ -1925,6 +1927,7 @@ main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:22px 18px 40px}
       });
       this.transport.onError((kind) => this.events.onError(`Connection problem: ${kind}`));
       this.transport.onConnection((c) => this.accept(c));
+      this.transport.onInfo?.((m) => this.events.onInfo ? this.events.onInfo(m) : this.events.onError(m));
     }
     /* ---------- public API used by the controller ---------- */
     get snapshot() {
@@ -2120,24 +2123,87 @@ main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:22px 18px 40px}
     onClose: (fn) => c.on("close", fn),
     close: () => c.close()
   });
-  var hostTransport = (code) => {
-    const peer = new (peerCtor())(peerIdFor(code), { debug: 1 });
+  var PATH_PROBE_MS = 3000;
+  var NO_RELAY_INFO = "No relay configured \u2014 players must be on the same network to join.";
+  /**
+   * A Peer whose ICE servers (STUN/TURN) come from shared/ice.js. The Peer exists only once
+   * HyperIce.load() resolves, so listeners registered before then are queued and replayed.
+   * Without shared/ice.js the Peer is created immediately with PeerJS defaults, as before.
+   */
+  var deferredPeer = (id) => {
+    const ice = globalThis.HyperIce;
+    let peer = null;
+    let iceResult = null;
+    let closed = false;
+    const queued = [];
+    const errorFns = [];
+    const ready = (fn) => peer ? fn(peer, iceResult) : queued.push(fn);
+    const create = (res) => {
+      if (closed) return;
+      iceResult = res;
+      try {
+        peer = new (peerCtor())(id, res ? { debug: 1, config: ice.peerConfig(res) } : { debug: 1 });
+      } catch (e) {
+        errorFns.forEach((fn) => fn(e instanceof Error ? e.message : String(e)));
+        return;
+      }
+      queued.splice(0).forEach((fn) => fn(peer, iceResult));
+    };
+    if (ice) ice.load().then(create, () => create(null));
+    else peer = new (peerCtor())(id, { debug: 1 });
     return {
-      onOpen: (fn) => peer.on("open", () => fn()),
-      onError: (fn) => peer.on("error", (e) => fn(e.type ?? "unknown")),
-      onConnection: (fn) => peer.on("connection", (c) => fn(wrap(c))),
-      close: () => peer.destroy()
+      ready,
+      onError: (fn) => {
+        errorFns.push(fn);
+        ready((p2) => p2.on("error", (e) => fn(e.type ?? "unknown")));
+      },
+      close: () => {
+        closed = true;
+        peer?.destroy();
+      }
+    };
+  };
+  /**
+   * A while after the data channel opens, say so if it runs through a TURN relay. Fires after
+   * TOAST_MS so it never replaces an info toast the host sends in reply to hello; a direct path
+   * is the ordinary case and stays silent.
+   */
+  var describePath = (c, fn) => {
+    const ice = globalThis.HyperIce;
+    if (!ice) return;
+    setTimeout(() => {
+      if (!c.open) return;
+      ice.describe(c.peerConnection).then((d) => {
+        if (d.path === "relay") fn("Connected via relay");
+      });
+    }, PATH_PROBE_MS);
+  };
+  var hostTransport = (code) => {
+    const p2 = deferredPeer(peerIdFor(code));
+    return {
+      onOpen: (fn) => p2.ready((peer) => peer.on("open", () => fn())),
+      onError: p2.onError,
+      onConnection: (fn) => p2.ready((peer) => peer.on("connection", (c) => fn(wrap(c)))),
+      onInfo: (fn) => p2.ready((peer, res) => {
+        if (res && !res.hasTurn) peer.on("open", () => fn(NO_RELAY_INFO));
+      }),
+      close: p2.close
     };
   };
   var clientTransport = (code) => {
-    const peer = new (peerCtor())(void 0, { debug: 1 });
+    const p2 = deferredPeer(void 0);
+    const infoFns = [];
     return {
-      onOpen: (fn) => peer.on("open", () => {
+      onOpen: (fn) => p2.ready((peer) => peer.on("open", () => {
         const c = peer.connect(peerIdFor(code), { reliable: true });
-        c.on("open", () => fn(wrap(c)));
-      }),
-      onError: (fn) => peer.on("error", (e) => fn(e.type ?? "unknown")),
-      close: () => peer.destroy()
+        c.on("open", () => {
+          fn(wrap(c));
+          describePath(c, (m) => infoFns.forEach((g) => g(m)));
+        });
+      })),
+      onError: p2.onError,
+      onInfo: (fn) => infoFns.push(fn),
+      close: p2.close
     };
   };
 
