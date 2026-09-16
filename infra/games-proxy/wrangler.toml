@@ -1,0 +1,7 @@
+name = "hyperagent-web-apps-games"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# Reverse proxy for the GitHub Pages site at https://games.sweedler.com (custom domain on the
+# sweedler.com zone). Path mapping is documented at the top of worker.js.
+routes = [{ pattern = "games.sweedler.com", custom_domain = true }]

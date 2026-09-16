@@ -8,7 +8,7 @@ routes = [{ pattern = "turn.sweedler.com", custom_domain = true }]
 
 [vars]
 # Comma-separated list of origins allowed to fetch credentials. Empty = allow any origin.
-ALLOWED_ORIGINS = "https://arisweedler-at.github.io"
+ALLOWED_ORIGINS = "https://arisweedler-at.github.io,https://games.sweedler.com"
 # Credential lifetime in seconds (300–86400). A game session should fit inside it.
 TTL_SECONDS = "7200"
 

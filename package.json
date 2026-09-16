@@ -1,0 +1,10 @@
+{
+  "name": "hyperagent-web-apps",
+  "private": true,
+  "type": "module",
+  "description": "Ari's browser games (Gin Rummy, Fidice) with their Cloudflare Workers, served by GitHub Pages",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": { "node": ">=22" }
+}
