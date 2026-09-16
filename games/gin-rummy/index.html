@@ -1,0 +1,2394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta property="og:title" content="Gin Rummy">
+    <meta property="og:type" content="website">
+    <meta property="og:image:width" content="1024">
+    <meta property="og:image:height" content="1024">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Gin Rummy">
+    <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Gin Rummy</title>
+<script>
+  // Load PeerJS with a fallback CDN — some networks/ad-blockers block one host but not the
+  // other. Every place that uses `Peer` already checks `typeof Peer === 'undefined'` first,
+  // so this never throws even if both loads fail; it just leaves Peer undefined.
+  window.__peerLoadFailed = false;
+  (function loadPeerJs(urls) {
+    if (!urls.length) { window.__peerLoadFailed = true; return; }
+    const s = document.createElement('script');
+    s.src = urls[0];
+    s.onerror = function () { loadPeerJs(urls.slice(1)); };
+    document.head.appendChild(s);
+  })([
+    'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js',
+    'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'
+  ]);
+</script>
+<style>
+  :root {
+    --bg: #0f2318; --card: #163526; --card-2: #1c4030; --accent: #4ade80; --accent-dark: #22c55e;
+    --gold: #fbbf24; --text: #f2fdf6; --muted: #9cc9ac; --danger: #f87171; --radius: 18px;
+    --felt: radial-gradient(ellipse at 50% 30%, #1f5a3a 0%, #123a26 55%, #0b2418 100%);
+    /* default (off-table) card sizes; the table screen scales these via --tscale */
+    --card-w: 50px; --mini-w: 34px; --pile-w: 84px; --tiny-w: 22px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; min-height: 100%; background: var(--felt); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overscroll-behavior-y: contain; }
+  #app { max-width: 480px; margin: 0 auto; min-height: 100dvh; padding: 12px 12px calc(16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
+  h1 { font-size: 1.35rem; margin: 6px 0 2px; text-align: center; letter-spacing: 0.4px; }
+  .subtitle { text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 14px; }
+  .card-box { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.05); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: none; border-radius: 14px; font-weight: 700; cursor: pointer;
+    font-size: 1rem; padding: 14px 18px; min-height: 54px; transition: transform 0.08s ease, filter 0.15s ease; user-select: none; color: var(--text); }
+  .btn:active { transform: scale(0.96); filter: brightness(0.95); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #08260f; width: 100%; font-size: 1.1rem; }
+  .btn-gold { background: linear-gradient(135deg, #fde68a, var(--gold)); color: #3a2a00; }
+  .btn-secondary { background: var(--card-2); }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.15); }
+  .btn-block { width: 100%; }
+  .btn-sm { padding: 10px 12px; min-height: 44px; font-size: 0.85rem; }
+  .btn small { font-weight: 600; opacity: 0.8; }
+  input[type="text"], input[type="number"] { width: 100%; padding: 14px 16px; border-radius: 14px; background: #0d2418; color: var(--text); font-size: 1.1rem; font-weight: 600; outline: none; border: 1px solid rgba(255,255,255,0.08); }
+  input::placeholder { color: var(--muted); font-weight: 400; }
+  label { font-size: 0.78rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row + .row { margin-top: 10px; }
+  .grow { flex: 1; }
+  .hidden { display: none !important; }
+  .icon-btn { background: var(--card-2); border: none; color: var(--text); border-radius: 12px; width: 44px; height: 44px; font-size: 1.1rem; flex-shrink: 0; }
+  .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.8rem; margin: 6px 0; }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,0.1); }
+  .code-input { text-align: center; letter-spacing: 0.4em; font-size: 1.5rem !important; text-transform: uppercase; font-family: ui-monospace, Menlo, monospace; }
+  .room-code { font-family: ui-monospace, Menlo, monospace; font-size: 3rem; letter-spacing: 0.35em; text-align: center; color: var(--gold); font-weight: 800; padding-left: 0.35em; }
+  .empty-note { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 8px 0; }
+  .pulse { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.45 } }
+
+  /* ---------- table ---------- */
+  /* While at the table the page never scrolls — the layout scales to fit instead. */
+  body.fixed-screen, body.fixed-screen #app { height: 100dvh; max-height: 100dvh; min-height: 0; overflow: hidden; }
+  #tableScreen {
+    --tscale: 1;
+    --pile-base: 84px;
+    --card-w: calc(50px * var(--tscale));
+    --mini-w: calc(34px * var(--tscale));
+    --pile-w: calc(var(--pile-base) * var(--tscale));
+    --tiny-w: calc(22px * var(--tscale));
+    display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;
+    gap: calc(8px * var(--tscale));
+  }
+  /* Piles are big while they're the thing you act on, then shrink to free room for the buttons. */
+  #tableScreen.piles-big { --pile-base: 112px; }
+  #tableScreen.piles-small { --pile-base: 64px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .badge { background: var(--card-2); color: var(--accent); font-weight: 700; font-size: 0.8rem; padding: 7px 12px; border-radius: 999px; white-space: nowrap; }
+  .badge.dim { color: var(--muted); }
+  .opp-strip { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgba(0,0,0,0.22); border-radius: 14px; padding: 8px 12px; }
+  .opp-info { display: flex; flex-direction: column; min-width: 0; }
+  .opp-name { font-weight: 800; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opp-score { color: var(--muted); font-size: 0.8rem; }
+  .opp-cards { display: flex; align-items: center; }
+  .opp-cards .card.tiny + .card.tiny { margin-left: -14px; }
+  .opp-count { margin-left: 8px; font-weight: 800; color: var(--muted); font-size: 0.85rem; }
+  .conn-dot { width: 10px; height: 10px; border-radius: 50%; background: #64748b; flex-shrink: 0; box-shadow: 0 0 0 3px rgba(255,255,255,0.06); }
+  .conn-dot.on { background: var(--accent); } .conn-dot.off { background: var(--danger); }
+
+  .table-center { display: flex; justify-content: center; gap: calc(26px * var(--tscale, 1)); padding: calc(10px * var(--tscale, 1)) 0 4px; flex-shrink: 0; }
+  .pile { display: flex; flex-direction: column; align-items: center; gap: 6px; border-radius: 16px; padding: 8px; transition: transform 0.1s; position: relative; }
+  .pile.tappable { cursor: pointer; box-shadow: 0 0 0 3px rgba(74,222,128,0.55), 0 0 22px rgba(74,222,128,0.35); animation: glow 1.4s ease-in-out infinite; }
+  .pile.tappable:active { transform: scale(0.96); }
+  .pile.blocked { opacity: 0.45; }
+  @keyframes glow { 0%,100% { box-shadow: 0 0 0 3px rgba(74,222,128,0.5), 0 0 16px rgba(74,222,128,0.25); } 50% { box-shadow: 0 0 0 4px rgba(74,222,128,0.9), 0 0 26px rgba(74,222,128,0.5); } }
+  .pile-label { font-size: 0.75rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+
+  .status-banner { text-align: center; background: rgba(0,0,0,0.22); border-radius: 14px; padding: calc(10px * var(--tscale, 1)) 12px; flex-shrink: 0; }
+  .status-banner.mine { background: rgba(74,222,128,0.16); border: 1px solid rgba(74,222,128,0.35); }
+  .status-main { font-weight: 800; font-size: 1.05rem; }
+  .status-sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+  .last-action { text-align: center; color: var(--muted); font-size: 0.8rem; min-height: 1.1em; padding: 0 6px; }
+
+  .hand-area { margin-top: auto; background: rgba(0,0,0,0.22); border-radius: 18px; padding: calc(10px * var(--tscale, 1)) 10px calc(12px * var(--tscale, 1)); display: flex; flex-direction: column; min-height: 0; flex-shrink: 1; }
+  .hand-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--muted); font-weight: 700; padding: 0 4px 8px; }
+  .hand-header .dw { color: var(--gold); }
+  .hand-header .dw.tappable-dw { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .hand-header .dw .alt-badge { background: rgba(251,191,36,0.2); border-radius: 999px; padding: 2px 7px; margin-left: 5px; font-size: 0.78rem; }
+  .hand { display: flex; flex-wrap: wrap; gap: calc(10px * var(--tscale, 1)) calc(12px * var(--tscale, 1)); justify-content: center; min-height: 0; padding: 6px 0 2px; overflow-y: auto; flex-shrink: 1; }
+  .meld-group { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(4px * var(--tscale, 1)); padding: calc(4px * var(--tscale, 1)) 4px calc(6px * var(--tscale, 1)); border-radius: 10px; border-bottom: 3px solid transparent; max-width: 100%; }
+  .meld-group.m0 { border-bottom-color: #4ade80; background: rgba(74,222,128,0.10); }
+  .meld-group.m1 { border-bottom-color: #60a5fa; background: rgba(96,165,250,0.10); }
+  .meld-group.m2 { border-bottom-color: #f472b6; background: rgba(244,114,182,0.10); }
+  .meld-group.m3 { border-bottom-color: #fb923c; background: rgba(251,146,60,0.10); }
+  .meld-group.m4 { border-bottom-color: #a78bfa; background: rgba(167,139,250,0.10); }
+  .meld-group.dead { gap: 6px; }
+  .meld-group.laid { border-bottom-color: var(--gold); background: rgba(251,191,36,0.12); }
+  .actions { display: flex; gap: 10px; margin-top: calc(10px * var(--tscale, 1)); min-height: 0; flex-shrink: 0; }
+  .waiting-note { flex: 1; text-align: center; color: var(--muted); font-size: 0.85rem; align-self: center; }
+
+  /* ---------- cards ---------- */
+  /* Every card dimension derives from --card-w, so the whole table scales to any screen.
+     font-size is set to --card-w so the pips/ranks can size themselves in em. */
+  .card { position: relative; width: var(--card-w); height: calc(var(--card-w) * 1.44); border-radius: calc(var(--card-w) * 0.16);
+    background: #fdfdf7; color: #111; box-shadow: 0 2px 5px rgba(0,0,0,0.35); flex-shrink: 0; user-select: none;
+    display: flex; align-items: center; justify-content: center; font-size: var(--card-w);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, width 0.24s cubic-bezier(.2,.8,.3,1), height 0.24s cubic-bezier(.2,.8,.3,1); }
+  .card.red { color: #c81e1e; }
+  .card .rank { position: absolute; top: 0.05em; left: 0.1em; font-size: 0.3em; font-weight: 800; line-height: 1; }
+  .card .rank.br { top: auto; left: auto; bottom: 0.05em; right: 0.1em; transform: rotate(180deg); }
+  .card .suit { font-size: 0.52em; line-height: 1; }
+  .card.mini { --card-w: var(--mini-w); }
+  .card.big { --card-w: var(--pile-w); }
+  .card.empty { background: rgba(255,255,255,0.06); border: 2px dashed rgba(255,255,255,0.2); box-shadow: none; }
+  .card.back { background: repeating-linear-gradient(45deg, #1d4ed8 0 6px, #1e40af 6px 12px); border: calc(var(--card-w) * 0.062) solid #f1f5f9; }
+  .card.back.tiny { --card-w: var(--tiny-w); }
+  .hand.active .card { cursor: pointer; }
+  .card.selected { transform: translateY(-12px); box-shadow: 0 0 0 3px var(--gold), 0 8px 16px rgba(0,0,0,0.45); }
+  .card.fresh::after { content: ""; position: absolute; top: -5px; right: -5px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid #0f2318; }
+  .card.locked { opacity: 0.55; }
+  .card.locked::before { content: "🔒"; position: absolute; bottom: 4px; left: 4px; font-size: 0.7rem; }
+  .table-center .discard .card { margin: 0; }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; background: rgba(6,20,12,0.9); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+  .sheet { background: var(--card); border-radius: 24px; padding: 22px 18px; max-width: 420px; width: 100%; max-height: 88dvh; overflow-y: auto; border: 2px solid var(--gold); }
+  .sheet-title { font-size: 1.35rem; font-weight: 800; text-align: center; margin: 4px 0 2px; }
+  .sheet-sub { color: var(--muted); text-align: center; font-size: 0.88rem; margin-bottom: 12px; }
+  .rules-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
+  .rules-list li { font-size: 0.86rem; line-height: 1.4; background: var(--card-2); border-radius: 12px; padding: 9px 12px; }
+  .rules-list li strong { color: var(--gold); }
+  .rr-panel { background: var(--card-2); border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; border: 2px solid transparent; }
+  .rr-panel.scored { border-color: var(--gold); }
+  .rr-head { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; font-size: 1rem; margin-bottom: 4px; }
+  .rr-head small { color: var(--muted); font-weight: 600; }
+  .rr-pts { color: var(--accent); font-size: 1.15rem; }
+  .rr-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 700; margin: 6px 0 3px; }
+  .rr-melds { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rr-panel > .meld-group { display: inline-flex; }
+  #roundResultOverlay .sheet { display: flex; flex-direction: column; overflow: hidden; }
+  #rrBody { overflow-y: auto; min-height: 0; flex: 1; }
+  .rr-melds .meld-group { padding: 2px 3px 4px; gap: 3px; }
+  .rr-totals { display: flex; justify-content: space-around; padding: 8px 0 0; color: var(--muted); font-size: 0.9rem; }
+  .rr-totals strong { color: var(--text); font-size: 1.05rem; }
+  .history-round { padding: 10px 4px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.88rem; }
+  .history-round:last-child { border-bottom: none; }
+  .history-scores { color: var(--muted); }
+  .history-time { color: var(--muted); font-size: 0.72rem; margin-top: 2px; opacity: 0.8; }
+  #historyTotalTime { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); }
+  .standing-row { display: flex; align-items: center; justify-content: space-between; background: var(--card-2); border-radius: 12px; padding: 10px 14px; }
+  .standing-row.winner { border: 2px solid var(--gold); }
+  .standing-rank { color: var(--muted); font-weight: 700; width: 28px; }
+  .standing-name { flex: 1; font-weight: 700; }
+  .standing-total { font-weight: 800; color: var(--accent); font-size: 1.1rem; }
+  #toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); background: #fef3c7; color: #3a2a00; font-weight: 700; padding: 12px 16px; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); opacity: 0; pointer-events: none; transition: all 0.2s; z-index: 100; max-width: 92vw; text-align: center; font-size: 0.92rem; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  /* ---------- scorer ---------- */
+  .setup-players { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+  .player-input-row { display: flex; gap: 8px; align-items: center; }
+  .player-input-row input { flex: 1; }
+  .remove-x { background: rgba(248,113,113,0.15); color: var(--danger); border: none; border-radius: 12px; width: 46px; height: 46px; font-size: 1.2rem; font-weight: 700; flex-shrink: 0; }
+  .player-card { background: var(--card); border-radius: var(--radius); padding: 14px 16px; border: 1px solid rgba(255,255,255,0.05); }
+  .player-card.leader { border: 2px solid var(--gold); box-shadow: 0 0 0 1px rgba(251,191,36,0.3), 0 4px 14px rgba(0,0,0,0.3); }
+  .player-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .player-name { font-size: 1.05rem; font-weight: 700; }
+  .player-total { font-size: 1.6rem; font-weight: 800; color: var(--accent); }
+  .stepper { display: flex; align-items: center; gap: 8px; }
+  .stepper button { width: 52px; height: 52px; border-radius: 12px; border: none; background: var(--card-2); color: var(--text); font-size: 1.5rem; font-weight: 700; }
+  .stepper input { flex: 1; text-align: center; padding: 10px 6px; font-size: 1.3rem; }
+  .stepper button:disabled, .stepper input:disabled { opacity: 0.35; cursor: not-allowed; }
+  .bonus-row { display: flex; gap: 8px; margin-top: 10px; }
+  .chip { flex: 1; padding: 12px 6px; border-radius: 12px; border: none; background: rgba(255,255,255,0.06); color: var(--muted); font-weight: 700; font-size: 0.9rem; min-height: 46px; }
+  .chip.active { background: var(--gold); color: #3a2a00; }
+  #submitRoundBar { position: sticky; bottom: 0; padding-top: 10px; margin-top: 10px; background: linear-gradient(to top, rgba(11,36,24,0.95) 60%, transparent); }
+  .history-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .history-actions button { background: rgba(255,255,255,0.08); border: none; color: var(--text); border-radius: 10px; width: 40px; height: 40px; font-size: 0.95rem; }
+  /* ---------- top tabs ---------- */
+  .tabbar { display: flex; gap: 6px; margin: 4px 0 16px; background: rgba(0,0,0,0.22); border-radius: 14px; padding: 4px; }
+  .tab-wrap { position: relative; flex: 1.2; display: flex; }
+  .tab-btn { flex: 1; background: transparent; border: none; color: var(--muted); font-weight: 700; font-size: 0.85rem; padding: 11px 6px; border-radius: 10px; white-space: nowrap; }
+  .tab-btn.active { background: var(--card-2); color: var(--text); }
+  .tab-panel.hidden { display: none !important; }
+  .tab-submenu {
+    position: absolute; top: calc(100% + 6px); left: 0; min-width: 180px; z-index: 30;
+    background: var(--card); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 6px;
+    display: flex; flex-direction: column; gap: 4px; box-shadow: 0 10px 26px rgba(0,0,0,0.45);
+    opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(-4px); transition: opacity 0.12s, transform 0.12s;
+  }
+  .tab-submenu.force-open { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
+  @media (hover: hover) {
+    .tab-wrap:hover .tab-submenu { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
+  }
+  .tab-submenu button { background: var(--card-2); border: none; color: var(--text); text-align: left; padding: 11px 12px; border-radius: 9px; font-weight: 600; font-size: 0.85rem; }
+  .tab-submenu button:active { filter: brightness(0.9); }
+  .mode-switch { display: flex; gap: 8px; margin-bottom: 14px; }
+  .mode-btn { flex: 1; background: var(--card-2); border: none; color: var(--muted); font-weight: 700; padding: 11px 6px; border-radius: 12px; font-size: 0.85rem; }
+  .mode-btn.active { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #08260f; }
+
+  /* ---------- voice input FAB ---------- */
+  .voice-fab {
+    position: fixed; right: max(18px, calc(50vw - 240px + 18px)); bottom: calc(96px + env(safe-area-inset-bottom));
+    width: 58px; height: 58px; border-radius: 50%; border: none; z-index: 35;
+    background: linear-gradient(135deg, var(--gold), #f59e0b); color: #3a2a00; font-size: 1.5rem;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center;
+  }
+  .voice-fab:active { transform: scale(0.94); }
+  .voice-fab.listening { background: linear-gradient(135deg, #f87171, #dc2626); color: #fff; animation: voicePulse 1s ease-in-out infinite; }
+  @keyframes voicePulse { 0%,100% { box-shadow: 0 6px 18px rgba(220,38,38,0.5); } 50% { box-shadow: 0 6px 26px rgba(220,38,38,0.9); } }
+
+  ::-webkit-scrollbar { width: 0; height: 0; }
+</style>
+<style>
+.ha-img-placeholder{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;background:#f4f4f5;border:1px dashed #d4d4d8;border-radius:8px;color:#71717a;font-size:12px;font-family:system-ui,sans-serif;min-height:80px;padding:16px;box-sizing:border-box;animation:ha-img-pulse 1.5s ease-in-out infinite}
+.ha-img-placeholder.ha-failed{animation:none;opacity:.7}
+@keyframes ha-img-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@media(prefers-color-scheme:dark){.ha-img-placeholder{background:#27272a;border-color:#3f3f46;color:#a1a1aa}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME / LOBBY -->
+  <div id="homeScreen">
+    <div class="row" style="justify-content:center;">
+      <h1>♠ Gin Rummy</h1>
+    </div>
+
+    <div id="resumeBox" class="card-box hidden" style="border-color: rgba(251,191,36,0.4);">
+      <label>Game in progress</label>
+      <button class="btn btn-gold btn-block" id="resumeBtn" style="margin-top:8px;">Resume</button>
+    </div>
+
+    <div class="tabbar" id="topTabbar">
+      <div class="tab-wrap" id="tabPlayWrap">
+        <button type="button" class="tab-btn" id="tabPlayBtn" data-tab="play">Play</button>
+        <div class="tab-submenu" id="playSubmenu">
+          <button type="button" data-mode="online">🌐 Online</button>
+          <button type="button" data-mode="local">📱 Pass &amp; Play</button>
+        </div>
+      </div>
+      <button type="button" class="tab-btn" id="tabRulesBtn" data-tab="rules">Rules</button>
+      <button type="button" class="tab-btn" id="tabScoreBtn" data-tab="score">Score Counter</button>
+    </div>
+
+    <!-- PLAY TAB -->
+    <div id="playPanel" class="tab-panel">
+      <div class="mode-switch" id="playModeSwitch">
+        <button type="button" class="mode-btn" data-mode="online">🌐 Online</button>
+        <button type="button" class="mode-btn" data-mode="local">📱 Pass &amp; Play</button>
+      </div>
+
+      <div id="onlineModeContent">
+        <div class="card-box">
+          <label>Your name</label>
+          <input type="text" id="nameInput" value="Ari" maxlength="20" autocomplete="off" style="margin-top:8px;">
+        </div>
+        <div class="card-box">
+          <label>Host a game</label>
+          <div class="row" style="margin-top:8px;">
+            <div class="grow"><input type="number" id="targetInput" value="100" inputmode="numeric" placeholder="Play to…"></div>
+            <button class="btn btn-primary grow" id="hostBtn" style="width:auto;">Host</button>
+          </div>
+          <div class="empty-note" style="text-align:left; padding:8px 2px 0;">You'll get a 4-letter room code to share.</div>
+        </div>
+        <div class="card-box">
+          <label>Join a game</label>
+          <div class="row" style="margin-top:8px;">
+            <input type="text" id="codeInput" class="code-input grow" placeholder="CODE" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="go" data-lpignore="true" name="room-code-no-ac">
+            <button class="btn btn-secondary" id="joinBtn" style="min-width:96px;">Join</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="localModeContent" class="hidden">
+        <div class="card-box">
+          <label>Player 1 name</label>
+          <input type="text" id="p1NameInput" placeholder="Player 1 name" maxlength="20" autocomplete="off" style="margin-top:8px;">
+        </div>
+        <div class="card-box">
+          <label>Player 2 name</label>
+          <input type="text" id="p2NameInput" placeholder="Player 2 name" maxlength="20" autocomplete="off" style="margin-top:8px;">
+        </div>
+        <div class="card-box">
+          <label>Play to</label>
+          <input type="number" id="localTargetInput" value="100" inputmode="numeric" style="margin-top:8px;">
+        </div>
+        <button class="btn btn-primary" id="localBtn">Start pass &amp; play</button>
+        <div class="empty-note" style="text-align:left; padding:8px 2px 0;">One phone, no internet needed — it hides each player's cards until they tap "Show my cards" on their turn.</div>
+      </div>
+    </div>
+
+    <!-- RULES TAB -->
+    <div id="rulesPanel" class="tab-panel hidden">
+      <ul class="rules-list">
+        <li><strong>Goal:</strong> Arrange your 10 cards into melds — sets (3–4 of a kind) or runs (3+ in a row, same suit; Ace is low only).</li>
+        <li><strong>Deadwood:</strong> Unmelded cards. Ace = 1, face cards = 10, others face value. The app arranges your melds for you and shows your deadwood live.</li>
+      <li><strong>Choosing melds:</strong> When a card could serve two melds (5♠5♥5♦ vs 4♠5♠6♠), tap the deadwood readout above your hand to pick which melds you declare. It won't change your score, but it changes what your opponent can lay off if you knock.</li>
+        <li><strong>First turn:</strong> The non-dealer may take the face-up card or pass; then the dealer may. If both pass, the non-dealer draws from the stock.</li>
+        <li><strong>Each turn:</strong> Draw one card (stock or discard pile), then discard one. You may not discard the card you just took from the discard pile.</li>
+        <li><strong>Knock:</strong> After drawing, pick a discard — if your remaining deadwood is 10 or less, the Knock button lights up.</li>
+        <li><strong>Gin:</strong> Knock with 0 deadwood: +25 bonus plus all of your opponent's deadwood. No lay-offs against gin.</li>
+        <li><strong>Lay off:</strong> Against a normal knock, the opponent's deadwood cards that fit your melds are laid off automatically.</li>
+        <li><strong>Undercut:</strong> If the opponent's deadwood is equal to or less than the knocker's, the opponent scores the difference + 25.</li>
+        <li><strong>Void hand:</strong> If only two cards remain in the stock and nobody has knocked, the hand is void and is redealt.</li>
+        <li><strong>Winning:</strong> Points accumulate each hand; the loser of a hand deals the next. First to the target score (default 100) wins.</li>
+      </ul>
+    </div>
+
+    <!-- SCORE COUNTER TAB -->
+    <div id="scorePanel" class="tab-panel hidden">
+      <div class="card-box">
+        <label>Play to</label>
+        <input type="number" id="scTargetInput" value="100" inputmode="numeric" style="margin-top:8px;">
+      </div>
+      <div class="card-box">
+        <label>Players</label>
+        <div class="setup-players" id="scPlayers"></div>
+        <button class="btn btn-secondary btn-block" id="scAddPlayerBtn" style="margin-top:4px;">+ Add player</button>
+      </div>
+      <button class="btn btn-primary" id="scStartBtn">Start scoring</button>
+    </div>
+  </div>
+
+  <!-- SCORER: GAME -->
+  <div id="scGameScreen" class="hidden">
+    <div class="topbar">
+      <button class="icon-btn" id="scLeaveBtn" title="End session">↺</button>
+      <div class="row" style="gap:6px;"><div class="badge" id="scRoundBadge">Hand 1</div><div class="badge dim" id="scTargetBadge">to 100</div></div>
+      <div class="row" style="gap:6px;">
+        <button class="icon-btn" id="scExportBtn" title="Export game as CSV">📤</button>
+        <button class="icon-btn" id="scRulesBtn2" title="Rules">📖</button>
+        <button class="icon-btn" id="scHistoryBtn" title="History">📜</button>
+      </div>
+    </div>
+    <div id="scBoard" style="display:flex; flex-direction:column; gap:10px; margin-top:6px;"></div>
+    <button type="button" id="scVoiceBtn" class="voice-fab" title="Speak the scores instead of typing">🎤</button>
+    <div id="submitRoundBar"><button class="btn btn-primary" id="scSubmitBtn">✓ Score this hand</button></div>
+  </div>
+
+  <!-- SCORER: END -->
+  <div id="scEndScreen" class="hidden">
+    <div class="row" style="justify-content:center;"><h1>🏆 Game Over</h1></div>
+    <div class="card-box" style="text-align:center;">
+      <div style="font-size:2.4rem;">🎉</div>
+      <div class="sheet-title" id="scEndTitle">Player wins!</div>
+      <div class="sheet-sub" id="scEndSub" style="margin-bottom:0;"></div>
+    </div>
+    <div class="card-box"><label>Final standings</label><div id="scStandings" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div></div>
+    <div class="card-box" style="text-align:center;"><label>Game duration</label><div id="scDuration" style="font-size:1.3rem; font-weight:800; color:var(--accent); margin-top:6px;"></div></div>
+    <div class="row">
+      <button class="btn btn-secondary" id="scEndHistoryBtn" style="min-width:52px;">📜</button>
+      <button class="btn btn-secondary" id="scEndExportBtn" style="min-width:52px;">📤</button>
+      <button class="btn btn-secondary grow" id="scEndKeepBtn">Keep playing</button>
+      <button class="btn btn-primary grow" id="scEndNewBtn">New game</button>
+    </div>
+  </div>
+
+  <!-- HOST WAITING -->
+  <div id="hostWaitScreen" class="hidden">
+    <h1>Your room</h1>
+    <div class="subtitle">Have your opponent open this same page and enter the code</div>
+    <div class="card-box" style="text-align:center;">
+      <label>Room code</label>
+      <div class="room-code" id="roomCode">----</div>
+      <button class="btn btn-secondary btn-sm" id="shareCodeBtn" style="margin-top:10px;">Share invite</button>
+    </div>
+    <div class="card-box" style="text-align:center;">
+      <div id="hostWaitStatus" class="pulse" style="color:var(--muted);">Opening room…</div>
+      <div class="empty-note" style="padding-top:10px;">Keep this screen open while your opponent joins — if you switch apps, come straight back and the room reconnects on its own.</div>
+    </div>
+    <button class="btn btn-primary hidden" id="startGameBtn">Deal the first hand</button>
+    <button class="btn btn-ghost btn-block" id="cancelHostBtn" style="margin-top:10px;">Cancel</button>
+  </div>
+
+  <!-- GUEST WAITING -->
+  <div id="guestWaitScreen" class="hidden">
+    <h1>Joining…</h1>
+    <div class="card-box" style="text-align:center;">
+      <div id="guestWaitStatus" class="pulse" style="color:var(--muted);">Connecting…</div>
+    </div>
+    <button class="btn btn-ghost btn-block" id="cancelGuestBtn">Back</button>
+  </div>
+
+  <!-- TABLE -->
+  <div id="tableScreen" class="hidden">
+    <div class="topbar">
+      <button class="icon-btn" id="leaveBtn" title="Leave game">↺</button>
+      <div class="row" style="gap:6px;"><div class="badge" id="roundBadge">Hand 1</div><div class="badge dim" id="targetBadge">to 100</div></div>
+      <div class="row" style="gap:6px;">
+        <button class="icon-btn" id="soundBtn" title="Sound & vibration">🔊</button>
+        <button class="icon-btn" id="rulesBtnGame" title="Rules">📖</button>
+        <button class="icon-btn" id="historyBtn" title="History">📜</button>
+      </div>
+    </div>
+
+    <div class="opp-strip">
+      <div class="opp-info"><div class="opp-name" id="oppName">Opponent</div><div class="opp-score" id="oppScore">0 pts</div></div>
+      <div class="opp-cards" id="oppCards"></div>
+      <div class="conn-dot" id="connDot"></div>
+    </div>
+
+    <div class="table-center">
+      <div class="pile stock" id="stockPile"></div>
+      <div class="pile discard" id="discardPile"></div>
+    </div>
+
+    <div class="status-banner" id="statusBanner">
+      <div class="status-main" id="statusMain">—</div>
+      <div class="status-sub" id="statusSub"></div>
+    </div>
+    <div class="last-action" id="lastAction"></div>
+
+    <div class="hand-area">
+      <div class="hand-header"><span id="myName">You</span><span class="dw" id="deadwoodInfo">Deadwood: —</span></div>
+      <div class="hand" id="hand"></div>
+      <div id="undoBar" class="hidden" style="margin-top:8px;"><button class="btn btn-ghost btn-sm" id="undoDrawBtn" style="width:100%;">↩ Undo draw</button></div>
+      <div class="actions" id="actions"></div>
+    </div>
+  </div>
+
+  <!-- ENDGAME -->
+  <div id="endgameScreen" class="hidden">
+    <div class="row" style="justify-content:center;"><h1>🏆 Game Over</h1></div>
+    <div class="card-box" style="text-align:center;">
+      <div style="font-size:2.4rem;">🎉</div>
+      <div class="sheet-title" id="endgameTitle">Player wins!</div>
+      <div class="sheet-sub" id="endgameSub" style="margin-bottom:0;">Reached the target score</div>
+    </div>
+    <div class="card-box">
+      <label>Final standings</label>
+      <div id="finalStandings" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+    <div class="card-box" style="text-align:center;">
+      <label>Game duration</label>
+      <div id="gameDuration" style="font-size:1.3rem; font-weight:800; color:var(--accent); margin-top:6px;"></div>
+    </div>
+    <div class="row">
+      <button class="btn btn-secondary" id="historyBtnEnd" style="min-width:60px;">📜</button>
+      <button class="btn btn-secondary grow" id="leaveBtnEnd">Leave</button>
+      <button class="btn btn-primary grow" id="rematchBtn">Rematch</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- PASS-AND-PLAY CURTAIN -->
+<div id="curtainOverlay" class="overlay hidden" style="background:#0b2418;">
+  <div class="sheet" style="text-align:center; border-color: var(--accent);">
+    <div style="font-size:3rem;">📱</div>
+    <div class="sheet-title" id="curtainTitle">Pass the phone</div>
+    <div class="sheet-sub" id="curtainSub"></div>
+    <div id="curtainLast" class="empty-note" style="margin-bottom:8px;"></div>
+    <button class="btn btn-primary btn-block" id="curtainBtn">Show my cards</button>
+  </div>
+</div>
+
+<!-- SCORER RESULT -->
+<div id="scResOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div style="text-align:center; font-size:2rem;">🀄</div>
+    <div class="sheet-title" id="scResTitle">Hand results</div>
+    <div class="sheet-sub" id="scResSub"></div>
+    <div id="scResList" style="display:flex; flex-direction:column; gap:8px;"></div>
+    <button class="btn btn-primary btn-block" id="scResContinue" style="margin-top:14px;">Continue</button>
+  </div>
+</div>
+
+<!-- MELD ARRANGEMENT CHOOSER -->
+<div id="meldOverlay" class="overlay hidden">
+  <div class="sheet" style="display:flex; flex-direction:column; overflow:hidden;">
+    <div style="text-align:center; font-size:2rem;">⇄</div>
+    <div class="sheet-title">Arrange your melds</div>
+    <div class="sheet-sub" id="meldSub"></div>
+    <div id="meldOptionList" style="display:flex; flex-direction:column; gap:10px; overflow-y:auto; min-height:0; flex:1;"></div>
+    <button class="btn btn-ghost btn-block btn-sm" id="closeMeldBtn" style="margin-top:14px;">Close</button>
+  </div>
+</div>
+
+<!-- ROUND RESULT -->
+<div id="roundResultOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div style="text-align:center; font-size:2rem;">🀄</div>
+    <div class="sheet-title" id="rrTitle">Hand over</div>
+    <div class="sheet-sub" id="rrSub"></div>
+    <div id="rrBody"></div>
+    <button class="btn btn-primary btn-block" id="rrContinueBtn" style="margin-top:10px;">Next hand</button>
+    <button class="btn btn-ghost btn-block btn-sm" id="rrHideBtn" style="margin-top:8px;">Look at the table</button>
+  </div>
+</div>
+
+<!-- RULES -->
+<div id="rulesOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div style="text-align:center; font-size:2rem;">📖</div>
+    <div class="sheet-title">Gin Rummy — Quick Rules</div>
+    <ul class="rules-list">
+      <li><strong>Goal:</strong> Arrange your 10 cards into melds — sets (3–4 of a kind) or runs (3+ in a row, same suit; Ace is low only).</li>
+      <li><strong>Deadwood:</strong> Unmelded cards. Ace = 1, face cards = 10, others face value. The app arranges your melds for you and shows your deadwood live.</li>
+      <li><strong>Choosing melds:</strong> When a card could serve two melds (5♠5♥5♦ vs 4♠5♠6♠), tap the deadwood readout above your hand to pick which melds you declare. It won't change your score, but it changes what your opponent can lay off if you knock.</li>
+      <li><strong>First turn:</strong> The non-dealer may take the face-up card or pass; then the dealer may. If both pass, the non-dealer draws from the stock.</li>
+      <li><strong>Each turn:</strong> Draw one card (stock or discard pile), then discard one. You may not discard the card you just took from the discard pile.</li>
+      <li><strong>Knock:</strong> After drawing, pick a discard — if your remaining deadwood is 10 or less, the Knock button lights up.</li>
+      <li><strong>Gin:</strong> Knock with 0 deadwood: +25 bonus plus all of your opponent's deadwood. No lay-offs against gin.</li>
+      <li><strong>Lay off:</strong> Against a normal knock, the opponent's deadwood cards that fit your melds are laid off automatically.</li>
+      <li><strong>Undercut:</strong> If the opponent's deadwood is equal to or less than the knocker's, the opponent scores the difference + 25.</li>
+      <li><strong>Void hand:</strong> If only two cards remain in the stock and nobody has knocked, the hand is void and is redealt.</li>
+      <li><strong>Winning:</strong> Points accumulate each hand; the loser of a hand deals the next. First to the target score (default 100) wins.</li>
+    </ul>
+    <button class="btn btn-primary btn-block" id="closeRulesBtn" style="margin-top:14px;">Got it</button>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div id="historyOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div class="row" style="justify-content:space-between;">
+      <div class="sheet-title" style="margin:0;">Hand history</div>
+      <button class="btn btn-ghost btn-sm" id="closeHistoryBtn">Close</button>
+    </div>
+    <div id="historyList" style="margin-top:10px;"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>/* Gin Rummy engine — pure logic, no DOM. Host-authoritative.
+ * Exposed as window.GinEngine in the browser or module.exports in Node. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.GinEngine = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const SUITS = ['S', 'H', 'D', 'C'];
+  const SUIT_SYMBOL = { S: '♠', H: '♥', D: '♦', C: '♣' };
+  const RANK_LABEL = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' };
+  const KNOCK_LIMIT = 10;
+  const GIN_BONUS = 25;
+  const UNDERCUT_BONUS = 25;
+
+  function makeCard(r, s) { return { id: rankLabel(r) + s, r, s }; }
+  function rankLabel(r) { return RANK_LABEL[r] || String(r); }
+  function cardValue(c) { return Math.min(c.r, 10); }
+  function sumValue(cards) { return cards.reduce((a, c) => a + cardValue(c), 0); }
+  function cardById(cards, id) { return cards.find(c => c.id === id) || null; }
+  function without(cards, id) { return cards.filter(c => c.id !== id); }
+
+  function makeDeck() {
+    const d = [];
+    for (const s of SUITS) for (let r = 1; r <= 13; r++) d.push(makeCard(r, s));
+    return d;
+  }
+
+  function shuffle(cards, rng) {
+    const a = cards.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // ---------- Meld detection ----------
+  // Returns every possible meld (as arrays of cards) contained in `cards`.
+  function allMelds(cards) {
+    const melds = [];
+    // sets
+    const byRank = {};
+    for (const c of cards) (byRank[c.r] = byRank[c.r] || []).push(c);
+    for (const r in byRank) {
+      const g = byRank[r];
+      if (g.length >= 3) {
+        if (g.length === 4) {
+          melds.push(g.slice());
+          for (let skip = 0; skip < 4; skip++) melds.push(g.filter((_, i) => i !== skip));
+        } else melds.push(g.slice());
+      }
+    }
+    // runs (ace low only)
+    const bySuit = {};
+    for (const c of cards) (bySuit[c.s] = bySuit[c.s] || []).push(c);
+    for (const s in bySuit) {
+      const g = bySuit[s].slice().sort((a, b) => a.r - b.r);
+      let i = 0;
+      while (i < g.length) {
+        let j = i;
+        while (j + 1 < g.length && g[j + 1].r === g[j].r + 1) j++;
+        const len = j - i + 1;
+        if (len >= 3) {
+          for (let a = i; a <= j; a++) for (let b = a + 2; b <= j; b++) melds.push(g.slice(a, b + 1));
+        }
+        i = j + 1;
+      }
+    }
+    return melds;
+  }
+
+  function isSet(meld) { return meld.length >= 3 && meld.every(c => c.r === meld[0].r); }
+
+  // Memoised bitmask DP over a hand. `excluded` marks cards that are not part of the
+  // hand for this query (e.g. the card about to be discarded, or cards laid off).
+  // One solver answers every "what if I discard X" question for an 11-card hand.
+  function meldSolver(cards) {
+    const n = cards.length;
+    const melds = allMelds(cards);
+    const idx = {}; cards.forEach((c, i) => { idx[c.id] = i; });
+    const meldMasks = melds.map(m => m.reduce((mask, c) => mask | (1 << idx[c.id]), 0));
+    const byCard = Array.from({ length: n }, () => []);
+    meldMasks.forEach((mask, mi) => { for (let i = 0; i < n; i++) if (mask & (1 << i)) byCard[i].push(mi); });
+    const values = cards.map(cardValue);
+    const FULL = (1 << n) - 1;
+    const memo = new Map();
+    const choice = new Map();
+
+    function f(used) {
+      if (used === FULL) return 0;
+      const hit = memo.get(used);
+      if (hit !== undefined) return hit;
+      let i = 0; while (used & (1 << i)) i++;
+      let best = values[i] + f(used | (1 << i));
+      let pick = -1;
+      for (const mi of byCard[i]) {
+        if (meldMasks[mi] & used) continue;
+        const v = f(used | meldMasks[mi]);
+        if (v < best) { best = v; pick = mi; }
+      }
+      memo.set(used, best); choice.set(used, pick);
+      return best;
+    }
+
+    function melding(excluded) {
+      excluded = excluded || 0;
+      const value = f(excluded);
+      const chosen = []; const deadwood = [];
+      let used = excluded;
+      while (used !== FULL) {
+        let i = 0; while (used & (1 << i)) i++;
+        const pick = choice.get(used);
+        if (pick === -1 || pick === undefined) { deadwood.push(cards[i]); used |= (1 << i); }
+        else { chosen.push(melds[pick]); used |= meldMasks[pick]; }
+      }
+      return { melds: chosen.map(sortMeld), deadwood: sortCards(deadwood), value };
+    }
+
+    function maskOf(ids) { return ids.reduce((m, id) => m | (1 << idx[id]), 0); }
+    return { melding, maskOf, value: (excluded) => f(excluded || 0) };
+  }
+
+  // Best melding: minimise deadwood value. Returns {melds, deadwood, value}.
+  function bestMelding(cards) {
+    if (!cards.length) return { melds: [], deadwood: [], value: 0 };
+    return meldSolver(cards).melding(0);
+  }
+
+  // ---------- alternative meld arrangements ----------
+  // A hand can often be melded several different ways for the SAME deadwood value
+  // (e.g. 5S 5H 5D + 4S 6S — either the set of 5s or the 4-5-6 run; the 5S can only
+  // go in one of them). Which melds you DECLARE matters when you knock, because the
+  // opponent lays their deadwood off onto your melds. These helpers let the player
+  // pick their preferred arrangement among equally-scoring ones.
+  function meldSig(melds) {
+    return melds.map(m => m.map(c => c.id).slice().sort().join('+')).sort().join('|');
+  }
+  function isValidMeldGroup(cs) {
+    if (!Array.isArray(cs) || cs.length < 3) return false;
+    const ranks = cs.map(c => c.r), suits = cs.map(c => c.s);
+    if (ranks.every(r => r === ranks[0])) {                 // set: 3-4 of a rank, distinct suits
+      return cs.length <= 4 && new Set(suits).size === cs.length;
+    }
+    if (!suits.every(s => s === suits[0])) return false;    // run: one suit, consecutive ranks
+    const sorted = ranks.slice().sort((a, b) => a - b);
+    for (let i = 1; i < sorted.length; i++) if (sorted[i] !== sorted[i - 1] + 1) return false;
+    return true;
+  }
+  // Build a melding from explicit groups of card ids. Returns null unless the groups are
+  // legal, non-overlapping melds drawn from cards actually present in `cards`.
+  function meldingFromGroups(cards, groups) {
+    if (!Array.isArray(groups)) return null;
+    const byId = {}; cards.forEach(c => { byId[c.id] = c; });
+    const used = new Set(); const melds = [];
+    for (const g of groups) {
+      if (!Array.isArray(g)) return null;
+      const cs = [];
+      for (const id of g) {
+        if (typeof id !== 'string' || !byId[id] || used.has(id)) return null;
+        used.add(id); cs.push(byId[id]);
+      }
+      if (!isValidMeldGroup(cs)) return null;
+      melds.push(sortMeld(cs));
+    }
+    const dead = cards.filter(c => !used.has(c.id));
+    return { melds, deadwood: sortCards(dead), value: sumValue(dead) };
+  }
+  const _altCache = new Map();
+  // Every distinct arrangement that achieves the minimum deadwood value.
+  function allOptimalMeldings(cards, limit) {
+    limit = limit || 12;
+    if (!cards.length) return [{ melds: [], deadwood: [], value: 0, sig: '' }];
+    const key = cards.map(c => c.id).slice().sort().join(',') + '#' + limit;
+    const hit = _altCache.get(key);
+    if (hit) return hit;
+    const minValue = bestMelding(cards).value;
+    const melds = allMelds(cards);
+    const n = cards.length;
+    const idx = {}; cards.forEach((c, i) => { idx[c.id] = i; });
+    const meldMasks = melds.map(m => m.reduce((mask, c) => mask | (1 << idx[c.id]), 0));
+    const byCard = Array.from({ length: n }, () => []);
+    meldMasks.forEach((mask, mi) => { for (let i = 0; i < n; i++) if (mask & (1 << i)) byCard[i].push(mi); });
+    const values = cards.map(cardValue);
+    const FULL = (1 << n) - 1;
+    const out = []; const seen = new Set(); const chosen = [];
+    let nodes = 0;
+    function rec(used, dead) {
+      if (out.length >= limit || nodes++ > 300000 || dead > minValue) return;
+      if (used === FULL) {
+        if (dead !== minValue) return;
+        const arrangement = chosen.map(mi => sortMeld(melds[mi]));
+        const sig = meldSig(arrangement);
+        if (seen.has(sig)) return;
+        seen.add(sig);
+        const covered = chosen.reduce((m, mi) => m | meldMasks[mi], 0);
+        out.push({ melds: arrangement, deadwood: sortCards(cards.filter((_, k) => !(covered & (1 << k)))), value: dead, sig });
+        return;
+      }
+      let i = 0; while (used & (1 << i)) i++;
+      for (const mi of byCard[i]) {
+        if (meldMasks[mi] & used) continue;
+        chosen.push(mi); rec(used | meldMasks[mi], dead); chosen.pop();
+        if (out.length >= limit) return;
+      }
+      rec(used | (1 << i), dead + values[i]);
+    }
+    rec(0, 0);
+    if (_altCache.size > 400) _altCache.clear();
+    _altCache.set(key, out);
+    return out;
+  }
+
+  // Given knocker's melds, lay off as many of `cards` as possible (chained). Returns {laidOff:[{card, ontoIndex}], remaining}.
+  function maximalLayoff(cards, knockerMelds) {
+    const melds = knockerMelds.map(m => m.slice());
+    let remaining = cards.slice();
+    const laidOff = [];
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let ci = 0; ci < remaining.length && !changed; ci++) {
+        const c = remaining[ci];
+        for (let mi = 0; mi < melds.length; mi++) {
+          const m = melds[mi];
+          let fits = false;
+          if (isSet(m)) fits = m.length < 4 && c.r === m[0].r && !m.some(x => x.s === c.s);
+          else {
+            const ranks = m.map(x => x.r);
+            const lo = Math.min(...ranks), hi = Math.max(...ranks);
+            fits = c.s === m[0].s && (c.r === lo - 1 || c.r === hi + 1);
+          }
+          if (fits) {
+            m.push(c);
+            laidOff.push({ card: c, onto: mi });
+            remaining = remaining.filter(x => x.id !== c.id);
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+    return { laidOff, remaining, extendedMelds: melds.map(sortMeld) };
+  }
+
+  // Opponent's best response to a knock: choose own melds + layoffs minimising deadwood.
+  // Layoff feasibility is monotone (each slot accepts exactly one specific card), so the
+  // maximal layoff set L is unique and every feasible layoff set is a subset of L.
+  function bestMeldingWithLayoffs(cards, knockerMelds) {
+    const L = maximalLayoff(cards, knockerMelds).laidOff.map(x => x.card);
+    const solver = meldSolver(cards);
+    let best = null;
+    const total = 1 << L.length;
+    for (let sub = 0; sub < total; sub++) {
+      const S = L.filter((_, i) => sub & (1 << i));
+      const lo = maximalLayoff(S, knockerMelds);
+      if (lo.laidOff.length !== S.length) continue; // not feasible on its own (e.g. 9 without the 8)
+      const m = solver.melding(solver.maskOf(S.map(c => c.id)));
+      if (!best || m.value < best.value) {
+        best = { melds: m.melds, laidOff: lo.laidOff, deadwood: m.deadwood, value: m.value, extendedMelds: lo.extendedMelds };
+      }
+    }
+    return best;
+  }
+
+  function sortMeld(m) {
+    return isSet(m) ? m.slice().sort((a, b) => SUITS.indexOf(a.s) - SUITS.indexOf(b.s)) : m.slice().sort((a, b) => a.r - b.r);
+  }
+  function sortCards(cards) {
+    return cards.slice().sort((a, b) => (SUITS.indexOf(a.s) - SUITS.indexOf(b.s)) || (a.r - b.r));
+  }
+
+  // ---------- Game state ----------
+  function createGame(opts) {
+    const rng = opts.rng || Math.random;
+    const state = {
+      players: opts.players.map(p => ({ id: p.id, name: p.name, total: 0 })),
+      target: opts.target || 100,
+      dealer: opts.dealer != null ? opts.dealer : (rng() < 0.5 ? 0 : 1),
+      turn: 0,
+      phase: 'roundOver',
+      hands: [[], []],
+      stock: [],
+      discard: [],
+      upcardStage: null,
+      drawnFromDiscard: null,
+      forceStock: false,
+      pendingDraw: null,
+      meldPref: [null, null],
+      lastAction: null,
+      handNumber: 0,
+      rounds: [],
+      result: null,
+      ready: [false, false],
+      winner: null,
+      startedAt: Date.now()
+    };
+    dealHand(state, rng);
+    return state;
+  }
+
+  function dealHand(state, rng) {
+    const deck = shuffle(makeDeck(), rng || Math.random);
+    const nonDealer = 1 - state.dealer;
+    const hands = [[], []];
+    for (let i = 0; i < 10; i++) { hands[nonDealer].push(deck.pop()); hands[state.dealer].push(deck.pop()); }
+    state.hands = hands;
+    state.discard = [deck.pop()];
+    state.stock = deck;
+    state.turn = nonDealer;
+    state.phase = 'upcard';
+    state.upcardStage = 'nonDealer';
+    state.drawnFromDiscard = null;
+    state.forceStock = false;
+    state.pendingDraw = null;
+    state.meldPref = [null, null];
+    state.handNumber += 1;
+    state.result = null;
+    state.ready = [false, false];
+    state.lastAction = { text: `${state.players[state.dealer].name} dealt hand ${state.handNumber}. ${state.players[nonDealer].name} may take the upcard or pass.` };
+    return state;
+  }
+
+  function otherPlayer(i) { return 1 - i; }
+
+  // Returns { ok: true } or { ok: false, error }
+  function applyAction(state, pIdx, action, rng) {
+    rng = rng || Math.random;
+    const me = state.players[pIdx];
+    const type = action && action.type;
+    const err = (m) => ({ ok: false, error: m });
+
+    // Choosing how to arrange your own melds is a declaration, not a move — it's allowed
+    // any time during play, including while waiting for the opponent.
+    if (type === 'setMelds') {
+      if (state.phase !== 'upcard' && state.phase !== 'draw' && state.phase !== 'discard') return err('You can only rearrange melds during play.');
+      if (!state.meldPref) state.meldPref = [null, null];
+      const myHand = state.hands[pIdx];
+      const m = meldingFromGroups(myHand, action.melds || []);
+      if (!m) return err("That meld arrangement doesn't fit your hand.");
+      const auto = bestMelding(myHand);
+      if (m.value !== auto.value) return err(`That arrangement would leave ${m.value} deadwood instead of ${auto.value}.`);
+      state.meldPref[pIdx] = (action.melds || []).map(g => g.slice());
+      return { ok: true };
+    }
+
+    if (state.phase === 'gameOver') {
+      if (type === 'ready') {
+        state.ready[pIdx] = true;
+        if (state.ready[0] && state.ready[1]) {
+          state.players.forEach(p => { p.total = 0; });
+          state.rounds = [];
+          state.winner = null;
+          state.handNumber = 0;
+          state.startedAt = Date.now();
+          state.dealer = rng() < 0.5 ? 0 : 1;
+          dealHand(state, rng);
+        }
+        return { ok: true };
+      }
+      return err('The game is over.');
+    }
+
+    if (state.phase === 'roundOver') {
+      if (type !== 'ready') return err('Waiting for both players to continue.');
+      state.ready[pIdx] = true;
+      if (state.ready[0] && state.ready[1]) {
+        const reached = state.players.map((p, i) => ({ i, t: p.total })).filter(x => x.t >= state.target);
+        if (reached.length) {
+          reached.sort((a, b) => b.t - a.t);
+          state.winner = reached[0].i;
+          state.phase = 'gameOver';
+          state.ready = [false, false];
+          state.lastAction = { text: `${state.players[state.winner].name} wins the game!` };
+        } else {
+          if (state.result && !state.result.void && state.result.loserIdx != null) state.dealer = state.result.loserIdx;
+          dealHand(state, rng);
+        }
+      }
+      return { ok: true };
+    }
+
+    if (pIdx !== state.turn) return err("It's not your turn.");
+    const hand = state.hands[pIdx];
+    const opp = otherPlayer(pIdx);
+
+    if (state.phase === 'upcard') {
+      if (type === 'takeUpcard') {
+        const c = state.discard.pop();
+        state.pendingDraw = { from: 'discard', cardId: c.id, prevPhase: 'upcard', prevUpcardStage: state.upcardStage, prevForceStock: state.forceStock, prevTurn: state.turn };
+        hand.push(c);
+        state.lastDrawn = { p: pIdx, id: c.id };
+        state.drawnFromDiscard = c.id;
+        state.phase = 'discard';
+        state.upcardStage = null;
+        state.lastAction = { text: `${me.name} took the ${pretty(c)} upcard.`, card: c.id, by: pIdx };
+        return { ok: true };
+      }
+      if (type === 'passUpcard') {
+        if (state.upcardStage === 'nonDealer') {
+          state.upcardStage = 'dealer';
+          state.turn = state.dealer;
+          state.lastAction = { text: `${me.name} passed on the upcard. ${state.players[state.dealer].name} may take it or pass.`, by: pIdx };
+        } else {
+          state.upcardStage = null;
+          state.phase = 'draw';
+          state.turn = otherPlayer(state.dealer);
+          state.forceStock = true;
+          state.lastAction = { text: `Both passed. ${state.players[state.turn].name} must draw from the stock.`, by: pIdx };
+        }
+        return { ok: true };
+      }
+      return err('Take the upcard or pass.');
+    }
+
+    if (state.phase === 'draw') {
+      if (type === 'drawStock') {
+        const c = state.stock.pop();
+        state.pendingDraw = { from: 'stock', cardId: c.id, prevPhase: 'draw', prevUpcardStage: state.upcardStage, prevForceStock: state.forceStock, prevTurn: state.turn };
+        hand.push(c);
+        state.lastDrawn = { p: pIdx, id: c.id };
+        state.drawnFromDiscard = null;
+        state.forceStock = false;
+        state.phase = 'discard';
+        state.lastAction = { text: `${me.name} drew from the stock.`, by: pIdx };
+        return { ok: true, privateCard: c.id };
+      }
+      if (type === 'drawDiscard') {
+        if (state.forceStock) return err('After both players pass, you must draw from the stock.');
+        if (!state.discard.length) return err('The discard pile is empty.');
+        const c = state.discard.pop();
+        state.pendingDraw = { from: 'discard', cardId: c.id, prevPhase: 'draw', prevUpcardStage: state.upcardStage, prevForceStock: state.forceStock, prevTurn: state.turn };
+        hand.push(c);
+        state.lastDrawn = { p: pIdx, id: c.id };
+        state.drawnFromDiscard = c.id;
+        state.phase = 'discard';
+        state.lastAction = { text: `${me.name} took the ${pretty(c)} from the discard pile.`, card: c.id, by: pIdx };
+        return { ok: true };
+      }
+      return err('Draw a card from the stock or the discard pile.');
+    }
+
+    if (state.phase === 'discard') {
+      if (type === 'undoDraw') {
+        const pd = state.pendingDraw;
+        if (!pd) return err('Nothing to undo.');
+        const drawnCard = cardById(hand, pd.cardId);
+        if (!drawnCard) return err('Nothing to undo.');
+        state.hands[pIdx] = without(hand, drawnCard.id);
+        if (pd.from === 'discard') state.discard.push(drawnCard); else state.stock.push(drawnCard);
+        state.phase = pd.prevPhase;
+        state.upcardStage = pd.prevUpcardStage;
+        state.forceStock = pd.prevForceStock;
+        state.turn = pd.prevTurn;
+        state.drawnFromDiscard = null;
+        state.lastDrawn = null;
+        state.pendingDraw = null;
+        state.lastAction = { text: `${me.name} undid their draw.`, by: pIdx };
+        return { ok: true };
+      }
+      if (type !== 'discard' && type !== 'knock') return err('Discard a card, knock, or undo your draw.');
+      const card = cardById(hand, action.cardId);
+      if (!card) return err("That card isn't in your hand.");
+      if (hand.length !== 11) return err('You must draw before discarding.');
+      if (card.id === state.drawnFromDiscard) return err("You can't discard the card you just took from the discard pile.");
+
+      if (type === 'discard') {
+        state.hands[pIdx] = without(hand, card.id);
+        state.discard.push(card);
+        state.drawnFromDiscard = null;
+        state.pendingDraw = null;
+        state.lastAction = { text: `${me.name} discarded the ${pretty(card)}.`, card: card.id, by: pIdx };
+        if (state.stock.length <= 2) {
+          finishVoid(state);
+        } else {
+          state.turn = opp;
+          state.phase = 'draw';
+        }
+        return { ok: true };
+      }
+
+      // knock — honour the player's chosen arrangement when it still fits the kept cards
+      // and scores the same, since it decides what the opponent can lay off.
+      const remaining = without(hand, card.id);
+      const autoMine = bestMelding(remaining);
+      const prefGroups = state.meldPref && state.meldPref[pIdx];
+      const prefMine = prefGroups ? meldingFromGroups(remaining, prefGroups) : null;
+      const mine = (prefMine && prefMine.value === autoMine.value) ? prefMine : autoMine;
+      if (mine.value > KNOCK_LIMIT) return err(`You need ${KNOCK_LIMIT} or fewer deadwood points to knock (you'd have ${mine.value}).`);
+      state.hands[pIdx] = remaining;
+      state.discard.push(card);
+      state.drawnFromDiscard = null;
+      state.pendingDraw = null;
+      const gin = mine.value === 0;
+      const oppHand = state.hands[opp];
+      const theirs = gin ? Object.assign({ laidOff: [], extendedMelds: mine.melds }, bestMelding(oppHand)) : bestMeldingWithLayoffs(oppHand, mine.melds);
+
+      const scores = [0, 0];
+      let outcome;
+      if (gin) {
+        scores[pIdx] = GIN_BONUS + theirs.value;
+        outcome = 'gin';
+      } else if (theirs.value <= mine.value) {
+        scores[opp] = (mine.value - theirs.value) + UNDERCUT_BONUS;
+        outcome = 'undercut';
+      } else {
+        scores[pIdx] = theirs.value - mine.value;
+        outcome = 'knock';
+      }
+      state.players[0].total += scores[0];
+      state.players[1].total += scores[1];
+      const scorerIdx = scores[pIdx] > 0 ? pIdx : opp;
+      const loserIdx = otherPlayer(scorerIdx);
+      const ts = Date.now();
+      state.result = {
+        void: false,
+        knockerIdx: pIdx,
+        outcome,
+        knockCard: card.id,
+        knocker: { melds: mine.melds, deadwood: mine.deadwood, value: mine.value },
+        opponent: { melds: theirs.melds, laidOff: theirs.laidOff || [], deadwood: theirs.deadwood, value: theirs.value, extendedMelds: theirs.extendedMelds || mine.melds },
+        scores, scorerIdx, loserIdx, ts,
+        totals: [state.players[0].total, state.players[1].total]
+      };
+      state.rounds.push({
+        handNumber: state.handNumber, ts,
+        knockerIdx: pIdx, outcome,
+        deadwood: { [state.players[pIdx].id]: mine.value, [state.players[opp].id]: theirs.value },
+        scores: { [state.players[0].id]: scores[0], [state.players[1].id]: scores[1] }
+      });
+      state.phase = 'roundOver';
+      state.ready = [false, false];
+      state.lastAction = { text: outcome === 'gin' ? `${me.name} went GIN!` : outcome === 'undercut' ? `${me.name} knocked but was undercut by ${state.players[opp].name}!` : `${me.name} knocked with ${mine.value}.`, by: pIdx };
+      return { ok: true };
+    }
+
+    return err('Unknown phase.');
+  }
+
+  function finishVoid(state) {
+    state.result = { void: true, ts: Date.now(), totals: [state.players[0].total, state.players[1].total] };
+    state.rounds.push({ handNumber: state.handNumber, ts: Date.now(), void: true, scores: { [state.players[0].id]: 0, [state.players[1].id]: 0 } });
+    state.phase = 'roundOver';
+    state.ready = [false, false];
+    state.lastAction = { text: 'Only two cards left in the stock — the hand is void. Same dealer redeals.' };
+  }
+
+  function pretty(c) { return rankLabel(c.r) + SUIT_SYMBOL[c.s]; }
+
+  // ---------- Redacted per-player view ----------
+  function viewFor(state, pIdx) {
+    const opp = otherPlayer(pIdx);
+    const hand = state.hands[pIdx];
+    const solver = hand.length ? meldSolver(hand) : null;
+    const autoBest = solver ? solver.melding(0) : { melds: [], deadwood: [], value: 0 };
+    // Honour the player's chosen arrangement while it still fits and scores the same.
+    const prefGroups = state.meldPref && state.meldPref[pIdx];
+    const prefMelding = (prefGroups && hand.length) ? meldingFromGroups(hand, prefGroups) : null;
+    const melding = (prefMelding && prefMelding.value === autoBest.value) ? prefMelding : autoBest;
+    const inPlay = state.phase === 'upcard' || state.phase === 'draw' || state.phase === 'discard';
+    let meldOptions = [];
+    if (inPlay && hand.length) {
+      meldOptions = allOptimalMeldings(hand, 12).slice();
+      const autoSig = meldSig(autoBest.melds);
+      if (!meldOptions.some(o => o.sig === autoSig)) {
+        meldOptions.unshift({ melds: autoBest.melds, deadwood: autoBest.deadwood, value: autoBest.value, sig: autoSig });
+      }
+    }
+    let discardOptions = null;
+    if (state.phase === 'discard' && state.turn === pIdx && hand.length === 11) {
+      discardOptions = {};
+      for (const c of hand) {
+        if (c.id === state.drawnFromDiscard) { discardOptions[c.id] = { locked: true }; continue; }
+        const v = solver.value(solver.maskOf([c.id]));
+        discardOptions[c.id] = { deadwood: v, canKnock: v <= KNOCK_LIMIT, isGin: v === 0 };
+      }
+    }
+    const view = {
+      me: { idx: pIdx, id: state.players[pIdx].id, name: state.players[pIdx].name, total: state.players[pIdx].total, hand: hand, melds: melding.melds, deadwood: melding.deadwood, deadwoodValue: melding.value },
+      opp: { idx: opp, id: state.players[opp].id, name: state.players[opp].name, total: state.players[opp].total, cardCount: state.hands[opp].length },
+      players: state.players.map(p => ({ id: p.id, name: p.name, total: p.total })),
+      phase: state.phase,
+      turn: state.turn,
+      isMyTurn: state.turn === pIdx,
+      dealer: state.dealer,
+      upcardStage: state.upcardStage,
+      stockCount: state.stock.length,
+      discardTop: state.discard.length ? state.discard[state.discard.length - 1] : null,
+      discardCount: state.discard.length,
+      drawnFromDiscard: state.drawnFromDiscard,
+      forceStock: state.forceStock,
+      lastAction: state.lastAction,
+      handNumber: state.handNumber,
+      target: state.target,
+      rounds: state.rounds,
+      result: state.result,
+      ready: state.ready,
+      winner: state.winner,
+      startedAt: state.startedAt,
+      discardOptions,
+      lastDrawnId: (state.lastDrawn && state.lastDrawn.p === pIdx && hand.some(c => c.id === state.lastDrawn.id)) ? state.lastDrawn.id : null,
+      canUndo: !!(state.phase === 'discard' && state.turn === pIdx && state.pendingDraw),
+      meldOptions,
+      activeMeldSig: meldSig(melding.melds),
+      knockLimit: KNOCK_LIMIT
+    };
+    return view;
+  }
+
+  // Legal action list for a view (used by UI + tests)
+  function legalActions(view) {
+    const acts = [];
+    if (view.phase === 'roundOver' || view.phase === 'gameOver') { if (!view.ready[view.me.idx]) acts.push({ type: 'ready' }); return acts; }
+    if (!view.isMyTurn) return acts;
+    if (view.phase === 'upcard') return [{ type: 'takeUpcard' }, { type: 'passUpcard' }];
+    if (view.phase === 'draw') {
+      acts.push({ type: 'drawStock' });
+      if (!view.forceStock && view.discardTop) acts.push({ type: 'drawDiscard' });
+      return acts;
+    }
+    if (view.phase === 'discard') {
+      if (view.canUndo) acts.push({ type: 'undoDraw' });
+      for (const c of view.me.hand) {
+        const o = view.discardOptions[c.id];
+        if (o.locked) continue;
+        acts.push({ type: 'discard', cardId: c.id });
+        if (o.canKnock) acts.push({ type: 'knock', cardId: c.id });
+      }
+    }
+    return acts;
+  }
+
+  return {
+    SUITS, SUIT_SYMBOL, KNOCK_LIMIT, GIN_BONUS, UNDERCUT_BONUS,
+    makeDeck, shuffle, makeCard, cardValue, sumValue, rankLabel, pretty,
+    allMelds, bestMelding, bestMeldingWithLayoffs, maximalLayoff, isSet, sortCards,
+    allOptimalMeldings, meldingFromGroups, meldSig,
+    createGame, dealHand, applyAction, viewFor, legalActions
+  };
+});
+</script>
+<script>/* Gin Rummy — multiplayer UI + PeerJS transport. Host is authoritative. */
+(function () {
+  'use strict';
+  const E = window.GinEngine;
+  const $ = (id) => document.getElementById(id);
+  const SAVE_KEY = 'ginRummyMP_v1';
+  const NAME_KEY = 'ginRummy_name';
+  const TAB_KEY = 'ginRummy_homeTab';
+  const PLAYMODE_KEY = 'ginRummy_playMode';
+  const PEER_PREFIX = 'ginrummy-ari-';
+  // STUN for discovery + public TURN relays so two phones behind carrier NAT can still connect.
+  const PEER_OPTS = {
+    debug: 0,
+    config: {
+      iceServers: [
+        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+        { urls: 'stun:openrelay.metered.ca:80' },
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+      ],
+      sdpSemantics: 'unified-plan'
+    }
+  };
+  function describePeerError(e) {
+    const t = (e && e.type) || '';
+    const map = {
+      'browser-incompatible': "This browser can't do peer-to-peer connections.",
+      'network': "Can't reach the connection service — check your internet (VPNs and some Wi-Fi networks block it).",
+      'socket-error': "Can't reach the connection service — check your internet (VPNs and some Wi-Fi networks block it).",
+      'socket-closed': 'Lost the connection service. Try again.',
+      'server-error': 'The connection service is having trouble. Try again in a moment.',
+      'peer-unavailable': 'Room not found — check the code.',
+      'unavailable-id': 'That room code is taken.',
+      'webrtc': "WebRTC failed — the two phones couldn't reach each other.",
+      'disconnected': 'Disconnected from the connection service.',
+      'ssl-unavailable': 'Secure connection unavailable.'
+    };
+    return (map[t] || 'Connection error') + (t ? ` [${t}]` : '') + (e && e.message && !map[t] ? ': ' + e.message : '');
+  }
+  // PeerJS now loads via a dynamically-injected <script> (with a CDN fallback), so it may
+  // not be ready the instant this code runs. Poll briefly before giving up rather than
+  // failing on the very first check.
+  function whenPeerReady(onReady, onFail) {
+    if (typeof Peer !== 'undefined') { onReady(); return; }
+    if (window.__peerLoadFailed) { onFail(); return; }
+    let waited = 0;
+    const iv = setInterval(() => {
+      if (typeof Peer !== 'undefined') { clearInterval(iv); onReady(); return; }
+      waited += 200;
+      if (waited >= 8000) { clearInterval(iv); onFail(); }
+    }, 200);
+  }
+  function peerWatchdog(peer, ms, onTimeout) {
+    let opened = false;
+    peer.on('open', () => { opened = true; });
+    setTimeout(() => { if (!opened && !peer.destroyed) onTimeout(); }, ms);
+  }
+  // Mobile browsers suspend background pages (e.g. while you switch to Messages to send the code),
+  // which drops the broker socket. Reconnect automatically instead of leaving the room dead.
+  function keepPeerAlive(peer, onStatus) {
+    let tries = 0, timer = null;
+    const attempt = () => {
+      if (peer.destroyed || !peer.disconnected) return;
+      tries++;
+      if (onStatus) onStatus(tries);
+      try { peer.reconnect(); } catch (e) {}
+      timer = setTimeout(attempt, Math.min(15000, 1500 * tries));
+    };
+    peer.on('disconnected', () => { clearTimeout(timer); timer = setTimeout(attempt, 400); });
+    peer.on('open', () => { tries = 0; clearTimeout(timer); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !peer.destroyed && peer.disconnected) { clearTimeout(timer); attempt(); } });
+    window.addEventListener('online', () => { if (!peer.destroyed && peer.disconnected) { clearTimeout(timer); attempt(); } });
+  }
+  // Screen Wake Lock keeps the host phone from sleeping mid-lobby (silently ignored where unsupported).
+  let wakeLock = null;
+  async function holdWakeLock() {
+    try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) {}
+  }
+  function dropWakeLock() { try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && app.role) holdWakeLock(); });
+  const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+  // ---------- state ----------
+  const app = {
+    role: null,          // 'host' | 'guest'
+    code: null,
+    myName: 'Ari',
+    target: 100,
+    peer: null,
+    conn: null,
+    game: null,          // engine state (host only)
+    view: null,          // my redacted view (both)
+    oppName: null,
+    oppConnected: false,
+    selectedCard: null,
+    hostSeated: false,
+    nameTouched: false,
+    revealed: null,      // pass-and-play: which player has tapped "show my cards" this turn
+    homeTab: 'play',
+    playMode: 'online'
+  };
+
+  // ---------- helpers ----------
+  function safeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function safeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function safeDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  function esc(s) { return String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+  function genCode() { let s = ''; for (let i = 0; i < 4; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]; return s; }
+  function fmtTime(ts) { return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+  function fmtDuration(ms) {
+    ms = Math.max(0, ms); const t = Math.floor(ms / 1000), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+    return h ? `${h}h ${m}m` : m ? `${m}m ${s}s` : `${s}s`;
+  }
+  let toastTimer = null;
+  function toast(msg, ms) {
+    const el = $('toast'); el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), ms || 2600);
+  }
+  function showScreen(id) {
+    ['homeScreen', 'hostWaitScreen', 'guestWaitScreen', 'tableScreen', 'endgameScreen', 'scGameScreen', 'scEndScreen'].forEach(s => $(s).classList.toggle('hidden', s !== id));
+    // The table locks to the viewport and scales itself; every other screen scrolls normally.
+    document.body.classList.toggle('fixed-screen', id === 'tableScreen');
+    window.scrollTo(0, 0);
+  }
+
+  // Shrink the table (cards, piles, gaps) until the whole hand fits the screen without
+  // scrolling. Bigger phones simply land on a larger scale.
+  function fitTable() {
+    const scr = $('tableScreen');
+    if (!scr || scr.classList.contains('hidden')) return;
+    const appEl = document.getElementById('app'), handEl = $('hand');
+    const overflows = () => (appEl.scrollHeight > appEl.clientHeight + 1) || (handEl.scrollHeight > handEl.clientHeight + 1);
+    let scale = 1;
+    scr.style.setProperty('--tscale', '1');
+    while (scale > 0.5 && overflows()) {
+      scale = Math.round((scale - 0.05) * 100) / 100;
+      scr.style.setProperty('--tscale', String(scale));
+    }
+  }
+  let fitQueued = false;
+  function queueFit() {
+    if (fitQueued) return;
+    fitQueued = true;
+    requestAnimationFrame(() => { fitQueued = false; fitTable(); });
+  }
+
+  // Rebuild a pile only when the card it shows actually changes, so the element survives
+  // re-renders and its CSS width/height transition can animate the grow/shrink.
+  function ensurePile(el, cardMarkup, labelText, key) {
+    if (el.dataset.pileKey !== key) {
+      el.dataset.pileKey = key;
+      el.innerHTML = cardMarkup + '<div class="pile-label"></div>';
+    }
+    const lab = el.querySelector('.pile-label');
+    if (lab) lab.textContent = labelText;
+  }
+
+  // ---------- persistence ----------
+  function persist() {
+    if (app.role === 'local') safeSet(SAVE_KEY, JSON.stringify({ role: 'local', game: app.game }));
+    else if (app.role === 'host') safeSet(SAVE_KEY, JSON.stringify({ role: 'host', code: app.code, myName: app.myName, target: app.target, game: app.game, oppName: app.oppName }));
+    else if (app.role === 'guest') safeSet(SAVE_KEY, JSON.stringify({ role: 'guest', code: app.code, myName: app.myName }));
+  }
+  function loadSaved() { try { const raw = safeGet(SAVE_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+  function clearSaved() { safeDel(SAVE_KEY); }
+
+  // ---------- sound + haptics ----------
+  const FX_KEY = 'ginRummy_sound';
+  const fx = {
+    enabled: safeGet(FX_KEY) !== 'off',
+    ctx: null,
+    ensure() {
+      if (!this.enabled) return null;
+      try {
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        return this.ctx;
+      } catch (e) { return null; }
+    },
+    tone(freq, start, dur, type, gain) {
+      const ctx = this.ensure(); if (!ctx || ctx.state !== 'running') return; // never queue audio on a suspended context
+      const t0 = ctx.currentTime + start;
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(gain || 0.18, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g).connect(ctx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+    },
+    seq(notes, type, gain) { let t = 0; notes.forEach(([f, d, gap]) => { this.tone(f, t, d, type, gain); t += gap != null ? gap : d; }); },
+    buzz(pattern) { if (!this.enabled) return; try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {} },
+    tap() { this.tone(660, 0, 0.05, 'triangle', 0.08); this.buzz(12); },
+    yourTurn() { this.seq([[523, 0.12, 0.13], [784, 0.22]], 'sine', 0.2); this.buzz([40, 60, 40]); },
+    knockGood() { this.seq([[587, 0.1, 0.11], [740, 0.1, 0.11], [880, 0.28]], 'triangle', 0.2); this.buzz([30, 40, 30, 40, 60]); },
+    gin() { this.seq([[523, 0.09, 0.1], [659, 0.09, 0.1], [784, 0.09, 0.1], [1047, 0.36]], 'triangle', 0.22); this.buzz([50, 50, 50, 50, 120]); },
+    bad() { this.seq([[440, 0.14, 0.15], [330, 0.3]], 'sawtooth', 0.09); this.buzz([120]); },
+    neutral() { this.tone(494, 0, 0.18, 'sine', 0.12); this.buzz(30); },
+    win() { this.seq([[523, 0.12, 0.13], [659, 0.12, 0.13], [784, 0.12, 0.13], [1047, 0.18, 0.2], [784, 0.1, 0.11], [1047, 0.45]], 'triangle', 0.22); this.buzz([80, 50, 80, 50, 200]); },
+    lose() { this.seq([[392, 0.2, 0.22], [349, 0.2, 0.22], [294, 0.45]], 'sine', 0.14); this.buzz([200]); },
+    toggle() { this.enabled = !this.enabled; safeSet(FX_KEY, this.enabled ? 'on' : 'off'); if (this.enabled) { this.ensure(); this.tap(); } this.renderToggle(); },
+    renderToggle() { const b = $('soundBtn'); if (b) { b.textContent = this.enabled ? '🔊' : '🔇'; b.title = this.enabled ? 'Sound & vibration on' : 'Sound & vibration off'; } }
+  };
+  // browsers only let audio start after a user gesture — warm the context on the first tap
+  ['pointerdown', 'touchstart', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if (fx.enabled) fx.ensure(); }, { passive: true }));
+
+  // detects transitions between renders so cues fire once per event
+  const cueState = { key: null, turnKey: null };
+  function playCuesFor(v) {
+    const me = v.me.idx;
+    if (app.role === 'local') {
+      // one phone: turn chimes come from the curtain; hand/game results are shared, so use neutral-positive cues
+      if (v.phase === 'roundOver' && v.result) { const k = 'round:' + v.result.ts; if (cueState.key !== k) { cueState.key = k; if (v.result.void) fx.neutral(); else if (v.result.outcome === 'gin') fx.gin(); else fx.knockGood(); } }
+      else if (v.phase === 'gameOver') { const k = 'over:' + v.players.map(p => p.total).join(','); if (cueState.key !== k) { cueState.key = k; fx.win(); } }
+      return;
+    }
+    if (v.phase === 'gameOver') {
+      const k = 'over:' + v.handNumber + ':' + v.players.map(p => p.total).join(',');
+      if (cueState.key !== k) { cueState.key = k; if (v.winner === me) fx.win(); else fx.lose(); }
+      return;
+    }
+    if (v.phase === 'roundOver' && v.result) {
+      const k = 'round:' + v.result.ts;
+      if (cueState.key !== k) {
+        cueState.key = k;
+        if (v.result.void) fx.neutral();
+        else if (v.result.scorerIdx === me) { if (v.result.outcome === 'gin') fx.gin(); else fx.knockGood(); }
+        else fx.bad();
+      }
+      cueState.turnKey = null;
+      return;
+    }
+    const tk = v.handNumber + ':' + v.phase + ':' + v.turn + ':' + (v.upcardStage || '');
+    const prevWasMine = cueState.turnKey && cueState.turnKey.endsWith(':me');
+    if (v.isMyTurn && v.phase !== 'discard') {
+      if (cueState.turnKey !== tk + ':me' && !prevWasMine) fx.yourTurn();
+      cueState.turnKey = tk + ':me';
+    } else if (!v.isMyTurn) cueState.turnKey = tk + ':them';
+    else cueState.turnKey = tk + ':me';
+  }
+
+  // ---------- card rendering ----------
+  function cardHtml(c, opts) {
+    opts = opts || {};
+    const red = c.s === 'H' || c.s === 'D';
+    const cls = ['card', red ? 'red' : 'black', opts.mini ? 'mini' : '', opts.big ? 'big' : '', opts.selected ? 'selected' : '', opts.dim ? 'dim' : '', opts.fresh ? 'fresh' : '', opts.locked ? 'locked' : ''].filter(Boolean).join(' ');
+    return `<div class="${cls}" data-card="${c.id}"><span class="rank">${E.rankLabel(c.r)}</span><span class="suit">${E.SUIT_SYMBOL[c.s]}</span><span class="rank br">${E.rankLabel(c.r)}</span></div>`;
+  }
+  function backHtml(cls) { return `<div class="card back ${cls || ''}"></div>`; }
+  function meldGroupsHtml(melds, extra, mini) {
+    let html = '';
+    melds.forEach((m, i) => { html += `<div class="meld-group m${i % 5}">${m.map(c => cardHtml(c, { mini })).join('')}</div>`; });
+    if (extra) html += extra;
+    return html;
+  }
+
+  // ---------- rendering the table ----------
+  function render() {
+    const v = app.view;
+    if (!v) return;
+    playCuesFor(v);
+    if (v.phase === 'gameOver') { renderEndgame(v); return; }
+    showScreen('tableScreen');
+    const me = v.me, opp = v.opp;
+
+    // opponent strip
+    $('oppName').textContent = opp.name;
+    $('oppScore').textContent = opp.total + ' pts';
+    $('oppCards').innerHTML = Array.from({ length: Math.min(opp.cardCount, 11) }, () => backHtml('tiny')).join('') + `<span class="opp-count">${opp.cardCount}</span>`;
+    $('connDot').className = 'conn-dot ' + (app.oppConnected ? 'on' : 'off') + (app.role === 'local' ? ' hidden' : '');
+    $('connDot').title = app.oppConnected ? 'Connected' : 'Disconnected';
+    $('roundBadge').textContent = 'Hand ' + v.handNumber;
+    $('targetBadge').textContent = 'to ' + v.target;
+
+    // piles
+    const stock = $('stockPile'), disc = $('discardPile');
+    ensurePile(stock, backHtml('big'), `Stock · ${v.stockCount}`, 'back');
+    ensurePile(disc, v.discardTop ? cardHtml(v.discardTop, { big: true }) : '<div class="card big empty"></div>', 'Discard', v.discardTop ? v.discardTop.id : 'empty');
+    // Piles take centre stage while they're what you act on, then shrink to make room
+    // for the discard/knock buttons.
+    const pilesActive = v.isMyTurn && (v.phase === 'draw' || v.phase === 'upcard');
+    const scr = $('tableScreen');
+    scr.classList.toggle('piles-big', pilesActive);
+    scr.classList.toggle('piles-small', !pilesActive);
+    const canDrawStock = v.isMyTurn && v.phase === 'draw';
+    const canDrawDiscard = v.isMyTurn && v.phase === 'draw' && !v.forceStock && !!v.discardTop;
+    const canTakeUpcard = v.isMyTurn && v.phase === 'upcard';
+    stock.classList.toggle('tappable', canDrawStock);
+    disc.classList.toggle('tappable', canDrawDiscard || canTakeUpcard);
+    disc.classList.toggle('blocked', v.isMyTurn && v.phase === 'draw' && v.forceStock);
+
+    // status
+    let status = '', sub = '';
+    const oppTurnName = opp.name;
+    if (v.phase === 'roundOver') { status = v.result && v.result.void ? 'Hand void' : 'Hand over'; sub = 'See results'; }
+    else if (!v.isMyTurn) {
+      status = `${oppTurnName}'s turn`;
+      sub = v.phase === 'upcard' ? 'Deciding on the upcard…' : v.phase === 'draw' ? 'Drawing a card…' : 'Choosing a discard…';
+    } else if (v.phase === 'upcard') { status = 'Your turn'; sub = 'Take the upcard or pass'; }
+    else if (v.phase === 'draw') { status = 'Your turn'; sub = v.forceStock ? 'Both passed — tap the stock to draw' : 'Tap the stock or the discard pile'; }
+    else if (v.phase === 'discard') { status = 'Your turn'; sub = app.selectedCard ? 'Discard it, or knock if you can' : 'Tap a card to select it'; }
+    $('statusMain').textContent = status;
+    $('statusSub').textContent = sub;
+    $('statusBanner').classList.toggle('mine', v.isMyTurn && v.phase !== 'roundOver');
+    $('lastAction').textContent = v.lastAction ? v.lastAction.text : '';
+
+    // my hand
+    $('myName').textContent = `${me.name} · ${me.total} pts`;
+    if (app.selectedCard && !me.hand.some(c => c.id === app.selectedCard)) app.selectedCard = null;
+    let dwText;
+    if (v.phase === 'discard' && v.isMyTurn && v.discardOptions) {
+      if (app.selectedCard && !v.discardOptions[app.selectedCard].locked) dwText = `Deadwood after discard: ${v.discardOptions[app.selectedCard].deadwood}`;
+      else {
+        const best = Math.min(...Object.values(v.discardOptions).filter(o => !o.locked).map(o => o.deadwood));
+        dwText = `Best possible deadwood: ${best}`;
+      }
+    } else dwText = `Deadwood: ${me.deadwoodValue}`;
+    // The deadwood readout doubles as the meld-arrangement control when the hand can be
+    // melded more than one way for the same score.
+    const altCount = (v.meldOptions || []).length;
+    const dwEl = $('deadwoodInfo');
+    dwEl.innerHTML = esc(dwText) + (altCount > 1 ? `<span class="alt-badge">⇄ ${altCount} ways</span>` : '');
+    dwEl.classList.toggle('tappable-dw', altCount > 1);
+    dwEl.title = altCount > 1 ? 'Tap to choose which melds you declare' : '';
+
+    const deadHtml = me.deadwood.length ? `<div class="meld-group dead">${me.deadwood.map(c => cardHtml(c, { selected: app.selectedCard === c.id, fresh: v.lastDrawnId === c.id, locked: v.drawnFromDiscard === c.id && v.phase === 'discard' && v.isMyTurn })).join('')}</div>` : '';
+    let html = '';
+    me.melds.forEach((m, i) => { html += `<div class="meld-group m${i % 5}">${m.map(c => cardHtml(c, { selected: app.selectedCard === c.id, fresh: v.lastDrawnId === c.id, locked: v.drawnFromDiscard === c.id && v.phase === 'discard' && v.isMyTurn })).join('')}</div>`; });
+    $('hand').innerHTML = html + deadHtml;
+    $('hand').classList.toggle('active', v.isMyTurn && v.phase === 'discard');
+
+    // undo (only meaningful right after a draw, before discarding)
+    $('undoBar').classList.toggle('hidden', !(v.phase === 'discard' && v.isMyTurn && v.canUndo));
+
+    // actions
+    const act = $('actions');
+    if (v.phase === 'upcard' && v.isMyTurn) {
+      act.innerHTML = `<button class="btn btn-secondary grow" data-act="passUpcard">Pass</button><button class="btn btn-primary grow" data-act="takeUpcard">Take ${v.discardTop ? E.pretty(v.discardTop) : 'upcard'}</button>`;
+    } else if (v.phase === 'discard' && v.isMyTurn) {
+      const sel = app.selectedCard && v.discardOptions[app.selectedCard];
+      const canDiscard = !!(sel && !sel.locked);
+      const canKnock = !!(sel && sel.canKnock);
+      const knockLabel = sel && sel.isGin ? 'Discard &amp; GIN!' : 'Discard &amp; knock';
+      act.innerHTML = `<button class="btn btn-secondary grow" data-act="discard" ${canDiscard ? '' : 'disabled'}>Discard &amp; end turn</button><button class="btn btn-gold grow" data-act="knock" ${canKnock ? '' : 'disabled'}>${knockLabel}${sel && !sel.locked ? ` <small>(${sel.deadwood})</small>` : ''}</button>`;
+    } else if (v.phase === 'roundOver') {
+      act.innerHTML = `<button class="btn btn-primary grow" data-act="showResult">Show results</button>`;
+    } else {
+      act.innerHTML = `<div class="waiting-note">${v.isMyTurn ? '' : `Waiting for ${esc(opp.name)}…`}</div>`;
+    }
+
+    // round result modal
+    if (v.phase === 'roundOver') renderRoundResult(v); else $('roundResultOverlay').classList.add('hidden');
+
+    queueFit();
+  }
+
+  function renderRoundResult(v) {
+    const r = v.result; if (!r) return;
+    const P = v.players;
+    const ov = $('roundResultOverlay');
+    const idx = v.rounds.length - 1;
+    const prevTs = idx > 0 ? v.rounds[idx - 1].ts : v.startedAt;
+    const roundDur = fmtDuration((v.rounds[idx] ? v.rounds[idx].ts : r.ts) - prevTs);
+    if (r.void) {
+      $('rrTitle').textContent = 'Hand void';
+      $('rrSub').textContent = `Only two cards were left in the stock. No points — same dealer redeals. · ⏱ ${roundDur}`;
+      $('rrBody').innerHTML = '';
+    } else {
+      const k = r.knockerIdx, o = 1 - k;
+      const kn = P[k].name, on = P[o].name;
+      $('rrTitle').textContent = r.outcome === 'gin' ? `${kn} went Gin!` : r.outcome === 'undercut' ? `${on} undercut ${kn}!` : `${kn} knocked`;
+      $('rrSub').textContent = (r.outcome === 'gin' ? `+${E.GIN_BONUS} bonus + ${on}'s ${r.opponent.value} deadwood` : r.outcome === 'undercut' ? `${on} had ${r.opponent.value} deadwood vs ${kn}'s ${r.knocker.value} → difference + ${E.UNDERCUT_BONUS} bonus` : `${kn} ${r.knocker.value} deadwood vs ${on} ${r.opponent.value}`) + ` · ⏱ ${roundDur}`;
+      const panel = (name, side, pts, isKnocker) => {
+        const laid = side.laidOff && side.laidOff.length ? `<div class="rr-label">Laid off onto ${esc(kn)}'s melds</div><div class="meld-group laid">${side.laidOff.map(x => cardHtml(x.card, { mini: true })).join('')}</div>` : '';
+        const dead = side.deadwood.length ? `<div class="rr-label">Deadwood · ${side.value}</div><div class="meld-group dead">${side.deadwood.map(c => cardHtml(c, { mini: true })).join('')}</div>` : `<div class="rr-label">No deadwood</div>`;
+        return `<div class="rr-panel ${pts > 0 ? 'scored' : ''}"><div class="rr-head"><span>${esc(name)}${isKnocker ? ' <small>(knocked)</small>' : ''}</span><span class="rr-pts">${pts > 0 ? '+' + pts : '0'}</span></div>` +
+          (side.melds.length ? `<div class="rr-label">Melds</div><div class="rr-melds">${meldGroupsHtml(side.melds, '', true)}</div>` : '') + laid + dead + `</div>`;
+      };
+      $('rrBody').innerHTML = panel(kn, r.knocker, r.scores[k], true) + panel(on, r.opponent, r.scores[o], false) +
+        `<div class="rr-totals">${P.map(p => `<span>${esc(p.name)} <strong>${p.total}</strong></span>`).join('')}</div>`;
+    }
+    const meReady = v.ready[v.me.idx];
+    const btn = $('rrContinueBtn');
+    btn.disabled = meReady;
+    btn.textContent = meReady ? `Waiting for ${v.opp.name}…` : (v.players.some(p => p.total >= v.target) ? 'See final result' : 'Next hand');
+    if (!ov.classList.contains('hidden') || !app.resultDismissed) ov.classList.remove('hidden');
+  }
+
+  function renderMeldChooser() {
+    const v = app.view; if (!v) return;
+    const opts = v.meldOptions || [];
+    if (opts.length < 2) { toast('This hand can only be melded one way.'); return; }
+    $('meldSub').textContent = `${opts.length} ways to meld for the same ${v.me.deadwoodValue} deadwood. Your score is identical either way — but the melds you declare decide what ${v.opp.name} can lay off if you knock.`;
+    $('meldOptionList').innerHTML = opts.map((o, i) => {
+      const active = o.sig === v.activeMeldSig;
+      const meldsHtml = o.melds.map((m, mi) => `<div class="meld-group m${mi % 5}">${m.map(c => cardHtml(c, { mini: true })).join('')}</div>`).join('');
+      const deadHtml = o.deadwood.length
+        ? `<div class="meld-group dead">${o.deadwood.map(c => cardHtml(c, { mini: true })).join('')}</div>`
+        : '<div class="empty-note" style="text-align:left;">No deadwood — that\'s gin!</div>';
+      return `<div class="rr-panel ${active ? 'scored' : ''}">
+        <div class="rr-head"><span>Option ${i + 1}${active ? ' <small>(in use)</small>' : ''}</span><span class="rr-pts">${o.value}</span></div>
+        <div class="rr-label">Melds</div><div class="rr-melds">${meldsHtml}</div>
+        <div class="rr-label">Deadwood · ${o.value}</div><div class="rr-melds">${deadHtml}</div>
+        ${active ? '' : `<button class="btn btn-primary btn-block btn-sm" data-meld-opt="${i}" style="margin-top:8px;">Use this arrangement</button>`}
+      </div>`;
+    }).join('');
+    $('meldOptionList').querySelectorAll('[data-meld-opt]').forEach(b => b.addEventListener('click', () => {
+      const o = opts[+b.dataset.meldOpt];
+      if (!o) return;
+      act({ type: 'setMelds', melds: o.melds.map(m => m.map(c => c.id)) });
+      $('meldOverlay').classList.add('hidden');
+    }));
+    $('meldOverlay').classList.remove('hidden');
+  }
+
+  function renderEndgame(v) {
+    showScreen('endgameScreen');
+    const w = v.players[v.winner];
+    $('endgameTitle').textContent = `${w.name} wins! 🎉`;
+    $('endgameSub').textContent = `Reached ${w.total} points (target ${v.target})`;
+    const ranked = v.players.map((p, i) => ({ p, i })).sort((a, b) => b.p.total - a.p.total);
+    $('finalStandings').innerHTML = ranked.map((x, n) => `<div class="standing-row ${x.i === v.winner ? 'winner' : ''}"><div class="standing-rank">#${n + 1}</div><div class="standing-name">${x.i === v.winner ? '👑 ' : ''}${esc(x.p.name)}</div><div class="standing-total">${x.p.total}</div></div>`).join('');
+    const last = v.rounds[v.rounds.length - 1];
+    $('gameDuration').textContent = last ? `${fmtDuration(last.ts - v.startedAt)} · ${v.rounds.length} hands` : '—';
+    const meReady = v.ready[v.me.idx];
+    $('rematchBtn').disabled = meReady;
+    $('rematchBtn').textContent = meReady ? `Waiting for ${v.opp.name}…` : 'Rematch';
+  }
+
+  function renderHistory() {
+    const v = app.view; const list = $('historyList');
+    if (!v || !v.rounds.length) { list.innerHTML = '<div class="empty-note">No hands finished yet.</div>'; return; }
+    const P = v.players;
+    list.innerHTML = v.rounds.map((r, i) => {
+      const when = fmtTime(r.ts);
+      const prevTs = i > 0 ? v.rounds[i - 1].ts : v.startedAt;
+      const dur = fmtDuration(r.ts - prevTs);
+      if (r.void) return `<div class="history-round"><div class="history-meta"><div class="history-scores"><strong>H${r.handNumber}</strong> — void (stock ran out)</div><div class="history-time">${when} · took ${dur}</div></div></div>`;
+      const k = P[r.knockerIdx], o = P[1 - r.knockerIdx];
+      const desc = r.outcome === 'gin' ? `${esc(k.name)} went Gin` : r.outcome === 'undercut' ? `${esc(o.name)} undercut ${esc(k.name)} (${r.deadwood[o.id]} vs ${r.deadwood[k.id]})` : `${esc(k.name)} knocked (${r.deadwood[k.id]} vs ${r.deadwood[o.id]})`;
+      const pts = P.map(p => `${esc(p.name)}: ${r.scores[p.id] > 0 ? '+' : ''}${r.scores[p.id]}`).join(' · ');
+      return `<div class="history-round"><div class="history-meta"><div class="history-scores"><strong>H${r.handNumber}</strong> — ${desc}</div><div class="history-scores">${pts}</div><div class="history-time">${when} · took ${dur}</div></div></div>`;
+    }).join('') + (v.rounds.length ? `<div id="historyTotalTime">⏱ Time played: ${fmtDuration(v.rounds[v.rounds.length - 1].ts - v.startedAt)}</div>` : '');
+  }
+
+  // ---------- actions ----------
+  // ---------- pass-and-play (one phone) ----------
+  function startLocal(p1, p2, target, savedGame) {
+    app.role = 'local'; app.code = null; app.conn = null; app.peer = null; app.oppConnected = true;
+    app.game = savedGame || E.createGame({ players: [{ id: 'p1', name: p1 }, { id: 'p2', name: p2 }], target });
+    app.revealed = null; app.resultDismissed = false;
+    holdWakeLock();
+    localBroadcast(true);
+  }
+  function localAct(action) {
+    const g = app.game;
+    if (action.type === 'ready') {
+      const r1 = E.applyAction(g, 0, action); const r2 = E.applyAction(g, 1, action);
+      if (!r1.ok && !r2.ok) { toast(r1.error); return; }
+    } else {
+      const res = E.applyAction(g, g.turn, action);
+      if (!res.ok) { toast(res.error); return; }
+    }
+    app.resultDismissed = false;
+    localBroadcast(false);
+  }
+  function localBroadcast(initial) {
+    const g = app.game;
+    const inPlay = g.phase !== 'roundOver' && g.phase !== 'gameOver';
+    const viewIdx = inPlay ? g.turn : (app.revealed != null ? app.revealed : 0);
+    app.view = E.viewFor(g, viewIdx);
+    app.selectedCard = null;
+    persist();
+    if (inPlay && app.revealed !== g.turn) {
+      showCurtain(g.turn, initial);
+    } else {
+      $('curtainOverlay').classList.add('hidden');
+    }
+    render();
+  }
+  function showCurtain(turnIdx, initial) {
+    const g = app.game; const p = g.players[turnIdx], o = g.players[1 - turnIdx];
+    $('curtainTitle').textContent = `Pass the phone to ${p.name}`;
+    $('curtainSub').textContent = `${o.name}, look away 👀`;
+    $('curtainLast').textContent = g.lastAction ? g.lastAction.text : '';
+    $('curtainBtn').textContent = `I'm ${p.name} — show my cards`;
+    $('curtainOverlay').classList.remove('hidden');
+    if (!initial) fx.yourTurn();
+  }
+
+  function act(action) {
+    fx.tap();
+    if (app.role === 'local') { localAct(action); return; }
+    if (app.role === 'host') dispatch(0, action);
+    else if (app.conn && app.conn.open) app.conn.send({ t: 'action', action });
+    else toast('Not connected to the host.');
+  }
+
+  // host-only: apply + broadcast
+  function dispatch(pIdx, action) {
+    const res = E.applyAction(app.game, pIdx, action);
+    if (!res.ok) {
+      if (pIdx === 0) toast(res.error); else if (app.conn && app.conn.open) app.conn.send({ t: 'toast', msg: res.error });
+      return;
+    }
+    app.resultDismissed = false;
+    broadcast();
+  }
+  function broadcast() {
+    app.view = E.viewFor(app.game, 0);
+    if (app.conn && app.conn.open) app.conn.send({ t: 'state', view: E.viewFor(app.game, 1) });
+    app.selectedCard = null;
+    persist();
+    render();
+  }
+
+  // ---------- PeerJS: host ----------
+  function startHost(resumeCode) {
+    app.role = 'host';
+    app.code = resumeCode || genCode();
+    showScreen('hostWaitScreen');
+    $('roomCode').textContent = app.code;
+    $('hostWaitStatus').textContent = 'Opening room…';
+    $('startGameBtn').classList.add('hidden');
+    whenPeerReady(() => {
+      if (app.role !== 'host' || app.code !== (resumeCode || app.code)) return; // user navigated away while we waited
+      const peer = new Peer(PEER_PREFIX + app.code, PEER_OPTS);
+      app.peer = peer;
+      holdWakeLock();
+      peerWatchdog(peer, 10000, () => { $('hostWaitStatus').textContent = 'Still trying to open the room… Your network may be blocking the connection service (VPN / strict Wi-Fi). Try mobile data or another network.'; });
+      keepPeerAlive(peer, (n) => { if (!app.oppConnected) $('hostWaitStatus').textContent = `Reconnecting to the connection service (attempt ${n})…`; });
+      peer.on('open', () => {
+        if (!app.oppConnected) $('hostWaitStatus').textContent = app.game ? `Room ${app.code} reopened — waiting for ${app.oppName || 'your opponent'} to rejoin…` : 'Waiting for your opponent to join…';
+        persist();
+      });
+      peer.on('error', (e) => {
+        if (e.type === 'unavailable-id') { peer.destroy(); if (!resumeCode) startHost(); else { toast('Room code busy, retrying…'); setTimeout(() => startHost(resumeCode), 1500); } return; }
+        const msg = describePeerError(e);
+        $('hostWaitStatus').textContent = msg; $('hostWaitStatus').classList.remove('pulse');
+        toast(msg, 5000);
+      });
+      peer.on('connection', (conn) => {
+        if (app.conn && app.conn.open) { conn.on('open', () => { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 300); }); return; }
+        app.conn = conn;
+        conn.on('open', () => { conn.send({ t: 'welcome', hostName: app.myName, target: app.target }); });
+        conn.on('data', (msg) => onGuestMsg(conn, msg));
+        conn.on('close', () => { if (app.conn === conn) { app.oppConnected = false; onGuestGone(); } });
+        conn.on('error', () => { if (app.conn === conn) { app.oppConnected = false; onGuestGone(); } });
+      });
+    }, () => {
+      $('hostWaitStatus').textContent = "The connection library didn't load. Check your internet and reload the page.";
+      $('hostWaitStatus').classList.remove('pulse');
+    });
+  }
+  function onGuestGone() {
+    if (app.game && app.view && app.view.phase !== 'gameOver') { render(); toast(`${app.oppName || 'Opponent'} disconnected — they can rejoin with code ${app.code}.`, 4000); }
+    else if (!app.game) { $('hostWaitStatus').textContent = 'Opponent left. Waiting for someone to join…'; $('startGameBtn').classList.add('hidden'); }
+  }
+  function onGuestMsg(conn, msg) {
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.t === 'join') {
+      let name = String(msg.name || 'Jeff').slice(0, 20).trim() || 'Jeff';
+      if (name.toLowerCase() === app.myName.toLowerCase()) name += ' 2';
+      app.oppConnected = true;
+      if (app.game) {
+        // rejoin: keep the seat, refresh name
+        app.game.players[1].name = name; app.oppName = name;
+        broadcast();
+      } else {
+        app.oppName = name;
+        $('hostWaitStatus').textContent = `${name} joined! Ready when you are.`;
+        $('startGameBtn').classList.remove('hidden');
+        conn.send({ t: 'lobby', hostName: app.myName, target: app.target });
+      }
+      return;
+    }
+    if (msg.t === 'action') { if (!app.game) return; dispatch(1, msg.action); return; }
+  }
+  function hostStartGame() {
+    if (!app.oppConnected) { toast('Waiting for your opponent to join.'); return; }
+    app.game = E.createGame({ players: [{ id: 'host', name: app.myName }, { id: 'guest', name: app.oppName }], target: app.target });
+    app.resultDismissed = false;
+    broadcast();
+  }
+
+  // ---------- PeerJS: guest ----------
+  function startGuest(code) {
+    app.role = 'guest';
+    app.code = code;
+    showScreen('guestWaitScreen');
+    $('guestWaitStatus').textContent = `Connecting to room ${code}…`;
+    whenPeerReady(() => {
+      if (app.role !== 'guest' || app.code !== code) return; // user navigated away while we waited
+      const peer = new Peer(PEER_OPTS);
+      app.peer = peer;
+      holdWakeLock();
+      peerWatchdog(peer, 10000, () => { $('guestWaitStatus').textContent = 'Still trying to reach the connection service… Your network may be blocking it (VPN / strict Wi-Fi). Try mobile data or another network.'; });
+      keepPeerAlive(peer, (n) => { if (!app.oppConnected) $('guestWaitStatus').textContent = `Reconnecting to the connection service (attempt ${n})…`; });
+      let joinTries = 0;
+      function tryJoin() {
+        if (peer.destroyed || peer.disconnected) return;
+        joinTries++;
+        $('guestWaitStatus').textContent = joinTries === 1 ? `Found the service — connecting to room ${code}…` : `Room ${code} isn't answering yet (the host's phone may be asleep or on another app). Retrying… (${joinTries})`;
+        const conn = peer.connect(PEER_PREFIX + code, { reliable: true });
+        app.conn = conn;
+        let opened = false;
+        setTimeout(() => { if (!opened && app.conn === conn && !app.oppConnected) $('guestWaitStatus').textContent = `Room ${code} answered but the phones can't reach each other yet… still trying. If this persists, put both phones on the same Wi-Fi or both on mobile data.`; }, 12000);
+        conn.on('open', () => { opened = true; joinTries = 0; app.oppConnected = true; conn.send({ t: 'join', name: app.myName }); $('guestWaitStatus').textContent = 'Connected. Waiting for the host to start…'; persist(); });
+        conn.on('data', onHostMsg);
+        conn.on('close', () => { if (app.conn !== conn) return; app.oppConnected = false; if (app.view && app.view.phase !== 'gameOver') { render(); toast('Lost connection to the host — reconnecting…', 4000); setTimeout(tryJoin, 1500); } else { $('guestWaitStatus').textContent = 'Disconnected from the host — reconnecting…'; showScreen('guestWaitScreen'); setTimeout(tryJoin, 1500); } });
+        conn.on('error', (e) => { toast(describePeerError(e), 5000); });
+      }
+      peer.on('open', tryJoin);
+      peer.on('error', (e) => {
+        if (e.type === 'peer-unavailable') {
+          // Host not registered right now — usually a backgrounded phone. Keep retrying for a while.
+          if (joinTries < 40) { setTimeout(tryJoin, 3000); return; }
+          $('guestWaitStatus').textContent = `Room ${code} not found. Check the code, and make sure the host's phone still has the room screen open.`; $('guestWaitStatus').classList.remove('pulse'); return;
+        }
+        const msg = describePeerError(e);
+        $('guestWaitStatus').textContent = msg; $('guestWaitStatus').classList.remove('pulse');
+        toast(msg, 5000);
+      });
+    }, () => {
+      $('guestWaitStatus').textContent = "The connection library didn't load. Check your internet and reload the page.";
+      $('guestWaitStatus').classList.remove('pulse');
+    });
+  }
+  function onHostMsg(msg) {
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.t === 'welcome' || msg.t === 'lobby') { app.oppName = msg.hostName; app.target = msg.target; $('guestWaitStatus').textContent = `Connected to ${msg.hostName}'s room (playing to ${msg.target}). Waiting for the host to start…`; return; }
+    if (msg.t === 'full') { $('guestWaitStatus').textContent = 'That room already has two players.'; return; }
+    if (msg.t === 'toast') { toast(msg.msg); return; }
+    if (msg.t === 'state') { app.view = msg.view; app.oppConnected = true; app.selectedCard = null; app.resultDismissed = false; render(); return; }
+  }
+
+  // ---------- leave ----------
+  function leaveGame() {
+    if (!confirm(app.role === 'local' ? 'End this game? Scores will be cleared.' : 'Leave this game? The room will close.')) return;
+    dropWakeLock();
+    try { if (app.conn) app.conn.close(); if (app.peer) app.peer.destroy(); } catch (e) {}
+    app.role = null; app.game = null; app.view = null; app.conn = null; app.peer = null; app.oppConnected = false; app.code = null; app.revealed = null;
+    clearSaved();
+    $('roundResultOverlay').classList.add('hidden');
+    $('curtainOverlay').classList.add('hidden');
+    initHome();
+  }
+
+  // ---------- home tabs ----------
+  const HOME_TABS = ['play', 'rules', 'score'];
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function setHomeTab(tab, opts) {
+    opts = opts || {};
+    if (HOME_TABS.indexOf(tab) === -1) tab = 'play';
+    app.homeTab = tab;
+    if (opts.persist !== false) safeSet(TAB_KEY, tab);
+    HOME_TABS.forEach(t => {
+      const btn = $('tab' + cap(t) + 'Btn'); if (btn) btn.classList.toggle('active', t === tab);
+      const panel = $(t + 'Panel'); if (panel) panel.classList.toggle('hidden', t !== tab);
+    });
+    if (tab === 'play') renderPlayMode();
+    if (tab === 'score' && window.__scorer) window.__scorer.onShown();
+  }
+
+  function setPlayMode(mode) {
+    app.playMode = (mode === 'local') ? 'local' : 'online';
+    safeSet(PLAYMODE_KEY, app.playMode);
+    renderPlayMode();
+  }
+
+  function renderPlayMode() {
+    $('onlineModeContent').classList.toggle('hidden', app.playMode !== 'online');
+    $('localModeContent').classList.toggle('hidden', app.playMode !== 'local');
+    document.querySelectorAll('#playModeSwitch .mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === app.playMode));
+    document.querySelectorAll('#playSubmenu button').forEach(b => b.classList.toggle('active', b.dataset.mode === app.playMode));
+  }
+
+  // ---------- home ----------
+  function initHome() {
+    showScreen('homeScreen');
+    const savedName = safeGet(NAME_KEY);
+    if (savedName) { $('nameInput').value = savedName; $('p1NameInput').value = savedName; app.nameTouched = true; }
+    app.homeTab = safeGet(TAB_KEY) || 'play';
+    app.playMode = safeGet(PLAYMODE_KEY) || 'online';
+    setHomeTab(app.homeTab, { persist: false });
+    const saved = loadSaved();
+    const resume = $('resumeBox');
+    const sc = window.__scorer && window.__scorer.saved();
+    if (sc) {
+      resume.classList.remove('hidden');
+      $('resumeBtn').textContent = `Resume scoring: ${sc.players.map(p => p.name).join(' vs ')}`;
+      $('resumeBtn').onclick = () => window.__scorer.resume();
+    } else if (saved && saved.role === 'local' && saved.game && saved.game.phase !== 'gameOver') {
+      resume.classList.remove('hidden');
+      $('resumeBtn').textContent = `Resume pass & play: ${saved.game.players.map(p => p.name).join(' vs ')}`;
+      $('resumeBtn').onclick = () => startLocal(null, null, null, saved.game);
+    } else if (saved && saved.role === 'host' && saved.game && saved.game.phase !== 'gameOver') {
+      resume.classList.remove('hidden');
+      $('resumeBtn').textContent = `Resume hosting room ${saved.code}`;
+      $('resumeBtn').onclick = () => {
+        app.myName = saved.myName; app.target = saved.target; app.game = saved.game; app.oppName = saved.oppName;
+        app.view = E.viewFor(app.game, 0);
+        startHost(saved.code);
+      };
+    } else if (saved && saved.role === 'guest' && saved.code) {
+      resume.classList.remove('hidden');
+      $('resumeBtn').textContent = `Rejoin room ${saved.code}`;
+      $('resumeBtn').onclick = () => { app.myName = saved.myName; startGuest(saved.code); };
+    } else resume.classList.add('hidden');
+  }
+
+  // ---------- events ----------
+  document.addEventListener('DOMContentLoaded', () => {
+    const nameInput = $('nameInput');
+    const p1NameInput = $('p1NameInput');
+    function rememberName(n) { if (n) safeSet(NAME_KEY, n.slice(0, 20)); else safeDel(NAME_KEY); }
+    nameInput.addEventListener('input', () => { app.nameTouched = true; rememberName(nameInput.value.trim()); });
+    p1NameInput.addEventListener('input', () => { rememberName(p1NameInput.value.trim()); });
+
+    $('hostBtn').addEventListener('click', () => {
+      app.myName = (nameInput.value.trim() || 'Ari').slice(0, 20);
+      const t = parseInt($('targetInput').value, 10); app.target = (!isNaN(t) && t > 0) ? t : 100;
+      app.game = null; app.oppName = null; app.oppConnected = false;
+      startHost();
+    });
+    $('joinBtn').addEventListener('click', () => {
+      const code = $('codeInput').value.trim().toUpperCase();
+      if (code.length !== 4) { toast('Enter the 4-letter room code.'); return; }
+      const typed = nameInput.value.trim();
+      app.myName = (typed && (app.nameTouched || typed !== 'Ari') ? typed : 'Jeff').slice(0, 20);
+      startGuest(code);
+    });
+    // Keep the code exactly as typed: uppercase letters only, and ignore keyboard word suggestions
+    // (composition/autocorrect replacements arrive as insertReplacementText or longer inserted strings).
+    const codeInput = $('codeInput');
+    let lastGoodCode = '';
+    codeInput.addEventListener('beforeinput', (e) => {
+      if (e.inputType === 'insertReplacementText' || (e.inputType === 'insertText' && e.data && e.data.length > 1)) e.preventDefault();
+    });
+    codeInput.addEventListener('input', (e) => {
+      let v = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+      // a suggestion that swapped earlier letters would show up as a change not at the end — revert to last good + new char
+      if (e.inputType === 'insertReplacementText') v = lastGoodCode;
+      e.target.value = v; lastGoodCode = v;
+    });
+    codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click(); });
+    $('startGameBtn').addEventListener('click', hostStartGame);
+    $('localBtn').addEventListener('click', () => {
+      const p1 = (p1NameInput.value.trim() || 'Player 1').slice(0, 20);
+      let p2 = ($('p2NameInput').value.trim() || 'Player 2').slice(0, 20);
+      if (p2.toLowerCase() === p1.toLowerCase()) p2 += ' 2';
+      const t = parseInt($('localTargetInput').value, 10);
+      startLocal(p1, p2, (!isNaN(t) && t > 0) ? t : 100);
+    });
+
+    // ---------- home tab bar: tap, hover (desktop), and long-press (touch) ----------
+    $('tabRulesBtn').addEventListener('click', () => setHomeTab('rules'));
+    $('tabScoreBtn').addEventListener('click', () => setHomeTab('score'));
+    document.querySelectorAll('#playModeSwitch .mode-btn').forEach(b => b.addEventListener('click', () => setPlayMode(b.dataset.mode)));
+
+    const tabPlayBtn = $('tabPlayBtn'), playSubmenu = $('playSubmenu'), tabPlayWrap = $('tabPlayWrap');
+    let pressTimer = null, longPressed = false;
+    tabPlayBtn.addEventListener('pointerdown', () => {
+      longPressed = false;
+      clearTimeout(pressTimer);
+      pressTimer = setTimeout(() => { longPressed = true; playSubmenu.classList.add('force-open'); fx.tap(); }, 450);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => tabPlayBtn.addEventListener(ev, () => clearTimeout(pressTimer)));
+    tabPlayBtn.addEventListener('click', () => {
+      if (longPressed) { longPressed = false; return; } // long-press already opened the submenu; don't also switch tabs
+      playSubmenu.classList.remove('force-open');
+      setHomeTab('play');
+    });
+    playSubmenu.querySelectorAll('button[data-mode]').forEach(b => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setPlayMode(b.dataset.mode);
+      setHomeTab('play');
+      playSubmenu.classList.remove('force-open');
+    }));
+    document.addEventListener('click', (e) => { if (!tabPlayWrap.contains(e.target)) playSubmenu.classList.remove('force-open'); });
+    $('curtainBtn').addEventListener('click', () => {
+      app.revealed = app.game.turn;
+      $('curtainOverlay').classList.add('hidden');
+      fx.tap();
+      localBroadcast(true);
+    });
+    $('shareCodeBtn').addEventListener('click', async () => {
+      const text = `Join my Gin Rummy game — room code ${app.code}. Open ${location.href.split('?')[0]} and tap Join.`;
+      try { if (navigator.share) { await navigator.share({ title: 'Gin Rummy', text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+      try { await navigator.clipboard.writeText(text); toast('Invite copied to clipboard'); } catch (e) { toast('Room code: ' + app.code, 4000); }
+    });
+    $('cancelHostBtn').addEventListener('click', () => { try { app.peer && app.peer.destroy(); } catch (e) {} app.role = null; clearSaved(); initHome(); });
+    $('cancelGuestBtn').addEventListener('click', () => { try { app.peer && app.peer.destroy(); } catch (e) {} app.role = null; clearSaved(); initHome(); });
+
+    // table interactions
+    $('stockPile').addEventListener('click', () => { const v = app.view; if (v && v.isMyTurn && v.phase === 'draw') act({ type: 'drawStock' }); });
+    $('discardPile').addEventListener('click', () => {
+      const v = app.view; if (!v || !v.isMyTurn) return;
+      if (v.phase === 'upcard') act({ type: 'takeUpcard' });
+      else if (v.phase === 'draw') { if (v.forceStock) toast('Both players passed — you must draw from the stock.'); else act({ type: 'drawDiscard' }); }
+    });
+    $('hand').addEventListener('click', (e) => {
+      const el = e.target.closest('.card'); if (!el) return;
+      const v = app.view; if (!v || !v.isMyTurn || v.phase !== 'discard') return;
+      const id = el.dataset.card;
+      if (v.drawnFromDiscard === id) { toast("You can't discard the card you just took from the discard pile."); return; }
+      app.selectedCard = app.selectedCard === id ? null : id;
+      fx.tap();
+      render();
+    });
+    $('soundBtn').addEventListener('click', () => fx.toggle());
+    $('undoDrawBtn').addEventListener('click', () => act({ type: 'undoDraw' }));
+    $('deadwoodInfo').addEventListener('click', () => {
+      const v = app.view;
+      if (!v || (v.meldOptions || []).length < 2) return;
+      fx.tap(); renderMeldChooser();
+    });
+    window.addEventListener('resize', queueFit);
+    window.addEventListener('orientationchange', queueFit);
+    $('closeMeldBtn').addEventListener('click', () => $('meldOverlay').classList.add('hidden'));
+    $('meldOverlay').addEventListener('click', (e) => { if (e.target.id === 'meldOverlay') $('meldOverlay').classList.add('hidden'); });
+    fx.renderToggle();
+    $('actions').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-act]'); if (!b || b.disabled) return;
+      const a = b.dataset.act;
+      if (a === 'passUpcard' || a === 'takeUpcard') act({ type: a });
+      else if (a === 'discard') { if (app.selectedCard) act({ type: 'discard', cardId: app.selectedCard }); }
+      else if (a === 'knock') { if (app.selectedCard) act({ type: 'knock', cardId: app.selectedCard }); }
+      else if (a === 'showResult') { app.resultDismissed = false; $('roundResultOverlay').classList.remove('hidden'); }
+    });
+    $('rrContinueBtn').addEventListener('click', () => { act({ type: 'ready' }); });
+    $('rrHideBtn').addEventListener('click', () => { app.resultDismissed = true; $('roundResultOverlay').classList.add('hidden'); });
+    $('rematchBtn').addEventListener('click', () => act({ type: 'ready' }));
+    $('leaveBtn').addEventListener('click', leaveGame);
+    $('leaveBtnEnd').addEventListener('click', leaveGame);
+
+    // overlays
+    $('rulesBtnGame').addEventListener('click', () => $('rulesOverlay').classList.remove('hidden'));
+    $('closeRulesBtn').addEventListener('click', () => $('rulesOverlay').classList.add('hidden'));
+    $('historyBtn').addEventListener('click', () => { renderHistory(); $('historyOverlay').classList.remove('hidden'); });
+    $('historyBtnEnd').addEventListener('click', () => { renderHistory(); $('historyOverlay').classList.remove('hidden'); });
+    $('closeHistoryBtn').addEventListener('click', () => $('historyOverlay').classList.add('hidden'));
+    ['rulesOverlay', 'historyOverlay'].forEach(id => $(id).addEventListener('click', (e) => { if (e.target.id === id) $(id).classList.add('hidden'); }));
+
+    initHome();
+  });
+
+  // test/debug hook (read-only access to state; actions still go through the normal path)
+  window.__gin = { app, act, render, showScreen, initHome, fx, setHomeTab, setPlayMode };
+})();
+</script>
+<script>/* Standalone scorer mode — keep score for a game played with real cards. No networking. */
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const KEY = 'ginRummyScorerState_v2';
+  const NAMES_KEY = 'ginRummy_scorerNames';
+  const NAME_KEY = 'ginRummy_name';
+  const GIN_BONUS = 25, UNDERCUT_BONUS = 25;
+  const KNOCK_LABELS = { knock: 'Knock', gin: 'Gin' };
+
+  function safeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function safeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function safeDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  function esc(s) { return String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+  function uid() { return Math.random().toString(36).slice(2, 9); }
+  function fmtTime(ts) { return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+  function fmtDuration(ms) { ms = Math.max(0, ms); const t = Math.floor(ms / 1000), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60; return h ? `${h}h ${m}m` : m ? `${m}m ${s}s` : `${s}s`; }
+  function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 2600); }
+
+  let state = null; // { players:[{id,name,total}], target, rounds:[], startedAt }
+  let cur = { deadwood: {}, knockerId: null, knockType: null };
+
+  function save() { if (state) safeSet(KEY, JSON.stringify(state)); else safeDel(KEY); }
+  function loadSaved() { try { const raw = safeGet(KEY); const s = raw ? JSON.parse(raw) : null; return s && Array.isArray(s.players) && s.players.length >= 2 ? s : null; } catch (e) { return null; } }
+  function totalFor(id) { return state.rounds.reduce((a, r) => a + (r.scores[id] || 0), 0); }
+  function resetCur() { cur = { deadwood: {}, knockerId: null, knockType: null }; state.players.forEach(p => { cur.deadwood[p.id] = 0; }); }
+
+  function computeRoundScores(deadwood, knockerId, knockType) {
+    const scores = {}; state.players.forEach(p => { scores[p.id] = 0; });
+    const kdw = deadwood[knockerId] || 0;
+    state.players.forEach(p => {
+      if (p.id === knockerId) return;
+      const odw = deadwood[p.id] || 0;
+      if (knockType === 'gin') scores[knockerId] += GIN_BONUS + odw;
+      else if (odw <= kdw) scores[p.id] += (kdw - odw) + UNDERCUT_BONUS;
+      else scores[knockerId] += odw - kdw;
+    });
+    return scores;
+  }
+
+  function show(id) { window.__gin.showScreen(id); }
+
+  // ---------- setup ----------
+  function addPlayerRow(value) {
+    const c = $('scPlayers');
+    const row = document.createElement('div'); row.className = 'player-input-row';
+    row.innerHTML = `<input type="text" placeholder="Player ${c.children.length + 1} name" value="${esc(value || '')}" maxlength="20"><button class="remove-x" type="button">✕</button>`;
+    row.querySelector('.remove-x').addEventListener('click', () => { if (c.children.length > 2) row.remove(); else toast('You need at least two players.'); });
+    c.appendChild(row);
+  }
+  function populateDefaultPlayers() {
+    const c = $('scPlayers'); c.innerHTML = '';
+    let names = null; try { names = JSON.parse(safeGet(NAMES_KEY) || 'null'); } catch (e) {}
+    if (!names || !Array.isArray(names) || names.length < 2) names = [safeGet(NAME_KEY) || 'Player 1', 'Player 2'];
+    else if (safeGet(NAME_KEY)) names[0] = safeGet(NAME_KEY);
+    names.forEach(n => addPlayerRow(n));
+    $('scTargetInput').value = 100;
+  }
+  // Called whenever the Score Counter tab is shown; only seed defaults the first time so
+  // switching tabs away and back doesn't wipe someone's in-progress player list.
+  function onScoreTabShown() { if (!$('scPlayers').children.length) populateDefaultPlayers(); }
+  function openFreshSetup() {
+    window.__gin.showScreen('homeScreen');
+    window.__gin.setHomeTab('score');
+    populateDefaultPlayers();
+  }
+  function startScoring() {
+    const names = Array.from($('scPlayers').querySelectorAll('input')).map(i => i.value.trim()).filter(Boolean);
+    if (names.length < 2) { toast('Add at least two players.'); return; }
+    const t = parseInt($('scTargetInput').value, 10);
+    state = { players: names.map(n => ({ id: uid(), name: n })), target: (!isNaN(t) && t > 0) ? t : 100, rounds: [], startedAt: Date.now() };
+    safeSet(NAMES_KEY, JSON.stringify(names));
+    save(); resetCur(); openGame();
+  }
+
+  // ---------- game ----------
+  function openGame() { show('scGameScreen'); renderBoard(); }
+  function renderBoard() {
+    $('scRoundBadge').textContent = 'Hand ' + (state.rounds.length + 1);
+    $('scTargetBadge').textContent = 'to ' + state.target;
+    const totals = state.players.map(p => totalFor(p.id));
+    const max = Math.max(...totals);
+    const leaders = totals.filter(t => t === max).length;
+    const board = $('scBoard'); board.innerHTML = '';
+    state.players.forEach((p, i) => {
+      const total = totals[i];
+      const isLeader = state.rounds.length > 0 && total === max && leaders === 1;
+      const ginLocked = cur.knockerId === p.id && cur.knockType === 'gin';
+      const dw = ginLocked ? 0 : (cur.deadwood[p.id] || 0);
+      const card = document.createElement('div');
+      card.className = 'player-card' + (isLeader ? ' leader' : '');
+      card.innerHTML = `
+        <div class="player-head"><div class="player-name">${isLeader ? '👑 ' : ''}${esc(p.name)}</div><div class="player-total">${total}</div></div>
+        <label style="display:block; margin-bottom:6px;">Deadwood${ginLocked ? ' — locked at 0 (Gin has no deadwood)' : ''}</label>
+        <div class="stepper">
+          <button type="button" class="dec" ${ginLocked ? 'disabled' : ''}>−</button>
+          <input type="number" inputmode="numeric" class="dw" value="${dw}" min="0" ${ginLocked ? 'disabled' : ''}>
+          <button type="button" class="inc" ${ginLocked ? 'disabled' : ''}>+</button>
+        </div>
+        <div class="bonus-row">
+          <button type="button" class="chip ${cur.knockerId === p.id && cur.knockType === 'knock' ? 'active' : ''}" data-k="knock">Knocked</button>
+          <button type="button" class="chip ${ginLocked ? 'active' : ''}" data-k="gin">Gin</button>
+        </div>`;
+      const input = card.querySelector('.dw');
+      const set = (v) => { if (ginLocked) return; const n = Math.max(0, isNaN(v) ? 0 : v); cur.deadwood[p.id] = n; input.value = n; };
+      input.addEventListener('focus', () => { if (input.value === '0') input.value = ''; input.select && input.select(); });
+      input.addEventListener('blur', () => { if (input.value.trim() === '') input.value = String(cur.deadwood[p.id] || 0); });
+      input.addEventListener('input', () => set(parseInt(input.value, 10)));
+      card.querySelector('.dec').addEventListener('click', () => set((cur.deadwood[p.id] || 0) - 1));
+      card.querySelector('.inc').addEventListener('click', () => set((cur.deadwood[p.id] || 0) + 1));
+      card.querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => {
+        const k = ch.dataset.k;
+        if (cur.knockerId === p.id && cur.knockType === k) { cur.knockerId = null; cur.knockType = null; }
+        else { cur.knockerId = p.id; cur.knockType = k; if (k === 'gin') cur.deadwood[p.id] = 0; }
+        renderBoard();
+      }));
+      board.appendChild(card);
+    });
+  }
+
+  function submitRound() {
+    if (!cur.knockerId) { toast('Select who Knocked or went Gin first.'); return; }
+    const deadwood = Object.assign({}, cur.deadwood);
+    if (cur.knockType === 'gin') deadwood[cur.knockerId] = 0;
+    const scores = computeRoundScores(deadwood, cur.knockerId, cur.knockType);
+    const round = { deadwood, knockerId: cur.knockerId, knockType: cur.knockType, scores, ts: Date.now() };
+    state.rounds.push(round); save();
+    const fx = window.__gin && window.__gin.fx;
+    if (fx) { if (cur.knockType === 'gin') fx.gin(); else if (scores[cur.knockerId] > 0) fx.knockGood(); else fx.bad(); }
+    showResult(round);
+  }
+
+  function showResult(round) {
+    const k = state.players.find(p => p.id === round.knockerId);
+    const idx = state.rounds.length - 1;
+    const prevTs = idx > 0 ? state.rounds[idx - 1].ts : state.startedAt;
+    const roundDur = fmtDuration(round.ts - prevTs);
+    $('scResTitle').textContent = `Hand ${state.rounds.length} results`;
+    $('scResSub').textContent = (k ? `${k.name} — ${KNOCK_LABELS[round.knockType] || 'Knock'}${round.knockType === 'knock' ? ` (${round.deadwood[k.id] || 0} deadwood)` : ''}` : '') + ` · ⏱ ${roundDur}`;
+    const entries = state.players.map(p => ({ p, pts: round.scores[p.id] || 0, dw: round.deadwood[p.id] || 0 })).sort((a, b) => b.pts - a.pts);
+    $('scResList').innerHTML = entries.map(e => `<div class="standing-row ${e.pts > 0 ? 'winner' : ''}"><div class="standing-name">${esc(e.p.name)} <small style="color:var(--muted);font-weight:600">· ${e.dw} deadwood</small></div><div class="standing-total">${e.pts > 0 ? '+' : ''}${e.pts}</div></div>`).join('');
+    $('scResOverlay').classList.remove('hidden');
+  }
+  function afterResult() {
+    $('scResOverlay').classList.add('hidden');
+    resetCur(); renderBoard();
+    checkWinner();
+  }
+  function checkWinner() {
+    const ranked = state.players.map(p => ({ p, total: totalFor(p.id) })).sort((a, b) => b.total - a.total);
+    if (ranked[0].total >= state.target) openEnd(ranked);
+  }
+  function openEnd(ranked) {
+    show('scEndScreen');
+    const w = ranked[0];
+    $('scEndTitle').textContent = `${w.p.name} wins! 🎉`;
+    $('scEndSub').textContent = `Reached ${w.total} points (target ${state.target})`;
+    $('scStandings').innerHTML = ranked.map((x, i) => `<div class="standing-row ${i === 0 ? 'winner' : ''}"><div class="standing-rank">#${i + 1}</div><div class="standing-name">${i === 0 ? '👑 ' : ''}${esc(x.p.name)}</div><div class="standing-total">${x.total}</div></div>`).join('');
+    const last = state.rounds[state.rounds.length - 1];
+    $('scDuration').textContent = last ? `${fmtDuration(last.ts - state.startedAt)} · ${state.rounds.length} hands` : '—';
+  }
+
+  // ---------- history ----------
+  function renderHistory() {
+    const list = $('historyList');
+    if (!state || !state.rounds.length) { list.innerHTML = '<div class="empty-note">No hands yet.</div>'; return; }
+    list.innerHTML = state.rounds.map((r, idx) => {
+      const k = state.players.find(p => p.id === r.knockerId);
+      const desc = k ? `${esc(k.name)} — ${KNOCK_LABELS[r.knockType] || 'Knock'}${r.knockType === 'knock' ? ` (${r.deadwood[k.id] || 0} dw)` : ''}` : '';
+      const pts = state.players.map(p => `${esc(p.name)}: ${r.scores[p.id] > 0 ? '+' : ''}${r.scores[p.id] || 0}`).join(' · ');
+      const prevTs = idx > 0 ? state.rounds[idx - 1].ts : state.startedAt;
+      const dur = fmtDuration(r.ts - prevTs);
+      return `<div class="history-round" style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="history-meta"><div class="history-scores"><strong>H${idx + 1}</strong> — ${desc}</div><div class="history-scores">${pts}</div><div class="history-time">${fmtTime(r.ts)} · took ${dur}</div></div><div class="history-actions"><button type="button" data-edit="${idx}">✎</button><button type="button" data-del="${idx}">🗑</button></div></div>`;
+    }).join('') + `<div id="historyTotalTime">⏱ Time played: ${fmtDuration(state.rounds[state.rounds.length - 1].ts - state.startedAt)}</div>`;
+    list.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => editRound(+b.dataset.edit)));
+    list.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => { if (confirm('Delete hand ' + (+b.dataset.del + 1) + '?')) { state.rounds.splice(+b.dataset.del, 1); save(); renderBoard(); renderHistory(); } }));
+  }
+  function editRound(idx) {
+    const r = state.rounds[idx];
+    const curName = (state.players.find(p => p.id === r.knockerId) || state.players[0]).name;
+    const who = prompt(`Hand ${idx + 1}: who knocked or went gin? (player name)`, curName);
+    if (who === null) return;
+    const kp = state.players.find(p => p.name.toLowerCase() === who.trim().toLowerCase());
+    if (!kp) { toast('No player with that name.'); return; }
+    const type = prompt(`Type for ${kp.name}: knock or gin`, r.knockType || 'knock'); if (type === null) return;
+    const knockType = type.trim().toLowerCase() === 'gin' ? 'gin' : 'knock';
+    const deadwood = {};
+    for (const p of state.players) {
+      if (knockType === 'gin' && p.id === kp.id) { deadwood[p.id] = 0; continue; }
+      const v = prompt(`Deadwood for ${p.name}:`, r.deadwood[p.id] || 0); if (v === null) return;
+      const n = parseInt(v, 10); deadwood[p.id] = isNaN(n) ? (r.deadwood[p.id] || 0) : Math.max(0, n);
+    }
+    r.deadwood = deadwood; r.knockerId = kp.id; r.knockType = knockType; r.scores = computeRoundScores(deadwood, kp.id, knockType);
+    save(); renderBoard(); renderHistory(); checkWinner();
+  }
+
+  // ---------- export ----------
+  function csvEscape(v) {
+    v = String(v == null ? '' : v);
+    return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+  function exportGame() {
+    if (!state || !state.rounds.length) { toast('No hands scored yet — nothing to export.'); return; }
+    const players = state.players;
+    const header = ['Hand', 'Time', 'Duration', 'Knocker', 'Type', ...players.map(p => p.name + ' Deadwood'), ...players.map(p => p.name + ' Score')];
+    const rows = [header];
+    state.rounds.forEach((r, i) => {
+      const k = players.find(p => p.id === r.knockerId);
+      const prevTs = i > 0 ? state.rounds[i - 1].ts : state.startedAt;
+      rows.push([
+        i + 1,
+        new Date(r.ts).toLocaleString(),
+        fmtDuration(r.ts - prevTs),
+        r.void ? 'VOID' : (k ? k.name : ''),
+        r.void ? 'void' : (KNOCK_LABELS[r.knockType] || 'Knock'),
+        ...players.map(p => r.void ? '' : (r.deadwood && r.deadwood[p.id] != null ? r.deadwood[p.id] : '')),
+        ...players.map(p => r.void ? 0 : (r.scores[p.id] || 0))
+      ]);
+    });
+    rows.push([]);
+    rows.push(['TOTAL', '', '', '', '', ...players.map(() => ''), ...players.map(p => totalFor(p.id))]);
+    const csv = rows.map(row => row.map(csvEscape).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    a.href = url;
+    a.download = `gin-rummy-${players.map(p => p.name.replace(/[^a-z0-9]+/gi, '')).join('-vs-')}-${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast('Exported the game as a CSV file.');
+  }
+
+  // ---------- voice entry ----------
+  const NUM_ONES = { zero: 0, oh: 0, o: 0, one: 1, two: 2, three: 3, four: 4, for: 4, five: 5, six: 6, seven: 7, eight: 8, ate: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19 };
+  const NUM_TENS = { twenty: 20, thirty: 30, forty: 40, fourty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+  function wordsToNumber(text) {
+    const tokens = text.toLowerCase().replace(/-/g, ' ').split(/\s+/).filter(Boolean);
+    let total = 0, found = false;
+    for (const t of tokens) {
+      if (t === 'hundred') { total = (total || 1) * 100; found = true; continue; }
+      if (NUM_TENS.hasOwnProperty(t)) { total += NUM_TENS[t]; found = true; continue; }
+      if (NUM_ONES.hasOwnProperty(t)) { total += NUM_ONES[t]; found = true; continue; }
+    }
+    return found ? total : null;
+  }
+  function extractNumber(clause) {
+    const m = clause.match(/\d+/);
+    if (m) return parseInt(m[0], 10);
+    return wordsToNumber(clause);
+  }
+  // Best-effort parser for phrases like "Ari knocked with five, Jeff twenty" or
+  // "Jeff gin, Ari twelve". Fills the deadwood/knock fields; never auto-submits —
+  // the player still reviews and taps "Score this hand" themselves.
+  function parseVoiceScores(transcript, players) {
+    const clauses = transcript.toLowerCase().split(/,|\band\b|&/).map(s => s.trim()).filter(Boolean);
+    const heard = { knockerId: null, knockType: null, deadwood: {} };
+    const matches = [];
+    for (const clause of clauses) {
+      let player = null;
+      for (const p of players) {
+        if (clause.includes(p.name.toLowerCase())) { if (!player || p.name.length > player.name.length) player = p; }
+      }
+      if (!player) continue;
+      const isGin = /\bgin\b/.test(clause);
+      const isKnock = /\bknock/.test(clause);
+      if (isGin) {
+        heard.knockerId = player.id; heard.knockType = 'gin'; heard.deadwood[player.id] = 0;
+        matches.push(`${player.name}: Gin`);
+      } else {
+        const n = extractNumber(clause);
+        if (isKnock) {
+          heard.knockerId = player.id; heard.knockType = 'knock';
+          if (n != null) heard.deadwood[player.id] = n;
+          matches.push(`${player.name}: Knock${n != null ? ' (' + n + ')' : ''}`);
+        } else if (n != null) {
+          heard.deadwood[player.id] = n;
+          matches.push(`${player.name}: ${n}`);
+        }
+      }
+    }
+    return { heard, matches };
+  }
+  function applyVoiceResult(transcript) {
+    const { heard, matches } = parseVoiceScores(transcript, state.players);
+    if (!matches.length) { toast(`Didn't catch that — heard: "${transcript}"`); return; }
+    Object.keys(heard.deadwood).forEach(id => { cur.deadwood[id] = heard.deadwood[id]; });
+    if (heard.knockerId) { cur.knockerId = heard.knockerId; cur.knockType = heard.knockType; if (heard.knockType === 'gin') cur.deadwood[heard.knockerId] = 0; }
+    renderBoard();
+    toast('Heard: ' + matches.join(' · '));
+  }
+  let recognizer = null;
+  function startVoiceEntry() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { toast("Voice input isn't supported in this browser."); return; }
+    if (recognizer) { try { recognizer.stop(); } catch (e) {} }
+    recognizer = new SR();
+    recognizer.lang = 'en-US';
+    recognizer.interimResults = false;
+    recognizer.maxAlternatives = 1;
+    const btn = $('scVoiceBtn');
+    btn.classList.add('listening');
+    toast('Listening… say e.g. "Ari knocked with five, Jeff twenty"');
+    recognizer.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      applyVoiceResult(transcript);
+    };
+    recognizer.onerror = (e) => {
+      if (e.error === 'no-speech') toast("Didn't hear anything — try again.");
+      else if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast('Microphone access was blocked.');
+      else toast('Voice input error: ' + e.error);
+    };
+    recognizer.onend = () => { btn.classList.remove('listening'); };
+    try { recognizer.start(); } catch (e) { btn.classList.remove('listening'); toast('Could not start voice input.'); }
+  }
+
+  function leave() {
+    if (!confirm('End this scoring session? Scores will be cleared.')) return;
+    state = null; save(); window.__gin.initHome();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    $('scAddPlayerBtn').addEventListener('click', () => addPlayerRow(''));
+    $('scStartBtn').addEventListener('click', startScoring);
+    $('scSubmitBtn').addEventListener('click', submitRound);
+    $('scResContinue').addEventListener('click', afterResult);
+    $('scLeaveBtn').addEventListener('click', leave);
+    $('scEndNewBtn').addEventListener('click', () => { state = null; save(); openFreshSetup(); });
+    $('scEndKeepBtn').addEventListener('click', () => openGame());
+    $('scRulesBtn2').addEventListener('click', () => $('rulesOverlay').classList.remove('hidden'));
+    ['scHistoryBtn', 'scEndHistoryBtn'].forEach(id => $(id).addEventListener('click', () => { renderHistory(); $('historyOverlay').classList.remove('hidden'); }));
+    ['scExportBtn', 'scEndExportBtn'].forEach(id => $(id).addEventListener('click', exportGame));
+    $('scVoiceBtn').addEventListener('click', startVoiceEntry);
+  });
+
+  window.__scorer = {
+    saved: loadSaved,
+    onShown: onScoreTabShown,
+    resume() { state = loadSaved(); if (!state) return; resetCur(); const ranked = state.players.map(p => ({ p, total: totalFor(p.id) })).sort((a, b) => b.total - a.total); if (ranked[0].total >= state.target) openEnd(ranked); else openGame(); }
+  };
+})();
+</script>
+</body>
+</html>

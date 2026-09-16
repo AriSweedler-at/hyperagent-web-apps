@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ari's web apps</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%B2%3C/text%3E%3C/svg%3E">
+<style>
+  :root{--bg:#0f1115;--fg:#e8e6e1;--muted:#9a9891;--card:#181b22;--line:#262a33;--accent:#e0b35a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  main{max-width:720px;margin:0 auto;padding:64px 24px 96px}
+  h1{font-size:2rem;letter-spacing:-.02em;margin:0 0 .25em}
+  p.lede{color:var(--muted);margin:0 0 40px}
+  .grid{display:grid;gap:16px}
+  a.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;color:inherit;text-decoration:none;transition:border-color .15s,transform .15s}
+  a.card:hover{border-color:var(--accent);transform:translateY(-1px)}
+  a.card h2{margin:0 0 6px;font-size:1.2rem}
+  a.card span{color:var(--muted);font-size:.95rem}
+  footer{margin-top:56px;color:var(--muted);font-size:.85rem}
+  footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Ari's web apps</h1>
+  <p class="lede">Single-file browser games. Nothing to install — open one on your phone and play.</p>
+  <div class="grid">
+    <a class="card" href="games/gin-rummy/">
+      <h2>🃏 Gin Rummy</h2>
+      <span>Two-player Gin Rummy. Play online with a 4-letter room code, pass-and-play on one phone, or just keep score for a game with real cards.</span>
+    </a>
+    <a class="card" href="games/fidice/">
+      <h2>🎲 Fidice</h2>
+      <span>One-cup liar's dice, Kezar Lake rules.</span>
+    </a>
+  </div>
+  <footer>Source: <a href="https://github.com/AriSweedler-at/hyperagent-web-apps">github.com/AriSweedler-at/hyperagent-web-apps</a></footer>
+</main>
+</body>
+</html>
