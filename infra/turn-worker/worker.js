@@ -12,9 +12,12 @@ export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
     const allowed = (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
-    const originOk = allowed.length === 0 || allowed.includes(origin);
+    // Requests without an Origin header (curl, server-side checks) are allowed through: the
+    // allow-list exists to keep other websites from using this endpoint, which browsers enforce
+    // via CORS, and a non-browser caller could spoof Origin anyway.
+    const originOk = allowed.length === 0 || !origin || allowed.includes(origin);
     const cors = {
-      'Access-Control-Allow-Origin': allowed.length === 0 ? '*' : (originOk ? origin : 'null'),
+      'Access-Control-Allow-Origin': allowed.length === 0 ? '*' : (origin && originOk ? origin : 'null'),
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Max-Age': '86400',

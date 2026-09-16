@@ -46,7 +46,7 @@ The key is visible in page source. That is acceptable for a free-tier hobby quot
    ```
 3. Put the printed `*.workers.dev` URL into `ICE_CONFIG_URL`.
 
-`wrangler.toml` has two vars: `ALLOWED_ORIGINS` (comma-separated origins allowed to fetch credentials; empty allows any) and `TTL_SECONDS` (credential lifetime, default 7200; a game session should fit inside it).
+`wrangler.toml` has two vars: `ALLOWED_ORIGINS` (comma-separated browser origins allowed to fetch credentials; empty allows any; requests with no Origin header such as curl always pass) and `TTL_SECONDS` (credential lifetime, default 7200; a game session should fit inside it). To test with `?ice=` from a local dev server, add its origin (for example `http://localhost:8765`) to `ALLOWED_ORIGINS` or leave the list empty.
 
 ### Verify
 
