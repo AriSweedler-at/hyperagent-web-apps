@@ -1,0 +1,4 @@
+# wrangler local state and secret files (infra/turn-worker)
+.wrangler/
+.dev.vars
+*.secrets.json
