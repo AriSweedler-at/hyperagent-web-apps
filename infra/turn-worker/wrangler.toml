@@ -8,6 +8,8 @@ ALLOWED_ORIGINS = "https://arisweedler-at.github.io"
 # Credential lifetime in seconds (300–86400). A game session should fit inside it.
 TTL_SECONDS = "7200"
 
-# Secrets (set with `wrangler secret put <NAME>`, never commit them):
-#   TURN_KEY_ID          — from Cloudflare dashboard → Realtime → TURN → your key
-#   TURN_KEY_API_TOKEN   — shown once when the TURN key is created
+# The TURN key's ID is not secret; the API token that pairs with it is.
+TURN_KEY_ID = "7436d257a985f5017a96e5aecae60311"
+
+# Secret (set with `wrangler secret put TURN_KEY_API_TOKEN`, never commit it):
+#   TURN_KEY_API_TOKEN   — shown once when the TURN key is created (Realtime → TURN)

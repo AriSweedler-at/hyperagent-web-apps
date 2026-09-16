@@ -24,7 +24,7 @@
 (function () {
   'use strict';
 
-  var ICE_CONFIG_URL = '';
+  var ICE_CONFIG_URL = 'https://hyperagent-web-apps-turn.arisweedler.workers.dev';
 
   // STUN-only fallback. Lets same-network / friendly-NAT peers connect when no relay
   // is configured or the credential endpoint is unreachable. Not enough for
