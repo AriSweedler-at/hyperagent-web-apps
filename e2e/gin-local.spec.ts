@@ -17,6 +17,17 @@ test('pass and play: start, curtain handoff, one full turn', async ({ player, pr
   const curtain = page.locator('#curtainOverlay');
   const title = page.locator('#curtainTitle');
   await expect(curtain).toBeVisible();
+  // ...and it must cover them: the topmost element at every hand card's centre is the curtain (or
+  // something inside it), so a CSS regression to .overlay's inset or z-index fails here.
+  await expect(page.locator('#hand .card')).toHaveCount(10);
+  const exposed = await page.evaluate<number>(
+    `Array.from(document.querySelectorAll('#hand .card')).filter((card) => {
+      const r = card.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return hit !== null && !document.getElementById('curtainOverlay').contains(hit);
+    }).length`,
+  );
+  expect(exposed, 'hand cards not covered by the curtain').toBe(0);
   await expect(title).toHaveText(/^Pass the phone to (Ann|Bob)$/);
   const first = (await title.innerText()).replace('Pass the phone to ', '');
   const other = first === 'Ann' ? 'Bob' : 'Ann';

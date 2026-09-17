@@ -17,14 +17,23 @@ export const ginHostRoom = async (page: Page, name: string): Promise<string> => 
   await page.locator('#nameInput').fill(name);
   await page.locator('#hostBtn').click();
   await expect(page.locator('#hostWaitScreen')).toBeVisible();
-  const code = await ginRoomCode(page);
+  // The page re-rolls the code (and rewrites #roomCode) when the broker reports the id taken, so
+  // the code is read only after the broker has confirmed the room.
   await expect(page.locator('#hostWaitStatus')).toContainText('Waiting for your opponent to join', {
     timeout: BROKER_TIMEOUT,
   });
-  return code;
+  return ginRoomCode(page);
 };
 
-/** Join a room by code; resolves once the data channel is open and the host has answered. */
+/**
+ * The guest's status once the host has answered its join. The guest itself writes
+ * 'Connected. Waiting for the host to start…' when the channel opens, before its join message is
+ * sent; only the host's reply carries a name and a target.
+ */
+export const GIN_HOST_ANSWERED =
+  /^Connected to .+'s room \(playing to \d+\)\. Waiting for the host to start/;
+
+/** Join a room by code; resolves once the data channel is open and the host has answered the join. */
 export const ginJoin = async (page: Page, name: string, code: string): Promise<void> => {
   await expect(page.locator('#onlineModeContent')).toBeVisible();
   await page.locator('#nameInput').fill(name);
@@ -33,7 +42,7 @@ export const ginJoin = async (page: Page, name: string, code: string): Promise<v
   await expect(page.locator('#codeInput')).toHaveValue(code);
   await page.locator('#joinBtn').click();
   await expect(page.locator('#guestWaitScreen')).toBeVisible();
-  await expect(page.locator('#guestWaitStatus')).toContainText('Waiting for the host to start', {
+  await expect(page.locator('#guestWaitStatus')).toHaveText(GIN_HOST_ANSWERED, {
     timeout: WEBRTC_TIMEOUT,
   });
 };

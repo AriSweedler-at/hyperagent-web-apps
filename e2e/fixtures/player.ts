@@ -33,6 +33,16 @@ export type Player = Readonly<{
 /** `E2E_BROKER=cloud` drops `?peer=` so the pages use 0.peerjs.com (the advisory CI job `broker`). */
 export const usesLocalBroker = (): boolean => process.env['E2E_BROKER'] !== 'cloud';
 
+/**
+ * Against the local PeerServer the seeds repeat from run to run. On the shared public broker two
+ * overlapping runs with the same seeds would host the same room code, so cloud mode mixes in a
+ * per-run salt: the Actions run id, or locally the worker's start time. Within a run every context
+ * still derives from the same salt, so host and guest stay deterministic relative to each other.
+ */
+const RUN_SALT: ReadonlyArray<string> = usesLocalBroker()
+  ? []
+  : [process.env['GITHUB_RUN_ID'] ?? String(Date.now())];
+
 export const gameQuery = (): string => {
   const params = new URLSearchParams({ ice: ICE_URL });
   if (usesLocalBroker()) params.set('peer', PEER_SERVER);
@@ -44,7 +54,7 @@ export const newPlayer = async (
   role: Role,
   testInfo: TestInfo,
 ): Promise<Player> => {
-  const seed = seedFor([testInfo.project.name, ...testInfo.titlePath, role]);
+  const seed = seedFor([...RUN_SALT, testInfo.project.name, ...testInfo.titlePath, role]);
   const context = await browser.newContext();
   await context.addInitScript({ content: seedScript(seed) });
   await context.addInitScript({ path: RECORD_PEER_SCRIPT });
