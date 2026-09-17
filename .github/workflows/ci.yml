@@ -1,6 +1,7 @@
-# Runs on every push and pull request. Today this is the node:test suites (Cloudflare Worker
-# path mapping); typecheck, lint, build and browser e2e jobs join as the TypeScript toolchain lands
-# (see docs/ARCHITECTURE.md).
+# Runs on every push to main and every pull request. Job "check" is the same gate as the local
+# pre-push hook (typecheck, lint, unit tests) plus coverage and a sanity check of the hook shims.
+# Build, dist tests, browser e2e and deploy jobs join as docs/MIGRATION.md steps 3-4 land
+# (see docs/ARCHITECTURE.md "GitHub Actions").
 name: CI
 
 on:
@@ -12,15 +13,22 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
+          cache: npm
       - name: Install dependencies
-        run: if [ -f package-lock.json ]; then npm ci; else echo "no lockfile yet; nothing to install"; fi
-      - name: Unit tests
-        run: npm test
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint and format check
+        run: npm run lint
+      - name: Unit tests with coverage
+        run: npm test -- --coverage
+      - name: Verify git hook wiring
+        run: npm run hooks:verify

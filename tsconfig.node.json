@@ -1,0 +1,18 @@
+{
+  // Node-side TypeScript: config files, tools/ (run with `node --experimental-strip-types`), the
+  // test/ tree and Playwright specs. No DOM.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"]
+  },
+  "include": [
+    "vitest.config.ts",
+    "vite.config.ts",
+    "playwright.config.ts",
+    "tools/**/*.ts",
+    "test/**/*.ts",
+    "e2e/**/*.ts"
+  ],
+  "exclude": ["test/fixtures/legacy/**"]
+}

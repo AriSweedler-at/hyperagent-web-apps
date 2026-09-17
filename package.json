@@ -4,7 +4,33 @@
   "type": "module",
   "description": "Ari's browser games (Gin Rummy, Fidice) with their Cloudflare Workers, served by GitHub Pages",
   "scripts": {
-    "test": "node --test"
+    "typecheck": "tsc -b",
+    "lint": "eslint . --max-warnings 0 && prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "hooks": "git config core.hooksPath .githooks",
+    "hooks:verify": "sh tools/hooks-verify.sh",
+    "prepare": "npm run hooks"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "peerjs": "1.5.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.2",
+    "@vitest/coverage-v8": "5.0.0",
+    "eslint": "10.10.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-functional": "10.0.0",
+    "eslint-plugin-import-x": "4.17.1",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
+    "vite": "8.3.0",
+    "vitest": "5.0.0"
+  }
 }

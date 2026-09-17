@@ -2,14 +2,28 @@
 
 Single-file web apps built in Hyperagent, hosted on GitHub Pages.
 
-| App | Live | Source |
-|---|---|---|
-| Gin Rummy | https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/ | `games/gin-rummy/index.html` |
-| Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/ | `games/fidice/index.html` |
+| App                          | Live                                                                  | Source                       |
+| ---------------------------- | --------------------------------------------------------------------- | ---------------------------- |
+| Gin Rummy                    | https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/ | `games/gin-rummy/index.html` |
+| Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/    | `games/fidice/index.html`    |
 
 The same site is served at **https://games.sweedler.com** through the Cloudflare Worker in `infra/games-proxy/`: `games.sweedler.com/gin-rummy/` and `games.sweedler.com/fidice/` are the short URLs, `/games/<name>/` redirects to them, and `/shared/…` maps to the repo's `shared/` directory.
 
-Each app is a fully self-contained `index.html`. Runtime dependencies are loaded from public CDNs (PeerJS for online play; Google Fonts in Fidice). No build step — edit the file, push, Pages redeploys. `npm test` runs the node:test suites (the Workers' path mapping so far).
+Each app is a fully self-contained `index.html`. Runtime dependencies are loaded from public CDNs (PeerJS for online play; Google Fonts in Fidice). No build step yet — edit the file, push, Pages redeploys. The pages are being migrated to strict TypeScript under `web/`; `docs/ARCHITECTURE.md` is the target and `docs/MIGRATION.md` the ordered plan.
+
+## Development
+
+Node 22 (`.nvmrc`). TypeScript, ESLint (typescript-eslint strict, eslint-plugin-functional, import-x boundaries), Prettier and vitest, all pinned exactly in `package.json`.
+
+```
+npm ci                 # install; the `prepare` script also installs the git hooks
+npm run check          # typecheck + lint + unit tests: the gate CI and the pre-push hook run
+npm test               # vitest once (`npm run test:watch` keeps it running; `-- --coverage` for the report)
+npm run hooks          # git config core.hooksPath .githooks (re-run if hooksPath was changed)
+npm run hooks:verify   # confirm the hook wiring
+```
+
+Git hooks live in `.githooks/`: `pre-commit` chains to the owner's template hook in `.git/hooks/pre-commit` (big-file and trailing-whitespace prompts) and `pre-push` runs `npm run check`. Legacy pages under `games/` and `shared/` are byte-frozen until the migration moves them; lint and Prettier ignore them.
 
 ## Layout
 

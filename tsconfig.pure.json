@@ -1,0 +1,16 @@
+{
+  // Pure layers: no DOM lib and no node types, so `window`, `document`, `HTMLElement` and `process`
+  // are unnameable here by the compiler (docs/ARCHITECTURE.md "Module boundaries and contracts").
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": [
+    "web/shared/lib/**/*.ts",
+    "web/games/*/src/engine/**/*.ts",
+    "web/games/*/src/domain/**/*.ts",
+    "web/games/*/src/bots/**/*.ts",
+    "web/games/*/src/protocol.ts"
+  ]
+}

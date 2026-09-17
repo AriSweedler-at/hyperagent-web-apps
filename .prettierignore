@@ -1,0 +1,13 @@
+# Legacy pages and their shared asset are served byte-for-byte until docs/MIGRATION.md step 4
+# moves them under legacy/ (which stays ignored: nothing there may change).
+index.html
+games/
+shared/
+legacy/
+test/fixtures/legacy/
+
+# Deployed by hand with wrangler and outside the migration ("unchanged" in docs/ARCHITECTURE.md).
+infra/turn-worker/
+
+# Hand-formatted specs; Prettier would reflow their tables.
+docs/

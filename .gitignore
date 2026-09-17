@@ -9,6 +9,7 @@ node_modules/
 coverage/
 playwright-report/
 test-results/
+*.tsbuildinfo
 
 # personal Claude Code permissions for this checkout
 .claude/settings.local.json

@@ -276,3 +276,24 @@ or updates a pinned issue on failure.
 - Generic host/client session and code-entry/toast/lobby builders: extracted from fidice's
   `HostSession`/`ClientSession` into `web/shared` only after both games are typed and parity-locked,
   behind the existing wire goldens.
+
+## Deviations (recorded as the steps land)
+
+Step 1 (toolchain scaffold), against the versions on the registry at the time:
+
+- TypeScript is pinned at 5.9.3, not 7.x: typescript-eslint 8.70 accepts `typescript >=4.8.4 <6.1.0`.
+  Vite is 8.3.0 (Rolldown) and vitest 5.0.0; the `rollupOptions` key names are verified in step 4.
+- `@eslint/js` is an extra exact devDependency: ESLint 10 no longer bundles it, and it supplies the
+  core `recommended` rules for the JS-only config on `infra/**/*.js`.
+- `@typescript-eslint/array-type` is set to `{default: 'array', readonly: 'generic'}` so it agrees
+  with `functional/readonly-type: generic`; the stylistic default (`readonly T[]`) contradicts it.
+- `import-x/extensions` is set to include `.ts`: without it ExportMap follows only `.js` dependencies
+  and `no-cycle` stays silent on a TypeScript cycle (verified with a throwaway lib/edge cycle).
+- `tsconfig.web.json` also includes `web/shared/lib` (the pure project remains the guard) so the
+  project never has zero inputs before the first DOM module lands.
+- `npm run hooks:verify` treats a missing `.git/hooks/pre-commit` as a failure locally and as a
+  note under `CI`, since CI checkouts have no template hook.
+- `package-lock.json` is lockfileVersion 3 (112 KB); the npm 8 default v2 file was 192 KB, above the
+  template hook's 150 KB prompt. npm 8.4.1 `npm ci` reads it unchanged.
+- The proxy Worker compares redirect `Location` hosts against the configured upstream host rather
+  than the literal GitHub host; identical for the default, and correct for `tools/proxy-dev.ts`.

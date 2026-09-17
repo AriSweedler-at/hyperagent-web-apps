@@ -1,0 +1,29 @@
+{
+  // Shared compiler flags (docs/ARCHITECTURE.md "Enforcement toolchain"). Each project sets `lib`,
+  // `types` and `include`. Type-check only: nothing is emitted, Vite bundles.
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "useUnknownInCatchVariables": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    // Imports carry explicit `.ts` specifiers so `node --experimental-strip-types tools/x.ts` runs unchanged.
+    "allowImportingTsExtensions": true,
+    "target": "ES2022",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "composite": true
+  }
+}
