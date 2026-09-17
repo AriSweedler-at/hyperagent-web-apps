@@ -4,7 +4,7 @@
 //   node --experimental-strip-types tools/legacy/extract-gin-engine.ts
 import { findLine, isMain, readRepoFile, writeFixture, type Extracted } from './extract.ts';
 
-export const GIN_PAGE = 'games/gin-rummy/index.html';
+export const GIN_PAGE = 'legacy/gin-rummy/index.html';
 export const GIN_FIXTURE = 'gin-engine.cjs';
 export const GIN_KEY = 'gin-engine';
 const TOOL = 'tools/legacy/extract-gin-engine.ts';

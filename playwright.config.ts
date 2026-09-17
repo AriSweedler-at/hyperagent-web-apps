@@ -1,7 +1,8 @@
 // Browser harness (docs/ARCHITECTURE.md "Testing pyramid", "Two origins"). Every spec runs on two
-// projects: `pages` (GitHub Pages emulated by tools/serve-dist.ts, site under /hyperagent-web-apps/
+// projects: `pages` (GitHub Pages emulated by tools/serve-dist.ts, dist/ under /hyperagent-web-apps/
 // on :4173) and `proxy` (games.sweedler.com emulated by tools/proxy-dev.ts on :8787, running the
-// real Worker against :4173). Online specs meet on a local PeerServer (`peer` package) on :9000,
+// real Worker against :4173). The specs exercise the built site: `npm run test:e2e` is
+// `npm run build && playwright test`, so dist/ is fresh; a bare `playwright test` reuses it. Online specs meet on a local PeerServer (`peer` package) on :9000,
 // which the pages reach through their `?peer=` hook; `E2E_BROKER=cloud` leaves it out so the
 // advisory CI job `broker` plays through 0.peerjs.com instead.
 import { defineConfig } from '@playwright/test';
@@ -43,7 +44,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `${node} tools/serve-dist.ts --base ${PAGES_BASE_PATH} --alias e2e-ice.json=e2e/fixtures/e2e-ice.json --port ${new URL(PAGES_ORIGIN).port}`,
+      command: `${node} tools/serve-dist.ts --root dist --base ${PAGES_BASE_PATH} --alias e2e-ice.json=e2e/fixtures/e2e-ice.json --port ${new URL(PAGES_ORIGIN).port}`,
       url: `${PAGES_ORIGIN}${PAGES_BASE_PATH}`,
       reuseExistingServer: !CI,
       timeout: 30_000,

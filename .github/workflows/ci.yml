@@ -1,13 +1,15 @@
 # Runs on every push to main and every pull request. Job "check" is the same gate as the local
-# pre-push hook (typecheck, lint, unit tests) plus coverage and a sanity check of the hook shims.
-# Job "e2e" plays the two-peer browser specs on both emulated origins through a local PeerServer
-# (the merge gate for online play, docs/MIGRATION.md step 3); job "broker" repeats the online specs
-# through the real 0.peerjs.com and is advisory (continue-on-error), so a third-party outage never
-# blocks a merge but a signalling regression is visible at review. Build, dist tests and deploy join
-# as step 4 lands (see docs/ARCHITECTURE.md "GitHub Actions"). Dependency installs go through
-# .github/actions/npm-ci: the lockfile names Airtable's Socket Firewall registry, which runners
-# cannot reach, so npm substitutes the public registry at install time and Socket Firewall Free
-# scans what it downloads.
+# pre-push hook (typecheck, lint, unit tests, build, dist guards) plus coverage and a sanity check
+# of the hook shims; it uploads dist/ as the artifact job "deploy" publishes. Job "e2e" plays the
+# two-peer browser specs on both emulated origins against a fresh build of dist/ through a local
+# PeerServer (the merge gate for online play, docs/MIGRATION.md step 3); job "broker" repeats the
+# online specs through the real 0.peerjs.com and is advisory (continue-on-error), so a third-party
+# outage never blocks a merge but a signalling regression is visible at review. Job "deploy"
+# (docs/MIGRATION.md step 4) publishes the checked dist/ to GitHub Pages on a push to main once
+# check and e2e are green; Settings > Pages > Source must be "GitHub Actions" for it to take
+# effect (see README "Deploying"). Dependency installs go through .github/actions/npm-ci: the
+# lockfile names Airtable's Socket Firewall registry, which runners cannot reach, so npm
+# substitutes the public registry at install time and Socket Firewall Free scans what it downloads.
 name: CI
 
 on:
@@ -36,8 +38,21 @@ jobs:
         run: npm run lint
       - name: Unit tests with coverage
         run: npm test -- --coverage
+      - name: Build dist
+        run: npm run build
+      - name: Dist guards (relative asset URLs, paths on both origins, parity with legacy/)
+        run: npm run test:dist
       - name: Verify git hook wiring
         run: npm run hooks:verify
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          # .nojekyll is a dotfile; upload-artifact v4 drops hidden files unless told otherwise.
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
 
   e2e:
     needs: check
@@ -53,7 +68,9 @@ jobs:
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Browser specs on both origins (local PeerServer)
+      # `npm run test:e2e` builds dist/ first (the build is deterministic and takes under a second),
+      # so the specs run against the same output "check" uploaded.
+      - name: Browser specs on both origins against dist (local PeerServer)
         run: npm run test:e2e
       - name: Upload Playwright report
         if: failure()
@@ -89,3 +106,42 @@ jobs:
           name: playwright-report-broker
           path: playwright-report
           retention-days: 7
+
+  # Publishes the dist/ that "check" built and tested. Nothing is installed here: the artifact is
+  # the whole input. Requires Settings > Pages > Source = GitHub Actions (one-time; README "Deploying").
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Download the checked dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Served URLs
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          {
+            echo "## Deployed"
+            echo "- ${PAGE_URL}"
+            echo "- https://games.sweedler.com/ (Cloudflare Worker infra/games-proxy in front of the URL above)"
+          } >> "$GITHUB_STEP_SUMMARY"
