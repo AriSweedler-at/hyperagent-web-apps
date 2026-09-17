@@ -291,6 +291,36 @@ describe.each(legs)('gin engine: %s', (_leg, E) => {
       expectConserved(s, 'after the scripted opening');
     });
 
+    test('the upcard taken is locked against discard and knock; melds are frozen once the hand is over', () => {
+      const s = newGame(mulberry32(2), 0);
+      const up = s.discard.at(-1)?.id ?? '';
+      expect(errorOf(s, 1, { type: 'takeUpcard' })).toBe('ok');
+      expect([s.phase, s.drawnFromDiscard]).toEqual(['discard', up]);
+      expect(s.lastAction?.text).toBe('Bob took the 8♣ upcard.');
+      expect(errorOf(s, 1, { type: 'discard', cardId: up })).toBe(
+        "You can't discard the card you just took from the discard pile.",
+      );
+      expect(errorOf(s, 1, { type: 'knock', cardId: up })).toBe(
+        "You can't discard the card you just took from the discard pile.",
+      );
+      expect(E.viewFor(s, 1).discardOptions?.[up]).toEqual({ locked: true });
+      expect(E.viewFor(s, 1).canUndo).toBe(true);
+
+      const knocked = position(
+        ['AS', '2S', '3S', '4H', '5H', '6H', '7D', '8D', '9D', '2C', 'KC'],
+        ['4S', '5S', '10H', 'JH', 'QH', '7C', '8C', '9C', 'QD', 'KD'],
+        '7C',
+      );
+      expect(errorOf(knocked, 0, { type: 'knock', cardId: 'KC' })).toBe('ok');
+      expect(knocked.phase).toBe('roundOver');
+      expect(errorOf(knocked, 0, { type: 'setMelds', melds: [] })).toBe(
+        'You can only rearrange melds during play.',
+      );
+      expect(errorOf(knocked, 1, { type: 'setMelds', melds: [['10H', 'JH', 'QH']] })).toBe(
+        'You can only rearrange melds during play.',
+      );
+    });
+
     test('drawing from the stock reports the private card only to the drawer', () => {
       const s = newGame(mulberry32(2), 0);
       E.applyAction(s, 1, { type: 'passUpcard' });
@@ -459,6 +489,36 @@ describe.each(legs)('gin engine: %s', (_leg, E) => {
       expect(s.players.map((p) => p.total)).toEqual([18, 0]);
     });
 
+    test('knock: the opponent lays off below the run too (4S then 3S under 5-6-7 of spades)', () => {
+      const s = position(
+        ['5S', '6S', '7S', '4H', '5H', '6H', '7D', '8D', '9D', '2C', 'KC'],
+        ['3S', '4S', '10H', 'JH', 'QH', '7C', '8C', '9C', 'QD', 'KD'],
+        'AD',
+      );
+      expect(E.applyAction(s, 0, { type: 'knock', cardId: 'KC' })).toEqual({ ok: true });
+      const r = scored(s);
+      expect(r.outcome).toBe('knock');
+      expect(meldStrings(r.knocker.melds)).toEqual(['5S 6S 7S', '4H 5H 6H', '7D 8D 9D']);
+      expect(r.opponent.laidOff.map((x) => [x.card.id, x.onto])).toEqual([
+        ['4S', 0],
+        ['3S', 0],
+      ]);
+      expect(meldStrings(r.opponent.extendedMelds)).toEqual([
+        '3S 4S 5S 6S 7S',
+        '4H 5H 6H',
+        '7D 8D 9D',
+      ]);
+      expect(meldStrings(r.opponent.melds)).toEqual(['10H JH QH', '7C 8C 9C']);
+      expect(ids(r.opponent.deadwood)).toEqual(['QD', 'KD']);
+      expect([r.knocker.value, r.opponent.value]).toEqual([2, 20]);
+      expect(r.scores).toEqual([18, 0]);
+      expect(s.players.map((p) => p.total)).toEqual([18, 0]);
+    });
+
+    test('the scoring constants', () => {
+      expect([E.GIN_BONUS, E.UNDERCUT_BONUS, E.KNOCK_LIMIT]).toEqual([25, 25, 10]);
+    });
+
     test('undercut: equal or lower opponent deadwood scores the difference plus 25 for the opponent', () => {
       const s = position(
         ['AS', '2S', '3S', '4H', '5H', '6H', '7D', '8D', '9D', '8C', 'KC'],
@@ -469,8 +529,10 @@ describe.each(legs)('gin engine: %s', (_leg, E) => {
       const r = scored(s);
       expect(r.outcome).toBe('undercut');
       expect([r.knocker.value, r.opponent.value]).toEqual([8, 5]);
-      expect(r.scores).toEqual([0, 8 - 5 + E.UNDERCUT_BONUS]);
+      // 8 - 5 deadwood plus the 25-point undercut bonus.
+      expect(r.scores).toEqual([0, 28]);
       expect([r.scorerIdx, r.loserIdx]).toEqual([1, 0]);
+      expect(s.players.map((p) => p.total)).toEqual([0, 28]);
       expect(s.lastAction?.text).toBe('Alice knocked but was undercut by Bob!');
 
       const tie = position(
@@ -480,7 +542,7 @@ describe.each(legs)('gin engine: %s', (_leg, E) => {
       );
       expect(E.applyAction(tie, 0, { type: 'knock', cardId: 'KC' })).toEqual({ ok: true });
       expect(scored(tie).outcome).toBe('undercut');
-      expect(scored(tie).scores).toEqual([0, E.UNDERCUT_BONUS]);
+      expect(scored(tie).scores).toEqual([0, 25]);
     });
 
     test('a knock above the limit is refused with the deadwood it would leave', () => {
@@ -558,6 +620,18 @@ describe.each(legs)('gin engine: %s', (_leg, E) => {
       E.applyAction(s, 0, { type: 'ready' }, mulberry32(1));
       E.applyAction(s, 1, { type: 'ready' }, mulberry32(1));
       expect([s.phase, s.dealer, s.handNumber]).toEqual(['upcard', 1, 2]);
+
+      // Three left is the other side of the boundary: the discard passes the turn as usual.
+      const three = position(
+        ['AS', '2S', '3S', '4H', '5H', '6H', '7D', '8D', '9D', '2C', 'KC'],
+        ['4S', '5S', '10H', 'JH', 'QH', '7C', '8C', '9C', 'QD', 'KD'],
+        '7C',
+      );
+      three.stock = three.stock.slice(0, 3);
+      expect(E.applyAction(three, 0, { type: 'discard', cardId: 'KC' })).toEqual({ ok: true });
+      expect([three.phase, three.turn, three.result, three.rounds]).toEqual(['draw', 1, null, []]);
+      expect(three.stock).toHaveLength(3);
+      expect(three.lastAction?.text).toBe('Alice discarded the K♣.');
     });
   });
 
@@ -573,6 +647,24 @@ describe.each(legs)('gin engine: %s', (_leg, E) => {
         ['5D+5H+5S', 51],
       ]);
       expect(E.bestMelding(mine.map(card)).value).toBe(51);
+    });
+
+    test('a four-of-a-kind may give up one card to a run: allMelds lists its 3-card subsets', () => {
+      const fives = ['5S', '5H', '5D', '5C'].map(card);
+      expect(meldStrings(E.allMelds(fives))).toEqual([
+        '5S 5H 5D 5C',
+        '5H 5D 5C',
+        '5S 5D 5C',
+        '5S 5H 5C',
+        '5S 5H 5D',
+      ]);
+      // Keeping all four fives strands 6C 7C (44 deadwood); splitting 5C off melds them (31).
+      const split = E.bestMelding(
+        ['5S', '5H', '5D', '5C', '6C', '7C', 'KH', 'QD', '9S', '2H'].map(card),
+      );
+      expect(split.value).toBe(31);
+      expect(meldStrings(split.melds)).toEqual(['5S 5H 5D', '5C 6C 7C']);
+      expect(ids(split.deadwood)).toEqual(['9S', '2H', 'KH', 'QD']);
     });
 
     test('setMelds accepts an equal-value arrangement and refuses anything else', () => {

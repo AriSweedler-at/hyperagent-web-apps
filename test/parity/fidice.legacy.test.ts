@@ -1,6 +1,8 @@
 // Characterization of the fidice core (docs/MIGRATION.md step 2; docs/ARCHITECTURE.md "Testing
 // pyramid", parity). Every assertion is an executable oracle over seeded inputs, so the same suite
 // runs unchanged on the de-bundled modules in step 6: add ['current', adapter] to `legs`.
+import { createHash } from 'node:crypto';
+
 import { describe, expect, test } from 'vitest';
 
 import { mulberry32, type Rng } from '../../web/shared/lib/rng.ts';
@@ -29,6 +31,9 @@ const pairs = <T>(xs: ReadonlyArray<T>): [T, T][] =>
     const a = xs[i];
     return a === undefined ? [] : [[a, b] as [T, T]];
   });
+/** First 16 hex digits of sha256 over the JSON: a pinned golden without a goldens directory. */
+const digest = (value: unknown): string =>
+  createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16);
 
 describe.each(legs)('fidice core: %s', (_leg, F) => {
   const seat = F.bySeat;
@@ -295,6 +300,10 @@ describe.each(legs)('fidice core: %s', (_leg, F) => {
       expect(pulled.round?.dice[0]).toEqual({ value: 2, inCup: false });
       expect(at(seat(0), { type: 'pull', die: 0 }, pulled)).toBe('That die is already out.');
       expect(pulled.log.at(-1)?.text).toBe('P0 pulls a 2 out from under the cup.');
+      // A pull accepts the cup too: with no bid yet the holder may pull unseen, and may not peek after.
+      const pulledUnseen = unwrap(F.apply(s, seat(0), { type: 'pull', die: 0 }, fixed()));
+      expect(pulledUnseen.round?.touched).toBe(true);
+      expect(at(seat(0), { type: 'peek' }, pulledUnseen)).toBe('You already accepted the cup.');
       const rolled = unwrap(
         F.apply(pulled, seat(0), { type: 'roll', cup: true, table: [], intoCup: [] }, fixed()),
       );
@@ -400,6 +409,141 @@ describe.each(legs)('fidice core: %s', (_leg, F) => {
       expect(s.log.at(-2)?.text).toBe('Game on! 2 players, keeping score.');
       const over = unwrap(F.apply(s, seat(0), { type: 'finish' }, fixed()));
       expect(over.phase).toBe('over');
+    });
+
+    /** Seat 0 has peeked and pulled `pulls`, then shaken the cup when `shake`; every die shows 2. */
+    const opened = (pulls: ReadonlyArray<number>, shake: boolean): GameState => {
+      const peeked = unwrap(F.apply(started(3), seat(0), { type: 'peek' }, fixed()));
+      const pulled = pulls.reduce(
+        (st, die) => unwrap(F.apply(st, seat(0), { type: 'pull', die }, fixed())),
+        peeked,
+      );
+      return shake
+        ? unwrap(
+            F.apply(pulled, seat(0), { type: 'roll', cup: true, table: [], intoCup: [] }, fixed()),
+          )
+        : pulled;
+    };
+
+    test('call: a bid equal to the real hand holds; one rung above it is busted', () => {
+      const rolled = opened([0], true);
+      expect(F.rankOf([2, 2, 2, 2, 2])).toBe(247);
+      const exact = unwrap(F.apply(rolled, seat(0), { type: 'bid', rank: 247 }, fixed()));
+      const held = unwrap(F.apply(exact, seat(1), { type: 'call' }, fixed()));
+      expect(held.reveal).toEqual({
+        dice: [2, 2, 2, 2, 2],
+        real: 247,
+        bid: 247,
+        holds: true,
+        caller: 1,
+        bidder: 0,
+        loser: 1,
+      });
+      expect(held.players.map((p) => [p.lives, p.losses])).toEqual([
+        [3, 0],
+        [2, 1],
+        [3, 0],
+      ]);
+      expect(held.log.at(-1)?.text).toBe(
+        'P1 calls liar! Under the cup: Five 2s. The bid holds — P1 loses a life.',
+      );
+
+      const above = unwrap(F.apply(rolled, seat(0), { type: 'bid', rank: 248 }, fixed()));
+      const busted = unwrap(F.apply(above, seat(1), { type: 'call' }, fixed()));
+      expect(busted.reveal).toEqual({
+        dice: [2, 2, 2, 2, 2],
+        real: 247,
+        bid: 248,
+        holds: false,
+        caller: 1,
+        bidder: 0,
+        loser: 0,
+      });
+      expect(busted.players.map((p) => [p.lives, p.losses])).toEqual([
+        [2, 1],
+        [3, 0],
+        [3, 0],
+      ]);
+      expect(busted.log.at(-1)?.text).toBe(
+        'P1 calls liar! Under the cup: Five 2s. Busted — P0 loses a life.',
+      );
+      expect(busted.records[0]).toMatchObject({ bid: 248, real: 247, holds: false, loser: 0 });
+    });
+
+    test('roll: named table dice are rerolled, tucked dice go back under a shaken cup, the rest stay', () => {
+      const twoOut = opened([0, 1], false);
+      expect(twoOut.round?.dice.map((d) => d.inCup)).toEqual([false, false, true, true, true]);
+      const sixes: Rng = () => 0.99;
+      // Tucking die 1 shakes the cup, so dice 2-4 reroll with it; die 0 is rerolled on the table.
+      const tucked = unwrap(
+        F.apply(twoOut, seat(0), { type: 'roll', cup: false, table: [0], intoCup: [1] }, sixes),
+      );
+      expect(tucked.round?.dice).toEqual([
+        { value: 6, inCup: false },
+        { value: 6, inCup: true },
+        { value: 6, inCup: true },
+        { value: 6, inCup: true },
+        { value: 6, inCup: true },
+      ]);
+      expect(tucked.round).toMatchObject({ rolled: true, touched: true });
+      expect(tucked.log.at(-1)?.text).toBe(
+        'P0 rolls 1 die on the table → 6, tucks 1 die back under the cup, shakes the cup (4 dice).',
+      );
+      // Rerolling a table die alone leaves the cup untouched.
+      const tableOnly = unwrap(
+        F.apply(twoOut, seat(0), { type: 'roll', cup: false, table: [0], intoCup: [] }, sixes),
+      );
+      expect(tableOnly.round?.dice).toEqual([
+        { value: 6, inCup: false },
+        { value: 2, inCup: false },
+        { value: 2, inCup: true },
+        { value: 2, inCup: true },
+        { value: 2, inCup: true },
+      ]);
+      expect(tableOnly.log.at(-1)?.text).toBe('P0 rolls 1 die on the table → 6.');
+    });
+
+    test('records keep the most recent 60 rounds', () => {
+      const bidded = unwrap(
+        F.apply(opened([0], true), seat(0), { type: 'bid', rank: 100 }, fixed()),
+      );
+      const filler = (roundNo: number): GameState['records'][number] => ({
+        roundNo,
+        bids: [],
+        bidder: 0,
+        caller: 1,
+        bid: 1,
+        real: 2,
+        holds: true,
+        loser: 1,
+      });
+      const stuffed = { ...bidded, records: Array.from({ length: 61 }, (_, i) => filler(i + 1)) };
+      const called = unwrap(F.apply(stuffed, seat(1), { type: 'call' }, fixed()));
+      expect(called.records).toHaveLength(60);
+      expect(called.records[0]?.roundNo).toBe(3);
+      expect(called.records.at(-1)).toMatchObject({ roundNo: 1, bid: 100, real: 247 });
+    });
+
+    test('finish: standings order by rounds lost, then lives, then seat; a tie at the top has no winner', () => {
+      const s = started(3);
+      const withPlayers = (lives: number[], losses: number[]): GameState => ({
+        ...s,
+        players: s.players.map((p, i) => ({ ...p, lives: lives[i] ?? 0, losses: losses[i] ?? 0 })),
+      });
+      const tied = unwrap(
+        F.apply(withPlayers([1, 3, 2], [0, 0, 0]), F.HOST, { type: 'finish' }, fixed()),
+      );
+      expect(tied.winner).toBeNull();
+      expect(tied.log.at(-1)?.text).toBe(
+        '🏁 The host ends the game. Rounds lost — P1 0, P2 0, P0 0. A tie at the top!',
+      );
+      const won = unwrap(
+        F.apply(withPlayers([1, 3, 2], [2, 2, 1]), F.HOST, { type: 'finish' }, fixed()),
+      );
+      expect(won.winner).toBe(2);
+      expect(won.log.at(-1)?.text).toBe(
+        '🏁 The host ends the game. Rounds lost — P2 1, P1 2, P0 2. P2 wins.',
+      );
     });
   });
 
@@ -526,10 +670,30 @@ describe.each(legs)('fidice core: %s', (_leg, F) => {
       expect(F.profileFor('nope', fixed())).toEqual({ strategy: 'gambler', random: false });
     });
 
+    /**
+     * Pinned digests of every state along each seeded bot game (decision points, then the final
+     * state). They freeze `apply` and the strategies together; a change to either is a diff here.
+     */
+    const BOT_GAME_DIGESTS: Readonly<Record<number, string>> = {
+      1: '3670a940c8d086cf',
+      2: 'ccf33a215de00c76',
+      3: '2e7e08864f6dfb37',
+      4: 'f95d1368e1442bed',
+      5: '47a4ee41c9543341',
+      6: '57ad2d2803b31b86',
+      7: '18221833744663c5',
+      8: '93450c3ddd05e172',
+      9: '752e133b78f768a8',
+      10: 'ba84f19e18e68ae6',
+      11: 'eafed36192751a0c',
+      12: 'f5df3d427a88b782',
+    };
+
     test.each(SEEDS)(
       'seed %i: a 3-6 bot table plays to "over" with no rejected bot action',
       (seed) => {
-        const { state, rejected, steps } = playBots(seed);
+        const { state, rejected, steps, decisionPoints } = playBots(seed);
+        expect(digest([...decisionPoints, state])).toBe(BOT_GAME_DIGESTS[seed]);
         expect(rejected).toEqual([]);
         expect(state.phase).toBe('over');
         expect(steps).toBeLessThan(STEP_CAP);
@@ -555,20 +719,48 @@ describe.each(legs)('fidice core: %s', (_leg, F) => {
       expect(a.decisionPoints.length).toBe(b.decisionPoints.length);
     });
 
-    describe.each(F.POOL.map((s) => [s.id, s] as const))('strategy %s', (_id, strategy) => {
+    /**
+     * Pinned digests of each strategy's `[action, round(delay), memory]` over the 30 seeded views
+     * below, from a fresh memory each time. Thresholds and styles are frozen here.
+     */
+    const DECIDE_DIGESTS: Readonly<Record<string, string>> = {
+      gambler: 'ad7c9e61c65fa159',
+      profiler: 'b3b7bfb48586f837',
+      pressure: '2eba6bcdb45a0206',
+      trapper: '5ac868ba963bba1c',
+      'classic-cautious': '0cd3aae7bb819490',
+      'classic-steady': '8521817fcbb82d3b',
+      'classic-reckless': '3d1189fa5478924a',
+      'learner-10': 'b7156c2f05526602',
+      'learner-100': '6826ab1c4c35184f',
+      'learner-300': '51ab2f4c276ed549',
+    };
+
+    describe.each(F.POOL.map((s) => [s.id, s] as const))('strategy %s', (id, strategy) => {
       const points = playBots(5).decisionPoints.slice(0, 30);
+      const viewAt = (s: GameState): Parameters<typeof strategy.decide>[0] => {
+        const holder = s.round?.holder ?? 0;
+        return { state: F.redactFor(s, { kind: 'seat', seat: holder }), me: holder };
+      };
 
       test('decide() is a pure function of (view, memory, rng) and proposes well-formed actions', () => {
         expect(points.length).toBe(30);
         points.forEach((s, k) => {
-          const holder = s.round?.holder ?? 0;
-          const view = { state: F.redactFor(s, { kind: 'seat', seat: holder }), me: holder };
+          const view = viewAt(s);
           const once = strategy.decide(view, strategy.fresh(), mulberry32(k));
           const twice = strategy.decide(view, strategy.fresh(), mulberry32(k));
           expect(once).toEqual(twice);
           expect(F.decodeAction(once.step.action)).toEqual({ ok: true, value: once.step.action });
           expect(Number.isFinite(once.step.delay) && once.step.delay >= 0).toBe(true);
         });
+      });
+
+      test('decide() over the 30 seeded views matches its pinned digest', () => {
+        const decisions = points.map((s, k) => {
+          const { step, memory } = strategy.decide(viewAt(s), strategy.fresh(), mulberry32(k));
+          return [step.action, Math.round(step.delay), memory];
+        });
+        expect(digest(decisions)).toBe(DECIDE_DIGESTS[id]);
       });
 
       test('a fresh memory is the same every time', () => {
