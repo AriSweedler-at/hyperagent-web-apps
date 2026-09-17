@@ -1,7 +1,8 @@
 # Runs on every push to main and every pull request. Job "check" is the same gate as the local
 # pre-push hook (typecheck, lint, unit tests, build, dist guards) plus coverage and a sanity check
 # of the hook shims; it uploads dist/ as the artifact job "deploy" publishes. Job "e2e" plays the
-# two-peer browser specs on both emulated origins against a fresh build of dist/ through a local
+# two-peer browser specs on both emulated origins against a fresh build of dist/, and the ported
+# pages on the dark dist-next/ build (project `next`, docs/MIGRATION.md step 6), through a local
 # PeerServer (the merge gate for online play, docs/MIGRATION.md step 3); job "broker" repeats the
 # online specs through the real 0.peerjs.com and is advisory (continue-on-error), so a third-party
 # outage never blocks a merge but a signalling regression is visible at review. Job "deploy"
@@ -47,7 +48,11 @@ jobs:
         run: npm run test:integration
       - name: Build dist
         run: npm run build
-      - name: Dist guards (relative asset URLs, paths on both origins, parity with legacy/)
+      # The same build with LEGACY_PAGES= (docs/MIGRATION.md step 6): the ported fidice page as
+      # Vite emits it, which the e2e project `next` plays and the dist guards check alongside dist/.
+      - name: Build dist-next
+        run: npm run build:next
+      - name: Dist guards (relative asset URLs, paths on both origins, parity with legacy/; dist/ and dist-next/)
         run: npm run test:dist
       - name: Verify git hook wiring
         run: npm run hooks:verify
@@ -75,9 +80,10 @@ jobs:
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      # `npm run test:e2e` builds dist/ first (the build is deterministic and takes under a second),
-      # so the specs run against the same output "check" uploaded.
-      - name: Browser specs on both origins against dist (local PeerServer)
+      # `npm run test:e2e` builds dist/ and dist-next/ first (deterministic, under a second each),
+      # so the specs run against the same output "check" uploaded. Projects: pages, proxy and next;
+      # the fidice-online spec on `next` is the proof that the dark page plays a real two-peer game.
+      - name: Browser specs on both origins against dist, and on the dark build (local PeerServer)
         run: npm run test:e2e
       - name: Upload Playwright report
         if: failure()

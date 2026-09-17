@@ -4,7 +4,9 @@
 *.secrets.json
 
 # build and test output. dist/ is anchored to the root: test/dist/ holds the dist guards.
+# dist-next/ is the LEGACY_PAGES= build the e2e `next` project serves (npm run build:next).
 /dist/
+/dist-next/
 node_modules/
 coverage/
 playwright-report/

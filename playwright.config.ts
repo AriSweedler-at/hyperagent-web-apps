@@ -1,13 +1,17 @@
 // Browser harness (docs/ARCHITECTURE.md "Testing pyramid", "Two origins"). Every spec runs on two
 // projects: `pages` (GitHub Pages emulated by tools/serve-dist.ts, dist/ under /hyperagent-web-apps/
 // on :4173) and `proxy` (games.sweedler.com emulated by tools/proxy-dev.ts on :8787, running the
-// real Worker against :4173). The specs exercise the built site: `npm run test:e2e` is
-// `npm run build && playwright test`, so dist/ is fresh; a bare `playwright test` reuses it. Online specs meet on a local PeerServer (`peer` package) on :9000,
+// real Worker against :4173). A third project, `next`, serves dist-next/ (built with `LEGACY_PAGES=`,
+// docs/MIGRATION.md step 6) the same way on :4174 and runs the smoke and fidice-online specs against
+// the ported page before it is flipped. The specs exercise the built site: `npm run test:e2e` is
+// `npm run build && npm run build:next && playwright test`, so both trees are fresh; a bare
+// `playwright test` reuses them. Online specs meet on a local PeerServer (`peer` package) on :9000,
 // which the pages reach through their `?peer=` hook; `E2E_BROKER=cloud` leaves it out so the
 // advisory CI job `broker` plays through 0.peerjs.com instead.
 import { defineConfig } from '@playwright/test';
 
 import {
+  NEXT_ORIGIN,
   PAGES_BASE_PATH,
   PAGES_ORIGIN,
   PEER_HOST,
@@ -41,11 +45,23 @@ export default defineConfig({
   projects: [
     { name: 'pages', use: { baseURL: `${PAGES_ORIGIN}${PAGES_BASE_PATH}` } },
     { name: 'proxy', use: { baseURL: `${PROXY_ORIGIN}/` } },
+    {
+      // The dark build: only the specs for pages that exist in dist-next/ (e2e/fixtures/site.ts).
+      name: 'next',
+      use: { baseURL: `${NEXT_ORIGIN}${PAGES_BASE_PATH}` },
+      testMatch: ['smoke.spec.ts', 'fidice-online.spec.ts'],
+    },
   ],
   webServer: [
     {
       command: `${node} tools/serve-dist.ts --root dist --base ${PAGES_BASE_PATH} --alias e2e-ice.json=e2e/fixtures/e2e-ice.json --port ${new URL(PAGES_ORIGIN).port}`,
       url: `${PAGES_ORIGIN}${PAGES_BASE_PATH}`,
+      reuseExistingServer: !CI,
+      timeout: 30_000,
+    },
+    {
+      command: `${node} tools/serve-dist.ts --root dist-next --base ${PAGES_BASE_PATH} --alias e2e-ice.json=e2e/fixtures/e2e-ice.json --port ${new URL(NEXT_ORIGIN).port}`,
+      url: `${NEXT_ORIGIN}${PAGES_BASE_PATH}`,
       reuseExistingServer: !CI,
       timeout: 30_000,
     },

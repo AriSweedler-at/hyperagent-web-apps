@@ -1,44 +1,92 @@
-// Shared plumbing for the dist guards (docs/ARCHITECTURE.md "Two origins"): where dist/ is, how to
-// list it, and how to pull every URL reference out of the HTML and CSS Vite wrote. These suites run
-// from `npm run test:dist` after `npm run build` (vitest.dist.config.ts); without a build they skip
-// with a note instead of failing, so a checkout without dist/ is never mistaken for a broken site.
+// Shared plumbing for the dist guards (docs/ARCHITECTURE.md "Two origins"): which build trees
+// exist, how to list one, and how to pull every URL reference out of the HTML and CSS Vite wrote.
+// Two trees are guarded: dist/ (`npm run build`, the legacy pages copied over Vite's output) and
+// dist-next/ (`npm run build:next`, `LEGACY_PAGES=` so a ported page is served as built; the e2e
+// project `next` runs against it). These suites run from `npm run test:dist` after the builds
+// (vitest.dist.config.ts); a tree that is absent is recorded as one skipped test with a note, so a
+// checkout without a build is never mistaken for a broken site.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
 import { describe, test } from 'vitest';
 
+import { DEFAULT_LEGACY_PAGES, legacyPagesFrom } from '../../vite.config.ts';
+
 export const REPO_ROOT = resolve(import.meta.dirname, '..', '..');
-export const DIST = resolve(REPO_ROOT, 'dist');
-export const SKIP_NOTE =
-  'dist/ is absent: run `npm run build` first (CI runs `npm run test:dist` after the build)';
 
-export const distPresent = (): boolean => existsSync(resolve(DIST, 'index.html'));
+export type DistRoot = Readonly<{
+  name: 'dist' | 'dist-next';
+  dir: string;
+  /** The pages this tree serves from legacy/ (the passthrough list the build ran with). */
+  legacyPages: ReadonlyArray<string>;
+  build: string;
+}>;
 
-/** `describe` that runs `body` when dist/ exists and otherwise records one skipped test with SKIP_NOTE. */
-export const describeDist = (name: string, body: () => void): void => {
-  if (distPresent()) {
-    describe(name, body);
-    return;
-  }
-  describe(name, () => {
-    test('skipped: no dist/', (context) => {
-      context.skip(SKIP_NOTE);
+export const DIST_ROOTS: ReadonlyArray<DistRoot> = [
+  {
+    name: 'dist',
+    dir: resolve(REPO_ROOT, 'dist'),
+    legacyPages: legacyPagesFrom(process.env['LEGACY_PAGES']),
+    build: 'npm run build',
+  },
+  {
+    name: 'dist-next',
+    dir: resolve(REPO_ROOT, 'dist-next'),
+    legacyPages: [],
+    build: 'npm run build:next',
+  },
+];
+
+export const distPresent = (root: DistRoot): boolean => existsSync(resolve(root.dir, 'index.html'));
+
+export const skipNote = (root: DistRoot): string =>
+  `${root.name}/ is absent: run \`${root.build}\` first (CI runs \`npm run test:dist\` after the builds)`;
+
+/**
+ * `describe` per build tree: runs `body(root)` for each tree that exists and records one skipped
+ * test with the build command for each that does not.
+ */
+export const describeDist = (name: string, body: (root: DistRoot) => void): void => {
+  DIST_ROOTS.forEach((root) => {
+    if (distPresent(root)) {
+      describe(`${name} [${root.name}]`, () => {
+        body(root);
+      });
+      return;
+    }
+    describe(`${name} [${root.name}]`, () => {
+      test(`skipped: no ${root.name}/`, (context) => {
+        context.skip(skipNote(root));
+      });
     });
   });
 };
 
-/** Every regular file under dist/, as posix paths relative to it, sorted. */
-export const distFiles = (): ReadonlyArray<string> =>
-  readdirSync(DIST, { recursive: true, encoding: 'utf8' })
+/**
+ * Game pages the landing page links to that this tree does not hold: a legacy page not copied in
+ * (`LEGACY_PAGES=`) whose port has no web/games/<g>/index.html yet. Their links are dead in this
+ * tree by design and the path guards leave them out (and say which ones).
+ */
+export const unbuiltPages = (root: DistRoot): ReadonlyArray<string> =>
+  DEFAULT_LEGACY_PAGES.filter(
+    (game) =>
+      !root.legacyPages.includes(game) &&
+      !existsSync(resolve(REPO_ROOT, 'web', 'games', game, 'index.html')),
+  );
+
+/** Every regular file under the tree, as posix paths relative to it, sorted. */
+export const distFiles = (root: DistRoot): ReadonlyArray<string> =>
+  readdirSync(root.dir, { recursive: true, encoding: 'utf8' })
     .map((path) => path.split(sep).join('/'))
-    .filter((path) => statSync(resolve(DIST, path)).isFile())
+    .filter((path) => statSync(resolve(root.dir, path)).isFile())
     .sort();
 
-export const readDist = (relPath: string): string => readFileSync(resolve(DIST, relPath), 'utf8');
+export const readDist = (root: DistRoot, relPath: string): string =>
+  readFileSync(resolve(root.dir, relPath), 'utf8');
 
-/** True when `relPath` names a regular file inside dist/. */
-export const distHasFile = (relPath: string): boolean => {
-  const abs = resolve(DIST, relPath);
+/** True when `relPath` names a regular file inside the tree. */
+export const distHasFile = (root: DistRoot, relPath: string): boolean => {
+  const abs = resolve(root.dir, relPath);
   return existsSync(abs) && statSync(abs).isFile();
 };
 
@@ -74,12 +122,12 @@ export const referencesIn = (file: string, text: string): ReadonlyArray<Referenc
   return [...attributes, ...urls];
 };
 
-/** The dist files whose references are checked: everything written as HTML or CSS. */
-export const referencedFiles = (): ReadonlyArray<string> =>
-  distFiles().filter((file) => file.endsWith('.html') || file.endsWith('.css'));
+/** The files whose references are checked: everything written as HTML or CSS. */
+export const referencedFiles = (root: DistRoot): ReadonlyArray<string> =>
+  distFiles(root).filter((file) => file.endsWith('.html') || file.endsWith('.css'));
 
-export const allReferences = (): ReadonlyArray<Reference> =>
-  referencedFiles().flatMap((file) => referencesIn(file, readDist(file)));
+export const allReferences = (root: DistRoot): ReadonlyArray<Reference> =>
+  referencedFiles(root).flatMap((file) => referencesIn(file, readDist(root, file)));
 
 export type Placement =
   | 'https'
