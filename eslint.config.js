@@ -395,6 +395,12 @@ export default defineConfig([
     },
   },
 
+  // --- Page-side init scripts the Playwright harness injects (e2e/browser/*.js) -------------
+  {
+    files: ['e2e/browser/**/*.js'],
+    languageOptions: { globals: { window: 'readonly' } },
+  },
+
   // Prettier formats; this disables every rule that would fight it. Must stay last.
   prettier,
 ]);

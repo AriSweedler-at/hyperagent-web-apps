@@ -345,3 +345,25 @@ Step 2 (freeze legacy and record goldens):
   nothing and the target is never reached. It knocks whenever legal and discards the least-deadwood
   card three times in four; every choice is still an element of `legalActions(view)`. 300 games take
   about three seconds.
+
+Step 3 (two-peer e2e against the legacy pages):
+
+- Playwright is 1.63.0 and the PeerServer is `peer` 1.0.2, both exact. The PeerServer runs from
+  the package's `peerjs` CLI as a `webServer` entry (`--host 127.0.0.1 --port 9000 --path /`);
+  `E2E_BROKER=cloud` leaves it out and drops `?peer=` so the `broker` job meets on 0.peerjs.com.
+- `tools/serve-dist.ts` takes `--base` and `--alias` on the command line instead of hard-coding
+  `/hyperagent-web-apps/`: the lint ban on absolute site paths applies to tools too, and the one
+  place the harness names the mount point is `e2e/fixtures/site.ts`.
+- `tsconfig.node.json` sets `allowJs` and lists `infra/games-proxy/worker.js` so
+  `tools/proxy-dev.ts` imports the Worker's default export with the types its JSDoc declares;
+  `checkJs` stays off (the JS lint config covers it).
+- Page-side harness code (`e2e/browser/*.js`: seeded `Math.random`, the Peer recorder) is plain
+  JavaScript injected with `addInitScript`, and specs read page state through locators and string
+  `page.evaluate` expressions, so the node project keeps `lib: ["ES2023"]` with no DOM types.
+- The harness is offline: the pages' CDN request for `peerjs@1.5.4/dist/peerjs.min.js` is
+  fulfilled from the identical bundle pinned in `node_modules` (same sha256) and Google Fonts with
+  an empty stylesheet; the smoke allowlist is therefore just `favicon.ico`.
+- Each browser context's seed is a hash of project, test title and role, so host and guest differ,
+  and the same spec on `pages` and `proxy` never holds the same room code on the broker at once.
+- `tools/serve-dist.ts` and `tools/proxy-dev.ts` have node-level tests in `test/tools/` (routing,
+  slash redirects, CORS, the Worker's redirect rewriting, byte-identical bodies through the proxy).

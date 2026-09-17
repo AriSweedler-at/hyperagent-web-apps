@@ -1,7 +1,10 @@
 # Runs on every push to main and every pull request. Job "check" is the same gate as the local
 # pre-push hook (typecheck, lint, unit tests) plus coverage and a sanity check of the hook shims.
-# Build, dist tests, browser e2e and deploy jobs join as docs/MIGRATION.md steps 3-4 land
-# (see docs/ARCHITECTURE.md "GitHub Actions").
+# Job "e2e" plays the two-peer browser specs on both emulated origins through a local PeerServer
+# (the merge gate for online play, docs/MIGRATION.md step 3); job "broker" repeats the online specs
+# through the real 0.peerjs.com and is advisory (continue-on-error), so a third-party outage never
+# blocks a merge but a signalling regression is visible at review. Build, dist tests and deploy join
+# as step 4 lands (see docs/ARCHITECTURE.md "GitHub Actions").
 name: CI
 
 on:
@@ -32,3 +35,54 @@ jobs:
         run: npm test -- --coverage
       - name: Verify git hook wiring
         run: npm run hooks:verify
+
+  e2e:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser specs on both origins (local PeerServer)
+        run: npm run test:e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
+  broker:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    env:
+      E2E_BROKER: cloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Online specs through 0.peerjs.com (advisory)
+        run: npm run test:e2e -- --grep @online
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-broker
+          path: playwright-report
+          retention-days: 7

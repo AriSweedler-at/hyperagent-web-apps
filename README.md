@@ -23,9 +23,18 @@ npm run hooks          # git config core.hooksPath .githooks (re-run if hooksPat
 npm run hooks:verify   # confirm the hook wiring
 npm run format         # prettier --write on everything it checks
 npm run fixtures:legacy  # re-cut test/fixtures/legacy/*.cjs from the pages and re-pin MANIFEST.json
+npm run test:e2e       # Playwright: every spec on both emulated origins (starts its own servers)
+npm run serve          # GitHub Pages emulation: the repo root at http://127.0.0.1:4173/hyperagent-web-apps/
+npm run proxy:dev      # games.sweedler.com emulation: the real Worker at http://127.0.0.1:8787/ over :4173
 ```
 
 Git hooks live in `.githooks/`: `pre-commit` chains to the owner's template hook in `.git/hooks/pre-commit` (big-file and trailing-whitespace prompts) and `pre-push` runs `npm run check`. Legacy pages under `games/` and `shared/` are byte-frozen until the migration moves them; lint and Prettier ignore them.
+
+### Browser tests
+
+`npm run test:e2e` (first time: `npx playwright install chromium`) runs the specs in `e2e/` on two Playwright projects: `pages` (the site under `/hyperagent-web-apps/` on `tools/serve-dist.ts`, like GitHub Pages) and `proxy` (short URLs on `tools/proxy-dev.ts`, which runs the real `infra/games-proxy/worker.js` against the pages origin, like games.sweedler.com). The config starts both servers and a local PeerServer (`peer` package, :9000); the online specs open a host and a guest context that meet there through the pages' `?peer=host:port` hook and take a STUN-only ICE list from `e2e/fixtures/e2e-ice.json` through `?ice=`, so no real network is needed. PeerJS and Google Fonts are answered from local copies. Each context gets a seeded `Math.random` (`e2e/browser/seed-random.js`), so deals and dice repeat. `E2E_BROKER=cloud npm run test:e2e -- --grep @online` plays the online specs through 0.peerjs.com instead; CI runs that as the advisory `broker` job. The HTML report lands in `playwright-report/` (`npx playwright show-report`).
+
+Two contexts in one browser connect over the machine's own addresses, so the online specs need local UDP loopback to those addresses. A Cloudflare WARP or similar tunnel that drops packets sent to its own interface address breaks that (the hermetic specs then time out at the data channel); CI runners and plain networks are fine.
 
 ### Legacy oracles
 

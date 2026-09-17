@@ -225,3 +225,11 @@ parity and e2e gates.
   suites recompute legacy behaviour over seeded inputs at test time. The CDP wire-golden capture
   moves to step 3, where the browser harness lands. The fidice page edit is 2 lines (the
   `HostSession` already took `rng` by injection). See ARCHITECTURE "Deviations".
+- Step 3: the fidice `?peer=` branch sits inside `deferredPeer`, which is inside the fixture range
+  pinned in step 2, so `test/fixtures/legacy/fidice-core.cjs` and `MANIFEST.json` were re-cut
+  (`npm run fixtures:legacy`; the range is now lines 371-2337 and the parity suites are unchanged).
+  The page edits are 7 added lines in gin and 6 in fidice (plus 2 changed construction lines) rather
+  than 6 and 6. Determinism comes from a seeded `Math.random` installed by `addInitScript` rather
+  than the `window.__rng` seam, so no further page edit was needed. Visual baselines and
+  computed-style goldens are not captured yet: they belong on the CI runner once the `e2e` job runs
+  there, and the harness in this step is what captures them. See ARCHITECTURE "Deviations".

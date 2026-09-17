@@ -3,10 +3,14 @@
   // test/ tree and Playwright specs. No DOM. web/shared/lib is listed because test/ imports it
   // (seeded rng for the parity suites) and a composite project must list every file it compiles;
   // tsconfig.pure.json remains the guard for that directory, as in tsconfig.web.json.
+  // infra/games-proxy/worker.js is listed (allowJs, its JSDoc supplies the types) because
+  // tools/proxy-dev.ts runs its default export; checkJs stays off: the JS config lints it.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023"],
-    "types": ["node"]
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": false
   },
   "include": [
     "vitest.config.ts",
@@ -15,7 +19,8 @@
     "tools/**/*.ts",
     "test/**/*.ts",
     "e2e/**/*.ts",
-    "web/shared/lib/**/*.ts"
+    "web/shared/lib/**/*.ts",
+    "infra/games-proxy/worker.js"
   ],
   "exclude": ["test/fixtures/legacy/*.cjs"]
 }
