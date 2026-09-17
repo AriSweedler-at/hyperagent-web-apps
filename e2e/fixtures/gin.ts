@@ -68,7 +68,9 @@ export const readTable = async (page: Page): Promise<TableView> => ({
   discardTop: await page.locator('#discardPile .card').getAttribute('data-card'),
   handSize: await page.locator('#hand .card').count(),
   oppCount: await page.locator('#oppCards .opp-count').innerText(),
-  stockLabel: await page.locator('#stockPile .pile-label').innerText(),
+  // textContent, not innerText: .pile-label is uppercased by CSS and innerText returns the
+  // rendered case on Linux Chromium ("STOCK · 31"), while the page writes "Stock · 31".
+  stockLabel: ((await page.locator('#stockPile .pile-label').textContent()) ?? '').trim(),
   hand: await page.locator('#roundBadge').innerText(),
 });
 
