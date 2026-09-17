@@ -9,3 +9,6 @@ node_modules/
 coverage/
 playwright-report/
 test-results/
+
+# personal Claude Code permissions for this checkout
+.claude/settings.local.json
