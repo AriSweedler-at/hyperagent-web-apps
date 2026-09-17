@@ -4012,7 +4012,7 @@ main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:22px 18px 40px}
         clock: realClock,
         doc: document,
         root,
-        makeHost: (opts, events) => new HostSession({ transport: hostTransport(opts.code), events, clock: realClock, rng: Math.random, newId: effects.randomId }, opts),
+        makeHost: (opts, events) => new HostSession({ transport: hostTransport(opts.code), events, clock: realClock, rng: globalThis.__rng ?? Math.random, newId: effects.randomId }, opts),
         makeClient: (code, role, name, events) => new ClientSession(
           { transport: clientTransport(code), events, clock: realClock, rememberToken: (t) => effects.storage.set(tokenKey(code), t) },
           { role, name, savedToken: role === "player" ? effects.storage.get(tokenKey(code)) : null }
@@ -4020,6 +4020,7 @@ main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:22px 18px 40px}
       },
       `${location.origin}${location.pathname}${location.search}`
     );
+    window.__fidice = { controller };
     controller.start();
   };
   boot();
