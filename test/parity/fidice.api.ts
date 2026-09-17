@@ -1,7 +1,9 @@
 // The surface of the legacy fidice core as the parity suites see it (docs/MIGRATION.md steps 2 and
 // 6). Only what the tests call is typed; the fixture exports every top-level binding of the bundle.
 // The `current` leg added in step 6 exposes the de-bundled modules under this same shape.
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
 
 export type Rng = () => number;
 export type Category =
@@ -196,3 +198,40 @@ const load = createRequire(import.meta.url);
 /** The sha256-pinned legacy core (test/fixtures/legacy/MANIFEST.json). */
 export const loadLegacyFidice = (): FidiceCore =>
   load('../fixtures/legacy/fidice-core.cjs') as FidiceCore;
+
+const FIDICE_DIR = resolve(import.meta.dirname, '..', '..', 'web', 'games', 'fidice');
+/** The last de-bundled module inside the legacy fixture's range (docs/MIGRATION.md step 2). */
+const LAST_PURE_MODULE = 'src/domain/search.js';
+
+/**
+ * The de-bundled modules the fixture range covers, in bundle order (web/games/fidice/MANIFEST.json
+ * lists the files in that order). None of them needs a DOM to evaluate: the net/ modules reach
+ * `Peer` and `HyperIce` only inside functions, like the fixture.
+ */
+export const currentFidiceModules = (): ReadonlyArray<string> => {
+  const manifest = JSON.parse(readFileSync(resolve(FIDICE_DIR, 'MANIFEST.json'), 'utf8')) as {
+    files: Record<string, unknown>;
+  };
+  const modules = Object.keys(manifest.files).filter((file) => file.startsWith('src/'));
+  const last = modules.indexOf(LAST_PURE_MODULE);
+  if (last < 0) throw new Error(`${LAST_PURE_MODULE} is not in the manifest`);
+  return modules.slice(0, last + 1);
+};
+
+/** One de-bundled module's namespace, evaluated in node. */
+export const importFidiceModule = (file: string): Promise<Readonly<Record<string, unknown>>> =>
+  import(/* @vite-ignore */ `../../web/games/fidice/${file}`) as Promise<
+    Readonly<Record<string, unknown>>
+  >;
+
+/**
+ * The `current` leg (docs/MIGRATION.md step 6): the de-bundled pure modules merged into the same
+ * flat surface as the fixture. Top-level names are unique across the bundle, so nothing collides.
+ */
+export const loadCurrentFidice = async (): Promise<FidiceCore> => {
+  const namespaces = await Promise.all(currentFidiceModules().map(importFidiceModule));
+  return namespaces.reduce<Record<string, unknown>>(
+    (acc, ns) => ({ ...acc, ...ns }),
+    {},
+  ) as unknown as FidiceCore;
+};

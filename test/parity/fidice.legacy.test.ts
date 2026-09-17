@@ -1,12 +1,14 @@
-// Characterization of the fidice core (docs/MIGRATION.md step 2; docs/ARCHITECTURE.md "Testing
-// pyramid", parity). Every assertion is an executable oracle over seeded inputs, so the same suite
-// runs unchanged on the de-bundled modules in step 6: add ['current', adapter] to `legs`.
+// Characterization of the fidice core (docs/MIGRATION.md steps 2 and 6; docs/ARCHITECTURE.md
+// "Testing pyramid", parity). Every assertion is an executable oracle over seeded inputs and runs
+// on both legs: the sha256-pinned legacy fixture and the de-bundled modules imported in node. The
+// last describe replays seeded bot games on both legs and deep-equals every state and log line.
 import { createHash } from 'node:crypto';
 
 import { describe, expect, test } from 'vitest';
 
 import { mulberry32, type Rng } from '../../web/shared/lib/rng.ts';
 import {
+  loadCurrentFidice,
   loadLegacyFidice,
   type Action,
   type FidiceCore,
@@ -15,7 +17,10 @@ import {
   type Result,
 } from './fidice.api.ts';
 
-const legs: ReadonlyArray<readonly [string, FidiceCore]> = [['legacy', loadLegacyFidice()]];
+const legs: ReadonlyArray<readonly [string, FidiceCore]> = [
+  ['legacy', loadLegacyFidice()],
+  ['current', await loadCurrentFidice()],
+];
 
 const SEEDS = Array.from({ length: 12 }, (_, i) => i + 1);
 /** A bot game takes a few hundred steps; the cap turns a hang into a failure. */
@@ -24,6 +29,73 @@ const STEP_CAP = 20_000;
 const unwrap = <T>(r: Result<T>): T => {
   if (!r.ok) throw new Error(r.error);
   return r.value;
+};
+
+const STRATEGY_IDS = [
+  'gambler',
+  'profiler',
+  'pressure',
+  'trapper',
+  'classic-cautious',
+  'classic-steady',
+  'classic-reckless',
+  'learner-10',
+  'learner-100',
+  'learner-300',
+];
+
+type BotGame = {
+  state: GameState;
+  steps: number;
+  rejected: string[];
+  decisionPoints: GameState[];
+};
+
+/** A lobby of `players` bots whose strategies walk STRATEGY_IDS from `seed`. */
+const botTableOn = (F: FidiceCore, seed: number, players: number): GameState =>
+  Array.from({ length: players }, (_, i) => i).reduce(
+    (s, i) =>
+      unwrap(
+        F.seatPlayer(
+          s,
+          F.makeBot(s, `bot${String(i)}`, {
+            strategy: STRATEGY_IDS[(seed + i) % STRATEGY_IDS.length] ?? 'gambler',
+            random: false,
+          }),
+        ),
+      ),
+    F.newGame('ABCDE', 3),
+  );
+
+/** Drives the game the way HostSession.schedule() does, minus the timers. */
+const playBotsOn = (F: FidiceCore, seed: number, players = 3 + (seed % 4)): BotGame => {
+  const rng = mulberry32(seed);
+  const decisionPoints: GameState[] = [];
+  const rejected: string[] = [];
+  let state = unwrap(F.apply(botTableOn(F, seed, players), F.HOST, { type: 'start' }, rng));
+  let memories = F.emptyMemories;
+  let steps = 0;
+  // `some` stops at the first true: game over, a rejected bot action (HostSession would hang
+  // there too) or the cap.
+  const advance = (): boolean => {
+    if (state.phase === 'over') return true;
+    steps += 1;
+    if (state.reveal) {
+      state = unwrap(F.apply(state, F.HOST, { type: 'next' }, rng));
+      return false;
+    }
+    const holder = state.round?.holder;
+    const decision = F.decide(state, memories, rng);
+    if (holder === undefined || decision === null) throw new Error(`no bot move in ${state.phase}`);
+    decisionPoints.push(state);
+    memories = decision.memories;
+    const r = F.apply(state, F.bySeat(holder), decision.step.action, rng);
+    if (r.ok) state = r.value;
+    else rejected.push(`${JSON.stringify(decision.step.action)}: ${r.error}`);
+    return !r.ok;
+  };
+  Array.from({ length: STEP_CAP }).some(advance);
+  return { state, steps, rejected, decisionPoints };
 };
 const errorOf = <T>(r: Result<T>): string => (r.ok ? 'ok' : r.error);
 const pairs = <T>(xs: ReadonlyArray<T>): [T, T][] =>
@@ -592,73 +664,7 @@ describe.each(legs)('fidice core: %s', (_leg, F) => {
   });
 
   describe('bots', () => {
-    const STRATEGY_IDS = [
-      'gambler',
-      'profiler',
-      'pressure',
-      'trapper',
-      'classic-cautious',
-      'classic-steady',
-      'classic-reckless',
-      'learner-10',
-      'learner-100',
-      'learner-300',
-    ];
-
-    const botTable = (seed: number): GameState => {
-      const n = 3 + (seed % 4);
-      return Array.from({ length: n }, (_, i) => i).reduce(
-        (s, i) =>
-          unwrap(
-            F.seatPlayer(
-              s,
-              F.makeBot(s, `bot${String(i)}`, {
-                strategy: STRATEGY_IDS[(seed + i) % STRATEGY_IDS.length] ?? 'gambler',
-                random: false,
-              }),
-            ),
-          ),
-        F.newGame('ABCDE', 3),
-      );
-    };
-
-    type BotGame = {
-      state: GameState;
-      steps: number;
-      rejected: string[];
-      decisionPoints: GameState[];
-    };
-    /** Drives the game the way HostSession.schedule() does, minus the timers. */
-    const playBots = (seed: number): BotGame => {
-      const rng = mulberry32(seed);
-      const decisionPoints: GameState[] = [];
-      const rejected: string[] = [];
-      let state = unwrap(F.apply(botTable(seed), F.HOST, { type: 'start' }, rng));
-      let memories = F.emptyMemories;
-      let steps = 0;
-      // `some` stops at the first true: game over, a rejected bot action (HostSession would hang
-      // there too) or the cap.
-      const advance = (): boolean => {
-        if (state.phase === 'over') return true;
-        steps += 1;
-        if (state.reveal) {
-          state = unwrap(F.apply(state, F.HOST, { type: 'next' }, rng));
-          return false;
-        }
-        const holder = state.round?.holder;
-        const decision = F.decide(state, memories, rng);
-        if (holder === undefined || decision === null)
-          throw new Error(`no bot move in ${state.phase}`);
-        decisionPoints.push(state);
-        memories = decision.memories;
-        const r = F.apply(state, seat(holder), decision.step.action, rng);
-        if (r.ok) state = r.value;
-        else rejected.push(`${JSON.stringify(decision.step.action)}: ${r.error}`);
-        return !r.ok;
-      };
-      Array.from({ length: STEP_CAP }).some(advance);
-      return { state, steps, rejected, decisionPoints };
-    };
+    const playBots = (seed: number): BotGame => playBotsOn(F, seed);
 
     test('the pool', () => {
       expect(F.POOL.map((s) => s.id)).toEqual(STRATEGY_IDS);
@@ -909,5 +915,51 @@ describe.each(legs)('fidice core: %s', (_leg, F) => {
       expect(F.suggestHands('', 250).map((s) => s.label)).toEqual(['Five 6s']);
       expect(F.suggestHands('five 6s', 251)).toEqual([]);
     });
+  });
+});
+
+// The two legs are both executable, so instead of a stored golden the seeded games are replayed on
+// each and compared state by state (docs/MIGRATION.md step 6, "the seeded 3-bot game log golden").
+describe('legacy and current agree', () => {
+  const legacy = legs[0]?.[1];
+  const current = legs[1]?.[1];
+  if (legacy === undefined || current === undefined) throw new Error('both legs are required');
+
+  test('the eager tables are the same rows', () => {
+    expect(current.HANDS).toEqual(legacy.HANDS);
+    expect(current.GROUPS).toEqual(legacy.GROUPS);
+    expect(current.CATEGORY_INFO).toEqual(legacy.CATEGORY_INFO);
+    expect(current.POOL.map((s) => [s.id, s.name, s.blurb])).toEqual(
+      legacy.POOL.map((s) => [s.id, s.name, s.blurb]),
+    );
+    expect(current.survivalFor([], 5)).toEqual(legacy.survivalFor([], 5));
+  });
+
+  test('a seeded 3-bot game (profiler, pressure, trapper) replays identically: every state and log line', () => {
+    const a = playBotsOn(legacy, 1, 3);
+    const b = playBotsOn(current, 1, 3);
+    expect(b.state.players.map((p) => p.bot?.strategy)).toEqual([
+      'profiler',
+      'pressure',
+      'trapper',
+    ]);
+    expect(b.state.phase).toBe('over');
+    expect(b.rejected).toEqual([]);
+    expect(b.steps).toBe(a.steps);
+    expect(b.decisionPoints.length).toBe(a.decisionPoints.length);
+    // Log lines first, so a divergence reads as a narrative; then the whole state sequence.
+    expect(b.state.log.map((e) => e.text)).toEqual(a.state.log.map((e) => e.text));
+    expect(b.decisionPoints.map((s) => s.log.map((e) => e.text))).toEqual(
+      a.decisionPoints.map((s) => s.log.map((e) => e.text)),
+    );
+    expect([...b.decisionPoints, b.state]).toEqual([...a.decisionPoints, a.state]);
+  });
+
+  test.each(SEEDS)('seed %i: the 3-6 bot table replays identically on both legs', (seed) => {
+    const a = playBotsOn(legacy, seed);
+    const b = playBotsOn(current, seed);
+    expect(b.rejected).toEqual(a.rejected);
+    expect(b.steps).toBe(a.steps);
+    expect([...b.decisionPoints, b.state]).toEqual([...a.decisionPoints, a.state]);
   });
 });
