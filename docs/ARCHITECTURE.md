@@ -402,3 +402,46 @@ Step 4 (Vite build in passthrough mode; Pages deployed by Actions):
   `fixtureSha256` was re-pinned by `npm run fixtures:legacy`; `sourceSha256` is unchanged for both.
 - `web/index.html` joins `.prettierignore`: it is the verbatim root page and dist parity compares
   against it byte for byte.
+
+Step 5 (shared TypeScript modules with tests first):
+
+- `web/shared/lib/clock.ts` holds `Clock` and an opaque `Timer` type only; `web/shared/edge/clock.ts`
+  is the real one and `clock.fake.ts` the hand-driven fake (a timer queue is state, so it is an edge).
+  `algorithms.ts` is reserved, not created: no step-5 helper needs a loop.
+- `web/shared/edge/ice.ts` is a behaviour-for-behaviour port of `legacy/shared/ice.js` with `fetch`,
+  `Clock`, `location.search` and the endpoint injected; `test/parity/ice.legacy.test.ts` evaluates the
+  legacy IIFE in `node:vm` with the same fakes and deep-equals every documented case. The port and
+  the two clock modules are written against structural types (no DOM lib) and are listed in
+  `tsconfig.node.json` for that test; `tsconfig.web.json` still owns `web/shared/edge`.
+- `transport.ts` exposes `Transport { open(id?) -> PeerHandle }`, `PeerHandle` (on, connect,
+  reconnect, destroy, flags) and `Connection` (send, onOpen/onMessage/onClose/onError, open(),
+  peerConnection()). `transport.fake.ts` is an in-memory broker with one FIFO queue (auto or manual
+  delivery, structured-cloned frames). `transport.contract.ts` is one scripted scenario whose log
+  (`transport.contract.log.ts`) the fake test and the browser integration test both must reproduce.
+- The integration test lives in `test/integration/` and runs from `npm run test:integration`
+  (`vitest.integration.config.ts`): PeerServer, Vite dev server and Chromium are started
+  programmatically on free ports; it skips with a note where loopback WebRTC is blocked and runs for
+  real in the CI `check` job, which now installs Chromium.
+- `dom.ts` takes `Readonly<HTMLElement>` and mutates through methods only, so the edge profile's
+  readonly-parameter rule needs no exception; the escaping template tag is `safeHtml` (Prettier
+  reformats `html`-tagged templates). Its tests use a structural fake: jsdom is not installed.
+- `vitest.config.ts` covers `web/shared/edge/**` with a 90% threshold on lines, functions and
+  statements (lib stays at 100% on all four); `test/integration/**` is excluded from `npm test`.
+
+Step 5 follow-up (review findings on the transport and room codes):
+
+- `transport.fake.ts` frames are not structured-cloned: they round-trip through PeerJS's BinaryPack
+  (`wireClone`, exported by `transport.ts`, the one `peerjs` importer), so the fake shows the real
+  wire's rewrites (`undefined` -> `null`, `Date` -> string) and throws (`Infinity`, `Map`, `Set`,
+  `BigInt`); `transport.contract.log.ts` pins `wire: undefined->null date->string` for both.
+- `PeerHandle.connect` returns an inert Connection when PeerJS refuses (disconnected peer) and
+  `PeerHandle.reconnect` is guarded like legacy `keepPeerAlive`; the fake refuses `connect` while
+  disconnected, emits `error(network)` then `disconnected` on a dropped socket with `id()` null in
+  between, emits `disconnected` before `close` on destroy, and emits a channel's `close` only if it
+  had opened, all as PeerJS 1.5.4 does.
+- `roomCode.sanitiseCode` is the legacy input handler per game (gin: `A-Z` only, four at most;
+  fidice: upper-case only), not a filter to the alphabet; `test/parity/roomCode.legacy.test.ts`
+  runs the captured legacy expressions beside it.
+- `test/integration/transport.integration.test.ts` skips on "signalling worked, no channel" only
+  outside `CI`; the script runs with `--reporter=verbose` so the skip note is visible.
+

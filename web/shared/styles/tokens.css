@@ -1,0 +1,7 @@
+/*
+ * Shared design tokens (docs/ARCHITECTURE.md "Seams reserved for the roadmap"). Empty on purpose
+ * until docs/MIGRATION.md step 14 hoists the two games' :root blocks here with their values
+ * unchanged; nothing imports this file yet. Only custom properties belong in this file.
+ */
+:root {
+}

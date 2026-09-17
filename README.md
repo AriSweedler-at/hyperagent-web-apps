@@ -21,6 +21,7 @@ npm run check          # typecheck + lint + unit tests + build + dist guards: th
 npm test               # vitest once (`npm run test:watch` keeps it running; `-- --coverage` for the report)
 npm run build          # vite build -> dist/ (legacy pages copied byte-for-byte by the passthrough plugin)
 npm run test:dist      # guards on dist/: relative asset URLs, paths on both origins, parity with legacy/ and web/
+npm run test:integration # real PeerJS transport through a local PeerServer in Chromium; skips where loopback WebRTC is blocked
 npm run hooks          # git config core.hooksPath .githooks (re-run if hooksPath was changed)
 npm run hooks:verify   # confirm the hook wiring
 npm run format         # prettier --write on everything it checks
@@ -60,7 +61,8 @@ Roll back by switching the source back to **Deploy from a branch** (`main`, `/ (
 ```
 web/index.html               landing page, the first Vite entry (no scripts); dist/index.html is byte-identical
 web/public/.nojekyll         copied to dist/ so Pages serves dotfiles and folders untouched
-web/shared/lib/              shared pure TypeScript (result, rng); games land under web/games/<name>/
+web/shared/lib/              shared pure TypeScript (result, rng, json decoders, roomCode, Clock types)
+web/shared/edge/             shared effects (ice, transport + fake, clock, storage, dom, fx); games land under web/games/<name>/
 legacy/gin-rummy/index.html  Gin Rummy, verbatim; copied to dist/games/gin-rummy/ by the passthrough plugin
 legacy/fidice/index.html     Fidice, verbatim; copied to dist/games/fidice/
 legacy/shared/ice.js         ICE/TURN config loader shared by the games (window.HyperIce); copied to dist/shared/

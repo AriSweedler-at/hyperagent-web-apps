@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:dist": "vitest run --config vitest.dist.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts --reporter=verbose",
     "test:e2e": "npm run build && playwright test",
     "check": "npm run typecheck && npm run lint && npm test && npm run build && npm run test:dist",
     "serve": "node --experimental-strip-types tools/serve-dist.ts --root dist --base /hyperagent-web-apps/ --alias e2e-ice.json=e2e/fixtures/e2e-ice.json",

@@ -254,3 +254,31 @@ parity and e2e gates.
   `shared/ice.js` is unaffected). Hash the github.io URLs, which the Worker proxies byte for byte
   (`test/tools/proxy-dev.test.ts`), or strip the trailing block first:
   `curl -sL "$u" | perl -0pe 's/<script>\(function\(\)\{function c\(\).*?<\/script><\/body>/<\/body>/s' | shasum -a 256`.
+- Step 5: `fakeClock` lives in `web/shared/edge/clock.fake.ts`, not `lib`: a usable fake keeps a
+  timer queue between calls. `lib/clock.ts` is types only and disables `functional/no-return-void`
+  for its two `void` members with a comment. `algorithms.ts` is not created (nothing needs a loop);
+  `web/shared/lib/README.md` reserves it. `ice.ts`, `clock.ts`, `clock.fake.ts` and
+  `transport.contract.log.ts` are written against structural types and are also listed in
+  `tsconfig.node.json`, so `test/parity/ice.legacy.test.ts` can run the legacy IIFE (node:vm, fake
+  clock, scripted fetch) beside the port and deep-equal the results; `ice.ts` takes an `endpoint`
+  dep so the empty-URL branch is reachable in both. The DOM edge takes `Readonly<HTMLElement>` and
+  writes through methods (`replaceChildren`, `insertAdjacentHTML`, `toggleAttribute`, `classList`)
+  so the readonly-parameter rule stays on; its template tag is `safeHtml`, not `html`, because
+  Prettier reformats markup inside `html` templates. jsdom is not installed, so `dom.test.ts` runs on
+  a structural fake (no `*.dom.test.ts`). The transport integration test needs WebRTC, which node
+  lacks, so `test/integration/transport.integration.test.ts` starts a PeerServer, a Vite dev server
+  and Chromium itself (`npm run test:integration`, `vitest.integration.config.ts`; the CI `check` job
+  installs Chromium and runs it after the unit tests). On this laptop it skips with a note (signalling
+  completes, no data channel opens: Cloudflare WARP). Edge coverage threshold is 90% lines,
+  functions and statements (branches uncounted: the fakes' defensive arms). See ARCHITECTURE "Deviations".
+- Step 5 follow-up (review findings on the transport and room codes): the fake clones frames through
+  PeerJS's own BinaryPack codec (`wireClone` in `transport.ts`, via the re-exported `util.pack` /
+  `util.unpack`), not `structuredClone`, so `undefined` arrives as `null` and a `Date` as a string
+  on both Transports; the contract log pins that. The adapter carries the legacy guards (`connect`
+  on a disconnected peer returns an inert Connection; `reconnect` is a no-op unless disconnected and
+  not destroyed) and the fake mirrors PeerJS's `error(network)` before `disconnected`, a null id
+  while disconnected, `disconnected` before `close` on destroy, and `close` only for a channel that
+  opened. `sanitiseCode` reproduces the legacy input handlers per game (gin keeps any A-Z, fidice
+  only upper-cases) instead of filtering to the alphabet. The integration test's heuristic skip is
+  off under `CI` (a channel that never opens fails there). See ARCHITECTURE "Deviations".
+

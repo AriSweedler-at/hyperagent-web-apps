@@ -38,6 +38,13 @@ jobs:
         run: npm run lint
       - name: Unit tests with coverage
         run: npm test -- --coverage
+      # The real Transport (PeerJS) needs a browser: a PeerServer, a Vite dev server and Chromium
+      # are started by the test itself (docs/MIGRATION.md step 5). It skips where loopback WebRTC
+      # is blocked; the runner has none of that, so here it runs for real.
+      - name: Install Chromium for the transport integration test
+        run: npx playwright install --with-deps chromium
+      - name: Transport integration (real PeerJS through a local PeerServer)
+        run: npm run test:integration
       - name: Build dist
         run: npm run build
       - name: Dist guards (relative asset URLs, paths on both origins, parity with legacy/)
