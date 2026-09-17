@@ -1,0 +1,249 @@
+{
+  "page": "legacy/fidice/index.html",
+  "tool": "tools/legacy/debundle-fidice.ts",
+  "startLine": 371,
+  "endLine": 4031,
+  "sourceSha256": "7cb363b9005289b1e52632fbcecfae41cb79fa558959b013965d4bd863ef2776",
+  "files": {
+    "index.html": {
+      "sha256": "70f8ab3c73dd65be941abd767e7790211157b5ae8dad591812080acb1a3450e1"
+    },
+    "theme.css": {
+      "sha256": "12363c3fb618eebda271ef26f2ebb4e237de080c944ed03c7ac0f5541907a5cf"
+    },
+    "src/assets/diceImages.js": {
+      "section": "src/assets/diceImages.ts",
+      "startLine": 374,
+      "endLine": 381,
+      "sha256": "77969efc0a46a75bdf41d0110f30664319237c08c12d09a674fc2b88e4dfd77e"
+    },
+    "src/domain/dice.js": {
+      "section": "src/domain/dice.ts",
+      "startLine": 384,
+      "endLine": 391,
+      "sha256": "b168654fcfaae36bf794a09aba010223c912af189b5da738cb0441007c80094d"
+    },
+    "src/domain/hands.js": {
+      "section": "src/domain/hands.ts",
+      "startLine": 394,
+      "endLine": 548,
+      "sha256": "ea5b4d5a961b687297f41c428373602a2a3c14f94eaa306b3168a4af78d77ece"
+    },
+    "src/domain/result.js": {
+      "section": "src/domain/result.ts",
+      "startLine": 551,
+      "endLine": 556,
+      "sha256": "886ae88c27a5131536de7c11fae22386db855368d40efc338715995de83aa00e"
+    },
+    "src/net/protocol.js": {
+      "section": "src/net/protocol.ts",
+      "startLine": 559,
+      "endLine": 607,
+      "sha256": "bae54cb9806043d9307ed2ce2159de6256f887aa63fb7a3e6ff278c06eb5b42e"
+    },
+    "src/net/client.js": {
+      "section": "src/net/client.ts",
+      "startLine": 610,
+      "endLine": 663,
+      "sha256": "74c2f143621ea9843a8875b3379549f0a86972fd61193220b9966d7dcae268e6"
+    },
+    "src/domain/game.js": {
+      "section": "src/domain/game.ts",
+      "startLine": 666,
+      "endLine": 859,
+      "sha256": "db63efc28453ccb112d5e0895eb1a4f464763d22f1ef67f757e024f59f3047fd"
+    },
+    "src/domain/publicState.js": {
+      "section": "src/domain/publicState.ts",
+      "startLine": 862,
+      "endLine": 877,
+      "sha256": "8b724700bb9537e5bc2d5ff3e6783dae2f05f406522289beca9ab175fcf18ae3"
+    },
+    "src/bots/strategy.js": {
+      "section": "src/bots/strategy.ts",
+      "startLine": 880,
+      "endLine": 880,
+      "sha256": "bf36541b6f2fd917f24d818734599b29329d8b95c2170cef99879e553df10f00"
+    },
+    "src/domain/probability.js": {
+      "section": "src/domain/probability.ts",
+      "startLine": 883,
+      "endLine": 903,
+      "sha256": "d3cec708b474a654c664b517627331b4f3974d3067591aff583788ef5b313eb2"
+    },
+    "src/bots/toolkit.js": {
+      "section": "src/bots/toolkit.ts",
+      "startLine": 906,
+      "endLine": 972,
+      "sha256": "f2eedcfbe88ec0816d50b2c082a0a94b7867d4136f7bb210f17586aa33e2fc47"
+    },
+    "src/bots/strategies/classic.js": {
+      "section": "src/bots/strategies/classic.ts",
+      "startLine": 975,
+      "endLine": 1035,
+      "sha256": "310b7f956781ac0bc7319f8c622773f4e386d3029b5c6c378541e728270d525c"
+    },
+    "src/bots/strategies/profiler.js": {
+      "section": "src/bots/strategies/profiler.ts",
+      "startLine": 1038,
+      "endLine": 1153,
+      "sha256": "ec7613069f9bf2d6b18b69b2312ccf7a0f9b6ae1abcc8689491862ba8114da4a"
+    },
+    "src/bots/strategies/trapper.js": {
+      "section": "src/bots/strategies/trapper.ts",
+      "startLine": 1156,
+      "endLine": 1276,
+      "sha256": "e5cfb8d903b612817be471b65711ff680992f0a827fb271611a556ee7f62359e"
+    },
+    "src/bots/strategies/gambler.js": {
+      "section": "src/bots/strategies/gambler.ts",
+      "startLine": 1279,
+      "endLine": 1519,
+      "sha256": "bed2455a7bc69b7e8718ea31ac1b313ff73c469f7cad31fd29dbc69aa6201d53"
+    },
+    "src/bots/strategies/pressure.js": {
+      "section": "src/bots/strategies/pressure.ts",
+      "startLine": 1522,
+      "endLine": 1653,
+      "sha256": "94052df94e435a95c6149b89ed8635f4c6fa71245da74b728ea871fac9117599"
+    },
+    "src/bots/strategies/learner.js": {
+      "section": "src/bots/strategies/learner.ts",
+      "startLine": 1656,
+      "endLine": 1759,
+      "sha256": "ce074f459fe0a9d00f18db7f21b714ad1ea5c646833808f5b7ed076ba38037ef"
+    },
+    "src/bots/strategies/learnerWeights.js": {
+      "section": "src/bots/strategies/learnerWeights.ts",
+      "startLine": 1762,
+      "endLine": 1766,
+      "sha256": "0467b2ce82f97795cc61dfdd860a477c3687ebb0a9dd0045325b90f55c2c3a15"
+    },
+    "src/bots/registry.js": {
+      "section": "src/bots/registry.ts",
+      "startLine": 1769,
+      "endLine": 1799,
+      "sha256": "b275429f70aadb7080240fef738389c3ced52c17e090ecd65220a6f3288336e5"
+    },
+    "src/bots/brain.js": {
+      "section": "src/bots/brain.ts",
+      "startLine": 1802,
+      "endLine": 1813,
+      "sha256": "2a95f2f6e621747fa248bb49115e58fb7c92957e252b1ad4bb9fe1cdb956215f"
+    },
+    "src/domain/lobby.js": {
+      "section": "src/domain/lobby.ts",
+      "startLine": 1816,
+      "endLine": 1889,
+      "sha256": "ab93d58c46e5935493c8c808b805401783edaddf601c7b7baabf3f214e512179"
+    },
+    "src/net/host.js": {
+      "section": "src/net/host.ts",
+      "startLine": 1892,
+      "endLine": 2108,
+      "sha256": "78ab6c46218bafe5224c9c095529202816c0bdd0dbb653965fe930fc1ae53756"
+    },
+    "src/net/peerjs.js": {
+      "section": "src/net/peerjs.ts",
+      "startLine": 2111,
+      "endLine": 2212,
+      "sha256": "fcd1759f4bd0ac7f0c708434ea1fd320dba20918edce866b0fcf6a1b31b99a8d"
+    },
+    "src/net/session.js": {
+      "section": "src/net/session.ts",
+      "startLine": 2215,
+      "endLine": 2219,
+      "sha256": "bbd24f01d46133cb63496034c2cc13a7c2500745bca8bc9555e160dcd0ae8857"
+    },
+    "src/domain/search.js": {
+      "section": "src/domain/search.ts",
+      "startLine": 2222,
+      "endLine": 2337,
+      "sha256": "e64f97e4af07b8fa76b888677efd51a95f95d2349b61307bed21428cd7df3536"
+    },
+    "src/view/vdom.js": {
+      "section": "src/view/vdom.ts",
+      "startLine": 2340,
+      "endLine": 2425,
+      "sha256": "f4c5cd1299f1c2fbc9df8a5d669795ab324d4196817a73ecb7f852d19bdafecf"
+    },
+    "src/view/components.js": {
+      "section": "src/view/components.ts",
+      "startLine": 2428,
+      "endLine": 2538,
+      "sha256": "ad69b5d515b8f7202bd70a50701a57c8da323934ef631f9fee962734727b4660"
+    },
+    "src/view/screens/menu.js": {
+      "section": "src/view/screens/menu.ts",
+      "startLine": 2541,
+      "endLine": 2682,
+      "sha256": "1413622769bd598caafe5eff8af48dad4f119b25348a85d3de60a01300227ae7"
+    },
+    "src/view/ui.js": {
+      "section": "src/view/ui.ts",
+      "startLine": 2685,
+      "endLine": 2718,
+      "sha256": "ccca4f1798232307ffb54fac302a2512410481b79f8235d09e61d59ae7b67b26"
+    },
+    "src/view/screens/lobby.js": {
+      "section": "src/view/screens/lobby.ts",
+      "startLine": 2721,
+      "endLine": 2790,
+      "sha256": "a13781df7486c15179be9ef8b35afacbe54f500fd9f08042458ace07ee75299d"
+    },
+    "src/view/screens/table.js": {
+      "section": "src/view/screens/table.ts",
+      "startLine": 2793,
+      "endLine": 3077,
+      "sha256": "2220dfbbce9d21c3e8edc3c82e045be4d292795adb83eea2cfd0397a6b54f610"
+    },
+    "src/view/screens/ladder.js": {
+      "section": "src/view/screens/ladder.ts",
+      "startLine": 3080,
+      "endLine": 3169,
+      "sha256": "6c66dc41c7d7b96054fef910b7b7980b81a5c2825ff541791eb78e1df8c6d9b1"
+    },
+    "src/view/screens/spectator.js": {
+      "section": "src/view/screens/spectator.ts",
+      "startLine": 3172,
+      "endLine": 3294,
+      "sha256": "8fc18052348c2674fe8bd5bdb3386426cf2a19d64e2a5830ec3ec0937b0b4a92"
+    },
+    "src/view/screens/rules.js": {
+      "section": "src/view/screens/rules.ts",
+      "startLine": 3297,
+      "endLine": 3374,
+      "sha256": "b1689ac817477c7ed6847a6dc8e27a5000489607219f9e3617f46dba56c26ee5"
+    },
+    "src/view/screens/botConfig.js": {
+      "section": "src/view/screens/botConfig.ts",
+      "startLine": 3377,
+      "endLine": 3475,
+      "sha256": "2f73ad02afc031596f1efea10d703c6095102be82d91a08c005bbdea4cd27301"
+    },
+    "src/view/app.js": {
+      "section": "src/view/app.ts",
+      "startLine": 3478,
+      "endLine": 3526,
+      "sha256": "9a7126bce7d44aaa121fd2643b8484cfe33c9bdbc468284737e403f56ea8ba47"
+    },
+    "src/app/controller.js": {
+      "section": "src/app/controller.ts",
+      "startLine": 3529,
+      "endLine": 3958,
+      "sha256": "b86b776875de4f7021cb61a67ad5c7079d995c57d1b136ba01b4886e3e341ede"
+    },
+    "src/app/effects.js": {
+      "section": "src/app/effects.ts",
+      "startLine": 3961,
+      "endLine": 3999,
+      "sha256": "cca941aaefcab14771d3f79aceff2f54bc42eb03f0918024a0f35f16f48a14cb"
+    },
+    "main.js": {
+      "section": "src/app/main.ts",
+      "startLine": 4002,
+      "endLine": 4030,
+      "sha256": "f9e2130758a47746f39ffdedb75560aadfb2c845a4214fa61850628398a4c7b4"
+    }
+  }
+}
