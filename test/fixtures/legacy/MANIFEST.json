@@ -4,9 +4,9 @@
     "fixture": "fidice-core.cjs",
     "tool": "tools/legacy/extract-fidice-core.ts",
     "startLine": 371,
-    "endLine": 2333,
-    "sourceSha256": "2edd60e1137af60f39b1b2f49243747b8ae5cbc51a5ca65ff9b7c1e4882482dc",
-    "fixtureSha256": "6921be27670b3da1af5c18aeb739f5ed36ea8d60e33757452d0be717aa4604ae"
+    "endLine": 2337,
+    "sourceSha256": "0a89e859c2612611db73152beabb40dc881f43dd419de3ac2c9e14ebeb6b4240",
+    "fixtureSha256": "a259ec06d9c749dc7b5f0e9f1744a97849f6529c84f4005f0b296c38ead41dd7"
   },
   "gin-engine": {
     "page": "games/gin-rummy/index.html",

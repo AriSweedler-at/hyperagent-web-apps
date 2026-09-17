@@ -1766,6 +1766,10 @@
    */
   var deferredPeer = (id) => {
     const ice = globalThis.HyperIce;
+    // Test hook (docs/ARCHITECTURE.md "Documented test hooks"): ?peer=host:port aims PeerJS at a local
+    // PeerServer instead of 0.peerjs.com. Without the param the options are exactly what they were.
+    const m = /^([^:/]+):(\d+)$/.exec(new URLSearchParams(globalThis.location?.search ?? "").get("peer") ?? "");
+    const withPeerOverride = (o) => m ? { ...o, host: m[1], port: Number(m[2]), path: "/", secure: false } : o;
     let peer = null;
     let iceResult = null;
     let closed = false;
@@ -1776,7 +1780,7 @@
       if (closed) return;
       iceResult = res;
       try {
-        peer = new (peerCtor())(id, res ? { debug: 1, config: ice.peerConfig(res) } : { debug: 1 });
+        peer = new (peerCtor())(id, withPeerOverride(res ? { debug: 1, config: ice.peerConfig(res) } : { debug: 1 }));
       } catch (e) {
         errorFns.forEach((fn) => fn(e instanceof Error ? e.message : String(e)));
         return;
@@ -1784,7 +1788,7 @@
       queued.splice(0).forEach((fn) => fn(peer, iceResult));
     };
     if (ice) ice.load().then(create, () => create(null));
-    else peer = new (peerCtor())(id, { debug: 1 });
+    else peer = new (peerCtor())(id, withPeerOverride({ debug: 1 }));
     return {
       ready,
       onError: (fn) => {
