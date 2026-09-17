@@ -8,7 +8,7 @@
 // Vite 8 is Rolldown-based: `build.rolldownOptions` is the supported key and `build.rollupOptions`
 // is a deprecated alias of it (node_modules/vite/dist/node/index.d.ts), so this file uses the former.
 import { copyFileSync, mkdirSync, readdirSync } from 'node:fs';
-import { basename, dirname, resolve, sep } from 'node:path';
+import { basename, dirname, posix, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { defineConfig, type Plugin } from 'vite';
@@ -51,33 +51,59 @@ const pageInputs = (): Readonly<Record<string, string>> =>
   );
 
 /**
- * After the bundle is written, copy each legacy page over Vite's output for that path (and the
- * legacy ICE loader beside them), so dist serves exactly the bytes in legacy/.
+ * After the bundle is written, copy each legacy page over Vite's output for that path, so dist
+ * serves exactly the bytes in legacy/. legacy/shared/ice.js is copied on every build, even with
+ * `LEGACY_PAGES=`: the ported fidice page still loads it as a classic script until
+ * docs/MIGRATION.md step 9 wires the typed edge. The output directory is read from the resolved
+ * config, so `vite build --outDir ../dist-next` (npm run build:next) is honoured.
  */
-const legacyPassthrough = (pages: ReadonlyArray<string>): Plugin => ({
-  name: 'legacy-passthrough',
-  apply: 'build',
-  enforce: 'post',
-  closeBundle: () => {
-    const pageCopies = pages.map(
-      (game) =>
-        [resolve(LEGACY, game, 'index.html'), resolve(DIST, 'games', game, 'index.html')] as const,
-    );
-    const sharedCopies =
-      pages.length > 0
-        ? [[resolve(LEGACY, 'shared', 'ice.js'), resolve(DIST, 'shared', 'ice.js')] as const]
-        : [];
-    [...pageCopies, ...sharedCopies].forEach(([from, to]) => {
-      mkdirSync(dirname(to), { recursive: true });
-      copyFileSync(from, to);
-    });
-  },
-});
+const legacyPassthrough = (pages: ReadonlyArray<string>): Plugin => {
+  let outDir = DIST;
+  return {
+    name: 'legacy-passthrough',
+    apply: 'build',
+    enforce: 'post',
+    configResolved: (config) => {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    closeBundle: () => {
+      const pageCopies = pages.map(
+        (game) =>
+          [
+            resolve(LEGACY, game, 'index.html'),
+            resolve(outDir, 'games', game, 'index.html'),
+          ] as const,
+      );
+      const sharedCopies = [
+        [resolve(LEGACY, 'shared', 'ice.js'), resolve(outDir, 'shared', 'ice.js')] as const,
+      ];
+      [...pageCopies, ...sharedCopies].forEach(([from, to]) => {
+        mkdirSync(dirname(to), { recursive: true });
+        copyFileSync(from, to);
+      });
+    },
+  };
+};
+
+/** `./app-x.js` or `../../shared/assets/x.css`: the path from the page's directory to the file. */
+const documentRelative = (fromFile: string, toFile: string): string => {
+  const rel = posix.relative(posix.dirname(fromFile), toFile);
+  return rel.startsWith('.') ? rel : `./${rel}`;
+};
 
 export default defineConfig({
   root: WEB,
   base: './',
   plugins: [legacyPassthrough(legacyPagesFrom(process.env['LEGACY_PAGES']))],
+  experimental: {
+    // With a relative base Vite prefixes every URL in a page with the path back to the site root
+    // (`../../games/fidice/app-x.js` from games/fidice/index.html), which the proxy origin can only
+    // reach through its /games/ redirect. Pages get true document-relative URLs instead: the
+    // page's own bundle as `./app-x.js`, shared output as `../../shared/assets/x` (docs/ARCHITECTURE.md
+    // "Two origins"). URLs inside JS and CSS keep Vite's own handling (import.meta.url-relative).
+    renderBuiltUrl: (filename, { hostId, hostType }) =>
+      hostType === 'html' ? documentRelative(hostId, filename) : undefined,
+  },
   build: {
     outDir: DIST,
     emptyOutDir: true,

@@ -445,3 +445,40 @@ Step 5 follow-up (review findings on the transport and room codes):
 - `test/integration/transport.integration.test.ts` skips on "signalling worked, no channel" only
   outside `CI`; the script runs with `--reporter=verbose` so the skip note is visible.
 
+Step 6 (de-bundle Fidice into modules, shipped dark):
+
+- esbuild's collision renames (`h2/p2/b2/i2`, `turnKey2..6`, `clamp2/3`) are kept in every module:
+  they are unique across the bundle, so no import can collide, and each module body is the page text
+  at the same scope depth (two-space indentation included), so shadowing is unchanged. Exports are
+  one trailing `export { ... }` line per module, so every body line is byte-identical to the page.
+  Step 8 renames and de-indents when it types the modules.
+- `tools/legacy/debundle-fidice.ts` finds declarations and free identifiers with ESLint's scope
+  manager (a one-off rule under `Linter.verify`; eslint is a devDependency already). The recovered
+  graph is a DAG in bundle order (no cycles, no forward references) and `main.js` imports all 38
+  modules in bundle order, so the ESM evaluation order equals the bundle order; the tool refuses
+  cross-module writes, duplicate top-level names and eager reads of a later module. It also cuts
+  `index.html` and `theme.css` from the page; `web/games/fidice/MANIFEST.json` pins the range and
+  every file, and `test/tools/debundle-fidice.test.ts` re-runs the tool on HEAD.
+- The classic `../../shared/ice.js` script carries Vite's `vite-ignore` attribute (stripped from
+  the output) so the build neither bundles nor warns about it; `legacyPassthrough` always copies
+  `legacy/shared/ice.js` and reads `build.outDir` from the resolved config (`npm run build:next` is
+  `LEGACY_PAGES= vite build --outDir ../dist-next`, gitignored; `check` and `test:e2e` build both).
+- `experimental.renderBuiltUrl` makes HTML URLs document-relative: with the relative base alone
+  Vite writes `../../games/fidice/app-x.js` (a parent escape for the asset-URL guard, and a
+  `/games/` redirect per load on the proxy origin); pages now get `./app-x.js` and
+  `../../shared/assets/x.css` as "Two origins" specifies. The entry's CSS is named after the entry
+  (`shared/assets/fidice-[hash].css`).
+- The dist guards run per tree (`describeDist` in `test/dist/dist.ts`, dist/ and dist-next/) and
+  leave out the landing link to gin-rummy in dist-next/, which that tree does not hold yet. The
+  Playwright project `next` serves dist-next/ on :4174 with `smoke.spec.ts` (landing and fidice) and
+  `fidice-online.spec.ts`; `e2e/fixtures/site.ts` gains `pagesOn(project)`.
+- The parity `current` leg is the 25 modules of the fixture range (`assets/diceImages` through
+  `domain/search`, in bundle order from MANIFEST.json) merged into one object; all of them evaluate in
+  node, the four `net/` modules included, since `Peer` and `HyperIce` are reached only inside
+  functions. `test/parity/fidice.modules.test.ts` imports each one on a fresh registry and compares
+  every export with the fixture's binding; the seeded 3-bot game is replayed on both legs and
+  deep-equalled instead of a stored golden.
+- A JS-only lint block for the generated files turns off `no-var`, `no-unused-vars` and `no-empty`
+  and names the nine browser globals the bundle uses under `no-undef`; import-x zones and `no-cycle`
+  stay on and pass. `test/ratchet.test.ts` (listed under step 8 in MIGRATION) lands here and pins
+  the `.js` count under `web/` at 39: the count exists from the first `.js` file.

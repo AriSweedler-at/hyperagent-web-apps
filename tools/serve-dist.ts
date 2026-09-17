@@ -7,6 +7,7 @@
 //     --alias e2e-ice.json=e2e/fixtures/e2e-ice.json [--root dist] [--host 127.0.0.1] [--port 4173]
 // Like GitHub Pages, a directory URL without its trailing slash redirects to it, and every response
 // carries `Access-Control-Allow-Origin: *` so the proxy origin can fetch the ICE fixture.
+import { existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -257,6 +258,14 @@ const isMain =
 
 if (isMain) {
   const options = parseServeArgs(process.argv.slice(2));
+  // A missing tree would serve 404 on every URL, and Playwright's health check would wait out its
+  // whole webServer timeout without saying why; exiting here surfaces the cause at once.
+  if (!existsSync(resolve(options.root, 'index.html'))) {
+    console.error(
+      `serve-dist: ${options.root} has no index.html; run \`npm run build\` (dist/) or \`npm run build:next\` (dist-next/) first`,
+    );
+    process.exit(1);
+  }
   startServer(options).then(
     ({ url }) => {
       console.log(`serve-dist: ${url}${options.base} -> ${options.root}`);

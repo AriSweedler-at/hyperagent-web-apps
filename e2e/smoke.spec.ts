@@ -1,12 +1,14 @@
-// Every page on both emulated origins: the right title, shared/ice.js and PeerJS loaded, zero
-// uncaught exceptions and zero failed requests outside the allowlist (e2e/fixtures/offline.ts).
-// The landing page's card links must also resolve on the origin they are clicked from: on the
-// proxy that means the Worker's /games/XXX -> /XXX redirect.
-import { EXPECTED_TITLES, PAGES, pagePath } from './fixtures/site.ts';
+// Every page on both emulated origins (and the ported pages on the dark `next` build): the right
+// title, shared/ice.js and PeerJS loaded, zero uncaught exceptions and zero failed requests outside
+// the allowlist (e2e/fixtures/offline.ts). The landing page's card links must also resolve on the
+// origin they are clicked from: on the proxy that means the Worker's /games/XXX -> /XXX redirect;
+// on `next` only the links to pages dist-next/ holds are followed.
+import { EXPECTED_TITLES, PAGES, pagePath, pagesOn } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 PAGES.forEach((name) => {
   test(`${name}: loads cleanly`, async ({ player, project }) => {
+    test.skip(!pagesOn(project).includes(name), `${name} is not built into dist-next/`);
     const { page, watched } = player;
     await page.goto(pagePath(project, name));
     await expect(page).toHaveTitle(EXPECTED_TITLES[name]);
@@ -32,8 +34,10 @@ test('landing: every card link resolves on this origin', async ({ player, projec
   const cards = await page.locator('a.card').all();
   const hrefs = await Promise.all(cards.map((card) => card.getAttribute('href')));
   expect(hrefs).toEqual(['games/gin-rummy/', 'games/fidice/']);
+  const built = hrefs.filter((href) => pagesOn(project).some((name) => href === `games/${name}/`));
+  expect(built.length).toBe(pagesOn(project).length - 1);
   await Promise.all(
-    hrefs.map(async (href) => {
+    built.map(async (href) => {
       const target = new URL(href ?? '', page.url()).toString();
       const response = await page.request.get(target);
       expect(response.status(), target).toBe(200);

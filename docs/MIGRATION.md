@@ -281,4 +281,12 @@ parity and e2e gates.
   opened. `sanitiseCode` reproduces the legacy input handlers per game (gin keeps any A-Z, fidice
   only upper-cases) instead of filtering to the alphabet. The integration test's heuristic skip is
   off under `CI` (a channel that never opens fails there). See ARCHITECTURE "Deviations".
-
+- Step 6: renames are kept (unique across the bundle) and bodies stay at their bundle indentation,
+  exported by a trailing `export { ... }` line, so every body line is byte-identical to the page;
+  `main.js` imports all 38 modules in bundle order and the recovered graph has no cycles or forward
+  references. The tool also generates `index.html` and `theme.css` and pins everything in
+  `web/games/fidice/MANIFEST.json`. `vite.config.ts` gains `experimental.renderBuiltUrl` (Vite's
+  relative base wrote `../../games/fidice/app-x.js`; pages now get `./app-x.js`) and the passthrough
+  always copies `shared/ice.js`; `npm run build:next` writes dist-next/ for the e2e project `next`
+  and the dist guards run on both trees. `test/ratchet.test.ts` lands here rather than in step 8.
+  See ARCHITECTURE "Deviations".
