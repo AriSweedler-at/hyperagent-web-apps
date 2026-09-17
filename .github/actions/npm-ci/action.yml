@@ -1,0 +1,28 @@
+# Install dependencies on a GitHub runner from a lockfile written behind Socket Firewall.
+#
+# The developer's npm registry is Airtable's Socket Firewall (registry mode), so package-lock.json
+# records https://sfw.security.shadowbox.cloud/npm/<name>/-/<file>.tgz as the "resolved" URL of
+# every package. The committed lockfile is kept exactly as the firewall wrote it. Runners have no
+# credentials for that host, so this action points the RUNNER'S CHECKED-OUT COPY of the lockfile at
+# the public registry (host and path prefix; npm's replace-registry-host swaps only the hostname and
+# leaves the firewall's /npm/ prefix behind), installs through Socket Firewall Free so CI installs
+# are scanned for malicious packages, and then restores the pristine lockfile. The sha512 integrity
+# hashes in the lockfile are verified against what is downloaded either way.
+name: npm ci through Socket Firewall
+description: Install dependencies with npm ci, fetching from the public registry through Socket Firewall Free
+runs:
+  using: composite
+  steps:
+    - name: Install Socket Firewall Free
+      shell: bash
+      run: npm install -g sfw@2.0.6
+    - name: Point the runner's lockfile copy at the public registry
+      shell: bash
+      run: node .github/actions/npm-ci/public-registry.mjs package-lock.json
+    - name: npm ci (scanned by Socket Firewall)
+      shell: bash
+      run: sfw npm ci
+    - name: Restore the committed lockfile
+      shell: bash
+      if: always()
+      run: git checkout -- package-lock.json && git diff --quiet -- package-lock.json && echo "package-lock.json restored"

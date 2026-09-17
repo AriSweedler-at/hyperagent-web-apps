@@ -2,3 +2,14 @@
 .wrangler/
 .dev.vars
 *.secrets.json
+
+# build and test output
+dist/
+node_modules/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# personal Claude Code permissions for this checkout
+.claude/settings.local.json

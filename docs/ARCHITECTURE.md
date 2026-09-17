@@ -218,7 +218,14 @@ check): download dist, `npx playwright install --with-deps chromium`, `npm run t
 first retry; report uploaded). Job `broker` (needs check, `continue-on-error: true`): the two-peer
 specs without `?peer=` through 0.peerjs.com, so signalling regressions surface at review without
 blocking on a third party. Job `deploy` as above. Branch protection on `main` requires `check` and
-`e2e`. `nightly.yml` runs the online specs against both live origins through the real broker and
+`e2e`. Installs in every job use the composite action `.github/actions/npm-ci`. The owner's npm registry is
+Airtable's Socket Firewall in registry mode, so `package-lock.json` records that host in every
+`resolved` URL and is committed exactly as written; it is never rewritten. Runners cannot
+authenticate to the firewall, so the action rewrites the runner's checked-out copy of the lockfile
+to the public registry (host and the firewall's `/npm/` path prefix; npm's `replace-registry-host`
+swaps only the hostname), installs through Socket Firewall Free (`sfw npm ci`) so CI installs are
+scanned too, and restores the pristine lockfile afterwards. The lockfile's integrity hashes are
+verified against what is downloaded either way. `nightly.yml` runs the online specs against both live origins through the real broker and
 `turn.sweedler.com`, plus one game with `iceTransportPolicy: 'relay'` forced via `?ice=`, and opens
 or updates a pinned issue on failure.
 
@@ -276,3 +283,94 @@ or updates a pinned issue on failure.
 - Generic host/client session and code-entry/toast/lobby builders: extracted from fidice's
   `HostSession`/`ClientSession` into `web/shared` only after both games are typed and parity-locked,
   behind the existing wire goldens.
+
+## Deviations (recorded as the steps land)
+
+Step 1 (toolchain scaffold), against the versions on the registry at the time:
+
+- TypeScript is pinned at 5.9.3, not 7.x: typescript-eslint 8.70 accepts `typescript >=4.8.4 <6.1.0`.
+  Vite is 8.3.0 (Rolldown) and vitest 5.0.0; the `rollupOptions` key names are verified in step 4.
+- `@eslint/js` is an extra exact devDependency: ESLint 10 no longer bundles it, and it supplies the
+  core `recommended` rules for the JS-only config on `infra/**/*.js`.
+- `@typescript-eslint/array-type` is set to `{default: 'array', readonly: 'generic'}` so it agrees
+  with `functional/readonly-type: generic`; the stylistic default (`readonly T[]`) contradicts it.
+- `import-x/extensions` is set to include `.ts`: without it ExportMap follows only `.js` dependencies
+  and `no-cycle` stays silent on a TypeScript cycle (verified with a throwaway lib/edge cycle).
+- `tsconfig.web.json` also includes `web/shared/lib` (the pure project remains the guard) so the
+  project never has zero inputs before the first DOM module lands.
+- `npm run hooks:verify` treats a missing `.git/hooks/pre-commit` as a failure locally and as a
+  note under `CI`, since CI checkouts have no template hook.
+- `package-lock.json` is lockfileVersion 3 (112 KB); the npm 8 default v2 file was 192 KB, above the
+  template hook's 150 KB prompt. npm 8.4.1 `npm ci` reads it unchanged.
+- The proxy Worker compares redirect `Location` hosts against the configured upstream host rather
+  than the literal GitHub host; identical for the default, and correct for `tools/proxy-dev.ts`.
+
+Step 1 follow-up (review findings on the scaffold):
+
+- The pure layer names fidice's protocol at `web/games/*/src/net/protocol.ts` too (MIGRATION step 8
+  puts it at `net/protocol`): the PURE lint glob, `tsconfig.pure.json` include, `tsconfig.web.json`
+  exclude and the protocol zone all list both paths; the `net/` zone targets `net/!(protocol).ts`.
+- `ui/state.ts` and `app/controller.ts` have their own zone ("everything below": only
+  `web/shared/edge/**` and `main.ts` are forbidden); the `ui/`/`view/` zone targets `ui/!(state).ts`.
+- `functional/no-expression-statements` is `error` now, not `warn`: with `--max-warnings 0` a warning
+  already failed lint, and no pure module exists to ratchet. Step 8 may reintroduce `warn` behind a
+  ratchet on the count if the ported code needs it.
+- `.prettierignore` anchors the root-only entries (`/index.html`, `/games/`, `/shared/`, `/legacy/`);
+  unanchored `shared/` and `games/` also matched `web/shared/**` and `web/games/**`, so Prettier
+  skipped the whole new tree.
+- The pre-commit shim and `hooks:verify` use `git rev-parse --git-common-dir`, not `--git-dir` as
+  written above: in a linked worktree `--git-dir` is `.git/worktrees/<name>`, which has no `hooks/`,
+  so the template hook silently stopped running there. Both print `.git` in a normal checkout.
+
+Step 2 (freeze legacy and record goldens):
+
+- Executable oracles instead of recorded goldens. The legacy cores live in the repo as sha256-pinned
+  fixtures, so the parity suites recompute legacy behaviour at test time over seeded inputs
+  (`mulberry32`) and there is no `tools/legacy/record-*.ts` and no `test/goldens/` yet. Goldens are
+  reserved for what node cannot recompute: wire frames captured via CDP and DOM/computed-style
+  snapshots land with the Playwright harness in step 3. Suites are `describe.each` over
+  `[['legacy', fixture]]`; steps 6 and 10 add the `current` leg without rewriting them.
+- `test/fixtures/legacy/manifest.test.ts` sits beside the fixtures and is linted, type-checked and
+  formatted, so the ignores narrowed from `test/fixtures/legacy/**` to `test/fixtures/legacy/*.cjs`
+  (eslint.config.js, tsconfig.node.json, .prettierignore). MANIFEST.json records page, fixture, tool,
+  1-based line range, sha256 of the page range and sha256 of the fixture.
+- The `*.algorithms.ts` override also turns off `functional/no-expression-statements`: the rule
+  flags `a = step(a)` (verified on `web/shared/lib/rng.algorithms.ts`), so "local mutation" was not
+  in fact allowed there. `mulberry32` lives in `rng.algorithms.ts` and `rng.ts` re-exports it next to
+  `type Rng`.
+- The fidice fixture is the bundle from `"use strict"` through the `domain/search.ts` section
+  (lines 371-2333, 109 KB, under the 140 KB ceiling without splitting). `net/client.ts`, `net/host.ts`,
+  `net/peerjs.ts` and `net/session.ts` are inside that range and come along; they touch
+  `globalThis.Peer` and `HyperIce` only inside functions, so the fixture loads without a DOM. The
+  export line is generated from every top-level `var` of the range (299 names) rather than
+  hand-listed, so nothing the tests may need is missing.
+- The fidice page edit is two lines, not ~30: `HostSession` already takes `rng` by injection, so
+  `rng: globalThis.__rng ?? Math.random` and `window.__fidice = { controller }` in `boot()` suffice.
+  Guests keep `Math.random` (only the host rolls dice).
+- The seeded gin play in `test/parity/gin.legacy.test.ts` is not uniform over `legalActions`: a
+  uniform policy almost never knocks, every hand ends void when the stock runs out, void hands score
+  nothing and the target is never reached. It knocks whenever legal and discards the least-deadwood
+  card three times in four; every choice is still an element of `legalActions(view)`. 300 games take
+  about three seconds.
+
+Step 3 (two-peer e2e against the legacy pages):
+
+- Playwright is 1.63.0 and the PeerServer is `peer` 1.0.2, both exact. The PeerServer runs from
+  the package's `peerjs` CLI as a `webServer` entry (`--host 127.0.0.1 --port 9000 --path /`);
+  `E2E_BROKER=cloud` leaves it out and drops `?peer=` so the `broker` job meets on 0.peerjs.com.
+- `tools/serve-dist.ts` takes `--base` and `--alias` on the command line instead of hard-coding
+  `/hyperagent-web-apps/`: the lint ban on absolute site paths applies to tools too, and the one
+  place the harness names the mount point is `e2e/fixtures/site.ts`.
+- `tsconfig.node.json` sets `allowJs` and lists `infra/games-proxy/worker.js` so
+  `tools/proxy-dev.ts` imports the Worker's default export with the types its JSDoc declares;
+  `checkJs` stays off (the JS lint config covers it).
+- Page-side harness code (`e2e/browser/*.js`: seeded `Math.random`, the Peer recorder) is plain
+  JavaScript injected with `addInitScript`, and specs read page state through locators and string
+  `page.evaluate` expressions, so the node project keeps `lib: ["ES2023"]` with no DOM types.
+- The harness is offline: the pages' CDN request for `peerjs@1.5.4/dist/peerjs.min.js` is
+  fulfilled from the identical bundle pinned in `node_modules` (same sha256) and Google Fonts with
+  an empty stylesheet; the smoke allowlist is therefore just `favicon.ico`.
+- Each browser context's seed is a hash of project, test title and role, so host and guest differ,
+  and the same spec on `pages` and `proxy` never holds the same room code on the broker at once.
+- `tools/serve-dist.ts` and `tools/proxy-dev.ts` have node-level tests in `test/tools/` (routing,
+  slash redirects, CORS, the Worker's redirect rewriting, byte-identical bodies through the proxy).

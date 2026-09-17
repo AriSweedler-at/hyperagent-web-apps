@@ -1,0 +1,16 @@
+# Legacy pages and their shared asset are served byte-for-byte until docs/MIGRATION.md step 4
+# moves them under legacy/ (which stays ignored: nothing there may change). The leading slash pins
+# each entry to the repo root; unanchored `shared/` would also skip web/shared/**.
+/index.html
+/games/
+/shared/
+/legacy/
+# Generated verbatim from the pages by tools/legacy/extract-*.ts; MANIFEST.json and the test beside
+# them are formatted.
+test/fixtures/legacy/*.cjs
+
+# Deployed by hand with wrangler and outside the migration ("unchanged" in docs/ARCHITECTURE.md).
+infra/turn-worker/
+
+# Hand-formatted specs; Prettier would reflow their tables.
+docs/

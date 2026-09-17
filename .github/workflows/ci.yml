@@ -1,6 +1,13 @@
-# Runs on every push and pull request. Today this is the node:test suites (Cloudflare Worker
-# path mapping); typecheck, lint, build and browser e2e jobs join as the TypeScript toolchain lands
-# (see docs/ARCHITECTURE.md).
+# Runs on every push to main and every pull request. Job "check" is the same gate as the local
+# pre-push hook (typecheck, lint, unit tests) plus coverage and a sanity check of the hook shims.
+# Job "e2e" plays the two-peer browser specs on both emulated origins through a local PeerServer
+# (the merge gate for online play, docs/MIGRATION.md step 3); job "broker" repeats the online specs
+# through the real 0.peerjs.com and is advisory (continue-on-error), so a third-party outage never
+# blocks a merge but a signalling regression is visible at review. Build, dist tests and deploy join
+# as step 4 lands (see docs/ARCHITECTURE.md "GitHub Actions"). Dependency installs go through
+# .github/actions/npm-ci: the lockfile names Airtable's Socket Firewall registry, which runners
+# cannot reach, so npm substitutes the public registry at install time and Socket Firewall Free
+# scans what it downloads.
 name: CI
 
 on:
@@ -12,15 +19,73 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
+          cache: npm
       - name: Install dependencies
-        run: if [ -f package-lock.json ]; then npm ci; else echo "no lockfile yet; nothing to install"; fi
-      - name: Unit tests
-        run: npm test
+        uses: ./.github/actions/npm-ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint and format check
+        run: npm run lint
+      - name: Unit tests with coverage
+        run: npm test -- --coverage
+      - name: Verify git hook wiring
+        run: npm run hooks:verify
+
+  e2e:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser specs on both origins (local PeerServer)
+        run: npm run test:e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
+  broker:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    env:
+      E2E_BROKER: cloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Online specs through 0.peerjs.com (advisory)
+        run: npm run test:e2e -- --grep @online
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-broker
+          path: playwright-report
+          retention-days: 7

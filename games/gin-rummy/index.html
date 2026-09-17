@@ -1209,7 +1209,13 @@
   // resolve in DNS, and the openrelay.metered.ca relays once listed here now reject the
   // shared 'openrelayproject' credentials. shared/ice.js fetches STUN + TURN at connect time.
   const PEER_OPTS = { debug: 0 };
-  function peerOptsFor(ice) { return ice ? { debug: 0, config: HyperIce.peerConfig(ice) } : PEER_OPTS; }
+  // Test hook (docs/ARCHITECTURE.md "Documented test hooks"): ?peer=host:port aims PeerJS at a local
+  // PeerServer instead of 0.peerjs.com. Without the param the options are exactly what they were.
+  const PEER_OVERRIDE = (function () { const m = /^([^:/]+):(\d+)$/.exec(new URLSearchParams(location.search).get('peer') || ''); return m ? { host: m[1], port: Number(m[2]), path: '/', secure: false } : null; })();
+  function peerOptsFor(ice) {
+    if (PEER_OVERRIDE) return Object.assign(ice ? { debug: 0, config: HyperIce.peerConfig(ice) } : { debug: 0 }, PEER_OVERRIDE);
+    return ice ? { debug: 0, config: HyperIce.peerConfig(ice) } : PEER_OPTS;
+  }
   const NO_RELAY_HINT = 'No relay configured — this only works when both devices are on the same network.';
   function relayHint(ice) { return ice && ice.hasTurn === false ? ' ' + NO_RELAY_HINT : ''; }
   const ICE_FAILED_MSG = "The two devices couldn't reach each other — a relay (TURN) is required when they're on different networks.";

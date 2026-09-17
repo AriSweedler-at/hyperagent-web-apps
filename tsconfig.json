@@ -1,0 +1,10 @@
+{
+  // Solution file: `tsc -b` checks the three projects below. Nothing is emitted (see tsconfig.base.json).
+  // pure comes first so the ESLint project service resolves web/shared/lib against the DOM-less project.
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.pure.json" },
+    { "path": "./tsconfig.web.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}

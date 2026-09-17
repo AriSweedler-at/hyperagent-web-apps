@@ -2,14 +2,47 @@
 
 Single-file web apps built in Hyperagent, hosted on GitHub Pages.
 
-| App | Live | Source |
-|---|---|---|
-| Gin Rummy | https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/ | `games/gin-rummy/index.html` |
-| Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/ | `games/fidice/index.html` |
+| App                          | Live                                                                  | Source                       |
+| ---------------------------- | --------------------------------------------------------------------- | ---------------------------- |
+| Gin Rummy                    | https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/ | `games/gin-rummy/index.html` |
+| Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/    | `games/fidice/index.html`    |
 
 The same site is served at **https://games.sweedler.com** through the Cloudflare Worker in `infra/games-proxy/`: `games.sweedler.com/gin-rummy/` and `games.sweedler.com/fidice/` are the short URLs, `/games/<name>/` redirects to them, and `/shared/…` maps to the repo's `shared/` directory.
 
-Each app is a fully self-contained `index.html`. Runtime dependencies are loaded from public CDNs (PeerJS for online play; Google Fonts in Fidice). No build step — edit the file, push, Pages redeploys. `npm test` runs the node:test suites (the Workers' path mapping so far).
+Each app is a fully self-contained `index.html`. Runtime dependencies are loaded from public CDNs (PeerJS for online play; Google Fonts in Fidice). No build step yet — edit the file, push, Pages redeploys. The pages are being migrated to strict TypeScript under `web/`; `docs/ARCHITECTURE.md` is the target and `docs/MIGRATION.md` the ordered plan.
+
+## Development
+
+Node 22 (`.nvmrc`). TypeScript, ESLint (typescript-eslint strict, eslint-plugin-functional, import-x boundaries), Prettier and vitest, all pinned exactly in `package.json`.
+
+```
+npm ci                 # install; the `prepare` script also installs the git hooks
+npm run check          # typecheck + lint + unit tests: the gate CI and the pre-push hook run
+npm test               # vitest once (`npm run test:watch` keeps it running; `-- --coverage` for the report)
+npm run hooks          # git config core.hooksPath .githooks (re-run if hooksPath was changed)
+npm run hooks:verify   # confirm the hook wiring
+npm run format         # prettier --write on everything it checks
+npm run fixtures:legacy  # re-cut test/fixtures/legacy/*.cjs from the pages and re-pin MANIFEST.json
+npm run test:e2e       # Playwright: every spec on both emulated origins (starts its own servers)
+npm run serve          # GitHub Pages emulation: the repo root at http://127.0.0.1:4173/hyperagent-web-apps/
+npm run proxy:dev      # games.sweedler.com emulation: the real Worker at http://127.0.0.1:8787/ over :4173
+```
+
+Git hooks live in `.githooks/`: `pre-commit` chains to the owner's template hook in `.git/hooks/pre-commit` (big-file and trailing-whitespace prompts) and `pre-push` runs `npm run check`. Legacy pages under `games/` and `shared/` are byte-frozen until the migration moves them; lint and Prettier ignore them.
+
+### Browser tests
+
+`npm run test:e2e` (first time: `npx playwright install chromium`) runs the specs in `e2e/` on two Playwright projects: `pages` (the site under `/hyperagent-web-apps/` on `tools/serve-dist.ts`, like GitHub Pages) and `proxy` (short URLs on `tools/proxy-dev.ts`, which runs the real `infra/games-proxy/worker.js` against the pages origin, like games.sweedler.com). The config starts both servers and a local PeerServer (`peer` package, :9000); the online specs open a host and a guest context that meet there through the pages' `?peer=host:port` hook and take a STUN-only ICE list from `e2e/fixtures/e2e-ice.json` through `?ice=`, so no real network is needed. PeerJS and Google Fonts are answered from local copies. Each context gets a seeded `Math.random` (`e2e/browser/seed-random.js`), so deals and dice repeat. `E2E_BROKER=cloud npm run test:e2e -- --grep @online` plays the online specs through 0.peerjs.com instead; CI runs that as the advisory `broker` job. The HTML report lands in `playwright-report/` (`npx playwright show-report`).
+
+Two contexts in one browser connect over the machine's own addresses, so the online specs need local UDP loopback to those addresses. A Cloudflare WARP or similar tunnel that drops packets sent to its own interface address breaks that (the hermetic specs then time out at the data channel); CI runners and plain networks are fine.
+
+### Legacy oracles
+
+`test/fixtures/legacy/` holds the gin engine (`gin-engine.cjs`) and the fidice core (`fidice-core.cjs`) cut verbatim out of the legacy pages by `tools/legacy/extract-*.ts` and pinned by sha256 in `MANIFEST.json`. `manifest.test.ts` re-runs the extractors against the pages on every test run, so an edit inside either range fails the suite until `npm run fixtures:legacy` regenerates the fixtures (and the PR says why the oracle moved). `test/parity/*.legacy.test.ts` characterize the cores over seeded inputs (`web/shared/lib/rng.ts`, mulberry32) rather than stored goldens; when a port lands it joins the same `describe.each` as a second leg and must agree. Test hooks on the pages: gin exposes `window.__gin`; fidice exposes `window.__fidice = { controller }` and the host session takes `globalThis.__rng` as its rng when a test installs one before boot.
+
+`package-lock.json` is written behind Airtable's Socket Firewall registry and is committed exactly as
+npm produces it. CI installs through `.github/actions/npm-ci`, which points the runner's copy of the
+lockfile at the public registry, scans the install with Socket Firewall Free, and restores the file.
 
 ## Layout
 
