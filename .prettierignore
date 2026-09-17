@@ -1,10 +1,9 @@
-# Legacy pages and their shared asset are served byte-for-byte until docs/MIGRATION.md step 4
-# moves them under legacy/ (which stays ignored: nothing there may change). The leading slash pins
-# each entry to the repo root; unanchored `shared/` would also skip web/shared/**.
-/index.html
-/games/
-/shared/
+# Legacy pages and their shared asset (docs/MIGRATION.md step 4) are served byte-for-byte from
+# legacy/: nothing there may change. The leading slash pins the entry to the repo root.
 /legacy/
+# The landing page is the verbatim root page of the pre-Vite site; test/dist/dist-parity.test.ts
+# compares dist/index.html against it, so it is not reformatted.
+/web/index.html
 # Generated verbatim from the pages by tools/legacy/extract-*.ts; MANIFEST.json and the test beside
 # them are formatted.
 test/fixtures/legacy/*.cjs

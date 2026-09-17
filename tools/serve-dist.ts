@@ -1,9 +1,10 @@
 // Static server for the browser harness (docs/ARCHITECTURE.md "Two origins"): mounts a directory
 // at a base path so local URLs match GitHub Pages (`/hyperagent-web-apps/games/fidice/` on :4173).
-// Until docs/MIGRATION.md step 4 produces dist/, the repo root is mounted and the legacy pages are
-// served exactly as they are. An alias publishes one file under another path (the e2e ICE fixture).
+// The directory is dist/ (the output of `npm run build`), so the harness exercises exactly what
+// Pages serves. An alias publishes one file from anywhere on disk under a path inside the mount
+// (the e2e ICE fixture); alias targets are resolved against the working directory, not the root.
 //   node --experimental-strip-types tools/serve-dist.ts --base /hyperagent-web-apps/ \
-//     --alias e2e-ice.json=e2e/fixtures/e2e-ice.json [--root .] [--host 127.0.0.1] [--port 4173]
+//     --alias e2e-ice.json=e2e/fixtures/e2e-ice.json [--root dist] [--host 127.0.0.1] [--port 4173]
 // Like GitHub Pages, a directory URL without its trailing slash redirects to it, and every response
 // carries `Access-Control-Allow-Origin: *` so the proxy origin can fetch the ICE fixture.
 import { readFile, stat } from 'node:fs/promises';
@@ -20,13 +21,14 @@ export type ServeOptions = Readonly<{
   base: string;
   host: string;
   port: number;
-  /** Path under `base` -> file path relative to `root`. */
+  /** Path under `base` -> absolute file path; an alias target may live outside `root`. */
   aliases: Readonly<Record<string, string>>;
 }>;
 
 export type Route =
   | Readonly<{ kind: 'redirect'; location: string }>
   | Readonly<{ kind: 'path'; relPath: string; trailingSlash: boolean }>
+  | Readonly<{ kind: 'alias'; path: string }>
   | Readonly<{ kind: 'notFound' }>;
 
 export type Served =
@@ -87,7 +89,7 @@ export const routeFor = (
   const rel = decoded.slice(base.length);
   if (isUnsafe(rel)) return { kind: 'notFound' };
   const alias = aliases[rel];
-  if (alias !== undefined) return { kind: 'path', relPath: alias, trailingSlash: false };
+  if (alias !== undefined) return { kind: 'alias', path: alias };
   return {
     kind: 'path',
     relPath: rel === '' ? '.' : rel,
@@ -110,7 +112,11 @@ export const serveFor = async (
   pathname: string,
   route: Route,
 ): Promise<Served> => {
-  if (route.kind !== 'path') return route;
+  if (route.kind === 'redirect' || route.kind === 'notFound') return route;
+  if (route.kind === 'alias')
+    return (await fileOrNothing(route.path)) === 'file'
+      ? { kind: 'file', path: route.path }
+      : { kind: 'notFound' };
   const abs = resolve(options.root, route.relPath);
   if (abs !== options.root && !abs.startsWith(options.root + sep)) return { kind: 'notFound' };
   const found = await fileOrNothing(abs);
@@ -222,7 +228,7 @@ export const parseServeArgs = (argv: ReadonlyArray<string>): ServeOptions => {
   const { values } = parseArgs({
     args: [...argv],
     options: {
-      root: { type: 'string', default: '.' },
+      root: { type: 'string', default: 'dist' },
       base: { type: 'string' },
       host: { type: 'string', default: '127.0.0.1' },
       port: { type: 'string', default: '4173' },
@@ -240,7 +246,9 @@ export const parseServeArgs = (argv: ReadonlyArray<string>): ServeOptions => {
     base: normaliseBase(values.base),
     host: values.host,
     port,
-    aliases: Object.fromEntries(values.alias.map(parseAlias)),
+    aliases: Object.fromEntries(
+      values.alias.map(parseAlias).map(([path, file]) => [path, resolve(file)]),
+    ),
   };
 };
 

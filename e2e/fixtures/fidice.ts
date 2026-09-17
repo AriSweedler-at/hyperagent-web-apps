@@ -1,4 +1,4 @@
-// Drives the legacy Fidice page through its DOM (ids from the vdom screens in games/fidice/index.html).
+// Drives the legacy Fidice page through its DOM (ids from the vdom screens in legacy/fidice/index.html).
 import { expect, type Locator, type Page } from '@playwright/test';
 
 import { BROKER_TIMEOUT, WEBRTC_TIMEOUT } from './timeouts.ts';

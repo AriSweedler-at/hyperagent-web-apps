@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['web/**/*.test.ts', 'test/**/*.test.ts', 'infra/**/*.test.{js,ts}'],
+    // test/dist/** reads the build output; vitest.dist.config.ts runs it after `npm run build`.
+    exclude: ['**/node_modules/**', 'test/dist/**'],
     coverage: {
       provider: 'v8',
       include: ['web/shared/lib/**/*.ts', 'infra/games-proxy/worker.js'],

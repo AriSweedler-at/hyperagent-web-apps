@@ -15,12 +15,18 @@ import {
   type Running,
   type ServeOptions,
 } from '../../tools/serve-dist.ts';
+import { REPO_ROOT, stageSite } from './site-fixture.ts';
 
-const REPO_ROOT = resolve(import.meta.dirname, '..', '..');
 const BASE = PAGES_BASE_PATH;
-const ALIASES = { 'e2e-ice.json': 'e2e/fixtures/e2e-ice.json' } as const;
+const ICE_FILE = resolve(REPO_ROOT, 'e2e/fixtures/e2e-ice.json');
+const ALIASES = { 'e2e-ice.json': ICE_FILE } as const;
+// A dist-shaped directory built from the verbatim legacy files, so no build is needed here.
+const site = stageSite();
+afterAll(() => {
+  site.remove();
+});
 const options: ServeOptions = {
-  root: REPO_ROOT,
+  root: site.root,
   base: BASE,
   host: '127.0.0.1',
   port: 0,
@@ -57,9 +63,8 @@ describe('routeFor', () => {
   });
   test('an alias publishes a file under another path', () => {
     expect(routeFor(`${BASE}e2e-ice.json`, BASE, ALIASES)).toEqual({
-      kind: 'path',
-      relPath: 'e2e/fixtures/e2e-ice.json',
-      trailingSlash: false,
+      kind: 'alias',
+      path: ICE_FILE,
     });
   });
   test('percent-encoding is decoded before matching', () => {
@@ -86,7 +91,7 @@ describe('serveFor', () => {
     );
     expect(served).toEqual({
       kind: 'file',
-      path: resolve(REPO_ROOT, 'games/gin-rummy/index.html'),
+      path: resolve(site.root, 'games/gin-rummy/index.html'),
     });
   });
   test('a directory without a slash redirects to the slash form', async () => {
@@ -100,13 +105,13 @@ describe('serveFor', () => {
   test('the mount root serves the landing page', async () => {
     expect(await serveFor(options, BASE, routeFor(BASE, BASE, {}))).toEqual({
       kind: 'file',
-      path: resolve(REPO_ROOT, 'index.html'),
+      path: resolve(site.root, 'index.html'),
     });
   });
   test('a plain file is served as is', async () => {
     expect(
       await serveFor(options, `${BASE}shared/ice.js`, routeFor(`${BASE}shared/ice.js`, BASE, {})),
-    ).toEqual({ kind: 'file', path: resolve(REPO_ROOT, 'shared/ice.js') });
+    ).toEqual({ kind: 'file', path: resolve(site.root, 'shared/ice.js') });
   });
   test('an alias resolves to its target file', async () => {
     expect(
@@ -115,7 +120,11 @@ describe('serveFor', () => {
         `${BASE}e2e-ice.json`,
         routeFor(`${BASE}e2e-ice.json`, BASE, ALIASES),
       ),
-    ).toEqual({ kind: 'file', path: resolve(REPO_ROOT, 'e2e/fixtures/e2e-ice.json') });
+    ).toEqual({ kind: 'file', path: ICE_FILE });
+  });
+  test('an alias whose file is missing is not found', async () => {
+    const missing = { kind: 'alias', path: resolve(site.root, 'nope.json') } as const;
+    expect(await serveFor(options, `${BASE}nope.json`, missing)).toEqual({ kind: 'notFound' });
   });
   test('a missing file, or a directory without index.html, is not found', async () => {
     expect(await serveFor(options, `${BASE}nope.js`, routeFor(`${BASE}nope.js`, BASE, {}))).toEqual(
@@ -153,7 +162,7 @@ describe('parseServeArgs', () => {
     expect(() => parseServeArgs([])).toThrow(/--base is required/);
     const parsed = parseServeArgs(['--base', BASE]);
     expect(parsed).toEqual({
-      root: resolve('.'),
+      root: resolve('dist'),
       base: BASE,
       host: '127.0.0.1',
       port: 4173,
@@ -164,7 +173,7 @@ describe('parseServeArgs', () => {
     expect(parseServeArgs(['--base', 'site']).base).toBe('/site/');
     expect(parseServeArgs(['--base', '/site']).base).toBe('/site/');
   });
-  test('parses aliases, port, host and root', () => {
+  test('parses aliases (resolved against the working directory), port, host and root', () => {
     const parsed = parseServeArgs([
       '--base',
       BASE,
@@ -179,7 +188,7 @@ describe('parseServeArgs', () => {
       '--root',
       'games',
     ]);
-    expect(parsed.aliases).toEqual({ 'a.json': 'x/a.json', b: 'y' });
+    expect(parsed.aliases).toEqual({ 'a.json': resolve('x/a.json'), b: resolve('y') });
     expect(parsed.port).toBe(0);
     expect(parsed.host).toBe('0.0.0.0');
     expect(parsed.root).toBe(resolve('games'));

@@ -374,3 +374,31 @@ Step 3 (two-peer e2e against the legacy pages):
   and the same spec on `pages` and `proxy` never holds the same room code on the broker at once.
 - `tools/serve-dist.ts` and `tools/proxy-dev.ts` have node-level tests in `test/tools/` (routing,
   slash redirects, CORS, the Worker's redirect rewriting, byte-identical bodies through the proxy).
+
+Step 4 (Vite build in passthrough mode; Pages deployed by Actions):
+
+- Vite is 8.3.0 (Rolldown): the config uses `build.rolldownOptions` (`rollupOptions` is a
+  deprecated alias in the installed types); `entryFileNames` is a function so the landing entry
+  (`index`) gets `app-[hash].js` and every other page `games/[name]/app-[hash].js`.
+- `build.cssMinify: false`: lightningcss reorders the declarations of the landing page's inline
+  `<style>`, and with it off `dist/index.html` is byte-identical to `web/index.html`. The parity
+  test is sha256 on all four files; nothing is normalised.
+- The multi-page input comes from a recursive `readdirSync` of `web/` filtered to `index.html`
+  outside `public/` (node 22's `fs.globSync` prints an experimental warning on every build).
+- `legacyPassthrough` copies `legacy/shared/ice.js` only while `LEGACY_PAGES` is non-empty; the
+  loader exists for the legacy pages alone.
+- `npm run test:e2e` builds first (`npm run build && playwright test`), so jobs `e2e` and `broker`
+  rebuild dist rather than download it; the build is deterministic. `deploy` downloads the `dist`
+  artifact `check` uploaded (with `include-hidden-files: true`, or `.nojekyll` would be dropped) and
+  installs nothing.
+- `test/dist/**` is excluded from `vitest.config.ts` and run by `vitest.dist.config.ts` via
+  `npm run test:dist`, which `npm run check` runs after `npm run build`; a missing dist/ skips with a
+  note. `.gitignore` anchors `/dist/` so `test/dist/` is tracked.
+- `tools/serve-dist.ts` defaults `--root` to `dist` and resolves `--alias` targets against the
+  working directory (route kind `alias`), since the e2e ICE fixture is not in dist. Its node tests and
+  the proxy's mount a temp directory staged from `legacy/` and `web/index.html`
+  (`test/tools/site-fixture.ts`) instead of the repo root.
+- Moving the pages changed the `// GENERATED ... from <page>` header of both fixtures, so
+  `fixtureSha256` was re-pinned by `npm run fixtures:legacy`; `sourceSha256` is unchanged for both.
+- `web/index.html` joins `.prettierignore`: it is the verbatim root page and dist parity compares
+  against it byte for byte.
