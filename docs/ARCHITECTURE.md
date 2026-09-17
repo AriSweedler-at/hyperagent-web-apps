@@ -297,3 +297,20 @@ Step 1 (toolchain scaffold), against the versions on the registry at the time:
   template hook's 150 KB prompt. npm 8.4.1 `npm ci` reads it unchanged.
 - The proxy Worker compares redirect `Location` hosts against the configured upstream host rather
   than the literal GitHub host; identical for the default, and correct for `tools/proxy-dev.ts`.
+
+Step 1 follow-up (review findings on the scaffold):
+
+- The pure layer names fidice's protocol at `web/games/*/src/net/protocol.ts` too (MIGRATION step 8
+  puts it at `net/protocol`): the PURE lint glob, `tsconfig.pure.json` include, `tsconfig.web.json`
+  exclude and the protocol zone all list both paths; the `net/` zone targets `net/!(protocol).ts`.
+- `ui/state.ts` and `app/controller.ts` have their own zone ("everything below": only
+  `web/shared/edge/**` and `main.ts` are forbidden); the `ui/`/`view/` zone targets `ui/!(state).ts`.
+- `functional/no-expression-statements` is `error` now, not `warn`: with `--max-warnings 0` a warning
+  already failed lint, and no pure module exists to ratchet. Step 8 may reintroduce `warn` behind a
+  ratchet on the count if the ported code needs it.
+- `.prettierignore` anchors the root-only entries (`/index.html`, `/games/`, `/shared/`, `/legacy/`);
+  unanchored `shared/` and `games/` also matched `web/shared/**` and `web/games/**`, so Prettier
+  skipped the whole new tree.
+- The pre-commit shim and `hooks:verify` use `git rev-parse --git-common-dir`, not `--git-dir` as
+  written above: in a linked worktree `--git-dir` is `.git/worktrees/<name>`, which has no `hooks/`,
+  so the template hook silently stopped running there. Both print `.git` in a normal checkout.

@@ -15,7 +15,9 @@ const PURE = [
   'web/games/*/src/engine/**/*.ts',
   'web/games/*/src/domain/**/*.ts',
   'web/games/*/src/bots/**/*.ts',
+  // gin keeps protocol.ts at src/; fidice's lives at src/net/protocol.ts (docs/MIGRATION.md step 8).
   'web/games/*/src/protocol.ts',
+  'web/games/*/src/net/protocol.ts',
 ];
 const ALGORITHMS = ['**/*.algorithms.ts'];
 const EDGES = [
@@ -115,8 +117,10 @@ const functionalPure = {
   'functional/no-try-statements': 'error',
   'functional/no-classes': 'error',
   'functional/no-this-expressions': 'error',
-  // warn until docs/MIGRATION.md step 15; a ratchet on the warning count lands with the first pure port
-  'functional/no-expression-statements': ['warn', { ignoreVoid: true }],
+  // error from the start: `--max-warnings 0` would fail on a warning anyway, and no pure module
+  // exists yet to ratchet. docs/MIGRATION.md step 8 may downgrade this to warn behind a ratchet on
+  // the count if the ported legacy code needs it (docs/ARCHITECTURE.md "Deviations").
+  'functional/no-expression-statements': ['error', { ignoreVoid: true }],
   'functional/no-return-void': 'error',
 };
 
@@ -141,6 +145,8 @@ const functionalOff = Object.fromEntries(
 // mixing. Zones for layers that do not exist yet are inert until those folders land.
 // ---------------------------------------------------------------------------------------------
 const GAME_SRC = './web/games/*/src';
+// Both protocol modules (see PURE above); they leave the net/ zone and join the protocol zone.
+const PROTOCOL = [`${GAME_SRC}/protocol.ts`, `${GAME_SRC}/net/protocol.ts`];
 const zones = [
   {
     target: './web/shared/lib',
@@ -179,7 +185,7 @@ const zones = [
     message: 'the pure core imports only web/shared/lib and its siblings.',
   },
   {
-    target: `${GAME_SRC}/protocol.ts`,
+    target: PROTOCOL,
     from: [
       './web/shared/edge/**',
       `${GAME_SRC}/net/**`,
@@ -191,7 +197,8 @@ const zones = [
     message: 'protocol.ts imports only engine/domain types and web/shared/lib.',
   },
   {
-    target: `${GAME_SRC}/net/**`,
+    // Every net/ module except protocol.ts, which the zone above owns.
+    target: [`${GAME_SRC}/net/!(protocol).ts`, `${GAME_SRC}/net/*/**`],
     from: [
       './web/shared/edge/**',
       `${GAME_SRC}/ui/**`,
@@ -207,7 +214,8 @@ const zones = [
     message: 'net/ imports protocol, engine/domain and only the transport and clock edges.',
   },
   {
-    target: [`${GAME_SRC}/ui/**`, `${GAME_SRC}/view/**`],
+    // Every ui/ module except ui/state.ts, which the reducer zone below owns.
+    target: [`${GAME_SRC}/ui/!(state).ts`, `${GAME_SRC}/ui/*/**`, `${GAME_SRC}/view/**`],
     from: [
       './web/shared/edge/**',
       `${GAME_SRC}/net/**`,
@@ -216,6 +224,14 @@ const zones = [
     ],
     except: ['**/web/shared/edge/dom.ts'],
     message: 'ui/ and view/ render views; DOM access only through @shared/edge/dom.',
+  },
+  {
+    // Reducers over intents: "everything below" in the boundary table, so only the edges and
+    // main.ts are off limits (main.ts constructs the adapters and injects them).
+    target: [`${GAME_SRC}/ui/state.ts`, `${GAME_SRC}/app/controller.ts`],
+    from: ['./web/shared/edge/**', './web/games/*/main.ts'],
+    message:
+      'ui/state.ts and app/controller.ts import everything below them, never an edge or main.ts.',
   },
   {
     target: [`${GAME_SRC}/storage.ts`, `${GAME_SRC}/app/effects.ts`],

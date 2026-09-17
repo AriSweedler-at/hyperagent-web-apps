@@ -23,7 +23,8 @@ for hook in .githooks/pre-commit .githooks/pre-push; do
   sh -n "$hook" || fail "$hook does not parse"
 done
 
-template="$(git rev-parse --git-dir)/hooks/pre-commit"
+# --git-common-dir: in a linked worktree --git-dir is .git/worktrees/<name>, which has no hooks/.
+template="$(git rev-parse --git-common-dir)/hooks/pre-commit"
 if [ -x "$template" ]; then
   echo "hooks:verify: ok (core.hooksPath=.githooks; pre-commit chains to $template)"
 elif [ -n "${CI:-}" ]; then

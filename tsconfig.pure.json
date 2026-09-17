@@ -11,6 +11,7 @@
     "web/games/*/src/engine/**/*.ts",
     "web/games/*/src/domain/**/*.ts",
     "web/games/*/src/bots/**/*.ts",
-    "web/games/*/src/protocol.ts"
+    "web/games/*/src/protocol.ts",
+    "web/games/*/src/net/protocol.ts"
   ]
 }

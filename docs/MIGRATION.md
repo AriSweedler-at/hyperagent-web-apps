@@ -215,3 +215,8 @@ Extract the generic host/client session and `shared/ui` screen builders from fid
 behind its wire goldens; restyle Fidice onto the shared tokens; alternative `HandView`
 implementations; replace `fitTable` via `ui/fit.ts`. Each is a separate design under the same
 parity and e2e gates.
+
+## Deviations
+
+- Step 1: the pre-commit shim uses `git rev-parse --git-common-dir` (not `--git-dir`) so linked
+  worktrees still reach `.git/hooks/pre-commit`; see ARCHITECTURE "Deviations".
