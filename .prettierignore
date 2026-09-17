@@ -5,7 +5,9 @@
 /games/
 /shared/
 /legacy/
-test/fixtures/legacy/
+# Generated verbatim from the pages by tools/legacy/extract-*.ts; MANIFEST.json and the test beside
+# them are formatted.
+test/fixtures/legacy/*.cjs
 
 # Deployed by hand with wrangler and outside the migration ("unchanged" in docs/ARCHITECTURE.md).
 infra/turn-worker/

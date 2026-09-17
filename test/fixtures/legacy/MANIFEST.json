@@ -1,0 +1,20 @@
+{
+  "fidice-core": {
+    "page": "games/fidice/index.html",
+    "fixture": "fidice-core.cjs",
+    "tool": "tools/legacy/extract-fidice-core.ts",
+    "startLine": 371,
+    "endLine": 2333,
+    "sourceSha256": "2edd60e1137af60f39b1b2f49243747b8ae5cbc51a5ca65ff9b7c1e4882482dc",
+    "fixtureSha256": "6921be27670b3da1af5c18aeb739f5ed36ea8d60e33757452d0be717aa4604ae"
+  },
+  "gin-engine": {
+    "page": "games/gin-rummy/index.html",
+    "fixture": "gin-engine.cjs",
+    "tool": "tools/legacy/extract-gin-engine.ts",
+    "startLine": 557,
+    "endLine": 1197,
+    "sourceSha256": "44f7c4014365cffbee9acbd6ef1c0ea8d909c34e4c9157dcc7f714745e4bf58d",
+    "fixtureSha256": "9d30b01cdcd2e1b834bd1014212bfd67d349f54c2e2c26f0e134e2f2dbb1a38b"
+  }
+}

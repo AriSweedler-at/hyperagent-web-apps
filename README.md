@@ -21,9 +21,15 @@ npm run check          # typecheck + lint + unit tests: the gate CI and the pre-
 npm test               # vitest once (`npm run test:watch` keeps it running; `-- --coverage` for the report)
 npm run hooks          # git config core.hooksPath .githooks (re-run if hooksPath was changed)
 npm run hooks:verify   # confirm the hook wiring
+npm run format         # prettier --write on everything it checks
+npm run fixtures:legacy  # re-cut test/fixtures/legacy/*.cjs from the pages and re-pin MANIFEST.json
 ```
 
 Git hooks live in `.githooks/`: `pre-commit` chains to the owner's template hook in `.git/hooks/pre-commit` (big-file and trailing-whitespace prompts) and `pre-push` runs `npm run check`. Legacy pages under `games/` and `shared/` are byte-frozen until the migration moves them; lint and Prettier ignore them.
+
+### Legacy oracles
+
+`test/fixtures/legacy/` holds the gin engine (`gin-engine.cjs`) and the fidice core (`fidice-core.cjs`) cut verbatim out of the legacy pages by `tools/legacy/extract-*.ts` and pinned by sha256 in `MANIFEST.json`. `manifest.test.ts` re-runs the extractors against the pages on every test run, so an edit inside either range fails the suite until `npm run fixtures:legacy` regenerates the fixtures (and the PR says why the oracle moved). `test/parity/*.legacy.test.ts` characterize the cores over seeded inputs (`web/shared/lib/rng.ts`, mulberry32) rather than stored goldens; when a port lands it joins the same `describe.each` as a second leg and must agree. Test hooks on the pages: gin exposes `window.__gin`; fidice exposes `window.__fidice = { controller }` and the host session takes `globalThis.__rng` as its rng when a test installs one before boot.
 
 ## Layout
 

@@ -6,9 +6,12 @@
   "scripts": {
     "typecheck": "tsc -b",
     "lint": "eslint . --max-warnings 0 && prettier --check .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint && npm test",
+    "fixtures:legacy": "node --experimental-strip-types tools/legacy/extract-gin-engine.ts && node --experimental-strip-types tools/legacy/extract-fidice-core.ts",
     "hooks": "git config core.hooksPath .githooks",
     "hooks:verify": "sh tools/hooks-verify.sh",
     "prepare": "npm run hooks"

@@ -220,3 +220,8 @@ parity and e2e gates.
 
 - Step 1: the pre-commit shim uses `git rev-parse --git-common-dir` (not `--git-dir`) so linked
   worktrees still reach `.git/hooks/pre-commit`; see ARCHITECTURE "Deviations".
+- Step 2: executable oracles instead of recorded goldens. `tools/legacy/record-*.ts` and
+  `test/goldens/` were not created: with the cores pinned in `test/fixtures/legacy/`, the parity
+  suites recompute legacy behaviour over seeded inputs at test time. The CDP wire-golden capture
+  moves to step 3, where the browser harness lands. The fidice page edit is 2 lines (the
+  `HostSession` already took `rng` by injection). See ARCHITECTURE "Deviations".

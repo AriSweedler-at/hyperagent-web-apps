@@ -314,3 +314,34 @@ Step 1 follow-up (review findings on the scaffold):
 - The pre-commit shim and `hooks:verify` use `git rev-parse --git-common-dir`, not `--git-dir` as
   written above: in a linked worktree `--git-dir` is `.git/worktrees/<name>`, which has no `hooks/`,
   so the template hook silently stopped running there. Both print `.git` in a normal checkout.
+
+Step 2 (freeze legacy and record goldens):
+
+- Executable oracles instead of recorded goldens. The legacy cores live in the repo as sha256-pinned
+  fixtures, so the parity suites recompute legacy behaviour at test time over seeded inputs
+  (`mulberry32`) and there is no `tools/legacy/record-*.ts` and no `test/goldens/` yet. Goldens are
+  reserved for what node cannot recompute: wire frames captured via CDP and DOM/computed-style
+  snapshots land with the Playwright harness in step 3. Suites are `describe.each` over
+  `[['legacy', fixture]]`; steps 6 and 10 add the `current` leg without rewriting them.
+- `test/fixtures/legacy/manifest.test.ts` sits beside the fixtures and is linted, type-checked and
+  formatted, so the ignores narrowed from `test/fixtures/legacy/**` to `test/fixtures/legacy/*.cjs`
+  (eslint.config.js, tsconfig.node.json, .prettierignore). MANIFEST.json records page, fixture, tool,
+  1-based line range, sha256 of the page range and sha256 of the fixture.
+- The `*.algorithms.ts` override also turns off `functional/no-expression-statements`: the rule
+  flags `a = step(a)` (verified on `web/shared/lib/rng.algorithms.ts`), so "local mutation" was not
+  in fact allowed there. `mulberry32` lives in `rng.algorithms.ts` and `rng.ts` re-exports it next to
+  `type Rng`.
+- The fidice fixture is the bundle from `"use strict"` through the `domain/search.ts` section
+  (lines 371-2333, 109 KB, under the 140 KB ceiling without splitting). `net/client.ts`, `net/host.ts`,
+  `net/peerjs.ts` and `net/session.ts` are inside that range and come along; they touch
+  `globalThis.Peer` and `HyperIce` only inside functions, so the fixture loads without a DOM. The
+  export line is generated from every top-level `var` of the range (299 names) rather than
+  hand-listed, so nothing the tests may need is missing.
+- The fidice page edit is two lines, not ~30: `HostSession` already takes `rng` by injection, so
+  `rng: globalThis.__rng ?? Math.random` and `window.__fidice = { controller }` in `boot()` suffice.
+  Guests keep `Math.random` (only the host rolls dice).
+- The seeded gin play in `test/parity/gin.legacy.test.ts` is not uniform over `legalActions`: a
+  uniform policy almost never knocks, every hand ends void when the stock runs out, void hands score
+  nothing and the target is never reached. It knocks whenever legal and discards the least-deadwood
+  card three times in four; every choice is still an element of `legalActions(view)`. 300 games take
+  about three seconds.
