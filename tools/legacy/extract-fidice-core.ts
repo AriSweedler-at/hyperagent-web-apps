@@ -13,7 +13,7 @@ import {
   type Extracted,
 } from './extract.ts';
 
-export const FIDICE_PAGE = 'games/fidice/index.html';
+export const FIDICE_PAGE = 'legacy/fidice/index.html';
 export const FIDICE_FIXTURE = 'fidice-core.cjs';
 export const FIDICE_KEY = 'fidice-core';
 const TOOL = 'tools/legacy/extract-fidice-core.ts';

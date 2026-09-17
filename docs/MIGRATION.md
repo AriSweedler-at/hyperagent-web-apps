@@ -233,3 +233,24 @@ parity and e2e gates.
   than the `window.__rng` seam, so no further page edit was needed. Visual baselines and
   computed-style goldens are not captured yet: they belong on the CI runner once the `e2e` job runs
   there, and the harness in this step is what captures them. See ARCHITECTURE "Deviations".
+- Step 4: Vite 8.3.0 is Rolldown-based, so `vite.config.ts` uses `build.rolldownOptions`
+  (`build.rollupOptions` is a deprecated alias in the installed types). `build.cssMinify` is off:
+  with it on, Vite minifies and reorders the landing page's inline `<style>`; with it off
+  `dist/index.html` is byte-identical to `web/index.html`, so `test/dist/dist-parity.test.ts`
+  compares all four served files by sha256 and no normalised diff is needed. `npm run test:e2e` is
+  `npm run build && playwright test`, so the `e2e` and `broker` jobs rebuild dist instead of
+  downloading the `check` artifact; `deploy` downloads it. `test/dist/**` runs from
+  `npm run test:dist` (its own `vitest.dist.config.ts`) after the build, also inside `npm run check`,
+  and skips with a note when dist/ is absent; with `LEGACY_PAGES=` only the parity suite is
+  meaningful until a page is ported. The generated fixture headers name the page they were cut
+  from, so moving the pages re-pinned `fixtureSha256` by that one comment line each; both
+  `sourceSha256` values are unchanged. `tools/serve-dist.ts` mounts `dist/` by default and resolves
+  `--alias` targets against the working directory (the ICE fixture lives outside dist); its node
+  tests mount a temp directory staged from `legacy/` and `web/index.html`
+  (`test/tools/site-fixture.ts`) so `npm test` needs no build. See ARCHITECTURE "Deviations".
+  The post-flip proof cannot be a raw sha256 of HTML fetched from games.sweedler.com: Cloudflare
+  appends a challenge-platform `<script>` with a per-request ray id before `</body>`, so that
+  origin's HTML hash differs from github.io and between two fetches (before this step too;
+  `shared/ice.js` is unaffected). Hash the github.io URLs, which the Worker proxies byte for byte
+  (`test/tools/proxy-dev.test.ts`), or strip the trailing block first:
+  `curl -sL "$u" | perl -0pe 's/<script>\(function\(\)\{function c\(\).*?<\/script><\/body>/<\/body>/s' | shasum -a 256`.

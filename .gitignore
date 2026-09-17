@@ -3,8 +3,8 @@
 .dev.vars
 *.secrets.json
 
-# build and test output
-dist/
+# build and test output. dist/ is anchored to the root: test/dist/ holds the dist guards.
+/dist/
 node_modules/
 coverage/
 playwright-report/

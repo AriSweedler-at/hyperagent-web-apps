@@ -2,15 +2,15 @@
 // infra/games-proxy/worker.js fronting tools/serve-dist.ts. These tests run the two together and
 // pin the behaviours the specs rely on: short URLs, the /games/ redirect, upstream redirects
 // rewritten to this origin, /shared/ mapping, passthrough and byte-identical page bodies.
-import { resolve } from 'node:path';
-
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
 import { parseProxyArgs, startProxy, type Running as RunningProxy } from '../../tools/proxy-dev.ts';
 import { startServer, type Running as RunningPages } from '../../tools/serve-dist.ts';
+import { stageSite } from './site-fixture.ts';
 
-const REPO_ROOT = resolve(import.meta.dirname, '..', '..');
+// A dist-shaped directory built from the verbatim legacy files, so no build is needed here.
+const site = stageSite();
 
 describe('parseProxyArgs', () => {
   test('requires --upstream and keeps only its origin', () => {
@@ -34,7 +34,7 @@ describe('proxy in front of serve-dist', () => {
   let proxy: RunningProxy;
   beforeAll(async () => {
     pages = await startServer({
-      root: REPO_ROOT,
+      root: site.root,
       base: PAGES_BASE_PATH,
       host: '127.0.0.1',
       port: 0,
@@ -45,6 +45,7 @@ describe('proxy in front of serve-dist', () => {
   afterAll(async () => {
     await proxy.close();
     await pages.close();
+    site.remove();
   });
 
   test('short game URLs serve the game pages', async () => {
