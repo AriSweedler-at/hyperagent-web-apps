@@ -218,7 +218,13 @@ check): download dist, `npx playwright install --with-deps chromium`, `npm run t
 first retry; report uploaded). Job `broker` (needs check, `continue-on-error: true`): the two-peer
 specs without `?peer=` through 0.peerjs.com, so signalling regressions surface at review without
 blocking on a third party. Job `deploy` as above. Branch protection on `main` requires `check` and
-`e2e`. `nightly.yml` runs the online specs against both live origins through the real broker and
+`e2e`. Installs in every job use the composite action `.github/actions/npm-ci`. The owner's npm registry is
+Airtable's Socket Firewall in registry mode, so `package-lock.json` records that host in every
+`resolved` URL and is committed exactly as written; it is never rewritten. Runners cannot
+authenticate to the firewall, so the action sets npm's `replace-registry-host=always`, which makes
+`npm ci` fetch each entry from the runner's configured (public) registry while still verifying the
+lockfile's integrity hashes, and wraps the install in Socket Firewall Free (`sfw npm ci`) so CI
+installs are scanned too. `nightly.yml` runs the online specs against both live origins through the real broker and
 `turn.sweedler.com`, plus one game with `iceTransportPolicy: 'relay'` forced via `?ice=`, and opens
 or updates a pinned issue on failure.
 

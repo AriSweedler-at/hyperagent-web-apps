@@ -4,7 +4,10 @@
 # (the merge gate for online play, docs/MIGRATION.md step 3); job "broker" repeats the online specs
 # through the real 0.peerjs.com and is advisory (continue-on-error), so a third-party outage never
 # blocks a merge but a signalling regression is visible at review. Build, dist tests and deploy join
-# as step 4 lands (see docs/ARCHITECTURE.md "GitHub Actions").
+# as step 4 lands (see docs/ARCHITECTURE.md "GitHub Actions"). Dependency installs go through
+# .github/actions/npm-ci: the lockfile names Airtable's Socket Firewall registry, which runners
+# cannot reach, so npm substitutes the public registry at install time and Socket Firewall Free
+# scans what it downloads.
 name: CI
 
 on:
@@ -26,7 +29,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - name: Install dependencies
-        run: npm ci
+        uses: ./.github/actions/npm-ci
       - name: Typecheck
         run: npm run typecheck
       - name: Lint and format check
@@ -47,7 +50,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - name: Install dependencies
-        run: npm ci
+        uses: ./.github/actions/npm-ci
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Browser specs on both origins (local PeerServer)
@@ -74,7 +77,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - name: Install dependencies
-        run: npm ci
+        uses: ./.github/actions/npm-ci
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Online specs through 0.peerjs.com (advisory)

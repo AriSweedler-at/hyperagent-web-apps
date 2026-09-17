@@ -1,0 +1,22 @@
+# Install dependencies on a GitHub runner from a lockfile written behind Socket Firewall.
+#
+# The developer's npm registry is Airtable's Socket Firewall (registry mode), so package-lock.json
+# records https://sfw.security.shadowbox.cloud/npm/... as the "resolved" URL of every package. The
+# lockfile is committed exactly as the firewall wrote it. Runners have no credentials for that host,
+# so here npm is told to substitute its own configured registry (the public one) for whichever host
+# the lockfile names: replace-registry-host=always is npm's documented switch for this, and the
+# sha512 integrity hashes in the lockfile are still verified against what is downloaded. The install
+# is wrapped in Socket Firewall Free so CI installs are scanned for malicious packages as well.
+name: npm ci through Socket Firewall
+description: Install dependencies with npm ci, fetching from the public registry through Socket Firewall Free
+runs:
+  using: composite
+  steps:
+    - name: Install Socket Firewall Free
+      shell: bash
+      run: npm install -g sfw@2.0.6
+    - name: npm ci (registry host substituted, scanned by Socket Firewall)
+      shell: bash
+      env:
+        NPM_CONFIG_REPLACE_REGISTRY_HOST: always
+      run: sfw npm ci
