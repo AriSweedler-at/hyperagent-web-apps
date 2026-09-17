@@ -4,7 +4,7 @@
 // test; `transport.contract.ts` is the behaviour both must show. Options follow the legacy pages
 // exactly: `{ debug, config: peerConfig(ice) }` when ICE loaded, `{ debug }` when it did not, and
 // the documented `?peer=host:port` test hook adds `{ host, port, path: '/', secure: false }`.
-import { Peer, type DataConnection } from 'peerjs';
+import { Peer, util, type DataConnection } from 'peerjs';
 
 import { peerConfig, type IceResult, type PeerConnectionLike, type PeerIceConfig } from './ice.ts';
 
@@ -16,6 +16,12 @@ export type Connection = Readonly<{
   peer: string;
   /** True between the channel opening and either side closing it. */
   open: () => boolean;
+  /**
+   * Frames cross the wire as PeerJS BinaryPack (`serialization: 'default'`), not structured clone:
+   * `undefined` arrives as `null` (in objects and arrays alike), a `Date` as its `toString()`,
+   * `NaN` as a denormal, and `Infinity`, `Map`, `Set` and `BigInt` throw synchronously. Decoders
+   * of optional fields must therefore accept `null` (see `wireClone`).
+   */
   send: (data: unknown) => void;
   onOpen: (fn: () => void) => void;
   onMessage: (fn: (data: unknown) => void) => void;
@@ -43,7 +49,13 @@ export type PeerHandle = Readonly<{
   /** The broker id, once `open` fired; null before. */
   id: () => string | null;
   on: <K extends keyof PeerEvents>(event: K, fn: PeerEvents[K]) => void;
+  /**
+   * Open a channel to `peerId`. When the broker socket is down (or the peer is destroyed) PeerJS
+   * refuses, emits `error{type:'disconnected'}` on the peer, and the Connection returned here is
+   * inert: never opens, never fires, `send`/`close` are no-ops.
+   */
   connect: (peerId: string) => Connection;
+  /** No-op unless disconnected and not destroyed (legacy `keepPeerAlive`); never throws. */
   reconnect: () => void;
   destroy: () => void;
   destroyed: () => boolean;
@@ -103,6 +115,35 @@ const asError = (e: Readonly<{ type: string; message: string }>): TransportError
  * assertion) keeps the narrowing rules honest about that.
  */
 const runtimeOptional = <T>(value: T): T | undefined => value;
+
+/**
+ * What the receiver sees when `data` crosses a real data channel: a round trip through the
+ * BinaryPack codec PeerJS 1.5.4 uses for `serialization: 'default'` (re-exported as `util.pack`
+ * and `util.unpack`). `transport.fake.ts` clones every frame with this, so a Session that passes
+ * over the fake has already met the wire's rewrites (`undefined` -> `null`, `Date` -> string) and
+ * its throws (`Infinity`, `Map`, `Set`, `BigInt`). Blob frames pack asynchronously and are not
+ * something the games send, so they are refused rather than modelled.
+ */
+export const wireClone = (data: unknown): unknown => {
+  const packed = util.pack(data as Parameters<typeof util.pack>[0]);
+  if (packed instanceof Promise) throw new Error('Blob frames are not supported');
+  return util.unpack(packed);
+};
+
+const noop = (): void => undefined;
+
+/** What `connect` returns when PeerJS refused: the error has already been emitted on the peer. */
+const closedConnection = (peer: string): Connection => ({
+  peer,
+  open: () => false,
+  send: noop,
+  onOpen: noop,
+  onMessage: noop,
+  onClose: noop,
+  onError: noop,
+  close: noop,
+  peerConnection: () => null,
+});
 
 // PeerJS objects are taken readonly: only their methods are called.
 const wrapConnection = (dc: Readonly<DataConnection>): Connection => ({
@@ -165,9 +206,15 @@ const wrapPeer = (peer: Readonly<Peer>): PeerHandle => {
     on: (event, fn) => {
       listeners[event](fn);
     },
-    connect: (peerId) => wrapConnection(peer.connect(peerId, { reliable: true })),
+    connect: (peerId) => {
+      // Typed as always returning a DataConnection, but a disconnected peer returns undefined
+      // after emitting `error{type:'disconnected'}` (legacy gin's tryJoin guarded the same case).
+      const dc = runtimeOptional(peer.connect(peerId, { reliable: true }));
+      return dc === undefined ? closedConnection(peerId) : wrapConnection(dc);
+    },
     reconnect: () => {
-      peer.reconnect();
+      // PeerJS throws when destroyed or not disconnected; legacy keepPeerAlive guarded both.
+      if (!peer.destroyed && peer.disconnected) peer.reconnect();
     },
     destroy: () => {
       peer.destroy();

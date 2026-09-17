@@ -271,4 +271,14 @@ parity and e2e gates.
   installs Chromium and runs it after the unit tests). On this laptop it skips with a note (signalling
   completes, no data channel opens: Cloudflare WARP). Edge coverage threshold is 90% lines,
   functions and statements (branches uncounted: the fakes' defensive arms). See ARCHITECTURE "Deviations".
+- Step 5 follow-up (review findings on the transport and room codes): the fake clones frames through
+  PeerJS's own BinaryPack codec (`wireClone` in `transport.ts`, via the re-exported `util.pack` /
+  `util.unpack`), not `structuredClone`, so `undefined` arrives as `null` and a `Date` as a string
+  on both Transports; the contract log pins that. The adapter carries the legacy guards (`connect`
+  on a disconnected peer returns an inert Connection; `reconnect` is a no-op unless disconnected and
+  not destroyed) and the fake mirrors PeerJS's `error(network)` before `disconnected`, a null id
+  while disconnected, `disconnected` before `close` on destroy, and `close` only for a channel that
+  opened. `sanitiseCode` reproduces the legacy input handlers per game (gin keeps any A-Z, fidice
+  only upper-cases) instead of filtering to the alphabet. The integration test's heuristic skip is
+  off under `CI` (a channel that never opens fails there). See ARCHITECTURE "Deviations".
 

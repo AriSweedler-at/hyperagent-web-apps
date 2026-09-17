@@ -171,6 +171,35 @@ describe('connecting', () => {
     await expect(errorOf(g)).resolves.toMatchObject({ type: 'disconnected' });
   });
 
+  test('a peer whose broker socket dropped cannot connect: inert connection, disconnected error, host untouched', () => {
+    const { host, guest, broker } = fakeTransportPair({ delivery: 'manual' });
+    const h = host.open('ginrummy-ari-ABCD');
+    const g = guest.open(undefined);
+    broker.flush();
+    const hostGot: Connection[] = [];
+    h.on('connection', (c) => hostGot.push(c));
+    const errors: TransportError[] = [];
+    g.on('error', (e) => errors.push(e));
+    broker.dropSocket('fake-peer-1');
+    broker.flush();
+    const conn = g.connect('ginrummy-ari-ABCD');
+    const events: string[] = [];
+    conn.onOpen(() => events.push('open'));
+    conn.onClose(() => events.push('close'));
+    broker.flush();
+    expect(hostGot).toEqual([]);
+    expect(conn.open()).toBe(false);
+    expect(conn.peer).toBe('ginrummy-ari-ABCD');
+    expect(events).toEqual([]);
+    expect(errors).toEqual([
+      { type: 'network', message: 'Lost connection to server.' },
+      {
+        type: 'disconnected',
+        message: 'Cannot connect to new Peer after disconnecting from server.',
+      },
+    ]);
+  });
+
   test('the host-side connection carries the guest id', async () => {
     const { hostConn, guestPeer } = await connectedPair();
     expect(hostConn.peer).toBe(guestPeer.id());
@@ -213,6 +242,54 @@ describe('frames', () => {
     await Promise.resolve();
     expect(atHost).toEqual([{ hand: ['AS', '2S'] }]);
     expect(atHost[0]).not.toBe(frame);
+  });
+
+  test('frames take the BinaryPack shape PeerJS delivers: undefined -> null, Date -> string', async () => {
+    const { hostConn, guestConn } = await connectedPair();
+    const atHost: unknown[] = [];
+    hostConn.onMessage((d) => atHost.push(d));
+    guestConn.send({
+      t: 'hello',
+      token: undefined,
+      when: new Date(0),
+      nested: { u: undefined, arr: [undefined, 1] },
+      n: null,
+      f: 1.5,
+      i: -3,
+      ok: true,
+    });
+    await Promise.resolve();
+    expect(atHost).toEqual([
+      {
+        t: 'hello',
+        token: null,
+        when: new Date(0).toString(),
+        nested: { u: null, arr: [null, 1] },
+        n: null,
+        f: 1.5,
+        i: -3,
+        ok: true,
+      },
+    ]);
+    // What structuredClone would have kept and the wire does not.
+    expect(structuredClone({ token: undefined })).toEqual({ token: undefined });
+    expect(Object.keys(structuredClone({ token: undefined }))).toEqual(['token']);
+  });
+
+  test('what PeerJS cannot pack throws synchronously from send, on the fake too', async () => {
+    const { guestConn } = await connectedPair();
+    expect(() => {
+      guestConn.send({ n: Infinity });
+    }).toThrow('Invalid integer');
+    expect(() => {
+      guestConn.send(new Map());
+    }).toThrow('not yet supported');
+    expect(() => {
+      guestConn.send(new Set());
+    }).toThrow('not yet supported');
+    expect(() => {
+      guestConn.send(1n);
+    }).toThrow();
   });
 
   test('manual delivery holds frames on the wire until flushed', async () => {
@@ -313,6 +390,75 @@ describe('closing', () => {
     expect(guestConn.open()).toBe(false);
     expect(guestPeer.destroyed()).toBe(false);
   });
+
+  test('destroy emits disconnected first, like PeerJS; a reconnect from that handler is a no-op', async () => {
+    const { hostPeer, guestPeer, hostConn } = await connectedPair();
+    const log: string[] = [];
+    hostPeer.on('open', (id) => log.push(`open ${id}`));
+    hostPeer.on('disconnected', () => {
+      log.push(
+        `disconnected id=${String(hostPeer.id())} destroyed=${String(hostPeer.destroyed())}`,
+      );
+      hostPeer.reconnect();
+    });
+    hostConn.onClose(() => log.push('conn close'));
+    hostPeer.on('close', () => log.push('close'));
+    hostPeer.destroy();
+    expect(log).toEqual(['disconnected id=null destroyed=true', 'conn close', 'close']);
+    expect(hostPeer.disconnected()).toBe(true);
+    expect(hostPeer.id()).toBeNull();
+    await Promise.resolve();
+    expect(log).toEqual(['disconnected id=null destroyed=true', 'conn close', 'close']);
+    expect(guestPeer.destroyed()).toBe(false);
+  });
+
+  test('destroying a peer whose socket already dropped emits no second disconnected', async () => {
+    const { host, broker } = fakeTransportPair();
+    const h = host.open('ginrummy-ari-ABCD');
+    await opened(h);
+    const log: string[] = [];
+    h.on('disconnected', () => log.push('disconnected'));
+    h.on('close', () => log.push('close'));
+    broker.dropSocket('ginrummy-ari-ABCD');
+    await Promise.resolve();
+    h.destroy();
+    expect(log).toEqual(['disconnected', 'close']);
+  });
+
+  test('a connection that never opened closes without a close event (PeerJS emits close only when open)', async () => {
+    const { guest, broker } = fakeTransportPair();
+    const g = guest.open(undefined);
+    await opened(g);
+    const errors: TransportError[] = [];
+    g.on('error', (e) => errors.push(e));
+    const conn = g.connect('ginrummy-ari-NOPE');
+    const log: string[] = [];
+    conn.onClose(() => log.push('close'));
+    conn.close();
+    broker.flush();
+    expect(conn.open()).toBe(false);
+    expect(log).toEqual([]);
+    expect(errors).toMatchObject([{ type: 'peer-unavailable' }]);
+    conn.close();
+    broker.flush();
+    expect(log).toEqual([]);
+  });
+
+  test('destroying a peer while its connect is pending fires no close on the never-opened channel', () => {
+    const { host, guest, broker } = fakeTransportPair({ delivery: 'manual' });
+    host.open('ginrummy-ari-ABCD');
+    const g = guest.open(undefined);
+    broker.flush();
+    const gc = g.connect('ginrummy-ari-ABCD');
+    const log: string[] = [];
+    gc.onClose(() => log.push('guest conn close'));
+    g.on('close', () => log.push('peer close'));
+    // Nothing delivered yet: the guest channel never opened.
+    g.destroy();
+    broker.flush();
+    expect(log).toEqual(['peer close']);
+    expect(gc.open()).toBe(false);
+  });
 });
 
 describe('broker socket', () => {
@@ -333,6 +479,31 @@ describe('broker socket', () => {
     await Promise.resolve();
     expect(log).toEqual(['disconnected', 'open ginrummy-ari-ABCD']);
     expect(broker.peers()).toEqual(['ginrummy-ari-ABCD']);
+  });
+
+  test('a dropped socket is error(network) then disconnected, with the id null until reconnect', async () => {
+    const { host, broker } = fakeTransportPair();
+    const h = host.open('ginrummy-ari-ABCD');
+    await opened(h);
+    const log: string[] = [];
+    h.on('error', (e) => log.push(`error ${e.type} "${e.message}" id=${String(h.id())}`));
+    h.on('disconnected', () => log.push(`disconnected id=${String(h.id())}`));
+    h.on('open', (id) => log.push(`open ${id}`));
+    broker.dropSocket('ginrummy-ari-ABCD');
+    expect(h.id()).toBeNull();
+    await Promise.resolve();
+    expect(log).toEqual([
+      'error network "Lost connection to server." id=null',
+      'disconnected id=null',
+    ]);
+    h.reconnect();
+    expect(h.id()).toBe('ginrummy-ari-ABCD');
+    await Promise.resolve();
+    expect(log).toEqual([
+      'error network "Lost connection to server." id=null',
+      'disconnected id=null',
+      'open ginrummy-ari-ABCD',
+    ]);
   });
 
   test('reconnect is a no-op when connected, destroyed or never opened; dropSocket on unknown too', async () => {

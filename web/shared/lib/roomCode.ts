@@ -57,16 +57,21 @@ export const randomCode = (game: Game, rng: Rng): string => {
 };
 
 /**
- * What the legacy code inputs keep as the user types: upper-cased, stripped to the letters (gin)
- * or letters and digits (fidice) the alphabet allows, cut to the code length.
+ * What the legacy code inputs keep as the user types, per game and not per alphabet: gin's
+ * `input` handler is `toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4)`, so I and O survive and
+ * digits do not; fidice's `form.code` intent only upper-cases (the length is checked on submit,
+ * `validateCode`). test/parity/roomCode.legacy.test.ts runs both legacy expressions beside this.
  */
-export const sanitiseCode = (game: Game, raw: string): string => {
-  const { alphabet, length } = ROOM_CODE[game];
-  return Array.from(raw.toUpperCase())
-    .filter((ch) => alphabet.includes(ch))
-    .slice(0, length)
-    .join('');
+const TYPED_CODE: Readonly<Record<Game, (raw: string) => string>> = {
+  'gin-rummy': (raw) =>
+    raw
+      .toUpperCase()
+      .replace(/[^A-Z]/g, '')
+      .slice(0, GIN_CODE_LENGTH),
+  fidice: (raw) => raw.toUpperCase(),
 };
+
+export const sanitiseCode = (game: Game, raw: string): string => TYPED_CODE[game](raw);
 
 /**
  * What the legacy join buttons accept: trimmed and upper-cased, then only the length is checked

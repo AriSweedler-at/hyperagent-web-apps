@@ -2,9 +2,17 @@
 // host/guest sessions run over this in unit tests). Every event and frame goes through one FIFO
 // queue, so ordering is deterministic; `delivery: 'auto'` drains it on a microtask and `'manual'`
 // waits for `flush()` / `deliverNext()`, which lets a test freeze the wire between two frames.
-// Frames are structured-cloned on the way, as a real data channel would serialise them. Mutable
-// state lives in closures behind readonly records, so the shared readonly-type rules stay on.
-import type { Connection, PeerEvents, PeerHandle, Transport, TransportError } from './transport.ts';
+// Frames go through PeerJS's own BinaryPack codec on the way (`wireClone`), so what a receiver
+// sees here is what it would see over a real data channel. Mutable state lives in closures behind
+// readonly records, so the shared readonly-type rules stay on.
+import {
+  wireClone,
+  type Connection,
+  type PeerEvents,
+  type PeerHandle,
+  type Transport,
+  type TransportError,
+} from './transport.ts';
 
 export type Delivery = 'auto' | 'manual';
 
@@ -47,7 +55,10 @@ type Endpoint = Readonly<{
 }>;
 
 type PeerRecord = Readonly<{
+  /** Null before registration and, as on PeerJS, while disconnected or destroyed. */
   id: () => string | null;
+  /** The id last registered under, kept for `reconnect` (PeerJS `_lastServerId`). */
+  lastId: () => string | null;
   setId: (id: string) => void;
   isDestroyed: () => boolean;
   markDestroyed: () => void;
@@ -88,7 +99,8 @@ const newRecord = (): PeerRecord => {
   let destroyed = false;
   let disconnected = false;
   return {
-    id: () => id,
+    id: () => (disconnected || destroyed ? null : id),
+    lastId: () => id,
     setId: (value) => {
       id = value;
     },
@@ -165,9 +177,11 @@ export const fakeBroker = (options: FakeBrokerOptions = {}): FakeBroker => {
 
   const closeEndpoint = (ep: Endpoint): void => {
     if (ep.isClosed()) return;
+    const wasOpen = ep.isOpen();
     ep.markClosed();
-    // PeerJS emits the local `close` synchronously; the remote learns of it over the wire.
-    call(ep.onClose);
+    // PeerJS emits the local `close` synchronously, and only for a channel that had opened; the
+    // remote learns of it over the wire.
+    if (wasOpen) call(ep.onClose);
     const remote = ep.remote();
     if (remote !== null)
       schedule(() => {
@@ -191,7 +205,7 @@ export const fakeBroker = (options: FakeBrokerOptions = {}): FakeBroker => {
         });
         return;
       }
-      const frame: unknown = structuredClone(data);
+      const frame: unknown = wireClone(data);
       const remote = ep.remote();
       schedule(() => {
         if (remote?.isOpen() === true) call(remote.onMessage, frame);
@@ -218,7 +232,9 @@ export const fakeBroker = (options: FakeBrokerOptions = {}): FakeBroker => {
   const connect = (from: PeerRecord, peerId: string): Connection => {
     const local = newEndpoint(peerId);
     const target = registry.get(peerId);
-    if (from.isDestroyed()) {
+    // PeerJS refuses while the broker socket is down (destroy implies disconnected) and hands
+    // back nothing; the adapter turns that into an inert Connection, as this does.
+    if (from.isDestroyed() || from.isDisconnected()) {
       fail(from, {
         type: 'disconnected',
         message: 'Cannot connect to new Peer after disconnecting from server.',
@@ -269,8 +285,9 @@ export const fakeBroker = (options: FakeBrokerOptions = {}): FakeBroker => {
       },
       connect: (peerId) => connect(record, peerId),
       reconnect: () => {
-        const id = record.id();
+        const id = record.lastId();
         if (record.isDestroyed() || !record.isDisconnected() || id === null) return;
+        // PeerJS restores the id synchronously and `open` follows from the server.
         record.setDisconnected(false);
         registry.set(id, record);
         schedule(() => {
@@ -279,9 +296,15 @@ export const fakeBroker = (options: FakeBrokerOptions = {}): FakeBroker => {
       },
       destroy: () => {
         if (record.isDestroyed()) return;
-        record.markDestroyed();
-        const id = record.id();
+        const id = record.lastId();
         if (id !== null && registry.get(id) === record) registry.delete(id);
+        // PeerJS: destroy() calls disconnect() first, which emits `disconnected` synchronously
+        // (unless the socket was already down), then closes every connection, then emits `close`.
+        // A `disconnected` handler that calls `reconnect()` here must find it a no-op.
+        const wasConnected = !record.isDisconnected();
+        record.setDisconnected(true);
+        record.markDestroyed();
+        if (wasConnected) call(record.handlers.disconnected);
         record.connections.forEach(closeEndpoint);
         call(record.handlers.close);
       },
@@ -301,7 +324,10 @@ export const fakeBroker = (options: FakeBrokerOptions = {}): FakeBroker => {
       if (record === undefined || record.isDestroyed()) return;
       record.setDisconnected(true);
       registry.delete(id);
+      // PeerJS on a lost socket: `error{type:'network'}` first, then disconnect(), which nulls the
+      // id and emits `disconnected`. Both land in one delivery, as they do from one socket event.
       schedule(() => {
+        call(record.handlers.error, { type: 'network', message: 'Lost connection to server.' });
         call(record.handlers.disconnected);
       });
     },

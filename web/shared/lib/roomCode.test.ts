@@ -85,21 +85,23 @@ describe('randomCode', () => {
   });
 });
 
-describe('sanitiseCode (what the legacy input handlers keep)', () => {
-  test('gin: upper case, letters only, four at most', () => {
+describe('sanitiseCode (what the legacy input handlers keep, per game)', () => {
+  test('gin: upper case, A-Z only, four at most', () => {
     expect(sanitiseCode('gin-rummy', 'ab1c-d e')).toBe('ABCD');
     expect(sanitiseCode('gin-rummy', 'abcdefg')).toBe('ABCD');
     expect(sanitiseCode('gin-rummy', '')).toBe('');
     expect(sanitiseCode('gin-rummy', 'wxyz')).toBe('WXYZ');
   });
 
-  test('gin: characters outside the alphabet are dropped (I and O too)', () => {
-    expect(sanitiseCode('gin-rummy', 'IOAB')).toBe('AB');
+  test('gin: I and O are letters, so the input keeps them (only genCode avoids them)', () => {
+    expect(sanitiseCode('gin-rummy', 'IOAB')).toBe('IOAB');
+    expect(isWellFormedCode('gin-rummy', 'IOAB')).toBe(false);
   });
 
-  test('fidice: upper case, alphabet characters only, five at most', () => {
-    expect(sanitiseCode('fidice', 'ab2c-d3 e')).toBe('AB2CD');
-    expect(sanitiseCode('fidice', 'il0o1abcd')).toBe('ABCD');
+  test('fidice: upper-cased and nothing else; length is checked on submit', () => {
+    expect(sanitiseCode('fidice', 'ab2c-d3 e')).toBe('AB2C-D3 E');
+    expect(sanitiseCode('fidice', 'il0o1abcd')).toBe('IL0O1ABCD');
+    expect(sanitiseCode('fidice', 'abcdefg')).toBe('ABCDEFG');
   });
 });
 

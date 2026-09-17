@@ -5,9 +5,11 @@
 // Vite dev server on free ports, then Chromium (Playwright) on test/integration/harness.html.
 //
 // WebRTC does not exist in node, hence the browser. Two peers in one page connect over the
-// machine's own addresses, which a Cloudflare WARP-style tunnel blocks; when signalling worked
-// but no data channel opened in time, the test skips with a note instead of failing, and
-// E2E_NO_LOOPBACK=1 skips it up front. CI runners have plain loopback and run it for real.
+// machine's own addresses, which a Cloudflare WARP-style tunnel blocks; E2E_NO_LOOPBACK=1 skips
+// the test up front on such a machine, and outside CI it also skips with a note when signalling
+// worked but no data channel opened in time. Under CI that same symptom is a failure: the runner
+// has plain loopback (the e2e job's two-peer specs rely on it too), so a channel that does not
+// open there is the adapter regression this test exists to catch, never an environment quirk.
 import { createServer as createNetServer } from 'node:net';
 import { resolve } from 'node:path';
 
@@ -25,6 +27,8 @@ const HOST = '127.0.0.1';
 const CONTRACT_TIMEOUT_MS = 15_000;
 const NO_LOOPBACK =
   process.env['E2E_NO_LOOPBACK'] !== undefined && process.env['E2E_NO_LOOPBACK'] !== '';
+/** In CI the heuristic skip below is off: a channel that never opens must turn the job red. */
+const CI = process.env['CI'] !== undefined && process.env['CI'] !== '';
 
 const report = object({
   log: arrayOf(string),
@@ -123,12 +127,17 @@ describe('transport over a local PeerServer in Chromium', () => {
     expect(expected).toEqual(EXPECTED_CONTRACT_LOG);
     if (timedOut) {
       const signalled = log.includes('host:open') && log.includes('guest:open');
-      if (signalled && !log.includes('connected')) {
+      const noChannel = signalled && !log.includes('connected');
+      if (noChannel && !CI) {
         context.skip(
-          `loopback WebRTC unavailable: both peers registered with the PeerServer but no data channel opened in ${String(CONTRACT_TIMEOUT_MS)} ms (a Cloudflare WARP-style tunnel blocks packets to the machine's own address; CI runs this for real). Log: ${JSON.stringify(log)}`,
+          `loopback WebRTC unavailable: both peers registered with the PeerServer but no data channel opened in ${String(CONTRACT_TIMEOUT_MS)} ms (a Cloudflare WARP-style tunnel blocks packets to the machine's own address; set E2E_NO_LOOPBACK=1 to skip up front; CI runs this for real). Log: ${JSON.stringify(log)}`,
         );
         return;
       }
+      if (noChannel)
+        throw new Error(
+          `no data channel opened in ${String(CONTRACT_TIMEOUT_MS)} ms although both peers registered; loopback WebRTC is expected to work in CI, so this is a transport regression. Log: ${JSON.stringify(log)}`,
+        );
       throw new Error(
         `transport contract timed out before signalling completed: ${JSON.stringify(log)}`,
       );

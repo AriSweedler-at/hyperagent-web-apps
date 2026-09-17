@@ -2,13 +2,32 @@
 // (docs/MIGRATION.md step 5: "roomCode constants equal the legacy literals"). Each assertion greps
 // the exact source line, so a page edit that changed an alphabet, a length, a prefix or a join
 // error would fail this suite before the TypeScript port could drift from it.
+import { runInNewContext } from 'node:vm';
+
 import { describe, expect, test } from 'vitest';
 
 import { readRepoFile } from '../../tools/legacy/extract.ts';
-import { ROOM_CODE } from '../../web/shared/lib/roomCode.ts';
+import { ROOM_CODE, sanitiseCode } from '../../web/shared/lib/roomCode.ts';
 
 const gin = readRepoFile('legacy/gin-rummy/index.html');
 const fidice = readRepoFile('legacy/fidice/index.html');
+
+/** What a user might type into a code box: look-alikes, digits, punctuation, too much. */
+const TYPED_INPUTS: ReadonlyArray<string> = [
+  '',
+  'abcd',
+  'IOAB',
+  'il0o1abcd',
+  'abcdefg',
+  'ab1c-d e',
+  ' ab2cd ',
+  'AB2C9',
+  'x',
+];
+
+/** Evaluate a captured legacy method chain (`.toUpperCase()...`) against `value`. */
+const legacyTyped = (chain: string, value: string): unknown =>
+  runInNewContext(`value${chain}`, { value });
 
 /** The single capture of `pattern` in `page`; fails loudly if the line is missing or ambiguous. */
 const capture = (page: string, pattern: RegExp): string => {
@@ -47,6 +66,16 @@ describe('gin (legacy/gin-rummy/index.html)', () => {
     );
   });
 
+  test('sanitiseCode is the input handler: same output as the legacy expression', () => {
+    const chain = capture(gin, /let v = e\.target\.value((?:\.[A-Za-z]+\([^)\n]*\))+);/);
+    expect(chain).toBe(".toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4)");
+    TYPED_INPUTS.forEach((typed) => {
+      expect(sanitiseCode('gin-rummy', typed), JSON.stringify(typed)).toBe(
+        legacyTyped(chain, typed),
+      );
+    });
+  });
+
   test('the host id is PEER_PREFIX + code, upper case as shown', () => {
     expect(gin).toContain('new Peer(PEER_PREFIX + app.code, peerOptsFor(ice))');
     expect(gin).toContain('peer.connect(PEER_PREFIX + code, { reliable: true })');
@@ -72,6 +101,17 @@ describe('fidice (legacy/fidice/index.html)', () => {
     expect(Number(capture(fidice, /randomCode: \(\) => Array\.from\(\{ length: (\d+) \}/))).toBe(
       spec.length,
     );
+  });
+
+  test('sanitiseCode is the form.code handler: upper-cased only, same as the legacy expression', () => {
+    const chain = capture(
+      fidice,
+      /case "form\.code":\n\s*this\.set\(\{ joinCode: intent\.value((?:\.[A-Za-z]+\([^)\n]*\))+) \}\);/,
+    );
+    expect(chain).toBe('.toUpperCase()');
+    TYPED_INPUTS.forEach((typed) => {
+      expect(sanitiseCode('fidice', typed), JSON.stringify(typed)).toBe(legacyTyped(chain, typed));
+    });
   });
 
   test('the join form checks the length and says so', () => {

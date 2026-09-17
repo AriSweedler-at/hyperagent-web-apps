@@ -3,7 +3,7 @@
 // Chromium over the real PeerJS adapter and a local PeerServer, and both must produce
 // EXPECTED_CONTRACT_LOG. A Session written against Transport therefore cannot tell them apart in
 // any way this scenario exercises: open, connect, ordered frames both ways, isolation of sent
-// data, close propagation and destroy.
+// data, the wire's rewriting of `undefined` and `Date`, close propagation and destroy.
 import type { Connection, PeerHandle, Transport } from './transport.ts';
 
 export { EXPECTED_CONTRACT_LOG } from './transport.contract.log.ts';
@@ -32,7 +32,13 @@ const whenConnOpen = (conn: Connection): Promise<null> =>
         });
       });
 
-type Frame = Readonly<{ t?: unknown; n?: unknown; tags?: unknown }>;
+type Frame = Readonly<{
+  t?: unknown;
+  n?: unknown;
+  tags?: unknown;
+  maybe?: unknown;
+  when?: unknown;
+}>;
 
 const asFrame = (data: unknown): Frame => (typeof data === 'object' && data !== null ? data : {});
 
@@ -74,7 +80,7 @@ export const runContract = async (
     const seen: unknown[] = [];
     hostConn.onMessage((data) => {
       seen.push(data);
-      if (seen.length === 2) fn(seen);
+      if (seen.length === 3) fn(seen);
     });
   });
   const pong = once<unknown>((fn) => {
@@ -85,6 +91,8 @@ export const runContract = async (
   // Mutating the sent object after `send` must not reach the receiver.
   frame.tags.push('mutated-after-send');
   guestConn.send({ t: 'ping', n: 2 });
+  // The wire is BinaryPack, not structured clone: `undefined` lands as `null`, a Date as a string.
+  guestConn.send({ t: 'ping', n: 3, maybe: undefined, when: new Date(0) });
   const received = await pings;
   received.forEach((data) => {
     const f = asFrame(data);
@@ -92,6 +100,10 @@ export const runContract = async (
   });
   const tags = asFrame(received[0]).tags;
   const isolated = Array.isArray(tags) && tags.length === 1;
+  const wire = asFrame(received[2]);
+  step(
+    `wire: undefined->${wire.maybe === null ? 'null' : typeof wire.maybe} date->${typeof wire.when}`,
+  );
   hostConn.send({ t: 'pong', n: received.length });
   const reply = asFrame(await pong);
   step(

@@ -428,3 +428,20 @@ Step 5 (shared TypeScript modules with tests first):
 - `vitest.config.ts` covers `web/shared/edge/**` with a 90% threshold on lines, functions and
   statements (lib stays at 100% on all four); `test/integration/**` is excluded from `npm test`.
 
+Step 5 follow-up (review findings on the transport and room codes):
+
+- `transport.fake.ts` frames are not structured-cloned: they round-trip through PeerJS's BinaryPack
+  (`wireClone`, exported by `transport.ts`, the one `peerjs` importer), so the fake shows the real
+  wire's rewrites (`undefined` -> `null`, `Date` -> string) and throws (`Infinity`, `Map`, `Set`,
+  `BigInt`); `transport.contract.log.ts` pins `wire: undefined->null date->string` for both.
+- `PeerHandle.connect` returns an inert Connection when PeerJS refuses (disconnected peer) and
+  `PeerHandle.reconnect` is guarded like legacy `keepPeerAlive`; the fake refuses `connect` while
+  disconnected, emits `error(network)` then `disconnected` on a dropped socket with `id()` null in
+  between, emits `disconnected` before `close` on destroy, and emits a channel's `close` only if it
+  had opened, all as PeerJS 1.5.4 does.
+- `roomCode.sanitiseCode` is the legacy input handler per game (gin: `A-Z` only, four at most;
+  fidice: upper-case only), not a filter to the alphabet; `test/parity/roomCode.legacy.test.ts`
+  runs the captured legacy expressions beside it.
+- `test/integration/transport.integration.test.ts` skips on "signalling worked, no channel" only
+  outside `CI`; the script runs with `--reporter=verbose` so the skip note is visible.
+

@@ -8,6 +8,7 @@ import {
   peerOptionsFor,
   peerOverrideFrom,
   realTransport,
+  wireClone,
   type Connection,
   type TransportError,
 } from './transport.ts';
@@ -59,22 +60,42 @@ const { FakePeer, FakeDataConnection, created } = vi.hoisted(() => {
       this.args = args;
       created.push(this);
     }
-    connect(peer: string, options: unknown): FakeDataConnection {
+    // Like PeerJS 1.5.4: a disconnected peer emits the error and returns nothing (typed as a
+    // DataConnection all the same).
+    connect(peer: string, options: unknown): FakeDataConnection | undefined {
+      if (this.disconnected) {
+        this.emit(
+          'error',
+          Object.assign(new Error('Cannot connect to new Peer after disconnecting from server.'), {
+            type: 'disconnected',
+          }),
+        );
+        return undefined;
+      }
       const dc = new FakeDataConnection(peer, options);
       this.connections.push(dc);
       return dc;
     }
+    // Like PeerJS 1.5.4: throws unless disconnected and not destroyed.
     reconnect(): void {
+      if (this.destroyed) throw new Error('This peer cannot reconnect to the server.');
+      if (!this.disconnected) throw new Error('cannot reconnect because it is not disconnected');
       this.reconnects += 1;
+      this.disconnected = false;
     }
     destroy(): void {
       this.destroyed = true;
+      this.disconnected = true;
     }
   }
   return { FakePeer, FakeDataConnection, created };
 });
 
-vi.mock('peerjs', () => ({ Peer: FakePeer }));
+// The stand-in Peer, with the real `util` (BinaryPack) that `wireClone` needs.
+vi.mock('peerjs', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  Peer: FakePeer,
+}));
 
 const lastPeer = (): InstanceType<typeof FakePeer> => {
   const peer = created.at(-1);
@@ -140,6 +161,47 @@ describe('peerOptionsFor (legacy peerOptsFor / withPeerOverride)', () => {
       config: { iceServers: ICE.iceServers, sdpSemantics: 'unified-plan' },
       ...override,
     });
+  });
+});
+
+describe('wireClone (a round trip through PeerJS BinaryPack)', () => {
+  test('rewrites undefined to null and Date to its string, keeps the JSON scalars', () => {
+    expect(
+      wireClone({
+        tok: undefined,
+        when: new Date(0),
+        nested: { u: undefined, arr: [undefined, 1] },
+        n: null,
+        f: 1.5,
+        i: -3,
+        s: 'x',
+        b: true,
+      }),
+    ).toEqual({
+      tok: null,
+      when: new Date(0).toString(),
+      nested: { u: null, arr: [null, 1] },
+      n: null,
+      f: 1.5,
+      i: -3,
+      s: 'x',
+      b: true,
+    });
+  });
+
+  test('returns a copy', () => {
+    const frame = { tags: ['a'] };
+    const clone = wireClone(frame);
+    expect(clone).toEqual(frame);
+    expect(clone).not.toBe(frame);
+  });
+
+  test('throws on what BinaryPack cannot carry: Infinity, Map, Set, BigInt, Blob', () => {
+    expect(() => wireClone(Infinity)).toThrow('Invalid integer');
+    expect(() => wireClone(new Map())).toThrow('not yet supported');
+    expect(() => wireClone(new Set())).toThrow('not yet supported');
+    expect(() => wireClone(1n)).toThrow();
+    expect(() => wireClone(new Blob(['x']))).toThrow('Blob frames are not supported');
   });
 });
 
@@ -216,6 +278,53 @@ describe('realTransport', () => {
     expect(peer.reconnects).toBe(1);
     handle.destroy();
     expect(handle.destroyed()).toBe(true);
+  });
+
+  test('reconnect is guarded like legacy keepPeerAlive: never called on an open or destroyed peer', () => {
+    const handle = realTransport({ ice: null, search: '' }).open('x');
+    const peer = lastPeer();
+    // PeerJS would throw here ("not disconnected"); the handle does not call it.
+    expect(() => {
+      handle.reconnect();
+    }).not.toThrow();
+    expect(peer.reconnects).toBe(0);
+    handle.destroy();
+    // Destroyed implies disconnected on PeerJS; reconnect would throw "already been destroyed".
+    expect(handle.disconnected()).toBe(true);
+    expect(() => {
+      handle.reconnect();
+    }).not.toThrow();
+    expect(peer.reconnects).toBe(0);
+  });
+
+  test('connect on a disconnected peer: PeerJS returns nothing, the handle returns an inert Connection', () => {
+    const handle = realTransport({ ice: null, search: '' }).open(undefined);
+    const peer = lastPeer();
+    const errors: TransportError[] = [];
+    handle.on('error', (e) => errors.push(e));
+    peer.disconnected = true;
+    const conn = handle.connect('ginrummy-ari-ABCD');
+    expect(peer.connections).toEqual([]);
+    expect(errors).toEqual([
+      {
+        type: 'disconnected',
+        message: 'Cannot connect to new Peer after disconnecting from server.',
+      },
+    ]);
+    expect(conn.peer).toBe('ginrummy-ari-ABCD');
+    expect(conn.open()).toBe(false);
+    expect(conn.peerConnection()).toBeNull();
+    const fired: string[] = [];
+    conn.onOpen(() => fired.push('open'));
+    conn.onMessage(() => fired.push('message'));
+    conn.onClose(() => fired.push('close'));
+    conn.onError(() => fired.push('error'));
+    expect(() => {
+      conn.send({ t: 'hello' });
+      conn.close();
+    }).not.toThrow();
+    expect(fired).toEqual([]);
+    expect(conn.open()).toBe(false);
   });
 
   test('connect asks for a reliable channel and wraps the DataConnection', () => {
