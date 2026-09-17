@@ -44,9 +44,7 @@ describeDist('dist asset URLs', (root) => {
     expect(distFiles(root).filter((file) => file.startsWith('assets/'))).toEqual([]);
   });
 
-  test('the built fidice page loads its bundle beside itself and its CSS under ../../shared/assets/', (context) => {
-    // In dist/ the legacy page is copied over the built one while fidice is in LEGACY_PAGES.
-    if (root.legacyPages.includes('fidice')) context.skip('fidice is served from legacy/ here');
+  test('the fidice page loads its bundle beside itself and its CSS under ../../shared/assets/', () => {
     const page = 'games/fidice/index.html';
     const references = referencesIn(page, readDist(root, page));
     expect(references.filter(({ kind }) => kind === 'src').map(({ value }) => value)).toEqual([

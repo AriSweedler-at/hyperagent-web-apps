@@ -482,3 +482,19 @@ Step 6 (de-bundle Fidice into modules, shipped dark):
   and names the nine browser globals the bundle uses under `no-undef`; import-x zones and `no-cycle`
   stay on and pass. `test/ratchet.test.ts` (listed under step 8 in MIGRATION) lands here and pins
   the `.js` count under `web/` at 39: the count exists from the first `.js` file.
+
+Step 7 (cut Fidice over):
+
+- `DEFAULT_LEGACY_PAGES` is `['gin-rummy']`; `legacy/fidice/index.html` is kept in place, unserved,
+  as the frozen source the oracle manifest, `extract-fidice-core.ts` and `debundle-fidice.ts` read
+  (and the generated module headers name). "Cutting a page over is deleting it from that list and
+  deleting its legacy file" therefore splits in two: the list entry goes at the flip, the file goes
+  in step 13 with the rest of `legacy/`.
+- `test/dist/dist-parity.test.ts` asserts the served fidice page is Vite's (module script beside the
+  page, `shared/assets/fidice-[hash].css`, no inline bundle), that every relative asset it references
+  is a file in the tree, that the legacy file is still present, and that the fidice output in dist/
+  and dist-next/ is byte-identical; `asset-urls` and `check-dist-paths` cover the fidice page in
+  both trees with no skips.
+- The Playwright project `next` runs `smoke.spec.ts` only: with fidice flipped, dist-next/ differs
+  from dist/ by the absence of gin-rummy alone, so fidice-online there duplicated `pages`/`proxy`.
+  The project and `npm run build:next` stay for the gin port (step 12).

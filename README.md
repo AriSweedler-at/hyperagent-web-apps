@@ -5,13 +5,13 @@ Single-file web apps built in Hyperagent, hosted on GitHub Pages.
 | App                          | Live                                                                  | Source                        |
 | ---------------------------- | --------------------------------------------------------------------- | ----------------------------- |
 | Gin Rummy                    | https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/ | `legacy/gin-rummy/index.html` |
-| Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/    | `legacy/fidice/index.html`    |
+| Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/    | `web/games/fidice/`           |
 
-Fidice's port lives in `web/games/fidice/` (the legacy bundle split into ES modules by `tools/legacy/debundle-fidice.ts`); it is built and tested on every run but not served yet (`docs/MIGRATION.md` step 6).
+Fidice is served from its port in `web/games/fidice/` (the legacy bundle split into ES modules by `tools/legacy/debundle-fidice.ts`, built by Vite into `dist/games/fidice/`) since `docs/MIGRATION.md` step 7; `legacy/fidice/index.html` stays in the repo, unserved, as the frozen source the oracle fixtures and the de-bundler are cut from. Rolling the cutover back is reverting that one commit (it puts `'fidice'` back in `DEFAULT_LEGACY_PAGES`).
 
 The same site is served at **https://games.sweedler.com** through the Cloudflare Worker in `infra/games-proxy/`: `games.sweedler.com/gin-rummy/` and `games.sweedler.com/fidice/` are the short URLs, `/games/<name>/` redirects to them, and `/shared/…` maps to the site's `shared/` directory (today `shared/ice.js`, later Vite's `shared/assets/`).
 
-Each app is still a fully self-contained `index.html`, frozen under `legacy/` and served byte-for-byte. Runtime dependencies are loaded from public CDNs (PeerJS for online play; Google Fonts in Fidice). The site is built by Vite into `dist/` (`npm run build`: `web/` is the Vite root, and the `legacyPassthrough` plugin in `vite.config.ts` copies each page listed in `LEGACY_PAGES` from `legacy/` over the output) and published to GitHub Pages by the `deploy` job in `.github/workflows/ci.yml` on every push to `main` whose `check` and `e2e` jobs pass; nothing generated is committed (see "Deploying"). The pages are being migrated to strict TypeScript under `web/`; `docs/ARCHITECTURE.md` is the target and `docs/MIGRATION.md` the ordered plan.
+Gin Rummy is still a fully self-contained `index.html`, frozen under `legacy/` and served byte-for-byte. Runtime dependencies are loaded from public CDNs (PeerJS for online play; Google Fonts in Fidice). The site is built by Vite into `dist/` (`npm run build`: `web/` is the Vite root, and the `legacyPassthrough` plugin in `vite.config.ts` copies each page listed in `LEGACY_PAGES` from `legacy/` over the output) and published to GitHub Pages by the `deploy` job in `.github/workflows/ci.yml` on every push to `main` whose `check` and `e2e` jobs pass; nothing generated is committed (see "Deploying"). The pages are being migrated to strict TypeScript under `web/`; `docs/ARCHITECTURE.md` is the target and `docs/MIGRATION.md` the ordered plan.
 
 ## Development
 
@@ -30,7 +30,7 @@ npm run hooks:verify   # confirm the hook wiring
 npm run format         # prettier --write on everything it checks
 npm run fixtures:legacy  # re-cut test/fixtures/legacy/*.cjs from the pages and re-pin MANIFEST.json
 npm run debundle:fidice  # re-split the legacy fidice bundle into web/games/fidice/** and re-pin its MANIFEST.json
-npm run test:e2e       # build both trees, then Playwright: every spec on both emulated origins against dist/, the fidice specs on dist-next/
+npm run test:e2e       # build both trees, then Playwright: every spec on both emulated origins against dist/, the smoke spec on dist-next/
 npm run serve          # GitHub Pages emulation: dist/ at http://127.0.0.1:4173/hyperagent-web-apps/
 npm run preview        # build, then serve
 npm run proxy:dev      # games.sweedler.com emulation: the real Worker at http://127.0.0.1:8787/ over :4173
@@ -40,7 +40,7 @@ Git hooks live in `.githooks/`: `pre-commit` chains to the owner's template hook
 
 ### Browser tests
 
-`npm run test:e2e` (first time: `npx playwright install chromium`) builds `dist/` and `dist-next/` and runs the specs in `e2e/` on three Playwright projects: `pages` (`dist/` under `/hyperagent-web-apps/` on `tools/serve-dist.ts`, like GitHub Pages), `proxy` (short URLs on `tools/proxy-dev.ts`, which runs the real `infra/games-proxy/worker.js` against the pages origin, like games.sweedler.com) and `next` (`dist-next/`, built with `LEGACY_PAGES=`, served like Pages on :4174; only the smoke and fidice-online specs, so the ported fidice page plays a real two-peer game before it is flipped). The config starts both servers and a local PeerServer (`peer` package, :9000); the online specs open a host and a guest context that meet there through the pages' `?peer=host:port` hook and take a STUN-only ICE list from `e2e/fixtures/e2e-ice.json` through `?ice=`, so no real network is needed. PeerJS and Google Fonts are answered from local copies. Each context gets a seeded `Math.random` (`e2e/browser/seed-random.js`), so deals and dice repeat. `E2E_BROKER=cloud npm run test:e2e -- --grep @online` plays the online specs through 0.peerjs.com instead; CI runs that as the advisory `broker` job. The HTML report lands in `playwright-report/` (`npx playwright show-report`). A bare `playwright test` (any project) needs both `npm run build` and `npm run build:next` to have run: the config starts a server for each tree, and `tools/serve-dist.ts` exits at once when its root has no `index.html`.
+`npm run test:e2e` (first time: `npx playwright install chromium`) builds `dist/` and `dist-next/` and runs the specs in `e2e/` on three Playwright projects: `pages` (`dist/` under `/hyperagent-web-apps/` on `tools/serve-dist.ts`, like GitHub Pages), `proxy` (short URLs on `tools/proxy-dev.ts`, which runs the real `infra/games-proxy/worker.js` against the pages origin, like games.sweedler.com) and `next` (`dist-next/`, built with `LEGACY_PAGES=`, served like Pages on :4174; only the smoke spec, on the pages that tree holds; a ported page plays here before it is flipped, as fidice did until step 7). The config starts both servers and a local PeerServer (`peer` package, :9000); the online specs open a host and a guest context that meet there through the pages' `?peer=host:port` hook and take a STUN-only ICE list from `e2e/fixtures/e2e-ice.json` through `?ice=`, so no real network is needed. PeerJS and Google Fonts are answered from local copies. Each context gets a seeded `Math.random` (`e2e/browser/seed-random.js`), so deals and dice repeat. `E2E_BROKER=cloud npm run test:e2e -- --grep @online` plays the online specs through 0.peerjs.com instead; CI runs that as the advisory `broker` job. The HTML report lands in `playwright-report/` (`npx playwright show-report`). A bare `playwright test` (any project) needs both `npm run build` and `npm run build:next` to have run: the config starts a server for each tree, and `tools/serve-dist.ts` exits at once when its root has no `index.html`.
 
 Two contexts in one browser connect over the machine's own addresses, so the online specs need local UDP loopback to those addresses. A Cloudflare WARP or similar tunnel that drops packets sent to its own interface address breaks that (the hermetic specs then time out at the data channel); CI runners and plain networks are fine.
 
@@ -67,9 +67,9 @@ web/index.html               landing page, the first Vite entry (no scripts); di
 web/public/.nojekyll         copied to dist/ so Pages serves dotfiles and folders untouched
 web/shared/lib/              shared pure TypeScript (result, rng, json decoders, roomCode, Clock types)
 web/shared/edge/             shared effects (ice, transport + fake, clock, storage, dom, fx)
-web/games/fidice/            Fidice as ES modules: index.html, theme.css, main.js, src/** (generated from the legacy bundle; not served yet)
+web/games/fidice/            Fidice as ES modules: index.html, theme.css, main.js, src/** (generated from the legacy bundle); built to dist/games/fidice/
 legacy/gin-rummy/index.html  Gin Rummy, verbatim; copied to dist/games/gin-rummy/ by the passthrough plugin
-legacy/fidice/index.html     Fidice, verbatim; copied to dist/games/fidice/
+legacy/fidice/index.html     Fidice, verbatim; not served since step 7, kept as the source of the oracle fixtures and the de-bundle
 legacy/shared/ice.js         ICE/TURN config loader shared by the games (window.HyperIce); copied to dist/shared/
 vite.config.ts               Vite root web/, base './', input = every web/**/index.html, legacyPassthrough
 dist/                        build output (gitignored): what GitHub Pages serves
