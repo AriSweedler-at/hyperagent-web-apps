@@ -299,5 +299,11 @@ parity and e2e gates.
   fidice output is byte-identical in dist/ and dist-next/). Its delete is deferred to step 13 with
   the rest of `legacy/`. The e2e project `next` keeps only `smoke.spec.ts` (fidice-online there would
   replay the same bytes `pages` and `proxy` now cover); it stays for the gin port. Rollback is still
-  one revert. The computed-style goldens and visual snapshots named above are not captured (see
-  step 3). See ARCHITECTURE "Deviations".
+  one revert, with one window the legacy page did not have: the served `games/fidice/index.html` is
+  unhashed and references `./app-[hash].js` and `../../shared/assets/fidice-[hash].css`, both origins
+  send `cache-control: max-age=600` on it, and `emptyOutDir: true` drops the previous hashes on
+  every build, so after a deploy that changes the hash (or the revert) a viewer holding the cached
+  page can get a 404 for the old module script and see an empty page for up to 10 minutes until they
+  reload. Closing it (carrying the previous deploy's `app-*.js` and `fidice-*.css` into `dist/`
+  before publishing) is deferred to step 13. The computed-style goldens and visual snapshots named
+  above are not captured (see step 3). See ARCHITECTURE "Deviations".
