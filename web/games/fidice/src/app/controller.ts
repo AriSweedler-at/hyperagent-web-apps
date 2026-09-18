@@ -9,14 +9,14 @@ import type { Clock, Timer } from '../../../../shared/lib/clock.ts';
 import { difficultyById } from '../bots/registry.ts';
 import { CATEGORY_INFO, groupByKey, handAt } from '../domain/hands.ts';
 import { suggestHands } from '../domain/search.ts';
-import type { Action, Category, PublicState, Rank, Seat } from '../domain/types.ts';
+import type { Action, PublicState, Rank, Seat } from '../domain/types.ts';
 import type { ClientSession } from '../net/client.ts';
 import type { HostOptions, HostSession } from '../net/host.ts';
 import type { Role } from '../net/protocol.ts';
 import type { HostEvents, Me, SessionEvents } from '../net/session.ts';
 import * as appJs from '../view/app.js';
-import * as ladderJs from '../view/screens/ladder.js';
-import * as spectatorJs from '../view/screens/spectator.js';
+import { catId, catKey, isOpen, mainMarks, rowId } from '../view/screens/ladder.ts';
+import { spectatorMarks } from '../view/screens/spectator.ts';
 import type {
   Dispatch,
   Intent,
@@ -33,17 +33,9 @@ import { emptyLadder, emptyPicker, initialUi, isMyTurn } from '../view/ui.ts';
 import { mount, type VNode } from '../view/vdom.ts';
 import type { Effects } from './effects.ts';
 
-// The screens are still the generated JavaScript in this phase (the next one types them): their
-// exports are bound to the shapes in view/types.ts here, at the one boundary the controller
-// crosses. `appView` needs a cast because its inferred tree is looser than vdom's `VNode` union.
+// view/app is still the generated JavaScript in this phase (the next one types it): `appView`
+// needs a cast because its inferred tree is looser than vdom's `VNode` union.
 const appView = appJs.appView as unknown as (ui: Ui, dispatch: Dispatch) => VNode;
-const catId: (ladder: LadderId, cat: Category) => string = ladderJs.catId;
-const catKey: (cat: Category) => string = ladderJs.catKey;
-const rowId: (ladder: LadderId, rank: Rank) => string = ladderJs.rowId;
-const isOpen: (l: Ladder, key: string, lo: Rank, hi: Rank, marks: Marks) => boolean =
-  ladderJs.isOpen;
-const mainMarks: (ui: Ui) => Marks = ladderJs.mainMarks;
-const spectatorMarks: (ui: Ui, game: PublicState) => Marks = spectatorJs.spectatorMarks;
 
 /** localStorage key of the player's name. */
 const NAME_KEY = 'fidice-name';

@@ -4,13 +4,13 @@
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
 import { cls, h } from './vdom.ts';
-import { menuScreen, nameScreen } from './screens/menu.js';
-import { lobbyScreen } from './screens/lobby.js';
-import { gameScreen } from './screens/table.js';
-import { ladderTab } from './screens/ladder.js';
-import { spectatorScreen } from './screens/spectator.js';
-import { rulesTab } from './screens/rules.js';
-import { configScreen } from './screens/botConfig.js';
+import { menuScreen, nameScreen } from './screens/menu.ts';
+import { lobbyScreen } from './screens/lobby.ts';
+import { gameScreen } from './screens/table.ts';
+import { ladderTab } from './screens/ladder.ts';
+import { spectatorScreen } from './screens/spectator.ts';
+import { rulesTab } from './screens/rules.ts';
+import { configScreen } from './screens/botConfig.ts';
 
   var TABS = [
     { tab: "play", label: "Play", tip: "Lobby, seats and the table" },

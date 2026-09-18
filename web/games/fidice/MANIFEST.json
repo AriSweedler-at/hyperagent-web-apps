@@ -173,11 +173,11 @@
       "endLine": 2538,
       "typed": true
     },
-    "src/view/screens/menu.js": {
+    "src/view/screens/menu.ts": {
       "section": "src/view/screens/menu.ts",
       "startLine": 2541,
       "endLine": 2682,
-      "sha256": "f3432230e2e827646de421ee40dccc26bd7b9acfc97176e6b122e233c49fa68a"
+      "typed": true
     },
     "src/view/ui.ts": {
       "section": "src/view/ui.ts",
@@ -185,47 +185,47 @@
       "endLine": 2718,
       "typed": true
     },
-    "src/view/screens/lobby.js": {
+    "src/view/screens/lobby.ts": {
       "section": "src/view/screens/lobby.ts",
       "startLine": 2721,
       "endLine": 2790,
-      "sha256": "bc1f2e81334cc41761738efd9b37a33a028761899e82b6578935363034c8815c"
+      "typed": true
     },
-    "src/view/screens/table.js": {
+    "src/view/screens/table.ts": {
       "section": "src/view/screens/table.ts",
       "startLine": 2793,
       "endLine": 3077,
-      "sha256": "a77ffe51c032518ed156892ce3beb652f1cf430334953f5daa72a51d69d14a2e"
+      "typed": true
     },
-    "src/view/screens/ladder.js": {
+    "src/view/screens/ladder.ts": {
       "section": "src/view/screens/ladder.ts",
       "startLine": 3080,
       "endLine": 3169,
-      "sha256": "8af5094b0690db672b03dd1d72bf49b742a00f3891cd84352033ceb0ee5c56b9"
+      "typed": true
     },
-    "src/view/screens/spectator.js": {
+    "src/view/screens/spectator.ts": {
       "section": "src/view/screens/spectator.ts",
       "startLine": 3172,
       "endLine": 3294,
-      "sha256": "db2bc0cdbab108860fa0503e7baced7f7bcb7e9adf9eb206db5bf5477560a0ac"
+      "typed": true
     },
-    "src/view/screens/rules.js": {
+    "src/view/screens/rules.ts": {
       "section": "src/view/screens/rules.ts",
       "startLine": 3297,
       "endLine": 3374,
-      "sha256": "2d9ae6ed9974e785b93b20e52d60a8be5f0c7fdf0ea07c828576e68002ec7d78"
+      "typed": true
     },
-    "src/view/screens/botConfig.js": {
+    "src/view/screens/botConfig.ts": {
       "section": "src/view/screens/botConfig.ts",
       "startLine": 3377,
       "endLine": 3475,
-      "sha256": "ed6448799b5a7fc6d907ac4e413b75fd273ed897b25bb81ac617ef4b442e6e71"
+      "typed": true
     },
     "src/view/app.js": {
       "section": "src/view/app.ts",
       "startLine": 3478,
       "endLine": 3526,
-      "sha256": "56f28b6a17bdc4c992e1d60eb54156898ccd4eb304ab6188a01d7db2de1c0f76"
+      "sha256": "3a9a1227b345247384d30d07a7ae3dcaf445aebedd051e4af0a80dc562bd259d"
     },
     "src/app/controller.ts": {
       "section": "src/app/controller.ts",
