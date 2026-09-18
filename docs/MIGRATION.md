@@ -307,3 +307,23 @@ parity and e2e gates.
   reload. Closing it (carrying the previous deploy's `app-*.js` and `fidice-*.css` into `dist/`
   before publishing) is deferred to step 13. The computed-style goldens and visual snapshots named
   above are not captured (see step 3). See ARCHITECTURE "Deviations".
+- Step 8, phase 1 (`domain/**`; `bots/**` and `net/protocol` follow): the eight domain modules are
+  typed in place (`git mv` `.js` -> `.ts`) with the shared shapes in `domain/types.ts` and the
+  cartesian enumeration plus its memo in `domain/probability.algorithms.ts`, re-exported from
+  `probability.ts` under the legacy names (`cache` included: the parity oracle reads it).
+  `domain/result.ts` re-exports `ok`/`err`/`Result` from `web/shared/lib/result.ts` by relative
+  path, since the `@shared/*` alias is not wired for Vite, vitest or the import-x resolver yet. Two
+  throws stay, each behind a commented `eslint-disable-next-line functional/no-throw-statements`:
+  `result.ts` `expect` (the host session's unwrap of impossible-Err paths; it leaves the domain with
+  `net/host` in step 9) and `hands.ts` `asRank` (the `RangeError` the parity suite pins). The hand
+  tables' totality (`HANDS[rank]`, `GROUP_BY_KEY.get`) is asserted once through `present<T>()` in
+  `hands.ts` instead of threading `| undefined` to every caller; runtime is unchanged. The debundle
+  tool takes an `IsPorted` predicate (`portedOnDisk`: a `.ts` beside where the `.js` would go): it
+  stops emitting that module, points the still-generated consumers at the `.ts` specifier and pins
+  only provenance (`typed: true`, no sha256) in `MANIFEST.json`; its test still checks every
+  generated file byte for byte and that no `.js` imports a missing module. The parity loader reads
+  the module list from the manifest, so the `current` leg imports the `.ts` files and the fixture
+  leg is untouched. `tsconfig.web.json` no longer excludes `domain/**` (a composite project must
+  list every `.ts` its `.js` edges import), so the domain is checked by both projects.
+  `JS_FILE_COUNT` is 31; coverage thresholds for `web/games/fidice/src/domain` are 90% lines,
+  functions and statements, 100% for its `*.algorithms.ts`. See ARCHITECTURE "Deviations".

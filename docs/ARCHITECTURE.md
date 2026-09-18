@@ -508,3 +508,25 @@ Step 7 (cut Fidice over):
 - The Playwright project `next` runs `smoke.spec.ts` only: with fidice flipped, dist-next/ differs
   from dist/ by the absence of gin-rummy alone, so fidice-online there duplicated `pages`/`proxy`.
   The project and `npm run build:next` stay for the gin port (step 12).
+
+Step 8 (type the Fidice pure core), phase 1: `domain/**`:
+
+- The `@shared/*` alias named in "Module boundaries" is not wired (Vite `resolve.alias`, vitest,
+  the import-x resolver, the tsconfigs), so `domain/result.ts` imports `web/shared/lib/result.ts`
+  by relative path. Wiring it is deferred until a second game imports the shared lib.
+- Two throws remain in the domain, each behind a commented `eslint-disable-next-line
+  functional/no-throw-statements`: `expect` in `domain/result.ts` (the host's unwrap of Err paths a
+  player cannot reach; it moves out with `net/host` in step 9) and `asRank` in `domain/hands.ts`
+  (the `RangeError` the parity suite pins). Neither is reachable from `apply`.
+- `domain/probability.algorithms.ts` holds `cartesian`, `survivalFor` and the memo `cache`: module
+  state the bundle kept and the oracle reads. The density is summed in a `for..of` over a local
+  array so the floating-point additions happen in the legacy order (a bot's choice can turn on the
+  last bit); `probability.ts` re-exports all three under the legacy names.
+- `tools/legacy/debundle-fidice.ts` takes an `IsPorted` predicate. A ported section is not
+  written; the remaining generated modules import it with a `.ts` specifier and `MANIFEST.json`
+  pins its provenance as `{ section, startLine, endLine, typed: true }` with no sha256.
+- `tsconfig.web.json` includes `domain/**` again: the `.js` view, bots and net modules import the
+  `.ts` domain, and a composite project must list every `.ts` its files import. The pure project
+  stays the guard (`lib: ES2023`, no DOM).
+- `JS_FILE_COUNT` is 31. Coverage thresholds: `web/games/fidice/src/domain/**` at 90% lines,
+  functions and statements; `*.algorithms.ts` there at 100%.
