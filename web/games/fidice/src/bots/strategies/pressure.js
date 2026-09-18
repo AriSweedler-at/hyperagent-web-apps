@@ -5,7 +5,7 @@
 
 import { BOTTOM_RANK, HAND_COUNT, TOP_RANK, asRank } from '../../domain/hands.ts';
 import { publicCupIndices, publicTableIndices } from '../../domain/publicState.ts';
-import { probabilityAtLeast } from '../../domain/probability.js';
+import { probabilityAtLeast } from '../../domain/probability.ts';
 import {
   bestKeep, floorBid, jitter, livesOf, nextSeat, oddsBidTrue, readSeat, rollFor,
   say, tableValues, truthfulTop, visibleRank,

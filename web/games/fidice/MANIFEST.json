@@ -65,17 +65,17 @@
       "endLine": 880,
       "sha256": "bf36541b6f2fd917f24d818734599b29329d8b95c2170cef99879e553df10f00"
     },
-    "src/domain/probability.js": {
+    "src/domain/probability.ts": {
       "section": "src/domain/probability.ts",
       "startLine": 883,
       "endLine": 903,
-      "sha256": "f0db9db62c36a3f8078b67d6a62040aa811952a28db62b2d1335f8cd73b2a3ee"
+      "typed": true
     },
     "src/bots/toolkit.js": {
       "section": "src/bots/toolkit.ts",
       "startLine": 906,
       "endLine": 972,
-      "sha256": "ea5caeb8b96bb6ac52011043f8a6b8a88254767f552802458a21cae3cdebe794"
+      "sha256": "ac8f02135d2743813feccacdc0351a49fc02fbe3b544dfb32aa23e85b1db3d9c"
     },
     "src/bots/strategies/classic.js": {
       "section": "src/bots/strategies/classic.ts",
@@ -87,7 +87,7 @@
       "section": "src/bots/strategies/profiler.ts",
       "startLine": 1038,
       "endLine": 1153,
-      "sha256": "794c0e726661e5854b5aee51bfbe0b51d72a67323da0d30ba4c953e3879e1cc8"
+      "sha256": "ff8e207533e1f15c7c29cc920c790360645404b758cd2da248cf9365acf36374"
     },
     "src/bots/strategies/trapper.js": {
       "section": "src/bots/strategies/trapper.ts",
@@ -105,7 +105,7 @@
       "section": "src/bots/strategies/pressure.ts",
       "startLine": 1522,
       "endLine": 1653,
-      "sha256": "543f338ad71d62e99bb9177101f8c3c4df641bb97c7c80b627e0eb6f89d6ec3b"
+      "sha256": "a758e0a2b719d3e46a599e492145dcb5ab683323ba08b5953f3347db5c025e4f"
     },
     "src/bots/strategies/learner.js": {
       "section": "src/bots/strategies/learner.ts",
@@ -155,11 +155,11 @@
       "endLine": 2219,
       "sha256": "bbd24f01d46133cb63496034c2cc13a7c2500745bca8bc9555e160dcd0ae8857"
     },
-    "src/domain/search.js": {
+    "src/domain/search.ts": {
       "section": "src/domain/search.ts",
       "startLine": 2222,
       "endLine": 2337,
-      "sha256": "35cc7fee8e8355a4ba0ea6fbf754d9afd219489e19ce6574e312464d483526b3"
+      "typed": true
     },
     "src/view/vdom.js": {
       "section": "src/view/vdom.ts",
@@ -195,7 +195,7 @@
       "section": "src/view/screens/table.ts",
       "startLine": 2793,
       "endLine": 3077,
-      "sha256": "390d57e5adab8d90db14d746ab071893d18d58fb2b072055261bc25d612e2f3e"
+      "sha256": "645ec75a58e316cb9d8d715adc879594964bd699545e61dac50be45a15e16a4a"
     },
     "src/view/screens/ladder.js": {
       "section": "src/view/screens/ladder.ts",
@@ -231,7 +231,7 @@
       "section": "src/app/controller.ts",
       "startLine": 3529,
       "endLine": 3958,
-      "sha256": "3a6b7ca5105af7147463e9a654c9611a7bed1aa0c0ba4be43ce7decad33de773"
+      "sha256": "267962d1a63697a6cc3040e35554f544725cb0234c59e0da239b6b68475c52a2"
     },
     "src/app/effects.js": {
       "section": "src/app/effects.ts",
@@ -243,7 +243,7 @@
       "section": "src/app/main.ts",
       "startLine": 4002,
       "endLine": 4030,
-      "sha256": "53fc368383fdd206626c207ca8e9521a80456a52688153c4aac1d5f2bd683972"
+      "sha256": "ddcecad7b3a9fcfe5d419295a6f8340a158a8a6f7308324409ba016fe5682870"
     }
   }
 }

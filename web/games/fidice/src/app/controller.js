@@ -5,7 +5,7 @@
 
 import { CATEGORY_INFO, groupByKey, handAt } from '../domain/hands.ts';
 import { difficultyById } from '../bots/registry.js';
-import { suggestHands } from '../domain/search.js';
+import { suggestHands } from '../domain/search.ts';
 import { mount } from '../view/vdom.js';
 import { emptyLadder, emptyPicker, initialUi, isMyTurn } from '../view/ui.js';
 import { catId, catKey, isOpen, mainMarks, rowId } from '../view/screens/ladder.js';

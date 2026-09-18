@@ -9,14 +9,26 @@ export default defineConfig({
     exclude: ['**/node_modules/**', 'test/dist/**', 'test/integration/**'],
     coverage: {
       provider: 'v8',
-      include: ['web/shared/lib/**/*.ts', 'web/shared/edge/**/*.ts', 'infra/games-proxy/worker.js'],
+      include: [
+        'web/shared/lib/**/*.ts',
+        'web/shared/edge/**/*.ts',
+        'web/games/fidice/src/domain/**/*.ts',
+        'infra/games-proxy/worker.js',
+      ],
       exclude: ['**/*.test.ts'],
       // The shared pure library is held at 100%; the edges (effects behind injected fakes) at
-      // 90% lines. Engine, domain, bots and *.algorithms.ts get theirs as they land
-      // (docs/ARCHITECTURE.md "Testing pyramid").
+      // 90% lines. The fidice domain (typed in docs/MIGRATION.md step 8) is at 90% lines, functions
+      // and statements, exercised by the parity suites; its *.algorithms.ts at 100% lines. Engine,
+      // bots and the rest get theirs as they land (docs/ARCHITECTURE.md "Testing pyramid").
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 90, functions: 90, statements: 90 },
+        'web/games/fidice/src/domain/**': { lines: 90, functions: 90, statements: 90 },
+        'web/games/fidice/src/domain/*.algorithms.ts': {
+          lines: 100,
+          functions: 100,
+          statements: 100,
+        },
       },
     },
   },
