@@ -4,7 +4,7 @@
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
 import { BOTTOM_RANK, GROUPS, TOP_RANK, groupTop } from '../../domain/hands.ts';
-import { publicCupIndices } from '../../domain/publicState.js';
+import { publicCupIndices } from '../../domain/publicState.ts';
 import {
   bestKeep, floorBid, livesOf, nextSeat, oddsAtLeast, oddsBidTrue, readSeat, rollFor,
   visibleRank,

@@ -10,7 +10,7 @@ import { expect, test } from 'vitest';
 const WEB = resolve(import.meta.dirname, '..', 'web');
 
 /** 38 de-bundled modules under web/games/fidice/src plus web/games/fidice/main.js. */
-const JS_FILE_COUNT = 36;
+const JS_FILE_COUNT = 33;
 
 const jsFilesUnderWeb = (): ReadonlyArray<string> =>
   readdirSync(WEB, { recursive: true, encoding: 'utf8' })

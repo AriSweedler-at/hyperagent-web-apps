@@ -7,7 +7,7 @@ import { faceCounts } from '../domain/dice.ts';
 import {
   BOTTOM_RANK, TOP_RANK, asRank, groupOf, groupTop, handAt, rankOf,
 } from '../domain/hands.ts';
-import { publicCupIndices, publicTableIndices } from '../domain/publicState.js';
+import { publicCupIndices, publicTableIndices } from '../domain/publicState.ts';
 import { expectedRank, probabilityAtLeast } from '../domain/probability.js';
 
   var tableValues = (r) => r.dice.flatMap((d) => !d.inCup && d.value !== null ? [d.value] : []);

@@ -4,8 +4,8 @@
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
 import { HAND_COUNT, TOP_RANK, handAt, rungOf, spokenName } from '../../domain/hands.ts';
-import { keepsScore, standings } from '../../domain/game.js';
-import { publicCupIndices, publicTableIndices } from '../../domain/publicState.js';
+import { keepsScore, standings } from '../../domain/game.ts';
+import { publicCupIndices, publicTableIndices } from '../../domain/publicState.ts';
 import { suggestHands } from '../../domain/search.js';
 import { cls, h } from '../vdom.js';
 import { diceRow, die, logView, seatOptions, seats, stepHeader } from '../components.js';

@@ -7,14 +7,14 @@ import { expect } from '../domain/result.ts';
 import { decodeClientMessage } from './protocol.js';
 import {
   HOST, apply, bySeat, newGame, scheduleAutoNext, stampLog, startGame,
-} from '../domain/game.js';
-import { redactFor } from '../domain/publicState.js';
+} from '../domain/game.ts';
+import { redactFor } from '../domain/publicState.ts';
 import { RANDOM_STRATEGY, describeProfile, profileFor } from '../bots/registry.js';
 import { decide, emptyMemories } from '../bots/brain.js';
 import {
   findSeat, hostSitsDown, hostStandsUp, makeBot, makeHuman, renameBot, seatPlayer, setBotProfile,
   setConnected, unseatPlayer, withSpectators,
-} from '../domain/lobby.js';
+} from '../domain/lobby.ts';
 
   var AUTO_NEXT_MS = 7e3;
   var HostSession = class {
