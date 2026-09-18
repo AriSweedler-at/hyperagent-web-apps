@@ -10,10 +10,11 @@ import { expect, test } from 'vitest';
 const WEB = resolve(import.meta.dirname, '..', 'web');
 
 /**
- * 38 de-bundled modules under web/games/fidice/src plus web/games/fidice/main.js, minus the 8
- * domain modules, the 11 bot modules and net/protocol step 8 typed in place (docs/MIGRATION.md step 8).
+ * 38 de-bundled modules under web/games/fidice/src plus web/games/fidice/main.js: the 8 domain
+ * modules, the 11 bot modules and net/protocol were typed in place in docs/MIGRATION.md step 8,
+ * the rest (net, app, the entry, view, assets) in step 9. Zero since then; step 15 drops allowJs.
  */
-const JS_FILE_COUNT = 19;
+const JS_FILE_COUNT = 0;
 
 const jsFilesUnderWeb = (): ReadonlyArray<string> =>
   readdirSync(WEB, { recursive: true, encoding: 'utf8' })

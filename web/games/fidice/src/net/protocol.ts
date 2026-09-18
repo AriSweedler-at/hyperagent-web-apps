@@ -8,14 +8,14 @@
 import { arrayOf, boolean, integer } from '../../../../shared/lib/json.ts';
 import { isRank } from '../domain/hands.ts';
 import { err, ok, type Result } from '../domain/result.ts';
-import type { Action, PublicState } from '../domain/types.ts';
+import type { Action, PublicState, Seat } from '../domain/types.ts';
 
 export type Role = 'player' | 'spectator';
 export type ClientMessage =
   | Readonly<{ t: 'hello'; role: Role; name: string | null; token: string | null }>
   | Readonly<{ t: 'act'; action: Action }>;
 /** The guest's own seat and token as the host sees them. */
-export type You = Readonly<{ seat: number | null; token: string | null; role: Role }>;
+export type You = Readonly<{ seat: Seat | null; token: string | null; role: Role }>;
 export type ServerMessage =
   | Readonly<{ t: 'state'; state: PublicState; you: You }>
   | Readonly<{ t: 'error' | 'info'; message: string }>;
@@ -96,7 +96,8 @@ const decodeServerMessage = (x: unknown): Result<ServerMessage, DecodeFailure> =
         // host. A field-by-field decoder is deferred (docs/MIGRATION.md "Deviations", step 8).
         state: state as PublicState,
         you: {
-          seat: typeof seat === 'number' ? seat : null,
+          // Any number passes, as in the bundle; the seat is trusted like the state above.
+          seat: typeof seat === 'number' ? (seat as Seat) : null,
           token: typeof token === 'string' ? token : null,
           role,
         },

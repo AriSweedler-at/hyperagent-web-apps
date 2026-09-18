@@ -83,7 +83,11 @@ Games never import each other. `infra/` shares only the pure `mapPath()` with te
 
 Documented test hooks that are part of the contract: `window.__gin`, `window.__fidice`,
 `window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
-`?ice=<url>` (ICE config override).
+`?ice=<url>` (ICE config override), and `globalThis.__peerCalls`: `web/shared/edge/transport.ts`
+pushes the arguments of every `new Peer(...)` it makes (`[id, options]` for a host, `[options]` for
+a guest, `options` the exact object handed to PeerJS) onto that array, creating it if absent, so a
+page that no longer exposes `window.Peer` can still be checked for the ICE config and broker
+override it used (the same shape `e2e/browser/record-peer.js` records for the legacy pages).
 
 ## Build and serve
 
@@ -549,3 +553,59 @@ Step 8 (type the Fidice pure core), phase 2: `bots/**` and `net/protocol.ts`:
   lines, functions and statements.
 - `.prettierignore` still skips `/web/games/fidice/src/` as a whole; the typed `.ts` files there
   are formatted with Prettier by hand until the ignore is narrowed to the generated `.js`.
+
+Step 9 (type the Fidice edges), phase 1: `net/**`, `app/**`, `main.ts`:
+
+- `net/session.ts` keeps the session-level transport shapes the legacy classes were written
+  against (`HostTransport`, `ClientTransport`, with `onInfo` optional) over the shared `Connection`;
+  `net/peerjs.ts` builds them from an injected `(ice) => Transport` factory, the ICE loader (or null)
+  and the Clock, and names the ICE types through `transport.ts` (`RealTransportOptions['ice']`,
+  `Connection['peerConnection']`) so `net/` still imports only the transport and clock edges. It is
+  in the `EDGES` lint glob (`net/{host,guest,client,session,peerjs}.ts`): it holds the deferred Peer.
+- PeerJS and the ICE loader load with the module bundle instead of as two classic `<script>`s
+  before it: the fidice page defines neither `window.Peer` nor `window.HyperIce` and no longer
+  requests unpkg or `../../shared/ice.js` (still copied for the legacy gin page). The ICE fetch
+  still starts on create/join and the Peer is created once `ice.load()` resolves, as before.
+- `globalThis.__peerCalls` records the argument list of every `new Peer(...)` (`[id, options]` /
+  `[options]`), the shape `e2e/browser/record-peer.js` already produced, so `peer-calls.ts` needs
+  no branch and fidice-online keeps its id assertion. The smoke spec checks `HyperIce`/`Peer`/
+  `shared/ice.js` on the legacy gin page only, and on fidice that `window.__fidice` booted and no
+  classic script was requested.
+- The protocol suite's "frame-by-frame equals wire goldens" is the differential oracle
+  `test/parity/fidice.sessions.test.ts`: legacy and typed sessions on one fake broker, traces
+  deep-equal (frames after `wireClone`, events, final state). `tsconfig.node.json` lists
+  `web/shared/edge/transport{,.fake}.ts` and the fidice `domain/`, `bots/`, `net/` for it.
+- `expect` stays in `domain/result.ts`, imported by `net/host.ts`: `test/parity/fidice.legacy.test.ts`
+  pins it on both legs. `view/types.ts` is a types-only module (not in the manifest) for `Ui` and
+  `Intent`; the controller binds the generated view's exports to those types until phase 2 types
+  `view/**`. `JS_FILE_COUNT` is 12.
+
+Step 9 (type the Fidice edges), phase 2: `view/**` and `assets/diceImages`:
+
+- `view/vdom.ts` owns the tree types (`VNode`, `Props`, `Child`, `Handlers`) and the reconciler;
+  `view/types.ts` stays the types-only module for `Ui` and `Intent` (the types did not move into
+  `view/ui.ts` as phase 1 announced: beside `domain/types.ts` and `bots/types.ts` is the smaller
+  diff). Handlers receive `Readonly<Event>`s; the `e.target` casts sit in vdom's `targetValue`,
+  `targetChecked` and `blurTarget`, so the screens hold no casts.
+- `domain/game.ts` `keepsScore`, `isOut` and `standings` take `PublicState` (type only): the view
+  calls them on the redacted state a guest holds, and a `State` is a `PublicState`.
+- No jsdom: `web/shared/edge/dom.fake.ts` is the structural DOM the view tests render into (the
+  members the reconciler touches, bubbling listeners, `value`/`checked`/`disabled`/`selected` on
+  the tags a browser gives them, a deterministic `serialize`). The `ui/`/`view/` import zone excepts
+  it, as the `net/` zone excepts `transport.fake.ts`. The per-screen tests live beside the screens
+  (the web project has the DOM lib); the oracle `test/parity/fidice.view.test.ts` imports the typed
+  view dynamically by path, as `fidice.modules.test.ts` does, and evaluates the legacy `src/view/*`
+  sections with node:vm over the pinned legacy core. `tsconfig.node.json` lists `dom.fake.ts` and
+  the DOM-free `view/{types,ui,scenarios}.ts` for it.
+- `view/scenarios.ts` is the one catalogue of representative states (built through the domain with
+  a seeded rng) that both the render tests and the oracle use; `view/render.fake.ts` mounts a state
+  and records intents. Coverage threshold: `web/games/fidice/src/view/**` at 90% lines, functions
+  and statements. Follow-up: `net/**` and `app/**` join `coverage.include` with the same 90%
+  threshold each (`main.ts` stays out: it constructs the real adapters); `app/effects.test.ts` pins
+  the storage fallback rules and `app/controller.test.ts` drives the reducer over fake effects, a
+  `fakeClock`, `dom.fake.ts` and recording session stubs (the reducer's `handle` is reached through
+  a test-only cast; the screens' render tests own the handler wiring). It pins two legacy defects
+  by name: the single toast timer and `ladder.showBid` keeping the current tab when there is a bid.
+- `JS_FILE_COUNT` is 0; the debundle tool writes the page, the stylesheet and the manifest only
+  and remains the audit of the bundle-to-module map. `allowJs` leaves `tsconfig.web.json` in
+  step 15, as planned.

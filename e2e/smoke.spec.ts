@@ -1,5 +1,7 @@
 // Every page on both emulated origins (and the ported pages on the dark `next` build): the right
-// title, shared/ice.js and PeerJS loaded, zero uncaught exceptions and zero failed requests outside
+// title, the page's networking in place (the legacy gin page: shared/ice.js and PeerJS loaded as
+// classic scripts; the typed fidice page: its controller booted, PeerJS and ICE arrive bundled and
+// no classic script is requested), zero uncaught exceptions and zero failed requests outside
 // the allowlist (e2e/fixtures/offline.ts). The landing page's card links must also resolve on the
 // origin they are clicked from: on the proxy that means the Worker's /games/XXX -> /XXX redirect;
 // on `next` only the links to pages dist-next/ holds are followed.
@@ -13,15 +15,26 @@ PAGES.forEach((name) => {
     await page.goto(pagePath(project, name));
     await expect(page).toHaveTitle(EXPECTED_TITLES[name]);
     await page.waitForLoadState('networkidle');
-    if (name !== 'landing') {
-      await expect(page.locator('#app')).toBeVisible();
+    if (name !== 'landing') await expect(page.locator('#app')).toBeVisible();
+    const ice = watched.responses().filter((response) => response.url.endsWith('shared/ice.js'));
+    if (name === 'gin-rummy') {
       await expect.poll(() => page.evaluate<string>('typeof window.HyperIce')).toBe('object');
       await expect.poll(() => page.evaluate<string>('typeof Peer')).toBe('function');
-      const ice = watched.responses().filter((response) => response.url.endsWith('shared/ice.js'));
       expect(
         ice.map((response) => response.status),
         'shared/ice.js response',
       ).toEqual([200]);
+    }
+    if (name === 'fidice') {
+      // docs/MIGRATION.md step 9: no classic scripts; the documented hook shows the boot finished.
+      await expect.poll(() => page.evaluate<string>('typeof window.__fidice')).toBe('object');
+      expect(await page.evaluate<string>('typeof Peer')).toBe('undefined');
+      expect(await page.evaluate<string>('typeof window.HyperIce')).toBe('undefined');
+      expect(ice, 'shared/ice.js must not be requested').toEqual([]);
+      expect(
+        watched.responses().filter((response) => response.url.includes('peerjs.min.js')),
+        'the PeerJS CDN bundle must not be requested',
+      ).toEqual([]);
     }
     expect(watched.errors(), 'uncaught exceptions').toEqual([]);
     expect(watched.failures(), 'failed requests').toEqual([]);

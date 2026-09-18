@@ -224,6 +224,27 @@ const wrapPeer = (peer: Readonly<Peer>): PeerHandle => {
   };
 };
 
+/**
+ * Test hook (docs/ARCHITECTURE.md "Documented test hooks"): the arguments of every `new Peer(...)`
+ * this adapter makes are pushed onto `globalThis.__peerCalls` (created if absent), `[id, options]`
+ * for a host and `[options]` for a guest, `options` being the very object handed to PeerJS. The
+ * Playwright harness reads it to assert that the `?ice=` configuration and the `?peer=` override
+ * reached PeerJS on a page that no longer exposes `window.Peer` (e2e/fixtures/peer-calls.ts); it
+ * is the same shape e2e/browser/record-peer.js records for the legacy pages. Additive: nothing
+ * reads it back here.
+ */
+const recordPeerCall = (args: ReadonlyArray<unknown>): void => {
+  const g = globalThis as { __peerCalls?: unknown[] };
+  g.__peerCalls ??= [];
+  g.__peerCalls.push(args);
+};
+
+const newPeer = (id: string | undefined, opts: PeerJsOptions): Peer => {
+  // Same call shapes as the legacy pages: (id, options) for a host, (options) for a guest.
+  recordPeerCall(id === undefined ? [opts] : [id, opts]);
+  return id === undefined ? new Peer(opts) : new Peer(id, opts);
+};
+
 export type RealTransportOptions = Readonly<{
   /** What `ice.load()` resolved to, or null when the loader was unavailable. */
   ice: IceResult | null;
@@ -236,8 +257,5 @@ export type RealTransportOptions = Readonly<{
 /** PeerJS 1.5.4 as a Transport. Constructed in main.ts only. */
 export const realTransport = (options: RealTransportOptions): Transport => {
   const opts = peerOptionsFor(options.ice, peerOverrideFrom(options.search), options.debug ?? 0);
-  return {
-    // Same call shapes as the legacy pages: (id, options) for a host, (options) for a guest.
-    open: (id) => wrapPeer(id === undefined ? new Peer(opts) : new Peer(id, opts)),
-  };
+  return { open: (id) => wrapPeer(newPeer(id, opts)) };
 };

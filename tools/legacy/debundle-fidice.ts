@@ -18,7 +18,12 @@
 // The last section (`src/app/main.ts`) becomes web/games/fidice/main.js and imports every other
 // module in bundle order (named where it uses one, side-effect only otherwise), so the ESM
 // evaluation order is the bundle order whenever the recovered graph points backwards. The page's
-// markup and its two `<style>` blocks are cut into index.html and theme.css beside it. Run:
+// markup and its two `<style>` blocks are cut into index.html and theme.css beside it. Once the
+// entry is typed (web/games/fidice/main.ts, docs/MIGRATION.md step 9) the page boots `./main.ts`
+// and loads neither the PeerJS CDN `<script>` nor `../../shared/ice.js`: both now arrive bundled
+// through web/shared/edge (main.ts constructs the adapters). With every section typed (the end of
+// step 9) the tool writes index.html, theme.css and the manifest only; it remains the audit that
+// maps each typed module to its bundle lines and recovers the legacy import graph. Run:
 //   node --experimental-strip-types tools/legacy/debundle-fidice.ts     (npm run debundle:fidice)
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, posix, resolve } from 'node:path';
@@ -37,10 +42,12 @@ const IIFE_OPEN = '(() => {';
 const IIFE_CLOSE = '})();';
 const MARKER = /^ {2}\/\/ (src\/[\w./-]+)\.ts$/;
 const ENTRY_SECTION = 'src/app/main';
-const ENTRY_FILE = 'main.js';
+const ENTRY_STEM = 'main';
 const ICE_SCRIPT = '<script src="../../shared/ice.js"></script>';
+const PEERJS_SCRIPT = '<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>';
 const STYLESHEET_LINK = '<link rel="stylesheet" href="./theme.css">';
-const MODULE_SCRIPT = '<script type="module" src="./main.js"></script>';
+const moduleScript = (entryFile: string): string =>
+  `<script type="module" src="./${entryFile}"></script>`;
 const NAMES_PER_LINE = 8;
 const LINE_WIDTH = 100;
 
@@ -115,16 +122,19 @@ export type IsPorted = (name: string) => boolean;
 
 const NONE_PORTED: IsPorted = () => false;
 
+/** Where a section lives under web/games/fidice, extension aside: the entry sits beside index.html. */
+const stemFor = (name: string): string => (name === ENTRY_SECTION ? ENTRY_STEM : name);
+
 /** The checked-in answer: docs/MIGRATION.md step 8 types the modules in place, `.js` -> `.ts`. */
 export const portedOnDisk: IsPorted = (name) =>
-  existsSync(resolve(REPO_ROOT, FIDICE_DIR, `${name}.ts`));
+  existsSync(resolve(REPO_ROOT, FIDICE_DIR, `${stemFor(name)}.ts`));
 
 /**
  * Output path of a section. A typed module is `<name>.ts`: the tool no longer writes it, but the
  * modules still importing it need the `.ts` specifier and the manifest still pins its provenance.
  */
 const fileFor = (name: string, isPorted: IsPorted): string =>
-  name === ENTRY_SECTION ? ENTRY_FILE : `${name}.${isPorted(name) ? 'ts' : 'js'}`;
+  `${stemFor(name)}.${isPorted(name) ? 'ts' : 'js'}`;
 
 export const splitSections = (
   lines: ReadonlyArray<string>,
@@ -318,6 +328,8 @@ const cutMarkup = (
   lines: ReadonlyArray<string>,
   start: number,
   close: number,
+  entry: Section,
+  isPorted: IsPorted,
 ): Readonly<{ html: string; css: string }> => {
   const headEnd = findLine(lines, (line) => line === '</head>', '</head>');
   const styleOpens = lines.flatMap((line, i) => (i < headEnd && line === '<style>' ? [i] : []));
@@ -333,15 +345,22 @@ const cutMarkup = (
   if (lines.slice(close + 1, scriptClose).some((line) => line.trim() !== ''))
     throw new Error(`unexpected text between ${IIFE_CLOSE} and </script>`);
   const iceLine = findLine(lines, (line) => line === ICE_SCRIPT, ICE_SCRIPT);
+  const peerLine = findLine(lines, (line) => line === PEERJS_SCRIPT, PEERJS_SCRIPT);
+  // With the entry typed, PeerJS and the ICE loader come bundled (web/shared/edge): the two
+  // classic scripts go. Until then the ICE script is kept, marked so Vite neither bundles nor
+  // warns about it.
+  const bundledEdges = isPorted(entry.name);
+  const head = lines.slice(0, firstStyle).flatMap((line, i) => {
+    if (i === peerLine) return bundledEdges ? [] : [line];
+    if (i === iceLine)
+      return bundledEdges ? [] : [ICE_SCRIPT.replace('<script ', '<script vite-ignore ')];
+    return [line];
+  });
   const html = [
-    ...lines
-      .slice(0, firstStyle)
-      .map((line, i) =>
-        i === iceLine ? ICE_SCRIPT.replace('<script ', '<script vite-ignore ') : line,
-      ),
+    ...head,
     STYLESHEET_LINK,
     ...lines.slice(lastStyle + 1, scriptOpen),
-    MODULE_SCRIPT,
+    moduleScript(entry.file),
     ...lines.slice(scriptClose + 1),
   ].join('\n');
   const cssHeader = [
@@ -428,7 +447,9 @@ export const debundleFidice = (page: string, isPorted: IsPorted = NONE_PORTED): 
     return { section, imports, exports, text: moduleText(section, imports, exports) };
   });
 
-  const { html, css } = cutMarkup(lines, start, close);
+  const entrySection = sections[entry];
+  if (entrySection === undefined) throw new Error('no entry section');
+  const { html, css } = cutMarkup(lines, start, close, entrySection, isPorted);
   // A typed module is not written: its .ts is hand-typed from the same body (step 8).
   const generated = modules.filter((m) => !isPorted(m.section.name));
   const files = new Map<string, string>([

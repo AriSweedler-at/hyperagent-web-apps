@@ -6,16 +6,16 @@
   "sourceSha256": "7cb363b9005289b1e52632fbcecfae41cb79fa558959b013965d4bd863ef2776",
   "files": {
     "index.html": {
-      "sha256": "70f8ab3c73dd65be941abd767e7790211157b5ae8dad591812080acb1a3450e1"
+      "sha256": "a6438febffb0f930a7f4eab98d117aa6596c0d4329591abc7efcb186397b0e3f"
     },
     "theme.css": {
       "sha256": "12363c3fb618eebda271ef26f2ebb4e237de080c944ed03c7ac0f5541907a5cf"
     },
-    "src/assets/diceImages.js": {
+    "src/assets/diceImages.ts": {
       "section": "src/assets/diceImages.ts",
       "startLine": 374,
       "endLine": 381,
-      "sha256": "77969efc0a46a75bdf41d0110f30664319237c08c12d09a674fc2b88e4dfd77e"
+      "typed": true
     },
     "src/domain/dice.ts": {
       "section": "src/domain/dice.ts",
@@ -41,11 +41,11 @@
       "endLine": 607,
       "typed": true
     },
-    "src/net/client.js": {
+    "src/net/client.ts": {
       "section": "src/net/client.ts",
       "startLine": 610,
       "endLine": 663,
-      "sha256": "a94b47c52f9110a7dc328af238bc03c3eb31c3b9f7860473ed20405ec5439769"
+      "typed": true
     },
     "src/domain/game.ts": {
       "section": "src/domain/game.ts",
@@ -137,23 +137,23 @@
       "endLine": 1889,
       "typed": true
     },
-    "src/net/host.js": {
+    "src/net/host.ts": {
       "section": "src/net/host.ts",
       "startLine": 1892,
       "endLine": 2108,
-      "sha256": "92ef5afbb9571b677684b43b02c31978c0ab85ee85d0d9e965cecfb42e6589ad"
+      "typed": true
     },
-    "src/net/peerjs.js": {
+    "src/net/peerjs.ts": {
       "section": "src/net/peerjs.ts",
       "startLine": 2111,
       "endLine": 2212,
-      "sha256": "fcd1759f4bd0ac7f0c708434ea1fd320dba20918edce866b0fcf6a1b31b99a8d"
+      "typed": true
     },
-    "src/net/session.js": {
+    "src/net/session.ts": {
       "section": "src/net/session.ts",
       "startLine": 2215,
       "endLine": 2219,
-      "sha256": "bbd24f01d46133cb63496034c2cc13a7c2500745bca8bc9555e160dcd0ae8857"
+      "typed": true
     },
     "src/domain/search.ts": {
       "section": "src/domain/search.ts",
@@ -161,89 +161,89 @@
       "endLine": 2337,
       "typed": true
     },
-    "src/view/vdom.js": {
+    "src/view/vdom.ts": {
       "section": "src/view/vdom.ts",
       "startLine": 2340,
       "endLine": 2425,
-      "sha256": "f4c5cd1299f1c2fbc9df8a5d669795ab324d4196817a73ecb7f852d19bdafecf"
+      "typed": true
     },
-    "src/view/components.js": {
+    "src/view/components.ts": {
       "section": "src/view/components.ts",
       "startLine": 2428,
       "endLine": 2538,
-      "sha256": "2b14ea1744e624fb0dc8dfbe5e5649d3379d59436a1fda2083915cb41ce15c94"
+      "typed": true
     },
-    "src/view/screens/menu.js": {
+    "src/view/screens/menu.ts": {
       "section": "src/view/screens/menu.ts",
       "startLine": 2541,
       "endLine": 2682,
-      "sha256": "82d9c01add36db694c56526370877f174187341b68a2d390f9d93af9e95421c8"
+      "typed": true
     },
-    "src/view/ui.js": {
+    "src/view/ui.ts": {
       "section": "src/view/ui.ts",
       "startLine": 2685,
       "endLine": 2718,
-      "sha256": "ccca4f1798232307ffb54fac302a2512410481b79f8235d09e61d59ae7b67b26"
+      "typed": true
     },
-    "src/view/screens/lobby.js": {
+    "src/view/screens/lobby.ts": {
       "section": "src/view/screens/lobby.ts",
       "startLine": 2721,
       "endLine": 2790,
-      "sha256": "a13781df7486c15179be9ef8b35afacbe54f500fd9f08042458ace07ee75299d"
+      "typed": true
     },
-    "src/view/screens/table.js": {
+    "src/view/screens/table.ts": {
       "section": "src/view/screens/table.ts",
       "startLine": 2793,
       "endLine": 3077,
-      "sha256": "645ec75a58e316cb9d8d715adc879594964bd699545e61dac50be45a15e16a4a"
+      "typed": true
     },
-    "src/view/screens/ladder.js": {
+    "src/view/screens/ladder.ts": {
       "section": "src/view/screens/ladder.ts",
       "startLine": 3080,
       "endLine": 3169,
-      "sha256": "64be0506f575f3b38c8710bbdd9788dfa704b1f545d54a56c05b57a95c59ce6f"
+      "typed": true
     },
-    "src/view/screens/spectator.js": {
+    "src/view/screens/spectator.ts": {
       "section": "src/view/screens/spectator.ts",
       "startLine": 3172,
       "endLine": 3294,
-      "sha256": "b0e4cbbf8d99e0bf2f1095a11af23f0f5d37834635ab09ceffe6d50b12ebff88"
+      "typed": true
     },
-    "src/view/screens/rules.js": {
+    "src/view/screens/rules.ts": {
       "section": "src/view/screens/rules.ts",
       "startLine": 3297,
       "endLine": 3374,
-      "sha256": "bb1bae4082da6dd818b32ccd97bec0da20bdbdd066ca21896623331ef57a2c39"
+      "typed": true
     },
-    "src/view/screens/botConfig.js": {
+    "src/view/screens/botConfig.ts": {
       "section": "src/view/screens/botConfig.ts",
       "startLine": 3377,
       "endLine": 3475,
-      "sha256": "51f0932c9bb1f7fe12968f54e0623b2cb3c7b425dcf315f74759a53a08e2bb92"
+      "typed": true
     },
-    "src/view/app.js": {
+    "src/view/app.ts": {
       "section": "src/view/app.ts",
       "startLine": 3478,
       "endLine": 3526,
-      "sha256": "9a7126bce7d44aaa121fd2643b8484cfe33c9bdbc468284737e403f56ea8ba47"
+      "typed": true
     },
-    "src/app/controller.js": {
+    "src/app/controller.ts": {
       "section": "src/app/controller.ts",
       "startLine": 3529,
       "endLine": 3958,
-      "sha256": "0468691075746e4c7f008683dd5d1d7147a90ba71c38aaa80907c5020879ae34"
+      "typed": true
     },
-    "src/app/effects.js": {
+    "src/app/effects.ts": {
       "section": "src/app/effects.ts",
       "startLine": 3961,
       "endLine": 3999,
-      "sha256": "cca941aaefcab14771d3f79aceff2f54bc42eb03f0918024a0f35f16f48a14cb"
+      "typed": true
     },
-    "main.js": {
+    "main.ts": {
       "section": "src/app/main.ts",
       "startLine": 4002,
       "endLine": 4030,
-      "sha256": "c26a90d8fcda8d9f50ea235248b4779976183ce51f19931bb249293bb0e95e58"
+      "typed": true
     }
   }
 }

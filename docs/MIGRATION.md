@@ -353,3 +353,74 @@ parity and e2e gates.
   still skips `/web/games/fidice/src/` whole, so the typed `.ts` there are formatted by running
   Prettier on them by hand; narrowing the ignore to the generated `.js` means reformatting four
   phase 1 domain files and is left for step 9. See ARCHITECTURE "Deviations".
+- Step 9, phase 1 (`net/**`, `app/**`, `main.ts`; `view/**` follows): the five edge modules and the
+  entry are typed in place (`git mv` `.js` -> `.ts`, `JS_FILE_COUNT` 12). `net/session.ts` holds the
+  session-level shapes (`HostTransport`, `ClientTransport`, `SessionEvents`, `Me`) over the shared
+  `Connection`, and keeps `realClock` as a re-export of `web/shared/edge/clock.ts` (the legacy
+  section's one binding; `main.ts` imports the clock from the edge directly). `net/peerjs.ts` is the
+  adapter over `web/shared/edge/transport.ts`: it takes a Transport factory `(ice) => Transport` and
+  the ICE loader (or null) by injection, so `main.ts` constructs `realTransport({ ice, search,
+  debug: 1 })` and `createIce(browserIceDeps())`; it names the ICE types through `transport.ts`
+  rather than importing `ice.ts`, so the `net/` import zone is unchanged, and it joins the edge lint
+  profile (`EDGES` now lists `net/{host,guest,client,session,peerjs}.ts`) because it holds the
+  deferred Peer. The load-timing change: PeerJS and the ICE loader arrive with the module bundle
+  (`./main.ts`, 216 KB minified) instead of as two classic `<script>`s ahead of it, so
+  `index.html` drops the unpkg CDN request and `../../shared/ice.js`, defines neither `window.Peer`
+  nor `window.HyperIce`, and paints without waiting on unpkg; the ICE fetch still starts when a
+  table is created or joined, and the Peer is still created only once `ice.load()` resolves.
+  `legacy/shared/ice.js` is still copied into dist for the legacy gin page. `expect` stays in
+  `domain/result.ts` (the parity suite pins it on both legs) and `net/host.ts` imports it;
+  `protocol.ts` types `You.seat` as `Seat | null` (same runtime check). The e2e hook for the ICE
+  assertion is `globalThis.__peerCalls` (see ARCHITECTURE "Documented test hooks"); it records the
+  argument list of each `new Peer(...)`, not the options object alone, so `e2e/fixtures/peer-calls.ts`
+  decodes both pages without a branch and fidice-online keeps asserting the host's id; the smoke spec
+  checks the legacy globals on gin only and, on fidice, that `window.__fidice` booted and no classic
+  script was requested. The differential oracle `test/parity/fidice.sessions.test.ts` replaces the
+  never-recorded wire goldens: both legs run over `transport.fake.ts` (the legacy leg with
+  `globalThis.Peer`/`HyperIce` shimmed onto it), and their frames, events and final state are
+  deep-equal across a full table (open, player and spectator hello, five refusals incl. two
+  malformed frames, start, roll/bid/peek/pull/roll/bid/call, auto-next, token reconnect, refused
+  addBot, close), lobby management, a four-bot autostart game to `over`, ICE with and without a
+  relay (and the `onError` fallback), and two failures (unknown code, 12 s connect timeout); two
+  legacy quirks it names: a guest closing its own session hears "The host closed the table.", and
+  a wrong code reports `onClosed` twice. `tsconfig.node.json` lists the transport edge and the
+  fidice pure core plus `net/` so that test imports statically. `view/types.ts` (types only, not
+  in the manifest) holds `Ui`, `Intent` and friends; `app/controller.ts` binds the still-generated
+  view exports to them at its import boundary (typed consts; `initialUi` alone is cast). Fidice
+  used no wake lock, vibration or audio, so `fx.ts` is not wired. `tools/legacy/debundle-fidice.ts`
+  treats the entry as typed when `main.ts` exists and emits the page accordingly (no classic
+  scripts, `./main.ts`); the dist guards follow (dist-next/ has no ice.js load at all). The manual
+  broker game and the CI two-peer run are the remaining gates for the PR body. See ARCHITECTURE
+  "Deviations".
+- Step 9, phase 2 (`view/**`, `assets/diceImages`): the eleven view modules and the dice images
+  are typed in place (`git mv` `.js` -> `.ts`); `JS_FILE_COUNT` is 0, every `MANIFEST.json` entry
+  is `typed: true`, and `tools/legacy/debundle-fidice.ts` now writes `index.html`, `theme.css` and
+  the manifest only (still the audit that maps each module to its bundle lines and recovers the
+  legacy import graph; `test/tools/debundle-fidice.test.ts` asserts every section is ported). The
+  eslint override for the generated `.js` and the two `.prettierignore` entries are retired;
+  `allowJs` stays in `tsconfig.web.json` until step 15 as planned. `view/types.ts` stays the
+  types-only module (phase 1 said the types would move into `view/ui.ts`; keeping them beside
+  `domain/types.ts` and `bots/types.ts` is the smaller diff); `VNode`, `Props`, `Child` and the
+  `Handlers` map live in `view/vdom.ts`, whose three `target*` helpers hold the `e.target` casts
+  so every handler is written against a `Readonly<Event>`. Four type-driven edits, each commented
+  in place and unreachable in the bundle's states: `botConfig`'s seat title reads `ui.game` through
+  an optional chain, the minimum raise is `asRank(current + 1)`, `menu`'s `titleFor` is an if-chain
+  over the pending kind, and `domain/game.ts` `keepsScore`/`isOut`/`standings` accept `PublicState`
+  (a `State` is one; the view calls them on redacted state). esbuild's suffixed names (`nameAt2`,
+  `bidCard2`, `i2`, `p2`, `title2`) are tidied. Tests: `web/shared/edge/dom.fake.ts` is a
+  structural DOM (parent, live children, attributes, bubbling listeners, the four form properties
+  on the tags a browser gives them, a deterministic `serialize`); `view/vdom.test.ts` pins the
+  reconciler; `view/scenarios.ts` (DOM-free, listed in `tsconfig.node.json` with `view/types.ts`,
+  `view/ui.ts` and `dom.fake.ts`) builds 41 representative states through the domain itself and
+  the per-screen tests beside the screens render them through `view/render.fake.ts` and pin the
+  ids, classes, text and intents the e2e specs and `theme.css` rely on; the oracle
+  `test/parity/fidice.view.test.ts` evaluates the page's own `src/view/*` sections (node:vm, bound
+  to the pinned legacy core) beside the typed view, imported dynamically by path as the pure
+  modules are (the node project has no DOM lib), and deep-equals the serialized trees and, for
+  every listener of every element, the dispatched intents, `preventDefault` and `stopPropagation`;
+  a re-render walk through nine states patches to the same trees on both legs. The `ui/`/`view/`
+  eslint zone excepts `dom.fake.ts` as `net/` excepts `transport.fake.ts`. Coverage: `view/**` at
+  90% lines, functions and statements (actual 99.6/99.6/98); as a follow-up, `net/**` and `app/**`
+  are included and gated at 90% too (`app/{effects,controller}.test.ts`; actual net 95.9/93.2/92.2,
+  app 99.7/98.5/99.1), `main.ts` excluded as the boot. The PeerJS load-timing change and the
+  remaining gates are as phase 1 recorded. See ARCHITECTURE "Deviations".
