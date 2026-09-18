@@ -12,6 +12,8 @@
   // test/parity/fidice.view.test.ts, which renders the typed and the legacy view of every
   // catalogued state into the fake DOM; the screens themselves (DOM types) are imported there
   // dynamically, as the pure modules are.
+  // The gin engine is listed since docs/MIGRATION.md step 10: test/parity runs it beside the
+  // legacy fixture as the `current` leg (tsconfig.pure.json remains its guard).
   // infra/games-proxy/worker.js is listed (allowJs, its JSDoc supplies the types) because
   // tools/proxy-dev.ts runs its default export; checkJs stays off: the JS config lints it.
   "extends": "./tsconfig.base.json",
@@ -44,6 +46,7 @@
     "web/games/fidice/src/view/types.ts",
     "web/games/fidice/src/view/ui.ts",
     "web/games/fidice/src/view/scenarios.ts",
+    "web/games/gin-rummy/src/engine/**/*.ts",
     "infra/games-proxy/worker.js"
   ],
   "exclude": ["test/fixtures/legacy/*.cjs"]
