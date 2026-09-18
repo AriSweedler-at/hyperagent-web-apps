@@ -14,7 +14,7 @@ import type { ClientSession } from '../net/client.ts';
 import type { HostOptions, HostSession } from '../net/host.ts';
 import type { Role } from '../net/protocol.ts';
 import type { HostEvents, Me, SessionEvents } from '../net/session.ts';
-import * as appJs from '../view/app.js';
+import { appView } from '../view/app.ts';
 import { catId, catKey, isOpen, mainMarks, rowId } from '../view/screens/ladder.ts';
 import { spectatorMarks } from '../view/screens/spectator.ts';
 import type {
@@ -30,12 +30,8 @@ import type {
   UiRole,
 } from '../view/types.ts';
 import { emptyLadder, emptyPicker, initialUi, isMyTurn } from '../view/ui.ts';
-import { mount, type VNode } from '../view/vdom.ts';
+import { mount } from '../view/vdom.ts';
 import type { Effects } from './effects.ts';
-
-// view/app is still the generated JavaScript in this phase (the next one types it): `appView`
-// needs a cast because its inferred tree is looser than vdom's `VNode` union.
-const appView = appJs.appView as unknown as (ui: Ui, dispatch: Dispatch) => VNode;
 
 /** localStorage key of the player's name. */
 const NAME_KEY = 'fidice-name';

@@ -1,9 +1,8 @@
 // The UI state and the intents (docs/MIGRATION.md step 9): the shapes app/controller.ts reduces
-// over, recovered from view/ui.js (`initialUi`), the screens' `dispatch` calls and the
-// controller's `handle` switch. The view modules themselves are still the generated JavaScript in
-// this phase; the controller binds their exports to these types at its import boundary, and the
-// phase that types the screens moves the types into view/ui.ts. A module the manifest does not
-// list, types only (as domain/types.ts and bots/types.ts).
+// over and the screens render from, recovered from the bundle's `initialUi` (view/ui.ts), the
+// screens' `dispatch` calls and the controller's `handle` switch. A module the manifest does not
+// list, types only (as domain/types.ts and bots/types.ts); the rendered tree's types are in
+// view/vdom.ts.
 import type { Action, Category, PublicState, Rank, Seat } from '../domain/types.ts';
 
 export type Tab = 'play' | 'ladder' | 'rules';

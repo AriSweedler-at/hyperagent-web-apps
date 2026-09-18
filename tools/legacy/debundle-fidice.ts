@@ -21,7 +21,9 @@
 // markup and its two `<style>` blocks are cut into index.html and theme.css beside it. Once the
 // entry is typed (web/games/fidice/main.ts, docs/MIGRATION.md step 9) the page boots `./main.ts`
 // and loads neither the PeerJS CDN `<script>` nor `../../shared/ice.js`: both now arrive bundled
-// through web/shared/edge (main.ts constructs the adapters). Run:
+// through web/shared/edge (main.ts constructs the adapters). With every section typed (the end of
+// step 9) the tool writes index.html, theme.css and the manifest only; it remains the audit that
+// maps each typed module to its bundle lines and recovers the legacy import graph. Run:
 //   node --experimental-strip-types tools/legacy/debundle-fidice.ts     (npm run debundle:fidice)
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, posix, resolve } from 'node:path';

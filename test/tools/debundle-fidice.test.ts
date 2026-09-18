@@ -1,12 +1,14 @@
 // Pins web/games/fidice/** to the legacy page (docs/MIGRATION.md step 6): re-running
-// tools/legacy/debundle-fidice.ts on the HEAD page must reproduce every committed file byte for
-// byte, MANIFEST.json must pin the bundle range and each file, and the recovered import graph must
-// be the one ESM can evaluate in the bundle's order (no cycles, no forward references). An edit to
-// the legacy page inside the bundle, or a hand edit of a generated module, fails here; the fix is
-// `npm run debundle:fidice` (and, for a page edit, a note on why the oracle moved). A module typed
-// in place (docs/MIGRATION.md step 8, `<name>.ts` beside where `<name>.js` was) is hand-written:
-// the tool stops emitting it, points the remaining modules at its `.ts` specifier and pins only its
-// provenance (section and lines) in the manifest.
+// tools/legacy/debundle-fidice.ts on the HEAD page must reproduce every committed generated file
+// byte for byte, MANIFEST.json must pin the bundle range and each file, and the recovered import
+// graph must be the one ESM can evaluate in the bundle's order (no cycles, no forward references).
+// An edit to the legacy page inside the bundle, or a hand edit of a generated file, fails here; the
+// fix is `npm run debundle:fidice` (and, for a page edit, a note on why the oracle moved). A module
+// typed in place (docs/MIGRATION.md step 8, `<name>.ts` beside where `<name>.js` was) is
+// hand-written: the tool stops emitting it and pins only its provenance (section and lines) in the
+// manifest. Since step 9 every section is typed, so the tool generates index.html and theme.css
+// alone and the manifest is the map from each .ts back to its bundle lines; the tool stays runnable
+// as an audit (`--dry-run` prints the recovered graph) and these tests keep it honest.
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
@@ -26,7 +28,7 @@ import { REPO_ROOT, readRepoFile, sha256 } from '../../tools/legacy/extract.ts';
 const page = readRepoFile(FIDICE_PAGE);
 const debundled = debundleFidice(page, portedOnDisk);
 const manifest = JSON.parse(readRepoFile(FIDICE_MANIFEST)) as DebundleManifest;
-/** The modules typed so far (step 8) and the ones the tool still generates. */
+/** The modules typed so far and the ones the tool still generates (none since step 9). */
 const typed = debundled.modules.filter((m) => portedOnDisk(m.section.name));
 const generated = debundled.modules.filter((m) => !portedOnDisk(m.section.name));
 /** `main.ts` once the entry is typed (docs/MIGRATION.md step 9), `main.js` before. */
@@ -65,6 +67,18 @@ describe('the de-bundled fidice modules', () => {
     debundled.files.forEach((text, file) => {
       expect(readRepoFile(`${FIDICE_DIR}/${file}`), file).toBe(text);
     });
+  });
+
+  test('every section is typed (docs/MIGRATION.md step 9): no .js is generated or committed', () => {
+    expect(generated).toEqual([]);
+    expect(typed).toHaveLength(39);
+    expect([...debundled.files.keys()].sort()).toEqual(['index.html', 'theme.css']);
+    expect(committedFiles().filter((file) => file.endsWith('.js'))).toEqual([]);
+    Object.values(manifest.files)
+      .filter((entry) => entry.section !== undefined)
+      .forEach((entry) => {
+        expect(entry.typed).toBe(true);
+      });
   });
 
   test('a typed module replaces its generated .js, and nothing imports the .js any more', () => {
