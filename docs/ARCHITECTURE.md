@@ -553,3 +553,29 @@ Step 8 (type the Fidice pure core), phase 2: `bots/**` and `net/protocol.ts`:
   lines, functions and statements.
 - `.prettierignore` still skips `/web/games/fidice/src/` as a whole; the typed `.ts` files there
   are formatted with Prettier by hand until the ignore is narrowed to the generated `.js`.
+
+Step 9 (type the Fidice edges), phase 1: `net/**`, `app/**`, `main.ts`:
+
+- `net/session.ts` keeps the session-level transport shapes the legacy classes were written
+  against (`HostTransport`, `ClientTransport`, with `onInfo` optional) over the shared `Connection`;
+  `net/peerjs.ts` builds them from an injected `(ice) => Transport` factory, the ICE loader (or null)
+  and the Clock, and names the ICE types through `transport.ts` (`RealTransportOptions['ice']`,
+  `Connection['peerConnection']`) so `net/` still imports only the transport and clock edges. It is
+  in the `EDGES` lint glob (`net/{host,guest,client,session,peerjs}.ts`): it holds the deferred Peer.
+- PeerJS and the ICE loader load with the module bundle instead of as two classic `<script>`s
+  before it: the fidice page defines neither `window.Peer` nor `window.HyperIce` and no longer
+  requests unpkg or `../../shared/ice.js` (still copied for the legacy gin page). The ICE fetch
+  still starts on create/join and the Peer is created once `ice.load()` resolves, as before.
+- `globalThis.__peerCalls` records the argument list of every `new Peer(...)` (`[id, options]` /
+  `[options]`), the shape `e2e/browser/record-peer.js` already produced, so `peer-calls.ts` needs
+  no branch and fidice-online keeps its id assertion. The smoke spec checks `HyperIce`/`Peer`/
+  `shared/ice.js` on the legacy gin page only, and on fidice that `window.__fidice` booted and no
+  classic script was requested.
+- The protocol suite's "frame-by-frame equals wire goldens" is the differential oracle
+  `test/parity/fidice.sessions.test.ts`: legacy and typed sessions on one fake broker, traces
+  deep-equal (frames after `wireClone`, events, final state). `tsconfig.node.json` lists
+  `web/shared/edge/transport{,.fake}.ts` and the fidice `domain/`, `bots/`, `net/` for it.
+- `expect` stays in `domain/result.ts`, imported by `net/host.ts`: `test/parity/fidice.legacy.test.ts`
+  pins it on both legs. `view/types.ts` is a types-only module (not in the manifest) for `Ui` and
+  `Intent`; the controller binds the generated view's exports to those types until phase 2 types
+  `view/**`. `JS_FILE_COUNT` is 12.

@@ -353,3 +353,42 @@ parity and e2e gates.
   still skips `/web/games/fidice/src/` whole, so the typed `.ts` there are formatted by running
   Prettier on them by hand; narrowing the ignore to the generated `.js` means reformatting four
   phase 1 domain files and is left for step 9. See ARCHITECTURE "Deviations".
+- Step 9, phase 1 (`net/**`, `app/**`, `main.ts`; `view/**` follows): the five edge modules and the
+  entry are typed in place (`git mv` `.js` -> `.ts`, `JS_FILE_COUNT` 12). `net/session.ts` holds the
+  session-level shapes (`HostTransport`, `ClientTransport`, `SessionEvents`, `Me`) over the shared
+  `Connection`, and keeps `realClock` as a re-export of `web/shared/edge/clock.ts` (the legacy
+  section's one binding; `main.ts` imports the clock from the edge directly). `net/peerjs.ts` is the
+  adapter over `web/shared/edge/transport.ts`: it takes a Transport factory `(ice) => Transport` and
+  the ICE loader (or null) by injection, so `main.ts` constructs `realTransport({ ice, search,
+  debug: 1 })` and `createIce(browserIceDeps())`; it names the ICE types through `transport.ts`
+  rather than importing `ice.ts`, so the `net/` import zone is unchanged, and it joins the edge lint
+  profile (`EDGES` now lists `net/{host,guest,client,session,peerjs}.ts`) because it holds the
+  deferred Peer. The load-timing change: PeerJS and the ICE loader arrive with the module bundle
+  (`./main.ts`, 216 KB minified) instead of as two classic `<script>`s ahead of it, so
+  `index.html` drops the unpkg CDN request and `../../shared/ice.js`, defines neither `window.Peer`
+  nor `window.HyperIce`, and paints without waiting on unpkg; the ICE fetch still starts when a
+  table is created or joined, and the Peer is still created only once `ice.load()` resolves.
+  `legacy/shared/ice.js` is still copied into dist for the legacy gin page. `expect` stays in
+  `domain/result.ts` (the parity suite pins it on both legs) and `net/host.ts` imports it;
+  `protocol.ts` types `You.seat` as `Seat | null` (same runtime check). The e2e hook for the ICE
+  assertion is `globalThis.__peerCalls` (see ARCHITECTURE "Documented test hooks"); it records the
+  argument list of each `new Peer(...)`, not the options object alone, so `e2e/fixtures/peer-calls.ts`
+  decodes both pages without a branch and fidice-online keeps asserting the host's id; the smoke spec
+  checks the legacy globals on gin only and, on fidice, that `window.__fidice` booted and no classic
+  script was requested. The differential oracle `test/parity/fidice.sessions.test.ts` replaces the
+  never-recorded wire goldens: both legs run over `transport.fake.ts` (the legacy leg with
+  `globalThis.Peer`/`HyperIce` shimmed onto it), and their frames, events and final state are
+  deep-equal across a full table (open, player and spectator hello, five refusals incl. two
+  malformed frames, start, roll/bid/peek/pull/roll/bid/call, auto-next, token reconnect, refused
+  addBot, close), lobby management, a four-bot autostart game to `over`, ICE with and without a
+  relay (and the `onError` fallback), and two failures (unknown code, 12 s connect timeout); two
+  legacy quirks it names: a guest closing its own session hears "The host closed the table.", and
+  a wrong code reports `onClosed` twice. `tsconfig.node.json` lists the transport edge and the
+  fidice pure core plus `net/` so that test imports statically. `view/types.ts` (types only, not
+  in the manifest) holds `Ui`, `Intent` and friends; `app/controller.ts` binds the still-generated
+  view exports to them at its import boundary (typed consts; `initialUi` alone is cast). Fidice
+  used no wake lock, vibration or audio, so `fx.ts` is not wired. `tools/legacy/debundle-fidice.ts`
+  treats the entry as typed when `main.ts` exists and emits the page accordingly (no classic
+  scripts, `./main.ts`); the dist guards follow (dist-next/ has no ice.js load at all). The manual
+  broker game and the CI two-peer run are the remaining gates for the PR body. See ARCHITECTURE
+  "Deviations".
