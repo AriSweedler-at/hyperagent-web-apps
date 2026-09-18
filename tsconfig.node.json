@@ -4,7 +4,10 @@
   // (seeded rng for the parity suites) and a composite project must list every file it compiles;
   // tsconfig.pure.json remains the guard for that directory, as in tsconfig.web.json. The three edge
   // modules listed are written against structural types (no DOM lib) because test/parity runs the
-  // ICE loader beside the legacy IIFE in node; tsconfig.web.json still owns web/shared/edge.
+  // ICE loader beside the legacy IIFE in node; tsconfig.web.json still owns web/shared/edge. The
+  // transport edge and the fidice pure core plus net/ are listed for the same reason since
+  // docs/MIGRATION.md step 9: test/parity/fidice.sessions.test.ts drives the typed sessions over
+  // transport.fake.ts beside the legacy classes (tsconfig.web.json still owns those files too).
   // infra/games-proxy/worker.js is listed (allowJs, its JSDoc supplies the types) because
   // tools/proxy-dev.ts runs its default export; checkJs stays off: the JS config lints it.
   "extends": "./tsconfig.base.json",
@@ -27,7 +30,12 @@
     "web/shared/edge/clock.ts",
     "web/shared/edge/clock.fake.ts",
     "web/shared/edge/ice.ts",
+    "web/shared/edge/transport.ts",
+    "web/shared/edge/transport.fake.ts",
     "web/shared/edge/transport.contract.log.ts",
+    "web/games/fidice/src/domain/**/*.ts",
+    "web/games/fidice/src/bots/**/*.ts",
+    "web/games/fidice/src/net/**/*.ts",
     "infra/games-proxy/worker.js"
   ],
   "exclude": ["test/fixtures/legacy/*.cjs"]
