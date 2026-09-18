@@ -3,7 +3,7 @@
 // and exports were recovered by scope analysis. Do not edit: `npm run debundle:fidice` regenerates
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
-import { BOTTOM_RANK, GROUPS, TOP_RANK, groupTop } from '../../domain/hands.js';
+import { BOTTOM_RANK, GROUPS, TOP_RANK, groupTop } from '../../domain/hands.ts';
 import { publicCupIndices } from '../../domain/publicState.js';
 import {
   bestKeep, floorBid, livesOf, nextSeat, oddsAtLeast, oddsBidTrue, readSeat, rollFor,

@@ -3,9 +3,9 @@
 // and exports were recovered by scope analysis. Do not edit: `npm run debundle:fidice` regenerates
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
-import { rollDice } from './dice.js';
-import { handAt, rankOf, spokenName } from './hands.js';
-import { err, ok } from './result.js';
+import { rollDice } from './dice.ts';
+import { handAt, rankOf, spokenName } from './hands.ts';
+import { err, ok } from './result.ts';
 
   var seat = (n) => n;
   var bySeat = (s) => ({ kind: "seat", seat: s });

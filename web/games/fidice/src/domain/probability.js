@@ -3,8 +3,8 @@
 // and exports were recovered by scope analysis. Do not edit: `npm run debundle:fidice` regenerates
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
-import { DIE_VALUES } from './dice.js';
-import { HAND_COUNT, rankOf } from './hands.js';
+import { DIE_VALUES } from './dice.ts';
+import { HAND_COUNT, rankOf } from './hands.ts';
 
   var cache = /* @__PURE__ */ new Map();
   var cartesian = (count) => count === 0 ? [[]] : DIE_VALUES.flatMap((v) => cartesian(count - 1).map((rest) => [v, ...rest]));

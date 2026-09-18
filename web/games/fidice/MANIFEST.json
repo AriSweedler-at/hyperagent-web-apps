@@ -17,29 +17,29 @@
       "endLine": 381,
       "sha256": "77969efc0a46a75bdf41d0110f30664319237c08c12d09a674fc2b88e4dfd77e"
     },
-    "src/domain/dice.js": {
+    "src/domain/dice.ts": {
       "section": "src/domain/dice.ts",
       "startLine": 384,
       "endLine": 391,
-      "sha256": "b168654fcfaae36bf794a09aba010223c912af189b5da738cb0441007c80094d"
+      "typed": true
     },
-    "src/domain/hands.js": {
+    "src/domain/hands.ts": {
       "section": "src/domain/hands.ts",
       "startLine": 394,
       "endLine": 548,
-      "sha256": "ea5b4d5a961b687297f41c428373602a2a3c14f94eaa306b3168a4af78d77ece"
+      "typed": true
     },
-    "src/domain/result.js": {
+    "src/domain/result.ts": {
       "section": "src/domain/result.ts",
       "startLine": 551,
       "endLine": 556,
-      "sha256": "886ae88c27a5131536de7c11fae22386db855368d40efc338715995de83aa00e"
+      "typed": true
     },
     "src/net/protocol.js": {
       "section": "src/net/protocol.ts",
       "startLine": 559,
       "endLine": 607,
-      "sha256": "bae54cb9806043d9307ed2ce2159de6256f887aa63fb7a3e6ff278c06eb5b42e"
+      "sha256": "dd6a52fa0a0910cf1fb4ae050ea71e15e71079b55c3651f5355f9adab9437181"
     },
     "src/net/client.js": {
       "section": "src/net/client.ts",
@@ -51,7 +51,7 @@
       "section": "src/domain/game.ts",
       "startLine": 666,
       "endLine": 859,
-      "sha256": "db63efc28453ccb112d5e0895eb1a4f464763d22f1ef67f757e024f59f3047fd"
+      "sha256": "b6a6c74e404859aae714a99cc8c5b22b672a0c23be7c3731aa04ac0e21b14207"
     },
     "src/domain/publicState.js": {
       "section": "src/domain/publicState.ts",
@@ -69,49 +69,49 @@
       "section": "src/domain/probability.ts",
       "startLine": 883,
       "endLine": 903,
-      "sha256": "d3cec708b474a654c664b517627331b4f3974d3067591aff583788ef5b313eb2"
+      "sha256": "f0db9db62c36a3f8078b67d6a62040aa811952a28db62b2d1335f8cd73b2a3ee"
     },
     "src/bots/toolkit.js": {
       "section": "src/bots/toolkit.ts",
       "startLine": 906,
       "endLine": 972,
-      "sha256": "f2eedcfbe88ec0816d50b2c082a0a94b7867d4136f7bb210f17586aa33e2fc47"
+      "sha256": "d1dfe24644b4c61ed031895f56a1dddf0111f5f2a47309a99766a4ac6fce5efc"
     },
     "src/bots/strategies/classic.js": {
       "section": "src/bots/strategies/classic.ts",
       "startLine": 975,
       "endLine": 1035,
-      "sha256": "310b7f956781ac0bc7319f8c622773f4e386d3029b5c6c378541e728270d525c"
+      "sha256": "246e2b89f000d75b780015f3cd581a30e7a5707893f9dda6f631ad03e64930e4"
     },
     "src/bots/strategies/profiler.js": {
       "section": "src/bots/strategies/profiler.ts",
       "startLine": 1038,
       "endLine": 1153,
-      "sha256": "ec7613069f9bf2d6b18b69b2312ccf7a0f9b6ae1abcc8689491862ba8114da4a"
+      "sha256": "ee207739943a4a2883714c547cd4cfdef7d50ea1d305c4b4dc56564127002925"
     },
     "src/bots/strategies/trapper.js": {
       "section": "src/bots/strategies/trapper.ts",
       "startLine": 1156,
       "endLine": 1276,
-      "sha256": "e5cfb8d903b612817be471b65711ff680992f0a827fb271611a556ee7f62359e"
+      "sha256": "4ebf81c32e0e8d337314042e22a6d819f85141ef23d6ad9d399447669e82908d"
     },
     "src/bots/strategies/gambler.js": {
       "section": "src/bots/strategies/gambler.ts",
       "startLine": 1279,
       "endLine": 1519,
-      "sha256": "bed2455a7bc69b7e8718ea31ac1b313ff73c469f7cad31fd29dbc69aa6201d53"
+      "sha256": "ca3a1ced4baa02abad7a4c42a50c88e5f09394f77b914437a64ca810f39c1440"
     },
     "src/bots/strategies/pressure.js": {
       "section": "src/bots/strategies/pressure.ts",
       "startLine": 1522,
       "endLine": 1653,
-      "sha256": "94052df94e435a95c6149b89ed8635f4c6fa71245da74b728ea871fac9117599"
+      "sha256": "aa46f9c05204f92627e5c1694e3d61142672af9344275e9800570fa1fa269fad"
     },
     "src/bots/strategies/learner.js": {
       "section": "src/bots/strategies/learner.ts",
       "startLine": 1656,
       "endLine": 1759,
-      "sha256": "ce074f459fe0a9d00f18db7f21b714ad1ea5c646833808f5b7ed076ba38037ef"
+      "sha256": "f9551ffb90eb9a427743ceca7a623c5d287251e348e03c489db3fffbe996cb57"
     },
     "src/bots/strategies/learnerWeights.js": {
       "section": "src/bots/strategies/learnerWeights.ts",
@@ -135,13 +135,13 @@
       "section": "src/domain/lobby.ts",
       "startLine": 1816,
       "endLine": 1889,
-      "sha256": "ab93d58c46e5935493c8c808b805401783edaddf601c7b7baabf3f214e512179"
+      "sha256": "f1fd6f23e8046fabca2efbbd41caeb4f4d7e052d519e50f2951e68b5677a5416"
     },
     "src/net/host.js": {
       "section": "src/net/host.ts",
       "startLine": 1892,
       "endLine": 2108,
-      "sha256": "78ab6c46218bafe5224c9c095529202816c0bdd0dbb653965fe930fc1ae53756"
+      "sha256": "8b1382ee9f08cb5a984462f1b45c8edf271b9227fedc8110a684b76a466f0350"
     },
     "src/net/peerjs.js": {
       "section": "src/net/peerjs.ts",
@@ -159,7 +159,7 @@
       "section": "src/domain/search.ts",
       "startLine": 2222,
       "endLine": 2337,
-      "sha256": "e64f97e4af07b8fa76b888677efd51a95f95d2349b61307bed21428cd7df3536"
+      "sha256": "35cc7fee8e8355a4ba0ea6fbf754d9afd219489e19ce6574e312464d483526b3"
     },
     "src/view/vdom.js": {
       "section": "src/view/vdom.ts",
@@ -195,19 +195,19 @@
       "section": "src/view/screens/table.ts",
       "startLine": 2793,
       "endLine": 3077,
-      "sha256": "2220dfbbce9d21c3e8edc3c82e045be4d292795adb83eea2cfd0397a6b54f610"
+      "sha256": "149ad6d24a41ac4be26103da8b2c38c939b80e800b102688827302b0a7d7a13b"
     },
     "src/view/screens/ladder.js": {
       "section": "src/view/screens/ladder.ts",
       "startLine": 3080,
       "endLine": 3169,
-      "sha256": "6c66dc41c7d7b96054fef910b7b7980b81a5c2825ff541791eb78e1df8c6d9b1"
+      "sha256": "64be0506f575f3b38c8710bbdd9788dfa704b1f545d54a56c05b57a95c59ce6f"
     },
     "src/view/screens/spectator.js": {
       "section": "src/view/screens/spectator.ts",
       "startLine": 3172,
       "endLine": 3294,
-      "sha256": "8fc18052348c2674fe8bd5bdb3386426cf2a19d64e2a5830ec3ec0937b0b4a92"
+      "sha256": "ed91c0ead268dc4819814444e235d48d2a44994661bff4540522718863f901d8"
     },
     "src/view/screens/rules.js": {
       "section": "src/view/screens/rules.ts",
@@ -231,7 +231,7 @@
       "section": "src/app/controller.ts",
       "startLine": 3529,
       "endLine": 3958,
-      "sha256": "b86b776875de4f7021cb61a67ad5c7079d995c57d1b136ba01b4886e3e341ede"
+      "sha256": "3a6b7ca5105af7147463e9a654c9611a7bed1aa0c0ba4be43ce7decad33de773"
     },
     "src/app/effects.js": {
       "section": "src/app/effects.ts",
@@ -243,7 +243,7 @@
       "section": "src/app/main.ts",
       "startLine": 4002,
       "endLine": 4030,
-      "sha256": "f9e2130758a47746f39ffdedb75560aadfb2c845a4214fa61850628398a4c7b4"
+      "sha256": "79f3476c185a620bdfecabc57bee59896945f31eeb90124f7f3f6644471098d0"
     }
   }
 }

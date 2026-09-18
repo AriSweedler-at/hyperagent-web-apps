@@ -4,9 +4,9 @@
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
 import { DICE_IMAGES } from './src/assets/diceImages.js';
-import './src/domain/dice.js';
-import './src/domain/hands.js';
-import './src/domain/result.js';
+import './src/domain/dice.ts';
+import './src/domain/hands.ts';
+import './src/domain/result.ts';
 import './src/net/protocol.js';
 import { ClientSession } from './src/net/client.js';
 import './src/domain/game.js';

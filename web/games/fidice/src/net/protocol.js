@@ -3,8 +3,8 @@
 // and exports were recovered by scope analysis. Do not edit: `npm run debundle:fidice` regenerates
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
-import { isRank } from '../domain/hands.js';
-import { err, ok } from '../domain/result.js';
+import { isRank } from '../domain/hands.ts';
+import { err, ok } from '../domain/result.ts';
 
   var isRecord = (x) => typeof x === "object" && x !== null;
   var isRole = (x) => x === "player" || x === "spectator";
