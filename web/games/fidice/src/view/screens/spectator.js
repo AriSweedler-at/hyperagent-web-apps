@@ -5,7 +5,7 @@
 
 import { HAND_COUNT, handAt, rankOf, rungOf, spokenName } from '../../domain/hands.ts';
 import { publicCupIndices, publicTableIndices } from '../../domain/publicState.ts';
-import { cls, h } from '../vdom.js';
+import { cls, h } from '../vdom.ts';
 import { die, logView, seatOptions, seats } from '../components.js';
 import { isHostUi } from '../ui.js';
 import { ladderView, noMarks } from './ladder.js';

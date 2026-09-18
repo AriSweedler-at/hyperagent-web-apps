@@ -128,6 +128,3 @@ export type Intent =
   | Readonly<{ type: 'spec.truth'; on: boolean }>;
 
 export type Dispatch = (intent: Intent) => void;
-
-/** A rendered tree, opaque to the controller: view/vdom builds and mounts it. */
-export type VNode = Readonly<{ kind: string }>;

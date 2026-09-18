@@ -223,7 +223,8 @@ const zones = [
       `${GAME_SRC}/app/**`,
       `${GAME_SRC}/storage.ts`,
     ],
-    except: ['**/web/shared/edge/dom.ts'],
+    // dom.fake.ts is the structural DOM the view tests render into (docs/MIGRATION.md step 9).
+    except: ['**/web/shared/edge/dom.ts', '**/web/shared/edge/dom.fake.ts'],
     message: 'ui/ and view/ render views; DOM access only through @shared/edge/dom.',
   },
   {

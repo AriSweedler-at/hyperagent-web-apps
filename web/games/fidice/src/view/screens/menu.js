@@ -6,7 +6,7 @@
 import {
   DIFFICULTIES, choiceLabel, difficultyById, difficultyOfChoice,
 } from '../../bots/registry.ts';
-import { cls, h } from '../vdom.js';
+import { cls, h } from '../vdom.ts';
 import { die } from '../components.js';
 
   var onEnter = (fn) => (e) => {

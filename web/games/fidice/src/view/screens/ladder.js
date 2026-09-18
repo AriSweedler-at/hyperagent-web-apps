@@ -4,7 +4,7 @@
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
 import { CATEGORY_INFO, inRange, rungOf } from '../../domain/hands.ts';
-import { cls, h } from '../vdom.js';
+import { cls, h } from '../vdom.ts';
 import { diceRow, shapeRow } from '../components.js';
 
   var noMarks = { bid: null, cup: null, dimAtOrBelow: null };

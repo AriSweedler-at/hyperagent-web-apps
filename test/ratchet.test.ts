@@ -12,10 +12,10 @@ const WEB = resolve(import.meta.dirname, '..', 'web');
 /**
  * 38 de-bundled modules under web/games/fidice/src plus web/games/fidice/main.js, minus the 8
  * domain modules, the 11 bot modules and net/protocol step 8 typed in place (docs/MIGRATION.md
- * step 8), minus net/{client,host,peerjs,session}, app/{controller,effects} and the entry
- * (main.ts) step 9 typed; view/** and assets/diceImages remain.
+ * step 8), minus net/{client,host,peerjs,session}, app/{controller,effects}, the entry
+ * (main.ts) and view/vdom step 9 typed; the rest of view/** and assets/diceImages remain.
  */
-const JS_FILE_COUNT = 12;
+const JS_FILE_COUNT = 11;
 
 const jsFilesUnderWeb = (): ReadonlyArray<string> =>
   readdirSync(WEB, { recursive: true, encoding: 'utf8' })

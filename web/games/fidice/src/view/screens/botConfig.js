@@ -7,7 +7,7 @@ import { CHECKPOINTS } from '../../bots/strategies/learnerWeights.ts';
 import {
   DIFFICULTIES, RANDOM_STRATEGY, SHIPPED, choiceLabel, difficultyOfChoice, learnerGeneration,
 } from '../../bots/registry.ts';
-import { cls, h } from '../vdom.js';
+import { cls, h } from '../vdom.ts';
 
   var currentChoice = (ui, target) => {
     if (target.kind === "solo") return ui.nameForm.botChoice;

@@ -28,17 +28,16 @@ import type {
   Screen,
   Ui,
   UiRole,
-  VNode,
 } from '../view/types.ts';
 import * as uiJs from '../view/ui.js';
-import * as vdomJs from '../view/vdom.js';
+import { mount, type VNode } from '../view/vdom.ts';
 import type { Effects } from './effects.ts';
 
-// The view is still the generated JavaScript in this phase (the next one types it): its exports
-// are bound to the shapes in view/types.ts here, at the one boundary the controller crosses.
-// `initialUi` needs a cast because a JavaScript object literal's string fields widen to `string`.
-const mount: (doc: Readonly<Document>, root: Readonly<Element>, tree: VNode) => void = vdomJs.mount;
-const appView: (ui: Ui, dispatch: Dispatch) => VNode = appJs.appView;
+// The screens are still the generated JavaScript in this phase (the next one types them): their
+// exports are bound to the shapes in view/types.ts here, at the one boundary the controller
+// crosses. `initialUi` needs a cast because a JavaScript object literal's string fields widen to
+// `string`; `appView` because its inferred tree is looser than vdom's `VNode` union.
+const appView = appJs.appView as unknown as (ui: Ui, dispatch: Dispatch) => VNode;
 const initialUi = uiJs.initialUi as unknown as (shareBase: string, savedName: string) => Ui;
 const isMyTurn: (ui: Ui) => boolean = uiJs.isMyTurn;
 const emptyLadder: Ladder = uiJs.emptyLadder;

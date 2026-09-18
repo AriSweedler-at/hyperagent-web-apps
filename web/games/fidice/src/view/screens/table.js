@@ -7,7 +7,7 @@ import { HAND_COUNT, TOP_RANK, handAt, rungOf, spokenName } from '../../domain/h
 import { keepsScore, standings } from '../../domain/game.ts';
 import { publicCupIndices, publicTableIndices } from '../../domain/publicState.ts';
 import { suggestHands } from '../../domain/search.ts';
-import { cls, h } from '../vdom.js';
+import { cls, h } from '../vdom.ts';
 import { diceRow, die, logView, seatOptions, seats, stepHeader } from '../components.js';
 import { isHostUi, isMyTurn } from '../ui.js';
 

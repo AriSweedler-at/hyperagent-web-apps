@@ -5,7 +5,7 @@
 
 import { isOut, keepsScore } from '../domain/game.ts';
 import { describeProfile, strategyFor } from '../bots/registry.ts';
-import { cls, h } from './vdom.js';
+import { cls, h } from './vdom.ts';
 
   var die = (value, o = {}) => h("div", {
     class: cls("die", o.size, value === null ? "hidden-face" : `v${value}`, o.clickable && "clickable", o.selected && "selected"),

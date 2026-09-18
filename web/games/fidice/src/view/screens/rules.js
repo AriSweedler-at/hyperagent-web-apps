@@ -4,7 +4,7 @@
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
 import { SHIPPED } from '../../bots/registry.ts';
-import { h } from '../vdom.js';
+import { h } from '../vdom.ts';
 
   var panel = (...children) => h("div", { class: "panel" }, ...children);
   var li = (...children) => h("li", {}, ...children);

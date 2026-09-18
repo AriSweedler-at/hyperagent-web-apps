@@ -161,23 +161,23 @@
       "endLine": 2337,
       "typed": true
     },
-    "src/view/vdom.js": {
+    "src/view/vdom.ts": {
       "section": "src/view/vdom.ts",
       "startLine": 2340,
       "endLine": 2425,
-      "sha256": "f4c5cd1299f1c2fbc9df8a5d669795ab324d4196817a73ecb7f852d19bdafecf"
+      "typed": true
     },
     "src/view/components.js": {
       "section": "src/view/components.ts",
       "startLine": 2428,
       "endLine": 2538,
-      "sha256": "2b14ea1744e624fb0dc8dfbe5e5649d3379d59436a1fda2083915cb41ce15c94"
+      "sha256": "e82e3253d17dd137685a8e01ed660ad58a3d0d00965f23b3a399867bb36eae6e"
     },
     "src/view/screens/menu.js": {
       "section": "src/view/screens/menu.ts",
       "startLine": 2541,
       "endLine": 2682,
-      "sha256": "82d9c01add36db694c56526370877f174187341b68a2d390f9d93af9e95421c8"
+      "sha256": "65b6aea9ed7a38f76686dc2ec36f3517496022b81640d4698bb07bf25f8100f5"
     },
     "src/view/ui.js": {
       "section": "src/view/ui.ts",
@@ -189,43 +189,43 @@
       "section": "src/view/screens/lobby.ts",
       "startLine": 2721,
       "endLine": 2790,
-      "sha256": "a13781df7486c15179be9ef8b35afacbe54f500fd9f08042458ace07ee75299d"
+      "sha256": "7e25f319f1a8460e805df5c49fa8cd84f726c296130a7e9996247c3a1639ffbf"
     },
     "src/view/screens/table.js": {
       "section": "src/view/screens/table.ts",
       "startLine": 2793,
       "endLine": 3077,
-      "sha256": "645ec75a58e316cb9d8d715adc879594964bd699545e61dac50be45a15e16a4a"
+      "sha256": "61156fa8e1562a28be126af491e008fc37daf7e892f84c861126e37bd03420f5"
     },
     "src/view/screens/ladder.js": {
       "section": "src/view/screens/ladder.ts",
       "startLine": 3080,
       "endLine": 3169,
-      "sha256": "64be0506f575f3b38c8710bbdd9788dfa704b1f545d54a56c05b57a95c59ce6f"
+      "sha256": "8f04e51b4caa865ba5cfdba1ea68df8040500e2032e08f8c6c083c3a2e7ff364"
     },
     "src/view/screens/spectator.js": {
       "section": "src/view/screens/spectator.ts",
       "startLine": 3172,
       "endLine": 3294,
-      "sha256": "b0e4cbbf8d99e0bf2f1095a11af23f0f5d37834635ab09ceffe6d50b12ebff88"
+      "sha256": "638592e391d2178180e65b136399b7f58b0787d8140a7ade578168bb584b89c0"
     },
     "src/view/screens/rules.js": {
       "section": "src/view/screens/rules.ts",
       "startLine": 3297,
       "endLine": 3374,
-      "sha256": "bb1bae4082da6dd818b32ccd97bec0da20bdbdd066ca21896623331ef57a2c39"
+      "sha256": "2d9ae6ed9974e785b93b20e52d60a8be5f0c7fdf0ea07c828576e68002ec7d78"
     },
     "src/view/screens/botConfig.js": {
       "section": "src/view/screens/botConfig.ts",
       "startLine": 3377,
       "endLine": 3475,
-      "sha256": "51f0932c9bb1f7fe12968f54e0623b2cb3c7b425dcf315f74759a53a08e2bb92"
+      "sha256": "ed6448799b5a7fc6d907ac4e413b75fd273ed897b25bb81ac617ef4b442e6e71"
     },
     "src/view/app.js": {
       "section": "src/view/app.ts",
       "startLine": 3478,
       "endLine": 3526,
-      "sha256": "9a7126bce7d44aaa121fd2643b8484cfe33c9bdbc468284737e403f56ea8ba47"
+      "sha256": "56f28b6a17bdc4c992e1d60eb54156898ccd4eb304ab6188a01d7db2de1c0f76"
     },
     "src/app/controller.ts": {
       "section": "src/app/controller.ts",
