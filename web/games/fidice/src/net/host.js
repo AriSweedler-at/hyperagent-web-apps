@@ -9,8 +9,8 @@ import {
   HOST, apply, bySeat, newGame, scheduleAutoNext, stampLog, startGame,
 } from '../domain/game.ts';
 import { redactFor } from '../domain/publicState.ts';
-import { RANDOM_STRATEGY, describeProfile, profileFor } from '../bots/registry.js';
-import { decide, emptyMemories } from '../bots/brain.js';
+import { RANDOM_STRATEGY, describeProfile, profileFor } from '../bots/registry.ts';
+import { decide, emptyMemories } from '../bots/brain.ts';
 import {
   findSeat, hostSitsDown, hostStandsUp, makeBot, makeHuman, renameBot, seatPlayer, setBotProfile,
   setConnected, unseatPlayer, withSpectators,

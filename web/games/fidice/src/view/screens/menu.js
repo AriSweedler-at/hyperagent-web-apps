@@ -5,7 +5,7 @@
 
 import {
   DIFFICULTIES, choiceLabel, difficultyById, difficultyOfChoice,
-} from '../../bots/registry.js';
+} from '../../bots/registry.ts';
 import { cls, h } from '../vdom.js';
 import { die } from '../components.js';
 

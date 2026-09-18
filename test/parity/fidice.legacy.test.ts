@@ -762,6 +762,27 @@ describe.each(legs)('fidice core: %s', (_leg, F) => {
       expect(F.profileFor('nope', fixed())).toEqual({ strategy: 'gambler', random: false });
     });
 
+    test('the menu helpers: difficulties, choice labels and profile descriptions', () => {
+      expect(F.DIFFICULTIES.map((d) => [d.id, d.label, d.strategy.id])).toEqual([
+        ['easy', 'Easy', 'pressure'],
+        ['medium', 'Medium', 'profiler'],
+        ['hard', 'Hard', 'gambler'],
+      ]);
+      expect(F.difficultyById('hard').strategy.id).toBe('gambler');
+      expect(F.difficultyById('nope').id).toBe('medium');
+      expect(F.difficultyOfChoice('pressure')).toBe('easy');
+      expect(F.difficultyOfChoice('trapper')).toBeNull();
+      expect(F.learnerGeneration('learner-300')).toBe(300);
+      expect(F.learnerGeneration('learner-x')).toBeNull();
+      expect(F.learnerGeneration('gambler')).toBeNull();
+      expect(F.choiceLabel('random')).toBe('🎲 Random strategy');
+      expect(F.choiceLabel('learner-100')).toBe('Self-taught · 100 generations');
+      expect(F.choiceLabel('trapper')).toBe('The Trapper');
+      expect(F.choiceLabel('nope')).toBe('The Gambler');
+      expect(F.describeProfile({ strategy: 'profiler', random: true })).toBe('The Reader (random)');
+      expect(F.describeProfile({ strategy: 'nope', random: false })).toBe('The Gambler');
+    });
+
     /**
      * Pinned digests of every state along each seeded bot game (decision points, then the final
      * state). They freeze `apply` and the strategies together; a change to either is a diff here.

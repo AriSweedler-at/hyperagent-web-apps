@@ -119,17 +119,17 @@
       "endLine": 1766,
       "typed": true
     },
-    "src/bots/registry.js": {
+    "src/bots/registry.ts": {
       "section": "src/bots/registry.ts",
       "startLine": 1769,
       "endLine": 1799,
-      "sha256": "b79f739543bed8f4f4a84f59c2ed3d64f10d41083f965ae3ed2ca7dff7c89c8d"
+      "typed": true
     },
-    "src/bots/brain.js": {
+    "src/bots/brain.ts": {
       "section": "src/bots/brain.ts",
       "startLine": 1802,
       "endLine": 1813,
-      "sha256": "e9aa2dca520bc7ec0c4399fe361e34c9e57daef11b10b66e8d74507a1c643dd5"
+      "typed": true
     },
     "src/domain/lobby.ts": {
       "section": "src/domain/lobby.ts",
@@ -141,7 +141,7 @@
       "section": "src/net/host.ts",
       "startLine": 1892,
       "endLine": 2108,
-      "sha256": "3db62cff28749dca7a42570c89529a347d850125ee41b0d3f5883bdbabf3feb3"
+      "sha256": "10f00ec3d0b2848853e1c426f0dba51794542ff9342c288df9ec5b94f9e2d49d"
     },
     "src/net/peerjs.js": {
       "section": "src/net/peerjs.ts",
@@ -171,13 +171,13 @@
       "section": "src/view/components.ts",
       "startLine": 2428,
       "endLine": 2538,
-      "sha256": "80ac97675d69ae8365cc7605169d244d55786a44872038165d09f5647db7d5c6"
+      "sha256": "2b14ea1744e624fb0dc8dfbe5e5649d3379d59436a1fda2083915cb41ce15c94"
     },
     "src/view/screens/menu.js": {
       "section": "src/view/screens/menu.ts",
       "startLine": 2541,
       "endLine": 2682,
-      "sha256": "1413622769bd598caafe5eff8af48dad4f119b25348a85d3de60a01300227ae7"
+      "sha256": "82d9c01add36db694c56526370877f174187341b68a2d390f9d93af9e95421c8"
     },
     "src/view/ui.js": {
       "section": "src/view/ui.ts",
@@ -213,13 +213,13 @@
       "section": "src/view/screens/rules.ts",
       "startLine": 3297,
       "endLine": 3374,
-      "sha256": "b1689ac817477c7ed6847a6dc8e27a5000489607219f9e3617f46dba56c26ee5"
+      "sha256": "bb1bae4082da6dd818b32ccd97bec0da20bdbdd066ca21896623331ef57a2c39"
     },
     "src/view/screens/botConfig.js": {
       "section": "src/view/screens/botConfig.ts",
       "startLine": 3377,
       "endLine": 3475,
-      "sha256": "4a93f1445d9a3efe0229b62b82bb799cf65c146e18e32cc1d00c4ca5a0ded8a3"
+      "sha256": "51f0932c9bb1f7fe12968f54e0623b2cb3c7b425dcf315f74759a53a08e2bb92"
     },
     "src/view/app.js": {
       "section": "src/view/app.ts",
@@ -231,7 +231,7 @@
       "section": "src/app/controller.ts",
       "startLine": 3529,
       "endLine": 3958,
-      "sha256": "267962d1a63697a6cc3040e35554f544725cb0234c59e0da239b6b68475c52a2"
+      "sha256": "0468691075746e4c7f008683dd5d1d7147a90ba71c38aaa80907c5020879ae34"
     },
     "src/app/effects.js": {
       "section": "src/app/effects.ts",
@@ -243,7 +243,7 @@
       "section": "src/app/main.ts",
       "startLine": 4002,
       "endLine": 4030,
-      "sha256": "6daecb0b162a1ab011c7ee2171ee2f35182a30c08e52e7fbc7bce3d268560423"
+      "sha256": "d0570ac860019a6f809e051bf6cb428e148fb7baf7e85677d2543286555d593b"
     }
   }
 }

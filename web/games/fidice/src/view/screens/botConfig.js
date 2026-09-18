@@ -6,7 +6,7 @@
 import { CHECKPOINTS } from '../../bots/strategies/learnerWeights.ts';
 import {
   DIFFICULTIES, RANDOM_STRATEGY, SHIPPED, choiceLabel, difficultyOfChoice, learnerGeneration,
-} from '../../bots/registry.js';
+} from '../../bots/registry.ts';
 import { cls, h } from '../vdom.js';
 
   var currentChoice = (ui, target) => {

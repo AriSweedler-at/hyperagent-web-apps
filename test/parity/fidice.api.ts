@@ -130,6 +130,7 @@ export type Strategy = {
   decide: (view: BotView, memory: unknown, rng: Rng) => Decision;
 };
 export type Memories = Map<string, unknown>;
+export type Difficulty = { id: string; label: string; strategy: Strategy; blurb: string };
 
 export type Suggestion = {
   group: boolean;
@@ -201,6 +202,12 @@ export type FidiceCore = {
   profileFor: (choice: string, rng: Rng) => BotProfile;
   emptyMemories: Memories;
   decide: (s: GameState, memories: Memories, rng: Rng) => { step: Step; memories: Memories } | null;
+  DIFFICULTIES: Difficulty[];
+  difficultyById: (id: string) => Difficulty;
+  difficultyOfChoice: (choice: string) => string | null;
+  learnerGeneration: (choice: string) => number | null;
+  choiceLabel: (choice: string) => string;
+  describeProfile: (profile: BotProfile) => string;
   // net/protocol
   decodeAction: (x: unknown) => Result<Action>;
   decodeClientMessage: (x: unknown) => Result<ClientMessage>;
