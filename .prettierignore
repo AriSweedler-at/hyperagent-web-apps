@@ -18,4 +18,4 @@ docs/
 /web/games/fidice/index.html
 /web/games/fidice/theme.css
 /web/games/fidice/main.js
-/web/games/fidice/src/
+/web/games/fidice/src/**/*.js

@@ -54,9 +54,23 @@ const groupAliases = (g: Group): ReadonlyArray<string> => {
     case 'five':
       return [`five ${a}s`, `5 ${a}s`, a.repeat(5), `yahtzee ${a}`, `five of a kind ${a}`];
     case 'quads':
-      return [`four ${a}s`, `4 ${a}s`, `quad ${a}s`, `quads ${a}`, a.repeat(4), `four of a kind ${a}`];
+      return [
+        `four ${a}s`,
+        `4 ${a}s`,
+        `quad ${a}s`,
+        `quads ${a}`,
+        a.repeat(4),
+        `four of a kind ${a}`,
+      ];
     case 'fullhouse':
-      return [`${a}s full`, `${a}s over`, `${a} over`, `full house ${a}`, `${a}s full of`, `boat ${a}`];
+      return [
+        `${a}s full`,
+        `${a}s over`,
+        `${a} over`,
+        `full house ${a}`,
+        `${a}s full of`,
+        `boat ${a}`,
+      ];
     case 'straight':
       return h.primary === 6
         ? ['straight 2-6', 'high straight', '23456', 'straight']
@@ -81,7 +95,14 @@ const groupAliases = (g: Group): ReadonlyArray<string> => {
         `${b}s and ${a}s`,
       ];
     case 'pair':
-      return [`pair of ${a}s`, `pair ${a}`, `${a}s pair`, `one pair ${a}`, a.repeat(2), `two ${a}s`];
+      return [
+        `pair of ${a}s`,
+        `pair ${a}`,
+        `${a}s pair`,
+        `one pair ${a}`,
+        a.repeat(2),
+        `two ${a}s`,
+      ];
     case 'high':
       return [`high die ${a}`, `high ${a}`, 'nothing', 'bust'];
   }
@@ -95,7 +116,13 @@ const handAliases = (h: Hand): ReadonlyArray<string> => {
   const kd = h.kickers.join('');
   const specific =
     h.cat === 'fullhouse'
-      ? [`${a}s over ${b}s`, `${a} over ${b}`, `${a}s full of ${b}s`, `${a} full ${b}`, `${a}${a}${a}${b}${b}`]
+      ? [
+          `${a}s over ${b}s`,
+          `${a} over ${b}`,
+          `${a}s full of ${b}s`,
+          `${a} full ${b}`,
+          `${a}${a}${a}${b}${b}`,
+        ]
       : h.cat === 'high'
         ? [
             [h.primary, ...h.kickers].join(' '),
@@ -126,7 +153,12 @@ const scoreAlias = (queryTokens: ReadonlyArray<string>, alias: string): number =
       const exactAfter = tokens.indexOf(t, acc.last + 1);
       const exact = exactAfter >= 0 ? exactAfter : tokens.indexOf(t);
       if (exact >= 0)
-        return { ...acc, score: acc.score + 3, ordered: acc.ordered && exact > acc.last, last: exact };
+        return {
+          ...acc,
+          score: acc.score + 3,
+          ordered: acc.ordered && exact > acc.last,
+          last: exact,
+        };
       const prefix = tokens.findIndex((w) => w.startsWith(t));
       if (prefix >= 0)
         return {
@@ -175,14 +207,8 @@ type LegalGroup = Readonly<{ g: Group; top: Rank }>;
 const byScoreThenStrength = (a: Suggestion, b: Suggestion): number =>
   b.score - a.score || (a.group === b.group ? b.rank - a.rank : a.group ? -1 : 1);
 
-const suggestHands = (
-  query: string,
-  above: Rank | null,
-  limit = 14,
-): ReadonlyArray<Suggestion> => {
-  const legal = new Set(
-    HANDS.filter((h) => above === null || h.rank > above).map((h) => h.rank),
-  );
+const suggestHands = (query: string, above: Rank | null, limit = 14): ReadonlyArray<Suggestion> => {
+  const legal = new Set(HANDS.filter((h) => above === null || h.rank > above).map((h) => h.rank));
   const legalGroups = GROUPS.flatMap((g): ReadonlyArray<LegalGroup> => {
     const top = topLegal(g, legal);
     return top === null ? [] : [{ g, top }];

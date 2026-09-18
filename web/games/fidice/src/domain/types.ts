@@ -24,14 +24,7 @@ export type DieValue = 1 | 2 | 3 | 4 | 5 | 6;
 export type NonEmpty<T> = readonly [T, ...T[]];
 
 export type Category =
-  | 'high'
-  | 'pair'
-  | 'twopair'
-  | 'trips'
-  | 'straight'
-  | 'fullhouse'
-  | 'quads'
-  | 'five';
+  'high' | 'pair' | 'twopair' | 'trips' | 'straight' | 'fullhouse' | 'quads' | 'five';
 
 /** What five dice show, before ranking: `secondary` is 0 unless the category has a second face. */
 export type Shape = Readonly<{

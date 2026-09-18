@@ -19,9 +19,7 @@ export const cache = new Map<string, ReadonlyArray<number>>();
 
 /** Every sequence of `count` faces, first die varying slowest. */
 export const cartesian = (count: number): ReadonlyArray<ReadonlyArray<DieValue>> =>
-  count === 0
-    ? [[]]
-    : DIE_VALUES.flatMap((v) => cartesian(count - 1).map((rest) => [v, ...rest]));
+  count === 0 ? [[]] : DIE_VALUES.flatMap((v) => cartesian(count - 1).map((rest) => [v, ...rest]));
 
 /**
  * `survival[r]` for r in 0..HAND_COUNT: the probability that `tableDice` plus `cupCount` random

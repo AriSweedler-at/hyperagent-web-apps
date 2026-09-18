@@ -142,9 +142,7 @@ const updateRound = (s: State, r: Round): State => ({ ...s, round: r });
 const peek = (s: State, r: Round, me: Player): Outcome =>
   r.touched
     ? err('You already accepted the cup.')
-    : ok(
-        withLog(updateRound(s, { ...r, touched: true }), `${me.name} accepts the cup and peeks.`),
-      );
+    : ok(withLog(updateRound(s, { ...r, touched: true }), `${me.name} accepts the cup and peeks.`));
 
 const pull = (s: State, r: Round, me: Player, index: number): Outcome => {
   if (!holderMaySee(r)) return err('Peek first.');
@@ -261,9 +259,7 @@ const call = (s: State, r: Round, me: Player, mySeat: Seat): Outcome => {
   return ok(
     withLog(
       { ...afterOut, phase: 'over', winner },
-      champion
-        ? `\u{1F3C6} ${champion.name} wins — last kayak on the lake!`
-        : 'Everyone fell in?!',
+      champion ? `\u{1F3C6} ${champion.name} wins — last kayak on the lake!` : 'Everyone fell in?!',
       true,
     ),
   );
@@ -300,7 +296,8 @@ const apply = (s: State, actor: Actor, action: Action, rng: Rng): Outcome => {
   if (action.type === 'finish') return finish(s, actor);
   const r = s.round;
   if (!r) return err('No round in progress.');
-  if (s.reveal) return action.type === 'next' ? nextRound(s, rng) : err('Waiting for the next round.');
+  if (s.reveal)
+    return action.type === 'next' ? nextRound(s, rng) : err('Waiting for the next round.');
   if (actor.kind !== 'seat') return err('Only a seated player can play.');
   if (actor.seat !== r.holder) return err("It's not your turn.");
   const me = playerAt(s, actor.seat);
