@@ -227,17 +227,17 @@
       "endLine": 3526,
       "sha256": "9a7126bce7d44aaa121fd2643b8484cfe33c9bdbc468284737e403f56ea8ba47"
     },
-    "src/app/controller.js": {
+    "src/app/controller.ts": {
       "section": "src/app/controller.ts",
       "startLine": 3529,
       "endLine": 3958,
-      "sha256": "0468691075746e4c7f008683dd5d1d7147a90ba71c38aaa80907c5020879ae34"
+      "typed": true
     },
-    "src/app/effects.js": {
+    "src/app/effects.ts": {
       "section": "src/app/effects.ts",
       "startLine": 3961,
       "endLine": 3999,
-      "sha256": "cca941aaefcab14771d3f79aceff2f54bc42eb03f0918024a0f35f16f48a14cb"
+      "typed": true
     },
     "main.ts": {
       "section": "src/app/main.ts",

@@ -9,14 +9,12 @@ import { realClock } from '../../shared/edge/clock.ts';
 import { browserIceDeps, createIce } from '../../shared/edge/ice.ts';
 import { realTransport } from '../../shared/edge/transport.ts';
 import type { Rng } from '../../shared/lib/rng.ts';
-import { Controller } from './src/app/controller.js';
-import { browserEffects } from './src/app/effects.js';
+import { Controller } from './src/app/controller.ts';
+import { browserEffects } from './src/app/effects.ts';
 import { DICE_IMAGES } from './src/assets/diceImages.js';
 import { ClientSession } from './src/net/client.ts';
-import { HostSession, type HostOptions } from './src/net/host.ts';
+import { HostSession } from './src/net/host.ts';
 import { clientTransport, hostTransport, type PeerDeps } from './src/net/peerjs.ts';
-import type { Role } from './src/net/protocol.ts';
-import type { HostEvents, SessionEvents } from './src/net/session.ts';
 
 const injectDiceStyles = (): void => {
   const style = document.createElement('style');
@@ -28,7 +26,8 @@ const injectDiceStyles = (): void => {
 
 const boot = (): void => {
   injectDiceStyles();
-  const effects = browserEffects();
+  // Lobby codes and ids draw from Math.random as on the legacy page (the e2e harness seeds it).
+  const effects = browserEffects(Math.random);
   const root = document.getElementById('app');
   if (!root) throw new Error('Missing #app root');
   const tokenKey = (code: string): string => `fidice-token-${code}`;
@@ -36,7 +35,7 @@ const boot = (): void => {
   // rng a harness installs before boot, and the controller exposed after it.
   const page = window as Window & {
     __rng?: Rng;
-    __fidice?: { controller: InstanceType<typeof Controller> };
+    __fidice?: { controller: Controller };
   };
   // Only the host rolls dice; guests still get Math.random for nothing in particular, as before.
   const rng: Rng = page.__rng ?? Math.random;
@@ -52,7 +51,7 @@ const boot = (): void => {
       clock: realClock,
       doc: document,
       root,
-      makeHost: (opts: HostOptions, events: HostEvents) =>
+      makeHost: (opts, events) =>
         new HostSession(
           {
             transport: hostTransport(opts.code, peerDeps),
@@ -63,7 +62,7 @@ const boot = (): void => {
           },
           opts,
         ),
-      makeClient: (code: string, role: Role, name: string | null, events: SessionEvents) =>
+      makeClient: (code, role, name, events) =>
         new ClientSession(
           {
             transport: clientTransport(code, peerDeps),
