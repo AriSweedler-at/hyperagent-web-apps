@@ -15,13 +15,15 @@ export default defineConfig({
         'web/games/fidice/src/domain/**/*.ts',
         'web/games/fidice/src/bots/**/*.ts',
         'web/games/fidice/src/net/protocol.ts',
+        'web/games/fidice/src/view/**/*.ts',
         'infra/games-proxy/worker.js',
       ],
       exclude: ['**/*.test.ts'],
       // The shared pure library is held at 100%; the edges (effects behind injected fakes) at
       // 90% lines. The fidice pure core (domain, bots and net/protocol, typed in docs/MIGRATION.md
       // step 8) is at 90% lines, functions and statements, exercised by the parity suites; the
-      // domain's *.algorithms.ts at 100% lines. Engine and the rest get theirs as they land
+      // domain's *.algorithms.ts at 100% lines; the fidice view (step 9) at 90%, exercised by the
+      // per-screen render tests and the view oracle. Engine and the rest get theirs as they land
       // (docs/ARCHITECTURE.md "Testing pyramid").
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
@@ -29,6 +31,7 @@ export default defineConfig({
         'web/games/fidice/src/domain/**': { lines: 90, functions: 90, statements: 90 },
         'web/games/fidice/src/bots/**': { lines: 90, functions: 90, statements: 90 },
         'web/games/fidice/src/net/protocol.ts': { lines: 90, functions: 90, statements: 90 },
+        'web/games/fidice/src/view/**': { lines: 90, functions: 90, statements: 90 },
         'web/games/fidice/src/domain/*.algorithms.ts': {
           lines: 100,
           functions: 100,

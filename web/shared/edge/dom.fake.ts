@@ -57,6 +57,9 @@ export type FakeElement = Readonly<{
   removeEventListener: (type: string, fn: FakeListener) => void;
   /** The event types with at least one listener, in first-registration order. */
   listenerTypes: () => ReadonlyArray<string>;
+  /** Focus management is a no-op here; a browser would move focus. */
+  focus: () => void;
+  blur: () => void;
 }> &
   FormProps;
 
@@ -158,6 +161,8 @@ const newElement = (tag: string): FakeElement => {
       else listeners.set(type, kept);
     },
     listenerTypes: () => [...listeners.keys()],
+    focus: () => undefined,
+    blur: () => undefined,
     ...(FORM_PROPS[tag] ?? {}),
   };
   LISTENERS.set(el, listeners);
@@ -251,6 +256,13 @@ export const all = (
 export const byId = (root: FakeNode, id: string): FakeElement | null =>
   all(root, (el) => el.getAttribute('id') === id)[0] ?? null;
 
+/** The element with `id`, which the tree must hold. */
+export const requireId = (root: FakeNode, id: string): FakeElement => {
+  const el = byId(root, id);
+  if (el === null) throw new Error(`missing element #${id}`);
+  return el;
+};
+
 export const classesOf = (el: FakeElement): ReadonlyArray<string> =>
   (el.getAttribute('class') ?? '').split(' ').filter((c) => c !== '');
 
@@ -259,3 +271,19 @@ export const hasClass = (el: FakeElement, className: string): boolean =>
 
 export const byClass = (root: FakeNode, className: string): ReadonlyArray<FakeElement> =>
   all(root, (el) => hasClass(el, className));
+
+export type Recorder<T> = Readonly<{
+  record: (value: T) => void;
+  recorded: () => ReadonlyArray<T>;
+}>;
+
+/** Collects what handlers dispatch, in order (a view test's `dispatch`). */
+export const recorder = <T>(): Recorder<T> => {
+  const values: T[] = [];
+  return {
+    record: (value) => {
+      values.push(value);
+    },
+    recorded: () => values,
+  };
+};
