@@ -35,17 +35,17 @@
       "endLine": 556,
       "typed": true
     },
-    "src/net/protocol.js": {
+    "src/net/protocol.ts": {
       "section": "src/net/protocol.ts",
       "startLine": 559,
       "endLine": 607,
-      "sha256": "dd6a52fa0a0910cf1fb4ae050ea71e15e71079b55c3651f5355f9adab9437181"
+      "typed": true
     },
     "src/net/client.js": {
       "section": "src/net/client.ts",
       "startLine": 610,
       "endLine": 663,
-      "sha256": "74c2f143621ea9843a8875b3379549f0a86972fd61193220b9966d7dcae268e6"
+      "sha256": "a94b47c52f9110a7dc328af238bc03c3eb31c3b9f7860473ed20405ec5439769"
     },
     "src/domain/game.ts": {
       "section": "src/domain/game.ts",
@@ -141,7 +141,7 @@
       "section": "src/net/host.ts",
       "startLine": 1892,
       "endLine": 2108,
-      "sha256": "10f00ec3d0b2848853e1c426f0dba51794542ff9342c288df9ec5b94f9e2d49d"
+      "sha256": "92ef5afbb9571b677684b43b02c31978c0ab85ee85d0d9e965cecfb42e6589ad"
     },
     "src/net/peerjs.js": {
       "section": "src/net/peerjs.ts",
@@ -243,7 +243,7 @@
       "section": "src/app/main.ts",
       "startLine": 4002,
       "endLine": 4030,
-      "sha256": "d0570ac860019a6f809e051bf6cb428e148fb7baf7e85677d2543286555d593b"
+      "sha256": "c26a90d8fcda8d9f50ea235248b4779976183ce51f19931bb249293bb0e95e58"
     }
   }
 }

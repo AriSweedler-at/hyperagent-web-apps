@@ -7,7 +7,7 @@ import { DICE_IMAGES } from './src/assets/diceImages.js';
 import './src/domain/dice.ts';
 import './src/domain/hands.ts';
 import './src/domain/result.ts';
-import './src/net/protocol.js';
+import './src/net/protocol.ts';
 import { ClientSession } from './src/net/client.js';
 import './src/domain/game.ts';
 import './src/domain/publicState.ts';

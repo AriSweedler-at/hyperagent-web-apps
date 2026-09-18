@@ -4,7 +4,7 @@
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
 import { expect } from '../domain/result.ts';
-import { decodeClientMessage } from './protocol.js';
+import { decodeClientMessage } from './protocol.ts';
 import {
   HOST, apply, bySeat, newGame, scheduleAutoNext, stampLog, startGame,
 } from '../domain/game.ts';
