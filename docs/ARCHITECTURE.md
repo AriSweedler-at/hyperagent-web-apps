@@ -530,3 +530,22 @@ Step 8 (type the Fidice pure core), phase 1: `domain/**`:
   stays the guard (`lib: ES2023`, no DOM).
 - `JS_FILE_COUNT` is 31. Coverage thresholds: `web/games/fidice/src/domain/**` at 90% lines,
   functions and statements; `*.algorithms.ts` there at 100%.
+
+Step 8 (type the Fidice pure core), phase 2: `bots/**` and `net/protocol.ts`:
+
+- The bots' shared shapes live in `bots/types.ts` next to two type guards (`hasRound`, `hasBid`),
+  as `domain/types.ts` holds its two counts: a module the manifest does not list may add runtime
+  exports, a typed legacy module may not (fidice.modules.test.ts checks every export against the
+  fixture). `Strategy<M>` is generic in its memory; `anyStrategy` erases it with a cast for the
+  registry's pool, as the bundle's name says it did.
+- `toolkit.readSeat` and `raisesBy` accept `Seat | null` because trapper passes `r.bidder`
+  unchecked; a `null` reads as an empty dossier, which is what the bundle computed.
+- `net/protocol.ts` uses the `web/shared/lib/json` leaf decoders (`integer`, `boolean`, `arrayOf`)
+  for field checks and keeps its own frame walk, `isRecord` (arrays included) and refusal texts:
+  the parity suite pins the texts, and `json.object` differs on inherited keys and wording. The
+  `state` of a server frame is cast to `PublicState` on the shape check alone, as before.
+- `tsconfig.web.json` no longer excludes `bots/**` or `net/protocol.ts` (same reason as `domain/**`
+  in phase 1). `JS_FILE_COUNT` is 19. Coverage thresholds: `bots/**` and `net/protocol.ts` at 90%
+  lines, functions and statements.
+- `.prettierignore` still skips `/web/games/fidice/src/` as a whole; the typed `.ts` files there
+  are formatted with Prettier by hand until the ignore is narrowed to the generated `.js`.
