@@ -54,9 +54,9 @@ const pageInputs = (): Readonly<Record<string, string>> =>
 /**
  * After the bundle is written, copy each legacy page over Vite's output for that path, so dist
  * serves exactly the bytes in legacy/. legacy/shared/ice.js is copied on every build, even with
- * `LEGACY_PAGES=`: the served fidice page still loads it as a classic script until
- * docs/MIGRATION.md step 9 wires the typed edge. The output directory is read from the resolved
- * config, so `vite build --outDir ../dist-next` (npm run build:next) is honoured.
+ * `LEGACY_PAGES=`: the legacy gin page loads it as a classic script (fidice stopped in
+ * docs/MIGRATION.md step 9; the copy goes with legacy/ in step 13). The output directory is read
+ * from the resolved config, so `vite build --outDir ../dist-next` (npm run build:next) is honoured.
  */
 const legacyPassthrough = (pages: ReadonlyArray<string>): Plugin => {
   let outDir = DIST;

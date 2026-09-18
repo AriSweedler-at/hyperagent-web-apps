@@ -52,8 +52,10 @@ describeDist('dist paths on both origins', (root) => {
   const relative = allReferences(root).filter(({ value }) => isRelative(classify(value)));
   const checked = relative.filter((reference) => !isDeadByDesign(root, reference));
 
-  test('there are relative references to check (landing links, shared/ice.js)', () => {
-    expect(checked.length).toBeGreaterThanOrEqual(4);
+  test('there are relative references to check (landing links, the fidice bundle and CSS)', () => {
+    // dist/: two landing links, the fidice bundle, its CSS and the gin page's shared/ice.js;
+    // dist-next/: one landing link (gin-rummy is left out by design), the bundle and the CSS.
+    expect(checked.length).toBeGreaterThanOrEqual(root.name === 'dist-next' ? 3 : 5);
   });
 
   test('the only references left out are landing links to pages this tree does not hold', () => {

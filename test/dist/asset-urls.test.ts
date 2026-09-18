@@ -35,9 +35,13 @@ describeDist('dist asset URLs', (root) => {
   });
 
   test('every load of shared/ice.js uses the one mapped parent path', () => {
+    // Only the legacy pages load it as a classic script (fidice stopped in docs/MIGRATION.md
+    // step 9), so a tree without legacy pages (dist-next/) has no such load.
     const iceLoads = allReferences(root).filter(({ value }) => value.endsWith('/ice.js'));
-    expect(iceLoads.length).toBeGreaterThan(0);
-    expect(new Set(iceLoads.map(({ value }) => value))).toEqual(new Set(['../../shared/ice.js']));
+    expect(iceLoads.length > 0).toBe(root.legacyPages.length > 0);
+    expect(new Set(iceLoads.map(({ value }) => value))).toEqual(
+      new Set(root.legacyPages.length > 0 ? ['../../shared/ice.js'] : []),
+    );
   });
 
   test('nothing is emitted under a root assets/ directory', () => {
@@ -47,9 +51,8 @@ describeDist('dist asset URLs', (root) => {
   test('the fidice page loads its bundle beside itself and its CSS under ../../shared/assets/', () => {
     const page = 'games/fidice/index.html';
     const references = referencesIn(page, readDist(root, page));
+    // Its only script is the bundle: PeerJS and the ICE loader come inside it (step 9).
     expect(references.filter(({ kind }) => kind === 'src').map(({ value }) => value)).toEqual([
-      'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js',
-      '../../shared/ice.js',
       expect.stringMatching(/^\.\/app-[\w-]+\.js$/) as string,
     ]);
     expect(

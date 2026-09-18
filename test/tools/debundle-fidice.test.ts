@@ -29,6 +29,8 @@ const manifest = JSON.parse(readRepoFile(FIDICE_MANIFEST)) as DebundleManifest;
 /** The modules typed so far (step 8) and the ones the tool still generates. */
 const typed = debundled.modules.filter((m) => portedOnDisk(m.section.name));
 const generated = debundled.modules.filter((m) => !portedOnDisk(m.section.name));
+/** `main.ts` once the entry is typed (docs/MIGRATION.md step 9), `main.js` before. */
+const entryFile = portedOnDisk('src/app/main') ? 'main.ts' : 'main.js';
 
 /** Every regular file under web/games/fidice except the manifest, as posix paths relative to it. */
 const committedFiles = (): ReadonlyArray<string> =>
@@ -39,13 +41,13 @@ const committedFiles = (): ReadonlyArray<string> =>
     .sort();
 
 describe('the de-bundled fidice modules', () => {
-  test('the tool splits the bundle at 39 markers: 38 modules under src/ and main.js', () => {
+  test('the tool splits the bundle at 39 markers: 38 modules under src/ and the entry', () => {
     const files = [...debundled.files.keys()];
     expect(debundled.modules).toHaveLength(39);
     expect(files.filter((file) => file.startsWith('src/') && file.endsWith('.js'))).toHaveLength(
-      38 - typed.length,
+      38 - typed.filter((m) => m.section.name !== 'src/app/main').length,
     );
-    expect(files).toContain('main.js');
+    expect(files.includes('main.js')).toBe(entryFile === 'main.js');
     expect(files).toContain('index.html');
     expect(files).toContain('theme.css');
     expect(debundled.modules.map((m) => `${m.section.name}.ts`)).toEqual(
@@ -67,10 +69,9 @@ describe('the de-bundled fidice modules', () => {
 
   test('a typed module replaces its generated .js, and nothing imports the .js any more', () => {
     typed.forEach(({ section }) => {
-      expect(section.file, section.name).toBe(`${section.name}.ts`);
-      expect(existsSync(resolve(REPO_ROOT, FIDICE_DIR, `${section.name}.js`)), section.name).toBe(
-        false,
-      );
+      const stem = section.name === 'src/app/main' ? 'main' : section.name;
+      expect(section.file, section.name).toBe(`${stem}.ts`);
+      expect(existsSync(resolve(REPO_ROOT, FIDICE_DIR, `${stem}.js`)), section.name).toBe(false);
     });
     committedFiles()
       .filter((file) => file.endsWith('.js'))
@@ -126,9 +127,9 @@ describe('the de-bundled fidice modules', () => {
     expect(debundled.report.evaluationOrder).toEqual(debundled.report.bundleOrder);
   });
 
-  test('main.js imports every module in bundle order and exports nothing', () => {
+  test('the entry imports every module in bundle order and exports nothing', () => {
     const main = debundled.modules.at(-1);
-    expect(main?.section.file).toBe('main.js');
+    expect(main?.section.file).toBe(entryFile);
     expect(main?.exports).toEqual([]);
     expect(main?.imports.map((imp) => imp.from.name)).toEqual(
       debundled.report.bundleOrder.slice(0, -1),
@@ -148,18 +149,22 @@ describe('the de-bundled fidice modules', () => {
     });
   });
 
-  test('the page keeps its head, loads shared/ice.js as a classic script and boots main.js as a module', () => {
+  test('the page keeps its head and boots the entry as a module; the classic scripts go with the typed entry', () => {
     const html = debundled.files.get('index.html') ?? '';
     expect(html).toContain("<title>Fidice — one-cup liar's dice</title>");
-    expect(html).toContain(
-      '<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>',
-    );
-    expect(html).toContain('<script vite-ignore src="../../shared/ice.js"></script>');
+    expect(html).toContain('<link rel="preconnect" href="https://fonts.googleapis.com">');
     expect(html).toContain('<link rel="stylesheet" href="./theme.css">');
     expect(html).toContain('<div id="app"></div>');
-    expect(html).toContain('<script type="module" src="./main.js"></script>');
+    expect(html).toContain(`<script type="module" src="./${entryFile}"></script>`);
     expect(html).not.toContain('<style>');
     expect(html).not.toContain('"use strict"');
+    // Step 9: PeerJS and the ICE loader are bundled through web/shared/edge (main.ts), so the
+    // page defines neither `window.Peer` nor `window.HyperIce`; before that it loaded both.
+    const peerCdn = '<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>';
+    const iceScript = '<script vite-ignore src="../../shared/ice.js"></script>';
+    expect(html.includes(peerCdn)).toBe(entryFile === 'main.js');
+    expect(html.includes(iceScript)).toBe(entryFile === 'main.js');
+    expect(/shared\/ice\.js|peerjs\.min\.js/.test(html)).toBe(entryFile === 'main.js');
   });
 
   test('theme.css is the two <style> blocks of the page in order', () => {

@@ -6,7 +6,7 @@
   "sourceSha256": "7cb363b9005289b1e52632fbcecfae41cb79fa558959b013965d4bd863ef2776",
   "files": {
     "index.html": {
-      "sha256": "70f8ab3c73dd65be941abd767e7790211157b5ae8dad591812080acb1a3450e1"
+      "sha256": "a6438febffb0f930a7f4eab98d117aa6596c0d4329591abc7efcb186397b0e3f"
     },
     "theme.css": {
       "sha256": "12363c3fb618eebda271ef26f2ebb4e237de080c944ed03c7ac0f5541907a5cf"
@@ -41,11 +41,11 @@
       "endLine": 607,
       "typed": true
     },
-    "src/net/client.js": {
+    "src/net/client.ts": {
       "section": "src/net/client.ts",
       "startLine": 610,
       "endLine": 663,
-      "sha256": "a94b47c52f9110a7dc328af238bc03c3eb31c3b9f7860473ed20405ec5439769"
+      "typed": true
     },
     "src/domain/game.ts": {
       "section": "src/domain/game.ts",
@@ -137,23 +137,23 @@
       "endLine": 1889,
       "typed": true
     },
-    "src/net/host.js": {
+    "src/net/host.ts": {
       "section": "src/net/host.ts",
       "startLine": 1892,
       "endLine": 2108,
-      "sha256": "92ef5afbb9571b677684b43b02c31978c0ab85ee85d0d9e965cecfb42e6589ad"
+      "typed": true
     },
-    "src/net/peerjs.js": {
+    "src/net/peerjs.ts": {
       "section": "src/net/peerjs.ts",
       "startLine": 2111,
       "endLine": 2212,
-      "sha256": "fcd1759f4bd0ac7f0c708434ea1fd320dba20918edce866b0fcf6a1b31b99a8d"
+      "typed": true
     },
-    "src/net/session.js": {
+    "src/net/session.ts": {
       "section": "src/net/session.ts",
       "startLine": 2215,
       "endLine": 2219,
-      "sha256": "bbd24f01d46133cb63496034c2cc13a7c2500745bca8bc9555e160dcd0ae8857"
+      "typed": true
     },
     "src/domain/search.ts": {
       "section": "src/domain/search.ts",
@@ -239,11 +239,11 @@
       "endLine": 3999,
       "sha256": "cca941aaefcab14771d3f79aceff2f54bc42eb03f0918024a0f35f16f48a14cb"
     },
-    "main.js": {
+    "main.ts": {
       "section": "src/app/main.ts",
       "startLine": 4002,
       "endLine": 4030,
-      "sha256": "c26a90d8fcda8d9f50ea235248b4779976183ce51f19931bb249293bb0e95e58"
+      "typed": true
     }
   }
 }

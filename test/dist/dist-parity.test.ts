@@ -85,8 +85,10 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     expect(html).toMatch(
       /<link rel="stylesheet" crossorigin href="\.\.\/\.\.\/shared\/assets\/fidice-[\w-]+\.css">/,
     );
-    expect(html).toContain('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js">');
-    expect(html).toContain('src="../../shared/ice.js"');
+    // Step 9: PeerJS and the ICE loader are bundled (web/shared/edge), so the page loads neither
+    // the CDN script nor shared/ice.js and defines no `window.Peer` / `window.HyperIce`.
+    expect(html).not.toContain('peerjs.min.js');
+    expect(html).not.toContain('shared/ice.js');
     expect(html).toContain('<div id="app"></div>');
     expect(html).not.toContain('"use strict";');
     expect(html).not.toContain('vite-ignore');
@@ -98,7 +100,6 @@ describeDist('dist parity with legacy/ and web/', (root) => {
       .map(({ value }) => value)
       .filter((value) => !value.startsWith('https://'));
     expect(relative).toEqual([
-      '../../shared/ice.js',
       expect.stringMatching(/^\.\/app-[\w-]+\.js$/) as string,
       expect.stringMatching(/^\.\.\/\.\.\/shared\/assets\/fidice-[\w-]+\.css$/) as string,
     ]);

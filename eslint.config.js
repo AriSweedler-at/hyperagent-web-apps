@@ -23,7 +23,8 @@ const ALGORITHMS = ['**/*.algorithms.ts'];
 const EDGES = [
   'web/**/main.ts',
   'web/**/app/**/*.ts',
-  'web/games/*/src/net/{host,guest,client,session}.ts',
+  // fidice's peerjs.ts is the PeerJS adapter itself: it holds the deferred Peer (step 9).
+  'web/games/*/src/net/{host,guest,client,session,peerjs}.ts',
   'web/**/view/vdom.ts',
   'web/shared/edge/**/*.ts',
 ];
