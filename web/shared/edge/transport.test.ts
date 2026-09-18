@@ -233,6 +233,32 @@ describe('realTransport', () => {
     ]);
   });
 
+  test('every construction is recorded on globalThis.__peerCalls with its exact arguments (test hook)', () => {
+    const g = globalThis as { __peerCalls?: unknown[] };
+    const before = g.__peerCalls;
+    delete g.__peerCalls;
+    try {
+      const t = realTransport({ ice: ICE, search: '', debug: 1 });
+      t.open('fidice-abcde');
+      t.open(undefined);
+      // Read through a fresh reference: `delete` above narrowed `g.__peerCalls` to undefined.
+      const calls = (globalThis as { __peerCalls?: unknown[] }).__peerCalls ?? [];
+      const peers = created.slice(-2).map((peer) => (peer as { args: unknown[] }).args);
+      // The same argument lists PeerJS received, the options object by identity.
+      expect(calls).toEqual(peers);
+      expect((calls[0] as unknown[])[1]).toBe(peers[0]?.[1]);
+      expect((calls[1] as unknown[])[0]).toBe(peers[1]?.[0]);
+      // An array that already exists (the Playwright recorder's) is appended to, not replaced.
+      const seeded: unknown[] = ['seeded'];
+      g.__peerCalls = seeded;
+      realTransport({ ice: null, search: '' }).open('x');
+      expect(seeded).toEqual(['seeded', ['x', { debug: 0 }]]);
+    } finally {
+      if (before === undefined) delete g.__peerCalls;
+      else g.__peerCalls = before;
+    }
+  });
+
   test('defaults: debug 0, no override, no config without ICE (exactly gin PEER_OPTS)', () => {
     realTransport({ ice: null, search: '' }).open('x');
     expect(lastPeer().args).toEqual(['x', { debug: 0 }]);

@@ -83,7 +83,11 @@ Games never import each other. `infra/` shares only the pure `mapPath()` with te
 
 Documented test hooks that are part of the contract: `window.__gin`, `window.__fidice`,
 `window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
-`?ice=<url>` (ICE config override).
+`?ice=<url>` (ICE config override), and `globalThis.__peerCalls`: `web/shared/edge/transport.ts`
+pushes the arguments of every `new Peer(...)` it makes (`[id, options]` for a host, `[options]` for
+a guest, `options` the exact object handed to PeerJS) onto that array, creating it if absent, so a
+page that no longer exposes `window.Peer` can still be checked for the ICE config and broker
+override it used (the same shape `e2e/browser/record-peer.js` records for the legacy pages).
 
 ## Build and serve
 
