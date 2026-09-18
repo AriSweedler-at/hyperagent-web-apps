@@ -290,3 +290,20 @@ parity and e2e gates.
   always copies `shared/ice.js`; `npm run build:next` writes dist-next/ for the e2e project `next`
   and the dist guards run on both trees. `test/ratchet.test.ts` lands here rather than in step 8.
   See ARCHITECTURE "Deviations".
+- Step 7: `legacy/fidice/index.html` is retained, not deleted: it is the frozen source that the
+  sha256 oracle (`test/fixtures/legacy/MANIFEST.json`), `tools/legacy/extract-fidice-core.ts` and
+  `tools/legacy/debundle-fidice.ts` read, and the generated modules' headers name it; moving it would
+  churn 40 generated files for no behaviour gain. It is no longer served: `'fidice'` left
+  `DEFAULT_LEGACY_PAGES` and `dist/games/fidice/index.html` is Vite's module page on both origins
+  (`test/dist/dist-parity.test.ts` asserts that, that every asset it references exists, and that the
+  fidice output is byte-identical in dist/ and dist-next/). Its delete is deferred to step 13 with
+  the rest of `legacy/`. The e2e project `next` keeps only `smoke.spec.ts` (fidice-online there would
+  replay the same bytes `pages` and `proxy` now cover); it stays for the gin port. Rollback is still
+  one revert, with one window the legacy page did not have: the served `games/fidice/index.html` is
+  unhashed and references `./app-[hash].js` and `../../shared/assets/fidice-[hash].css`, both origins
+  send `cache-control: max-age=600` on it, and `emptyOutDir: true` drops the previous hashes on
+  every build, so after a deploy that changes the hash (or the revert) a viewer holding the cached
+  page can get a 404 for the old module script and see an empty page for up to 10 minutes until they
+  reload. Closing it (carrying the previous deploy's `app-*.js` and `fidice-*.css` into `dist/`
+  before publishing) is deferred to step 13. The computed-style goldens and visual snapshots named
+  above are not captured (see step 3). See ARCHITECTURE "Deviations".

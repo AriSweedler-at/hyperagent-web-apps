@@ -2,8 +2,9 @@
 // projects: `pages` (GitHub Pages emulated by tools/serve-dist.ts, dist/ under /hyperagent-web-apps/
 // on :4173) and `proxy` (games.sweedler.com emulated by tools/proxy-dev.ts on :8787, running the
 // real Worker against :4173). A third project, `next`, serves dist-next/ (built with `LEGACY_PAGES=`,
-// docs/MIGRATION.md step 6) the same way on :4174 and runs the smoke and fidice-online specs against
-// the ported page before it is flipped. The specs exercise the built site: `npm run test:e2e` is
+// docs/MIGRATION.md step 6) the same way on :4174 and runs the smoke spec against the pages that
+// tree holds; it is where a ported page plays before it is flipped (fidice did, until step 7 cut it
+// over; the gin port is next). The specs exercise the built site: `npm run test:e2e` is
 // `npm run build && npm run build:next && playwright test`, so both trees are fresh; a bare
 // `playwright test` reuses them. Online specs meet on a local PeerServer (`peer` package) on :9000,
 // which the pages reach through their `?peer=` hook; `E2E_BROKER=cloud` leaves it out so the
@@ -47,9 +48,12 @@ export default defineConfig({
     { name: 'proxy', use: { baseURL: `${PROXY_ORIGIN}/` } },
     {
       // The dark build: only the specs for pages that exist in dist-next/ (e2e/fixtures/site.ts).
+      // Since step 7 the fidice output is byte-identical in dist/ and dist-next/
+      // (test/dist/dist-parity.test.ts), so fidice-online runs on `pages` and `proxy` only; a
+      // ported gin page joins this list when step 12 ships it dark.
       name: 'next',
       use: { baseURL: `${NEXT_ORIGIN}${PAGES_BASE_PATH}` },
-      testMatch: ['smoke.spec.ts', 'fidice-online.spec.ts'],
+      testMatch: ['smoke.spec.ts'],
     },
   ],
   webServer: [

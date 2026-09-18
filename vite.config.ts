@@ -20,13 +20,14 @@ const LEGACY = resolve(REPO_ROOT, 'legacy');
 
 /**
  * Pages served byte-for-byte from legacy/ until their port is cut over (docs/MIGRATION.md).
- * Cutting a page over is deleting it from this list and deleting its legacy file.
+ * Cutting a page over is deleting it from this list (step 7 did so for fidice; its legacy file
+ * stays as the frozen source of the oracle fixtures until step 13 retires legacy/).
  */
-export const DEFAULT_LEGACY_PAGES: ReadonlyArray<string> = ['gin-rummy', 'fidice'];
+export const DEFAULT_LEGACY_PAGES: ReadonlyArray<string> = ['gin-rummy'];
 
 /**
- * `LEGACY_PAGES=gin-rummy,fidice` overrides the list; `LEGACY_PAGES=` (empty) disables the
- * passthrough so a ported page can be exercised end-to-end before it is flipped (e2e project `next`).
+ * `LEGACY_PAGES=gin-rummy` overrides the list; `LEGACY_PAGES=` (empty) disables the passthrough
+ * so a ported page can be exercised end-to-end before it is flipped (e2e project `next`).
  */
 export const legacyPagesFrom = (env: string | undefined): ReadonlyArray<string> =>
   env === undefined
@@ -53,7 +54,7 @@ const pageInputs = (): Readonly<Record<string, string>> =>
 /**
  * After the bundle is written, copy each legacy page over Vite's output for that path, so dist
  * serves exactly the bytes in legacy/. legacy/shared/ice.js is copied on every build, even with
- * `LEGACY_PAGES=`: the ported fidice page still loads it as a classic script until
+ * `LEGACY_PAGES=`: the served fidice page still loads it as a classic script until
  * docs/MIGRATION.md step 9 wires the typed edge. The output directory is read from the resolved
  * config, so `vite build --outDir ../dist-next` (npm run build:next) is honoured.
  */

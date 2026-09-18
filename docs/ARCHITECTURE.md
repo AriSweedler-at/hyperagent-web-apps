@@ -102,6 +102,12 @@ overwriting Vite's output for that path. Cutting a page over is deleting it from
 deleting its legacy file; rollback is reverting that commit. The e2e `next` project builds
 with `LEGACY_PAGES=` so a ported page is exercised end-to-end before it is flipped.
 
+A cut-over page is an unhashed `index.html` referencing hashed sub-resources, both origins send
+`cache-control: max-age=600` on it, and `emptyOutDir: true` removes the previous hashes on every
+build. A deploy that changes a page's hash (the rollback revert included) therefore leaves a viewer
+with the cached page requesting an `app-[hash].js` that 404s, an empty page, for up to 10 minutes
+until they reload. A self-contained legacy page has no such window.
+
 Deploy: `.github/workflows/ci.yml` job `deploy` runs only on push to `main`, `needs: [check, e2e]`,
 `permissions: {contents: read, pages: write, id-token: write}`, `concurrency: {group: pages}`,
 steps `actions/configure-pages@v5`, `actions/upload-pages-artifact@v3 {path: dist}`,
@@ -482,3 +488,23 @@ Step 6 (de-bundle Fidice into modules, shipped dark):
   and names the nine browser globals the bundle uses under `no-undef`; import-x zones and `no-cycle`
   stay on and pass. `test/ratchet.test.ts` (listed under step 8 in MIGRATION) lands here and pins
   the `.js` count under `web/` at 39: the count exists from the first `.js` file.
+
+Step 7 (cut Fidice over):
+
+- `DEFAULT_LEGACY_PAGES` is `['gin-rummy']`; `legacy/fidice/index.html` is kept in place, unserved,
+  as the frozen source the oracle manifest, `extract-fidice-core.ts` and `debundle-fidice.ts` read
+  (and the generated module headers name). "Cutting a page over is deleting it from that list and
+  deleting its legacy file" therefore splits in two: the list entry goes at the flip, the file goes
+  in step 13 with the rest of `legacy/`.
+- The cutover introduces the up-to-10-minute cache window described in "Build and serve" (cached
+  `games/fidice/index.html` asking for a dropped `app-[hash].js` after a hash-changing deploy or the
+  revert). It is documented, not closed; a retained-assets copy in the deploy job (or dropping
+  `emptyOutDir`) is noted for step 13.
+- `test/dist/dist-parity.test.ts` asserts the served fidice page is Vite's (module script beside the
+  page, `shared/assets/fidice-[hash].css`, no inline bundle), that every relative asset it references
+  is a file in the tree, that the legacy file is still present, and that the fidice output in dist/
+  and dist-next/ is byte-identical; `asset-urls` and `check-dist-paths` cover the fidice page in
+  both trees with no skips.
+- The Playwright project `next` runs `smoke.spec.ts` only: with fidice flipped, dist-next/ differs
+  from dist/ by the absence of gin-rummy alone, so fidice-online there duplicated `pages`/`proxy`.
+  The project and `npm run build:next` stay for the gin port (step 12).
