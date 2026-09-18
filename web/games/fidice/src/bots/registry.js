@@ -7,9 +7,9 @@ import { anyStrategy } from './strategy.ts';
 import { classicCautious, classicReckless, classicSteady } from './strategies/classic.ts';
 import { profiler } from './strategies/profiler.ts';
 import { trapper } from './strategies/trapper.ts';
-import { gambler } from './strategies/gambler.js';
-import { pressure } from './strategies/pressure.js';
-import { learnerWith } from './strategies/learner.js';
+import { gambler } from './strategies/gambler.ts';
+import { pressure } from './strategies/pressure.ts';
+import { learnerWith } from './strategies/learner.ts';
 import { CHECKPOINTS } from './strategies/learnerWeights.ts';
 
   var LEARNERS = CHECKPOINTS.map((c) => anyStrategy(learnerWith(`learner-${c.generation}`, `Learner (gen ${c.generation})`, `Trained by evolution for ${c.generation} generations against the shipped AIs; won ${(c.fitness * 100).toFixed(0)}% of its training games.`, c.weights)));

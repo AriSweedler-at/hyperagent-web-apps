@@ -95,23 +95,23 @@
       "endLine": 1276,
       "typed": true
     },
-    "src/bots/strategies/gambler.js": {
+    "src/bots/strategies/gambler.ts": {
       "section": "src/bots/strategies/gambler.ts",
       "startLine": 1279,
       "endLine": 1519,
-      "sha256": "ce086771b48fd1d45d8519a1751e330cb15d077aab1aa37ad4db28622891a9f1"
+      "typed": true
     },
-    "src/bots/strategies/pressure.js": {
+    "src/bots/strategies/pressure.ts": {
       "section": "src/bots/strategies/pressure.ts",
       "startLine": 1522,
       "endLine": 1653,
-      "sha256": "417ef55e4b4b3ea1d6efce95994f8172aeec41a7e09936af32bbaae53c01e7b5"
+      "typed": true
     },
-    "src/bots/strategies/learner.js": {
+    "src/bots/strategies/learner.ts": {
       "section": "src/bots/strategies/learner.ts",
       "startLine": 1656,
       "endLine": 1759,
-      "sha256": "f72acd199e00c2ae2dc50470d4a4f6390ef9a16ae39d9832e007349edc7681b4"
+      "typed": true
     },
     "src/bots/strategies/learnerWeights.ts": {
       "section": "src/bots/strategies/learnerWeights.ts",
@@ -123,7 +123,7 @@
       "section": "src/bots/registry.ts",
       "startLine": 1769,
       "endLine": 1799,
-      "sha256": "710a7934a0a533a7d44c8b1d849cfb95ddb1f290b6481c922e989eb390109aec"
+      "sha256": "b79f739543bed8f4f4a84f59c2ed3d64f10d41083f965ae3ed2ca7dff7c89c8d"
     },
     "src/bots/brain.js": {
       "section": "src/bots/brain.ts",
@@ -243,7 +243,7 @@
       "section": "src/app/main.ts",
       "startLine": 4002,
       "endLine": 4030,
-      "sha256": "89c449fbeca0b89500b80263b237de58ae92a99f5d5608566482e5685f6dea5e"
+      "sha256": "6daecb0b162a1ab011c7ee2171ee2f35182a30c08e52e7fbc7bce3d268560423"
     }
   }
 }
