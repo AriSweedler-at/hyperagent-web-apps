@@ -5,7 +5,7 @@
 
 import { BOTTOM_RANK, TOP_RANK } from '../../domain/hands.ts';
 import { publicCupIndices, publicTableIndices } from '../../domain/publicState.ts';
-import { bestKeep, floorBid, jitter, oddsBidTrue, rollFor, say, visibleRank } from '../toolkit.js';
+import { bestKeep, floorBid, jitter, oddsBidTrue, rollFor, say, visibleRank } from '../toolkit.ts';
 
   var turnKey = (view) => `${view.state.roundNo}:${view.state.round?.history.length ?? 0}`;
   var decideCallOrAccept = (r, style, rng) => {

@@ -59,11 +59,11 @@
       "endLine": 877,
       "typed": true
     },
-    "src/bots/strategy.js": {
+    "src/bots/strategy.ts": {
       "section": "src/bots/strategy.ts",
       "startLine": 880,
       "endLine": 880,
-      "sha256": "bf36541b6f2fd917f24d818734599b29329d8b95c2170cef99879e553df10f00"
+      "typed": true
     },
     "src/domain/probability.ts": {
       "section": "src/domain/probability.ts",
@@ -71,59 +71,59 @@
       "endLine": 903,
       "typed": true
     },
-    "src/bots/toolkit.js": {
+    "src/bots/toolkit.ts": {
       "section": "src/bots/toolkit.ts",
       "startLine": 906,
       "endLine": 972,
-      "sha256": "ac8f02135d2743813feccacdc0351a49fc02fbe3b544dfb32aa23e85b1db3d9c"
+      "typed": true
     },
     "src/bots/strategies/classic.js": {
       "section": "src/bots/strategies/classic.ts",
       "startLine": 975,
       "endLine": 1035,
-      "sha256": "f5f234f8d7aba98f30cf3dc8c039bad70e0ef909033f628f019d5473ffcc173f"
+      "sha256": "d4a0ea8acb4f8a32b8ec839754d86e48950921b5f61def578a4d65c242f6c8f9"
     },
     "src/bots/strategies/profiler.js": {
       "section": "src/bots/strategies/profiler.ts",
       "startLine": 1038,
       "endLine": 1153,
-      "sha256": "ff8e207533e1f15c7c29cc920c790360645404b758cd2da248cf9365acf36374"
+      "sha256": "c1f6865cc6dce09c51e74e9e1520ac780e5551913d52b15a0943b22e8b38a87c"
     },
     "src/bots/strategies/trapper.js": {
       "section": "src/bots/strategies/trapper.ts",
       "startLine": 1156,
       "endLine": 1276,
-      "sha256": "842c11116b054a6b53134a0012c81f9d3655ae82c709bdf11527593911a46758"
+      "sha256": "113be26b403dffbf9ac76f49bd73f34e77f912ae5624bb35958e4aa8e362cea2"
     },
     "src/bots/strategies/gambler.js": {
       "section": "src/bots/strategies/gambler.ts",
       "startLine": 1279,
       "endLine": 1519,
-      "sha256": "145f2fad35ceb1ad915904dff9b5d772a4faa00d330329a0beaa14444d5809c8"
+      "sha256": "ce086771b48fd1d45d8519a1751e330cb15d077aab1aa37ad4db28622891a9f1"
     },
     "src/bots/strategies/pressure.js": {
       "section": "src/bots/strategies/pressure.ts",
       "startLine": 1522,
       "endLine": 1653,
-      "sha256": "a758e0a2b719d3e46a599e492145dcb5ab683323ba08b5953f3347db5c025e4f"
+      "sha256": "417ef55e4b4b3ea1d6efce95994f8172aeec41a7e09936af32bbaae53c01e7b5"
     },
     "src/bots/strategies/learner.js": {
       "section": "src/bots/strategies/learner.ts",
       "startLine": 1656,
       "endLine": 1759,
-      "sha256": "ce64170e061d1b53f2606c82ba9af7d7cabb80c289458606f75aede6a8d80148"
+      "sha256": "f72acd199e00c2ae2dc50470d4a4f6390ef9a16ae39d9832e007349edc7681b4"
     },
-    "src/bots/strategies/learnerWeights.js": {
+    "src/bots/strategies/learnerWeights.ts": {
       "section": "src/bots/strategies/learnerWeights.ts",
       "startLine": 1762,
       "endLine": 1766,
-      "sha256": "0467b2ce82f97795cc61dfdd860a477c3687ebb0a9dd0045325b90f55c2c3a15"
+      "typed": true
     },
     "src/bots/registry.js": {
       "section": "src/bots/registry.ts",
       "startLine": 1769,
       "endLine": 1799,
-      "sha256": "b275429f70aadb7080240fef738389c3ced52c17e090ecd65220a6f3288336e5"
+      "sha256": "c9bc1aec1292ac623bfd3391e776435a9f007b8e15df3914c46edfa7b4cb7593"
     },
     "src/bots/brain.js": {
       "section": "src/bots/brain.ts",
@@ -219,7 +219,7 @@
       "section": "src/view/screens/botConfig.ts",
       "startLine": 3377,
       "endLine": 3475,
-      "sha256": "2f73ad02afc031596f1efea10d703c6095102be82d91a08c005bbdea4cd27301"
+      "sha256": "4a93f1445d9a3efe0229b62b82bb799cf65c146e18e32cc1d00c4ca5a0ded8a3"
     },
     "src/view/app.js": {
       "section": "src/view/app.ts",
@@ -243,7 +243,7 @@
       "section": "src/app/main.ts",
       "startLine": 4002,
       "endLine": 4030,
-      "sha256": "ddcecad7b3a9fcfe5d419295a6f8340a158a8a6f7308324409ba016fe5682870"
+      "sha256": "e50e2220259363eed37bd865edefe4984efd5e5ba163a48de5773de0c7016b46"
     }
   }
 }

@@ -11,9 +11,9 @@ const WEB = resolve(import.meta.dirname, '..', 'web');
 
 /**
  * 38 de-bundled modules under web/games/fidice/src plus web/games/fidice/main.js, minus the 8
- * domain modules step 8 typed in place (docs/MIGRATION.md step 8).
+ * domain modules and the 3 bot modules step 8 typed in place (docs/MIGRATION.md step 8).
  */
-const JS_FILE_COUNT = 31;
+const JS_FILE_COUNT = 28;
 
 const jsFilesUnderWeb = (): ReadonlyArray<string> =>
   readdirSync(WEB, { recursive: true, encoding: 'utf8' })

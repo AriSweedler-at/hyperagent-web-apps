@@ -3,14 +3,14 @@
 // and exports were recovered by scope analysis. Do not edit: `npm run debundle:fidice` regenerates
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
-import { anyStrategy } from './strategy.js';
+import { anyStrategy } from './strategy.ts';
 import { classicCautious, classicReckless, classicSteady } from './strategies/classic.js';
 import { profiler } from './strategies/profiler.js';
 import { trapper } from './strategies/trapper.js';
 import { gambler } from './strategies/gambler.js';
 import { pressure } from './strategies/pressure.js';
 import { learnerWith } from './strategies/learner.js';
-import { CHECKPOINTS } from './strategies/learnerWeights.js';
+import { CHECKPOINTS } from './strategies/learnerWeights.ts';
 
   var LEARNERS = CHECKPOINTS.map((c) => anyStrategy(learnerWith(`learner-${c.generation}`, `Learner (gen ${c.generation})`, `Trained by evolution for ${c.generation} generations against the shipped AIs; won ${(c.fitness * 100).toFixed(0)}% of its training games.`, c.weights)));
   var RANDOM_STRATEGY = "random";

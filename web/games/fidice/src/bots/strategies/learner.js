@@ -8,7 +8,7 @@ import { publicCupIndices } from '../../domain/publicState.ts';
 import {
   bestKeep, floorBid, livesOf, nextSeat, oddsAtLeast, oddsBidTrue, readSeat, rollFor,
   visibleRank,
-} from '../toolkit.js';
+} from '../toolkit.ts';
 
   var RECEIVE_FEATURES = 11;
   var ROLL_FEATURES = 7;

@@ -8,7 +8,7 @@ import { publicCupIndices, publicTableIndices } from '../../domain/publicState.t
 import {
   bestKeep, floorBid, jitter, keepFace, livesOf, nextSeat, oddsAtLeast, oddsBidTrue,
   readSeat, rollFor, say, visibleRank,
-} from '../toolkit.js';
+} from '../toolkit.ts';
 
   var freshMemory = () => ({
     turn: "",

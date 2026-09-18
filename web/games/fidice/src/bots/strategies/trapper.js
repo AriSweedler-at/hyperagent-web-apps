@@ -8,7 +8,7 @@ import { publicCupIndices, publicTableIndices } from '../../domain/publicState.t
 import {
   bestKeep, canSeeAll, floorBid, jitter, keepFace, livesOf, nextSeat, oddsAtLeast,
   oddsBidTrue, readSeat, rollFor, say, seatsAfter, visibleRank,
-} from '../toolkit.js';
+} from '../toolkit.ts';
 
   var SHAKE = "shakes the cup";
   var MIN_HIDDEN = 2;

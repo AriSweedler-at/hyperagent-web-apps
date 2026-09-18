@@ -9,7 +9,7 @@ import { probabilityAtLeast } from '../../domain/probability.ts';
 import {
   bestKeep, floorBid, jitter, livesOf, nextSeat, oddsBidTrue, readSeat, rollFor,
   say, tableValues, truthfulTop, visibleRank,
-} from '../toolkit.js';
+} from '../toolkit.ts';
 
   var RANKS = Array.from({ length: HAND_COUNT }, (_, i2) => i2);
   var ceilingOf = (table, cupCount, trust) => RANKS.findLast((r) => probabilityAtLeast(table, cupCount, r) >= trust) ?? BOTTOM_RANK;

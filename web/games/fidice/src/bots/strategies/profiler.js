@@ -9,7 +9,7 @@ import { probabilityAtLeast } from '../../domain/probability.ts';
 import {
   bestKeep, floorBid, jitter, livesOf, nextSeat, oddsAtLeast, oddsBidTrue, readSeat,
   rollFor, say, visibleRank,
-} from '../toolkit.js';
+} from '../toolkit.ts';
 
   var LIE_WEIGHT = 0.5;
   var PRIOR = { bluff: 0.4, call: 0.33, sharp: 0.4, raise: 30, lie: 26 };
