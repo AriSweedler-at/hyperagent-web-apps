@@ -600,7 +600,12 @@ Step 9 (type the Fidice edges), phase 2: `view/**` and `assets/diceImages`:
 - `view/scenarios.ts` is the one catalogue of representative states (built through the domain with
   a seeded rng) that both the render tests and the oracle use; `view/render.fake.ts` mounts a state
   and records intents. Coverage threshold: `web/games/fidice/src/view/**` at 90% lines, functions
-  and statements.
+  and statements. Follow-up: `net/**` and `app/**` join `coverage.include` with the same 90%
+  threshold each (`main.ts` stays out: it constructs the real adapters); `app/effects.test.ts` pins
+  the storage fallback rules and `app/controller.test.ts` drives the reducer over fake effects, a
+  `fakeClock`, `dom.fake.ts` and recording session stubs (the reducer's `handle` is reached through
+  a test-only cast; the screens' render tests own the handler wiring). It pins two legacy defects
+  by name: the single toast timer and `ladder.showBid` keeping the current tab when there is a bid.
 - `JS_FILE_COUNT` is 0; the debundle tool writes the page, the stylesheet and the manifest only
   and remains the audit of the bundle-to-module map. `allowJs` leaves `tsconfig.web.json` in
   step 15, as planned.

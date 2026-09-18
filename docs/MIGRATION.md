@@ -420,5 +420,7 @@ parity and e2e gates.
   every listener of every element, the dispatched intents, `preventDefault` and `stopPropagation`;
   a re-render walk through nine states patches to the same trees on both legs. The `ui/`/`view/`
   eslint zone excepts `dom.fake.ts` as `net/` excepts `transport.fake.ts`. Coverage: `view/**` at
-  90% lines, functions and statements (actual 99.6/99.6/98). The PeerJS load-timing change and the
+  90% lines, functions and statements (actual 99.6/99.6/98); as a follow-up, `net/**` and `app/**`
+  are included and gated at 90% too (`app/{effects,controller}.test.ts`; actual net 95.9/93.2/92.2,
+  app 99.7/98.5/99.1), `main.ts` excluded as the boot. The PeerJS load-timing change and the
   remaining gates are as phase 1 recorded. See ARCHITECTURE "Deviations".

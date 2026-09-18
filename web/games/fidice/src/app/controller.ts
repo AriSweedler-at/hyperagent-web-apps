@@ -619,6 +619,8 @@ export class Controller {
         this.render();
         this.deps.effects.scrollIntoView(catId('main', intent.cat));
         return;
+      // Known legacy defect, kept: with a bid, withLadder spreads the whole Ui after `tab`, so
+      // the current tab wins and "See on ladder" opens the bid's rows without switching tabs.
       case 'ladder.showBid': {
         const bid = currentBid(this.ui);
         this.set({
