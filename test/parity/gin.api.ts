@@ -5,6 +5,14 @@
 // both.
 import { createRequire } from 'node:module';
 
+import * as engine from '../../web/games/gin-rummy/src/engine/index.ts';
+import type {
+  CreateGameOptions as EngineOptions,
+  Seat,
+  State,
+} from '../../web/games/gin-rummy/src/engine/index.ts';
+import { mulberry32 } from '../../web/shared/lib/rng.ts';
+
 export type Suit = 'S' | 'H' | 'D' | 'C';
 export type Card = { id: string; r: number; s: Suit };
 export type Rng = () => number;
@@ -172,3 +180,46 @@ const load = createRequire(import.meta.url);
 /** The sha256-pinned legacy engine (test/fixtures/legacy/MANIFEST.json), loaded through its UMD branch. */
 export const loadLegacyGin = (): GinEngine =>
   load('../fixtures/legacy/gin-engine.cjs') as GinEngine;
+
+/**
+ * The `current` leg (docs/MIGRATION.md step 10): the TypeScript engine behind the legacy calling
+ * convention. The engine returns a new State; the adapter copies it onto the object the test holds,
+ * as the legacy engine's in-place mutation would leave it (the same keys in the same order, so
+ * `lastDrawn` still appears only after the first draw). `Result<State, RuleError>` becomes the
+ * legacy `{ ok, error }`; the private card a stock draw reported is read from `pendingDraw`.
+ * Where the legacy defaulted to `Math.random` (an omitted rng) the adapter passes a fixed seed:
+ * every test that consumes randomness passes its own. The clock is `Date.now`, as the legacy read
+ * it; the suites mask `ts` and `startedAt`.
+ */
+export const loadCurrentGin = (): GinEngine => {
+  const rngOr = (rng: Rng | undefined): Rng => rng ?? mulberry32(0);
+  const adapted = {
+    ...engine,
+    createGame: (opts: CreateGameOptions): GinState => {
+      const { rng, ...rest } = opts;
+      return engine.createGame(
+        rest as unknown as EngineOptions,
+        rngOr(rng),
+        Date.now,
+      ) as unknown as GinState;
+    },
+    dealHand: (state: GinState, rng?: Rng): GinState =>
+      Object.assign(state, engine.dealHand(state as unknown as State, rngOr(rng))),
+    applyAction: (state: GinState, pIdx: number, action: GinAction, rng?: Rng): ApplyResult => {
+      const r = engine.applyAction(
+        state as unknown as State,
+        pIdx as Seat,
+        action,
+        rngOr(rng),
+        Date.now,
+      );
+      if (!r.ok) return { ok: false, error: r.error };
+      Object.assign(state, r.value);
+      const drawnFromStock = action.type === 'drawStock' ? r.value.pendingDraw?.cardId : undefined;
+      return drawnFromStock === undefined
+        ? { ok: true }
+        : { ok: true, privateCard: drawnFromStock };
+    },
+  };
+  return adapted as unknown as GinEngine;
+};

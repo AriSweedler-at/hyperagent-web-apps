@@ -1,21 +1,26 @@
-// Characterization of the gin engine (docs/MIGRATION.md step 2; docs/ARCHITECTURE.md "Testing
-// pyramid", parity). Every assertion here is an executable oracle over seeded inputs, so the same
-// suite runs unchanged on the TypeScript engine in step 10: add ['current', adapter] to `legs`.
-// Known legacy defects are asserted as they are and named "KNOWN DEFECT"; step 15 flips them.
+// Characterization of the gin engine (docs/MIGRATION.md steps 2 and 10; docs/ARCHITECTURE.md
+// "Testing pyramid", parity). Every assertion here is an executable oracle over seeded inputs and
+// runs on both legs: the sha256-pinned legacy fixture and the TypeScript engine behind the adapter
+// in gin.api.ts. Known legacy defects are asserted as they are and named "KNOWN DEFECT"; step 15
+// flips them.
 import { describe, expect, test } from 'vitest';
 
 import { mulberry32, type Rng } from '../../web/shared/lib/rng.ts';
 import {
+  loadCurrentGin,
   loadLegacyGin,
   type Card,
   type GinAction,
   type GinEngine,
   type GinState,
-  type GinView,
   type Suit,
 } from './gin.api.ts';
+import { actor, policy } from './gin.policy.ts';
 
-const legs: ReadonlyArray<readonly [string, GinEngine]> = [['legacy', loadLegacyGin()]];
+const legs: ReadonlyArray<readonly [string, GinEngine]> = [
+  ['legacy', loadLegacyGin()],
+  ['current', loadCurrentGin()],
+];
 
 const PLAYERS = [
   { id: 'a', name: 'Alice' },
@@ -85,43 +90,6 @@ describe.each(legs)('gin engine: %s', (_leg, E) => {
     s.hands.forEach((h) => {
       check(h.length === 10 || h.length === 11, `hand size 10/11 ${where}`);
     });
-  };
-
-  /** Seat whose move it is: in roundOver/gameOver the first player not yet ready. */
-  const actor = (s: GinState): number =>
-    s.phase === 'roundOver' || s.phase === 'gameOver' ? (s.ready[0] === true ? 1 : 0) : s.turn;
-
-  const deadwoodAfter = (view: GinView, a: GinAction): number => {
-    if (a.type !== 'discard' && a.type !== 'knock') return Infinity;
-    const option = view.discardOptions?.[a.cardId];
-    return option === undefined || option.locked === true ? Infinity : option.deadwood;
-  };
-  const leastDeadwood = (view: GinView, acts: GinAction[]): GinAction | undefined =>
-    acts.reduce<GinAction | undefined>(
-      (best, a) =>
-        best === undefined || deadwoodAfter(view, a) < deadwoodAfter(view, best) ? a : best,
-      undefined,
-    );
-  /**
-   * Seeded legal play. A uniform choice over legalActions does not finish: random hands almost
-   * never reach knocking deadwood, so every hand ends void when the stock runs out, and void
-   * hands score nothing. So: knock whenever knocking is legal (the least-deadwood knock), discard
-   * the least-deadwood card three times in four, and choose uniformly otherwise. Every choice is
-   * an element of legalActions(view).
-   */
-  const policy = (rng: Rng, view: GinView, acts: GinAction[]): GinAction => {
-    const knocks = acts.filter((a) => a.type === 'knock');
-    const discards = acts.filter((a) => a.type === 'discard');
-    const preferred =
-      knocks.length > 0
-        ? leastDeadwood(view, knocks)
-        : discards.length > 0 && rng() < 0.75
-          ? leastDeadwood(view, discards)
-          : undefined;
-    const uniform = acts[Math.floor(rng() * acts.length)];
-    const chosen = preferred ?? uniform;
-    if (chosen === undefined) throw new Error('no legal action');
-    return chosen;
   };
 
   type Played = { state: GinState; steps: number; outcomes: string[]; trace: string[] };
