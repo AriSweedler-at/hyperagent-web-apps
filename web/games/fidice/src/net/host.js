@@ -3,18 +3,18 @@
 // and exports were recovered by scope analysis. Do not edit: `npm run debundle:fidice` regenerates
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
-import { expect } from '../domain/result.js';
-import { decodeClientMessage } from './protocol.js';
+import { expect } from '../domain/result.ts';
+import { decodeClientMessage } from './protocol.ts';
 import {
   HOST, apply, bySeat, newGame, scheduleAutoNext, stampLog, startGame,
-} from '../domain/game.js';
-import { redactFor } from '../domain/publicState.js';
-import { RANDOM_STRATEGY, describeProfile, profileFor } from '../bots/registry.js';
-import { decide, emptyMemories } from '../bots/brain.js';
+} from '../domain/game.ts';
+import { redactFor } from '../domain/publicState.ts';
+import { RANDOM_STRATEGY, describeProfile, profileFor } from '../bots/registry.ts';
+import { decide, emptyMemories } from '../bots/brain.ts';
 import {
   findSeat, hostSitsDown, hostStandsUp, makeBot, makeHuman, renameBot, seatPlayer, setBotProfile,
   setConnected, unseatPlayer, withSpectators,
-} from '../domain/lobby.js';
+} from '../domain/lobby.ts';
 
   var AUTO_NEXT_MS = 7e3;
   var HostSession = class {

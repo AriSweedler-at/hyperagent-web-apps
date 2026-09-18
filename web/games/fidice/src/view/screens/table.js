@@ -3,10 +3,10 @@
 // and exports were recovered by scope analysis. Do not edit: `npm run debundle:fidice` regenerates
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
-import { HAND_COUNT, TOP_RANK, handAt, rungOf, spokenName } from '../../domain/hands.js';
-import { keepsScore, standings } from '../../domain/game.js';
-import { publicCupIndices, publicTableIndices } from '../../domain/publicState.js';
-import { suggestHands } from '../../domain/search.js';
+import { HAND_COUNT, TOP_RANK, handAt, rungOf, spokenName } from '../../domain/hands.ts';
+import { keepsScore, standings } from '../../domain/game.ts';
+import { publicCupIndices, publicTableIndices } from '../../domain/publicState.ts';
+import { suggestHands } from '../../domain/search.ts';
 import { cls, h } from '../vdom.js';
 import { diceRow, die, logView, seatOptions, seats, stepHeader } from '../components.js';
 import { isHostUi, isMyTurn } from '../ui.js';

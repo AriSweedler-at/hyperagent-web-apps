@@ -508,3 +508,44 @@ Step 7 (cut Fidice over):
 - The Playwright project `next` runs `smoke.spec.ts` only: with fidice flipped, dist-next/ differs
   from dist/ by the absence of gin-rummy alone, so fidice-online there duplicated `pages`/`proxy`.
   The project and `npm run build:next` stay for the gin port (step 12).
+
+Step 8 (type the Fidice pure core), phase 1: `domain/**`:
+
+- The `@shared/*` alias named in "Module boundaries" is not wired (Vite `resolve.alias`, vitest,
+  the import-x resolver, the tsconfigs), so `domain/result.ts` imports `web/shared/lib/result.ts`
+  by relative path. Wiring it is deferred until a second game imports the shared lib.
+- Two throws remain in the domain, each behind a commented `eslint-disable-next-line
+  functional/no-throw-statements`: `expect` in `domain/result.ts` (the host's unwrap of Err paths a
+  player cannot reach; it moves out with `net/host` in step 9) and `asRank` in `domain/hands.ts`
+  (the `RangeError` the parity suite pins). Neither is reachable from `apply`.
+- `domain/probability.algorithms.ts` holds `cartesian`, `survivalFor` and the memo `cache`: module
+  state the bundle kept and the oracle reads. The density is summed in a `for..of` over a local
+  array so the floating-point additions happen in the legacy order (a bot's choice can turn on the
+  last bit); `probability.ts` re-exports all three under the legacy names.
+- `tools/legacy/debundle-fidice.ts` takes an `IsPorted` predicate. A ported section is not
+  written; the remaining generated modules import it with a `.ts` specifier and `MANIFEST.json`
+  pins its provenance as `{ section, startLine, endLine, typed: true }` with no sha256.
+- `tsconfig.web.json` includes `domain/**` again: the `.js` view, bots and net modules import the
+  `.ts` domain, and a composite project must list every `.ts` its files import. The pure project
+  stays the guard (`lib: ES2023`, no DOM).
+- `JS_FILE_COUNT` is 31. Coverage thresholds: `web/games/fidice/src/domain/**` at 90% lines,
+  functions and statements; `*.algorithms.ts` there at 100%.
+
+Step 8 (type the Fidice pure core), phase 2: `bots/**` and `net/protocol.ts`:
+
+- The bots' shared shapes live in `bots/types.ts` next to two type guards (`hasRound`, `hasBid`),
+  as `domain/types.ts` holds its two counts: a module the manifest does not list may add runtime
+  exports, a typed legacy module may not (fidice.modules.test.ts checks every export against the
+  fixture). `Strategy<M>` is generic in its memory; `anyStrategy` erases it with a cast for the
+  registry's pool, as the bundle's name says it did.
+- `toolkit.readSeat` and `raisesBy` accept `Seat | null` because trapper passes `r.bidder`
+  unchecked; a `null` reads as an empty dossier, which is what the bundle computed.
+- `net/protocol.ts` uses the `web/shared/lib/json` leaf decoders (`integer`, `boolean`, `arrayOf`)
+  for field checks and keeps its own frame walk, `isRecord` (arrays included) and refusal texts:
+  the parity suite pins the texts, and `json.object` differs on inherited keys and wording. The
+  `state` of a server frame is cast to `PublicState` on the shape check alone, as before.
+- `tsconfig.web.json` no longer excludes `bots/**` or `net/protocol.ts` (same reason as `domain/**`
+  in phase 1). `JS_FILE_COUNT` is 19. Coverage thresholds: `bots/**` and `net/protocol.ts` at 90%
+  lines, functions and statements.
+- `.prettierignore` still skips `/web/games/fidice/src/` as a whole; the typed `.ts` files there
+  are formatted with Prettier by hand until the ignore is narrowed to the generated `.js`.

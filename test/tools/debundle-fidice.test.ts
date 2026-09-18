@@ -3,7 +3,10 @@
 // byte, MANIFEST.json must pin the bundle range and each file, and the recovered import graph must
 // be the one ESM can evaluate in the bundle's order (no cycles, no forward references). An edit to
 // the legacy page inside the bundle, or a hand edit of a generated module, fails here; the fix is
-// `npm run debundle:fidice` (and, for a page edit, a note on why the oracle moved).
+// `npm run debundle:fidice` (and, for a page edit, a note on why the oracle moved). A module typed
+// in place (docs/MIGRATION.md step 8, `<name>.ts` beside where `<name>.js` was) is hand-written:
+// the tool stops emitting it, points the remaining modules at its `.ts` specifier and pins only its
+// provenance (section and lines) in the manifest.
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
@@ -15,13 +18,17 @@ import {
   FIDICE_PAGE,
   TOOL,
   debundleFidice,
+  portedOnDisk,
   type DebundleManifest,
 } from '../../tools/legacy/debundle-fidice.ts';
 import { REPO_ROOT, readRepoFile, sha256 } from '../../tools/legacy/extract.ts';
 
 const page = readRepoFile(FIDICE_PAGE);
-const debundled = debundleFidice(page);
+const debundled = debundleFidice(page, portedOnDisk);
 const manifest = JSON.parse(readRepoFile(FIDICE_MANIFEST)) as DebundleManifest;
+/** The modules typed so far (step 8) and the ones the tool still generates. */
+const typed = debundled.modules.filter((m) => portedOnDisk(m.section.name));
+const generated = debundled.modules.filter((m) => !portedOnDisk(m.section.name));
 
 /** Every regular file under web/games/fidice except the manifest, as posix paths relative to it. */
 const committedFiles = (): ReadonlyArray<string> =>
@@ -34,8 +41,9 @@ const committedFiles = (): ReadonlyArray<string> =>
 describe('the de-bundled fidice modules', () => {
   test('the tool splits the bundle at 39 markers: 38 modules under src/ and main.js', () => {
     const files = [...debundled.files.keys()];
+    expect(debundled.modules).toHaveLength(39);
     expect(files.filter((file) => file.startsWith('src/') && file.endsWith('.js'))).toHaveLength(
-      38,
+      38 - typed.length,
     );
     expect(files).toContain('main.js');
     expect(files).toContain('index.html');
@@ -48,10 +56,32 @@ describe('the de-bundled fidice modules', () => {
   });
 
   test('every committed file is what the tool cuts from the HEAD page, and nothing else is committed', () => {
-    expect(committedFiles()).toEqual([...debundled.files.keys()].sort());
+    // Typed modules and their companions (types, *.algorithms, tests) are hand-written .ts files.
+    expect(committedFiles().filter((file) => !file.endsWith('.ts'))).toEqual(
+      [...debundled.files.keys()].sort(),
+    );
     debundled.files.forEach((text, file) => {
       expect(readRepoFile(`${FIDICE_DIR}/${file}`), file).toBe(text);
     });
+  });
+
+  test('a typed module replaces its generated .js, and nothing imports the .js any more', () => {
+    typed.forEach(({ section }) => {
+      expect(section.file, section.name).toBe(`${section.name}.ts`);
+      expect(existsSync(resolve(REPO_ROOT, FIDICE_DIR, `${section.name}.js`)), section.name).toBe(
+        false,
+      );
+    });
+    committedFiles()
+      .filter((file) => file.endsWith('.js'))
+      .forEach((file) => {
+        const text = readRepoFile(`${FIDICE_DIR}/${file}`);
+        [...text.matchAll(/(?:from|^import) '(\.[^']+)';$/gm)].forEach((m) => {
+          const specifier = m[1] ?? '';
+          const target = resolve(REPO_ROOT, FIDICE_DIR, file, '..', specifier);
+          expect(existsSync(target), `${file} imports ${specifier}`).toBe(true);
+        });
+      });
   });
 
   test('MANIFEST.json pins the bundle range and every file', () => {
@@ -65,15 +95,23 @@ describe('the de-bundled fidice modules', () => {
       manifest.sourceSha256,
     );
     Object.entries(manifest.files).forEach(([file, entry]) => {
-      expect(sha256(readRepoFile(`${FIDICE_DIR}/${file}`)), file).toBe(entry.sha256);
+      if (entry.typed) {
+        expect(file).toMatch(/\.ts$/);
+        expect(entry.sha256).toBeUndefined();
+        expect(existsSync(resolve(REPO_ROOT, FIDICE_DIR, file)), file).toBe(true);
+      } else {
+        expect(sha256(readRepoFile(`${FIDICE_DIR}/${file}`)), file).toBe(entry.sha256);
+      }
     });
   });
 
-  test('each module body is the page text at its pinned lines, verbatim', () => {
+  test('each generated module body is the page text at its pinned lines, verbatim', () => {
     const lines = page.split('\n');
-    debundled.modules.forEach(({ section, text }) => {
+    generated.forEach(({ section, text }) => {
       const body = lines.slice(section.startLine - 1, section.endLine).join('\n');
       expect(text, section.file).toContain(`\n${body}\n`);
+    });
+    debundled.modules.forEach(({ section }) => {
       expect(manifest.files[section.file]).toMatchObject({
         section: `${section.name}.ts`,
         startLine: section.startLine,

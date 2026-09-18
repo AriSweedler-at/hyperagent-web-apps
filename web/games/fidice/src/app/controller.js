@@ -3,9 +3,9 @@
 // and exports were recovered by scope analysis. Do not edit: `npm run debundle:fidice` regenerates
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
-import { CATEGORY_INFO, groupByKey, handAt } from '../domain/hands.js';
-import { difficultyById } from '../bots/registry.js';
-import { suggestHands } from '../domain/search.js';
+import { CATEGORY_INFO, groupByKey, handAt } from '../domain/hands.ts';
+import { difficultyById } from '../bots/registry.ts';
+import { suggestHands } from '../domain/search.ts';
 import { mount } from '../view/vdom.js';
 import { emptyLadder, emptyPicker, initialUi, isMyTurn } from '../view/ui.js';
 import { catId, catKey, isOpen, mainMarks, rowId } from '../view/screens/ladder.js';

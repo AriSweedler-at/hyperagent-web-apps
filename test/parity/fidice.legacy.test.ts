@@ -309,6 +309,92 @@ describe.each(legs)('fidice core: %s', (_leg, F) => {
         ).log.at(-1)?.text,
       ).toBe('Moose (a computer, strategy drawn at random) sits down.');
     });
+
+    test('seats are found by id; leaving shifts the host seat only when it sits above the gap', () => {
+      const s = table(3);
+      expect([F.seatOf(s, 'h1'), F.findSeat(s, 'h2'), F.seatOf(s, 'nobody')]).toEqual([1, 2, null]);
+      expect([F.shiftHostSeat(null, 0), F.shiftHostSeat(2, 0), F.shiftHostSeat(0, 2)]).toEqual([
+        null,
+        1,
+        0,
+      ]);
+      const left = F.unseatPlayer(s, 'h0');
+      expect(left.players.map((p) => p.id)).toEqual(['h1', 'h2']);
+      expect(left.hostSeat).toBe(0);
+      expect(left.log.at(-1)?.text).toBe('P0 leaves the table.');
+      expect(F.unseatPlayer(s, 'nobody')).toBe(s);
+      const playing = started(2);
+      expect(F.unseatPlayer(playing, 'h0')).toBe(playing);
+    });
+
+    test('connection changes are logged, and a reconnect may bring a new name', () => {
+      const s = table(2);
+      const gone = F.setConnected(s, 'h1', false);
+      expect(gone.players[1]?.connected).toBe(false);
+      expect(gone.log.at(-1)?.text).toBe('P1 disconnected.');
+      const back = F.setConnected(gone, 'h1', true, 'Pat');
+      expect(back.players[1]).toMatchObject({ connected: true, name: 'Pat' });
+      expect(back.log.at(-1)?.text).toBe('Pat is back at the table.');
+      expect(F.setConnected(s, 'nobody', true)).toBe(s);
+      expect(F.withSpectators(s, 2).spectators).toBe(2);
+      expect(F.withSpectators(s, -1).spectators).toBe(0);
+    });
+
+    test('bots are renamed and re-profiled in the lobby only; no-ops return the same state', () => {
+      const s = unwrap(
+        F.seatPlayer(table(1), F.makeBot(table(1), 'b1', { strategy: 'trapper', random: false })),
+      );
+      expect(F.cleanName('  abcdefghijklmnopqrstuvwxyz ')).toBe('abcdefghijklmnop');
+      expect(F.nextBotName(s)).toBe('Moose');
+      const ziggy = F.renameBot(s, 'b1', '  Ziggy  ');
+      expect(ziggy.players[1]?.name).toBe('Ziggy');
+      expect(ziggy.log.at(-1)?.text).toBe('Loon is now called Ziggy.');
+      expect(F.renameBot(s, 'b1', '   ').log.at(-1)?.text).toBe('Loon is now called Moose.');
+      expect(F.renameBot(s, 'b1', 'Loon')).toBe(s);
+      expect(F.renameBot(s, 'h0', 'Human')).toBe(s);
+      const gambler = F.setBotProfile(s, 'b1', { strategy: 'gambler', random: true }, 'Gambler');
+      expect(gambler.players[1]?.bot).toEqual({ strategy: 'gambler', random: true });
+      expect(gambler.log.at(-1)?.text).toBe('Loon will play Gambler.');
+      expect(F.setBotProfile(s, 'b1', { strategy: 'trapper', random: false }, 'Trapper')).toBe(s);
+      expect(F.setBotProfile(s, 'h0', { strategy: 'gambler', random: false }, 'Gambler')).toBe(s);
+    });
+
+    test('the host stands up to watch and sits back down at seat 0', () => {
+      const s = table(2);
+      const up = F.hostStandsUp(s);
+      expect(up.players.map((p) => p.id)).toEqual(['h1']);
+      expect(up.hostSeat).toBeNull();
+      expect(up.log.at(-1)?.text).toBe('The host stands up to watch.');
+      expect(F.hostStandsUp(up)).toBe(up);
+      const down = F.hostSitsDown(up, F.makeHuman('host', 'Host', 3));
+      expect(down.players.map((p) => p.id)).toEqual(['host', 'h1']);
+      expect(down.hostSeat).toBe(0);
+      expect(down.log.at(-1)?.text).toBe('Host takes a seat.');
+      expect(F.hostSitsDown(s, F.makeHuman('host', 'Host', 3))).toBe(s);
+      const playing = started(2);
+      expect(F.hostStandsUp(playing)).toBe(playing);
+    });
+
+    test('log entries are stamped once; autoNext is a plain field; inRange is inclusive', () => {
+      const s = table(2);
+      expect(s.log.every((e) => e.at === null)).toBe(true);
+      const stamped = F.stampLog(s, 1234);
+      expect(stamped.log.map((e) => e.at)).toEqual([1234, 1234]);
+      expect(F.stampLog(stamped, 999)).toBe(stamped);
+      expect(F.scheduleAutoNext(s, 42).autoNextAt).toBe(42);
+      expect([F.inRange(5, 3, 7), F.inRange(3, 3, 7), F.inRange(8, 3, 7)]).toEqual([
+        true,
+        true,
+        false,
+      ]);
+      expect([F.inRange(null, 0, 251), F.inRange(undefined, 0, 251)]).toEqual([false, false]);
+    });
+
+    test('expect unwraps an Ok and throws the Err with its context', () => {
+      expect(F.expect({ ok: true, value: 3 })).toBe(3);
+      expect(() => F.expect({ ok: false, error: 'nope' }, 'seating')).toThrow('seating: nope');
+      expect(() => F.expect({ ok: false, error: 'nope' })).toThrow('result: nope');
+    });
   });
 
   describe('apply phase gates', () => {
@@ -674,6 +760,27 @@ describe.each(legs)('fidice core: %s', (_leg, F) => {
       expect(F.profileFor('random', () => 0.5)).toEqual({ strategy: 'profiler', random: true });
       expect(F.profileFor('trapper', fixed())).toEqual({ strategy: 'trapper', random: false });
       expect(F.profileFor('nope', fixed())).toEqual({ strategy: 'gambler', random: false });
+    });
+
+    test('the menu helpers: difficulties, choice labels and profile descriptions', () => {
+      expect(F.DIFFICULTIES.map((d) => [d.id, d.label, d.strategy.id])).toEqual([
+        ['easy', 'Easy', 'pressure'],
+        ['medium', 'Medium', 'profiler'],
+        ['hard', 'Hard', 'gambler'],
+      ]);
+      expect(F.difficultyById('hard').strategy.id).toBe('gambler');
+      expect(F.difficultyById('nope').id).toBe('medium');
+      expect(F.difficultyOfChoice('pressure')).toBe('easy');
+      expect(F.difficultyOfChoice('trapper')).toBeNull();
+      expect(F.learnerGeneration('learner-300')).toBe(300);
+      expect(F.learnerGeneration('learner-x')).toBeNull();
+      expect(F.learnerGeneration('gambler')).toBeNull();
+      expect(F.choiceLabel('random')).toBe('🎲 Random strategy');
+      expect(F.choiceLabel('learner-100')).toBe('Self-taught · 100 generations');
+      expect(F.choiceLabel('trapper')).toBe('The Trapper');
+      expect(F.choiceLabel('nope')).toBe('The Gambler');
+      expect(F.describeProfile({ strategy: 'profiler', random: true })).toBe('The Reader (random)');
+      expect(F.describeProfile({ strategy: 'nope', random: false })).toBe('The Gambler');
     });
 
     /**

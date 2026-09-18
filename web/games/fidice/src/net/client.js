@@ -3,7 +3,7 @@
 // and exports were recovered by scope analysis. Do not edit: `npm run debundle:fidice` regenerates
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
-import { decodeServerMessage } from './protocol.js';
+import { decodeServerMessage } from './protocol.ts';
 
   var CONNECT_TIMEOUT_MS = 12e3;
   var ClientSession = class {

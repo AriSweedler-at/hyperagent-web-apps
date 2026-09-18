@@ -3,10 +3,10 @@
 // and exports were recovered by scope analysis. Do not edit: `npm run debundle:fidice` regenerates
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
-import { CHECKPOINTS } from '../../bots/strategies/learnerWeights.js';
+import { CHECKPOINTS } from '../../bots/strategies/learnerWeights.ts';
 import {
   DIFFICULTIES, RANDOM_STRATEGY, SHIPPED, choiceLabel, difficultyOfChoice, learnerGeneration,
-} from '../../bots/registry.js';
+} from '../../bots/registry.ts';
 import { cls, h } from '../vdom.js';
 
   var currentChoice = (ui, target) => {

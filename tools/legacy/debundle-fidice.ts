@@ -20,7 +20,7 @@
 // evaluation order is the bundle order whenever the recovered graph points backwards. The page's
 // markup and its two `<style>` blocks are cut into index.html and theme.css beside it. Run:
 //   node --experimental-strip-types tools/legacy/debundle-fidice.ts     (npm run debundle:fidice)
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, posix, resolve } from 'node:path';
 
 import { Linter, type Rule, type Scope } from 'eslint';
@@ -79,7 +79,10 @@ export type Report = Readonly<{
 }>;
 
 export type FileEntry = Readonly<{
-  sha256: string;
+  /** Absent for a typed module: its .ts is hand-written, so only its provenance is pinned. */
+  sha256?: string;
+  /** The module has been typed (docs/MIGRATION.md step 8): the key is its .ts path. */
+  typed?: true;
   section?: string;
   startLine?: number;
   endLine?: number;
@@ -107,10 +110,25 @@ export type Debundled = Readonly<{
 // Sections
 // ---------------------------------------------------------------------------------------------
 
-const fileFor = (name: string): string => (name === ENTRY_SECTION ? ENTRY_FILE : `${name}.js`);
+/** Whether a section is already typed: is a `<name>.ts` sitting where the tool would write `<name>.js`? */
+export type IsPorted = (name: string) => boolean;
+
+const NONE_PORTED: IsPorted = () => false;
+
+/** The checked-in answer: docs/MIGRATION.md step 8 types the modules in place, `.js` -> `.ts`. */
+export const portedOnDisk: IsPorted = (name) =>
+  existsSync(resolve(REPO_ROOT, FIDICE_DIR, `${name}.ts`));
+
+/**
+ * Output path of a section. A typed module is `<name>.ts`: the tool no longer writes it, but the
+ * modules still importing it need the `.ts` specifier and the manifest still pins its provenance.
+ */
+const fileFor = (name: string, isPorted: IsPorted): string =>
+  name === ENTRY_SECTION ? ENTRY_FILE : `${name}.${isPorted(name) ? 'ts' : 'js'}`;
 
 export const splitSections = (
   lines: ReadonlyArray<string>,
+  isPorted: IsPorted = NONE_PORTED,
 ): Readonly<{ start: number; close: number; sections: ReadonlyArray<Section> }> => {
   const start = findLine(lines, (line) => line === USE_STRICT, USE_STRICT);
   if (lines[start + 1] !== IIFE_OPEN) throw new Error(`expected ${IIFE_OPEN} after ${USE_STRICT}`);
@@ -124,7 +142,7 @@ export const splitSections = (
     const end = trimBlankBefore(lines, markers[k + 1] ?? close);
     return {
       name,
-      file: fileFor(name),
+      file: fileFor(name, isPorted),
       startLine: marker + 2,
       endLine: end,
       body: lines.slice(marker + 1, end),
@@ -341,10 +359,14 @@ const cutMarkup = (
 // Whole thing
 // ---------------------------------------------------------------------------------------------
 
-export const debundleFidice = (page: string): Debundled => {
+export const debundleFidice = (page: string, isPorted: IsPorted = NONE_PORTED): Debundled => {
   const lines = page.split('\n');
-  const { start, close, sections } = splitSections(lines);
-  const analyses = sections.map((section) => analyze(section.body.join('\n'), section.file));
+  const { start, close, sections } = splitSections(lines, isPorted);
+  // The body is analysed as JavaScript whatever the output extension: ESLint's default file
+  // patterns select the parser by the name it is given, and a `.ts` name would select none.
+  const analyses = sections.map((section) =>
+    analyze(section.body.join('\n'), `${section.name}.js`),
+  );
 
   const declaredIn = new Map<string, number>();
   analyses.forEach((analysis, i) => {
@@ -407,10 +429,12 @@ export const debundleFidice = (page: string): Debundled => {
   });
 
   const { html, css } = cutMarkup(lines, start, close);
+  // A typed module is not written: its .ts is hand-typed from the same body (step 8).
+  const generated = modules.filter((m) => !isPorted(m.section.name));
   const files = new Map<string, string>([
     ['index.html', `${html}${page.endsWith('\n') ? '' : '\n'}`],
     ['theme.css', `${css}\n`],
-    ...modules.map((m): [string, string] => [m.section.file, m.text]),
+    ...generated.map((m): [string, string] => [m.section.file, m.text]),
   ]);
 
   const nameOf = (i: number): string => sections[i]?.name ?? '?';
@@ -435,22 +459,23 @@ export const debundleFidice = (page: string): Debundled => {
     startLine: start + 1,
     endLine: close + 1,
     sourceSha256: sha256(lines.slice(start, close + 1).join('\n')),
-    files: Object.fromEntries(
-      [...files.entries()].map(([file, text]): [string, FileEntry] => {
-        const module = modules.find((m) => m.section.file === file);
-        return [
-          file,
-          module === undefined
-            ? { sha256: sha256(text) }
-            : {
-                section: `${module.section.name}.ts`,
-                startLine: module.section.startLine,
-                endLine: module.section.endLine,
-                sha256: sha256(text),
-              },
-        ];
-      }),
-    ),
+    // Bundle order, typed modules included at their place: test/parity/fidice.api.ts reads the
+    // module list from here.
+    files: Object.fromEntries([
+      ...['index.html', 'theme.css'].map((file): [string, FileEntry] => [
+        file,
+        { sha256: sha256(files.get(file) ?? '') },
+      ]),
+      ...modules.map(({ section, text }): [string, FileEntry] => [
+        section.file,
+        {
+          section: `${section.name}.ts`,
+          startLine: section.startLine,
+          endLine: section.endLine,
+          ...(isPorted(section.name) ? { typed: true } : { sha256: sha256(text) }),
+        },
+      ]),
+    ]),
   };
 
   return { files, modules, manifest, report };
@@ -490,7 +515,7 @@ const printReport = (debundled: Debundled): void => {
 };
 
 if (isMain(import.meta.url)) {
-  const debundled = debundleFidice(readRepoFile(FIDICE_PAGE));
+  const debundled = debundleFidice(readRepoFile(FIDICE_PAGE), portedOnDisk);
   if (!process.argv.includes('--dry-run')) writeDebundle(debundled);
   printReport(debundled);
 }

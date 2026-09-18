@@ -307,3 +307,49 @@ parity and e2e gates.
   reload. Closing it (carrying the previous deploy's `app-*.js` and `fidice-*.css` into `dist/`
   before publishing) is deferred to step 13. The computed-style goldens and visual snapshots named
   above are not captured (see step 3). See ARCHITECTURE "Deviations".
+- Step 8, phase 1 (`domain/**`; `bots/**` and `net/protocol` follow): the eight domain modules are
+  typed in place (`git mv` `.js` -> `.ts`) with the shared shapes in `domain/types.ts` and the
+  cartesian enumeration plus its memo in `domain/probability.algorithms.ts`, re-exported from
+  `probability.ts` under the legacy names (`cache` included: the parity oracle reads it).
+  `domain/result.ts` re-exports `ok`/`err`/`Result` from `web/shared/lib/result.ts` by relative
+  path, since the `@shared/*` alias is not wired for Vite, vitest or the import-x resolver yet. Two
+  throws stay, each behind a commented `eslint-disable-next-line functional/no-throw-statements`:
+  `result.ts` `expect` (the host session's unwrap of impossible-Err paths; it leaves the domain with
+  `net/host` in step 9) and `hands.ts` `asRank` (the `RangeError` the parity suite pins). The hand
+  tables' totality (`HANDS[rank]`, `GROUP_BY_KEY.get`) is asserted once through `present<T>()` in
+  `hands.ts` instead of threading `| undefined` to every caller; runtime is unchanged. The debundle
+  tool takes an `IsPorted` predicate (`portedOnDisk`: a `.ts` beside where the `.js` would go): it
+  stops emitting that module, points the still-generated consumers at the `.ts` specifier and pins
+  only provenance (`typed: true`, no sha256) in `MANIFEST.json`; its test still checks every
+  generated file byte for byte and that no `.js` imports a missing module. The parity loader reads
+  the module list from the manifest, so the `current` leg imports the `.ts` files and the fixture
+  leg is untouched. `tsconfig.web.json` no longer excludes `domain/**` (a composite project must
+  list every `.ts` its `.js` edges import), so the domain is checked by both projects.
+  `JS_FILE_COUNT` is 31; coverage thresholds for `web/games/fidice/src/domain` are 90% lines,
+  functions and statements, 100% for its `*.algorithms.ts`. See ARCHITECTURE "Deviations".
+- Step 8, phase 2 (`bots/**` and `net/protocol`): the eleven bots modules and `net/protocol` are
+  typed in place (`git mv` `.js` -> `.ts`); `JS_FILE_COUNT` is 19 (`main.js`, `assets`,
+  `net/{client,host,peerjs,session}`, `view/**`, `app/**` remain for step 9). `bots/types.ts` holds
+  the shared shapes (`BotView` with a non-null round, `BidRound`, `Step`, `Decision<M>`,
+  `Strategy<M>`, `AnyStrategy`) and the guards `hasRound`/`hasBid` that narrow to them;
+  `strategy.ts` keeps `anyStrategy` as the memory-erasing identity it was (a cast). Four
+  behaviour-neutral edits, each commented in place: `toolkit.readSeat`/`raisesBy` take
+  `Seat | null` (trapper passes `r.bidder` as is); gambler's `cupPlans` drops the two locals
+  (`keepers`, `junk`) the bundle computed and never read (both pure, both still exported);
+  learner's plan builder checks `best === null` before the roll scorer instead of after it (the same
+  short-circuit); `brain.decide` narrows the redacted state through `hasRound` (never taken:
+  `redactFor` keeps the round the host state has). gambler's memory type is `GamblerMemory | null`
+  so the bundle's `memory ?? freshMemory()` stays. `net/protocol.ts` checks `die`, `cup`, `table`
+  and `intoCup` with `web/shared/lib/json` leaf decoders (`integer(0, 4)`, `boolean`, `arrayOf`),
+  whose acceptance matches the bundle's `Number.isInteger`/`typeof` checks for every input; the
+  frame walk, `isRecord` (arrays included) and the refusal texts stay the bundle's because the
+  parity suite pins them, and `json.object` is not used (its own-property rule and `'object'`
+  message differ). A server frame's `state` still passes through on the shape check alone, cast to
+  `PublicState`: a field-by-field decoder is deferred to step 9 or 15. The eslint PURE globs and
+  `tsconfig.pure.json` already covered `bots/**` and `net/protocol.ts` (checked with
+  `--print-config`); `tsconfig.web.json` no longer excludes them. Coverage thresholds: `bots/**`
+  and `net/protocol.ts` at 90% lines, functions and statements (actual 100/100/97 and 100/100/100);
+  one characterization test for the registry's menu helpers runs on both legs. `.prettierignore`
+  still skips `/web/games/fidice/src/` whole, so the typed `.ts` there are formatted by running
+  Prettier on them by hand; narrowing the ignore to the generated `.js` means reformatting four
+  phase 1 domain files and is left for step 9. See ARCHITECTURE "Deviations".
