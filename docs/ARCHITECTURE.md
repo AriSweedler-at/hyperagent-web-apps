@@ -579,3 +579,28 @@ Step 9 (type the Fidice edges), phase 1: `net/**`, `app/**`, `main.ts`:
   pins it on both legs. `view/types.ts` is a types-only module (not in the manifest) for `Ui` and
   `Intent`; the controller binds the generated view's exports to those types until phase 2 types
   `view/**`. `JS_FILE_COUNT` is 12.
+
+Step 9 (type the Fidice edges), phase 2: `view/**` and `assets/diceImages`:
+
+- `view/vdom.ts` owns the tree types (`VNode`, `Props`, `Child`, `Handlers`) and the reconciler;
+  `view/types.ts` stays the types-only module for `Ui` and `Intent` (the types did not move into
+  `view/ui.ts` as phase 1 announced: beside `domain/types.ts` and `bots/types.ts` is the smaller
+  diff). Handlers receive `Readonly<Event>`s; the `e.target` casts sit in vdom's `targetValue`,
+  `targetChecked` and `blurTarget`, so the screens hold no casts.
+- `domain/game.ts` `keepsScore`, `isOut` and `standings` take `PublicState` (type only): the view
+  calls them on the redacted state a guest holds, and a `State` is a `PublicState`.
+- No jsdom: `web/shared/edge/dom.fake.ts` is the structural DOM the view tests render into (the
+  members the reconciler touches, bubbling listeners, `value`/`checked`/`disabled`/`selected` on
+  the tags a browser gives them, a deterministic `serialize`). The `ui/`/`view/` import zone excepts
+  it, as the `net/` zone excepts `transport.fake.ts`. The per-screen tests live beside the screens
+  (the web project has the DOM lib); the oracle `test/parity/fidice.view.test.ts` imports the typed
+  view dynamically by path, as `fidice.modules.test.ts` does, and evaluates the legacy `src/view/*`
+  sections with node:vm over the pinned legacy core. `tsconfig.node.json` lists `dom.fake.ts` and
+  the DOM-free `view/{types,ui,scenarios}.ts` for it.
+- `view/scenarios.ts` is the one catalogue of representative states (built through the domain with
+  a seeded rng) that both the render tests and the oracle use; `view/render.fake.ts` mounts a state
+  and records intents. Coverage threshold: `web/games/fidice/src/view/**` at 90% lines, functions
+  and statements.
+- `JS_FILE_COUNT` is 0; the debundle tool writes the page, the stylesheet and the manifest only
+  and remains the audit of the bundle-to-module map. `allowJs` leaves `tsconfig.web.json` in
+  step 15, as planned.

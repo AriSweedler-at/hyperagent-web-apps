@@ -392,3 +392,33 @@ parity and e2e gates.
   scripts, `./main.ts`); the dist guards follow (dist-next/ has no ice.js load at all). The manual
   broker game and the CI two-peer run are the remaining gates for the PR body. See ARCHITECTURE
   "Deviations".
+- Step 9, phase 2 (`view/**`, `assets/diceImages`): the eleven view modules and the dice images
+  are typed in place (`git mv` `.js` -> `.ts`); `JS_FILE_COUNT` is 0, every `MANIFEST.json` entry
+  is `typed: true`, and `tools/legacy/debundle-fidice.ts` now writes `index.html`, `theme.css` and
+  the manifest only (still the audit that maps each module to its bundle lines and recovers the
+  legacy import graph; `test/tools/debundle-fidice.test.ts` asserts every section is ported). The
+  eslint override for the generated `.js` and the two `.prettierignore` entries are retired;
+  `allowJs` stays in `tsconfig.web.json` until step 15 as planned. `view/types.ts` stays the
+  types-only module (phase 1 said the types would move into `view/ui.ts`; keeping them beside
+  `domain/types.ts` and `bots/types.ts` is the smaller diff); `VNode`, `Props`, `Child` and the
+  `Handlers` map live in `view/vdom.ts`, whose three `target*` helpers hold the `e.target` casts
+  so every handler is written against a `Readonly<Event>`. Four type-driven edits, each commented
+  in place and unreachable in the bundle's states: `botConfig`'s seat title reads `ui.game` through
+  an optional chain, the minimum raise is `asRank(current + 1)`, `menu`'s `titleFor` is an if-chain
+  over the pending kind, and `domain/game.ts` `keepsScore`/`isOut`/`standings` accept `PublicState`
+  (a `State` is one; the view calls them on redacted state). esbuild's suffixed names (`nameAt2`,
+  `bidCard2`, `i2`, `p2`, `title2`) are tidied. Tests: `web/shared/edge/dom.fake.ts` is a
+  structural DOM (parent, live children, attributes, bubbling listeners, the four form properties
+  on the tags a browser gives them, a deterministic `serialize`); `view/vdom.test.ts` pins the
+  reconciler; `view/scenarios.ts` (DOM-free, listed in `tsconfig.node.json` with `view/types.ts`,
+  `view/ui.ts` and `dom.fake.ts`) builds 41 representative states through the domain itself and
+  the per-screen tests beside the screens render them through `view/render.fake.ts` and pin the
+  ids, classes, text and intents the e2e specs and `theme.css` rely on; the oracle
+  `test/parity/fidice.view.test.ts` evaluates the page's own `src/view/*` sections (node:vm, bound
+  to the pinned legacy core) beside the typed view, imported dynamically by path as the pure
+  modules are (the node project has no DOM lib), and deep-equals the serialized trees and, for
+  every listener of every element, the dispatched intents, `preventDefault` and `stopPropagation`;
+  a re-render walk through nine states patches to the same trees on both legs. The `ui/`/`view/`
+  eslint zone excepts `dom.fake.ts` as `net/` excepts `transport.fake.ts`. Coverage: `view/**` at
+  90% lines, functions and statements (actual 99.6/99.6/98). The PeerJS load-timing change and the
+  remaining gates are as phase 1 recorded. See ARCHITECTURE "Deviations".
