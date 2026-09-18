@@ -6,25 +6,33 @@
 // and identical; functions must be functions on both sides.
 import { describe, expect, test, vi } from 'vitest';
 
-import { loadLegacyFidice, currentFidiceModules, importFidiceModule } from './fidice.api.ts';
+import {
+  loadLegacyFidice,
+  currentFidiceModules,
+  importFidiceModule,
+  sectionOf,
+} from './fidice.api.ts';
 
 const legacy = loadLegacyFidice() as unknown as Readonly<Record<string, unknown>>;
 
-/** Tables the bundle built at evaluation time, by the module that owns them, with their sizes. */
+/**
+ * Tables the bundle built at evaluation time, by the section that owns them (`.js` until step 8
+ * types the module, `.ts` after), with their sizes.
+ */
 const EAGER_TABLES: ReadonlyArray<readonly [string, string, number]> = [
-  ['src/domain/hands.js', 'HANDS', 252],
-  ['src/domain/hands.js', 'GROUPS', 48],
-  ['src/domain/hands.js', 'CATEGORY_INFO', 8],
-  ['src/domain/hands.js', 'BY_SHAPE', 252],
-  ['src/domain/hands.js', 'GROUP_BY_KEY', 48],
-  ['src/bots/strategies/gambler.js', 'GROUP_TOPS', 48],
-  ['src/bots/strategies/pressure.js', 'RANKS', 252],
-  ['src/bots/strategies/learner.js', 'BID_LADDER', 48],
-  ['src/bots/registry.js', 'LEARNERS', 3],
-  ['src/bots/registry.js', 'SHIPPED', 3],
-  ['src/bots/registry.js', 'POOL', 10],
-  ['src/bots/registry.js', 'byId', 10],
-  ['src/bots/registry.js', 'DIFFICULTIES', 3],
+  ['src/domain/hands', 'HANDS', 252],
+  ['src/domain/hands', 'GROUPS', 48],
+  ['src/domain/hands', 'CATEGORY_INFO', 8],
+  ['src/domain/hands', 'BY_SHAPE', 252],
+  ['src/domain/hands', 'GROUP_BY_KEY', 48],
+  ['src/bots/strategies/gambler', 'GROUP_TOPS', 48],
+  ['src/bots/strategies/pressure', 'RANKS', 252],
+  ['src/bots/strategies/learner', 'BID_LADDER', 48],
+  ['src/bots/registry', 'LEARNERS', 3],
+  ['src/bots/registry', 'SHIPPED', 3],
+  ['src/bots/registry', 'POOL', 10],
+  ['src/bots/registry', 'byId', 10],
+  ['src/bots/registry', 'DIFFICULTIES', 3],
 ];
 
 /** Structural view of a binding: functions collapse to a tag, Maps and Sets to their entries. */
@@ -49,7 +57,7 @@ describe('each pure module evaluates standalone', () => {
   test('the fixture range covers 25 modules, dice through search', () => {
     expect(modules).toHaveLength(25);
     expect(modules[0]).toBe('src/assets/diceImages.js');
-    expect(modules.at(-1)).toBe('src/domain/search.js');
+    expect(sectionOf(modules.at(-1) ?? '')).toBe('src/domain/search');
   });
 
   describe.each(modules.map((file) => [file] as const))('%s', (file) => {
@@ -67,9 +75,9 @@ describe('each pure module evaluates standalone', () => {
 
   test.each(EAGER_TABLES)(
     '%s builds %s (%i rows) when imported alone',
-    async (file, name, rows) => {
+    async (section, name, rows) => {
       vi.resetModules();
-      const ns = await importFidiceModule(file);
+      const ns = await importFidiceModule(modules.find((f) => sectionOf(f) === section) ?? '');
       expect(sizeOf(ns[name])).toBe(rows);
       expect(sizeOf(legacy[name])).toBe(rows);
       expect(shape(ns[name])).toEqual(shape(legacy[name]));

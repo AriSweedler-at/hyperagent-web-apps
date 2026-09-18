@@ -169,10 +169,27 @@ export type FidiceCore = {
   makeHuman: (id: string, name: string, lives: number) => Player;
   makeBot: (s: GameState, id: string, profile: BotProfile) => Player;
   seatPlayer: (s: GameState, player: Player) => Result<GameState>;
+  seatOf: (s: GameState, id: string) => number | null;
+  findSeat: (s: GameState, id: string) => number | null;
+  shiftHostSeat: (hostSeat: number | null, removed: number) => number | null;
+  unseatPlayer: (s: GameState, id: string) => GameState;
+  setConnected: (s: GameState, id: string, connected: boolean, rename?: string) => GameState;
+  withSpectators: (s: GameState, delta: number) => GameState;
+  nextBotName: (s: GameState) => string;
+  cleanName: (name: string) => string;
+  renameBot: (s: GameState, id: string, name: string) => GameState;
+  setBotProfile: (s: GameState, id: string, profile: BotProfile, label: string) => GameState;
+  hostStandsUp: (s: GameState) => GameState;
+  hostSitsDown: (s: GameState, host: Player) => GameState;
+  stampLog: (s: GameState, now: number) => GameState;
+  scheduleAutoNext: (s: GameState, at: number) => GameState;
+  inRange: (rank: number | null | undefined, lo: number, hi: number) => boolean;
   startGame: (s: GameState, rng: Rng) => Result<GameState>;
   apply: (s: GameState, actor: Actor, action: Action, rng: Rng) => Result<GameState>;
   canSeeCup: (s: GameState, viewer: Viewer) => boolean;
   redactFor: (s: GameState, viewer: Viewer) => GameState;
+  // domain/result
+  expect: <T>(r: Result<T>, context?: string) => T;
   // domain/probability
   survivalFor: (tableDice: number[], cupCount: number) => number[];
   probabilityAtLeast: (tableDice: number[], cupCount: number, rank: number) => number;
@@ -201,7 +218,10 @@ export const loadLegacyFidice = (): FidiceCore =>
 
 const FIDICE_DIR = resolve(import.meta.dirname, '..', '..', 'web', 'games', 'fidice');
 /** The last de-bundled module inside the legacy fixture's range (docs/MIGRATION.md step 2). */
-const LAST_PURE_MODULE = 'src/domain/search.js';
+const LAST_PURE_MODULE = 'src/domain/search';
+
+/** `src/domain/hands.js` or `.ts` (once step 8 has typed it) -> `src/domain/hands`. */
+export const sectionOf = (file: string): string => file.replace(/\.(js|ts)$/, '');
 
 /**
  * The de-bundled modules the fixture range covers, in bundle order (web/games/fidice/MANIFEST.json
@@ -213,7 +233,7 @@ export const currentFidiceModules = (): ReadonlyArray<string> => {
     files: Record<string, unknown>;
   };
   const modules = Object.keys(manifest.files).filter((file) => file.startsWith('src/'));
-  const last = modules.indexOf(LAST_PURE_MODULE);
+  const last = modules.findIndex((file) => sectionOf(file) === LAST_PURE_MODULE);
   if (last < 0) throw new Error(`${LAST_PURE_MODULE} is not in the manifest`);
   return modules.slice(0, last + 1);
 };

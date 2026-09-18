@@ -1,7 +1,8 @@
 {
-  // Browser code under web/: DOM available. The game-owned pure dirs are excluded because
-  // tsconfig.pure.json owns them. web/shared/lib is checked by both projects on purpose: the pure
-  // project is the guard, and keeping it here means this project never has zero inputs.
+  // Browser code under web/: DOM available. The game-owned pure dirs still in JavaScript are
+  // excluded because tsconfig.pure.json owns them. web/shared/lib and the typed pure dirs (fidice
+  // domain since docs/MIGRATION.md step 8) are checked by both projects on purpose: the pure
+  // project is the guard, and a composite project must list every .ts its edges import.
   // Migration only: `allowJs` lets de-bundled .js modules type-check as they are ported; step 15
   // removes it (a ratchet test keeps the .js count from growing).
   "extends": "./tsconfig.base.json",
@@ -14,7 +15,6 @@
   "include": ["web/**/*.ts", "web/**/*.js"],
   "exclude": [
     "web/games/*/src/engine/**",
-    "web/games/*/src/domain/**",
     "web/games/*/src/bots/**",
     "web/games/*/src/protocol.ts",
     "web/games/*/src/net/protocol.ts"
