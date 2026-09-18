@@ -8,8 +8,8 @@ import { keepsScore, standings } from '../../domain/game.ts';
 import { publicCupIndices, publicTableIndices } from '../../domain/publicState.ts';
 import { suggestHands } from '../../domain/search.ts';
 import { cls, h } from '../vdom.ts';
-import { diceRow, die, logView, seatOptions, seats, stepHeader } from '../components.js';
-import { isHostUi, isMyTurn } from '../ui.js';
+import { diceRow, die, logView, seatOptions, seats, stepHeader } from '../components.ts';
+import { isHostUi, isMyTurn } from '../ui.ts';
 
   var nameAt = (g, i2) => i2 === null ? "?" : g.players[i2]?.name ?? "?";
   var turnBar = (ui, g, r) => {

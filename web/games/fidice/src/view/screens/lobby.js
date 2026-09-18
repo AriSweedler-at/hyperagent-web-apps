@@ -4,8 +4,8 @@
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
 import { h } from '../vdom.ts';
-import { seatOptions, seats } from '../components.js';
-import { isHostUi, playerLink, spectatorLink } from '../ui.js';
+import { seatOptions, seats } from '../components.ts';
+import { isHostUi, playerLink, spectatorLink } from '../ui.ts';
 
   var shareRow = (icon, tip, label, id, link, dispatch) => h(
     "div",

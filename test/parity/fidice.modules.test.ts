@@ -56,7 +56,7 @@ describe('each pure module evaluates standalone', () => {
 
   test('the fixture range covers 25 modules, dice through search', () => {
     expect(modules).toHaveLength(25);
-    expect(modules[0]).toBe('src/assets/diceImages.js');
+    expect(modules[0]).toBe('src/assets/diceImages.ts');
     expect(sectionOf(modules.at(-1) ?? '')).toBe('src/domain/search');
   });
 

@@ -7,7 +7,7 @@ import {
   DIFFICULTIES, choiceLabel, difficultyById, difficultyOfChoice,
 } from '../../bots/registry.ts';
 import { cls, h } from '../vdom.ts';
-import { die } from '../components.js';
+import { die } from '../components.ts';
 
   var onEnter = (fn) => (e) => {
     if (e.key === "Enter") fn();

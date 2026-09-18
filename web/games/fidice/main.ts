@@ -11,7 +11,7 @@ import { realTransport } from '../../shared/edge/transport.ts';
 import type { Rng } from '../../shared/lib/rng.ts';
 import { Controller } from './src/app/controller.ts';
 import { browserEffects } from './src/app/effects.ts';
-import { DICE_IMAGES } from './src/assets/diceImages.js';
+import { DICE_IMAGES } from './src/assets/diceImages.ts';
 import { ClientSession } from './src/net/client.ts';
 import { HostSession } from './src/net/host.ts';
 import { clientTransport, hostTransport, type PeerDeps } from './src/net/peerjs.ts';

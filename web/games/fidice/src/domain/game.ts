@@ -13,6 +13,7 @@ import {
   type DieValue,
   type Player,
   type PublicRound,
+  type PublicState,
   type Rank,
   type Round,
   type RuleError,
@@ -60,15 +61,17 @@ const stampLog = (s: State, now: number): State =>
 const playerAt = (s: State, i: Seat): Player | undefined => s.players[i];
 const nameOf = (s: State, i: Seat): string => playerAt(s, i)?.name ?? '?';
 /** `lives: 0` means the table keeps score (rounds lost) instead of knocking players out. */
-const keepsScore = (s: State): boolean => s.lives === 0;
-const isOut = (s: State, p: Player): boolean => !keepsScore(s) && p.lives <= 0;
+// `keepsScore`, `isOut` and `standings` read lives, players and phase only, which a redacted
+// PublicState carries too, so the view calls them on what a guest sees (a State is a PublicState).
+const keepsScore = (s: PublicState): boolean => s.lives === 0;
+const isOut = (s: PublicState, p: Player): boolean => !keepsScore(s) && p.lives <= 0;
 const alivePlayers = (s: State): ReadonlyArray<Player> => s.players.filter((p) => !isOut(s, p));
 const isAlive = (s: State, i: Seat): boolean => {
   const p = playerAt(s, i);
   return p !== undefined && !isOut(s, p);
 };
 
-const standings = (s: State): ReadonlyArray<Seat> =>
+const standings = (s: PublicState): ReadonlyArray<Seat> =>
   s.players
     .map((p, i): Readonly<{ p: Player; i: Seat }> => ({ p, i: seat(i) }))
     .sort((a, b) => a.p.losses - b.p.losses || b.p.lives - a.p.lives || a.i - b.i)

@@ -6,8 +6,8 @@
 import { HAND_COUNT, handAt, rankOf, rungOf, spokenName } from '../../domain/hands.ts';
 import { publicCupIndices, publicTableIndices } from '../../domain/publicState.ts';
 import { cls, h } from '../vdom.ts';
-import { die, logView, seatOptions, seats } from '../components.js';
-import { isHostUi } from '../ui.js';
+import { die, logView, seatOptions, seats } from '../components.ts';
+import { isHostUi } from '../ui.ts';
 import { ladderView, noMarks } from './ladder.js';
 
   var nameAt2 = (g, i2) => i2 === null ? "?" : g.players[i2]?.name ?? "?";

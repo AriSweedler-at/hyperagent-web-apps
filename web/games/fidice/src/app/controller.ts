@@ -29,19 +29,14 @@ import type {
   Ui,
   UiRole,
 } from '../view/types.ts';
-import * as uiJs from '../view/ui.js';
+import { emptyLadder, emptyPicker, initialUi, isMyTurn } from '../view/ui.ts';
 import { mount, type VNode } from '../view/vdom.ts';
 import type { Effects } from './effects.ts';
 
 // The screens are still the generated JavaScript in this phase (the next one types them): their
 // exports are bound to the shapes in view/types.ts here, at the one boundary the controller
-// crosses. `initialUi` needs a cast because a JavaScript object literal's string fields widen to
-// `string`; `appView` because its inferred tree is looser than vdom's `VNode` union.
+// crosses. `appView` needs a cast because its inferred tree is looser than vdom's `VNode` union.
 const appView = appJs.appView as unknown as (ui: Ui, dispatch: Dispatch) => VNode;
-const initialUi = uiJs.initialUi as unknown as (shareBase: string, savedName: string) => Ui;
-const isMyTurn: (ui: Ui) => boolean = uiJs.isMyTurn;
-const emptyLadder: Ladder = uiJs.emptyLadder;
-const emptyPicker: Picker = uiJs.emptyPicker;
 const catId: (ladder: LadderId, cat: Category) => string = ladderJs.catId;
 const catKey: (cat: Category) => string = ladderJs.catKey;
 const rowId: (ladder: LadderId, rank: Rank) => string = ladderJs.rowId;

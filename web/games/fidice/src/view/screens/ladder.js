@@ -5,7 +5,7 @@
 
 import { CATEGORY_INFO, inRange, rungOf } from '../../domain/hands.ts';
 import { cls, h } from '../vdom.ts';
-import { diceRow, shapeRow } from '../components.js';
+import { diceRow, shapeRow } from '../components.ts';
 
   var noMarks = { bid: null, cup: null, dimAtOrBelow: null };
   var catKey = (cat) => `cat:${cat}`;

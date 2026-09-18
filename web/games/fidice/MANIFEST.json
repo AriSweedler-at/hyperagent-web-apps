@@ -11,11 +11,11 @@
     "theme.css": {
       "sha256": "12363c3fb618eebda271ef26f2ebb4e237de080c944ed03c7ac0f5541907a5cf"
     },
-    "src/assets/diceImages.js": {
+    "src/assets/diceImages.ts": {
       "section": "src/assets/diceImages.ts",
       "startLine": 374,
       "endLine": 381,
-      "sha256": "77969efc0a46a75bdf41d0110f30664319237c08c12d09a674fc2b88e4dfd77e"
+      "typed": true
     },
     "src/domain/dice.ts": {
       "section": "src/domain/dice.ts",
@@ -167,47 +167,47 @@
       "endLine": 2425,
       "typed": true
     },
-    "src/view/components.js": {
+    "src/view/components.ts": {
       "section": "src/view/components.ts",
       "startLine": 2428,
       "endLine": 2538,
-      "sha256": "e82e3253d17dd137685a8e01ed660ad58a3d0d00965f23b3a399867bb36eae6e"
+      "typed": true
     },
     "src/view/screens/menu.js": {
       "section": "src/view/screens/menu.ts",
       "startLine": 2541,
       "endLine": 2682,
-      "sha256": "65b6aea9ed7a38f76686dc2ec36f3517496022b81640d4698bb07bf25f8100f5"
+      "sha256": "f3432230e2e827646de421ee40dccc26bd7b9acfc97176e6b122e233c49fa68a"
     },
-    "src/view/ui.js": {
+    "src/view/ui.ts": {
       "section": "src/view/ui.ts",
       "startLine": 2685,
       "endLine": 2718,
-      "sha256": "ccca4f1798232307ffb54fac302a2512410481b79f8235d09e61d59ae7b67b26"
+      "typed": true
     },
     "src/view/screens/lobby.js": {
       "section": "src/view/screens/lobby.ts",
       "startLine": 2721,
       "endLine": 2790,
-      "sha256": "7e25f319f1a8460e805df5c49fa8cd84f726c296130a7e9996247c3a1639ffbf"
+      "sha256": "bc1f2e81334cc41761738efd9b37a33a028761899e82b6578935363034c8815c"
     },
     "src/view/screens/table.js": {
       "section": "src/view/screens/table.ts",
       "startLine": 2793,
       "endLine": 3077,
-      "sha256": "61156fa8e1562a28be126af491e008fc37daf7e892f84c861126e37bd03420f5"
+      "sha256": "a77ffe51c032518ed156892ce3beb652f1cf430334953f5daa72a51d69d14a2e"
     },
     "src/view/screens/ladder.js": {
       "section": "src/view/screens/ladder.ts",
       "startLine": 3080,
       "endLine": 3169,
-      "sha256": "8f04e51b4caa865ba5cfdba1ea68df8040500e2032e08f8c6c083c3a2e7ff364"
+      "sha256": "8af5094b0690db672b03dd1d72bf49b742a00f3891cd84352033ceb0ee5c56b9"
     },
     "src/view/screens/spectator.js": {
       "section": "src/view/screens/spectator.ts",
       "startLine": 3172,
       "endLine": 3294,
-      "sha256": "638592e391d2178180e65b136399b7f58b0787d8140a7ade578168bb584b89c0"
+      "sha256": "db2bc0cdbab108860fa0503e7baced7f7bcb7e9adf9eb206db5bf5477560a0ac"
     },
     "src/view/screens/rules.js": {
       "section": "src/view/screens/rules.ts",
