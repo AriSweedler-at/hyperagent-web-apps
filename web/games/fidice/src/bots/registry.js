@@ -4,9 +4,9 @@
 // it and test/tools/debundle-fidice.test.ts checks it (docs/MIGRATION.md step 6; step 8 types it).
 
 import { anyStrategy } from './strategy.ts';
-import { classicCautious, classicReckless, classicSteady } from './strategies/classic.js';
-import { profiler } from './strategies/profiler.js';
-import { trapper } from './strategies/trapper.js';
+import { classicCautious, classicReckless, classicSteady } from './strategies/classic.ts';
+import { profiler } from './strategies/profiler.ts';
+import { trapper } from './strategies/trapper.ts';
 import { gambler } from './strategies/gambler.js';
 import { pressure } from './strategies/pressure.js';
 import { learnerWith } from './strategies/learner.js';
