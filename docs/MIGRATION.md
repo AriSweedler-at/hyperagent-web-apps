@@ -424,3 +424,36 @@ parity and e2e gates.
   are included and gated at 90% too (`app/{effects,controller}.test.ts`; actual net 95.9/93.2/92.2,
   app 99.7/98.5/99.1), `main.ts` excluded as the boot. The PeerJS load-timing change and the
   remaining gates are as phase 1 recorded. See ARCHITECTURE "Deviations".
+- Step 10 (gin engine): `web/games/gin-rummy/src/engine/**` is ported from the pinned
+  `test/fixtures/legacy/gin-engine.cjs`; no page imports it and dist is unchanged. Signatures that
+  gained an injected parameter: `createGame(opts, rng, now)` (the legacy read `opts.rng`,
+  defaulting to `Math.random`, and `Date.now()`), `dealHand(state, rng)` (rng required) and
+  `applyAction(state, seat, action, rng, now)`, where `Now = () => number` is required rather than
+  optional because the UI turns `startedAt` and every round's `ts` into durations. `applyAction`
+  returns `Result<State, RuleError>` and never mutates; the legacy `privateCard` of a stock draw is
+  `state.pendingDraw.cardId` (the parity adapter derives it). `legalActions(view)` keeps the legacy
+  signature. `lastDrawn` is an optional key that appears at the first draw, as the legacy key did,
+  and `dealHand` leaves it alone (the named leak, asserted on both legs and counted in the replay
+  corpus). Small type-driven edits, each commented in place: three legacy TypeErrors on impossible
+  states are `RuleError`s (`takeUpcard`/`drawDiscard` on an empty pile, `drawStock` on an empty
+  stock), the `'Unknown phase.'` fallthrough is gone (exhaustive switch), and two dead guards of the
+  DFS (`dead !== minValue` at a full mask, the `seen` signature set) are dropped since pruning and
+  the canonical meld order make them unreachable and the 100% statement threshold could not be met
+  with them; the meld differential is unchanged either way. `melds.algorithms.ts` imports `melds.ts`
+  (not the reverse), so `bestMelding` and `allOptimalMeldings` are exported from the algorithms file
+  with the DP and the DFS they wrap, and `index.ts` presents the 26 legacy names. `meldingFromGroups`
+  decodes `groups` with `web/shared/lib/json` `arrayOf(arrayOf(string))`, which accepts exactly
+  what the legacy `Array.isArray`/`typeof` checks did. Toolchain: `tsconfig.web.json` no longer
+  excludes `engine/**`, `tsconfig.node.json` lists the gin engine so test/parity imports it
+  statically, and eslint bans `Date.now` in the PURE globs and `*.algorithms.ts` (verified with
+  `--print-config` and a throwaway violation). Tests: `gin.legacy.test.ts` runs both legs through
+  `loadCurrentGin()` (gin.api.ts copies the returned State onto the test's object); `gin.policy.ts`
+  holds the shared seeded policy; `gin.replay.test.ts` plays 1000 seeded games on both legs (one
+  mulberry32 stream each, the same action choices) and compares state, both views and both
+  legal-action lists after every action as JSON text with `ts`/`startedAt` masked, so key order is
+  pinned too (`GIN_REPLAY_GAMES=<n>` for a quicker local run; ~53 s at 1000 on this laptop);
+  `gin.melds.test.ts` compares every meld helper over 2000 seeded 10/11-card hands from three pools
+  plus the node-cap truncation case (26 cards, 187 arrangements); `engine/melds.algorithms.test.ts`
+  covers the memo eviction and the empty/limit edges. Coverage: `engine/**` at 90% lines, functions
+  and statements (actual 99.7/99.3/98.1), `melds.algorithms.ts` at 100%. See ARCHITECTURE
+  "Deviations".

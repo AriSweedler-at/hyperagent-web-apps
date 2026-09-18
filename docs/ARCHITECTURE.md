@@ -609,3 +609,22 @@ Step 9 (type the Fidice edges), phase 2: `view/**` and `assets/diceImages`:
 - `JS_FILE_COUNT` is 0; the debundle tool writes the page, the stylesheet and the manifest only
   and remains the audit of the bundle-to-module map. `allowJs` leaves `tsconfig.web.json` in
   step 15, as planned.
+
+Step 10 (gin engine): `web/games/gin-rummy/src/engine/**`:
+
+- `createGame(opts, rng, now)` and `applyAction(state, seat, action, rng, now)` take a `Now`
+  (`() => number`) beside the `Rng`: the legacy read `Date.now()` for `startedAt` and each round's
+  `ts`, which the UI turns into durations, so the clock is a required injection, not an optional
+  one. `dealHand(state, rng)` requires its rng. A stock draw's `privateCard` is not part of the
+  `Result`; it is `state.pendingDraw.cardId`.
+- The PURE globs also ban `Date.now` (`no-restricted-syntax`, the same shape as the `Math.random`
+  ban), `*.algorithms.ts` included; tests beside pure modules are exempt.
+- `melds.algorithms.ts` imports `melds.ts` (`allMelds`, `meldSig`) rather than the reverse, so the
+  wrappers `bestMelding` and `allOptimalMeldings` are exported from the algorithms file with the DP
+  and the DFS they wrap, and `engine/index.ts` presents the one surface; the memo `altCache` is
+  module state, as the legacy `_altCache` was. Two unreachable guards of the legacy DFS are dropped
+  (commented in place) so the 100% statement threshold holds.
+- `tsconfig.web.json` no longer excludes `engine/**`; `tsconfig.node.json` lists the gin engine for
+  the parity suites. Coverage: `engine/**` at 90% lines, functions and statements,
+  `melds.algorithms.ts` at 100%. The 1000-game replay adds ~50 s to `npm test`;
+  `GIN_REPLAY_GAMES=<n>` shortens a local run.
