@@ -5,6 +5,9 @@
 // (wall-clock fields zeroed), `viewFor` for both seats and `legalActions` for both seats must be
 // the same JSON text: same values, same keys, same key order.
 //
+// The corpus is seeds 1..GAMES, split into SHARDS equal ranges so vitest runs them on SHARDS
+// workers at once: `gin.replay.<n>.test.ts` is one line, `replayShard(n)`. Each shard asserts the
+// outcome coverage and the lastDrawn leak over its own range.
 // GIN_REPLAY_GAMES overrides the game count for a quicker local run (CI runs the default 1000).
 import { describe, expect, test } from 'vitest';
 
@@ -16,6 +19,7 @@ import { actor, policy } from './gin.policy.ts';
 
 const legacy = loadLegacyGin();
 const GAMES = Number(process.env['GIN_REPLAY_GAMES'] ?? 1000);
+const SHARDS = 4;
 /** A seeded game averages ~430 steps; the cap only exists to turn a hang into a failure. */
 const STEP_CAP = 5000;
 const PLAYERS = [
@@ -116,13 +120,24 @@ const replay = (seed: number): Replay => {
   return { steps: final.steps, leaks: final.leaks, outcomes };
 };
 
-describe('gin engine parity: legacy vs current, full games', () => {
-  test(`${String(GAMES)} seeded games agree on every state, both views and both legal-action lists after every action`, () => {
-    const games = Array.from({ length: GAMES }, (_, i) => replay(i + 1));
-    const outcomes = new Set(games.flatMap((g) => [...g.outcomes]));
-    expect(outcomes).toEqual(new Set(['gin', 'knock', 'undercut', 'void']));
-    expect(games.reduce((n, g) => n + g.steps, 0)).toBeGreaterThan(GAMES * 100);
-    // The lastDrawn leak shows in the corpus (see the comment in `replay`).
-    expect(games.reduce((n, g) => n + g.leaks, 0)).toBeGreaterThan(0);
-  }, 600_000);
-});
+/** Seeds of shard `n` (0-based): the n-th of SHARDS equal ranges of 1..GAMES. */
+const seedsOf = (shard: number): ReadonlyArray<number> => {
+  const from = Math.floor((shard * GAMES) / SHARDS) + 1;
+  const to = Math.floor(((shard + 1) * GAMES) / SHARDS);
+  return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+};
+
+/** Registers shard `n`'s test; each `gin.replay.<n+1>.test.ts` calls this once. */
+export const replayShard = (shard: number): void => {
+  const seeds = seedsOf(shard);
+  describe(`gin engine parity: legacy vs current, full games (shard ${String(shard + 1)} of ${String(SHARDS)})`, () => {
+    test(`seeds ${String(seeds[0])}..${String(seeds.at(-1))} agree on every state, both views and both legal-action lists after every action`, () => {
+      const games = seeds.map(replay);
+      const outcomes = new Set(games.flatMap((g) => [...g.outcomes]));
+      expect(outcomes).toEqual(new Set(['gin', 'knock', 'undercut', 'void']));
+      expect(games.reduce((n, g) => n + g.steps, 0)).toBeGreaterThan(seeds.length * 100);
+      // The lastDrawn leak shows in every shard (see the comment in `replay`).
+      expect(games.reduce((n, g) => n + g.leaks, 0)).toBeGreaterThan(0);
+    }, 600_000);
+  });
+};
