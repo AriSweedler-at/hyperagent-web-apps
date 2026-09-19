@@ -2,5 +2,5 @@
   "key": "ginRummyScorerState_v2",
   "variant": "fresh",
   "captured": "started scoring to 150, no hands yet",
-  "raw": "{\"players\":[{\"id\":\"j2t6gsg\",\"name\":\"Ann\"},{\"id\":\"lw4do4k\",\"name\":\"Bob\"},{\"id\":\"l8ue7hg\",\"name\":\"Cy\"}],\"target\":150,\"rounds\":[],\"startedAt\":1789778081721}"
+  "raw": "{\"players\":[{\"id\":\"j2t6gsg\",\"name\":\"Ann\"},{\"id\":\"lw4do4k\",\"name\":\"Bob\"},{\"id\":\"l8ue7hg\",\"name\":\"Cy\"}],\"target\":150,\"rounds\":[],\"startedAt\":1700000001000}"
 }

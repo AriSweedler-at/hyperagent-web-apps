@@ -29,6 +29,8 @@ const HOST = '127.0.0.1';
 /** The Pages mount point, spelled once in e2e/fixtures/site.ts. */
 const BASE = PAGES_BASE_PATH;
 const SEED = 11;
+/** The pinned clock's first tick, the epoch and step of tools/legacy/record-gin-wire.ts. */
+const EPOCH = 1_700_000_000_000;
 const STEP_TIMEOUT = 15_000;
 
 export type Capture = Readonly<{
@@ -99,7 +101,11 @@ export const capture = async (pageUrl: string): Promise<ReadonlyArray<Capture>> 
   const browser = await chromium.launch();
   const context = await browser.newContext();
   context.setDefaultTimeout(STEP_TIMEOUT);
-  await context.addInitScript({ content: seedScript(SEED) });
+  // The page's engine (startedAt, round ts), its saves and the scorer all read Date.now(); pinned
+  // to a stepping clock so a re-capture equals the committed files byte for byte.
+  await context.addInitScript({
+    content: `${seedScript(SEED)}\n(() => { let t = ${String(EPOCH)}; Date.now = () => (t += 1000); })();`,
+  });
   await routeOffline(context);
   const page = await context.newPage();
   // leaveGame() and the scorer's leave() ask through confirm(); Playwright would dismiss (cancel).
@@ -298,5 +304,8 @@ if (isMain(import.meta.url)) {
   } finally {
     await peers.close();
     await server.close();
+    // The `peer` package keeps its connection-check and message-expiry timers armed after
+    // httpServer.close(), so the event loop never drains on its own.
+    process.exit(0);
   }
 }
