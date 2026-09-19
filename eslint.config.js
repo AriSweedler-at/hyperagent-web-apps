@@ -239,8 +239,9 @@ const zones = [
     message: 'net/ imports protocol, engine/domain and only the transport and clock edges.',
   },
   {
-    // Every ui/ module except ui/state.ts, which the reducer zone below owns.
-    target: [`${GAME_SRC}/ui/!(state).ts`, `${GAME_SRC}/ui/*/**`, `${GAME_SRC}/view/**`],
+    // Every ui/ module except ui/state.ts, which the reducer zone below owns, and the tests beside
+    // them, which reach the fakes and the layers their module wires (docs/MIGRATION.md step 12).
+    target: [`${GAME_SRC}/ui/!(state|*.test).ts`, `${GAME_SRC}/ui/*/**`, `${GAME_SRC}/view/**`],
     from: [
       './web/shared/edge/**',
       `${GAME_SRC}/net/**`,
