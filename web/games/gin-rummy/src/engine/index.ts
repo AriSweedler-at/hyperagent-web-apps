@@ -1,6 +1,8 @@
 // The gin engine as one module (docs/MIGRATION.md step 10): the 26 names the legacy GinEngine
 // block exported, under the same names, plus the types and four names the port added (`sortMeld`,
-// `meldSolver`, `DEFAULT_TARGET`, `HAND_SIZE`). The memo `altCache` is not re-exported: it is
+// `meldSolver`, `DEFAULT_TARGET`, `HAND_SIZE`), and since step 11 the decoders of its shapes
+// (decode.ts: `decodeState`, `decodeView`, `decodeAction`, `decodeCard`, `ACTION_TYPES`) that
+// protocol.ts and storage.ts run inbound data through. The memo `altCache` is not re-exported: it is
 // module state of melds.algorithms.ts, reachable only by its own test. test/parity loads this for
 // the `current` leg and step 12 imports it into the UI, net and app layers. Pure: no DOM, no
 // clock, no randomness of its own (docs/ARCHITECTURE.md "Module boundaries").
@@ -23,6 +25,7 @@ export { bestMelding, allOptimalMeldings, meldSolver } from './melds.algorithms.
 export { maximalLayoff, bestMeldingWithLayoffs } from './layoff.ts';
 export { createGame, dealHand, applyAction, legalActions } from './game.ts';
 export { viewFor } from './view.ts';
+export { ACTION_TYPES, decodeAction, decodeCard, decodeState, decodeView } from './decode.ts';
 export { KNOCK_LIMIT, GIN_BONUS, UNDERCUT_BONUS, DEFAULT_TARGET, HAND_SIZE } from './types.ts';
 export type {
   Action,

@@ -1,0 +1,6 @@
+{
+  "key": "ginRummyMP_v1",
+  "variant": "guest.derived",
+  "captured": "derived from persist()'s guest branch (legacy/gin-rummy/index.html): written only when the guest's data channel opens, which needs a second peer",
+  "raw": "{\"role\":\"guest\",\"code\":\"KQZM\",\"myName\":\"Jeff\"}"
+}

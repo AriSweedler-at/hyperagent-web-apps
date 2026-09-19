@@ -1,0 +1,46 @@
+[
+  {
+    "t": "toast",
+    "msg": "After both players pass, you must draw from the stock."
+  },
+  {
+    "t": "toast",
+    "msg": "Discard a card, knock, or undo your draw."
+  },
+  {
+    "t": "toast",
+    "msg": "Draw a card from the stock or the discard pile."
+  },
+  {
+    "t": "toast",
+    "msg": "It's not your turn."
+  },
+  {
+    "t": "toast",
+    "msg": "Take the upcard or pass."
+  },
+  {
+    "t": "toast",
+    "msg": "That arrangement would leave 49 deadwood instead of 48."
+  },
+  {
+    "t": "toast",
+    "msg": "That card isn't in your hand."
+  },
+  {
+    "t": "toast",
+    "msg": "That meld arrangement doesn't fit your hand."
+  },
+  {
+    "t": "toast",
+    "msg": "Waiting for both players to continue."
+  },
+  {
+    "t": "toast",
+    "msg": "You can only rearrange melds during play."
+  },
+  {
+    "t": "toast",
+    "msg": "You need 10 or fewer deadwood points to knock (you'd have 47)."
+  }
+]

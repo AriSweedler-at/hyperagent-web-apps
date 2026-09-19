@@ -161,7 +161,7 @@ Gin's inline classic scripts depend on execution order (`window.GinEngine`, `win
 - Goal: `protocol.ts` and `storage.ts` codecs (keys `ginRummyMP_v1`, `ginRummy_name`,
   `ginRummy_homeTab`, `ginRummy_playMode`, `ginRummy_sound`, `ginRummyScorerState_v2`,
   `ginRummy_scorerNames` frozen), `ui/{cards,cues,fit,rules}.ts`, `ui/hand/{HandView,meldGroups}.ts`,
-  `scorer/{scores,voice,csv}.ts` (`computeRoundScores` takes players explicitly).
+  `scorer/{scores,voice,csv,format}.ts` (`computeRoundScores` takes players explicitly).
 - Proves: wire goldens decode and re-encode byte-identically; rejection fuzz; storage decoders
   accept payloads captured from a real legacy session; `cardHtml`/`meldGroupsHtml` string goldens;
   scorer table tests.
@@ -470,3 +470,38 @@ parity and e2e gates.
   four workers (~15 s wall instead of ~55 s). `engine/index.ts` no longer re-exports the memo
   `altCache` (its test imports it from `melds.algorithms.ts`); the header names the four
   non-legacy exports. See ARCHITECTURE "Deviations".
+- Step 11 (gin protocol, storage and pure UI/scorer helpers): everything ships dark under
+  `web/games/gin-rummy/src/`; no page imports it and dist is unchanged. Oracles first:
+  `tools/legacy/extract-gin-ui.ts` cuts the pure helpers of the two UI IIFEs function by function
+  into `test/fixtures/legacy/gin-ui.cjs` (a factory over the free variables the page supplied;
+  blocks cut from inside `render()` get a generated wrapper), pinned in `MANIFEST.json` with a new
+  `ranges` list for multi-range fixtures; `tools/legacy/record-gin-wire.ts` records the wire corpus
+  `test/fixtures/legacy/gin-wire/*.json` from 40 seeded legacy games with `Date.now` pinned (one
+  file per tag, `state` split; `gin-wire.test.ts` re-records and compares); and
+  `tools/legacy/capture-gin-storage.ts` drives the legacy page in headless Chromium (served through
+  serve-dist aliases, PeerJS from node_modules, a local PeerServer for the broker) and dumps every
+  `ginRummy*` key to `test/fixtures/legacy/gin-storage/<key>.<variant>.json`. Two saves could not
+  come from the DOM alone: the host mid-hand save goes through the page's own `window.__gin` hook
+  (the persist path is the page's), and the guest save is derived from `persist()` and marked so
+  (both need a second peer; a live two-peer capture is CI-only and lands with step 12's
+  differential net test). Shapes: `engine/decode.ts` holds the `State`, `View` and `Action`
+  decoders (the engine's literal key order, so a decoded value re-encodes byte for byte) that both
+  `protocol.ts` and `storage.ts` use, since the save carries a `State`; `web/shared/lib/json`
+  `object()` now leaves an absent optional key out (typed optional) instead of setting `undefined`,
+  and gained `record()` (own keys in input order; `__proto__`/`constructor`/`prototype` refused).
+  Protocol: the join `name` must be a string of at most 20 characters (the legacy coerced and cut
+  any value; a legacy guest never sends more) and a toast at most 500; `guestNameFor` is the host's
+  normalisation; `decodeGuestFrame`/`decodeHostFrame` refuse the other side's tags. Storage: the
+  four bare-string keys are decoded as such; garbage under `ginRummy_playMode` is refused (the
+  legacy would have hidden both mode panels) and `soundEnabled` keeps `!== 'off'`; the scorer's
+  `void` CSV branches are not ported (a scorer round never carries `void`); a knocker who is not a
+  player is not reproduced (`NaN` in the legacy). UI: `ui/cues.ts` holds the cue machine as
+  `nextCue(state, view, role)` and re-exports `fmtDuration` from `scorer/format.ts` (the CSV export
+  shares it and the scorer may not import `ui/`); `ui/rules.ts` equals both legacy copies up to the
+  page's indentation. `scorer/voice.ts` is the spoken-entry parser (the legacy has voice entry, not
+  announcements). Toolchain: `scorer/` (except `main.ts`) joins the pure layers (`PURE` glob,
+  `tsconfig.pure.json`, an import zone of its own; `protocol.ts` may not import it);
+  `tsconfig.web.json` no longer excludes `protocol.ts`, `tsconfig.node.json` lists the whole gin
+  `src/` tree (DOM-free by design) and `web/shared/edge/storage.ts`; coverage gates `protocol.ts`,
+  `storage.ts`, `ui/**` and `scorer/**` at 90% lines, functions and statements (actual
+  100/100/100). See ARCHITECTURE "Deviations".

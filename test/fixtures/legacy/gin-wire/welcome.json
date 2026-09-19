@@ -1,0 +1,17 @@
+[
+  {
+    "t": "welcome",
+    "hostName": "Ann",
+    "target": 100
+  },
+  {
+    "t": "welcome",
+    "hostName": "ABCDEFGHIJKLMNOPQRST",
+    "target": 250
+  },
+  {
+    "t": "welcome",
+    "hostName": "Zoë 🃏",
+    "target": 1
+  }
+]

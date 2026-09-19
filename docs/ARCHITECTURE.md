@@ -46,7 +46,7 @@ and tests that prove it land before the code they protect.
 │       ├── gin-rummy/           index.html (legacy markup + module script), main.ts, theme.css (legacy CSS), src/
 │       │   └── src/             engine/ (types, cards, melds, melds.algorithms, layoff, game, view, index),
 │       │                        protocol.ts, storage.ts, net/{host,guest}.ts, ui/{state,render,cards,cues,fit,
-│       │                        local,home,rules}.ts, ui/hand/{HandView,meldGroups}.ts, scorer/{scores,voice,csv,main}.ts
+│       │                        local,home,rules}.ts, ui/hand/{HandView,meldGroups}.ts, scorer/{scores,voice,csv,format,main}.ts
 │       └── fidice/              index.html, main.ts, theme.css, src/ = the 38 modules at their // src/<path>.ts
 │                                marker paths (assets, domain (+probability.algorithms), bots, net, view, app)
 ├── legacy/                      MIGRATION ONLY: verbatim pages + shared/ice.js, copied into dist by the plugin
@@ -63,15 +63,16 @@ and tests that prove it land before the code they protect.
 ## Module boundaries and contracts
 
 Enforced by `eslint-plugin-import-x` `no-restricted-paths` zones, `import-x/no-cycle`, and
-`tsconfig.pure.json`, which compiles `**/engine`, `**/domain`, `**/bots`, `web/shared/lib` and
-both `protocol.ts` files with `lib: ["ES2023"]` and no DOM, so `window`, `document` and
-`HTMLElement` are unnameable there by the compiler.
+`tsconfig.pure.json`, which compiles `**/engine`, `**/domain`, `**/bots`, `web/shared/lib`,
+both `protocol.ts` files and `scorer/` (except `scorer/main.ts`) with `lib: ["ES2023"]` and no
+DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compiler.
 
 | Layer | May import | Contract |
 |---|---|---|
 | `web/shared/lib` | itself | Leaf modules. `Result<T,E>` (`ok/err/map/andThen`), `Rng = () => number`, `mulberry32`, JSON decoders, `roomCode` constants (`'ginrummy-ari-'`, `'fidice-'`, alphabets). |
 | `engine` / `domain` / `bots` | shared/lib, siblings | Pure. `applyAction(state, seat, action, rng): Result<State, RuleError>` (gin), `apply(s, actor, action, rng): Result` (fidice). Return new state; never mutate. `viewFor` / `redactFor` are the only redaction. |
 | `protocol.ts` | engine/domain types, shared/lib | Trust boundary. Every inbound frame passes a decoder returning `Result`; outbound frames are built here. Shapes frozen by wire goldens; a future change adds a version field here. |
+| `scorer/` (not `main.ts`) | engine types, shared/lib, siblings | Pure maths under the pure profile: the Score Counter's `computeRoundScores`, standings, voice parser, CSV text and `fmtDuration` (which `ui/cues.ts` re-exports). `scorer/main.ts` is its screen, an edge. |
 | `net/` | protocol, engine/domain, `@shared/edge/transport`, `@shared/edge/clock` | Never imports `peerjs`. `Transport`, `Clock`, `Rng`, `NewId` are injected so protocol tests run on `transport.fake.ts`. |
 | `ui/` / `view/` | engine/domain types, shared/lib, `@shared/edge/dom` | Render a view to strings/VNodes; DOM writes only in `render.ts` / `vdom.ts`. `HandView { render(model, selection): string }` is the only way a hand is drawn. |
 | `storage.ts` / `app/effects.ts` | shared/lib, `@shared/edge/storage` | Only modules that touch localStorage; every read goes through a decoder. |
@@ -630,3 +631,25 @@ Step 10 (gin engine): `web/games/gin-rummy/src/engine/**`:
   (`test/parity/gin.replay.{1..4}.test.ts`, one line each over `gin.replay.ts`) so vitest spreads
   it across workers: ~15 s wall on a 16-core laptop instead of ~55 s in one worker;
   `GIN_REPLAY_GAMES=<n>` shortens a local run.
+
+Step 11 (gin protocol, storage and pure UI/scorer helpers): `web/games/gin-rummy/src/`:
+
+- `engine/decode.ts` is a new engine module: the `State`, `View` and `Action` decoders in the
+  engine's literal key order, shared by `protocol.ts` (views, actions) and `storage.ts` (the save
+  carries a `State`), so both promise byte-identical re-encoding without knowing the shapes.
+- `web/shared/lib/json`: `object()` leaves an absent optional key out of its output and types it
+  optional (`Shape<F>`); `record()` decodes id-keyed maps, refusing the three prototype-chain keys.
+- `protocol.ts` caps a join name at 20 characters and a toast at 500 rather than coercing as the
+  legacy host did; `guestNameFor` applies the host's normalisation after the decode.
+- `storage.ts` imports the engine decoder and the scorer's types beside `web/shared/lib` and
+  `@shared/edge/storage`; its `ui/`, `net/`, `view/` and edge bans are unchanged.
+- `ui/cues.ts` holds the sound-cue machine (`nextCue`) beside the status strings and re-exports
+  `fmtDuration` from `scorer/format.ts`, so `scorer/csv.ts` never imports `ui/`; `scorer/` (except
+  `main.ts`) is a pure layer in the layer table, `PURE` glob, `tsconfig.pure.json` and its own
+  import zone, and `protocol.ts` may not import it. `scorer/voice.ts` is the spoken-entry parser.
+- `tsconfig.node.json` lists the whole gin `src/` tree and `web/shared/edge/storage.ts` for the
+  parity suites; `tsconfig.web.json` no longer excludes `protocol.ts`. Coverage: `protocol.ts`,
+  `storage.ts`, `ui/**` and `scorer/**` at 90% lines, functions and statements.
+- Fixtures: `MANIFEST.json` entries may carry `ranges` (a fixture cut from several page ranges);
+  `test/fixtures/legacy/{gin-wire,gin-storage}` hold the recorded wire corpus and the captured
+  localStorage payloads (README there).

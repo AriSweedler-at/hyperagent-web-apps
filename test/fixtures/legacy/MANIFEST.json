@@ -16,5 +16,108 @@
     "endLine": 1197,
     "sourceSha256": "44f7c4014365cffbee9acbd6ef1c0ea8d909c34e4c9157dcc7f714745e4bf58d",
     "fixtureSha256": "02922bf5985f4737ff4efcc5d5d0411e5ac5860b24f22901842ee0f2a9d2e4f6"
+  },
+  "gin-ui": {
+    "page": "legacy/gin-rummy/index.html",
+    "fixture": "gin-ui.cjs",
+    "tool": "tools/legacy/extract-gin-ui.ts",
+    "startLine": 325,
+    "endLine": 2376,
+    "ranges": [
+      {
+        "startLine": 325,
+        "endLine": 337
+      },
+      {
+        "startLine": 527,
+        "endLine": 539
+      },
+      {
+        "startLine": 1332,
+        "endLine": 1335
+      },
+      {
+        "startLine": 1350,
+        "endLine": 1361
+      },
+      {
+        "startLine": 1429,
+        "endLine": 1429
+      },
+      {
+        "startLine": 1430,
+        "endLine": 1461
+      },
+      {
+        "startLine": 1464,
+        "endLine": 1469
+      },
+      {
+        "startLine": 1470,
+        "endLine": 1470
+      },
+      {
+        "startLine": 1471,
+        "endLine": 1476
+      },
+      {
+        "startLine": 1514,
+        "endLine": 1522
+      },
+      {
+        "startLine": 1531,
+        "endLine": 1538
+      },
+      {
+        "startLine": 1547,
+        "endLine": 1549
+      },
+      {
+        "startLine": 2099,
+        "endLine": 2099
+      },
+      {
+        "startLine": 2100,
+        "endLine": 2100
+      },
+      {
+        "startLine": 2116,
+        "endLine": 2116
+      },
+      {
+        "startLine": 2119,
+        "endLine": 2130
+      },
+      {
+        "startLine": 2289,
+        "endLine": 2292
+      },
+      {
+        "startLine": 2293,
+        "endLine": 2325
+      },
+      {
+        "startLine": 2328,
+        "endLine": 2328
+      },
+      {
+        "startLine": 2329,
+        "endLine": 2329
+      },
+      {
+        "startLine": 2330,
+        "endLine": 2339
+      },
+      {
+        "startLine": 2340,
+        "endLine": 2344
+      },
+      {
+        "startLine": 2348,
+        "endLine": 2376
+      }
+    ],
+    "sourceSha256": "51401ea03c29e7ad6d5e709517833e5168a75660aa5ff350d9c610dfbc3617cf",
+    "fixtureSha256": "a595c89ef08b3dee64fdc472f3bb278615d3649d81ba01c3cc2ce827d0a76bee"
   }
 }
