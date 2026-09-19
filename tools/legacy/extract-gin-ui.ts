@@ -80,11 +80,18 @@ const blockRange = (
 };
 
 const plain = (range: LineRange): Cut => ({ range, before: [], after: [] });
-const wrapped = (range: LineRange, signature: string, returns: string): Cut => ({
+/** A block of render() as a function of the view: `locals` are the render() consts it read. */
+const wrapped = (
+  range: LineRange,
+  signature: string,
+  locals: ReadonlyArray<string>,
+  returns: string,
+): Cut => ({
   range,
   before: [
     `  // wrapper: the block below is cut from inside render()`,
     `  function ${signature} {`,
+    ...locals.map((local) => `    const ${local} = v.${local};`),
   ],
   after: [`    return ${returns};`, '  }'],
 });
@@ -109,16 +116,19 @@ const cutsOf = (lines: ReadonlyArray<string>): ReadonlyArray<Cut> => {
         ui,
       ),
       'legacyStatus(v)',
+      ['opp'],
       '{ status, sub }',
     ),
     wrapped(
       blockRange(lines, '    let dwText;', '    } else dwText = ', ui),
       'legacyDeadwoodText(v)',
+      ['me'],
       'dwText',
     ),
     wrapped(
       blockRange(lines, '    const deadHtml = me.deadwood.length', '    me.melds.forEach(', ui),
       'legacyHandHtml(v)',
+      ['me'],
       'html + deadHtml',
     ),
     plain(lineRange(lines, '  const GIN_BONUS = 25, UNDERCUT_BONUS = 25;', scorer)),

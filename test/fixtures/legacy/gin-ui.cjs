@@ -93,6 +93,7 @@ module.exports = function legacyGinUi(deps) {
   // ---- legacy/gin-rummy/index.html lines 1514-1522
   // wrapper: the block below is cut from inside render()
   function legacyStatus(v) {
+    const opp = v.opp;
     let status = '', sub = '';
     const oppTurnName = opp.name;
     if (v.phase === 'roundOver') { status = v.result && v.result.void ? 'Hand void' : 'Hand over'; sub = 'See results'; }
@@ -107,6 +108,7 @@ module.exports = function legacyGinUi(deps) {
   // ---- legacy/gin-rummy/index.html lines 1531-1538
   // wrapper: the block below is cut from inside render()
   function legacyDeadwoodText(v) {
+    const me = v.me;
     let dwText;
     if (v.phase === 'discard' && v.isMyTurn && v.discardOptions) {
       if (app.selectedCard && !v.discardOptions[app.selectedCard].locked) dwText = `Deadwood after discard: ${v.discardOptions[app.selectedCard].deadwood}`;
@@ -120,6 +122,7 @@ module.exports = function legacyGinUi(deps) {
   // ---- legacy/gin-rummy/index.html lines 1547-1549
   // wrapper: the block below is cut from inside render()
   function legacyHandHtml(v) {
+    const me = v.me;
     const deadHtml = me.deadwood.length ? `<div class="meld-group dead">${me.deadwood.map(c => cardHtml(c, { selected: app.selectedCard === c.id, fresh: v.lastDrawnId === c.id, locked: v.drawnFromDiscard === c.id && v.phase === 'discard' && v.isMyTurn })).join('')}</div>` : '';
     let html = '';
     me.melds.forEach((m, i) => { html += `<div class="meld-group m${i % 5}">${m.map(c => cardHtml(c, { selected: app.selectedCard === c.id, fresh: v.lastDrawnId === c.id, locked: v.drawnFromDiscard === c.id && v.phase === 'discard' && v.isMyTurn })).join('')}</div>`; });
