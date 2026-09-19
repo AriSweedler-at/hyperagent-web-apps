@@ -630,3 +630,23 @@ Step 10 (gin engine): `web/games/gin-rummy/src/engine/**`:
   (`test/parity/gin.replay.{1..4}.test.ts`, one line each over `gin.replay.ts`) so vitest spreads
   it across workers: ~15 s wall on a 16-core laptop instead of ~55 s in one worker;
   `GIN_REPLAY_GAMES=<n>` shortens a local run.
+
+Step 11 (gin protocol, storage and pure UI/scorer helpers): `web/games/gin-rummy/src/`:
+
+- `engine/decode.ts` is a new engine module: the `State`, `View` and `Action` decoders in the
+  engine's literal key order, shared by `protocol.ts` (views, actions) and `storage.ts` (the save
+  carries a `State`), so both promise byte-identical re-encoding without knowing the shapes.
+- `web/shared/lib/json`: `object()` leaves an absent optional key out of its output and types it
+  optional (`Shape<F>`); `record()` decodes id-keyed maps, refusing the three prototype-chain keys.
+- `protocol.ts` caps a join name at 20 characters and a toast at 500 rather than coercing as the
+  legacy host did; `guestNameFor` applies the host's normalisation after the decode.
+- `storage.ts` imports the engine decoder and the scorer's types beside `web/shared/lib` and
+  `@shared/edge/storage`; its `ui/`, `net/`, `view/` and edge bans are unchanged.
+- `ui/cues.ts` holds `fmtDuration` and the sound-cue machine (`nextCue`) beside the status strings;
+  `scorer/csv.ts` imports `fmtDuration` from it. `scorer/voice.ts` is the spoken-entry parser.
+- `tsconfig.node.json` lists the whole gin `src/` tree and `web/shared/edge/storage.ts` for the
+  parity suites; `tsconfig.web.json` no longer excludes `protocol.ts`. Coverage: `protocol.ts`,
+  `storage.ts`, `ui/**` and `scorer/**` at 90% lines, functions and statements.
+- Fixtures: `MANIFEST.json` entries may carry `ranges` (a fixture cut from several page ranges);
+  `test/fixtures/legacy/{gin-wire,gin-storage}` hold the recorded wire corpus and the captured
+  localStorage payloads (README there).
