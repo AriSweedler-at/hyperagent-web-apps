@@ -6,9 +6,25 @@ import {
   addClass,
   byId,
   clear,
+  closestFrom,
+  dataOf,
   escapeHtml,
   hasClass,
+  inputDataOf,
+  inputTypeOf,
+  isDisabled,
+  isWithin,
+  keyOf,
+  listen,
+  listenId,
+  preventDefault,
+  queryAllIn,
+  queryIn,
+  readValue,
   safeHtml,
+  selectText,
+  setStyleProperty,
+  setValue,
   removeClass,
   requireId,
   setAttr,
@@ -16,10 +32,14 @@ import {
   setHidden,
   setHtml,
   setText,
+  stopPropagation,
+  targetIdOf,
+  targetValueOf,
   toggleClass,
   trustedHtml,
   type DocumentLike,
 } from './dom.ts';
+import { fakeEl, fakePage, fakeTarget } from './page.fake.ts';
 
 type FakeEl = Readonly<{
   el: HTMLElement;
@@ -189,5 +209,80 @@ describe('setters', () => {
     expect(f.attrs.get('aria-label')).toBe('Hand');
     setAttr(f.el, 'aria-label', null);
     expect(f.attrs.has('aria-label')).toBe(false);
+  });
+});
+
+describe('values, styles and queries (over page.fake.ts)', () => {
+  test('readValue/setValue write only when the value differs; selectText tolerates its absence', () => {
+    const input = fakeEl('nameInput', { value: 'Ari' });
+    expect(readValue(input.el)).toBe('Ari');
+    setValue(input.el, 'Bob');
+    expect(input.value()).toBe('Bob');
+    setValue(input.el, 'Bob');
+    expect(input.value()).toBe('Bob');
+    selectText(input.el);
+    selectText({} as unknown as HTMLElement);
+  });
+
+  test('style properties, data attributes, disabled, queries', () => {
+    const label = fakeEl('label');
+    const pile = fakeEl('stockPile', {
+      attrs: { 'data-pile-key': 'back' },
+      queries: { '.pile-label': [label] },
+    });
+    setStyleProperty(pile.el, '--tscale', '0.85');
+    expect(pile.style('--tscale')).toBe('0.85');
+    expect(dataOf(pile.el, 'pile-key')).toBe('back');
+    expect(dataOf(pile.el, 'card')).toBeNull();
+    expect(isDisabled(pile.el)).toBe(false);
+    pile.el.toggleAttribute('disabled', true);
+    expect(isDisabled(pile.el)).toBe(true);
+    expect(queryIn(pile.el, '.pile-label')).toBe(label.el);
+    expect(queryIn(pile.el, '.nope')).toBeNull();
+    expect(queryAllIn(pile.el, '.pile-label')).toEqual([label.el]);
+    expect(queryAllIn(pile.el, '.nope')).toEqual([]);
+  });
+});
+
+describe('events (over page.fake.ts)', () => {
+  test('listen/listenId register handlers; the target helpers read through the casts', () => {
+    const card = fakeEl('card', { attrs: { 'data-card': 'AS' } });
+    const hand = fakeEl('hand', { children: [card] });
+    const page = fakePage([hand, card]);
+    const seen: string[] = [];
+    listen(hand.el, 'click', (e) => {
+      seen.push(
+        `hand:${targetIdOf(e)}:${closestFrom(e, '.card')?.getAttribute('data-card') ?? '-'}`,
+      );
+    });
+    listenId(page.doc, 'card', 'input', (e) => {
+      seen.push(`card:${targetValueOf(e)}:${inputTypeOf(e)}:${inputDataOf(e) ?? 'null'}`);
+      preventDefault(e);
+    });
+    listen(page.doc, 'keydown', (e) => {
+      seen.push(`doc:${keyOf(e)}`);
+      stopPropagation(e);
+    });
+    hand.fire('click', { target: fakeTarget({ id: 'x', closest: { '.card': card } }) });
+    hand.fire('click');
+    const input = card.fire('input', { inputType: 'insertText', data: 'a' });
+    const key = page.fire('keydown', { key: 'Enter' });
+    expect(seen).toEqual(['hand:x:AS', 'hand:hand:-', 'card::insertText:a', 'doc:Enter']);
+    expect(input.wasPrevented()).toBe(true);
+    expect(key.wasStopped()).toBe(true);
+    expect(hand.listenerTypes()).toEqual(['click']);
+    // Containment: the element, its declared children, and nothing else.
+    const stranger = fakeEl('stranger');
+    expect(isWithin(hand.el, card.fire('pointerdown'))).toBe(true);
+    expect(isWithin(hand.el, stranger.fire('pointerdown'))).toBe(false);
+    expect(isWithin(hand.el, page.fire('click'))).toBe(false);
+    // The target helpers on a bare event with no target.
+    const bare = page.fire('click');
+    expect(targetIdOf(bare)).toBe('');
+    expect(targetValueOf(bare)).toBe('');
+    expect(closestFrom(bare, '.card')).toBeNull();
+    expect(keyOf(bare)).toBe('');
+    expect(inputTypeOf(bare)).toBe('');
+    expect(inputDataOf(bare)).toBeNull();
   });
 });
