@@ -95,6 +95,8 @@ export type AudioCues = Readonly<{
   tone: (freq: number, start: number, dur: number, type?: OscillatorType, gain?: number) => void;
   /** Play notes back to back. */
   seq: (notes: ReadonlyArray<Note>, type?: OscillatorType, gain?: number) => void;
+  /** Create and resume the context without playing (the legacy `ensure()` on the first gesture). */
+  warm: () => void;
   setEnabled: (enabled: boolean) => void;
   enabled: () => boolean;
 }>;
@@ -155,6 +157,9 @@ export const createAudioCues = (options: AudioCueOptions): AudioCues => {
   return {
     tone,
     seq,
+    warm: () => {
+      ensure();
+    },
     setEnabled: (value) => {
       enabled = value;
     },

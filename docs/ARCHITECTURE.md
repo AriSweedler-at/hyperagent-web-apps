@@ -653,3 +653,22 @@ Step 11 (gin protocol, storage and pure UI/scorer helpers): `web/games/gin-rummy
 - Fixtures: `MANIFEST.json` entries may carry `ranges` (a fixture cut from several page ranges);
   `test/fixtures/legacy/{gin-wire,gin-storage}` hold the recorded wire corpus and the captured
   localStorage payloads (README there).
+
+Step 12, phase 1 (gin page, net, state, boot): `web/games/gin-rummy/`:
+
+- `net/peerjs.ts` joins `net/{host,guest}.ts` as the third gin net module (the edge glob already
+  named it): the peer plumbing both sessions share, over `@shared/edge/transport` and the Clock.
+- The sessions take `read()` (the app fields the legacy handlers read) and an events record (status,
+  toast, wake lock, persist, decoded frames, gone/lost) instead of touching the page; `ui/state.ts`
+  turns the events into intents through main.ts's wiring.
+- `ui/state.ts` returns `Effect`s as data and exports `runEffect(app, effect, deps)`; the mutable
+  `app` and session cells live in `main.ts` (the edge), which paints after every intent.
+- `ui/render.ts` is where the gin DOM writes live; it is excluded from `tsconfig.node.json` (DOM).
+  `ui/sound.ts` holds the cue tables; `src/fx.ts` (audio, vibration, the `ginRummy_sound` key) is
+  the legacy `fx` object over `@shared/edge/fx`, whose `AudioCues` gained `warm()`.
+- Import zones: net/ may import `clock.fake.ts` (tests beside the sessions); the ui/ zone's target
+  leaves `*.test.ts` out. Coverage: gin `net/**` and `fx.ts` at 90% lines, functions and statements.
+- `index.html` adds `id="rulesList"` / `id="rulesOverlayList"` to the two rules slots; every other
+  id and class is the legacy's. dist/ carries the unreferenced gin bundle beside the legacy page.
+- Two module pages: the modules both import are one `shared/assets/[name]-[hash].js` chunk,
+  preloaded by both pages (`<link rel="modulepreload">`), the layout `chunkFileNames` reserved.
