@@ -30,7 +30,8 @@ const EDGES = [
   'web/**/view/vdom.ts',
   'web/shared/edge/**/*.ts',
 ];
-const RNG_ALLOWED = ['web/**/main.ts', 'web/shared/edge/**/*.ts'];
+// The page boots only: gin's scorer/main.ts is an edge (EDGES) but takes its rng injected.
+const RNG_ALLOWED = ['web/games/*/main.ts', 'web/shared/edge/**/*.ts'];
 const TESTS_AND_TOOLS = [
   '**/*.test.ts',
   'e2e/**/*.ts',

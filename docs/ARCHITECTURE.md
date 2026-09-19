@@ -692,3 +692,5 @@ Step 12, phase 2 (gin paint, wiring, scorer screen, oracle):
   `e2e/gin-dom-parity.spec.ts` on the `next` project; `e2e/gin-resume.spec.ts` covers host resume
   and guest rejoin on every project; `PORTED_PAGES` lists gin-rummy, so the `next` project runs
   every gin spec against dist-next/.
+- `RNG_ALLOWED` is `web/games/*/main.ts` (the page boots) plus `web/shared/edge/**`: gin's
+  `scorer/main.ts` is an edge for `let`/`try` but keeps the `Math.random` ban (`ScorerDeps.rng`).
