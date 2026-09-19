@@ -33,8 +33,12 @@ export type FakeElOptions = Readonly<{
   attrs?: Readonly<Record<string, string>>;
   text?: string;
   value?: string;
-  /** Elements `queryIn`/`queryAllIn` return for a selector (first for `queryIn`). */
-  queries?: Readonly<Record<string, ReadonlyArray<FakeEl>>>;
+  /**
+   * Elements `queryIn`/`queryAllIn` return for a selector (first for `queryIn`); a function is
+   * called on every query, so a test can hand out fresh elements after each re-render as a real
+   * DOM would.
+   */
+  queries?: Readonly<Record<string, ReadonlyArray<FakeEl> | (() => ReadonlyArray<FakeEl>)>>;
   /** Elements `contains` reports as inside this one (and their own children). */
   children?: ReadonlyArray<FakeEl>;
 }>;
@@ -53,6 +57,8 @@ export type FakeEl = Readonly<{
   value: () => string;
   style: (name: string) => string | null;
   disabled: () => boolean;
+  /** `el.remove()` was called. */
+  removed: () => boolean;
   /** Event types with a listener, in registration order. */
   listenerTypes: () => ReadonlyArray<string>;
   fire: (type: string, init?: FireInit) => FakeEvent;
@@ -102,12 +108,18 @@ export const fakeEl = (id: string, options: FakeElOptions = {}): FakeEl => {
   const attrs = new Map<string, string>(Object.entries(options.attrs ?? {}));
   const styles = new Map<string, string>();
   const listeners = new Map<string, Listener[]>();
-  const state = { content: options.text ?? '', value: options.value ?? '' };
+  const state = { content: options.text ?? '', value: options.value ?? '', removed: false };
   const children = options.children ?? [];
-  const queried = Object.values(options.queries ?? {}).flat();
+  const query = (selector: string): ReadonlyArray<FakeEl> => {
+    const found = options.queries?.[selector];
+    return typeof found === 'function' ? found() : (found ?? []);
+  };
+  const queried = (): ReadonlyArray<FakeEl> => Object.keys(options.queries ?? {}).flatMap(query);
   const contains = (node: unknown): boolean =>
     node === el ||
-    [...children, ...queried].some((child) => child.el === node || child.el.contains(node as Node));
+    [...children, ...queried()].some(
+      (child) => child.el === node || child.el.contains(node as Node),
+    );
   const el = {
     id,
     get value() {
@@ -119,8 +131,8 @@ export const fakeEl = (id: string, options: FakeElOptions = {}): FakeEl => {
     replaceChildren: (...nodes: ReadonlyArray<string>) => {
       state.content = nodes.join('');
     },
-    insertAdjacentHTML: (_position: string, markup: string) => {
-      state.content = markup + state.content;
+    insertAdjacentHTML: (position: string, markup: string) => {
+      state.content = position === 'beforeend' ? state.content + markup : markup + state.content;
     },
     classList: {
       add: (...names: ReadonlyArray<string>) => {
@@ -156,9 +168,15 @@ export const fakeEl = (id: string, options: FakeElOptions = {}): FakeEl => {
         styles.set(name, value);
       },
     },
-    querySelector: (selector: string) => options.queries?.[selector]?.[0]?.el ?? null,
-    querySelectorAll: (selector: string) => (options.queries?.[selector] ?? []).map((c) => c.el),
+    querySelector: (selector: string) => query(selector)[0]?.el ?? null,
+    querySelectorAll: (selector: string) => query(selector).map((c) => c.el),
     contains,
+    get children() {
+      return children.map((c) => c.el);
+    },
+    remove: () => {
+      state.removed = true;
+    },
     closest: () => null,
     select: () => undefined,
     addEventListener: (type: string, fn: Listener) => {
@@ -183,6 +201,7 @@ export const fakeEl = (id: string, options: FakeElOptions = {}): FakeEl => {
     value: () => state.value,
     style: (name) => styles.get(name) ?? null,
     disabled: () => attrs.has('disabled'),
+    removed: () => state.removed,
     listenerTypes: () => [...listeners.keys()],
     fire,
   };

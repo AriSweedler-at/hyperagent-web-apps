@@ -27,12 +27,14 @@ import { GuestSession, type GuestEvents } from './src/net/guest.ts';
 import { HostSession, type HostEvents } from './src/net/host.ts';
 import type { NetDeps } from './src/net/peerjs.ts';
 import { isGuestFrame } from './src/protocol.ts';
+import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
 import { soundEnabled } from './src/storage.ts';
 import { defaultHandView } from './src/ui/hand/HandView.ts';
 import { fillNameInputs, inviteText, setCodeInput } from './src/ui/home.ts';
 import {
   bindAll,
   fitTable,
+  fmtTime,
   hideToast,
   paint,
   paintSound,
@@ -61,10 +63,24 @@ const TOAST_MS = 2600;
 
 type Scorer = Readonly<{ onShown: () => void; resume: () => void }>;
 
+/** `exportGame()`'s download: a Blob behind an anchor clicked once, its URL revoked 2 s later. */
+const downloadText = (fileName: string, text: string): void => {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8;' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  realClock.setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 2000);
+};
+
 const boot = (): void => {
   // The documented test hooks on this page (docs/ARCHITECTURE.md "Documented test hooks"): a seeded
   // rng a harness installs before boot, the app hook set after it, and the Score Counter's screen
-  // (src/scorer/main.ts, phase 2) registering itself as the legacy `window.__scorer` did.
+  // (src/scorer/main.ts) registering itself as the legacy `window.__scorer` did.
   const page = window as Window & { __rng?: Rng; __gin?: unknown; __scorer?: Scorer };
   const store = browserStore();
   const rng: Rng = page.__rng ?? Math.random;
@@ -281,8 +297,54 @@ const boot = (): void => {
     },
   };
 
+  // The Score Counter: `window.SpeechRecognition || window.webkitSpeechRecognition` as the legacy read it.
+  const speechGlobals = globalThis as unknown as Readonly<{
+    SpeechRecognition?: new () => SpeechRecognizerLike;
+    webkitSpeechRecognition?: new () => SpeechRecognizerLike;
+  }>;
+  const SpeechCtor = speechGlobals.SpeechRecognition ?? speechGlobals.webkitSpeechRecognition;
+  const scorer = createScorer({
+    doc: document,
+    store,
+    now,
+    rng,
+    fx: (cue) => {
+      fx.play(cue);
+    },
+    toast: (message) => {
+      toast(message, null);
+    },
+    dialogs: {
+      prompt: (message, initial) => window.prompt(message, initial),
+      confirm: (message) => window.confirm(message),
+    },
+    screens: {
+      show: (screen) => {
+        dispatch({ type: 'screen/show', screen });
+      },
+      initHome: () => {
+        dispatch({ type: 'home/init', home: readHome(store) });
+      },
+      showScoreTab: () => {
+        dispatch({ type: 'tab/set', tab: 'score' });
+      },
+      openRules: () => {
+        dispatch({ type: 'rules/open' });
+      },
+      openHistory: () => {
+        dispatch({ type: 'history/open', who: 'scorer' });
+      },
+    },
+    download: downloadText,
+    speech: SpeechCtor === undefined ? null : () => new SpeechCtor(),
+    formatTime: fmtTime,
+    formatDateTime: (ts) => new Date(ts).toLocaleString(),
+  });
+  page.__scorer = scorer;
+
   renderRules(document);
   bindAll(document, dispatch);
+  scorer.bind();
   paintSound(document, fx.enabled());
   window.addEventListener('resize', queueFit);
   window.addEventListener('orientationchange', queueFit);

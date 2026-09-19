@@ -205,8 +205,9 @@ const zones = [
     message: 'protocol.ts imports only engine/domain types and web/shared/lib.',
   },
   {
-    // Every scorer/ module except scorer/main.ts, the Score Counter's screen (an edge).
-    target: [`${GAME_SRC}/scorer/!(main).ts`],
+    // Every scorer/ module except scorer/main.ts, the Score Counter's screen (an edge), and the
+    // tests beside them (scorer/main.test.ts drives the screen on the page fake).
+    target: [`${GAME_SRC}/scorer/!(main|*.test).ts`],
     from: [
       './web/shared/edge/**',
       `${GAME_SRC}/net/**`,

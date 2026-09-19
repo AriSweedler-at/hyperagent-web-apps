@@ -91,6 +91,19 @@ export const clear = (el: Element): void => {
   el.replaceChildren();
 };
 
+/** Append parsed markup after the element's last child (`insertAdjacentHTML('beforeend')`). */
+export const appendHtml = (el: Element, markup: SafeHtml): void => {
+  el.insertAdjacentHTML('beforeend', markup.markup);
+};
+
+/** `el.remove()`. */
+export const removeElement = (el: Element): void => {
+  el.remove();
+};
+
+/** `el.children.length`. */
+export const childCount = (el: Element): number => el.children.length;
+
 /** Add or remove `className` according to `on` (the third argument of classList.toggle). */
 export const toggleClass = (el: Element, className: string, on: boolean): void => {
   el.classList.toggle(className, on);

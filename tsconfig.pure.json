@@ -15,7 +15,7 @@
     "web/games/*/src/net/protocol.ts",
     "web/games/*/src/scorer/**/*.ts"
   ],
-  // The Score Counter's screen (docs/MIGRATION.md step 12) is an edge; eslint.config.js spells the
-  // same carve-out as `scorer/!(main).ts`.
-  "exclude": ["web/games/*/src/scorer/main.ts"]
+  // The Score Counter's screen (docs/MIGRATION.md step 12) is an edge, and its test runs on the
+  // DOM page fake; eslint.config.js spells the same carve-out as `scorer/!(main|*.test).ts`.
+  "exclude": ["web/games/*/src/scorer/main*.ts"]
 }
