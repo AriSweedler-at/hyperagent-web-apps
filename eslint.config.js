@@ -73,6 +73,10 @@ const mathRandomBan = {
   selector: 'MemberExpression[object.name="Math"][property.name="random"]',
   message: 'inject Rng; Math.random is constructed only in main.ts and web/shared/edge',
 };
+const dateNowBan = {
+  selector: 'MemberExpression[object.name="Date"][property.name="now"]',
+  message: 'inject a clock; Date.now is constructed only in main.ts and web/shared/edge',
+};
 const syntaxBans = [...loopBans, ...erasableSyntaxBans, absolutePathBan];
 
 // ---------------------------------------------------------------------------------------------
@@ -307,6 +311,13 @@ export default defineConfig([
     rules: { 'no-restricted-syntax': ['error', ...syntaxBans] },
   },
   {
+    // The pure layers take their clock by injection too (docs/MIGRATION.md step 10: the gin
+    // engine's `Now`); tests beside them may read the real clock.
+    files: PURE,
+    ignores: ['**/*.test.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...syntaxBans, mathRandomBan, dateNowBan] },
+  },
+  {
     files: ['web/shared/edge/transport.ts'],
     rules: { 'no-restricted-imports': 'off' },
   },
@@ -329,7 +340,13 @@ export default defineConfig([
     files: ALGORITHMS,
     plugins: { functional },
     rules: {
-      'no-restricted-syntax': ['error', ...erasableSyntaxBans, absolutePathBan, mathRandomBan],
+      'no-restricted-syntax': [
+        'error',
+        ...erasableSyntaxBans,
+        absolutePathBan,
+        mathRandomBan,
+        dateNowBan,
+      ],
       'functional/no-loop-statements': 'off',
       'functional/no-let': 'off',
       'functional/immutable-data': 'off',
