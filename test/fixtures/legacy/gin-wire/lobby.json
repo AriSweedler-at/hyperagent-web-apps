@@ -1,0 +1,12 @@
+[
+  {
+    "t": "lobby",
+    "hostName": "Ann",
+    "target": 100
+  },
+  {
+    "t": "lobby",
+    "hostName": "Host",
+    "target": 50
+  }
+]

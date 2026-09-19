@@ -1,0 +1,2033 @@
+[
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 1,
+        "id": "guest",
+        "name": "Jeff",
+        "total": 0,
+        "hand": [
+          {
+            "id": "4S",
+            "r": 4,
+            "s": "S"
+          },
+          {
+            "id": "AS",
+            "r": 1,
+            "s": "S"
+          },
+          {
+            "id": "5C",
+            "r": 5,
+            "s": "C"
+          },
+          {
+            "id": "4C",
+            "r": 4,
+            "s": "C"
+          },
+          {
+            "id": "3D",
+            "r": 3,
+            "s": "D"
+          },
+          {
+            "id": "5D",
+            "r": 5,
+            "s": "D"
+          },
+          {
+            "id": "AC",
+            "r": 1,
+            "s": "C"
+          },
+          {
+            "id": "2D",
+            "r": 2,
+            "s": "D"
+          },
+          {
+            "id": "AD",
+            "r": 1,
+            "s": "D"
+          },
+          {
+            "id": "7D",
+            "r": 7,
+            "s": "D"
+          }
+        ],
+        "melds": [
+          [
+            {
+              "id": "AD",
+              "r": 1,
+              "s": "D"
+            },
+            {
+              "id": "2D",
+              "r": 2,
+              "s": "D"
+            },
+            {
+              "id": "3D",
+              "r": 3,
+              "s": "D"
+            }
+          ]
+        ],
+        "deadwood": [
+          {
+            "id": "AS",
+            "r": 1,
+            "s": "S"
+          },
+          {
+            "id": "4S",
+            "r": 4,
+            "s": "S"
+          },
+          {
+            "id": "5D",
+            "r": 5,
+            "s": "D"
+          },
+          {
+            "id": "7D",
+            "r": 7,
+            "s": "D"
+          },
+          {
+            "id": "AC",
+            "r": 1,
+            "s": "C"
+          },
+          {
+            "id": "4C",
+            "r": 4,
+            "s": "C"
+          },
+          {
+            "id": "5C",
+            "r": 5,
+            "s": "C"
+          }
+        ],
+        "deadwoodValue": 27
+      },
+      "opp": {
+        "idx": 0,
+        "id": "host",
+        "name": "Ann",
+        "total": 0,
+        "cardCount": 10
+      },
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann",
+          "total": 0
+        },
+        {
+          "id": "guest",
+          "name": "Jeff",
+          "total": 0
+        }
+      ],
+      "phase": "roundOver",
+      "turn": 1,
+      "isMyTurn": true,
+      "dealer": 1,
+      "upcardStage": null,
+      "stockCount": 2,
+      "discardTop": {
+        "id": "QC",
+        "r": 12,
+        "s": "C"
+      },
+      "discardCount": 30,
+      "drawnFromDiscard": null,
+      "forceStock": false,
+      "lastAction": {
+        "text": "Only two cards left in the stock — the hand is void. Same dealer redeals."
+      },
+      "handNumber": 1,
+      "target": 100,
+      "rounds": [
+        {
+          "handNumber": 1,
+          "ts": 1700000041000,
+          "void": true,
+          "scores": {
+            "host": 0,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 2,
+          "ts": 1700000042000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 3,
+            "host": 36
+          },
+          "scores": {
+            "host": 0,
+            "guest": 33
+          }
+        },
+        {
+          "handNumber": 3,
+          "ts": 1700000044000,
+          "void": true,
+          "scores": {
+            "host": 0,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 4,
+          "ts": 1700000045000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 5,
+            "host": 39
+          },
+          "scores": {
+            "host": 0,
+            "guest": 34
+          }
+        },
+        {
+          "handNumber": 5,
+          "ts": 1700000046000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 10,
+            "guest": 56
+          },
+          "scores": {
+            "host": 46,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 6,
+          "ts": 1700000047000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 7,
+            "guest": 40
+          },
+          "scores": {
+            "host": 33,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 7,
+          "ts": 1700000049000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 2,
+            "host": 37
+          },
+          "scores": {
+            "host": 0,
+            "guest": 35
+          }
+        }
+      ],
+      "result": {
+        "void": true,
+        "ts": 1700000040000,
+        "totals": [0, 0]
+      },
+      "ready": [true, true],
+      "winner": null,
+      "startedAt": 1700000039000,
+      "discardOptions": null,
+      "lastDrawnId": null,
+      "canUndo": false,
+      "meldOptions": [],
+      "activeMeldSig": "2D+3D+AD",
+      "knockLimit": 10
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 1,
+        "id": "guest",
+        "name": "Jeff",
+        "total": 33,
+        "hand": [
+          {
+            "id": "2H",
+            "r": 2,
+            "s": "H"
+          },
+          {
+            "id": "5C",
+            "r": 5,
+            "s": "C"
+          },
+          {
+            "id": "AH",
+            "r": 1,
+            "s": "H"
+          },
+          {
+            "id": "4S",
+            "r": 4,
+            "s": "S"
+          },
+          {
+            "id": "AS",
+            "r": 1,
+            "s": "S"
+          },
+          {
+            "id": "3D",
+            "r": 3,
+            "s": "D"
+          },
+          {
+            "id": "6D",
+            "r": 6,
+            "s": "D"
+          },
+          {
+            "id": "7H",
+            "r": 7,
+            "s": "H"
+          },
+          {
+            "id": "6H",
+            "r": 6,
+            "s": "H"
+          },
+          {
+            "id": "9C",
+            "r": 9,
+            "s": "C"
+          }
+        ],
+        "melds": [],
+        "deadwood": [
+          {
+            "id": "AS",
+            "r": 1,
+            "s": "S"
+          },
+          {
+            "id": "4S",
+            "r": 4,
+            "s": "S"
+          },
+          {
+            "id": "AH",
+            "r": 1,
+            "s": "H"
+          },
+          {
+            "id": "2H",
+            "r": 2,
+            "s": "H"
+          },
+          {
+            "id": "6H",
+            "r": 6,
+            "s": "H"
+          },
+          {
+            "id": "7H",
+            "r": 7,
+            "s": "H"
+          },
+          {
+            "id": "3D",
+            "r": 3,
+            "s": "D"
+          },
+          {
+            "id": "6D",
+            "r": 6,
+            "s": "D"
+          },
+          {
+            "id": "5C",
+            "r": 5,
+            "s": "C"
+          },
+          {
+            "id": "9C",
+            "r": 9,
+            "s": "C"
+          }
+        ],
+        "deadwoodValue": 44
+      },
+      "opp": {
+        "idx": 0,
+        "id": "host",
+        "name": "Ann",
+        "total": 0,
+        "cardCount": 10
+      },
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann",
+          "total": 0
+        },
+        {
+          "id": "guest",
+          "name": "Jeff",
+          "total": 33
+        }
+      ],
+      "phase": "roundOver",
+      "turn": 1,
+      "isMyTurn": true,
+      "dealer": 0,
+      "upcardStage": null,
+      "stockCount": 2,
+      "discardTop": {
+        "id": "7C",
+        "r": 7,
+        "s": "C"
+      },
+      "discardCount": 30,
+      "drawnFromDiscard": null,
+      "forceStock": false,
+      "lastAction": {
+        "text": "Only two cards left in the stock — the hand is void. Same dealer redeals."
+      },
+      "handNumber": 3,
+      "target": 100,
+      "rounds": [
+        {
+          "handNumber": 1,
+          "ts": 1700000041000,
+          "void": true,
+          "scores": {
+            "host": 0,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 2,
+          "ts": 1700000042000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 3,
+            "host": 36
+          },
+          "scores": {
+            "host": 0,
+            "guest": 33
+          }
+        },
+        {
+          "handNumber": 3,
+          "ts": 1700000044000,
+          "void": true,
+          "scores": {
+            "host": 0,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 4,
+          "ts": 1700000045000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 5,
+            "host": 39
+          },
+          "scores": {
+            "host": 0,
+            "guest": 34
+          }
+        },
+        {
+          "handNumber": 5,
+          "ts": 1700000046000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 10,
+            "guest": 56
+          },
+          "scores": {
+            "host": 46,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 6,
+          "ts": 1700000047000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 7,
+            "guest": 40
+          },
+          "scores": {
+            "host": 33,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 7,
+          "ts": 1700000049000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 2,
+            "host": 37
+          },
+          "scores": {
+            "host": 0,
+            "guest": 35
+          }
+        }
+      ],
+      "result": {
+        "void": true,
+        "ts": 1700000043000,
+        "totals": [0, 33]
+      },
+      "ready": [true, true],
+      "winner": null,
+      "startedAt": 1700000039000,
+      "discardOptions": null,
+      "lastDrawnId": "9C",
+      "canUndo": false,
+      "meldOptions": [],
+      "activeMeldSig": "",
+      "knockLimit": 10
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 1,
+        "id": "guest",
+        "name": "Jeff",
+        "total": 20,
+        "hand": [
+          {
+            "id": "JD",
+            "r": 11,
+            "s": "D"
+          },
+          {
+            "id": "8C",
+            "r": 8,
+            "s": "C"
+          },
+          {
+            "id": "9C",
+            "r": 9,
+            "s": "C"
+          },
+          {
+            "id": "JC",
+            "r": 11,
+            "s": "C"
+          },
+          {
+            "id": "7H",
+            "r": 7,
+            "s": "H"
+          },
+          {
+            "id": "JH",
+            "r": 11,
+            "s": "H"
+          },
+          {
+            "id": "AS",
+            "r": 1,
+            "s": "S"
+          },
+          {
+            "id": "4C",
+            "r": 4,
+            "s": "C"
+          },
+          {
+            "id": "9H",
+            "r": 9,
+            "s": "H"
+          },
+          {
+            "id": "3S",
+            "r": 3,
+            "s": "S"
+          }
+        ],
+        "melds": [
+          [
+            {
+              "id": "JH",
+              "r": 11,
+              "s": "H"
+            },
+            {
+              "id": "JD",
+              "r": 11,
+              "s": "D"
+            },
+            {
+              "id": "JC",
+              "r": 11,
+              "s": "C"
+            }
+          ]
+        ],
+        "deadwood": [
+          {
+            "id": "AS",
+            "r": 1,
+            "s": "S"
+          },
+          {
+            "id": "3S",
+            "r": 3,
+            "s": "S"
+          },
+          {
+            "id": "7H",
+            "r": 7,
+            "s": "H"
+          },
+          {
+            "id": "9H",
+            "r": 9,
+            "s": "H"
+          },
+          {
+            "id": "4C",
+            "r": 4,
+            "s": "C"
+          },
+          {
+            "id": "8C",
+            "r": 8,
+            "s": "C"
+          },
+          {
+            "id": "9C",
+            "r": 9,
+            "s": "C"
+          }
+        ],
+        "deadwoodValue": 41
+      },
+      "opp": {
+        "idx": 0,
+        "id": "host",
+        "name": "Ann",
+        "total": 83,
+        "cardCount": 10
+      },
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann",
+          "total": 83
+        },
+        {
+          "id": "guest",
+          "name": "Jeff",
+          "total": 20
+        }
+      ],
+      "phase": "roundOver",
+      "turn": 0,
+      "isMyTurn": false,
+      "dealer": 1,
+      "upcardStage": null,
+      "stockCount": 19,
+      "discardTop": {
+        "id": "5D",
+        "r": 5,
+        "s": "D"
+      },
+      "discardCount": 13,
+      "drawnFromDiscard": null,
+      "forceStock": false,
+      "lastAction": {
+        "text": "Ann went GIN!",
+        "by": 0
+      },
+      "handNumber": 4,
+      "target": 100,
+      "rounds": [
+        {
+          "handNumber": 1,
+          "ts": 1700000204000,
+          "void": true,
+          "scores": {
+            "host": 0,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 2,
+          "ts": 1700000205000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 8,
+            "host": 28
+          },
+          "scores": {
+            "host": 0,
+            "guest": 20
+          }
+        },
+        {
+          "handNumber": 3,
+          "ts": 1700000206000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 5,
+            "guest": 22
+          },
+          "scores": {
+            "host": 17,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 4,
+          "ts": 1700000208000,
+          "knockerIdx": 0,
+          "outcome": "gin",
+          "deadwood": {
+            "host": 0,
+            "guest": 41
+          },
+          "scores": {
+            "host": 66,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 5,
+          "ts": 1700000209000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 9,
+            "host": 18
+          },
+          "scores": {
+            "host": 0,
+            "guest": 9
+          }
+        },
+        {
+          "handNumber": 6,
+          "ts": 1700000211000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 2,
+            "guest": 35
+          },
+          "scores": {
+            "host": 33,
+            "guest": 0
+          }
+        }
+      ],
+      "result": {
+        "void": false,
+        "knockerIdx": 0,
+        "outcome": "gin",
+        "knockCard": "5D",
+        "knocker": {
+          "melds": [
+            [
+              {
+                "id": "AC",
+                "r": 1,
+                "s": "C"
+              },
+              {
+                "id": "2C",
+                "r": 2,
+                "s": "C"
+              },
+              {
+                "id": "3C",
+                "r": 3,
+                "s": "C"
+              }
+            ],
+            [
+              {
+                "id": "4S",
+                "r": 4,
+                "s": "S"
+              },
+              {
+                "id": "5S",
+                "r": 5,
+                "s": "S"
+              },
+              {
+                "id": "6S",
+                "r": 6,
+                "s": "S"
+              },
+              {
+                "id": "7S",
+                "r": 7,
+                "s": "S"
+              }
+            ],
+            [
+              {
+                "id": "5C",
+                "r": 5,
+                "s": "C"
+              },
+              {
+                "id": "6C",
+                "r": 6,
+                "s": "C"
+              },
+              {
+                "id": "7C",
+                "r": 7,
+                "s": "C"
+              }
+            ]
+          ],
+          "deadwood": [],
+          "value": 0
+        },
+        "opponent": {
+          "melds": [
+            [
+              {
+                "id": "JH",
+                "r": 11,
+                "s": "H"
+              },
+              {
+                "id": "JD",
+                "r": 11,
+                "s": "D"
+              },
+              {
+                "id": "JC",
+                "r": 11,
+                "s": "C"
+              }
+            ]
+          ],
+          "laidOff": [],
+          "deadwood": [
+            {
+              "id": "AS",
+              "r": 1,
+              "s": "S"
+            },
+            {
+              "id": "3S",
+              "r": 3,
+              "s": "S"
+            },
+            {
+              "id": "7H",
+              "r": 7,
+              "s": "H"
+            },
+            {
+              "id": "9H",
+              "r": 9,
+              "s": "H"
+            },
+            {
+              "id": "4C",
+              "r": 4,
+              "s": "C"
+            },
+            {
+              "id": "8C",
+              "r": 8,
+              "s": "C"
+            },
+            {
+              "id": "9C",
+              "r": 9,
+              "s": "C"
+            }
+          ],
+          "value": 41,
+          "extendedMelds": [
+            [
+              {
+                "id": "AC",
+                "r": 1,
+                "s": "C"
+              },
+              {
+                "id": "2C",
+                "r": 2,
+                "s": "C"
+              },
+              {
+                "id": "3C",
+                "r": 3,
+                "s": "C"
+              }
+            ],
+            [
+              {
+                "id": "4S",
+                "r": 4,
+                "s": "S"
+              },
+              {
+                "id": "5S",
+                "r": 5,
+                "s": "S"
+              },
+              {
+                "id": "6S",
+                "r": 6,
+                "s": "S"
+              },
+              {
+                "id": "7S",
+                "r": 7,
+                "s": "S"
+              }
+            ],
+            [
+              {
+                "id": "5C",
+                "r": 5,
+                "s": "C"
+              },
+              {
+                "id": "6C",
+                "r": 6,
+                "s": "C"
+              },
+              {
+                "id": "7C",
+                "r": 7,
+                "s": "C"
+              }
+            ]
+          ]
+        },
+        "scores": [66, 0],
+        "scorerIdx": 0,
+        "loserIdx": 1,
+        "ts": 1700000208000,
+        "totals": [83, 20]
+      },
+      "ready": [true, true],
+      "winner": null,
+      "startedAt": 1700000202000,
+      "discardOptions": null,
+      "lastDrawnId": null,
+      "canUndo": false,
+      "meldOptions": [],
+      "activeMeldSig": "JC+JD+JH",
+      "knockLimit": 10
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 1,
+        "id": "guest",
+        "name": "Jeff",
+        "total": 0,
+        "hand": [
+          {
+            "id": "AH",
+            "r": 1,
+            "s": "H"
+          },
+          {
+            "id": "4C",
+            "r": 4,
+            "s": "C"
+          },
+          {
+            "id": "3S",
+            "r": 3,
+            "s": "S"
+          },
+          {
+            "id": "AD",
+            "r": 1,
+            "s": "D"
+          },
+          {
+            "id": "2S",
+            "r": 2,
+            "s": "S"
+          },
+          {
+            "id": "4H",
+            "r": 4,
+            "s": "H"
+          },
+          {
+            "id": "7C",
+            "r": 7,
+            "s": "C"
+          },
+          {
+            "id": "9H",
+            "r": 9,
+            "s": "H"
+          },
+          {
+            "id": "5S",
+            "r": 5,
+            "s": "S"
+          },
+          {
+            "id": "9S",
+            "r": 9,
+            "s": "S"
+          }
+        ],
+        "melds": [],
+        "deadwood": [
+          {
+            "id": "2S",
+            "r": 2,
+            "s": "S"
+          },
+          {
+            "id": "3S",
+            "r": 3,
+            "s": "S"
+          },
+          {
+            "id": "5S",
+            "r": 5,
+            "s": "S"
+          },
+          {
+            "id": "9S",
+            "r": 9,
+            "s": "S"
+          },
+          {
+            "id": "AH",
+            "r": 1,
+            "s": "H"
+          },
+          {
+            "id": "4H",
+            "r": 4,
+            "s": "H"
+          },
+          {
+            "id": "9H",
+            "r": 9,
+            "s": "H"
+          },
+          {
+            "id": "AD",
+            "r": 1,
+            "s": "D"
+          },
+          {
+            "id": "4C",
+            "r": 4,
+            "s": "C"
+          },
+          {
+            "id": "7C",
+            "r": 7,
+            "s": "C"
+          }
+        ],
+        "deadwoodValue": 45
+      },
+      "opp": {
+        "idx": 0,
+        "id": "host",
+        "name": "Ann",
+        "total": 27,
+        "cardCount": 10
+      },
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann",
+          "total": 27
+        },
+        {
+          "id": "guest",
+          "name": "Jeff",
+          "total": 0
+        }
+      ],
+      "phase": "roundOver",
+      "turn": 0,
+      "isMyTurn": false,
+      "dealer": 1,
+      "upcardStage": null,
+      "stockCount": 16,
+      "discardTop": {
+        "id": "6S",
+        "r": 6,
+        "s": "S"
+      },
+      "discardCount": 16,
+      "drawnFromDiscard": null,
+      "forceStock": false,
+      "lastAction": {
+        "text": "Ann knocked with 7.",
+        "by": 0
+      },
+      "handNumber": 1,
+      "target": 100,
+      "rounds": [
+        {
+          "handNumber": 1,
+          "ts": 1700000002000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 7,
+            "guest": 34
+          },
+          "scores": {
+            "host": 27,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 2,
+          "ts": 1700000003000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 10,
+            "host": 38
+          },
+          "scores": {
+            "host": 0,
+            "guest": 28
+          }
+        },
+        {
+          "handNumber": 3,
+          "ts": 1700000004000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 8,
+            "host": 32
+          },
+          "scores": {
+            "host": 0,
+            "guest": 24
+          }
+        },
+        {
+          "handNumber": 4,
+          "ts": 1700000005000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 9,
+            "guest": 29
+          },
+          "scores": {
+            "host": 20,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 5,
+          "ts": 1700000006000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 8,
+            "host": 22
+          },
+          "scores": {
+            "host": 0,
+            "guest": 14
+          }
+        },
+        {
+          "handNumber": 6,
+          "ts": 1700000007000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 10,
+            "host": 38
+          },
+          "scores": {
+            "host": 0,
+            "guest": 28
+          }
+        },
+        {
+          "handNumber": 7,
+          "ts": 1700000008000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 8,
+            "guest": 41
+          },
+          "scores": {
+            "host": 33,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 8,
+          "ts": 1700000009000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 7,
+            "host": 55
+          },
+          "scores": {
+            "host": 0,
+            "guest": 48
+          }
+        }
+      ],
+      "result": {
+        "void": false,
+        "knockerIdx": 0,
+        "outcome": "knock",
+        "knockCard": "6S",
+        "knocker": {
+          "melds": [
+            [
+              {
+                "id": "8C",
+                "r": 8,
+                "s": "C"
+              },
+              {
+                "id": "9C",
+                "r": 9,
+                "s": "C"
+              },
+              {
+                "id": "10C",
+                "r": 10,
+                "s": "C"
+              },
+              {
+                "id": "JC",
+                "r": 11,
+                "s": "C"
+              }
+            ],
+            [
+              {
+                "id": "5H",
+                "r": 5,
+                "s": "H"
+              },
+              {
+                "id": "6H",
+                "r": 6,
+                "s": "H"
+              },
+              {
+                "id": "7H",
+                "r": 7,
+                "s": "H"
+              }
+            ]
+          ],
+          "deadwood": [
+            {
+              "id": "2H",
+              "r": 2,
+              "s": "H"
+            },
+            {
+              "id": "3H",
+              "r": 3,
+              "s": "H"
+            },
+            {
+              "id": "2D",
+              "r": 2,
+              "s": "D"
+            }
+          ],
+          "value": 7
+        },
+        "opponent": {
+          "melds": [],
+          "laidOff": [
+            {
+              "card": {
+                "id": "4H",
+                "r": 4,
+                "s": "H"
+              },
+              "onto": 1
+            },
+            {
+              "card": {
+                "id": "7C",
+                "r": 7,
+                "s": "C"
+              },
+              "onto": 0
+            }
+          ],
+          "deadwood": [
+            {
+              "id": "2S",
+              "r": 2,
+              "s": "S"
+            },
+            {
+              "id": "3S",
+              "r": 3,
+              "s": "S"
+            },
+            {
+              "id": "5S",
+              "r": 5,
+              "s": "S"
+            },
+            {
+              "id": "9S",
+              "r": 9,
+              "s": "S"
+            },
+            {
+              "id": "AH",
+              "r": 1,
+              "s": "H"
+            },
+            {
+              "id": "9H",
+              "r": 9,
+              "s": "H"
+            },
+            {
+              "id": "AD",
+              "r": 1,
+              "s": "D"
+            },
+            {
+              "id": "4C",
+              "r": 4,
+              "s": "C"
+            }
+          ],
+          "value": 34,
+          "extendedMelds": [
+            [
+              {
+                "id": "7C",
+                "r": 7,
+                "s": "C"
+              },
+              {
+                "id": "8C",
+                "r": 8,
+                "s": "C"
+              },
+              {
+                "id": "9C",
+                "r": 9,
+                "s": "C"
+              },
+              {
+                "id": "10C",
+                "r": 10,
+                "s": "C"
+              },
+              {
+                "id": "JC",
+                "r": 11,
+                "s": "C"
+              }
+            ],
+            [
+              {
+                "id": "4H",
+                "r": 4,
+                "s": "H"
+              },
+              {
+                "id": "5H",
+                "r": 5,
+                "s": "H"
+              },
+              {
+                "id": "6H",
+                "r": 6,
+                "s": "H"
+              },
+              {
+                "id": "7H",
+                "r": 7,
+                "s": "H"
+              }
+            ]
+          ]
+        },
+        "scores": [27, 0],
+        "scorerIdx": 0,
+        "loserIdx": 1,
+        "ts": 1700000002000,
+        "totals": [27, 0]
+      },
+      "ready": [true, true],
+      "winner": null,
+      "startedAt": 1700000001000,
+      "discardOptions": null,
+      "lastDrawnId": null,
+      "canUndo": false,
+      "meldOptions": [],
+      "activeMeldSig": "",
+      "knockLimit": 10
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 1,
+        "id": "guest",
+        "name": "Jeff",
+        "total": 0,
+        "hand": [
+          {
+            "id": "3H",
+            "r": 3,
+            "s": "H"
+          },
+          {
+            "id": "5C",
+            "r": 5,
+            "s": "C"
+          },
+          {
+            "id": "5S",
+            "r": 5,
+            "s": "S"
+          },
+          {
+            "id": "4H",
+            "r": 4,
+            "s": "H"
+          },
+          {
+            "id": "6D",
+            "r": 6,
+            "s": "D"
+          },
+          {
+            "id": "5D",
+            "r": 5,
+            "s": "D"
+          },
+          {
+            "id": "2H",
+            "r": 2,
+            "s": "H"
+          },
+          {
+            "id": "AD",
+            "r": 1,
+            "s": "D"
+          },
+          {
+            "id": "3C",
+            "r": 3,
+            "s": "C"
+          },
+          {
+            "id": "AS",
+            "r": 1,
+            "s": "S"
+          }
+        ],
+        "melds": [
+          [
+            {
+              "id": "2H",
+              "r": 2,
+              "s": "H"
+            },
+            {
+              "id": "3H",
+              "r": 3,
+              "s": "H"
+            },
+            {
+              "id": "4H",
+              "r": 4,
+              "s": "H"
+            }
+          ],
+          [
+            {
+              "id": "5S",
+              "r": 5,
+              "s": "S"
+            },
+            {
+              "id": "5D",
+              "r": 5,
+              "s": "D"
+            },
+            {
+              "id": "5C",
+              "r": 5,
+              "s": "C"
+            }
+          ]
+        ],
+        "deadwood": [
+          {
+            "id": "AS",
+            "r": 1,
+            "s": "S"
+          },
+          {
+            "id": "AD",
+            "r": 1,
+            "s": "D"
+          },
+          {
+            "id": "6D",
+            "r": 6,
+            "s": "D"
+          },
+          {
+            "id": "3C",
+            "r": 3,
+            "s": "C"
+          }
+        ],
+        "deadwoodValue": 11
+      },
+      "opp": {
+        "idx": 0,
+        "id": "host",
+        "name": "Ann",
+        "total": 0,
+        "cardCount": 10
+      },
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann",
+          "total": 0
+        },
+        {
+          "id": "guest",
+          "name": "Jeff",
+          "total": 0
+        }
+      ],
+      "phase": "roundOver",
+      "turn": 0,
+      "isMyTurn": false,
+      "dealer": 0,
+      "upcardStage": null,
+      "stockCount": 2,
+      "discardTop": {
+        "id": "JH",
+        "r": 11,
+        "s": "H"
+      },
+      "discardCount": 30,
+      "drawnFromDiscard": null,
+      "forceStock": false,
+      "lastAction": {
+        "text": "Only two cards left in the stock — the hand is void. Same dealer redeals."
+      },
+      "handNumber": 1,
+      "target": 100,
+      "rounds": [
+        {
+          "handNumber": 1,
+          "ts": 1700000052000,
+          "void": true,
+          "scores": {
+            "host": 0,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 2,
+          "ts": 1700000054000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 4,
+            "host": 17
+          },
+          "scores": {
+            "host": 0,
+            "guest": 13
+          }
+        },
+        {
+          "handNumber": 3,
+          "ts": 1700000055000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 9,
+            "host": 42
+          },
+          "scores": {
+            "host": 0,
+            "guest": 33
+          }
+        },
+        {
+          "handNumber": 4,
+          "ts": 1700000056000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 10,
+            "guest": 39
+          },
+          "scores": {
+            "host": 29,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 5,
+          "ts": 1700000057000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 9,
+            "guest": 51
+          },
+          "scores": {
+            "host": 42,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 6,
+          "ts": 1700000058000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 7,
+            "guest": 62
+          },
+          "scores": {
+            "host": 55,
+            "guest": 0
+          }
+        }
+      ],
+      "result": {
+        "void": true,
+        "ts": 1700000051000,
+        "totals": [0, 0]
+      },
+      "ready": [true, true],
+      "winner": null,
+      "startedAt": 1700000050000,
+      "discardOptions": null,
+      "lastDrawnId": null,
+      "canUndo": false,
+      "meldOptions": [],
+      "activeMeldSig": "2H+3H+4H|5C+5D+5S",
+      "knockLimit": 10
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 1,
+        "id": "guest",
+        "name": "Jeff",
+        "total": 0,
+        "hand": [
+          {
+            "id": "AS",
+            "r": 1,
+            "s": "S"
+          },
+          {
+            "id": "10C",
+            "r": 10,
+            "s": "C"
+          },
+          {
+            "id": "AH",
+            "r": 1,
+            "s": "H"
+          },
+          {
+            "id": "KC",
+            "r": 13,
+            "s": "C"
+          },
+          {
+            "id": "4C",
+            "r": 4,
+            "s": "C"
+          },
+          {
+            "id": "8H",
+            "r": 8,
+            "s": "H"
+          },
+          {
+            "id": "3H",
+            "r": 3,
+            "s": "H"
+          },
+          {
+            "id": "AC",
+            "r": 1,
+            "s": "C"
+          },
+          {
+            "id": "3S",
+            "r": 3,
+            "s": "S"
+          },
+          {
+            "id": "KH",
+            "r": 13,
+            "s": "H"
+          },
+          {
+            "id": "AD",
+            "r": 1,
+            "s": "D"
+          }
+        ],
+        "melds": [
+          [
+            {
+              "id": "AS",
+              "r": 1,
+              "s": "S"
+            },
+            {
+              "id": "AH",
+              "r": 1,
+              "s": "H"
+            },
+            {
+              "id": "AC",
+              "r": 1,
+              "s": "C"
+            }
+          ]
+        ],
+        "deadwood": [
+          {
+            "id": "3S",
+            "r": 3,
+            "s": "S"
+          },
+          {
+            "id": "3H",
+            "r": 3,
+            "s": "H"
+          },
+          {
+            "id": "8H",
+            "r": 8,
+            "s": "H"
+          },
+          {
+            "id": "KH",
+            "r": 13,
+            "s": "H"
+          },
+          {
+            "id": "4C",
+            "r": 4,
+            "s": "C"
+          },
+          {
+            "id": "10C",
+            "r": 10,
+            "s": "C"
+          },
+          {
+            "id": "KC",
+            "r": 13,
+            "s": "C"
+          }
+        ],
+        "deadwoodValue": 48
+      },
+      "opp": {
+        "idx": 0,
+        "id": "host",
+        "name": "Ann",
+        "total": 0,
+        "cardCount": 10
+      },
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann",
+          "total": 0
+        },
+        {
+          "id": "guest",
+          "name": "Jeff",
+          "total": 0
+        }
+      ],
+      "phase": "upcard",
+      "turn": 1,
+      "isMyTurn": true,
+      "dealer": 1,
+      "upcardStage": "dealer",
+      "stockCount": 31,
+      "discardTop": {
+        "id": "QD",
+        "r": 12,
+        "s": "D"
+      },
+      "discardCount": 1,
+      "drawnFromDiscard": null,
+      "forceStock": false,
+      "lastAction": {
+        "text": "Ann passed on the upcard. Jeff may take it or pass.",
+        "by": 0
+      },
+      "handNumber": 1,
+      "target": 100,
+      "rounds": [
+        {
+          "handNumber": 1,
+          "ts": 1700000002000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 7,
+            "guest": 34
+          },
+          "scores": {
+            "host": 27,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 2,
+          "ts": 1700000003000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 10,
+            "host": 38
+          },
+          "scores": {
+            "host": 0,
+            "guest": 28
+          }
+        },
+        {
+          "handNumber": 3,
+          "ts": 1700000004000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 8,
+            "host": 32
+          },
+          "scores": {
+            "host": 0,
+            "guest": 24
+          }
+        },
+        {
+          "handNumber": 4,
+          "ts": 1700000005000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 9,
+            "guest": 29
+          },
+          "scores": {
+            "host": 20,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 5,
+          "ts": 1700000006000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 8,
+            "host": 22
+          },
+          "scores": {
+            "host": 0,
+            "guest": 14
+          }
+        },
+        {
+          "handNumber": 6,
+          "ts": 1700000007000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 10,
+            "host": 38
+          },
+          "scores": {
+            "host": 0,
+            "guest": 28
+          }
+        },
+        {
+          "handNumber": 7,
+          "ts": 1700000008000,
+          "knockerIdx": 0,
+          "outcome": "knock",
+          "deadwood": {
+            "host": 8,
+            "guest": 41
+          },
+          "scores": {
+            "host": 33,
+            "guest": 0
+          }
+        },
+        {
+          "handNumber": 8,
+          "ts": 1700000009000,
+          "knockerIdx": 1,
+          "outcome": "knock",
+          "deadwood": {
+            "guest": 7,
+            "host": 55
+          },
+          "scores": {
+            "host": 0,
+            "guest": 48
+          }
+        }
+      ],
+      "result": null,
+      "ready": [false, false],
+      "winner": null,
+      "startedAt": 1700000001000,
+      "discardOptions": null,
+      "lastDrawnId": null,
+      "canUndo": false,
+      "meldOptions": [
+        {
+          "melds": [
+            [
+              {
+                "id": "AS",
+                "r": 1,
+                "s": "S"
+              },
+              {
+                "id": "AH",
+                "r": 1,
+                "s": "H"
+              },
+              {
+                "id": "AC",
+                "r": 1,
+                "s": "C"
+              }
+            ]
+          ],
+          "deadwood": [
+            {
+              "id": "3S",
+              "r": 3,
+              "s": "S"
+            },
+            {
+              "id": "3H",
+              "r": 3,
+              "s": "H"
+            },
+            {
+              "id": "8H",
+              "r": 8,
+              "s": "H"
+            },
+            {
+              "id": "KH",
+              "r": 13,
+              "s": "H"
+            },
+            {
+              "id": "4C",
+              "r": 4,
+              "s": "C"
+            },
+            {
+              "id": "10C",
+              "r": 10,
+              "s": "C"
+            },
+            {
+              "id": "KC",
+              "r": 13,
+              "s": "C"
+            }
+          ],
+          "value": 48,
+          "sig": "AC+AH+AS"
+        }
+      ],
+      "activeMeldSig": "AC+AH+AS",
+      "knockLimit": 10
+    }
+  }
+]

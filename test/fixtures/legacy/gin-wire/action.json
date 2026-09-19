@@ -1,0 +1,59 @@
+[
+  {
+    "t": "action",
+    "action": {
+      "type": "discard",
+      "cardId": "AD"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "drawDiscard"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "drawStock"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "knock",
+      "cardId": "6S"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "passUpcard"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "ready"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "setMelds",
+      "melds": [["4S", "4H", "4D"]]
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "takeUpcard"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "undoDraw"
+    }
+  }
+]
