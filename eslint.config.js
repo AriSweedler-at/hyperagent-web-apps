@@ -229,10 +229,12 @@ const zones = [
       `${GAME_SRC}/app/**`,
       `${GAME_SRC}/storage.ts`,
     ],
+    // The two fakes are for the session tests beside the modules (docs/MIGRATION.md step 12).
     except: [
       '**/web/shared/edge/transport.ts',
       '**/web/shared/edge/transport.fake.ts',
       '**/web/shared/edge/clock.ts',
+      '**/web/shared/edge/clock.fake.ts',
     ],
     message: 'net/ imports protocol, engine/domain and only the transport and clock edges.',
   },

@@ -22,6 +22,7 @@ export default defineConfig({
         'web/games/gin-rummy/src/storage.ts',
         'web/games/gin-rummy/src/ui/**/*.ts',
         'web/games/gin-rummy/src/scorer/**/*.ts',
+        'web/games/gin-rummy/src/net/**/*.ts',
         'infra/games-proxy/worker.js',
       ],
       exclude: ['**/*.test.ts'],
@@ -36,6 +37,8 @@ export default defineConfig({
       // and the replay, its melds.algorithms.ts at 100%. The gin protocol, storage and the pure
       // ui/ and scorer/ helpers (step 11) are at 90% each, exercised by the wire-corpus, storage
       // capture and string-golden suites under test/parity plus the table tests beside them. The
+      // gin net/ sessions (step 12) are at 90%, exercised by the scenario tests beside them over
+      // transport.fake.ts and clock.fake.ts and by the wire-corpus replay under test/parity. The
       // rest get theirs as they land (docs/ARCHITECTURE.md "Testing pyramid").
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
@@ -61,6 +64,7 @@ export default defineConfig({
         'web/games/gin-rummy/src/storage.ts': { lines: 90, functions: 90, statements: 90 },
         'web/games/gin-rummy/src/ui/**': { lines: 90, functions: 90, statements: 90 },
         'web/games/gin-rummy/src/scorer/**': { lines: 90, functions: 90, statements: 90 },
+        'web/games/gin-rummy/src/net/**': { lines: 90, functions: 90, statements: 90 },
       },
     },
   },
