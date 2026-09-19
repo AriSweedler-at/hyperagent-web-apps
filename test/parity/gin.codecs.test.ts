@@ -84,16 +84,28 @@ const legacyGame = (seed: number): Counted => {
   return { states: steps, views: steps * 2 };
 };
 
-describe('engine decoders re-encode the engine text byte for byte', () => {
-  test('every state and view of seeded games on the current engine', () => {
-    const counted = SEEDS.map(currentGame);
-    expect(counted.reduce((n, c) => n + c.states, 0)).toBeGreaterThan(SEEDS.length * 100);
-  });
+// Re-encoding every state and view of the seeded games takes ~1.5 s here and ~6 s on a CI runner
+// under v8 coverage instrumentation, past vitest's 5 s default; the bound is generous on purpose.
+const SEEDED_GAMES_TIMEOUT_MS = 60_000;
 
-  test('every state and view of seeded games on the legacy engine', () => {
-    const counted = SEEDS.map(legacyGame);
-    expect(counted.reduce((n, c) => n + c.views, 0)).toBeGreaterThan(SEEDS.length * 200);
-  });
+describe('engine decoders re-encode the engine text byte for byte', () => {
+  test(
+    'every state and view of seeded games on the current engine',
+    () => {
+      const counted = SEEDS.map(currentGame);
+      expect(counted.reduce((n, c) => n + c.states, 0)).toBeGreaterThan(SEEDS.length * 100);
+    },
+    SEEDED_GAMES_TIMEOUT_MS,
+  );
+
+  test(
+    'every state and view of seeded games on the legacy engine',
+    () => {
+      const counted = SEEDS.map(legacyGame);
+      expect(counted.reduce((n, c) => n + c.views, 0)).toBeGreaterThan(SEEDS.length * 200);
+    },
+    SEEDED_GAMES_TIMEOUT_MS,
+  );
 
   test('the views inside every recorded wire state frame', () => {
     const states = wireFrames().filter(({ frame }) => frame['t'] === 'state');
