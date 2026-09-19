@@ -19,7 +19,7 @@
     "check": "npm run typecheck && npm run lint && npm test && npm run build && npm run build:next && npm run test:dist",
     "serve": "node --experimental-strip-types tools/serve-dist.ts --root dist --base /hyperagent-web-apps/ --alias e2e-ice.json=e2e/fixtures/e2e-ice.json",
     "proxy:dev": "node --experimental-strip-types tools/proxy-dev.ts --upstream http://127.0.0.1:4173",
-    "fixtures:legacy": "node --experimental-strip-types tools/legacy/extract-gin-engine.ts && node --experimental-strip-types tools/legacy/extract-fidice-core.ts",
+    "fixtures:legacy": "node --experimental-strip-types tools/legacy/extract-gin-engine.ts && node --experimental-strip-types tools/legacy/extract-fidice-core.ts && node --experimental-strip-types tools/legacy/extract-gin-ui.ts",
     "debundle:fidice": "node --experimental-strip-types tools/legacy/debundle-fidice.ts",
     "hooks": "git config core.hooksPath .githooks",
     "hooks:verify": "sh tools/hooks-verify.sh",

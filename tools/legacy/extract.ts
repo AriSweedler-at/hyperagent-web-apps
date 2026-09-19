@@ -14,12 +14,21 @@ export const MANIFEST_PATH = `${FIXTURE_DIR}/MANIFEST.json`;
 /** The owner's template pre-commit prompts on files over 150 KB; stay clear of it. */
 export const FIXTURE_SIZE_LIMIT = 140 * 1024;
 
+/** A 1-based, inclusive line range of a page. */
+export type LineRange = Readonly<{ startLine: number; endLine: number }>;
+
 export type Extracted = Readonly<{
   /** 1-based, inclusive line range of the page the fixture was cut from. */
   startLine: number;
   endLine: number;
-  /** The page text of that range, byte for byte; `sourceSha256` pins it. */
+  /**
+   * The page text of that range, byte for byte; `sourceSha256` pins it. A fixture cut from several
+   * ranges (tools/legacy/extract-gin-ui.ts) lists them in `ranges`, `startLine`/`endLine` is their
+   * overall span and `source` is the ranges' text joined with newlines: a page edit inside any
+   * range changes the hash, one between two ranges does not.
+   */
   source: string;
+  ranges?: ReadonlyArray<LineRange>;
   /** The generated CommonJS module; `fixtureSha256` pins it. */
   fixture: string;
 }>;
@@ -30,9 +39,16 @@ export type ManifestEntry = Readonly<{
   tool: string;
   startLine: number;
   endLine: number;
+  ranges?: ReadonlyArray<LineRange>;
   sourceSha256: string;
   fixtureSha256: string;
 }>;
+
+/** The text of `ranges` in a page, each range's lines joined and the ranges joined by newlines. */
+export const textOfRanges = (
+  lines: ReadonlyArray<string>,
+  ranges: ReadonlyArray<LineRange>,
+): string => ranges.map((r) => lines.slice(r.startLine - 1, r.endLine).join('\n')).join('\n');
 
 export type Manifest = Readonly<Record<string, ManifestEntry>>;
 
@@ -94,6 +110,7 @@ export const writeFixture = (
     tool,
     startLine: extracted.startLine,
     endLine: extracted.endLine,
+    ...(extracted.ranges === undefined ? {} : { ranges: extracted.ranges }),
     sourceSha256: sha256(extracted.source),
     fixtureSha256: sha256(extracted.fixture),
   };
