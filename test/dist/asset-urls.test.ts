@@ -1,8 +1,7 @@
 // Guard 1 of docs/ARCHITECTURE.md "Two origins": every src/href/url() in dist HTML and CSS is
 // `./`-relative (or bare relative), `../../shared/`-relative or `https://`; never `/`-rooted, so
 // the same bytes resolve from /hyperagent-web-apps/ on github.io and from / on games.sweedler.com.
-// Nothing may be emitted to a root /assets/ either. Runs on dist/ and dist-next/ after the builds
-// (test:dist).
+// Nothing may be emitted to a root /assets/ either. Runs on dist/ after the build (test:dist).
 import { expect, test } from 'vitest';
 
 import {
@@ -34,35 +33,35 @@ describeDist('dist asset URLs', (root) => {
     expect(offenders, 'references that break one of the two origins').toEqual([]);
   });
 
-  test('every load of shared/ice.js uses the one mapped parent path', () => {
-    // Only the legacy pages load it as a classic script (fidice stopped in docs/MIGRATION.md
-    // step 9), so a tree without legacy pages (dist-next/) has no such load.
-    const iceLoads = allReferences(root).filter(({ value }) => value.endsWith('/ice.js'));
-    expect(iceLoads.length > 0).toBe(root.legacyPages.length > 0);
-    expect(new Set(iceLoads.map(({ value }) => value))).toEqual(
-      new Set(root.legacyPages.length > 0 ? ['../../shared/ice.js'] : []),
-    );
+  test('no page loads shared/ice.js or the PeerJS CDN bundle as a classic script', () => {
+    // Only the legacy pages did (fidice stopped in docs/MIGRATION.md step 9, gin in step 13); the
+    // ICE loader and PeerJS arrive with the module graph.
+    const references = allReferences(root);
+    expect(references.filter(({ value }) => value.endsWith('/ice.js'))).toEqual([]);
+    expect(references.filter(({ value }) => value.includes('peerjs'))).toEqual([]);
   });
 
   test('nothing is emitted under a root assets/ directory', () => {
     expect(distFiles(root).filter((file) => file.startsWith('assets/'))).toEqual([]);
   });
 
-  test('the fidice page loads its bundle beside itself and its CSS under ../../shared/assets/', () => {
-    const page = 'games/fidice/index.html';
-    const references = referencesIn(page, readDist(root, page));
-    // Its only script is the bundle: PeerJS and the ICE loader come with the module graph (step 9),
-    // since step 12 through a preloaded shared chunk under ../../shared/assets/ (no classic script).
-    expect(references.filter(({ kind }) => kind === 'src').map(({ value }) => value)).toEqual([
-      expect.stringMatching(/^\.\/app-[\w-]+\.js$/) as string,
-    ]);
-    references
-      .filter(({ kind, value }) => kind === 'href' && value.endsWith('.js'))
-      .forEach(({ value }) => {
-        expect(value).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.js$/);
-      });
-    expect(
-      references.filter(({ value }) => value.endsWith('.css')).map(({ value }) => value),
-    ).toEqual([expect.stringMatching(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.css$/) as string]);
+  ['gin-rummy', 'fidice'].forEach((game) => {
+    test(`the ${game} page loads its bundle beside itself and its CSS under ../../shared/assets/`, () => {
+      const page = `games/${game}/index.html`;
+      const references = referencesIn(page, readDist(root, page));
+      // Its only script is the bundle: PeerJS and the ICE loader come with the module graph (steps
+      // 9 and 12), through a preloaded shared chunk under ../../shared/assets/ (no classic script).
+      expect(references.filter(({ kind }) => kind === 'src').map(({ value }) => value)).toEqual([
+        expect.stringMatching(/^\.\/app-[\w-]+\.js$/) as string,
+      ]);
+      references
+        .filter(({ kind, value }) => kind === 'href' && value.endsWith('.js'))
+        .forEach(({ value }) => {
+          expect(value).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.js$/);
+        });
+      expect(
+        references.filter(({ value }) => value.endsWith('.css')).map(({ value }) => value),
+      ).toEqual([expect.stringMatching(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.css$/) as string]);
+    });
   });
 });

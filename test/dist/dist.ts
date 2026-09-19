@@ -1,78 +1,47 @@
-// Shared plumbing for the dist guards (docs/ARCHITECTURE.md "Two origins"): which build trees
-// exist, how to list one, and how to pull every URL reference out of the HTML and CSS Vite wrote.
-// Two trees are guarded: dist/ (`npm run build`, the legacy pages copied over Vite's output) and
-// dist-next/ (`npm run build:next`, `LEGACY_PAGES=` so a ported page is served as built; the e2e
-// project `next` runs against it). These suites run from `npm run test:dist` after the builds
-// (vitest.dist.config.ts); a tree that is absent is recorded as one skipped test with a note, so a
-// checkout without a build is never mistaken for a broken site.
+// Shared plumbing for the dist guards (docs/ARCHITECTURE.md "Two origins"): whether the build
+// tree exists, how to list it, and how to pull every URL reference out of the HTML and CSS Vite
+// wrote. One tree is guarded, dist/ (`npm run build`): since docs/MIGRATION.md step 13 every page
+// is Vite's and the dark dist-next/ build is gone. These suites run from `npm run test:dist` after
+// the build (vitest.dist.config.ts); an absent tree is recorded as one skipped test with a note, so
+// a checkout without a build is never mistaken for a broken site.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
 import { describe, test } from 'vitest';
 
-import { DEFAULT_LEGACY_PAGES, legacyPagesFrom } from '../../vite.config.ts';
-
 export const REPO_ROOT = resolve(import.meta.dirname, '..', '..');
 
-export type DistRoot = Readonly<{
-  name: 'dist' | 'dist-next';
-  dir: string;
-  /** The pages this tree serves from legacy/ (the passthrough list the build ran with). */
-  legacyPages: ReadonlyArray<string>;
-  build: string;
-}>;
+export type DistRoot = Readonly<{ name: 'dist'; dir: string; build: string }>;
 
-export const DIST_ROOTS: ReadonlyArray<DistRoot> = [
-  {
-    name: 'dist',
-    dir: resolve(REPO_ROOT, 'dist'),
-    legacyPages: legacyPagesFrom(process.env['LEGACY_PAGES']),
-    build: 'npm run build',
-  },
-  {
-    name: 'dist-next',
-    dir: resolve(REPO_ROOT, 'dist-next'),
-    legacyPages: [],
-    build: 'npm run build:next',
-  },
-];
+export const DIST_ROOT: DistRoot = {
+  name: 'dist',
+  dir: resolve(REPO_ROOT, 'dist'),
+  build: 'npm run build',
+};
 
 export const distPresent = (root: DistRoot): boolean => existsSync(resolve(root.dir, 'index.html'));
 
 export const skipNote = (root: DistRoot): string =>
-  `${root.name}/ is absent: run \`${root.build}\` first (CI runs \`npm run test:dist\` after the builds)`;
+  `${root.name}/ is absent: run \`${root.build}\` first (CI runs \`npm run test:dist\` after the build)`;
 
 /**
- * `describe` per build tree: runs `body(root)` for each tree that exists and records one skipped
- * test with the build command for each that does not.
+ * `describe` over the build tree: runs `body(root)` when dist/ exists and records one skipped test
+ * with the build command when it does not.
  */
 export const describeDist = (name: string, body: (root: DistRoot) => void): void => {
-  DIST_ROOTS.forEach((root) => {
-    if (distPresent(root)) {
-      describe(`${name} [${root.name}]`, () => {
-        body(root);
-      });
-      return;
-    }
+  const root = DIST_ROOT;
+  if (distPresent(root)) {
     describe(`${name} [${root.name}]`, () => {
-      test(`skipped: no ${root.name}/`, (context) => {
-        context.skip(skipNote(root));
-      });
+      body(root);
+    });
+    return;
+  }
+  describe(`${name} [${root.name}]`, () => {
+    test(`skipped: no ${root.name}/`, (context) => {
+      context.skip(skipNote(root));
     });
   });
 };
-
-/**
- * Game pages the landing page links to that this tree does not hold: a legacy page not copied in
- * (`LEGACY_PAGES=`) whose port has no web/games/<g>/index.html yet. Their links are dead in this
- * tree by design and the path guards leave them out (and say which ones).
- */
-export const unbuiltPages = (root: DistRoot): ReadonlyArray<string> =>
-  DEFAULT_LEGACY_PAGES.filter(
-    (game) =>
-      !root.legacyPages.includes(game) &&
-      !existsSync(resolve(REPO_ROOT, 'web', 'games', game, 'index.html')),
-  );
 
 /** Every regular file under the tree, as posix paths relative to it, sorted. */
 export const distFiles = (root: DistRoot): ReadonlyArray<string> =>

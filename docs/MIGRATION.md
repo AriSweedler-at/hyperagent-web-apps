@@ -578,3 +578,30 @@ parity and e2e gates.
   Web Share / clipboard chain; `tsconfig.node.json` excludes the DOM modules, `tsconfig.pure.json`
   and the scorer zone carve out `scorer/main*.ts`, the ui zone may import `page.fake.ts`, and
   ambient `.d.ts` files are exempt from the erasable-syntax ban. See ARCHITECTURE "Deviations".
+- Step 13: `legacy/gin-rummy/index.html`, `legacy/fidice/index.html` and `legacy/shared/ice.js` are
+  retained, not deleted or moved: they are the frozen, sha256-pinned sources of the parity oracles
+  (the engine/core/UI fixtures `manifest.test.ts` re-extracts on every run, the wire and storage
+  captures, the fidice de-bundle audit, `roomCode.legacy.test.ts`, `ice.legacy.test.ts`, the
+  serve-dist test fixture and the DOM-parity oracle), and moving them would churn ~30 files for no
+  behaviour gain. Nothing serves them: `DEFAULT_LEGACY_PAGES` went to `[]` (the flip, one commit)
+  and then the `legacyPassthrough` plugin, the `LEGACY_PAGES` env, `npm run build:next`,
+  `dist-next/` and the Playwright project `next` were deleted (the retire, one commit), so dist/ is
+  the only tree, holds no `shared/ice.js`, and both game pages are Vite's module pages preloading
+  the same shared chunk (`test/dist/dist-parity.test.ts`, single-tree `describeDist`).
+  `legacy/README.md` (new) states the files are test fixtures frozen at the cutover, never to be
+  edited, and lists every reader; the manifest test still fails if they change. Follow-up: that
+  manifest pins only the extracted ranges (35% of the gin page, none of `shared/ice.js`), so
+  `test/fixtures/legacy/frozen.test.ts` (new) pins the whole-file sha256 of all three and the
+  `legacy/` listing; the pins are hand-computed constants with no regenerator, so re-pinning is a
+  visible, explained edit. `?peer=` lives only in `web/shared/edge/transport.ts` (and, unserved,
+  in the legacy pages). The `next` project is
+  gone because nothing is dark any more: `npm run test:e2e` builds dist/ once and runs every spec
+  on `pages` and `proxy`; `e2e/gin-dom-parity.spec.ts` runs once, on `pages`, where the harness's
+  serve-dist publishes the legacy gin page under `legacy/games/gin-rummy/index.html` (so its
+  `../../shared/ice.js` resolves to the aliased `legacy/shared/ice.js`) beside the served dist/,
+  and the standalone `tools/parity/gin-dom-parity.ts` serves dist/ instead of dist-next/. The
+  10-minute cache window step 7 described now applies to both game pages and the shared chunk; the
+  retained-assets copy in the deploy job it noted for this step is still not done (deferred to
+  step 15 or later, with the owner). Computed-style goldens and visual snapshots are not captured
+  (see step 3); the manual mixed-origin phone game is the PR body's gate. See ARCHITECTURE
+  "Deviations".

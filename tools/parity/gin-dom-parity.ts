@@ -10,11 +10,12 @@
 // read from the legacy page's `window.__gin` hook and applied to both, so the two never diverge on
 // a choice.
 //
-// Locally (Chromium from `npx playwright install`; `npm run build:next` first):
+// Locally (Chromium from `npx playwright install`; `npm run build` first):
 //   node --experimental-strip-types tools/parity/gin-dom-parity.ts
-// It serves legacy/gin-rummy/index.html through tools/serve-dist.ts aliases and dist-next/ on a
-// second server, prints every checkpoint and exits 1 on a mismatch. e2e/gin-dom-parity.spec.ts runs
-// the same driver in CI against the harness's `pages` (dist/, the legacy page) and `next` origins.
+// It serves legacy/gin-rummy/index.html through tools/serve-dist.ts aliases and dist/ on a second
+// server, prints every checkpoint and exits 1 on a mismatch. e2e/gin-dom-parity.spec.ts runs the
+// same driver in CI on the harness's `pages` origin, where the legacy page is aliased under legacy/
+// (e2e/fixtures/site.ts) beside the served dist/.
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -431,9 +432,9 @@ const printReport = (report: Report, errors: ReadonlyArray<string>): boolean => 
 };
 
 if (isMain(import.meta.url)) {
-  const distNext = resolve(REPO_ROOT, 'dist-next');
-  if (!existsSync(resolve(distNext, 'games', 'gin-rummy', 'index.html'))) {
-    console.error('dist-next/ has no gin page: run `npm run build:next` first');
+  const dist = resolve(REPO_ROOT, 'dist');
+  if (!existsSync(resolve(dist, 'games', 'gin-rummy', 'index.html'))) {
+    console.error('dist/ has no gin page: run `npm run build` first');
     process.exit(1);
   }
   const legacyServer = await startServer({
@@ -447,7 +448,7 @@ if (isMain(import.meta.url)) {
     },
   });
   const nextServer = await startServer({
-    root: distNext,
+    root: dist,
     base: PAGES_BASE_PATH,
     host: HOST,
     port: 0,

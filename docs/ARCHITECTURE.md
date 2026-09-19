@@ -697,3 +697,26 @@ Step 12, phase 2 (gin paint, wiring, scorer screen, oracle):
 - The `ui/state.ts` row reads "imported by `main.ts`, the `ui/` painters `render`, `home` and
   `local` (the `App`/`Intent` types and the screen and tab lists only) and tests"; a zone refuses
   every other `ui/`, `ui/*/` and `view/` importer of `ui/state.ts` / `app/controller.ts`.
+
+Step 13 (cut Gin Rummy over; retire the passthrough):
+
+- `dist/games/gin-rummy/index.html` is Vite's module page on both origins; `DEFAULT_LEGACY_PAGES`,
+  `legacyPagesFrom`, the `legacyPassthrough` plugin and the `LEGACY_PAGES` env are deleted from
+  `vite.config.ts`, which now only globs `web/**/index.html` and names the output. dist/ holds no
+  `shared/ice.js`: the proxy's `/shared/` rule now serves Vite's `shared/assets/` alone.
+- `legacy/` is kept, not deleted as "Build and serve" and the layout tree say: it is MIGRATION ONLY
+  in the sense of test fixtures (the frozen, sha256-pinned oracle sources; `legacy/README.md` lists
+  every reader). "Pinned" means whole files: `test/fixtures/legacy/frozen.test.ts` holds each
+  file's sha256 beside the range pins in `MANIFEST.json`, which cover only the extracted cuts.
+  Nothing copies it into dist and no page loads it; the one browser that opens a legacy page is the
+  DOM-parity oracle, through serve-dist aliases on the harness's pages origin (`LEGACY_ALIASES` in
+  `e2e/fixtures/site.ts`, mounted at `legacy/games/gin-rummy/index.html` so its
+  `../../shared/ice.js` resolves to the aliased `legacy/shared/ice.js`).
+- `npm run build:next`, `dist-next/` and the Playwright project `next` are retired: nothing is dark
+  any more, so `test:e2e` is `npm run build && playwright test` on `pages` and `proxy` with every
+  spec, and `check` builds once. `test/dist/dist.ts` guards the single tree (`DIST_ROOT`,
+  `describeDist` without a per-tree loop, no `unbuiltPages`); `dist-parity` asserts both game pages
+  are module pages with resolvable assets preloading the same shared chunk, the landing page
+  byte-identical to `web/index.html`, and `legacy/` present.
+- The 10-minute cache window in "Build and serve" now applies to both game pages and the shared
+  chunk; closing it (retained assets in the deploy job) is still deferred.
