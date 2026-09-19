@@ -1,0 +1,6 @@
+{
+  "key": "ginRummyScorerState_v2",
+  "variant": "twoHands",
+  "captured": "Ann knocked with 5 (Bob 20, Cy 3: Cy undercuts), then Bob went gin (Ann 12, Cy 40)",
+  "raw": "{\"players\":[{\"id\":\"j2t6gsg\",\"name\":\"Ann\"},{\"id\":\"lw4do4k\",\"name\":\"Bob\"},{\"id\":\"l8ue7hg\",\"name\":\"Cy\"}],\"target\":150,\"rounds\":[{\"deadwood\":{\"j2t6gsg\":5,\"lw4do4k\":20,\"l8ue7hg\":3},\"knockerId\":\"j2t6gsg\",\"knockType\":\"knock\",\"scores\":{\"j2t6gsg\":15,\"lw4do4k\":0,\"l8ue7hg\":27},\"ts\":1789778081788},{\"deadwood\":{\"j2t6gsg\":12,\"lw4do4k\":0,\"l8ue7hg\":40},\"knockerId\":\"lw4do4k\",\"knockType\":\"gin\",\"scores\":{\"j2t6gsg\":0,\"lw4do4k\":102,\"l8ue7hg\":0},\"ts\":1789778081888}],\"startedAt\":1789778081721}"
+}

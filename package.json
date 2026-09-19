@@ -20,6 +20,8 @@
     "serve": "node --experimental-strip-types tools/serve-dist.ts --root dist --base /hyperagent-web-apps/ --alias e2e-ice.json=e2e/fixtures/e2e-ice.json",
     "proxy:dev": "node --experimental-strip-types tools/proxy-dev.ts --upstream http://127.0.0.1:4173",
     "fixtures:legacy": "node --experimental-strip-types tools/legacy/extract-gin-engine.ts && node --experimental-strip-types tools/legacy/extract-fidice-core.ts && node --experimental-strip-types tools/legacy/extract-gin-ui.ts",
+    "fixtures:gin-wire": "node --experimental-strip-types tools/legacy/record-gin-wire.ts",
+    "fixtures:gin-storage": "node --experimental-strip-types tools/legacy/capture-gin-storage.ts",
     "debundle:fidice": "node --experimental-strip-types tools/legacy/debundle-fidice.ts",
     "hooks": "git config core.hooksPath .githooks",
     "hooks:verify": "sh tools/hooks-verify.sh",

@@ -1,0 +1,6 @@
+{
+  "key": "ginRummyMP_v1",
+  "variant": "host.lobby",
+  "captured": "hosted a room to 75 through a local PeerServer; no guest yet",
+  "raw": "{\"role\":\"host\",\"code\":\"LRZL\",\"myName\":\"Ann\",\"target\":75,\"game\":null,\"oppName\":null}"
+}
