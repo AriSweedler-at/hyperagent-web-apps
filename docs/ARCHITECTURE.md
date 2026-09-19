@@ -672,3 +672,23 @@ Step 12, phase 1 (gin page, net, state, boot): `web/games/gin-rummy/`:
   id and class is the legacy's. dist/ carries the unreferenced gin bundle beside the legacy page.
 - Two module pages: the modules both import are one `shared/assets/[name]-[hash].js` chunk,
   preloaded by both pages (`<link rel="modulepreload">`), the layout `chunkFileNames` reserved.
+
+Step 12, phase 2 (gin paint, wiring, scorer screen, oracle):
+
+- `ui/render.ts` composes the whole paint (`paint(doc, app, handView)`): screens, statuses, the
+  home screen (`ui/home.ts`), the curtain (`ui/local.ts`), the table, the sheets, the endgame and
+  the overlays, each from the App alone; the HandView is main.ts's choice and `fitTable` measures
+  while `ui/fit.ts` decides. Each module also binds its controls to intents (`bindAll`).
+- The App gained what the legacy kept in the DOM or in closures (rules/history overlays, the
+  long-press submenu, the code draft); named timers, the sound toggle, the share and the two input
+  writes are effects. `scorer/main.ts` (an edge) holds the Score Counter's state in a closure over
+  the pure scorer modules, with the dialogs, screens, download and SpeechRecognition injected.
+- `@shared/edge/dom` grew listeners, values, styles, queries, the `e.target` casts and
+  `PageLike`; `@shared/edge/page.fake` is a string-backed static-page fake (the ui zone may import
+  it); `@shared/edge/share` the Web Share / clipboard chain. `web/raw-imports.d.ts` declares Vite's
+  `?raw` import for the tests that build the fake from `index.html`; ambient `.d.ts` files are
+  exempt from the erasable-syntax ban.
+- The DOM-snapshot oracle is `tools/parity/gin-dom-parity.ts`, run locally by hand and in CI as
+  `e2e/gin-dom-parity.spec.ts` on the `next` project; `e2e/gin-resume.spec.ts` covers host resume
+  and guest rejoin on every project; `PORTED_PAGES` lists gin-rummy, so the `next` project runs
+  every gin spec against dist-next/.

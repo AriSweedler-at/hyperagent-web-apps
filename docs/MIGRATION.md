@@ -549,3 +549,32 @@ parity and e2e gates.
   reserved `chunkFileNames` for (the proxy maps `/shared/`), so the dist guards accept a preloaded
   shared chunk, require both pages to preload the same one, and compare the chunks across dist/
   and dist-next/. See ARCHITECTURE "Deviations".
+- Step 12, phase 2 (`ui/{render,home,local}.ts`, `scorer/main.ts`, the input wiring, the oracle,
+  the e2e): the dark page is complete and the e2e project `next` runs smoke, gin-local, gin-scorer,
+  gin-online, the new gin-resume (host reload and resume, guest rejoin; also on `pages`/`proxy`
+  for the legacy page) and the DOM-snapshot parity. The oracle is `tools/parity/gin-dom-parity.ts`
+  (also `e2e/gin-dom-parity.spec.ts` on `next`): two contexts with the same seeded `Math.random`
+  and a stepping `Date.now` play the same pass-and-play game (to a knock, the sheets, the endgame,
+  a rematch, a reload and resume, a leave) and the same Score Counter session (a hand, the end
+  screen, an edit through the `prompt()` dialogs, a delete, an export, a gin hand, a new game)
+  through the UI on the legacy page and the new page, comparing the normalised `outerHTML` of the
+  home screen, the table, the curtain, every sheet and overlay and the scorer screens plus the
+  toast's text at 84 checkpoints; only whitespace, the two rules slots' ids and the fitted
+  `--tscale` are normalised, and the discard choices are read from the legacy page's `window.__gin`
+  and applied to both. The paint is a function of the App alone, so where the legacy wrote a region
+  only on some path the paint keeps that condition (the result sheet stays over the endgame at
+  `gameOver` until "Look at the table", the mode buttons' marks change only while the Play tab
+  shows, the table is untouched without a view). What the legacy kept in the DOM or in closures
+  joined the App (the rules and
+  history overlays, the Play tab's long-press submenu with its 450 ms timer as a named timer
+  effect, the code input's last good value); the two input writes `initHome` and the code handler
+  made are effects (`fillName`, `setCode`) so the paint never fights the player's typing. The
+  history and meld-chooser lists are repainted from the live view while open, where the legacy
+  wrote them once at opening (no state can change while either is open on one phone). The Score
+  Counter keeps its `prompt()`/`confirm()` dialogs (the named debt). Toolchain: `dom.ts` gained
+  listeners, values, styles, queries and the `e.target` casts; `page.fake.ts` (shared edge) and
+  `ui/page.fake.ts` (the gin page's ids from `index.html`, read by the tests through a Vite
+  `?raw` import declared in `web/raw-imports.d.ts`) replace jsdom; `share.ts` is the invite's
+  Web Share / clipboard chain; `tsconfig.node.json` excludes the DOM modules, `tsconfig.pure.json`
+  and the scorer zone carve out `scorer/main*.ts`, the ui zone may import `page.fake.ts`, and
+  ambient `.d.ts` files are exempt from the erasable-syntax ban. See ARCHITECTURE "Deviations".

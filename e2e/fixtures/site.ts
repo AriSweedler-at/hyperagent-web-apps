@@ -4,8 +4,8 @@
 // Worker against the pages origin. `next` is the Pages layout again, serving dist-next/ (built with
 // `LEGACY_PAGES=`, docs/MIGRATION.md step 6), so a ported page is played end to end before it is
 // flipped; only the ported pages exist in that tree (fidice, flipped in step 7, is the same bytes
-// there as in dist/; gin-rummy joins when its port lands). Everything the harness needs to know
-// about URLs is here, so specs never spell out an absolute site path themselves.
+// there as in dist/; gin-rummy is the dark port since step 12). Everything the harness needs to
+// know about URLs is here, so specs never spell out an absolute site path themselves.
 
 export type Project = 'pages' | 'proxy' | 'next';
 export type PageName = 'landing' | 'gin-rummy' | 'fidice';
@@ -29,8 +29,11 @@ export const ICE_FIXTURE = { iceServers: [{ urls: 'stun:127.0.0.1:3478' }] } as 
 
 export const PROJECTS: ReadonlyArray<Project> = ['pages', 'proxy', 'next'];
 export const PAGES: ReadonlyArray<PageName> = ['landing', 'gin-rummy', 'fidice'];
-/** Pages a project's tree holds: dist/ has every page; dist-next/ only the landing and ported ones (no gin-rummy yet). */
-export const PORTED_PAGES: ReadonlyArray<PageName> = ['landing', 'fidice'];
+/** Pages a project's tree holds: dist/ has every page; dist-next/ the landing and the ported ones. */
+export const PORTED_PAGES: ReadonlyArray<PageName> = ['landing', 'gin-rummy', 'fidice'];
+/** On the `next` project the gin page is the typed port; on `pages` and `proxy` still the legacy one. */
+export const isTypedPage = (project: Project, page: PageName): boolean =>
+  page === 'fidice' || (page === 'gin-rummy' && project === 'next');
 export const pagesOn = (project: Project): ReadonlyArray<PageName> =>
   project === 'next' ? PORTED_PAGES : PAGES;
 

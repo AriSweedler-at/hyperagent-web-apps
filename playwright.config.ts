@@ -49,11 +49,19 @@ export default defineConfig({
     {
       // The dark build: only the specs for pages that exist in dist-next/ (e2e/fixtures/site.ts).
       // Since step 7 the fidice output is byte-identical in dist/ and dist-next/
-      // (test/dist/dist-parity.test.ts), so fidice-online runs on `pages` and `proxy` only; a
-      // ported gin page joins this list when step 12 ships it dark.
+      // (test/dist/dist-parity.test.ts), so fidice-online runs on `pages` and `proxy` only. The
+      // gin port (step 12) plays here dark: its four specs, the resume spec and the DOM-snapshot
+      // parity against the legacy page on the `pages` origin.
       name: 'next',
       use: { baseURL: `${NEXT_ORIGIN}${PAGES_BASE_PATH}` },
-      testMatch: ['smoke.spec.ts'],
+      testMatch: [
+        'smoke.spec.ts',
+        'gin-local.spec.ts',
+        'gin-scorer.spec.ts',
+        'gin-online.spec.ts',
+        'gin-resume.spec.ts',
+        'gin-dom-parity.spec.ts',
+      ],
     },
   ],
   webServer: [
