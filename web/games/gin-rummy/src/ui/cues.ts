@@ -74,18 +74,8 @@ export const deadwoodText = (view: View, selection: Selection): string => {
   return `Deadwood: ${String(view.me.deadwoodValue)}`;
 };
 
-/** `1h 2m`, `3m 4s` or `5s`; negative durations read as 0. */
-export const fmtDuration = (ms: number): string => {
-  const t = Math.floor(Math.max(0, ms) / 1000);
-  const h = Math.floor(t / 3600);
-  const m = Math.floor((t % 3600) / 60);
-  const s = t % 60;
-  return h !== 0
-    ? `${String(h)}h ${String(m)}m`
-    : m !== 0
-      ? `${String(m)}m ${String(s)}s`
-      : `${String(s)}s`;
-};
+/** The duration formatter is the scorer's (its CSV export shares it); the golden test is beside this file. */
+export { fmtDuration } from '../scorer/format.ts';
 
 // ---- sound cues --------------------------------------------------------------------------------
 

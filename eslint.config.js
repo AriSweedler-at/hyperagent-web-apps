@@ -18,6 +18,8 @@ const PURE = [
   // gin keeps protocol.ts at src/; fidice's lives at src/net/protocol.ts (docs/MIGRATION.md step 8).
   'web/games/*/src/protocol.ts',
   'web/games/*/src/net/protocol.ts',
+  // gin's scorer maths; scorer/main.ts is the Score Counter's screen (docs/MIGRATION.md step 12).
+  'web/games/*/src/scorer/!(main).ts',
 ];
 const ALGORITHMS = ['**/*.algorithms.ts'];
 const EDGES = [
@@ -197,9 +199,25 @@ const zones = [
       `${GAME_SRC}/ui/**`,
       `${GAME_SRC}/view/**`,
       `${GAME_SRC}/app/**`,
+      `${GAME_SRC}/scorer/**`,
       `${GAME_SRC}/storage.ts`,
     ],
     message: 'protocol.ts imports only engine/domain types and web/shared/lib.',
+  },
+  {
+    // Every scorer/ module except scorer/main.ts, the Score Counter's screen (an edge).
+    target: [`${GAME_SRC}/scorer/!(main).ts`],
+    from: [
+      './web/shared/edge/**',
+      `${GAME_SRC}/net/**`,
+      `${GAME_SRC}/ui/**`,
+      `${GAME_SRC}/view/**`,
+      `${GAME_SRC}/app/**`,
+      `${GAME_SRC}/protocol.ts`,
+      `${GAME_SRC}/storage.ts`,
+      './web/games/*/main.ts',
+    ],
+    message: 'scorer maths imports only engine types and web/shared/lib.',
   },
   {
     // Every net/ module except protocol.ts, which the zone above owns.

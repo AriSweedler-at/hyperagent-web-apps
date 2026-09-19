@@ -161,7 +161,7 @@ Gin's inline classic scripts depend on execution order (`window.GinEngine`, `win
 - Goal: `protocol.ts` and `storage.ts` codecs (keys `ginRummyMP_v1`, `ginRummy_name`,
   `ginRummy_homeTab`, `ginRummy_playMode`, `ginRummy_sound`, `ginRummyScorerState_v2`,
   `ginRummy_scorerNames` frozen), `ui/{cards,cues,fit,rules}.ts`, `ui/hand/{HandView,meldGroups}.ts`,
-  `scorer/{scores,voice,csv}.ts` (`computeRoundScores` takes players explicitly).
+  `scorer/{scores,voice,csv,format}.ts` (`computeRoundScores` takes players explicitly).
 - Proves: wire goldens decode and re-encode byte-identically; rejection fuzz; storage decoders
   accept payloads captured from a real legacy session; `cardHtml`/`meldGroupsHtml` string goldens;
   scorer table tests.
@@ -495,11 +495,13 @@ parity and e2e gates.
   four bare-string keys are decoded as such; garbage under `ginRummy_playMode` is refused (the
   legacy would have hidden both mode panels) and `soundEnabled` keeps `!== 'off'`; the scorer's
   `void` CSV branches are not ported (a scorer round never carries `void`); a knocker who is not a
-  player is not reproduced (`NaN` in the legacy). UI: `ui/cues.ts` also holds `fmtDuration` (the
-  CSV export imports it) and the cue machine as `nextCue(state, view, role)`; `ui/rules.ts` equals
-  both legacy copies up to the page's indentation. `scorer/voice.ts` is the spoken-entry parser
-  (the legacy has voice entry, not announcements). Toolchain: `tsconfig.web.json` no longer
-  excludes `protocol.ts`, `tsconfig.node.json` lists the whole gin `src/` tree (DOM-free by
-  design) and `web/shared/edge/storage.ts`; coverage gates `protocol.ts`, `storage.ts`, `ui/**`
-  and `scorer/**` at 90% lines, functions and statements (actual 100/100/100). See ARCHITECTURE
-  "Deviations".
+  player is not reproduced (`NaN` in the legacy). UI: `ui/cues.ts` holds the cue machine as
+  `nextCue(state, view, role)` and re-exports `fmtDuration` from `scorer/format.ts` (the CSV export
+  shares it and the scorer may not import `ui/`); `ui/rules.ts` equals both legacy copies up to the
+  page's indentation. `scorer/voice.ts` is the spoken-entry parser (the legacy has voice entry, not
+  announcements). Toolchain: `scorer/` (except `main.ts`) joins the pure layers (`PURE` glob,
+  `tsconfig.pure.json`, an import zone of its own; `protocol.ts` may not import it);
+  `tsconfig.web.json` no longer excludes `protocol.ts`, `tsconfig.node.json` lists the whole gin
+  `src/` tree (DOM-free by design) and `web/shared/edge/storage.ts`; coverage gates `protocol.ts`,
+  `storage.ts`, `ui/**` and `scorer/**` at 90% lines, functions and statements (actual
+  100/100/100). See ARCHITECTURE "Deviations".

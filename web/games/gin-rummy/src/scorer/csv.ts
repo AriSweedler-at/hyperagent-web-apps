@@ -4,7 +4,7 @@
 // Blob, the download link and the toast stay with the screen (step 12). The hand's time column is
 // `new Date(ts).toLocaleString()` in the legacy, so the formatter is injected and the golden test
 // passes that same expression. test/parity/gin.scorer.test.ts is the oracle.
-import { fmtDuration } from '../ui/cues.ts';
+import { fmtDuration } from './format.ts';
 import { KNOCK_LABELS, totalFor, type ScorerPlayer, type ScorerState } from './scores.ts';
 
 export type CsvCell = string | number;
