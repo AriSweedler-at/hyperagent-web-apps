@@ -14,6 +14,7 @@ import {
   LEAVE_LOCAL_MSG,
   LEAVE_ONLINE_MSG,
   LOCKED_CARD_MSG,
+  LONG_PRESS_MS,
   LOST_HOST_MSG,
   NOT_CONNECTED_MSG,
   OPPONENT_LEFT_MSG,
@@ -167,8 +168,13 @@ describe('home', () => {
       playMode: 'local',
       resume: null,
     });
-    // The tab is applied without persisting (`{ persist: false }`); the score tab wakes the scorer.
-    expect(effects).toEqual([{ type: 'scrollTop' }, { type: 'scorer', call: 'shown' }]);
+    // The saved name goes into the inputs; the tab is applied without persisting
+    // (`{ persist: false }`); the score tab wakes the scorer.
+    expect(effects).toEqual([
+      { type: 'scrollTop' },
+      { type: 'fillName', name: 'Ann' },
+      { type: 'scorer', call: 'shown' },
+    ]);
     const plain = run(initialApp, { type: 'home/init', home });
     expect(plain.app.nameTouched).toBe(false);
     expect(plain.effects).toEqual([{ type: 'scrollTop' }]);
@@ -216,6 +222,80 @@ describe('home', () => {
     expect(run(initialApp, { type: 'screen/show', screen: 'scGameScreen' })).toEqual({
       app: { ...initialApp, screen: 'scGameScreen' },
       effects: [{ type: 'scrollTop' }],
+    });
+  });
+
+  test('the Play tab: a tap switches tabs; a long press opens the submenu and swallows the click that follows', () => {
+    const pressed = run({ ...initialApp, homeTab: 'rules' }, { type: 'submenu/press' });
+    expect(pressed.app.longPressed).toBe(false);
+    expect(pressed.effects).toEqual([
+      {
+        type: 'startTimer',
+        id: 'longPress',
+        ms: LONG_PRESS_MS,
+        then: { type: 'submenu/longPress' },
+      },
+    ]);
+    // Released in time: the timer is cancelled and the click switches to the Play tab.
+    const tapped = run(pressed.app, { type: 'submenu/release' }, { type: 'tab/playClick' });
+    expect(tapped.app).toMatchObject({ homeTab: 'play', submenuOpen: false, longPressed: false });
+    expect(tapped.effects).toEqual([
+      { type: 'cancelTimer', id: 'longPress' },
+      { type: 'writeHomeTab', tab: 'play' },
+    ]);
+    // Held: the submenu opens with a tap sound; the click that follows only clears the flag.
+    const held = run(pressed.app, { type: 'submenu/longPress' });
+    expect(held.app).toMatchObject({ submenuOpen: true, longPressed: true, homeTab: 'rules' });
+    expect(held.effects).toEqual([{ type: 'fx', cue: 'tap' }]);
+    const swallowed = run(held.app, { type: 'tab/playClick' });
+    expect(swallowed.app).toMatchObject({
+      submenuOpen: true,
+      longPressed: false,
+      homeTab: 'rules',
+    });
+    expect(swallowed.effects).toEqual([]);
+    // A submenu pick sets the mode, shows the Play tab and closes the submenu; a click elsewhere just closes it.
+    const picked = run(held.app, { type: 'submenu/pick', mode: 'local' });
+    expect(picked.app).toMatchObject({ playMode: 'local', homeTab: 'play', submenuOpen: false });
+    expect(picked.effects).toEqual([
+      { type: 'writePlayMode', mode: 'local' },
+      { type: 'writeHomeTab', tab: 'play' },
+    ]);
+    expect(run(held.app, { type: 'submenu/dismiss' }).app.submenuOpen).toBe(false);
+  });
+
+  test('the code input keeps upper-case letters only, four at most, and reverts a keyboard replacement', () => {
+    const typed = run(initialApp, { type: 'code/typed', value: 'ab1c', inputType: 'insertText' });
+    expect(typed.app.codeDraft).toBe('ABC');
+    expect(typed.effects).toEqual([{ type: 'setCode', value: 'ABC' }]);
+    const more = run(typed.app, { type: 'code/typed', value: 'abcde', inputType: 'insertText' });
+    expect(more.app.codeDraft).toBe('ABCD');
+    const swapped = run(more.app, {
+      type: 'code/typed',
+      value: 'XYZW',
+      inputType: 'insertReplacementText',
+    });
+    expect(swapped.app.codeDraft).toBe('ABCD');
+    expect(swapped.effects).toEqual([{ type: 'setCode', value: 'ABCD' }]);
+  });
+
+  test('sound, share and the two overlays', () => {
+    expect(run(initialApp, { type: 'sound/toggle' })).toEqual({
+      app: initialApp,
+      effects: [{ type: 'toggleSound' }],
+    });
+    expect(run(initialApp, { type: 'share/click' }).effects).toEqual([]);
+    expect(run({ ...initialApp, code: 'ABCD' }, { type: 'share/click' }).effects).toEqual([
+      { type: 'share', code: 'ABCD' },
+    ]);
+    const opened = run(initialApp, { type: 'rules/open' }, { type: 'history/open', who: 'game' });
+    expect(opened.app).toMatchObject({ rulesOpen: true, history: 'game' });
+    expect(opened.effects).toEqual([]);
+    const scorer = run(opened.app, { type: 'history/open', who: 'scorer' });
+    expect(scorer.app.history).toBe('scorer');
+    expect(run(opened.app, { type: 'rules/close' }, { type: 'history/close' }).app).toMatchObject({
+      rulesOpen: false,
+      history: null,
     });
   });
 });
@@ -995,6 +1075,10 @@ describe('runEffect', () => {
       },
       scrollTop: note('scrollTop'),
       scorer: { shown: note('scorer.shown'), resume: note('scorer.resume') },
+      timers: { start: note('timers.start'), cancel: note('timers.cancel') },
+      toggleSound: note('toggleSound'),
+      share: note('share'),
+      page: { fillName: note('page.fillName'), setCode: note('page.setCode') },
       dispatch: note('dispatch'),
     };
     return { deps, log, storage, answer };
@@ -1036,6 +1120,12 @@ describe('runEffect', () => {
       { type: 'scrollTop' },
       { type: 'scorer', call: 'shown' },
       { type: 'scorer', call: 'resume' },
+      { type: 'startTimer', id: 'longPress', ms: 450, then: { type: 'submenu/longPress' } },
+      { type: 'cancelTimer', id: 'longPress' },
+      { type: 'toggleSound' },
+      { type: 'share', code: 'ABCD' },
+      { type: 'fillName', name: 'Ann' },
+      { type: 'setCode', value: 'AB' },
       { type: 'initHome' },
     ];
     effects.forEach((e) => {
@@ -1055,6 +1145,12 @@ describe('runEffect', () => {
       ['scrollTop'],
       ['scorer.shown'],
       ['scorer.resume'],
+      ['timers.start', 'longPress', 450, { type: 'submenu/longPress' }],
+      ['timers.cancel', 'longPress'],
+      ['toggleSound'],
+      ['share', 'ABCD'],
+      ['page.fillName', 'Ann'],
+      ['page.setCode', 'AB'],
       ['dispatch', { type: 'home/init', home }],
     ]);
     answer.yes = false;

@@ -16,6 +16,7 @@ import {
   type NavigatorLike,
 } from '../../shared/edge/fx.ts';
 import { browserIceDeps, createIce } from '../../shared/edge/ice.ts';
+import { shareText } from '../../shared/edge/share.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
 import { realTransport } from '../../shared/edge/transport.ts';
 import type { Timer } from '../../shared/lib/clock.ts';
@@ -27,18 +28,23 @@ import { HostSession, type HostEvents } from './src/net/host.ts';
 import type { NetDeps } from './src/net/peerjs.ts';
 import { isGuestFrame } from './src/protocol.ts';
 import { soundEnabled } from './src/storage.ts';
+import { fillNameInputs, inviteText, setCodeInput } from './src/ui/home.ts';
 import { hideToast, paint, renderRules, showToast } from './src/ui/render.ts';
 import {
+  INVITE_COPIED_MSG,
+  SHARE_FALLBACK_MS,
   guestContextOf,
   hostContextOf,
   initialApp,
   readHome,
   reduce,
+  roomCodeMsg,
   runEffect,
   type App,
   type EffectDeps,
   type Intent,
   type ScreenId,
+  type TimerId,
 } from './src/ui/state.ts';
 
 /** The legacy `toast(msg, ms)` default. */
@@ -71,6 +77,13 @@ const boot = (): void => {
   let app: App = initialApp;
   let session: HostSession | GuestSession | null = null;
   let toastTimer: Timer | null = null;
+  /** The reducer's named timers (the Play tab's long press); arming one again restarts it. */
+  const timers = new Map<TimerId, Timer>();
+  const cancelTimer = (id: TimerId): void => {
+    const armed = timers.get(id);
+    if (armed !== undefined) realClock.clearTimeout(armed);
+    timers.delete(id);
+  };
 
   const toast = (message: string, ms: number | null): void => {
     showToast(document, message);
@@ -201,6 +214,40 @@ const boot = (): void => {
     scorer: {
       shown: () => page.__scorer?.onShown(),
       resume: () => page.__scorer?.resume(),
+    },
+    timers: {
+      start: (id, ms, then) => {
+        cancelTimer(id);
+        timers.set(
+          id,
+          realClock.setTimeout(() => {
+            timers.delete(id);
+            dispatch(then);
+          }, ms),
+        );
+      },
+      cancel: cancelTimer,
+    },
+    toggleSound: () => {
+      fx.toggle();
+    },
+    share: (code) => {
+      // The legacy handler: the share sheet, else the clipboard with a toast, else the code itself.
+      const pageUrl = location.href.split('?')[0] ?? location.href;
+      void shareText(navigator, { title: 'Gin Rummy', text: inviteText(code, pageUrl) }).then(
+        (outcome) => {
+          if (outcome === 'copied') toast(INVITE_COPIED_MSG, null);
+          else if (outcome === 'failed') toast(roomCodeMsg(code), SHARE_FALLBACK_MS);
+        },
+      );
+    },
+    page: {
+      fillName: (name) => {
+        fillNameInputs(document, name);
+      },
+      setCode: (value) => {
+        setCodeInput(document, value);
+      },
     },
     dispatch: (intent) => {
       dispatch(intent);

@@ -11,11 +11,16 @@
 // through storage.ts, producing the same `ginRummyMP_v1` bytes as the captured fixtures
 // (test/parity/gin.state.test.ts).
 //
+// Phase 2 adds what the legacy kept in the DOM or in handler closures for the paint and the
+// wiring: the rules and history overlays, the Play tab's long-press submenu (its timer is an
+// effect main.ts arms), the code input's last good value, and the two input writes `initHome`
+// and the code handler made (effects, so the paint never fights the player's typing).
+//
 // Two legacy traits kept on purpose: the reducer runs `render()`'s state effects wherever the
 // legacy called `render()` (the cue machine steps, the screen flips to the table, a selection no
 // longer in hand is dropped), and a leave closes the network before the state is reset, so the
 // session's own close still raises the "disconnected" toast the legacy raised.
-import { randomCode, validateCode } from '../../../../shared/lib/roomCode.ts';
+import { randomCode, sanitiseCode, validateCode } from '../../../../shared/lib/roomCode.ts';
 import type { Rng } from '../../../../shared/lib/rng.ts';
 import { applyAction, createGame, viewFor } from '../engine/index.ts';
 import type { Action, Now, Seat, State, View } from '../engine/types.ts';
@@ -128,6 +133,19 @@ export type App = Readonly<{
   /** `ginRummy_name`, as `initHome` put it in the inputs. */
   savedName: string | null;
   resume: Resume | null;
+  /** `#rulesOverlay` open. */
+  rulesOpen: boolean;
+  /**
+   * `#historyOverlay` open, and whose list it shows: the game's (painted from the view) or the
+   * Score Counter's (scorer/main.ts writes the list itself).
+   */
+  history: 'game' | 'scorer' | null;
+  /** `#playSubmenu` held open by a long press on the Play tab (`force-open`). */
+  submenuOpen: boolean;
+  /** A long press just opened the submenu, so the click that follows must not switch tabs. */
+  longPressed: boolean;
+  /** `#codeInput` as last sanitised (the legacy `lastGoodCode`). */
+  codeDraft: string;
 }>;
 
 export const DEFAULT_NAME = 'Ari';
@@ -159,7 +177,19 @@ export const initialApp: App = {
   cues: INITIAL_CUES,
   savedName: null,
   resume: null,
+  rulesOpen: false,
+  history: null,
+  submenuOpen: false,
+  longPressed: false,
+  codeDraft: '',
 };
+
+/** The Play tab opens its submenu after this long a press. */
+export const LONG_PRESS_MS = 450;
+export const INVITE_COPIED_MSG = 'Invite copied to clipboard';
+export const roomCodeMsg = (code: string): string => `Room code: ${code}`;
+/** `shareCodeBtn`'s fallback toast lasts this long. */
+export const SHARE_FALLBACK_MS = 4000;
 
 // ---- the strings the app (not the sessions) wrote --------------------------------------------
 
@@ -215,6 +245,28 @@ export type Intent =
   | Readonly<{ type: 'cancel/finish' }>
   /** The hook's `showScreen(id)` (the scorer screens use it). */
   | Readonly<{ type: 'screen/show'; screen: ScreenId }>
+  /** `#tabPlayBtn` pointerdown: the long-press timer starts. */
+  | Readonly<{ type: 'submenu/press' }>
+  /** `#tabPlayBtn` pointerup/leave/cancel: the timer is cancelled. */
+  | Readonly<{ type: 'submenu/release' }>
+  /** The long-press timer fired. */
+  | Readonly<{ type: 'submenu/longPress' }>
+  /** `#tabPlayBtn` click: the Play tab, unless a long press just opened the submenu. */
+  | Readonly<{ type: 'tab/playClick' }>
+  /** A `#playSubmenu` button. */
+  | Readonly<{ type: 'submenu/pick'; mode: string }>
+  /** A click outside `#tabPlayWrap`. */
+  | Readonly<{ type: 'submenu/dismiss' }>
+  /** `#codeInput` input: the raw value and the InputEvent's type. */
+  | Readonly<{ type: 'code/typed'; value: string; inputType: string }>
+  /** `#soundBtn`. */
+  | Readonly<{ type: 'sound/toggle' }>
+  /** `#shareCodeBtn`. */
+  | Readonly<{ type: 'share/click' }>
+  | Readonly<{ type: 'rules/open' }>
+  | Readonly<{ type: 'rules/close' }>
+  | Readonly<{ type: 'history/open'; who: 'game' | 'scorer' }>
+  | Readonly<{ type: 'history/close' }>
   // ---- net: host ----
   /** `startHost(resumeCode)`: null draws a fresh code. */
   | Readonly<{ type: 'host/start'; code: string | null }>
@@ -281,7 +333,20 @@ export type Effect =
   /** `showScreen`'s `window.scrollTo(0, 0)`. */
   | Readonly<{ type: 'scrollTop' }>
   /** `window.__scorer.onShown()` / `.resume()`. */
-  | Readonly<{ type: 'scorer'; call: 'shown' | 'resume' }>;
+  | Readonly<{ type: 'scorer'; call: 'shown' | 'resume' }>
+  /** Arm a named timer that dispatches `then` after `ms`; arming again restarts it. */
+  | Readonly<{ type: 'startTimer'; id: TimerId; ms: number; then: Intent }>
+  | Readonly<{ type: 'cancelTimer'; id: TimerId }>
+  /** `fx.toggle()`. */
+  | Readonly<{ type: 'toggleSound' }>
+  /** The invite for `code` through the share sheet or the clipboard. */
+  | Readonly<{ type: 'share'; code: string }>
+  /** `initHome`: the saved name into `#nameInput` and `#p1NameInput`. */
+  | Readonly<{ type: 'fillName'; name: string }>
+  /** `#codeInput`'s value after sanitising. */
+  | Readonly<{ type: 'setCode'; value: string }>;
+
+export type TimerId = 'longPress';
 
 export type Step = Readonly<{ app: App; effects: ReadonlyArray<Effect> }>;
 
@@ -584,20 +649,22 @@ const setHomeTab = (app: App, tab: string, persist: boolean): Step => {
   );
 };
 
-/** `initHome()` over a storage snapshot. */
+/** `initHome()` over a storage snapshot: the saved name goes into the two name inputs. */
 const initHome = (app: App, home: HomeSnapshot): Step =>
   then(showScreen(app, 'homeScreen'), (a) =>
     then(
-      setHomeTab(
-        {
-          ...a,
-          savedName: home.name,
-          nameTouched: home.name !== null ? true : a.nameTouched,
-          homeTab: home.homeTab,
-          playMode: home.playMode,
-        },
-        home.homeTab,
-        false,
+      then(
+        step(
+          {
+            ...a,
+            savedName: home.name,
+            nameTouched: home.name !== null ? true : a.nameTouched,
+            homeTab: home.homeTab,
+            playMode: home.playMode,
+          },
+          ...(home.name === null ? [] : [{ type: 'fillName', name: home.name } as const]),
+        ),
+        (b) => setHomeTab(b, home.homeTab, false),
       ),
       (b) => pure({ ...b, resume: resumeFor(home.save, home.scorer) }),
     ),
@@ -740,6 +807,51 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       return cancelFinish(app);
     case 'screen/show':
       return showScreen(app, intent.screen);
+    case 'submenu/press':
+      return step(
+        { ...app, longPressed: false },
+        {
+          type: 'startTimer',
+          id: 'longPress',
+          ms: LONG_PRESS_MS,
+          then: { type: 'submenu/longPress' },
+        },
+      );
+    case 'submenu/release':
+      return step(app, { type: 'cancelTimer', id: 'longPress' });
+    case 'submenu/longPress':
+      return step({ ...app, longPressed: true, submenuOpen: true }, { type: 'fx', cue: 'tap' });
+    case 'tab/playClick':
+      // The long press already opened the submenu; the click that follows must not switch tabs.
+      return app.longPressed
+        ? pure({ ...app, longPressed: false })
+        : setHomeTab({ ...app, submenuOpen: false }, 'play', true);
+    case 'submenu/pick':
+      return then(reduce(app, { type: 'mode/set', mode: intent.mode }, ctx), (a) =>
+        setHomeTab({ ...a, submenuOpen: false }, 'play', true),
+      );
+    case 'submenu/dismiss':
+      return pure({ ...app, submenuOpen: false });
+    case 'code/typed': {
+      // A keyboard suggestion that swapped earlier letters arrives as a replacement: keep the last good code.
+      const value =
+        intent.inputType === 'insertReplacementText'
+          ? app.codeDraft
+          : sanitiseCode('gin-rummy', intent.value);
+      return step({ ...app, codeDraft: value }, { type: 'setCode', value });
+    }
+    case 'sound/toggle':
+      return step(app, { type: 'toggleSound' });
+    case 'share/click':
+      return app.code === null ? pure(app) : step(app, { type: 'share', code: app.code });
+    case 'rules/open':
+      return pure({ ...app, rulesOpen: true });
+    case 'rules/close':
+      return pure({ ...app, rulesOpen: false });
+    case 'history/open':
+      return pure({ ...app, history: intent.who });
+    case 'history/close':
+      return pure({ ...app, history: null });
     // ---- net: host ----
     case 'host/start':
       return startHost(app, intent.code, ctx);
@@ -938,6 +1050,14 @@ export type EffectDeps = Readonly<{
   confirm: (message: string) => boolean;
   scrollTop: () => void;
   scorer: Readonly<{ shown: () => void; resume: () => void }>;
+  timers: Readonly<{
+    start: (id: TimerId, ms: number, then: Intent) => void;
+    cancel: (id: TimerId) => void;
+  }>;
+  toggleSound: () => void;
+  share: (code: string) => void;
+  /** The two input writes the paint does not own (they would fight the player's typing). */
+  page: Readonly<{ fillName: (name: string) => void; setCode: (value: string) => void }>;
   dispatch: (intent: Intent) => void;
 }>;
 
@@ -996,6 +1116,24 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'scorer':
       deps.scorer[effect.call]();
+      return;
+    case 'startTimer':
+      deps.timers.start(effect.id, effect.ms, effect.then);
+      return;
+    case 'cancelTimer':
+      deps.timers.cancel(effect.id);
+      return;
+    case 'toggleSound':
+      deps.toggleSound();
+      return;
+    case 'share':
+      deps.share(effect.code);
+      return;
+    case 'fillName':
+      deps.page.fillName(effect.name);
+      return;
+    case 'setCode':
+      deps.page.setCode(effect.value);
       return;
   }
 };

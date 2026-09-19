@@ -48,6 +48,10 @@ const depsOver = (store: EffectDeps['store'], dispatch: (i: Intent) => void): Ef
   confirm: () => true,
   scrollTop: quiet,
   scorer: { shown: quiet, resume: quiet },
+  timers: { start: quiet, cancel: quiet },
+  toggleSound: quiet,
+  share: quiet,
+  page: { fillName: quiet, setCode: quiet },
   dispatch,
 });
 

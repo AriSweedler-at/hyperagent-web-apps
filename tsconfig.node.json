@@ -55,6 +55,13 @@
     "web/shared/edge/fx.ts",
     "infra/games-proxy/worker.js"
   ],
-  // The gin paint (ui/render.ts, step 12) is written against the DOM edge and stays out with its test.
-  "exclude": ["test/fixtures/legacy/*.cjs", "web/games/gin-rummy/src/ui/render*.ts"]
+  // The gin paint and wiring (ui/{render,home,local}.ts and scorer/main.ts, step 12) are written
+  // against the DOM edge and stay out with their tests.
+  "exclude": [
+    "test/fixtures/legacy/*.cjs",
+    "web/games/gin-rummy/src/ui/render*.ts",
+    "web/games/gin-rummy/src/ui/home*.ts",
+    "web/games/gin-rummy/src/ui/local*.ts",
+    "web/games/gin-rummy/src/scorer/main*.ts"
+  ]
 }
