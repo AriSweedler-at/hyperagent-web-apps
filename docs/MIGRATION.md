@@ -457,3 +457,16 @@ parity and e2e gates.
   covers the memo eviction and the empty/limit edges. Coverage: `engine/**` at 90% lines, functions
   and statements (actual 99.7/99.3/98.1), `melds.algorithms.ts` at 100%. See ARCHITECTURE
   "Deviations".
+- Step 10 follow-up (review findings on the engine and its oracle): `setMelds` without a `melds`
+  key is refused as an unfit arrangement ("That meld arrangement doesn't fit your hand."); the
+  legacy read `action.melds || []` and treated it as an empty declaration (accepted when the hand
+  has no melds, else the deadwood refusal). The typed `Action` requires the key and the legacy UI
+  always sends it, so step 12's protocol decoder makes that call knowingly. `gin.policy.ts`
+  declares one of the view's optimal arrangements one time in ten when there is more than one, so
+  the seeded corpora (the 300 characterization games and the 1000-game replay) cover `meldPref`,
+  the knock with a declared arrangement, `activeMeldSig` and `me.melds` on both legs; the replay
+  is `gin.replay.ts` (the driver) plus four one-line shard files `gin.replay.{1..4}.test.ts` of 250
+  seeds each, asserting outcome coverage and the lastDrawn leak per shard, so vitest runs them on
+  four workers (~15 s wall instead of ~55 s). `engine/index.ts` no longer re-exports the memo
+  `altCache` (its test imports it from `melds.algorithms.ts`); the header names the four
+  non-legacy exports. See ARCHITECTURE "Deviations".

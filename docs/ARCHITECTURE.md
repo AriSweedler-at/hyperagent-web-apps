@@ -626,5 +626,7 @@ Step 10 (gin engine): `web/games/gin-rummy/src/engine/**`:
   (commented in place) so the 100% statement threshold holds.
 - `tsconfig.web.json` no longer excludes `engine/**`; `tsconfig.node.json` lists the gin engine for
   the parity suites. Coverage: `engine/**` at 90% lines, functions and statements,
-  `melds.algorithms.ts` at 100%. The 1000-game replay adds ~50 s to `npm test`;
+  `melds.algorithms.ts` at 100%. The 1000-game replay runs as four 250-game shards
+  (`test/parity/gin.replay.{1..4}.test.ts`, one line each over `gin.replay.ts`) so vitest spreads
+  it across workers: ~15 s wall on a 16-core laptop instead of ~55 s in one worker;
   `GIN_REPLAY_GAMES=<n>` shortens a local run.
