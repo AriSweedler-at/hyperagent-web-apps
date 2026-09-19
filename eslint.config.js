@@ -260,6 +260,18 @@ const zones = [
     message: 'ui/ and view/ render views; DOM access only through @shared/edge/dom.',
   },
   {
+    // The reducer is imported by main.ts, the tests and the three gin painters that paint the App
+    // and dispatch its Intents (render, home, local: types and the screen/tab lists only,
+    // docs/ARCHITECTURE.md step 12 deviations); every other ui/ or view/ module is refused.
+    target: [
+      `${GAME_SRC}/ui/!(state|render|home|local|*.test).ts`,
+      `${GAME_SRC}/ui/*/**`,
+      `${GAME_SRC}/view/**`,
+    ],
+    from: [`${GAME_SRC}/ui/state.ts`, `${GAME_SRC}/app/controller.ts`],
+    message: 'ui/state.ts is imported only by main.ts, tests and the painters render/home/local.',
+  },
+  {
     // Reducers over intents: "everything below" in the boundary table, so only the edges and
     // main.ts are off limits (main.ts constructs the adapters and injects them).
     target: [`${GAME_SRC}/ui/state.ts`, `${GAME_SRC}/app/controller.ts`],

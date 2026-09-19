@@ -694,3 +694,6 @@ Step 12, phase 2 (gin paint, wiring, scorer screen, oracle):
   every gin spec against dist-next/.
 - `RNG_ALLOWED` is `web/games/*/main.ts` (the page boots) plus `web/shared/edge/**`: gin's
   `scorer/main.ts` is an edge for `let`/`try` but keeps the `Math.random` ban (`ScorerDeps.rng`).
+- The `ui/state.ts` row reads "imported by `main.ts`, the `ui/` painters `render`, `home` and
+  `local` (the `App`/`Intent` types and the screen and tab lists only) and tests"; a zone refuses
+  every other `ui/`, `ui/*/` and `view/` importer of `ui/state.ts` / `app/controller.ts`.
