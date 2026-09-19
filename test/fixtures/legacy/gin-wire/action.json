@@ -41,7 +41,13 @@
     "t": "action",
     "action": {
       "type": "setMelds",
-      "melds": [["4S", "4H", "4D"]]
+      "melds": [
+        [
+          "4S",
+          "4H",
+          "4D"
+        ]
+      ]
     }
   },
   {

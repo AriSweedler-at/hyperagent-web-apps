@@ -252,7 +252,10 @@
         }
       ],
       "result": null,
-      "ready": [false, false],
+      "ready": [
+        false,
+        false
+      ],
       "winner": null,
       "startedAt": 1700000039000,
       "discardOptions": null,
@@ -600,7 +603,10 @@
         }
       ],
       "result": null,
-      "ready": [false, false],
+      "ready": [
+        false,
+        false
+      ],
       "winner": null,
       "startedAt": 1700000001000,
       "discardOptions": null,
@@ -901,7 +907,10 @@
         }
       ],
       "result": null,
-      "ready": [false, false],
+      "ready": [
+        false,
+        false
+      ],
       "winner": null,
       "startedAt": 1700000010000,
       "discardOptions": null,

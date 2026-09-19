@@ -7,6 +7,9 @@
 # Generated verbatim from the pages by tools/legacy/extract-*.ts; MANIFEST.json and the test beside
 # them are formatted.
 test/fixtures/legacy/*.cjs
+# Written by tools/legacy/record-gin-wire.ts as JSON.stringify(frames, null, 2); gin-wire.test.ts
+# pins values and key order, so the recorder's output is the committed bytes.
+test/fixtures/legacy/gin-wire/
 
 # Deployed by hand with wrangler and outside the migration ("unchanged" in docs/ARCHITECTURE.md).
 infra/turn-worker/

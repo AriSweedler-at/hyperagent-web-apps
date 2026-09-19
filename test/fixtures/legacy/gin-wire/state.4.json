@@ -444,13 +444,22 @@
             ]
           ]
         },
-        "scores": [26, 0],
+        "scores": [
+          26,
+          0
+        ],
         "scorerIdx": 0,
         "loserIdx": 1,
         "ts": 1700000102000,
-        "totals": [110, 89]
+        "totals": [
+          110,
+          89
+        ]
       },
-      "ready": [false, false],
+      "ready": [
+        false,
+        false
+      ],
       "winner": 0,
       "startedAt": 1700000092000,
       "discardOptions": null,
@@ -826,13 +835,22 @@
             ]
           ]
         },
-        "scores": [80, 0],
+        "scores": [
+          80,
+          0
+        ],
         "scorerIdx": 0,
         "loserIdx": 1,
         "ts": 1700000221000,
-        "totals": [106, 0]
+        "totals": [
+          106,
+          0
+        ]
       },
-      "ready": [false, false],
+      "ready": [
+        false,
+        false
+      ],
       "winner": 0,
       "startedAt": 1700000219000,
       "discardOptions": null,
@@ -1233,13 +1251,22 @@
             ]
           ]
         },
-        "scores": [24, 0],
+        "scores": [
+          24,
+          0
+        ],
         "scorerIdx": 0,
         "loserIdx": 1,
         "ts": 1700000016000,
-        "totals": [110, 27]
+        "totals": [
+          110,
+          27
+        ]
       },
-      "ready": [false, false],
+      "ready": [
+        false,
+        false
+      ],
       "winner": 0,
       "startedAt": 1700000010000,
       "discardOptions": null,
@@ -1667,13 +1694,22 @@
             ]
           ]
         },
-        "scores": [0, 56],
+        "scores": [
+          0,
+          56
+        ],
         "scorerIdx": 1,
         "loserIdx": 0,
         "ts": 1700000187000,
-        "totals": [0, 60]
+        "totals": [
+          0,
+          60
+        ]
       },
-      "ready": [true, true],
+      "ready": [
+        true,
+        true
+      ],
       "winner": null,
       "startedAt": 1700000184000,
       "discardOptions": null,
@@ -2108,13 +2144,22 @@
             ]
           ]
         },
-        "scores": [0, 28],
+        "scores": [
+          0,
+          28
+        ],
         "scorerIdx": 1,
         "loserIdx": 0,
         "ts": 1700000003000,
-        "totals": [27, 28]
+        "totals": [
+          27,
+          28
+        ]
       },
-      "ready": [true, true],
+      "ready": [
+        true,
+        true
+      ],
       "winner": null,
       "startedAt": 1700000001000,
       "discardOptions": null,
@@ -2571,13 +2616,22 @@
             ]
           ]
         },
-        "scores": [26, 0],
+        "scores": [
+          26,
+          0
+        ],
         "scorerIdx": 0,
         "loserIdx": 1,
         "ts": 1700000102000,
-        "totals": [110, 89]
+        "totals": [
+          110,
+          89
+        ]
       },
-      "ready": [true, true],
+      "ready": [
+        true,
+        true
+      ],
       "winner": null,
       "startedAt": 1700000092000,
       "discardOptions": null,

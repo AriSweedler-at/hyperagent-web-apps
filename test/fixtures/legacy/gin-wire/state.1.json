@@ -283,7 +283,10 @@
         }
       ],
       "result": null,
-      "ready": [false, false],
+      "ready": [
+        false,
+        false
+      ],
       "winner": null,
       "startedAt": 1700000001000,
       "discardOptions": {
@@ -701,7 +704,10 @@
         }
       ],
       "result": null,
-      "ready": [false, false],
+      "ready": [
+        false,
+        false
+      ],
       "winner": null,
       "startedAt": 1700000001000,
       "discardOptions": {
@@ -1072,7 +1078,10 @@
         }
       ],
       "result": null,
-      "ready": [false, false],
+      "ready": [
+        false,
+        false
+      ],
       "winner": null,
       "startedAt": 1700000010000,
       "discardOptions": {
@@ -1555,7 +1564,10 @@
         }
       ],
       "result": null,
-      "ready": [false, false],
+      "ready": [
+        false,
+        false
+      ],
       "winner": null,
       "startedAt": 1700000001000,
       "discardOptions": {
@@ -2032,7 +2044,10 @@
         }
       ],
       "result": null,
-      "ready": [false, false],
+      "ready": [
+        false,
+        false
+      ],
       "winner": null,
       "startedAt": 1700000001000,
       "discardOptions": null,
@@ -2382,7 +2397,10 @@
         }
       ],
       "result": null,
-      "ready": [false, false],
+      "ready": [
+        false,
+        false
+      ],
       "winner": null,
       "startedAt": 1700000001000,
       "discardOptions": null,
