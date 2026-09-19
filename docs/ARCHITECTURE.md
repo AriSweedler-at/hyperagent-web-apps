@@ -653,3 +653,47 @@ Step 11 (gin protocol, storage and pure UI/scorer helpers): `web/games/gin-rummy
 - Fixtures: `MANIFEST.json` entries may carry `ranges` (a fixture cut from several page ranges);
   `test/fixtures/legacy/{gin-wire,gin-storage}` hold the recorded wire corpus and the captured
   localStorage payloads (README there).
+
+Step 12, phase 1 (gin page, net, state, boot): `web/games/gin-rummy/`:
+
+- `net/peerjs.ts` joins `net/{host,guest}.ts` as the third gin net module (the edge glob already
+  named it): the peer plumbing both sessions share, over `@shared/edge/transport` and the Clock.
+- The sessions take `read()` (the app fields the legacy handlers read) and an events record (status,
+  toast, wake lock, persist, decoded frames, gone/lost) instead of touching the page; `ui/state.ts`
+  turns the events into intents through main.ts's wiring.
+- `ui/state.ts` returns `Effect`s as data and exports `runEffect(app, effect, deps)`; the mutable
+  `app` and session cells live in `main.ts` (the edge), which paints after every intent.
+- `ui/render.ts` is where the gin DOM writes live; it is excluded from `tsconfig.node.json` (DOM).
+  `ui/sound.ts` holds the cue tables; `src/fx.ts` (audio, vibration, the `ginRummy_sound` key) is
+  the legacy `fx` object over `@shared/edge/fx`, whose `AudioCues` gained `warm()`.
+- Import zones: net/ may import `clock.fake.ts` (tests beside the sessions); the ui/ zone's target
+  leaves `*.test.ts` out. Coverage: gin `net/**` and `fx.ts` at 90% lines, functions and statements.
+- `index.html` adds `id="rulesList"` / `id="rulesOverlayList"` to the two rules slots; every other
+  id and class is the legacy's. dist/ carries the unreferenced gin bundle beside the legacy page.
+- Two module pages: the modules both import are one `shared/assets/[name]-[hash].js` chunk,
+  preloaded by both pages (`<link rel="modulepreload">`), the layout `chunkFileNames` reserved.
+
+Step 12, phase 2 (gin paint, wiring, scorer screen, oracle):
+
+- `ui/render.ts` composes the whole paint (`paint(doc, app, handView)`): screens, statuses, the
+  home screen (`ui/home.ts`), the curtain (`ui/local.ts`), the table, the sheets, the endgame and
+  the overlays, each from the App alone; the HandView is main.ts's choice and `fitTable` measures
+  while `ui/fit.ts` decides. Each module also binds its controls to intents (`bindAll`).
+- The App gained what the legacy kept in the DOM or in closures (rules/history overlays, the
+  long-press submenu, the code draft); named timers, the sound toggle, the share and the two input
+  writes are effects. `scorer/main.ts` (an edge) holds the Score Counter's state in a closure over
+  the pure scorer modules, with the dialogs, screens, download and SpeechRecognition injected.
+- `@shared/edge/dom` grew listeners, values, styles, queries, the `e.target` casts and
+  `PageLike`; `@shared/edge/page.fake` is a string-backed static-page fake (the ui zone may import
+  it); `@shared/edge/share` the Web Share / clipboard chain. `web/raw-imports.d.ts` declares Vite's
+  `?raw` import for the tests that build the fake from `index.html`; ambient `.d.ts` files are
+  exempt from the erasable-syntax ban.
+- The DOM-snapshot oracle is `tools/parity/gin-dom-parity.ts`, run locally by hand and in CI as
+  `e2e/gin-dom-parity.spec.ts` on the `next` project; `e2e/gin-resume.spec.ts` covers host resume
+  and guest rejoin on every project; `PORTED_PAGES` lists gin-rummy, so the `next` project runs
+  every gin spec against dist-next/.
+- `RNG_ALLOWED` is `web/games/*/main.ts` (the page boots) plus `web/shared/edge/**`: gin's
+  `scorer/main.ts` is an edge for `let`/`try` but keeps the `Math.random` ban (`ScorerDeps.rng`).
+- The `ui/state.ts` row reads "imported by `main.ts`, the `ui/` painters `render`, `home` and
+  `local` (the `App`/`Intent` types and the screen and tab lists only) and tests"; a zone refuses
+  every other `ui/`, `ui/*/` and `view/` importer of `ui/state.ts` / `app/controller.ts`.

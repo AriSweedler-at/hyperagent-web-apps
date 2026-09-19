@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta property="og:title" content="Gin Rummy">
+    <meta property="og:type" content="website">
+    <meta property="og:image:width" content="1024">
+    <meta property="og:image:height" content="1024">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Gin Rummy">
+    <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Gin Rummy</title>
+<link rel="stylesheet" href="./theme.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME / LOBBY -->
+  <div id="homeScreen">
+    <div class="row" style="justify-content:center;">
+      <h1>♠ Gin Rummy</h1>
+    </div>
+
+    <div id="resumeBox" class="card-box hidden" style="border-color: rgba(251,191,36,0.4);">
+      <label>Game in progress</label>
+      <button class="btn btn-gold btn-block" id="resumeBtn" style="margin-top:8px;">Resume</button>
+    </div>
+
+    <div class="tabbar" id="topTabbar">
+      <div class="tab-wrap" id="tabPlayWrap">
+        <button type="button" class="tab-btn" id="tabPlayBtn" data-tab="play">Play</button>
+        <div class="tab-submenu" id="playSubmenu">
+          <button type="button" data-mode="online">🌐 Online</button>
+          <button type="button" data-mode="local">📱 Pass &amp; Play</button>
+        </div>
+      </div>
+      <button type="button" class="tab-btn" id="tabRulesBtn" data-tab="rules">Rules</button>
+      <button type="button" class="tab-btn" id="tabScoreBtn" data-tab="score">Score Counter</button>
+    </div>
+
+    <!-- PLAY TAB -->
+    <div id="playPanel" class="tab-panel">
+      <div class="mode-switch" id="playModeSwitch">
+        <button type="button" class="mode-btn" data-mode="online">🌐 Online</button>
+        <button type="button" class="mode-btn" data-mode="local">📱 Pass &amp; Play</button>
+      </div>
+
+      <div id="onlineModeContent">
+        <div class="card-box">
+          <label>Your name</label>
+          <input type="text" id="nameInput" value="Ari" maxlength="20" autocomplete="off" style="margin-top:8px;">
+        </div>
+        <div class="card-box">
+          <label>Host a game</label>
+          <div class="row" style="margin-top:8px;">
+            <div class="grow"><input type="number" id="targetInput" value="100" inputmode="numeric" placeholder="Play to…"></div>
+            <button class="btn btn-primary grow" id="hostBtn" style="width:auto;">Host</button>
+          </div>
+          <div class="empty-note" style="text-align:left; padding:8px 2px 0;">You'll get a 4-letter room code to share.</div>
+        </div>
+        <div class="card-box">
+          <label>Join a game</label>
+          <div class="row" style="margin-top:8px;">
+            <input type="text" id="codeInput" class="code-input grow" placeholder="CODE" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="go" data-lpignore="true" name="room-code-no-ac">
+            <button class="btn btn-secondary" id="joinBtn" style="min-width:96px;">Join</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="localModeContent" class="hidden">
+        <div class="card-box">
+          <label>Player 1 name</label>
+          <input type="text" id="p1NameInput" placeholder="Player 1 name" maxlength="20" autocomplete="off" style="margin-top:8px;">
+        </div>
+        <div class="card-box">
+          <label>Player 2 name</label>
+          <input type="text" id="p2NameInput" placeholder="Player 2 name" maxlength="20" autocomplete="off" style="margin-top:8px;">
+        </div>
+        <div class="card-box">
+          <label>Play to</label>
+          <input type="number" id="localTargetInput" value="100" inputmode="numeric" style="margin-top:8px;">
+        </div>
+        <button class="btn btn-primary" id="localBtn">Start pass &amp; play</button>
+        <div class="empty-note" style="text-align:left; padding:8px 2px 0;">One phone, no internet needed — it hides each player's cards until they tap "Show my cards" on their turn.</div>
+      </div>
+    </div>
+
+    <!-- RULES TAB -->
+    <div id="rulesPanel" class="tab-panel hidden">
+      <ul class="rules-list" id="rulesList"></ul>
+    </div>
+
+    <!-- SCORE COUNTER TAB -->
+    <div id="scorePanel" class="tab-panel hidden">
+      <div class="card-box">
+        <label>Play to</label>
+        <input type="number" id="scTargetInput" value="100" inputmode="numeric" style="margin-top:8px;">
+      </div>
+      <div class="card-box">
+        <label>Players</label>
+        <div class="setup-players" id="scPlayers"></div>
+        <button class="btn btn-secondary btn-block" id="scAddPlayerBtn" style="margin-top:4px;">+ Add player</button>
+      </div>
+      <button class="btn btn-primary" id="scStartBtn">Start scoring</button>
+    </div>
+  </div>
+
+  <!-- SCORER: GAME -->
+  <div id="scGameScreen" class="hidden">
+    <div class="topbar">
+      <button class="icon-btn" id="scLeaveBtn" title="End session">↺</button>
+      <div class="row" style="gap:6px;"><div class="badge" id="scRoundBadge">Hand 1</div><div class="badge dim" id="scTargetBadge">to 100</div></div>
+      <div class="row" style="gap:6px;">
+        <button class="icon-btn" id="scExportBtn" title="Export game as CSV">📤</button>
+        <button class="icon-btn" id="scRulesBtn2" title="Rules">📖</button>
+        <button class="icon-btn" id="scHistoryBtn" title="History">📜</button>
+      </div>
+    </div>
+    <div id="scBoard" style="display:flex; flex-direction:column; gap:10px; margin-top:6px;"></div>
+    <button type="button" id="scVoiceBtn" class="voice-fab" title="Speak the scores instead of typing">🎤</button>
+    <div id="submitRoundBar"><button class="btn btn-primary" id="scSubmitBtn">✓ Score this hand</button></div>
+  </div>
+
+  <!-- SCORER: END -->
+  <div id="scEndScreen" class="hidden">
+    <div class="row" style="justify-content:center;"><h1>🏆 Game Over</h1></div>
+    <div class="card-box" style="text-align:center;">
+      <div style="font-size:2.4rem;">🎉</div>
+      <div class="sheet-title" id="scEndTitle">Player wins!</div>
+      <div class="sheet-sub" id="scEndSub" style="margin-bottom:0;"></div>
+    </div>
+    <div class="card-box"><label>Final standings</label><div id="scStandings" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div></div>
+    <div class="card-box" style="text-align:center;"><label>Game duration</label><div id="scDuration" style="font-size:1.3rem; font-weight:800; color:var(--accent); margin-top:6px;"></div></div>
+    <div class="row">
+      <button class="btn btn-secondary" id="scEndHistoryBtn" style="min-width:52px;">📜</button>
+      <button class="btn btn-secondary" id="scEndExportBtn" style="min-width:52px;">📤</button>
+      <button class="btn btn-secondary grow" id="scEndKeepBtn">Keep playing</button>
+      <button class="btn btn-primary grow" id="scEndNewBtn">New game</button>
+    </div>
+  </div>
+
+  <!-- HOST WAITING -->
+  <div id="hostWaitScreen" class="hidden">
+    <h1>Your room</h1>
+    <div class="subtitle">Have your opponent open this same page and enter the code</div>
+    <div class="card-box" style="text-align:center;">
+      <label>Room code</label>
+      <div class="room-code" id="roomCode">----</div>
+      <button class="btn btn-secondary btn-sm" id="shareCodeBtn" style="margin-top:10px;">Share invite</button>
+    </div>
+    <div class="card-box" style="text-align:center;">
+      <div id="hostWaitStatus" class="pulse" style="color:var(--muted);">Opening room…</div>
+      <div class="empty-note" style="padding-top:10px;">Keep this screen open while your opponent joins — if you switch apps, come straight back and the room reconnects on its own.</div>
+    </div>
+    <button class="btn btn-primary hidden" id="startGameBtn">Deal the first hand</button>
+    <button class="btn btn-ghost btn-block" id="cancelHostBtn" style="margin-top:10px;">Cancel</button>
+  </div>
+
+  <!-- GUEST WAITING -->
+  <div id="guestWaitScreen" class="hidden">
+    <h1>Joining…</h1>
+    <div class="card-box" style="text-align:center;">
+      <div id="guestWaitStatus" class="pulse" style="color:var(--muted);">Connecting…</div>
+    </div>
+    <button class="btn btn-ghost btn-block" id="cancelGuestBtn">Back</button>
+  </div>
+
+  <!-- TABLE -->
+  <div id="tableScreen" class="hidden">
+    <div class="topbar">
+      <button class="icon-btn" id="leaveBtn" title="Leave game">↺</button>
+      <div class="row" style="gap:6px;"><div class="badge" id="roundBadge">Hand 1</div><div class="badge dim" id="targetBadge">to 100</div></div>
+      <div class="row" style="gap:6px;">
+        <button class="icon-btn" id="soundBtn" title="Sound & vibration">🔊</button>
+        <button class="icon-btn" id="rulesBtnGame" title="Rules">📖</button>
+        <button class="icon-btn" id="historyBtn" title="History">📜</button>
+      </div>
+    </div>
+
+    <div class="opp-strip">
+      <div class="opp-info"><div class="opp-name" id="oppName">Opponent</div><div class="opp-score" id="oppScore">0 pts</div></div>
+      <div class="opp-cards" id="oppCards"></div>
+      <div class="conn-dot" id="connDot"></div>
+    </div>
+
+    <div class="table-center">
+      <div class="pile stock" id="stockPile"></div>
+      <div class="pile discard" id="discardPile"></div>
+    </div>
+
+    <div class="status-banner" id="statusBanner">
+      <div class="status-main" id="statusMain">—</div>
+      <div class="status-sub" id="statusSub"></div>
+    </div>
+    <div class="last-action" id="lastAction"></div>
+
+    <div class="hand-area">
+      <div class="hand-header"><span id="myName">You</span><span class="dw" id="deadwoodInfo">Deadwood: —</span></div>
+      <div class="hand" id="hand"></div>
+      <div id="undoBar" class="hidden" style="margin-top:8px;"><button class="btn btn-ghost btn-sm" id="undoDrawBtn" style="width:100%;">↩ Undo draw</button></div>
+      <div class="actions" id="actions"></div>
+    </div>
+  </div>
+
+  <!-- ENDGAME -->
+  <div id="endgameScreen" class="hidden">
+    <div class="row" style="justify-content:center;"><h1>🏆 Game Over</h1></div>
+    <div class="card-box" style="text-align:center;">
+      <div style="font-size:2.4rem;">🎉</div>
+      <div class="sheet-title" id="endgameTitle">Player wins!</div>
+      <div class="sheet-sub" id="endgameSub" style="margin-bottom:0;">Reached the target score</div>
+    </div>
+    <div class="card-box">
+      <label>Final standings</label>
+      <div id="finalStandings" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+    <div class="card-box" style="text-align:center;">
+      <label>Game duration</label>
+      <div id="gameDuration" style="font-size:1.3rem; font-weight:800; color:var(--accent); margin-top:6px;"></div>
+    </div>
+    <div class="row">
+      <button class="btn btn-secondary" id="historyBtnEnd" style="min-width:60px;">📜</button>
+      <button class="btn btn-secondary grow" id="leaveBtnEnd">Leave</button>
+      <button class="btn btn-primary grow" id="rematchBtn">Rematch</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- PASS-AND-PLAY CURTAIN -->
+<div id="curtainOverlay" class="overlay hidden" style="background:#0b2418;">
+  <div class="sheet" style="text-align:center; border-color: var(--accent);">
+    <div style="font-size:3rem;">📱</div>
+    <div class="sheet-title" id="curtainTitle">Pass the phone</div>
+    <div class="sheet-sub" id="curtainSub"></div>
+    <div id="curtainLast" class="empty-note" style="margin-bottom:8px;"></div>
+    <button class="btn btn-primary btn-block" id="curtainBtn">Show my cards</button>
+  </div>
+</div>
+
+<!-- SCORER RESULT -->
+<div id="scResOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div style="text-align:center; font-size:2rem;">🀄</div>
+    <div class="sheet-title" id="scResTitle">Hand results</div>
+    <div class="sheet-sub" id="scResSub"></div>
+    <div id="scResList" style="display:flex; flex-direction:column; gap:8px;"></div>
+    <button class="btn btn-primary btn-block" id="scResContinue" style="margin-top:14px;">Continue</button>
+  </div>
+</div>
+
+<!-- MELD ARRANGEMENT CHOOSER -->
+<div id="meldOverlay" class="overlay hidden">
+  <div class="sheet" style="display:flex; flex-direction:column; overflow:hidden;">
+    <div style="text-align:center; font-size:2rem;">⇄</div>
+    <div class="sheet-title">Arrange your melds</div>
+    <div class="sheet-sub" id="meldSub"></div>
+    <div id="meldOptionList" style="display:flex; flex-direction:column; gap:10px; overflow-y:auto; min-height:0; flex:1;"></div>
+    <button class="btn btn-ghost btn-block btn-sm" id="closeMeldBtn" style="margin-top:14px;">Close</button>
+  </div>
+</div>
+
+<!-- ROUND RESULT -->
+<div id="roundResultOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div style="text-align:center; font-size:2rem;">🀄</div>
+    <div class="sheet-title" id="rrTitle">Hand over</div>
+    <div class="sheet-sub" id="rrSub"></div>
+    <div id="rrBody"></div>
+    <button class="btn btn-primary btn-block" id="rrContinueBtn" style="margin-top:10px;">Next hand</button>
+    <button class="btn btn-ghost btn-block btn-sm" id="rrHideBtn" style="margin-top:8px;">Look at the table</button>
+  </div>
+</div>
+
+<!-- RULES -->
+<div id="rulesOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div style="text-align:center; font-size:2rem;">📖</div>
+    <div class="sheet-title">Gin Rummy — Quick Rules</div>
+    <ul class="rules-list" id="rulesOverlayList"></ul>
+    <button class="btn btn-primary btn-block" id="closeRulesBtn" style="margin-top:14px;">Got it</button>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div id="historyOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div class="row" style="justify-content:space-between;">
+      <div class="sheet-title" style="margin:0;">Hand history</div>
+      <button class="btn btn-ghost btn-sm" id="closeHistoryBtn">Close</button>
+    </div>
+    <div id="historyList" style="margin-top:10px;"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script type="module" src="./main.ts"></script>
+</body>
+</html>

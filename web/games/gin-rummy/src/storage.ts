@@ -9,6 +9,10 @@
 // (`ginRummy_name`, `ginRummy_homeTab`, `ginRummy_playMode`, `ginRummy_sound`), as the legacy
 // `safeSet` wrote them.
 import type { Store, StorageError } from '../../../shared/edge/storage.ts';
+
+// ui/state.ts names the Store through this module (docs/MIGRATION.md step 12): the reducer may
+// import everything below it but never an edge (docs/ARCHITECTURE.md "Module boundaries").
+export type { Store, StorageError };
 import {
   arrayOf,
   formatError,

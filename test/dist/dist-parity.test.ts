@@ -72,8 +72,43 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     const bundles = files.filter((file) => /^games\/fidice\/app-[\w-]+\.js$/.test(file));
     expect(bundles).toHaveLength(1);
     expect(files).toContain(`${bundles[0] ?? ''}.map`);
-    expect(files.filter((file) => /^shared\/assets\/[\w-]+\.css$/.test(file))).toHaveLength(1);
+    expect(files.filter((file) => /^shared\/assets\/fidice-[\w-]+\.css$/.test(file))).toHaveLength(
+      1,
+    );
     expect(files.filter((file) => file.startsWith('games/fidice/'))).toHaveLength(3);
+  });
+
+  test('the gin bundle is emitted in both trees; only dist-next/ serves its page (step 12, dark)', () => {
+    const files = distFiles(root);
+    const bundles = files.filter((file) => /^games\/gin-rummy\/app-[\w-]+\.js$/.test(file));
+    expect(bundles).toHaveLength(1);
+    expect(files).toContain(`${bundles[0] ?? ''}.map`);
+    expect(
+      files.filter((file) => /^shared\/assets\/gin-rummy-[\w-]+\.css$/.test(file)),
+    ).toHaveLength(1);
+    const html = readDist(root, 'games/gin-rummy/index.html');
+    if (root.legacyPages.includes('gin-rummy')) {
+      // The passthrough overwrote Vite's page with the legacy one; the unreferenced bundle stays beside it.
+      expect(html).toContain('peerjs.min.js');
+      expect(html).toContain('../../shared/ice.js');
+      return;
+    }
+    expect(html).toMatch(/<script type="module" crossorigin src="\.\/app-[\w-]+\.js"><\/script>/);
+    expect(html).toMatch(
+      /<link rel="stylesheet" crossorigin href="\.\.\/\.\.\/shared\/assets\/gin-rummy-[\w-]+\.css">/,
+    );
+    expect(html).not.toContain('peerjs.min.js');
+    expect(html).not.toContain('shared/ice.js');
+    // The legacy markup, ids intact, with the two rules slots empty (filled from ui/rules.ts at boot).
+    ['id="app"', 'id="homeScreen"', 'id="tableScreen"', 'id="scResOverlay"', 'id="toast"'].forEach(
+      (id) => {
+        expect(html).toContain(id);
+      },
+    );
+    expect(html).toContain('<ul class="rules-list" id="rulesList"></ul>');
+    expect(html).toContain('<ul class="rules-list" id="rulesOverlayList"></ul>');
+    expect(html).not.toContain('<strong>Goal:</strong>');
+    expect(html).toContain('<title>Gin Rummy</title>');
   });
 
   test('the fidice page is the built module page, not the legacy bundle (step 7)', () => {
@@ -95,20 +130,40 @@ describeDist('dist parity with legacy/ and web/', (root) => {
   });
 
   test('every relative asset the fidice page references is a file in the tree', () => {
+    // Its bundle, the shared chunk(s) it preloads (what both module pages import: PeerJS and the
+    // shared edges, split out since the gin page joined the build in docs/MIGRATION.md step 12),
+    // and its CSS, in that order.
     const page = 'games/fidice/index.html';
     const relative = referencesIn(page, readDist(root, page))
       .map(({ value }) => value)
       .filter((value) => !value.startsWith('https://'));
-    expect(relative).toEqual([
-      expect.stringMatching(/^\.\/app-[\w-]+\.js$/) as string,
-      expect.stringMatching(/^\.\.\/\.\.\/shared\/assets\/fidice-[\w-]+\.css$/) as string,
-    ]);
+    expect(relative[0]).toMatch(/^\.\/app-[\w-]+\.js$/);
+    expect(relative.at(-1)).toMatch(/^\.\.\/\.\.\/shared\/assets\/fidice-[\w-]+\.css$/);
+    const chunks = relative.slice(1, -1);
+    expect(chunks.length).toBeGreaterThanOrEqual(1);
+    chunks.forEach((value) => {
+      expect(value).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.js$/);
+    });
     relative.forEach((value) => {
       const target = value.startsWith('./')
         ? `games/fidice/${value.slice(2)}`
         : value.replace('../../', '');
       expect(distHasFile(root, target), `${value} -> ${target}`).toBe(true);
     });
+  });
+
+  test('both module pages preload the same shared chunk(s) under shared/assets/', () => {
+    const preloads = (page: string): ReadonlyArray<string> =>
+      referencesIn(page, readDist(root, page))
+        .map(({ value }) => value)
+        .filter((value) => /^\.\.\/\.\.\/shared\/assets\/[\w-]+\.js$/.test(value));
+    const fidice = preloads('games/fidice/index.html');
+    expect(fidice.length).toBeGreaterThanOrEqual(1);
+    if (!root.legacyPages.includes('gin-rummy'))
+      expect(preloads('games/gin-rummy/index.html')).toEqual(fidice);
+    expect(readDist(root, 'games/fidice/index.html')).toContain(
+      '<link rel="modulepreload" crossorigin href="../../shared/assets/',
+    );
   });
 
   test('legacy/fidice/index.html is retained as the frozen oracle source (deleted in step 13)', () => {
@@ -149,9 +204,13 @@ test('dist/ and dist-next/ carry byte-identical fidice output', (context) => {
     context.skip('both dist/ and dist-next/ are needed: run `npm run build && npm run build:next`');
     return;
   }
+  // The shared chunk(s) both pages preload are the same sources in both trees too.
   const fidiceFiles = (root: DistRoot): ReadonlyArray<string> =>
     distFiles(root).filter(
-      (file) => file.startsWith('games/fidice/') || file.startsWith('shared/assets/fidice-'),
+      (file) =>
+        file.startsWith('games/fidice/') ||
+        file.startsWith('shared/assets/fidice-') ||
+        (file.startsWith('shared/assets/') && /\.js(\.map)?$/.test(file)),
     );
   expect(fidiceFiles(dist)).toEqual(fidiceFiles(next));
   expect(fidiceFiles(dist).length).toBeGreaterThanOrEqual(4);

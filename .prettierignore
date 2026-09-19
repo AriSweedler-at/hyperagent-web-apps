@@ -20,3 +20,7 @@ docs/
 # step 6): the page's markup and CSS verbatim. MANIFEST.json beside them is formatted.
 /web/games/fidice/index.html
 /web/games/fidice/theme.css
+# Cut from legacy/gin-rummy/index.html (docs/MIGRATION.md step 12): the page's markup with the two
+# rules slots emptied, and its <style> block verbatim.
+/web/games/gin-rummy/index.html
+/web/games/gin-rummy/theme.css

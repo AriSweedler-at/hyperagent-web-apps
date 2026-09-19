@@ -51,10 +51,16 @@ describeDist('dist asset URLs', (root) => {
   test('the fidice page loads its bundle beside itself and its CSS under ../../shared/assets/', () => {
     const page = 'games/fidice/index.html';
     const references = referencesIn(page, readDist(root, page));
-    // Its only script is the bundle: PeerJS and the ICE loader come inside it (step 9).
+    // Its only script is the bundle: PeerJS and the ICE loader come with the module graph (step 9),
+    // since step 12 through a preloaded shared chunk under ../../shared/assets/ (no classic script).
     expect(references.filter(({ kind }) => kind === 'src').map(({ value }) => value)).toEqual([
       expect.stringMatching(/^\.\/app-[\w-]+\.js$/) as string,
     ]);
+    references
+      .filter(({ kind, value }) => kind === 'href' && value.endsWith('.js'))
+      .forEach(({ value }) => {
+        expect(value).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.js$/);
+      });
     expect(
       references.filter(({ value }) => value.endsWith('.css')).map(({ value }) => value),
     ).toEqual([expect.stringMatching(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.css$/) as string]);

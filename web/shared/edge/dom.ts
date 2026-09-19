@@ -91,6 +91,19 @@ export const clear = (el: Element): void => {
   el.replaceChildren();
 };
 
+/** Append parsed markup after the element's last child (`insertAdjacentHTML('beforeend')`). */
+export const appendHtml = (el: Element, markup: SafeHtml): void => {
+  el.insertAdjacentHTML('beforeend', markup.markup);
+};
+
+/** `el.remove()`. */
+export const removeElement = (el: Element): void => {
+  el.remove();
+};
+
+/** `el.children.length`. */
+export const childCount = (el: Element): number => el.children.length;
+
 /** Add or remove `className` according to `on` (the third argument of classList.toggle). */
 export const toggleClass = (el: Element, className: string, on: boolean): void => {
   el.classList.toggle(className, on);
@@ -119,4 +132,114 @@ export const setDisabled = (el: Element, disabled: boolean): void => {
 export const setAttr = (el: Element, name: string, value: string | null): void => {
   if (value === null) el.removeAttribute(name);
   else el.setAttribute(name, value);
+};
+
+// ---- values, styles and queries (docs/MIGRATION.md step 12: the gin paint and its wiring) ----
+
+/** The `value` of an input (the legacy `el.value`). */
+export const readValue = (el: Element): string => (el as HTMLInputElement).value;
+
+/** `el.value = value`, written only when it differs so the caret is left alone. */
+export const setValue = (el: Element, value: string): void => {
+  const input = el as HTMLInputElement;
+  if (input.value !== value) input.value = value;
+};
+
+/** `input.select()` where the element has it (the legacy `input.select && input.select()`). */
+export const selectText = (el: Element): void => {
+  const input = el as Partial<HTMLInputElement>;
+  input.select?.call(el);
+};
+
+/** `el.style.setProperty(name, value)`: the table's `--tscale`. */
+export const setStyleProperty = (el: Element, name: string, value: string): void => {
+  el.style.setProperty(name, value);
+};
+
+/** `el.dataset.<name>` read as the attribute it is (`dataOf(el, 'meld-opt')` for `data-meld-opt`). */
+export const dataOf = (el: Element, name: string): string | null => el.getAttribute(`data-${name}`);
+
+export const isDisabled = (el: Element): boolean => el.hasAttribute('disabled');
+
+/** `el.querySelector(selector)` inside `el`. */
+export const queryIn = (el: Element, selector: string): Element | null =>
+  el.querySelector<HTMLElement>(selector);
+
+/** `el.querySelectorAll(selector)` inside `el`, as an array. */
+export const queryAllIn = (el: Element, selector: string): ReadonlyArray<Element> =>
+  Array.from(el.querySelectorAll<HTMLElement>(selector));
+
+// ---- events -------------------------------------------------------------------------------------
+
+/** Anything with `addEventListener`: an element, the document or the window. */
+export type Listenable = Readonly<{
+  addEventListener: (
+    type: string,
+    listener: (e: Readonly<Event>) => void,
+    options?: boolean | Readonly<AddEventListenerOptions>,
+  ) => void;
+}>;
+
+/** The document as the paint and the wiring see it: lookup by id, the body, and listeners. */
+export type PageLike = DocumentLike & Listenable & Readonly<{ body: Element }>;
+
+export type Handler = (e: Readonly<Event>) => void;
+
+/** `target.addEventListener(type, handler, options)`. */
+export const listen = (
+  target: Listenable,
+  type: string,
+  handler: Handler,
+  options?: boolean | Readonly<AddEventListenerOptions>,
+): void => {
+  target.addEventListener(type, handler, options);
+};
+
+/** `listen` on the element with `id`, which the page must hold. */
+export const listenId = (doc: DocumentLike, id: string, type: string, handler: Handler): void => {
+  listen(requireId(doc, id), type, handler);
+};
+
+// The casts the handlers need on `e.target` live here, as fidice's view/vdom.ts keeps its
+// `target*` helpers, so the ui/ modules are written against a `Readonly<Event>`.
+type TargetLike = Partial<
+  Readonly<{
+    id: string;
+    value: string;
+    closest: (selector: string) => HTMLElement | null;
+  }>
+>;
+const targetOf = (e: Readonly<Event>): TargetLike | null => e.target as TargetLike | null;
+
+/** `e.target.closest(selector)`, or null when the target is not an element or nothing matches. */
+export const closestFrom = (e: Readonly<Event>, selector: string): Element | null =>
+  targetOf(e)?.closest?.(selector) ?? null;
+
+/** `e.target.id` (the overlays close when their backdrop, not their sheet, is tapped). */
+export const targetIdOf = (e: Readonly<Event>): string => targetOf(e)?.id ?? '';
+
+/** `e.target.value` of the input the event fired on. */
+export const targetValueOf = (e: Readonly<Event>): string => targetOf(e)?.value ?? '';
+
+/** `container.contains(e.target)`. */
+export const isWithin = (container: Element, e: Readonly<Event>): boolean =>
+  container.contains(e.target as Node | null);
+
+/** `InputEvent.inputType`, '' for other events. */
+export const inputTypeOf = (e: Readonly<Event>): string =>
+  (e as Partial<InputEvent>).inputType ?? '';
+
+/** `InputEvent.data`, null when absent. */
+export const inputDataOf = (e: Readonly<Event>): string | null =>
+  (e as Partial<InputEvent>).data ?? null;
+
+/** `KeyboardEvent.key`, '' for other events. */
+export const keyOf = (e: Readonly<Event>): string => (e as Partial<KeyboardEvent>).key ?? '';
+
+export const preventDefault = (e: Readonly<Event>): void => {
+  e.preventDefault();
+};
+
+export const stopPropagation = (e: Readonly<Event>): void => {
+  e.stopPropagation();
 };

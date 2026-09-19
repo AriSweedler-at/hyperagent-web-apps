@@ -1,0 +1,602 @@
+// Where the gin page's DOM writes for the game screens live (docs/ARCHITECTURE.md "Module
+// boundaries": ui/ reaches the document only through @shared/edge/dom; `HandView.render` is the
+// only way a hand is drawn; ui/fit.ts decides the table scale). `paint(doc, app, handView)` is
+// idempotent and runs after every intent: it composes the screen switch and the waiting statuses
+// (phase 1), the home screen (ui/home.ts), the curtain (ui/local.ts), the table, the endgame and
+// the overlays, each written from the App (ui/state.ts) alone, so the same App always paints the
+// same DOM. Every id, class, text and tooltip is the legacy `render()`'s
+// (legacy/gin-rummy/index.html), and the DOM-snapshot oracle (tools/parity/gin-dom-parity.ts) plays
+// both pages through the same sequence and compares them.
+//
+// Where the legacy wrote a region only on some path, this paints it only under the same condition,
+// so stale content stays stale on both: the table is written only while a view exists and the hand
+// is not over; the round-result sheet only at `roundOver`, and it is left as it is at `gameOver`
+// (the legacy `render()` returned before hiding it, so the sheet stays over the endgame screen
+// until "Look at the table"); the endgame screen only at `gameOver`; the meld chooser and the
+// history list only while open. `bindTable` turns the table's and the overlays' controls into
+// intents; the input wiring of the home screen and the curtain is beside their paints.
+import {
+  byId,
+  closestFrom,
+  dataOf,
+  hasClass,
+  isDisabled,
+  listenId,
+  queryIn,
+  requireId,
+  safeHtml,
+  setAttr,
+  setDisabled,
+  setHtml,
+  setStyleProperty,
+  setText,
+  targetIdOf,
+  toggleClass,
+  trustedHtml,
+  type DocumentLike,
+  type PageLike,
+  type SafeHtml,
+} from '../../../../shared/edge/dom.ts';
+import {
+  GIN_BONUS,
+  UNDERCUT_BONUS,
+  type LayoffMelding,
+  type Melding,
+  type View,
+} from '../engine/types.ts';
+import { backHtml, cardHtml, pretty } from './cards.ts';
+import { deadwoodText, fmtDuration, statusFor, type Selection } from './cues.ts';
+import { fitScale, type Measure } from './fit.ts';
+import { defaultHandView, type HandView } from './hand/HandView.ts';
+import { meldGroupsHtml } from './hand/meldGroups.ts';
+import { bindHome, paintHome } from './home.ts';
+import { bindLocal, paintCurtain } from './local.ts';
+import { RULES_ITEMS } from './rules.ts';
+import { SCREENS, type App, type Intent } from './state.ts';
+
+export type { PageLike };
+export type Dispatch = (intent: Intent) => void;
+
+/** The ids of the two `<ul class="rules-list">` slots: the home tab's and the in-game overlay's. */
+export const RULES_SLOT_IDS = ['rulesList', 'rulesOverlayList'] as const;
+
+/** The eleven `<li>`s, one per line as the legacy page had them between its tags. */
+export const rulesItemsHtml = (): string =>
+  RULES_ITEMS.map((item) => `<li>${item}</li>`).join('\n');
+
+/** Fill both rules slots from ui/rules.ts (once, at boot). */
+export const renderRules = (doc: DocumentLike): void => {
+  const markup = trustedHtml(rulesItemsHtml());
+  RULES_SLOT_IDS.forEach((id) => {
+    setHtml(requireId(doc, id), markup);
+  });
+};
+
+/** `showScreen(id)`: every screen but `id` gets `hidden`; the table locks the body to the viewport. */
+export const paintScreen = (doc: PageLike, app: App): void => {
+  SCREENS.forEach((id) => {
+    toggleClass(requireId(doc, id), 'hidden', id !== app.screen);
+  });
+  toggleClass(doc.body, 'fixed-screen', app.screen === 'tableScreen');
+};
+
+/** `#roomCode`, `#hostWaitStatus` (+ its pulse), `#startGameBtn`, `#guestWaitStatus` (+ its pulse). */
+export const paintWaiting = (doc: DocumentLike, app: App): void => {
+  setText(requireId(doc, 'roomCode'), app.code ?? '----');
+  const hostStatus = requireId(doc, 'hostWaitStatus');
+  setText(hostStatus, app.hostStatus.text);
+  toggleClass(hostStatus, 'pulse', app.hostStatus.pulse);
+  toggleClass(requireId(doc, 'startGameBtn'), 'hidden', !app.startGameVisible);
+  const guestStatus = requireId(doc, 'guestWaitStatus');
+  setText(guestStatus, app.guestStatus.text);
+  toggleClass(guestStatus, 'pulse', app.guestStatus.pulse);
+};
+
+/** `toast(msg)`'s DOM half: the text and the `show` class; main.ts keeps the hide timer. */
+export const showToast = (doc: DocumentLike, message: string): void => {
+  const el = requireId(doc, 'toast');
+  setText(el, message);
+  toggleClass(el, 'show', true);
+};
+
+export const hideToast = (doc: DocumentLike): void => {
+  toggleClass(requireId(doc, 'toast'), 'show', false);
+};
+
+/** `fx.renderToggle()`: `#soundBtn`'s glyph and tooltip. */
+export const paintSound = (doc: DocumentLike, enabled: boolean): void => {
+  const btn = requireId(doc, 'soundBtn');
+  setText(btn, enabled ? '🔊' : '🔇');
+  setAttr(btn, 'title', enabled ? 'Sound & vibration on' : 'Sound & vibration off');
+};
+
+// ---- the table -----------------------------------------------------------------------------------
+
+/** The opponent's strip: at most eleven card backs and the count. */
+export const oppCardsHtml = (cardCount: number): string =>
+  Array.from({ length: Math.min(cardCount, 11) }, () => backHtml('tiny')).join('') +
+  `<span class="opp-count">${String(cardCount)}</span>`;
+
+/** `#connDot`'s whole class attribute; pass-and-play hides it. */
+export const connDotClass = (app: App): string =>
+  `conn-dot ${app.oppConnected ? 'on' : 'off'}${app.role === 'local' ? ' hidden' : ''}`;
+
+const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
+  setText(requireId(doc, 'oppName'), v.opp.name);
+  setText(requireId(doc, 'oppScore'), `${String(v.opp.total)} pts`);
+  setHtml(requireId(doc, 'oppCards'), trustedHtml(oppCardsHtml(v.opp.cardCount)));
+  const dot = requireId(doc, 'connDot');
+  setAttr(dot, 'class', connDotClass(app));
+  setAttr(dot, 'title', app.oppConnected ? 'Connected' : 'Disconnected');
+  setText(requireId(doc, 'roundBadge'), `Hand ${String(v.handNumber)}`);
+  setText(requireId(doc, 'targetBadge'), `to ${String(v.target)}`);
+};
+
+/**
+ * Rebuild a pile only when the card it shows changes (`data-pile-key`), so the element survives
+ * re-renders and its CSS size transition can animate; the label is refreshed every time.
+ */
+const ensurePile = (
+  el: ReturnType<typeof requireId>,
+  cardMarkup: string,
+  label: string,
+  key: string,
+): void => {
+  if (dataOf(el, 'pile-key') !== key) {
+    setAttr(el, 'data-pile-key', key);
+    setHtml(el, trustedHtml(`${cardMarkup}<div class="pile-label"></div>`));
+  }
+  const lab = queryIn(el, '.pile-label');
+  if (lab !== null) setText(lab, label);
+};
+
+const paintPiles = (doc: DocumentLike, v: View): void => {
+  const stock = requireId(doc, 'stockPile');
+  const disc = requireId(doc, 'discardPile');
+  ensurePile(stock, backHtml('big'), `Stock · ${String(v.stockCount)}`, 'back');
+  ensurePile(
+    disc,
+    v.discardTop === null
+      ? '<div class="card big empty"></div>'
+      : cardHtml(v.discardTop, { big: true }),
+    'Discard',
+    v.discardTop?.id ?? 'empty',
+  );
+  // Piles take centre stage while they are what you act on, then shrink for the buttons.
+  const pilesActive = v.isMyTurn && (v.phase === 'draw' || v.phase === 'upcard');
+  const scr = requireId(doc, 'tableScreen');
+  toggleClass(scr, 'piles-big', pilesActive);
+  toggleClass(scr, 'piles-small', !pilesActive);
+  const canDrawStock = v.isMyTurn && v.phase === 'draw';
+  const canDrawDiscard = canDrawStock && !v.forceStock && v.discardTop !== null;
+  const canTakeUpcard = v.isMyTurn && v.phase === 'upcard';
+  toggleClass(stock, 'tappable', canDrawStock);
+  toggleClass(disc, 'tappable', canDrawDiscard || canTakeUpcard);
+  toggleClass(disc, 'blocked', canDrawStock && v.forceStock);
+};
+
+const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
+  const status = statusFor(v, app.selectedCard);
+  setText(requireId(doc, 'statusMain'), status.main);
+  setText(requireId(doc, 'statusSub'), status.sub);
+  toggleClass(requireId(doc, 'statusBanner'), 'mine', v.isMyTurn && v.phase !== 'roundOver');
+  setText(requireId(doc, 'lastAction'), v.lastAction?.text ?? '');
+};
+
+/** The deadwood readout, doubling as the meld-arrangement control when the hand melds two ways. */
+export const deadwoodHtml = (v: View, selection: Selection): SafeHtml => {
+  const altCount = v.meldOptions.length;
+  const badge =
+    altCount > 1
+      ? trustedHtml(`<span class="alt-badge">⇄ ${String(altCount)} ways</span>`)
+      : trustedHtml('');
+  return safeHtml`${deadwoodText(v, selection)}${badge}`;
+};
+
+/** The action buttons under the hand, by phase. */
+export const actionsHtml = (v: View, selection: Selection): SafeHtml => {
+  if (v.phase === 'upcard' && v.isMyTurn) {
+    const take = v.discardTop === null ? 'upcard' : pretty(v.discardTop);
+    return trustedHtml(
+      `<button class="btn btn-secondary grow" data-act="passUpcard">Pass</button><button class="btn btn-primary grow" data-act="takeUpcard">Take ${take}</button>`,
+    );
+  }
+  if (v.phase === 'discard' && v.isMyTurn) {
+    const sel = selection === null ? undefined : v.discardOptions?.[selection];
+    const scored = sel !== undefined && !('locked' in sel) ? sel : null;
+    const canKnock = scored?.canKnock === true;
+    const knockLabel = scored?.isGin === true ? 'Discard &amp; GIN!' : 'Discard &amp; knock';
+    const count = scored === null ? '' : ` <small>(${String(scored.deadwood)})</small>`;
+    return trustedHtml(
+      `<button class="btn btn-secondary grow" data-act="discard" ${scored === null ? 'disabled' : ''}>Discard &amp; end turn</button><button class="btn btn-gold grow" data-act="knock" ${canKnock ? '' : 'disabled'}>${knockLabel}${count}</button>`,
+    );
+  }
+  if (v.phase === 'roundOver')
+    return trustedHtml(
+      `<button class="btn btn-primary grow" data-act="showResult">Show results</button>`,
+    );
+  const waiting = v.isMyTurn ? trustedHtml('') : safeHtml`Waiting for ${v.opp.name}…`;
+  return safeHtml`<div class="waiting-note">${waiting}</div>`;
+};
+
+const paintHand = (doc: DocumentLike, app: App, v: View, handView: HandView): void => {
+  setText(requireId(doc, 'myName'), `${v.me.name} · ${String(v.me.total)} pts`);
+  const altCount = v.meldOptions.length;
+  const dw = requireId(doc, 'deadwoodInfo');
+  setHtml(dw, deadwoodHtml(v, app.selectedCard));
+  toggleClass(dw, 'tappable-dw', altCount > 1);
+  setAttr(dw, 'title', altCount > 1 ? 'Tap to choose which melds you declare' : '');
+  const hand = requireId(doc, 'hand');
+  setHtml(hand, trustedHtml(handView.render(v, app.selectedCard)));
+  toggleClass(hand, 'active', v.isMyTurn && v.phase === 'discard');
+  toggleClass(
+    requireId(doc, 'undoBar'),
+    'hidden',
+    !(v.phase === 'discard' && v.isMyTurn && v.canUndo),
+  );
+  setHtml(requireId(doc, 'actions'), actionsHtml(v, app.selectedCard));
+};
+
+// ---- the round result --------------------------------------------------------------------------
+
+const miniCards = (cards: ReadonlyArray<Parameters<typeof cardHtml>[0]>): string =>
+  cards.map((c) => cardHtml(c, { mini: true })).join('');
+
+/** One side of the result sheet: melds, lay-offs (the opponent's), deadwood, points. */
+const resultPanel = (
+  name: string,
+  knockerName: string,
+  side: Melding | LayoffMelding,
+  pts: number,
+  isKnocker: boolean,
+): SafeHtml => {
+  const laid =
+    'laidOff' in side && side.laidOff.length > 0
+      ? safeHtml`<div class="rr-label">Laid off onto ${knockerName}'s melds</div><div class="meld-group laid">${trustedHtml(miniCards(side.laidOff.map((x) => x.card)))}</div>`
+      : trustedHtml('');
+  const dead =
+    side.deadwood.length > 0
+      ? trustedHtml(
+          `<div class="rr-label">Deadwood · ${String(side.value)}</div><div class="meld-group dead">${miniCards(side.deadwood)}</div>`,
+        )
+      : trustedHtml(`<div class="rr-label">No deadwood</div>`);
+  const melds =
+    side.melds.length > 0
+      ? trustedHtml(
+          `<div class="rr-label">Melds</div><div class="rr-melds">${meldGroupsHtml(side.melds, '', true)}</div>`,
+        )
+      : trustedHtml('');
+  const knocked = trustedHtml(isKnocker ? ' <small>(knocked)</small>' : '');
+  const points = pts > 0 ? `+${String(pts)}` : '0';
+  return safeHtml`<div class="rr-panel ${pts > 0 ? 'scored' : ''}"><div class="rr-head"><span>${name}${knocked}</span><span class="rr-pts">${points}</span></div>${melds}${laid}${dead}</div>`;
+};
+
+export type RoundResultText = Readonly<{ title: string; sub: string; body: SafeHtml }>;
+
+/** What `renderRoundResult` wrote for a hand's result, or null when the view carries none. */
+export const roundResultText = (v: View): RoundResultText | null => {
+  const r = v.result;
+  if (r === null) return null;
+  const idx = v.rounds.length - 1;
+  const prevTs = idx > 0 ? (v.rounds[idx - 1]?.ts ?? v.startedAt) : v.startedAt;
+  const roundDur = fmtDuration((v.rounds[idx]?.ts ?? r.ts) - prevTs);
+  if (r.void) {
+    return {
+      title: 'Hand void',
+      sub: `Only two cards were left in the stock. No points — same dealer redeals. · ⏱ ${roundDur}`,
+      body: trustedHtml(''),
+    };
+  }
+  const k = r.knockerIdx;
+  const o = k === 0 ? 1 : 0;
+  const kn = v.players[k].name;
+  const on = v.players[o].name;
+  const title =
+    r.outcome === 'gin'
+      ? `${kn} went Gin!`
+      : r.outcome === 'undercut'
+        ? `${on} undercut ${kn}!`
+        : `${kn} knocked`;
+  const sub =
+    r.outcome === 'gin'
+      ? `+${String(GIN_BONUS)} bonus + ${on}'s ${String(r.opponent.value)} deadwood`
+      : r.outcome === 'undercut'
+        ? `${on} had ${String(r.opponent.value)} deadwood vs ${kn}'s ${String(r.knocker.value)} → difference + ${String(UNDERCUT_BONUS)} bonus`
+        : `${kn} ${String(r.knocker.value)} deadwood vs ${on} ${String(r.opponent.value)}`;
+  const totals = v.players.map((p) => safeHtml`<span>${p.name} <strong>${p.total}</strong></span>`);
+  return {
+    title,
+    sub: `${sub} · ⏱ ${roundDur}`,
+    body: safeHtml`${resultPanel(kn, kn, r.knocker, r.scores[k], true)}${resultPanel(on, kn, r.opponent, r.scores[o], false)}<div class="rr-totals">${totals}</div>`,
+  };
+};
+
+/** `#rrContinueBtn`'s label: waiting once I am ready, else the next hand or the final result. */
+export const continueLabel = (v: View): string =>
+  v.ready[v.me.idx]
+    ? `Waiting for ${v.opp.name}…`
+    : v.players.some((p) => p.total >= v.target)
+      ? 'See final result'
+      : 'Next hand';
+
+const paintRoundResult = (doc: DocumentLike, app: App, v: View): void => {
+  const overlay = requireId(doc, 'roundResultOverlay');
+  if (v.phase !== 'roundOver') {
+    // The legacy hid it on every other phase but gameOver, where render() had already returned:
+    // there only rrHideBtn wrote the class, so a Rematch (resultDismissed back to false) never
+    // brings a put-away sheet back over the endgame.
+    if (v.phase !== 'gameOver') toggleClass(overlay, 'hidden', true);
+    else if (app.resultDismissed) toggleClass(overlay, 'hidden', true);
+    return;
+  }
+  const text = roundResultText(v);
+  if (text === null) return;
+  setText(requireId(doc, 'rrTitle'), text.title);
+  setText(requireId(doc, 'rrSub'), text.sub);
+  setHtml(requireId(doc, 'rrBody'), text.body);
+  const btn = requireId(doc, 'rrContinueBtn');
+  setDisabled(btn, v.ready[v.me.idx]);
+  setText(btn, continueLabel(v));
+  toggleClass(overlay, 'hidden', app.resultDismissed);
+};
+
+// ---- the meld chooser ----------------------------------------------------------------------------
+
+/** One arrangement in the chooser, the legacy template line for line (its whitespace included). */
+export const meldOptionHtml = (
+  o: View['meldOptions'][number],
+  i: number,
+  active: boolean,
+): string => {
+  const deadHtml =
+    o.deadwood.length > 0
+      ? `<div class="meld-group dead">${miniCards(o.deadwood)}</div>`
+      : '<div class="empty-note" style="text-align:left;">No deadwood — that\'s gin!</div>';
+  const use = active
+    ? ''
+    : `<button class="btn btn-primary btn-block btn-sm" data-meld-opt="${String(i)}" style="margin-top:8px;">Use this arrangement</button>`;
+  return `<div class="rr-panel ${active ? 'scored' : ''}">
+        <div class="rr-head"><span>Option ${String(i + 1)}${active ? ' <small>(in use)</small>' : ''}</span><span class="rr-pts">${String(o.value)}</span></div>
+        <div class="rr-label">Melds</div><div class="rr-melds">${meldGroupsHtml(o.melds, '', true)}</div>
+        <div class="rr-label">Deadwood · ${String(o.value)}</div><div class="rr-melds">${deadHtml}</div>
+        ${use}
+      </div>`;
+};
+
+export const meldChooserSub = (v: View): string =>
+  `${String(v.meldOptions.length)} ways to meld for the same ${String(v.me.deadwoodValue)} deadwood. Your score is identical either way — but the melds you declare decide what ${v.opp.name} can lay off if you knock.`;
+
+const paintMeldChooser = (doc: DocumentLike, app: App, v: View): void => {
+  toggleClass(requireId(doc, 'meldOverlay'), 'hidden', !app.meldChooser);
+  if (!app.meldChooser) return;
+  setText(requireId(doc, 'meldSub'), meldChooserSub(v));
+  setHtml(
+    requireId(doc, 'meldOptionList'),
+    trustedHtml(
+      v.meldOptions.map((o, i) => meldOptionHtml(o, i, o.sig === v.activeMeldSig)).join(''),
+    ),
+  );
+};
+
+// ---- the endgame -------------------------------------------------------------------------------
+
+type Ranked = Readonly<{ p: View['players'][number]; i: number }>;
+
+/** `#finalStandings`: players by total, the winner crowned. */
+export const standingsHtml = (v: View): SafeHtml => {
+  const ranked = [...v.players.map((p, i): Ranked => ({ p, i }))].sort(
+    (a: Ranked, b: Ranked) => b.p.total - a.p.total,
+  );
+  return safeHtml`${ranked.map(
+    (x: Ranked, n) =>
+      safeHtml`<div class="standing-row ${x.i === v.winner ? 'winner' : ''}"><div class="standing-rank">#${n + 1}</div><div class="standing-name">${x.i === v.winner ? '👑 ' : ''}${x.p.name}</div><div class="standing-total">${x.p.total}</div></div>`,
+  )}`;
+};
+
+/** `#gameDuration`: the time to the last hand and the hand count, or a dash. */
+export const gameDurationText = (v: View): string => {
+  const last = v.rounds.at(-1);
+  return last === undefined
+    ? '—'
+    : `${fmtDuration(last.ts - v.startedAt)} · ${String(v.rounds.length)} hands`;
+};
+
+const paintEndgame = (doc: DocumentLike, v: View): void => {
+  const w = v.players[v.winner ?? 0];
+  setText(requireId(doc, 'endgameTitle'), `${w.name} wins! 🎉`);
+  setText(
+    requireId(doc, 'endgameSub'),
+    `Reached ${String(w.total)} points (target ${String(v.target)})`,
+  );
+  setHtml(requireId(doc, 'finalStandings'), standingsHtml(v));
+  setText(requireId(doc, 'gameDuration'), gameDurationText(v));
+  const meReady = v.ready[v.me.idx];
+  const rematch = requireId(doc, 'rematchBtn');
+  setDisabled(rematch, meReady);
+  setText(rematch, meReady ? `Waiting for ${v.opp.name}…` : 'Rematch');
+};
+
+// ---- the history -------------------------------------------------------------------------------
+
+/** `new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })`. */
+export const fmtTime = (ts: number): string =>
+  new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+/** `#historyList` for the game: one row per finished hand and the time played, or a note. */
+export const historyHtml = (v: View | null): SafeHtml => {
+  if (v === null || v.rounds.length === 0)
+    return trustedHtml('<div class="empty-note">No hands finished yet.</div>');
+  const rows = v.rounds.map((r, i) => {
+    const when = fmtTime(r.ts);
+    const prevTs = i > 0 ? (v.rounds[i - 1]?.ts ?? v.startedAt) : v.startedAt;
+    const dur = fmtDuration(r.ts - prevTs);
+    if ('void' in r)
+      return safeHtml`<div class="history-round"><div class="history-meta"><div class="history-scores"><strong>H${r.handNumber}</strong> — void (stock ran out)</div><div class="history-time">${when} · took ${dur}</div></div></div>`;
+    const k = v.players[r.knockerIdx];
+    const o = v.players[r.knockerIdx === 0 ? 1 : 0];
+    const dw = (id: string): number => r.deadwood[id] ?? 0;
+    const desc =
+      r.outcome === 'gin'
+        ? safeHtml`${k.name} went Gin`
+        : r.outcome === 'undercut'
+          ? safeHtml`${o.name} undercut ${k.name} (${dw(o.id)} vs ${dw(k.id)})`
+          : safeHtml`${k.name} knocked (${dw(k.id)} vs ${dw(o.id)})`;
+    const pts = v.players.map((p, n) => {
+      const score = r.scores[p.id] ?? 0;
+      return safeHtml`${n > 0 ? ' · ' : ''}${p.name}: ${score > 0 ? '+' : ''}${score}`;
+    });
+    return safeHtml`<div class="history-round"><div class="history-meta"><div class="history-scores"><strong>H${r.handNumber}</strong> — ${desc}</div><div class="history-scores">${pts}</div><div class="history-time">${when} · took ${dur}</div></div></div>`;
+  });
+  const last = v.rounds[v.rounds.length - 1];
+  const total =
+    last === undefined
+      ? trustedHtml('')
+      : safeHtml`<div id="historyTotalTime">⏱ Time played: ${fmtDuration(last.ts - v.startedAt)}</div>`;
+  return safeHtml`${rows}${total}`;
+};
+
+const paintOverlays = (doc: DocumentLike, app: App): void => {
+  toggleClass(requireId(doc, 'rulesOverlay'), 'hidden', !app.rulesOpen);
+  toggleClass(requireId(doc, 'historyOverlay'), 'hidden', app.history === null);
+  if (app.history === 'game') setHtml(requireId(doc, 'historyList'), historyHtml(app.view));
+};
+
+// ---- fitting the table ---------------------------------------------------------------------------
+
+/**
+ * `fitTable()`: shrink the table (`--tscale`) until the hand fits the screen without scrolling.
+ * The measuring is here; the decision is ui/fit.ts's, pure over the measured sizes.
+ */
+export const fitTable = (doc: DocumentLike): void => {
+  const scr = byId(doc, 'tableScreen');
+  if (scr === null || hasClass(scr, 'hidden')) return;
+  const appEl = requireId(doc, 'app');
+  const handEl = requireId(doc, 'hand');
+  const measureAt = (scale: number): Measure => {
+    setStyleProperty(scr, '--tscale', String(scale));
+    return {
+      appScrollHeight: appEl.scrollHeight,
+      appClientHeight: appEl.clientHeight,
+      handScrollHeight: handEl.scrollHeight,
+      handClientHeight: handEl.clientHeight,
+    };
+  };
+  fitScale(measureAt);
+};
+
+// ---- the whole paint -----------------------------------------------------------------------------
+
+/** The game screens from a view: the endgame at `gameOver`, else the table and its sheets. */
+const paintGame = (doc: DocumentLike, app: App, handView: HandView): void => {
+  const v = app.view;
+  if (v === null) {
+    // `leaveGame()` hid the result sheet; nothing else of the table is touched without a view.
+    toggleClass(requireId(doc, 'roundResultOverlay'), 'hidden', true);
+    return;
+  }
+  if (v.phase === 'gameOver') {
+    paintEndgame(doc, v);
+    paintRoundResult(doc, app, v);
+    return;
+  }
+  paintOpponent(doc, app, v);
+  paintPiles(doc, v);
+  paintStatus(doc, app, v);
+  paintHand(doc, app, v, handView);
+  paintRoundResult(doc, app, v);
+  paintMeldChooser(doc, app, v);
+};
+
+/** Everything, from the App alone; `handView` is main.ts's choice (docs/ARCHITECTURE.md "Seams"). */
+export const paint = (doc: PageLike, app: App, handView: HandView = defaultHandView): void => {
+  paintScreen(doc, app);
+  paintWaiting(doc, app);
+  paintHome(doc, app);
+  paintCurtain(doc, app);
+  paintGame(doc, app, handView);
+  paintOverlays(doc, app);
+};
+
+// ---- input wiring --------------------------------------------------------------------------------
+
+/** The table's, the sheets' and the endgame's controls, each an intent (the legacy click handlers). */
+export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
+  listenId(doc, 'stockPile', 'click', () => {
+    dispatch({ type: 'stock/tap' });
+  });
+  listenId(doc, 'discardPile', 'click', () => {
+    dispatch({ type: 'discard/tap' });
+  });
+  listenId(doc, 'hand', 'click', (e) => {
+    const card = closestFrom(e, '.card');
+    const id = card === null ? null : dataOf(card, 'card');
+    if (id !== null) dispatch({ type: 'card/tap', cardId: id });
+  });
+  listenId(doc, 'soundBtn', 'click', () => {
+    dispatch({ type: 'sound/toggle' });
+  });
+  listenId(doc, 'undoDrawBtn', 'click', () => {
+    dispatch({ type: 'act', action: { type: 'undoDraw' } });
+  });
+  listenId(doc, 'deadwoodInfo', 'click', () => {
+    dispatch({ type: 'meld/open' });
+  });
+  listenId(doc, 'closeMeldBtn', 'click', () => {
+    dispatch({ type: 'meld/close' });
+  });
+  listenId(doc, 'meldOverlay', 'click', (e) => {
+    if (targetIdOf(e) === 'meldOverlay') dispatch({ type: 'meld/close' });
+  });
+  listenId(doc, 'meldOptionList', 'click', (e) => {
+    const btn = closestFrom(e, '[data-meld-opt]');
+    const index = btn === null ? null : dataOf(btn, 'meld-opt');
+    if (index !== null) dispatch({ type: 'meld/choose', index: Number(index) });
+  });
+  listenId(doc, 'actions', 'click', (e) => {
+    const btn = closestFrom(e, 'button[data-act]');
+    if (btn === null || isDisabled(btn)) return;
+    const act = dataOf(btn, 'act');
+    if (act !== null) dispatch({ type: 'action/click', act });
+  });
+  listenId(doc, 'rrContinueBtn', 'click', () => {
+    dispatch({ type: 'act', action: { type: 'ready' } });
+  });
+  listenId(doc, 'rrHideBtn', 'click', () => {
+    dispatch({ type: 'result/hide' });
+  });
+  listenId(doc, 'rematchBtn', 'click', () => {
+    dispatch({ type: 'act', action: { type: 'ready' } });
+  });
+  ['leaveBtn', 'leaveBtnEnd'].forEach((id) => {
+    listenId(doc, id, 'click', () => {
+      dispatch({ type: 'leave/request' });
+    });
+  });
+  listenId(doc, 'rulesBtnGame', 'click', () => {
+    dispatch({ type: 'rules/open' });
+  });
+  listenId(doc, 'closeRulesBtn', 'click', () => {
+    dispatch({ type: 'rules/close' });
+  });
+  ['historyBtn', 'historyBtnEnd'].forEach((id) => {
+    listenId(doc, id, 'click', () => {
+      dispatch({ type: 'history/open', who: 'game' });
+    });
+  });
+  listenId(doc, 'closeHistoryBtn', 'click', () => {
+    dispatch({ type: 'history/close' });
+  });
+  listenId(doc, 'rulesOverlay', 'click', (e) => {
+    if (targetIdOf(e) === 'rulesOverlay') dispatch({ type: 'rules/close' });
+  });
+  listenId(doc, 'historyOverlay', 'click', (e) => {
+    if (targetIdOf(e) === 'historyOverlay') dispatch({ type: 'history/close' });
+  });
+};
+
+/** Every control of the page (home, curtain, table, sheets), once, at boot. */
+export const bindAll = (doc: PageLike, dispatch: Dispatch): void => {
+  bindHome(doc, dispatch);
+  bindLocal(doc, dispatch);
+  bindTable(doc, dispatch);
+};

@@ -86,7 +86,8 @@ export const decodeFrame = (input: unknown): Result<Frame, DecodeFailure> => {
   }
 };
 
-const isGuestFrame = (frame: Frame): frame is GuestFrame =>
+/** `join` and `action` come from a guest; the other five from a host (main.ts routes a send by it). */
+export const isGuestFrame = (frame: Frame): frame is GuestFrame =>
   frame.t === 'join' || frame.t === 'action';
 
 /** What a host accepts from its guest: `join` and `action`; a host frame here is refused. */

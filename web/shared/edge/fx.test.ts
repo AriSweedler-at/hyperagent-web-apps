@@ -373,3 +373,25 @@ describe('createAudioCues', () => {
     }).not.toThrow();
   });
 });
+
+describe('createAudioCues.warm', () => {
+  test('creates and resumes the context without scheduling a note; nothing while disabled', () => {
+    let made = 0;
+    const f = fakeContext('suspended');
+    const cues = createAudioCues({
+      makeContext: () => {
+        made += 1;
+        return f.ctx;
+      },
+      enabled: false,
+    });
+    cues.warm();
+    expect(made).toBe(0);
+    cues.setEnabled(true);
+    cues.warm();
+    cues.warm();
+    expect(made).toBe(1);
+    expect(f.resumed()).toBe(2);
+    expect(f.calls).toEqual([]);
+  });
+});

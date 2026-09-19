@@ -30,7 +30,8 @@ const EDGES = [
   'web/**/view/vdom.ts',
   'web/shared/edge/**/*.ts',
 ];
-const RNG_ALLOWED = ['web/**/main.ts', 'web/shared/edge/**/*.ts'];
+// The page boots only: gin's scorer/main.ts is an edge (EDGES) but takes its rng injected.
+const RNG_ALLOWED = ['web/games/*/main.ts', 'web/shared/edge/**/*.ts'];
 const TESTS_AND_TOOLS = [
   '**/*.test.ts',
   'e2e/**/*.ts',
@@ -205,8 +206,9 @@ const zones = [
     message: 'protocol.ts imports only engine/domain types and web/shared/lib.',
   },
   {
-    // Every scorer/ module except scorer/main.ts, the Score Counter's screen (an edge).
-    target: [`${GAME_SRC}/scorer/!(main).ts`],
+    // Every scorer/ module except scorer/main.ts, the Score Counter's screen (an edge), and the
+    // tests beside them (scorer/main.test.ts drives the screen on the page fake).
+    target: [`${GAME_SRC}/scorer/!(main|*.test).ts`],
     from: [
       './web/shared/edge/**',
       `${GAME_SRC}/net/**`,
@@ -229,25 +231,45 @@ const zones = [
       `${GAME_SRC}/app/**`,
       `${GAME_SRC}/storage.ts`,
     ],
+    // The two fakes are for the session tests beside the modules (docs/MIGRATION.md step 12).
     except: [
       '**/web/shared/edge/transport.ts',
       '**/web/shared/edge/transport.fake.ts',
       '**/web/shared/edge/clock.ts',
+      '**/web/shared/edge/clock.fake.ts',
     ],
     message: 'net/ imports protocol, engine/domain and only the transport and clock edges.',
   },
   {
-    // Every ui/ module except ui/state.ts, which the reducer zone below owns.
-    target: [`${GAME_SRC}/ui/!(state).ts`, `${GAME_SRC}/ui/*/**`, `${GAME_SRC}/view/**`],
+    // Every ui/ module except ui/state.ts, which the reducer zone below owns, and the tests beside
+    // them, which reach the fakes and the layers their module wires (docs/MIGRATION.md step 12).
+    target: [`${GAME_SRC}/ui/!(state|*.test).ts`, `${GAME_SRC}/ui/*/**`, `${GAME_SRC}/view/**`],
     from: [
       './web/shared/edge/**',
       `${GAME_SRC}/net/**`,
       `${GAME_SRC}/app/**`,
       `${GAME_SRC}/storage.ts`,
     ],
-    // dom.fake.ts is the structural DOM the view tests render into (docs/MIGRATION.md step 9).
-    except: ['**/web/shared/edge/dom.ts', '**/web/shared/edge/dom.fake.ts'],
+    // dom.fake.ts is the structural DOM the view tests render into (docs/MIGRATION.md step 9);
+    // page.fake.ts the static-page fake the gin ui/page.fake.ts fixture builds on (step 12).
+    except: [
+      '**/web/shared/edge/dom.ts',
+      '**/web/shared/edge/dom.fake.ts',
+      '**/web/shared/edge/page.fake.ts',
+    ],
     message: 'ui/ and view/ render views; DOM access only through @shared/edge/dom.',
+  },
+  {
+    // The reducer is imported by main.ts, the tests and the three gin painters that paint the App
+    // and dispatch its Intents (render, home, local: types and the screen/tab lists only,
+    // docs/ARCHITECTURE.md step 12 deviations); every other ui/ or view/ module is refused.
+    target: [
+      `${GAME_SRC}/ui/!(state|render|home|local|*.test).ts`,
+      `${GAME_SRC}/ui/*/**`,
+      `${GAME_SRC}/view/**`,
+    ],
+    from: [`${GAME_SRC}/ui/state.ts`, `${GAME_SRC}/app/controller.ts`],
+    message: 'ui/state.ts is imported only by main.ts, tests and the painters render/home/local.',
   },
   {
     // Reducers over intents: "everything below" in the boundary table, so only the edges and
@@ -338,6 +360,12 @@ export default defineConfig([
   {
     files: ['web/shared/edge/transport.ts'],
     rules: { 'no-restricted-imports': 'off' },
+  },
+  {
+    // Ambient declarations (web/raw-imports.d.ts) are never executed, so the erasable-syntax ban on
+    // `declare module` does not apply; the other bans stay.
+    files: ['web/**/*.d.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...loopBans, absolutePathBan, mathRandomBan] },
   },
 
   // --- eslint-plugin-functional profiles ------------------------------------------------------

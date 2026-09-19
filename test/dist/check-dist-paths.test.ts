@@ -52,18 +52,16 @@ describeDist('dist paths on both origins', (root) => {
   const relative = allReferences(root).filter(({ value }) => isRelative(classify(value)));
   const checked = relative.filter((reference) => !isDeadByDesign(root, reference));
 
-  test('there are relative references to check (landing links, the fidice bundle and CSS)', () => {
+  test('there are relative references to check (landing links, the bundles and CSS)', () => {
     // dist/: two landing links, the fidice bundle, its CSS and the gin page's shared/ice.js;
-    // dist-next/: one landing link (gin-rummy is left out by design), the bundle and the CSS.
-    expect(checked.length).toBeGreaterThanOrEqual(root.name === 'dist-next' ? 3 : 5);
+    // dist-next/: two landing links and both pages' bundles and CSS (docs/MIGRATION.md step 12).
+    expect(checked.length).toBeGreaterThanOrEqual(5);
   });
 
-  test('the only references left out are landing links to pages this tree does not hold', () => {
+  test('no landing link is left out: both game pages are built in both trees', () => {
     const leftOut = relative.filter((reference) => isDeadByDesign(root, reference));
-    expect(leftOut.map(({ value }) => value)).toEqual(
-      unbuiltPages(root).map((game) => `games/${game}/`),
-    );
-    expect(unbuiltPages(root)).toEqual(root.name === 'dist-next' ? ['gin-rummy'] : []);
+    expect(leftOut).toEqual([]);
+    expect(unbuiltPages(root)).toEqual([]);
   });
 
   test('on the Pages origin every relative reference names a file in the tree', () => {

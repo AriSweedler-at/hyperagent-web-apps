@@ -505,3 +505,76 @@ parity and e2e gates.
   `src/` tree (DOM-free by design) and `web/shared/edge/storage.ts`; coverage gates `protocol.ts`,
   `storage.ts`, `ui/**` and `scorer/**` at 90% lines, functions and statements (actual
   100/100/100). See ARCHITECTURE "Deviations".
+- Step 12, phase 1 (the page, `net/{peerjs,host,guest}.ts`, `ui/{state,render,sound}.ts`, `fx.ts`,
+  `main.ts`; `ui/{local,home}.ts`, the table paint and `scorer/main.ts` follow in phase 2): the
+  new page ships dark. `web/games/gin-rummy/index.html` is the legacy `<head>` meta and body
+  markup verbatim with one addition, `id="rulesList"` and `id="rulesOverlayList"` on the two
+  (now empty) `<ul class="rules-list">` slots, which `ui/render.ts` fills from `ui/rules.ts` at
+  boot (the DOM edge finds elements by id only); `theme.css` is the page's two `<style>` blocks
+  verbatim, the stray `.ha-img-placeholder` block included as fidice's is. PeerJS and the ICE
+  loader arrive with `./main.ts` (no CDN `<script>`, no `shared/ice.js`, no `window.Peer` /
+  `window.HyperIce`), as step 9 did for fidice. Sessions: `net/peerjs.ts` holds the shared peer
+  plumbing (`whenTransportReady`, 10 s watchdog, `keepPeerAlive` at 400 ms then
+  `min(15000, 1500 * tries)`, the 1.5 s path toast, `describePeerError`, `relayHint`); the
+  legacy `whenPeerReady` poll and its "library didn't load" branch have no counterpart. The
+  sessions read the app through `read()` and act through injected events, so every status and
+  toast string is the legacy's and `net/sessions.test.ts` drives them over `transport.fake.ts` and
+  `clock.fake.ts`; `test/parity/gin.sessions.test.ts` replays the wire corpus through both. Two
+  legacy traits kept and named: `tryJoin` runs on every Peer `open` (a broker reconnect opens a
+  second channel), and after the 40th failed join the 12 s stall note still replaces "Room not
+  found". Two decoder-driven differences: a guest frame that fails `protocol.ts` is dropped where
+  the legacy would have handed a malformed `action` to the engine and toasted its refusal, and a
+  guest's "Not connected" check reads `oppConnected` (set on open, cleared on close) instead of
+  `conn.open`. `ui/state.ts` is the legacy `app` object as an immutable record plus what the
+  page kept in the DOM (screen, wait statuses, deal button, curtain, meld chooser, cue memory,
+  resume offer), a reducer over intents returning effects as data, `saveFor`/`readHome` for the
+  save (byte-identical to the captures, `test/parity/gin.state.test.ts`) and `runEffect`, which
+  applies effects to injected adapters; `main.ts` holds the `let app` loop and constructs the
+  adapters. A leave closes the network before the reset, so the session's own close still raises
+  the legacy's "disconnected" toast. `ui/render.ts` paints only what phase 1 models (screens,
+  wait statuses, room code, deal button, rules, toast text); the table paint, the input wiring and
+  `window.__gin.showScreen`'s effect on the page beyond the screen class come with phase 2, and
+  the e2e `next` project does not list gin yet (`PORTED_PAGES`). `ui/sound.ts` spells `Note` and
+  `OscillatorType` itself (ui/ may not import the fx edge). Toolchain: the net import zone
+  excepts `clock.fake.ts`, the ui zone leaves `*.test.ts` out of its target, `tsconfig.node.json`
+  lists `web/shared/edge/fx.ts` and excludes `ui/render*.ts` (DOM), `edge/fx.ts` gained
+  `AudioCues.warm`, and vitest gates gin `net/**` and `fx.ts` at 90%. Vite emits the gin
+  bundle and CSS into dist/ too (the passthrough overwrites only `index.html`), so dist/ carries
+  an unreferenced `games/gin-rummy/app-[hash].js`; the dist guards assert that state. With two
+  module pages Rolldown splits what both import (PeerJS, the shared edges, `roomCode`) into one
+  `shared/assets/[name]-[hash].js` chunk (the name is Rolldown's pick, ~100 KB), which both pages
+  load through `<link rel="modulepreload">`; the fidice page therefore references three assets
+  (bundle, chunk, CSS), its own bundle shrank to what is fidice's and re-hashed, and the step-7
+  cache window now covers the chunk too. That is the layout ARCHITECTURE "Build and serve"
+  reserved `chunkFileNames` for (the proxy maps `/shared/`), so the dist guards accept a preloaded
+  shared chunk, require both pages to preload the same one, and compare the chunks across dist/
+  and dist-next/. See ARCHITECTURE "Deviations".
+- Step 12, phase 2 (`ui/{render,home,local}.ts`, `scorer/main.ts`, the input wiring, the oracle,
+  the e2e): the dark page is complete and the e2e project `next` runs smoke, gin-local, gin-scorer,
+  gin-online, the new gin-resume (host reload and resume, guest rejoin; also on `pages`/`proxy`
+  for the legacy page) and the DOM-snapshot parity. The oracle is `tools/parity/gin-dom-parity.ts`
+  (also `e2e/gin-dom-parity.spec.ts` on `next`): two contexts with the same seeded `Math.random`
+  and a stepping `Date.now` play the same pass-and-play game (to a knock, the sheets, the endgame,
+  a rematch, a reload and resume, a leave) and the same Score Counter session (a hand, the end
+  screen, an edit through the `prompt()` dialogs, a delete, an export, a gin hand, a new game)
+  through the UI on the legacy page and the new page, comparing the normalised `outerHTML` of the
+  home screen, the table, the curtain, every sheet and overlay and the scorer screens plus the
+  toast's text at 84 checkpoints; only whitespace, the two rules slots' ids and the fitted
+  `--tscale` are normalised, and the discard choices are read from the legacy page's `window.__gin`
+  and applied to both. The paint is a function of the App alone, so where the legacy wrote a region
+  only on some path the paint keeps that condition (the result sheet stays over the endgame at
+  `gameOver` until "Look at the table", the mode buttons' marks change only while the Play tab
+  shows, the table is untouched without a view). What the legacy kept in the DOM or in closures
+  joined the App (the rules and
+  history overlays, the Play tab's long-press submenu with its 450 ms timer as a named timer
+  effect, the code input's last good value); the two input writes `initHome` and the code handler
+  made are effects (`fillName`, `setCode`) so the paint never fights the player's typing. The
+  history and meld-chooser lists are repainted from the live view while open, where the legacy
+  wrote them once at opening (no state can change while either is open on one phone). The Score
+  Counter keeps its `prompt()`/`confirm()` dialogs (the named debt). Toolchain: `dom.ts` gained
+  listeners, values, styles, queries and the `e.target` casts; `page.fake.ts` (shared edge) and
+  `ui/page.fake.ts` (the gin page's ids from `index.html`, read by the tests through a Vite
+  `?raw` import declared in `web/raw-imports.d.ts`) replace jsdom; `share.ts` is the invite's
+  Web Share / clipboard chain; `tsconfig.node.json` excludes the DOM modules, `tsconfig.pure.json`
+  and the scorer zone carve out `scorer/main*.ts`, the ui zone may import `page.fake.ts`, and
+  ambient `.d.ts` files are exempt from the erasable-syntax ban. See ARCHITECTURE "Deviations".
