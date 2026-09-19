@@ -322,9 +322,11 @@ export const continueLabel = (v: View): string =>
 const paintRoundResult = (doc: DocumentLike, app: App, v: View): void => {
   const overlay = requireId(doc, 'roundResultOverlay');
   if (v.phase !== 'roundOver') {
-    // The legacy hid it on every other phase but gameOver, where render() had already returned.
+    // The legacy hid it on every other phase but gameOver, where render() had already returned:
+    // there only rrHideBtn wrote the class, so a Rematch (resultDismissed back to false) never
+    // brings a put-away sheet back over the endgame.
     if (v.phase !== 'gameOver') toggleClass(overlay, 'hidden', true);
-    else toggleClass(overlay, 'hidden', app.resultDismissed);
+    else if (app.resultDismissed) toggleClass(overlay, 'hidden', true);
     return;
   }
   const text = roundResultText(v);

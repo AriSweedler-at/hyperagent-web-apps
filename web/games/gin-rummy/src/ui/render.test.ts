@@ -37,8 +37,9 @@ import {
   showToast,
   standingsHtml,
 } from './render.ts';
+import { state as stateFrame } from '../protocol.ts';
 import { RULES_ITEMS, RULES_LIST_HTML } from './rules.ts';
-import { SCREENS, initialApp, type App, type Intent } from './state.ts';
+import { SCREENS, initialApp, reduce, type App, type Intent } from './state.ts';
 
 import MARKUP from '../../index.html?raw';
 
@@ -403,6 +404,44 @@ describe('the table', () => {
     expect(p.get('roundResultOverlay').hidden()).toBe(true);
     // The table itself was not repainted.
     expect(p.get('hand').text()).toBe('');
+  });
+
+  test('gameOver: a Rematch never brings a put-away sheet back (host and guest)', () => {
+    const ctx = { rng, now: () => NOW };
+    // Host: "Look at the table", then Rematch. The engine keeps gameOver with ready [true, false]
+    // and the reducer clears resultDismissed, as the legacy act(ready) did; the legacy render()
+    // returned at gameOver before its overlay write, so the sheet stayed hidden.
+    const p = page();
+    const host: App = { ...local(over, 0), role: 'host', code: 'ABCD' };
+    const hidden = reduce(host, { type: 'result/hide' }, ctx).app;
+    paint(p.doc, hidden);
+    expect(p.get('roundResultOverlay').hidden()).toBe(true);
+    const readied = reduce(hidden, { type: 'act', action: { type: 'ready' } }, ctx).app;
+    expect(readied.view?.phase).toBe('gameOver');
+    expect(readied.view?.ready).toEqual([true, false]);
+    expect(readied.resultDismissed).toBe(false);
+    paint(p.doc, readied);
+    expect(p.get('roundResultOverlay').hidden()).toBe(true);
+    // Guest: the host's state frame after its Rematch arrives while the sheet is put away.
+    const q = page();
+    const guest: App = {
+      ...initialApp,
+      role: 'guest',
+      code: 'ABCD',
+      oppConnected: true,
+      view: viewFor(over, 1),
+      screen: 'endgameScreen',
+    };
+    const gHidden = reduce(guest, { type: 'result/hide' }, ctx).app;
+    paint(q.doc, gHidden);
+    expect(q.get('roundResultOverlay').hidden()).toBe(true);
+    if (readied.game === null) throw new Error('the host lost its game');
+    const frame = stateFrame(viewFor(readied.game, 1));
+    const received = reduce(gHidden, { type: 'guest/frame', frame }, ctx).app;
+    expect(received.view?.ready).toEqual([true, false]);
+    expect(received.resultDismissed).toBe(false);
+    paint(q.doc, received);
+    expect(q.get('roundResultOverlay').hidden()).toBe(true);
   });
 
   test('the rules and history overlays follow the App; the game history lists every hand', () => {
