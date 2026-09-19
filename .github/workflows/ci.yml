@@ -1,10 +1,10 @@
 # Runs on every push to main and every pull request. Job "check" is the same gate as the local
 # pre-push hook (typecheck, lint, unit tests, build, dist guards) plus coverage and a sanity check
-# of the hook shims; it uploads dist/ as the artifact job "deploy" publishes. Job "e2e" plays the
-# two-peer browser specs on both emulated origins against a fresh build of dist/ (the fidice page is
-# the Vite-built module page since docs/MIGRATION.md step 7), and the smoke spec on the dark
-# dist-next/ build (project `next`, step 6), through a local
-# PeerServer (the merge gate for online play, docs/MIGRATION.md step 3); job "broker" repeats the
+# of the hook shims; it uploads dist/ as the artifact job "deploy" publishes. Job "e2e" plays every
+# browser spec on both emulated origins against a fresh build of dist/ (both game pages are the
+# Vite-built module pages since docs/MIGRATION.md steps 7 and 13; the gin DOM-parity spec compares
+# the served page with the frozen legacy page the harness aliases in), the two-peer games through a
+# local PeerServer (the merge gate for online play, docs/MIGRATION.md step 3); job "broker" repeats the
 # online specs through the real 0.peerjs.com and is advisory (continue-on-error), so a third-party
 # outage never blocks a merge but a signalling regression is visible at review. Job "deploy"
 # (docs/MIGRATION.md step 4) publishes the checked dist/ to GitHub Pages on a push to main once
@@ -49,12 +49,7 @@ jobs:
         run: npm run test:integration
       - name: Build dist
         run: npm run build
-      # The same build with LEGACY_PAGES= (docs/MIGRATION.md step 6): every ported page as Vite
-      # emits it, which the e2e project `next` smokes and the dist guards check alongside dist/
-      # (the guards also pin its fidice output to dist/'s, byte for byte).
-      - name: Build dist-next
-        run: npm run build:next
-      - name: Dist guards (relative asset URLs, paths on both origins, parity with legacy/; dist/ and dist-next/)
+      - name: Dist guards (relative asset URLs, paths on both origins, module pages and the landing page's parity with web/)
         run: npm run test:dist
       - name: Verify git hook wiring
         run: npm run hooks:verify
@@ -82,11 +77,11 @@ jobs:
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      # `npm run test:e2e` builds dist/ and dist-next/ first (deterministic, under a second each),
-      # so the specs run against the same output "check" uploaded. Projects: pages, proxy and next;
-      # fidice-online on `pages` and `proxy` is the proof that the served module page plays a real
-      # two-peer game on both origins.
-      - name: Browser specs on both origins against dist, and on the dark build (local PeerServer)
+      # `npm run test:e2e` builds dist/ first (deterministic, under a second), so the specs run
+      # against the same output "check" uploaded. Projects: pages and proxy; gin-online, gin-resume
+      # and fidice-online on both are the proof that the served module pages play real two-peer
+      # games on both origins, and gin-dom-parity that the gin page paints what the legacy page did.
+      - name: Browser specs on both origins against dist (local PeerServer)
         run: npm run test:e2e
       - name: Upload Playwright report
         if: failure()

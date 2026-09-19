@@ -1,8 +1,7 @@
 // Guard 1 of docs/ARCHITECTURE.md "Two origins": every src/href/url() in dist HTML and CSS is
 // `./`-relative (or bare relative), `../../shared/`-relative or `https://`; never `/`-rooted, so
 // the same bytes resolve from /hyperagent-web-apps/ on github.io and from / on games.sweedler.com.
-// Nothing may be emitted to a root /assets/ either. Runs on dist/ and dist-next/ after the builds
-// (test:dist).
+// Nothing may be emitted to a root /assets/ either. Runs on dist/ after the build (test:dist).
 import { expect, test } from 'vitest';
 
 import {

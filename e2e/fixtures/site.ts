@@ -1,13 +1,11 @@
 // The two emulated origins (docs/ARCHITECTURE.md "Two origins") and where each page lives on them.
 // `pages` mirrors GitHub Pages: the site under /hyperagent-web-apps/ on tools/serve-dist.ts.
 // `proxy` mirrors games.sweedler.com: short game URLs on tools/proxy-dev.ts, which runs the real
-// Worker against the pages origin. `next` is the Pages layout again, serving dist-next/ (built with
-// `LEGACY_PAGES=`, docs/MIGRATION.md step 6), where a ported page played end to end before it was
-// flipped; since step 13 cut gin-rummy over nothing is dark and both trees hold the same pages.
-// Everything the harness needs to know about URLs is here, so specs never spell out an absolute
-// site path themselves.
+// Worker against the pages origin. Both serve dist/, the only build tree since docs/MIGRATION.md
+// step 13 cut the last page over. Everything the harness needs to know about URLs is here, so
+// specs never spell out an absolute site path themselves.
 
-export type Project = 'pages' | 'proxy' | 'next';
+export type Project = 'pages' | 'proxy';
 export type PageName = 'landing' | 'gin-rummy' | 'fidice';
 
 /** The GitHub Pages mount point. The one place the harness may name it (see the lint ban). */
@@ -16,8 +14,6 @@ export const PAGES_BASE_PATH = '/hyperagent-web-apps/';
 
 export const PAGES_ORIGIN = 'http://127.0.0.1:4173';
 export const PROXY_ORIGIN = 'http://127.0.0.1:8787';
-/** dist-next/ on a second tools/serve-dist.ts, mounted like Pages. */
-export const NEXT_ORIGIN = 'http://127.0.0.1:4174';
 /** Local PeerServer (`peer` package) that `?peer=host:port` aims the pages at. */
 export const PEER_HOST = '127.0.0.1';
 export const PEER_PORT = 9000;
@@ -40,7 +36,7 @@ export const LEGACY_ALIASES: Readonly<Record<string, string>> = {
   'legacy/shared/ice.js': 'legacy/shared/ice.js',
 };
 
-export const PROJECTS: ReadonlyArray<Project> = ['pages', 'proxy', 'next'];
+export const PROJECTS: ReadonlyArray<Project> = ['pages', 'proxy'];
 export const PAGES: ReadonlyArray<PageName> = ['landing', 'gin-rummy', 'fidice'];
 
 export const EXPECTED_TITLES: Readonly<Record<PageName, string>> = {
@@ -49,13 +45,13 @@ export const EXPECTED_TITLES: Readonly<Record<PageName, string>> = {
   fidice: "Fidice — one-cup liar's dice",
 };
 
-/** Path of a page relative to the project's baseURL (`games/fidice/` on pages and next, `fidice/` on proxy). */
+/** Path of a page relative to the project's baseURL (`games/fidice/` on pages, `fidice/` on proxy). */
 export const pagePath = (project: Project, page: PageName): string => {
   if (page === 'landing') return '';
   return project === 'proxy' ? `${page}/` : `games/${page}/`;
 };
 
 export const asProject = (name: string): Project => {
-  if (name === 'pages' || name === 'proxy' || name === 'next') return name;
+  if (name === 'pages' || name === 'proxy') return name;
   throw new Error(`unknown Playwright project: ${name}`);
 };

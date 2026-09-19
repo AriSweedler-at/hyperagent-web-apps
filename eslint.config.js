@@ -297,7 +297,6 @@ export default defineConfig([
     [
       'legacy/**',
       'dist/**',
-      'dist-next/**',
       'node_modules/**',
       'coverage/**',
       'playwright-report/**',

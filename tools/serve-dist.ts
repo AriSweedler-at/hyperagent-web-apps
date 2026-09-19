@@ -261,9 +261,7 @@ if (isMain) {
   // A missing tree would serve 404 on every URL, and Playwright's health check would wait out its
   // whole webServer timeout without saying why; exiting here surfaces the cause at once.
   if (!existsSync(resolve(options.root, 'index.html'))) {
-    console.error(
-      `serve-dist: ${options.root} has no index.html; run \`npm run build\` (dist/) or \`npm run build:next\` (dist-next/) first`,
-    );
+    console.error(`serve-dist: ${options.root} has no index.html; run \`npm run build\` first`);
     process.exit(1);
   }
   startServer(options).then(

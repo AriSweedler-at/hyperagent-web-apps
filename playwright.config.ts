@@ -1,19 +1,18 @@
 // Browser harness (docs/ARCHITECTURE.md "Testing pyramid", "Two origins"). Every spec runs on two
 // projects: `pages` (GitHub Pages emulated by tools/serve-dist.ts, dist/ under /hyperagent-web-apps/
 // on :4173) and `proxy` (games.sweedler.com emulated by tools/proxy-dev.ts on :8787, running the
-// real Worker against :4173). A third project, `next`, serves dist-next/ (built with `LEGACY_PAGES=`,
-// docs/MIGRATION.md step 6) the same way on :4174 and runs the smoke spec against the pages that
-// tree holds; it is where a ported page plays before it is flipped (fidice did, until step 7 cut it
-// over; the gin port is next). The specs exercise the built site: `npm run test:e2e` is
-// `npm run build && npm run build:next && playwright test`, so both trees are fresh; a bare
-// `playwright test` reuses them. Online specs meet on a local PeerServer (`peer` package) on :9000,
-// which the pages reach through their `?peer=` hook; `E2E_BROKER=cloud` leaves it out so the
-// advisory CI job `broker` plays through 0.peerjs.com instead.
+// real Worker against :4173). dist/ is the only tree since docs/MIGRATION.md step 13 cut the last
+// page over (the dark `next` project that played a port before its flip is retired); the pages
+// origin also publishes the frozen legacy gin page under legacy/ through serve-dist aliases for
+// e2e/gin-dom-parity.spec.ts. The specs exercise the built site: `npm run test:e2e` is
+// `npm run build && playwright test`, so dist/ is fresh; a bare `playwright test` reuses it. Online
+// specs meet on a local PeerServer (`peer` package) on :9000, which the pages reach through their
+// `?peer=` hook; `E2E_BROKER=cloud` leaves it out so the advisory CI job `broker` plays through
+// 0.peerjs.com instead.
 import { defineConfig } from '@playwright/test';
 
 import {
   LEGACY_ALIASES,
-  NEXT_ORIGIN,
   PAGES_BASE_PATH,
   PAGES_ORIGIN,
   PEER_HOST,
@@ -53,31 +52,11 @@ export default defineConfig({
   projects: [
     { name: 'pages', use: { baseURL: `${PAGES_ORIGIN}${PAGES_BASE_PATH}` } },
     { name: 'proxy', use: { baseURL: `${PROXY_ORIGIN}/` } },
-    {
-      // The dark build. Since step 13 cut gin-rummy over, dist-next/ is the same tree as dist/
-      // and every spec here replays `pages`; the project is retired with the passthrough.
-      name: 'next',
-      use: { baseURL: `${NEXT_ORIGIN}${PAGES_BASE_PATH}` },
-      testMatch: [
-        'smoke.spec.ts',
-        'gin-local.spec.ts',
-        'gin-scorer.spec.ts',
-        'gin-online.spec.ts',
-        'gin-resume.spec.ts',
-        'gin-dom-parity.spec.ts',
-      ],
-    },
   ],
   webServer: [
     {
       command: `${node} tools/serve-dist.ts --root dist --base ${PAGES_BASE_PATH} ${pagesAliases} --port ${new URL(PAGES_ORIGIN).port}`,
       url: `${PAGES_ORIGIN}${PAGES_BASE_PATH}`,
-      reuseExistingServer: !CI,
-      timeout: 30_000,
-    },
-    {
-      command: `${node} tools/serve-dist.ts --root dist-next --base ${PAGES_BASE_PATH} --alias e2e-ice.json=e2e/fixtures/e2e-ice.json --port ${new URL(NEXT_ORIGIN).port}`,
-      url: `${NEXT_ORIGIN}${PAGES_BASE_PATH}`,
       reuseExistingServer: !CI,
       timeout: 30_000,
     },

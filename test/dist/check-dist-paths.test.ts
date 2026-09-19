@@ -3,7 +3,7 @@
 // /hyperagent-web-apps/; on the proxy origin it sits at the short URL the Worker gives it
 // (unmapPath), and the resolved path is fed through the Worker's real mapPath(), redirects
 // followed, to reach an upstream path. Either way the target must be a file in the tree (or a
-// directory holding index.html). Runs on dist/ and dist-next/ after the builds (test:dist).
+// directory holding index.html). Runs on dist/ after the build (test:dist).
 import { expect, test } from 'vitest';
 
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
@@ -14,9 +14,7 @@ import {
   describeDist,
   distHasFile,
   isRelative,
-  unbuiltPages,
   type DistRoot,
-  type Reference,
 } from './dist.ts';
 
 /** Any origin: only pathnames matter here. */
@@ -42,25 +40,19 @@ const throughProxy = (pathname: string): string => {
 
 const resolvedPath = (base: string, value: string): string => new URL(value, base).pathname;
 
-/** A landing link to a game page this tree does not hold (dist-next/ without gin-rummy). */
-const isDeadByDesign = (root: DistRoot, reference: Reference): boolean =>
-  reference.file === 'index.html' &&
-  reference.kind === 'href' &&
-  unbuiltPages(root).some((game) => reference.value === `games/${game}/`);
-
 describeDist('dist paths on both origins', (root) => {
   const relative = allReferences(root).filter(({ value }) => isRelative(classify(value)));
-  const checked = relative.filter((reference) => !isDeadByDesign(root, reference));
+  const checked = relative;
 
   test('there are relative references to check (landing links, the bundles and CSS)', () => {
     // Two landing links and, per game page, its bundle, the preloaded shared chunk and its CSS.
-    expect(checked.length).toBeGreaterThanOrEqual(5);
+    expect(checked.length).toBeGreaterThanOrEqual(8);
   });
 
-  test('no landing link is left out: both game pages are built in both trees', () => {
-    const leftOut = relative.filter((reference) => isDeadByDesign(root, reference));
-    expect(leftOut).toEqual([]);
-    expect(unbuiltPages(root)).toEqual([]);
+  test('both game pages are built', () => {
+    ['gin-rummy', 'fidice'].forEach((game) => {
+      expect(distHasFile(root, `games/${game}/index.html`), game).toBe(true);
+    });
   });
 
   test('on the Pages origin every relative reference names a file in the tree', () => {
@@ -109,8 +101,7 @@ describeDist('dist paths on both origins', (root) => {
         kind: 'redirect',
         path: `/${reference.value}`.replace('/games', ''),
       });
-      if (!isDeadByDesign(root, reference))
-        expect(distTarget(root, throughProxy(proxyPath))).toBe(`${reference.value}index.html`);
+      expect(distTarget(root, throughProxy(proxyPath))).toBe(`${reference.value}index.html`);
     });
   });
 });

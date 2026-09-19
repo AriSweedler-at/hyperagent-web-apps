@@ -1,28 +1,18 @@
 // docs/MIGRATION.md step 4: the switch to a built dist/ is provably zero-diff. The landing page is
 // byte-identical to web/index.html (Vite leaves it alone with cssMinify off; a future Vite that
 // reformats it will fail here and the owner decides). Step 7 cut fidice over and step 13 gin-rummy:
-// in both trees each games/<g>/index.html is Vite's module page (never the legacy bundle), its
-// app-[hash].js sits beside it, its CSS under shared/assets/, both pages preload the same shared
-// chunk, and every asset a page references exists. legacy/** stays in the repo as the frozen source
-// of the oracle fixtures (legacy/README.md; test/fixtures/legacy/manifest.test.ts pins it) and is
-// never served. Runs after the builds (test:dist).
+// each games/<g>/index.html is Vite's module page (never the legacy bundle), its app-[hash].js sits
+// beside it, its CSS under shared/assets/, both pages preload the same shared chunk, and every
+// asset a page references exists; no shared/ice.js is emitted. legacy/** stays in the repo as the
+// frozen source of the oracle fixtures (legacy/README.md; test/fixtures/legacy/manifest.test.ts
+// pins it) and is never served. Runs after the build (test:dist).
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { expect, test } from 'vitest';
 
-import {
-  DIST_ROOTS,
-  REPO_ROOT,
-  describeDist,
-  distFiles,
-  distHasFile,
-  distPresent,
-  readDist,
-  referencesIn,
-  type DistRoot,
-} from './dist.ts';
+import { REPO_ROOT, describeDist, distFiles, distHasFile, readDist, referencesIn } from './dist.ts';
 
 const sha256 = (path: string): string =>
   createHash('sha256').update(readFileSync(path)).digest('hex');
@@ -31,12 +21,6 @@ const GAMES = ['gin-rummy', 'fidice'] as const;
 const legacyPage = (game: string): string => resolve(REPO_ROOT, 'legacy', game, 'index.html');
 
 describeDist('dist parity with legacy/ and web/', (root) => {
-  test('shared/ice.js is byte-identical to legacy/ (copied on every build)', () => {
-    expect(sha256(resolve(root.dir, 'shared', 'ice.js'))).toBe(
-      sha256(resolve(REPO_ROOT, 'legacy', 'shared', 'ice.js')),
-    );
-  });
-
   test('index.html (the landing page) is byte-identical to web/index.html', () => {
     expect(readDist(root, 'index.html')).toBe(
       readFileSync(resolve(REPO_ROOT, 'web', 'index.html'), 'utf8'),
@@ -149,14 +133,13 @@ describeDist('dist parity with legacy/ and web/', (root) => {
 
   test('the tree holds the landing page, both game pages and nothing stray at the root', () => {
     const files = distFiles(root);
-    [
-      '.nojekyll',
-      'index.html',
-      'shared/ice.js',
-      ...GAMES.map((game) => `games/${game}/index.html`),
-    ].forEach((file) => {
-      expect(files, file).toContain(file);
-    });
+    ['.nojekyll', 'index.html', ...GAMES.map((game) => `games/${game}/index.html`)].forEach(
+      (file) => {
+        expect(files, file).toContain(file);
+      },
+    );
+    // The classic ICE loader went with the last legacy page (step 13); it is bundled now.
+    expect(files).not.toContain('shared/ice.js');
     // Root-level files: the landing page, .nojekyll and (once it has a script) the landing's own
     // app-[hash].js with its map. Nothing else may sit beside them.
     const stray = files
@@ -164,22 +147,5 @@ describeDist('dist parity with legacy/ and web/', (root) => {
       .filter((file) => !['.nojekyll', 'index.html'].includes(file))
       .filter((file) => !/^app-[\w-]+\.js(\.map)?$/.test(file));
     expect(stray).toEqual([]);
-  });
-});
-
-// With no page left in LEGACY_PAGES the two trees are the same build: every file is byte-identical.
-test('dist/ and dist-next/ are byte-identical', (context) => {
-  const present = DIST_ROOTS.filter(distPresent);
-  const dist = present.find((root) => root.name === 'dist');
-  const next = present.find((root) => root.name === 'dist-next');
-  if (dist === undefined || next === undefined) {
-    context.skip('both dist/ and dist-next/ are needed: run `npm run build && npm run build:next`');
-    return;
-  }
-  const files = (root: DistRoot): ReadonlyArray<string> => distFiles(root);
-  expect(files(dist)).toEqual(files(next));
-  expect(files(dist).length).toBeGreaterThanOrEqual(8);
-  files(dist).forEach((file) => {
-    expect(sha256(resolve(dist.dir, file)), file).toBe(sha256(resolve(next.dir, file)));
   });
 });

@@ -5,7 +5,6 @@
   "description": "Ari's browser games (Gin Rummy, Fidice) with their Cloudflare Workers, served by GitHub Pages",
   "scripts": {
     "build": "vite build",
-    "build:next": "LEGACY_PAGES= vite build --outDir ../dist-next",
     "preview": "npm run build && npm run serve",
     "typecheck": "tsc -b",
     "lint": "eslint . --max-warnings 0 && prettier --check .",
@@ -15,8 +14,8 @@
     "test:watch": "vitest",
     "test:dist": "vitest run --config vitest.dist.config.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts --reporter=verbose",
-    "test:e2e": "npm run build && npm run build:next && playwright test",
-    "check": "npm run typecheck && npm run lint && npm test && npm run build && npm run build:next && npm run test:dist",
+    "test:e2e": "npm run build && playwright test",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build && npm run test:dist",
     "serve": "node --experimental-strip-types tools/serve-dist.ts --root dist --base /hyperagent-web-apps/ --alias e2e-ice.json=e2e/fixtures/e2e-ice.json",
     "proxy:dev": "node --experimental-strip-types tools/proxy-dev.ts --upstream http://127.0.0.1:4173",
     "fixtures:legacy": "node --experimental-strip-types tools/legacy/extract-gin-engine.ts && node --experimental-strip-types tools/legacy/extract-fidice-core.ts && node --experimental-strip-types tools/legacy/extract-gin-ui.ts",
