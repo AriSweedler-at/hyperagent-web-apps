@@ -589,8 +589,12 @@ parity and e2e gates.
   the only tree, holds no `shared/ice.js`, and both game pages are Vite's module pages preloading
   the same shared chunk (`test/dist/dist-parity.test.ts`, single-tree `describeDist`).
   `legacy/README.md` (new) states the files are test fixtures frozen at the cutover, never to be
-  edited, and lists every reader; the manifest test still fails if they change. `?peer=` lives only
-  in `web/shared/edge/transport.ts` (and, unserved, in the legacy pages). The `next` project is
+  edited, and lists every reader; the manifest test still fails if they change. Follow-up: that
+  manifest pins only the extracted ranges (35% of the gin page, none of `shared/ice.js`), so
+  `test/fixtures/legacy/frozen.test.ts` (new) pins the whole-file sha256 of all three and the
+  `legacy/` listing; the pins are hand-computed constants with no regenerator, so re-pinning is a
+  visible, explained edit. `?peer=` lives only in `web/shared/edge/transport.ts` (and, unserved,
+  in the legacy pages). The `next` project is
   gone because nothing is dark any more: `npm run test:e2e` builds dist/ once and runs every spec
   on `pages` and `proxy`; `e2e/gin-dom-parity.spec.ts` runs once, on `pages`, where the harness's
   serve-dist publishes the legacy gin page under `legacy/games/gin-rummy/index.html` (so its

@@ -5,8 +5,10 @@ The three files beside this README are the pre-migration site exactly as it was 
 loader they both used. They are **test fixtures**, frozen at each page's cutover (Fidice in step 7,
 Gin Rummy in step 13), and they are **never edited**: `test/fixtures/legacy/manifest.test.ts`
 re-runs the extractors against them on every `npm test` and fails if a pinned range or a fixture
-changes (`test/fixtures/legacy/MANIFEST.json` holds the sha256 of each); lint, Prettier and the
-Vite build ignore the directory.
+changes (`test/fixtures/legacy/MANIFEST.json` holds the sha256 of each range and fixture), and
+`test/fixtures/legacy/frozen.test.ts` pins the sha256 of each whole file and the directory listing,
+so a byte change anywhere in the three files (or a fourth file here) fails the suite; lint,
+Prettier and the Vite build ignore the directory.
 
 **Nothing serves them.** Since step 13 `dist/` holds only what Vite builds from `web/`: both game
 pages are the TypeScript ports, `dist/shared/ice.js` no longer exists, and the passthrough plugin

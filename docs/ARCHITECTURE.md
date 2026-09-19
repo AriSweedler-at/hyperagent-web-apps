@@ -706,10 +706,12 @@ Step 13 (cut Gin Rummy over; retire the passthrough):
   `shared/ice.js`: the proxy's `/shared/` rule now serves Vite's `shared/assets/` alone.
 - `legacy/` is kept, not deleted as "Build and serve" and the layout tree say: it is MIGRATION ONLY
   in the sense of test fixtures (the frozen, sha256-pinned oracle sources; `legacy/README.md` lists
-  every reader). Nothing copies it into dist and no page loads it; the one browser that opens a
-  legacy page is the DOM-parity oracle, through serve-dist aliases on the harness's pages origin
-  (`LEGACY_ALIASES` in `e2e/fixtures/site.ts`, mounted at `legacy/games/gin-rummy/index.html` so
-  its `../../shared/ice.js` resolves to the aliased `legacy/shared/ice.js`).
+  every reader). "Pinned" means whole files: `test/fixtures/legacy/frozen.test.ts` holds each
+  file's sha256 beside the range pins in `MANIFEST.json`, which cover only the extracted cuts.
+  Nothing copies it into dist and no page loads it; the one browser that opens a legacy page is the
+  DOM-parity oracle, through serve-dist aliases on the harness's pages origin (`LEGACY_ALIASES` in
+  `e2e/fixtures/site.ts`, mounted at `legacy/games/gin-rummy/index.html` so its
+  `../../shared/ice.js` resolves to the aliased `legacy/shared/ice.js`).
 - `npm run build:next`, `dist-next/` and the Playwright project `next` are retired: nothing is dark
   any more, so `test:e2e` is `npm run build && playwright test` on `pages` and `proxy` with every
   spec, and `check` builds once. `test/dist/dist.ts` guards the single tree (`DIST_ROOT`,

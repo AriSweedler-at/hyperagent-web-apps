@@ -35,7 +35,7 @@ npm run preview        # build, then serve
 npm run proxy:dev      # games.sweedler.com emulation: the real Worker at http://127.0.0.1:8787/ over :4173
 ```
 
-Git hooks live in `.githooks/`: `pre-commit` chains to the owner's template hook in `.git/hooks/pre-commit` (big-file and trailing-whitespace prompts) and `pre-push` runs `npm run check`. The legacy pages under `legacy/` are byte-frozen (the fixture manifest pins them; `legacy/README.md`); lint and Prettier ignore them, and Prettier also leaves `web/index.html` alone because dist parity compares against it verbatim.
+Git hooks live in `.githooks/`: `pre-commit` chains to the owner's template hook in `.git/hooks/pre-commit` (big-file and trailing-whitespace prompts) and `pre-push` runs `npm run check`. The legacy pages under `legacy/` are byte-frozen (`test/fixtures/legacy/frozen.test.ts` pins each whole file's sha256, the fixture manifest the extracted ranges; `legacy/README.md`); lint and Prettier ignore them, and Prettier also leaves `web/index.html` alone because dist parity compares against it verbatim.
 
 ### Browser tests
 
