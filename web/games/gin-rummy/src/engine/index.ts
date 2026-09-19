@@ -1,7 +1,9 @@
 // The gin engine as one module (docs/MIGRATION.md step 10): the 26 names the legacy GinEngine
-// block exported, under the same names, plus the types. test/parity loads this for the `current`
-// leg and step 12 imports it into the UI, net and app layers. Pure: no DOM, no clock, no
-// randomness of its own (docs/ARCHITECTURE.md "Module boundaries").
+// block exported, under the same names, plus the types and four names the port added (`sortMeld`,
+// `meldSolver`, `DEFAULT_TARGET`, `HAND_SIZE`). The memo `altCache` is not re-exported: it is
+// module state of melds.algorithms.ts, reachable only by its own test. test/parity loads this for
+// the `current` leg and step 12 imports it into the UI, net and app layers. Pure: no DOM, no
+// clock, no randomness of its own (docs/ARCHITECTURE.md "Module boundaries").
 export {
   SUITS,
   SUIT_SYMBOL,
@@ -17,7 +19,7 @@ export {
   sortMeld,
 } from './cards.ts';
 export { allMelds, meldingFromGroups, meldSig } from './melds.ts';
-export { bestMelding, allOptimalMeldings, meldSolver, altCache } from './melds.algorithms.ts';
+export { bestMelding, allOptimalMeldings, meldSolver } from './melds.algorithms.ts';
 export { maximalLayoff, bestMeldingWithLayoffs } from './layoff.ts';
 export { createGame, dealHand, applyAction, legalActions } from './game.ts';
 export { viewFor } from './view.ts';
