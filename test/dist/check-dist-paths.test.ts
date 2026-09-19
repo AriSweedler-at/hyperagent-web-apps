@@ -53,8 +53,7 @@ describeDist('dist paths on both origins', (root) => {
   const checked = relative.filter((reference) => !isDeadByDesign(root, reference));
 
   test('there are relative references to check (landing links, the bundles and CSS)', () => {
-    // dist/: two landing links, the fidice bundle, its CSS and the gin page's shared/ice.js;
-    // dist-next/: two landing links and both pages' bundles and CSS (docs/MIGRATION.md step 12).
+    // Two landing links and, per game page, its bundle, the preloaded shared chunk and its CSS.
     expect(checked.length).toBeGreaterThanOrEqual(5);
   });
 

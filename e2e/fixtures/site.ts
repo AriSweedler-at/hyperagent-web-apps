@@ -2,10 +2,10 @@
 // `pages` mirrors GitHub Pages: the site under /hyperagent-web-apps/ on tools/serve-dist.ts.
 // `proxy` mirrors games.sweedler.com: short game URLs on tools/proxy-dev.ts, which runs the real
 // Worker against the pages origin. `next` is the Pages layout again, serving dist-next/ (built with
-// `LEGACY_PAGES=`, docs/MIGRATION.md step 6), so a ported page is played end to end before it is
-// flipped; only the ported pages exist in that tree (fidice, flipped in step 7, is the same bytes
-// there as in dist/; gin-rummy is the dark port since step 12). Everything the harness needs to
-// know about URLs is here, so specs never spell out an absolute site path themselves.
+// `LEGACY_PAGES=`, docs/MIGRATION.md step 6), where a ported page played end to end before it was
+// flipped; since step 13 cut gin-rummy over nothing is dark and both trees hold the same pages.
+// Everything the harness needs to know about URLs is here, so specs never spell out an absolute
+// site path themselves.
 
 export type Project = 'pages' | 'proxy' | 'next';
 export type PageName = 'landing' | 'gin-rummy' | 'fidice';
@@ -27,15 +27,21 @@ export const ICE_URL = `${PAGES_ORIGIN}${PAGES_BASE_PATH}e2e-ice.json`;
 /** What e2e/fixtures/e2e-ice.json holds; test/tools/serve-dist.test.ts pins the file to it. */
 export const ICE_FIXTURE = { iceServers: [{ urls: 'stun:127.0.0.1:3478' }] } as const;
 
+/**
+ * The frozen legacy gin page (docs/MIGRATION.md step 13: no longer served, kept as the oracle
+ * source), published on the `pages` origin under legacy/ by tools/serve-dist.ts aliases
+ * (playwright.config.ts) for e2e/gin-dom-parity.spec.ts alone; dist/ holds no legacy file. It is
+ * mounted two directories deep so its own `../../shared/ice.js` resolves to the aliased legacy copy.
+ */
+export const LEGACY_GIN_PAGE = 'legacy/games/gin-rummy/index.html';
+/** Path under the Pages mount -> repo-relative file, as `--alias path=file` arguments. */
+export const LEGACY_ALIASES: Readonly<Record<string, string>> = {
+  [LEGACY_GIN_PAGE]: 'legacy/gin-rummy/index.html',
+  'legacy/shared/ice.js': 'legacy/shared/ice.js',
+};
+
 export const PROJECTS: ReadonlyArray<Project> = ['pages', 'proxy', 'next'];
 export const PAGES: ReadonlyArray<PageName> = ['landing', 'gin-rummy', 'fidice'];
-/** Pages a project's tree holds: dist/ has every page; dist-next/ the landing and the ported ones. */
-export const PORTED_PAGES: ReadonlyArray<PageName> = ['landing', 'gin-rummy', 'fidice'];
-/** On the `next` project the gin page is the typed port; on `pages` and `proxy` still the legacy one. */
-export const isTypedPage = (project: Project, page: PageName): boolean =>
-  page === 'fidice' || (page === 'gin-rummy' && project === 'next');
-export const pagesOn = (project: Project): ReadonlyArray<PageName> =>
-  project === 'next' ? PORTED_PAGES : PAGES;
 
 export const EXPECTED_TITLES: Readonly<Record<PageName, string>> = {
   landing: "Ari's web apps",

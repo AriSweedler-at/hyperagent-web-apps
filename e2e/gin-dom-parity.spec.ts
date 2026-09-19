@@ -1,22 +1,24 @@
-// DOM-snapshot parity of the dark gin page against the legacy page (docs/MIGRATION.md step 12):
-// the driver in tools/parity/gin-dom-parity.ts plays the same pass-and-play game and Score Counter
-// session on both, with the same seeded Math.random and pinned clock, and compares the screens at
-// every checkpoint. The legacy page is dist/ on the `pages` origin and the new page dist-next/ on
-// the `next` origin, both served by the harness, so the spec runs once, on the `next` project.
+// DOM-snapshot parity of the served gin page against the frozen legacy page (docs/MIGRATION.md
+// steps 12 and 13): the driver in tools/parity/gin-dom-parity.ts plays the same pass-and-play game
+// and Score Counter session on both, with the same seeded Math.random and pinned clock, and
+// compares the screens at every checkpoint. Both come from the `pages` origin: the new page is
+// dist/games/gin-rummy/ and the legacy page is legacy/gin-rummy/index.html, published under
+// legacy/ by the harness's serve-dist aliases (e2e/fixtures/site.ts), so the spec runs once, on
+// the `pages` project.
 import { expect, test } from '@playwright/test';
 
-import { NEXT_ORIGIN, PAGES_BASE_PATH, PAGES_ORIGIN } from './fixtures/site.ts';
+import { LEGACY_GIN_PAGE, PAGES_BASE_PATH, PAGES_ORIGIN } from './fixtures/site.ts';
 import { PROMPTS, openPair, runParity } from '../tools/parity/gin-dom-parity.ts';
 
-test('the dark gin page paints what the legacy page paints, checkpoint for checkpoint', async ({
+test('the served gin page paints what the legacy page paints, checkpoint for checkpoint', async ({
   browser,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== 'next', 'runs once, on the project that serves dist-next/');
+  test.skip(testInfo.project.name !== 'pages', 'runs once, on the origin that serves both pages');
   test.setTimeout(240_000);
   const pair = await openPair(
     browser,
+    `${PAGES_ORIGIN}${PAGES_BASE_PATH}${LEGACY_GIN_PAGE}`,
     `${PAGES_ORIGIN}${PAGES_BASE_PATH}games/gin-rummy/`,
-    `${NEXT_ORIGIN}${PAGES_BASE_PATH}games/gin-rummy/`,
     PROMPTS,
   );
   try {

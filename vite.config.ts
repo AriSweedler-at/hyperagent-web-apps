@@ -20,10 +20,11 @@ const LEGACY = resolve(REPO_ROOT, 'legacy');
 
 /**
  * Pages served byte-for-byte from legacy/ until their port is cut over (docs/MIGRATION.md).
- * Cutting a page over is deleting it from this list (step 7 did so for fidice; its legacy file
- * stays as the frozen source of the oracle fixtures until step 13 retires legacy/).
+ * Cutting a page over is deleting it from this list: step 7 did so for fidice, step 13 for
+ * gin-rummy, so the list is empty and every page is Vite's; the legacy files stay as the frozen
+ * sources of the oracle fixtures (legacy/README.md).
  */
-export const DEFAULT_LEGACY_PAGES: ReadonlyArray<string> = ['gin-rummy'];
+export const DEFAULT_LEGACY_PAGES: ReadonlyArray<string> = [];
 
 /**
  * `LEGACY_PAGES=gin-rummy` overrides the list; `LEGACY_PAGES=` (empty) disables the passthrough

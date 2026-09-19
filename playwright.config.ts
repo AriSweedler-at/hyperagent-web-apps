@@ -12,6 +12,7 @@
 import { defineConfig } from '@playwright/test';
 
 import {
+  LEGACY_ALIASES,
   NEXT_ORIGIN,
   PAGES_BASE_PATH,
   PAGES_ORIGIN,
@@ -24,6 +25,12 @@ import {
 const CI = process.env['CI'] !== undefined && process.env['CI'] !== '';
 const cloudBroker = process.env['E2E_BROKER'] === 'cloud';
 const node = 'node --experimental-strip-types';
+/** The e2e ICE fixture and, on the pages origin, the frozen legacy gin page for the DOM-parity spec. */
+const aliasArgs = (aliases: Readonly<Record<string, string>>): string =>
+  Object.entries(aliases)
+    .map(([path, file]) => `--alias ${path}=${file}`)
+    .join(' ');
+const pagesAliases = aliasArgs({ 'e2e-ice.json': 'e2e/fixtures/e2e-ice.json', ...LEGACY_ALIASES });
 
 export default defineConfig({
   testDir: 'e2e',
@@ -47,11 +54,8 @@ export default defineConfig({
     { name: 'pages', use: { baseURL: `${PAGES_ORIGIN}${PAGES_BASE_PATH}` } },
     { name: 'proxy', use: { baseURL: `${PROXY_ORIGIN}/` } },
     {
-      // The dark build: only the specs for pages that exist in dist-next/ (e2e/fixtures/site.ts).
-      // Since step 7 the fidice output is byte-identical in dist/ and dist-next/
-      // (test/dist/dist-parity.test.ts), so fidice-online runs on `pages` and `proxy` only. The
-      // gin port (step 12) plays here dark: its four specs, the resume spec and the DOM-snapshot
-      // parity against the legacy page on the `pages` origin.
+      // The dark build. Since step 13 cut gin-rummy over, dist-next/ is the same tree as dist/
+      // and every spec here replays `pages`; the project is retired with the passthrough.
       name: 'next',
       use: { baseURL: `${NEXT_ORIGIN}${PAGES_BASE_PATH}` },
       testMatch: [
@@ -66,7 +70,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `${node} tools/serve-dist.ts --root dist --base ${PAGES_BASE_PATH} --alias e2e-ice.json=e2e/fixtures/e2e-ice.json --port ${new URL(PAGES_ORIGIN).port}`,
+      command: `${node} tools/serve-dist.ts --root dist --base ${PAGES_BASE_PATH} ${pagesAliases} --port ${new URL(PAGES_ORIGIN).port}`,
       url: `${PAGES_ORIGIN}${PAGES_BASE_PATH}`,
       reuseExistingServer: !CI,
       timeout: 30_000,

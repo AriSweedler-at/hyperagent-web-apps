@@ -1,7 +1,7 @@
 // Resume and rejoin (docs/MIGRATION.md step 12): the host deals, reloads the page and resumes the
 // room from `ginRummyMP_v1`; the guest, whose channel dropped, rejoins by itself and both tables
-// show the same hand again. Then the guest reloads and rejoins from its own save. Runs on the
-// legacy page (`pages`, `proxy`) and on the dark page (`next`).
+// show the same hand again. Then the guest reloads and rejoins from its own save. Runs on both
+// origins against the served page (the typed port since docs/MIGRATION.md step 13).
 import { BROKER_TIMEOUT, WEBRTC_TIMEOUT } from './fixtures/timeouts.ts';
 import { ginHostDeals, readTable } from './fixtures/gin.ts';
 import { openGame } from './fixtures/player.ts';

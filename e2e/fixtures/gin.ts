@@ -1,4 +1,4 @@
-// Drives the legacy Gin Rummy page through its DOM (ids from legacy/gin-rummy/index.html). Nothing
+// Drives the Gin Rummy page through its DOM (the legacy ids, kept by web/games/gin-rummy/index.html). Nothing
 // here reads `window.__gin`: whose turn it is, what may be tapped and what was discarded are all
 // read from the same elements a player sees.
 import { expect, type Page } from '@playwright/test';
