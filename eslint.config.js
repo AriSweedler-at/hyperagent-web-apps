@@ -248,8 +248,13 @@ const zones = [
       `${GAME_SRC}/app/**`,
       `${GAME_SRC}/storage.ts`,
     ],
-    // dom.fake.ts is the structural DOM the view tests render into (docs/MIGRATION.md step 9).
-    except: ['**/web/shared/edge/dom.ts', '**/web/shared/edge/dom.fake.ts'],
+    // dom.fake.ts is the structural DOM the view tests render into (docs/MIGRATION.md step 9);
+    // page.fake.ts the static-page fake the gin ui/page.fake.ts fixture builds on (step 12).
+    except: [
+      '**/web/shared/edge/dom.ts',
+      '**/web/shared/edge/dom.fake.ts',
+      '**/web/shared/edge/page.fake.ts',
+    ],
     message: 'ui/ and view/ render views; DOM access only through @shared/edge/dom.',
   },
   {
@@ -341,6 +346,12 @@ export default defineConfig([
   {
     files: ['web/shared/edge/transport.ts'],
     rules: { 'no-restricted-imports': 'off' },
+  },
+  {
+    // Ambient declarations (web/raw-imports.d.ts) are never executed, so the erasable-syntax ban on
+    // `declare module` does not apply; the other bans stay.
+    files: ['web/**/*.d.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...loopBans, absolutePathBan, mathRandomBan] },
   },
 
   // --- eslint-plugin-functional profiles ------------------------------------------------------

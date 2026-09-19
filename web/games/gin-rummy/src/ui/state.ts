@@ -63,6 +63,9 @@ import { INITIAL_CUES, nextCue, selectionIn, type Cue, type CueState } from './c
 
 // ---- the state ---------------------------------------------------------------------------------
 
+// ui/home.ts paints the tabs from the same list storage.ts decodes; ui/ may not import storage.ts.
+export { HOME_TABS, type HomeTab };
+
 export type Role = 'host' | 'guest' | 'local';
 
 /** The seven top-level screens `showScreen` toggled between. */

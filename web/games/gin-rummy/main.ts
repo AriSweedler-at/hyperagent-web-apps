@@ -28,8 +28,17 @@ import { HostSession, type HostEvents } from './src/net/host.ts';
 import type { NetDeps } from './src/net/peerjs.ts';
 import { isGuestFrame } from './src/protocol.ts';
 import { soundEnabled } from './src/storage.ts';
+import { defaultHandView } from './src/ui/hand/HandView.ts';
 import { fillNameInputs, inviteText, setCodeInput } from './src/ui/home.ts';
-import { hideToast, paint, renderRules, showToast } from './src/ui/render.ts';
+import {
+  bindAll,
+  fitTable,
+  hideToast,
+  paint,
+  paintSound,
+  renderRules,
+  showToast,
+} from './src/ui/render.ts';
 import {
   INVITE_COPIED_MSG,
   SHARE_FALLBACK_MS,
@@ -99,10 +108,21 @@ const boot = (): void => {
       vibrate(nav, pattern);
     },
     store,
-    onToggle: () => {
-      paint(document, app);
+    onToggle: (enabled) => {
+      paintSound(document, enabled);
     },
   });
+
+  // `queueFit()`: one fitTable per animation frame, after a paint of the table and on resize.
+  let fitQueued = false;
+  const queueFit = (): void => {
+    if (fitQueued) return;
+    fitQueued = true;
+    requestAnimationFrame(() => {
+      fitQueued = false;
+      fitTable(document);
+    });
+  };
 
   const netDeps: NetDeps = {
     // PeerJS log level 0 as on the legacy page; realTransport reads the ?peer= hook itself.
@@ -117,13 +137,20 @@ const boot = (): void => {
     },
   };
 
+  // The hand is drawn by the default HandView (docs/ARCHITECTURE.md "Seams reserved": a second
+  // view is another module and this choice).
+  const repaint = (): void => {
+    paint(document, app, defaultHandView);
+    if (app.screen === 'tableScreen') queueFit();
+  };
+
   const dispatch = (intent: Intent): void => {
     const step = reduce(app, intent, { rng, now });
     app = step.app;
     step.effects.forEach((effect) => {
       runEffect(app, effect, deps);
     });
-    paint(document, app);
+    repaint();
   };
 
   const hostEvents: HostEvents = {
@@ -255,6 +282,10 @@ const boot = (): void => {
   };
 
   renderRules(document);
+  bindAll(document, dispatch);
+  paintSound(document, fx.enabled());
+  window.addEventListener('resize', queueFit);
+  window.addEventListener('orientationchange', queueFit);
   // Browsers only let audio start after a user gesture: warm the context on the first tap.
   ['pointerdown', 'touchstart', 'keydown'].forEach((event) => {
     document.addEventListener(

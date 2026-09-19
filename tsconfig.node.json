@@ -62,6 +62,7 @@
     "web/games/gin-rummy/src/ui/render*.ts",
     "web/games/gin-rummy/src/ui/home*.ts",
     "web/games/gin-rummy/src/ui/local*.ts",
+    "web/games/gin-rummy/src/ui/page.fake.ts",
     "web/games/gin-rummy/src/scorer/main*.ts"
   ]
 }
