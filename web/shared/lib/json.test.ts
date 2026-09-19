@@ -12,6 +12,7 @@ import {
   object,
   oneOf,
   optional,
+  record,
   refine,
   string,
   type DecodeError,
@@ -203,20 +204,40 @@ describe('optional / nullable', () => {
 describe('object', () => {
   const player = object({ name: string, seat: integer(0, 1), nick: optional(string) });
 
-  test('decodes the declared fields and infers the type', () => {
+  test('decodes the declared fields and infers the type (optional fields as optional keys)', () => {
     const r = player({ name: 'Ari', seat: 1 });
-    expect(r).toEqual(ok({ name: 'Ari', seat: 1, nick: undefined }));
+    expect(r).toEqual(ok({ name: 'Ari', seat: 1 }));
     if (r.ok) {
       expectTypeOf(r.value).toEqualTypeOf<
-        Readonly<{ name: string; seat: number; nick: string | undefined }>
+        Readonly<{ name: string; seat: number; nick?: string }>
       >();
     }
   });
 
-  test('drops undeclared keys', () => {
-    const r = player({ name: 'Ari', seat: 0, extra: 'x', t: 'hello' });
-    expect(r).toEqual(ok({ name: 'Ari', seat: 0, nick: undefined }));
-    expect(r.ok && Object.keys(r.value)).toEqual(['name', 'seat', 'nick']);
+  test('drops undeclared keys and keeps the declared order', () => {
+    const r = player({ seat: 0, name: 'Ari', extra: 'x', t: 'hello' });
+    expect(r).toEqual(ok({ name: 'Ari', seat: 0 }));
+    expect(r.ok && Object.keys(r.value)).toEqual(['name', 'seat']);
+  });
+
+  test('an optional key absent in the input is absent in the output; present, it is kept in place', () => {
+    const absent = player({ name: 'Ari', seat: 0 });
+    expect(absent.ok && Object.keys(absent.value)).toEqual(['name', 'seat']);
+    expect(absent.ok && 'nick' in absent.value).toBe(false);
+    const present = player({ name: 'Ari', seat: 0, nick: 'A' });
+    expect(present).toEqual(ok({ name: 'Ari', seat: 0, nick: 'A' }));
+    expect(present.ok && Object.keys(present.value)).toEqual(['name', 'seat', 'nick']);
+    // So the JSON text round-trips through the decoder (a wire golden's key set survives).
+    const d = object({ text: string, card: optional(string), by: optional(integer(0, 1)) });
+    ['{"text":"t"}', '{"text":"t","by":1}', '{"text":"t","card":"AS","by":0}'].forEach((json) => {
+      const r = d(JSON.parse(json));
+      expect(r.ok && JSON.stringify(r.value)).toBe(json);
+    });
+  });
+
+  test('an explicit undefined under an optional key (not JSON) is left out like a missing one', () => {
+    const r = player({ name: 'Ari', seat: 0, nick: undefined });
+    expect(r.ok && Object.keys(r.value)).toEqual(['name', 'seat']);
   });
 
   test('reports a bad field by key, nested paths compose', () => {
@@ -254,7 +275,7 @@ describe('object', () => {
       '{"__proto__": {"polluted": true}, "constructor": {"prototype": {"x": 1}}, "name": "Ari", "seat": 0}',
     ) as unknown;
     const r = player(hostile);
-    expect(r).toEqual(ok({ name: 'Ari', seat: 0, nick: undefined }));
+    expect(r).toEqual(ok({ name: 'Ari', seat: 0 }));
     if (r.ok) {
       expect(Object.getPrototypeOf(r.value)).toBe(Object.prototype);
       expect('polluted' in r.value).toBe(false);
@@ -267,11 +288,48 @@ describe('object', () => {
     const o: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
     o['name'] = 'n';
     o['seat'] = 1;
-    expect(player(o)).toEqual(ok({ name: 'n', seat: 1, nick: undefined }));
+    expect(player(o)).toEqual(ok({ name: 'n', seat: 1 }));
   });
 
   test('an empty field set accepts any object and yields {}', () => {
     expect(object({})({ a: 1 })).toEqual(ok({}));
+  });
+});
+
+describe('record', () => {
+  const scores = record(integer(0, 100));
+
+  test('keeps every own key in input order and decodes each value', () => {
+    const r = scores({ b: 2, a: 1, AS: 10 });
+    expect(r).toEqual(ok({ b: 2, a: 1, AS: 10 }));
+    expect(r.ok && Object.keys(r.value)).toEqual(['b', 'a', 'AS']);
+    expect(scores({})).toEqual(ok({}));
+  });
+
+  test('reports the failing key and rejects non-objects', () => {
+    expect(scores({ a: 1, b: 'x' })).toEqual(failure(['b'], 'integer in [0, 100]'));
+    expect(scores([1])).toEqual(failure([], 'object'));
+    expect(scores(null)).toEqual(failure([], 'object'));
+    expect(scores('a')).toEqual(failure([], 'object'));
+    const nested = record(object({ n: integer(0, 9) }));
+    expect(nested({ k: { n: 10 } })).toEqual(failure(['k', 'n'], 'integer in [0, 9]'));
+  });
+
+  test('refuses prototype-chain keys instead of carrying them', () => {
+    HOSTILE_KEYS.slice(0, 3).forEach((key) => {
+      const hostile = JSON.parse(`{"a": 1, "${key}": 2}`) as unknown;
+      expect(scores(hostile)).toEqual(failure([key], 'a key that is not a prototype member'));
+    });
+    // Other inherited names are ordinary keys when they are own properties.
+    expect(scores({ toString: 3 })).toEqual(ok({ toString: 3 }));
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
+  });
+
+  test('reads own properties only and yields a clean prototype', () => {
+    const proto = { inherited: 1 };
+    const r = scores(Object.create(proto) as unknown);
+    expect(r).toEqual(ok({}));
+    if (r.ok) expect(Object.getPrototypeOf(r.value)).toBe(Object.prototype);
   });
 });
 
@@ -323,6 +381,7 @@ describe('properties over arbitrary and hostile inputs', () => {
     ['literal', literal('a', 1, true, null)],
     ['arrayOf', arrayOf(number)],
     ['frame', frame],
+    ['record', record(oneOf<unknown>(string, number, boolean))],
     ['oneOf', oneOf<unknown>(string, number, boolean)],
   ];
 
@@ -341,10 +400,11 @@ describe('properties over arbitrary and hostile inputs', () => {
     });
   });
 
-  test('an Ok from object has exactly the declared keys and a clean prototype', () => {
+  test('an Ok from object has exactly the declared keys (the optional one when present) and a clean prototype', () => {
     const decoded = inputs.map((input) => frame(input)).filter((r) => r.ok);
     decoded.forEach((r) => {
-      expect(Object.keys(r.value).sort()).toEqual(['n', 't', 'who', 'xs']);
+      const keys = Object.keys(r.value).sort();
+      expect(keys).toEqual(keys.includes('n') ? ['n', 't', 'who', 'xs'] : ['t', 'who', 'xs']);
       expect(Object.getPrototypeOf(r.value)).toBe(Object.prototype);
     });
   });

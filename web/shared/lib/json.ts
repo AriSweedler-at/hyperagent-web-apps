@@ -17,6 +17,21 @@ export type Decoder<T> = (input: unknown) => Result<T, DecodeError>;
 /** Value type of a decoder, for spelling the output of `object` without repeating it. */
 export type Decoded<D> = D extends Decoder<infer T> ? T : never;
 
+type OptionalKeys<F> = { [K in keyof F]: undefined extends Decoded<F[K]> ? K : never }[keyof F];
+/** A mapped type over an intersection flattens it into one object type (optionality kept). */
+type Flat<T> = { [K in keyof T]: T[K] };
+/**
+ * The output of `object(fields)`: a field whose decoder accepts `undefined` (see `optional`) is
+ * an optional key, absent when the input lacks it; every other field is required.
+ */
+export type Shape<F> = Readonly<
+  Flat<
+    { [K in Exclude<keyof F, OptionalKeys<F>>]: Decoded<F[K]> } & {
+      [K in OptionalKeys<F>]?: Exclude<Decoded<F[K]>, undefined>;
+    }
+  >
+>;
+
 const fail = (expected: string, path: ReadonlyArray<string | number> = []): DecodeError => ({
   path,
   expected,
@@ -94,13 +109,12 @@ const own = (record: Readonly<Record<string, unknown>>, key: string): unknown =>
 /**
  * A plain object with the declared fields. Keys not declared are dropped, so the decoded value has
  * exactly the shape of `fields`; a field decoder that accepts `undefined` (see `optional`) makes
- * that key optional in the input. The output is built key by key on a fresh literal, never by
- * spreading the input.
+ * that key optional in the input, and a key the input lacks stays absent in the output (never set
+ * to `undefined`), so `JSON.stringify` of the decoded value reproduces the input's keys. The output is
+ * built key by key on a fresh literal, in the declared order, never by spreading the input.
  */
 export const object =
-  <F extends Readonly<Record<string, Decoder<unknown>>>>(
-    fields: Readonly<F>,
-  ): Decoder<Readonly<{ [K in keyof F]: Decoded<F[K]> }>> =>
+  <F extends Readonly<Record<string, Decoder<unknown>>>>(fields: Readonly<F>): Decoder<Shape<F>> =>
   (input) => {
     if (!isRecord(input)) return err(fail('object'));
     const entries: ReadonlyArray<readonly [string, Decoder<unknown>]> = Object.entries(
@@ -111,15 +125,38 @@ export const object =
         if (!acc.ok) return acc;
         const [key, decoder] = entry;
         const field = decoder(own(input, key));
-        return field.ok
-          ? ok([...acc.value, [key, field.value] as const])
-          : nested(field.error, key);
+        if (!field.ok) return nested(field.error, key);
+        // A missing key decodes to undefined only through `optional`; leave it out (an explicit
+        // `undefined` in the input is not JSON and is treated the same).
+        return field.value === undefined ? acc : ok([...acc.value, [key, field.value] as const]);
       },
       ok([]),
     );
-    return decoded.ok
-      ? ok(Object.fromEntries(decoded.value) as Readonly<{ [K in keyof F]: Decoded<F[K]> }>)
-      : decoded;
+    return decoded.ok ? ok(Object.fromEntries(decoded.value) as Shape<F>) : decoded;
+  };
+
+/** Keys that would reach the prototype chain rather than the data; refused in `record` inputs. */
+const UNSAFE_KEYS: ReadonlyArray<string> = ['__proto__', 'constructor', 'prototype'];
+
+/**
+ * A plain object used as a map: every own enumerable key is kept, in the input's order, and every
+ * value must satisfy `value` (the failing key is reported). The three keys that would touch the
+ * prototype chain are refused rather than dropped, since a map is not expected to carry them.
+ */
+export const record =
+  <V>(value: Decoder<V>): Decoder<Readonly<Record<string, V>>> =>
+  (input) => {
+    if (!isRecord(input)) return err(fail('object'));
+    const decoded = Object.keys(input).reduce<
+      Result<ReadonlyArray<readonly [string, V]>, DecodeError>
+    >((acc, key) => {
+      if (!acc.ok) return acc;
+      if (UNSAFE_KEYS.includes(key))
+        return err(fail('a key that is not a prototype member', [key]));
+      const item = value(own(input, key));
+      return item.ok ? ok([...acc.value, [key, item.value] as const]) : nested(item.error, key);
+    }, ok([]));
+    return decoded.ok ? ok(Object.fromEntries(decoded.value)) : decoded;
   };
 
 /** Post-process a decoded value; the mapping itself cannot fail. */
