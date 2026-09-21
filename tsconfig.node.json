@@ -56,13 +56,16 @@
     "infra/games-proxy/**/*.ts"
   ],
   // The gin paint and wiring (ui/{render,home,local}.ts and scorer/main.ts, step 12) are written
-  // against the DOM edge and stay out with their tests.
+  // against the DOM edge and stay out with their tests, as does the stories page (stories/boot.ts
+  // paints; its catalogue is DOM-free and stays in, e2e/gin-stories.spec.ts imports it).
   "exclude": [
     "test/fixtures/legacy/*.cjs",
     "web/games/gin-rummy/src/ui/render*.ts",
     "web/games/gin-rummy/src/ui/home*.ts",
     "web/games/gin-rummy/src/ui/local*.ts",
     "web/games/gin-rummy/src/ui/page.fake.ts",
-    "web/games/gin-rummy/src/scorer/main*.ts"
+    "web/games/gin-rummy/src/scorer/main*.ts",
+    "web/games/gin-rummy/src/stories/boot.ts",
+    "web/games/gin-rummy/src/stories/catalogue.test.ts"
   ]
 }

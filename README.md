@@ -119,10 +119,26 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    and on the frozen legacy page (aliased in by the harness) and compares 84 checkpoints. The report
    lands in `playwright-report/` (`npx playwright show-report`). The two contexts connect over the
    machine's own addresses: a Cloudflare WARP-style tunnel that drops loopback UDP times them out.
-7. **Advisory broker** (CI job `broker`, `continue-on-error`):
+7. **Stories** (`e2e/gin-stories.spec.ts`, `pages` project; `docs/design/gin-draw-ghost-slot.md`
+   §7-§8): sixteen catalogued table states of the gin page
+   (`web/games/gin-rummy/src/stories/catalogue.ts`, one seeded deal played through the engine),
+   each opened through the page's `?story=<id>` hook at 390x844, 1280x800 and 375x667 and checked
+   against facts derived from the engine (what is tappable, fresh, locked, selected, enabled), the
+   fixed geometry (no scroll, eleven same-size cells, two rows on a phone) and the owner's rule that
+   a draw moves no card; at the first two viewports a screenshot is compared against the committed
+   per-platform baseline in `e2e/__screenshots__/` (`maxDiffPixelRatio: 0.002`; a missing baseline
+   fails). `?story=` alone lists the stories in the browser. After a named visual change re-record
+   both platforms and say so in the PR:
+
+   ```sh
+   npm run test:e2e -- e2e/gin-stories.spec.ts --project pages --update-snapshots   # the -darwin.png files, locally
+   gh workflow run stories-baselines.yml --ref <branch> && gh run download -n stories-baselines-linux -D e2e/__screenshots__   # the -linux.png files
+   ```
+
+8. **Advisory broker** (CI job `broker`, `continue-on-error`):
    `E2E_BROKER=cloud npm run test:e2e -- --grep @online` plays the same specs through 0.peerjs.com,
    so a signalling regression is visible at review without a third party blocking a merge.
-8. **Nightly** (`.github/workflows/nightly.yml`, 09:23 UTC or `gh workflow run nightly.yml`):
+9. **Nightly** (`.github/workflows/nightly.yml`, 09:23 UTC or `gh workflow run nightly.yml`):
    `npm run test:live` aims both projects at the live origins with nothing local started and runs
    the `@online` specs through the real broker and `turn.sweedler.com`, plus
    `e2e/gin-relay.spec.ts`: a gin game opened with `?ice-policy=relay`, so every candidate must

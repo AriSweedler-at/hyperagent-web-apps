@@ -77,6 +77,18 @@ const downloadText = (fileName: string, text: string): void => {
 };
 
 const boot = (): void => {
+  // The stories page (docs/design/gin-draw-ghost-slot.md §8; docs/ARCHITECTURE.md "Documented test
+  // hooks"): `?story=<id>` paints one catalogued table state and constructs no adapter at all. The
+  // catalogue arrives as its own chunk (a dynamic import), so the game's entry carries none of it.
+  const params = new URLSearchParams(location.search);
+  const story = params.get('story');
+  if (story !== null) {
+    void import('./src/stories/boot.ts').then((stories) => {
+      stories.bootStory(document, story, params.has('nav'));
+    });
+    return;
+  }
+
   // The documented test hooks on this page (docs/ARCHITECTURE.md "Documented test hooks"): a seeded
   // rng a harness installs before boot, the app hook set after it, and the Score Counter's screen
   // (src/scorer/main.ts) registering itself as the legacy `window.__scorer` did.

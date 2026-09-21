@@ -47,6 +47,10 @@ export default defineConfig({
   retries: 1,
   forbidOnly: CI,
   reporter: [['list'], ['html', { open: 'never' }]],
+  // Screenshot baselines (e2e/gin-stories.spec.ts) are committed per platform, since Chromium's
+  // text rendering differs between macOS and the linux runner: `<story>--<viewport>-darwin.png`
+  // is recorded locally, `-linux.png` by .github/workflows/stories-baselines.yml on the branch.
+  snapshotPathTemplate: '{testDir}/__screenshots__/{testFileName}/{arg}-{platform}{ext}',
   use: {
     browserName: 'chromium',
     trace: 'on-first-retry',

@@ -88,7 +88,11 @@ Games never import each other. `infra/` shares only the pure `mapPath()` with te
 Documented test hooks that are part of the contract: `window.__gin`, `window.__fidice`,
 `window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
 `?ice=<url>` (ICE config override), `?ice-policy=relay` (port-only: `iceTransportPolicy: 'relay'`
-inside the Peer `config`, for the nightly's relay-forced game), and `globalThis.__peerCalls`:
+inside the Peer `config`, for the nightly's relay-forced game), `?story=<id>` (gin only: `main.ts`
+reads it before anything else and, when present, imports `src/stories/boot.ts` and returns, so the
+page paints one catalogued table state from `src/stories/catalogue.ts` with the real `paint` and
+constructs no store, network, ICE or timer; `?story=` alone lists the stories as links, `&nav` adds
+a prev/index/next bar; "Testing pyramid" 5), and `globalThis.__peerCalls`:
 `web/shared/edge/transport.ts`
 pushes the arguments of every `new Peer(...)` it makes (`[id, options]` for a host, `[options]` for
 a guest, `options` the exact object handed to PeerJS) onto that array, creating it if absent, so a
@@ -288,6 +292,33 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
    bots to `over`; smoke on every page: zero uncaught exceptions, zero failed requests outside an
    allowlist, and the Peer constructor received the `?ice=` config. Visual `toHaveScreenshot`
    baselines captured on the CI runner from the legacy pages.
+5. Stories (`web/games/gin-rummy/src/stories/catalogue.ts`; `e2e/gin-stories.spec.ts` on `pages`;
+   docs/design/gin-draw-ghost-slot.md §7-§8). A story is one table state of the gin page as an
+   `App` the real `paint` renders through the `?story=<id>` hook, played through the engine alone
+   from one seeded deal (`mulberry32(12)`, dealer 1), with the facts the DOM must then show (slot and
+   card counts, the ghost cell's class, the fresh, locked and selected cards, the piles' classes,
+   the buttons and their state, the status line) derived from the engine state and the draw stage,
+   never from the renderer, so the catalogue is an oracle of the paint rather than a copy of it.
+   Sixteen stories cover the ghost draw slot from the upcard decision to the round over; a
+   `sameHandAs` pair asserts the owner's sentence, the same card in the same cell before and after a
+   draw. `catalogue.test.ts` paints every story on the page fake and reads the facts back out of the
+   strings (vitest, no browser); the spec opens every story at 390x844, 1280x800 and 375x667 and
+   asserts the facts, the geometry (`#app` and `#hand` never scroll, eleven cells of one size, six
+   and five in two rows on the phones, one row on the laptop) and, for a `sameHandAs` pair, equal
+   pixel rectangles of the first ten cards; at the first two viewports it then compares a screenshot
+   (`body` on the phone, `#app` on the laptop) against the committed baseline
+   `e2e/__screenshots__/gin-stories.spec.ts/<id>--<viewport>-<platform>.png` with
+   `maxDiffPixelRatio: 0.002` (a fifth of a percent of the pixels: antialiasing noise, never a moved
+   card or a changed label). Baselines are per platform (Chromium's text rendering differs between
+   macOS and the linux runner) and a missing one fails, so CI is never green with no visual coverage.
+   To add a story: one `story({ ... })` entry in `STORIES` (an engine state, the seat whose view is
+   shown, the status line, optionally a draw stage, a selection, App overrides and `sameHandAs`),
+   then re-record. To re-record after a named visual change: `npm run test:e2e --
+   e2e/gin-stories.spec.ts --project pages --update-snapshots` on macOS for the `-darwin.png`
+   files; `gh workflow run stories-baselines.yml --ref <branch>` and `gh run download -n
+   stories-baselines-linux -D e2e/__screenshots__` for the `-linux.png` files
+   (`.github/workflows/stories-baselines.yml`, `workflow_dispatch` only); commit both and name the
+   change in the PR body. The e2e job fails on the branch until both platforms' files exist.
 
 ## Conventions for small diffs
 
