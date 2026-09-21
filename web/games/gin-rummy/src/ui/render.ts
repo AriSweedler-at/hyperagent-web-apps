@@ -6,7 +6,10 @@
 // the overlays, each written from the App (ui/state.ts) alone, so the same App always paints the
 // same DOM. Every id, class, text and tooltip is the legacy `render()`'s
 // (legacy/gin-rummy/index.html), and the DOM-snapshot oracle (tools/parity/gin-dom-parity.ts) plays
-// both pages through the same sequence and compares them.
+// both pages through the same sequence and compares them; the one region that diverges by design
+// is `#tableScreen` since the ghost draw slot (docs/design/gin-draw-ghost-slot.md: slots, the
+// undo button in the actions row, one pile size, shorter button labels), which the oracle no
+// longer snapshots.
 //
 // Where the legacy wrote a region only on some path, this paints it only under the same condition,
 // so stale content stays stale on both: the table is written only while a view exists and the hand
@@ -45,9 +48,9 @@ import {
   type View,
 } from '../engine/types.ts';
 import { backHtml, cardHtml, pretty } from './cards.ts';
-import { deadwoodText, fmtDuration, statusFor, type Selection } from './cues.ts';
+import { deadwoodText, fmtDuration, statusWith, type Selection } from './cues.ts';
 import { fitScale, type Measure } from './fit.ts';
-import { defaultHandView, type HandView } from './hand/HandView.ts';
+import type { HandView } from './hand/HandView.ts';
 import { meldGroupsHtml } from './hand/meldGroups.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
@@ -162,11 +165,7 @@ const paintPiles = (doc: DocumentLike, v: View): void => {
     'Discard',
     v.discardTop?.id ?? 'empty',
   );
-  // Piles take centre stage while they are what you act on, then shrink for the buttons.
-  const pilesActive = v.isMyTurn && (v.phase === 'draw' || v.phase === 'upcard');
-  const scr = requireId(doc, 'tableScreen');
-  toggleClass(scr, 'piles-big', pilesActive);
-  toggleClass(scr, 'piles-small', !pilesActive);
+  // One pile size in every phase: nothing above the hand changes size on a draw.
   const canDrawStock = v.isMyTurn && v.phase === 'draw';
   const canDrawDiscard = canDrawStock && !v.forceStock && v.discardTop !== null;
   const canTakeUpcard = v.isMyTurn && v.phase === 'upcard';
@@ -176,7 +175,7 @@ const paintPiles = (doc: DocumentLike, v: View): void => {
 };
 
 const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
-  const status = statusFor(v, app.selectedCard);
+  const status = statusWith(v, app.selectedCard, app.draw);
   setText(requireId(doc, 'statusMain'), status.main);
   setText(requireId(doc, 'statusSub'), status.sub);
   toggleClass(requireId(doc, 'statusBanner'), 'mine', v.isMyTurn && v.phase !== 'roundOver');
@@ -193,7 +192,12 @@ export const deadwoodHtml = (v: View, selection: Selection): SafeHtml => {
   return safeHtml`${deadwoodText(v, selection)}${badge}`;
 };
 
-/** The action buttons under the hand, by phase. */
+/**
+ * The action buttons under the hand, by phase. While discarding, the undo button leads the row
+ * whenever the draw can still be taken back, and the labels are the short ones (`Discard`,
+ * `Knock` / `GIN!`) so three buttons never wrap in the fixed 54px row on a phone
+ * (docs/design/gin-draw-ghost-slot.md §4: an owner-visible copy change).
+ */
 export const actionsHtml = (v: View, selection: Selection): SafeHtml => {
   if (v.phase === 'upcard' && v.isMyTurn) {
     const take = v.discardTop === null ? 'upcard' : pretty(v.discardTop);
@@ -205,10 +209,13 @@ export const actionsHtml = (v: View, selection: Selection): SafeHtml => {
     const sel = selection === null ? undefined : v.discardOptions?.[selection];
     const scored = sel !== undefined && !('locked' in sel) ? sel : null;
     const canKnock = scored?.canKnock === true;
-    const knockLabel = scored?.isGin === true ? 'Discard &amp; GIN!' : 'Discard &amp; knock';
+    const knockLabel = scored?.isGin === true ? 'GIN!' : 'Knock';
     const count = scored === null ? '' : ` <small>(${String(scored.deadwood)})</small>`;
+    const undo = v.canUndo
+      ? '<button class="btn btn-ghost" data-act="undoDraw" title="Undo draw">↩</button>'
+      : '';
     return trustedHtml(
-      `<button class="btn btn-secondary grow" data-act="discard" ${scored === null ? 'disabled' : ''}>Discard &amp; end turn</button><button class="btn btn-gold grow" data-act="knock" ${canKnock ? '' : 'disabled'}>${knockLabel}${count}</button>`,
+      `${undo}<button class="btn btn-secondary grow" data-act="discard" ${scored === null ? 'disabled' : ''}>Discard</button><button class="btn btn-gold grow" data-act="knock" ${canKnock ? '' : 'disabled'}>${knockLabel}${count}</button>`,
     );
   }
   if (v.phase === 'roundOver')
@@ -227,13 +234,8 @@ const paintHand = (doc: DocumentLike, app: App, v: View, handView: HandView): vo
   toggleClass(dw, 'tappable-dw', altCount > 1);
   setAttr(dw, 'title', altCount > 1 ? 'Tap to choose which melds you declare' : '');
   const hand = requireId(doc, 'hand');
-  setHtml(hand, trustedHtml(handView.render(v, app.selectedCard)));
+  setHtml(hand, trustedHtml(handView.render(v, app.selectedCard, app.draw)));
   toggleClass(hand, 'active', v.isMyTurn && v.phase === 'discard');
-  toggleClass(
-    requireId(doc, 'undoBar'),
-    'hidden',
-    !(v.phase === 'discard' && v.isMyTurn && v.canUndo),
-  );
   setHtml(requireId(doc, 'actions'), actionsHtml(v, app.selectedCard));
 };
 
@@ -507,8 +509,11 @@ const paintGame = (doc: DocumentLike, app: App, handView: HandView): void => {
   paintMeldChooser(doc, app, v);
 };
 
-/** Everything, from the App alone; `handView` is main.ts's choice (docs/ARCHITECTURE.md "Seams"). */
-export const paint = (doc: PageLike, app: App, handView: HandView = defaultHandView): void => {
+/**
+ * Everything, from the App alone; `handView` is main.ts's choice (docs/ARCHITECTURE.md "Seams":
+ * `slotHandView`; no default here, so the legacy `defaultHandView` tree-shakes out of the page).
+ */
+export const paint = (doc: PageLike, app: App, handView: HandView): void => {
   paintScreen(doc, app);
   paintWaiting(doc, app);
   paintHome(doc, app);
@@ -534,9 +539,6 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   });
   listenId(doc, 'soundBtn', 'click', () => {
     dispatch({ type: 'sound/toggle' });
-  });
-  listenId(doc, 'undoDrawBtn', 'click', () => {
-    dispatch({ type: 'act', action: { type: 'undoDraw' } });
   });
   listenId(doc, 'deadwoodInfo', 'click', () => {
     dispatch({ type: 'meld/open' });

@@ -29,7 +29,7 @@ import type { NetDeps } from './src/net/peerjs.ts';
 import { isGuestFrame } from './src/protocol.ts';
 import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
 import { soundEnabled } from './src/storage.ts';
-import { defaultHandView } from './src/ui/hand/HandView.ts';
+import { slotHandView } from './src/ui/hand/SlotHandView.ts';
 import { fillNameInputs, inviteText, setCodeInput } from './src/ui/home.ts';
 import {
   bindAll,
@@ -153,10 +153,10 @@ const boot = (): void => {
     },
   };
 
-  // The hand is drawn by the default HandView (docs/ARCHITECTURE.md "Seams reserved": a second
-  // view is another module and this choice).
+  // The hand is drawn by the slot view with the ghost draw slot (docs/ARCHITECTURE.md "Seams
+  // reserved": the view is another module and this choice; docs/design/gin-draw-ghost-slot.md).
   const repaint = (): void => {
-    paint(document, app, defaultHandView);
+    paint(document, app, slotHandView);
     if (app.screen === 'tableScreen') queueFit();
   };
 
