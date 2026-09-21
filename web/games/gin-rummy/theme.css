@@ -1,10 +1,10 @@
-/* The legacy page's two <style> blocks, in order (legacy/gin-rummy/index.html; docs/MIGRATION.md
-   step 12), hand-owned since step 14, which moved the primitives both games share (the box-sizing
-   reset, html/body margin, .hidden) into web/shared/styles/base.css and its palette into
+/* The legacy page's first <style> block (legacy/gin-rummy/index.html; docs/MIGRATION.md step 12),
+   hand-owned since step 14, which moved the primitives both games share (the box-sizing reset,
+   html/body margin, .hidden) into web/shared/styles/base.css and its palette into
    web/shared/styles/tokens.css; the page links tokens.css and base.css before this file.
-   Everything else is verbatim; the second block is the stray .ha-img-placeholder block, kept until
-   step 15. The computed-style goldens (test/fixtures/styles/gin-rummy.*.json) and the class contract
-   are the oracles. */
+   Everything else is verbatim. The legacy page's second block, the stray .ha-img-placeholder
+   rules that no element carried, was removed in step 15. The computed-style goldens
+   (test/fixtures/styles/gin-rummy.*.json) and the class contract are the oracles. */
   :root {
     /* The palette (--bg --card --card-2 --accent --accent-dark --gold --text --muted --danger
        --radius --felt) is the shared vocabulary in web/shared/styles/tokens.css, with these values. */
@@ -214,7 +214,3 @@
   @keyframes voicePulse { 0%,100% { box-shadow: 0 6px 18px rgba(220,38,38,0.5); } 50% { box-shadow: 0 6px 26px rgba(220,38,38,0.9); } }
 
   ::-webkit-scrollbar { width: 0; height: 0; }
-.ha-img-placeholder{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;background:#f4f4f5;border:1px dashed #d4d4d8;border-radius:8px;color:#71717a;font-size:12px;font-family:system-ui,sans-serif;min-height:80px;padding:16px;box-sizing:border-box;animation:ha-img-pulse 1.5s ease-in-out infinite}
-.ha-img-placeholder.ha-failed{animation:none;opacity:.7}
-@keyframes ha-img-pulse{0%,100%{opacity:1}50%{opacity:.5}}
-@media(prefers-color-scheme:dark){.ha-img-placeholder{background:#27272a;border-color:#3f3f46;color:#a1a1aa}}
