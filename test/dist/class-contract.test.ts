@@ -48,8 +48,9 @@ describeDist('CSS <-> TS class contract', (root) => {
     const markup = markupClasses(root, game);
     const css = cssClasses(root, game);
 
-    test(`${game}: the page links one built stylesheet and the three sources are non-empty`, () => {
+    test(`${game}: the page links the shared stylesheet then its own, and the three sources are non-empty`, () => {
       expect(stylesheets(root, game)).toEqual([
+        expect.stringMatching(/^shared\/assets\/[\w-]+\.css$/) as string,
         expect.stringMatching(new RegExp(`^shared/assets/${game}-[\\w-]+\\.css$`)) as string,
       ]);
       expect(tsNames.length).toBeGreaterThan(50);
