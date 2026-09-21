@@ -689,6 +689,21 @@ describe.each(legs)('gin engine: %s', (leg, E) => {
       expect(redeals.length).toBeGreaterThan(0);
       return redeals;
     };
+    /**
+     * The rematch: a seeded game played to gameOver, then `ready` from both seats. `readyAfterGame`
+     * redeals over the finished state, whose `lastDrawn` key exists, so the two legs disagree here
+     * exactly as at a round's redeal; `before` is the finished game's last draw.
+     */
+    const rematch = (seed: number): { before: unknown; s: GinState } => {
+      const { state: s } = play(seed);
+      const before = s.lastDrawn;
+      expect(before).toEqual({ p: expect.any(Number) as number, id: expect.any(String) as string });
+      expect(E.applyAction(s, 0, { type: 'ready' }, mulberry32(seed)).ok).toBe(true);
+      expect(E.applyAction(s, 1, { type: 'ready' }, mulberry32(seed)).ok).toBe(true);
+      expect(s.handNumber).toBe(1);
+      expect(s.phase).toBe('upcard');
+      return { before, s };
+    };
 
     test.runIf(leg === 'legacy')(
       'KNOWN DEFECT (lastDrawn leak), legacy only: dealHand does not reset lastDrawn, so a card drawn in the previous hand is marked "last drawn" when the redeal happens to give it back',
@@ -708,6 +723,17 @@ describe.each(legs)('gin engine: %s', (leg, E) => {
             id: expect.any(String) as string,
           });
         });
+        // The rematch too: the finished game's last draw survives into hand 1 of the next game.
+        // Seed 2's deal keeps its stale QS out of sight; seed 5's hands 4C back to seat 1, who
+        // sees it marked fresh.
+        [2, 5].forEach((seed) => {
+          const { before, s: next } = rematch(seed);
+          expect(next.lastDrawn).toEqual(before);
+        });
+        expect(rematch(2).before).toEqual({ p: 1, id: 'QS' });
+        expect(E.viewFor(rematch(2).s, 1).lastDrawnId).toBeNull();
+        expect(rematch(5).before).toEqual({ p: 1, id: '4C' });
+        expect(E.viewFor(rematch(5).s, 1).lastDrawnId).toBe('4C');
       },
     );
 
@@ -725,6 +751,15 @@ describe.each(legs)('gin engine: %s', (leg, E) => {
             expect(lastDrawn).toBeNull();
             expect(shown).toEqual([null, null]);
           });
+        });
+        // The rematch too (seed 5's deal hands the legacy's stale 4C back to seat 1).
+        [2, 5].forEach((seed) => {
+          const { s: next } = rematch(seed);
+          expect(next.lastDrawn).toBeNull();
+          expect([E.viewFor(next, 0).lastDrawnId, E.viewFor(next, 1).lastDrawnId]).toEqual([
+            null,
+            null,
+          ]);
         });
       },
     );
