@@ -70,7 +70,8 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     test(`every relative asset the ${game} page references is a file in the tree`, () => {
       // Its bundle, the shared chunk(s) it preloads (what both module pages import: PeerJS and the
       // shared edges, split out since the gin page joined the build in docs/MIGRATION.md step 12),
-      // and its CSS, in that order.
+      // the shared chunk's CSS (web/shared/styles, step 14) and its own CSS, in that order: the
+      // shared sheets cascade before the game's theme, as the source page links them.
       const page = `games/${game}/index.html`;
       const relative = referencesIn(page, readDist(root, page))
         .map(({ value }) => value)
@@ -79,7 +80,8 @@ describeDist('dist parity with legacy/ and web/', (root) => {
       expect(relative.at(-1)).toMatch(
         new RegExp(`^\\.\\./\\.\\./shared/assets/${game}-[\\w-]+\\.css$`),
       );
-      const chunks = relative.slice(1, -1);
+      expect(relative.at(-2)).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.css$/);
+      const chunks = relative.slice(1, -2);
       expect(chunks.length).toBeGreaterThanOrEqual(1);
       chunks.forEach((value) => {
         expect(value).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.js$/);
@@ -108,14 +110,19 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     expect(gin).toContain('<title>Gin Rummy</title>');
   });
 
-  test('both module pages preload the same shared chunk(s) under shared/assets/', () => {
-    const preloads = (page: string): ReadonlyArray<string> =>
+  test('both module pages preload the same shared chunk(s) and link the same shared stylesheet under shared/assets/', () => {
+    const shared = (page: string, ext: string): ReadonlyArray<string> =>
       referencesIn(page, readDist(root, page))
         .map(({ value }) => value)
-        .filter((value) => /^\.\.\/\.\.\/shared\/assets\/[\w-]+\.js$/.test(value));
-    const fidice = preloads('games/fidice/index.html');
+        .filter((value) => new RegExp(`^\\.\\./\\.\\./shared/assets/[\\w-]+\\.${ext}$`).test(value))
+        .filter((value) => !value.includes('/fidice-') && !value.includes('/gin-rummy-'));
+    const fidice = shared('games/fidice/index.html', 'js');
     expect(fidice.length).toBeGreaterThanOrEqual(1);
-    expect(preloads('games/gin-rummy/index.html')).toEqual(fidice);
+    expect(shared('games/gin-rummy/index.html', 'js')).toEqual(fidice);
+    // web/shared/styles/{tokens,base}.css, linked by both pages, are emitted once (step 14).
+    const sharedCss = shared('games/fidice/index.html', 'css');
+    expect(sharedCss).toHaveLength(1);
+    expect(shared('games/gin-rummy/index.html', 'css')).toEqual(sharedCss);
     expect(readDist(root, 'games/fidice/index.html')).toContain(
       '<link rel="modulepreload" crossorigin href="../../shared/assets/',
     );

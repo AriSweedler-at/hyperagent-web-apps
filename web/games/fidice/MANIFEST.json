@@ -5,12 +5,6 @@
   "endLine": 4031,
   "sourceSha256": "7cb363b9005289b1e52632fbcecfae41cb79fa558959b013965d4bd863ef2776",
   "files": {
-    "index.html": {
-      "sha256": "a6438febffb0f930a7f4eab98d117aa6596c0d4329591abc7efcb186397b0e3f"
-    },
-    "theme.css": {
-      "sha256": "12363c3fb618eebda271ef26f2ebb4e237de080c944ed03c7ac0f5541907a5cf"
-    },
     "src/assets/diceImages.ts": {
       "section": "src/assets/diceImages.ts",
       "startLine": 374,

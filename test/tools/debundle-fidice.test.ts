@@ -6,9 +6,12 @@
 // fix is `npm run debundle:fidice` (and, for a page edit, a note on why the oracle moved). A module
 // typed in place (docs/MIGRATION.md step 8, `<name>.ts` beside where `<name>.js` was) is
 // hand-written: the tool stops emitting it and pins only its provenance (section and lines) in the
-// manifest. Since step 9 every section is typed, so the tool generates index.html and theme.css
-// alone and the manifest is the map from each .ts back to its bundle lines; the tool stays runnable
-// as an audit (`--dry-run` prints the recovered graph) and these tests keep it honest.
+// manifest. Since step 9 every section is typed, so the manifest is the map from each .ts back to
+// its bundle lines; the tool stays runnable as an audit (`--dry-run` prints the recovered graph)
+// and these tests keep it honest. index.html and theme.css were the tool's last generated files
+// until docs/MIGRATION.md step 14 hoisted the shared primitives out of theme.css and linked
+// web/shared/styles from the page: both are hand-owned now, and the goldens, the class contract and
+// the e2e specs are their oracles, so the tool neither cuts nor pins them.
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
@@ -33,6 +36,8 @@ const typed = debundled.modules.filter((m) => portedOnDisk(m.section.name));
 const generated = debundled.modules.filter((m) => !portedOnDisk(m.section.name));
 /** `main.ts` once the entry is typed (docs/MIGRATION.md step 9), `main.js` before. */
 const entryFile = portedOnDisk('src/app/main') ? 'main.ts' : 'main.js';
+/** The page files beside the modules, hand-owned since docs/MIGRATION.md step 14. */
+const PAGE_FILES: ReadonlyArray<string> = ['index.html', 'theme.css'];
 
 /** Every regular file under web/games/fidice except the manifest, as posix paths relative to it. */
 const committedFiles = (): ReadonlyArray<string> =>
@@ -50,8 +55,6 @@ describe('the de-bundled fidice modules', () => {
       38 - typed.filter((m) => m.section.name !== 'src/app/main').length,
     );
     expect(files.includes('main.js')).toBe(entryFile === 'main.js');
-    expect(files).toContain('index.html');
-    expect(files).toContain('theme.css');
     expect(debundled.modules.map((m) => `${m.section.name}.ts`)).toEqual(
       page
         .split('\n')
@@ -59,10 +62,10 @@ describe('the de-bundled fidice modules', () => {
     );
   });
 
-  test('every committed file is what the tool cuts from the HEAD page, and nothing else is committed', () => {
+  test('every committed file is what the tool cuts from the HEAD page or a hand-owned page file, and nothing else is committed', () => {
     // Typed modules and their companions (types, *.algorithms, tests) are hand-written .ts files.
     expect(committedFiles().filter((file) => !file.endsWith('.ts'))).toEqual(
-      [...debundled.files.keys()].sort(),
+      [...PAGE_FILES, ...debundled.files.keys()].sort(),
     );
     debundled.files.forEach((text, file) => {
       expect(readRepoFile(`${FIDICE_DIR}/${file}`), file).toBe(text);
@@ -72,7 +75,8 @@ describe('the de-bundled fidice modules', () => {
   test('every section is typed (docs/MIGRATION.md step 9): no .js is generated or committed', () => {
     expect(generated).toEqual([]);
     expect(typed).toHaveLength(39);
-    expect([...debundled.files.keys()].sort()).toEqual(['index.html', 'theme.css']);
+    expect([...debundled.files.keys()]).toEqual([]);
+    expect(Object.keys(manifest.files).filter((file) => PAGE_FILES.includes(file))).toEqual([]);
     expect(committedFiles().filter((file) => file.endsWith('.js'))).toEqual([]);
     Object.values(manifest.files)
       .filter((entry) => entry.section !== undefined)
@@ -163,32 +167,23 @@ describe('the de-bundled fidice modules', () => {
     });
   });
 
-  test('the page keeps its head and boots the entry as a module; the classic scripts go with the typed entry', () => {
-    const html = debundled.files.get('index.html') ?? '';
+  test('the hand-owned page boots the typed entry as a module and links the shared stylesheets before its own', () => {
+    // Step 9: PeerJS and the ICE loader are bundled through web/shared/edge (main.ts), so the page
+    // defines neither `window.Peer` nor `window.HyperIce`. Step 14: the cascade is tokens, base,
+    // then the game's theme (docs/ARCHITECTURE.md "Two origins": relative links only).
+    const html = readRepoFile(`${FIDICE_DIR}/index.html`);
     expect(html).toContain("<title>Fidice — one-cup liar's dice</title>");
-    expect(html).toContain('<link rel="preconnect" href="https://fonts.googleapis.com">');
-    expect(html).toContain('<link rel="stylesheet" href="./theme.css">');
     expect(html).toContain('<div id="app"></div>');
     expect(html).toContain(`<script type="module" src="./${entryFile}"></script>`);
     expect(html).not.toContain('<style>');
     expect(html).not.toContain('"use strict"');
-    // Step 9: PeerJS and the ICE loader are bundled through web/shared/edge (main.ts), so the
-    // page defines neither `window.Peer` nor `window.HyperIce`; before that it loaded both.
-    const peerCdn = '<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>';
-    const iceScript = '<script vite-ignore src="../../shared/ice.js"></script>';
-    expect(html.includes(peerCdn)).toBe(entryFile === 'main.js');
-    expect(html.includes(iceScript)).toBe(entryFile === 'main.js');
-    expect(/shared\/ice\.js|peerjs\.min\.js/.test(html)).toBe(entryFile === 'main.js');
-  });
-
-  test('theme.css is the two <style> blocks of the page in order', () => {
-    const css = debundled.files.get('theme.css') ?? '';
-    const styles = [...page.matchAll(/<style>\n([\s\S]*?)<\/style>/g)].map((m) => m[1] ?? '');
-    expect(styles).toHaveLength(2);
-    styles.forEach((block) => {
-      expect(css).toContain(block);
-    });
-    expect(css.indexOf(styles[0] ?? '')).toBeLessThan(css.indexOf(styles[1] ?? ''));
+    expect(/shared\/ice\.js|peerjs\.min\.js/.test(html)).toBe(false);
+    const links = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map((m) => m[1]);
+    expect(links).toEqual([
+      '../../shared/styles/tokens.css',
+      '../../shared/styles/base.css',
+      './theme.css',
+    ]);
   });
 
   test('the generated files exist on disk and carry no trailing whitespace', () => {

@@ -605,3 +605,41 @@ parity and e2e gates.
   step 15 or later, with the owner). Computed-style goldens and visual snapshots are not captured
   (see step 3); the manual mixed-origin phone game is the PR body's gate. See ARCHITECTURE
   "Deviations".
+- Step 14, phase 1 (the gates, no CSS moved): the computed-style goldens (`tools/parity/computed-styles.ts`,
+  `test/fixtures/styles/<game>.<WxH>.json`; 29 gin screens, 20 fidice screens at 390x844 and
+  1280x800) are a CI gate as `e2e/computed-styles.spec.ts` on the `pages` project (one test per
+  game and viewport, 15-40 s each; the styles are the same bytes on both origins), not the
+  `test/dist/computed-styles.test.ts` the tool's header first named: the capture drives a browser.
+  The class contract is `test/dist/class-contract.test.ts` over `test/dist/classes.ts`: a few
+  documented regular expressions collect the classes TS names (`toggleClass`-family literals, vdom
+  `class:` and `cls(...)` literals, `class="..."` words in template strings), the served page's
+  class attributes and every `.name` in the linked built stylesheets, and both directions are
+  asserted per game. `web/shared/styles/CONTRACT.md` lists only what the extraction cannot see
+  (helper-built names such as `cardClass`, `abs-${sym}`), hooks with no rule, one `cls()` false
+  positive (the phase literal `'lobby'`) and the dead rules step 15 removes (`.ha-img-placeholder`,
+  `.ha-failed`, fidice's `.hidden`, `.kbd`, `.or`, ... and gin's `.divider`), rather than every
+  class (~120 gin, ~165 fidice): each row is checked against the tree so it cannot go stale.
+  `DIST_DIR` points the dist guards at a scratch copy (the proof that the contract bites: deleting
+  `.status-banner.mine` fails with `mine (web/games/gin-rummy/src/ui/render.ts)`). The markup
+  source is the served `dist/games/<g>/index.html` rather than `web/games/<g>/index.html`: same
+  class attributes, and the guard reads the tree it ships. See ARCHITECTURE "Deviations".
+- Step 14, phase 2 (the hoist, values unchanged): `web/shared/styles/tokens.css` and `base.css`
+  exist and both pages link them before `./theme.css`, in that cascade order. `tokens.css` declares
+  nothing: the seven names both themes share (`--felt --card --accent --accent-dark --gold --muted
+  --radius`) agree on no value, and the goldens pin each page's declared custom-property set and
+  every `:root` value, so a new shared name, or the fidice alias the step planned (`--ink` onto
+  `--text`), is itself a golden change; the aliasing is deferred to the Fidice restyle (roadmap),
+  which re-records, and `CONTRACT.md` "Tokens" tables both palettes as its input (five columns, so
+  the class parser skips it). `base.css` holds the three primitives the themes carried identically,
+  `* { box-sizing }`, `html, body { margin: 0 }` and `.hidden`; gin keeps `* { -webkit-tap-highlight-color }`
+  and the rest of its `html, body` rule, fidice `html, body { height: 100% }`. Nothing else was
+  verbatim in both: buttons, inputs, labels, toasts, overlays and sheets differ in selector or value
+  every time, so they stay in the themes, and the identical `.ha-img-placeholder` block stays in
+  both because step 15 deletes it. Vite attaches the shared sheets to the shared chunk, so each
+  built page links `shared/assets/roomCode-<hash>.css` then `shared/assets/<game>-<hash>.css`; the
+  dist guards assert the pair and the order, and the 10-minute cache window covers that file too.
+  `web/games/fidice/{index.html,theme.css}` are hand-owned: `tools/legacy/debundle-fidice.ts` no
+  longer cuts or pins them (the manifest maps the typed modules only) and both games' page files
+  stay in `.prettierignore` as legacy-layout bytes. Visual snapshots are still not captured (step
+  3). Oracles: `computed-styles.ts --check` 0 differences x4, `npm run check`, and every non-online
+  e2e spec on both projects. See ARCHITECTURE "Deviations".

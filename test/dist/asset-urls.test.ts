@@ -59,9 +59,16 @@ describeDist('dist asset URLs', (root) => {
         .forEach(({ value }) => {
           expect(value).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.js$/);
         });
+      // Two stylesheets, both under ../../shared/assets/: the web/shared/styles sheets both pages
+      // link ride the shared chunk (docs/MIGRATION.md step 14), then the game's own CSS.
       expect(
         references.filter(({ value }) => value.endsWith('.css')).map(({ value }) => value),
-      ).toEqual([expect.stringMatching(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.css$/) as string]);
+      ).toEqual([
+        expect.stringMatching(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.css$/) as string,
+        expect.stringMatching(
+          new RegExp(`^\\.\\./\\.\\./shared/assets/${game}-[\\w-]+\\.css$`),
+        ) as string,
+      ]);
     });
   });
 });

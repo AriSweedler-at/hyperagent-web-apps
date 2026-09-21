@@ -1,7 +1,16 @@
 /*
- * Shared design tokens (docs/ARCHITECTURE.md "Seams reserved for the roadmap"). Empty on purpose
- * until docs/MIGRATION.md step 14 hoists the two games' :root blocks here with their values
- * unchanged; nothing imports this file yet. Only custom properties belong in this file.
+ * Shared design tokens (docs/ARCHITECTURE.md "Seams reserved for the roadmap"; docs/MIGRATION.md
+ * step 14). Both game pages link this file first, then base.css, then their own theme.css. Only
+ * custom properties belong in this file.
+ *
+ * The shared vocabulary is the seven names both themes already declare on :root: --felt, --card,
+ * --accent, --accent-dark, --gold, --muted and --radius. No value is shared: the two palettes
+ * disagree on every one of them (CONTRACT.md "Tokens" has both values side by side), so each
+ * theme.css keeps its own and this :root stays empty. The computed-style goldens
+ * (test/fixtures/styles/<game>.<WxH>.json) pin the set of custom properties each page declares and
+ * the value of every one of them on :root, so declaring a new shared name here, or aliasing a
+ * legacy name onto one in a theme, is itself a golden change. Values move into this file with the
+ * Fidice restyle (the roadmap step that maps its palette onto the shared names and re-records).
  */
 :root {
 }

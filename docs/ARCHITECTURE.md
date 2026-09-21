@@ -40,8 +40,9 @@ and tests that prove it land before the code they protect.
 │   │   │                        algorithms (the loop escape hatch), clock (types)
 │   │   ├── edge/                EFFECTS: ice, transport (only importer of 'peerjs'; ?peer= override),
 │   │   │                        transport.fake, clock, storage, dom, fx
-│   │   ├── ui/                  RESERVED (README only): HandView slot, toast/name-entry/lobby builders, base.css
-│   │   └── styles/              tokens.css (:root tokens only), CONTRACT.md (CSS<->TS class contract)
+│   │   ├── ui/                  RESERVED (README only): HandView slot, toast/name-entry/lobby builders
+│   │   └── styles/              tokens.css (:root tokens only), base.css (shared primitives), CONTRACT.md
+│   │                            (CSS<->TS class contract + the two palettes' token table); both pages link them
 │   └── games/
 │       ├── gin-rummy/           index.html (legacy markup + module script), main.ts, theme.css (legacy CSS), src/
 │       │   └── src/             engine/ (types, cards, melds, melds.algorithms, layoff, game, view, index),
@@ -283,10 +284,11 @@ or updates a pinned issue on failure.
 
 ## Seams reserved for the roadmap (not implemented now)
 
-- Shared design tokens / UI kit: `web/shared/styles/tokens.css` (nearly empty now; the two games'
-  `:root` blocks disagree on `--felt`) and `web/shared/ui/` (README only). The Fidice restyle maps
-  its palette onto shared token names in `theme.css`, then moves screen builders into `shared/ui`;
-  computed-style goldens and the class contract gate it.
+- Shared design tokens / UI kit: `web/shared/styles/tokens.css` (linked by both pages since step 14
+  but still an empty `:root`: the two games' `:root` blocks disagree on every shared name, `--felt`
+  first; `CONTRACT.md` "Tokens" tables both) and `web/shared/ui/` (README only). The Fidice restyle
+  maps its palette onto shared token names in `theme.css` and re-records the goldens, then moves
+  screen builders into `shared/ui`; computed-style goldens and the class contract gate it.
 - Swappable hand display: `ui/hand/HandView.ts` is the interface `render.ts` consumes; a new view is
   a second module and a `main.ts` choice, gated by DOM-snapshot parity of the default.
 - Phone layout stability: `ui/fit.ts` isolates `nextScale()` as a pure function over measured sizes
@@ -720,3 +722,18 @@ Step 13 (cut Gin Rummy over; retire the passthrough):
   byte-identical to `web/index.html`, and `legacy/` present.
 - The 10-minute cache window in "Build and serve" now applies to both game pages and the shared
   chunk; closing it (retained assets in the deploy job) is still deferred.
+- Step 14, phase 1: the computed-style goldens run as `e2e/computed-styles.spec.ts` on `pages`
+  (a browser capture, so an e2e spec, not a dist test), and `test/dist/class-contract.test.ts`
+  checks the class contract by extraction (`test/dist/classes.ts`), so `CONTRACT.md` lists the
+  exceptions the extraction cannot see, not every class. `DIST_DIR` redirects the dist guards.
+- Step 14, phase 2 (the hoist): both pages link `web/shared/styles/tokens.css` and `base.css`
+  before `./theme.css`. `tokens.css` is still an empty `:root`: the seven names both themes declare
+  agree on no value, and the goldens pin each page's declared custom-property set and `:root`
+  values, so a shared name or a fidice alias is a golden change reserved for the Fidice restyle.
+  `base.css` holds the box-sizing reset, `html, body { margin: 0 }` and `.hidden`, the only rules
+  the themes carried identically. Vite attaches the shared sheets to the shared chunk, so a built
+  page links `shared/assets/roomCode-<hash>.css` then `shared/assets/<game>-<hash>.css` (the dist
+  guards assert the pair, the order and that both pages link the same shared file; the cache window
+  in "Build and serve" covers it too). `web/games/fidice/{index.html,theme.css}` are hand-owned, no
+  longer cut or pinned by `tools/legacy/debundle-fidice.ts`; `web/shared/ui/README.md`'s `base.css`
+  row moved to `web/shared/styles`.
