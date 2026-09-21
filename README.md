@@ -11,7 +11,7 @@ Both games are served from their TypeScript ports under `web/games/`, built by V
 
 The same site is served at **https://games.sweedler.com** through the Cloudflare Worker in `infra/games-proxy/`: `games.sweedler.com/gin-rummy/` and `games.sweedler.com/fidice/` are the short URLs, `/games/<name>/` redirects to them, and `/shared/…` maps to the site's `shared/` directory (Vite's `shared/assets/`).
 
-Runtime dependencies: PeerJS (bundled from npm) for online play; Google Fonts in Fidice from the CDN. The site is built by Vite into `dist/` (`npm run build`; `web/` is the Vite root and every `web/**/index.html` an entry) and published to GitHub Pages by the `deploy` job in `.github/workflows/ci.yml` on every push to `main` whose `check` and `e2e` jobs pass; nothing generated is committed (see "Deploying"). `docs/ARCHITECTURE.md` is the target layout and `docs/MIGRATION.md` the ordered plan that got here (steps 14 and 15 remain).
+Runtime dependencies: PeerJS (bundled from npm) for online play; Google Fonts in Fidice from the CDN. The site is built by Vite into `dist/` (`npm run build`; `web/` is the Vite root and every `web/**/index.html` an entry) and published to GitHub Pages by the `deploy` job in `.github/workflows/ci.yml` on every push to `main` whose `check` and `e2e` jobs pass; nothing generated is committed (see "Deploying"). `docs/ARCHITECTURE.md` is the target layout and `docs/MIGRATION.md` the ordered plan that got here (step 15 part B remains: nightly.yml, the README rewrite and three named behaviour fixes).
 
 ## Development
 
