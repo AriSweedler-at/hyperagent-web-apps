@@ -81,8 +81,11 @@ const createGame = (opts: CreateGameOptions, rng: Rng, now: Now): State => {
 
 /**
  * Shuffle a fresh deck and deal from its top: non-dealer, dealer, ten cards each, then the upcard;
- * the rest is the stock. Resets everything about the hand except `lastDrawn` (the named leak,
- * types.ts). The rng is consumed exactly as the legacy `shuffle` did.
+ * the rest is the stock. Resets everything about the hand, `lastDrawn` included (docs/MIGRATION.md
+ * step 15; the legacy left it alone, so a card drawn in the previous hand showed as "last drawn"
+ * when the redeal happened to give it back). The key stays absent until the first draw, as on the
+ * wire (types.ts), so the first deal adds nothing. The rng is consumed exactly as the legacy
+ * `shuffle` did.
  */
 const dealHand = (state: State, rng: Rng): State => {
   const deck = shuffle(makeDeck(), rng);
@@ -94,6 +97,7 @@ const dealHand = (state: State, rng: Rng): State => {
   const handNumber = state.handNumber + 1;
   return {
     ...state,
+    ...(state.lastDrawn === undefined ? {} : { lastDrawn: null }),
     hands: setAt(setAt(state.hands, nonDealer, toNonDealer), state.dealer, toDealer),
     discard: deck.slice(topOfStock, topOfStock + 1),
     stock: deck.slice(0, topOfStock),

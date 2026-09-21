@@ -43,7 +43,6 @@ no row.
 | fidice    | class | `hidden`                                                                         |                                                                    | `web/shared/styles/base.css`    | Fidice never toggles it (the vdom omits a node instead); the rule is shared with gin, which does. Dead here.            |
 | fidice    | class | `in-range rolling`                                                               |                                                                    | `web/games/fidice/theme.css`    | `.lrow.in-range`, `.die.rolling`: nothing sets either since the port. Dead, removal is step 15's.                       |
 | fidice    | class | `kbd ladder-wrap or scene`                                                       |                                                                    | `web/games/fidice/theme.css`    | Rules for markup the legacy page had and the typed screens do not build. Dead, removal is step 15's.                    |
-| shared    | class | `ha-img-placeholder ha-failed`                                                   |                                                                    | `web/games/*/theme.css`         | The stray image-placeholder block both pages carry (docs/MIGRATION.md step 6). Dead, removed in step 15.                |
 
 Rules of the table:
 

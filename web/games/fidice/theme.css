@@ -1,9 +1,10 @@
-/* The legacy page's two <style> blocks, in order, cut from legacy/fidice/index.html by
+/* The legacy page's first <style> block, cut from legacy/fidice/index.html by
    tools/legacy/debundle-fidice.ts (docs/MIGRATION.md step 6) and hand-owned since step 14, which moved
    the primitives both games share into web/shared/styles/base.css (the page links tokens.css and
    base.css before this file; :root also redeclares the shared names tokens.css carries). Everything
-   else is verbatim; the second block is the stray .ha-img-placeholder block, kept until step 15. The
-   computed-style goldens (test/fixtures/styles/fidice.*.json) and the class contract are the oracles. */
+   else is verbatim. The legacy page's second block, the stray .ha-img-placeholder rules that no
+   element carried, was removed in step 15. The computed-style goldens
+   (test/fixtures/styles/fidice.*.json) and the class contract are the oracles. */
 :root{
   /* Kezar Lake, Maine — pines, water, cabin wood, birch */
   --felt:#1f4d3a; --felt-dark:#153627; --felt-light:#2e6b4f; --pine:#1f4d3a; --pine-light:#5f8f72; --moss:#a6bfa3;
@@ -348,8 +349,3 @@ main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:22px 18px 40px}
   .handoff{min-height:60vh;padding:20px}
   .cfg-grid{grid-template-columns:1fr}
 }
-
-.ha-img-placeholder{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;background:#f4f4f5;border:1px dashed #d4d4d8;border-radius:8px;color:#71717a;font-size:12px;font-family:system-ui,sans-serif;min-height:80px;padding:16px;box-sizing:border-box;animation:ha-img-pulse 1.5s ease-in-out infinite}
-.ha-img-placeholder.ha-failed{animation:none;opacity:.7}
-@keyframes ha-img-pulse{0%,100%{opacity:1}50%{opacity:.5}}
-@media(prefers-color-scheme:dark){.ha-img-placeholder{background:#27272a;border-color:#3f3f46;color:#a1a1aa}}
