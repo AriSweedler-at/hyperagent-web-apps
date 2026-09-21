@@ -1,8 +1,9 @@
 // Characterization of the gin engine (docs/MIGRATION.md steps 2 and 10; docs/ARCHITECTURE.md
 // "Testing pyramid", parity). Every assertion here is an executable oracle over seeded inputs and
 // runs on both legs: the sha256-pinned legacy fixture and the TypeScript engine behind the adapter
-// in gin.api.ts. Known legacy defects are asserted as they are and named "KNOWN DEFECT"; step 15
-// flips them.
+// in gin.api.ts. The one behaviour the legs disagree on is the `lastDrawn` leak (docs/MIGRATION.md
+// step 15): the legacy leg asserts it as it is, named "KNOWN DEFECT", and the current leg asserts
+// the fix; everything else is one assertion for both.
 import { describe, expect, test } from 'vitest';
 
 import { mulberry32, type Rng } from '../../web/shared/lib/rng.ts';
@@ -45,7 +46,7 @@ const masked = (value: unknown): unknown =>
     ),
   );
 
-describe.each(legs)('gin engine: %s', (_leg, E) => {
+describe.each(legs)('gin engine: %s', (leg, E) => {
   const card = (id: string): Card => {
     const suit = id.slice(-1);
     const label = id.slice(0, -1);
@@ -657,27 +658,87 @@ describe.each(legs)('gin engine: %s', (_leg, E) => {
     });
   });
 
-  describe('known defects, preserved until docs/MIGRATION.md step 15', () => {
-    test('KNOWN DEFECT (lastDrawn leak): dealHand does not reset lastDrawn, so a card drawn in the previous hand is marked "last drawn" when the redeal happens to give it back', () => {
-      // Seed 2 leaves AS out of seat 0's hand; the redeal with seed 1 puts AS in it.
+  describe('lastDrawn across a redeal (docs/MIGRATION.md step 15: the legs disagree)', () => {
+    /**
+     * Seed 2 leaves AS out of seat 0's hand; the redeal with seed 1 puts AS in it. `lastDrawn` is
+     * set by hand, as a takeUpcard/drawStock/drawDiscard of AS in the previous hand leaves it.
+     */
+    const redealtWithAS = (): GinState => {
       const s = newGame(mulberry32(2), 0);
       expect(ids(hand(s, 0))).not.toContain('AS');
-      s.lastDrawn = { p: 0, id: 'AS' }; // as a takeUpcard/drawStock/drawDiscard of AS leaves it
+      s.lastDrawn = { p: 0, id: 'AS' };
       E.dealHand(s, mulberry32(1));
       expect(ids(hand(s, 0))).toContain('AS');
-      expect(s.lastDrawn).toEqual({ p: 0, id: 'AS' });
-      const view = E.viewFor(s, 0);
-      expect(view.lastDrawnId).toBe('AS');
-      expect(view.canUndo).toBe(false);
       expect(s.pendingDraw).toBeNull();
-      // Whether the leak shows is down to the shuffle: redeal without AS and it stays hidden.
-      E.dealHand(s, mulberry32(2));
-      expect(ids(hand(s, 0))).not.toContain('AS');
+      expect(E.viewFor(s, 0).canUndo).toBe(false);
+      return s;
+    };
+    type Redeal = { lastDrawn: unknown; shown: (string | null)[] };
+    /** `s.lastDrawn` and both seats' `lastDrawnId` at every deal after the first of a seeded game. */
+    const atRedeals = (seed: number): Redeal[] => {
+      const redeals: Redeal[] = [];
+      const hands = { seen: 1 };
+      play(seed, (s) => {
+        if (s.handNumber === hands.seen) return;
+        hands.seen = s.handNumber;
+        redeals.push({
+          lastDrawn: s.lastDrawn,
+          shown: [E.viewFor(s, 0).lastDrawnId, E.viewFor(s, 1).lastDrawnId],
+        });
+      });
+      expect(redeals.length).toBeGreaterThan(0);
+      return redeals;
+    };
+
+    test.runIf(leg === 'legacy')(
+      'KNOWN DEFECT (lastDrawn leak), legacy only: dealHand does not reset lastDrawn, so a card drawn in the previous hand is marked "last drawn" when the redeal happens to give it back',
+      () => {
+        const s = redealtWithAS();
+        expect(s.lastDrawn).toEqual({ p: 0, id: 'AS' });
+        expect(E.viewFor(s, 0).lastDrawnId).toBe('AS');
+        // Whether the leak shows is down to the shuffle: redeal without AS and it stays hidden.
+        E.dealHand(s, mulberry32(2));
+        expect(ids(hand(s, 0))).not.toContain('AS');
+        expect(E.viewFor(s, 0).lastDrawnId).toBeNull();
+        expect(s.lastDrawn).toEqual({ p: 0, id: 'AS' });
+        // Through the real path (`ready` x2 or a void hand): every redeal keeps the stale draw.
+        atRedeals(3).forEach(({ lastDrawn }) => {
+          expect(lastDrawn).toEqual({
+            p: expect.any(Number) as number,
+            id: expect.any(String) as string,
+          });
+        });
+      },
+    );
+
+    test.runIf(leg === 'current')(
+      'dealHand resets lastDrawn: the redeal that hands back the last card drawn does not mark it fresh',
+      () => {
+        const s = redealtWithAS();
+        expect(s.lastDrawn).toBeNull();
+        expect(E.viewFor(s, 0).lastDrawnId).toBeNull();
+        E.dealHand(s, mulberry32(2));
+        expect(s.lastDrawn).toBeNull();
+        // Through the real path (`ready` x2 or a void hand): nothing is fresh right after a deal.
+        [3, 4, 5].forEach((seed) => {
+          atRedeals(seed).forEach(({ lastDrawn, shown }) => {
+            expect(lastDrawn).toBeNull();
+            expect(shown).toEqual([null, null]);
+          });
+        });
+      },
+    );
+
+    test('the first deal leaves lastDrawn absent, as the wire has it; the first draw adds the key', () => {
+      const s = newGame(mulberry32(2), 0);
+      expect('lastDrawn' in s).toBe(false);
       expect(E.viewFor(s, 0).lastDrawnId).toBeNull();
-      expect(s.lastDrawn).toEqual({ p: 0, id: 'AS' });
+      expect(E.viewFor(s, 1).lastDrawnId).toBeNull();
+      E.applyAction(s, 1, { type: 'takeUpcard' });
+      expect(Object.keys(s).at(-1)).toBe('lastDrawn');
     });
 
-    test('undoDraw is the only action that clears lastDrawn', () => {
+    test('undoDraw clears lastDrawn', () => {
       const s = newGame(mulberry32(2), 0);
       E.applyAction(s, 1, { type: 'takeUpcard' });
       expect(s.lastDrawn).toEqual({ p: 1, id: hand(s, 1).at(-1)?.id });

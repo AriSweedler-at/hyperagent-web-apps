@@ -5,9 +5,15 @@
 // (wall-clock fields zeroed), `viewFor` for both seats and `legalActions` for both seats must be
 // the same JSON text: same values, same keys, same key order.
 //
+// The one behaviour the legs disagree on is the legacy `lastDrawn` leak (docs/MIGRATION.md step
+// 15): the legacy dealHand keeps the previous hand's last draw, the current one resets it. After a
+// legacy redeal the leak is counted from the legacy views, then the legacy state is normalised
+// (`lastDrawn = null`, what the current engine does) so every later comparison stays strict.
+//
 // The corpus is seeds 1..GAMES, split into SHARDS equal ranges so vitest runs them on SHARDS
 // workers at once: `gin.replay.<n>.test.ts` is one line, `replayShard(n)`. Each shard asserts the
-// outcome coverage and the lastDrawn leak over its own range.
+// outcome coverage, that the legacy leak shows at least once and that the current engine never
+// marks a card fresh right after a redeal, over its own range.
 // GIN_REPLAY_GAMES overrides the game count for a quicker local run (CI runs the default 1000).
 import { describe, expect, test } from 'vitest';
 
@@ -41,7 +47,7 @@ const expectSame = (label: string, currentText: string, legacyText: string): voi
   }
 };
 
-type Replay = { steps: number; leaks: number; outcomes: Set<string> };
+type Replay = { steps: number; legacyLeaks: number; currentLeaks: number; outcomes: Set<string> };
 /** One seat's legacy view and legal actions after a step, compared to the current leg's already. */
 type Seen = { view: GinView; acts: GinAction[] };
 
@@ -76,7 +82,17 @@ const replay = (seed: number): Replay => {
     return [compareSeat(label, C, 0), compareSeat(label, C, 1)];
   };
   const outcomes = new Set<string>();
-  type Progress = { C: State; seen: Pair<Seen>; steps: number; leaks: number; done: boolean };
+  /** Whether either seat's view marks a card as the last drawn. */
+  const marksFresh = (viewOf: (seat: Seat) => { lastDrawnId: string | null }): boolean =>
+    viewOf(0).lastDrawnId !== null || viewOf(1).lastDrawnId !== null;
+  type Progress = {
+    C: State;
+    seen: Pair<Seen>;
+    steps: number;
+    legacyLeaks: number;
+    currentLeaks: number;
+    done: boolean;
+  };
   const step = (acc: Progress): Progress => {
     if (acc.done || L.phase === 'gameOver') return { ...acc, done: true };
     const seat = actor(L) as Seat;
@@ -89,21 +105,25 @@ const replay = (seed: number): Replay => {
     expect(rC.ok, `${label}: current refused ${rC.ok ? '' : rC.error}`).toBe(true);
     expect(rL.ok, `${label}: legacy refused ${rL.ok ? '' : rL.error}`).toBe(true);
     if (!rC.ok) return { ...acc, done: true };
+    // KNOWN DEFECT (lastDrawn leak), legacy leg only: its dealHand does not reset lastDrawn, so
+    // right after a redeal a card drawn in the previous hand shows as "last drawn" when the
+    // shuffle gave it back. Count it from the legacy views, then normalise the legacy state to
+    // what the current dealHand produces (null once the key exists) before comparing the legs.
+    const redealt = L.handNumber > handsBefore;
+    const legacyLeaked = redealt && marksFresh((seat) => legacy.viewFor(L, seat));
+    if (redealt && L.lastDrawn !== undefined) L.lastDrawn = null;
+    const currentLeaked = redealt && marksFresh((seat) => current.viewFor(rC.value, seat));
     const seen = at(label, rC.value);
     const last = L.rounds.at(-1);
     if (last !== undefined && L.phase === 'roundOver') {
       outcomes.add(last.void === true ? 'void' : (last.outcome ?? 'none'));
     }
-    // KNOWN DEFECT (lastDrawn leak): dealHand does not reset lastDrawn, so right after a redeal a
-    // card drawn in the previous hand can show as "last drawn" when the shuffle gave it back.
-    // Both legs exhibit it (the state and view comparisons above include it); count it here so
-    // the corpus is known to cover it.
-    const leaked = L.handNumber > handsBefore && seen.some((s) => s.view.lastDrawnId !== null);
     return {
       C: rC.value,
       seen,
       steps: acc.steps + 1,
-      leaks: acc.leaks + (leaked ? 1 : 0),
+      legacyLeaks: acc.legacyLeaks + (legacyLeaked ? 1 : 0),
+      currentLeaks: acc.currentLeaks + (currentLeaked ? 1 : 0),
       done: false,
     };
   };
@@ -111,13 +131,19 @@ const replay = (seed: number): Replay => {
     C: start,
     seen: at(`seed ${String(seed)} after the deal`, start),
     steps: 0,
-    leaks: 0,
+    legacyLeaks: 0,
+    currentLeaks: 0,
     done: false,
   });
   expect(L.phase, `seed ${String(seed)} did not finish in ${String(STEP_CAP)} steps`).toBe(
     'gameOver',
   );
-  return { steps: final.steps, leaks: final.leaks, outcomes };
+  return {
+    steps: final.steps,
+    legacyLeaks: final.legacyLeaks,
+    currentLeaks: final.currentLeaks,
+    outcomes,
+  };
 };
 
 /** Seeds of shard `n` (0-based): the n-th of SHARDS equal ranges of 1..GAMES. */
@@ -136,8 +162,10 @@ export const replayShard = (shard: number): void => {
       const outcomes = new Set(games.flatMap((g) => [...g.outcomes]));
       expect(outcomes).toEqual(new Set(['gin', 'knock', 'undercut', 'void']));
       expect(games.reduce((n, g) => n + g.steps, 0)).toBeGreaterThan(seeds.length * 100);
-      // The lastDrawn leak shows in every shard (see the comment in `replay`).
-      expect(games.reduce((n, g) => n + g.leaks, 0)).toBeGreaterThan(0);
+      // The legacy lastDrawn leak shows in every shard; the current engine never has it (see the
+      // comment in `replay`).
+      expect(games.reduce((n, g) => n + g.legacyLeaks, 0)).toBeGreaterThan(0);
+      expect(games.reduce((n, g) => n + g.currentLeaks, 0)).toBe(0);
     }, 600_000);
   });
 };

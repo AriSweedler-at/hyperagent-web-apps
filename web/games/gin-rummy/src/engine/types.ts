@@ -127,9 +127,10 @@ export type State = Readonly<{
   winner: Seat | null;
   startedAt: number;
   /**
-   * KNOWN DEFECT (lastDrawn leak), preserved until docs/MIGRATION.md step 15: set by every draw,
-   * cleared only by `undoDraw`, absent until the first draw. `dealHand` leaves it alone, so a card
-   * drawn in the previous hand is marked "last drawn" when the redeal happens to give it back.
+   * The card the last draw added and to whom, for the view's "fresh" mark: set by every draw,
+   * cleared by `undoDraw` and by every deal after the first (docs/MIGRATION.md step 15; the legacy
+   * dealt over it, so a card drawn in the previous hand showed as "last drawn" when the redeal
+   * happened to give it back). Absent until the first draw, as the legacy key was on the wire.
    */
   lastDrawn?: LastDrawn | null;
 }>;

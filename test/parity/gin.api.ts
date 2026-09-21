@@ -83,7 +83,10 @@ export type GinState = {
   ready: boolean[];
   winner: number | null;
   startedAt: number;
-  /** Set by every draw and cleared only by undoDraw; dealHand leaves it alone (the named leak). */
+  /**
+   * Set by every draw and cleared by undoDraw. The legacy dealHand leaves it alone (the leak
+   * docs/MIGRATION.md step 15 fixes); the current one resets it to null once the key exists.
+   */
   lastDrawn?: { p: number; id: string } | null;
 };
 
