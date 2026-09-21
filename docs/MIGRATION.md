@@ -661,5 +661,6 @@ parity and e2e gates.
   `allowJs`/`checkJs`. The owner ships the TypeScript Worker with `npx wrangler deploy` at leisure
   (identical behaviour; the deployed JS keeps serving until then; wrangler is not installed in this
   repo, so no dry run was built). `infra/turn-worker/worker.js` stays plain JavaScript on purpose
-  (deployed by hand, "unchanged" in ARCHITECTURE) and keeps its `.prettierignore` entry. See
-  ARCHITECTURE "Deviations".
+  (deployed by hand, "unchanged" in ARCHITECTURE) and keeps its `.prettierignore` entry.
+  `test/ratchet.test.ts` is one test, no `.js` under `web/` (`JS_FILE_COUNT` and the fidice-only
+  second test are gone with `allowJs`). See ARCHITECTURE "Deviations".

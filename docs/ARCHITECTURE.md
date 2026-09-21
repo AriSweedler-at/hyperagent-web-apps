@@ -156,8 +156,8 @@ can run `tools/*.ts` unchanged), `target: ES2022`, `lib` per project (web: ES202
 pure: ES2023; node: ES2023 + `types: ["node"]`), `noEmit`, `skipLibCheck`. No project sets
 `allowJs`: the migration-only `allowJs: true, checkJs: false` (in `tsconfig.web.json` for the
 de-bundled fidice modules, in `tsconfig.node.json` for the games-proxy Worker) left in step 15, when
-the Worker became `infra/games-proxy/worker.ts`; a ratchet test asserts the count of `.js` files
-under `web/` never increases.
+the Worker became `infra/games-proxy/worker.ts`; `test/ratchet.test.ts` asserts that no `.js`
+file exists under `web/` (it ratcheted the count down to zero during the migration).
 
 ### eslint.config.js
 
@@ -765,3 +765,6 @@ Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage r
   plain JavaScript on purpose: it is deployed by hand and "unchanged" throughout this document, and
   it keeps its `.prettierignore` entry. The import-x block lints `**/*.ts` only: no remaining `.js`
   takes part in a zone.
+- `test/ratchet.test.ts` is one test: no `.js` file under `web/`. `JS_FILE_COUNT` and the
+  fidice-only allow-list are gone with `allowJs`; a `.js` under `web/` would now escape the
+  compiler, so the test refuses it outright.

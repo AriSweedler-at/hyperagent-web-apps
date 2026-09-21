@@ -1,7 +1,7 @@
-// Migration ratchet (docs/ARCHITECTURE.md "tsconfig.base.json"; docs/MIGRATION.md step 6). During
-// the migration tsconfig.web.json carries `allowJs` so the de-bundled fidice modules type-check as
-// they are ported to .ts. The number of .js files under web/ may only go down: lower JS_FILE_COUNT
-// in the same commit that ports a module, never raise it. Step 15 removes allowJs at zero.
+// No JavaScript under web/ (docs/ARCHITECTURE.md "tsconfig.base.json"; docs/MIGRATION.md steps 6-9
+// and 15). During the migration tsconfig.web.json carried `allowJs` and this file ratcheted the
+// number of .js files down as the de-bundled fidice modules were typed; step 15 removed `allowJs`
+// at zero, so a .js file under web/ would now be invisible to the compiler and this test refuses it.
 import { readdirSync, statSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
@@ -9,29 +9,13 @@ import { expect, test } from 'vitest';
 
 const WEB = resolve(import.meta.dirname, '..', 'web');
 
-/**
- * 38 de-bundled modules under web/games/fidice/src plus web/games/fidice/main.js: the 8 domain
- * modules, the 11 bot modules and net/protocol were typed in place in docs/MIGRATION.md step 8,
- * the rest (net, app, the entry, view, assets) in step 9. Zero since then; step 15 drops allowJs.
- */
-const JS_FILE_COUNT = 0;
-
 const jsFilesUnderWeb = (): ReadonlyArray<string> =>
   readdirSync(WEB, { recursive: true, encoding: 'utf8' })
     .map((path) => path.split(sep).join('/'))
     .filter((path) => path.endsWith('.js') && statSync(resolve(WEB, path)).isFile())
     .sort();
 
-test('the number of .js files under web/ never increases (lower JS_FILE_COUNT when porting)', () => {
+test('no .js file exists under web/ (every module is TypeScript; allowJs is gone)', () => {
   const files = jsFilesUnderWeb();
-  expect(files.length, files.join('\n')).toBeLessThanOrEqual(JS_FILE_COUNT);
-  expect(files.length, 'lower JS_FILE_COUNT in test/ratchet.test.ts to match').toBe(JS_FILE_COUNT);
-});
-
-test('every .js under web/ is a de-bundled fidice module or its entry', () => {
-  jsFilesUnderWeb().forEach((file) => {
-    expect(file === 'games/fidice/main.js' || file.startsWith('games/fidice/src/'), file).toBe(
-      true,
-    );
-  });
+  expect(files, files.join('\n')).toEqual([]);
 });
