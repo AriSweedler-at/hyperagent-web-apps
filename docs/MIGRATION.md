@@ -623,3 +623,23 @@ parity and e2e gates.
   `.status-banner.mine` fails with `mine (web/games/gin-rummy/src/ui/render.ts)`). The markup
   source is the served `dist/games/<g>/index.html` rather than `web/games/<g>/index.html`: same
   class attributes, and the guard reads the tree it ships. See ARCHITECTURE "Deviations".
+- Step 14, phase 2 (the hoist, values unchanged): `web/shared/styles/tokens.css` and `base.css`
+  exist and both pages link them before `./theme.css`, in that cascade order. `tokens.css` declares
+  nothing: the seven names both themes share (`--felt --card --accent --accent-dark --gold --muted
+  --radius`) agree on no value, and the goldens pin each page's declared custom-property set and
+  every `:root` value, so a new shared name, or the fidice alias the step planned (`--ink` onto
+  `--text`), is itself a golden change; the aliasing is deferred to the Fidice restyle (roadmap),
+  which re-records, and `CONTRACT.md` "Tokens" tables both palettes as its input (five columns, so
+  the class parser skips it). `base.css` holds the three primitives the themes carried identically,
+  `* { box-sizing }`, `html, body { margin: 0 }` and `.hidden`; gin keeps `* { -webkit-tap-highlight-color }`
+  and the rest of its `html, body` rule, fidice `html, body { height: 100% }`. Nothing else was
+  verbatim in both: buttons, inputs, labels, toasts, overlays and sheets differ in selector or value
+  every time, so they stay in the themes, and the identical `.ha-img-placeholder` block stays in
+  both because step 15 deletes it. Vite attaches the shared sheets to the shared chunk, so each
+  built page links `shared/assets/roomCode-<hash>.css` then `shared/assets/<game>-<hash>.css`; the
+  dist guards assert the pair and the order, and the 10-minute cache window covers that file too.
+  `web/games/fidice/{index.html,theme.css}` are hand-owned: `tools/legacy/debundle-fidice.ts` no
+  longer cuts or pins them (the manifest maps the typed modules only) and both games' page files
+  stay in `.prettierignore` as legacy-layout bytes. Visual snapshots are still not captured (step
+  3). Oracles: `computed-styles.ts --check` 0 differences x4, `npm run check`, and every non-online
+  e2e spec on both projects. See ARCHITECTURE "Deviations".
