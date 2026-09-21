@@ -621,8 +621,9 @@ Step 9 (type the Fidice edges), phase 2: `view/**` and `assets/diceImages`:
   threshold each (`main.ts` stays out: it constructs the real adapters); `app/effects.test.ts` pins
   the storage fallback rules and `app/controller.test.ts` drives the reducer over fake effects, a
   `fakeClock`, `dom.fake.ts` and recording session stubs (the reducer's `handle` is reached through
-  a test-only cast; the screens' render tests own the handler wiring). It pins two legacy defects
-  by name: the single toast timer and `ladder.showBid` keeping the current tab when there is a bid.
+  a test-only cast; the screens' render tests own the handler wiring). It pinned two legacy defects
+  by name, the single toast timer (queued since step 15) and `ladder.showBid` keeping the current
+  tab when there is a bid; only `showBid` is still pinned.
 - `JS_FILE_COUNT` is 0; the debundle tool writes the page, the stylesheet and the manifest only
   and remains the audit of the bundle-to-module map. `allowJs` leaves `tsconfig.web.json` in
   step 15, as planned.
@@ -789,3 +790,15 @@ Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage r
   fidice net/ group (95.9/93.2/92.2) stays at 90. Nothing went down. A second run passed against
   the new numbers, which are listed in the `vitest.config.ts` comment and summarised under
   "Testing pyramid".
+- Step 15, behaviour fixes: the three named debts landed as one commit each, before the step's
+  tightening. Gin `dealHand` resets `lastDrawn` (null once the key exists; still absent until the
+  first draw, so the wire and storage shapes are unchanged), and the parity suites split on it:
+  `gin.legacy.test.ts` pins the leak on the legacy leg only and the reset on the current one, and
+  `gin.replay.ts` normalises the legacy state after each redeal and asserts legacy leaks > 0,
+  current leaks == 0 per shard. The DOM oracle `tools/parity/gin-dom-parity.ts` read 84 checkpoints,
+  0 mismatches against the frozen legacy page with no mask: its seeded game has no void hand, so the
+  only redeal it drives is the rematch (a fresh game, `lastDrawn` absent on both pages), and no
+  checkpoint carries `fresh` after a deal. Fidice's controller queues toasts FIFO, each for
+  TOAST_MS, instead of restarting one timer; `controller.test.ts` now pins only `ladder.showBid` as
+  a legacy defect. The dead `.ha-img-placeholder` block is gone from both themes and from
+  `CONTRACT.md`; the computed-style goldens did not move.

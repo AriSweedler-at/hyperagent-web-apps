@@ -672,3 +672,28 @@ parity and e2e gates.
   and a second coverage run proves they hold. `nightly.yml`, the README rewrite and the three
   behaviour fixes (`dealHand` resets `lastDrawn`, single toast timer, dead `.ha-img-placeholder`
   CSS) are part B. See ARCHITECTURE "Deviations".
+- Step 15, behaviour fixes (the three named debts, one commit each, in a PR of their own; the step's
+  tightening, `allowJs`, the lint flip, coverage thresholds, `nightly.yml` and the README, is not in
+  it): (3) both hand-owned `theme.css` files drop the legacy pages' second `<style>` block
+  (`.ha-img-placeholder`, `.ha-failed`, `@keyframes ha-img-pulse` and its dark override); the
+  `shared` row in `web/shared/styles/CONTRACT.md` goes with it (with the rules gone the row would
+  have failed the class contract as stale), the computed-style goldens are byte-identical because no
+  element carried the class, and `legacy/**` keeps its copies. (1) gin `dealHand` resets `lastDrawn`
+  to null when the key exists; the key still appears at the first draw and not before, so a fresh
+  game and every recorded wire and storage frame (all hand 1) are unchanged and the codec, storage
+  and protocol suites needed nothing. `test/parity/gin.legacy.test.ts` runs the KNOWN DEFECT pin on
+  the legacy leg only (`test.runIf`) and asserts the reset on the current leg, by hand and at every
+  redeal of seeded games; `gin.replay.ts` counts the legacy leak from the legacy views at each
+  redeal, then normalises the legacy state (`lastDrawn = null`, what the current `dealHand` does)
+  before the strict state/view/legalActions comparison, and each shard asserts legacy leaks > 0 and
+  current leaks == 0 over its 250 games. The DOM oracle `tools/parity/gin-dom-parity.ts` read 84
+  checkpoints, 0 mismatches against the frozen legacy page with no mask: its seeded game has no void
+  hand, so the only redeal it drives is the rematch (a fresh game, `lastDrawn` absent on both
+  pages), and no checkpoint carries `fresh` after a deal. (2) fidice toasts queue: `toast()` shows a
+  message at once when nothing is showing and otherwise appends it, and the timer callback shows the
+  next one for its own TOAST_MS, clearing the toast only when the queue is empty (the view is
+  unchanged); `app/controller.test.ts` flips "a second toast restarts the one timer" into the queue
+  behaviour and adds a burst of three, a toast queued in the instant one expires and an immediate
+  toast when nothing is showing, so `ladder.showBid` is the one legacy defect that file still pins.
+  Oracles: `computed-styles.ts --check` 0 differences and 0 notes x4, `gin-dom-parity.ts` as above,
+  `npm run check`, and every non-online e2e spec on both projects. See ARCHITECTURE "Deviations".
