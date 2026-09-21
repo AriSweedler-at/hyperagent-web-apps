@@ -714,8 +714,9 @@ Step 12, phase 2 (gin paint, wiring, scorer screen, oracle):
 
 - `ui/render.ts` composes the whole paint (`paint(doc, app, handView)`): screens, statuses, the
   home screen (`ui/home.ts`), the curtain (`ui/local.ts`), the table, the sheets, the endgame and
-  the overlays, each from the App alone; the HandView is main.ts's choice and `fitTable` measures
-  while `ui/fit.ts` decides. Each module also binds its controls to intents (`bindAll`).
+  the overlays, each from the App alone; the HandView is main.ts's choice and `fitTable` measured
+  while `ui/fit.ts` decided (both retired by docs/design/gin-draw-ghost-slot.md PR B for CSS
+  bounds). Each module also binds its controls to intents (`bindAll`).
 - The App gained what the legacy kept in the DOM or in closures (rules/history overlays, the
   long-press submenu, the code draft); named timers, the sound toggle, the share and the two input
   writes are effects. `scorer/main.ts` (an edge) holds the Score Counter's state in a closure over

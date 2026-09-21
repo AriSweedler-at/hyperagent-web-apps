@@ -565,12 +565,13 @@ parity and e2e gates.
   screen, an edit through the `prompt()` dialogs, a delete, an export, a gin hand, a new game)
   through the UI on the legacy page and the new page, comparing the normalised `outerHTML` of the
   home screen, the table, the curtain, every sheet and overlay and the scorer screens plus the
-  toast's text at 84 checkpoints; only whitespace, the two rules slots' ids and the fitted
-  `--tscale` are normalised, and the discard choices are read from the legacy page's `window.__gin`
-  and applied to both. The paint is a function of the App alone, so where the legacy wrote a region
-  only on some path the paint keeps that condition (the result sheet stays over the endgame at
-  `gameOver` until "Look at the table", the mode buttons' marks change only while the Play tab
-  shows, the table is untouched without a view). What the legacy kept in the DOM or in closures
+  toast's text at 84 checkpoints; only whitespace, the two rules slots' ids and (until
+  docs/design/gin-draw-ghost-slot.md PR B retired it) the fitted `--tscale` are normalised, and the
+  discard choices are read from the legacy page's `window.__gin` and applied to both. The paint is a
+  function of the App alone, so where the legacy wrote a region only on some path the paint keeps
+  that condition (the result sheet stays over the endgame at `gameOver` until "Look at the table",
+  the mode buttons' marks change only while the Play tab shows, the table is untouched without a
+  view). What the legacy kept in the DOM or in closures
   joined the App (the rules and
   history overlays, the Play tab's long-press submenu with its 450 ms timer as a named timer
   effect, the code input's last good value); the two input writes `initHome` and the code handler
