@@ -398,3 +398,14 @@ the guest toast reset) so the 94%/90% ratchet holds.
 - `defaultHandView` lives on as test-only code until PR D; a future `paint` call site passing no
   view would bring it back into the bundle. The stories chunk ships behind `?story=`: static, no
   store, no network, and out of the game's entry chunk thanks to the dynamic import.
+
+## Status
+
+PR A landed on 2026-09-21 (branch `gin-ghost-slot-a`): §3, §4, the PR A part of §5 (`.slot*`, the
+`.hand` grid with the 900px breakpoint, the fixed `.actions` row, one pile size; `--tscale` and
+`fitTable` stay for PR B), §6, the real-click proof `e2e/gin-draw.spec.ts` pulled forward from PR C
+at 390x844 and 1280x800, `ginAcceptDraw` in the fixtures, the gin-local assertion, and §9's oracle
+edits: `gin-dom-parity` without `tableScreen` (84 checkpoints, 0 mismatches), the gin
+computed-style goldens re-recorded at both viewports (fidice byte-identical), the CONTRACT.md
+`m0..m4` row. Owner-visible choices kept as written: accept-on-select, and the button labels
+`Discard` / `Knock` / `GIN!`. Next: PR B (fixed geometry, retire `--tscale`), PR C (stories).

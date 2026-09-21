@@ -312,7 +312,12 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
   goldens, then moves screen builders into `shared/ui`; computed-style goldens and the class
   contract gate it.
 - Swappable hand display: `ui/hand/HandView.ts` is the interface `render.ts` consumes; a new view is
-  a second module and a `main.ts` choice, gated by DOM-snapshot parity of the default.
+  a second module and a `main.ts` choice. Landed: `ui/hand/SlotHandView.ts`, the eleven fixed
+  cells with the ghost draw slot (docs/design/gin-draw-ghost-slot.md, PR A), is what `main.ts`
+  paints; `render.ts` hands it the App's `draw` stage as the interface's optional third argument.
+  `defaultHandView` stays as test-only code for its legacy string golden until the design's PR D,
+  and `#tableScreen` left the DOM-snapshot oracle's scope (the table diverges by design; every
+  sheet and overlay it opens still compares). The fixed-geometry proof is `e2e/gin-draw.spec.ts`.
 - Phone layout stability: `ui/fit.ts` isolates `nextScale()` as a pure function over measured sizes
   so the layout-thrash loop can be replaced without touching `render.ts`.
 - Generic host/client session and code-entry/toast/lobby builders: extracted from fidice's
