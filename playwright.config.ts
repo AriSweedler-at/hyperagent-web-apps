@@ -8,7 +8,9 @@
 // `npm run build && playwright test`, so dist/ is fresh; a bare `playwright test` reuses it. Online
 // specs meet on a local PeerServer (`peer` package) on :9000, which the pages reach through their
 // `?peer=` hook; `E2E_BROKER=cloud` leaves it out so the advisory CI job `broker` plays through
-// 0.peerjs.com instead.
+// 0.peerjs.com instead. `E2E_TARGET=live` (.github/workflows/nightly.yml) aims both projects at
+// the deployed origins (e2e/fixtures/site.ts LIVE_ORIGINS), starts nothing local and implies the
+// cloud broker; specs that need the local servers skip themselves with a reason.
 import { defineConfig } from '@playwright/test';
 
 import {
@@ -19,9 +21,14 @@ import {
   PEER_PORT,
   PEER_SERVER,
   PROXY_ORIGIN,
+  baseUrl,
+  isLive,
 } from './e2e/fixtures/site.ts';
 
 const CI = process.env['CI'] !== undefined && process.env['CI'] !== '';
+const live = isLive();
+// A live run meets on 0.peerjs.com: no PeerServer to start, and the fixtures drop `?peer=` too.
+if (live) process.env['E2E_BROKER'] = 'cloud';
 const cloudBroker = process.env['E2E_BROKER'] === 'cloud';
 const node = 'node --experimental-strip-types';
 /** The e2e ICE fixture and, on the pages origin, the frozen legacy gin page for the DOM-parity spec. */
@@ -50,31 +57,33 @@ export default defineConfig({
     },
   },
   projects: [
-    { name: 'pages', use: { baseURL: `${PAGES_ORIGIN}${PAGES_BASE_PATH}` } },
-    { name: 'proxy', use: { baseURL: `${PROXY_ORIGIN}/` } },
+    { name: 'pages', use: { baseURL: baseUrl('pages') } },
+    { name: 'proxy', use: { baseURL: baseUrl('proxy') } },
   ],
-  webServer: [
-    {
-      command: `${node} tools/serve-dist.ts --root dist --base ${PAGES_BASE_PATH} ${pagesAliases} --port ${new URL(PAGES_ORIGIN).port}`,
-      url: `${PAGES_ORIGIN}${PAGES_BASE_PATH}`,
-      reuseExistingServer: !CI,
-      timeout: 30_000,
-    },
-    {
-      command: `${node} tools/proxy-dev.ts --upstream ${PAGES_ORIGIN} --port ${new URL(PROXY_ORIGIN).port}`,
-      url: `${PROXY_ORIGIN}/`,
-      reuseExistingServer: !CI,
-      timeout: 30_000,
-    },
-    ...(cloudBroker
-      ? []
-      : [
-          {
-            command: `peerjs --host ${PEER_HOST} --port ${String(PEER_PORT)} --path /`,
-            url: `http://${PEER_SERVER}/`,
-            reuseExistingServer: !CI,
-            timeout: 30_000,
-          },
-        ]),
-  ],
+  webServer: live
+    ? []
+    : [
+        {
+          command: `${node} tools/serve-dist.ts --root dist --base ${PAGES_BASE_PATH} ${pagesAliases} --port ${new URL(PAGES_ORIGIN).port}`,
+          url: `${PAGES_ORIGIN}${PAGES_BASE_PATH}`,
+          reuseExistingServer: !CI,
+          timeout: 30_000,
+        },
+        {
+          command: `${node} tools/proxy-dev.ts --upstream ${PAGES_ORIGIN} --port ${new URL(PROXY_ORIGIN).port}`,
+          url: `${PROXY_ORIGIN}/`,
+          reuseExistingServer: !CI,
+          timeout: 30_000,
+        },
+        ...(cloudBroker
+          ? []
+          : [
+              {
+                command: `peerjs --host ${PEER_HOST} --port ${String(PEER_PORT)} --path /`,
+                url: `http://${PEER_SERVER}/`,
+                reuseExistingServer: !CI,
+                timeout: 30_000,
+              },
+            ]),
+      ],
 });

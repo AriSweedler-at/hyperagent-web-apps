@@ -3,7 +3,7 @@
 // starts and both see the same round with the cup at the same seat. The recorded Peer
 // constructions prove the ?peer= broker override and the ?ice= configuration reached PeerJS.
 import { fidiceRound, fidiceSeatName, fidiceSeats } from './fixtures/fidice.ts';
-import { expectedPeerOptions, openGame } from './fixtures/player.ts';
+import { expectPeerOptions, openGame } from './fixtures/player.ts';
 import { expect, hostRoom, joinByCode, test } from './fixtures/two-players.ts';
 
 test(
@@ -48,8 +48,8 @@ test(
     const hostCall = (await host.peerCalls()).at(-1);
     const guestCall = (await guest.peerCalls()).at(-1);
     expect(hostCall?.id).toBe(`fidice-${code.toLowerCase()}`);
-    expect(hostCall?.options).toEqual(expectedPeerOptions(1));
+    expectPeerOptions(hostCall, 1);
     expect(guestCall?.id).toBeNull();
-    expect(guestCall?.options).toEqual(expectedPeerOptions(1));
+    expectPeerOptions(guestCall, 1);
   },
 );

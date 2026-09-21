@@ -10,7 +10,7 @@ import {
   isMyTurn,
   readTable,
 } from './fixtures/gin.ts';
-import { expectedPeerOptions, openGame } from './fixtures/player.ts';
+import { expectPeerOptions, openGame } from './fixtures/player.ts';
 import { expect, hostRoom, joinByCode, test } from './fixtures/two-players.ts';
 
 test(
@@ -60,8 +60,8 @@ test(
     const hostCall = (await host.peerCalls()).at(-1);
     const guestCall = (await guest.peerCalls()).at(-1);
     expect(hostCall?.id).toBe(`ginrummy-ari-${code}`);
-    expect(hostCall?.options).toEqual(expectedPeerOptions(0));
+    expectPeerOptions(hostCall, 0);
     expect(guestCall?.id).toBeNull();
-    expect(guestCall?.options).toEqual(expectedPeerOptions(0));
+    expectPeerOptions(guestCall, 0);
   },
 );
