@@ -317,9 +317,13 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
   paints; `render.ts` hands it the App's `draw` stage as the interface's optional third argument.
   `defaultHandView` stays as test-only code for its legacy string golden until the design's PR D,
   and `#tableScreen` left the DOM-snapshot oracle's scope (the table diverges by design; every
-  sheet and overlay it opens still compares). The fixed-geometry proof is `e2e/gin-draw.spec.ts`.
-- Phone layout stability: `ui/fit.ts` isolates `nextScale()` as a pure function over measured sizes
-  so the layout-thrash loop can be replaced without touching `render.ts`.
+  sheet and overlay it opens still compares). The fixed-geometry proofs are `e2e/gin-draw.spec.ts`
+  (no card moves on a draw) and `e2e/gin-geometry.spec.ts` (no scroll, one frame in every phase).
+- Phone layout stability: done, by CSS (the design's PR B). `#tableScreen` bounds `--card-w` and
+  `--pile-w` by the viewport with clamp() and every row above the hand has one height in every
+  phase, so nothing is measured after a paint; the legacy `fitTable()` loop, `ui/fit.ts` and
+  `--tscale` are retired, and `e2e/gin-geometry.spec.ts` asserts the result at 390x844, 1280x800
+  and 375x667.
 - Generic host/client session and code-entry/toast/lobby builders: extracted from fidice's
   `HostSession`/`ClientSession` into `web/shared` only after both games are typed and parity-locked,
   behind the existing wire goldens.
