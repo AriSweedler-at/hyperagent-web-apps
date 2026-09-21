@@ -242,9 +242,14 @@ authenticate to the firewall, so the action rewrites the runner's checked-out co
 to the public registry (host and the firewall's `/npm/` path prefix; npm's `replace-registry-host`
 swaps only the hostname), installs through Socket Firewall Free (`sfw npm ci`) so CI installs are
 scanned too, and restores the pristine lockfile afterwards. The lockfile's integrity hashes are
-verified against what is downloaded either way. `nightly.yml` runs the online specs against both live origins through the real broker and
-`turn.sweedler.com`, plus one game with `iceTransportPolicy: 'relay'` forced via `?ice=`, and opens
-or updates a pinned issue on failure.
+verified against what is downloaded either way. `nightly.yml` (`cron 23 9 * * *` and
+`workflow_dispatch`; by hand `gh workflow run nightly.yml`) runs `npm run test:live`
+(`E2E_TARGET=live E2E_BROKER=cloud playwright test --grep "@online|@relay"`, no build): the online
+specs against both live origins through the real broker and `turn.sweedler.com`, plus one gin game
+with `iceTransportPolicy: 'relay'` forced via the `?ice-policy=relay` hook (`e2e/gin-relay.spec.ts`;
+hermetic runs skip that game and assert only that the hook reaches `new Peer`). On failure it
+uploads the report and comments the run URL on the open issue labelled `nightly`, creating
+"Nightly live run failed" when none is open; a green run closes it.
 
 ## Testing pyramid
 
