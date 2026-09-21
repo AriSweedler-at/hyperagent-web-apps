@@ -9,9 +9,9 @@
 // declare (all of them on `:root`, and on any other element only where its value differs from the
 // root's). Animations are rewound to their first frame and transitions finished before each read,
 // and the table's fitted `--tscale` is pinned to 1 for the read, so the values are a function of
-// the CSS alone. test/dist/computed-styles.test.ts replays the capture against dist/ and
-// deep-equals it with test/fixtures/styles/<game>.<viewport>.json; a CSS move that changes any
-// computed value shows up as a selector/property diff.
+// the CSS alone. e2e/computed-styles.spec.ts (the `pages` project) replays the capture against the
+// served dist/ and deep-equals it with test/fixtures/styles/<game>.<viewport>.json; a CSS move that
+// changes any computed value shows up as a selector/property diff.
 //
 // Locally (Chromium from `npx playwright install`; `npm run build` first):
 //   node --experimental-strip-types tools/parity/computed-styles.ts            # rewrite the goldens
