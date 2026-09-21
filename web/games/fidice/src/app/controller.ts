@@ -2,9 +2,10 @@
 // 3529-3958 (bundle section "// src/app/controller.ts"); every state transition, toast, timer
 // and session call is the same. It owns the UI state (view/types.ts `Ui`), turns the screens'
 // intents into state patches and session calls, and re-renders through view/vdom after each.
-// Sessions, effects, the clock and the document come from main.ts. Known legacy defect, kept
-// until docs/MIGRATION.md step 15: one toast timer, so a second toast within TOAST_MS restarts
-// the first one's countdown instead of queueing.
+// Sessions, effects, the clock and the document come from main.ts. One departure from the legacy
+// (docs/MIGRATION.md step 15): toasts queue, each shown for TOAST_MS in arrival order, where the
+// legacy's single timer let a second toast within TOAST_MS replace the first and restart its
+// countdown.
 import type { Clock, Timer } from '../../../../shared/lib/clock.ts';
 import { difficultyById } from '../bots/registry.ts';
 import { CATEGORY_INFO, groupByKey, handAt } from '../domain/hands.ts';
@@ -135,6 +136,8 @@ export class Controller {
   private host: HostSession | null = null;
   private hostName = 'Host';
   private toastTimer: Timer | null = null;
+  /** Toasts that arrived while one was showing, oldest first. */
+  private toastQueue: ReadonlyArray<string> = [];
   private tickTimer: Timer | null = null;
   private handoffTimer: Timer | null = null;
   private shownLogLength = 0;
@@ -188,12 +191,23 @@ export class Controller {
     });
   }
 
+  /** Show `message` for TOAST_MS, or, while another toast is showing, after the ones before it. */
   private toast(message: string): void {
+    if (this.toastTimer !== null) {
+      this.toastQueue = [...this.toastQueue, message];
+      return;
+    }
+    this.showToast(message);
+  }
+
+  private showToast(message: string): void {
     this.set({ toast: message });
-    if (this.toastTimer !== null) this.deps.clock.clearTimeout(this.toastTimer);
     this.toastTimer = this.deps.clock.setTimeout(() => {
       this.toastTimer = null;
-      this.set({ toast: null });
+      const [next, ...rest] = this.toastQueue;
+      this.toastQueue = rest;
+      if (next === undefined) this.set({ toast: null });
+      else this.showToast(next);
       this.render();
     }, TOAST_MS);
   }

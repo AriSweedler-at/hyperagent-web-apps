@@ -542,7 +542,15 @@ describe('Controller joining', () => {
 });
 
 describe('Controller toasts and timers', () => {
-  test('onInfo and onError toast for TOAST_MS; a second toast restarts the one timer', () => {
+  /** The host's info hook, which the controller always registers. */
+  const infoOf = (h: Harness): ((m: string) => void) => {
+    const info = h.host().events.onInfo;
+    if (info === undefined) throw new Error('the controller always listens for info');
+    return info;
+  };
+  const toastText = (h: Harness): string | null => requireId(h.root, 'toast').textContent;
+
+  test('onInfo and onError toast for TOAST_MS; a second toast within it waits its turn (docs/MIGRATION.md step 15)', () => {
     const h = harness();
     hostALobby(h);
     h.host().events.onError('No relay configured');
@@ -550,16 +558,63 @@ describe('Controller toasts and timers', () => {
     expect(requireId(h.root, 'toast').getAttribute('class')).toBe('toast show');
     h.clock.advance(TOAST_MS - 1);
     expect(h.controller.state.toast).toBe('No relay configured');
-    // Known legacy defect kept (see the module header): the countdown restarts.
-    const info = h.host().events.onInfo;
-    if (info === undefined) throw new Error('the controller always listens for info');
-    info('Copied!');
+    // The legacy's one timer restarted here and 'Copied!' replaced the error at once. Now the
+    // first toast keeps its last millisecond and the second gets a full TOAST_MS after it.
+    infoOf(h)('Copied!');
+    expect(h.controller.state.toast).toBe('No relay configured');
+    expect(toastText(h)).toBe('No relay configured');
+    h.clock.advance(1);
+    expect(h.controller.state.toast).toBe('Copied!');
+    expect(toastText(h)).toBe('Copied!');
     h.clock.advance(TOAST_MS - 1);
     expect(h.controller.state.toast).toBe('Copied!');
     h.clock.advance(1);
     expect(h.controller.state.toast).toBeNull();
     expect(requireId(h.root, 'toast').getAttribute('class')).toBe('toast');
     expect(h.clock.pending()).toBe(0);
+  });
+
+  test('a burst of three toasts shows each for TOAST_MS, in arrival order, on one timer at a time', () => {
+    const h = harness();
+    hostALobby(h);
+    const info = infoOf(h);
+    ['one', 'two', 'three'].forEach(info);
+    expect(h.controller.state.toast).toBe('one');
+    expect(h.clock.pending()).toBe(1);
+    h.clock.advance(TOAST_MS);
+    expect(h.controller.state.toast).toBe('two');
+    expect(toastText(h)).toBe('two');
+    expect(h.clock.pending()).toBe(1);
+    h.clock.advance(TOAST_MS);
+    expect(h.controller.state.toast).toBe('three');
+    h.clock.advance(TOAST_MS - 1);
+    expect(h.controller.state.toast).toBe('three');
+    h.clock.advance(1);
+    expect(h.controller.state.toast).toBeNull();
+    expect(requireId(h.root, 'toast').getAttribute('class')).toBe('toast');
+    expect(h.clock.pending()).toBe(0);
+  });
+
+  test('a toast arriving as the showing one expires follows it without a gap; with nothing showing a toast is immediate', () => {
+    const h = harness();
+    hostALobby(h);
+    const info = infoOf(h);
+    info('first');
+    // Queued in the same instant the first expires: shown as it goes, for its own TOAST_MS.
+    h.clock.advance(TOAST_MS - 1);
+    info('second');
+    h.clock.advance(1);
+    expect(h.controller.state.toast).toBe('second');
+    h.clock.advance(TOAST_MS);
+    expect(h.controller.state.toast).toBeNull();
+    expect(h.clock.pending()).toBe(0);
+    // Nothing showing: no wait.
+    info('third');
+    expect(h.controller.state.toast).toBe('third');
+    expect(requireId(h.root, 'toast').getAttribute('class')).toBe('toast show');
+    h.clock.advance(TOAST_MS);
+    expect(h.controller.state.toast).toBeNull();
+    expect(requireId(h.root, 'toast').getAttribute('class')).toBe('toast');
   });
 
   test('the countdown ticks every TICK_MS while a reveal is showing', () => {
