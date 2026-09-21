@@ -1,16 +1,29 @@
 /*
  * Shared design tokens (docs/ARCHITECTURE.md "Seams reserved for the roadmap"; docs/MIGRATION.md
  * step 14). Both game pages link this file first, then base.css, then their own theme.css. Only
- * custom properties belong in this file.
+ * custom properties belong in this file (test/tokens.test.ts holds it to that).
  *
- * The shared vocabulary is the seven names both themes already declare on :root: --felt, --card,
- * --accent, --accent-dark, --gold, --muted and --radius. No value is shared: the two palettes
- * disagree on every one of them (CONTRACT.md "Tokens" has both values side by side), so each
- * theme.css keeps its own and this :root stays empty. The computed-style goldens
- * (test/fixtures/styles/<game>.<WxH>.json) pin the set of custom properties each page declares and
- * the value of every one of them on :root, so declaring a new shared name here, or aliasing a
- * legacy name onto one in a theme, is itself a golden change. Values move into this file with the
- * Fidice restyle (the roadmap step that maps its palette onto the shared names and re-records).
+ * The vocabulary is gin's palette, the look the roadmap restyles Fidice towards, so gin's values
+ * are canonical and gin's theme.css declares none of these names (single source). Fidice's
+ * theme.css, linked last, redeclares every one of them onto its own palette (its seven of the
+ * same name, and --bg --card-2 --text --danger aliased onto --mist --cream-2 --ink --red), so the
+ * shared names resolve to fidice's own look until the restyle drops those overrides.
+ * CONTRACT.md "Tokens" tables the canonical value beside each override. The computed-style
+ * goldens (test/fixtures/styles/<game>.<WxH>.json) pin every declared custom property and its
+ * :root value; a name added here is a note in tools/parity/computed-styles.ts --check until the
+ * goldens are re-recorded, a changed value a difference. Gin's layout tokens (--card-w --mini-w
+ * --pile-w --tiny-w) are gin-only and stay in its theme.css.
  */
 :root {
+  --bg: #0f2318;
+  --card: #163526;
+  --card-2: #1c4030;
+  --accent: #4ade80;
+  --accent-dark: #22c55e;
+  --gold: #fbbf24;
+  --text: #f2fdf6;
+  --muted: #9cc9ac;
+  --danger: #f87171;
+  --radius: 18px;
+  --felt: radial-gradient(ellipse at 50% 30%, #1f5a3a 0%, #123a26 55%, #0b2418 100%);
 }
