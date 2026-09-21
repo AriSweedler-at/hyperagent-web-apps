@@ -1,5 +1,5 @@
 // Local stand-in for games.sweedler.com (docs/ARCHITECTURE.md "Two origins"): a node http server
-// that runs the real Cloudflare Worker handler from infra/games-proxy/worker.js against a local
+// that runs the real Cloudflare Worker handler from infra/games-proxy/worker.ts against a local
 // upstream, so the Playwright project `proxy` exercises exactly the path mapping the live proxy
 // applies. Only transport plumbing lives here (node request <-> fetch Request/Response); every
 // routing decision is the Worker's.
@@ -11,7 +11,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import worker from '../infra/games-proxy/worker.js';
+import worker from '../infra/games-proxy/worker.ts';
 
 export type ProxyOptions = Readonly<{ host: string; port: number; upstream: string }>;
 
@@ -141,7 +141,7 @@ if (isMain) {
   const options = parseProxyArgs(process.argv.slice(2));
   startProxy(options).then(
     ({ url }) => {
-      console.log(`proxy-dev: ${url} -> ${options.upstream} (infra/games-proxy/worker.js)`);
+      console.log(`proxy-dev: ${url} -> ${options.upstream} (infra/games-proxy/worker.ts)`);
     },
     (error: unknown) => {
       console.error('proxy-dev failed to start:', error);

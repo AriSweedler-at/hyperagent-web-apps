@@ -56,7 +56,7 @@ and tests that prove it land before the code they protect.
 │                                class-contract)
 ├── e2e/                         Playwright specs + fixtures/two-players.ts
 ├── tools/                       serve-dist, proxy-dev, replay-goldens, legacy/{extract,debundle,record}-*
-└── infra/                       games-proxy/ (mapPath exported, UPSTREAM from env), turn-worker/ (unchanged)
+└── infra/                       games-proxy/ (worker.ts: mapPath exported, UPSTREAM from env), turn-worker/ (plain JS, unchanged)
 ```
 
 `dist/` is gitignored. The repo root holds no HTML once `web/` exists.
@@ -132,12 +132,12 @@ the Worker's catch-all to `/hyperagent-web-apps/games/fidice/app-x.js`) and `/sh
 1. `test/dist/asset-urls.test.ts`: every `src`/`href`/`url()` in dist HTML and CSS is
    `./`-relative, `../../shared/`-relative or `https://`; never `/`-rooted.
 2. `test/dist/check-dist-paths.test.ts`: resolves each reference against both bases, feeds the
-   proxy-origin path through `mapPath()` exported from `infra/games-proxy/worker.js`, and asserts
+   proxy-origin path through `mapPath()` exported from `infra/games-proxy/worker.ts`, and asserts
    the target exists in dist.
 3. `no-restricted-syntax` bans string literals starting with `/hyperagent-web-apps` or `/shared`.
 4. Playwright runs every spec on project `pages` (`tools/serve-dist.ts`, dist mounted at
    `/hyperagent-web-apps/` on :4173) and project `proxy` (`tools/proxy-dev.ts` on :8787 running the
-   real `worker.js` fetch handler with `UPSTREAM=http://127.0.0.1:4173`).
+   real `worker.ts` fetch handler with `UPSTREAM=http://127.0.0.1:4173`).
 
 localStorage stays per-origin (unchanged). Peer ids are origin-independent, so a github.io host
 and a games.sweedler.com guest still meet on the broker.
@@ -153,9 +153,11 @@ and a games.sweedler.com guest still meet on the broker.
 `forceConsistentCasingInFileNames`, `module: ESNext`, `moduleResolution: Bundler`,
 `allowImportingTsExtensions` (imports use explicit `.ts` specifiers so `node --experimental-strip-types`
 can run `tools/*.ts` unchanged), `target: ES2022`, `lib` per project (web: ES2023+DOM+DOM.Iterable;
-pure: ES2023; node: ES2023 + `types: ["node"]`), `noEmit`, `skipLibCheck`. During migration only:
-`allowJs: true, checkJs: false` in `tsconfig.web.json`, removed in the last step; a ratchet test
-asserts the count of `.js` files under `web/` never increases.
+pure: ES2023; node: ES2023 + `types: ["node"]`), `noEmit`, `skipLibCheck`. No project sets
+`allowJs`: the migration-only `allowJs: true, checkJs: false` (in `tsconfig.web.json` for the
+de-bundled fidice modules, in `tsconfig.node.json` for the games-proxy Worker) left in step 15, when
+the Worker became `infra/games-proxy/worker.ts`; `test/ratchet.test.ts` asserts that no `.js`
+file exists under `web/` (it ratcheted the count down to zero during the migration).
 
 ### eslint.config.js
 
@@ -174,7 +176,7 @@ a named algorithm in *.algorithms.ts"); `TSEnumDeclaration`, `TSParameterPropert
 `MemberExpression[object.name=Math][property.name=random]` outside `main.ts` and `web/shared/edge`
 ("inject Rng").
 
-`eslint-plugin-functional` v7. ON everywhere under `web/`: `no-loop-statements` (redundant with
+`eslint-plugin-functional` v7. ON everywhere under `web/` and in `infra/games-proxy/`: `no-loop-statements` (redundant with
 the syntax ban on purpose: two messages, one intent), `no-let: [error, {allowInForLoopInit: false}]`,
 `immutable-data: [error, {ignoreImmediateMutation: true, ignoreClasses: false}]` (lets
 `[...xs].sort()` through), `prefer-immutable-types` (`ReadonlyShallow` for parameters,
@@ -182,8 +184,9 @@ the syntax ban on purpose: two messages, one intent), `no-let: [error, {allowInF
 (`ReadonlyShallow`, `AtLeast`, all identifiers), `prefer-property-signatures`, `readonly-type: generic`.
 ON only in pure dirs (`engine`, `domain`, `bots`, `web/shared/lib`, both `protocol.ts`):
 `no-throw-statements`, `no-try-statements`, `no-classes`, `no-this-expressions`,
-`no-expression-statements: [error, {ignoreVoid: true}]` (warn until the tightening step, tracked by
-a ratchet on the warning count), `no-return-void`. OFF with reasons: `no-conditional-statements`
+`no-expression-statements: [error, {ignoreVoid: true}]` (`error` from step 1 on: with
+`--max-warnings 0` a warning fails lint anyway, and no ratchet on a warning count was ever needed),
+`no-return-void`. OFF with reasons: `no-conditional-statements`
 (the owner asked for no raw loops, not no branches; early returns beat nested ternaries in
 reducers), `functional-parameters` (bans zero-arity thunks that DOM callbacks need),
 `prefer-tacit` (collides with `unbound-method`, hurts stack traces), `no-mixed-types` (VNode and
@@ -195,8 +198,8 @@ reject). Overrides: `**/*.algorithms.ts` turns off the loop ban, `no-let`, `immu
 `no-return-void`, `no-throw-statements`, `no-try-statements`; `**/*.test.ts`, `e2e/**`, `tools/**`
 get `strictTypeChecked` only plus `no-console: off`; `legacy/**` and `test/fixtures/legacy/**` are
 ignored. `eslint-plugin-import-x`: `no-restricted-paths` zones per the table above, `no-cycle`.
-`eslint-config-prettier` last; Prettier formats. Lint runs with `--max-warnings 0` except the
-tracked `no-expression-statements` warnings during migration.
+`eslint-config-prettier` last; Prettier formats. Lint runs with `--max-warnings 0`: every rule
+above is `error` or `off`, nothing is a warning.
 
 ### Git hooks
 
@@ -248,8 +251,15 @@ or updates a pinned issue on failure.
    ladder, `apply` phase gates, `redactFor`, `survivalFor` spot values, every strategy's `decide()`
    over seeded views), property tests via `legalActions` (300 seeded games: 52-card conservation,
    hand sizes 10/11, totals monotone, termination), pure UI helpers, scorer maths, `ice.ts` with a
-   fetch parameter. Coverage: 90% lines on engine/domain/bots, 100% on `*.algorithms.ts` (with
-   direct tests of the 300k node cap and the 400-entry cache eviction).
+   fetch parameter. Coverage (`vitest.config.ts` thresholds, ratcheted in step 15 from the measured
+   numbers: lines, functions and statements 5 points under measured wherever that beat the former
+   90% floor by 8 or more, branches 3 points under, nothing lowered): 100% on `web/shared/lib` and
+   on both `*.algorithms.ts` (with direct tests of the 300k node cap and the 400-entry cache
+   eviction; branches 84% on fidice's, 97% on gin's); lines/functions/statements 94-95% on the gin
+   engine, the fidice domain and view, the gin ui/, net/ and scorer maths, the gin protocol, storage
+   and fx, the shared edges and the games-proxy Worker; 92-93% on the fidice bots; 90% on the
+   fidice net/ sessions; branches 81-97% per group. The unit suites are seeded, so the figures are
+   deterministic.
 2. Protocol: decoders reject malformed and hostile frames (wrong `t`, out-of-range rank/die,
    oversized names, prototype-pollution keys) with the strings fidice already echoes; wire goldens
    recorded from the legacy pages decode AND re-encode byte-for-byte after `ts` masking; host/guest
@@ -305,7 +315,9 @@ Step 1 (toolchain scaffold), against the versions on the registry at the time:
 - TypeScript is pinned at 5.9.3, not 7.x: typescript-eslint 8.70 accepts `typescript >=4.8.4 <6.1.0`.
   Vite is 8.3.0 (Rolldown) and vitest 5.0.0; the `rollupOptions` key names are verified in step 4.
 - `@eslint/js` is an extra exact devDependency: ESLint 10 no longer bundles it, and it supplies the
-  core `recommended` rules for the JS-only config on `infra/**/*.js`.
+  core `recommended` rules for the JS-only config on the plain JavaScript that remains (since step
+  15: `infra/turn-worker/worker.js`, the harness scripts under `e2e/browser/` and
+  `test/integration/`, the `.mjs` shim under `.github/actions/npm-ci/` and `eslint.config.js`).
 - `@typescript-eslint/array-type` is set to `{default: 'array', readonly: 'generic'}` so it agrees
   with `functional/readonly-type: generic`; the stylistic default (`readonly T[]`) contradicts it.
 - `import-x/extensions` is set to include `.ts`: without it ExportMap follows only `.js` dependencies
@@ -377,7 +389,8 @@ Step 3 (two-peer e2e against the legacy pages):
   place the harness names the mount point is `e2e/fixtures/site.ts`.
 - `tsconfig.node.json` sets `allowJs` and lists `infra/games-proxy/worker.js` so
   `tools/proxy-dev.ts` imports the Worker's default export with the types its JSDoc declares;
-  `checkJs` stays off (the JS lint config covers it).
+  `checkJs` stays off (the JS lint config covers it). Step 15 ported the Worker to `worker.ts` and
+  dropped `allowJs` from every project.
 - Page-side harness code (`e2e/browser/*.js`: seeded `Math.random`, the Peer recorder) is plain
   JavaScript injected with `addInitScript`, and specs read page state through locators and string
   `page.evaluate` expressions, so the node project keeps `lib: ["ES2023"]` with no DOM types.
@@ -745,3 +758,34 @@ Step 13 (cut Gin Rummy over; retire the passthrough):
   in "Build and serve" covers it too). `web/games/fidice/{index.html,theme.css}` are hand-owned, no
   longer cut or pinned by `tools/legacy/debundle-fidice.ts`; `web/shared/ui/README.md`'s `base.css`
   row moved to `web/shared/styles`.
+
+Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage ratcheted):
+
+- `infra/games-proxy/worker.{js,test.js}` are `worker.{ts,test.ts}` (`git mv`, then the JSDoc types
+  written as TypeScript: `Env`, `Mapped`, a `Handler` type over the WHATWG globals `@types/node`
+  declares) so `tsconfig.node.json` needs no `allowJs`; `wrangler.toml` points `main` at
+  `worker.ts`, which wrangler bundles natively. Behaviour is identical and the table tests are the
+  same rows; the functional profile now covers `infra/games-proxy/**/*.ts` too, while the
+  absolute-site-path ban does not: the Worker is the one place that spells those paths, to map them
+  between the origins, and its table tests list them. The deployed JS keeps
+  serving until the owner runs `npx wrangler deploy` from that directory at leisure (wrangler is not
+  a devDependency, so the port was not dry-run built here). `infra/turn-worker/worker.js` stays
+  plain JavaScript on purpose: it is deployed by hand and "unchanged" throughout this document, and
+  it keeps its `.prettierignore` entry. The import-x block lints `**/*.ts` only: no remaining `.js`
+  takes part in a zone.
+- `test/ratchet.test.ts` is one test: no `.js` file under `web/`. `JS_FILE_COUNT` and the
+  fidice-only allow-list are gone with `allowJs`; a `.js` under `web/` would now escape the
+  compiler, so the test refuses it outright.
+- The lint story is stated as it stands: `functional/no-expression-statements` has been `error` in
+  the pure dirs since step 1 (step 8 never needed the `warn`-plus-ratchet fallback), and lint runs
+  with `--max-warnings 0` and no exceptions. The "warn until the tightening step" and "except the
+  tracked warnings during migration" wording in "eslint.config.js" is gone.
+- Coverage thresholds are ratcheted, not merely "enforced" (they were enforced from step 5 on):
+  `npm test -- --coverage` was run once for the per-group figures (aggregated over each glob's
+  files from `coverage-summary.json`, the way vitest evaluates a glob threshold), every group
+  gained a `branches` floor at `floor(measured) - 3` (the lowest measured branches was 84.4%, on
+  the fidice net/ sessions, so none was omitted), and lines/functions/statements rose to
+  `floor(measured) - 5` where the measured number beat the old threshold by 8 or more points; the
+  fidice net/ group (95.9/93.2/92.2) stays at 90. Nothing went down. A second run passed against
+  the new numbers, which are listed in the `vitest.config.ts` comment and summarised under
+  "Testing pyramid".

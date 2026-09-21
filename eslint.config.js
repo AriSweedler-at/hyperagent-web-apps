@@ -125,9 +125,9 @@ const functionalPure = {
   'functional/no-try-statements': 'error',
   'functional/no-classes': 'error',
   'functional/no-this-expressions': 'error',
-  // error from the start: `--max-warnings 0` would fail on a warning anyway, and no pure module
-  // exists yet to ratchet. docs/MIGRATION.md step 8 may downgrade this to warn behind a ratchet on
-  // the count if the ported legacy code needs it (docs/ARCHITECTURE.md "Deviations").
+  // error from the start and never downgraded: `--max-warnings 0` would fail on a warning anyway,
+  // and the ported pure code (docs/MIGRATION.md steps 8 and 10) never needed the warn-plus-ratchet
+  // fallback the plan held in reserve (docs/ARCHITECTURE.md "Deviations", step 1 follow-up).
   'functional/no-expression-statements': ['error', { ignoreVoid: true }],
   'functional/no-return-void': 'error',
 };
@@ -361,6 +361,13 @@ export default defineConfig([
     rules: { 'no-restricted-imports': 'off' },
   },
   {
+    // The games.sweedler.com Worker is the one place that spells the site's absolute paths: it
+    // maps them between the two origins (docs/ARCHITECTURE.md "Two origins"). Its table tests
+    // list them too. The other bans stay.
+    files: ['infra/games-proxy/**/*.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...loopBans, ...erasableSyntaxBans, mathRandomBan] },
+  },
+  {
     // Ambient declarations (web/raw-imports.d.ts) are never executed, so the erasable-syntax ban on
     // `declare module` does not apply; the other bans stay.
     files: ['web/**/*.d.ts'],
@@ -369,7 +376,8 @@ export default defineConfig([
 
   // --- eslint-plugin-functional profiles ------------------------------------------------------
   {
-    files: ['web/**/*.ts'],
+    // Every shipped .ts: the site under web/ and the games.sweedler.com Worker.
+    files: ['web/**/*.ts', 'infra/games-proxy/**/*.ts'],
     ignores: ['**/*.test.ts'],
     plugins: { functional },
     rules: functionalEverywhere,
@@ -417,7 +425,7 @@ export default defineConfig([
 
   // --- Module boundaries ----------------------------------------------------------------------
   {
-    files: ['**/*.ts', '**/*.js'],
+    files: ['**/*.ts'],
     plugins: { 'import-x': importX },
     settings: {
       'import-x/resolver-next': [
@@ -433,7 +441,10 @@ export default defineConfig([
     },
   },
 
-  // --- Plain JavaScript (Cloudflare Workers under infra/, this config): no type-aware rules ---
+  // --- Plain JavaScript: no type-aware rules. What is left after docs/MIGRATION.md step 15:
+  // infra/turn-worker/worker.js (deployed by hand, unchanged), the page-side harness scripts
+  // e2e/browser/*.js and test/integration/harness.js, the .mjs registry shim under
+  // .github/actions, and this config. Nothing under web/ or infra/games-proxy/ is JavaScript.
   {
     files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
     extends: [js.configs.recommended],

@@ -7,7 +7,7 @@
 import { expect, test } from 'vitest';
 
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
-import { mapPath, unmapPath } from '../../infra/games-proxy/worker.js';
+import { mapPath, unmapPath } from '../../infra/games-proxy/worker.ts';
 import {
   allReferences,
   classify,

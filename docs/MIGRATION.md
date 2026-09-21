@@ -28,7 +28,7 @@ Steps 1-4 are the foundation and should be done first, in order.
   `.githooks/{pre-commit,pre-push}`, `.gitignore` (+dist, node_modules, playwright-report,
   test-results), `.github/workflows/ci.yml` job `check`; `infra/games-proxy/worker.js` exports
   `mapPath()` and reads `env.UPSTREAM ?? 'https://arisweedler-at.github.io'`; `worker.test.js`
-  moves to vitest and covers `mapPath` for every current path shape.
+  moves to vitest and covers `mapPath` for every current path shape (both `.ts` since step 15).
 - Proves: CI `check` green; `npm run hooks:verify` passes; manually, committing a file with trailing
   whitespace still triggers the template hook's prompt, and `git push` runs pre-push. `git rev-parse
   --git-dir` (not `--git-path hooks`) is what the shim uses; see ARCHITECTURE.
@@ -654,3 +654,21 @@ parity and e2e gates.
   stay in `.prettierignore` as legacy-layout bytes. Visual snapshots are still not captured (step
   3). Oracles: `computed-styles.ts --check` 0 differences x4, `npm run check`, and every non-online
   e2e spec on both projects. See ARCHITECTURE "Deviations".
+- Step 15, part A (`allowJs` out): `infra/games-proxy/worker.js` and its test are `worker.ts` and
+  `worker.test.ts` (`git mv`; the JSDoc types become `Env`, `Mapped` and a `Handler` type over the
+  `@types/node` globals) and `wrangler.toml` names `main = "worker.ts"`, which wrangler bundles as is.
+  Behaviour and the table tests are unchanged; `tsconfig.web.json` and `tsconfig.node.json` drop
+  `allowJs`/`checkJs`. The owner ships the TypeScript Worker with `npx wrangler deploy` at leisure
+  (identical behaviour; the deployed JS keeps serving until then; wrangler is not installed in this
+  repo, so no dry run was built). `infra/turn-worker/worker.js` stays plain JavaScript on purpose
+  (deployed by hand, "unchanged" in ARCHITECTURE) and keeps its `.prettierignore` entry.
+  `test/ratchet.test.ts` is one test, no `.js` under `web/` (`JS_FILE_COUNT` and the fidice-only
+  second test are gone with `allowJs`). `functional/no-expression-statements` needed no flip: it
+  has been `error` in the pure dirs since step 1 (see the step 1 follow-up above), and ARCHITECTURE
+  "eslint.config.js" now says so instead of "warn until the tightening step". Coverage
+  thresholds were already enforced; this step ratchets them to the measured numbers (lines,
+  functions, statements at `floor(measured) - 5` where measured beat 90 by 8+, `branches` at
+  `floor(measured) - 3` for every group, `infra/games-proxy/worker.ts` added; nothing lowered)
+  and a second coverage run proves they hold. `nightly.yml`, the README rewrite and the three
+  behaviour fixes (`dealHand` resets `lastDrawn`, single toast timer, dead `.ha-img-placeholder`
+  CSS) are part B. See ARCHITECTURE "Deviations".
