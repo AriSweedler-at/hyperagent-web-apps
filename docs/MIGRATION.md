@@ -218,7 +218,8 @@ Gin's inline classic scripts depend on execution order (`window.GinEngine`, `win
 
 Extract the generic host/client session and `shared/ui` screen builders from fidice and adapt gin
 behind its wire goldens; restyle Fidice onto the shared tokens; alternative `HandView`
-implementations; replace `fitTable` via `ui/fit.ts`. Each is a separate design under the same
+implementations (done: docs/design/gin-draw-ghost-slot.md PR A); replace `fitTable` (done: PR B
+retired it and `ui/fit.ts` for CSS bounds in theme.css). Each is a separate design under the same
 parity and e2e gates.
 
 ## Deviations

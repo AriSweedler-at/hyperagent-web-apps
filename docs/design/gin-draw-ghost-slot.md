@@ -440,4 +440,14 @@ overflow, the actions row ends on screen, the eleven slots are one size in the r
 implies, and the topbar, opp-strip, both piles, banner, last-action, hand grid and actions row keep
 their boxes to half a pixel; `ginStartLocal`/`ginReveal` joined the fixtures. Goldens flipped
 (named): the gin computed-style goldens at both viewports (fidice byte-identical); gin-dom-parity
-84 checkpoints, 0 mismatches. Next: PR C (stories).
+84 checkpoints, 0 mismatches. Review follow-ups on the same branch, each measured with real
+clicks: the hand header is one fixed line (`height: 24px; line-height: 16px`, the name ellipsizes,
+the deadwood readout does not shrink) since a 20-character name wrapped it to two lines at the
+draw -> discard transition and the `⇄ N ways` badge grew it by 1px; `.last-action` and `.pile`
+gained `flex-shrink: 0` and a 92px `min-width` floor (the "STOCK · 30" label was wider than a 64px
+pile's box); and under `@media (max-height: 661px)`, where the floor sizes' 658px cannot fit (a
+phone in landscape, a phone with the browser's toolbar shown), the page scrolls to the actions row
+instead of clipping it behind `overflow: hidden`. `e2e/gin-geometry.spec.ts` compares the hand area
+and header too, plays 375x667 with 20-character names, and adds 375x553 and 844x390 (the document
+scrolls, `#app`/`#tableScreen` clip nothing, the actions row is reachable). No golden flipped: none
+of the properties involved is in the computed-style list. Next: PR C (stories).
