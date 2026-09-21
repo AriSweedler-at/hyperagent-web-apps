@@ -106,7 +106,13 @@ const openContext = async (
     const answer = dialog.type() === 'prompt' ? answers() : undefined;
     void (answer === 'CANCEL' ? dialog.dismiss() : dialog.accept(answer));
   });
-  await page.goto(url);
+  const response = await page.goto(url);
+  // A 404 here would otherwise surface much later as "0 checkpoints" (the driver waits on hooks
+  // that never appear): name the page and the status instead.
+  if (!response?.ok()) {
+    const status = response ? `HTTP ${String(response.status())}` : 'no response';
+    throw new Error(`${label} page not served (${status}): ${url}`);
+  }
   return { context, page };
 };
 

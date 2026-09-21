@@ -12,12 +12,21 @@ import { PROMPTS, openPair, runParity } from '../tools/parity/gin-dom-parity.ts'
 
 test('the served gin page paints what the legacy page paints, checkpoint for checkpoint', async ({
   browser,
+  request,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'pages', 'runs once, on the origin that serves both pages');
   test.setTimeout(240_000);
+  const legacyUrl = `${PAGES_ORIGIN}${PAGES_BASE_PATH}${LEGACY_GIN_PAGE}`;
+  // Locally (reuseExistingServer) a stray `npm run serve` on the pages port is reused, and it
+  // lacks the legacy aliases: say so, rather than failing on the checkpoint count below.
+  const probe = await request.get(legacyUrl);
+  expect(
+    probe.status(),
+    `legacy page not served at ${legacyUrl}: start the harness with LEGACY_ALIASES (e2e/fixtures/site.ts); a stray \`npm run serve\` on the pages port is reused locally`,
+  ).toBe(200);
   const pair = await openPair(
     browser,
-    `${PAGES_ORIGIN}${PAGES_BASE_PATH}${LEGACY_GIN_PAGE}`,
+    legacyUrl,
     `${PAGES_ORIGIN}${PAGES_BASE_PATH}games/gin-rummy/`,
     PROMPTS,
   );
