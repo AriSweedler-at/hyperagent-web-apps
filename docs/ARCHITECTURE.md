@@ -56,7 +56,7 @@ and tests that prove it land before the code they protect.
 │                                class-contract)
 ├── e2e/                         Playwright specs + fixtures/two-players.ts
 ├── tools/                       serve-dist, proxy-dev, replay-goldens, legacy/{extract,debundle,record}-*
-└── infra/                       games-proxy/ (mapPath exported, UPSTREAM from env), turn-worker/ (unchanged)
+└── infra/                       games-proxy/ (worker.ts: mapPath exported, UPSTREAM from env), turn-worker/ (plain JS, unchanged)
 ```
 
 `dist/` is gitignored. The repo root holds no HTML once `web/` exists.
@@ -132,12 +132,12 @@ the Worker's catch-all to `/hyperagent-web-apps/games/fidice/app-x.js`) and `/sh
 1. `test/dist/asset-urls.test.ts`: every `src`/`href`/`url()` in dist HTML and CSS is
    `./`-relative, `../../shared/`-relative or `https://`; never `/`-rooted.
 2. `test/dist/check-dist-paths.test.ts`: resolves each reference against both bases, feeds the
-   proxy-origin path through `mapPath()` exported from `infra/games-proxy/worker.js`, and asserts
+   proxy-origin path through `mapPath()` exported from `infra/games-proxy/worker.ts`, and asserts
    the target exists in dist.
 3. `no-restricted-syntax` bans string literals starting with `/hyperagent-web-apps` or `/shared`.
 4. Playwright runs every spec on project `pages` (`tools/serve-dist.ts`, dist mounted at
    `/hyperagent-web-apps/` on :4173) and project `proxy` (`tools/proxy-dev.ts` on :8787 running the
-   real `worker.js` fetch handler with `UPSTREAM=http://127.0.0.1:4173`).
+   real `worker.ts` fetch handler with `UPSTREAM=http://127.0.0.1:4173`).
 
 localStorage stays per-origin (unchanged). Peer ids are origin-independent, so a github.io host
 and a games.sweedler.com guest still meet on the broker.
@@ -153,9 +153,11 @@ and a games.sweedler.com guest still meet on the broker.
 `forceConsistentCasingInFileNames`, `module: ESNext`, `moduleResolution: Bundler`,
 `allowImportingTsExtensions` (imports use explicit `.ts` specifiers so `node --experimental-strip-types`
 can run `tools/*.ts` unchanged), `target: ES2022`, `lib` per project (web: ES2023+DOM+DOM.Iterable;
-pure: ES2023; node: ES2023 + `types: ["node"]`), `noEmit`, `skipLibCheck`. During migration only:
-`allowJs: true, checkJs: false` in `tsconfig.web.json`, removed in the last step; a ratchet test
-asserts the count of `.js` files under `web/` never increases.
+pure: ES2023; node: ES2023 + `types: ["node"]`), `noEmit`, `skipLibCheck`. No project sets
+`allowJs`: the migration-only `allowJs: true, checkJs: false` (in `tsconfig.web.json` for the
+de-bundled fidice modules, in `tsconfig.node.json` for the games-proxy Worker) left in step 15, when
+the Worker became `infra/games-proxy/worker.ts`; a ratchet test asserts the count of `.js` files
+under `web/` never increases.
 
 ### eslint.config.js
 
@@ -174,7 +176,7 @@ a named algorithm in *.algorithms.ts"); `TSEnumDeclaration`, `TSParameterPropert
 `MemberExpression[object.name=Math][property.name=random]` outside `main.ts` and `web/shared/edge`
 ("inject Rng").
 
-`eslint-plugin-functional` v7. ON everywhere under `web/`: `no-loop-statements` (redundant with
+`eslint-plugin-functional` v7. ON everywhere under `web/` and in `infra/games-proxy/`: `no-loop-statements` (redundant with
 the syntax ban on purpose: two messages, one intent), `no-let: [error, {allowInForLoopInit: false}]`,
 `immutable-data: [error, {ignoreImmediateMutation: true, ignoreClasses: false}]` (lets
 `[...xs].sort()` through), `prefer-immutable-types` (`ReadonlyShallow` for parameters,
@@ -305,7 +307,9 @@ Step 1 (toolchain scaffold), against the versions on the registry at the time:
 - TypeScript is pinned at 5.9.3, not 7.x: typescript-eslint 8.70 accepts `typescript >=4.8.4 <6.1.0`.
   Vite is 8.3.0 (Rolldown) and vitest 5.0.0; the `rollupOptions` key names are verified in step 4.
 - `@eslint/js` is an extra exact devDependency: ESLint 10 no longer bundles it, and it supplies the
-  core `recommended` rules for the JS-only config on `infra/**/*.js`.
+  core `recommended` rules for the JS-only config on the plain JavaScript that remains (since step
+  15: `infra/turn-worker/worker.js`, the harness scripts under `e2e/browser/` and
+  `test/integration/`, the `.mjs` shim under `.github/actions/npm-ci/` and `eslint.config.js`).
 - `@typescript-eslint/array-type` is set to `{default: 'array', readonly: 'generic'}` so it agrees
   with `functional/readonly-type: generic`; the stylistic default (`readonly T[]`) contradicts it.
 - `import-x/extensions` is set to include `.ts`: without it ExportMap follows only `.js` dependencies
@@ -377,7 +381,8 @@ Step 3 (two-peer e2e against the legacy pages):
   place the harness names the mount point is `e2e/fixtures/site.ts`.
 - `tsconfig.node.json` sets `allowJs` and lists `infra/games-proxy/worker.js` so
   `tools/proxy-dev.ts` imports the Worker's default export with the types its JSDoc declares;
-  `checkJs` stays off (the JS lint config covers it).
+  `checkJs` stays off (the JS lint config covers it). Step 15 ported the Worker to `worker.ts` and
+  dropped `allowJs` from every project.
 - Page-side harness code (`e2e/browser/*.js`: seeded `Math.random`, the Peer recorder) is plain
   JavaScript injected with `addInitScript`, and specs read page state through locators and string
   `page.evaluate` expressions, so the node project keeps `lib: ["ES2023"]` with no DOM types.
@@ -745,3 +750,18 @@ Step 13 (cut Gin Rummy over; retire the passthrough):
   in "Build and serve" covers it too). `web/games/fidice/{index.html,theme.css}` are hand-owned, no
   longer cut or pinned by `tools/legacy/debundle-fidice.ts`; `web/shared/ui/README.md`'s `base.css`
   row moved to `web/shared/styles`.
+
+Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage ratcheted):
+
+- `infra/games-proxy/worker.{js,test.js}` are `worker.{ts,test.ts}` (`git mv`, then the JSDoc types
+  written as TypeScript: `Env`, `Mapped`, a `Handler` type over the WHATWG globals `@types/node`
+  declares) so `tsconfig.node.json` needs no `allowJs`; `wrangler.toml` points `main` at
+  `worker.ts`, which wrangler bundles natively. Behaviour is identical and the table tests are the
+  same rows; the functional profile now covers `infra/games-proxy/**/*.ts` too, while the
+  absolute-site-path ban does not: the Worker is the one place that spells those paths, to map them
+  between the origins, and its table tests list them. The deployed JS keeps
+  serving until the owner runs `npx wrangler deploy` from that directory at leisure (wrangler is not
+  a devDependency, so the port was not dry-run built here). `infra/turn-worker/worker.js` stays
+  plain JavaScript on purpose: it is deployed by hand and "unchanged" throughout this document, and
+  it keeps its `.prettierignore` entry. The import-x block lints `**/*.ts` only: no remaining `.js`
+  takes part in a zone.

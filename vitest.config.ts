@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['web/**/*.test.ts', 'test/**/*.test.ts', 'infra/**/*.test.{js,ts}'],
+    include: ['web/**/*.test.ts', 'test/**/*.test.ts', 'infra/**/*.test.ts'],
     // test/dist/** reads the build output; vitest.dist.config.ts runs it after `npm run build`.
     // test/integration/** needs a PeerServer and Chromium; vitest.integration.config.ts runs it.
     exclude: ['**/node_modules/**', 'test/dist/**', 'test/integration/**'],
@@ -24,7 +24,7 @@ export default defineConfig({
         'web/games/gin-rummy/src/scorer/**/*.ts',
         'web/games/gin-rummy/src/net/**/*.ts',
         'web/games/gin-rummy/src/fx.ts',
-        'infra/games-proxy/worker.js',
+        'infra/games-proxy/worker.ts',
       ],
       exclude: ['**/*.test.ts'],
       // The shared pure library is held at 100%; the edges (effects behind injected fakes) at
@@ -40,7 +40,9 @@ export default defineConfig({
       // capture and string-golden suites under test/parity plus the table tests beside them. The
       // gin net/ sessions (step 12) are at 90%, exercised by the scenario tests beside them over
       // transport.fake.ts and clock.fake.ts and by the wire-corpus replay under test/parity. The
-      // rest get theirs as they land (docs/ARCHITECTURE.md "Testing pyramid").
+      // games.sweedler.com Worker (infra/games-proxy/worker.ts, TypeScript since step 15) is at 90%,
+      // exercised by the table tests beside it over a stubbed global fetch. The rest get theirs as
+      // they land (docs/ARCHITECTURE.md "Testing pyramid").
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 90, functions: 90, statements: 90 },
@@ -67,6 +69,7 @@ export default defineConfig({
         'web/games/gin-rummy/src/scorer/**': { lines: 90, functions: 90, statements: 90 },
         'web/games/gin-rummy/src/net/**': { lines: 90, functions: 90, statements: 90 },
         'web/games/gin-rummy/src/fx.ts': { lines: 90, functions: 90, statements: 90 },
+        'infra/games-proxy/worker.ts': { lines: 90, functions: 90, statements: 90 },
       },
     },
   },

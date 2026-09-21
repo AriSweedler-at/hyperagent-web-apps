@@ -1,24 +1,32 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import worker, { DEFAULT_UPSTREAM, mapPath, unmapPath } from './worker.js';
+import worker, { DEFAULT_UPSTREAM, type Env, mapPath, unmapPath } from './worker.ts';
 
 const ORIGIN = 'https://games.sweedler.com';
 const GH = 'https://arisweedler-at.github.io';
 
+/** A stand-in upstream: the Worker always hands `fetch` a Request, never a bare URL. */
+type Upstream = (req: Request) => Response;
+
 /** Run fn with the global fetch (the only side effect the Worker has) replaced by handler. */
-const withUpstream = async (handler, fn) => {
-  const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(handler);
+const withUpstream = async <T>(handler: Upstream, fn: () => Promise<T>): Promise<T> => {
+  const spy = vi
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation((input) =>
+      Promise.resolve(handler(input instanceof Request ? input : new Request(input))),
+    );
   try {
     return await fn();
   } finally {
     spy.mockRestore();
   }
 };
-const upstreamEcho = async (req) => new Response(req.url, { status: 200 });
-const noUpstream = async () => {
+const upstreamEcho: Upstream = (req) => new Response(req.url, { status: 200 });
+const noUpstream: Upstream = () => {
   throw new Error('no upstream call expected');
 };
-const get = (path, env) => worker.fetch(new Request(ORIGIN + path), env);
+const get = (path: string, env?: Env): Promise<Response> =>
+  worker.fetch(new Request(ORIGIN + path), env);
 
 describe('mapPath: the mapping table in the file header', () => {
   test.each([
@@ -113,7 +121,7 @@ describe('fetch handler', () => {
 
   test('upstream trailing-slash redirect is rewritten back to this origin', () =>
     withUpstream(
-      async () =>
+      () =>
         new Response(null, {
           status: 301,
           headers: { Location: `${GH}/hyperagent-web-apps/games/gin-rummy/` },
@@ -152,7 +160,7 @@ describe('fetch handler', () => {
 
   test('a redirect from a custom upstream host is rewritten too', () =>
     withUpstream(
-      async () =>
+      () =>
         new Response(null, {
           status: 301,
           headers: { Location: 'http://127.0.0.1:4173/hyperagent-web-apps/games/fidice/' },
@@ -165,7 +173,7 @@ describe('fetch handler', () => {
 
   test('a relative upstream Location resolves against the fetched target', () =>
     withUpstream(
-      async () => new Response(null, { status: 302, headers: { Location: 'gin-rummy/' } }),
+      () => new Response(null, { status: 302, headers: { Location: 'gin-rummy/' } }),
       async () => {
         const res = await get('/gin-rummy');
         expect(res.status).toBe(302);
@@ -175,7 +183,7 @@ describe('fetch handler', () => {
 
   test('an upstream Location outside games/ maps to the root form and keeps its query', () =>
     withUpstream(
-      async () =>
+      () =>
         new Response(null, {
           status: 301,
           headers: { Location: `${GH}/hyperagent-web-apps/shared/?a=1` },
@@ -188,8 +196,7 @@ describe('fetch handler', () => {
 
   test('a Location on another host passes through unchanged', () =>
     withUpstream(
-      async () =>
-        new Response(null, { status: 302, headers: { Location: 'https://example.com/x?y=1' } }),
+      () => new Response(null, { status: 302, headers: { Location: 'https://example.com/x?y=1' } }),
       async () => {
         const res = await get('/gin-rummy/');
         expect(res.headers.get('Location')).toBe('https://example.com/x?y=1');
@@ -198,7 +205,7 @@ describe('fetch handler', () => {
 
   test('status, statusText and other headers pass through', () =>
     withUpstream(
-      async () =>
+      () =>
         new Response('missing', {
           status: 404,
           statusText: 'Not Found',
@@ -216,7 +223,7 @@ describe('fetch handler', () => {
 
   test('method and request headers are forwarded; GET carries no body and follows no redirects', () =>
     withUpstream(
-      async (req) => {
+      (req) => {
         expect(req.method).toBe('GET');
         expect(req.headers.get('x-test')).toBe('hello');
         expect(req.body).toBeNull();
@@ -233,7 +240,7 @@ describe('fetch handler', () => {
 
   test('HEAD is forwarded as HEAD without a body', () =>
     withUpstream(
-      async (req) => {
+      (req) => {
         expect(req.method).toBe('HEAD');
         expect(req.body).toBeNull();
         return new Response(null, { status: 200, headers: { 'content-length': '12' } });

@@ -1,16 +1,14 @@
 {
   // Browser code under web/: DOM available. web/shared/lib and the typed pure dirs (fidice domain,
-  // bots and net/protocol since docs/MIGRATION.md step 8, the gin engine since step 10, the gin
-  // protocol.ts since step 11) are checked by both projects on purpose: the pure project is the
-  // guard, and a composite project must list every .ts its edges import. Migration only: `allowJs`
-  // lets de-bundled .js modules type-check as they are ported; step 15 removes it (a ratchet test
-  // keeps the .js count from growing).
+  // bots and net/protocol, the gin engine, the gin protocol.ts and scorer maths) are checked by both
+  // projects on purpose: the pure project is the guard, and a composite project must list every .ts
+  // its edges import. TypeScript only: `allowJs` carried the de-bundled fidice .js modules while
+  // they were ported (docs/MIGRATION.md steps 6-9) and left in step 15; test/ratchet.test.ts
+  // asserts that no .js file exists under web/.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": [],
-    "allowJs": true,
-    "checkJs": false
+    "types": []
   },
-  "include": ["web/**/*.ts", "web/**/*.js"]
+  "include": ["web/**/*.ts"]
 }

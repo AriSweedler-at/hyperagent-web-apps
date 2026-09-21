@@ -1,5 +1,5 @@
 // tools/proxy-dev.ts is the `proxy` origin of the browser harness: the real Worker handler from
-// infra/games-proxy/worker.js fronting tools/serve-dist.ts. These tests run the two together and
+// infra/games-proxy/worker.ts fronting tools/serve-dist.ts. These tests run the two together and
 // pin the behaviours the specs rely on: short URLs, the /games/ redirect, upstream redirects
 // rewritten to this origin, /shared/ mapping, passthrough and byte-identical page bodies.
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';

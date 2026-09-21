@@ -18,14 +18,14 @@
   // DOM-free by design) with web/shared/edge/storage.ts, for the codec, storage and string-golden
   // parity suites; since step 12 web/shared/edge/fx.ts is listed too (the gin fx.ts wraps it, all
   // structural types) and ui/render.ts (DOM) is excluded below.
-  // infra/games-proxy/worker.js is listed (allowJs, its JSDoc supplies the types) because
-  // tools/proxy-dev.ts runs its default export; checkJs stays off: the JS config lints it.
+  // infra/games-proxy/**/*.ts is the games.sweedler.com Worker (TypeScript since step 15; wrangler
+  // bundles it as is) with its table tests: tools/proxy-dev.ts runs its default export and the dist
+  // guards import mapPath. It uses the WHATWG globals @types/node declares (Request, Response,
+  // Headers, URL, fetch), the same interfaces Cloudflare provides.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023"],
-    "types": ["node"],
-    "allowJs": true,
-    "checkJs": false
+    "types": ["node"]
   },
   "include": [
     "vitest.config.ts",
@@ -53,7 +53,7 @@
     "web/games/gin-rummy/src/**/*.ts",
     "web/shared/edge/storage.ts",
     "web/shared/edge/fx.ts",
-    "infra/games-proxy/worker.js"
+    "infra/games-proxy/**/*.ts"
   ],
   // The gin paint and wiring (ui/{render,home,local}.ts and scorer/main.ts, step 12) are written
   // against the DOM edge and stay out with their tests.
