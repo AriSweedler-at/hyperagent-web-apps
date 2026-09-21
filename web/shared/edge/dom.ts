@@ -151,11 +151,6 @@ export const selectText = (el: Element): void => {
   input.select?.call(el);
 };
 
-/** `el.style.setProperty(name, value)`: the table's `--tscale`. */
-export const setStyleProperty = (el: Element, name: string, value: string): void => {
-  el.style.setProperty(name, value);
-};
-
 /** `el.dataset.<name>` read as the attribute it is (`dataOf(el, 'meld-opt')` for `data-meld-opt`). */
 export const dataOf = (el: Element, name: string): string | null => el.getAttribute(`data-${name}`);
 

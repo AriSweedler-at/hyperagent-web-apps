@@ -3,8 +3,9 @@
 // the free variables they read) on the same inputs, and the strings must match character for
 // character: every card in every option combination, meld groups, the whole hand markup over
 // seeded views and selections, the status and deadwood readouts, the sound-cue sequence of whole
-// games in both roles, the table-fit loop over seeded measurements, and the rules list against
-// both legacy copies.
+// games in both roles, and the rules list against both legacy copies. The legacy `fitTable` loop
+// had a golden here (`fitScale`) until docs/design/gin-draw-ghost-slot.md PR B retired the
+// measure-and-shrink table fit for CSS bounds; the cut's `fitTable` is not called.
 import { describe, expect, test } from 'vitest';
 
 import * as engine from '../../web/games/gin-rummy/src/engine/index.ts';
@@ -21,18 +22,12 @@ import {
   type CueRole,
   type CueState,
 } from '../../web/games/gin-rummy/src/ui/cues.ts';
-import { fitScale, type Measure } from '../../web/games/gin-rummy/src/ui/fit.ts';
 import { defaultHandView } from '../../web/games/gin-rummy/src/ui/hand/HandView.ts';
 import { meldGroupsHtml } from '../../web/games/gin-rummy/src/ui/hand/meldGroups.ts';
 import { RULES_ITEMS, RULES_LIST_HTML } from '../../web/games/gin-rummy/src/ui/rules.ts';
-import { mulberry32, type Rng } from '../../web/shared/lib/rng.ts';
+import { mulberry32 } from '../../web/shared/lib/rng.ts';
 import { loadLegacyGin, type GinState } from './gin.api.ts';
-import {
-  legacyRulesBlocks,
-  loadLegacyGinUi,
-  type LegacyApp,
-  type LegacyElement,
-} from './gin.fixtures.ts';
+import { legacyRulesBlocks, loadLegacyGinUi, type LegacyApp } from './gin.fixtures.ts';
 import { actor, policy } from './gin.policy.ts';
 
 const legacy = loadLegacyGin();
@@ -47,42 +42,13 @@ const fx = Object.fromEntries(
     },
   ]),
 );
-/** The fake table: `--tscale` is read back through the measurement function under test. */
-const table: { scale: number; measureAt: (scale: number) => Measure } = {
-  scale: 1,
-  measureAt: () => ZERO,
-};
-const ZERO: Measure = {
-  appScrollHeight: 0,
-  appClientHeight: 0,
-  handScrollHeight: 0,
-  handClientHeight: 0,
-};
-const element = (pick: (m: Measure) => readonly [number, number]): LegacyElement => ({
-  classList: { contains: () => false },
-  style: {
-    setProperty: (_name, value) => {
-      table.scale = Number(value);
-    },
-  },
-  get scrollHeight() {
-    return pick(table.measureAt(table.scale))[0];
-  },
-  get clientHeight() {
-    return pick(table.measureAt(table.scale))[1];
-  },
-});
-const elements: Record<string, LegacyElement> = {
-  tableScreen: element(() => [0, 0]),
-  app: element((m) => [m.appScrollHeight, m.appClientHeight]),
-  hand: element((m) => [m.handScrollHeight, m.handClientHeight]),
-};
+/** No page: the helpers under test read no element (the cut's `fitTable`, which did, is not called). */
 const ui = loadLegacyGinUi({
   engine: legacy,
   app,
   fx,
-  $: (id) => elements[id] ?? null,
-  document: { getElementById: (id) => elements[id] ?? null },
+  $: () => null,
+  document: { getElementById: () => null },
   toast: () => undefined,
   state: null,
 });
@@ -268,49 +234,6 @@ describe('nextCue', () => {
       ),
     );
     expect([...everything].sort()).toEqual(['-', ...CUES].sort());
-  });
-});
-
-describe('fitScale', () => {
-  /** Seeded measurement functions: content shrinks with the scale, boxes are fixed. */
-  const measures = (rng: Rng): ((scale: number) => Measure) => {
-    const appContent = 400 + Math.floor(rng() * 800);
-    const appBox = 500 + Math.floor(rng() * 400);
-    const handContent = 100 + Math.floor(rng() * 300);
-    const handBox = 120 + Math.floor(rng() * 200);
-    const jitter = Math.floor(rng() * 3);
-    return (scale) => ({
-      appScrollHeight: Math.round(appContent * scale) + jitter,
-      appClientHeight: appBox,
-      handScrollHeight: Math.round(handContent * scale),
-      handClientHeight: handBox,
-    });
-  };
-
-  test('lands on the legacy --tscale over 500 seeded layouts, floor and fit included', () => {
-    const rng = mulberry32(77);
-    const results = Array.from({ length: 500 }, () => {
-      table.measureAt = measures(rng);
-      table.scale = 1;
-      ui.fitTable();
-      const legacyScale = table.scale;
-      const ours = fitScale(table.measureAt);
-      expect(ours).toBe(legacyScale);
-      return ours;
-    });
-    expect(results).toContain(1);
-    expect(results).toContain(0.5);
-    expect(results.some((s) => s > 0.5 && s < 1)).toBe(true);
-  });
-
-  test('a hidden table screen leaves the legacy loop idle (the renderer decides when to fit)', () => {
-    const shown = elements['tableScreen'];
-    if (shown === undefined) throw new Error('no table screen stub');
-    elements['tableScreen'] = { ...shown, classList: { contains: () => true } };
-    table.scale = 0.7;
-    ui.fitTable();
-    expect(table.scale).toBe(0.7);
-    elements['tableScreen'] = shown;
   });
 });
 

@@ -1,6 +1,6 @@
 // Where the gin page's DOM writes for the game screens live (docs/ARCHITECTURE.md "Module
 // boundaries": ui/ reaches the document only through @shared/edge/dom; `HandView.render` is the
-// only way a hand is drawn; ui/fit.ts decides the table scale). `paint(doc, app, handView)` is
+// only way a hand is drawn; the table's geometry is theme.css's alone). `paint(doc, app, handView)` is
 // idempotent and runs after every intent: it composes the screen switch and the waiting statuses
 // (phase 1), the home screen (ui/home.ts), the curtain (ui/local.ts), the table, the endgame and
 // the overlays, each written from the App (ui/state.ts) alone, so the same App always paints the
@@ -19,10 +19,8 @@
 // history list only while open. `bindTable` turns the table's and the overlays' controls into
 // intents; the input wiring of the home screen and the curtain is beside their paints.
 import {
-  byId,
   closestFrom,
   dataOf,
-  hasClass,
   isDisabled,
   listenId,
   queryIn,
@@ -31,7 +29,6 @@ import {
   setAttr,
   setDisabled,
   setHtml,
-  setStyleProperty,
   setText,
   targetIdOf,
   toggleClass,
@@ -49,7 +46,6 @@ import {
 } from '../engine/types.ts';
 import { backHtml, cardHtml, pretty } from './cards.ts';
 import { deadwoodText, fmtDuration, statusWith, type Selection } from './cues.ts';
-import { fitScale, type Measure } from './fit.ts';
 import type { HandView } from './hand/HandView.ts';
 import { meldGroupsHtml } from './hand/meldGroups.ts';
 import { bindHome, paintHome } from './home.ts';
@@ -461,29 +457,6 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
   toggleClass(requireId(doc, 'rulesOverlay'), 'hidden', !app.rulesOpen);
   toggleClass(requireId(doc, 'historyOverlay'), 'hidden', app.history === null);
   if (app.history === 'game') setHtml(requireId(doc, 'historyList'), historyHtml(app.view));
-};
-
-// ---- fitting the table ---------------------------------------------------------------------------
-
-/**
- * `fitTable()`: shrink the table (`--tscale`) until the hand fits the screen without scrolling.
- * The measuring is here; the decision is ui/fit.ts's, pure over the measured sizes.
- */
-export const fitTable = (doc: DocumentLike): void => {
-  const scr = byId(doc, 'tableScreen');
-  if (scr === null || hasClass(scr, 'hidden')) return;
-  const appEl = requireId(doc, 'app');
-  const handEl = requireId(doc, 'hand');
-  const measureAt = (scale: number): Measure => {
-    setStyleProperty(scr, '--tscale', String(scale));
-    return {
-      appScrollHeight: appEl.scrollHeight,
-      appClientHeight: appEl.clientHeight,
-      handScrollHeight: handEl.scrollHeight,
-      handClientHeight: handEl.clientHeight,
-    };
-  };
-  fitScale(measureAt);
 };
 
 // ---- the whole paint -----------------------------------------------------------------------------
