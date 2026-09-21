@@ -57,29 +57,40 @@ Rules of the table:
 
 ## Tokens
 
-The `:root` custom properties of the two themes, side by side (docs/MIGRATION.md step 14). A name
-both themes declare is the shared vocabulary; `web/shared/styles/tokens.css` holds a value only
-when both games agree on it, and today none do, so its `:root` is empty and every value below lives
-in the game's `theme.css`. The computed-style goldens pin each page's declared custom properties
-and their `:root` values, so this table is the input to the Fidice restyle (the roadmap step that
-re-records them), not a plan for this step. Columns are five on purpose: `test/dist/classes.ts`
-reads the six-column class table above and nothing else.
+The shared vocabulary (docs/MIGRATION.md step 14 Deviations) is gin's palette: the roadmap
+restyles Fidice to look like Gin, so `web/shared/styles/tokens.css` declares the eleven names below
+with gin's values and gin's `theme.css` declares none of them (`test/tokens.test.ts` holds both).
+Fidice's `theme.css`, linked last, redeclares every one of them so the names resolve to its own
+palette until the restyle: the seven it always declared under the same name keep their values, and
+the four it lacked are aliased onto its role equivalents. The computed-style goldens pin every
+declared custom property and its `:root` value; a new shared name is a note in
+`tools/parity/computed-styles.ts --check` until the goldens are re-recorded, a changed value a
+difference. Columns are four on purpose: `test/dist/classes.ts` reads the six-column class table
+above and nothing else.
 
-| Shared name     | gin-rummy                                                                             | fidice                            | Status   | Notes                                                                    |
-| --------------- | ------------------------------------------------------------------------------------- | --------------------------------- | -------- | ------------------------------------------------------------------------ |
-| `--felt`        | `radial-gradient(ellipse at 50% 30%, #1f5a3a 0%, #123a26 55%, #0b2418 100%)`          | `#1f4d3a`                         | per-game | gin paints the body with it; fidice uses it as a flat pine green.        |
-| `--card`        | `#163526`                                                                             | `var(--birch)` (`#fbf7ef`)        | per-game | Dark panel vs. light birch card.                                         |
-| `--accent`      | `#4ade80`                                                                             | `#d9782f`                         | per-game | Green vs. orange.                                                        |
-| `--accent-dark` | `#22c55e`                                                                             | `#a9561d`                         | per-game |                                                                          |
-| `--gold`        | `#fbbf24`                                                                             | `#e6a93c`                         | per-game |                                                                          |
-| `--muted`       | `#9cc9ac`                                                                             | `#66746c`                         | per-game | Light on dark vs. dark on light.                                         |
-| `--radius`      | `18px`                                                                                | `16px`                            | per-game |                                                                          |
-| `--text`        | `#f2fdf6`                                                                             | `--ink: #22302a`                  | per-game | Same role, different name: the restyle aliases fidice's `--ink` onto it. |
-| `--danger`      | `#f87171`                                                                             | `--red: #b8433a`                  | per-game | Same role, different name (`--red`).                                     |
-| `--shadow`      | `0 4px 14px rgba(0,0,0,0.25)` (inline in `.card-box`)                                 | `0 8px 26px rgba(21,54,39,.16)`   | per-game | Not a gin token yet.                                                     |
-| body font       | `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif` | `'Nunito', system-ui, sans-serif` | per-game | Neither game names its font stack as a token.                            |
+| Shared name     | Canonical value (tokens.css, gin)                                            | Fidice override (theme.css)  | Notes                                                                       |
+| --------------- | ---------------------------------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------- |
+| `--bg`          | `#0f2318`                                                                    | `var(--mist)` (`#dcecf5`)    | Alias. `--mist` is the top stop of the sky gradient fidice's `body` paints. |
+| `--card`        | `#163526`                                                                    | `var(--birch)` (`#fbf7ef`)   | Dark panel vs. light birch card.                                            |
+| `--card-2`      | `#1c4030`                                                                    | `var(--cream-2)` (`#ece1cc`) | Alias. Fidice's secondary surface (`.btn-secondary`).                       |
+| `--accent`      | `#4ade80`                                                                    | `#d9782f`                    | Green vs. orange.                                                           |
+| `--accent-dark` | `#22c55e`                                                                    | `#a9561d`                    |                                                                             |
+| `--gold`        | `#fbbf24`                                                                    | `#e6a93c`                    |                                                                             |
+| `--text`        | `#f2fdf6`                                                                    | `var(--ink)` (`#22302a`)     | Alias. Light on dark vs. dark on light; fidice rules still read `--ink`.    |
+| `--muted`       | `#9cc9ac`                                                                    | `#66746c`                    |                                                                             |
+| `--danger`      | `#f87171`                                                                    | `var(--red)` (`#b8433a`)     | Alias. Fidice rules still read `--red`.                                     |
+| `--radius`      | `18px`                                                                       | `16px`                       |                                                                             |
+| `--felt`        | `radial-gradient(ellipse at 50% 30%, #1f5a3a 0%, #123a26 55%, #0b2418 100%)` | `#1f4d3a`                    | Gin paints the body with it; fidice uses it as a flat pine green.           |
 
-Game-only tokens, unchanged and not shared: gin `--bg --card-2 --card-w --mini-w --pile-w --tiny-w`
-(the card sizes are rescaled per element by `--tscale` and `--pile-base` on `#tableScreen`); fidice
-`--felt-dark --felt-light --pine --pine-light --moss --lake --lake-deep --lake-light --mist --wood
---wood-dark --wood-light --timber --cream --cream-2 --birch --blue --line`.
+No fidice rule reads the four aliases yet (`--bg --card-2 --text --danger`): they exist so the
+vocabulary resolves everywhere, and the restyle is what points fidice's rules at the shared names.
+Not tokens in either game: gin's `.card-box` shadow is inline (`0 4px 14px rgba(0,0,0,0.25)`) while
+fidice has `--shadow: 0 8px 26px rgba(21,54,39,.16)`; neither names its body font stack
+(`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif` vs.
+`'Nunito', system-ui, sans-serif`).
+
+Game-only tokens, unchanged and not shared: gin `--card-w --mini-w --pile-w --tiny-w` (the card
+sizes, rescaled per element by `--tscale` and `--pile-base` on `#tableScreen`), still in its
+`theme.css`; fidice `--felt-dark --felt-light --pine --pine-light --moss --lake --lake-deep
+--lake-light --mist --wood --wood-dark --wood-light --timber --cream --cream-2 --birch --ink --red
+--blue --line --shadow`.

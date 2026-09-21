@@ -624,14 +624,25 @@ parity and e2e gates.
   source is the served `dist/games/<g>/index.html` rather than `web/games/<g>/index.html`: same
   class attributes, and the guard reads the tree it ships. See ARCHITECTURE "Deviations".
 - Step 14, phase 2 (the hoist, values unchanged): `web/shared/styles/tokens.css` and `base.css`
-  exist and both pages link them before `./theme.css`, in that cascade order. `tokens.css` declares
-  nothing: the seven names both themes share (`--felt --card --accent --accent-dark --gold --muted
-  --radius`) agree on no value, and the goldens pin each page's declared custom-property set and
-  every `:root` value, so a new shared name, or the fidice alias the step planned (`--ink` onto
-  `--text`), is itself a golden change; the aliasing is deferred to the Fidice restyle (roadmap),
-  which re-records, and `CONTRACT.md` "Tokens" tables both palettes as its input (five columns, so
-  the class parser skips it). `base.css` holds the three primitives the themes carried identically,
-  `* { box-sizing }`, `html, body { margin: 0 }` and `.hidden`; gin keeps `* { -webkit-tap-highlight-color }`
+  exist and both pages link them before `./theme.css`, in that cascade order. `tokens.css` first
+  landed empty (the seven names both themes shared agreed on no value, and the goldens pin each
+  page's declared custom-property set and every `:root` value, so any new shared name was a golden
+  diff on `:root` at every screen); the follow-up in the same PR filled it: since the roadmap
+  restyles Fidice to look like Gin, gin's palette is the canonical vocabulary, so `tokens.css`
+  declares the eleven gin names (`--bg --card --card-2 --accent --accent-dark --gold --text --muted
+  --danger --radius --felt`) with gin's values, gin's `theme.css` drops them (single source; it
+  keeps `--card-w --mini-w --pile-w --tiny-w`) and fidice's `theme.css`, linked last, redeclares all
+  eleven so they resolve to its own look until the restyle: its seven of the same name were already
+  there, and `--bg --card-2 --text --danger` are aliased onto `--mist --cream-2 --ink --red` (no
+  fidice rule reads them yet). To make that additive, `computed-styles.ts` now reports a `--token`
+  the capture declares on a selector that the golden never recorded there as a note, not a
+  difference (a missing or changed token, and any PROPERTIES change, still fail): the check against
+  the old goldens read 0 differences and exactly four notes per fidice viewport, the fidice goldens
+  were re-recorded, and the gin goldens are byte-identical. `test/tokens.test.ts` pins where each
+  name is declared; `CONTRACT.md` "Tokens" tables the canonical value beside fidice's override
+  (four columns, so the class parser skips it). `base.css` holds the three primitives the themes
+  carried identically, `* { box-sizing }`, `html, body { margin: 0 }` and `.hidden`; gin keeps
+  `* { -webkit-tap-highlight-color }`
   and the rest of its `html, body` rule, fidice `html, body { height: 100% }`. Nothing else was
   verbatim in both: buttons, inputs, labels, toasts, overlays and sheets differ in selector or value
   every time, so they stay in the themes, and the identical `.ha-img-placeholder` block stays in
