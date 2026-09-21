@@ -15,6 +15,13 @@
 // served dist/ and deep-equals it with test/fixtures/styles/<game>.<viewport>.json; a CSS move that
 // changes any computed value shows up as a selector/property diff.
 //
+// The comparison is additive for custom properties only: a `--token` the capture declares on a
+// selector that the golden never recorded there is a note ("new token --x = v"), printed apart and
+// ignored by the exit code, because a new name in the shared vocabulary (web/shared/styles/
+// tokens.css, or a theme's alias onto one) changes what no rule reads yet; a `--token` that is
+// missing or changed, and every PROPERTIES change, is a difference and fails the check. Re-record
+// to absorb the notes once the new names are intended (docs/MIGRATION.md step 14 Deviations).
+//
 // Locally (Chromium from `npx playwright install`; `npm run build` first):
 //   node --experimental-strip-types tools/parity/computed-styles.ts            # rewrite the goldens
 //   node --experimental-strip-types tools/parity/computed-styles.ts --check    # compare, exit 1 on a diff
@@ -1101,18 +1108,68 @@ export const writeGolden = (golden: Golden, viewport: Viewport): string => {
   return path;
 };
 
-const describeRecord = (golden: Golden, hash: string | null): Readonly<Record<string, string>> => {
-  if (hash === null) return {};
-  const r = golden.styles[hash];
-  if (r === undefined) return { '<missing style>': hash };
-  return {
-    ...Object.fromEntries(golden.properties.map((p, i) => [p, r.v[i] ?? ''])),
-    ...r.vars,
-  };
+/**
+ * What a comparison says. `differences` fail the check: a PROPERTIES value that changed, a custom
+ * property that vanished or changed on a selector, a selector or screen that matched differently.
+ * `notes` only inform: a `--token` the capture declares that the golden never recorded on that
+ * selector (a new name in the shared vocabulary) is additive, and the goldens are re-recorded to
+ * absorb it once it is intended. One note per selector and token, however many screens record it.
+ */
+export type GoldenDiff = Readonly<{
+  differences: ReadonlyArray<string>;
+  notes: ReadonlyArray<string>;
+}>;
+
+type DiffLine = Readonly<{ kind: 'difference' | 'note'; text: string }>;
+
+const difference = (text: string): DiffLine => ({ kind: 'difference', text });
+const note = (text: string): DiffLine => ({ kind: 'note', text });
+
+/** PROPERTIES by name, so two files whose property lists differ still compare what they share. */
+const fixedByName = (golden: Golden, r: StyleRecord): Readonly<Record<string, string>> =>
+  Object.fromEntries(golden.properties.map((p, i) => [p, r.v[i] ?? '']));
+
+const compareRecords = (
+  where: string,
+  sel: string,
+  expected: Golden,
+  eh: string,
+  actual: Golden,
+  ah: string,
+): ReadonlyArray<DiffLine> => {
+  const er = expected.styles[eh];
+  const ar = actual.styles[ah];
+  if (er === undefined || ar === undefined)
+    return [difference(`${where} / ${sel}: <missing style> ${eh} -> ${ah}`)];
+  const ep = fixedByName(expected, er);
+  const ap = fixedByName(actual, ar);
+  const props = [...new Set([...Object.keys(ep), ...Object.keys(ap)])].sort();
+  const fixed = props.flatMap((p) =>
+    ep[p] === ap[p]
+      ? []
+      : [
+          difference(
+            `${where} / ${sel} / ${p}: ${JSON.stringify(ep[p] ?? '')} -> ${JSON.stringify(ap[p] ?? '')}`,
+          ),
+        ],
+  );
+  const names = [...new Set([...Object.keys(er.vars), ...Object.keys(ar.vars)])].sort();
+  const vars = names.flatMap((name) => {
+    const ev = er.vars[name];
+    const av = ar.vars[name];
+    if (ev === av) return [];
+    if (ev === undefined) return [note(`${sel}: new token ${name} = ${av ?? ''}`)];
+    return [
+      difference(
+        `${where} / ${sel} / ${name}: ${JSON.stringify(ev)} -> ${JSON.stringify(av ?? '')}`,
+      ),
+    ];
+  });
+  return [...fixed, ...vars];
 };
 
-/** Human-readable lines, one per differing screen/selector/property; empty when equal. */
-export const diffGoldens = (expected: Golden, actual: Golden): ReadonlyArray<string> => {
+/** Human-readable lines per differing screen/selector/property, split into differences and notes. */
+export const diffGoldens = (expected: Golden, actual: Golden): GoldenDiff => {
   const header =
     JSON.stringify(expected.properties) === JSON.stringify(actual.properties)
       ? []
@@ -1122,31 +1179,29 @@ export const diffGoldens = (expected: Golden, actual: Golden): ReadonlyArray<str
   const screenNames = [
     ...new Set([...Object.keys(expected.screens), ...Object.keys(actual.screens)]),
   ].sort();
-  const body = screenNames.flatMap((screen) => {
+  const body = screenNames.flatMap((screen): ReadonlyArray<DiffLine> => {
     const e = expected.screens[screen];
     const a = actual.screens[screen];
-    if (e === undefined) return [`${screen}: only in the capture`];
-    if (a === undefined) return [`${screen}: only in the golden`];
+    if (e === undefined) return [difference(`${screen}: only in the capture`)];
+    if (a === undefined) return [difference(`${screen}: only in the golden`)];
     const selectors = [...new Set([...Object.keys(e), ...Object.keys(a)])].sort();
     return selectors.flatMap((sel) => {
       const eh = e[sel] ?? null;
       const ah = a[sel] ?? null;
       if (eh === ah) return [];
-      if (eh === null) return [`${screen} / ${sel}: matched nothing in the golden, matches now`];
-      if (ah === null) return [`${screen} / ${sel}: matched in the golden, matches nothing now`];
-      const er = describeRecord(expected, eh);
-      const ar = describeRecord(actual, ah);
-      const props = [...new Set([...Object.keys(er), ...Object.keys(ar)])].sort();
-      return props.flatMap((p) =>
-        er[p] === ar[p]
-          ? []
-          : [
-              `${screen} / ${sel} / ${p}: ${JSON.stringify(er[p] ?? '')} -> ${JSON.stringify(ar[p] ?? '')}`,
-            ],
-      );
+      if (eh === null)
+        return [difference(`${screen} / ${sel}: matched nothing in the golden, matches now`)];
+      if (ah === null)
+        return [difference(`${screen} / ${sel}: matched in the golden, matches nothing now`)];
+      return compareRecords(screen, sel, expected, eh, actual, ah);
     });
   });
-  return [...header, ...body];
+  const texts = (kind: DiffLine['kind']): ReadonlyArray<string> =>
+    body.filter((line) => line.kind === kind).map((line) => line.text);
+  return {
+    differences: [...header, ...texts('difference')],
+    notes: [...new Set(texts('note'))],
+  };
 };
 
 // ---- CLI ---------------------------------------------------------------------------------------------
@@ -1174,14 +1229,21 @@ if (isMain(import.meta.url)) {
         });
         if (check) {
           const expected = readGolden(game, viewport);
-          const diff = expected === null ? ['no golden recorded'] : diffGoldens(expected, golden);
-          diff.forEach((line) => {
+          const { differences, notes } =
+            expected === null
+              ? { differences: ['no golden recorded'], notes: [] }
+              : diffGoldens(expected, golden);
+          differences.forEach((line) => {
             console.log(`${label}: ${line}`);
           });
+          notes.forEach((line) => {
+            console.log(`${label}: note: ${line}`);
+          });
+          const ok = differences.length === 0 && errors.length === 0;
           console.log(
-            `${diff.length === 0 && errors.length === 0 ? 'ok  ' : 'DIFF'} ${label}: ${String(screens)} screens, ${String(styles)} distinct styles, ${String(diff.length)} differences`,
+            `${ok ? 'ok  ' : 'DIFF'} ${label}: ${String(screens)} screens, ${String(styles)} distinct styles, ${String(differences.length)} differences, ${String(notes.length)} notes`,
           );
-          return [...done, diff.length === 0 && errors.length === 0];
+          return [...done, ok];
         }
         const path = writeGolden(golden, viewport);
         console.log(

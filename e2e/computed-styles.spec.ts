@@ -3,7 +3,8 @@
 // phone and a laptop viewport and reads `getComputedStyle` for every selector in its list; this
 // spec replays that capture against the harness's running servers and deep-equals it with the
 // committed golden in test/fixtures/styles/. A CSS move that changes any computed value fails the
-// test with one line per screen/selector/property. Like gin-dom-parity it runs once, on `pages`:
+// test with one line per screen/selector/property; a custom property the golden never recorded is
+// only an annotation (the tool's additive rule). Like gin-dom-parity it runs once, on `pages`:
 // the values are a function of the CSS alone, and both origins serve the same bytes.
 import { expect, test } from '@playwright/test';
 
@@ -44,8 +45,13 @@ GAMES.forEach((game) => {
       if (expected === null) return;
       const { golden, errors } = await capture(browser, HARNESS, game, viewport);
       expect(errors, 'uncaught exceptions').toEqual([]);
-      const diff = diffGoldens(expected, golden);
-      expect(diff, `computed styles differ from the golden:\n${diff.join('\n')}`).toEqual([]);
+      const { differences, notes } = diffGoldens(expected, golden);
+      // A token the golden never recorded is additive (see the tool's header): report, do not fail.
+      notes.forEach((line) => testInfo.annotations.push({ type: 'note', description: line }));
+      expect(
+        differences,
+        `computed styles differ from the golden:\n${differences.join('\n')}`,
+      ).toEqual([]);
     });
   });
 });
