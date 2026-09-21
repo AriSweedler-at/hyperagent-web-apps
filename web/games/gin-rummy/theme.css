@@ -11,7 +11,9 @@
    `fitTable()` measure-and-shrink loop with its `--tscale`/`--pile-base` is retired. The legacy
    page's second block, the stray .ha-img-placeholder rules that no element carried, was removed
    in step 15. The computed-style goldens (test/fixtures/styles/gin-rummy.*.json), the class
-   contract and e2e/gin-geometry.spec.ts (no scroll, one size per phase) are the oracles. */
+   contract and e2e/gin-geometry.spec.ts (no scroll, one size per phase) are the oracles. Beneath
+   the height the floor sizes need (661px: a phone in landscape, a browser with its toolbar shown)
+   the page scrolls instead of clipping the hand and the actions row. */
   :root {
     /* The palette (--bg --card --card-2 --accent --accent-dark --gold --text --muted --danger
        --radius --felt) is the shared vocabulary in web/shared/styles/tokens.css, with these values. */
@@ -53,7 +55,9 @@
 
   /* ---------- table ---------- */
   /* While at the table the page never scrolls: the card sizes are bounded by the viewport below, and
-     every row above the hand has one height in every phase, so nothing is measured after a paint. */
+     every row above the hand has one height in every phase, so nothing is measured after a paint.
+     The fallback under `@media (max-height: 661px)` at the end of this section lets it scroll
+     where the floor sizes cannot fit. */
   body.fixed-screen, body.fixed-screen #app { height: 100dvh; max-height: 100dvh; min-height: 0; overflow: hidden; }
   #tableScreen {
     /* Width: six columns fill a phone, (100vw - 24 #app padding - 20 .hand-area padding) / 6 cells of
@@ -80,8 +84,9 @@
   .conn-dot.on { background: var(--accent); } .conn-dot.off { background: var(--danger); }
 
   .table-center { display: flex; justify-content: center; gap: 26px; padding: 10px 0 4px; flex-shrink: 0; }
-  /* min-width: the box is the card's, not the label's, so "Stock · 9" and "Stock · 31" are one width. */
-  .pile { display: flex; flex-direction: column; align-items: center; gap: 6px; border-radius: 16px; padding: 8px; min-width: calc(var(--pile-w) + 24px); transition: transform 0.1s; position: relative; }
+  /* min-width: the box is the card's, not the label's, so "Stock · 9" and "Stock · 31" are one width;
+     the 92px floor is wider than "STOCK · 30" at the 64px pile floor, where the card alone is not. */
+  .pile { display: flex; flex-direction: column; align-items: center; gap: 6px; border-radius: 16px; padding: 8px; min-width: max(calc(var(--pile-w) + 24px), 92px); transition: transform 0.1s; position: relative; }
   .pile.tappable { cursor: pointer; box-shadow: 0 0 0 3px rgba(74,222,128,0.55), 0 0 22px rgba(74,222,128,0.35); animation: glow 1.4s ease-in-out infinite; }
   .pile.tappable:active { transform: scale(0.96); }
   .pile.blocked { opacity: 0.45; }
@@ -94,12 +99,16 @@
   .status-banner.mine { background: rgba(74,222,128,0.16); border-color: rgba(74,222,128,0.35); }
   .status-main { font-weight: 800; font-size: 1.05rem; }
   .status-sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; min-height: 1.25em; line-height: 1.25; }
-  .last-action { text-align: center; color: var(--muted); font-size: 0.8rem; height: 1.25em; line-height: 1.25; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .last-action { text-align: center; color: var(--muted); font-size: 0.8rem; height: 1.25em; line-height: 1.25; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
 
   /* margin-top: auto anchors the hand to the bottom; what the viewport leaves over opens above it. */
   .hand-area { margin-top: auto; background: rgba(0,0,0,0.22); border-radius: 18px; padding: 10px 10px 12px; display: flex; flex-direction: column; min-height: 0; flex-shrink: 0; }
-  .hand-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--muted); font-weight: 700; padding: 0 4px 8px; }
-  .hand-header .dw { color: var(--gold); }
+  /* One fixed line (16 of content, 8 of padding): a 20-character name ellipsizes rather than wrapping
+     the header to two lines, the deadwood readout keeps its width, and the alt-badge's taller glyph
+     line box cannot grow the row, so the hand-area's top edge is one place in every phase. */
+  .hand-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--muted); font-weight: 700; padding: 0 4px 8px; height: 24px; line-height: 16px; }
+  .hand-header #myName { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hand-header .dw { color: var(--gold); white-space: nowrap; flex-shrink: 0; }
   .hand-header .dw.tappable-dw { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
   .hand-header .dw .alt-badge { background: rgba(251,191,36,0.2); border-radius: 999px; padding: 2px 7px; margin-left: 5px; font-size: 0.78rem; }
   /* Eleven fixed cells: ten cards and the ghost draw slot, or eleven cards once a draw is accepted.
@@ -141,6 +150,18 @@
     }
     .hand { grid-template-columns: repeat(11, calc(var(--card-w) + 6px)); }
     .table-center { gap: 40px; }
+  }
+  /* Where the floor sizes cannot fit, the page scrolls rather than clipping the hand and the actions
+     row behind overflow: hidden with no way to reach them. At the 40px card / 64px pile floor the
+     table needs 630.3px plus the 28px of #app padding; the piles grow with the viewport from 640px
+     (`10dvh`), so the two rows and the piles first fit at 661.4px (a laptop's one row of eleven at
+     615.7px). Above the bound this block would change nothing (`min-height: 100dvh` keeps the hand
+     anchored to the bottom), so a phone in landscape (844x390), an iPhone SE with Safari's toolbar
+     (375x553) or a 360x640 Android with the URL bar shown scroll to the actions row. */
+  @media (max-height: 661px) {
+    body.fixed-screen, body.fixed-screen #app { height: auto; max-height: none; overflow: visible; }
+    body.fixed-screen #app { min-height: 100dvh; }
+    #tableScreen { overflow: visible; }
   }
 
   /* ---------- cards ---------- */
