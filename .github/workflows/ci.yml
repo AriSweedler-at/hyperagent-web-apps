@@ -4,7 +4,10 @@
 # browser spec on both emulated origins against a fresh build of dist/ (both game pages are the
 # Vite-built module pages since docs/MIGRATION.md steps 7 and 13; the gin DOM-parity spec compares
 # the served page with the frozen legacy page the harness aliases in), the two-peer games through a
-# local PeerServer (the merge gate for online play, docs/MIGRATION.md step 3); job "broker" repeats the
+# local PeerServer (the merge gate for online play, docs/MIGRATION.md step 3), and the stories spec
+# (e2e/gin-stories.spec.ts) against the committed per-platform screenshot baselines under
+# e2e/__screenshots__, whose -linux.png files the workflow_dispatch job stories-baselines.yml records
+# on the branch for the PR author to commit before this job can pass; job "broker" repeats the
 # online specs through the real 0.peerjs.com and is advisory (continue-on-error), so a third-party
 # outage never blocks a merge but a signalling regression is visible at review. Job "deploy"
 # (docs/MIGRATION.md step 4) publishes the checked dist/ to GitHub Pages on a push to main once

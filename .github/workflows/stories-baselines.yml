@@ -1,0 +1,49 @@
+# Records the linux screenshot baselines of the stories spec (e2e/gin-stories.spec.ts; docs/ARCHITECTURE.md
+# "Testing pyramid" 5) on the same runner image CI's e2e job uses. Playwright compares every
+# `toHaveScreenshot` against a per-platform file (playwright.config.ts `snapshotPathTemplate`:
+# e2e/__screenshots__/gin-stories.spec.ts/<story>--<viewport>-<platform>.png). The -darwin.png files
+# are recorded on the owner's machine with the same command; the -linux.png files come from here,
+# because Chromium's text rendering differs between the two and a missing baseline fails the test on
+# purpose (CI is never green with no visual coverage). By hand only (workflow_dispatch), on the branch
+# whose PR changes how the table looks; the e2e job of ci.yml FAILS on that branch until the -linux.png
+# files this job records are committed:
+#
+#   gh workflow run stories-baselines.yml --ref <branch>
+#   gh run watch "$(gh run list --workflow stories-baselines.yml --branch <branch> --limit 1 --json databaseId --jq '.[0].databaseId')"
+#   gh run download -n stories-baselines-linux -D e2e/__screenshots__
+#   git add e2e/__screenshots__ && git commit -m "test(e2e): Record the linux story baselines"
+#
+# The artifact holds the whole e2e/__screenshots__ tree as the runner left it: the -linux.png files
+# it wrote plus the committed -darwin.png files, byte-identical, so the download overwrites nothing.
+name: Stories baselines (linux)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baselines:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      # Builds dist/ first (test:e2e), starts the pages server, records or rewrites every baseline.
+      - name: Record the linux baselines of every story at both screenshot viewports
+        run: npm run test:e2e -- e2e/gin-stories.spec.ts --project pages --update-snapshots
+      - name: Upload the baselines
+        uses: actions/upload-artifact@v4
+        with:
+          name: stories-baselines-linux
+          path: e2e/__screenshots__
+          if-no-files-found: error
+          retention-days: 14
