@@ -289,8 +289,10 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
 
 ## Conventions for small diffs
 
-- New game: `web/games/<g>/{index.html, main.ts, theme.css, src/}` plus tests; nothing in `web/shared`
-  changes. Vite picks up the folder; the proxy needs no change; e2e gets one spec per mode.
+- New game: `web/games/<g>/{index.html, main.ts, theme.css, src/}` plus tests, a coverage entry,
+  `CONTRACT.md` rows and its name in the harness lists (`GAMES`, `PAGES`); nothing in `web/shared`
+  changes. Vite picks up the folder; the proxy needs no change; e2e gets one spec per mode. The
+  README's "Add a game" is the step-by-step version.
 - New rule or action: add the variant to the `Action` union in `engine/types.ts`, the reducer branch
   in `game.ts` (exhaustiveness check fails until every switch handles it), the codec case in
   `protocol.ts`, a table test and a recorded golden. Wire-visible changes add a version field.

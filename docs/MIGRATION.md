@@ -208,6 +208,11 @@ Gin's inline classic scripts depend on execution order (`window.GinEngine`, `win
 - Proves: CI green with zero `.js` under `web/`; all goldens except the named ones unchanged;
   nightly passes once against both live origins including the relay-forced game.
 - Rollback: revert individual fixes; each is its own commit.
+- Done: step 14's gates (computed-style goldens, the class contract, the shared stylesheet seam)
+  landed in #13 and its hoist (tokens and base) in #14; part A (`allowJs` out, the TypeScript
+  games-proxy Worker, the coverage ratchet) in #15; the three behaviour fixes in #16; part B
+  (`nightly.yml`, the `?ice-policy=relay` hook, `E2E_TARGET=live`, `npm run test:live` and the
+  README rewrite) in #17. Deviations for each are recorded below.
 
 ## After the migration (roadmap, not scheduled here)
 
