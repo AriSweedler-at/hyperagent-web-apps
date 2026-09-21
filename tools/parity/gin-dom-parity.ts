@@ -138,7 +138,7 @@ export const openPair = async (
 type Step = (page: Page) => Promise<void>;
 
 /** The legacy page's view through its documented hook, for the choices the driver makes. */
-type HookView = Readonly<{
+export type HookView = Readonly<{
   phase: string;
   isMyTurn: boolean;
   me: Readonly<{ hand: ReadonlyArray<Readonly<{ id: string }>> }>;
@@ -150,7 +150,7 @@ type HookView = Readonly<{
   forceStock: boolean;
 }>;
 
-const readView = (page: Page): Promise<HookView | null> =>
+export const readView = (page: Page): Promise<HookView | null> =>
   page.evaluate<HookView | null>('window.__gin.app.view');
 
 const click =
