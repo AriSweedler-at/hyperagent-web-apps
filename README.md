@@ -3,10 +3,11 @@
 Two browser games, Gin Rummy and Fidice (one-cup liar's dice), written in strict functional
 TypeScript, built by Vite into static pages and served from two origins: GitHub Pages and a
 Cloudflare Worker in front of it. Online play is peer-to-peer over WebRTC (PeerJS brokers the
-handshake; a Cloudflare TURN relay carries the game when NAT blocks a direct path). Every push and
-PR is gated by typecheck, lint, unit and parity tests, dist guards and a two-peer Playwright game on
-both emulated origins; a nightly plays the deployed pages for real. `docs/ARCHITECTURE.md` is the
-layout and its rules; `docs/MIGRATION.md` records how two single-file pages got here.
+handshake; a Cloudflare TURN relay carries the game when NAT blocks a direct path). Every push to
+`main` and every PR is gated by typecheck, lint, unit and parity tests, dist guards and a two-peer
+Playwright game on both emulated origins; a nightly plays the deployed pages for real.
+`docs/ARCHITECTURE.md` is the layout and its rules; `docs/MIGRATION.md` records how two single-file
+pages got here.
 
 ## Play
 
@@ -42,7 +43,7 @@ npm run check     # typecheck + lint + unit tests + build + dist guards: what CI
 | `npm run typecheck`                                  | `tsc -b` over the web, pure and node projects                                                                  |
 | `npm run lint`                                       | `eslint . --max-warnings 0`, then `prettier --check .`                                                         |
 | `npm run lint:fix` / `npm run format`                | `eslint --fix` / `prettier --write` on everything they check                                                   |
-| `npm test`                                           | vitest once over every `*.test.ts` under `web/`, `test/` and `infra/`; `-- --coverage` enforces the thresholds |
+| `npm test`                                           | vitest over `web/`, `test/`, `infra/` `*.test.ts` bar `test/dist/`, `test/integration/`; `-- --coverage` gates |
 | `npm run test:watch`                                 | vitest, watching                                                                                               |
 | `npm run build`                                      | `vite build` -> `dist/` (`web/` is the root; every `web/**/index.html` is an entry)                            |
 | `npm run test:dist`                                  | the guards on `dist/` (see "Tests"); needs a build first                                                       |
@@ -87,10 +88,11 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    the never-edited pages under `legacy/` into `test/fixtures/legacy/*.cjs` by
    `tools/legacy/extract-*.ts` and pinned by sha256 in `MANIFEST.json`; `manifest.test.ts` re-runs
    the extractors on every run and `frozen.test.ts` pins the whole files. 1000 seeded gin games and
-   200 fidice games replay through both legs with states deep-equal; recorded wire frames and
-   localStorage captures decode and re-encode byte for byte. Known legacy defects the port fixes are
-   named and pinned on the legacy leg only. Test hooks on the pages: `window.__gin`,
-   `window.__fidice`, and `window.__rng` as the rng when installed before boot.
+   12 seeded fidice bot games (`SEEDS` in `test/parity/fidice.legacy.test.ts`) replay through both
+   legs with states deep-equal; recorded wire frames and localStorage captures decode and re-encode
+   byte for byte. Known legacy defects the port fixes are named and pinned on the legacy leg only.
+   Test hooks on the pages: `window.__gin`, `window.__fidice`, and `window.__rng` as the rng when
+   installed before boot.
 3. **Dist guards** (`npm run build && npm run test:dist`, `test/dist/`): every URL in dist HTML and
    CSS is relative and resolves on both origins through the Worker's real `mapPath()`; both game
    pages are Vite module pages that preload one shared chunk and link the shared stylesheet;
@@ -158,9 +160,12 @@ A game is a folder; nothing under `web/shared` changes and the proxy needs nothi
    as a `Result` and never mutates). `protocol.ts` (at `src/` or `src/net/`) is pure and the trust
    boundary: every inbound frame through a `Result` decoder. `net/{host,guest}.ts` are edges that
    take a `Transport` and never import `peerjs`. `ui/` or `view/` render to strings or VNodes with
-   DOM writes in one module. `storage.ts` is the only localStorage reader, a decoder on every read.
-   A loop goes into `*.algorithms.ts` with a reason comment and 100% line coverage. `Math.random`
-   and `Date.now` are banned outside `main.ts` and `web/shared/edge`.
+   DOM writes in one module. `storage.ts` (or `app/effects.ts`, fidice's shape; both are the eslint
+   storage zone) is the only localStorage reader, through `@shared/edge/storage` with a decoder on
+   every read. A loop goes into `*.algorithms.ts` with a reason comment and 100% line coverage.
+   `Math.random` is banned outside `main.ts` and `web/shared/edge`; the pure layers (`engine/`,
+   `domain/`, `bots/`, `protocol.ts`, the scorer maths, `*.algorithms.ts`) also ban `Date.now`:
+   inject a clock.
 5. Tests beside each module. Add the new folders to `coverage.include` and one `thresholds` entry
    per group in `vitest.config.ts` (measured minus a margin; nothing existing goes down).
 6. A class TypeScript builds in a way the extraction cannot see, a hook with no rule, or dead CSS

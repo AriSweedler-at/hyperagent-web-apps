@@ -23,8 +23,10 @@ and tests that prove it land before the code they protect.
 
 ```
 .
-├── package.json / .nvmrc        scripts: dev, build, preview, typecheck, lint, test, test:e2e, test:live,
-│                                replay, check (= typecheck+lint+test), hooks, hooks:verify
+├── package.json / .nvmrc        scripts: build, preview, serve, proxy:dev, typecheck, lint, lint:fix, format,
+│                                test, test:watch, test:dist, test:integration, test:e2e, test:live,
+│                                check (= typecheck+lint+test+build+test:dist), fixtures:*, debundle:fidice,
+│                                hooks, hooks:verify (README "Develop" has the table)
 ├── tsconfig.json                solution -> tsconfig.{base,web,pure,node}.json
 ├── vite.config.ts               root web/, base './', input = glob web/**/index.html, legacyPassthrough plugin
 ├── vitest.config.ts             node env; jsdom only for *.dom.test.ts; v8 coverage thresholds
@@ -273,7 +275,7 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
    sessions over `transport.fake.ts` + `fakeClock` replay every recorded sequence; frozen-constant
    tests for prefixes, alphabets, storage keys and `t` tags.
 3. Parity (permanent): `describe.each([['legacy', gin-engine.cjs], ['current', engine]])` runs the
-   same assertions on both; 1000 seeded gin games and 200 seeded fidice games replay through both
+   same assertions on both; 1000 seeded gin games and 12 seeded fidice bot games replay through both
    with state and views deep-equal (known defects preserved and named); DOM-snapshot parity
    (normalised innerHTML of `#hand`, `#actions`, `#statusBanner`, `#oppCards`, `#rrBody`, `#app` over
    ~60 recorded views); computed-style goldens (~60 selectors at 390x844 and 1280x800) recorded
