@@ -9,7 +9,7 @@
 # outage never blocks a merge but a signalling regression is visible at review. Job "deploy"
 # (docs/MIGRATION.md step 4) publishes the checked dist/ to GitHub Pages on a push to main once
 # check and e2e are green; Settings > Pages > Source must be "GitHub Actions" for it to take
-# effect (see README "Deploying"). Dependency installs go through .github/actions/npm-ci: the
+# effect (see README "Deploy"). Dependency installs go through .github/actions/npm-ci: the
 # lockfile names Airtable's Socket Firewall registry, which runners cannot reach, so npm
 # substitutes the public registry at install time and Socket Firewall Free scans what it downloads.
 # nightly.yml is the other workflow: it plays the deployed origins every night through the real
@@ -121,7 +121,7 @@ jobs:
           retention-days: 7
 
   # Publishes the dist/ that "check" built and tested. Nothing is installed here: the artifact is
-  # the whole input. Requires Settings > Pages > Source = GitHub Actions (one-time; README "Deploying").
+  # the whole input. Requires Settings > Pages > Source = GitHub Actions (one-time; README "Deploy").
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [check, e2e]
