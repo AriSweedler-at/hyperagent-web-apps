@@ -8,8 +8,10 @@
 // list that depends on neither layout nor font metrics, plus every `--token` the stylesheets
 // declare (all of them on `:root`, and on any other element only where its value differs from the
 // root's). Animations are rewound to their first frame and transitions finished before each read,
-// and the table's fitted `--tscale` is pinned to 1 for the read, so the values are a function of
-// the CSS alone. e2e/computed-styles.spec.ts (the `pages` project) replays the capture against the
+// the table's fitted `--tscale` is pinned to 1 for the read, the mouse is parked in the top-left
+// corner so no `:hover` rule applies, and `font-family` is normalised across platforms
+// (FONT_ALIASES), so the values are a function of the CSS alone and a golden recorded on macOS
+// agrees with the Linux runner. e2e/computed-styles.spec.ts (the `pages` project) replays the capture against the
 // served dist/ and deep-equals it with test/fixtures/styles/<game>.<viewport>.json; a CSS move that
 // changes any computed value shows up as a selector/property diff.
 //
@@ -442,6 +444,20 @@ export type GoldenFile = Readonly<{
 
 const sha256 = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
 
+/**
+ * Platform spellings of one font-family, collapsed to the macOS form so goldens agree between
+ * macOS and the Linux runners: Chromium on macOS resolves the `BlinkMacSystemFont` alias to
+ * `system-ui` when it parses the stylesheet, and the UA's default serif (what `:root` shows before
+ * any rule sets a font) is `Times` on macOS and `"Times New Roman"` on Linux.
+ */
+export const FONT_ALIASES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\bBlinkMacSystemFont\b/g, '"system-ui"'],
+  [/"Times New Roman"/g, 'Times'],
+];
+
+export const normaliseFont = (value: string): string =>
+  FONT_ALIASES.reduce((v, [from, to]) => v.replace(from, to), value);
+
 /** A data: URL or other very long value keeps its length and hash, which still pins it. */
 export const compactValue = (value: string): string =>
   value.length > LONG_VALUE
@@ -615,7 +631,9 @@ const readStyles = async (page: Page, game: Game): Promise<RawReading> => {
       r === null
         ? null
         : {
-            v: r.v.map(compactValue),
+            v: r.v.map((value, i) =>
+              compactValue(PROPERTIES[i] === 'font-family' ? normaliseFont(value) : value),
+            ),
             vars: Object.fromEntries(
               Object.entries(r.vars).map(([k, value]) => [k, compactValue(value)]),
             ),
@@ -643,6 +661,9 @@ class Recorder {
 
   /** Read every selector now and file it under `name` (numbered so the JSON keeps capture order). */
   readonly shot = async (name: string): Promise<void> => {
+    // The last click left the pointer over its target; park it so no :hover rule is read (where
+    // that target sits depends on font metrics, which differ between platforms).
+    await this.page.mouse.move(0, 0);
     const reading = await readStyles(this.page, this.game);
     if (process.env['STYLES_TRACE'] !== undefined)
       console.log(`${String(Date.now() - this.started).padStart(6)} ms  shot: ${name}`);
