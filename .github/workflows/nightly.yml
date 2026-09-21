@@ -68,6 +68,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          for number in $(gh issue list --label nightly --state open --json number --jq '.[].number'); do
+          # Assigned first so `set -e` sees a gh failure; a substitution inside `for` would exit 0.
+          numbers="$(gh issue list --label nightly --state open --json number --jq '.[].number')"
+          for number in ${numbers}; do
             gh issue close "${number}" --comment "Nightly live run passed: ${RUN_URL}"
           done
