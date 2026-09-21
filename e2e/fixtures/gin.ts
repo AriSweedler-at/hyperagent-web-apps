@@ -77,6 +77,34 @@ export const readTable = async (page: Page): Promise<TableView> => ({
 export const isMyTurn = async (page: Page): Promise<boolean> =>
   (await page.locator('#statusMain').innerText()) === 'Your turn';
 
+/** Hand the phone over: the pass-and-play curtain is up, the seat behind it taps to reveal. */
+export const ginReveal = async (page: Page): Promise<void> => {
+  await expect(page.locator('#curtainOverlay')).toBeVisible();
+  await page.locator('#curtainBtn').click();
+  await expect(page.locator('#curtainOverlay')).toBeHidden();
+};
+
+/**
+ * Start pass-and-play (Ann and Bob unless `names` says otherwise; the inputs take 20 characters) at
+ * `viewport` on the page at `url` and reveal the first seat: the upcard decision. The player fixture
+ * opens its own context, so a describe's `viewport` is applied to its page here.
+ */
+export const ginStartLocal = async (
+  page: Page,
+  url: string,
+  viewport: Readonly<{ width: number; height: number }>,
+  names: Readonly<[string, string]> = ['Ann', 'Bob'],
+): Promise<void> => {
+  await page.setViewportSize({ width: viewport.width, height: viewport.height });
+  await page.goto(url);
+  await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
+  await page.locator('#p1NameInput').fill(names[0]);
+  await page.locator('#p2NameInput').fill(names[1]);
+  await page.locator('#localBtn').click();
+  await ginReveal(page);
+  await expect(page.locator('#statusSub')).toHaveText('Take the upcard or pass');
+};
+
 export const ginPassUpcard = async (page: Page): Promise<void> => {
   const pass = page.locator('#actions [data-act="passUpcard"]');
   await expect(pass).toBeVisible();

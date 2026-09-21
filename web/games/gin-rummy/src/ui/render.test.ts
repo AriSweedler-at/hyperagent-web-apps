@@ -19,7 +19,6 @@ import {
   connDotClass,
   continueLabel,
   deadwoodHtml,
-  fitTable,
   fmtTime,
   gameDurationText,
   hideToast,
@@ -572,23 +571,6 @@ describe('the table', () => {
     paintAll(p.doc, local(knocked, 0));
     expect(p.get('rulesOverlay').hidden()).toBe(true);
     expect(p.get('historyOverlay').hidden()).toBe(true);
-  });
-
-  test('fitTable sets --tscale from ui/fit.ts over the measured sizes, only while the table shows', () => {
-    const p = page();
-    fitTable(p.doc);
-    expect(p.get('tableScreen').style('--tscale')).toBeNull();
-    paintAll(p.doc, local(drawn, 0));
-    fitTable(p.doc);
-    expect(p.get('tableScreen').style('--tscale')).toBe('1');
-    // An overflowing hand shrinks the table until it fits or hits the floor.
-    const tall = page();
-    const hand = tall.get('hand').el as unknown as { scrollHeight: number; clientHeight: number };
-    hand.scrollHeight = 300;
-    hand.clientHeight = 100;
-    paintAll(tall.doc, local(drawn, 0));
-    fitTable(tall.doc);
-    expect(tall.get('tableScreen').style('--tscale')).toBe('0.5');
   });
 });
 

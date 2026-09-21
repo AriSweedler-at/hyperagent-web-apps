@@ -26,7 +26,6 @@ import {
   removeElement,
   safeHtml,
   selectText,
-  setStyleProperty,
   setValue,
   removeClass,
   requireId,
@@ -244,8 +243,6 @@ describe('values, styles and queries (over page.fake.ts)', () => {
       attrs: { 'data-pile-key': 'back' },
       queries: { '.pile-label': [label] },
     });
-    setStyleProperty(pile.el, '--tscale', '0.85');
-    expect(pile.style('--tscale')).toBe('0.85');
     expect(dataOf(pile.el, 'pile-key')).toBe('back');
     expect(dataOf(pile.el, 'card')).toBeNull();
     expect(isDisabled(pile.el)).toBe(false);

@@ -8,8 +8,8 @@
 // list that depends on neither layout nor font metrics, plus every `--token` the stylesheets
 // declare (all of them on `:root`, and on any other element only where its value differs from the
 // root's). Animations are rewound to their first frame and transitions finished before each read,
-// the table's fitted `--tscale` is pinned to 1 for the read, the mouse is parked in the top-left
-// corner so no `:hover` rule applies, and `font-family` is normalised across platforms
+// the mouse is parked in the top-left corner so no `:hover` rule applies, and `font-family` is
+// normalised across platforms
 // (FONT_ALIASES), so the values are a function of the CSS alone and a golden recorded on macOS
 // agrees with the Linux runner. e2e/computed-styles.spec.ts (the `pages` project) replays the capture against the
 // served dist/ and deep-equals it with test/fixtures/styles/<game>.<viewport>.json; a CSS move that
@@ -575,7 +575,7 @@ export const parse = (text: string): Golden => decode(JSON.parse(text) as Golden
  * Runs in the page (a string: this file is node-side and has no DOM types). Returns
  * `{ [selector]: { v, vars } | null }`. Every transition is finished and every animation rewound
  * to its first frame and paused, the declared custom properties are collected from the
- * stylesheets, `#tableScreen`'s fitted `--tscale` is pinned to 1 for the read and restored.
+ * stylesheets.
  */
 const READ_SCRIPT = `((selectors, properties) => {
   document.getAnimations().forEach((a) => {
@@ -591,9 +591,6 @@ const READ_SCRIPT = `((selectors, properties) => {
   });
   Array.from(document.styleSheets).forEach((s) => { try { walk(s.cssRules); } catch (_) {} });
   const tokens = Array.from(declared).sort();
-  const table = document.getElementById('tableScreen');
-  const savedScale = table ? table.style.getPropertyValue('--tscale') : '';
-  if (table) table.style.setProperty('--tscale', '1');
   const root = document.documentElement;
   const rootStyle = getComputedStyle(root);
   // getComputedStyle resolves an auto margin to the pixels layout gave it; the Typed OM keeps the
@@ -626,10 +623,6 @@ const READ_SCRIPT = `((selectors, properties) => {
     const el = base === ':root' ? root : document.querySelector(base);
     out[sel] = el ? read(el, pseudo) : null;
   });
-  if (table) {
-    if (savedScale === '') table.style.removeProperty('--tscale');
-    else table.style.setProperty('--tscale', savedScale);
-  }
   return out;
 })`;
 

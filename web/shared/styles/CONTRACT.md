@@ -89,7 +89,8 @@ fidice has `--shadow: 0 8px 26px rgba(21,54,39,.16)`; neither names its body fon
 `'Nunito', system-ui, sans-serif`).
 
 Game-only tokens, unchanged and not shared: gin `--card-w --mini-w --pile-w --tiny-w` (the card
-sizes, rescaled per element by `--tscale` and `--pile-base` on `#tableScreen`), still in its
-`theme.css`; fidice `--felt-dark --felt-light --pine --pine-light --moss --lake --lake-deep
+sizes; `#tableScreen` redeclares `--card-w` and `--pile-w` as clamp()s of the viewport, per element
+`.card.mini`/`.big`/`.back.tiny` alias `--card-w` onto the other three), still in its `theme.css`;
+fidice `--felt-dark --felt-light --pine --pine-light --moss --lake --lake-deep
 --lake-light --mist --wood --wood-dark --wood-light --timber --cream --cream-2 --birch --ink --red
 --blue --line --shadow`.

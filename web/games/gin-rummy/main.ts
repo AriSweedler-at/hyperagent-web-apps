@@ -33,7 +33,6 @@ import { slotHandView } from './src/ui/hand/SlotHandView.ts';
 import { fillNameInputs, inviteText, setCodeInput } from './src/ui/home.ts';
 import {
   bindAll,
-  fitTable,
   fmtTime,
   hideToast,
   paint,
@@ -129,17 +128,6 @@ const boot = (): void => {
     },
   });
 
-  // `queueFit()`: one fitTable per animation frame, after a paint of the table and on resize.
-  let fitQueued = false;
-  const queueFit = (): void => {
-    if (fitQueued) return;
-    fitQueued = true;
-    requestAnimationFrame(() => {
-      fitQueued = false;
-      fitTable(document);
-    });
-  };
-
   const netDeps: NetDeps = {
     // PeerJS log level 0 as on the legacy page; realTransport reads the ?peer= hook itself.
     transportFor: (ice) => realTransport({ ice, search: location.search, debug: 0 }),
@@ -155,9 +143,9 @@ const boot = (): void => {
 
   // The hand is drawn by the slot view with the ghost draw slot (docs/ARCHITECTURE.md "Seams
   // reserved": the view is another module and this choice; docs/design/gin-draw-ghost-slot.md).
+  // Nothing is measured after a paint: the table's geometry is bounded by the viewport in theme.css.
   const repaint = (): void => {
     paint(document, app, slotHandView);
-    if (app.screen === 'tableScreen') queueFit();
   };
 
   const dispatch = (intent: Intent): void => {
@@ -346,8 +334,6 @@ const boot = (): void => {
   bindAll(document, dispatch);
   scorer.bind();
   paintSound(document, fx.enabled());
-  window.addEventListener('resize', queueFit);
-  window.addEventListener('orientationchange', queueFit);
   // Browsers only let audio start after a user gesture: warm the context on the first tap.
   ['pointerdown', 'touchstart', 'keydown'].forEach((event) => {
     document.addEventListener(

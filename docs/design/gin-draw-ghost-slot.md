@@ -413,3 +413,41 @@ computed-style goldens re-recorded at both viewports (fidice byte-identical), th
 `Discard` / `Knock` / `GIN!`. Follow-up on the same branch: `act` ignores a draw while one is
 `waiting`, closing the guest-only double-tap hole (the host's refusal toast collapsed the ghost
 card). Next: PR B (fixed geometry, retire `--tscale`), PR C (stories).
+
+PR B landed on 2026-09-21 (branch `gin-ghost-slot-b`): §5 in full, measured against the real
+theme.css rather than the doc's arithmetic. The doc's fixed heights were off (the topbar is 54px,
+not 44; the opp-strip 49; the hand's chrome 152, not 134), so the constants moved: `--card-w:
+clamp(40px, min(calc((100vw - 80px) / 6), calc((100dvh - 572px) / 2.88)), 54px)` and `--pile-w:
+clamp(64px, 10dvh, 84px)` on `#tableScreen`; from 900px `clamp(40px, calc((100dvh - 600px) /
+1.44), 64px)` and `clamp(84px, 14dvh, 112px)`, so a short laptop window is bounded too (the doc's
+fixed 64/112 resolve at 1280x800). `--mini-w`/`--tiny-w` inherit the `:root` values (the doc
+redeclared them unchanged). Measured: 390x844 uses 692.8 of the 816px `#tableScreen` (51.7px cards,
+84px piles, two rows), 1280x800 659.5 of 772 (64/112, one row), 375x667 634.2 of 639 (40/67); the
+doc said 706, 672 and "a 659px table" for 667 (it is 639). Three stability fixes the doc's list
+lacked, each found by measuring: the status banner always carries its 1px border (`.mine` only
+colours it; it was 60px on my turn and 58 otherwise), `.last-action` has a fixed `height` and
+`line-height` (an empty line was 14.1px, a filled one 15), and `.pile` has `min-width:
+calc(var(--pile-w) + 24px)` (at 67px piles the "Stock · 31" label was wider than the card and the box
+moved with the count). `.hand-area` is `flex-shrink: 0` so an overflow would show rather than
+squash the hand. Retired: `fitTable`, `queueFit` and the resize/orientationchange listeners,
+`ui/fit.ts` and `fit.test.ts`, the render.test fit case, the `fitScale` golden with its fake table
+elements and `LegacyUi.fitTable` (the legacy cut is unchanged), `setStyleProperty` in
+@shared/edge/dom (no other caller), the READ_SCRIPT `--tscale` pin, the `normalise` strip, the
+CONTRACT.md `--tscale`/`--pile-base` mention. New: `e2e/gin-geometry.spec.ts` (both projects,
+390x844 / 1280x800 / 375x667): from the upcard through draw, shown, accepted, selected, the next
+turn under the curtain and the round over, the document, `#app`, `#tableScreen` and `#hand` never
+overflow, the actions row ends on screen, the eleven slots are one size in the rows the width
+implies, and the topbar, opp-strip, both piles, banner, last-action, hand grid and actions row keep
+their boxes to half a pixel; `ginStartLocal`/`ginReveal` joined the fixtures. Goldens flipped
+(named): the gin computed-style goldens at both viewports (fidice byte-identical); gin-dom-parity
+84 checkpoints, 0 mismatches. Review follow-ups on the same branch, each measured with real
+clicks: the hand header is one fixed line (`height: 24px; line-height: 16px`, the name ellipsizes,
+the deadwood readout does not shrink) since a 20-character name wrapped it to two lines at the
+draw -> discard transition and the `⇄ N ways` badge grew it by 1px; `.last-action` and `.pile`
+gained `flex-shrink: 0` and a 92px `min-width` floor (the "STOCK · 30" label was wider than a 64px
+pile's box); and under `@media (max-height: 661px)`, where the floor sizes' 658px cannot fit (a
+phone in landscape, a phone with the browser's toolbar shown), the page scrolls to the actions row
+instead of clipping it behind `overflow: hidden`. `e2e/gin-geometry.spec.ts` compares the hand area
+and header too, plays 375x667 with 20-character names, and adds 375x553 and 844x390 (the document
+scrolls, `#app`/`#tableScreen` clip nothing, the actions row is reachable). No golden flipped: none
+of the properties involved is in the computed-style list. Next: PR C (stories).

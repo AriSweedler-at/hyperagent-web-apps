@@ -2,17 +2,22 @@
    hand-owned since step 14, which moved the primitives both games share (the box-sizing reset,
    html/body margin, .hidden) into web/shared/styles/base.css and its palette into
    web/shared/styles/tokens.css; the page links tokens.css and base.css before this file.
-   Everything else is verbatim except the hand (docs/design/gin-draw-ghost-slot.md §5, PR A): the
+   Everything else is verbatim except the table (docs/design/gin-draw-ghost-slot.md §5): the
    `.hand` is a grid of eleven fixed `.slot` cells (six columns on a phone, eleven from 900px) with
    the ghost draw slot, the `.actions` row has a fixed height so the undo button never moves the
-   hand, and the piles have one size (`.piles-big`/`.piles-small` are gone). The legacy page's
-   second block, the stray .ha-img-placeholder rules that no element carried, was removed in step
-   15. The computed-style goldens (test/fixtures/styles/gin-rummy.*.json) and the class contract
-   are the oracles. */
+   hand, the piles have one size (`.piles-big`/`.piles-small` are gone), and the table's geometry
+   is bounded by the viewport in CSS alone (PR B): the card sizes are clamp()s of the viewport on
+   `#tableScreen`, every row above the hand has one height in every phase, and the legacy
+   `fitTable()` measure-and-shrink loop with its `--tscale`/`--pile-base` is retired. The legacy
+   page's second block, the stray .ha-img-placeholder rules that no element carried, was removed
+   in step 15. The computed-style goldens (test/fixtures/styles/gin-rummy.*.json), the class
+   contract and e2e/gin-geometry.spec.ts (no scroll, one size per phase) are the oracles. Beneath
+   the height the floor sizes need (661px: a phone in landscape, a browser with its toolbar shown)
+   the page scrolls instead of clipping the hand and the actions row. */
   :root {
     /* The palette (--bg --card --card-2 --accent --accent-dark --gold --text --muted --danger
        --radius --felt) is the shared vocabulary in web/shared/styles/tokens.css, with these values. */
-    /* default (off-table) card sizes; the table screen scales these via --tscale */
+    /* default (off-table) card sizes: the result sheet and the meld chooser; #tableScreen sets its own --card-w and --pile-w */
     --card-w: 50px; --mini-w: 34px; --pile-w: 84px; --tiny-w: 22px;
   }
   * { -webkit-tap-highlight-color: transparent; }
@@ -49,17 +54,21 @@
   @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.45 } }
 
   /* ---------- table ---------- */
-  /* While at the table the page never scrolls — the layout scales to fit instead. */
+  /* While at the table the page never scrolls: the card sizes are bounded by the viewport below, and
+     every row above the hand has one height in every phase, so nothing is measured after a paint.
+     The fallback under `@media (max-height: 661px)` at the end of this section lets it scroll
+     where the floor sizes cannot fit. */
   body.fixed-screen, body.fixed-screen #app { height: 100dvh; max-height: 100dvh; min-height: 0; overflow: hidden; }
   #tableScreen {
-    --tscale: 1;
-    --pile-base: 84px;
-    --card-w: calc(50px * var(--tscale));
-    --mini-w: calc(34px * var(--tscale));
-    --pile-w: calc(var(--pile-base) * var(--tscale));
-    --tiny-w: calc(22px * var(--tscale));
-    display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;
-    gap: calc(8px * var(--tscale));
+    /* Width: six columns fill a phone, (100vw - 24 #app padding - 20 .hand-area padding) / 6 cells of
+       card + 6px slot padding. Height: everything that is not a card measures 451px (28 #app padding,
+       five 8px gaps, 54 topbar, 49 opp-strip, 61 status banner, 16 last-action, 51 of pile chrome,
+       152 of hand chrome), the piles 1.44 x --pile-w (121 at most) and the two rows 2.88 x --card-w;
+       so (100dvh - 572px) / 2.88 keeps two rows and the piles on a short phone, with 40px the floor
+       (375x667: 40px cards, 67px piles, 662 of the 667px used). Off the table the :root sizes apply. */
+    --card-w: clamp(40px, min(calc((100vw - 80px) / 6), calc((100dvh - 572px) / 2.88)), 54px);
+    --pile-w: clamp(64px, 10dvh, 84px);
+    display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; gap: 8px;
   }
   .topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .badge { background: var(--card-2); color: var(--accent); font-weight: 700; font-size: 0.8rem; padding: 7px 12px; border-radius: 999px; white-space: nowrap; }
@@ -74,23 +83,32 @@
   .conn-dot { width: 10px; height: 10px; border-radius: 50%; background: #64748b; flex-shrink: 0; box-shadow: 0 0 0 3px rgba(255,255,255,0.06); }
   .conn-dot.on { background: var(--accent); } .conn-dot.off { background: var(--danger); }
 
-  .table-center { display: flex; justify-content: center; gap: calc(26px * var(--tscale, 1)); padding: calc(10px * var(--tscale, 1)) 0 4px; flex-shrink: 0; }
-  .pile { display: flex; flex-direction: column; align-items: center; gap: 6px; border-radius: 16px; padding: 8px; transition: transform 0.1s; position: relative; }
+  .table-center { display: flex; justify-content: center; gap: 26px; padding: 10px 0 4px; flex-shrink: 0; }
+  /* min-width: the box is the card's, not the label's, so "Stock · 9" and "Stock · 31" are one width;
+     the 92px floor is wider than "STOCK · 30" at the 64px pile floor, where the card alone is not. */
+  .pile { display: flex; flex-direction: column; align-items: center; gap: 6px; border-radius: 16px; padding: 8px; min-width: max(calc(var(--pile-w) + 24px), 92px); transition: transform 0.1s; position: relative; }
   .pile.tappable { cursor: pointer; box-shadow: 0 0 0 3px rgba(74,222,128,0.55), 0 0 22px rgba(74,222,128,0.35); animation: glow 1.4s ease-in-out infinite; }
   .pile.tappable:active { transform: scale(0.96); }
   .pile.blocked { opacity: 0.45; }
   @keyframes glow { 0%,100% { box-shadow: 0 0 0 3px rgba(74,222,128,0.5), 0 0 16px rgba(74,222,128,0.25); } 50% { box-shadow: 0 0 0 4px rgba(74,222,128,0.9), 0 0 26px rgba(74,222,128,0.5); } }
   .pile-label { font-size: 0.75rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
 
-  .status-banner { text-align: center; background: rgba(0,0,0,0.22); border-radius: 14px; padding: calc(10px * var(--tscale, 1)) 12px; flex-shrink: 0; }
-  .status-banner.mine { background: rgba(74,222,128,0.16); border: 1px solid rgba(74,222,128,0.35); }
+  /* One height in every phase: the border is always there (`.mine` only colours it), the sub line is
+     reserved when empty, and the last action is one clipped line. */
+  .status-banner { text-align: center; background: rgba(0,0,0,0.22); border-radius: 14px; padding: 10px 12px; border: 1px solid transparent; flex-shrink: 0; }
+  .status-banner.mine { background: rgba(74,222,128,0.16); border-color: rgba(74,222,128,0.35); }
   .status-main { font-weight: 800; font-size: 1.05rem; }
-  .status-sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
-  .last-action { text-align: center; color: var(--muted); font-size: 0.8rem; min-height: 1.1em; padding: 0 6px; }
+  .status-sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; min-height: 1.25em; line-height: 1.25; }
+  .last-action { text-align: center; color: var(--muted); font-size: 0.8rem; height: 1.25em; line-height: 1.25; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
 
-  .hand-area { margin-top: auto; background: rgba(0,0,0,0.22); border-radius: 18px; padding: calc(10px * var(--tscale, 1)) 10px calc(12px * var(--tscale, 1)); display: flex; flex-direction: column; min-height: 0; flex-shrink: 1; }
-  .hand-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--muted); font-weight: 700; padding: 0 4px 8px; }
-  .hand-header .dw { color: var(--gold); }
+  /* margin-top: auto anchors the hand to the bottom; what the viewport leaves over opens above it. */
+  .hand-area { margin-top: auto; background: rgba(0,0,0,0.22); border-radius: 18px; padding: 10px 10px 12px; display: flex; flex-direction: column; min-height: 0; flex-shrink: 0; }
+  /* One fixed line (16 of content, 8 of padding): a 20-character name ellipsizes rather than wrapping
+     the header to two lines, the deadwood readout keeps its width, and the alt-badge's taller glyph
+     line box cannot grow the row, so the hand-area's top edge is one place in every phase. */
+  .hand-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--muted); font-weight: 700; padding: 0 4px 8px; height: 24px; line-height: 16px; }
+  .hand-header #myName { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hand-header .dw { color: var(--gold); white-space: nowrap; flex-shrink: 0; }
   .hand-header .dw.tappable-dw { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
   .hand-header .dw .alt-badge { background: rgba(251,191,36,0.2); border-radius: 999px; padding: 2px 7px; margin-left: 5px; font-size: 0.78rem; }
   /* Eleven fixed cells: ten cards and the ghost draw slot, or eleven cards once a draw is accepted.
@@ -110,7 +128,7 @@
   .slot.ghost.open, .slot.ghost.pending, .slot.ghost.shown { visibility: visible; }
   .slot.ghost.open::before, .slot.ghost.pending::before { content: ""; position: absolute; inset: 0 3px 9px; border-radius: calc(var(--card-w) * 0.16); border: 2px dashed rgba(74,222,128,0.6); animation: glow 1.4s ease-in-out infinite; }
   .slot.ghost.pending::before { border-color: rgba(255,255,255,0.25); animation: pulse 1.6s infinite; }
-  .meld-group { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(4px * var(--tscale, 1)); padding: calc(4px * var(--tscale, 1)) 4px calc(6px * var(--tscale, 1)); border-radius: 10px; border-bottom: 3px solid transparent; max-width: 100%; }
+  .meld-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 4px 4px 6px; border-radius: 10px; border-bottom: 3px solid transparent; max-width: 100%; }
   .meld-group.m0 { border-bottom-color: #4ade80; background: rgba(74,222,128,0.10); }
   .meld-group.m1 { border-bottom-color: #60a5fa; background: rgba(96,165,250,0.10); }
   .meld-group.m2 { border-bottom-color: #f472b6; background: rgba(244,114,182,0.10); }
@@ -119,21 +137,40 @@
   .meld-group.dead { gap: 6px; }
   .meld-group.laid { border-bottom-color: var(--gold); background: rgba(251,191,36,0.12); }
   /* A fixed row: the undo button appears and the buttons change without the hand above moving. */
-  .actions { display: flex; gap: 10px; margin-top: calc(10px * var(--tscale, 1)); min-height: 54px; flex-shrink: 0; }
+  .actions { display: flex; gap: 10px; margin-top: 10px; min-height: 54px; flex-shrink: 0; }
   .actions .btn { white-space: nowrap; }
   .waiting-note { flex: 1; text-align: center; color: var(--muted); font-size: 0.85rem; align-self: center; }
+  /* The laptop layout: one row of eleven 70px cells (770px) inside the 816px the wider #app leaves,
+     bigger piles, and the same height bound so a short window (a 720px laptop) still never scrolls. */
   @media (min-width: 900px) {
     body.fixed-screen #app { max-width: 860px; }
+    #tableScreen {
+      --card-w: clamp(40px, calc((100dvh - 600px) / 1.44), 64px);
+      --pile-w: clamp(84px, 14dvh, 112px);
+    }
     .hand { grid-template-columns: repeat(11, calc(var(--card-w) + 6px)); }
+    .table-center { gap: 40px; }
+  }
+  /* Where the floor sizes cannot fit, the page scrolls rather than clipping the hand and the actions
+     row behind overflow: hidden with no way to reach them. At the 40px card / 64px pile floor the
+     table needs 630.3px plus the 28px of #app padding; the piles grow with the viewport from 640px
+     (`10dvh`), so the two rows and the piles first fit at 661.4px (a laptop's one row of eleven at
+     615.7px). Above the bound this block would change nothing (`min-height: 100dvh` keeps the hand
+     anchored to the bottom), so a phone in landscape (844x390), an iPhone SE with Safari's toolbar
+     (375x553) or a 360x640 Android with the URL bar shown scroll to the actions row. */
+  @media (max-height: 661px) {
+    body.fixed-screen, body.fixed-screen #app { height: auto; max-height: none; overflow: visible; }
+    body.fixed-screen #app { min-height: 100dvh; }
+    #tableScreen { overflow: visible; }
   }
 
   /* ---------- cards ---------- */
-  /* Every card dimension derives from --card-w, so the whole table scales to any screen.
+  /* Every card dimension derives from --card-w, so one variable sizes a whole screen's cards.
      font-size is set to --card-w so the pips/ranks can size themselves in em. */
   .card { position: relative; width: var(--card-w); height: calc(var(--card-w) * 1.44); border-radius: calc(var(--card-w) * 0.16);
     background: #fdfdf7; color: #111; box-shadow: 0 2px 5px rgba(0,0,0,0.35); flex-shrink: 0; user-select: none;
     display: flex; align-items: center; justify-content: center; font-size: var(--card-w);
-    transition: transform 0.12s ease, box-shadow 0.12s ease, width 0.24s cubic-bezier(.2,.8,.3,1), height 0.24s cubic-bezier(.2,.8,.3,1); }
+    transition: transform 0.12s ease, box-shadow 0.12s ease; }
   .card.red { color: #c81e1e; }
   .card .rank { position: absolute; top: 0.05em; left: 0.1em; font-size: 0.3em; font-weight: 800; line-height: 1; }
   .card .rank.br { top: auto; left: auto; bottom: 0.05em; right: 0.1em; transform: rotate(180deg); }

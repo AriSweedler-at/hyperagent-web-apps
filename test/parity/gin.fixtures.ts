@@ -68,7 +68,6 @@ export type LegacyUiDeps = {
 
 export type LegacyUi = {
   fmtDuration: (ms: number) => string;
-  fitTable: () => void;
   cueState: { key: string | null; turnKey: string | null };
   playCuesFor: (v: unknown) => void;
   cardHtml: (c: unknown, opts?: Record<string, boolean | undefined>) => string;
