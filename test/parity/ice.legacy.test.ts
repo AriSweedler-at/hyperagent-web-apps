@@ -256,6 +256,16 @@ describe('peerConfig', () => {
     });
     expect(plain(port)).toEqual(plain(legacy));
   });
+
+  test('the ?ice-policy= hook is port-only: the legacy has no policy and the default is its shape', async () => {
+    const [legacy, port] = await both(
+      [json([TURN])],
+      async (ice) => ice.peerConfig(await ice.load()),
+      '?ice-policy=relay',
+    );
+    expect(plain(port)).toEqual(plain(legacy));
+    expect(Object.keys(plain(legacy) as object)).toEqual(['iceServers', 'sdpSemantics']);
+  });
 });
 
 // ---------------------------------------------------------------------------------------------

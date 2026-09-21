@@ -1,7 +1,8 @@
 // One browser context per player: its own seeded Math.random, the Peer recorder, the offline
 // routes, and collectors for uncaught exceptions and failed requests. `openGame` navigates to a
 // page on the current project with the harness's `?peer=` (local PeerServer) and `?ice=` (STUN-only
-// fixture) hooks, so no spec needs the public broker or a real network.
+// fixture) hooks, so no spec needs the public broker or a real network; `{ relay: true }` adds the
+// `?ice-policy=relay` hook for the relay-forced game.
 import type { Browser, BrowserContext, Page, TestInfo } from '@playwright/test';
 
 import { ALLOWED_FAILURES, routeOffline } from './offline.ts';
@@ -43,9 +44,15 @@ const RUN_SALT: ReadonlyArray<string> = usesLocalBroker()
   ? []
   : [process.env['GITHUB_RUN_ID'] ?? String(Date.now())];
 
-export const gameQuery = (): string => {
+export type GameHooks = Readonly<{
+  /** Force every ICE candidate through TURN (`?ice-policy=relay`). */
+  relay?: true;
+}>;
+
+export const gameQuery = (hooks: GameHooks = {}): string => {
   const params = new URLSearchParams({ ice: ICE_URL });
   if (usesLocalBroker()) params.set('peer', PEER_SERVER);
+  if (hooks.relay === true) params.set('ice-policy', 'relay');
   return `?${params.toString()}`;
 };
 
@@ -65,16 +72,29 @@ export const newPlayer = async (
 };
 
 /** Open a game page on `project` with the `?peer=` and `?ice=` hooks (relative to the project's baseURL). */
-export const openGame = async (player: Player, project: Project, game: PageName): Promise<void> => {
-  await player.page.goto(`${pagePath(project, game)}${gameQuery()}`);
+export const openGame = async (
+  player: Player,
+  project: Project,
+  game: PageName,
+  hooks: GameHooks = {},
+): Promise<void> => {
+  await player.page.goto(`${pagePath(project, game)}${gameQuery(hooks)}`);
 };
 
 /**
  * The PeerJS options a page must have built from the harness's URL: the ?ice= fixture through
- * HyperIce.peerConfig, plus the ?peer= broker override unless the run targets the cloud broker.
+ * HyperIce.peerConfig (with `iceTransportPolicy` when `{ relay: true }` opened the page), plus the
+ * ?peer= broker override unless the run targets the cloud broker.
  */
-export const expectedPeerOptions = (debug: number): Readonly<Record<string, unknown>> => ({
+export const expectedPeerOptions = (
+  debug: number,
+  hooks: GameHooks = {},
+): Readonly<Record<string, unknown>> => ({
   debug,
-  config: { iceServers: ICE_FIXTURE.iceServers, sdpSemantics: 'unified-plan' },
+  config: {
+    iceServers: ICE_FIXTURE.iceServers,
+    sdpSemantics: 'unified-plan',
+    ...(hooks.relay === true ? { iceTransportPolicy: 'relay' } : {}),
+  },
   ...(usesLocalBroker() ? { host: PEER_HOST, port: PEER_PORT, path: '/', secure: false } : {}),
 });

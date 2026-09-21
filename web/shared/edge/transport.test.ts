@@ -162,6 +162,21 @@ describe('peerOptionsFor (legacy peerOptsFor / withPeerOverride)', () => {
       ...override,
     });
   });
+
+  test('the relay policy lands inside config, with ICE and (over the fallback) without', () => {
+    expect(peerOptionsFor(ICE, null, 0, 'relay')).toEqual({
+      debug: 0,
+      config: {
+        iceServers: ICE.iceServers,
+        sdpSemantics: 'unified-plan',
+        iceTransportPolicy: 'relay',
+      },
+    });
+    expect(peerOptionsFor(null, null, 0, 'relay').config).toMatchObject({
+      iceTransportPolicy: 'relay',
+    });
+    expect(peerOptionsFor(ICE, null, 0, null)).toEqual(peerOptionsFor(ICE, null, 0));
+  });
 });
 
 describe('wireClone (a round trip through PeerJS BinaryPack)', () => {
@@ -262,6 +277,26 @@ describe('realTransport', () => {
   test('defaults: debug 0, no override, no config without ICE (exactly gin PEER_OPTS)', () => {
     realTransport({ ice: null, search: '' }).open('x');
     expect(lastPeer().args).toEqual(['x', { debug: 0 }]);
+  });
+
+  test('?ice-policy=relay reaches PeerJS inside config, for a host and a guest alike', () => {
+    const t = realTransport({ ice: ICE, search: '?peer=127.0.0.1:9000&ice-policy=relay' });
+    t.open('ginrummy-ari-ABCD');
+    const forced = {
+      debug: 0,
+      config: {
+        iceServers: ICE.iceServers,
+        sdpSemantics: 'unified-plan',
+        iceTransportPolicy: 'relay',
+      },
+      host: '127.0.0.1',
+      port: 9000,
+      path: '/',
+      secure: false,
+    };
+    expect(lastPeer().args).toEqual(['ginrummy-ari-ABCD', forced]);
+    t.open(undefined);
+    expect(lastPeer().args).toEqual([forced]);
   });
 
   test('peer events are forwarded with the adapter shapes', () => {

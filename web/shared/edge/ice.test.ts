@@ -10,6 +10,7 @@ import {
   browserIceDeps,
   configUrl,
   createIce,
+  icePolicy,
   isTurn,
   normalize,
   type FetchLike,
@@ -104,6 +105,21 @@ describe('configUrl', () => {
     expect(configUrl('?ice=javascript:alert(1)')).toBe(ICE_CONFIG_URL);
     expect(configUrl('?ice=')).toBe(ICE_CONFIG_URL);
     expect(configUrl('?ice=ftp://x')).toBe(ICE_CONFIG_URL);
+  });
+});
+
+describe('icePolicy (the ?ice-policy=relay hook)', () => {
+  test('relay is the one value the hook accepts', () => {
+    expect(icePolicy('?ice-policy=relay')).toBe('relay');
+    expect(icePolicy('?peer=127.0.0.1:9000&ice-policy=relay&ice=https://x')).toBe('relay');
+  });
+
+  test('anything else is the browser default', () => {
+    expect(icePolicy('')).toBeNull();
+    expect(icePolicy('?ice=https://alt.example')).toBeNull();
+    expect(icePolicy('?ice-policy=')).toBeNull();
+    expect(icePolicy('?ice-policy=all')).toBeNull();
+    expect(icePolicy('?ice-policy=RELAY')).toBeNull();
   });
 });
 
@@ -339,6 +355,22 @@ describe('peerConfig', () => {
     expect(a).toEqual({ iceServers: FALLBACK_ICE, sdpSemantics: 'unified-plan' });
     expect(b.iceServers).toEqual(FALLBACK_ICE);
     expect(a.iceServers).not.toBe(FALLBACK_ICE);
+  });
+
+  test('a forced policy adds iceTransportPolicy; none or null leaves the legacy shape', () => {
+    const loaded = { iceServers: [TURN], source: 'remote', hasTurn: true, error: null } as const;
+    expect(ice.peerConfig(loaded, 'relay')).toEqual({
+      iceServers: [TURN],
+      sdpSemantics: 'unified-plan',
+      iceTransportPolicy: 'relay',
+    });
+    expect(ice.peerConfig(null, 'relay')).toEqual({
+      iceServers: FALLBACK_ICE,
+      sdpSemantics: 'unified-plan',
+      iceTransportPolicy: 'relay',
+    });
+    expect(ice.peerConfig(loaded, null)).toEqual(ice.peerConfig(loaded));
+    expect(Object.keys(ice.peerConfig(loaded))).toEqual(['iceServers', 'sdpSemantics']);
   });
 });
 

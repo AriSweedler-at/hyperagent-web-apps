@@ -7,8 +7,10 @@
 // object `{ iceServers: [...] }`. `load` never rejects: any failure resolves to the STUN-only
 // fallback with `error` set so the page can warn the player. Results are cached for ten minutes
 // per URL so a reconnect reuses the same credentials. `?ice=<url>` on the page overrides the
-// endpoint for testing. `fetch`, the clock and `location.search` are injected so every branch
-// (timeout, cache expiry, override) is driven by hand in tests.
+// endpoint for testing, and `?ice-policy=relay` (a port-only hook, docs/ARCHITECTURE.md "Documented
+// test hooks") forces every candidate through TURN so the nightly can prove the relay works.
+// `fetch`, the clock and `location.search` are injected so every branch (timeout, cache expiry,
+// override) is driven by hand in tests.
 import type { Clock } from '../lib/clock.ts';
 import { realClock } from './clock.ts';
 
@@ -48,9 +50,14 @@ export type IceLoadOptions = Readonly<{
   timeoutMs?: number;
 }>;
 
+/** The one RTCIceTransportPolicy the hook can force; the browser default (`all`) is the absence. */
+export type IcePolicy = 'relay';
+
 export type PeerIceConfig = Readonly<{
   iceServers: ReadonlyArray<IceServer>;
   sdpSemantics: 'unified-plan';
+  /** Present only when `?ice-policy=relay` asked for it. */
+  iceTransportPolicy?: IcePolicy;
 }>;
 
 export type PathDescription = Readonly<{
@@ -106,8 +113,8 @@ export type IceDeps = Readonly<{
 export type Ice = Readonly<{
   /** Resolve the ICE server list. Never rejects: on any failure resolves to the STUN fallback. */
   load: (opts?: IceLoadOptions) => Promise<IceResult>;
-  /** RTCConfiguration for PeerJS's `config` option. */
-  peerConfig: (result: IceResult | null | undefined) => PeerIceConfig;
+  /** RTCConfiguration for PeerJS's `config` option; `policy` adds `iceTransportPolicy`. */
+  peerConfig: (result: IceResult | null | undefined, policy?: IcePolicy | null) => PeerIceConfig;
   /** Inspect the selected candidate pair: was the connection direct or relayed through TURN? */
   describe: (pc: PeerConnectionLike | null | undefined) => Promise<PathDescription>;
   /** Report ICE / connection state transitions so the UI can explain stalls; returns the unsubscribe. */
@@ -124,6 +131,10 @@ export const configUrl = (search: string, endpoint: string = ICE_CONFIG_URL): st
   const q = new URLSearchParams(search).get('ice');
   return q !== null && /^https?:\/\//.test(q) ? q : endpoint;
 };
+
+/** `?ice-policy=relay` forces TURN; anything else (or nothing) leaves the browser's `all`. */
+export const icePolicy = (search: string): IcePolicy | null =>
+  new URLSearchParams(search).get('ice-policy') === 'relay' ? 'relay' : null;
 
 export const isTurn = (server: IceServer): boolean => {
   const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
@@ -167,10 +178,17 @@ const errorText = (e: unknown): string => {
   return String(e);
 };
 
-/** RTCConfiguration for PeerJS's `config` option (legacy `HyperIce.peerConfig`). */
-export const peerConfig = (result: IceResult | null | undefined): PeerIceConfig => ({
+/**
+ * RTCConfiguration for PeerJS's `config` option (legacy `HyperIce.peerConfig`). Without a policy
+ * the output is the legacy's, key for key; `'relay'` adds `iceTransportPolicy` (the hook).
+ */
+export const peerConfig = (
+  result: IceResult | null | undefined,
+  policy: IcePolicy | null = null,
+): PeerIceConfig => ({
   iceServers: result?.iceServers ?? [...FALLBACK_ICE],
   sdpSemantics: 'unified-plan',
+  ...(policy === null ? {} : { iceTransportPolicy: policy }),
 });
 
 type Cache = Readonly<{ url: string; at: number; result: IceResult }>;
