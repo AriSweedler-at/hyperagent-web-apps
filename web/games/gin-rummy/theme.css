@@ -1,13 +1,13 @@
 /* The legacy page's two <style> blocks, in order (legacy/gin-rummy/index.html; docs/MIGRATION.md
    step 12), hand-owned since step 14, which moved the primitives both games share (the box-sizing
-   reset, html/body margin, .hidden) into web/shared/styles/base.css; the page links tokens.css and
-   base.css before this file. Everything else is verbatim; the second block is the stray
-   .ha-img-placeholder block, kept until step 15. The computed-style goldens
-   (test/fixtures/styles/gin-rummy.*.json) and the class contract are the oracles. */
+   reset, html/body margin, .hidden) into web/shared/styles/base.css and its palette into
+   web/shared/styles/tokens.css; the page links tokens.css and base.css before this file.
+   Everything else is verbatim; the second block is the stray .ha-img-placeholder block, kept until
+   step 15. The computed-style goldens (test/fixtures/styles/gin-rummy.*.json) and the class contract
+   are the oracles. */
   :root {
-    --bg: #0f2318; --card: #163526; --card-2: #1c4030; --accent: #4ade80; --accent-dark: #22c55e;
-    --gold: #fbbf24; --text: #f2fdf6; --muted: #9cc9ac; --danger: #f87171; --radius: 18px;
-    --felt: radial-gradient(ellipse at 50% 30%, #1f5a3a 0%, #123a26 55%, #0b2418 100%);
+    /* The palette (--bg --card --card-2 --accent --accent-dark --gold --text --muted --danger
+       --radius --felt) is the shared vocabulary in web/shared/styles/tokens.css, with these values. */
     /* default (off-table) card sizes; the table screen scales these via --tscale */
     --card-w: 50px; --mini-w: 34px; --pile-w: 84px; --tiny-w: 22px;
   }

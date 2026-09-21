@@ -1,9 +1,9 @@
 /* The legacy page's two <style> blocks, in order, cut from legacy/fidice/index.html by
    tools/legacy/debundle-fidice.ts (docs/MIGRATION.md step 6) and hand-owned since step 14, which moved
    the primitives both games share into web/shared/styles/base.css (the page links tokens.css and
-   base.css before this file). Everything else is verbatim; the second block is the stray
-   .ha-img-placeholder block, kept until step 15. The computed-style goldens
-   (test/fixtures/styles/fidice.*.json) and the class contract are the oracles. */
+   base.css before this file; :root also redeclares the shared names tokens.css carries). Everything
+   else is verbatim; the second block is the stray .ha-img-placeholder block, kept until step 15. The
+   computed-style goldens (test/fixtures/styles/fidice.*.json) and the class contract are the oracles. */
 :root{
   /* Kezar Lake, Maine — pines, water, cabin wood, birch */
   --felt:#1f4d3a; --felt-dark:#153627; --felt-light:#2e6b4f; --pine:#1f4d3a; --pine-light:#5f8f72; --moss:#a6bfa3;
@@ -12,6 +12,11 @@
   --cream:#f6efe2; --cream-2:#ece1cc; --birch:#fbf7ef; --ink:#22302a; --muted:#66746c;
   --accent:#d9782f; --accent-dark:#a9561d; --gold:#e6a93c; --red:#b8433a; --blue:var(--lake);
   --card:var(--birch); --line:#dfd3bd; --radius:16px; --shadow:0 8px 26px rgba(21,54,39,.16);
+  /* The shared vocabulary (web/shared/styles/tokens.css) carries gin's palette; every shared name is
+     redeclared here so it resolves to this palette until the restyle. The seven above already do;
+     these four alias fidice's role equivalents: --bg is --mist, the top stop of the sky gradient
+     body paints (the shoreline artwork in body::before covers only its bottom 32vh). */
+  --bg:var(--mist); --card-2:var(--cream-2); --text:var(--ink); --danger:var(--red);
 }
 html,body{height:100%}
 body{font-family:'Nunito',system-ui,sans-serif;color:var(--ink);min-height:100%;display:flex;flex-direction:column;position:relative;

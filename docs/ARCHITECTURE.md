@@ -284,11 +284,12 @@ or updates a pinned issue on failure.
 
 ## Seams reserved for the roadmap (not implemented now)
 
-- Shared design tokens / UI kit: `web/shared/styles/tokens.css` (linked by both pages since step 14
-  but still an empty `:root`: the two games' `:root` blocks disagree on every shared name, `--felt`
-  first; `CONTRACT.md` "Tokens" tables both) and `web/shared/ui/` (README only). The Fidice restyle
-  maps its palette onto shared token names in `theme.css` and re-records the goldens, then moves
-  screen builders into `shared/ui`; computed-style goldens and the class contract gate it.
+- Shared design tokens / UI kit: `web/shared/styles/tokens.css` (linked by both pages since step 14;
+  it declares gin's palette under the eleven shared names, fidice's `theme.css` overrides every one
+  onto its own palette; `CONTRACT.md` "Tokens" tables both) and `web/shared/ui/` (README only). The
+  Fidice restyle drops those overrides, points fidice's rules at the shared names and re-records the
+  goldens, then moves screen builders into `shared/ui`; computed-style goldens and the class
+  contract gate it.
 - Swappable hand display: `ui/hand/HandView.ts` is the interface `render.ts` consumes; a new view is
   a second module and a `main.ts` choice, gated by DOM-snapshot parity of the default.
 - Phone layout stability: `ui/fit.ts` isolates `nextScale()` as a pure function over measured sizes
@@ -727,9 +728,16 @@ Step 13 (cut Gin Rummy over; retire the passthrough):
   checks the class contract by extraction (`test/dist/classes.ts`), so `CONTRACT.md` lists the
   exceptions the extraction cannot see, not every class. `DIST_DIR` redirects the dist guards.
 - Step 14, phase 2 (the hoist): both pages link `web/shared/styles/tokens.css` and `base.css`
-  before `./theme.css`. `tokens.css` is still an empty `:root`: the seven names both themes declare
-  agree on no value, and the goldens pin each page's declared custom-property set and `:root`
-  values, so a shared name or a fidice alias is a golden change reserved for the Fidice restyle.
+  before `./theme.css`. `tokens.css` landed empty, then the follow-up filled it with gin's palette
+  under the eleven shared names (`--bg --card --card-2 --accent --accent-dark --gold --text --muted
+  --danger --radius --felt`): gin is the look the roadmap restyles Fidice towards, so its values are
+  canonical and its `theme.css` no longer declares them (`test/tokens.test.ts`), while fidice's
+  `theme.css` redeclares all eleven, aliasing the four it lacked onto `--mist --cream-2 --ink --red`,
+  so its look is unchanged until the restyle. Because the goldens pin every declared custom property
+  and its `:root` value, a new shared name used to fail the check at every screen; the comparison in
+  `tools/parity/computed-styles.ts` is now additive for custom properties only (a token the golden
+  never recorded on a selector is a note, a missing or changed token or any property change a
+  difference), which let the fidice goldens be re-recorded with the gin goldens byte-identical.
   `base.css` holds the box-sizing reset, `html, body { margin: 0 }` and `.hidden`, the only rules
   the themes carried identically. Vite attaches the shared sheets to the shared chunk, so a built
   page links `shared/assets/roomCode-<hash>.css` then `shared/assets/<game>-<hash>.css` (the dist
