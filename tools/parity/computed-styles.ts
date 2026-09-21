@@ -40,7 +40,7 @@ import { seedScript } from '../../e2e/fixtures/seed.ts';
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
 import { REPO_ROOT, isMain } from '../legacy/extract.ts';
 import { startServer } from '../serve-dist.ts';
-import { EPOCH, SEED, clockScript, readView } from './gin-dom-parity.ts';
+import { EPOCH, SEED, acceptIfShown, clockScript, readView } from './gin-dom-parity.ts';
 
 export type Game = 'gin-rummy' | 'fidice';
 export const GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice'];
@@ -121,8 +121,6 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.empty-note',
     '.pulse',
     '#tableScreen',
-    '#tableScreen.piles-big',
-    '#tableScreen.piles-small',
     '.topbar',
     '.badge',
     '.badge.dim',
@@ -150,10 +148,19 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.alt-badge',
     '.hand',
     '.hand.active',
+    '.slot',
+    '.slot.m0',
+    '.slot.dead',
+    '.slot.head',
+    '.slot.ghost',
+    '.slot.ghost.open',
+    '.slot.ghost.open::before',
+    '.slot.ghost.shown',
     '.meld-group.m0',
     '.meld-group.m1',
     '.meld-group.dead',
     '.actions',
+    '.actions .btn',
     '.waiting-note',
     '.card',
     '.card.red',
@@ -717,7 +724,9 @@ const visible = async (page: Page, selector: string): Promise<void> => {
 /**
  * Gin: the home tabs, hosting on the broker, a pass-and-play hand to a knock (the driver reads the
  * legacy hook `window.__gin.app.view` for its choices as gin-dom-parity does, a one-point target so
- * the first scored hand ends the game), the overlays, the endgame and a Score Counter session.
+ * the first scored hand ends the game), the overlays, the endgame and a Score Counter session. A
+ * draw is shot twice: the drawn card in the ghost slot, then accepted into the hand
+ * (docs/design/gin-draw-ghost-slot.md §9).
  */
 const driveGin = async (page: Page, shot: Shot): Promise<void> => {
   await page.waitForFunction('typeof window.__gin === "object"');
@@ -757,6 +766,7 @@ const driveGin = async (page: Page, shot: Shot): Promise<void> => {
   await click(page, '#curtainBtn');
   await click(page, '#actions [data-act="takeUpcard"]');
   await shot('local: dealer took the upcard (locked card)');
+  await acceptIfShown(page);
   const taken = await readView(page);
   const lockedId = taken?.drawnFromDiscard ?? null;
   const firstFree = taken?.me.hand.find((c) => c.id !== lockedId)?.id ?? null;
@@ -788,7 +798,9 @@ const driveGin = async (page: Page, shot: Shot): Promise<void> => {
     if (before.phase === 'draw') {
       if (before.forceStock) await once('turn: both passed, the discard pile is blocked');
       await click(page, '#stockPile');
-      await once('turn: drew from the stock (fresh card)');
+      await once('turn: drew from the stock (ghost slot shown)');
+      await acceptIfShown(page);
+      await once('turn: accepted the drawn card (fresh)');
     }
     const view = await readView(page);
     const discardOptions = view?.discardOptions ?? null;

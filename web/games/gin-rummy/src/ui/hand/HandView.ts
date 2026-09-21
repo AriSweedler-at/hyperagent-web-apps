@@ -4,11 +4,15 @@
 // (legacy/gin-rummy/index.html, pinned in test/fixtures/legacy/gin-ui.cjs) character for
 // character: one `.meld-group.mN` per meld, then `.meld-group.dead` for the deadwood when there is
 // any; a card is `selected` when it is the selection, `fresh` when it was the last drawn, `locked`
-// when it came off the discard pile this turn and may not go back. A second view is another module
-// and a main.ts choice, gated by the same DOM-snapshot parity.
+// when it came off the discard pile this turn and may not go back. The second view is
+// SlotHandView.ts (the ghost draw slot, docs/design/gin-draw-ghost-slot.md), main.ts's choice
+// since PR A of that design; this one stays for its legacy string golden
+// (test/parity/gin.ui.test.ts) until the design's PR D retires it. The optional `stage` is the
+// draw slot's; the default view ignores it.
 import type { View } from '../../engine/types.ts';
 import { cardHtml } from '../cards.ts';
 import type { Selection } from '../cues.ts';
+import type { DrawStage } from './draw.ts';
 import { meldGroupClass } from './meldGroups.ts';
 
 /** What a hand view reads: a `View` satisfies it. */
@@ -17,7 +21,9 @@ export type HandModel = Pick<
   'me' | 'phase' | 'isMyTurn' | 'lastDrawnId' | 'drawnFromDiscard'
 >;
 
-export type HandView = Readonly<{ render: (model: HandModel, selection: Selection) => string }>;
+export type HandView = Readonly<{
+  render: (model: HandModel, selection: Selection, stage?: DrawStage | null) => string;
+}>;
 
 export const defaultHandView: HandView = {
   render: (model, selection) => {

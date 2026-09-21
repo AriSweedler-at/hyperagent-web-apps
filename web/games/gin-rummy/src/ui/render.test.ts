@@ -10,7 +10,7 @@ import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { applyAction, createGame, legalActions, viewFor } from '../engine/index.ts';
 import type { Action, Seat, State, View } from '../engine/index.ts';
 import { cardHtml, pretty } from './cards.ts';
-import { defaultHandView } from './hand/HandView.ts';
+import { slotHandView } from './hand/SlotHandView.ts';
 import { ginPage, type GinPage } from './page.fake.ts';
 import {
   RULES_SLOT_IDS,
@@ -36,6 +36,7 @@ import {
   rulesItemsHtml,
   showToast,
   standingsHtml,
+  type PageLike,
 } from './render.ts';
 import { state as stateFrame } from '../protocol.ts';
 import { RULES_ITEMS, RULES_LIST_HTML } from './rules.ts';
@@ -44,6 +45,10 @@ import { SCREENS, initialApp, reduce, type App, type Intent } from './state.ts';
 import MARKUP from '../../index.html?raw';
 
 const page = (): GinPage => ginPage(MARKUP);
+/** The whole paint with main.ts's hand view (the slot view with the ghost draw slot). */
+const paintAll = (doc: PageLike, app: App): void => {
+  paint(doc, app, slotHandView);
+};
 
 const NOW = 1_700_000_000_000;
 const rng = mulberry32(3);
@@ -183,7 +188,7 @@ describe('screens, waiting statuses, toast and sound', () => {
   test('a missing element is a programming error', () => {
     const p = page();
     expect(() => {
-      paint({ ...p.doc, getElementById: () => null }, initialApp);
+      paint({ ...p.doc, getElementById: () => null }, initialApp, slotHandView);
     }).toThrow('missing element #homeScreen');
   });
 });
@@ -192,7 +197,7 @@ describe('the table', () => {
   test('without a view nothing of the table is touched; the result sheet is hidden (leaveGame)', () => {
     const p = page();
     p.get('roundResultOverlay').el.classList.remove('hidden');
-    paint(p.doc, initialApp);
+    paintAll(p.doc, initialApp);
     expect(p.get('hand').text()).toBe('');
     expect(p.get('statusMain').text()).toBe('');
     expect(p.get('oppCards').text()).toBe('');
@@ -204,7 +209,7 @@ describe('the table', () => {
     const app = local(drawn, 0);
     const v = viewFor(drawn, 0);
     if (v.discardTop === null) throw new Error('the upcard is on the pile after the deal');
-    paint(p.doc, app);
+    paintAll(p.doc, app);
     expect(shown(p)).toEqual(['tableScreen']);
     expect(p.get('oppName').text()).toBe('Bob');
     expect(p.get('oppScore').text()).toBe('0 pts');
@@ -228,9 +233,10 @@ describe('the table', () => {
       `${cardHtml(v.discardTop, { big: true })}<div class="pile-label"></div>`,
     );
     expect(p.discardLabel.text()).toBe('Discard');
-    expect(p.get('tableScreen').hasClass('piles-small')).toBe(true);
+    // One pile size: no phase class on the table screen.
+    expect(p.get('tableScreen').classes()).toEqual([]);
     expect(p.get('stockPile').hasClass('tappable')).toBe(false);
-    // Status and hand.
+    // Status and hand: the eleven accepted cards in slots, no ghost cell (a game resumed mid-draw).
     expect(p.get('statusMain').text()).toBe('Your turn');
     expect(p.get('statusSub').text()).toBe('Tap a card to select it');
     expect(p.get('statusBanner').hasClass('mine')).toBe(true);
@@ -238,44 +244,109 @@ describe('the table', () => {
     expect(p.get('myName').text()).toBe('Ann · 0 pts');
     expect(p.get('deadwoodInfo').text()).toBe(deadwoodHtml(v, null).markup);
     expect(p.get('deadwoodInfo').text()).toMatch(/^Best possible deadwood: \d+/);
-    expect(p.get('hand').text()).toBe(defaultHandView.render(v, null));
+    expect(p.get('hand').text()).toBe(slotHandView.render(v, null, null));
+    expect(
+      p
+        .get('hand')
+        .text()
+        .match(/<div class="slot /g),
+    ).toHaveLength(11);
+    expect(p.get('hand').text()).not.toContain('ghost');
     expect(p.get('hand').hasClass('active')).toBe(true);
-    expect(p.get('undoBar').hidden()).toBe(false);
+    // The undo button leads the actions row while the draw can be taken back; the short labels.
     expect(p.get('actions').text()).toBe(
-      '<button class="btn btn-secondary grow" data-act="discard" disabled>Discard &amp; end turn</button><button class="btn btn-gold grow" data-act="knock" disabled>Discard &amp; knock</button>',
+      '<button class="btn btn-ghost" data-act="undoDraw" title="Undo draw">↩</button><button class="btn btn-secondary grow" data-act="discard" disabled>Discard</button><button class="btn btn-gold grow" data-act="knock" disabled>Knock</button>',
     );
     expect(p.get('roundResultOverlay').hidden()).toBe(true);
     expect(p.get('meldOverlay').hidden()).toBe(true);
     // A selection: the status, the readout, the buttons.
     const selected = v.me.hand.find((c) => v.discardOptions?.[c.id] !== undefined)?.id ?? null;
-    paint(p.doc, { ...app, selectedCard: selected });
+    paintAll(p.doc, { ...app, selectedCard: selected });
     expect(p.get('statusSub').text()).toBe('Discard it, or knock if you can');
     expect(p.get('deadwoodInfo').text()).toMatch(/^Deadwood after discard: \d+/);
-    expect(p.get('actions').text()).toContain('data-act="discard" >Discard');
-    expect(p.get('actions').text()).toMatch(/<small>\(\d+\)<\/small><\/button>$/);
+    expect(p.get('actions').text()).toContain('data-act="discard" >Discard</button>');
+    expect(p.get('actions').text()).toMatch(/>Knock <small>\(\d+\)<\/small><\/button>$/);
     expect(p.get('hand').text()).toContain(' selected"');
+    // Without an undo (the draw is final once a meld arrangement is declared, say): no ↩.
+    paintAll(p.doc, { ...app, view: { ...v, canUndo: false } });
+    expect(p.get('actions').text().startsWith('<button class="btn btn-secondary grow"')).toBe(true);
+    // A gin selection labels the knock button GIN!.
+    const gin: View = {
+      ...v,
+      discardOptions: { [selected ?? '']: { deadwood: 0, canKnock: true, isGin: true } },
+    };
+    expect(actionsHtml(gin, selected).markup).toContain(
+      '<button class="btn btn-gold grow" data-act="knock" >GIN! <small>(0)</small></button>',
+    );
   });
 
-  test('the first turn: the upcard buttons, big piles; the waiting note on the other side', () => {
+  test('the ghost draw slot: the drawn card shown over the held ten, its status, the pending cell', () => {
+    const p = page();
+    const before = viewFor(passed, 0);
+    const shownApp = reduce(local(passed, 0), { type: 'stock/tap' }, { rng, now: () => NOW }).app;
+    const v = shownApp.view;
+    if (v === null || shownApp.draw === null) throw new Error('the draw did not show');
+    paintAll(p.doc, shownApp);
+    expect(p.get('statusSub').text()).toBe('Tap the new card to keep it, or pick a discard');
+    expect(p.get('hand').text()).toBe(slotHandView.render(v, null, shownApp.draw));
+    // The ten held cards paint as they were before the draw; the eleventh sits in the ghost cell.
+    expect(
+      p
+        .get('hand')
+        .text()
+        .startsWith(
+          slotHandView.render(before, null).slice(0, -'<div class="slot ghost open"></div>'.length),
+        ),
+    ).toBe(true);
+    expect(p.get('hand').text()).toMatch(
+      /<div class="slot ghost shown"><div class="card (red|black) fresh" data-card="[^"]+">.*<\/div><\/div>$/,
+    );
+    expect(
+      p
+        .get('hand')
+        .text()
+        .match(/data-card=/g),
+    ).toHaveLength(11);
+    expect(
+      p.get('actions').text().startsWith('<button class="btn btn-ghost" data-act="undoDraw"'),
+    ).toBe(true);
+    expect(p.get('actions').text()).toContain('data-act="discard" disabled');
+    // A guest awaiting the host's state frame: the pending cell and "Drawing…".
+    const pending = {
+      ...local(passed, 0),
+      draw: {
+        kind: 'waiting',
+        from: 'stock',
+        hold: { melds: before.me.melds, deadwood: before.me.deadwood },
+      } as const,
+    };
+    paintAll(p.doc, pending);
+    expect(p.get('statusSub').text()).toBe('Drawing…');
+    expect(p.get('hand').text()).toContain('<div class="slot ghost pending"></div>');
+  });
+
+  test('the first turn: the upcard buttons, the open ghost cell; the waiting note on the other side', () => {
     const p = page();
     const v = viewFor(dealt, 0);
     if (v.discardTop === null) throw new Error('the upcard is on the pile after the deal');
-    paint(p.doc, local(dealt, 0));
-    expect(p.get('tableScreen').hasClass('piles-big')).toBe(true);
+    paintAll(p.doc, local(dealt, 0));
+    expect(p.get('tableScreen').classes()).toEqual([]);
     expect(p.get('discardPile').hasClass('tappable')).toBe(true);
     expect(p.get('statusSub').text()).toBe('Take the upcard or pass');
     expect(p.get('actions').text()).toBe(
       `<button class="btn btn-secondary grow" data-act="passUpcard">Pass</button><button class="btn btn-primary grow" data-act="takeUpcard">Take ${pretty(v.discardTop)}</button>`,
     );
-    expect(p.get('undoBar').hidden()).toBe(true);
-    paint(p.doc, { ...local(dealt, 1), role: 'host', oppName: 'Ann' });
+    expect(p.get('hand').text()).toBe(slotHandView.render(v, null));
+    expect(p.get('hand').text().endsWith('<div class="slot ghost open"></div>')).toBe(true);
+    paintAll(p.doc, { ...local(dealt, 1), role: 'host', oppName: 'Ann' });
+    expect(p.get('hand').text().endsWith('<div class="slot ghost"></div>')).toBe(true);
     expect(p.get('statusMain').text()).toBe("Ann's turn");
     expect(p.get('statusSub').text()).toBe('Deciding on the upcard…');
     expect(p.get('statusBanner').hasClass('mine')).toBe(false);
     expect(p.get('actions').text()).toBe('<div class="waiting-note">Waiting for Ann…</div>');
     expect(p.get('connDot').attr('class')).toBe('conn-dot on');
     // Both passed: the stock is the only draw, the discard pile is blocked.
-    paint(p.doc, local(passed, 0));
+    paintAll(p.doc, local(passed, 0));
     expect(p.get('stockPile').hasClass('tappable')).toBe(true);
     expect(p.get('discardPile').hasClass('tappable')).toBe(false);
     expect(p.get('discardPile').hasClass('blocked')).toBe(true);
@@ -287,7 +358,7 @@ describe('the table', () => {
   test('a knock: the result sheet, its texts and its continue button; dismissed hides it', () => {
     const p = page();
     const v = viewFor(knocked, 0);
-    paint(p.doc, local(knocked, 0));
+    paintAll(p.doc, local(knocked, 0));
     expect(p.get('statusMain').text()).toBe('Hand over');
     expect(p.get('statusSub').text()).toBe('See results');
     expect(p.get('statusBanner').hasClass('mine')).toBe(false);
@@ -310,7 +381,7 @@ describe('the table', () => {
     expect(p.get('rrContinueBtn').disabled()).toBe(false);
     expect(continueLabel({ ...v, ready: [true, false] })).toBe('Waiting for Bob…');
     expect(continueLabel({ ...v, target: 1 })).toBe('See final result');
-    paint(p.doc, local(knocked, 0, { resultDismissed: true }));
+    paintAll(p.doc, local(knocked, 0, { resultDismissed: true }));
     expect(p.get('roundResultOverlay').hidden()).toBe(true);
     // A void hand has its own texts; a view without a result writes nothing.
     const voided = roundResultText({
@@ -349,7 +420,7 @@ describe('the table', () => {
     };
     const optB = { melds: [v.me.hand.slice(1, 4)], deadwood: [], value: 0, sig: 'b' };
     const twoWays: View = { ...v, meldOptions: [optA, optB], activeMeldSig: 'a' };
-    paint(p.doc, local(drawn, 0, { view: twoWays, meldChooser: true }));
+    paintAll(p.doc, local(drawn, 0, { view: twoWays, meldChooser: true }));
     expect(p.get('meldOverlay').hidden()).toBe(false);
     expect(p.get('meldSub').text()).toBe(meldChooserSub(twoWays));
     expect(p.get('meldSub').text()).toMatch(
@@ -370,7 +441,7 @@ describe('the table', () => {
     expect(p.get('deadwoodInfo').text()).toContain('<span class="alt-badge">⇄ 2 ways</span>');
     expect(p.get('deadwoodInfo').hasClass('tappable-dw')).toBe(true);
     expect(p.get('deadwoodInfo').attr('title')).toBe('Tap to choose which melds you declare');
-    paint(p.doc, local(drawn, 0));
+    paintAll(p.doc, local(drawn, 0));
     expect(p.get('meldOverlay').hidden()).toBe(true);
     expect(p.get('deadwoodInfo').attr('title')).toBe('');
   });
@@ -378,7 +449,7 @@ describe('the table', () => {
   test('gameOver: the endgame screen; the result sheet is left as it was', () => {
     const p = page();
     const v = viewFor(over, 0);
-    paint(p.doc, local(over, 0));
+    paintAll(p.doc, local(over, 0));
     // The screen switch is the reducer's; the paint writes the endgame texts.
     expect(shown(p)).toEqual(['tableScreen']);
     const w = v.players[v.winner ?? 0];
@@ -393,14 +464,14 @@ describe('the table', () => {
     expect(gameDurationText({ ...v, rounds: [] })).toBe('—');
     expect(p.get('rematchBtn').text()).toBe('Rematch');
     expect(p.get('rematchBtn').disabled()).toBe(false);
-    paint(p.doc, local(over, 0, { view: { ...v, ready: [true, false] } }));
+    paintAll(p.doc, local(over, 0, { view: { ...v, ready: [true, false] } }));
     expect(p.get('rematchBtn').text()).toBe('Waiting for Bob…');
     expect(p.get('rematchBtn').disabled()).toBe(true);
     // The sheet stays up over the endgame until "Look at the table".
     p.get('roundResultOverlay').el.classList.remove('hidden');
-    paint(p.doc, local(over, 0));
+    paintAll(p.doc, local(over, 0));
     expect(p.get('roundResultOverlay').hidden()).toBe(false);
-    paint(p.doc, local(over, 0, { resultDismissed: true }));
+    paintAll(p.doc, local(over, 0, { resultDismissed: true }));
     expect(p.get('roundResultOverlay').hidden()).toBe(true);
     // The table itself was not repainted.
     expect(p.get('hand').text()).toBe('');
@@ -414,13 +485,13 @@ describe('the table', () => {
     const p = page();
     const host: App = { ...local(over, 0), role: 'host', code: 'ABCD' };
     const hidden = reduce(host, { type: 'result/hide' }, ctx).app;
-    paint(p.doc, hidden);
+    paintAll(p.doc, hidden);
     expect(p.get('roundResultOverlay').hidden()).toBe(true);
     const readied = reduce(hidden, { type: 'act', action: { type: 'ready' } }, ctx).app;
     expect(readied.view?.phase).toBe('gameOver');
     expect(readied.view?.ready).toEqual([true, false]);
     expect(readied.resultDismissed).toBe(false);
-    paint(p.doc, readied);
+    paintAll(p.doc, readied);
     expect(p.get('roundResultOverlay').hidden()).toBe(true);
     // Guest: the host's state frame after its Rematch arrives while the sheet is put away.
     const q = page();
@@ -433,20 +504,20 @@ describe('the table', () => {
       screen: 'endgameScreen',
     };
     const gHidden = reduce(guest, { type: 'result/hide' }, ctx).app;
-    paint(q.doc, gHidden);
+    paintAll(q.doc, gHidden);
     expect(q.get('roundResultOverlay').hidden()).toBe(true);
     if (readied.game === null) throw new Error('the host lost its game');
     const frame = stateFrame(viewFor(readied.game, 1));
     const received = reduce(gHidden, { type: 'guest/frame', frame }, ctx).app;
     expect(received.view?.ready).toEqual([true, false]);
     expect(received.resultDismissed).toBe(false);
-    paint(q.doc, received);
+    paintAll(q.doc, received);
     expect(q.get('roundResultOverlay').hidden()).toBe(true);
   });
 
   test('the rules and history overlays follow the App; the game history lists every hand', () => {
     const p = page();
-    paint(p.doc, local(knocked, 0, { rulesOpen: true, history: 'game' }));
+    paintAll(p.doc, local(knocked, 0, { rulesOpen: true, history: 'game' }));
     expect(p.get('rulesOverlay').hidden()).toBe(false);
     expect(p.get('historyOverlay').hidden()).toBe(false);
     const v = viewFor(knocked, 0);
@@ -495,10 +566,10 @@ describe('the table', () => {
     expect(undercut).toContain('<div class="history-scores">Ann: 0 · Bob: +28</div>');
     expect(undercut).toContain('<strong>H2</strong> — Bob went Gin</div>');
     // The Score Counter writes its own list: the paint leaves it alone.
-    paint(p.doc, local(knocked, 0, { history: 'scorer' }));
+    paintAll(p.doc, local(knocked, 0, { history: 'scorer' }));
     expect(p.get('historyOverlay').hidden()).toBe(false);
     expect(p.get('historyList').text()).toBe(historyHtml(v).markup);
-    paint(p.doc, local(knocked, 0));
+    paintAll(p.doc, local(knocked, 0));
     expect(p.get('rulesOverlay').hidden()).toBe(true);
     expect(p.get('historyOverlay').hidden()).toBe(true);
   });
@@ -507,7 +578,7 @@ describe('the table', () => {
     const p = page();
     fitTable(p.doc);
     expect(p.get('tableScreen').style('--tscale')).toBeNull();
-    paint(p.doc, local(drawn, 0));
+    paintAll(p.doc, local(drawn, 0));
     fitTable(p.doc);
     expect(p.get('tableScreen').style('--tscale')).toBe('1');
     // An overflowing hand shrinks the table until it fits or hits the floor.
@@ -515,7 +586,7 @@ describe('the table', () => {
     const hand = tall.get('hand').el as unknown as { scrollHeight: number; clientHeight: number };
     hand.scrollHeight = 300;
     hand.clientHeight = 100;
-    paint(tall.doc, local(drawn, 0));
+    paintAll(tall.doc, local(drawn, 0));
     fitTable(tall.doc);
     expect(tall.get('tableScreen').style('--tscale')).toBe('0.5');
   });
@@ -536,13 +607,17 @@ describe('bindAll', () => {
     const card = fakeEl('card', { attrs: { 'data-card': 'AS' } });
     const optBtn = fakeEl('opt', { attrs: { 'data-meld-opt': '1' } });
     const actBtn = fakeEl('act', { attrs: { 'data-act': 'knock' } });
+    const undoBtn = fakeEl('undo', { attrs: { 'data-act': 'undoDraw' } });
     const disabledBtn = fakeEl('dis', { attrs: { 'data-act': 'discard', disabled: '' } });
     p.get('stockPile').fire('click');
     p.get('discardPile').fire('click');
     p.get('hand').fire('click', { target: fakeTarget({ closest: { '.card': card } }) });
     p.get('hand').fire('click');
     p.get('soundBtn').fire('click');
-    p.get('undoDrawBtn').fire('click');
+    // The undo button is a data-act in the actions row, delegated like the others.
+    p.get('actions').fire('click', {
+      target: fakeTarget({ closest: { 'button[data-act]': undoBtn } }),
+    });
     p.get('deadwoodInfo').fire('click');
     p.get('closeMeldBtn').fire('click');
     p.get('meldOverlay').fire('click', { target: fakeTarget({ id: 'meldOverlay' }) });
@@ -577,7 +652,7 @@ describe('bindAll', () => {
       { type: 'discard/tap' },
       { type: 'card/tap', cardId: 'AS' },
       { type: 'sound/toggle' },
-      { type: 'act', action: { type: 'undoDraw' } },
+      { type: 'action/click', act: 'undoDraw' },
       { type: 'meld/open' },
       { type: 'meld/close' },
       { type: 'meld/close' },

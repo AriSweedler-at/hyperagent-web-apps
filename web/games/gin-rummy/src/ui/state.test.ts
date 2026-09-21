@@ -7,6 +7,7 @@ import type { Action, Seat, State } from '../engine/index.ts';
 import { CONNECTED_MSG, connectingMsg } from '../net/guest.ts';
 import { OPENING_MSG, WAITING_MSG } from '../net/host.ts';
 import { STORAGE_KEYS } from '../storage.ts';
+import { holdOf } from './hand/draw.ts';
 import {
   DISCONNECTED_MSG,
   FORCE_STOCK_MSG,
@@ -655,9 +656,10 @@ describe('pass and play', () => {
     expect(passed.app.view).toEqual(viewFor(game, game.turn));
     expect(kinds(passed.effects)).toEqual(['fx', 'persist', 'fx', 'scrollTop']);
     expect(passed.effects[2]).toEqual({ type: 'fx', cue: 'yourTurn' });
-    // A refused move is toasted and changes nothing.
+    // A refused move is toasted and changes nothing (a refused draw passes through the ghost
+    // slot's waiting stage and back, so the record is equal rather than the same object).
     const refused = run(passed.app, { type: 'act', action: { type: 'drawStock' } });
-    expect(refused.app).toBe(passed.app);
+    expect(refused.app).toEqual(passed.app);
     expect(toasts(refused.effects)).toEqual([['Take the upcard or pass.', null]]);
     // Reveal with no game is a no-op.
     expect(run(initialApp, { type: 'curtain/reveal' })).toEqual({ app: initialApp, effects: [] });
@@ -812,6 +814,228 @@ describe('the table', () => {
       view: { ...viewFor(drawn, 0), phase: 'gameOver' as const, winner: 0 as const },
     };
     expect(run(over, { type: 'render' }).app.screen).toBe('endgameScreen');
+  });
+});
+
+describe('the ghost draw slot', () => {
+  /** Pass-and-play, seat 0 revealed and moving. */
+  const local = (game: State): App => ({
+    ...initialApp,
+    role: 'local',
+    oppConnected: true,
+    game,
+    view: viewFor(game, 0),
+    screen: 'tableScreen',
+    revealed: 0,
+  });
+  const passed = play(dealt, [
+    [0, { type: 'passUpcard' }],
+    [1, { type: 'passUpcard' }],
+  ]);
+  const preDraw = holdOf(viewFor(passed, 0).me);
+
+  test('a stock draw shows the drawn card over the ten cards held as they were before the draw', () => {
+    const { app, effects } = run(local(passed), { type: 'stock/tap' });
+    const view = app.view;
+    expect(view?.phase).toBe('discard');
+    expect(app.draw).toEqual({
+      kind: 'shown',
+      from: 'stock',
+      cardId: view?.lastDrawnId,
+      hold: preDraw,
+    });
+    // The hold is the picture before the draw, not the re-melded eleven.
+    expect(app.draw?.hold).not.toEqual(holdOf(view?.me ?? viewFor(passed, 0).me));
+    expect(app.selectedCard).toBeNull();
+    expect(kinds(effects)).toEqual(['fx', 'persist', 'scrollTop']);
+  });
+
+  test('taking the upcard shows it from the discard pile (the locked card)', () => {
+    const tapped = run(local(dealt), { type: 'discard/tap' }).app;
+    expect(tapped.draw).toEqual({
+      kind: 'shown',
+      from: 'discard',
+      cardId: tapped.game?.drawnFromDiscard,
+      hold: holdOf(viewFor(dealt, 0).me),
+    });
+    const button = run(local(dealt), { type: 'action/click', act: 'takeUpcard' }).app;
+    expect(button.draw).toEqual(tapped.draw);
+    const drawPile = run(
+      local(
+        play(dealt, [
+          [0, { type: 'takeUpcard' }],
+          [0, { type: 'discard', cardId: dealt.hands[0][0]?.id ?? '' }],
+        ]),
+      ),
+      { type: 'render' },
+    ).app;
+    // Seat 1 draws now; a view for seat 0 is not its turn, so no stage is set.
+    expect(run(drawPile, { type: 'discard/tap' }).app.draw).toBeNull();
+  });
+
+  test('tapping the ghost card accepts it; tapping a held card accepts and selects that card', () => {
+    const shown = run(local(passed), { type: 'stock/tap' }).app;
+    const ghostId = shown.draw?.kind === 'shown' ? shown.draw.cardId : '';
+    const accepted = run(shown, { type: 'card/tap', cardId: ghostId });
+    expect(accepted.app.draw).toBeNull();
+    expect(accepted.app.selectedCard).toBeNull();
+    expect(accepted.app.view).toBe(shown.view);
+    expect(accepted.effects).toEqual([{ type: 'fx', cue: 'tap' }, { type: 'scrollTop' }]);
+    const held = shown.view?.me.hand.find((c) => c.id !== ghostId)?.id ?? '';
+    const selected = run(shown, { type: 'card/tap', cardId: held });
+    expect(selected.app.draw).toBeNull();
+    expect(selected.app.selectedCard).toBe(held);
+    expect(selected.effects).toEqual([{ type: 'fx', cue: 'tap' }, { type: 'scrollTop' }]);
+    // Accepted: today's toggle, no stage comes back.
+    const toggled = run(selected.app, { type: 'card/tap', cardId: held });
+    expect(toggled.app.selectedCard).toBeNull();
+    expect(toggled.app.draw).toBeNull();
+  });
+
+  test('a re-render while shown keeps the stage (the meld chooser re-broadcasts the same view)', () => {
+    const shown = run(local(passed), { type: 'stock/tap' }).app;
+    expect(run(shown, { type: 'render' }).app.draw).toBe(shown.draw);
+    expect(run(shown, { type: 'visible' }).app.draw).toBe(shown.draw);
+    expect(run(shown, { type: 'meld/open' }).app.draw).toBe(shown.draw);
+  });
+
+  test('the undo button undoes the draw through act: the view is back in the draw phase, no stage', () => {
+    const shown = run(local(passed), { type: 'stock/tap' }).app;
+    const undone = run(shown, { type: 'action/click', act: 'undoDraw' });
+    expect(undone.app.view?.phase).toBe('draw');
+    expect(undone.app.view?.canUndo).toBe(false);
+    expect(undone.app.draw).toBeNull();
+    expect(kinds(undone.effects)).toEqual(['fx', 'persist', 'scrollTop']);
+    // The upcard path undoes back to the upcard decision.
+    const took = run(local(dealt), { type: 'discard/tap' }).app;
+    const back = run(took, { type: 'action/click', act: 'undoDraw' }).app;
+    expect(back.view?.phase).toBe('upcard');
+    expect(back.draw).toBeNull();
+  });
+
+  test('a refused draw clears the stage and toasts: pass-and-play, the host, a disconnected guest', () => {
+    // Both passed: the engine refuses the discard pile (the reducer's own guard is bypassed by act).
+    const refused = run(local(passed), { type: 'act', action: { type: 'drawDiscard' } });
+    expect(refused.app.draw).toBeNull();
+    expect(kinds(refused.effects)).toEqual(['fx', 'toast']);
+    const host = { ...hosting(), game: passed, view: viewFor(passed, 0) };
+    const hostRefused = run(host, { type: 'act', action: { type: 'drawDiscard' } });
+    expect(hostRefused.app.draw).toBeNull();
+    expect(kinds(hostRefused.effects)).toEqual(['fx', 'toast']);
+    const guest: App = {
+      ...run(initialApp, { type: 'join/click', name: 'Jeff', code: 'KQZM' }).app,
+      view: viewFor(passed, 0),
+    };
+    const offline = run(guest, { type: 'stock/tap' });
+    expect(offline.app.draw).toBeNull();
+    expect(toasts(offline.effects)).toEqual([[NOT_CONNECTED_MSG, null]]);
+    // A refusal that is not a draw (ready for both seats) clears nothing that was not there.
+    expect(run(local(passed), { type: 'act', action: { type: 'ready' } }).app.draw).toBeNull();
+  });
+
+  test('a guest waits for the state frame: pending through a re-render, shown on the frame, cleared by a toast', () => {
+    const guest: App = {
+      ...run(
+        initialApp,
+        { type: 'join/click', name: 'Jeff', code: 'KQZM' },
+        { type: 'guest/connected' },
+      ).app,
+      view: viewFor(passed, 0),
+      screen: 'tableScreen',
+    };
+    const waiting = run(guest, { type: 'stock/tap' });
+    expect(waiting.app.draw).toEqual({ kind: 'waiting', from: 'stock', hold: preDraw });
+    expect(waiting.effects).toEqual([
+      { type: 'fx', cue: 'tap' },
+      { type: 'send', frame: { t: 'action', action: { type: 'drawStock' } } },
+    ]);
+    const rerendered = run(waiting.app, { type: 'render' }, { type: 'visible' }).app;
+    expect(rerendered.draw).toEqual(waiting.app.draw);
+    const view = viewFor(drawn, 0);
+    const shown = run(rerendered, { type: 'guest/frame', frame: { t: 'state', view } }).app;
+    expect(shown.draw).toEqual({
+      kind: 'shown',
+      from: 'stock',
+      cardId: view.lastDrawnId,
+      hold: preDraw,
+    });
+    const refused = run(waiting.app, { type: 'guest/frame', frame: { t: 'toast', msg: 'no' } });
+    expect(refused.app.draw).toBeNull();
+    expect(toasts(refused.effects)).toEqual([['no', null]]);
+    // The host's own view never carries the guest's stage: a state frame for the other seat clears it.
+    const theirs = run(waiting.app, {
+      type: 'guest/frame',
+      frame: { t: 'state', view: viewFor(drawn, 1) },
+    }).app;
+    expect(theirs.draw).toBeNull();
+    // Losing the host mid-wait clears the stage.
+    expect(run(waiting.app, { type: 'guest/lost' }).app.draw).toBeNull();
+  });
+
+  test('a guest tapping again mid-wait sends nothing: one draw on the wire, the stage kept, no refusal', () => {
+    const guest: App = {
+      ...run(
+        initialApp,
+        { type: 'join/click', name: 'Jeff', code: 'KQZM' },
+        { type: 'guest/connected' },
+      ).app,
+      view: viewFor(passed, 0),
+      screen: 'tableScreen',
+    };
+    const twice = run(guest, { type: 'stock/tap' }, { type: 'stock/tap' });
+    expect(twice.app.draw).toEqual({ kind: 'waiting', from: 'stock', hold: preDraw });
+    expect(twice.effects).toEqual([
+      { type: 'fx', cue: 'tap' },
+      { type: 'send', frame: { t: 'action', action: { type: 'drawStock' } } },
+    ]);
+    // Nor does the Take button or a direct draw action get through (the discard pile here is
+    // forced-stock: its toast fires before `act`, and keeps the stage).
+    (
+      [
+        { type: 'action/click', act: 'takeUpcard' },
+        { type: 'act', action: { type: 'drawDiscard' } },
+      ] as const
+    ).forEach((intent) => {
+      const again = run(twice.app, intent);
+      expect(again.app).toBe(twice.app);
+      expect(again.effects).toEqual([]);
+    });
+    expect(run(twice.app, { type: 'discard/tap' }).app.draw).toEqual(twice.app.draw);
+    // The upcard path: two pile taps, one `takeUpcard` on the wire.
+    const upcardTwice = run(
+      { ...guest, view: viewFor(dealt, 0) },
+      { type: 'discard/tap' },
+      { type: 'discard/tap' },
+    );
+    expect(upcardTwice.app.draw?.kind).toBe('waiting');
+    expect(upcardTwice.effects.filter((e) => e.type === 'send')).toEqual([
+      { type: 'send', frame: { t: 'action', action: { type: 'takeUpcard' } } },
+    ]);
+    // The host, having seen one draw, answers with one state frame: the card shows, and no
+    // refusal toast follows to clear it.
+    const view = viewFor(drawn, 0);
+    const shown = run(twice.app, { type: 'guest/frame', frame: { t: 'state', view } }).app;
+    expect(shown.draw).toEqual({
+      kind: 'shown',
+      from: 'stock',
+      cardId: view.lastDrawnId,
+      hold: preDraw,
+    });
+    // Undo is not a draw: it is never swallowed by the wait.
+    expect(kinds(run(twice.app, { type: 'action/click', act: 'undoDraw' }).effects)).toContain(
+      'send',
+    );
+  });
+
+  test('a new game, a new deal and leaving clear the stage; the save never carries it', () => {
+    const shown = run(local(passed), { type: 'stock/tap' }).app;
+    expect(run(shown, { type: 'local/click', p1: 'A', p2: 'B', target: '1' }).app.draw).toBeNull();
+    expect(run(shown, { type: 'leave/finish' }).app.draw).toBeNull();
+    const host = { ...lobby(), draw: shown.draw };
+    expect(run(host, { type: 'host/deal' }).app.draw).toBeNull();
+    expect(saveFor(shown)).toEqual({ role: 'local', game: shown.game });
+    expect(saveFor(shown)).not.toHaveProperty('draw');
+    expect(saveFor({ ...hosting(), draw: shown.draw })).not.toHaveProperty('draw');
   });
 });
 
