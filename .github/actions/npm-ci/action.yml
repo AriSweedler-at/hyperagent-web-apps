@@ -8,6 +8,14 @@
 # leaves the firewall's /npm/ prefix behind), installs through Socket Firewall Free so CI installs
 # are scanned for malicious packages, and then restores the pristine lockfile. The sha512 integrity
 # hashes in the lockfile are verified against what is downloaded either way.
+#
+# The sfw npm package is a wrapper that downloads the scanner binary on first use by asking GitHub's
+# release API for the latest sfw-free release, unauthenticated. Runner IPs share that API's
+# anonymous rate limit, so the call fails now and then ("Unable to fetch latest release and no valid
+# cached release found"), which failed two runs on 2026-09-21. The binary is therefore cached between
+# runs (actions/cache on the wrapper's .sfw-cache directory, keyed on the wrapper version and the
+# runner platform) and the first download is retried; with a cached binary the wrapper only checks
+# for a newer release once an hour and ignores a failed check. Nothing about the scan itself changes.
 name: npm ci through Socket Firewall
 description: Install dependencies with npm ci, fetching from the public registry through Socket Firewall Free
 runs:
@@ -16,6 +24,25 @@ runs:
     - name: Install Socket Firewall Free
       shell: bash
       run: npm install -g sfw@2.0.6
+    - name: Locate Socket Firewall's binary cache
+      id: sfw
+      shell: bash
+      run: echo "dir=$(npm root -g)/sfw/.sfw-cache" >> "$GITHUB_OUTPUT"
+    - name: Restore the Socket Firewall binary from the last run
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.sfw.outputs.dir }}
+        key: sfw-binary-2.0.6-${{ runner.os }}-${{ runner.arch }}
+    - name: Prepare the Socket Firewall binary (retried; the release API is rate-limited per IP)
+      shell: bash
+      run: |
+        for attempt in 1 2 3 4; do
+          if sfw npm --version; then exit 0; fi
+          echo "sfw could not prepare its binary (attempt ${attempt} of 4); retrying"
+          sleep $((attempt * 20))
+        done
+        echo "::error::Socket Firewall could not fetch its binary after 4 attempts"
+        exit 1
     - name: Point the runner's lockfile copy at the public registry
       shell: bash
       run: node .github/actions/npm-ci/public-registry.mjs package-lock.json
