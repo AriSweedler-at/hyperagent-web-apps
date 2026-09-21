@@ -251,8 +251,15 @@ or updates a pinned issue on failure.
    ladder, `apply` phase gates, `redactFor`, `survivalFor` spot values, every strategy's `decide()`
    over seeded views), property tests via `legalActions` (300 seeded games: 52-card conservation,
    hand sizes 10/11, totals monotone, termination), pure UI helpers, scorer maths, `ice.ts` with a
-   fetch parameter. Coverage: 90% lines on engine/domain/bots, 100% on `*.algorithms.ts` (with
-   direct tests of the 300k node cap and the 400-entry cache eviction).
+   fetch parameter. Coverage (`vitest.config.ts` thresholds, ratcheted in step 15 from the measured
+   numbers: lines, functions and statements 5 points under measured wherever that beat the former
+   90% floor by 8 or more, branches 3 points under, nothing lowered): 100% on `web/shared/lib` and
+   on both `*.algorithms.ts` (with direct tests of the 300k node cap and the 400-entry cache
+   eviction; branches 84% on fidice's, 97% on gin's); lines/functions/statements 94-95% on the gin
+   engine, the fidice domain and view, the gin ui/, net/ and scorer maths, the gin protocol, storage
+   and fx, the shared edges and the games-proxy Worker; 92-93% on the fidice bots; 90% on the
+   fidice net/ sessions; branches 81-97% per group. The unit suites are seeded, so the figures are
+   deterministic.
 2. Protocol: decoders reject malformed and hostile frames (wrong `t`, out-of-range rank/die,
    oversized names, prototype-pollution keys) with the strings fidice already echoes; wire goldens
    recorded from the legacy pages decode AND re-encode byte-for-byte after `ts` masking; host/guest
@@ -773,3 +780,12 @@ Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage r
   the pure dirs since step 1 (step 8 never needed the `warn`-plus-ratchet fallback), and lint runs
   with `--max-warnings 0` and no exceptions. The "warn until the tightening step" and "except the
   tracked warnings during migration" wording in "eslint.config.js" is gone.
+- Coverage thresholds are ratcheted, not merely "enforced" (they were enforced from step 5 on):
+  `npm test -- --coverage` was run once for the per-group figures (aggregated over each glob's
+  files from `coverage-summary.json`, the way vitest evaluates a glob threshold), every group
+  gained a `branches` floor at `floor(measured) - 3` (the lowest measured branches was 84.4%, on
+  the fidice net/ sessions, so none was omitted), and lines/functions/statements rose to
+  `floor(measured) - 5` where the measured number beat the old threshold by 8 or more points; the
+  fidice net/ group (95.9/93.2/92.2) stays at 90. Nothing went down. A second run passed against
+  the new numbers, which are listed in the `vitest.config.ts` comment and summarised under
+  "Testing pyramid".

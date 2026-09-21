@@ -665,5 +665,10 @@ parity and e2e gates.
   `test/ratchet.test.ts` is one test, no `.js` under `web/` (`JS_FILE_COUNT` and the fidice-only
   second test are gone with `allowJs`). `functional/no-expression-statements` needed no flip: it
   has been `error` in the pure dirs since step 1 (see the step 1 follow-up above), and ARCHITECTURE
-  "eslint.config.js" now says so instead of "warn until the tightening step". See ARCHITECTURE
-  "Deviations".
+  "eslint.config.js" now says so instead of "warn until the tightening step". Coverage
+  thresholds were already enforced; this step ratchets them to the measured numbers (lines,
+  functions, statements at `floor(measured) - 5` where measured beat 90 by 8+, `branches` at
+  `floor(measured) - 3` for every group, `infra/games-proxy/worker.ts` added; nothing lowered)
+  and a second coverage run proves they hold. `nightly.yml`, the README rewrite and the three
+  behaviour fixes (`dealHand` resets `lastDrawn`, single toast timer, dead `.ha-img-placeholder`
+  CSS) are part B. See ARCHITECTURE "Deviations".

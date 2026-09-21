@@ -27,49 +27,92 @@ export default defineConfig({
         'infra/games-proxy/worker.ts',
       ],
       exclude: ['**/*.test.ts'],
-      // The shared pure library is held at 100%; the edges (effects behind injected fakes) at
-      // 90% lines. The fidice pure core (domain, bots and net/protocol, typed in docs/MIGRATION.md
-      // step 8) is at 90% lines, functions and statements, exercised by the parity suites; the
-      // domain's *.algorithms.ts at 100% lines; the fidice view (step 9) at 90%, exercised by the
-      // per-screen render tests and the view oracle; its edges net/** (sessions over
-      // transport.fake.ts) and app/** (the controller over fake effects, clock, DOM and session
-      // stubs) at 90%. main.ts is the boot that constructs the real adapters and stays out. The gin
-      // engine (step 10) is at 90% lines, functions and statements, exercised by the parity suites
-      // and the replay, its melds.algorithms.ts at 100%. The gin protocol, storage and the pure
-      // ui/ and scorer/ helpers (step 11) are at 90% each, exercised by the wire-corpus, storage
-      // capture and string-golden suites under test/parity plus the table tests beside them. The
-      // gin net/ sessions (step 12) are at 90%, exercised by the scenario tests beside them over
-      // transport.fake.ts and clock.fake.ts and by the wire-corpus replay under test/parity. The
-      // games.sweedler.com Worker (infra/games-proxy/worker.ts, TypeScript since step 15) is at 90%,
-      // exercised by the table tests beside it over a stubbed global fetch. The rest get theirs as
-      // they land (docs/ARCHITECTURE.md "Testing pyramid").
+      // Ratcheted from the measured numbers in docs/MIGRATION.md step 15 (the unit suites are
+      // seeded, so the figures are deterministic): lines, functions and statements sit 5 points
+      // under what was measured wherever that beat the former 90% floor by 8 or more, branches
+      // 3 points under (every group measured above 75%), and nothing went down. The shared pure
+      // library and both *.algorithms.ts stay at 100% lines, functions and statements
+      // (docs/ARCHITECTURE.md "*.algorithms.ts"). Who exercises what: the fidice pure core (domain,
+      // bots, net/protocol) the parity suites; the fidice view the per-screen render tests and the
+      // view oracle; its net/** (sessions over transport.fake.ts) and app/** (the controller over
+      // fake effects, clock, DOM and session stubs) the tests beside them, main.ts staying out as
+      // the boot that constructs the real adapters; the gin engine the parity suites and the
+      // replay; the gin protocol, storage and pure ui/ and scorer/ helpers the wire-corpus,
+      // storage-capture and string-golden suites under test/parity plus the table tests beside
+      // them; the gin net/ sessions the scenario tests beside them and the wire-corpus replay;
+      // the games.sweedler.com Worker (infra/games-proxy/worker.ts) its table tests over a stubbed
+      // global fetch. Measured at the ratchet (lines/functions/statements/branches):
+      // shared/lib 100/100/100/100, shared/edge 99.5/99.1/98.9/93.4, fidice domain
+      // 100/100/99.1/92.6, bots 98.9/97.9/98.4/89.9, net/protocol 100/100/100/96.7, net
+      // 95.9/93.2/92.2/84.4, app 99.7/98.5/99.1/97.2, view 100/100/99.3/94.3, domain algorithms
+      // 100/100/100/87.5; gin engine 99.8/99.3/98.7/95.8, engine algorithms 100/100/100/100,
+      // protocol 100/100/100/100, storage 100/100/100/100, ui 99.8/99.5/99.1/93.7, scorer
+      // 100/100/97.9/88.5, net 100/100/99.2/96.2, fx 100/100/100/100; games-proxy
+      // 100/100/100/96.7 (docs/ARCHITECTURE.md "Testing pyramid").
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
-        'web/shared/edge/**': { lines: 90, functions: 90, statements: 90 },
-        'web/games/fidice/src/domain/**': { lines: 90, functions: 90, statements: 90 },
-        'web/games/fidice/src/bots/**': { lines: 90, functions: 90, statements: 90 },
-        'web/games/fidice/src/net/protocol.ts': { lines: 90, functions: 90, statements: 90 },
-        'web/games/fidice/src/net/**': { lines: 90, functions: 90, statements: 90 },
-        'web/games/fidice/src/app/**': { lines: 90, functions: 90, statements: 90 },
-        'web/games/fidice/src/view/**': { lines: 90, functions: 90, statements: 90 },
+        'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
+        'web/games/fidice/src/domain/**': {
+          lines: 95,
+          functions: 95,
+          statements: 94,
+          branches: 89,
+        },
+        'web/games/fidice/src/bots/**': { lines: 93, functions: 92, statements: 93, branches: 86 },
+        'web/games/fidice/src/net/protocol.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 93,
+        },
+        'web/games/fidice/src/net/**': { lines: 90, functions: 90, statements: 90, branches: 81 },
+        'web/games/fidice/src/app/**': { lines: 94, functions: 93, statements: 94, branches: 94 },
+        'web/games/fidice/src/view/**': { lines: 95, functions: 95, statements: 94, branches: 91 },
         'web/games/fidice/src/domain/*.algorithms.ts': {
           lines: 100,
           functions: 100,
           statements: 100,
+          branches: 84,
         },
-        'web/games/gin-rummy/src/engine/**': { lines: 90, functions: 90, statements: 90 },
+        'web/games/gin-rummy/src/engine/**': {
+          lines: 94,
+          functions: 94,
+          statements: 93,
+          branches: 92,
+        },
         'web/games/gin-rummy/src/engine/*.algorithms.ts': {
           lines: 100,
           functions: 100,
           statements: 100,
+          branches: 97,
         },
-        'web/games/gin-rummy/src/protocol.ts': { lines: 90, functions: 90, statements: 90 },
-        'web/games/gin-rummy/src/storage.ts': { lines: 90, functions: 90, statements: 90 },
-        'web/games/gin-rummy/src/ui/**': { lines: 90, functions: 90, statements: 90 },
-        'web/games/gin-rummy/src/scorer/**': { lines: 90, functions: 90, statements: 90 },
-        'web/games/gin-rummy/src/net/**': { lines: 90, functions: 90, statements: 90 },
-        'web/games/gin-rummy/src/fx.ts': { lines: 90, functions: 90, statements: 90 },
-        'infra/games-proxy/worker.ts': { lines: 90, functions: 90, statements: 90 },
+        'web/games/gin-rummy/src/protocol.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 97,
+        },
+        'web/games/gin-rummy/src/storage.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 97,
+        },
+        'web/games/gin-rummy/src/ui/**': { lines: 94, functions: 94, statements: 94, branches: 90 },
+        'web/games/gin-rummy/src/scorer/**': {
+          lines: 95,
+          functions: 95,
+          statements: 92,
+          branches: 85,
+        },
+        'web/games/gin-rummy/src/net/**': {
+          lines: 95,
+          functions: 95,
+          statements: 94,
+          branches: 93,
+        },
+        'web/games/gin-rummy/src/fx.ts': { lines: 95, functions: 95, statements: 95, branches: 97 },
+        'infra/games-proxy/worker.ts': { lines: 95, functions: 95, statements: 95, branches: 93 },
       },
     },
   },
