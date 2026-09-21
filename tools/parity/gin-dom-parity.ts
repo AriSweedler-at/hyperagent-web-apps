@@ -2,13 +2,17 @@
 // pyramid": ~60 recorded views compared against the legacy page). Two browser contexts with the
 // same seeded `Math.random` and the same stepping `Date.now` open the LEGACY page and the NEW page
 // and play the same pass-and-play game and the same Score Counter session through the UI, control
-// by control; at every checkpoint the normalised `outerHTML` of the home screen, the table, the
-// curtain, the sheets, the endgame, the history and rules overlays, the scorer screens and the
-// toast's text are compared, and any difference is a mismatch. Only whitespace, the two rules
-// slots' ids (the new page's one markup addition) and the table's fitted `--tscale` are
-// normalised. What is read from the pages is compared; what is decided (which card to discard) is
-// read from the legacy page's `window.__gin` hook and applied to both, so the two never diverge on
-// a choice.
+// by control; at every checkpoint the normalised `outerHTML` of the home screen, the curtain, the
+// sheets, the endgame, the history and rules overlays, the scorer screens and the toast's text are
+// compared, and any difference is a mismatch. The table screen is out of the snapshot since the
+// ghost draw slot (docs/design/gin-draw-ghost-slot.md §9): it diverges by design (slots, the ghost
+// cell, the undo button in the actions row, one pile size, shorter labels), while everything the
+// table opens (the sheets, the overlays, the toast) still compares at every checkpoint. Only
+// whitespace, the two rules slots' ids (the new page's one markup addition) and the table's fitted
+// `--tscale` are normalised. What is read from the pages is compared; what is decided (which card
+// to discard) is read from the legacy page's `window.__gin` hook and applied to both, so the two
+// never diverge on a choice; after a draw the new page's ghost card is accepted (`acceptIfShown`)
+// so both pages hold the same accepted state before the next click.
 //
 // Locally (Chromium from `npx playwright install`; `npm run build` first):
 //   node --experimental-strip-types tools/parity/gin-dom-parity.ts
@@ -34,10 +38,9 @@ export const EPOCH = 1_700_000_000_000;
 export const clockScript = (epoch: number): string =>
   `(() => { let t = ${String(epoch)}; Date.now = () => (t += 1000); })();`;
 
-/** The elements whose `outerHTML` is compared at every checkpoint. */
+/** The elements whose `outerHTML` is compared at every checkpoint (`tableScreen` diverges by design). */
 export const SNAPSHOT_IDS: ReadonlyArray<string> = [
   'homeScreen',
-  'tableScreen',
   'curtainOverlay',
   'roundResultOverlay',
   'meldOverlay',
@@ -159,6 +162,18 @@ export type HookView = Readonly<{
 export const readView = (page: Page): Promise<HookView | null> =>
   page.evaluate<HookView | null>('window.__gin.app.view');
 
+/**
+ * Accept the drawn card when the page shows it in the ghost slot (docs/design/gin-draw-ghost-slot.md
+ * §4: a tap on it puts it into the hand), so a driver that took the upcard or drew from the stock
+ * goes on from the accepted eleven-card state. The legacy page never has one: a no-op there.
+ */
+export const acceptIfShown = async (page: Page): Promise<void> => {
+  const ghost = page.locator('#hand .slot.ghost .card');
+  if ((await ghost.count()) === 0) return;
+  await ghost.click();
+  await page.locator('#hand .slot.ghost').waitFor({ state: 'detached' });
+};
+
 const click =
   (selector: string): Step =>
   async (page) => {
@@ -247,6 +262,7 @@ const drive = async (pair: Pair, checkpoints: string[], mismatches: Mismatch[]):
   await both(click('#curtainBtn'));
   await check('local: dealer revealed');
   await both(click('#actions [data-act="takeUpcard"]'));
+  await acceptIfShown(pair.next);
   await check('local: dealer took the upcard');
   const taken = await readView(pair.legacy);
   const lockedId = taken?.drawnFromDiscard ?? null;
@@ -271,6 +287,7 @@ const drive = async (pair: Pair, checkpoints: string[], mismatches: Mismatch[]):
     if (before.phase === 'roundOver') return 'void';
     if (before.phase === 'draw') {
       await both(click('#stockPile'));
+      await acceptIfShown(pair.next);
       await check(`turn ${String(turn)}: drew from the stock`);
     }
     const view = await readView(pair.legacy);
