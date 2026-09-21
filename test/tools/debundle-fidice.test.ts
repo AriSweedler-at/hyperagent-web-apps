@@ -179,10 +179,11 @@ describe('the de-bundled fidice modules', () => {
     expect(html).not.toContain('"use strict"');
     expect(/shared\/ice\.js|peerjs\.min\.js/.test(html)).toBe(false);
     const links = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map((m) => m[1]);
-    expect(links.at(-1)).toBe('./theme.css');
-    links.slice(0, -1).forEach((link) => {
-      expect(link).toMatch(/^\.\.\/\.\.\/shared\/styles\/[\w-]+\.css$/);
-    });
+    expect(links).toEqual([
+      '../../shared/styles/tokens.css',
+      '../../shared/styles/base.css',
+      './theme.css',
+    ]);
   });
 
   test('the generated files exist on disk and carry no trailing whitespace', () => {

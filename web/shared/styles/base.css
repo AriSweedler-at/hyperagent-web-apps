@@ -1,0 +1,18 @@
+/*
+ * Shared primitives (docs/MIGRATION.md step 14): the rules both game themes carried with the same
+ * computed result, moved here once and linked by each page after tokens.css and before its own
+ * theme.css, so a theme rule of equal specificity still wins. Only what was identical in both
+ * themes belongs here; a primitive the games style differently (buttons, inputs, labels, toasts,
+ * overlays) stays in each theme.css until a restyle makes them agree. The computed-style goldens
+ * (test/fixtures/styles) are the oracle for every move.
+ */
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+}
+.hidden {
+  display: none !important;
+}
