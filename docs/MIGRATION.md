@@ -663,4 +663,7 @@ parity and e2e gates.
   repo, so no dry run was built). `infra/turn-worker/worker.js` stays plain JavaScript on purpose
   (deployed by hand, "unchanged" in ARCHITECTURE) and keeps its `.prettierignore` entry.
   `test/ratchet.test.ts` is one test, no `.js` under `web/` (`JS_FILE_COUNT` and the fidice-only
-  second test are gone with `allowJs`). See ARCHITECTURE "Deviations".
+  second test are gone with `allowJs`). `functional/no-expression-statements` needed no flip: it
+  has been `error` in the pure dirs since step 1 (see the step 1 follow-up above), and ARCHITECTURE
+  "eslint.config.js" now says so instead of "warn until the tightening step". See ARCHITECTURE
+  "Deviations".

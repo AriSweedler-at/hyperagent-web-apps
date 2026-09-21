@@ -184,8 +184,9 @@ the syntax ban on purpose: two messages, one intent), `no-let: [error, {allowInF
 (`ReadonlyShallow`, `AtLeast`, all identifiers), `prefer-property-signatures`, `readonly-type: generic`.
 ON only in pure dirs (`engine`, `domain`, `bots`, `web/shared/lib`, both `protocol.ts`):
 `no-throw-statements`, `no-try-statements`, `no-classes`, `no-this-expressions`,
-`no-expression-statements: [error, {ignoreVoid: true}]` (warn until the tightening step, tracked by
-a ratchet on the warning count), `no-return-void`. OFF with reasons: `no-conditional-statements`
+`no-expression-statements: [error, {ignoreVoid: true}]` (`error` from step 1 on: with
+`--max-warnings 0` a warning fails lint anyway, and no ratchet on a warning count was ever needed),
+`no-return-void`. OFF with reasons: `no-conditional-statements`
 (the owner asked for no raw loops, not no branches; early returns beat nested ternaries in
 reducers), `functional-parameters` (bans zero-arity thunks that DOM callbacks need),
 `prefer-tacit` (collides with `unbound-method`, hurts stack traces), `no-mixed-types` (VNode and
@@ -197,8 +198,8 @@ reject). Overrides: `**/*.algorithms.ts` turns off the loop ban, `no-let`, `immu
 `no-return-void`, `no-throw-statements`, `no-try-statements`; `**/*.test.ts`, `e2e/**`, `tools/**`
 get `strictTypeChecked` only plus `no-console: off`; `legacy/**` and `test/fixtures/legacy/**` are
 ignored. `eslint-plugin-import-x`: `no-restricted-paths` zones per the table above, `no-cycle`.
-`eslint-config-prettier` last; Prettier formats. Lint runs with `--max-warnings 0` except the
-tracked `no-expression-statements` warnings during migration.
+`eslint-config-prettier` last; Prettier formats. Lint runs with `--max-warnings 0`: every rule
+above is `error` or `off`, nothing is a warning.
 
 ### Git hooks
 
@@ -768,3 +769,7 @@ Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage r
 - `test/ratchet.test.ts` is one test: no `.js` file under `web/`. `JS_FILE_COUNT` and the
   fidice-only allow-list are gone with `allowJs`; a `.js` under `web/` would now escape the
   compiler, so the test refuses it outright.
+- The lint story is stated as it stands: `functional/no-expression-statements` has been `error` in
+  the pure dirs since step 1 (step 8 never needed the `warn`-plus-ratchet fallback), and lint runs
+  with `--max-warnings 0` and no exceptions. The "warn until the tightening step" and "except the
+  tracked warnings during migration" wording in "eslint.config.js" is gone.

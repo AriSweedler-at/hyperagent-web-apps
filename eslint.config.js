@@ -125,9 +125,9 @@ const functionalPure = {
   'functional/no-try-statements': 'error',
   'functional/no-classes': 'error',
   'functional/no-this-expressions': 'error',
-  // error from the start: `--max-warnings 0` would fail on a warning anyway, and no pure module
-  // exists yet to ratchet. docs/MIGRATION.md step 8 may downgrade this to warn behind a ratchet on
-  // the count if the ported legacy code needs it (docs/ARCHITECTURE.md "Deviations").
+  // error from the start and never downgraded: `--max-warnings 0` would fail on a warning anyway,
+  // and the ported pure code (docs/MIGRATION.md steps 8 and 10) never needed the warn-plus-ratchet
+  // fallback the plan held in reserve (docs/ARCHITECTURE.md "Deviations", step 1 follow-up).
   'functional/no-expression-statements': ['error', { ignoreVoid: true }],
   'functional/no-return-void': 'error',
 };
