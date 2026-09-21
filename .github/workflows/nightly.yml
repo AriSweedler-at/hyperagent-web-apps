@@ -1,0 +1,75 @@
+# Plays the deployed site every night (docs/MIGRATION.md step 15, docs/ARCHITECTURE.md "CI").
+# ci.yml proves the code on emulated origins through a local PeerServer; this proves the two live
+# origins, https://arisweedler-at.github.io/hyperagent-web-apps/ and https://games.sweedler.com/,
+# with everything real in the loop: the pages GitHub Pages and the Cloudflare Worker actually
+# serve, the public broker 0.peerjs.com, and the TURN credentials from turn.sweedler.com. The
+# @online specs (gin join/deal/turn, gin resume/rejoin, fidice lobby/start) run on both origins
+# with the credentials the pages fetched, and the @relay spec opens gin with ?ice-policy=relay so
+# every candidate must go through the Cloudflare relay: if the credentials stop working, that game
+# cannot connect and the run fails. Nothing local is started (E2E_TARGET=live, e2e/fixtures/site.ts).
+# On failure the Playwright report is uploaded and the open issue labelled `nightly` gets a comment
+# with the run URL (or the issue is created); a green run closes it. By hand:
+#   gh workflow run nightly.yml
+name: Nightly
+
+on:
+  schedule:
+    - cron: '23 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      # No build: the deployed pages are the subject. `npm run test:live` is
+      # `E2E_TARGET=live E2E_BROKER=cloud playwright test --grep "@online|@relay"`, both projects.
+      - name: Online and relay-forced specs against both live origins
+        run: npm run test:live
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-nightly
+          path: playwright-report
+          retention-days: 14
+      - name: Report the failure on the pinned `nightly` issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create nightly --description "Opened by nightly.yml when the live run fails" --color B60205 || true
+          open_issue="$(gh issue list --label nightly --state open --limit 1 --json number --jq '.[0].number // empty')"
+          body="Nightly live run failed: ${RUN_URL}"
+          if [ -n "${open_issue}" ]; then
+            gh issue comment "${open_issue}" --body "${body}"
+          else
+            gh issue create --title "Nightly live run failed" --label nightly --body "${body}"
+          fi
+      - name: Close the `nightly` issue on a green run
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Assigned first so `set -e` sees a gh failure; a substitution inside `for` would exit 0.
+          numbers="$(gh issue list --label nightly --state open --json number --jq '.[].number')"
+          for number in ${numbers}; do
+            gh issue close "${number}" --comment "Nightly live run passed: ${RUN_URL}"
+          done

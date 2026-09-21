@@ -23,8 +23,10 @@ and tests that prove it land before the code they protect.
 
 ```
 .
-├── package.json / .nvmrc        scripts: dev, build, preview, typecheck, lint, test, test:e2e, test:live,
-│                                replay, check (= typecheck+lint+test), hooks, hooks:verify
+├── package.json / .nvmrc        scripts: build, preview, serve, proxy:dev, typecheck, lint, lint:fix, format,
+│                                test, test:watch, test:dist, test:integration, test:e2e, test:live,
+│                                check (= typecheck+lint+test+build+test:dist), fixtures:*, debundle:fidice,
+│                                hooks, hooks:verify (README "Develop" has the table)
 ├── tsconfig.json                solution -> tsconfig.{base,web,pure,node}.json
 ├── vite.config.ts               root web/, base './', input = glob web/**/index.html, legacyPassthrough plugin
 ├── vitest.config.ts             node env; jsdom only for *.dom.test.ts; v8 coverage thresholds
@@ -85,7 +87,9 @@ Games never import each other. `infra/` shares only the pure `mapPath()` with te
 
 Documented test hooks that are part of the contract: `window.__gin`, `window.__fidice`,
 `window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
-`?ice=<url>` (ICE config override), and `globalThis.__peerCalls`: `web/shared/edge/transport.ts`
+`?ice=<url>` (ICE config override), `?ice-policy=relay` (port-only: `iceTransportPolicy: 'relay'`
+inside the Peer `config`, for the nightly's relay-forced game), and `globalThis.__peerCalls`:
+`web/shared/edge/transport.ts`
 pushes the arguments of every `new Peer(...)` it makes (`[id, options]` for a host, `[options]` for
 a guest, `options` the exact object handed to PeerJS) onto that array, creating it if absent, so a
 page that no longer exposes `window.Peer` can still be checked for the ICE config and broker
@@ -240,9 +244,14 @@ authenticate to the firewall, so the action rewrites the runner's checked-out co
 to the public registry (host and the firewall's `/npm/` path prefix; npm's `replace-registry-host`
 swaps only the hostname), installs through Socket Firewall Free (`sfw npm ci`) so CI installs are
 scanned too, and restores the pristine lockfile afterwards. The lockfile's integrity hashes are
-verified against what is downloaded either way. `nightly.yml` runs the online specs against both live origins through the real broker and
-`turn.sweedler.com`, plus one game with `iceTransportPolicy: 'relay'` forced via `?ice=`, and opens
-or updates a pinned issue on failure.
+verified against what is downloaded either way. `nightly.yml` (`cron 23 9 * * *` and
+`workflow_dispatch`; by hand `gh workflow run nightly.yml`) runs `npm run test:live`
+(`E2E_TARGET=live E2E_BROKER=cloud playwright test --grep "@online|@relay"`, no build): the online
+specs against both live origins through the real broker and `turn.sweedler.com`, plus one gin game
+with `iceTransportPolicy: 'relay'` forced via the `?ice-policy=relay` hook (`e2e/gin-relay.spec.ts`;
+hermetic runs skip that game and assert only that the hook reaches `new Peer`). On failure it
+uploads the report and comments the run URL on the open issue labelled `nightly`, creating
+"Nightly live run failed" when none is open; a green run closes it.
 
 ## Testing pyramid
 
@@ -266,7 +275,7 @@ or updates a pinned issue on failure.
    sessions over `transport.fake.ts` + `fakeClock` replay every recorded sequence; frozen-constant
    tests for prefixes, alphabets, storage keys and `t` tags.
 3. Parity (permanent): `describe.each([['legacy', gin-engine.cjs], ['current', engine]])` runs the
-   same assertions on both; 1000 seeded gin games and 200 seeded fidice games replay through both
+   same assertions on both; 1000 seeded gin games and 12 seeded fidice bot games replay through both
    with state and views deep-equal (known defects preserved and named); DOM-snapshot parity
    (normalised innerHTML of `#hand`, `#actions`, `#statusBanner`, `#oppCards`, `#rrBody`, `#app` over
    ~60 recorded views); computed-style goldens (~60 selectors at 390x844 and 1280x800) recorded
@@ -282,8 +291,10 @@ or updates a pinned issue on failure.
 
 ## Conventions for small diffs
 
-- New game: `web/games/<g>/{index.html, main.ts, theme.css, src/}` plus tests; nothing in `web/shared`
-  changes. Vite picks up the folder; the proxy needs no change; e2e gets one spec per mode.
+- New game: `web/games/<g>/{index.html, main.ts, theme.css, src/}` plus tests, a coverage entry,
+  `CONTRACT.md` rows and its name in the harness lists (`GAMES`, `PAGES`); nothing in `web/shared`
+  changes. Vite picks up the folder; the proxy needs no change; e2e gets one spec per mode. The
+  README's "Add a game" is the step-by-step version.
 - New rule or action: add the variant to the `Action` union in `engine/types.ts`, the reducer branch
   in `game.ts` (exhaustiveness check fails until every switch handles it), the codec case in
   `protocol.ts`, a table test and a recorded golden. Wire-visible changes add a version field.

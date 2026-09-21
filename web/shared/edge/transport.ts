@@ -3,10 +3,19 @@
 // `Connection` below and receives this real adapter from main.ts or `transport.fake.ts` from a
 // test; `transport.contract.ts` is the behaviour both must show. Options follow the legacy pages
 // exactly: `{ debug, config: peerConfig(ice) }` when ICE loaded, `{ debug }` when it did not, and
-// the documented `?peer=host:port` test hook adds `{ host, port, path: '/', secure: false }`.
+// the documented `?peer=host:port` test hook adds `{ host, port, path: '/', secure: false }`. The
+// port-only `?ice-policy=relay` hook adds `iceTransportPolicy: 'relay'` inside `config` (the
+// nightly's relay-forced game, docs/ARCHITECTURE.md "Documented test hooks").
 import { Peer, util, type DataConnection } from 'peerjs';
 
-import { peerConfig, type IceResult, type PeerConnectionLike, type PeerIceConfig } from './ice.ts';
+import {
+  icePolicy,
+  peerConfig,
+  type IcePolicy,
+  type IceResult,
+  type PeerConnectionLike,
+  type PeerIceConfig,
+} from './ice.ts';
 
 export type TransportError = Readonly<{ type: string; message: string }>;
 
@@ -90,13 +99,19 @@ export type PeerJsOptions = Readonly<{
   secure?: false;
 }>;
 
-/** Legacy gin `peerOptsFor(ice)` / fidice `withPeerOverride(...)`: ICE config first, then the override. */
+/**
+ * Legacy gin `peerOptsFor(ice)` / fidice `withPeerOverride(...)`: ICE config first, then the
+ * override. A forced policy needs a `config` to live in, so it is built even when ICE did not load
+ * (then over the STUN fallback, which a relay-forced pair cannot use: the hook is for live runs).
+ */
 export const peerOptionsFor = (
   ice: IceResult | null,
   override: PeerOverride | null,
   debug: number,
+  policy: IcePolicy | null = null,
 ): PeerJsOptions => {
-  const base: PeerJsOptions = ice === null ? { debug } : { debug, config: peerConfig(ice) };
+  const base: PeerJsOptions =
+    ice === null && policy === null ? { debug } : { debug, config: peerConfig(ice, policy) };
   return override === null ? base : { ...base, ...override };
 };
 
@@ -248,7 +263,7 @@ const newPeer = (id: string | undefined, opts: PeerJsOptions): Peer => {
 export type RealTransportOptions = Readonly<{
   /** What `ice.load()` resolved to, or null when the loader was unavailable. */
   ice: IceResult | null;
-  /** The page's `location.search`, for the `?peer=` hook. */
+  /** The page's `location.search`, for the `?peer=` and `?ice-policy=` hooks. */
   search: string;
   /** PeerJS log level: gin uses 0, fidice 1. */
   debug?: number;
@@ -256,6 +271,11 @@ export type RealTransportOptions = Readonly<{
 
 /** PeerJS 1.5.4 as a Transport. Constructed in main.ts only. */
 export const realTransport = (options: RealTransportOptions): Transport => {
-  const opts = peerOptionsFor(options.ice, peerOverrideFrom(options.search), options.debug ?? 0);
+  const opts = peerOptionsFor(
+    options.ice,
+    peerOverrideFrom(options.search),
+    options.debug ?? 0,
+    icePolicy(options.search),
+  );
   return { open: (id) => wrapPeer(newPeer(id, opts)) };
 };

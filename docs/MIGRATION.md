@@ -208,6 +208,11 @@ Gin's inline classic scripts depend on execution order (`window.GinEngine`, `win
 - Proves: CI green with zero `.js` under `web/`; all goldens except the named ones unchanged;
   nightly passes once against both live origins including the relay-forced game.
 - Rollback: revert individual fixes; each is its own commit.
+- Done: step 14's gates (computed-style goldens, the class contract, the shared stylesheet seam)
+  landed in #13 and its hoist (tokens and base) in #14; part A (`allowJs` out, the TypeScript
+  games-proxy Worker, the coverage ratchet) in #15; the three behaviour fixes in #16; part B
+  (`nightly.yml`, the `?ice-policy=relay` hook, `E2E_TARGET=live`, `npm run test:live` and the
+  README rewrite) in #17. Deviations for each are recorded below.
 
 ## After the migration (roadmap, not scheduled here)
 
@@ -708,3 +713,36 @@ parity and e2e gates.
   play on the menu nor delay the next table's. Both are pinned in "Controller toasts and timers".
   Oracles: `computed-styles.ts --check` 0 differences and 0 notes x4, `gin-dom-parity.ts` as above,
   `npm run check`, and every non-online e2e spec on both projects. See ARCHITECTURE "Deviations".
+- Step 15, part B.1 (`nightly.yml`): the relay-forced game is forced through a new port-only hook,
+  `?ice-policy=relay`, not "via `?ice=`" as the step and ARCHITECTURE read: `?ice=` names an
+  endpoint, and no endpoint payload can carry a transport policy. `icePolicy(search)` in
+  `web/shared/edge/ice.ts` reads it and `peerConfig(result, policy?)` adds `iceTransportPolicy:
+  'relay'` only when asked, so the default output is the legacy's key for key
+  (`test/parity/ice.legacy.test.ts` pins that with the hook in the query string); `peerOptionsFor` /
+  `realTransport` carry it for both games, host and guest. `E2E_TARGET=live` in
+  `playwright.config.ts` aims `pages` at `https://arisweedler-at.github.io/hyperagent-web-apps/` and
+  `proxy` at `https://games.sweedler.com/` (`LIVE_ORIGINS` and `baseUrl()` in `e2e/fixtures/site.ts`),
+  starts no webServer and implies `E2E_BROKER=cloud`. Live, `gameQuery()` omits `?ice=` and `?peer=`
+  (the deployed pages fetch `turn.sweedler.com` and meet on 0.peerjs.com) and `expectPeerOptions(call)`
+  asserts the shape of what arrived (Cloudflare's STUN server, a TURN entry with username and
+  credential, unified-plan, the policy when forced, no broker override) where a local run asserts
+  the fixture byte for byte; `gin-dom-parity` and `computed-styles` skip live with a reason.
+  `e2e/gin-relay.spec.ts` (`@relay @online`) plays the relay-forced gin game live only: the local
+  harness has a STUN-only fixture and no TURN server, so a relay-forced pair cannot connect there;
+  its second, hermetic `@relay` test hosts a room with the hook on both projects and asserts the
+  option reached `new Peer` without attempting a join. What nightly proves: the deployed pages on
+  both origins play a real two-peer game (gin join/deal/turn, gin resume/rejoin, fidice lobby/start)
+  through the public broker with the credentials they fetched, and one gin game connects through
+  the Cloudflare relay alone and says so ("Connected via relay" on both pages). A failure comments
+  the run URL on the open issue labelled `nightly` (creating it, and the label, when missing); a
+  pass closes it. The command is `npm run test:live`, the script ARCHITECTURE's directory layout has
+  listed since step 0 and which exists from this step; the deployed pages gain the hook only when
+  this lands, so the first relay-forced nightly is the one after the merge. Proof on the author's
+  laptop (2026-09-21): `npm run check` green; `npm run test:e2e -- --grep-invert @online` 19 passed,
+  5 skipped (the existing proxy-project skips) on both projects with the hermetic hook check
+  under a second each; the live dry run `E2E_TARGET=live E2E_BROKER=cloud npm run test:e2e --
+  --grep @online --grep-invert @relay` 3 passed on `pages` and 3 on `proxy` through 0.peerjs.com
+  with turn.sweedler.com's credentials; and the relay-forced game run live against the deployed
+  pages (which lack the hook) failed only at the `iceTransportPolicy` assertion, after both live
+  pages had joined, toasted "Connected via relay" of their own accord and dealt. See ARCHITECTURE
+  "CI" and "Documented test hooks".
