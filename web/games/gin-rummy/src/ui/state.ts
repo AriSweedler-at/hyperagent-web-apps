@@ -545,9 +545,13 @@ const startGuest = (app: App, code: string): Step => {
  * `act(action)`: a tap, then by role. A draw (the stock, the discard pile, the upcard) first holds
  * the ten-card picture on screen, so the slot view keeps it until the player accepts the card
  * (docs/design/gin-draw-ghost-slot.md §3); the stage settles in `rendered` or clears in `refuse`.
+ * A second draw while one is `waiting` (a guest's round trip: the view stays in the draw phase
+ * until the host's state frame lands) is ignored, or the host would refuse the duplicate with a
+ * toast that clears the stage and collapses the ghost card without the player's accept tap.
  */
 const act = (app: App, action: Action, ctx: Context): Step => {
   const from = drawSource(action);
+  if (from !== null && app.draw?.kind === 'waiting') return pure(app);
   const held: App =
     from !== null && app.view !== null
       ? { ...app, draw: { kind: 'waiting', from, hold: holdOf(app.view.me) } }

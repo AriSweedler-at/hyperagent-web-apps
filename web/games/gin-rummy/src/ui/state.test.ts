@@ -972,6 +972,61 @@ describe('the ghost draw slot', () => {
     expect(run(waiting.app, { type: 'guest/lost' }).app.draw).toBeNull();
   });
 
+  test('a guest tapping again mid-wait sends nothing: one draw on the wire, the stage kept, no refusal', () => {
+    const guest: App = {
+      ...run(
+        initialApp,
+        { type: 'join/click', name: 'Jeff', code: 'KQZM' },
+        { type: 'guest/connected' },
+      ).app,
+      view: viewFor(passed, 0),
+      screen: 'tableScreen',
+    };
+    const twice = run(guest, { type: 'stock/tap' }, { type: 'stock/tap' });
+    expect(twice.app.draw).toEqual({ kind: 'waiting', from: 'stock', hold: preDraw });
+    expect(twice.effects).toEqual([
+      { type: 'fx', cue: 'tap' },
+      { type: 'send', frame: { t: 'action', action: { type: 'drawStock' } } },
+    ]);
+    // Nor does the Take button or a direct draw action get through (the discard pile here is
+    // forced-stock: its toast fires before `act`, and keeps the stage).
+    (
+      [
+        { type: 'action/click', act: 'takeUpcard' },
+        { type: 'act', action: { type: 'drawDiscard' } },
+      ] as const
+    ).forEach((intent) => {
+      const again = run(twice.app, intent);
+      expect(again.app).toBe(twice.app);
+      expect(again.effects).toEqual([]);
+    });
+    expect(run(twice.app, { type: 'discard/tap' }).app.draw).toEqual(twice.app.draw);
+    // The upcard path: two pile taps, one `takeUpcard` on the wire.
+    const upcardTwice = run(
+      { ...guest, view: viewFor(dealt, 0) },
+      { type: 'discard/tap' },
+      { type: 'discard/tap' },
+    );
+    expect(upcardTwice.app.draw?.kind).toBe('waiting');
+    expect(upcardTwice.effects.filter((e) => e.type === 'send')).toEqual([
+      { type: 'send', frame: { t: 'action', action: { type: 'takeUpcard' } } },
+    ]);
+    // The host, having seen one draw, answers with one state frame: the card shows, and no
+    // refusal toast follows to clear it.
+    const view = viewFor(drawn, 0);
+    const shown = run(twice.app, { type: 'guest/frame', frame: { t: 'state', view } }).app;
+    expect(shown.draw).toEqual({
+      kind: 'shown',
+      from: 'stock',
+      cardId: view.lastDrawnId,
+      hold: preDraw,
+    });
+    // Undo is not a draw: it is never swallowed by the wait.
+    expect(kinds(run(twice.app, { type: 'action/click', act: 'undoDraw' }).effects)).toContain(
+      'send',
+    );
+  });
+
   test('a new game, a new deal and leaving clear the stage; the save never carries it', () => {
     const shown = run(local(passed), { type: 'stock/tap' }).app;
     expect(run(shown, { type: 'local/click', p1: 'A', p2: 'B', target: '1' }).app.draw).toBeNull();

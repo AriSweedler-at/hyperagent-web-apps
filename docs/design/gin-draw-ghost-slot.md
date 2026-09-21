@@ -204,7 +204,9 @@ drawn card lands in cell 11 and the held ten paint from the hold. At 375x667 the
   ↩ / Discard (off) / Knock (off). `Pass`: as today, no hold.
 - My `draw` (`open`), tap the stock: `act(drawStock)` → `shown` (dot, no lock). Tap the discard
   pile: `act(drawDiscard)` → `shown` with 🔒; when `forceStock`: FORCE_STOCK_MSG toast, slot stays
-  `open`. Guest: `waiting` (`pending`, "Drawing…") until the `state` frame or a `toast` frame.
+  `open`. Guest: `waiting` (`pending`, "Drawing…") until the `state` frame or a `toast` frame;
+  a second draw tap during the wait (either pile, `Take`) is ignored, so the host never sees a
+  duplicate it would refuse with a toast that clears the stage.
 - `shown`, tap the ghost card: accept. `draw: null`, the 11 cards re-meld into slots 0..10, the dot
   stays on the drawn card, normal selection state. Tap a held card: accept and select it in one
   tap (status "Discard it, or knock if you can", Discard enabled, deadwood-after readout).
@@ -408,4 +410,6 @@ at 390x844 and 1280x800, `ginAcceptDraw` in the fixtures, the gin-local assertio
 edits: `gin-dom-parity` without `tableScreen` (84 checkpoints, 0 mismatches), the gin
 computed-style goldens re-recorded at both viewports (fidice byte-identical), the CONTRACT.md
 `m0..m4` row. Owner-visible choices kept as written: accept-on-select, and the button labels
-`Discard` / `Knock` / `GIN!`. Next: PR B (fixed geometry, retire `--tscale`), PR C (stories).
+`Discard` / `Knock` / `GIN!`. Follow-up on the same branch: `act` ignores a draw while one is
+`waiting`, closing the guest-only double-tap hole (the host's refusal toast collapsed the ghost
+card). Next: PR B (fixed geometry, retire `--tscale`), PR C (stories).
