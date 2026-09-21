@@ -617,6 +617,71 @@ describe('Controller toasts and timers', () => {
     expect(requireId(h.root, 'toast').getAttribute('class')).toBe('toast');
   });
 
+  test('a repeated message coalesces: three roll.go taps with nothing chosen read as one toast for one TOAST_MS', () => {
+    const h = harness();
+    hostALobby(h);
+    h.host().events.onState(OPENING, player(0));
+    const refusal = 'Select table dice or tick "Shake the cup" first';
+    h.send({ type: 'roll.go' });
+    h.send({ type: 'roll.go' });
+    h.send({ type: 'roll.go' });
+    expect(h.controller.state.toast).toBe(refusal);
+    expect(h.clock.pending()).toBe(1);
+    h.clock.advance(TOAST_MS - 1);
+    expect(h.controller.state.toast).toBe(refusal);
+    h.clock.advance(1);
+    expect(h.controller.state.toast).toBeNull();
+    expect(requireId(h.root, 'toast').getAttribute('class')).toBe('toast');
+    expect(h.clock.pending()).toBe(0);
+    // The check is against the toast showing and the queue's tail: the second 'b' repeats the
+    // tail and the last 'a' repeats the one showing, so both are dropped; 'c' is new and queues.
+    const info = infoOf(h);
+    ['a', 'b', 'b', 'a', 'c'].forEach(info);
+    expect(h.controller.state.toast).toBe('a');
+    h.clock.advance(TOAST_MS);
+    expect(h.controller.state.toast).toBe('b');
+    h.clock.advance(TOAST_MS);
+    expect(h.controller.state.toast).toBe('c');
+    h.clock.advance(TOAST_MS);
+    expect(h.controller.state.toast).toBeNull();
+    expect(h.clock.pending()).toBe(0);
+  });
+
+  test('leaving a table drops the toasts queued behind the one showing, which finishes its TOAST_MS', () => {
+    const h = harness();
+    hostALobby(h);
+    h.host().events.onState(OPENING, player(0));
+    const error = h.host().events.onError;
+    ['Connection problem: a', 'Connection problem: b', 'Connection problem: c'].forEach(error);
+    h.send({ type: 'leave' });
+    expect(h.controller.state.screen).toBe('menu');
+    expect(h.controller.state.toast).toBe('Connection problem: a');
+    h.clock.advance(TOAST_MS);
+    expect(h.controller.state.toast).toBeNull();
+    expect(requireId(h.root, 'toast').getAttribute('class')).toBe('toast');
+    expect(h.clock.pending()).toBe(0);
+  });
+
+  test("a closed table's queued toasts do not delay the next table's", () => {
+    const h = harness();
+    hostALobby(h);
+    const info = infoOf(h);
+    info('old one');
+    info('old two');
+    h.host().events.onClosed('Host left');
+    expect(h.controller.state.screen).toBe('name');
+    fire(requireId(h.root, 'btnNameGo'), 'click');
+    h.host().events.onReady();
+    h.host().events.onState(LOBBY, player(0));
+    infoOf(h)('new table ready');
+    // 'old one' finishes its TOAST_MS; 'old two' is gone; the new table's toast is next.
+    h.clock.advance(TOAST_MS);
+    expect(h.controller.state.toast).toBe('new table ready');
+    h.clock.advance(TOAST_MS);
+    expect(h.controller.state.toast).toBeNull();
+    expect(h.clock.pending()).toBe(0);
+  });
+
   test('the countdown ticks every TICK_MS while a reveal is showing', () => {
     const h = harness();
     hostALobby(h);

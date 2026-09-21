@@ -5,7 +5,8 @@
 // Sessions, effects, the clock and the document come from main.ts. One departure from the legacy
 // (docs/MIGRATION.md step 15): toasts queue, each shown for TOAST_MS in arrival order, where the
 // legacy's single timer let a second toast within TOAST_MS replace the first and restart its
-// countdown.
+// countdown; a repeat of the toast showing or last queued is dropped, and leaving a table drops
+// the queue behind the toast showing.
 import type { Clock, Timer } from '../../../../shared/lib/clock.ts';
 import { difficultyById } from '../bots/registry.ts';
 import { CATEGORY_INFO, groupByKey, handAt } from '../domain/hands.ts';
@@ -191,9 +192,15 @@ export class Controller {
     });
   }
 
-  /** Show `message` for TOAST_MS, or, while another toast is showing, after the ones before it. */
+  /**
+   * Show `message` for TOAST_MS, or, while another toast is showing, after the ones before it. A
+   * message equal to the one showing or to the last one queued is dropped: a burst of the same
+   * refusal (`roll.go` with nothing chosen, the host's error for each act out of turn) reads once,
+   * not once per tap.
+   */
   private toast(message: string): void {
     if (this.toastTimer !== null) {
+      if (message === this.ui.toast || this.toastQueue.at(-1) === message) return;
       this.toastQueue = [...this.toastQueue, message];
       return;
     }
@@ -272,11 +279,16 @@ export class Controller {
     };
   }
 
+  /**
+   * Close the session and forget the table. The toast showing finishes its TOAST_MS (as the
+   * legacy's did); the ones queued behind it belonged to the closed table and are dropped.
+   */
   private teardown(): void {
     this.session?.close();
     this.session = null;
     this.host = null;
     this.clearHandoffTimer();
+    this.toastQueue = [];
     this.set({
       game: null,
       mySeat: null,
