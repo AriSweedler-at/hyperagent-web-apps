@@ -688,12 +688,23 @@ parity and e2e gates.
   before the strict state/view/legalActions comparison, and each shard asserts legacy leaks > 0 and
   current leaks == 0 over its 250 games. The DOM oracle `tools/parity/gin-dom-parity.ts` read 84
   checkpoints, 0 mismatches against the frozen legacy page with no mask: its seeded game has no void
-  hand, so the only redeal it drives is the rematch (a fresh game, `lastDrawn` absent on both
-  pages), and no checkpoint carries `fresh` after a deal. (2) fidice toasts queue: `toast()` shows a
-  message at once when nothing is showing and otherwise appends it, and the timer callback shows the
-  next one for its own TOAST_MS, clearing the toast only when the queue is empty (the view is
-  unchanged); `app/controller.test.ts` flips "a second toast restarts the one timer" into the queue
-  behaviour and adds a burst of three, a toast queued in the instant one expires and an immediate
-  toast when nothing is showing, so `ladder.showBid` is the one legacy defect that file still pins.
+  hand, so the only redeal it drives is the rematch, which redeals over a state whose `lastDrawn`
+  key exists (`readyAfterGame` spreads the finished game into `dealHand`: the legacy keeps the
+  stale draw, the current engine has null); with SEED 12 no card came back fresh at that
+  checkpoint, so no mask. If a SEED change hands the last-drawn card back at the rematch or void
+  checkpoint, add the named `fresh` mask there. `gin.legacy.test.ts` covers the rematch path on
+  both legs (seed 5's rematch deals the legacy's stale 4C back to seat 1, which sees it fresh; the
+  current leg has `lastDrawn` null and both `lastDrawnId` null). (2) fidice toasts queue: `toast()`
+  shows a message at once when nothing is showing and otherwise appends it, and the timer callback
+  shows the next one for its own TOAST_MS, clearing the toast only when the queue is empty (the view
+  is unchanged); `app/controller.test.ts` flips "a second toast restarts the one timer" into the
+  queue behaviour and adds a burst of three, a toast queued in the instant one expires and an
+  immediate toast when nothing is showing, so `ladder.showBid` is the one legacy defect that file
+  still pins. Two edges the plain queue got wrong: a message equal to the toast showing or to the
+  queue's tail is dropped (N taps of `roll.go` with nothing chosen, or the host's error for each act
+  out of turn, read as one toast for one TOAST_MS, where N queued copies held it N x TOAST_MS), and
+  `teardown()` (leave, form.back, onClosed, a new host or join) drops the queue behind the toast
+  showing, which finishes its TOAST_MS as the legacy's did, so a closed table's toasts neither
+  play on the menu nor delay the next table's. Both are pinned in "Controller toasts and timers".
   Oracles: `computed-styles.ts --check` 0 differences and 0 notes x4, `gin-dom-parity.ts` as above,
   `npm run check`, and every non-online e2e spec on both projects. See ARCHITECTURE "Deviations".

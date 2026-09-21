@@ -797,8 +797,11 @@ Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage r
   `gin.replay.ts` normalises the legacy state after each redeal and asserts legacy leaks > 0,
   current leaks == 0 per shard. The DOM oracle `tools/parity/gin-dom-parity.ts` read 84 checkpoints,
   0 mismatches against the frozen legacy page with no mask: its seeded game has no void hand, so the
-  only redeal it drives is the rematch (a fresh game, `lastDrawn` absent on both pages), and no
-  checkpoint carries `fresh` after a deal. Fidice's controller queues toasts FIFO, each for
-  TOAST_MS, instead of restarting one timer; `controller.test.ts` now pins only `ladder.showBid` as
-  a legacy defect. The dead `.ha-img-placeholder` block is gone from both themes and from
-  `CONTRACT.md`; the computed-style goldens did not move.
+  only redeal it drives is the rematch, which redeals over a state whose `lastDrawn` key exists
+  (the legacy keeps the stale draw, the current engine has null); with SEED 12 no card came back
+  fresh there, so no mask, and a SEED that hands the last-drawn card back at the rematch or void
+  checkpoint needs a named `fresh` mask. Fidice's controller queues toasts FIFO, each for
+  TOAST_MS, instead of restarting one timer, drops a repeat of the toast showing or last queued,
+  and drops the queue (not the toast showing) when a table is torn down; `controller.test.ts` pins
+  each and now names only `ladder.showBid` as a legacy defect. The dead `.ha-img-placeholder` block
+  is gone from both themes and from `CONTRACT.md`; the computed-style goldens did not move.
