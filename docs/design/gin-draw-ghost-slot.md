@@ -451,3 +451,31 @@ instead of clipping it behind `overflow: hidden`. `e2e/gin-geometry.spec.ts` com
 and header too, plays 375x667 with 20-character names, and adds 375x553 and 844x390 (the document
 scrolls, `#app`/`#tableScreen` clip nothing, the actions row is reachable). No golden flipped: none
 of the properties involved is in the computed-style list. Next: PR C (stories).
+
+PR C landed on 2026-09-21 (branch `gin-ghost-slot-c`): §7 and §8 in full. The catalogue
+(`web/games/gin-rummy/src/stories/catalogue.ts`, outside `src/ui/**`, in coverage with its own 90%
+group) builds the sixteen stories under the §7 ids from one `mulberry32(12)` deal (dealer 1): Ann's
+upcard decision, then Ann passes, Bob takes the upcard and discards for the least deadwood, so Ann
+faces the open draw the shown/undo stories share; both passing gives the forced draw. What the doc
+got wrong or left open, measured: `StoryFacts.ghost` needed a fifth value, `none`, because the
+accepted stories emit no ghost cell at all (§4 point 3), while `hidden` is the bare cell; no seed of
+the first 300 offers a knock right after the first stock draw, so the knock search plays a
+least-deadwood policy from each seed's opening and `Array.from(...).find` settles on seed 12 itself
+(a knock for Ann at turn 17, stock 14), and `round-over-table` is that knock applied; the gin story
+is a `State` rebuilt around a gin hand and viewed through `viewFor`, not a hand-built `View`, so the
+`GIN!` label comes from the engine's own `isGin`; `undo-back-to-draw` is byte-identical to
+`draw-mine-open` in `#hand` and `#actions` but not in `#lastAction` ("undid their draw"), which the
+spec does not compare. Boot: `main.ts` reads `story` first and `void import`s
+`src/stories/boot.ts`, which lands as `dist/shared/assets/boot-<hash>.js` (8.2 kB) while
+`dist/games/gin-rummy/` keeps its three files (dist-parity green); `boot.ts` and
+`catalogue.test.ts` join tsconfig.node.json's excludes beside the other DOM-bound gin modules, the
+catalogue itself stays in for the spec. The spec (`e2e/gin-stories.spec.ts`, `pages` only, the
+plain `page` fixture with `watchPage`) asserts zero exceptions and zero failed requests too;
+48 tests, 15.6 s on the owner's laptop (phone ~0.35 s, desktop ~0.45 s, phone-short ~0.08 s per
+story). Baselines: 30 `-darwin.png` files, 6,762,253 bytes (the doc's 3-5 MB was for both platforms;
+one is 6.8), stable across two further runs at the 0.002 ratio with no story fixed for flicker.
+`.github/workflows/stories-baselines.yml` (`workflow_dispatch`) records the linux set; ci.yml's
+header names both, and its e2e job fails on this branch until the `-linux.png` files are committed.
+Goldens: none flipped (computed styles 0 differences at both viewports and both games, gin-dom-parity
+84/0). Docs: ARCHITECTURE "Documented test hooks" (`?story=`) and "Testing pyramid" 5, README Tests 7.
+CONTRACT.md untouched: the stories page names no class (inline styles only). PR D stays optional.
