@@ -605,3 +605,21 @@ parity and e2e gates.
   step 15 or later, with the owner). Computed-style goldens and visual snapshots are not captured
   (see step 3); the manual mixed-origin phone game is the PR body's gate. See ARCHITECTURE
   "Deviations".
+- Step 14, phase 1 (the gates, no CSS moved): the computed-style goldens (`tools/parity/computed-styles.ts`,
+  `test/fixtures/styles/<game>.<WxH>.json`; 29 gin screens, 20 fidice screens at 390x844 and
+  1280x800) are a CI gate as `e2e/computed-styles.spec.ts` on the `pages` project (one test per
+  game and viewport, 15-40 s each; the styles are the same bytes on both origins), not the
+  `test/dist/computed-styles.test.ts` the tool's header first named: the capture drives a browser.
+  The class contract is `test/dist/class-contract.test.ts` over `test/dist/classes.ts`: a few
+  documented regular expressions collect the classes TS names (`toggleClass`-family literals, vdom
+  `class:` and `cls(...)` literals, `class="..."` words in template strings), the served page's
+  class attributes and every `.name` in the linked built stylesheets, and both directions are
+  asserted per game. `web/shared/styles/CONTRACT.md` lists only what the extraction cannot see
+  (helper-built names such as `cardClass`, `abs-${sym}`), hooks with no rule, one `cls()` false
+  positive (the phase literal `'lobby'`) and the dead rules step 15 removes (`.ha-img-placeholder`,
+  `.ha-failed`, fidice's `.hidden`, `.kbd`, `.or`, ... and gin's `.divider`), rather than every
+  class (~120 gin, ~165 fidice): each row is checked against the tree so it cannot go stale.
+  `DIST_DIR` points the dist guards at a scratch copy (the proof that the contract bites: deleting
+  `.status-banner.mine` fails with `mine (web/games/gin-rummy/src/ui/render.ts)`). The markup
+  source is the served `dist/games/<g>/index.html` rather than `web/games/<g>/index.html`: same
+  class attributes, and the guard reads the tree it ships. See ARCHITECTURE "Deviations".

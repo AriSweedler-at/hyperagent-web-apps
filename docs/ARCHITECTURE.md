@@ -720,3 +720,7 @@ Step 13 (cut Gin Rummy over; retire the passthrough):
   byte-identical to `web/index.html`, and `legacy/` present.
 - The 10-minute cache window in "Build and serve" now applies to both game pages and the shared
   chunk; closing it (retained assets in the deploy job) is still deferred.
+- Step 14, phase 1: the computed-style goldens run as `e2e/computed-styles.spec.ts` on `pages`
+  (a browser capture, so an e2e spec, not a dist test), and `test/dist/class-contract.test.ts`
+  checks the class contract by extraction (`test/dist/classes.ts`), so `CONTRACT.md` lists the
+  exceptions the extraction cannot see, not every class. `DIST_DIR` redirects the dist guards.

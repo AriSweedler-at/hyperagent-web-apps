@@ -13,9 +13,10 @@ export const REPO_ROOT = resolve(import.meta.dirname, '..', '..');
 
 export type DistRoot = Readonly<{ name: 'dist'; dir: string; build: string }>;
 
+/** `DIST_DIR` points the guards at a scratch copy of the tree, to show that one of them bites. */
 export const DIST_ROOT: DistRoot = {
   name: 'dist',
-  dir: resolve(REPO_ROOT, 'dist'),
+  dir: process.env['DIST_DIR'] ?? resolve(REPO_ROOT, 'dist'),
   build: 'npm run build',
 };
 
