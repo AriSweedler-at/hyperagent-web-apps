@@ -83,8 +83,20 @@ export const ginPassUpcard = async (page: Page): Promise<void> => {
   await pass.click();
 };
 
+/**
+ * Accept the drawn card from the ghost slot (docs/design/gin-draw-ghost-slot.md: the owner's
+ * second tap puts it into the hand): the ghost cell goes and the hand holds eleven cards.
+ */
+export const ginAcceptDraw = async (page: Page): Promise<void> => {
+  const ghost = page.locator('#hand .slot.ghost .card');
+  await expect(ghost).toHaveCount(1);
+  await ghost.click();
+  await expect(page.locator('#hand .slot.ghost')).toHaveCount(0);
+  await expect(page.locator('#hand .card')).toHaveCount(11);
+};
+
 /** Select the first card that may be discarded and discard it; returns the card id. */
-const discardFirstFree = async (page: Page): Promise<string> => {
+export const ginDiscardFirstFree = async (page: Page): Promise<string> => {
   await expect(page.locator('#hand')).toHaveClass(/active/);
   await expect(page.locator('#hand .card')).toHaveCount(11);
   const id = await page.locator('#hand .card:not(.locked)').first().getAttribute('data-card');
@@ -99,18 +111,30 @@ const discardFirstFree = async (page: Page): Promise<string> => {
   return id;
 };
 
-/** One legal turn from the draw phase: draw from the stock, then discard. Returns the discarded id. */
+/** Take the upcard: it lands in the ghost slot, locked, until it is accepted. */
+export const ginTakeUpcard = async (page: Page): Promise<void> => {
+  const take = page.locator('#actions [data-act="takeUpcard"]');
+  await expect(take).toBeVisible();
+  await take.click();
+  await expect(page.locator('#hand .slot.ghost.shown .card.locked')).toHaveCount(1);
+};
+
+/**
+ * One legal turn from the draw phase: draw from the stock, accept the card from the ghost slot
+ * (the owner's two-tap flow), then discard. Returns the discarded id.
+ */
 export const ginDrawAndDiscard = async (page: Page): Promise<string> => {
   const stock = page.locator('#stockPile');
   await expect(stock).toHaveClass(/tappable/);
   await stock.click();
-  return discardFirstFree(page);
+  await expect(page.locator('#hand .slot.ghost.shown .card.fresh')).toHaveCount(1);
+  await ginAcceptDraw(page);
+  return ginDiscardFirstFree(page);
 };
 
-/** One legal first turn: take the upcard (it stays locked), then discard another card. */
+/** One legal first turn: take the upcard (it stays locked), accept it, then discard another card. */
 export const ginTakeUpcardAndDiscard = async (page: Page): Promise<string> => {
-  const take = page.locator('#actions [data-act="takeUpcard"]');
-  await expect(take).toBeVisible();
-  await take.click();
-  return discardFirstFree(page);
+  await ginTakeUpcard(page);
+  await ginAcceptDraw(page);
+  return ginDiscardFirstFree(page);
 };

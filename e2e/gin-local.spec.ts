@@ -1,6 +1,6 @@
 // Pass-and-play on one page: start, the curtain hands the phone to the first player, one full turn
 // (take the upcard, discard), and the curtain comes back for the other player naming the move.
-import { ginTakeUpcardAndDiscard } from './fixtures/gin.ts';
+import { ginAcceptDraw, ginDiscardFirstFree, ginTakeUpcard } from './fixtures/gin.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -41,9 +41,20 @@ test('pass and play: start, curtain handoff, one full turn', async ({ player, pr
   await expect(page.locator('#statusBanner')).toHaveClass(/mine/);
   await expect(page.locator('#statusSub')).toHaveText('Take the upcard or pass');
 
-  // One full turn: take the upcard (it stays locked), then discard another card.
+  // One full turn: take the upcard (it stays locked), accept it, then discard another card.
   const upcard = await page.locator('#discardPile .card').getAttribute('data-card');
-  const discarded = await ginTakeUpcardAndDiscard(page);
+  const HELD_ORDER = `Array.from(document.querySelectorAll('#hand .slot:not(.ghost) .card')).map((c) => c.getAttribute('data-card'))`;
+  const order = await page.evaluate<ReadonlyArray<string | null>>(HELD_ORDER);
+  expect(order).toHaveLength(10);
+  await ginTakeUpcard(page);
+  // The ghost slot holds the locked upcard; the ten others kept their data-card order.
+  await expect(page.locator('#hand .slot.ghost.shown .card.locked')).toHaveAttribute(
+    'data-card',
+    upcard ?? '',
+  );
+  expect(await page.evaluate<ReadonlyArray<string | null>>(HELD_ORDER)).toEqual(order);
+  await ginAcceptDraw(page);
+  const discarded = await ginDiscardFirstFree(page);
   expect(discarded).not.toBe(upcard);
 
   // The turn passed: the curtain asks for the other player and names the move, and the table
