@@ -55,6 +55,21 @@ export const statusFor = (view: View, selection: Selection): Status => {
   }
 };
 
+/** What the ghost draw slot (ui/hand/draw.ts) needs of a stage to word the status. */
+export type StatusStage = Readonly<{ kind: 'waiting' | 'shown' }> | null;
+
+/**
+ * `statusFor` with the ghost draw slot's two moments in front of it (docs/design/
+ * gin-draw-ghost-slot.md §3): the draw awaited, then the drawn card shown until it is accepted.
+ * `statusFor` itself is untouched, so its legacy golden stands.
+ */
+export const statusWith = (view: View, selection: Selection, stage: StatusStage): Status => {
+  if (stage === null) return statusFor(view, selection);
+  return stage.kind === 'waiting'
+    ? { main: 'Your turn', sub: 'Drawing…' }
+    : { main: 'Your turn', sub: 'Tap the new card to keep it, or pick a discard' };
+};
+
 /**
  * The deadwood readout above the hand: while choosing a discard it shows what the selected card
  * would leave, or the best any discard could leave; otherwise the hand's deadwood.

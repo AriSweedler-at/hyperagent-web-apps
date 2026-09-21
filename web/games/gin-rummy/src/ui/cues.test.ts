@@ -10,6 +10,7 @@ import {
   nextCue,
   selectionIn,
   statusFor,
+  statusWith,
 } from './cues.ts';
 
 const now = (): number => 1_700_000_000_000;
@@ -72,6 +73,27 @@ describe('statusFor', () => {
     expect(statusFor(voided, null).main).toBe('Hand void');
     const over: View = { ...viewFor(drawn, 0), phase: 'gameOver' };
     expect(statusFor(over, null)).toEqual({ main: '', sub: '' });
+  });
+});
+
+describe('statusWith', () => {
+  test('the two ghost-slot moments in front of statusFor; without a stage it is statusFor', () => {
+    const v = viewFor(drawn, 0);
+    expect(statusWith(v, null, { kind: 'waiting' })).toEqual({
+      main: 'Your turn',
+      sub: 'Drawing…',
+    });
+    expect(statusWith(v, null, { kind: 'shown' })).toEqual({
+      main: 'Your turn',
+      sub: 'Tap the new card to keep it, or pick a discard',
+    });
+    // A selection never shows while the ghost card is: the stage wins.
+    expect(statusWith(v, 'AS', { kind: 'shown' }).sub).toBe(
+      'Tap the new card to keep it, or pick a discard',
+    );
+    expect(statusWith(v, null, null)).toEqual(statusFor(v, null));
+    expect(statusWith(v, 'AS', null)).toEqual(statusFor(v, 'AS'));
+    expect(statusWith(viewFor(dealt, 1), null, null)).toEqual(statusFor(viewFor(dealt, 1), null));
   });
 });
 

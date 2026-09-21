@@ -60,6 +60,7 @@ import {
   type Store,
 } from '../storage.ts';
 import { INITIAL_CUES, nextCue, selectionIn, type Cue, type CueState } from './cues.ts';
+import { drawSource, holdOf, settleDraw, type DrawStage } from './hand/draw.ts';
 
 // ---- the state ---------------------------------------------------------------------------------
 
@@ -149,6 +150,11 @@ export type App = Readonly<{
   longPressed: boolean;
   /** `#codeInput` as last sanitised (the legacy `lastGoodCode`). */
   codeDraft: string;
+  /**
+   * The ghost draw slot (docs/design/gin-draw-ghost-slot.md §3): the held ten-card picture and
+   * whether the drawn card is awaited or shown. Not saved, not on the wire.
+   */
+  draw: DrawStage | null;
 }>;
 
 export const DEFAULT_NAME = 'Ari';
@@ -185,6 +191,7 @@ export const initialApp: App = {
   submenuOpen: false,
   longPressed: false,
   codeDraft: '',
+  draw: null,
 };
 
 /** The Play tab opens its submenu after this long a press. */
@@ -367,6 +374,9 @@ const toast = (message: string, ms: number | null = null): Effect => ({
   message,
   ms,
 });
+/** A refused move: the toast, and a draw that was awaited never leaves the ghost slot pending. */
+const refuse = (app: App, message: string): Step =>
+  step(app.draw === null ? app : { ...app, draw: null }, toast(message));
 
 // ---- helpers, as the legacy had them ------------------------------------------------------------
 
@@ -387,8 +397,9 @@ const showScreen = (app: App, screen: ScreenId): Step =>
 
 /**
  * The state side of the legacy `render()`: nothing without a view; else the cue machine steps
- * (its cue is played), the screen is the table or, at gameOver, the end screen, and a selection
- * that left the hand is dropped. The paint itself is main.ts's after every intent.
+ * (its cue is played), the screen is the table or, at gameOver, the end screen, a selection
+ * that left the hand is dropped, and the draw stage settles against the view. The paint itself
+ * is main.ts's after every intent.
  */
 const rendered = (app: App): Step => {
   const view = app.view;
@@ -397,7 +408,7 @@ const rendered = (app: App): Step => {
   const selectedCard = selectionIn(view, app.selectedCard);
   const screen: ScreenId = view.phase === 'gameOver' ? 'endgameScreen' : 'tableScreen';
   return step(
-    { ...app, cues: cued.state, selectedCard, screen },
+    { ...app, cues: cued.state, selectedCard, screen, draw: settleDraw(app.draw, view) },
     ...(cued.cue === null ? [] : [{ type: 'fx', cue: cued.cue } as const]),
     { type: 'scrollTop' },
   );
@@ -439,10 +450,9 @@ const hostDispatch = (app: App, seat: Seat, action: Action, ctx: Context): Step 
   if (app.game === null) return pure(app);
   const res = applyAction(app.game, seat, action, ctx.rng, ctx.now);
   if (!res.ok) {
-    return step(
-      app,
-      seat === 0 ? toast(res.error) : { type: 'send', frame: toastFrame(res.error) },
-    );
+    return seat === 0
+      ? refuse(app, res.error)
+      : step(app, { type: 'send', frame: toastFrame(res.error) });
   }
   return broadcast({ ...app, game: res.value, resultDismissed: false });
 };
@@ -476,11 +486,11 @@ const localAct = (app: App, action: Action, ctx: Context): Step => {
     const r1 = applyAction(game, 0, action, ctx.rng, ctx.now);
     const g1 = r1.ok ? r1.value : game;
     const r2 = applyAction(g1, 1, action, ctx.rng, ctx.now);
-    if (!r1.ok && !r2.ok) return step(app, toast(r1.error));
+    if (!r1.ok && !r2.ok) return refuse(app, r1.error);
     return localBroadcast({ ...app, game: r2.ok ? r2.value : g1, resultDismissed: false }, false);
   }
   const res = applyAction(game, game.turn, action, ctx.rng, ctx.now);
-  if (!res.ok) return step(app, toast(res.error));
+  if (!res.ok) return refuse(app, res.error);
   return localBroadcast({ ...app, game: res.value, resultDismissed: false }, false);
 };
 
@@ -496,6 +506,7 @@ const startLocal = (app: App, game: State): Step =>
         game,
         revealed: null,
         resultDismissed: false,
+        draw: null,
       },
       { type: 'wakeLock', hold: true },
     ),
@@ -530,9 +541,18 @@ const startGuest = (app: App, code: string): Step => {
   );
 };
 
-/** `act(action)`: a tap, then by role. */
-const act = (app: App, action: Action, ctx: Context): Step =>
-  then(step(app, { type: 'fx', cue: 'tap' }), (a) => {
+/**
+ * `act(action)`: a tap, then by role. A draw (the stock, the discard pile, the upcard) first holds
+ * the ten-card picture on screen, so the slot view keeps it until the player accepts the card
+ * (docs/design/gin-draw-ghost-slot.md §3); the stage settles in `rendered` or clears in `refuse`.
+ */
+const act = (app: App, action: Action, ctx: Context): Step => {
+  const from = drawSource(action);
+  const held: App =
+    from !== null && app.view !== null
+      ? { ...app, draw: { kind: 'waiting', from, hold: holdOf(app.view.me) } }
+      : app;
+  return then(step(held, { type: 'fx', cue: 'tap' }), (a) => {
     switch (a.role) {
       case 'local':
         return localAct(a, action, ctx);
@@ -544,9 +564,10 @@ const act = (app: App, action: Action, ctx: Context): Step =>
         // the host counts as connected (set on open, cleared on close), and no role has no channel.
         return a.role === 'guest' && a.oppConnected
           ? step(a, { type: 'send', frame: actionFrame(action) })
-          : step(a, toast(NOT_CONNECTED_MSG));
+          : refuse(a, NOT_CONNECTED_MSG);
     }
   });
+};
 
 /** `onGuestGone()` after `oppConnected` was cleared. */
 const guestGone = (app: App): Step => {
@@ -593,7 +614,8 @@ const guestFrame = (app: App, frame: HostFrame): Step => {
     case 'full':
       return pure(withGuestStatus(app, ROOM_FULL_MSG));
     case 'toast':
-      return step(app, toast(frame.msg));
+      // The host refused the guest's move: a draw that was awaited is over.
+      return refuse(app, frame.msg);
     case 'state':
       return rendered({
         ...app,
@@ -712,6 +734,7 @@ const leaveFinish = (app: App): Step =>
       revealed: null,
       curtain: null,
       meldChooser: false,
+      draw: null,
     },
     { type: 'clearSave' },
     { type: 'initHome' },
@@ -730,6 +753,7 @@ const actionClick = (app: App, which: string, ctx: Context): Step => {
   switch (which) {
     case 'passUpcard':
     case 'takeUpcard':
+    case 'undoDraw':
       return act(app, { type: which }, ctx);
     case 'discard':
     case 'knock':
@@ -882,7 +906,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
         ctx.rng,
         ctx.now,
       );
-      return broadcast({ ...app, game, resultDismissed: false });
+      return broadcast({ ...app, game, resultDismissed: false, draw: null });
     }
     // ---- net: guest ----
     case 'guest/start':
@@ -894,7 +918,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'guest/frame':
       return guestFrame(app, intent.frame);
     case 'guest/lost': {
-      const lost = { ...app, oppConnected: false };
+      const lost = { ...app, oppConnected: false, draw: null };
       if (lost.view !== null && lost.view.phase !== 'gameOver')
         return then(rendered(lost), (a) => step(a, toast(LOST_HOST_MSG, GONE_TOAST_MS)));
       return showScreen(withGuestStatus(lost, DISCONNECTED_MSG), 'guestWaitScreen');
@@ -905,6 +929,15 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'card/tap': {
       const v = app.view;
       if (v === null || !v.isMyTurn || v.phase !== 'discard') return pure(app);
+      if (app.draw?.kind === 'shown') {
+        // A tap on the ghost card accepts it; a tap on a held card accepts and selects that card
+        // in one go (a tap on a held card is an action by the owner's rule: cards may move now).
+        const accepted: App =
+          app.draw.cardId === intent.cardId
+            ? { ...app, draw: null }
+            : { ...app, draw: null, selectedCard: intent.cardId };
+        return then(step(accepted, { type: 'fx', cue: 'tap' }), rendered);
+      }
       if (v.drawnFromDiscard === intent.cardId) return step(app, toast(LOCKED_CARD_MSG));
       const selectedCard = app.selectedCard === intent.cardId ? null : intent.cardId;
       return then(step({ ...app, selectedCard }, { type: 'fx', cue: 'tap' }), rendered);
