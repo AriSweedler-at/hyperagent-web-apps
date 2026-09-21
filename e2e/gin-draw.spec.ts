@@ -7,8 +7,8 @@
 // on the phone, one row of eleven on the laptop) and neither scrolls.
 import type { Page } from '@playwright/test';
 
-import { ginAcceptDraw, ginPassUpcard } from './fixtures/gin.ts';
-import { pagePath, type Project } from './fixtures/site.ts';
+import { ginAcceptDraw, ginPassUpcard, ginReveal, ginStartLocal } from './fixtures/gin.ts';
+import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 type Box = Readonly<{ x: number; y: number; w: number; h: number }>;
@@ -56,27 +56,6 @@ const expectInside = (inner: Box | null, outer: Box | null): void => {
   expect(inner.y + inner.h).toBeLessThanOrEqual(outer.y + outer.h + 0.5);
 };
 
-type Viewport = Readonly<{ width: number; height: number }>;
-
-/** Start pass-and-play at `viewport` and hand the phone to the first player: the upcard decision. */
-const startAndReveal = async (page: Page, project: Project, viewport: Viewport): Promise<void> => {
-  // The player fixture opens its own context, so the describe's viewport is applied to its page here.
-  await page.setViewportSize(viewport);
-  await page.goto(pagePath(project, 'gin-rummy'));
-  await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
-  await page.locator('#p1NameInput').fill('Ann');
-  await page.locator('#p2NameInput').fill('Bob');
-  await page.locator('#localBtn').click();
-  await reveal(page);
-  await expect(page.locator('#statusSub')).toHaveText('Take the upcard or pass');
-};
-
-const reveal = async (page: Page): Promise<void> => {
-  await expect(page.locator('#curtainOverlay')).toBeVisible();
-  await page.locator('#curtainBtn').click();
-  await expect(page.locator('#curtainOverlay')).toBeHidden();
-};
-
 /** The geometry both layouts share: eleven cells, none scrolling, the rows the viewport implies. */
 const expectLayout = async (page: Page, rows: number): Promise<void> => {
   await expect(page.locator('#hand .slot')).toHaveCount(11);
@@ -98,12 +77,12 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       project,
     }) => {
       const { page } = player;
-      await startAndReveal(page, project, vp);
+      await ginStartLocal(page, pagePath(project, 'gin-rummy'), vp);
       // Both pass the upcard, so the first player draws (from the stock only).
       await ginPassUpcard(page);
-      await reveal(page);
+      await ginReveal(page);
       await ginPassUpcard(page);
-      await reveal(page);
+      await ginReveal(page);
       await expect(page.locator('#statusSub')).toHaveText('Both passed — tap the stock to draw');
       await expect(page.locator('#stockPile')).toHaveClass(/tappable/);
       await expect(page.locator('#hand .slot.ghost.open')).toHaveCount(1);
@@ -149,7 +128,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       project,
     }) => {
       const { page } = player;
-      await startAndReveal(page, project, vp);
+      await ginStartLocal(page, pagePath(project, 'gin-rummy'), vp);
       await expect(page.locator('#hand .slot.ghost.open')).toHaveCount(1);
       await expect(page.locator('#discardPile')).toHaveClass(/tappable/);
       const upcard = await page.locator('#discardPile .card').getAttribute('data-card');
