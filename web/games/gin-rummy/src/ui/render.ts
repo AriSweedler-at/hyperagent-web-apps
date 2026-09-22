@@ -59,7 +59,7 @@ import { SORT_MODES, type SortMode } from '../sort.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { RULES_ITEMS } from './rules.ts';
-import { SCREENS, type App, type Intent } from './state.ts';
+import { handoffLabel, SCREENS, type App, type Intent } from './state.ts';
 
 export type { PageLike };
 export type Dispatch = (intent: Intent) => void;
@@ -148,6 +148,19 @@ export const paintSound = (doc: DocumentLike, enabled: boolean): void => {
   const btn = requireId(doc, 'soundBtn');
   setText(btn, enabled ? '🔊' : '🔇');
   setAttr(btn, 'title', enabled ? 'Sound & vibration on' : 'Sound & vibration off');
+};
+
+/**
+ * `#handoffBtn` (the 🌐 beside the leave button): a pass-and-play game can go on as a hosted room,
+ * the other seat joining from its own device (ui/state.ts `handoff`); the tooltip names who hosts
+ * and who joins. A room is online already and the scorer has no table, so it shows for
+ * pass-and-play alone.
+ */
+export const paintHandoff = (doc: DocumentLike, app: App): void => {
+  const btn = requireId(doc, 'handoffBtn');
+  const game = app.role === 'local' ? app.game : null;
+  toggleClass(btn, 'hidden', game === null);
+  if (game !== null) setAttr(btn, 'title', handoffLabel(game));
 };
 
 // ---- the table -----------------------------------------------------------------------------------
@@ -669,6 +682,7 @@ export const paint = (doc: PageLike, app: App, handView: HandView): void => {
   paintWaiting(doc, app);
   paintHome(doc, app);
   paintCurtain(doc, app);
+  paintHandoff(doc, app);
   paintGame(doc, app, handView);
   paintOverlays(doc, app);
 };
@@ -747,6 +761,9 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
     listenId(doc, id, 'click', () => {
       dispatch({ type: 'leave/request' });
     });
+  });
+  listenId(doc, 'handoffBtn', 'click', () => {
+    dispatch({ type: 'handoff/click' });
   });
   listenId(doc, 'rulesBtnGame', 'click', () => {
     dispatch({ type: 'rules/open' });

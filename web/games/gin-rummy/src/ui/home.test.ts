@@ -85,7 +85,6 @@ describe('paintHome', () => {
     expect(p.submenuButtons.map((b) => b.hasClass('active'))).toEqual([true, false, false]);
     expect(p.get('playSubmenu').hasClass('force-open')).toBe(false);
     expect(p.get('resumeBox').hidden()).toBe(true);
-    expect(p.get('handoffBtn').hidden()).toBe(true);
 
     paintHome(p.doc, {
       ...initialApp,
@@ -100,9 +99,8 @@ describe('paintHome', () => {
     expect(p.get('playSubmenu').hasClass('force-open')).toBe(true);
     expect(p.get('resumeBox').hidden()).toBe(false);
     expect(p.get('resumeBtn').text()).toBe('Rejoin room KQZM');
-    expect(p.get('handoffBtn').hidden()).toBe(true);
 
-    // Only a pass-and-play game is offered online.
+    // A pass-and-play game in progress: the resume offer alone (the 🌐 lives on the table).
     const game = createGame(
       {
         players: [
@@ -116,8 +114,6 @@ describe('paintHome', () => {
     );
     paintHome(p.doc, { ...initialApp, resume: { kind: 'local', game } });
     expect(p.get('resumeBtn').text()).toBe('Resume pass & play: Ann vs Bob');
-    expect(p.get('handoffBtn').hidden()).toBe(false);
-    expect(p.get('handoffBtn').text()).toBe('Continue online: Ann hosts, Bob joins by invite');
   });
 
   test('renderPlayMode ran only on the Play tab: another tab leaves the mode marks as they were', () => {
@@ -205,7 +201,6 @@ describe('bindHome', () => {
     p.modeButtons[1]?.fire('click');
     p.modeButtons[2]?.fire('click');
     p.get('resumeBtn').fire('click');
-    p.get('handoffBtn').fire('click');
     p.get('shareCodeBtn').fire('click');
     p.get('cancelHostBtn').fire('click');
     p.get('cancelGuestBtn').fire('click');
@@ -225,7 +220,6 @@ describe('bindHome', () => {
       { type: 'mode/set', mode: 'local' },
       { type: 'mode/set', mode: 'sandbox' },
       { type: 'resume/click' },
-      { type: 'handoff/click' },
       { type: 'share/click' },
       { type: 'cancel' },
       { type: 'cancel' },

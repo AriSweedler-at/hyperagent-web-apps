@@ -1,8 +1,8 @@
 // The remote handoff: a pass-and-play game in progress goes on as a hosted room, seat 0 keeping
 // this device and seat 1 joining from its own through the invite, a link that carries the room
-// code (`?join=`, docs/ARCHITECTURE.md "Documented test hooks") and nothing else. The offer sits
-// on the home screen's resume box and on the pass-and-play curtain (the
-// moment the phone would change hands). `#shareCodeBtn` hands the invite to the share sheet where
+// code (`?join=`, docs/ARCHITECTURE.md "Documented test hooks") and nothing else. The offer is
+// the 🌐 button beside the table's leave button, shown for pass-and-play alone, its tooltip naming
+// who hosts and who joins. `#shareCodeBtn` hands the invite to the share sheet where
 // there is one (a phone's OS menu) and to the clipboard otherwise (desktop); an invite link fills
 // the join form and leaves the address bar; the offer survives a reload of the waiting room; and
 // cancelling the room before anyone joined gives the game back to pass-and-play. The two-device
@@ -70,9 +70,18 @@ const roomOpen = async (page: Page): Promise<string> => {
   return ginRoomCode(page);
 };
 
+/** The table's 🌐: shown for pass-and-play, its tooltip the offer; a click opens the room. */
+const takeOffer = async (page: Page): Promise<string> => {
+  const handoffBtn = page.locator('#handoffBtn');
+  await expect(handoffBtn).toBeVisible();
+  await expect(handoffBtn).toHaveAttribute('title', OFFER);
+  await handoffBtn.click();
+  return roomOpen(page);
+};
+
 /**
- * Start Ann and Bob's pass-and-play game, reload, and take the home screen's offer. Returns the
- * confirmed code and the table as the first mover saw it.
+ * Start Ann and Bob's pass-and-play game and take the table's offer. Returns the confirmed code
+ * and the table as the first mover saw it.
  */
 const handOff = async (
   page: Page,
@@ -80,12 +89,7 @@ const handOff = async (
 ): Promise<Readonly<{ code: string; before: TableView }>> => {
   await ginStartLocal(page, url, PHONE);
   const before = await readTable(page);
-  await page.reload();
-  await expect(page.locator('#resumeBtn')).toHaveText('Resume pass & play: Ann vs Bob');
-  const handoffBtn = page.locator('#handoffBtn');
-  await expect(handoffBtn).toHaveText(OFFER);
-  await handoffBtn.click();
-  return { code: await roomOpen(page), before };
+  return { code: await takeOffer(page), before };
 };
 
 /** Cancel the room and resume pass-and-play: the hand as it stood. */
@@ -93,9 +97,9 @@ const cancelAndResume = async (page: Page): Promise<TableView> => {
   await page.locator('#cancelHostBtn').click();
   await expect(page.locator('#homeScreen')).toBeVisible();
   await expect(page.locator('#resumeBtn')).toHaveText('Resume pass & play: Ann vs Bob');
-  await expect(page.locator('#handoffBtn')).toBeVisible();
   await page.locator('#resumeBtn').click();
   await ginReveal(page);
+  await expect(page.locator('#handoffBtn')).toBeVisible();
   return readTable(page);
 };
 
@@ -115,7 +119,6 @@ test('a pass-and-play game is offered online; the share sheet gets the link alon
   // invite carries, not as a room to host.
   await page.reload();
   await expect(page.locator('#resumeBtn')).toHaveText(OFFER);
-  await expect(page.locator('#handoffBtn')).toBeHidden();
   await page.locator('#resumeBtn').click();
   expect(await roomOpen(page)).toBe(code);
 
@@ -132,22 +135,21 @@ test('without a share sheet (desktop) the link is copied', async ({ player, proj
   expect(await page.evaluate('window.__copied')).toBe(inviteLinkOf(page, code));
 });
 
-test('the curtain offers the game online from the table: no reload, the curtain marks cleared, cancel gives it back', async ({
+test("the offer is the table's alone: the curtain carries none; after a pass the next seat reveals and takes it, the curtain marks cleared, cancel gives it back", async ({
   player,
   project,
 }) => {
   const { page } = player;
   await ginStartLocal(page, gameUrl(project), PHONE);
-  // The first mover passes; the phone is to go to the other seat, and the curtain offers to hand
-  // the game off instead.
+  // The first mover passes; the phone goes to the other seat under the curtain, which offers
+  // nothing but the reveal.
   await ginPassUpcard(page);
   await expect(page.locator('#curtainOverlay')).toBeVisible();
   await expect(page.locator('#curtainTitle')).toHaveText(/^Pass the phone to (Ann|Bob)$/);
+  await expect(page.locator('#curtainOverlay .btn')).toHaveCount(1);
+  await ginReveal(page);
   const before = await readTable(page);
-  const offer = page.locator('#curtainHandoffBtn');
-  await expect(offer).toHaveText(OFFER);
-  await offer.click();
-  await roomOpen(page);
+  await takeOffer(page);
   await expect(page.locator('#curtainOverlay')).toBeHidden();
   expect(await cancelAndResume(page)).toEqual(before);
 });

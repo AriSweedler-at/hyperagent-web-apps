@@ -36,7 +36,6 @@ import {
 import { PRESETS } from '../sandbox.ts';
 import {
   HOME_TABS,
-  handoffLabel,
   resumeLabel,
   sandboxUnlocked,
   type App,
@@ -139,10 +138,6 @@ export const paintHome = (doc: DocumentLike, app: App): void => {
   toggleClass(requireId(doc, 'playSubmenu'), 'force-open', app.submenuOpen);
   toggleClass(requireId(doc, 'resumeBox'), 'hidden', app.resume === null);
   if (app.resume !== null) setText(requireId(doc, 'resumeBtn'), resumeLabel(app.resume));
-  // Only a pass-and-play game can go online: a room is already one, the scorer has no table.
-  const handoffBtn = requireId(doc, 'handoffBtn');
-  toggleClass(handoffBtn, 'hidden', app.resume?.kind !== 'local');
-  if (app.resume?.kind === 'local') setText(handoffBtn, handoffLabel(app.resume.game));
 };
 
 /** Every control of the home screen and the two waiting screens, as the legacy registered them. */
@@ -262,9 +257,6 @@ export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): voi
   });
   listenId(doc, 'resumeBtn', 'click', () => {
     dispatch({ type: 'resume/click' });
-  });
-  listenId(doc, 'handoffBtn', 'click', () => {
-    dispatch({ type: 'handoff/click' });
   });
   listenId(doc, 'shareCodeBtn', 'click', () => {
     dispatch({ type: 'share/click' });

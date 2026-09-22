@@ -8,7 +8,7 @@
 // ghost draw slot (docs/design/gin-draw-ghost-slot.md §9): it diverges by design (slots, the ghost
 // cell, the undo button in the actions row, one pile size, shorter labels), while everything the
 // table opens (the sheets, the overlays, the toast) still compares at every checkpoint. Only
-// whitespace, the two rules slots' ids, the `#handoffBtn` and `#curtainHandoffBtn` buttons, the
+// whitespace, the two rules slots' ids, the `#handoffBtn` button and the row that holds it, the
 // sandbox (its two mode buttons and `#sandboxModeContent`; the new page's markup additions), the
 // result body's key and the hidden curtain's stale text (the knock's layoff phase, §7b, shows a
 // curtain the legacy never did) are normalised.
@@ -56,15 +56,19 @@ export const SNAPSHOT_IDS: ReadonlyArray<string> = [
 ];
 
 /**
- * Whitespace runs, the rules slots' ids, the `#handoffBtn` and `#curtainHandoffBtn` buttons (the
- * pass-and-play game offered online, which the legacy page never had) and the Score Counter's
+ * Whitespace runs, the rules slots' ids, the `#handoffBtn` button and the row wrapping it with
+ * `#leaveBtn` (the pass-and-play game offered online, which the legacy page never had) and the Score Counter's
  * player inputs (two fixed ones sharing pass-and-play's names, where the legacy grew a list) are
  * the only differences allowed.
  */
 export const normalise = (html: string): string =>
   html
     .replace(/ id="rules(Overlay)?List"/g, '')
-    .replace(/<button[^>]*\bid="(curtainH|h)andoffBtn"[^>]*>[^<]*<\/button>/g, '')
+    .replace(/<button[^>]*\bid="handoffBtn"[^>]*>[^<]*<\/button>/g, '')
+    .replace(
+      /<div class="row" style="gap:6px;">(<button[^>]*\bid="leaveBtn"[^>]*>[^<]*<\/button>)<\/div>/g,
+      '$1',
+    )
     // The result sheet's body is built once per result and keyed so its lay-out animation runs once.
     .replace(/ data-result-key="[^"]*"/g, '')
     // A hidden curtain keeps the text of its last showing, and the new page shows one the legacy

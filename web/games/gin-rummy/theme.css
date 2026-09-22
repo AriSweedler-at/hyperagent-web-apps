@@ -77,6 +77,10 @@
   .topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .badge { background: var(--card-2); color: var(--accent); font-weight: 700; font-size: 0.8rem; padding: 7px 12px; border-radius: 999px; white-space: nowrap; }
   .badge.dim { color: var(--muted); }
+  /* The pass-and-play 🌐 (`#handoffBtn`, beside the leave button) is a fourth 44px button in a bar
+     that holds three, two badges and their gaps with 24px to spare at 390px: while it shows, a
+     phone's dim target badge yields (the target stays on the endgame screen and the home form). */
+  @media (max-width: 899px) { .topbar:has(#handoffBtn:not(.hidden)) #targetBadge { display: none; } }
   .opp-strip { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgba(0,0,0,0.22); border-radius: 14px; padding: 8px 12px; }
   .opp-info { display: flex; flex-direction: column; min-width: 0; }
   .opp-name { font-weight: 800; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

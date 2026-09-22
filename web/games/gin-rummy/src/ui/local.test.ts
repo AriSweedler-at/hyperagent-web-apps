@@ -55,9 +55,6 @@ describe('paintCurtain', () => {
     expect(page.get('curtainSub').text()).toBe('Ann, look away 👀');
     expect(page.get('curtainLast').text()).toBe(passed.lastAction?.text);
     expect(page.get('curtainBtn').text()).toBe("I'm Bob — show my cards");
-    expect(page.get('curtainHandoffBtn').text()).toBe(
-      'Continue online: Ann hosts, Bob joins by invite',
-    );
     paintCurtain(page.doc, { ...initialApp, role: 'local', game: passed, curtain: null });
     expect(page.get('curtainOverlay').hidden()).toBe(true);
     expect(page.get('curtainTitle').text()).toBe('Pass the phone to Bob');
@@ -68,14 +65,13 @@ describe('paintCurtain', () => {
 });
 
 describe('bindLocal', () => {
-  test('the curtain button reveals; the handoff button offers the game online', () => {
+  test('the curtain button reveals', () => {
     const page = ginPage(MARKUP);
     const intents: Intent[] = [];
     bindLocal(page.doc, (i) => {
       intents.push(i);
     });
     page.get('curtainBtn').fire('click');
-    page.get('curtainHandoffBtn').fire('click');
-    expect(intents).toEqual([{ type: 'curtain/reveal' }, { type: 'handoff/click' }]);
+    expect(intents).toEqual([{ type: 'curtain/reveal' }]);
   });
 });
