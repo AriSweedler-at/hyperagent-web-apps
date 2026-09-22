@@ -33,5 +33,5 @@ export const routeOffline = async (context: BrowserContext): Promise<void> => {
   );
 };
 
-/** Requests that may fail without failing a spec. Chromium asks for a favicon the pages do not ship. */
+/** Requests that may fail without failing a spec: Chromium asks the origin root for a favicon on the legacy pages, which link no icon. */
 export const ALLOWED_FAILURES: ReadonlyArray<RegExp> = [/\/favicon\.ico$/];

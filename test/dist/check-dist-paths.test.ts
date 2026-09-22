@@ -91,9 +91,24 @@ describeDist('dist paths on both origins', (root) => {
   });
 
   test('the landing links reach the game pages through the /games/ redirect on the proxy', () => {
-    const landingLinks = relative.filter(
+    const landingHrefs = relative.filter(
       ({ file, kind }) => file === 'index.html' && kind === 'href',
     );
+    // The site's icon (web/public/shared/favicon.*) is fetched, not redirected, on the proxy.
+    const icons = landingHrefs.filter(({ value }) => value.startsWith('./shared/favicon.'));
+    expect(icons.map(({ value }) => value)).toEqual([
+      './shared/favicon.svg',
+      './shared/favicon.ico',
+    ]);
+    icons.forEach(({ value }) => {
+      const proxyPath = resolvedPath(`${ORIGIN}/`, value);
+      expect(mapPath(proxyPath)).toEqual({
+        kind: 'fetch',
+        path: `${PAGES_BASE_PATH}${value.slice(2)}`,
+      });
+      expect(distTarget(root, throughProxy(proxyPath))).toBe(value.slice(2));
+    });
+    const landingLinks = landingHrefs.filter((reference) => !icons.includes(reference));
     expect(landingLinks.map(({ value }) => value)).toEqual(['games/gin-rummy/', 'games/fidice/']);
     landingLinks.forEach((reference) => {
       const proxyPath = resolvedPath(`${ORIGIN}/`, reference.value);

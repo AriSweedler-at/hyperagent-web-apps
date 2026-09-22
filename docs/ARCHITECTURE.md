@@ -484,7 +484,9 @@ Step 3 (two-peer e2e against the legacy pages):
   `page.evaluate` expressions, so the node project keeps `lib: ["ES2023"]` with no DOM types.
 - The harness is offline: the pages' CDN request for `peerjs@1.5.4/dist/peerjs.min.js` is
   fulfilled from the identical bundle pinned in `node_modules` (same sha256) and Google Fonts with
-  an empty stylesheet; the smoke allowlist is therefore just `favicon.ico`.
+  an empty stylesheet; the smoke allowlist is therefore just `favicon.ico` (the legacy pages, served
+  beside dist/ for parity, link no icon; the site's pages link `shared/favicon.svg`, and the Worker
+  maps the origin-root `/favicon.ico` to `shared/favicon.ico`).
 - Each browser context's seed is a hash of project, test title and role, so host and guest differ,
   and the same spec on `pages` and `proxy` never holds the same room code on the broker at once.
 - `tools/serve-dist.ts` and `tools/proxy-dev.ts` have node-level tests in `test/tools/` (routing,

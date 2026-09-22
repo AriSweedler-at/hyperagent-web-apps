@@ -73,9 +73,13 @@ describeDist('dist parity with legacy/ and web/', (root) => {
       // the shared chunk's CSS (web/shared/styles, step 14) and its own CSS, in that order: the
       // shared sheets cascade before the game's theme, as the source page links them.
       const page = `games/${game}/index.html`;
-      const relative = referencesIn(page, readDist(root, page))
+      const references = referencesIn(page, readDist(root, page))
         .map(({ value }) => value)
         .filter((value) => !value.startsWith('https://'));
+      // The site's one icon (web/public/shared/favicon.*), linked by every page.
+      const icons = references.filter((value) => value.includes('/favicon.'));
+      expect(icons).toEqual(['../../shared/favicon.svg', '../../shared/favicon.ico']);
+      const relative = references.filter((value) => !icons.includes(value));
       expect(relative[0]).toMatch(/^\.\/app-[\w-]+\.js$/);
       expect(relative.at(-1)).toMatch(
         new RegExp(`^\\.\\./\\.\\./shared/assets/${game}-[\\w-]+\\.css$`),
@@ -86,7 +90,7 @@ describeDist('dist parity with legacy/ and web/', (root) => {
       chunks.forEach((value) => {
         expect(value).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.js$/);
       });
-      relative.forEach((value) => {
+      references.forEach((value) => {
         const target = value.startsWith('./')
           ? `games/${game}/${value.slice(2)}`
           : value.replace('../../', '');
