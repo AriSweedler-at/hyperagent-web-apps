@@ -49,7 +49,7 @@ npm run check     # typecheck + lint + unit tests + build + dist guards: what CI
 | `npm run test:dist`                                  | the guards on `dist/` (see "Tests"); needs a build first                                                       |
 | `npm run test:integration`                           | the real PeerJS transport through a local PeerServer in Chromium; skips where loopback WebRTC is blocked       |
 | `npm run test:e2e`                                   | build, then Playwright: every spec in `e2e/` on both emulated origins                                          |
-| `npm run test:live`                                  | the `@online` and `@relay` specs against the two live origins; what nightly runs                               |
+| `npm run test:deployed`                              | the `@online` and `@relay` specs with the deployed Pages page as the subject, every server local; nightly      |
 | `npm run serve`                                      | GitHub Pages emulation: `dist/` at http://127.0.0.1:4173/hyperagent-web-apps/                                  |
 | `npm run preview`                                    | build, then serve                                                                                              |
 | `npm run proxy:dev`                                  | games.sweedler.com emulation: the real Worker at http://127.0.0.1:8787/ over :4173                             |
@@ -110,15 +110,27 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    the same log.
 6. **Hermetic two-peer e2e** (`npm run test:e2e`; first time `npx playwright install chromium`):
    builds `dist/`, starts `tools/serve-dist.ts` (:4173), `tools/proxy-dev.ts` (:8787, the real
-   Worker over :4173) and a PeerServer (:9000), then runs every spec in `e2e/` on projects `pages`
+   Worker over :4173), a PeerServer (:9000) and, when `turnserver` is on PATH, a coturn TURN relay
+   (:3478, static credentials, loopback only), then runs every spec in `e2e/` on projects `pages`
    and `proxy`: smoke on every page (zero uncaught exceptions, zero failed requests outside an
    allowlist), gin local and scorer, and the `@online` specs (gin join/deal/turns, host reload and
    guest rejoin, fidice lobby/start) in a host and a guest context that meet through `?peer=` and
    take a STUN-only ICE list through `?ice=`; fonts and CDNs are answered from local copies and
-   `Math.random` is seeded. `e2e/gin-dom-parity.spec.ts` plays the same game on the served gin page
+   `Math.random` is seeded. The `@relay` specs (`e2e/gin-relay.spec.ts`, `e2e/fidice-relay.spec.ts`)
+   open both pages with `?ice-policy=relay` and an ICE list naming that relay (written per run under
+   `e2e/fixtures/.generated/`, since its port follows the offset), so every candidate must cross it:
+   both games still join and play, "Connected via relay" shows, and the selected candidate pair read
+   off each `RTCPeerConnection` is a relay one. Without coturn they skip with the install line
+   (`brew install coturn` / `apt-get install coturn`); `E2E_TURN=off` leaves the relay out on
+   purpose. `e2e/gin-dom-parity.spec.ts` plays the same game on the served gin page
    and on the frozen legacy page (aliased in by the harness) and compares 84 checkpoints. The report
    lands in `playwright-report/` (`npx playwright show-report`). The two contexts connect over the
    machine's own addresses: a Cloudflare WARP-style tunnel that drops loopback UDP times them out.
+   Every harness port is a base plus `E2E_PORT_OFFSET` (default 0; `e2e/fixtures/site.ts` `PORTS`):
+   pages 4173+o, proxy 8787+o, PeerServer 9000+o, TURN 3478+o. To run a second e2e beside one
+   that holds the defaults (another worktree, a lingering `npm run serve`), set the offset once and
+   the servers, readiness URLs and `?peer=`/`?ice=` hooks all follow:
+   `E2E_PORT_OFFSET=1000 npm run test:e2e -- e2e/smoke.spec.ts` binds 5173/9787/10000.
 7. **Stories** (`e2e/gin-stories.spec.ts`, `pages` project; `docs/design/gin-draw-ghost-slot.md`
    §7-§8): sixteen catalogued table states of the gin page
    (`web/games/gin-rummy/src/stories/catalogue.ts`, one seeded deal played through the engine),
@@ -136,15 +148,22 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    ```
 
 8. **Advisory broker** (CI job `broker`, `continue-on-error`):
-   `E2E_BROKER=cloud npm run test:e2e -- --grep @online` plays the same specs through 0.peerjs.com,
-   so a signalling regression is visible at review without a third party blocking a merge.
+   `E2E_BROKER=cloud npm run test:e2e -- --grep "@online|@relay"` plays the same specs through
+   0.peerjs.com (the TURN relay stays the local coturn), so a signalling regression is visible at
+   review without a third party blocking a merge.
 9. **Nightly** (`.github/workflows/nightly.yml`, 09:23 UTC or `gh workflow run nightly.yml`):
-   `npm run test:live` aims both projects at the live origins with nothing local started and runs
-   the `@online` specs through the real broker and `turn.sweedler.com`, plus
-   `e2e/gin-relay.spec.ts`: a gin game opened with `?ice-policy=relay`, so every candidate must
-   cross the Cloudflare relay and "Connected via relay" must show on both pages. A failure
-   comments the run URL on the open issue labelled `nightly` (creating it when missing); a green
-   run closes it.
+   `npm run test:deployed` (`E2E_TARGET=deployed`) runs the same `@online` and `@relay` specs with
+   the deployed page, https://arisweedler-at.github.io/hyperagent-web-apps/, as the subject: the
+   `pages` project's baseURL is that origin, and the page is opened with the same `?peer=` and
+   `?ice=` hooks, naming the PeerServer, ICE lists and coturn the harness started on the runner
+   (the build only feeds the serve-dist that hosts the lists). A public https page reaching
+   127.0.0.1 needs Chromium's Local Network Access permission, which the player fixture grants to
+   its context. There is no `proxy` project in that run and nothing fetches `turn.sweedler.com`:
+   games.sweedler.com and the credential Worker are Cloudflare, whose bot protection challenged the
+   runner once (issue #19), and no test depends on Cloudflare. What it proves is that the bytes
+   Pages serves still play a two-peer game and a relay-forced one; the deployed relay credentials
+   are checked by hand (see "Online play", "Verify"). A failure comments the run URL on the open
+   issue labelled `nightly` (creating it when missing); a green run closes it.
 
 **Moving a golden.** A PR that changes what a golden pins says so in its body and touches only that
 golden. Computed styles: `npm run build`, then
@@ -193,7 +212,8 @@ A game is a folder; nothing under `web/shared` changes and the proxy needs nothi
    Add a card to `web/index.html`.
 8. One e2e spec per mode: `e2e/<g>-local.spec.ts` and `e2e/<g>-online.spec.ts` tagged `@online`
    (host and guest through `e2e/fixtures/two-players.ts`; `expectPeerOptions` on the recorded
-   `new Peer` call). Both run on both projects, and the online one live in nightly, for free.
+   `new Peer` call). Both run on both projects, and the online one against the deployed page in
+   nightly, for free.
 9. The proxy needs nothing: the Worker's catch-all maps `games.sweedler.com/<g>/` to
    `/hyperagent-web-apps/games/<g>/`.
 
@@ -226,8 +246,10 @@ The path mapping is the table at the top of `worker.ts`; `worker.test.ts` pins e
 **turn.sweedler.com.** `infra/turn-worker/worker.js`, plain JavaScript deployed by hand: see
 "Online play".
 
-**Nightly.** `.github/workflows/nightly.yml` plays the deployed pages every night (see "Tests");
-`gh workflow run nightly.yml` runs it after a deploy you want checked now.
+**Nightly.** `.github/workflows/nightly.yml` plays the deployed Pages page every night through the
+harness's own local servers (see "Tests" 9; nothing Cloudflare is in the loop, so
+games.sweedler.com is not played by any test); `gh workflow run nightly.yml` runs it after a deploy
+you want checked now.
 
 ## Online play (TURN relay)
 
@@ -240,8 +262,8 @@ games fall back to STUN-only and the host's wait screen shows a warning.
 **Where to configure.** One constant, `ICE_CONFIG_URL` in `web/shared/edge/ice.ts` (bundled into
 both games), points at `https://turn.sweedler.com`, the Worker below. For a test, `?ice=<url>` on a
 game URL overrides it without editing the file, and `?ice-policy=relay` forces
-`iceTransportPolicy: 'relay'` so only relayed candidates are used (the nightly's relay-forced
-game). The URL must return JSON, a bare array of ICE servers or `{"iceServers":[...]}`, with CORS
+`iceTransportPolicy: 'relay'` so only relayed candidates are used (the `@relay` specs' relay-forced
+games). The URL must return JSON, a bare array of ICE servers or `{"iceServers":[...]}`, with CORS
 headers that allow both site origins. Results are cached for 10 minutes; a fetch failure falls back
 to STUN-only.
 
@@ -279,7 +301,9 @@ writing) that is ample for text-only game traffic.
 - Open a game (with `?ice=<url>` to test another endpoint) and host a room. The wait screen shows
   a relay hint only when no relay is configured.
 - Connect a second device. A toast says "Connected via relay" or "Connected directly".
-- `npm run test:live` plays both live origins, including the relay-forced game.
+- No test fetches `turn.sweedler.com` (the harness relays through its own coturn), so the deployed
+  credentials are checked here, by hand: `curl` above, then a game with `?ice-policy=relay` and no
+  `?ice=` that toasts "Connected via relay".
 
 ## Layout
 
@@ -304,12 +328,12 @@ tools/                       serve-dist, proxy-dev, hooks-verify; legacy/ extrac
 infra/games-proxy/           Cloudflare Worker (TypeScript) serving the site at games.sweedler.com
 infra/turn-worker/           Cloudflare Worker (plain JS) minting TURN credentials at turn.sweedler.com
 docs/                        ARCHITECTURE.md (the layout and its rules), MIGRATION.md (the plan and its Deviations)
-.github/workflows/           ci.yml (check, e2e, broker, deploy), nightly.yml (the live run)
+.github/workflows/           ci.yml (check, e2e, broker, deploy), nightly.yml (the deployed page through local servers)
 .github/actions/npm-ci/      the scanned install that rewrites the runner's lockfile copy (see "Develop")
 .githooks/                   pre-commit (chains the template hook), pre-push (npm run check)
 vite.config.ts               root web/, base './', input = every web/**/index.html
 vitest.config.ts             unit config and coverage thresholds; vitest.dist / vitest.integration configs beside it
-playwright.config.ts         projects pages and proxy; E2E_BROKER=cloud, E2E_TARGET=live
+playwright.config.ts         projects pages and proxy; E2E_BROKER=cloud, E2E_TARGET=deployed, E2E_PORT_OFFSET, E2E_TURN
 dist/                        build output (gitignored): what both origins serve
 ```
 

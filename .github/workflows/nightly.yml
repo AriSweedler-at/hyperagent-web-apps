@@ -1,14 +1,15 @@
-# Plays the deployed site every night (docs/MIGRATION.md step 15, docs/ARCHITECTURE.md "CI").
-# ci.yml proves the code on emulated origins through a local PeerServer; this proves the two live
-# origins, https://arisweedler-at.github.io/hyperagent-web-apps/ and https://games.sweedler.com/,
-# with everything real in the loop: the pages GitHub Pages and the Cloudflare Worker actually
-# serve, the public broker 0.peerjs.com, and the TURN credentials from turn.sweedler.com. The
-# @online specs (gin join/deal/turn, gin resume/rejoin, fidice lobby/start) run on both origins
-# with the credentials the pages fetched, and the @relay spec opens gin with ?ice-policy=relay so
-# every candidate must go through the Cloudflare relay: if the credentials stop working, that game
-# cannot connect and the run fails. Nothing local is started (E2E_TARGET=live, e2e/fixtures/site.ts).
-# On failure the Playwright report is uploaded and the open issue labelled `nightly` gets a comment
-# with the run URL (or the issue is created); a green run closes it. By hand:
+# Plays the deployed page every night (docs/MIGRATION.md step 15, docs/ARCHITECTURE.md "CI").
+# ci.yml proves the code on emulated origins; this proves the bytes GitHub Pages actually serves at
+# https://arisweedler-at.github.io/hyperagent-web-apps/ still play: the @online specs (gin
+# join/deal/turn, gin resume/rejoin, fidice lobby/start) and the @relay specs (both games with
+# ?ice-policy=relay, every candidate through the relay) open the deployed pages with the same hooks
+# the PR harness uses, ?peer= naming a PeerServer on this runner, ?ice= naming an ICE list served
+# from this runner and the coturn started on it. Nothing Cloudflare is in the loop: not
+# games.sweedler.com (the `proxy` project does not exist here), not turn.sweedler.com, not the
+# public broker; the zone's bot protection challenged this runner once (issue #19) and the owner
+# ruled that no test depends on Cloudflare. E2E_TARGET=deployed (e2e/fixtures/site.ts) is the
+# switch. On failure the Playwright report is uploaded and the open issue labelled `nightly` gets
+# a comment with the run URL (or the issue is created); a green run closes it. By hand:
 #   gh workflow run nightly.yml
 name: Nightly
 
@@ -22,7 +23,7 @@ permissions:
   issues: write
 
 jobs:
-  live:
+  deployed:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -35,10 +36,18 @@ jobs:
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      # No build: the deployed pages are the subject. `npm run test:live` is
-      # `E2E_TARGET=live E2E_BROKER=cloud playwright test --grep "@online|@relay"`, both projects.
-      - name: Online and relay-forced specs against both live origins
-        run: npm run test:live
+      # The relay the deployed page is forced through (as in ci.yml's e2e job): the Debian package
+      # starts a system turnserver on :3478, stopped so the harness can bind its own.
+      - name: Install coturn for the relay-forced games
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y coturn
+          sudo systemctl disable --now coturn || true
+      # `npm run test:deployed` is `E2E_TARGET=deployed npm run test:e2e -- --grep "@online|@relay"`:
+      # the build only feeds the local serve-dist that hosts the ICE lists; the pages under test are
+      # the deployed ones, on the `pages` project alone.
+      - name: Online and relay-forced specs against the deployed page
+        run: npm run test:deployed
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
@@ -53,13 +62,13 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh label create nightly --description "Opened by nightly.yml when the live run fails" --color B60205 || true
+          gh label create nightly --description "Opened by nightly.yml when the deployed run fails" --color B60205 || true
           open_issue="$(gh issue list --label nightly --state open --limit 1 --json number --jq '.[0].number // empty')"
-          body="Nightly live run failed: ${RUN_URL}"
+          body="Nightly deployed run failed: ${RUN_URL}"
           if [ -n "${open_issue}" ]; then
             gh issue comment "${open_issue}" --body "${body}"
           else
-            gh issue create --title "Nightly live run failed" --label nightly --body "${body}"
+            gh issue create --title "Nightly deployed run failed" --label nightly --body "${body}"
           fi
       - name: Close the `nightly` issue on a green run
         if: success()
@@ -71,5 +80,5 @@ jobs:
           # Assigned first so `set -e` sees a gh failure; a substitution inside `for` would exit 0.
           numbers="$(gh issue list --label nightly --state open --json number --jq '.[].number')"
           for number in ${numbers}; do
-            gh issue close "${number}" --comment "Nightly live run passed: ${RUN_URL}"
+            gh issue close "${number}" --comment "Nightly deployed run passed: ${RUN_URL}"
           done

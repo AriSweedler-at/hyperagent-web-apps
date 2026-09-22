@@ -27,6 +27,10 @@ jobs:
   baselines:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # The stories spec plays no relay-forced game, so this job installs no coturn; without this the
+    # config refuses to run under CI with turnserver missing (playwright.config.ts).
+    env:
+      E2E_TURN: 'off'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

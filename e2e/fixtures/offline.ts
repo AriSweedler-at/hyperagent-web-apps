@@ -3,9 +3,10 @@
 // (same sha256 as the CDN copy) and the font stylesheet with an empty one. Nothing about the pages
 // changes; only where two static files come from. The broker (0.peerjs.com) is never routed: the
 // hermetic projects point it at the local PeerServer with ?peer=, and the `broker` CI job lets it
-// through on purpose. Nothing here matches the pages' own origin, emulated or live, nor
-// turn.sweedler.com: a live run (E2E_TARGET=live) plays the deployed bytes and fetches real ICE
-// credentials, and only these two third-party static files are still answered locally.
+// through on purpose. Nothing here matches the pages' own origin, emulated or deployed
+// (E2E_TARGET=deployed plays the GitHub Pages bytes with the same two static files answered
+// locally), and the pages never fetch turn.sweedler.com: every game the harness opens carries
+// `?ice=` naming a list it serves itself.
 import { resolve } from 'node:path';
 
 import type { BrowserContext } from '@playwright/test';

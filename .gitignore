@@ -10,6 +10,9 @@ coverage/
 playwright-report/
 test-results/
 *.tsbuildinfo
+# written by playwright.config.ts per run: the TURN ICE list (its port follows E2E_PORT_OFFSET)
+# and coturn's pidfile
+e2e/fixtures/.generated/
 
 # personal Claude Code permissions for this checkout
 .claude/settings.local.json
