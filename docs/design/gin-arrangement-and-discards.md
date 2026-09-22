@@ -448,3 +448,33 @@ button lands on the final hand geometry. Each PR keeps pass-and-play, host, gues
   needing persist or send silently does nothing (documented as UI-only).
 - Three story re-records (PR 2 and 3 each ~39 PNGs × 2 platforms, ~7 MB per set in history).
   Accept-on-select stays (no longer a visible rearrangement); a pure two-tap flow is one branch.
+
+## Status
+
+PR 1 landed on 2026-09-21 (branch `gin-rules-undo-layoff`): §4 and §7 in full and the PR 1 items
+of §10-§12. Engine: `undoDraw` refuses a stock draw with the exported `STOCK_DRAW_FINAL_MSG`,
+`canUndo` requires `pendingDraw.from === 'discard'`, `legalActions` follows; `layOff` became
+`layoffLeaves` (recursion over immutable records, no `*.algorithms.ts` needed), `maximalLayoff`
+keeps the leaf with the most cards (the first on a tie), `bestMeldingWithLayoffs` enumerates the
+subsets of the leaves' union; the false "L is unique" comment is gone. State, saves and the wire
+corpus are byte-identical. The defect was reproduced through both legs before the fix: the §7
+position scores the defender 28 (legacy: 7♣ onto the sevens, 8♣ stranded) against 20 (current:
+both onto the clubs run); a hand built to the judges' figures (defender 7♣ 8♣ Q♦ K♦ 3♦ A-5♥ against
+sevens, 4-5-6♣ and 9-10-J♥) scores 31 against 23. UI: `settleDraw` keys on `lastDrawnId`, `refuse`
+clears only a `waiting` stage, the catalogue offers `undoDraw` only after a discard-pile draw and
+`undone` comes from `drewDiscard`; `round-over-laid-off` and `round-over-laid-off-defender` added
+with the `sheet` and `laidOff` facts (the only §10 fact fields PR 1 needed). Parity: the per-leg
+splits as written; `gin.replay.ts` tallies `stockUndos` and `multiFitKnock` and ends a seed at a
+`multiFit` knock. Oracles: `npm run check` green (77 files, 1938 tests); computed-styles `--check`
+twice, 0 differences at both viewports, fidice byte-identical; gin-dom-parity 84 checkpoints, 0
+mismatches, 0 page errors; coverage `engine/**` 98.7 / 95.85 / 99.33 / 99.76 over the 94/94/93/92
+ratchet; `npm run test:e2e -- --grep-invert @online` green; the stories spec twice more with 0
+diffs. Darwin PNGs re-recorded: `drawn-stock-shown`, `accepted-fresh`, `accepted-selected`,
+`accepted-knock`, `accepted-gin` (phone and desktop); added: `round-over-laid-off`,
+`round-over-laid-off-defender` (phone and desktop); the linux set comes from the dispatch job.
+Where the doc was off: §12 places the `.actions .btn` flip at "turn: accepted the drawn card
+(fresh)"; the golden records it at "12 turn: drew from the stock (ghost slot shown)" (the first
+match is now the disabled Discard, the `.btn:disabled` hash) and "17 turn: knock available" (the
+enabled `btn-secondary` Discard), and checkpoint 13 gains no entry because its first match equals
+12's. §7's "31 vs 23" hand names no cards; the one above is a hand those figures fit. Next: PR 2
+(the kept picture, Arrange), PR 3 (the discards sheet).
