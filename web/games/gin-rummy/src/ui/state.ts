@@ -47,11 +47,13 @@ import {
   clearSave,
   readHomeTab,
   readName,
+  readP2Name,
   readPlayMode,
   readSave,
   readScorerState,
   writeHomeTab,
   writeName,
+  writeP2Name,
   writePlayMode,
   writeSave,
   type HomeTab,
@@ -227,6 +229,8 @@ export const GONE_TOAST_MS = 4000;
 /** What the legacy `initHome` read from storage, in one snapshot (`readHome`). */
 export type HomeSnapshot = Readonly<{
   name: string | null;
+  /** The pass-and-play second name: this page's own key, so a legacy session has none. */
+  p2Name: string | null;
   homeTab: HomeTab;
   playMode: PlayMode;
   save: Save | null;
@@ -238,6 +242,7 @@ export type Intent =
   | Readonly<{ type: 'home/init'; home: HomeSnapshot }>
   | Readonly<{ type: 'name/typed'; value: string }>
   | Readonly<{ type: 'p1name/typed'; value: string }>
+  | Readonly<{ type: 'p2name/typed'; value: string }>
   /** `setHomeTab(tab, { persist })`: an unknown tab is `play`. */
   | Readonly<{ type: 'tab/set'; tab: string; persist?: boolean }>
   /** `setPlayMode(mode)`: anything but `local` is `online`. */
@@ -322,6 +327,7 @@ export type Effect =
   | Readonly<{ type: 'persist' }>
   | Readonly<{ type: 'clearSave' }>
   | Readonly<{ type: 'rememberName'; name: string }>
+  | Readonly<{ type: 'rememberP2Name'; name: string }>
   | Readonly<{ type: 'writeHomeTab'; tab: HomeTab }>
   | Readonly<{ type: 'writePlayMode'; mode: PlayMode }>
   /** `ms` null is the default duration. */
@@ -353,6 +359,8 @@ export type Effect =
   | Readonly<{ type: 'share'; code: string }>
   /** `initHome`: the saved name into `#nameInput` and `#p1NameInput`. */
   | Readonly<{ type: 'fillName'; name: string }>
+  /** `initHome`: the saved pass-and-play second name into `#p2NameInput`. */
+  | Readonly<{ type: 'fillP2Name'; name: string }>
   /** `#codeInput`'s value after sanitising. */
   | Readonly<{ type: 'setCode'; value: string }>;
 
@@ -678,7 +686,7 @@ const setHomeTab = (app: App, tab: string, persist: boolean): Step => {
   );
 };
 
-/** `initHome()` over a storage snapshot: the saved name goes into the two name inputs. */
+/** `initHome()` over a storage snapshot: the saved names go into the three name inputs. */
 const initHome = (app: App, home: HomeSnapshot): Step =>
   then(showScreen(app, 'homeScreen'), (a) =>
     then(
@@ -692,6 +700,7 @@ const initHome = (app: App, home: HomeSnapshot): Step =>
             playMode: home.playMode,
           },
           ...(home.name === null ? [] : [{ type: 'fillName', name: home.name } as const]),
+          ...(home.p2Name === null ? [] : [{ type: 'fillP2Name', name: home.p2Name } as const]),
         ),
         (b) => setHomeTab(b, home.homeTab, false),
       ),
@@ -785,6 +794,8 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       );
     case 'p1name/typed':
       return step(app, { type: 'rememberName', name: intent.value.trim() });
+    case 'p2name/typed':
+      return step(app, { type: 'rememberP2Name', name: intent.value.trim() });
     case 'tab/set':
       return setHomeTab(app, intent.tab, intent.persist !== false);
     case 'mode/set': {
@@ -1036,15 +1047,17 @@ export const saveFor = (app: App): Save | null => {
   }
 };
 
-/** `initHome`'s reads: the name, the tab and mode (defaults when unreadable), the save, the scorer session. */
+/** `initHome`'s reads: the names, the tab and mode (defaults when unreadable), the save, the scorer session. */
 export const readHome = (store: Store): HomeSnapshot => {
   const name = readName(store);
+  const p2Name = readP2Name(store);
   const tab = readHomeTab(store);
   const mode = readPlayMode(store);
   const save = readSave(store);
   const scorer = readScorerState(store);
   return {
     name: name.ok ? name.value : null,
+    p2Name: p2Name.ok ? p2Name.value : null,
     homeTab: tab.ok ? tab.value : DEFAULT_HOME_TAB,
     playMode: mode.ok ? mode.value : DEFAULT_PLAY_MODE,
     save: save.ok ? save.value : null,
@@ -1096,8 +1109,12 @@ export type EffectDeps = Readonly<{
   }>;
   toggleSound: () => void;
   share: (code: string) => void;
-  /** The two input writes the paint does not own (they would fight the player's typing). */
-  page: Readonly<{ fillName: (name: string) => void; setCode: (value: string) => void }>;
+  /** The three input writes the paint does not own (they would fight the player's typing). */
+  page: Readonly<{
+    fillName: (name: string) => void;
+    fillP2Name: (name: string) => void;
+    setCode: (value: string) => void;
+  }>;
   dispatch: (intent: Intent) => void;
 }>;
 
@@ -1114,6 +1131,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'rememberName':
       writeName(deps.store, effect.name);
+      return;
+    case 'rememberP2Name':
+      writeP2Name(deps.store, effect.name);
       return;
     case 'writeHomeTab':
       writeHomeTab(deps.store, effect.tab);
@@ -1171,6 +1191,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'fillName':
       deps.page.fillName(effect.name);
+      return;
+    case 'fillP2Name':
+      deps.page.fillP2Name(effect.name);
       return;
     case 'setCode':
       deps.page.setCode(effect.value);

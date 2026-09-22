@@ -7,6 +7,7 @@ import {
   bindHome,
   blocksCodeInput,
   fillNameInputs,
+  fillP2NameInput,
   inviteText,
   paintHome,
   setCodeInput,
@@ -24,11 +25,15 @@ const type = (p: GinPage, id: string, value: string): void => {
 };
 
 describe('the input writes the reducer raises as effects', () => {
-  test('fillNameInputs writes both name inputs; setCodeInput the code field', () => {
+  test('fillNameInputs writes both name inputs, fillP2NameInput the second; setCodeInput the code field', () => {
     const p = page();
     expect(p.get('nameInput').value()).toBe('Ari');
     fillNameInputs(p.doc, 'Ann');
     expect(p.get('nameInput').value()).toBe('Ann');
+    expect(p.get('p1NameInput').value()).toBe('Ann');
+    expect(p.get('p2NameInput').value()).toBe('');
+    fillP2NameInput(p.doc, 'Bob');
+    expect(p.get('p2NameInput').value()).toBe('Bob');
     expect(p.get('p1NameInput').value()).toBe('Ann');
     setCodeInput(p.doc, 'AB');
     expect(p.get('codeInput').value()).toBe('AB');
@@ -128,6 +133,7 @@ describe('bindHome', () => {
     p.get('codeInput').fire('keydown', { key: 'a' });
     p.get('startGameBtn').fire('click');
     type(p, 'p2NameInput', 'Bob');
+    p.get('p2NameInput').fire('input');
     type(p, 'localTargetInput', '50');
     p.get('localBtn').fire('click');
     p.get('tabRulesBtn').fire('click');
@@ -144,6 +150,7 @@ describe('bindHome', () => {
       { type: 'join/click', name: ' Ann ', code: 'abcd' },
       { type: 'join/click', name: ' Ann ', code: 'abcd' },
       { type: 'host/deal' },
+      { type: 'p2name/typed', value: 'Bob' },
       { type: 'local/click', p1: 'Zoë', p2: 'Bob', target: '50' },
       { type: 'tab/set', tab: 'rules' },
       { type: 'tab/set', tab: 'score' },

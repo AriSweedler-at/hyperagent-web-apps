@@ -79,8 +79,12 @@ const roundTrips: Readonly<Record<string, RoundTrip>> = {
 };
 
 describe('the captured legacy payloads', () => {
-  test('cover all seven keys, the three save roles and both sound states', () => {
-    expect(new Set(captures.map((c) => c.key))).toEqual(new Set(Object.values(STORAGE_KEYS)));
+  test('cover all seven legacy keys, the three save roles and both sound states', () => {
+    // `ginRummy_p2Name` is this page's own key: the legacy never stored the second name, so no
+    // capture exists for it.
+    const legacyKeys = Object.values(STORAGE_KEYS).filter((k) => k !== STORAGE_KEYS.p2Name);
+    expect(legacyKeys).toHaveLength(7);
+    expect(new Set(captures.map((c) => c.key))).toEqual(new Set(legacyKeys));
     const roles = captures
       .filter((c) => c.key === STORAGE_KEYS.save)
       .map((c) => (JSON.parse(c.raw) as { role: string }).role);

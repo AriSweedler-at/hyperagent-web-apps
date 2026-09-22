@@ -2,10 +2,10 @@
 // ui/ reaches the document only through @shared/edge/dom). The legacy page (legacy/gin-rummy/
 // index.html) wrote the home screen from `initHome`, `setHomeTab`, `renderPlayMode` and the
 // handlers registered at DOMContentLoaded; here `paintHome` reads the App (ui/state.ts) and
-// `bindHome` turns each control into an intent. The two input writes that are not a paint (the
-// saved name at `initHome`, the sanitised room code as it is typed) are effects the reducer raises
-// and main.ts runs through `fillNameInputs` / `setCodeInput`, so the paint never overwrites what
-// the player is typing.
+// `bindHome` turns each control into an intent. The three input writes that are not a paint (the
+// saved names at `initHome`, the sanitised room code as it is typed) are effects the reducer
+// raises and main.ts runs through `fillNameInputs` / `fillP2NameInput` / `setCodeInput`, so the
+// paint never overwrites what the player is typing.
 //
 // One legacy trait kept: `renderPlayMode` ran only when the Play tab was shown or the mode was
 // set, so the mode buttons' `active` marks (the submenu's are visible on every tab) are painted
@@ -36,6 +36,11 @@ import { HOME_TABS, resumeLabel, type App, type HomeTab, type Intent } from './s
 export const fillNameInputs = (doc: DocumentLike, name: string): void => {
   setValue(requireId(doc, 'nameInput'), name);
   setValue(requireId(doc, 'p1NameInput'), name);
+};
+
+/** `initHome`: the saved pass-and-play second name into `#p2NameInput`. */
+export const fillP2NameInput = (doc: DocumentLike, name: string): void => {
+  setValue(requireId(doc, 'p2NameInput'), name);
 };
 
 /** `#codeInput` after the reducer sanitised what was typed. */
@@ -93,6 +98,10 @@ export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): voi
   listen(p1NameInput, 'input', () => {
     dispatch({ type: 'p1name/typed', value: readValue(p1NameInput) });
   });
+  const p2NameInput = requireId(doc, 'p2NameInput');
+  listen(p2NameInput, 'input', () => {
+    dispatch({ type: 'p2name/typed', value: readValue(p2NameInput) });
+  });
   listenId(doc, 'hostBtn', 'click', () => {
     dispatch({
       type: 'host/click',
@@ -121,7 +130,7 @@ export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): voi
     dispatch({
       type: 'local/click',
       p1: readValue(p1NameInput),
-      p2: readValue(requireId(doc, 'p2NameInput')),
+      p2: readValue(p2NameInput),
       target: readValue(requireId(doc, 'localTargetInput')),
     });
   });
