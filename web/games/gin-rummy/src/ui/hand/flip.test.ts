@@ -1,7 +1,8 @@
-// FLIP over hand-rolled elements: a card whose rect changed across the repaint is put back with
-// an inverted transform and released under the transition, then its inline transition is cleared
+// FLIP over hand-rolled elements: a card whose cell moved across the repaint is put back with an
+// inverted transform and released under the transition, then its inline transition is cleared
 // when the transition ends (or the fallback timer fires); a card that stayed, a card new to the
-// hand and a card with no measurable rect are left alone.
+// hand, a card with no measurable rect, and a card lifted by its own transform inside an unmoved
+// cell are left alone.
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import type { Element, Rect } from '../../../../../shared/edge/dom.ts';
@@ -10,20 +11,24 @@ import { FLIP_MS, flipCards } from './flip.ts';
 type Card = Readonly<{
   el: Element;
   log: string[];
+  /** Move the card's cell; `lift` moves the card alone, as a `.selected` transform does. */
   place: (r: Rect) => void;
+  lift: (r: Rect) => void;
   end: () => void;
 }>;
 
 const rect = (left: number, top: number): Rect => ({ left, top, width: 50, height: 70 });
 const NONE: Rect = { left: 0, top: 0, width: 0, height: 0 };
 
-/** A card element that reports `rect`, records its inline styles and its transitionend handler. */
+/** A card element in a slot: the slot reports the cell's rect, the card its own; the card records its inline styles and its transitionend handler. */
 const card = (id: string, first: Rect): Card => {
-  const state = { rect: first, onEnd: null as (() => void) | null };
+  const state = { cell: first, own: first, onEnd: null as (() => void) | null };
   const log: string[] = [];
+  const slot = { getBoundingClientRect: () => state.cell };
   const el = {
     getAttribute: () => id,
-    getBoundingClientRect: () => state.rect,
+    getBoundingClientRect: () => state.own,
+    closest: (selector: string) => (selector === '.slot' ? slot : null),
     style: {
       setProperty: (name: string, value: string) => {
         log.push(`${name}=${value}`);
@@ -37,7 +42,11 @@ const card = (id: string, first: Rect): Card => {
     el: el as unknown as Element,
     log,
     place: (r) => {
-      state.rect = r;
+      state.cell = r;
+      state.own = r;
+    },
+    lift: (r) => {
+      state.own = r;
     },
     end: () => state.onEnd?.(),
   };
@@ -95,6 +104,18 @@ describe('flipCards', () => {
     expect(moved.log).toHaveLength(5);
     moved.end();
     expect(moved.log).toHaveLength(5);
+  });
+
+  test('a card lifted by its own transform in an unmoved cell (a selection) is not glided', () => {
+    const lifted = card('7H', rect(0, 0));
+    const shown = { cards: [lifted] };
+    flipCards(
+      hand(() => shown.cards),
+      () => {
+        lifted.lift(rect(0, -12));
+      },
+    );
+    expect(lifted.log).toEqual([]);
   });
 
   test('a hand with no cards before the repaint (a fresh deal) only repaints', () => {
