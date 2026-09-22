@@ -5,8 +5,9 @@
 // the pointer, and the landing. A press on a loose card of the hand, or on a laid-off card on the
 // table, starts a session; once the pointer has moved DRAG_THRESHOLD the drag begins: the long
 // press is cancelled, `card/dragStart` empties the card's place (the paint marks it `dragging`),
-// and a clone of the card, the ghost, is fixed over it and follows the pointer frame by frame with
-// the motion of drag.ts (momentum and lean). Every pointer move says which of the knocker's melds
+// and a clone of the card, the ghost, is fixed over it (sized by the card's own `--card-w`, so its
+// face is the card's) and follows the pointer frame by frame with the motion of drag.ts (momentum
+// and lean). Every pointer move says which of the knocker's melds
 // the pointer is over (`card/dragOnto`, lit where the card fits) and, for a hand card over none,
 // asks `dropIndex` where it would land among the loose cards (`card/dragOver`, so the others glide
 // aside). On release, `card/dragEnd` carries the meld the pointer is over: a hand card over a meld
@@ -126,6 +127,10 @@ export const bindDrag = (doc: PageLike, dispatch: DragDispatch): void => {
     if (ghost === null) return { ...s, moving: true, grab: p, base };
     addClass(ghost, 'drag-ghost');
     removeClass(ghost, 'selected', 'dragging');
+    // The ghost sits on the body, where `--card-w` is the off-table default; every dimension of a
+    // card's face is an em of that variable (theme.css), so the ghost takes the card's own width
+    // as its `--card-w` and its face is the card's face, not a smaller or larger one.
+    setStyle(ghost, '--card-w', px(base.width));
     setStyle(ghost, 'left', px(base.left));
     setStyle(ghost, 'top', px(base.top));
     setStyle(ghost, 'width', px(base.width));
