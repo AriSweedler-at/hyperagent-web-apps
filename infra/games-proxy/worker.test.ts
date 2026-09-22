@@ -44,7 +44,7 @@ describe('mapPath: the mapping table in the file header', () => {
     ['/games', '/hyperagent-web-apps/games/games'],
     ['/shared', '/hyperagent-web-apps/games/shared'],
     ['/hyperagent-web-apps', '/hyperagent-web-apps/games/hyperagent-web-apps'],
-    ['/favicon.ico', '/hyperagent-web-apps/games/favicon.ico'],
+    ['/favicon.ico', '/hyperagent-web-apps/shared/favicon.ico'],
   ])('%s is fetched from upstream %s', (pathname, upstreamPath) => {
     expect(mapPath(pathname)).toEqual({ kind: 'fetch', path: upstreamPath });
   });

@@ -3,6 +3,8 @@
 //   /XXX         -> .../hyperagent-web-apps/games/XXX      (short game URLs)
 //   /games/XXX   -> 301 to /XXX                            (landing-page links)
 //   /shared/…    -> .../hyperagent-web-apps/shared/…       (assets loaded relatively by game pages)
+//   /favicon.ico -> .../hyperagent-web-apps/shared/favicon.ico (the one icon the site ships; browsers
+//                   and bookmarks ask the origin root for it)
 //   /hyperagent-web-apps/… passes through unchanged.
 // Only the slash-terminated prefixes are special: /games, /shared and /hyperagent-web-apps without
 // a trailing slash fall into the /XXX rule. worker.test.ts pins every row of this table.
@@ -35,6 +37,7 @@ export const mapPath = (pathname: string): Mapped => {
     return { kind: 'redirect', path: pathname.slice('/games'.length) };
   }
   if (pathname.startsWith('/shared/')) return { kind: 'fetch', path: SITE + pathname };
+  if (pathname === '/favicon.ico') return { kind: 'fetch', path: `${SITE}/shared/favicon.ico` };
   return { kind: 'fetch', path: `${SITE}/games${pathname}` };
 };
 
