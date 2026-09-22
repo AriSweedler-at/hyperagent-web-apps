@@ -3,8 +3,9 @@
 // both aimed at the local PeerServer with ?peer= and at the STUN-only ICE fixture with ?ice=. The
 // `player` fixture is the single-context version for pass-and-play, the scorer and smoke.
 // Teardown asserts zero uncaught exceptions on every page a spec opened.
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, type Page } from '@playwright/test';
 
+import type { Game } from '../../tools/games.ts';
 import { fidiceHostLobby, fidiceJoin, fidiceLobbyCode } from './fidice.ts';
 import { ginHostRoom, ginJoin, ginRoomCode } from './gin.ts';
 import { newPlayer, type Player } from './player.ts';
@@ -12,7 +13,23 @@ import { asProject, type Project } from './site.ts';
 
 export type Players = Readonly<{ host: Player; guest: Player }>;
 
-export type OnlineGame = 'gin-rummy' | 'fidice';
+export type OnlineGame = Game;
+
+/** How one game's pages are driven through hosting and joining (e2e/fixtures/<g>.ts). */
+type Driver = Readonly<{
+  /** Host a room or table as `name`; resolves with the code shown in the host DOM. */
+  hostRoom: (page: Page, name: string) => Promise<string>;
+  /** The code the host DOM shows right now. */
+  readRoomCode: (page: Page) => Promise<string>;
+  /** Drive the guest through the join form; resolves once the guest is connected to the host. */
+  joinByCode: (page: Page, name: string, code: string) => Promise<void>;
+}>;
+
+/** One driver per game: a game the registry knows without a driver is a type error here. */
+const DRIVERS: Readonly<Record<OnlineGame, Driver>> = {
+  'gin-rummy': { hostRoom: ginHostRoom, readRoomCode: ginRoomCode, joinByCode: ginJoin },
+  fidice: { hostRoom: fidiceHostLobby, readRoomCode: fidiceLobbyCode, joinByCode: fidiceJoin },
+};
 
 type Fixtures = { project: Project; player: Player; players: Players };
 
@@ -40,11 +57,11 @@ export { expect };
 
 /** Host a room or table as `name`; resolves with the code shown in the host DOM. */
 export const hostRoom = (player: Player, game: OnlineGame, name: string): Promise<string> =>
-  game === 'gin-rummy' ? ginHostRoom(player.page, name) : fidiceHostLobby(player.page, name);
+  DRIVERS[game].hostRoom(player.page, name);
 
 /** The code the host DOM shows right now. */
 export const readRoomCode = (player: Player, game: OnlineGame): Promise<string> =>
-  game === 'gin-rummy' ? ginRoomCode(player.page) : fidiceLobbyCode(player.page);
+  DRIVERS[game].readRoomCode(player.page);
 
 /** Drive the guest through the join form; resolves once the guest is connected to the host. */
 export const joinByCode = (
@@ -52,5 +69,4 @@ export const joinByCode = (
   game: OnlineGame,
   code: string,
   name: string,
-): Promise<void> =>
-  game === 'gin-rummy' ? ginJoin(player.page, name, code) : fidiceJoin(player.page, name, code);
+): Promise<void> => DRIVERS[game].joinByCode(player.page, name, code);

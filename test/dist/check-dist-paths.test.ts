@@ -8,6 +8,7 @@ import { expect, test } from 'vitest';
 
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
 import { mapPath, unmapPath } from '../../infra/games-proxy/worker.ts';
+import { GAMES, LANDING_HREFS } from '../../tools/games.ts';
 import {
   allReferences,
   classify,
@@ -49,8 +50,8 @@ describeDist('dist paths on both origins', (root) => {
     expect(checked.length).toBeGreaterThanOrEqual(8);
   });
 
-  test('both game pages are built', () => {
-    ['gin-rummy', 'fidice'].forEach((game) => {
+  test('every game page is built', () => {
+    GAMES.forEach((game) => {
       expect(distHasFile(root, `games/${game}/index.html`), game).toBe(true);
     });
   });
@@ -109,7 +110,7 @@ describeDist('dist paths on both origins', (root) => {
       expect(distTarget(root, throughProxy(proxyPath))).toBe(value.slice(2));
     });
     const landingLinks = landingHrefs.filter((reference) => !icons.includes(reference));
-    expect(landingLinks.map(({ value }) => value)).toEqual(['games/gin-rummy/', 'games/fidice/']);
+    expect(landingLinks.map(({ value }) => value)).toEqual(LANDING_HREFS);
     landingLinks.forEach((reference) => {
       const proxyPath = resolvedPath(`${ORIGIN}/`, reference.value);
       expect(mapPath(proxyPath)).toEqual({

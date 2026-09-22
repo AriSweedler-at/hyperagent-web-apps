@@ -4,6 +4,7 @@
 // Nothing may be emitted to a root /assets/ either. Runs on dist/ after the build (test:dist).
 import { expect, test } from 'vitest';
 
+import { GAMES } from '../../tools/games.ts';
 import {
   allReferences,
   classify,
@@ -45,7 +46,7 @@ describeDist('dist asset URLs', (root) => {
     expect(distFiles(root).filter((file) => file.startsWith('assets/'))).toEqual([]);
   });
 
-  ['gin-rummy', 'fidice'].forEach((game) => {
+  GAMES.forEach((game) => {
     test(`the ${game} page loads its bundle beside itself and its CSS under ../../shared/assets/`, () => {
       const page = `games/${game}/index.html`;
       const references = referencesIn(page, readDist(root, page));

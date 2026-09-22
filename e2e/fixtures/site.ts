@@ -17,8 +17,10 @@
 import { accessSync, constants } from 'node:fs';
 import { delimiter, join } from 'node:path';
 
+import { GAMES, PAGE_TITLES, type PageName } from '../../tools/games.ts';
+
 export type Project = 'pages' | 'proxy';
-export type PageName = 'landing' | 'gin-rummy' | 'fidice';
+export type { PageName };
 
 /** The GitHub Pages mount point. The one place the harness may name it (see the lint ban). */
 // eslint-disable-next-line no-restricted-syntax -- this is the mount point itself, not a URL a page emits
@@ -184,13 +186,10 @@ export const LEGACY_ALIASES: Readonly<Record<string, string>> = {
   'legacy/shared/ice.js': 'legacy/shared/ice.js',
 };
 
-export const PAGES: ReadonlyArray<PageName> = ['landing', 'gin-rummy', 'fidice'];
+/** Every page smoke opens: the landing page, then the games as tools/games.ts lists them. */
+export const PAGES: ReadonlyArray<PageName> = ['landing', ...GAMES];
 
-export const EXPECTED_TITLES: Readonly<Record<PageName, string>> = {
-  landing: "Ari's web apps",
-  'gin-rummy': 'Gin Rummy',
-  fidice: "Fidice — one-cup liar's dice",
-};
+export const EXPECTED_TITLES: Readonly<Record<PageName, string>> = PAGE_TITLES;
 
 /** Path of a page relative to the project's baseURL (`games/fidice/` on pages, `fidice/` on proxy). */
 export const pagePath = (project: Project, page: PageName): string => {
