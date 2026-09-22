@@ -116,7 +116,9 @@ const viewFor = (state: State, seat: Seat): View => {
     discardOptions,
     lastDrawnId:
       lastDrawn?.p === seat && hand.some((c) => c.id === lastDrawn.id) ? lastDrawn.id : null,
-    canUndo: state.phase === 'discard' && state.turn === seat && state.pendingDraw !== null,
+    // Only a draw from the discard pile undoes (docs/design/gin-arrangement-and-discards.md §4).
+    canUndo:
+      state.phase === 'discard' && state.turn === seat && state.pendingDraw?.from === 'discard',
     meldOptions,
     activeMeldSig: meldSig(melding.melds),
     knockLimit: KNOCK_LIMIT,

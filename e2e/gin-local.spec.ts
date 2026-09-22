@@ -1,8 +1,33 @@
 // Pass-and-play on one page: start, the curtain hands the phone to the first player, one full turn
 // (take the upcard, discard), and the curtain comes back for the other player naming the move.
+// Then, through the `window.__gin` driver of e2e/fixtures/gin-play.ts, rounds to their end until
+// one is scored: at every round over the result sheet shows exactly the cards the engine laid off
+// onto the knocker's melds (docs/design/gin-arrangement-and-discards.md §7).
+import type { Page } from '@playwright/test';
+
 import { ginAcceptDraw, ginDiscardFirstFree, ginTakeUpcard } from './fixtures/gin.ts';
+import { playToRoundOver, readView } from './fixtures/gin-play.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
+
+/**
+ * The result sheet against the engine's result: `.meld-group.laid .card` counts the laid-off
+ * cards and the "Laid off onto" label exists exactly when there are any. Returns whether the
+ * round was scored (a void hand lays nothing off and proves less).
+ */
+const expectLaidOffSheet = async (page: Page): Promise<boolean> => {
+  const view = await readView(page);
+  expect(view?.phase).toBe('roundOver');
+  const result = view?.result ?? null;
+  expect(result).not.toBeNull();
+  const laidOff = result?.void === false ? (result.opponent?.laidOff.length ?? 0) : 0;
+  await expect(page.locator('#roundResultOverlay')).toBeVisible();
+  await expect(page.locator('#rrBody .meld-group.laid .card')).toHaveCount(laidOff);
+  await expect(page.locator('#rrBody .rr-label', { hasText: 'Laid off onto' })).toHaveCount(
+    laidOff > 0 ? 1 : 0,
+  );
+  return result?.void === false;
+};
 
 test('pass and play: start, curtain handoff, one full turn', async ({ player, project }) => {
   const { page } = player;
@@ -68,4 +93,26 @@ test('pass and play: start, curtain handoff, one full turn', async ({ player, pr
   const raw = await page.evaluate<string | null>("localStorage.getItem('ginRummyMP_v1')");
   const saved: unknown = JSON.parse(raw ?? 'null');
   expect(saved).toMatchObject({ role: 'local', game: { handNumber: 1 } });
+});
+
+test('pass and play: at every round over the sheet shows the cards laid off, as the engine has them', async ({
+  player,
+  project,
+}) => {
+  const { page } = player;
+  await page.goto(pagePath(project, 'gin-rummy'));
+  await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
+  await page.locator('#p1NameInput').fill('Ann');
+  await page.locator('#p2NameInput').fill('Bob');
+  await page.locator('#localBtn').click();
+  // Rounds until one is scored (a void hand's sheet is checked too and continued), three at most.
+  const rounds = async (round: number): Promise<void> => {
+    await playToRoundOver(page);
+    const scored = await expectLaidOffSheet(page);
+    if (scored || round === 3) return;
+    await page.locator('#rrContinueBtn').click();
+    await expect(page.locator('#roundResultOverlay')).toBeHidden();
+    await rounds(round + 1);
+  };
+  await rounds(1);
 });

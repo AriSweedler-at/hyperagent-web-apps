@@ -9,8 +9,9 @@
 // same card at the same pixel rectangle in each of the first ten slots as that story, so a draw
 // moves nothing); and, at the two screenshot viewports, a screenshot compared against the committed
 // per-platform baseline (`e2e/__screenshots__/gin-stories.spec.ts/<id>--<viewport>-<platform>.png`,
-// playwright.config.ts `snapshotPathTemplate`). A missing baseline fails: CI is never green with no
-// visual coverage. Re-recording: `npm run test:e2e -- e2e/gin-stories.spec.ts --project pages
+// playwright.config.ts `snapshotPathTemplate`); a story with a sheet open shoots `body` at both
+// viewports, since the overlays are siblings of `#app`. A missing baseline fails: CI is never
+// green with no visual coverage. Re-recording: `npm run test:e2e -- e2e/gin-stories.spec.ts --project pages
 // --update-snapshots` on macOS, and the `stories-baselines.yml` workflow for linux. Runs once, on
 // `pages`: both origins serve the same bytes.
 import { expect, test, type Page } from '@playwright/test';
@@ -40,6 +41,9 @@ const FACTS = `(() => {
   const kind = ghost === null ? 'none' : (['open', 'pending', 'shown'].find((k) => ghost.classList.contains(k)) ?? 'hidden');
   const stock = document.getElementById('stockPile').classList;
   const disc = document.getElementById('discardPile').classList;
+  const open = (id) => !document.getElementById(id).classList.contains('hidden');
+  const sheet = open('meldOverlay') ? 'meldOverlay' : open('roundResultOverlay') ? 'roundResultOverlay' : 'none';
+  const laidOff = sheet === 'roundResultOverlay' ? { laidOff: all('#rrBody .meld-group.laid .card').map((c) => c.getAttribute('data-card')) } : {};
   return {
     slots: all('#hand .slot').length,
     handCards: all('#hand .slot .card[data-card]').length,
@@ -51,6 +55,8 @@ const FACTS = `(() => {
     discard: disc.contains('tappable') ? 'tappable' : disc.contains('blocked') ? 'blocked' : 'idle',
     actions: all('#actions [data-act]').map((b) => ({ act: b.getAttribute('data-act'), enabled: !b.disabled })),
     statusSub: document.getElementById('statusSub').textContent,
+    sheet,
+    ...laidOff,
   };
 })()`;
 /** Nothing scrolls, and every slot cell's size and top. */
@@ -146,10 +152,12 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         }
 
         if (vp.shot && story.screenshot) {
-          await expect(page.locator(name === 'phone' ? 'body' : '#app')).toHaveScreenshot(
-            `${story.id}--${name}.png`,
-            { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.002 },
-          );
+          const target = name === 'phone' || story.facts.sheet !== 'none' ? 'body' : '#app';
+          await expect(page.locator(target)).toHaveScreenshot(`${story.id}--${name}.png`, {
+            animations: 'disabled',
+            caret: 'hide',
+            maxDiffPixelRatio: 0.002,
+          });
         }
         expect(watched.errors(), 'uncaught exceptions').toEqual([]);
         expect(watched.failures(), 'failed requests').toEqual([]);

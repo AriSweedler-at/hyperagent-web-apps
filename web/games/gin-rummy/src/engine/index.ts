@@ -23,7 +23,7 @@ export {
 export { allMelds, meldingFromGroups, meldSig } from './melds.ts';
 export { bestMelding, allOptimalMeldings, meldSolver } from './melds.algorithms.ts';
 export { maximalLayoff, bestMeldingWithLayoffs } from './layoff.ts';
-export { createGame, dealHand, applyAction, legalActions } from './game.ts';
+export { STOCK_DRAW_FINAL_MSG, createGame, dealHand, applyAction, legalActions } from './game.ts';
 export { viewFor } from './view.ts';
 export { ACTION_TYPES, decodeAction, decodeCard, decodeState, decodeView } from './decode.ts';
 export { KNOCK_LIMIT, GIN_BONUS, UNDERCUT_BONUS, DEFAULT_TARGET, HAND_SIZE } from './types.ts';

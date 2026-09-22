@@ -7,8 +7,15 @@ import { describe, expect, test } from 'vitest';
 
 import { fakeEl, fakeTarget } from '../../../../shared/edge/page.fake.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
-import { applyAction, createGame, legalActions, viewFor } from '../engine/index.ts';
-import type { Action, Seat, State, View } from '../engine/index.ts';
+import {
+  applyAction,
+  createGame,
+  legalActions,
+  makeCard,
+  makeDeck,
+  viewFor,
+} from '../engine/index.ts';
+import type { Action, Card, Rank, Seat, State, View } from '../engine/index.ts';
 import { cardHtml, pretty } from './cards.ts';
 import { slotHandView } from './hand/SlotHandView.ts';
 import { ginPage, type GinPage } from './page.fake.ts';
@@ -99,8 +106,10 @@ const playUntil = (s: State, stop: (s: State) => boolean, budget = 2000): State 
 /** Dealer 1, so seat 0 (Ann) is the non-dealer and moves first. */
 const dealt = createGame({ players: PLAYERS, target: 100, dealer: 1 }, rng, () => NOW);
 const passed = apply(apply(dealt, 0, { type: 'passUpcard' }), 1, { type: 'passUpcard' });
-/** Seat 0 drew from the stock and must discard. */
+/** Seat 0 drew from the stock and must discard; that draw is final. */
 const drawn = apply(passed, 0, { type: 'drawStock' });
+/** Seat 0 took the upcard and must discard; that draw undoes. */
+const taken = apply(dealt, 0, { type: 'takeUpcard' });
 const knocked = playUntil(dealt, (s) => s.phase === 'roundOver' && s.result?.void === false);
 /** A one-point game: the first scored hand ends it. */
 const short = createGame({ players: PLAYERS, target: 1, dealer: 0 }, rng, () => NOW);
@@ -252,9 +261,11 @@ describe('the table', () => {
     ).toHaveLength(11);
     expect(p.get('hand').text()).not.toContain('ghost');
     expect(p.get('hand').hasClass('active')).toBe(true);
-    // The undo button leads the actions row while the draw can be taken back; the short labels.
+    // A stock draw is final: no undo button, the short labels (docs/design/gin-arrangement-and-
+    // discards.md §4).
+    expect(v.canUndo).toBe(false);
     expect(p.get('actions').text()).toBe(
-      '<button class="btn btn-ghost" data-act="undoDraw" title="Undo draw">↩</button><button class="btn btn-secondary grow" data-act="discard" disabled>Discard</button><button class="btn btn-gold grow" data-act="knock" disabled>Knock</button>',
+      '<button class="btn btn-secondary grow" data-act="discard" disabled>Discard</button><button class="btn btn-gold grow" data-act="knock" disabled>Knock</button>',
     );
     expect(p.get('roundResultOverlay').hidden()).toBe(true);
     expect(p.get('meldOverlay').hidden()).toBe(true);
@@ -266,9 +277,13 @@ describe('the table', () => {
     expect(p.get('actions').text()).toContain('data-act="discard" >Discard</button>');
     expect(p.get('actions').text()).toMatch(/>Knock <small>\(\d+\)<\/small><\/button>$/);
     expect(p.get('hand').text()).toContain(' selected"');
-    // Without an undo (the draw is final once a meld arrangement is declared, say): no ↩.
-    paintAll(p.doc, { ...app, view: { ...v, canUndo: false } });
-    expect(p.get('actions').text().startsWith('<button class="btn btn-secondary grow"')).toBe(true);
+    // A draw from the discard pile can be taken back: the undo button leads the actions row.
+    const upcard = viewFor(taken, 0);
+    expect(upcard.canUndo).toBe(true);
+    paintAll(p.doc, local(taken, 0));
+    expect(p.get('actions').text()).toBe(
+      '<button class="btn btn-ghost" data-act="undoDraw" title="Undo draw">↩</button><button class="btn btn-secondary grow" data-act="discard" disabled>Discard</button><button class="btn btn-gold grow" data-act="knock" disabled>Knock</button>',
+    );
     // A gin selection labels the knock button GIN!.
     const gin: View = {
       ...v,
@@ -306,9 +321,8 @@ describe('the table', () => {
         .text()
         .match(/data-card=/g),
     ).toHaveLength(11);
-    expect(
-      p.get('actions').text().startsWith('<button class="btn btn-ghost" data-act="undoDraw"'),
-    ).toBe(true);
+    // A stock draw is final: no undo button while it sits in the ghost cell either.
+    expect(p.get('actions').text()).not.toContain('data-act="undoDraw"');
     expect(p.get('actions').text()).toContain('data-act="discard" disabled');
     // A guest awaiting the host's state frame: the pending cell and "Drawing…".
     const pending = {
@@ -352,6 +366,52 @@ describe('the table', () => {
     expect(p.get('statusSub').text()).toBe('Both passed — tap the stock to draw');
     expect(p.get('actions').text()).toBe('<div class="waiting-note"></div>');
     expect(actionsHtml({ ...v, discardTop: null }, null).markup).toContain('Take upcard');
+  });
+
+  test('the result sheet names the cards laid off, from both seats (the chain position)', () => {
+    // Alice AS 2S 3S 4H 5H 6H 7D 8D 9D 2C KC knocks with the KC; Bob 4S 5S 10H JH QH 7C 8C 9C QD KD
+    // lays 4S then 5S onto the spades and counts QD KD (test/parity/gin.legacy.test.ts).
+    const card = (id: string): Card => {
+      const rank = { A: 1, J: 11, Q: 12, K: 13 }[id.slice(0, -1)] ?? Number(id.slice(0, -1));
+      const suit = id.slice(-1);
+      if (suit !== 'S' && suit !== 'H' && suit !== 'D' && suit !== 'C') throw new Error(id);
+      return makeCard(rank as Rank, suit);
+    };
+    const alice = 'AS 2S 3S 4H 5H 6H 7D 8D 9D 2C KC'.split(' ').map(card);
+    const bob = '4S 5S 10H JH QH 7C 8C 9C QD KD'.split(' ').map(card);
+    const held = new Set([...alice, ...bob].map((c) => c.id));
+    const rest = makeDeck().filter((c) => !held.has(c.id));
+    const position: State = {
+      ...drawn,
+      players: [
+        { id: 'p1', name: 'Alice', total: 0 },
+        { id: 'p2', name: 'Bob', total: 0 },
+      ],
+      hands: [alice, bob],
+      discard: rest.slice(0, 1),
+      stock: rest.slice(1),
+      turn: 0,
+      phase: 'discard',
+      drawnFromDiscard: null,
+      pendingDraw: null,
+      meldPref: [null, null],
+    };
+    const knockedOn = apply(position, 0, { type: 'knock', cardId: 'KC' });
+    const result = knockedOn.result;
+    if (result === null || result.void) throw new Error('the knock did not score');
+    expect(result.opponent.laidOff.map((x) => x.card.id)).toEqual(['4S', '5S']);
+    const laid = `<div class="rr-label">Laid off onto Alice's melds</div><div class="meld-group laid">${cardHtml(card('4S'), { mini: true })}${cardHtml(card('5S'), { mini: true })}</div>`;
+    const dead = `<div class="rr-label">Deadwood · 20</div><div class="meld-group dead">${cardHtml(card('QD'), { mini: true })}${cardHtml(card('KD'), { mini: true })}</div>`;
+    ([0, 1] as const).forEach((seat) => {
+      const p = page();
+      paintAll(p.doc, local(knockedOn, seat));
+      expect(p.get('roundResultOverlay').hidden(), `seat ${String(seat)}`).toBe(false);
+      expect(p.get('rrTitle').text()).toBe('Alice knocked');
+      expect(p.get('rrBody').text()).toContain(laid);
+      expect(p.get('rrBody').text()).toContain(dead);
+      expect(p.get('rrBody').text()).toContain('<span>Alice <small>(knocked)</small></span>');
+      expect(p.get('rrBody').text()).toMatch(/<div class="rr-label">Deadwood · 2<\/div>/);
+    });
   });
 
   test('a knock: the result sheet, its texts and its continue button; dismissed hides it', () => {

@@ -1,6 +1,12 @@
 // Layoffs against a knock (docs/MIGRATION.md step 10): ported from the legacy GinEngine block
 // (test/fixtures/legacy/gin-engine.cjs); behaviour, including the order cards are laid off in and
-// the extended melds that result, is unchanged, test/parity/gin.melds.test.ts is the oracle.
+// the extended melds that result, is unchanged wherever every card fits one meld at most, and
+// test/parity/gin.melds.test.ts is the oracle there. Where a card fits two of the knocker's melds
+// (a set and a run, or two runs of its suit) the legacy attached it to the first and lost the other
+// meld's continuation (7C onto three sevens strands the 8C that 4-5-6 of clubs would have taken);
+// here every fit is followed and the layoff that takes the most cards wins
+// (docs/design/gin-arrangement-and-discards.md §7). gin.legacy.test.ts pins both legs on that
+// position and gin.melds.test.ts allows the current leg only to do better there.
 import { isSet, sortMeld } from './cards.ts';
 import { meldSolver } from './melds.algorithms.ts';
 import type { Card, Cards, Layoff, LayoffEntry, LayoffMelding, Meld } from './types.ts';
@@ -20,26 +26,43 @@ type Progress = Readonly<{
   laidOff: ReadonlyArray<LayoffEntry>;
 }>;
 
+/** The indexes of the melds `c` fits now, in declaration order. */
+const fitsOf = (melds: ReadonlyArray<Meld>, c: Card): ReadonlyArray<number> =>
+  melds.flatMap((m, i) => (fitsOnto(c, m) ? [i] : []));
+
+/** `card` laid off onto meld `onto`: the meld grows, the card leaves the hand, the entry is kept. */
+const laid = (p: Progress, card: Card, onto: number): Progress => ({
+  melds: p.melds.map((m, i) => (i === onto ? [...m, card] : m)),
+  remaining: p.remaining.filter((x) => x.id !== card.id),
+  laidOff: [...p.laidOff, { card, onto }],
+});
+
 /**
- * Lay off one card at a time, always the first remaining card that fits any meld (melds in
- * declaration order), restarting from the first card after each, until nothing fits. A chain
- * (4S then 5S onto A-2-3 of spades) falls out of the restart.
+ * Lay off one card at a time, always the first remaining card that fits any meld, restarting from
+ * the first card after each, until nothing fits: every way of doing so, one leaf per way. A card
+ * that fits one meld (the usual case) gives one branch, so the tree is a chain and its single leaf
+ * is the legacy's result, laid off in the legacy's order (4S then 5S onto A-2-3 of spades falls out
+ * of the restart). A card that fits two melds is laid off onto each in turn, and each way is
+ * followed to its own end, because which meld takes it decides what the later cards can join.
  */
-const layOff = (p: Progress): Progress => {
-  const fit = p.remaining
-    .map((card): LayoffEntry => ({ card, onto: p.melds.findIndex((m) => fitsOnto(card, m)) }))
-    .find((x) => x.onto >= 0);
-  if (fit === undefined) return p;
-  return layOff({
-    melds: p.melds.map((m, i) => (i === fit.onto ? [...m, fit.card] : m)),
-    remaining: p.remaining.filter((x) => x.id !== fit.card.id),
-    laidOff: [...p.laidOff, fit],
-  });
+const layoffLeaves = (p: Progress): ReadonlyArray<Progress> => {
+  const first = p.remaining
+    .map((card): Readonly<{ card: Card; onto: ReadonlyArray<number> }> => ({
+      card,
+      onto: fitsOf(p.melds, card),
+    }))
+    .find((x) => x.onto.length > 0);
+  if (first === undefined) return [p];
+  return first.onto.flatMap((onto) => layoffLeaves(laid(p, first.card, onto)));
 };
+
+/** The leaf laying off the most cards; the first on a tie, so a single-fit hand is the legacy's. */
+const mostLaidOff = (leaves: ReadonlyArray<Progress>): Progress =>
+  leaves.reduce((best, leaf) => (leaf.laidOff.length > best.laidOff.length ? leaf : best));
 
 /** Given the knocker's melds, lay off as many of `cards` as possible (chained). */
 const maximalLayoff = (cards: Cards, knockerMelds: ReadonlyArray<Meld>): Layoff => {
-  const done = layOff({ melds: knockerMelds, remaining: cards, laidOff: [] });
+  const done = mostLaidOff(layoffLeaves({ melds: knockerMelds, remaining: cards, laidOff: [] }));
   return {
     laidOff: done.laidOff,
     remaining: done.remaining,
@@ -47,18 +70,26 @@ const maximalLayoff = (cards: Cards, knockerMelds: ReadonlyArray<Meld>): Layoff 
   };
 };
 
+/** Every card some leaf lays off, once each, in the order the leaves lay them off. */
+const laidOffByAny = (leaves: ReadonlyArray<Progress>): Cards =>
+  leaves
+    .flatMap((leaf) => leaf.laidOff.map((x) => x.card))
+    .filter((c, i, all: Cards) => all.findIndex((x) => x.id === c.id) === i);
+
 /**
- * Opponent's best response to a knock: choose own melds + layoffs minimising deadwood. Layoff
- * feasibility is monotone (each slot accepts exactly one specific card), so the maximal layoff set
- * L is unique and every feasible layoff set is a subset of L. Every subset is tried in bitmask
- * order and the first to reach the minimum wins (laying nothing off is subset 0).
+ * Opponent's best response to a knock: choose own melds + layoffs minimising deadwood. A card laid
+ * off is one the hand need not meld, so the candidates are the subsets of L, every card some leaf
+ * of the layoff tree lays off; a subset S is feasible when some leaf lays off all of S (the leaf
+ * with the most cards, which `maximalLayoff` picks, then has S.length). Every subset is tried in
+ * bitmask order and the first to reach the minimum wins (laying nothing off is subset 0). Where
+ * every card fits one meld the tree has one leaf and L is its cards in the legacy's order.
  */
 const bestMeldingWithLayoffs = (cards: Cards, knockerMelds: ReadonlyArray<Meld>): LayoffMelding => {
-  const L = maximalLayoff(cards, knockerMelds).laidOff.map((x) => x.card);
+  const L = laidOffByAny(layoffLeaves({ melds: knockerMelds, remaining: cards, laidOff: [] }));
   const solver = meldSolver(cards);
   const response = (S: Cards): LayoffMelding | null => {
     const lo = maximalLayoff(S, knockerMelds);
-    // not feasible on its own (e.g. 9 without the 8)
+    // No leaf lays off all of S (the 9 without the 8, or the 8C without the 7C on the run).
     if (lo.laidOff.length !== S.length) return null;
     const m = solver.melding(solver.maskOf(S.map((c) => c.id)));
     return {

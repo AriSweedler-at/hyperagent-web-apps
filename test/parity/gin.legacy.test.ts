@@ -1,11 +1,14 @@
 // Characterization of the gin engine (docs/MIGRATION.md steps 2 and 10; docs/ARCHITECTURE.md
 // "Testing pyramid", parity). Every assertion here is an executable oracle over seeded inputs and
 // runs on both legs: the sha256-pinned legacy fixture and the TypeScript engine behind the adapter
-// in gin.api.ts. The one behaviour the legs disagree on is the `lastDrawn` leak (docs/MIGRATION.md
-// step 15): the legacy leg asserts it as it is, named "KNOWN DEFECT", and the current leg asserts
-// the fix; everything else is one assertion for both.
+// in gin.api.ts. The legs disagree on three behaviours, each a `test.runIf(leg === ...)` pair: the
+// `lastDrawn` leak (docs/MIGRATION.md step 15), the undo of a stock draw and the layoff of a card
+// that fits two knocker melds (docs/design/gin-arrangement-and-discards.md §4 and §7); the legacy
+// leg asserts each as it is, named "KNOWN DEFECT" where it is one, and the current leg asserts the
+// rule; everything else is one assertion for both.
 import { describe, expect, test } from 'vitest';
 
+import { STOCK_DRAW_FINAL_MSG } from '../../web/games/gin-rummy/src/engine/index.ts';
 import { mulberry32, type Rng } from '../../web/shared/lib/rng.ts';
 import {
   loadCurrentGin,
@@ -214,7 +217,8 @@ describe.each(legs)('gin engine: %s', (leg, E) => {
   });
 
   describe('turn flow and rule errors', () => {
-    test('the exact refusal for every out-of-turn or out-of-phase move', () => {
+    /** Seed 2, dealer 0: both pass the upcard and Bob draws from the stock, every refusal checked. */
+    const drewFromStock = (): GinState => {
       const s = newGame(mulberry32(2), 0);
       expect(errorOf(s, 0, { type: 'takeUpcard' })).toBe("It's not your turn.");
       expect(errorOf(s, 1, { type: 'drawStock' })).toBe('Take the upcard or pass.');
@@ -231,23 +235,27 @@ describe.each(legs)('gin engine: %s', (leg, E) => {
       );
       expect(errorOf(s, 1, { type: 'drawStock' })).toBe('ok');
       expect([s.phase, hand(s, 1).length, s.stock.length]).toEqual(['discard', 11, 30]);
-      expect(E.viewFor(s, 1).canUndo).toBe(true);
-      expect(errorOf(s, 1, { type: 'undoDraw' })).toBe('ok');
-      expect([s.phase, hand(s, 1).length, s.stock.length, s.forceStock]).toEqual([
-        'draw',
-        10,
-        31,
-        true,
-      ]);
-      expect(errorOf(s, 1, { type: 'undoDraw' })).toBe(
-        'Draw a card from the stock or the discard pile.',
-      );
-      expect(errorOf(s, 1, { type: 'drawStock' })).toBe('ok');
+      return s;
+    };
+    /** Bob, holding eleven, discards; Alice takes from the discard pile: the rest of the refusals. */
+    const restOfTheOpening = (s: GinState): void => {
       expect(errorOf(s, 1, { type: 'discard', cardId: 'ZZ' })).toBe(
         "That card isn't in your hand.",
       );
       expect(errorOf(s, 1, { type: 'discard', cardId: hand(s, 1)[0]?.id ?? '' })).toBe('ok');
       expect([s.phase, s.turn]).toEqual(['draw', 0]);
+      expect(errorOf(s, 0, { type: 'drawDiscard' })).toBe('ok');
+      expect(s.drawnFromDiscard).toBe(hand(s, 0).at(-1)?.id);
+      // A draw from the discard pile undoes on both legs (public information), and can be redone.
+      expect(E.viewFor(s, 0).canUndo).toBe(true);
+      expect(E.legalActions(E.viewFor(s, 0))).toContainEqual({ type: 'undoDraw' });
+      expect(errorOf(s, 0, { type: 'undoDraw' })).toBe('ok');
+      expect([s.phase, hand(s, 0).length, s.discard.length, s.drawnFromDiscard]).toEqual([
+        'draw',
+        10,
+        2,
+        null,
+      ]);
       expect(errorOf(s, 0, { type: 'drawDiscard' })).toBe('ok');
       expect(s.drawnFromDiscard).toBe(hand(s, 0).at(-1)?.id);
       expect(errorOf(s, 0, { type: 'discard', cardId: s.drawnFromDiscard ?? '' })).toBe(
@@ -258,7 +266,48 @@ describe.each(legs)('gin engine: %s', (leg, E) => {
         "That meld arrangement doesn't fit your hand.",
       );
       expectConserved(s, 'after the scripted opening');
-    });
+    };
+
+    test.runIf(leg === 'legacy')(
+      'the exact refusal for every out-of-turn or out-of-phase move; legacy only: a stock draw undoes too',
+      () => {
+        const s = drewFromStock();
+        expect(E.viewFor(s, 1).canUndo).toBe(true);
+        expect(E.legalActions(E.viewFor(s, 1))).toContainEqual({ type: 'undoDraw' });
+        expect(errorOf(s, 1, { type: 'undoDraw' })).toBe('ok');
+        expect([s.phase, hand(s, 1).length, s.stock.length, s.forceStock]).toEqual([
+          'draw',
+          10,
+          31,
+          true,
+        ]);
+        expect(errorOf(s, 1, { type: 'undoDraw' })).toBe(
+          'Draw a card from the stock or the discard pile.',
+        );
+        expect(errorOf(s, 1, { type: 'drawStock' })).toBe('ok');
+        restOfTheOpening(s);
+      },
+    );
+
+    test.runIf(leg === 'current')(
+      'the exact refusal for every out-of-turn or out-of-phase move; a stock draw is final (docs/design/gin-arrangement-and-discards.md §4)',
+      () => {
+        const s = drewFromStock();
+        expect(E.viewFor(s, 1).canUndo).toBe(false);
+        expect(E.legalActions(E.viewFor(s, 1))).not.toContainEqual({ type: 'undoDraw' });
+        expect(errorOf(s, 1, { type: 'undoDraw' })).toBe(STOCK_DRAW_FINAL_MSG);
+        expect(STOCK_DRAW_FINAL_MSG).toBe("You can't undo a draw from the stock.");
+        expect([s.phase, hand(s, 1).length, s.stock.length, s.pendingDraw?.from]).toEqual([
+          'discard',
+          11,
+          30,
+          'stock',
+        ]);
+        // The card drawn is still marked fresh: the ghost cell shows it, and only accepting remains.
+        expect(E.viewFor(s, 1).lastDrawnId).toBe(s.pendingDraw?.cardId);
+        restOfTheOpening(s);
+      },
+    );
 
     test('the upcard taken is locked against discard and knock; melds are frozen once the hand is over', () => {
       const s = newGame(mulberry32(2), 0);
@@ -457,6 +506,64 @@ describe.each(legs)('gin engine: %s', (leg, E) => {
       expect(s.lastAction?.text).toBe('Alice knocked with 2.');
       expect(s.players.map((p) => p.total)).toEqual([18, 0]);
     });
+
+    /**
+     * Alice knocks on three sevens, 4-5-6 of clubs and A-2-3 of spades with the 4D as deadwood; Bob
+     * holds 7C 8C beside two melds and QD KD. The 7C fits the sevens and the clubs run; only the
+     * run lets the 8C follow (docs/design/gin-arrangement-and-discards.md §7).
+     */
+    const sevenAndEightOfClubs = (): GinState =>
+      position(
+        ['7S', '7H', '7D', '4C', '5C', '6C', 'AS', '2S', '3S', '4D', 'KC'],
+        ['7C', '8C', '10H', 'JH', 'QH', '4H', '5H', '6H', 'QD', 'KD'],
+        '9D',
+      );
+
+    test.runIf(leg === 'legacy')(
+      'KNOWN DEFECT (greedy layoff), legacy only: a card fitting a set and a run goes onto the set, stranding the card the run would have taken next',
+      () => {
+        const s = sevenAndEightOfClubs();
+        expect(E.applyAction(s, 0, { type: 'knock', cardId: 'KC' })).toEqual({ ok: true });
+        const r = scored(s);
+        expect(meldStrings(r.knocker.melds)).toEqual(['7S 7H 7D', '4C 5C 6C', 'AS 2S 3S']);
+        expect(r.opponent.laidOff.map((x) => [x.card.id, x.onto])).toEqual([['7C', 0]]);
+        expect(meldStrings(r.opponent.extendedMelds)).toEqual([
+          '7S 7H 7D 7C',
+          '4C 5C 6C',
+          'AS 2S 3S',
+        ]);
+        expect(ids(r.opponent.deadwood)).toEqual(['QD', 'KD', '8C']);
+        expect([r.knocker.value, r.opponent.value]).toEqual([4, 28]);
+        expect(r.scores).toEqual([24, 0]);
+      },
+    );
+
+    test.runIf(leg === 'current')(
+      'knock: a card fitting a set and a run goes where the next card can follow (7C then 8C onto 4-5-6 of clubs)',
+      () => {
+        const s = sevenAndEightOfClubs();
+        expect(E.applyAction(s, 0, { type: 'knock', cardId: 'KC' })).toEqual({ ok: true });
+        const r = scored(s);
+        expect(r.outcome).toBe('knock');
+        expect(meldStrings(r.knocker.melds)).toEqual(['7S 7H 7D', '4C 5C 6C', 'AS 2S 3S']);
+        const clubRun = meldStrings(r.knocker.melds).indexOf('4C 5C 6C');
+        expect(r.opponent.laidOff.map((x) => [x.card.id, x.onto])).toEqual([
+          ['7C', clubRun],
+          ['8C', clubRun],
+        ]);
+        expect(meldStrings(r.opponent.extendedMelds)).toEqual([
+          '7S 7H 7D',
+          '4C 5C 6C 7C 8C',
+          'AS 2S 3S',
+        ]);
+        expect(meldStrings(r.opponent.melds)).toEqual(['10H JH QH', '4H 5H 6H']);
+        expect(ids(r.opponent.deadwood)).toEqual(['QD', 'KD']);
+        expect([r.knocker.value, r.opponent.value]).toEqual([4, 20]);
+        expect(r.scores).toEqual([16, 0]);
+        expect(s.lastAction?.text).toBe('Alice knocked with 4.');
+        expect(s.players.map((p) => p.total)).toEqual([16, 0]);
+      },
+    );
 
     test('knock: the opponent lays off below the run too (4S then 3S under 5-6-7 of spades)', () => {
       const s = position(

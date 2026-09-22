@@ -1,6 +1,9 @@
 // The rules (docs/MIGRATION.md step 10): ported from the legacy GinEngine block
 // (test/fixtures/legacy/gin-engine.cjs); every phase transition, refusal text, score and history
-// line is unchanged, test/parity/gin.legacy.test.ts and gin.replay.test.ts are the oracle.
+// line is unchanged, test/parity/gin.legacy.test.ts and gin.replay.test.ts are the oracle, but for
+// the two rules of docs/design/gin-arrangement-and-discards.md: a stock draw cannot be undone (§4,
+// `undoDraw`) and a layoff follows the meld that lets more cards follow (§7, layoff.ts); both are
+// pinned per leg there.
 // `applyAction(state, seat, action, rng, now)` is the reducer: it returns a new State or a
 // RuleError worded for the player, never mutates and never throws. Randomness and the clock are
 // injected: the legacy defaulted to `Math.random` and read `Date.now()` for `startedAt` and every
@@ -193,7 +196,11 @@ const readyAfterRound = (state: State, seat: Seat, rng: Rng): Applied => {
   return ok(dealHand({ ...state, ready, dealer }, rng));
 };
 
-/** The drawn card joins the hand; what the draw changed is kept so `undoDraw` can put it back. */
+/**
+ * The drawn card joins the hand; what the draw changed is kept so `undoDraw` can put it back. A
+ * stock draw records it too, although it can no longer be undone: `State` stays byte-identical
+ * with the legacy's, and the view still reads `pendingDraw.from`.
+ */
 const drawn = (
   state: State,
   seat: Seat,
@@ -287,17 +294,25 @@ const drawPhase = (state: State, seat: Seat, action: Action): Applied => {
   return err('Draw a card from the stock or the discard pile.');
 };
 
+/**
+ * The one refusal the legacy never had (docs/design/gin-arrangement-and-discards.md §4): a card
+ * drawn from the stock is private information the ghost cell already showed, so putting it back
+ * would be a free peek. A card taken from the discard pile is public, and that draw undoes as before.
+ */
+const STOCK_DRAW_FINAL_MSG = "You can't undo a draw from the stock.";
+
 const undoDraw = (state: State, seat: Seat): Applied => {
   const pd = state.pendingDraw;
   if (!pd) return err('Nothing to undo.');
+  if (pd.from === 'stock') return err(STOCK_DRAW_FINAL_MSG);
   const hand = state.hands[seat];
   const drawnCard = cardById(hand, pd.cardId);
   if (!drawnCard) return err('Nothing to undo.');
   return ok({
     ...state,
     hands: setAt(state.hands, seat, without(hand, drawnCard.id)),
-    discard: pd.from === 'discard' ? [...state.discard, drawnCard] : state.discard,
-    stock: pd.from === 'stock' ? [...state.stock, drawnCard] : state.stock,
+    discard: [...state.discard, drawnCard],
+    stock: state.stock,
     phase: pd.prevPhase,
     upcardStage: pd.prevUpcardStage,
     forceStock: pd.prevForceStock,
@@ -493,4 +508,4 @@ const legalActions = (view: View): ReadonlyArray<Action> => {
   return [...undo, ...perCard];
 };
 
-export { otherPlayer, createGame, dealHand, applyAction, legalActions };
+export { STOCK_DRAW_FINAL_MSG, otherPlayer, createGame, dealHand, applyAction, legalActions };

@@ -984,7 +984,7 @@
     {
       "name": "12 turn: drew from the stock (ghost slot shown)",
       "changes": {
-        ".actions .btn": "36735779642e",
+        ".actions .btn": "31314c506667",
         ".btn:disabled": "31314c506667",
         ".card.fresh": "9705f1134223",
         ".card.fresh::after": "306c996efeac",
@@ -1067,7 +1067,7 @@
     {
       "name": "17 turn: knock available",
       "changes": {
-        ".actions .btn": "36735779642e",
+        ".actions .btn": "9bc9f9be6304",
         ".card.fresh": "af1b5fbc6b1e",
         ".card.fresh::after": "ebf0aa265736",
         ".card.selected": "8cb94495d190",

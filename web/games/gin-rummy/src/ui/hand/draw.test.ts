@@ -24,8 +24,9 @@ const passed = play(dealt, [
   [1, { type: 'passUpcard' }],
 ]);
 const drawn = play(passed, [[0, { type: 'drawStock' }]]);
-const undone = play(drawn, [[0, { type: 'undoDraw' }]]);
 const took = play(dealt, [[0, { type: 'takeUpcard' }]]);
+/** Only a draw from the discard pile undoes (docs/design/gin-arrangement-and-discards.md §4). */
+const undone = play(took, [[0, { type: 'undoDraw' }]]);
 
 const hold = holdOf(viewFor(passed, 0).me);
 const waiting: DrawStage = { kind: 'waiting', from: 'stock', hold };
@@ -66,7 +67,7 @@ describe('settleDraw', () => {
     expect(settleDraw(null, viewFor(passed, 0))).toBeNull();
   });
 
-  test('a view carrying my undoable draw shows the drawn card; the same shown stage is kept as is', () => {
+  test('a view carrying my draw shows the drawn card; the same shown stage is kept as is', () => {
     expect(settleDraw(waiting, v)).toEqual(shown);
     expect(settleDraw(shown, v)).toBe(shown);
     // The hold travels from the waiting stage: the ten cards as they were before the draw.
@@ -88,12 +89,17 @@ describe('settleDraw', () => {
     expect(settleDraw(upcard, viewFor(dealt, 0))).toBe(upcard);
   });
 
-  test('anything else clears it: the undo, the opponent turn, a discard already made, no undo', () => {
+  test('shown even with canUndo false: a stock draw cannot be undone and still sits in the ghost cell', () => {
+    expect(v.canUndo).toBe(false);
+    expect(settleDraw(waiting, v)).toEqual(shown);
+    expect(settleDraw(shown, v)).toBe(shown);
+    expect(viewFor(took, 0).canUndo).toBe(true);
+  });
+
+  test('anything else clears it: the undo, the opponent turn, a discard already made', () => {
     expect(settleDraw(shown, viewFor(undone, 0))).toBeNull();
     expect(settleDraw(waiting, viewFor(undone, 1))).toBeNull();
     expect(settleDraw(shown, viewFor(drawn, 1))).toBeNull();
-    const noUndo: View = { ...v, canUndo: false };
-    expect(settleDraw(shown, noUndo)).toBeNull();
     const noFresh: View = { ...v, lastDrawnId: null };
     expect(settleDraw(waiting, noFresh)).toBeNull();
     const theirs: View = { ...v, isMyTurn: false };

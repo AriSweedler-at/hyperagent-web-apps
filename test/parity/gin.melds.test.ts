@@ -1,13 +1,17 @@
 // Meld-level parity for the gin engine (docs/MIGRATION.md step 10): the legacy fixture and the
 // TypeScript engine over 2000 seeded 10/11-card hands, drawn from three pools (the full deck, two
 // suits, ranks ace to seven) so sets, runs, four-of-a-kinds and chained layoffs are dense. Every
-// helper's result is compared as JSON text: values, keys and order, tie-breaking included.
+// helper's result is compared as JSON text: values, keys and order, tie-breaking included, with
+// one relaxation: where a card of the hand fits two knocker melds (`multiFit`, gin.layoffs.ts) the
+// current engine may lay off more and leave less deadwood than the legacy, never less or more
+// (docs/design/gin-arrangement-and-discards.md §7); every other hand's layoffs match exactly.
 import { describe, expect, test } from 'vitest';
 
 import * as current from '../../web/games/gin-rummy/src/engine/index.ts';
 import type { Card as EngineCard, Meld } from '../../web/games/gin-rummy/src/engine/index.ts';
 import { mulberry32 } from '../../web/shared/lib/rng.ts';
 import { loadLegacyGin, type Card } from './gin.api.ts';
+import { multiFit } from './gin.layoffs.ts';
 
 const legacy = loadLegacyGin();
 const HANDS = 2000;
@@ -31,8 +35,8 @@ const same = (label: string, got: unknown, want: unknown): void => {
 const asEngine = (cards: Card[]): EngineCard[] => cards as EngineCard[];
 const asEngineMelds = (melds: Card[][]): Meld[] => melds as Meld[];
 
-/** One seeded hand and a seeded opponent hand; every meld helper compared on both legs. */
-const compareHand = (seed: number): void => {
+/** Whether the hand of `seed` fits two knocker melds, so the layoff helpers were compared loosely. */
+const compareHand = (seed: number): boolean => {
   const pool = pools[seed % pools.length] ?? deck;
   const shuffled = legacy.shuffle(pool, mulberry32(seed));
   same(`shuffle ${String(seed)}`, current.shuffle(asEngine(pool), mulberry32(seed)), shuffled);
@@ -58,16 +62,24 @@ const compareHand = (seed: number): void => {
   );
   // The knocker's melds are the seeded opponent's best melding; the hand lays off onto them.
   const knockerMelds = legacy.bestMelding(opponent).melds;
-  same(
-    `${label}: maximalLayoff`,
-    current.maximalLayoff(asEngine(hand), asEngineMelds(knockerMelds)),
-    legacy.maximalLayoff(hand, knockerMelds),
-  );
-  same(
-    `${label}: bestMeldingWithLayoffs`,
-    current.bestMeldingWithLayoffs(asEngine(hand), asEngineMelds(knockerMelds)),
-    legacy.bestMeldingWithLayoffs(hand, knockerMelds),
-  );
+  const loose = multiFit(hand, knockerMelds);
+  const layoff = current.maximalLayoff(asEngine(hand), asEngineMelds(knockerMelds));
+  const withLayoffs = current.bestMeldingWithLayoffs(asEngine(hand), asEngineMelds(knockerMelds));
+  const legacyLayoff = legacy.maximalLayoff(hand, knockerMelds);
+  const legacyWithLayoffs = legacy.bestMeldingWithLayoffs(hand, knockerMelds);
+  if (loose) {
+    // A card fits two knocker melds: the current engine follows both and may do better.
+    expect(layoff.laidOff.length, `${label}: maximalLayoff`).toBeGreaterThanOrEqual(
+      legacyLayoff.laidOff.length,
+    );
+    expect(legacyWithLayoffs, `${label}: legacy bestMeldingWithLayoffs`).not.toBeNull();
+    expect(withLayoffs.value, `${label}: bestMeldingWithLayoffs`).toBeLessThanOrEqual(
+      legacyWithLayoffs?.value ?? -1,
+    );
+  } else {
+    same(`${label}: maximalLayoff`, layoff, legacyLayoff);
+    same(`${label}: bestMeldingWithLayoffs`, withLayoffs, legacyWithLayoffs);
+  }
   // Declared arrangements: each optimal arrangement's groups round-trip; a group with a card
   // from the other hand, an overlapping group and a non-meld are refused on both legs.
   const groupsOf = (melds: Card[][]): string[][] => melds.map((m) => m.map((c) => c.id));
@@ -93,11 +105,15 @@ const compareHand = (seed: number): void => {
       legacy.meldingFromGroups(hand, groups),
     );
   });
+  return loose;
 };
 
 describe('gin engine parity: legacy vs current, meld helpers', () => {
-  test(`${String(HANDS)} seeded hands agree on every meld helper, in order`, () => {
-    Array.from({ length: HANDS }, (_, i) => i + 1).forEach(compareHand);
+  test(`${String(HANDS)} seeded hands agree on every meld helper, in order; the layoff helpers loosely where a card fits two knocker melds`, () => {
+    const loose = Array.from({ length: HANDS }, (_, i) => i + 1).filter(compareHand);
+    // The relaxation is exercised (14 hands at the time of writing) and stays the exception.
+    expect(loose.length).toBeGreaterThan(0);
+    expect(loose.length).toBeLessThan(HANDS / 50);
   }, 120_000);
 
   test('the constants and the card helpers', () => {
