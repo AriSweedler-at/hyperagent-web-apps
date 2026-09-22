@@ -8,6 +8,7 @@ import {
   deadwoodText,
   fmtDuration,
   nextCue,
+  oppDrawCue,
   selectionIn,
   statusFor,
   statusWith,
@@ -216,5 +217,27 @@ describe('nextCue', () => {
     expect(nextCue(first.state, over, 'local').cue).toBe('win');
     const noResult: View = { ...base, phase: 'roundOver', result: null };
     expect(nextCue(first.state, noResult, 'local').cue).toBeNull();
+  });
+});
+
+describe('oppDrawCue', () => {
+  const bothPassed = play(dealt, [
+    [0, { type: 'passUpcard' }],
+    [1, { type: 'passUpcard' }],
+  ]);
+  const tookUpcard = play(dealt, [[0, { type: 'takeUpcard' }]]);
+
+  test("Jeff hears Ann's pickup: from the stock a fall, from the discard pile a rise", () => {
+    expect(oppDrawCue(viewFor(bothPassed, 1), viewFor(drawn, 1))).toBe('oppStock');
+    expect(oppDrawCue(viewFor(dealt, 1), viewFor(tookUpcard, 1))).toBe('oppDiscard');
+  });
+
+  test('silent: no previous view, my own draw, their discard phase again, another hand, a pass', () => {
+    expect(oppDrawCue(null, viewFor(drawn, 1))).toBeNull();
+    expect(oppDrawCue(viewFor(bothPassed, 0), viewFor(drawn, 0))).toBeNull();
+    expect(oppDrawCue(viewFor(drawn, 1), viewFor(drawn, 1))).toBeNull();
+    expect(oppDrawCue({ ...viewFor(bothPassed, 1), handNumber: 9 }, viewFor(drawn, 1))).toBeNull();
+    const passed = play(dealt, [[0, { type: 'passUpcard' }]]);
+    expect(oppDrawCue(viewFor(dealt, 1), viewFor(passed, 1))).toBeNull();
   });
 });

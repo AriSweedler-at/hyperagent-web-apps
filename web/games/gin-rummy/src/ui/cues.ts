@@ -94,8 +94,9 @@ export { fmtDuration } from '../scorer/format.ts';
 
 // ---- sound cues --------------------------------------------------------------------------------
 
-/** The `fx` method the legacy called. */
-export type Cue = 'yourTurn' | 'knockGood' | 'gin' | 'bad' | 'neutral' | 'win' | 'lose';
+/** The `fx` method the legacy called, plus the port's two pickup cues (`oppDrawCue`). */
+export type Cue =
+  'yourTurn' | 'knockGood' | 'gin' | 'bad' | 'neutral' | 'win' | 'lose' | 'oppStock' | 'oppDiscard';
 /** `local` is pass-and-play on one phone; `online` a host or a guest. */
 export type CueRole = 'local' | 'online';
 /** What `playCuesFor` remembered between renders so each event chimes once. */
@@ -104,6 +105,22 @@ export const INITIAL_CUES: CueState = { key: null, turnKey: null };
 export type Cued = Readonly<{ state: CueState; cue: Cue | null }>;
 
 const totalsKey = (view: View): string => view.players.map((p) => String(p.total)).join(',');
+
+/**
+ * The opponent picked up a card (the owner, 2026-09-22: "when the opponent picks up from the
+ * stock or from the discard pile, a sound should be played"): `prev` was their draw or upcard
+ * decision, `next` is their discard phase of the same hand, and the stock or the discard pile is
+ * one card shorter. Beside `nextCue`, not in it: the legacy machine never fired here, and its
+ * parity golden stands. Null without a previous view (a join, a resume, a reload) and on one
+ * phone, where whoever drew is holding it (ui/state.ts gates the role).
+ */
+export const oppDrawCue = (prev: View | null, next: View): Cue | null => {
+  if (prev === null || next.isMyTurn || next.phase !== 'discard') return null;
+  if (prev.handNumber !== next.handNumber || prev.phase === 'discard') return null;
+  if (next.stockCount < prev.stockCount) return 'oppStock';
+  if (next.discardCount < prev.discardCount) return 'oppDiscard';
+  return null;
+};
 
 /** The cue a freshly rendered view fires, if any, and the state to carry to the next render. */
 export const nextCue = (prev: CueState, view: View, role: CueRole): Cued => {

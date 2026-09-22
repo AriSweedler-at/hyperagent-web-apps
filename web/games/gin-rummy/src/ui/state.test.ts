@@ -467,6 +467,9 @@ describe('hosting', () => {
       type: 'send',
       frame: { t: 'state', view: viewFor(afterGuest.app.game ?? drawn, 1) },
     });
+    // The guest drew from the stock: the host hears the pickup.
+    expect(kinds(afterGuest.effects)).toEqual(['send', 'persist', 'fx', 'scrollTop']);
+    expect(afterGuest.effects[2]).toEqual({ type: 'fx', cue: 'oppStock' });
     expect(afterGuest.app.view).toEqual(viewFor(afterGuest.app.game ?? drawn, 0));
   });
 
@@ -592,6 +595,24 @@ describe('joining', () => {
       screen: 'tableScreen',
     });
     expect(shown.effects).toEqual([{ type: 'scrollTop' }]);
+  });
+
+  test("the opponent's pickup chimes on the guest's side: their draw phase, then their discard phase with a pile one shorter", () => {
+    const bothPassed = play(dealt, [
+      [0, { type: 'passUpcard' }],
+      [1, { type: 'passUpcard' }],
+    ]);
+    const stock = run(
+      { ...joined(), view: viewFor(bothPassed, 1) },
+      { type: 'guest/frame', frame: { t: 'state', view: viewFor(drawn, 1) } },
+    );
+    expect(stock.effects).toEqual([{ type: 'fx', cue: 'oppStock' }, { type: 'scrollTop' }]);
+    const tookUpcard = play(dealt, [[0, { type: 'takeUpcard' }]]);
+    const discard = run(
+      { ...joined(), view: viewFor(dealt, 1) },
+      { type: 'guest/frame', frame: { t: 'state', view: viewFor(tookUpcard, 1) } },
+    );
+    expect(discard.effects).toEqual([{ type: 'fx', cue: 'oppDiscard' }, { type: 'scrollTop' }]);
   });
 
   test('acting sends the action frame while connected, else the not-connected toast', () => {
