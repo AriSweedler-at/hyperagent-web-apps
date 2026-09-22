@@ -51,7 +51,7 @@ const depsOver = (store: EffectDeps['store'], dispatch: (i: Intent) => void): Ef
   timers: { start: quiet, cancel: quiet },
   toggleSound: quiet,
   share: quiet,
-  page: { fillName: quiet, setCode: quiet },
+  page: { fillName: quiet, fillP2Name: quiet, setCode: quiet },
   dispatch,
 });
 

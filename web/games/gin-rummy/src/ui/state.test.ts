@@ -81,6 +81,7 @@ const drawn = play(dealt, [
 
 const home: HomeSnapshot = {
   name: null,
+  p2Name: null,
   homeTab: 'play',
   playMode: 'online',
   save: null,
@@ -158,7 +159,7 @@ describe('home', () => {
       { ...initialApp, screen: 'tableScreen' },
       {
         type: 'home/init',
-        home: { ...home, name: 'Ann', homeTab: 'score', playMode: 'local' },
+        home: { ...home, name: 'Ann', p2Name: 'Bob', homeTab: 'score', playMode: 'local' },
       },
     );
     expect(app).toMatchObject({
@@ -169,11 +170,12 @@ describe('home', () => {
       playMode: 'local',
       resume: null,
     });
-    // The saved name goes into the inputs; the tab is applied without persisting
+    // The saved names go into the inputs; the tab is applied without persisting
     // (`{ persist: false }`); the score tab wakes the scorer.
     expect(effects).toEqual([
       { type: 'scrollTop' },
       { type: 'fillName', name: 'Ann' },
+      { type: 'fillP2Name', name: 'Bob' },
       { type: 'scorer', call: 'shown' },
     ]);
     const plain = run(initialApp, { type: 'home/init', home });
@@ -210,6 +212,22 @@ describe('home', () => {
     expect(run(initialApp, { type: 'p1name/typed', value: '' })).toEqual({
       app: initialApp,
       effects: [{ type: 'rememberName', name: '' }],
+    });
+  });
+
+  test('typing the second pass-and-play name remembers it trimmed under its own key and touches nothing', () => {
+    expect(run(initialApp, { type: 'p2name/typed', value: ' Bob ' })).toEqual({
+      app: initialApp,
+      effects: [{ type: 'rememberP2Name', name: 'Bob' }],
+    });
+    expect(run(initialApp, { type: 'p2name/typed', value: '' })).toEqual({
+      app: initialApp,
+      effects: [{ type: 'rememberP2Name', name: '' }],
+    });
+    // A saved second name alone fills its input and nothing else.
+    expect(run(initialApp, { type: 'home/init', home: { ...home, p2Name: 'Bob' } })).toMatchObject({
+      app: { nameTouched: false, savedName: null },
+      effects: [{ type: 'scrollTop' }, { type: 'fillP2Name', name: 'Bob' }],
     });
   });
 
@@ -1207,6 +1225,7 @@ describe('storage', () => {
     const store = createStore(storage);
     expect(readHome(store)).toEqual(home);
     storage.setItem(STORAGE_KEYS.name, 'Ann');
+    storage.setItem(STORAGE_KEYS.p2Name, 'Bob');
     storage.setItem(STORAGE_KEYS.homeTab, 'rules');
     storage.setItem(STORAGE_KEYS.playMode, 'local');
     storage.setItem(STORAGE_KEYS.save, '{"role":"guest","code":"KQZM","myName":"Jeff"}');
@@ -1224,6 +1243,7 @@ describe('storage', () => {
     );
     expect(readHome(store)).toEqual({
       name: 'Ann',
+      p2Name: 'Bob',
       homeTab: 'rules',
       playMode: 'local',
       save: { role: 'guest', code: 'KQZM', myName: 'Jeff' },
@@ -1240,7 +1260,8 @@ describe('storage', () => {
     // Garbage reads as the defaults, as the legacy fell back.
     storage.setItem(STORAGE_KEYS.homeTab, 'settings');
     storage.setItem(STORAGE_KEYS.save, 'not json');
-    expect(readHome(store)).toMatchObject({ homeTab: 'play', save: null });
+    storage.setItem(STORAGE_KEYS.p2Name, '');
+    expect(readHome(store)).toMatchObject({ homeTab: 'play', save: null, p2Name: null });
   });
 });
 
@@ -1302,7 +1323,11 @@ describe('runEffect', () => {
       timers: { start: note('timers.start'), cancel: note('timers.cancel') },
       toggleSound: note('toggleSound'),
       share: note('share'),
-      page: { fillName: note('page.fillName'), setCode: note('page.setCode') },
+      page: {
+        fillName: note('page.fillName'),
+        fillP2Name: note('page.fillP2Name'),
+        setCode: note('page.setCode'),
+      },
       dispatch: note('dispatch'),
     };
     return { deps, log, storage, answer };
@@ -1318,15 +1343,20 @@ describe('runEffect', () => {
     runEffect(initialApp, { type: 'clearSave' }, deps);
     expect(storage.map.has(STORAGE_KEYS.save)).toBe(false);
     runEffect(initialApp, { type: 'rememberName', name: 'Ann' }, deps);
+    runEffect(initialApp, { type: 'rememberP2Name', name: 'Bob' }, deps);
     runEffect(initialApp, { type: 'writeHomeTab', tab: 'score' }, deps);
     runEffect(initialApp, { type: 'writePlayMode', mode: 'local' }, deps);
     expect([...storage.map.entries()]).toEqual([
       [STORAGE_KEYS.name, 'Ann'],
+      [STORAGE_KEYS.p2Name, 'Bob'],
       [STORAGE_KEYS.homeTab, 'score'],
       [STORAGE_KEYS.playMode, 'local'],
     ]);
     runEffect(initialApp, { type: 'rememberName', name: '' }, deps);
     expect(storage.map.has(STORAGE_KEYS.name)).toBe(false);
+    expect(storage.map.get(STORAGE_KEYS.p2Name)).toBe('Bob');
+    runEffect(initialApp, { type: 'rememberP2Name', name: '' }, deps);
+    expect(storage.map.has(STORAGE_KEYS.p2Name)).toBe(false);
   });
 
   test('every other effect reaches its adapter; confirm dispatches only on yes; initHome re-reads storage', () => {
@@ -1349,6 +1379,7 @@ describe('runEffect', () => {
       { type: 'toggleSound' },
       { type: 'share', code: 'ABCD' },
       { type: 'fillName', name: 'Ann' },
+      { type: 'fillP2Name', name: 'Bob' },
       { type: 'setCode', value: 'AB' },
       { type: 'initHome' },
     ];
@@ -1374,6 +1405,7 @@ describe('runEffect', () => {
       ['toggleSound'],
       ['share', 'ABCD'],
       ['page.fillName', 'Ann'],
+      ['page.fillP2Name', 'Bob'],
       ['page.setCode', 'AB'],
       ['dispatch', { type: 'home/init', home }],
     ]);

@@ -7,7 +7,9 @@
 // module names the keys (docs/ARCHITECTURE.md "Module boundaries"); it takes a `Store` from
 // web/shared/edge/storage.ts, so tests run it over a Map. Four keys hold bare strings, not JSON
 // (`ginRummy_name`, `ginRummy_homeTab`, `ginRummy_playMode`, `ginRummy_sound`), as the legacy
-// `safeSet` wrote them.
+// `safeSet` wrote them. One key is this page's own: `ginRummy_p2Name`, the pass-and-play second
+// name, remembered under `rememberName`'s rule; the legacy read `#p2NameInput` only at the Start
+// button and never stored it, so no capture exists for it.
 import type { Store, StorageError } from '../../../shared/edge/storage.ts';
 
 // ui/state.ts names the Store through this module (docs/MIGRATION.md step 12): the reducer may
@@ -36,6 +38,11 @@ export const STORAGE_KEYS = {
   save: 'ginRummyMP_v1',
   /** The player's name, as typed (bare string, at most 20 characters). */
   name: 'ginRummy_name',
+  /**
+   * The pass-and-play second name, as typed (bare string, at most 20 characters). Not a legacy
+   * key: the legacy page read `#p2NameInput` only at the Start button and never stored it.
+   */
+  p2Name: 'ginRummy_p2Name',
   /** The home tab last shown (bare string). */
   homeTab: 'ginRummy_homeTab',
   /** Online or pass-and-play (bare string). */
@@ -190,10 +197,18 @@ export const readName = (store: Store): Result<string, StorageError> =>
   readTextWith(store, STORAGE_KEYS.name, decodeName);
 
 /** `rememberName`: an empty name removes the key, anything else is stored cut to NAME_MAX. */
+const writeNameUnder = (store: Store, key: StorageKey, name: string): Result<null, StorageError> =>
+  name === '' ? store.remove(key) : store.writeText(key, name.slice(0, NAME_MAX));
+
 export const writeName = (store: Store, name: string): Result<null, StorageError> =>
-  name === ''
-    ? store.remove(STORAGE_KEYS.name)
-    : store.writeText(STORAGE_KEYS.name, name.slice(0, NAME_MAX));
+  writeNameUnder(store, STORAGE_KEYS.name, name);
+
+/** The pass-and-play second name, under `rememberName`'s rule; the legacy never stored it. */
+export const readP2Name = (store: Store): Result<string, StorageError> =>
+  readTextWith(store, STORAGE_KEYS.p2Name, decodeName);
+
+export const writeP2Name = (store: Store, name: string): Result<null, StorageError> =>
+  writeNameUnder(store, STORAGE_KEYS.p2Name, name);
 
 export const readHomeTab = (store: Store): Result<HomeTab, StorageError> =>
   readTextWith(store, STORAGE_KEYS.homeTab, decodeHomeTab);

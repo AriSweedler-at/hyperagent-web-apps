@@ -15,6 +15,7 @@ import {
   clearSave,
   readHomeTab,
   readName,
+  readP2Name,
   readSave,
   readScorerNames,
   readScorerState,
@@ -22,6 +23,7 @@ import {
   soundEnabled,
   writeHomeTab,
   writeName,
+  writeP2Name,
   writePlayMode,
   writeSave,
   writeScorerNames,
@@ -57,10 +59,11 @@ const game = createGame(
 );
 
 describe('frozen constants', () => {
-  test('the seven legacy keys, the tabs, modes, sound states and the name cap', () => {
+  test('the seven legacy keys and the second name, the tabs, modes, sound states and the name cap', () => {
     expect(ALL_KEYS).toEqual([
       'ginRummyMP_v1',
       'ginRummy_name',
+      'ginRummy_p2Name',
       'ginRummy_homeTab',
       'ginRummy_playMode',
       'ginRummy_sound',
@@ -142,6 +145,25 @@ describe('the bare-string preferences', () => {
     expect(readName(store)).toEqual({
       ok: false,
       error: { kind: 'invalid', key: STORAGE_KEYS.name, reason: '$: expected a non-empty name' },
+    });
+  });
+
+  test('the second name round-trips under its own key by the same rule; an empty stored value is refused', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    expect(writeP2Name(store, 'Bob')).toEqual({ ok: true, value: null });
+    expect(s.map.get(STORAGE_KEYS.p2Name)).toBe('Bob');
+    expect(readP2Name(store)).toEqual({ ok: true, value: 'Bob' });
+    // The first name's key is untouched: the two are remembered apart.
+    expect(s.map.has(STORAGE_KEYS.name)).toBe(false);
+    expect(writeP2Name(store, 'abcdefghijklmnopqrstuvwxyz').ok).toBe(true);
+    expect(s.map.get(STORAGE_KEYS.p2Name)).toBe('abcdefghijklmnopqrst');
+    expect(writeP2Name(store, '')).toEqual({ ok: true, value: null });
+    expect(s.map.has(STORAGE_KEYS.p2Name)).toBe(false);
+    s.setItem(STORAGE_KEYS.p2Name, '');
+    expect(readP2Name(store)).toEqual({
+      ok: false,
+      error: { kind: 'invalid', key: STORAGE_KEYS.p2Name, reason: '$: expected a non-empty name' },
     });
   });
 

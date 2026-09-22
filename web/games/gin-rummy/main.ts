@@ -30,7 +30,7 @@ import { isGuestFrame } from './src/protocol.ts';
 import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
 import { soundEnabled } from './src/storage.ts';
 import { slotHandView } from './src/ui/hand/SlotHandView.ts';
-import { fillNameInputs, inviteText, setCodeInput } from './src/ui/home.ts';
+import { fillNameInputs, fillP2NameInput, inviteText, setCodeInput } from './src/ui/home.ts';
 import {
   bindAll,
   fmtTime,
@@ -287,6 +287,9 @@ const boot = (): void => {
     page: {
       fillName: (name) => {
         fillNameInputs(document, name);
+      },
+      fillP2Name: (name) => {
+        fillP2NameInput(document, name);
       },
       setCode: (value) => {
         setCodeInput(document, value);
