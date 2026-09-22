@@ -62,7 +62,7 @@ const FACTS = `(() => {
     human: all('#hand .slot.human .card').map((c) => c.getAttribute('data-card')),
     rows: Number(document.getElementById('hand').getAttribute('data-rows')),
     arrange: arrangeBtn.disabled ? 'off' : arrangeBtn.classList.contains('due') ? 'due' : 'idle',
-    sort: activeSort === null ? 'melds' : activeSort.getAttribute('data-sort'),
+    sort: activeSort === null ? 'suit' : activeSort.getAttribute('data-sort'),
     stock: stock.contains('tappable') ? 'tappable' : 'idle',
     discard: disc.contains('tappable') ? 'tappable' : disc.contains('blocked') ? 'blocked' : 'idle',
     actions: all('#actions [data-act]').map((b) => ({ act: b.getAttribute('data-act'), enabled: !b.disabled })),

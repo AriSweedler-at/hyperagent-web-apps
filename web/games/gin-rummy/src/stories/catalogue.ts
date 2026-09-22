@@ -33,7 +33,6 @@ import { arrangedOf, toggleMeld, type HumanMelds } from '../ui/hand/arrange.ts';
 import type { DrawStage } from '../ui/hand/draw.ts';
 import {
   cardsOf,
-  engineOf,
   phoneRows,
   samePicture,
   settlePicture,
@@ -181,7 +180,9 @@ const discarded = play(drewStock, 0, {
 // ---- pictures --------------------------------------------------------------------------------------
 
 /** The turn-start arrangement of `seat` over `state`: the engine's melding, nothing hand-made. */
-const startOf = (state: State, seat: Seat): Picture => engineOf(viewFor(state, seat), null);
+/** The turn-start picture as the app arranges it: the engine's melds, the loose cards in the default order. */
+const startOf = (state: State, seat: Seat): Picture =>
+  arrangedOf(viewFor(state, seat), null, null, DEFAULT_SORT);
 
 /** The picture after a draw from `before` was accepted: the turn-start picture, the drawn card loose at its end. */
 const acceptedFrom = (before: State, after: State, seat: Seat): Picture =>
@@ -193,6 +194,11 @@ const discardedFrom = (accepted: Picture, after: State, seat: Seat): Picture =>
 
 /** Ann's accepted stock draw, the drawn card loose at the end: the picture the accepted stories keep. */
 const acceptedPicture = acceptedFrom(openDraw, drewStock, 0);
+/** The engine's eleven arranged, the loose cards reversed by hand: `manual` keeps them so. */
+const manualPicture = ((): Picture => {
+  const arranged = arrangedOf(viewFor(drewStock, 0), null, null, DEFAULT_SORT);
+  return { ...arranged, loose: [...arranged.loose].reverse() };
+})();
 
 /**
  * Turns after a stock draw, both seats discarding for the least deadwood and drawing from the
@@ -472,7 +478,7 @@ const factsOf = (
   const selectedId = stage === null ? selected : null;
   const { picture, human, sort } = arrangement;
   const arrangeable = inPlay(view.phase) && stage === null;
-  const asked = arrangedOf(view, stage, human, sort);
+  const asked = arrangedOf(view, stage, human, sort, picture);
   return {
     slots: Math.max(hand.length, HAND_SIZE + 1),
     handCards: hand.length,
@@ -709,23 +715,26 @@ export const STORIES: ReadonlyArray<Story> = [
   }),
   story({
     id: 'sorted-by-rank',
-    title: 'The accepted hand arranged by rank: groups by their lowest card, then the loose cards',
+    title: 'The accepted hand arranged by rank: the melds first, then the loose cards by rank',
     state: drewStock,
     seat: 0,
     sort: 'rank',
     statusSub: ACCEPTED_SUB,
   }),
   story({
-    id: 'sorted-by-suit',
-    title: 'The accepted hand arranged by suit: spades, hearts, diamonds, clubs',
+    id: 'manual-order',
+    title:
+      'The accepted hand in manual order: the loose cards as the player left them, Arrange idle',
     state: drewStock,
     seat: 0,
-    sort: 'suit',
+    sort: 'manual',
+    picture: manualPicture,
     statusSub: ACCEPTED_SUB,
   }),
   story({
     id: 'arrange-sheet-open',
-    title: 'The arrange sheet: the three sort modes, the current one active, the long-press hint',
+    title:
+      'The arrange sheet: by suit, by rank, manual, the current one active, the long-press hint',
     state: drewStock,
     seat: 0,
     picture: acceptedPicture,

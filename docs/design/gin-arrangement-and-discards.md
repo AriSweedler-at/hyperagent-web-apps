@@ -174,10 +174,10 @@ hand.
 
 MODULE `src/ui/hand/arrange.ts` (pure):
 
-- `SortMode = 'melds' | 'rank' | 'suit'` (storage.ts, key `ginRummy_sort`, default `melds`);
-  `sorted(picture, mode)`: `melds` leaves the solver's order; `rank` and `suit` order every group by
-  its lowest card and the loose cards by the same key (rank then suit; suit in SUITS order then
-  rank).
+- `SortMode = 'suit' | 'rank' | 'manual'` (src/sort.ts; storage.ts key `ginRummy_sort`, default
+  `suit`; §5c replaced the original `melds | rank | suit`): `sorted(picture, mode, prev)` orders the
+  loose cards alone, by suit (SUITS order then rank), by rank (then suit), or as `prev`, the picture
+  on screen, had them (`manual`). The groups stay as they come, hand-made first then the solver's.
 - `HumanMelds = { hand: number; groups: string[][] }` on `App.human` (not saved, not on the wire):
   the melds the player made by hand in hand number `hand`. `standing(human, hand, held)` keeps the
   cards still held in each group and drops a group that is no longer a meld (a discarded card out
@@ -218,6 +218,27 @@ FACTS AND STORIES. `StoryFacts` gains `human` (the `.slot.human .card` ids), `ro
 seed from SEED whose accepted first draw melds two ways: `TWO_WAYS_SEED`; it carries every story
 that needs a meld, since seed 12's accepted hand melds nothing). Flows: e2e/gin-arrange.spec.ts
 over `?story=<id>&live` (the chooser pick, the sort modes, the long press and the toast).
+
+## 5c. Deadwood only (the owner, 2026-09-22)
+
+"I don't wanna arrange by melds ever. you arrange deadwood only, and melds sit off to the side. So
+you can arrange by: suit, rank, manually (where you have to click and drag cards around)."
+
+- The melds are not arranged: they sit first in every mode, hand-made ones leading, then the
+  solver's in its order. Only the loose cards sort. `melds` (the solver's order for everything)
+  is retired; a stored `melds` decodes as nothing and the default, `suit`, applies.
+- `manual`: the loose cards stay as the picture on screen has them. `arrangedOf` takes `prev`,
+  the current picture, and `sorted(…, 'manual', prev)` orders the loose cards by their place in
+  `prev` (its loose cards first, then the cards a group of `prev` let go, then cards new to the
+  table, each run in the solver's order). Every caller passes `App.picture`: the turn-start
+  arrangement (`settlePicture` rule a), the Arrange sheet, a long press, the `due` check. So
+  under `manual` the sheet re-melds without moving a loose card, and Arrange is `due` only when a
+  meld formed or broke.
+- Choosing `manual` in the sheet freezes the order as it is. The drag that moves a card (PR D2)
+  switches the mode to `manual` and writes it.
+- Stories: `sorted-by-suit` is retired (it is the default now); `manual-order` (the accepted
+  hand's engine arrangement with its loose cards reversed by hand, `sort: manual`, Arrange idle)
+  takes its place. `sorted-by-rank` and `arrange-sheet-open` stand, re-recorded.
 
 ## 6. Hand layout
 
