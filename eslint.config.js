@@ -231,14 +231,16 @@ const zones = [
       `${GAME_SRC}/app/**`,
       `${GAME_SRC}/storage.ts`,
     ],
-    // The two fakes are for the session tests beside the modules (docs/MIGRATION.md step 12).
+    // The two fakes are for the session tests beside the modules (docs/MIGRATION.md step 12);
+    // peer.ts is the peer plumbing every game's sessions share (watchdog, keep-alive, path toast).
     except: [
       '**/web/shared/edge/transport.ts',
       '**/web/shared/edge/transport.fake.ts',
       '**/web/shared/edge/clock.ts',
       '**/web/shared/edge/clock.fake.ts',
+      '**/web/shared/edge/peer.ts',
     ],
-    message: 'net/ imports protocol, engine/domain and only the transport and clock edges.',
+    message: 'net/ imports protocol, engine/domain and only the transport, clock and peer edges.',
   },
   {
     // Every ui/ module except ui/state.ts, which the reducer zone below owns, and the tests beside

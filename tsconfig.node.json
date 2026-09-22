@@ -43,6 +43,7 @@
     "web/shared/edge/ice.ts",
     "web/shared/edge/transport.ts",
     "web/shared/edge/transport.fake.ts",
+    "web/shared/edge/peer.ts",
     "web/shared/edge/transport.contract.log.ts",
     "web/shared/edge/dom.fake.ts",
     "web/games/fidice/src/domain/**/*.ts",

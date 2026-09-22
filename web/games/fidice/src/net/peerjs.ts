@@ -6,35 +6,19 @@
 // which honours the `?peer=` hook), and the ICE loader (or null: the page without shared/ice.js).
 // The Peer still exists only once `ice.load()` resolves, listeners registered before then are
 // queued and replayed in order, and the relay probe runs on the injected Clock.
-import type { Clock } from '../../../../shared/lib/clock.ts';
-import type {
-  Connection,
-  PeerHandle,
-  RealTransportOptions,
-  Transport,
-} from '../../../../shared/edge/transport.ts';
+import type { IceResult, NetDeps } from '../../../../shared/edge/peer.ts';
+import type { Connection, PeerHandle } from '../../../../shared/edge/transport.ts';
+import { peerIdFor } from '../../../../shared/lib/roomCode.ts';
 import type { ClientTransport, ErrorKind, HostTransport } from './session.ts';
 
-// The ICE shapes are named through transport.ts and Connection rather than imported from ice.ts:
-// net/ may reach only the transport and clock edges (docs/ARCHITECTURE.md "Module boundaries"),
-// and web/shared/edge/ice.ts's `Ice` satisfies `IceLoader` structurally.
-/** What `ice.load()` resolves to (web/shared/edge/ice.ts `IceResult`). */
-export type IceResult = NonNullable<RealTransportOptions['ice']>;
-/** The two members of `Ice` this adapter calls. */
-export type IceLoader = Readonly<{
-  load: () => Promise<IceResult>;
-  describe: (pc: ReturnType<Connection['peerConnection']>) => Promise<Readonly<{ path: string }>>;
-}>;
+export type { IceLoader, IceResult } from '../../../../shared/edge/peer.ts';
 
-export type PeerDeps = Readonly<{
-  /** A Transport whose Peers carry `ice`: main.ts passes `(ice) => realTransport({ ice, search, debug: 1 })`. */
-  transportFor: (ice: IceResult | null) => Transport;
-  /** The ICE loader; null when there is none (the Peer is then created at once, PeerJS defaults). */
-  ice: IceLoader | null;
-  clock: Clock;
-}>;
-
-const peerIdFor = (code: string): string => `fidice-${code.toLowerCase()}`;
+/**
+ * The shared NetDeps (web/shared/edge/peer.ts) without `onWake`: this adapter has no keep-alive, so
+ * nothing here listens for the page waking. main.ts passes `(ice) => realTransport({ ice, search,
+ * debug: 1 })` as `transportFor`.
+ */
+export type PeerDeps = Omit<NetDeps, 'onWake'>;
 
 /** How long after the channel opens the relay probe looks at the selected candidate pair. */
 const PATH_PROBE_MS = 3000;
@@ -119,7 +103,7 @@ const describePath = (c: Connection, deps: PeerDeps, fn: (message: string) => vo
 };
 
 const hostTransport = (code: string, deps: PeerDeps): HostTransport => {
-  const p = deferredPeer(peerIdFor(code), deps);
+  const p = deferredPeer(peerIdFor('fidice', code), deps);
   return {
     onOpen: (fn) => {
       p.ready((peer) => {
@@ -155,7 +139,7 @@ const clientTransport = (code: string, deps: PeerDeps): ClientTransport => {
     onOpen: (fn) => {
       p.ready((peer) => {
         peer.on('open', () => {
-          const c = peer.connect(peerIdFor(code));
+          const c = peer.connect(peerIdFor('fidice', code));
           c.onOpen(() => {
             fn(c);
             describePath(c, deps, (m) => {
@@ -175,12 +159,4 @@ const clientTransport = (code: string, deps: PeerDeps): ClientTransport => {
   };
 };
 
-export {
-  peerIdFor,
-  PATH_PROBE_MS,
-  NO_RELAY_INFO,
-  deferredPeer,
-  describePath,
-  hostTransport,
-  clientTransport,
-};
+export { PATH_PROBE_MS, NO_RELAY_INFO, deferredPeer, describePath, hostTransport, clientTransport };
