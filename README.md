@@ -87,7 +87,7 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    `describe.each` on the frozen legacy code and on the port. The legacy side is cut verbatim out of
    the never-edited pages under `legacy/` into `test/fixtures/legacy/*.cjs` by
    `tools/legacy/extract-*.ts` and pinned by sha256 in `MANIFEST.json`; `manifest.test.ts` re-runs
-   the extractors on every run and `frozen.test.ts` pins the whole files. 1000 seeded gin games and
+   the extractors on every run and `frozen.test.ts` pins the whole files. 400 seeded gin games (1000 nightly) and
    12 seeded fidice bot games (`SEEDS` in `test/parity/fidice.legacy.test.ts`) replay through both
    legs with states deep-equal; recorded wire frames and localStorage captures decode and re-encode
    byte for byte. Known legacy defects the port fixes are named and pinned on the legacy leg only.

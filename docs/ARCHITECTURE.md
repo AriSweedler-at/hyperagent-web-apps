@@ -305,7 +305,7 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
    sessions over `transport.fake.ts` + `fakeClock` replay every recorded sequence; frozen-constant
    tests for prefixes, alphabets, storage keys and `t` tags.
 3. Parity (permanent): `describe.each([['legacy', gin-engine.cjs], ['current', engine]])` runs the
-   same assertions on both; 1000 seeded gin games and 12 seeded fidice bot games replay through both
+   same assertions on both; 400 seeded gin games (1000 nightly) and 12 seeded fidice bot games replay through both
    with state and views deep-equal (known defects preserved and named); DOM-snapshot parity
    (normalised innerHTML of `#hand`, `#actions`, `#statusBanner`, `#oppCards`, `#rrBody`, `#app` over
    ~60 recorded views); computed-style goldens (~60 selectors at 390x844 and 1280x800) recorded
@@ -727,7 +727,7 @@ Step 10 (gin engine): `web/games/gin-rummy/src/engine/**`:
   (commented in place) so the 100% statement threshold holds.
 - `tsconfig.web.json` no longer excludes `engine/**`; `tsconfig.node.json` lists the gin engine for
   the parity suites. Coverage: `engine/**` at 90% lines, functions and statements,
-  `melds.algorithms.ts` at 100%. The 1000-game replay runs as four 250-game shards
+  `melds.algorithms.ts` at 100%. The replay (400 games on every push, 1000 in the nightly) runs as four shards
   (`test/parity/gin.replay.{1..4}.test.ts`, one line each over `gin.replay.ts`) so vitest spreads
   it across workers: ~15 s wall on a 16-core laptop instead of ~55 s in one worker;
   `GIN_REPLAY_GAMES=<n>` shortens a local run.

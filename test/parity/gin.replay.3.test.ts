@@ -1,4 +1,4 @@
-// Shard 3 of the 1000-game gin replay (test/parity/gin.replay.ts).
+// Shard 3 of the 400-game gin replay (1000 nightly) (test/parity/gin.replay.ts).
 import { replayShard } from './gin.replay.ts';
 
 replayShard(2);
