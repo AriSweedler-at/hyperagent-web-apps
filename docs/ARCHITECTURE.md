@@ -14,8 +14,10 @@ and tests that prove it land before the code they protect.
 2. Breakage is caught mechanically: typecheck, lint, unit, protocol, parity and two-peer e2e
    run on every push and PR, and the same typecheck+lint+unit run before every push locally.
 3. Online play never regresses: the merge gate plays a real host/guest game in two browser
-   contexts through a local PeerServer on both emulated origins; a real-broker game runs on
-   every PR (advisory) and nightly against both live origins including a relay-forced game.
+   contexts through a local PeerServer on both emulated origins, and a relay-forced one through a
+   local TURN relay; a real-broker game runs on every PR (advisory), and nightly the same online
+   and relay-forced games play with the deployed GitHub Pages page as the subject and every server
+   local. No test depends on a Cloudflare service.
 4. Engine and domain code is pure, immutable, loop-free and exception-free by tooling, not
    convention.
 
@@ -24,13 +26,14 @@ and tests that prove it land before the code they protect.
 ```
 .
 ├── package.json / .nvmrc        scripts: build, preview, serve, proxy:dev, typecheck, lint, lint:fix, format,
-│                                test, test:watch, test:dist, test:integration, test:e2e, test:live,
+│                                test, test:watch, test:dist, test:integration, test:e2e, test:deployed,
 │                                check (= typecheck+lint+test+build+test:dist), fixtures:*, debundle:fidice,
 │                                hooks, hooks:verify (README "Develop" has the table)
 ├── tsconfig.json                solution -> tsconfig.{base,web,pure,node}.json
 ├── vite.config.ts               root web/, base './', input = glob web/**/index.html, legacyPassthrough plugin
 ├── vitest.config.ts             node env; jsdom only for *.dom.test.ts; v8 coverage thresholds
-├── playwright.config.ts         projects: pages, proxy, next (hermetic); broker (real 0.peerjs.com, advisory)
+├── playwright.config.ts         projects: pages, proxy (hermetic); E2E_BROKER=cloud (real 0.peerjs.com, advisory);
+│                                E2E_TARGET=deployed (the deployed page, pages only; nightly)
 ├── eslint.config.js             flat config (below)
 ├── .githooks/{pre-commit,pre-push}   shim chaining the owner's template hook; npm run check
 ├── .github/workflows/{ci,nightly}.yml
@@ -88,7 +91,7 @@ Games never import each other. `infra/` shares only the pure `mapPath()` with te
 Documented test hooks that are part of the contract: `window.__gin`, `window.__fidice`,
 `window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
 `?ice=<url>` (ICE config override), `?ice-policy=relay` (port-only: `iceTransportPolicy: 'relay'`
-inside the Peer `config`, for the nightly's relay-forced game), `?story=<id>` (gin only: `main.ts`
+inside the Peer `config`, for the `@relay` specs' relay-forced games), `?story=<id>` (gin only: `main.ts`
 reads it before anything else and, when present, imports `src/stories/boot.ts` and returns, so the
 page paints one catalogued table state from `src/stories/catalogue.ts` with the real `paint` and
 constructs no store, network, ICE or timer; `?story=` alone lists the stories as links, `&nav` adds
@@ -258,13 +261,18 @@ to the public registry (host and the firewall's `/npm/` path prefix; npm's `repl
 swaps only the hostname), installs through Socket Firewall Free (`sfw npm ci`) so CI installs are
 scanned too, and restores the pristine lockfile afterwards. The lockfile's integrity hashes are
 verified against what is downloaded either way. `nightly.yml` (`cron 23 9 * * *` and
-`workflow_dispatch`; by hand `gh workflow run nightly.yml`) runs `npm run test:live`
-(`E2E_TARGET=live E2E_BROKER=cloud playwright test --grep "@online|@relay"`, no build): the online
-specs against both live origins through the real broker and `turn.sweedler.com`, plus the same
-relay-forced games through that relay instead of the local coturn (live, `gameQuery()` drops
-`?ice=`, so `{ ice: 'turn' }` is moot and the deployed credentials are what carry the game). On failure it
+`workflow_dispatch`; by hand `gh workflow run nightly.yml`) installs coturn like `e2e` and runs
+`npm run test:deployed` (`E2E_TARGET=deployed npm run test:e2e -- --grep "@online|@relay"`): the
+`pages` project's baseURL is the deployed origin `https://arisweedler-at.github.io` (`e2e/fixtures/site.ts`
+`DEPLOYED_PAGES_ORIGIN`, `baseUrl()`), there is no `proxy` project (`PROJECTS`), proxy-dev is not
+started, and the deployed page is opened with the same `?peer=` and `?ice=` hooks as the emulated
+one, naming the PeerServer, the ICE lists on serve-dist (the build's only role) and the coturn on
+the runner. Chromium's Local Network Access asks before a public https page reaches 127.0.0.1, so
+`newPlayer` grants `local-network-access` to the context when deployed; the options `new Peer`
+receives are the fixtures byte for byte, as everywhere. Nothing Cloudflare is in the loop
+(games.sweedler.com, turn.sweedler.com, the zone's bot protection: issue #19). On failure it
 uploads the report and comments the run URL on the open issue labelled `nightly`, creating
-"Nightly live run failed" when none is open; a green run closes it.
+"Nightly deployed run failed" when none is open; a green run closes it.
 
 ## Testing pyramid
 
@@ -300,7 +308,12 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
    gin scorer (CSV blob), fidice online (lobby, hello, seeded bots, redaction, spectator), fidice
    bots to `over`; smoke on every page: zero uncaught exceptions, zero failed requests outside an
    allowlist, and the Peer constructor received the `?ice=` config. Visual `toHaveScreenshot`
-   baselines captured on the CI runner from the legacy pages.
+   baselines captured on the CI runner from the legacy pages. The `@relay` specs (gin and fidice
+   with `?ice-policy=relay`) connect through the harness's coturn and read the selected candidate
+   pair off every `RTCPeerConnection`: relay on both ends. `E2E_TARGET=deployed` (nightly) runs the
+   `@online` and `@relay` specs with the deployed Pages page in place of the emulated one and the
+   same local servers behind the hooks; the emulated-only specs (DOM parity, computed styles) skip
+   there with a reason.
 5. Stories (`web/games/gin-rummy/src/stories/catalogue.ts`; `e2e/gin-stories.spec.ts` on `pages`;
    docs/design/gin-draw-ghost-slot.md §7-§8). A story is one table state of the gin page as an
    `App` the real `paint` renders through the `?story=<id>` hook, played through the engine alone

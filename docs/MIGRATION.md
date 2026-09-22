@@ -762,4 +762,28 @@ parity and e2e gates.
   with turn.sweedler.com's credentials; and the relay-forced game run live against the deployed
   pages (which lack the hook) failed only at the `iceTransportPolicy` assertion, after both live
   pages had joined, toasted "Connected via relay" of their own accord and dealt. See ARCHITECTURE
-  "CI" and "Documented test hooks".
+  "CI" and "Documented test hooks". Second follow-up (2026-09-22, the rest of issue #19): the owner
+  ruled that no test depends on Cloudflare, so `E2E_TARGET=live` is retired with everything that
+  existed only for it (`LIVE_ORIGINS`, `isLive()`, the live branches of `gameQuery()`,
+  `expectPeerOptions()` and `skipWithoutRelay()`, the no-webServer config branch, `npm run
+  test:live`): `expectPeerOptions` asserts the fixture byte for byte everywhere, and an
+  `E2E_TARGET` that is not `local` or `deployed` throws. The nightly is decided by experiment:
+  the deployed Pages page opened in Playwright with the local hooks
+  (`?peer=127.0.0.1:<port>&ice=http://127.0.0.1:<port>/hyperagent-web-apps/e2e-ice-turn.json&ice-policy=relay`)
+  fetches the list (serve-dist answers with `Access-Control-Allow-Origin: *`), meets on the local
+  PeerServer over `ws://127.0.0.1` and relays through the local coturn; the one thing in the way is
+  Chromium's Local Network Access (since 142; the harness's Chromium is 153), which asks before a
+  public https page reaches a loopback address and which `newPlayer` grants to the context as the
+  `local-network-access` permission when deployed. So `E2E_TARGET=deployed` is the deployed bytes
+  plus the local PeerServer, TURN and ICE lists, `pages` project only (`PROJECTS` in `site.ts`
+  drops `proxy`: games.sweedler.com is Cloudflare), and `nightly.yml` installs coturn and runs
+  `npm run test:deployed` (`E2E_TARGET=deployed npm run test:e2e -- --grep "@online|@relay"`; the
+  build only feeds serve-dist) with the same issue-on-failure and close-on-green steps ("Nightly
+  deployed run failed/passed"). The deployed TURN credentials are no longer proven by any test;
+  README "Online play" > "Verify" says how to check them by hand. Proof on the author's laptop
+  (2026-09-22, `E2E_PORT_OFFSET=1000`, coturn 4.18 from the Homebrew bottle): the deployed gin and
+  fidice relay-forced games passed against https://arisweedler-at.github.io (both pages toasted
+  "Connected via relay", relay candidates on both sides, the deal and the round agreed), the
+  hermetic hook check passed; the three direct `@online` specs timed out at the WebRTC ceiling on
+  the deployed target exactly as they do on the local target on this machine (Cloudflare WARP drops
+  loopback host candidates; relay candidates get through), so their proof is the ubuntu runner's.
