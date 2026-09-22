@@ -35,6 +35,7 @@
         <div class="tab-submenu" id="playSubmenu">
           <button type="button" data-mode="online">🌐 Online</button>
           <button type="button" data-mode="local">📱 Pass &amp; Play</button>
+          <button type="button" class="hidden" data-mode="sandbox">🧪 Sandbox</button>
         </div>
       </div>
       <button type="button" class="tab-btn" id="tabRulesBtn" data-tab="rules">Rules</button>
@@ -46,6 +47,7 @@
       <div class="mode-switch" id="playModeSwitch">
         <button type="button" class="mode-btn" data-mode="online">🌐 Online</button>
         <button type="button" class="mode-btn" data-mode="local">📱 Pass &amp; Play</button>
+        <button type="button" class="mode-btn hidden" data-mode="sandbox">🧪 Sandbox</button>
       </div>
 
       <div id="onlineModeContent">
@@ -86,6 +88,23 @@
         <button class="btn btn-primary" id="localBtn">Start pass &amp; play</button>
         <div class="empty-note" style="text-align:left; padding:8px 2px 0;">One phone, no internet needed — it hides each player's cards until they tap "Show my cards" on their turn.</div>
       </div>
+
+      <!-- The sandbox (src/sandbox.ts): shown while the first player is named "sandbox". -->
+      <div id="sandboxModeContent" class="hidden">
+        <div class="card-box">
+          <label>Starting point</label>
+          <select id="sbPreset" style="margin-top:8px;"></select>
+          <textarea id="sbMap" rows="7" spellcheck="false" autocapitalize="off" autocomplete="off" style="margin-top:8px;"></textarea>
+          <div class="row" style="margin-top:8px;">
+            <button class="btn btn-secondary btn-sm grow" id="sbRandomBtn">🎲 Random</button>
+            <button class="btn btn-secondary btn-sm grow" id="sbCopyBtn">Copy</button>
+            <button class="btn btn-ghost btn-sm grow" id="sbHelpBtn">Help</button>
+          </div>
+          <div class="empty-note" id="sbError" style="text-align:left; padding:8px 2px 0; color: var(--danger);"></div>
+        </div>
+        <button class="btn btn-primary" id="sbStartBtn">Deal the map</button>
+        <div class="empty-note" style="text-align:left; padding:8px 2px 0;">A pass-and-play game dealt exactly as written above: both hands, the discard pile, the stock. From the console: <code>__gin.sandbox(map)</code>.</div>
+      </div><!-- /sandbox -->
     </div>
 
     <!-- RULES TAB -->
@@ -290,6 +309,29 @@
     <div class="dc-grid" id="discardsGrid"></div>
     <label class="dc-toggle"><input type="checkbox" id="discardsHandToggle"> Include the cards in my hand</label>
     <button class="btn btn-ghost btn-block btn-sm" id="closeDiscardsBtn" style="margin-top:14px;">Close</button>
+  </div>
+</div>
+
+<!-- SANDBOX HELP -->
+<div id="sandboxHelpOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div style="text-align:center; font-size:2rem;">🧪</div>
+    <div class="sheet-title">The sandbox</div>
+    <div class="sheet-sub">Deal any position to test how a hand is arranged. Pick a starting point, edit the map, deal it. It plays as pass &amp; play.</div>
+    <pre class="sb-help">p1: AS 2S 3S 7H 7D 7C 9S 10D QH KC
+p2: 4S 5S 6S 8H 8D 8C 9D JD QD 2C
+discard: 5H        # bottom first, top last
+stock: 3C 4C       # top first; the rest of the
+                   # deck follows in deck order
+turn: p1           # or p2
+phase: draw        # upcard, draw or discard
+drawn: KC          # discard phase: the card just
+                   # drawn from the stock (the dot)
+melds: 7H 7D 7C | AS 2S 3S   # p1's hand-made melds
+target: 100</pre>
+    <div class="sheet-sub" style="margin-top:10px;">Cards are A 2 … 10 J Q K (T for ten) and S H D C, in any case; <code>#</code> starts a comment. Only p1, p2 and a discard card are needed. In the discard phase the turn player holds eleven.</div>
+    <div class="sheet-sub">Console: <code>__gin.sandbox(map)</code> deals a map string; <code>__gin.sandboxMap()</code> prints the table as a map you can paste back. Copy puts the map in the clipboard as that call.</div>
+    <button class="btn btn-ghost btn-block btn-sm" id="closeSandboxHelpBtn" style="margin-top:14px;">Close</button>
   </div>
 </div>
 

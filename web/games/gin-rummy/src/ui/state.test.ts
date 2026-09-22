@@ -6,6 +6,7 @@ import { STOCK_DRAW_FINAL_MSG, applyAction, createGame, viewFor } from '../engin
 import type { Action, Seat, State, View } from '../engine/index.ts';
 import { CONNECTED_MSG, connectingMsg } from '../net/guest.ts';
 import { OPENING_MSG, WAITING_MSG, handoffMsg } from '../net/host.ts';
+import { DEFAULT_PRESET, presetById } from '../sandbox.ts';
 import { STORAGE_KEYS } from '../storage.ts';
 import { arrangedOf } from './hand/arrange.ts';
 import { engineOf } from './hand/picture.ts';
@@ -17,6 +18,7 @@ import {
   LEAVE_ONLINE_MSG,
   LOCKED_CARD_MSG,
   LONG_PRESS_MS,
+  SANDBOX_COPIED_MSG,
   LOST_HOST_MSG,
   NOT_CONNECTED_MSG,
   NO_MELD_MSG,
@@ -30,6 +32,7 @@ import {
   hostContextOf,
   hostRoomMsg,
   initialApp,
+  sandboxUnlocked,
   joinedMsg,
   parseTarget,
   readHome,
@@ -140,6 +143,8 @@ describe('the initial app', () => {
       revealed: null,
       homeTab: 'play',
       playMode: 'online',
+      p1Name: '',
+      sandbox: { preset: 'no-melds', map: DEFAULT_PRESET.map, error: null, helpOpen: false },
       screen: 'homeScreen',
       netAttempt: 0,
       hostStatus: { text: 'Opening room…', pulse: true },
@@ -207,7 +212,7 @@ describe('home', () => {
 
   test('typing a name remembers it trimmed, shows it as typed in the other inputs, and marks the online one touched', () => {
     expect(run(initialApp, { type: 'name/typed', value: '  Zoë ' })).toEqual({
-      app: { ...initialApp, nameTouched: true },
+      app: { ...initialApp, nameTouched: true, p1Name: '  Zoë ' },
       effects: [
         { type: 'rememberName', name: 'Zoë' },
         { type: 'fillName', name: '  Zoë ' },
@@ -1376,6 +1381,7 @@ describe('runEffect', () => {
       timers: { start: note('timers.start'), cancel: note('timers.cancel') },
       toggleSound: note('toggleSound'),
       share: note('share'),
+      copy: note('copy'),
       page: {
         fillName: note('page.fillName'),
         fillP2Name: note('page.fillP2Name'),
@@ -1436,6 +1442,7 @@ describe('runEffect', () => {
       { type: 'fillName', name: 'Ann' },
       { type: 'fillP2Name', name: 'Bob' },
       { type: 'setCode', value: 'AB' },
+      { type: 'copy', text: 'x' },
       { type: 'initHome' },
     ];
     effects.forEach((e) => {
@@ -1461,6 +1468,7 @@ describe('runEffect', () => {
       ['page.fillName', 'Ann'],
       ['page.fillP2Name', 'Bob'],
       ['page.setCode', 'AB'],
+      ['copy', 'x'],
       ['dispatch', { type: 'home/init', home }],
     ]);
     answer.yes = false;
@@ -1849,5 +1857,86 @@ describe('the discarded-cards sheet', () => {
     ) as View;
     const guest: App = { ...table, role: 'guest', game: null, view: legacy };
     expect(run(guest, { type: 'discards/open' }).app).toBe(guest);
+  });
+});
+
+describe('the sandbox', () => {
+  const twoWays = presetById('two-ways-tie')?.map ?? '';
+  const unlocked = run(initialApp, { type: 'p1name/typed', value: ' Sandbox ' }).app;
+
+  test('unlocks on the first name "sandbox" from any of its inputs or from storage, and locks again', () => {
+    expect(sandboxUnlocked(initialApp)).toBe(false);
+    expect(sandboxUnlocked(unlocked)).toBe(true);
+    expect(sandboxUnlocked(run(initialApp, { type: 'name/typed', value: 'sandbox' }).app)).toBe(
+      true,
+    );
+    expect(
+      sandboxUnlocked(
+        run(initialApp, { type: 'home/init', home: { ...home, name: 'sandbox' } }).app,
+      ),
+    ).toBe(true);
+    // Locked, the mode cannot be set; unlocked it can, and it is never stored.
+    expect(run(initialApp, { type: 'mode/set', mode: 'sandbox' })).toEqual({
+      app: initialApp,
+      effects: [],
+    });
+    const inSandbox = run(unlocked, { type: 'mode/set', mode: 'sandbox' });
+    expect(inSandbox.app.playMode).toBe('sandbox');
+    expect(inSandbox.effects).toEqual([]);
+    // The name changing away while in the sandbox falls back to pass-and-play.
+    expect(run(inSandbox.app, { type: 'p1name/typed', value: 'Ann' }).app.playMode).toBe('local');
+    expect(run(inSandbox.app, { type: 'p1name/typed', value: 'SANDBOX' }).app.playMode).toBe(
+      'sandbox',
+    );
+  });
+
+  test('the editor: a preset, typing, a random deal, help, and copy as a console call', () => {
+    const preset = run(initialApp, { type: 'sandbox/preset', id: 'two-ways-tie' });
+    expect(preset.app.sandbox).toEqual({
+      preset: 'two-ways-tie',
+      map: twoWays,
+      error: null,
+      helpOpen: false,
+    });
+    expect(run(initialApp, { type: 'sandbox/preset', id: 'nope' }).app).toBe(initialApp);
+    const typed = run(preset.app, { type: 'sandbox/typed', value: 'p1: AS' });
+    expect(typed.app.sandbox).toMatchObject({ preset: '', map: 'p1: AS', error: null });
+    const random = run(typed.app, { type: 'sandbox/random' });
+    expect(random.app.sandbox.preset).toBe('random');
+    expect(random.app.sandbox.map).toMatch(/^p1: (\S+ ){9}\S+\np2: /);
+    expect(run(random.app, { type: 'sandbox/help', open: true }).app.sandbox.helpOpen).toBe(true);
+    expect(run(typed.app, { type: 'sandbox/copy' }).effects).toEqual([
+      { type: 'copy', text: '__gin.sandbox(`p1: AS`)' },
+      { type: 'toast', message: SANDBOX_COPIED_MSG, ms: null },
+    ]);
+  });
+
+  test('dealing a map starts a pass-and-play game exactly as written, with its hand-made melds; a bad map shows its error', () => {
+    const dealt = run(unlocked, { type: 'sandbox/start', map: twoWays, p1: 'sandbox', p2: 'Bob' });
+    expect(dealt.app).toMatchObject({
+      role: 'local',
+      screen: 'tableScreen',
+      sandbox: { error: null },
+    });
+    expect(dealt.app.game?.players.map((p) => p.name)).toEqual(['sandbox', 'Bob']);
+    expect(dealt.app.game?.hands[0].map((c) => c.id)).toEqual(
+      '6S 7S 8S 7H 7D 2C 9H JD QC KH'.split(' '),
+    );
+    expect(dealt.app.game?.discard.map((c) => c.id)).toEqual(['5S']);
+    expect(dealt.app.game).toMatchObject({ turn: 0, phase: 'draw', handNumber: 1 });
+    expect(dealt.app.human).toBeNull();
+    expect(kinds(dealt.effects)).toEqual(['wakeLock', 'persist', 'scrollTop']);
+    // The console deals with default names; a hand-made meld in the map is the player's.
+    const made = run(initialApp, {
+      type: 'sandbox/start',
+      map: presetById('hand-made-set')?.map ?? '',
+    });
+    expect(made.app.game?.players.map((p) => p.name)).toEqual(['Player 1', 'Player 2']);
+    expect(made.app.human).toEqual({ hand: 1, groups: [['7S', '7H', '7D']] });
+    expect(made.app.picture?.groups.map((g) => g.map((c) => c.id))).toEqual([['7S', '7H', '7D']]);
+    const bad = run(unlocked, { type: 'sandbox/start', map: 'p1: AS' });
+    expect(bad.app.game).toBeNull();
+    expect(bad.app.sandbox).toMatchObject({ map: 'p1: AS', error: 'p1 needs 10 cards, has 1' });
+    expect(bad.effects).toEqual([]);
   });
 });

@@ -16,7 +16,7 @@ import {
   type NavigatorLike,
 } from '../../shared/edge/fx.ts';
 import { browserIceDeps, createIce } from '../../shared/edge/ice.ts';
-import { shareText } from '../../shared/edge/share.ts';
+import { shareText, type ShareNavigatorLike } from '../../shared/edge/share.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
 import { realTransport } from '../../shared/edge/transport.ts';
 import type { Timer } from '../../shared/lib/clock.ts';
@@ -29,8 +29,15 @@ import type { NetDeps } from './src/net/peerjs.ts';
 import { isGuestFrame } from './src/protocol.ts';
 import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
 import { soundEnabled } from './src/storage.ts';
+import { formatMap, mapOf } from './src/sandbox.ts';
 import { slotHandView } from './src/ui/hand/SlotHandView.ts';
-import { fillNameInputs, fillP2NameInput, inviteUrl, setCodeInput } from './src/ui/home.ts';
+import {
+  fillNameInputs,
+  fillP2NameInput,
+  inviteUrl,
+  renderSandbox,
+  setCodeInput,
+} from './src/ui/home.ts';
 import {
   bindAll,
   fmtTime,
@@ -289,6 +296,11 @@ const boot = (): void => {
         },
       );
     },
+    copy: (text) => {
+      // The clipboard alone, no share sheet: a console call is for the keyboard, not a friend.
+      const nav: ShareNavigatorLike = navigator;
+      void nav.clipboard?.writeText(text).catch(() => undefined);
+    },
     page: {
       fillName: (name) => {
         fillNameInputs(document, name);
@@ -351,6 +363,7 @@ const boot = (): void => {
   page.__scorer = scorer;
 
   renderRules(document);
+  renderSandbox(document);
   bindAll(document, dispatch);
   scorer.bind();
   paintSound(document, fx.enabled());
@@ -393,6 +406,11 @@ const boot = (): void => {
     setPlayMode: (mode: string) => {
       dispatch({ type: 'mode/set', mode });
     },
+    // The sandbox from the console (src/sandbox.ts): deal a map; read the table back as one.
+    sandbox: (map: string) => {
+      dispatch({ type: 'sandbox/start', map });
+    },
+    sandboxMap: (): string | null => (app.game === null ? null : formatMap(mapOf(app.game))),
     dispatch,
   };
 

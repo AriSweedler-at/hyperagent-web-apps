@@ -38,8 +38,12 @@
   .btn-block { width: 100%; }
   .btn-sm { padding: 10px 12px; min-height: 44px; font-size: 0.85rem; }
   .btn small { font-weight: 600; opacity: 0.8; }
-  input[type="text"], input[type="number"] { width: 100%; padding: 14px 16px; border-radius: 14px; background: #0d2418; color: var(--text); font-size: 1.1rem; font-weight: 600; outline: none; border: 1px solid rgba(255,255,255,0.08); }
+  input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 14px 16px; border-radius: 14px; background: #0d2418; color: var(--text); font-size: 1.1rem; font-weight: 600; outline: none; border: 1px solid rgba(255,255,255,0.08); }
   input::placeholder { color: var(--muted); font-weight: 400; }
+  /* The sandbox's map editor and its help: a map is columns of card ids, so both are monospaced. */
+  #sbMap, .sb-help { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.82rem; font-weight: 500; line-height: 1.45; }
+  #sbMap { resize: vertical; min-height: 120px; padding: 10px 12px; }
+  .sb-help { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: #0d2418; color: var(--text); white-space: pre; overflow-x: auto; text-align: left; }
   label { font-size: 0.78rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
   .row { display: flex; gap: 10px; align-items: center; }
   .row + .row { margin-top: 10px; }

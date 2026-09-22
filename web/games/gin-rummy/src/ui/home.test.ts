@@ -12,9 +12,11 @@ import {
   fillP2NameInput,
   inviteUrl,
   paintHome,
+  renderSandbox,
   setCodeInput,
   tabButtonId,
 } from './home.ts';
+import { PRESETS } from '../sandbox.ts';
 import { ginPage, type GinPage } from './page.fake.ts';
 import { initialApp, type Intent } from './state.ts';
 
@@ -79,8 +81,8 @@ describe('paintHome', () => {
     expect(p.get('scorePanel').hidden()).toBe(true);
     expect(p.get('onlineModeContent').hidden()).toBe(false);
     expect(p.get('localModeContent').hidden()).toBe(true);
-    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([true, false]);
-    expect(p.submenuButtons.map((b) => b.hasClass('active'))).toEqual([true, false]);
+    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([true, false, false]);
+    expect(p.submenuButtons.map((b) => b.hasClass('active'))).toEqual([true, false, false]);
     expect(p.get('playSubmenu').hasClass('force-open')).toBe(false);
     expect(p.get('resumeBox').hidden()).toBe(true);
     expect(p.get('handoffBtn').hidden()).toBe(true);
@@ -93,8 +95,8 @@ describe('paintHome', () => {
     });
     expect(p.get('onlineModeContent').hidden()).toBe(true);
     expect(p.get('localModeContent').hidden()).toBe(false);
-    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([false, true]);
-    expect(p.submenuButtons.map((b) => b.hasClass('active'))).toEqual([false, true]);
+    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([false, true, false]);
+    expect(p.submenuButtons.map((b) => b.hasClass('active'))).toEqual([false, true, false]);
     expect(p.get('playSubmenu').hasClass('force-open')).toBe(true);
     expect(p.get('resumeBox').hidden()).toBe(false);
     expect(p.get('resumeBtn').text()).toBe('Rejoin room KQZM');
@@ -125,10 +127,45 @@ describe('paintHome', () => {
     expect(p.get('rulesPanel').hidden()).toBe(false);
     expect(p.get('playPanel').hidden()).toBe(true);
     expect(p.get('localModeContent').hidden()).toBe(true);
-    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([false, false]);
-    expect(p.submenuButtons.map((b) => b.hasClass('active'))).toEqual([false, false]);
+    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([false, false, false]);
+    expect(p.submenuButtons.map((b) => b.hasClass('active'))).toEqual([false, false, false]);
     paintHome(p.doc, { ...initialApp, homeTab: 'score' });
     expect(p.get('scorePanel').hidden()).toBe(false);
+  });
+
+  test('the sandbox: its mode buttons show for the first name "sandbox"; its panel, map and error paint from the App', () => {
+    const p = page();
+    paintHome(p.doc, initialApp);
+    expect(p.modeButtons[2]?.hidden()).toBe(true);
+    expect(p.submenuButtons[2]?.hidden()).toBe(true);
+    expect(p.get('sandboxModeContent').hidden()).toBe(true);
+    expect(p.get('sbMap').value()).toBe(initialApp.sandbox.map);
+    expect(p.get('sbPreset').value()).toBe('no-melds');
+    expect(p.get('sbError').text()).toBe('');
+    paintHome(p.doc, {
+      ...initialApp,
+      p1Name: 'Sandbox',
+      playMode: 'sandbox',
+      sandbox: { preset: '', map: 'p1: AS', error: 'p1 needs 10 cards, has 1', helpOpen: false },
+    });
+    expect(p.modeButtons[2]?.hidden()).toBe(false);
+    expect(p.submenuButtons[2]?.hidden()).toBe(false);
+    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([false, false, true]);
+    expect(p.get('sandboxModeContent').hidden()).toBe(false);
+    expect(p.get('onlineModeContent').hidden()).toBe(true);
+    expect(p.get('sbMap').value()).toBe('p1: AS');
+    expect(p.get('sbError').text()).toBe('p1 needs 10 cards, has 1');
+  });
+
+  test('renderSandbox lists every preset by title, then a random deal', () => {
+    const p = page();
+    renderSandbox(p.doc);
+    const html = p.get('sbPreset').text();
+    PRESETS.forEach((preset) => {
+      expect(html).toContain(`<option value="${preset.id}">`);
+    });
+    expect(html).toContain('<option value="random">');
+    expect(html.match(/<option /g)).toHaveLength(PRESETS.length + 1);
   });
 });
 
@@ -166,6 +203,7 @@ describe('bindHome', () => {
     p.get('tabRulesBtn').fire('click');
     p.get('tabScoreBtn').fire('click');
     p.modeButtons[1]?.fire('click');
+    p.modeButtons[2]?.fire('click');
     p.get('resumeBtn').fire('click');
     p.get('handoffBtn').fire('click');
     p.get('shareCodeBtn').fire('click');
@@ -185,11 +223,35 @@ describe('bindHome', () => {
       { type: 'tab/set', tab: 'rules' },
       { type: 'tab/set', tab: 'score' },
       { type: 'mode/set', mode: 'local' },
+      { type: 'mode/set', mode: 'sandbox' },
       { type: 'resume/click' },
       { type: 'handoff/click' },
       { type: 'share/click' },
       { type: 'cancel' },
       { type: 'cancel' },
+    ]);
+  });
+
+  test('the sandbox controls: preset, random, typing, the buttons, and the deal with the pass-and-play names', () => {
+    const { p, intents } = wired();
+    p.get('sbPreset').fire('change', { target: fakeTarget({ value: 'gin-in-hand' }) });
+    p.get('sbPreset').fire('change', { target: fakeTarget({ value: 'random' }) });
+    type(p, 'sbMap', 'p1: AS');
+    p.get('sbMap').fire('input');
+    p.get('sbRandomBtn').fire('click');
+    p.get('sbCopyBtn').fire('click');
+    p.get('sbHelpBtn').fire('click');
+    type(p, 'p1NameInput', 'sandbox');
+    type(p, 'p2NameInput', 'Bob');
+    p.get('sbStartBtn').fire('click');
+    expect(intents).toEqual([
+      { type: 'sandbox/preset', id: 'gin-in-hand' },
+      { type: 'sandbox/random' },
+      { type: 'sandbox/typed', value: 'p1: AS' },
+      { type: 'sandbox/random' },
+      { type: 'sandbox/copy' },
+      { type: 'sandbox/help', open: true },
+      { type: 'sandbox/start', map: 'p1: AS', p1: 'sandbox', p2: 'Bob' },
     ]);
   });
 
