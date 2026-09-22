@@ -106,11 +106,18 @@ export const stylesheets = (root: DistRoot, game: Game): ReadonlyArray<string> =
 
 const CSS_COMMENT = /\/\*[\s\S]*?\*\//g;
 const CSS_STRING = /"[^"]*"|'[^']*'/g;
-/** `.name` in a selector; comments and strings (a data: URI's `w3.org`) are blanked first. */
+/** `url(./x.jpg)`: an unquoted asset URL, whose extension would read as a class. */
+const CSS_URL = /url\([^)]*\)/g;
+/** `.name` in a selector; comments, strings (a data: URI's `w3.org`) and url() bodies are blanked first. */
 const CSS_CLASS = /\.([A-Za-z_][\w-]*)/g;
 
 export const classesInCss = (css: string): ReadonlyArray<string> =>
-  unique(captures(css.replace(CSS_COMMENT, ' ').replace(CSS_STRING, '""'), CSS_CLASS));
+  unique(
+    captures(
+      css.replace(CSS_COMMENT, ' ').replace(CSS_STRING, '""').replace(CSS_URL, 'url()'),
+      CSS_CLASS,
+    ),
+  );
 
 export const cssClasses = (root: DistRoot, game: Game): ReadonlyArray<string> =>
   unique(stylesheets(root, game).flatMap((file) => classesInCss(readDist(root, file))));

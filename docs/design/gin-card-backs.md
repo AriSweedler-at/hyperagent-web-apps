@@ -19,13 +19,24 @@ same picture. The SVGs live in `web/games/gin-rummy/backs/` and are under a kilo
 build inlines them (Vite's 4KB limit) and the stylesheet carries no URL (the computed-style goldens
 hash long values and see no port).
 
+### 1b. A raster back
+
+A back the owner supplies as a picture is committed once, as supplied
+(`web/games/gin-rummy/assets/<name>-back.jpg`), and `tools/card-backs.ts` draws it at the widths a
+face-down card is painted at (112px, the widest card, at 1x, 2x and 3x device pixels) into
+`backs/<name>-{112,224,336}.jpg`, which theme.css offers through `image-set()` (a plain `url()` of
+the 2x file stands where `image-set()` is unknown). The derived files are committed too, because the
+dist that deploys is the one CI's check job builds and that job has no browser or image library (the
+tool draws with Playwright's Chromium); `test/card-backs.test.ts` reads each file's JPEG frame size
+and fails until the tool is re-run after a change to a source or to the width list.
+
 ## 2. The presets (src/cardBack.ts)
 
 | name          | picture                                                                          |
 | ------------- | -------------------------------------------------------------------------------- |
 | `default`     | a navy field, a lattice of small diamonds, a light border, a spade medallion      |
 | `blue-stripe` | the diagonal stripes the page opened with, twelve units of a hundred, so ~8 across |
-| `yu-gi-oh`    | a brown field with a warm vortex and a pale border, in that game's spirit (an original drawing; no logo, no artwork of the real card) |
+| `yu-gi-oh`    | the Yu-Gi-Oh! card back the owner supplied (2026-09-22), a raster (§1b), on a near-black brown |
 | `empty`       | a plain navy back with the border                                                |
 
 `CARD_BACKS`, `CardBack`, `DEFAULT_CARD_BACK`, `isCardBack`, `badCardBackMsg` sit at the src/ root
@@ -48,6 +59,7 @@ other.
 
 ## 4. Oracles
 
+- `test/card-backs.test.ts`: the derived raster files exist at the tool's sizes (§1b).
 - `storage.test.ts`: the vocabulary and the decoder; `state.test.ts`: `cardBack/set` writes and
   paints, `home/init` reads it; `render.test.ts`: the body attribute.
 - `e2e/gin-card-back.spec.ts` (page-only): the stock's back and the opponent's strip's backs share

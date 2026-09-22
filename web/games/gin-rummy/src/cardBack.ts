@@ -3,7 +3,7 @@
 // among a few presets. At the src/ root, like sort.ts, because storage.ts (the `ginRummy_cardBack`
 // key) and ui/ (the paint) share it and the lint zones let neither import the other.
 export const CARD_BACKS = ['default', 'blue-stripe', 'yu-gi-oh', 'empty'] as const;
-/** `default`: a navy lattice with a spade; `blue-stripe`: the diagonal stripes the page opened with; `yu-gi-oh`: a brown vortex in that game's spirit; `empty`: a plain navy back. */
+/** `default`: a navy lattice with a spade; `blue-stripe`: the diagonal stripes the page opened with; `yu-gi-oh`: the card back the owner supplied (assets/yu-gi-oh-back.jpg, drawn at three sizes by tools/card-backs.ts); `empty`: a plain navy back. */
 export type CardBack = (typeof CARD_BACKS)[number];
 export const DEFAULT_CARD_BACK: CardBack = 'default';
 export const isCardBack = (value: string): value is CardBack => CARD_BACKS.some((b) => b === value);
