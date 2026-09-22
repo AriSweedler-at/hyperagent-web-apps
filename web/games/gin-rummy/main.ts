@@ -20,7 +20,7 @@ import { shareText, type ShareNavigatorLike } from '../../shared/edge/share.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
 import { realTransport } from '../../shared/edge/transport.ts';
 import type { Timer } from '../../shared/lib/clock.ts';
-import { joinCodeFrom, withoutJoin } from '../../shared/lib/invite.ts';
+import { joinCodeFrom, withoutJoin } from '../../shared/edge/invite.ts';
 import type { Rng } from '../../shared/lib/rng.ts';
 import { bestLayoffActions, legalActions } from './src/engine/index.ts';
 import type { Action } from './src/engine/types.ts';

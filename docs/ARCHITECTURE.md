@@ -76,7 +76,8 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 | Layer | May import | Contract |
 |---|---|---|
 | `web/shared/lib` | itself | Leaf modules. `Result<T,E>` (`ok/err/map/andThen`), `Rng = () => number`, `mulberry32`, JSON decoders, `roomCode` constants (`'ginrummy-ari-'`, `'fidice-'`, alphabets). |
-| `web/shared/lib/invite.ts` | itself | The invite link: `inviteUrl(code, pageUrl)` is `<pageUrl>?join=<code>`; `joinCodeFrom(search)` and `withoutJoin(search)` read and drop it as `URLSearchParams` would (pure: the DOM class is unnameable here). |
+| `web/shared/lib/invite.ts` | itself | The invite link: `inviteUrl(code, pageUrl)` is `<pageUrl>?join=<code>` (pure). |
+| `web/shared/edge/invite.ts` | itself | `joinCodeFrom(search)` and `withoutJoin(search)`: a boot reads the code and drops it from the address bar through the platform's `URLSearchParams`. |
 | `web/shared/edge/peer.ts` | shared/lib, `@shared/edge/transport` | The peer plumbing every game's sessions share: `NetDeps`, `whenTransportReady`, `peerWatchdog`, `keepPeerAlive`, `announcePath`, `describePeerError`, the legacy timings and strings. Each game's `net/peerjs.ts` re-exports it (gin) or takes its types (fidice). |
 | `engine` / `domain` / `bots` | shared/lib, siblings | Pure. `applyAction(state, seat, action, rng): Result<State, RuleError>` (gin), `apply(s, actor, action, rng): Result` (fidice). Return new state; never mutate. `viewFor` / `redactFor` are the only redaction. |
 | `protocol.ts` | engine/domain types, shared/lib | Trust boundary. Every inbound frame passes a decoder returning `Result`; outbound frames are built here. Shapes frozen by wire goldens; a future change adds a version field here. |
@@ -100,7 +101,7 @@ used to make by itself, which the drivers play a knock's layoff phase through, a
 `window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
 `?ice=<url>` (ICE config override), `?ice-policy=relay` (port-only: `iceTransportPolicy: 'relay'`
 inside the Peer `config`, for the `@relay` specs' relay-forced games), `?join=<code>` (every
-game's invite convention, built and read by `web/shared/lib/invite.ts`; fidice keeps its `#join=` /
+game's invite convention, built by `web/shared/lib/invite.ts` and read by `web/shared/edge/invite.ts`; fidice keeps its `#join=` /
 `#watch=` fragments for now. Gin: the invite link `#shareCodeBtn` shares, the link alone with no
 text beside it; `main.ts` dispatches `join/link` after `home/init`, so the code sits in the join
 form on the Play tab in online mode, then drops it from the address bar with
