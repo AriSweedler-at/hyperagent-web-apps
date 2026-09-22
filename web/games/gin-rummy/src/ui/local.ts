@@ -12,7 +12,7 @@ import {
   type PageLike,
 } from '../../../../shared/edge/dom.ts';
 import type { State } from '../engine/types.ts';
-import { handoffLabel, type App, type Intent } from './state.ts';
+import type { App, Intent } from './state.ts';
 
 export type CurtainText = Readonly<{ title: string; sub: string; last: string; button: string }>;
 
@@ -39,17 +39,11 @@ export const paintCurtain = (doc: PageLike, app: App): void => {
   setText(requireId(doc, 'curtainSub'), text.sub);
   setText(requireId(doc, 'curtainLast'), text.last);
   setText(requireId(doc, 'curtainBtn'), text.button);
-  // The moment the phone would change hands is the moment to hand the game off instead: the other
-  // seat joins from its own device (ui/state.ts `handoff`).
-  setText(requireId(doc, 'curtainHandoffBtn'), handoffLabel(app.game));
 };
 
-/** `#curtainBtn`: the seat whose turn it is reveals its cards. `#curtainHandoffBtn`: go online. */
+/** `#curtainBtn`: the seat whose turn it is reveals its cards. */
 export const bindLocal = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
   listenId(doc, 'curtainBtn', 'click', () => {
     dispatch({ type: 'curtain/reveal' });
-  });
-  listenId(doc, 'curtainHandoffBtn', 'click', () => {
-    dispatch({ type: 'handoff/click' });
   });
 };

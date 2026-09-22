@@ -205,7 +205,7 @@ export type App = Readonly<{
    */
   draw: DrawStage | null;
   /**
-   * The hosted game came from pass-and-play (`#handoffBtn`, `#curtainHandoffBtn`) and its remote
+   * The hosted game came from pass-and-play (`#handoffBtn`, the 🌐 in the table's top bar) and its remote
    * seat has not joined yet: the wait screen tells the player to send the invite, a guest that
    * drops before its join leaves the wait screen as it is, and cancelling the room gives the game
    * back to pass-and-play. Saved with the host save (storage.ts `HostSave.handoff`), so a reload
@@ -360,8 +360,8 @@ export type Intent =
   /** `#resumeBtn`: whatever `app.resume` offers. */
   | Readonly<{ type: 'resume/click' }>
   /**
-   * `#handoffBtn` (the home screen's offer) / `#curtainHandoffBtn` (the pass-and-play curtain):
-   * the pass-and-play game goes on as a hosted room.
+   * `#handoffBtn` (the 🌐 beside the table's leave button, pass-and-play alone): the game goes on
+   * as a hosted room.
    */
   | Readonly<{ type: 'handoff/click' }>
   /** `#cancelHostBtn` / `#cancelGuestBtn`. */
@@ -870,7 +870,7 @@ export const resumeLabel = (resume: Resume): string => {
   }
 };
 
-/** `#handoffBtn`'s label: seat 0 keeps this device and hosts; seat 1 joins through the invite. */
+/** `#handoffBtn`'s tooltip, and a handed-off room's resume offer: seat 0 keeps this device and hosts; seat 1 joins through the invite. */
 export const handoffLabel = (game: State): string =>
   `Continue online: ${game.players[0].name} hosts, ${game.players[1].name} joins by invite`;
 
@@ -936,7 +936,7 @@ const resume = (app: App, offer: Resume, ctx: Context): Step => {
 };
 
 /**
- * `#handoffBtn` / `#curtainHandoffBtn`: the pass-and-play game goes on as a hosted room with a
+ * `#handoffBtn`: the pass-and-play game goes on as a hosted room with a
  * fresh code. Seat 0 keeps this device as the host; seat 1 joins from its own through the invite,
  * and the host's join handler takes it as a rejoin (the seat is kept, the name refreshed, the hand
  * broadcast). From the table the pass-and-play marks (the curtain, the revealed seat, the draw

@@ -21,6 +21,7 @@ import { cardHtml, pretty } from './cards.ts';
 import { slotHandView } from './hand/SlotHandView.ts';
 import { ginPage, type GinPage } from './page.fake.ts';
 import {
+  paintHandoff,
   RULES_SLOT_IDS,
   actionsHtml,
   bindAll,
@@ -198,6 +199,19 @@ describe('screens, waiting statuses, toast and sound', () => {
     paintSound(p.doc, true);
     expect(p.get('soundBtn').text()).toBe('🔊');
     expect(p.get('soundBtn').attr('title')).toBe('Sound & vibration on');
+  });
+
+  test('paintHandoff: the 🌐 shows for a pass-and-play game alone, its tooltip naming who hosts and who joins', () => {
+    const p = page();
+    paintHandoff(p.doc, local(dealt, 0));
+    expect(p.get('handoffBtn').hidden()).toBe(false);
+    expect(p.get('handoffBtn').attr('title')).toBe(
+      `Continue online: ${PLAYERS[0].name} hosts, ${PLAYERS[1].name} joins by invite`,
+    );
+    paintHandoff(p.doc, local(dealt, 0, { role: 'host' }));
+    expect(p.get('handoffBtn').hidden()).toBe(true);
+    paintHandoff(p.doc, { ...initialApp, role: 'local' });
+    expect(p.get('handoffBtn').hidden()).toBe(true);
   });
 
   test('a missing element is a programming error', () => {
@@ -697,6 +711,7 @@ describe('bindAll', () => {
     p.get('rematchBtn').fire('click');
     p.get('leaveBtn').fire('click');
     p.get('leaveBtnEnd').fire('click');
+    p.get('handoffBtn').fire('click');
     p.get('rulesBtnGame').fire('click');
     p.get('closeRulesBtn').fire('click');
     p.get('historyBtn').fire('click');
@@ -722,6 +737,7 @@ describe('bindAll', () => {
       { type: 'act', action: { type: 'ready' } },
       { type: 'leave/request' },
       { type: 'leave/request' },
+      { type: 'handoff/click' },
       { type: 'rules/open' },
       { type: 'rules/close' },
       { type: 'history/open', who: 'game' },
