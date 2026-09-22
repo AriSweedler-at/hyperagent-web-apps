@@ -6,8 +6,11 @@
 // through to the clipboard; a clipboard that failed reports `failed` so the page can show the
 // code itself.
 
-/** `url` rides beside `text` on the share sheet; the clipboard gets `text`, then `url`. */
-export type SharePayload = Readonly<{ title: string; text: string; url?: string }>;
+/**
+ * `text` and `url` ride together on the share sheet, either may be left out; the clipboard gets
+ * whichever are there, `text` then `url`, a space between.
+ */
+export type SharePayload = Readonly<{ title: string; text?: string; url?: string }>;
 
 export type ShareNavigatorLike = Readonly<{
   share?: (payload: SharePayload) => Promise<void>;
@@ -19,7 +22,11 @@ export type ShareOutcome = 'shared' | 'aborted' | 'copied' | 'failed';
 const isAbort = (e: unknown): boolean =>
   typeof e === 'object' && e !== null && (e as Partial<Error>).name === 'AbortError';
 
-/** Share `payload` through the sheet, else copy `payload.text`; never throws. */
+/** What the clipboard gets for `payload`: its text and its url, whichever are there. */
+export const clipboardLine = (payload: SharePayload): string =>
+  [payload.text, payload.url].filter((s): s is string => s !== undefined).join(' ');
+
+/** Share `payload` through the sheet, else copy it; never throws. */
 export const shareText = async (
   nav: ShareNavigatorLike,
   payload: SharePayload,
@@ -34,9 +41,7 @@ export const shareText = async (
   }
   try {
     if (nav.clipboard === undefined) return 'failed';
-    await nav.clipboard.writeText(
-      payload.url === undefined ? payload.text : `${payload.text} ${payload.url}`,
-    );
+    await nav.clipboard.writeText(clipboardLine(payload));
     return 'copied';
   } catch {
     return 'failed';

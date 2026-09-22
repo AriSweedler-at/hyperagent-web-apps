@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { shareText, type SharePayload } from './share.ts';
+import { clipboardLine, shareText, type SharePayload } from './share.ts';
 
 const payload: SharePayload = { title: 'Gin Rummy', text: 'Join my game — room code ABCD.' };
 
@@ -77,5 +77,16 @@ describe('shareText', () => {
     expect(copied).toEqual([
       'Join my game — room code ABCD. https://games.sweedler.com/gin-rummy/?join=ABCD',
     ]);
+    // A link alone (gin's invite): the sheet gets it as it is, the clipboard gets the link.
+    const linkOnly: SharePayload = {
+      title: 'Gin Rummy',
+      url: 'https://games.sweedler.com/gin-rummy/?join=ABCD',
+    };
+    expect(await shareText({ share, clipboard }, linkOnly)).toBe('shared');
+    expect(shared.at(-1)).toEqual(linkOnly);
+    expect(await shareText({ clipboard }, linkOnly)).toBe('copied');
+    expect(copied.at(-1)).toBe('https://games.sweedler.com/gin-rummy/?join=ABCD');
+    expect(clipboardLine({ title: 'x', text: 'a' })).toBe('a');
+    expect(clipboardLine({ title: 'x' })).toBe('');
   });
 });

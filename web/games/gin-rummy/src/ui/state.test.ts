@@ -317,11 +317,8 @@ describe('home', () => {
       effects: [{ type: 'toggleSound' }],
     });
     expect(run(initialApp, { type: 'share/click' }).effects).toEqual([]);
-    expect(
-      run({ ...initialApp, code: 'ABCD', oppName: 'Jeff' }, { type: 'share/click' }).effects,
-    ).toEqual([{ type: 'share', code: 'ABCD', name: 'Jeff' }]);
     expect(run({ ...initialApp, code: 'ABCD' }, { type: 'share/click' }).effects).toEqual([
-      { type: 'share', code: 'ABCD', name: null },
+      { type: 'share', code: 'ABCD' },
     ]);
     const opened = run(initialApp, { type: 'rules/open' }, { type: 'history/open', who: 'game' });
     expect(opened.app).toMatchObject({ rulesOpen: true, history: 'game' });
@@ -1414,7 +1411,7 @@ describe('runEffect', () => {
       { type: 'startTimer', id: 'longPress', ms: 450, then: { type: 'submenu/longPress' } },
       { type: 'cancelTimer', id: 'longPress' },
       { type: 'toggleSound' },
-      { type: 'share', code: 'ABCD', name: 'Jeff' },
+      { type: 'share', code: 'ABCD' },
       { type: 'fillName', name: 'Ann' },
       { type: 'fillP2Name', name: 'Bob' },
       { type: 'setCode', value: 'AB' },
@@ -1439,7 +1436,7 @@ describe('runEffect', () => {
       ['timers.start', 'longPress', 450, { type: 'submenu/longPress' }],
       ['timers.cancel', 'longPress'],
       ['toggleSound'],
-      ['share', 'ABCD', 'Jeff'],
+      ['share', 'ABCD'],
       ['page.fillName', 'Ann'],
       ['page.fillP2Name', 'Bob'],
       ['page.setCode', 'AB'],
@@ -1657,7 +1654,7 @@ describe('the remote handoff of a pass-and-play game', () => {
   test('join/link: the invite code into the join form, the Play tab and online mode; nothing stored', () => {
     const linked = run(
       { ...initialApp, homeTab: 'rules', playMode: 'local' },
-      { type: 'join/link', code: 'kqzm9', name: null },
+      { type: 'join/link', code: 'kqzm9' },
     );
     expect(linked.app).toMatchObject({
       codeDraft: 'KQZM',
@@ -1666,25 +1663,6 @@ describe('the remote handoff of a pass-and-play game', () => {
       nameTouched: false,
     });
     expect(linked.effects).toEqual([{ type: 'setCode', value: 'KQZM' }]);
-  });
-
-  test("join/link with the invited seat's name: the name into #nameInput, counted as typed so join/click keeps it", () => {
-    const linked = run(initialApp, { type: 'join/link', code: 'KQZM', name: ' Bob ' });
-    expect(linked.app.nameTouched).toBe(true);
-    expect(linked.effects).toEqual([
-      { type: 'setCode', value: 'KQZM' },
-      { type: 'fillName', name: 'Bob' },
-    ]);
-    expect(run(linked.app, { type: 'join/click', name: 'Bob', code: 'KQZM' }).app.myName).toBe(
-      'Bob',
-    );
-    // A blank name is no name; a long one is cut as the inputs cut it.
-    expect(run(initialApp, { type: 'join/link', code: 'KQZM', name: '  ' }).effects).toEqual([
-      { type: 'setCode', value: 'KQZM' },
-    ]);
-    expect(
-      run(initialApp, { type: 'join/link', code: 'KQZM', name: 'x'.repeat(30) }).effects.at(-1),
-    ).toEqual({ type: 'fillName', name: 'x'.repeat(20) });
   });
 });
 
