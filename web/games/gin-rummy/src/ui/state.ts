@@ -65,7 +65,7 @@ import {
   type Save,
   type Store,
 } from '../storage.ts';
-import { INITIAL_CUES, nextCue, selectionIn, type Cue, type CueState } from './cues.ts';
+import { INITIAL_CUES, nextCue, oppDrawCue, selectionIn, type Cue, type CueState } from './cues.ts';
 import { drawSource, settleDraw, type DrawStage } from './hand/draw.ts';
 import { arrangedOf, declarable, toggleMeld, type HumanMelds } from './hand/arrange.ts';
 import { settlePicture, type Picture } from './hand/picture.ts';
@@ -479,14 +479,17 @@ const showScreen = (app: App, screen: ScreenId): Step =>
 
 /**
  * The state side of the legacy `render()`: nothing without a view; else the cue machine steps
- * (its cue is played), the screen is the table or, at gameOver, the end screen, a selection
- * that left the hand is dropped, and the draw stage, then the picture, settle against the view.
- * The paint itself is main.ts's after every intent.
+ * (its cue is played), the opponent's pickup chimes when `prev` (the view this one replaces, given
+ * by a host broadcast and a guest's state frame; never on one phone) shows they just drew, the
+ * screen is the table or, at gameOver, the end screen, a selection that left the hand is dropped,
+ * and the draw stage, then the picture, settle against the view. The paint itself is main.ts's
+ * after every intent.
  */
-const rendered = (app: App): Step => {
+const rendered = (app: App, prev: View | null = null): Step => {
   const view = app.view;
   if (view === null) return pure(app);
   const cued = nextCue(app.cues, view, app.role === 'local' ? 'local' : 'online');
+  const drew = app.role === 'local' ? null : oppDrawCue(prev, view);
   const selectedCard = selectionIn(view, app.selectedCard);
   const screen: ScreenId = view.phase === 'gameOver' ? 'endgameScreen' : 'tableScreen';
   const draw = settleDraw(app.draw, view);
@@ -496,6 +499,7 @@ const rendered = (app: App): Step => {
   return step(
     { ...app, cues: cued.state, selectedCard, screen, draw, picture },
     ...(cued.cue === null ? [] : [{ type: 'fx', cue: cued.cue } as const]),
+    ...(drew === null ? [] : [{ type: 'fx', cue: drew } as const]),
     { type: 'scrollTop' },
   );
 };
@@ -527,7 +531,7 @@ const broadcast = (app: App): Step => {
       { type: 'send', frame: stateFrame(viewFor(game, 1)) },
       { type: 'persist' },
     ),
-    rendered,
+    (a) => rendered(a, app.view),
   );
 };
 
@@ -711,13 +715,16 @@ const guestFrame = (app: App, frame: HostFrame): Step => {
       // The host refused the guest's move: a draw that was awaited is over.
       return refuse(app, frame.msg);
     case 'state':
-      return rendered({
-        ...app,
-        view: frame.view,
-        oppConnected: true,
-        selectedCard: null,
-        resultDismissed: false,
-      });
+      return rendered(
+        {
+          ...app,
+          view: frame.view,
+          oppConnected: true,
+          selectedCard: null,
+          resultDismissed: false,
+        },
+        app.view,
+      );
   }
 };
 

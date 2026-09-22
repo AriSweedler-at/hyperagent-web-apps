@@ -24,7 +24,7 @@ const note = (freq: number, dur: number, gap?: number): Note =>
 /** `fx.tap()`: one short triangle blip. */
 export const TAP: CueSpec = { notes: [note(660, 0.05)], type: 'triangle', gain: 0.08, buzz: 12 };
 
-/** The seven named cues `playCuesFor` fires. */
+/** The seven named cues `playCuesFor` fires, and the two pickup cues `oppDrawCue` adds. */
 export const CUES: Readonly<Record<Cue, CueSpec>> = {
   yourTurn: {
     notes: [note(523, 0.12, 0.13), note(784, 0.22)],
@@ -69,5 +69,20 @@ export const CUES: Readonly<Record<Cue, CueSpec>> = {
     type: 'sine',
     gain: 0.14,
     buzz: [200],
+  },
+  // The opponent's pickup (ui/cues.ts `oppDrawCue`): quieter and shorter than the turn chime. A
+  // draw from the stock falls (a card slid off the pile), one from the discard pile rises (a card
+  // taken up), so the ear tells the two apart.
+  oppStock: {
+    notes: [note(392, 0.06, 0.07), note(330, 0.09)],
+    type: 'triangle',
+    gain: 0.09,
+    buzz: 15,
+  },
+  oppDiscard: {
+    notes: [note(494, 0.06, 0.07), note(587, 0.09)],
+    type: 'triangle',
+    gain: 0.1,
+    buzz: 15,
   },
 };

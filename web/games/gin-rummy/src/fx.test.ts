@@ -105,6 +105,20 @@ describe('the cue tables', () => {
     expect(CUES.bad.type).toBe('sawtooth');
     expect(CUES.knockGood.buzz).toEqual([30, 40, 30, 40, 60]);
   });
+
+  test("the port's pickup cues: a falling pair for the stock, a rising pair for the discard pile", () => {
+    expect(CUES.oppStock).toEqual({
+      notes: [
+        { freq: 392, dur: 0.06, gap: 0.07 },
+        { freq: 330, dur: 0.09 },
+      ],
+      type: 'triangle',
+      gain: 0.09,
+      buzz: 15,
+    });
+    expect(CUES.oppDiscard.notes.map((n) => n.freq)).toEqual([494, 587]);
+    expect(CUES.oppDiscard.gain).toBeLessThan(CUES.yourTurn.gain);
+  });
 });
 
 describe('createFx', () => {
