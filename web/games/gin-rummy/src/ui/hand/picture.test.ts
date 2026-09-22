@@ -17,6 +17,7 @@ import {
   settlePicture,
   spansOf,
   type Picture,
+  moveLoose,
 } from './picture.ts';
 
 const now = (): number => 1_700_000_000_000;
@@ -277,5 +278,23 @@ describe('spansOf / rowsOf / phoneRows', () => {
     expect(phoneRows(kept)).toBe(2);
     expect(phoneRows(pic([spades, [as, ah, ad, k], [q, d9, c2]], []))).toBe(3);
     expect(phoneRows(pic([[s5, s6, s7, s8, as, ah, ad], aces], [jh]))).toBe(3);
+  });
+});
+
+describe('moveLoose', () => {
+  const p = pic([aces], [k, q, d9]);
+
+  test('a loose card moves to the index, the others keep their order; the index is clamped', () => {
+    expect(moveLoose(p, 'KC', 2).loose).toEqual([q, d9, k]);
+    expect(moveLoose(p, '9D', 0).loose).toEqual([d9, k, q]);
+    expect(moveLoose(p, 'QH', 1)).toEqual(p);
+    expect(moveLoose(p, 'KC', 99).loose).toEqual([q, d9, k]);
+    expect(moveLoose(p, 'QH', -3).loose).toEqual([q, k, d9]);
+    expect(moveLoose(p, 'KC', 2).groups).toEqual([aces]);
+  });
+
+  test('a card in a group, or not held, moves nothing: the picture itself comes back', () => {
+    expect(moveLoose(p, 'AS', 1)).toBe(p);
+    expect(moveLoose(p, '2C', 1)).toBe(p);
   });
 });

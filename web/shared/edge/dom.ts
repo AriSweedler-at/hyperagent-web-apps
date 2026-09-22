@@ -244,3 +244,77 @@ export const preventDefault = (e: Readonly<Event>): void => {
 export const stopPropagation = (e: Readonly<Event>): void => {
   e.stopPropagation();
 };
+
+// ---- geometry, styles, clones, frames and pointers (the hand's drag and FLIP: ui/hand/dragger.ts, flip.ts) ----
+
+export type Rect = Readonly<{ left: number; top: number; width: number; height: number }>;
+
+/** `getBoundingClientRect()` as a plain rect; all zeros where the element cannot be measured (a fake). */
+export const rectOf = (el: Element): Rect => {
+  const measured = el as Partial<Pick<HTMLElement, 'getBoundingClientRect'>>;
+  const r = measured.getBoundingClientRect?.call(el);
+  return r === undefined
+    ? { left: 0, top: 0, width: 0, height: 0 }
+    : { left: r.left, top: r.top, width: r.width, height: r.height };
+};
+
+/** `el.style.setProperty(prop, value)`; an empty value removes the inline property. Nothing on a fake. */
+export const setStyle = (el: Element, prop: string, value: string): void => {
+  const styled = el as Partial<Pick<HTMLElement, 'style'>>;
+  styled.style?.setProperty(prop, value);
+};
+
+/** A deep clone of `el`, appended to `parent`. */
+export const cloneInto = (parent: Element, el: Element): Element => {
+  const copy = el.cloneNode(true) as HTMLElement;
+  parent.appendChild(copy);
+  return copy;
+};
+
+/** `el.closest(selector)` from the element itself. */
+export const closestIn = (el: Element, selector: string): Element | null => el.closest(selector);
+
+/** `requestAnimationFrame(fn)` where there is one; nothing on a fake. */
+export const nextFrame = (fn: () => void): void => {
+  const frames = globalThis as Partial<Pick<typeof globalThis, 'requestAnimationFrame'>>;
+  frames.requestAnimationFrame?.(() => {
+    fn();
+  });
+};
+
+/** `fn` once, when `el`'s transition ends or after `fallbackMs` if it never does. */
+export const afterTransition = (el: Element, fn: () => void, fallbackMs: number): void => {
+  const cell = { done: false };
+  const once = (): void => {
+    if (cell.done) return;
+    cell.done = true;
+    fn();
+  };
+  listen(el, 'transitionend', once, { once: true });
+  setTimeout(once, fallbackMs);
+};
+
+/** Where a pointer event is (viewport coordinates) and which pointer it is. */
+export type PointerAt = Readonly<{ x: number; y: number; id: number }>;
+export const pointerOf = (e: Readonly<Event>): PointerAt => {
+  const p = e as Partial<PointerEvent>;
+  return { x: p.clientX ?? 0, y: p.clientY ?? 0, id: p.pointerId ?? 0 };
+};
+
+/** `el.setPointerCapture(id)` / `releasePointerCapture(id)`; a pointer already gone is no error. */
+export const capturePointer = (el: Element, id: number): void => {
+  const target = el as Partial<Pick<HTMLElement, 'setPointerCapture'>>;
+  try {
+    target.setPointerCapture?.call(el, id);
+  } catch {
+    // The pointer was released before the capture: nothing to hold.
+  }
+};
+export const releasePointer = (el: Element, id: number): void => {
+  const target = el as Partial<Pick<HTMLElement, 'releasePointerCapture'>>;
+  try {
+    target.releasePointerCapture?.call(el, id);
+  } catch {
+    // Not captured: nothing to release.
+  }
+};

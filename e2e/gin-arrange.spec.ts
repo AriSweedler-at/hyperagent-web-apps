@@ -127,6 +127,56 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       expect(watched.errors(), 'uncaught exceptions').toEqual([]);
     });
 
+    test('a drag: the ghost leans into a fast pull left, the cell empties, the card lands first, the order is manual', async ({
+      page,
+    }, testInfo) => {
+      test.skip(testInfo.project.name !== 'pages', 'runs once: the same bytes on both origins');
+      const watched = watchPage(page, ALLOWED_FAILURES);
+      await openLive(page, 'arranged-after-accept');
+      const loose = await page.evaluate<Ids>(LOOSE);
+      expect(loose.length).toBeGreaterThanOrEqual(2);
+      const last = loose[loose.length - 1] ?? '';
+      const first = loose[0] ?? '';
+      const from = await page.locator(`#hand .card[data-card="${last}"]`).boundingBox();
+      const to = await page.locator(`#hand .card[data-card="${first}"]`).boundingBox();
+      if (from === null || to === null) throw new Error('the loose cards have no boxes');
+      const ghost = page.locator('.drag-ghost');
+
+      await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+      await page.mouse.down();
+      // Under the threshold nothing happens; past it the cell empties and the ghost appears.
+      await page.mouse.move(from.x + from.width / 2 - 4, from.y + from.height / 2);
+      await expect(ghost).toHaveCount(0);
+      await page.mouse.move(from.x + from.width / 2 - 20, from.y + from.height / 2, { steps: 2 });
+      await expect(ghost).toHaveCount(1);
+      await expect(page.locator(`#hand .slot.dragging .card[data-card="${last}"]`)).toHaveCount(1);
+      // A fast pull to the left: the ghost leans left (a negative rotate) as it trails the pointer.
+      await page.mouse.move(to.x + 4, to.y + to.height / 2, { steps: 2 });
+      expect(
+        await page.evaluate<string>("document.querySelector('.drag-ghost')?.style.transform ?? ''"),
+      ).toMatch(/rotate\(-\d/);
+      // The other cards made room: the dragged card is first in the order already.
+      await expect.poll(() => page.evaluate<Ids>(LOOSE)).toEqual([last, ...loose.slice(0, -1)]);
+      await page.mouse.up();
+      // Landed: the ghost is gone, the card shows in its new cell, and nothing is selected.
+      await expect(ghost).toHaveCount(0);
+      await expect(page.locator('#hand .slot.dragging')).toHaveCount(0);
+      await expect(page.locator(`#hand .card[data-card="${last}"]`)).toBeVisible();
+      await expect(page.locator('#hand .card.selected')).toHaveCount(0);
+      expect(await page.evaluate<Ids>(LOOSE)).toEqual([last, ...loose.slice(0, -1)]);
+      await expectHandRows(page, vp.columns);
+      await page.locator('#arrangeBtn').click();
+      await expect(page.locator('#arrangeModes .btn.active')).toHaveAttribute(
+        'data-sort',
+        'manual',
+      );
+      await page.locator('#closeArrangeBtn').click();
+      // A plain tap still selects.
+      await page.locator(`#hand .card[data-card="${last}"]`).click();
+      await expect(page.locator(`#hand .card[data-card="${last}"]`)).toHaveClass(/selected/);
+      expect(watched.errors(), 'uncaught exceptions').toEqual([]);
+    });
+
     test('a long press makes a meld by hand and marks it; a second press dissolves it; a card that melds nothing toasts', async ({
       page,
     }, testInfo) => {

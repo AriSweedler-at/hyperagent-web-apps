@@ -77,7 +77,7 @@ import {
 import { INITIAL_CUES, nextCue, oppDrawCue, selectionIn, type Cue, type CueState } from './cues.ts';
 import { drawSource, settleDraw, type DrawStage } from './hand/draw.ts';
 import { arrangedOf, declarable, toggleMeld, type HumanMelds } from './hand/arrange.ts';
-import { settlePicture, type Picture } from './hand/picture.ts';
+import { settlePicture, type Picture, moveLoose, samePicture } from './hand/picture.ts';
 
 // ---- the state ---------------------------------------------------------------------------------
 
@@ -208,6 +208,11 @@ export type App = Readonly<{
   picture: Picture | null;
   /** The melds the player made by hand this hand (arrange.ts). Not saved, not on the wire. */
   human: HumanMelds | null;
+  /**
+   * The loose card being dragged (ui/hand/dragger.ts, docs/design/gin-arrangement-and-discards.md
+   * §5d): its cell is emptied for the ghost, a tap is ignored until it lands. Session only.
+   */
+  drag: Readonly<{ cardId: string }> | null;
   /** How the hand is arranged (`ginRummy_sort`). */
   sort: SortMode;
   /** `#arrangeOverlay` open. */
@@ -219,7 +224,7 @@ export type App = Readonly<{
 
 // What a table leaves behind when a hand is dealt, left or lost: the ghost cell's stage, the kept
 // picture and the melds made by hand all belong to the hand that just ended.
-const HAND_CLEARED = { draw: null, picture: null, human: null } as const;
+const HAND_CLEARED = { draw: null, picture: null, human: null, drag: null } as const;
 
 export const DEFAULT_NAME = 'Ari';
 export const DEFAULT_TARGET = 100;
@@ -261,6 +266,7 @@ export const initialApp: App = {
   handoff: false,
   picture: null,
   human: null,
+  drag: null,
   sort: DEFAULT_SORT,
   arrangeOpen: false,
   discardsOpen: false,
@@ -356,6 +362,13 @@ export type Intent =
   | Readonly<{ type: 'submenu/pick'; mode: string }>
   /** A click outside `#tabPlayWrap`. */
   | Readonly<{ type: 'submenu/dismiss' }>
+  // ---- a loose card dragged by hand (ui/hand/dragger.ts) ----
+  /** The pointer moved off a pressed loose card: its cell empties for the ghost. */
+  | Readonly<{ type: 'card/dragStart'; cardId: string }>
+  /** The pointer is over loose index `index`: the card moves there, the order is manual from now on. */
+  | Readonly<{ type: 'card/dragOver'; index: number }>
+  /** The ghost landed: the card shows in its cell again. */
+  | Readonly<{ type: 'card/dragEnd' }>
   // ---- the sandbox (src/sandbox.ts), shown while the first player is named `sandbox` ----
   /** `#sbPreset`: a preset's map into the editor. */
   | Readonly<{ type: 'sandbox/preset'; id: string }>
@@ -1210,6 +1223,8 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       return act(app, intent.action, ctx);
     case 'card/tap': {
       const v = app.view;
+      // The click a drag's release fires reaches a card: a drag selects nothing.
+      if (app.drag !== null) return pure(app);
       if (v === null || !v.isMyTurn || v.phase !== 'discard') return pure(app);
       if (app.draw?.kind === 'shown') {
         // A tap on the ghost card accepts it; a tap on a held card accepts and selects that card
@@ -1299,6 +1314,28 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
         rendered,
       );
     }
+    case 'card/dragStart': {
+      // A loose card, in play, no drawn card waiting: its cell empties and the long press is off.
+      const v = app.view;
+      const loose = app.picture?.loose.some((c) => c.id === intent.cardId) === true;
+      if (v === null || !inPlay(v.phase) || app.draw !== null || !loose) return pure(app);
+      return step(
+        { ...app, drag: { cardId: intent.cardId } },
+        { type: 'cancelTimer', id: 'cardPress' },
+      );
+    }
+    case 'card/dragOver': {
+      if (app.drag === null || app.picture === null) return pure(app);
+      const moved = moveLoose(app.picture, app.drag.cardId, intent.index);
+      if (samePicture(moved, app.picture)) return pure(app);
+      // A card moved by hand makes the order manual, remembered once.
+      return step(
+        { ...app, picture: moved, sort: 'manual' },
+        ...(app.sort === 'manual' ? [] : [{ type: 'writeSort', sort: 'manual' } as const]),
+      );
+    }
+    case 'card/dragEnd':
+      return app.drag === null ? pure(app) : pure({ ...app, drag: null });
     case 'card/press': {
       // The App is returned as is: main.ts skips the paint, so the pressed element survives to
       // receive its click (a plain tap) or the timer below (a long press).

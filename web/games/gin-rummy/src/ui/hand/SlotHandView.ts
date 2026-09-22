@@ -6,7 +6,9 @@
 // and an eleventh `.slot.ghost` where a drawn card lands before the player accepts it. A group is
 // one grid item, so the browser never splits a meld across two rows; the grid's dense flow lets a
 // later loose card or the ghost fill a hole a meld left. The ghost cell is never a `.card`, so
-// `#hand .card` keeps counting real cards for the fixtures and the drivers. The `fresh` dot marks
+// `#hand .card` keeps counting real cards for the fixtures and the drivers. A loose cell whose card
+// is being dragged (ui/hand/dragger.ts) is `dead dragging`: it keeps its place and hides its card
+// while the ghost follows the pointer. The `fresh` dot marks
 // the drawn card only while its holder chooses the discard: once they have discarded it is gone
 // (the owner: it must not wait for the opponent's move), so a view of the opponent's turn, a
 // round over or the other seat's hand carries no dot. Strings only: the DOM write is render.ts's.
@@ -39,7 +41,7 @@ const ghostSlot = (model: HandModel, stage: DrawStage | null): string => {
 };
 
 export const slotHandView: HandView = {
-  render: (model, selection, stage = null, picture = null) => {
+  render: (model, selection, stage = null, picture = null, dragging = null) => {
     const shown: Picture = picture ?? engineOf(model, stage);
     const card = (c: Card): string =>
       cardHtml(c, {
@@ -60,7 +62,10 @@ export const slotHandView: HandView = {
         .join('');
       return `<div class="${groupClass(g.length)}">${slots}</div>`;
     };
-    const loose = shown.loose.map((c) => slot(c, 'dead', false, false)).join('');
+    // The dragged card's cell stays, emptied (`dragging`): the ghost is over it or on its way.
+    const loose = shown.loose
+      .map((c) => slot(c, c.id === dragging ? 'dead dragging' : 'dead', false, false))
+      .join('');
     const ghost = cardsOf(shown).length < SLOT_COUNT ? ghostSlot(model, stage) : '';
     return shown.groups.map(group).join('') + loose + ghost;
   },
