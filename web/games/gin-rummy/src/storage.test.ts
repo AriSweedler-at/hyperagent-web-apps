@@ -77,8 +77,8 @@ describe('frozen constants', () => {
     expect(PLAY_MODES).toEqual(['online', 'local']);
     expect(DEFAULT_PLAY_MODE).toBe('online');
     expect(SOUND_STATES).toEqual(['on', 'off']);
-    expect(SORT_MODES).toEqual(['melds', 'rank', 'suit']);
-    expect(DEFAULT_SORT).toBe('melds');
+    expect(SORT_MODES).toEqual(['suit', 'rank', 'manual']);
+    expect(DEFAULT_SORT).toBe('suit');
     expect(NAME_MAX).toBe(20);
   });
 });

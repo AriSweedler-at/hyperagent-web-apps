@@ -79,7 +79,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       expect(watched.errors(), 'uncaught exceptions').toEqual([]);
     });
 
-    test('the Arrange sheet: a sort mode rearranges at once, is marked active, and by melds restores the solver order', async ({
+    test('the Arrange sheet: a sort mode rearranges the loose cards at once and is marked active; manual keeps them', async ({
       page,
     }, testInfo) => {
       test.skip(testInfo.project.name !== 'pages', 'runs once: the same bytes on both origins');
@@ -93,7 +93,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
 
       await page.locator('#arrangeBtn').click();
       await expect(page.locator('#arrangeOverlay')).toBeVisible();
-      await expect(page.locator('#arrangeModes .btn.active')).toHaveAttribute('data-sort', 'melds');
+      await expect(page.locator('#arrangeModes .btn.active')).toHaveAttribute('data-sort', 'suit');
       await page.locator('#arrangeModes [data-sort="rank"]').click();
       await expect(page.locator('#arrangeOverlay')).toBeHidden();
       await expect(page.locator('#arrangeBtn')).not.toHaveClass(/due/);
@@ -107,12 +107,23 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const bySuit = (await page.evaluate<Ids>(LOOSE)).map((id) => suitOf.get(id) ?? 0);
       expect([...bySuit].sort((a, b) => a - b)).toEqual(bySuit);
 
-      await page.locator('#arrangeBtn').click();
-      await page.locator('#arrangeModes [data-sort="melds"]').click();
+      // The melds never move: the same groups in the same order under every mode.
       const arranged = storyById('arranged-after-accept');
       expect(await page.evaluate<ReadonlyArray<Ids>>(GROUPS)).toEqual(
         (arranged?.app.picture?.groups ?? []).map((g) => g.map((c) => c.id)),
       );
+      // Manual keeps the loose cards exactly where they are.
+      const loose = await page.evaluate<Ids>(LOOSE);
+      await page.locator('#arrangeBtn').click();
+      await page.locator('#arrangeModes [data-sort="manual"]').click();
+      await expect(page.locator('#arrangeOverlay')).toBeHidden();
+      expect(await page.evaluate<Ids>(LOOSE)).toEqual(loose);
+      await page.locator('#arrangeBtn').click();
+      await expect(page.locator('#arrangeModes .btn.active')).toHaveAttribute(
+        'data-sort',
+        'manual',
+      );
+      await page.locator('#closeArrangeBtn').click();
       expect(watched.errors(), 'uncaught exceptions').toEqual([]);
     });
 

@@ -90,7 +90,7 @@ const home: HomeSnapshot = {
   p2Name: null,
   homeTab: 'play',
   playMode: 'online',
-  sort: 'melds',
+  sort: 'suit',
   save: null,
   scorer: null,
 };
@@ -1302,7 +1302,7 @@ describe('storage', () => {
       p2Name: 'Bob',
       homeTab: 'rules',
       playMode: 'local',
-      sort: 'melds',
+      sort: 'suit',
       save: { role: 'guest', code: 'KQZM', myName: 'Jeff' },
       scorer: {
         players: [
@@ -1746,7 +1746,11 @@ describe('the arrangement: the sheet, the sort modes and the long press', () => 
         { type: 'fx', cue: 'tap' },
       ]),
     );
-    expect(sorted.app.picture).toEqual(arrangedOf(v, null, null, 'suit'));
+    expect(sorted.app.picture).toEqual(arrangedOf(v, null, null, 'suit', accepted.picture));
+    // Manual keeps the loose cards where they are: the picture only re-melds.
+    const manual = run(sorted.app, { type: 'hand/arrange', mode: 'manual' });
+    expect(manual.app.sort).toBe('manual');
+    expect(manual.app.picture?.loose).toEqual(sorted.app.picture?.loose);
     // Out of play the mode is still remembered, the picture untouched.
     const over = { ...accepted, view: { ...v, phase: 'roundOver' as const } };
     const later = run(over, { type: 'hand/arrange', mode: 'rank' });

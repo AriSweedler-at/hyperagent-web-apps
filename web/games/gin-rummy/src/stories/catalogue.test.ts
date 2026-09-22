@@ -31,7 +31,7 @@ type Painted = Readonly<{ page: GinPage; modes: ReadonlyArray<FakeEl> }>;
 
 /** The story painted on the page fake; the arrange sheet's mode buttons are declared for the paint's query. */
 const painted = (story: Story): Painted => {
-  const modes = ['melds', 'rank', 'suit'].map((m) =>
+  const modes = ['suit', 'rank', 'manual'].map((m) =>
     fakeEl(`mode-${m}`, { classes: ['btn'], attrs: { 'data-sort': m } }),
   );
   const page = ginPage(MARKUP, { arrangeModes: { queries: { 'button[data-sort]': modes } } });
@@ -120,7 +120,7 @@ const factsOnPage = ({ page, modes }: Painted): StoryFacts => {
     ),
     rows: Number(page.get('hand').attr('data-rows')),
     arrange: arrange.disabled() ? 'off' : arrange.hasClass('due') ? 'due' : 'idle',
-    sort: sort === 'rank' || sort === 'suit' ? sort : 'melds',
+    sort: sort === 'rank' || sort === 'manual' ? sort : 'suit',
     stock: stock.hasClass('tappable') ? 'tappable' : 'idle',
     discard: disc.hasClass('tappable') ? 'tappable' : disc.hasClass('blocked') ? 'blocked' : 'idle',
     actions: [...page.get('actions').text().matchAll(BUTTON)].map((m) => ({
@@ -168,7 +168,7 @@ const IDS = [
   'meld-chooser-open',
   'human-meld',
   'sorted-by-rank',
-  'sorted-by-suit',
+  'manual-order',
   'arrange-sheet-open',
   'hand-three-rows',
   'undo-back-to-draw',
@@ -293,11 +293,16 @@ describe('the catalogue', () => {
     expect(STORIES.filter((s) => s.facts.human.length > 0).map((s) => s.id)).toEqual([
       'human-meld',
     ]);
-    expect(STORIES.map((s) => [s.id, s.facts.sort]).filter(([, sort]) => sort !== 'melds')).toEqual(
-      [
-        ['sorted-by-rank', 'rank'],
-        ['sorted-by-suit', 'suit'],
-      ],
+    expect(STORIES.map((s) => [s.id, s.facts.sort]).filter(([, sort]) => sort !== 'suit')).toEqual([
+      ['sorted-by-rank', 'rank'],
+      ['manual-order', 'manual'],
+    ]);
+    // Manual keeps the loose cards as they are: the reversed order is what was asked for.
+    const manual = STORIES.find((s) => s.id === 'manual-order');
+    expect(manual?.facts.arrange).toBe('idle');
+    const rank = STORIES.find((s) => s.id === 'sorted-by-rank');
+    expect(manual?.app.picture?.loose.map((c) => c.id)).not.toEqual(
+      rank?.app.picture?.loose.map((c) => c.id),
     );
   });
 
@@ -374,7 +379,7 @@ describe('every story painted on the page fake', () => {
       'accepted-two-ways',
       'human-meld',
       'sorted-by-rank',
-      'sorted-by-suit',
+      'manual-order',
       'hand-three-rows',
     ].forEach((id) => {
       const html = hand(must(id));
@@ -403,7 +408,7 @@ describe('every story painted on the page fake', () => {
     expect(story.facts.arrange).toBe('idle');
   });
 
-  test('the sort stories: the loose cards ascend by rank, then by suit', () => {
+  test('the sort stories: the loose cards ascend by rank; by suit under the default; manual keeps them reversed', () => {
     const view = must('sorted-by-rank').app.view;
     if (view === null) throw new Error('no view');
     const byId = new Map(view.me.hand.map((c) => [c.id, c]));
@@ -413,13 +418,20 @@ describe('every story painted on the page fake', () => {
         .flatMap(([, card]) => (card === null ? [] : [card]));
     const ranks = looseOf('sorted-by-rank').map((id) => byId.get(id)?.r ?? 0);
     expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
-    const suits = looseOf('sorted-by-suit').map((id) => 'SHDC'.indexOf(byId.get(id)?.s ?? ''));
+    // The default (`arranged-after-accept`): by suit, spades first.
+    const suits = looseOf('arranged-after-accept').map((id) =>
+      'SHDC'.indexOf(byId.get(id)?.s ?? ''),
+    );
     expect([...suits].sort((a, b) => a - b)).toEqual(suits);
-    expect(
-      painted(must('sorted-by-suit'))
+    // Manual: the same loose cards, in the order the player left them (reversed here).
+    expect(looseOf('manual-order')).toEqual([...looseOf('arranged-after-accept')].reverse());
+    const active = (id: string): string | null =>
+      painted(must(id))
         .modes.find((b) => b.hasClass('active'))
-        ?.attr('data-sort'),
-    ).toBe('suit');
+        ?.attr('data-sort') ?? null;
+    expect(active('manual-order')).toBe('manual');
+    expect(active('sorted-by-rank')).toBe('rank');
+    expect(active('arranged-after-accept')).toBe('suit');
   });
 
   test('hand-three-rows: the run of seven is one group, three rows on a phone', () => {
@@ -452,7 +464,7 @@ describe('every story painted on the page fake', () => {
     const sheet = painted(must('arrange-sheet-open'));
     expect(sheet.page.get('arrangeOverlay').hidden()).toBe(false);
     expect(sheet.modes.filter((b) => b.hasClass('active')).map((b) => b.attr('data-sort'))).toEqual(
-      ['melds'],
+      ['suit'],
     );
   });
 

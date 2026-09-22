@@ -557,7 +557,7 @@ const rendered = (app: App, prev: View | null = null): Step => {
   const screen: ScreenId = view.phase === 'gameOver' ? 'endgameScreen' : 'tableScreen';
   const draw = settleDraw(app.draw, view);
   const picture = settlePicture(app.picture, view, draw, () =>
-    arrangedOf(view, draw, app.human, app.sort),
+    arrangedOf(view, draw, app.human, app.sort, app.picture),
   );
   return step(
     { ...app, cues: cued.state, selectedCard, screen, draw, picture },
@@ -1288,10 +1288,14 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       const remembered: Effect = { type: 'writeSort', sort: intent.mode };
       if (v === null || !inPlay(v.phase) || app.draw !== null) return step(chosen, remembered);
       return then(
-        step({ ...chosen, picture: arrangedOf(v, null, app.human, intent.mode) }, remembered, {
-          type: 'fx',
-          cue: 'tap',
-        }),
+        step(
+          { ...chosen, picture: arrangedOf(v, null, app.human, intent.mode, app.picture) },
+          remembered,
+          {
+            type: 'fx',
+            cue: 'tap',
+          },
+        ),
         rendered,
       );
     }
@@ -1316,7 +1320,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       if (human === null) return step(app, toast(NO_MELD_MSG));
       // The repaint replaces the pressed card's element, so the click that ends the press never
       // reaches a card: a long press selects nothing.
-      const picture = arrangedOf(v, null, human, app.sort);
+      const picture = arrangedOf(v, null, human, app.sort, app.picture);
       const marked: App = { ...app, human, picture, selectedCard: null };
       // Declared to the engine too when it scores as well as the solver, so a knock lays off
       // against these melds; a worse arrangement stays a picture and the knock counts the best.

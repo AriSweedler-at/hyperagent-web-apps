@@ -305,7 +305,7 @@ const paintHand = (doc: DocumentLike, app: App, v: View, handView: HandView): vo
   toggleClass(dw, 'tappable-dw', altCount > 1);
   setAttr(dw, 'title', altCount > 1 ? 'Tap to choose which melds you declare' : '');
   const hand = requireId(doc, 'hand');
-  const arranged = arrangedOf(v, app.draw, app.human, app.sort);
+  const arranged = arrangedOf(v, app.draw, app.human, app.sort, app.picture);
   const picture = app.picture ?? arranged;
   setHtml(hand, trustedHtml(handView.render(v, app.selectedCard, app.draw, picture)));
   toggleClass(hand, 'active', v.isMyTurn && v.phase === 'discard');

@@ -98,29 +98,42 @@ describe('standing', () => {
 describe('sorted', () => {
   const p = pic([spades, aces], [k, d9, q]);
 
-  test('melds: untouched', () => {
-    expect(sorted(p, 'melds')).toBe(p);
+  test('the groups are never reordered: only the loose cards sort', () => {
+    expect(sorted(p, 'rank').groups).toEqual([spades, aces]);
+    expect(sorted(p, 'suit').groups).toEqual([spades, aces]);
+    expect(sorted(p, 'manual').groups).toEqual([spades, aces]);
   });
 
-  test('rank: groups by their lowest card, then the loose cards by rank', () => {
-    expect(sorted(p, 'rank')).toEqual(pic([aces, spades], [d9, q, k]));
+  test('rank: the loose cards by rank, then suit', () => {
+    expect(sorted(p, 'rank')).toEqual(pic([spades, aces], [d9, q, k]));
   });
 
   test('suit: spades, hearts, diamonds, clubs, then rank', () => {
-    expect(sorted(p, 'suit')).toEqual(pic([aces, spades], [q, d9, k]));
-    // A group's suit is its lowest card's under the same key: the aces lead on the spade.
-    expect(sorted(pic([[ah, ad, ac], spades], []), 'suit').groups).toEqual([spades, [ah, ad, ac]]);
+    expect(sorted(p, 'suit')).toEqual(pic([spades, aces], [q, d9, k]));
+  });
+
+  test('manual: the loose cards as the previous picture had them; nothing previous keeps the order given', () => {
+    expect(sorted(p, 'manual')).toEqual(p);
+    const prev = pic([], [q, k, d9]);
+    expect(sorted(p, 'manual', prev).loose).toEqual([q, k, d9]);
+    // A card a previous group let go comes after the kept loose cards; a new card after those.
+    const broke = pic([[as, ah, ad]], [k]);
+    expect(sorted(pic([], [ah, d9, k, as]), 'manual', broke).loose).toEqual([k, as, ah, d9]);
   });
 });
 
 describe('arrangedOf', () => {
   test("nothing hand-made: the engine's melding, sorted", () => {
     const v = view(ten);
-    expect(arrangedOf(v, null, null, 'melds')).toEqual(engineOf(v, null));
-    expect(arrangedOf(v, null, mine(aces), 'melds').human).toEqual(['AS', 'AH', 'AD']);
-    expect(arrangedOf(v, null, { hand: 2, groups: [ids(aces)] }, 'melds')).toEqual(
+    expect(arrangedOf(v, null, null, 'manual')).toEqual(engineOf(v, null));
+    expect(arrangedOf(v, null, mine(aces), 'manual').human).toEqual(['AS', 'AH', 'AD']);
+    expect(arrangedOf(v, null, { hand: 2, groups: [ids(aces)] }, 'manual')).toEqual(
       engineOf(v, null),
     );
+    // The default order sorts the loose cards by suit; manual with a previous picture keeps its order.
+    expect(ids(arrangedOf(v, null, null, 'suit').loose)).toEqual(['QH', '9D', 'KC']);
+    const prev = { ...engineOf(v, null), loose: [k, q, d9] };
+    expect(arrangedOf(v, null, null, 'manual', prev).loose).toEqual([k, q, d9]);
   });
 
   test('a hand-made meld leads and the solver melds the rest, even when the engine melds differently', () => {
@@ -130,7 +143,7 @@ describe('arrangedOf', () => {
     const v = view(hand);
     expect(engineOf(v, null).groups).toEqual([[s5, s6, s7]]);
     const fives = [s5, makeCard(5, 'H'), makeCard(5, 'D')];
-    const arranged = arrangedOf(v, null, mine(fives), 'melds');
+    const arranged = arrangedOf(v, null, mine(fives), 'manual');
     expect(arranged.groups).toEqual([fives]);
     expect(ids(arranged.loose)).toEqual(['6S', '7S', 'JH', 'QH', 'AD', '9D', 'KC']);
     expect(arranged.human).toEqual(['5S', '5H', '5D']);
@@ -142,7 +155,7 @@ describe('arrangedOf', () => {
       v,
       { kind: 'shown', from: 'stock', cardId: 'JH' },
       mine(aces),
-      'melds',
+      'manual',
     );
     expect(ids([...arranged.groups.flat(), ...arranged.loose])).not.toContain('JH');
     expect(arranged.groups[0]).toEqual(aces);
@@ -186,7 +199,7 @@ describe('toggleMeld', () => {
     expect(dissolved).toEqual({ hand: 1, groups: [] });
     const fives = toggleMeld(dissolved, 1, hand, '5H');
     expect(fives).toEqual(mine([s5, makeCard(5, 'H'), makeCard(5, 'D')]));
-    expect(arrangedOf(view(hand), null, fives, 'melds').groups[1]).toEqual([s6, s7, s8]);
+    expect(arrangedOf(view(hand), null, fives, 'manual').groups[1]).toEqual([s6, s7, s8]);
   });
 
   test('another hand number starts from no hand-made melds', () => {

@@ -3,7 +3,9 @@
 // meld is a constraint the solver melds around: it stays a group while its cards are held and
 // still form a meld, whatever the engine's own melding says, and the engine's `meldPref` (the
 // chooser's declaration, dropped by the engine as soon as the hand changes) is mirrored here so a
-// pick sticks across the moves that follow. A long press on a card asks for a meld with it:
+// pick sticks across the moves that follow. The sort order touches the loose cards alone (the
+// owner, 2026-09-22): the melds sit first, in the solver's order, in every mode; `manual` keeps
+// the loose cards as the picture on screen had them. A long press on a card asks for a meld with it:
 // first a hand-made meld it can join, else the meld with it among the cards no hand-made meld
 // holds that leaves the least deadwood, else nothing. A long press on a card in a hand-made meld
 // dissolves that meld. Pure; imported by ui/state.ts, ui/render.ts and stories/catalogue.ts.
@@ -40,38 +42,47 @@ export const standing = (
 const suitIndex = (c: Card): number => SUITS.indexOf(c.s);
 const byRank = (c: Card): number => c.r * SUITS.length + suitIndex(c);
 const bySuit = (c: Card): number => suitIndex(c) * 14 + c.r;
-const lowest = (g: Cards, key: (c: Card) => number): number => Math.min(...g.map(key));
 
-/** `p` in `sort` order: groups by their lowest card, the loose cards by the same key. */
-export const sorted = (p: Picture, sort: SortMode): Picture => {
-  if (sort === 'melds') return p;
+/**
+ * `p` with its loose cards in `sort` order, its groups as they come. `manual`: as `prev` (the
+ * picture on screen) had them, the loose cards first in their order, then the cards a group of
+ * `prev` let go, then the cards new to the table, each run in `p`'s own order.
+ */
+export const sorted = (p: Picture, sort: SortMode, prev: Picture | null = null): Picture => {
+  if (sort === 'manual') {
+    const order = prev === null ? [] : [...idsOf(prev.loose), ...idsOf(prev.groups.flat())];
+    const at = (c: Card): number => {
+      const i = order.indexOf(c.id);
+      return i < 0 ? order.length : i;
+    };
+    return { ...p, loose: [...p.loose].sort((a, b) => at(a) - at(b)) };
+  }
   const key = sort === 'rank' ? byRank : bySuit;
-  return {
-    ...p,
-    groups: [...p.groups].sort((a, b) => lowest(a, key) - lowest(b, key)),
-    loose: [...p.loose].sort((a, b) => key(a) - key(b)),
-  };
+  return { ...p, loose: [...p.loose].sort((a, b) => key(a) - key(b)) };
 };
 
 /**
  * The arrangement the player asked for over the on-table cards: the hand-made melds, then the
  * solver's melding of the other cards (the engine's own, honouring the chooser, when nothing is
- * hand-made), in `sort` order.
+ * hand-made), the loose cards in `sort` order (`prev`, the picture on screen, is what `manual`
+ * keeps).
  */
 export const arrangedOf = (
   v: View,
   stage: DrawStage | null,
   human: HumanMelds | null,
   sort: SortMode,
+  prev: Picture | null = null,
 ): Picture => {
   const table = onTable(v, stage);
   const mine = standing(human, v.handNumber, table);
-  if (mine.length === 0) return sorted(engineOf(v, stage), sort);
+  if (mine.length === 0) return sorted(engineOf(v, stage), sort, prev);
   const taken = new Set(idsOf(mine.flat()));
   const rest = bestMelding(table.filter((c) => !taken.has(c.id)));
   return sorted(
     { groups: [...mine, ...rest.melds], loose: rest.deadwood, human: idsOf(mine.flat()) },
     sort,
+    prev,
   );
 };
 
