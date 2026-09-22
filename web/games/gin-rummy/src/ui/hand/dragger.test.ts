@@ -9,10 +9,13 @@ import { LAND_MS, bindDrag, type DragIntent } from './dragger.ts';
 
 type Table = Readonly<{
   hand: FakeEl;
+  melds: FakeEl;
   loose: ReadonlyArray<FakeEl>;
   slots: ReadonlyArray<FakeEl>;
   meldCard: FakeEl;
   meldSlot: FakeEl;
+  /** A card laid off onto the knocker's melds, on the table (§7b). */
+  laidCard: FakeEl;
   ghost: FakeEl;
   intents: DragIntent[];
 }>;
@@ -41,12 +44,16 @@ const table = (cloneable: boolean): Table => {
       '.card[data-card="AS"]': [meldCard],
     },
   });
-  const page = fakePage([hand]);
+  const laidCard = fakeEl('card-4S', { classes: ['card', 'laid'], attrs: { 'data-card': '4S' } });
+  const melds = fakeEl('tableMelds', {
+    queries: { '.meld-group': [], '.card[data-card="4S"]': [laidCard] },
+  });
+  const page = fakePage([hand, melds]);
   const intents: DragIntent[] = [];
   bindDrag(page.doc, (i) => {
     intents.push(i);
   });
-  return { hand, loose, slots, meldCard, meldSlot, ghost, intents };
+  return { hand, melds, loose, slots, meldCard, meldSlot, laidCard, ghost, intents };
 };
 
 /** A pointer event's init: where it is, on which card in which slot. */
@@ -88,7 +95,7 @@ describe('bindDrag', () => {
     // The two other loose cells precede a pointer at (120, 100) when every rect is zero.
     expect(t.intents).toEqual([
       { type: 'card/release' },
-      { type: 'card/dragStart', cardId: '7H' },
+      { type: 'card/dragStart', cardId: '7H', from: 'hand' },
       { type: 'card/dragOver', index: 2 },
     ]);
     // The ghost: the card's clone, fixed at its rect (zeros here), the selection lift removed.
@@ -108,7 +115,7 @@ describe('bindDrag', () => {
     t.hand.fire('pointermove', on(card, slot, 10, 10));
     expect(t.intents).toHaveLength(3);
     t.ghost.fire('transitionend');
-    expect(t.intents.at(-1)).toEqual({ type: 'card/dragEnd' });
+    expect(t.intents.at(-1)).toEqual({ type: 'card/dragEnd', over: null });
     // Once: the fallback timer finds the latch set.
     t.ghost.fire('transitionend');
     expect(t.intents).toHaveLength(4);
@@ -125,7 +132,44 @@ describe('bindDrag', () => {
     t.hand.fire('pointercancel', on(card, slot, 120, 100));
     expect(t.intents.at(-1)).toEqual({ type: 'card/dragOver', index: 2 });
     vi.advanceTimersByTime(LAND_MS + 60);
-    expect(t.intents.at(-1)).toEqual({ type: 'card/dragEnd' });
+    expect(t.intents.at(-1)).toEqual({ type: 'card/dragEnd', over: null });
+  });
+
+  test('a laid-off card on the table drags too: no glide on release, the end says where it was dropped', () => {
+    const t = table(true);
+    const onCard = (x: number, y: number) => ({
+      clientX: x,
+      clientY: y,
+      pointerId: 2,
+      target: fakeTarget({ closest: { '.card': t.laidCard } }),
+    });
+    t.melds.fire('pointerdown', onCard(50, 50));
+    t.melds.fire('pointermove', onCard(50, 90));
+    expect(t.intents).toEqual([
+      { type: 'card/release' },
+      { type: 'card/dragStart', cardId: '4S', from: 'table' },
+    ]);
+    // Off the melds (every rect is zero on a fake): the end reports no meld, at once.
+    t.melds.fire('pointerup', onCard(50, 90));
+    expect(t.intents.at(-1)).toEqual({ type: 'card/dragEnd', over: null });
+    // A pinned card (no `laid`) on the table starts nothing.
+    const pinned = fakeEl('card-AS-table', {
+      classes: ['card', 'pinned'],
+      attrs: { 'data-card': 'AS' },
+    });
+    t.melds.fire('pointerdown', {
+      clientX: 1,
+      clientY: 1,
+      pointerId: 3,
+      target: fakeTarget({ closest: { '.card': pinned } }),
+    });
+    t.melds.fire('pointermove', {
+      clientX: 60,
+      clientY: 60,
+      pointerId: 3,
+      target: fakeTarget({ closest: { '.card': pinned } }),
+    });
+    expect(t.intents).toHaveLength(3);
   });
 
   test('an element that cannot clone has no ghost: the drag still moves the card and ends at once on release', () => {
@@ -139,12 +183,12 @@ describe('bindDrag', () => {
     t.hand.fire('pointermove', on(card, slot, 100, 130));
     expect(t.intents).toEqual([
       { type: 'card/release' },
-      { type: 'card/dragStart', cardId: '7H' },
+      { type: 'card/dragStart', cardId: '7H', from: 'hand' },
       { type: 'card/dragOver', index: 2 },
     ]);
     expect(t.ghost.hasClass('drag-ghost')).toBe(false);
     t.hand.fire('pointerup', on(card, slot, 100, 130));
-    expect(t.intents.at(-1)).toEqual({ type: 'card/dragEnd' });
+    expect(t.intents.at(-1)).toEqual({ type: 'card/dragEnd', over: null });
     // The session is over: a new press works as before.
     t.hand.fire('pointerdown', on(card, slot, 100, 100));
     t.hand.fire('pointerup', on(card, slot, 100, 100));

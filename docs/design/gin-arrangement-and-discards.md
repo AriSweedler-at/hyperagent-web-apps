@@ -370,6 +370,82 @@ class="rr-label">Laid off onto Alice's melds</div><div class="meld-group laid">`
 every round over, `.meld-group.laid .card` count equals `result.opponent.laidOff.length` (via
 `__gin`), and the `Laid off onto` label exists iff it is positive.
 
+## 7b. Laying off by hand (the owner, 2026-09-22)
+
+"For laying off, that should be a manual process. You should be able to play your melds yourself,
+and you should be able to click and drag to lay off. And when you lay off, their cards should be
+highlighted differently to make it clear that they are locked in place. So you can pick your cards
+back up from laying off and so on."
+
+RULE CHANGE. A knock no longer scores at once. It opens the `layoff` phase: the knocker's melds are
+laid out on the table (locked: nothing moves them), the turn passes to the defender, who drags any
+of their cards onto a meld it extends (a fourth to a set, the next rank either end of a run), drags
+it back while nothing was laid after it on that meld, arranges their own melds as ever (the long
+press, the chooser, the sort modes), and finishes with "Done laying off". Only then does the round
+score, with the layoffs as laid. A gin allows no layoff and scores at once, as before. Their own
+melds are still the solver's best over what they kept (`setMelds` only decorates), so a player
+cannot score worse than their cards allow except by what they chose not to lay off, which is the
+game.
+
+ENGINE (`game.ts`, `layoff.ts`, `types.ts`, `decode.ts`, `view.ts`):
+
+- `Phase` gains `layoff`; `inPlay` includes it (the defender arranges, `meldOptions` are offered,
+  `setMelds` is allowed).
+- `State.knock?: Knock | null`, `Knock = { by: Seat; card: string; melding: Melding; laidOff:
+  { cardId: string; onto: number }[] }`: the knock awaiting its answer. Optional, so every save
+  before this decodes; null outside the phase. The defender's hand keeps its ten cards throughout
+  (the laid-off ids are the entries), so `hands` never changes shape and the parity legs compare
+  states as before.
+- `knock`: as now up to the knocker's melding and the KNOCK_LIMIT refusal; then gin scores at once
+  (`finishKnock`), else `phase: 'layoff'`, `turn: defender`, `knock: {…, laidOff: []}`.
+- `layoffPhase(state, defender, action)`: `layOff {cardId, onto}` (the card in hand, not laid yet,
+  `fitsOnto` the meld as extended so far), `takeBack {cardId}` (laid, and the meld stays a meld
+  without it and with the cards laid after it), `finishLayoff` (`layoffMeldingFrom(hand, melds,
+  laidOff)`: the best melding of the kept cards, the entries with their cards, the extended melds;
+  then `finishKnock` scores exactly as the old knock did: outcome, scores, result, round, totals).
+  Any other action: "Lay off onto the melds, take a card back, or finish." The knocker waits.
+- `legalActions` in `layoff` for the defender: every fitting `layOff`, every `takeBack` allowed,
+  and `finishLayoff`; nothing for the knocker.
+- `View.layoff?: { knocker: Seat; melds: Meld[]; extended: Meld[]; laidOff: LayoffEntry[];
+  knockerValue: number }`, optional and last, as `discardIds` was added. During the phase the
+  defender's `me.melds/deadwood/deadwoodValue` are over the kept cards (hand minus laid), so the
+  deadwood readout answers each layoff; `me.hand` keeps all ten.
+- Actions on the wire: `layOff`, `takeBack`, `finishLayoff` (`ACTION_TYPES`, `decodeAction`).
+
+PARITY. The legacy engine has no such phase. test/parity/gin.replay.ts: when the current leg enters
+`layoff`, the policy lays off exactly the legacy result's entries in the legacy's order and
+finishes; the intermediate states are compared to nothing, and the round-over that follows is
+compared as before (the same layoffs give the same deadwood, scores and totals). The
+characterization suite (gin.legacy.test.ts) plays its knock positions through the phase the same
+way. The wire corpus still decodes byte for byte (nothing removed, the new keys optional or absent).
+
+UI (`render.ts`, `dragger.ts`, `state.ts`, `index.html`, `theme.css`):
+
+- `#tableMelds` inside `.table-center`, shown in the `layoff` phase in place of the piles: the
+  knocker's melds as `.meld-group.mK.locked` groups (their cards `.card.pinned`: a steel edge, no
+  lift, the "locked in place" look), with the laid-off cards appended as `.card.laid` (a gold edge,
+  lifted a little: still the defender's to take back). The groups drop in with §7a's `layOut`
+  cascade when the phase begins; a card laid off drops in the same way.
+- The defender's hand: the kept cards only (`onTable` leaves the laid ids out, so `settlePicture`
+  sees a layoff as one card fewer, left in place, and a take-back as one card more, appended). A
+  drag of a loose card over a `.meld-group` marks it `.drop` where the card fits (`fitsOnto` over
+  the extended meld, computed in the UI from the view) and a release there dispatches
+  `act(layOff)`; over nothing it reorders as now. A `.card.laid` on the table drags too, and a
+  release over the hand (or anywhere off the melds) dispatches `act(takeBack)`; the engine's
+  refusal ("take back the cards laid after it first") is the toast.
+- The actions row: `Done laying off` (`data-act="finishLayoff"`) for the defender; the knocker's
+  row says "Waiting for {name} to lay off…". Status: defender "Your turn / Lay off onto {name}'s
+  melds, then Done"; knocker "{name}'s turn / Laying off…". The cue machine chimes `yourTurn` for
+  the defender as for any turn.
+- Pass-and-play: the knock hands the phone to the defender through the curtain, as any turn does.
+  Online: the defender's actions travel as `action` frames; the knocker's table shows each layoff
+  as the frames land.
+- Stories: `layoff-mine` (the defender's table, one card laid, one that fits marked on a drag),
+  `layoff-theirs` (the knocker waiting); facts gain `layoff?: { melds, laid }`. Flows:
+  e2e/gin-local.spec.ts plays a knock through the phase by dragging a fitting card onto its meld,
+  taking it back, laying it off again and finishing, and the sheet shows exactly that; the
+  `playToRoundOver` driver finishes a `layoff` phase through `legalActions`.
+
 ## 8. Discards modal
 
 BUTTON. index.html `.table-center` (188-191) gains a third child after the piles: `<button

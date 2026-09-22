@@ -16,7 +16,7 @@ import { mulberry32 } from '../../web/shared/lib/rng.ts';
 export type Suit = 'S' | 'H' | 'D' | 'C';
 export type Card = { id: string; r: number; s: Suit };
 export type Rng = () => number;
-export type Phase = 'upcard' | 'draw' | 'discard' | 'roundOver' | 'gameOver';
+export type Phase = 'upcard' | 'draw' | 'discard' | 'layoff' | 'roundOver' | 'gameOver';
 export type Outcome = 'gin' | 'knock' | 'undercut';
 
 export type Player = { id: string; name: string; total: number };
@@ -88,11 +88,28 @@ export type GinState = {
    * docs/MIGRATION.md step 15 fixes); the current one resets it to null once the key exists.
    */
   lastDrawn?: { p: number; id: string } | null;
+  /** The current engine's knock awaiting its answer (docs/design/gin-arrangement-and-discards.md §7b); the legacy has none. */
+  knock?: {
+    by: number;
+    card: string;
+    melding: Melding;
+    laidOff: { cardId: string; onto: number }[];
+  } | null;
 };
 
 export type GinAction =
-  | { type: 'ready' | 'takeUpcard' | 'passUpcard' | 'drawStock' | 'drawDiscard' | 'undoDraw' }
-  | { type: 'discard' | 'knock'; cardId: string }
+  | {
+      type:
+        | 'ready'
+        | 'takeUpcard'
+        | 'passUpcard'
+        | 'drawStock'
+        | 'drawDiscard'
+        | 'undoDraw'
+        | 'finishLayoff';
+    }
+  | { type: 'discard' | 'knock' | 'takeBack'; cardId: string }
+  | { type: 'layOff'; cardId: string; onto: number }
   | { type: 'setMelds'; melds: string[][] };
 
 export type DiscardOption =
@@ -137,6 +154,14 @@ export type GinView = {
   knockLimit: number;
   /** The current engine's addition (docs/design/gin-arrangement-and-discards.md §8); the legacy view has none. */
   discardIds?: string[];
+  /** The current engine's knock being answered (§7b); the legacy view has none. */
+  layoff?: {
+    knocker: number;
+    melds: Card[][];
+    extended: Card[][];
+    laidOff: LayoffEntry[];
+    knockerValue: number;
+  };
 };
 
 export type ApplyResult = { ok: true; privateCard?: string } | { ok: false; error: string };
@@ -219,6 +244,12 @@ export const loadCurrentGin = (): GinEngine => {
         Date.now,
       );
       if (!r.ok) return { ok: false, error: r.error };
+      // A key the new state no longer has (`knock`, once a round scores) leaves the object too.
+      Object.keys(state)
+        .filter((key) => !(key in r.value))
+        .forEach((key) => {
+          Reflect.deleteProperty(state, key);
+        });
       Object.assign(state, r.value);
       const drawnFromStock = action.type === 'drawStock' ? r.value.pendingDraw?.cardId : undefined;
       return drawnFromStock === undefined

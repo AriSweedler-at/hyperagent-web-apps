@@ -21,6 +21,7 @@ import { browserStore } from '../../shared/edge/storage.ts';
 import { realTransport } from '../../shared/edge/transport.ts';
 import type { Timer } from '../../shared/lib/clock.ts';
 import type { Rng } from '../../shared/lib/rng.ts';
+import { bestLayoffActions, legalActions } from './src/engine/index.ts';
 import type { Action } from './src/engine/types.ts';
 import { createFx } from './src/fx.ts';
 import { GuestSession, type GuestEvents } from './src/net/guest.ts';
@@ -406,6 +407,14 @@ const boot = (): void => {
     setPlayMode: (mode: string) => {
       dispatch({ type: 'mode/set', mode });
     },
+    /** The engine's legal actions for my view. */
+    legal: (): ReadonlyArray<Action> => (app.view === null ? [] : legalActions(app.view)),
+    /**
+     * The layoffs the engine used to make by itself, then `finishLayoff` (§7b): what the drivers
+     * (e2e/fixtures/gin-play.ts, tools/parity) play through a knock's layoff phase to land where
+     * the automatic layoff landed. Host and pass-and-play only (the game is here).
+     */
+    layoffs: (): ReadonlyArray<Action> => (app.game === null ? [] : bestLayoffActions(app.game)),
     // The sandbox from the console (src/sandbox.ts): deal a map; read the table back as one.
     sandbox: (map: string) => {
       dispatch({ type: 'sandbox/start', map });

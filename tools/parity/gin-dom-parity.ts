@@ -8,9 +8,10 @@
 // ghost draw slot (docs/design/gin-draw-ghost-slot.md §9): it diverges by design (slots, the ghost
 // cell, the undo button in the actions row, one pile size, shorter labels), while everything the
 // table opens (the sheets, the overlays, the toast) still compares at every checkpoint. Only
-// whitespace, the two rules slots' ids, the `#handoffBtn` and `#curtainHandoffBtn` buttons and
-// the sandbox (its two mode buttons and `#sandboxModeContent`; the new page's markup additions)
-// are normalised.
+// whitespace, the two rules slots' ids, the `#handoffBtn` and `#curtainHandoffBtn` buttons, the
+// sandbox (its two mode buttons and `#sandboxModeContent`; the new page's markup additions), the
+// result body's key and the hidden curtain's stale text (the knock's layoff phase, §7b, shows a
+// curtain the legacy never did) are normalised.
 // What is read from the pages is compared; what is decided (which card
 // to discard) is read from the legacy page's `window.__gin` hook and applied to both, so the two
 // never diverge on a choice; after a draw the new page's ghost card is accepted (`acceptIfShown`)
@@ -66,6 +67,12 @@ export const normalise = (html: string): string =>
     .replace(/<button[^>]*\bid="(curtainH|h)andoffBtn"[^>]*>[^<]*<\/button>/g, '')
     // The result sheet's body is built once per result and keyed so its lay-out animation runs once.
     .replace(/ data-result-key="[^"]*"/g, '')
+    // A hidden curtain keeps the text of its last showing, and the new page shows one the legacy
+    // never had: a knock hands the phone to the defender to lay off (§7b). Unseen, it is blanked.
+    .replace(
+      /^<div id="curtainOverlay" class="overlay hidden"[^>]*>[\s\S]*$/,
+      '<div id="curtainOverlay" class="overlay hidden"></div>',
+    )
     // The sandbox (src/sandbox.ts): a third mode button in the switch and the submenu, and its
     // panel up to the marker comment that closes it.
     .replace(/<button[^>]*\bdata-mode="sandbox"[^>]*>[^<]*<\/button>/g, '')
@@ -187,6 +194,21 @@ export const readView = (page: Page): Promise<HookView | null> =>
  * §4: a tap on it puts it into the hand), so a driver that took the upcard or drew from the stock
  * goes on from the accepted eleven-card state. The legacy page never has one: a no-op there.
  */
+/**
+ * RULE CHANGE (docs/design/gin-arrangement-and-discards.md §7b): a knock opens the new page's
+ * layoff phase, which the legacy page never had. The defender's answer is played through the
+ * hook as the engine used to make it by itself (`__gin.layoffs()`: the same layoffs, then
+ * finished), so the round over that follows compares with the legacy's.
+ */
+export const answerKnock = async (page: Page): Promise<void> => {
+  const acts =
+    await page.evaluate<ReadonlyArray<Record<string, unknown>>>('window.__gin.layoffs()');
+  await acts.reduce(
+    (done, a) => done.then(() => page.evaluate(`window.__gin.act(${JSON.stringify(a)})`)),
+    Promise.resolve<unknown>(null),
+  );
+};
+
 export const acceptIfShown = async (page: Page): Promise<void> => {
   const ghost = page.locator('#hand .slot.ghost .card');
   if ((await ghost.count()) === 0) return;
@@ -328,6 +350,7 @@ const drive = async (pair: Pair, checkpoints: string[], mismatches: Mismatch[]):
       await both(click(`#hand .card[data-card="${knock.id}"]`));
       await check(`turn ${String(turn)}: knock available`);
       await both(click('#actions [data-act="knock"]'));
+      await answerKnock(pair.next);
       await check(`turn ${String(turn)}: knocked, result sheet`);
       return 'knocked';
     }

@@ -23,7 +23,13 @@ export {
 } from './cards.ts';
 export { allMelds, meldingFromGroups, meldSig } from './melds.ts';
 export { bestMelding, allOptimalMeldings, meldSolver } from './melds.algorithms.ts';
-export { maximalLayoff, bestMeldingWithLayoffs } from './layoff.ts';
+export {
+  maximalLayoff,
+  bestMeldingWithLayoffs,
+  fitsOnto,
+  extendedMelds,
+  canTakeBack,
+} from './layoff.ts';
 export {
   STOCK_DRAW_FINAL_MSG,
   createGame,
@@ -31,6 +37,8 @@ export {
   applyAction,
   legalActions,
   inPlay,
+  keptHand,
+  bestLayoffActions,
 } from './game.ts';
 export { viewFor } from './view.ts';
 export { ACTION_TYPES, decodeAction, decodeCard, decodeState, decodeView } from './decode.ts';
@@ -44,9 +52,12 @@ export type {
   DiscardOption,
   LastAction,
   LastDrawn,
+  Knock,
+  LaidOff,
   Layoff,
   LayoffEntry,
   LayoffMelding,
+  LayoffView,
   Meld,
   MeldGroups,
   Melding,

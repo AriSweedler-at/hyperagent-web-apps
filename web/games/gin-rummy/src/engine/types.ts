@@ -18,7 +18,7 @@ export type Meld = ReadonlyArray<Card>;
 export type Seat = 0 | 1;
 export type Pair<T> = readonly [T, T];
 
-export type Phase = 'upcard' | 'draw' | 'discard' | 'roundOver' | 'gameOver';
+export type Phase = 'upcard' | 'draw' | 'discard' | 'layoff' | 'roundOver' | 'gameOver';
 export type UpcardStage = 'nonDealer' | 'dealer';
 export type Outcome = 'gin' | 'knock' | 'undercut';
 
@@ -54,6 +54,27 @@ export type LayoffMelding = Readonly<{
 }>;
 /** A player's declared arrangement: groups of card ids (`setMelds`). */
 export type MeldGroups = ReadonlyArray<ReadonlyArray<string>>;
+
+/**
+ * A card the defender laid off onto the knocker's meld at index `onto`, by id: the card stays in
+ * the hand until the round scores (docs/design/gin-arrangement-and-discards.md §7b).
+ */
+export type LaidOff = Readonly<{ cardId: string; onto: number }>;
+/** The knock awaiting the defender's answer (`phase: 'layoff'`): who knocked, with what, their melding, the layoffs so far. */
+export type Knock = Readonly<{
+  by: Seat;
+  card: string;
+  melding: Melding;
+  laidOff: ReadonlyArray<LaidOff>;
+}>;
+/** What both seats see of a knock being answered: the knocker's melds, as extended by the layoffs so far. */
+export type LayoffView = Readonly<{
+  knocker: Seat;
+  melds: ReadonlyArray<Meld>;
+  extended: ReadonlyArray<Meld>;
+  laidOff: ReadonlyArray<LayoffEntry>;
+  knockerValue: number;
+}>;
 
 export type PlayerInfo = Readonly<{ id: string; name: string }>;
 export type PlayerState = Readonly<{ id: string; name: string; total: number }>;
@@ -133,13 +154,27 @@ export type State = Readonly<{
    * happened to give it back). Absent until the first draw, as the legacy key was on the wire.
    */
   lastDrawn?: LastDrawn | null;
+  /**
+   * The knock being answered while `phase` is `layoff` (§7b), null otherwise. Optional: a save
+   * written before the phase existed decodes as before.
+   */
+  knock?: Knock | null;
 }>;
 
 export type Action =
   | Readonly<{
-      type: 'ready' | 'takeUpcard' | 'passUpcard' | 'drawStock' | 'drawDiscard' | 'undoDraw';
+      type:
+        | 'ready'
+        | 'takeUpcard'
+        | 'passUpcard'
+        | 'drawStock'
+        | 'drawDiscard'
+        | 'undoDraw'
+        | 'finishLayoff';
     }>
-  | Readonly<{ type: 'discard' | 'knock'; cardId: string }>
+  | Readonly<{ type: 'discard' | 'knock' | 'takeBack'; cardId: string }>
+  /** The defender lays `cardId` off onto the knocker's meld at index `onto` (§7b). */
+  | Readonly<{ type: 'layOff'; cardId: string; onto: number }>
   | Readonly<{ type: 'setMelds'; melds: MeldGroups }>;
 
 /** A refused move, worded for the player who tried it; `applyAction` returns `Result<State, RuleError>`. */
@@ -203,4 +238,6 @@ export type View = Readonly<{
    * Optional and last: a legacy frame or save without it decodes and re-encodes byte for byte.
    */
   discardIds?: ReadonlyArray<string>;
+  /** The knock being answered, while `phase` is `layoff` (§7b). Optional and last, as `discardIds`. */
+  layoff?: LayoffView;
 }>;

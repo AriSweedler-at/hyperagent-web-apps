@@ -175,9 +175,10 @@ const HAND_GEOMETRY = `(() => {
  * phone, into as few rows as it needs), no row wider than `columns`, one row on the laptop, and
  * on a phone the two or three rows `#hand[data-rows]` announces. Returns the row count.
  */
-export const expectHandRows = async (page: Page, columns: 6 | 11): Promise<number> => {
+/** `cells`: eleven, less one per card the defender laid off onto the knocker's melds (§7b). */
+export const expectHandRows = async (page: Page, columns: 6 | 11, cells = 11): Promise<number> => {
   const g = await page.evaluate<HandGeometry>(HAND_GEOMETRY);
-  expect(g.tops, 'eleven cells').toHaveLength(11);
+  expect(g.tops, `${String(cells)} cells`).toHaveLength(cells);
   expect(g.sizes, 'one cell size').toHaveLength(1);
   expect(g.handFits, '#hand scrolls').toBe(true);
   g.groups.forEach((tops, i) => {

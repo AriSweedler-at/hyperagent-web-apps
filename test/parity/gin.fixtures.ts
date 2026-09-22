@@ -70,7 +70,7 @@ export type LegacyUi = {
   fmtDuration: (ms: number) => string;
   cueState: { key: string | null; turnKey: string | null };
   playCuesFor: (v: unknown) => void;
-  cardHtml: (c: unknown, opts?: Record<string, boolean | undefined>) => string;
+  cardHtml: (c: unknown, opts?: Record<string, boolean | string | undefined>) => string;
   backHtml: (cls?: string) => string;
   meldGroupsHtml: (melds: unknown, extra?: string, mini?: boolean) => string;
   legacyStatus: (v: unknown) => { status: string; sub: string };

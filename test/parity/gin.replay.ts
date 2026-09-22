@@ -27,7 +27,13 @@
 import { describe, expect, test } from 'vitest';
 
 import * as current from '../../web/games/gin-rummy/src/engine/index.ts';
-import type { Pair, Seat, State, View } from '../../web/games/gin-rummy/src/engine/index.ts';
+import type {
+  Action,
+  Pair,
+  Seat,
+  State,
+  View,
+} from '../../web/games/gin-rummy/src/engine/index.ts';
 import { mulberry32 } from '../../web/shared/lib/rng.ts';
 import { loadLegacyGin, type GinAction, type GinState, type GinView } from './gin.api.ts';
 import { multiFit } from './gin.layoffs.ts';
@@ -128,6 +134,23 @@ const replay = (seed: number): Replay => {
     );
     return true;
   };
+  /** The current leg's layoff phase played through with the legacy result's layoffs (see `step`). */
+  const settleLayoff = (C: State, label: string): State => {
+    if (C.phase !== 'layoff') return C;
+    const rL = L.result;
+    const entries = rL !== null && !rL.void ? rL.opponent.laidOff : [];
+    const actions: ReadonlyArray<Action> = [
+      ...entries.map((e): Action => ({ type: 'layOff', cardId: e.card.id, onto: e.onto })),
+      { type: 'finishLayoff' },
+    ];
+    return actions.reduce((state, a) => {
+      const r = current.applyAction(state, state.turn, a, rngCurrent, now);
+      expect(r.ok, `${label}: layoff ${JSON.stringify(a)} refused ${r.ok ? '' : r.error}`).toBe(
+        true,
+      );
+      return r.ok ? r.value : state;
+    }, C);
+  };
   type Progress = {
     C: State;
     seen: Pair<Seen>;
@@ -150,8 +173,13 @@ const replay = (seed: number): Replay => {
     expect(rC.ok, `${label}: current refused ${rC.ok ? '' : rC.error}`).toBe(true);
     expect(rL.ok, `${label}: legacy refused ${rL.ok ? '' : rL.error}`).toBe(true);
     if (!rC.ok) return { ...acc, done: true };
-    if (multiFitKnock(action, seat === 0 ? 1 : 0, rC.value)) {
-      return { ...acc, C: rC.value, steps: acc.steps + 1, multiFitKnock: true, done: true };
+    // RULE CHANGE (§7b, laying off by hand): a knock opens the current leg's layoff phase, which
+    // the legacy never had. The defender lays off exactly what the legacy's result laid off, in
+    // its order, and finishes; the states in between compare to nothing, the round over that
+    // follows compares as before.
+    const settled = settleLayoff(rC.value, label);
+    if (multiFitKnock(action, seat === 0 ? 1 : 0, settled)) {
+      return { ...acc, C: settled, steps: acc.steps + 1, multiFitKnock: true, done: true };
     }
     // KNOWN DEFECT (lastDrawn leak), legacy leg only: its dealHand does not reset lastDrawn, so
     // right after a redeal a card drawn in the previous hand shows as "last drawn" when the
@@ -160,14 +188,14 @@ const replay = (seed: number): Replay => {
     const redealt = L.handNumber > handsBefore;
     const legacyLeaked = redealt && marksFresh((seat) => legacy.viewFor(L, seat));
     if (redealt && L.lastDrawn !== undefined) L.lastDrawn = null;
-    const currentLeaked = redealt && marksFresh((seat) => current.viewFor(rC.value, seat));
-    const seen = at(label, rC.value);
+    const currentLeaked = redealt && marksFresh((seat) => current.viewFor(settled, seat));
+    const seen = at(label, settled);
     const last = L.rounds.at(-1);
     if (last !== undefined && L.phase === 'roundOver') {
       outcomes.add(last.void === true ? 'void' : (last.outcome ?? 'none'));
     }
     return {
-      C: rC.value,
+      C: settled,
       seen,
       steps: acc.steps + 1,
       legacyLeaks: acc.legacyLeaks + (legacyLeaked ? 1 : 0),

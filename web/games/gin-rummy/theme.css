@@ -101,6 +101,21 @@
   .pile.blocked { opacity: 0.45; }
   @keyframes glow { 0%,100% { box-shadow: 0 0 0 3px rgba(74,222,128,0.5), 0 0 16px rgba(74,222,128,0.25); } 50% { box-shadow: 0 0 0 4px rgba(74,222,128,0.9), 0 0 26px rgba(74,222,128,0.5); } }
   .pile-label { font-size: 0.75rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+  /* The knocker's melds laid out over the piles while the defender lays off (docs/design/
+     gin-arrangement-and-discards.md §7b): the piles keep their boxes, unseen; the melds drop in as
+     the result sheet's do. The knocker's cards are `pinned` (a steel edge: locked in place), the
+     defender's laid-off cards `laid` (a gold edge, lifted a little: theirs to take back, by a drag),
+     and a group a dragged card fits lights up as `drop` while the card is over it. */
+  .table-center.laying .pile, .table-center.laying .pile-peek { visibility: hidden; }
+  .table-melds { position: absolute; inset: 0; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 6px 8px; padding: 4px 6px; overflow: hidden; }
+  .table-melds .meld-group { padding: 4px 5px 6px; gap: 4px; border: 2px solid transparent; border-bottom-width: 3px; transition: border-color 0.12s, background-color 0.12s; animation: layOut 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .table-melds .meld-group:nth-child(2) { animation-delay: 80ms; }
+  .table-melds .meld-group:nth-child(3) { animation-delay: 160ms; }
+  .table-melds .meld-group:nth-child(4) { animation-delay: 240ms; }
+  .table-melds .meld-group.drop { border-color: var(--gold); background: rgba(251,191,36,0.2); }
+  .table-melds .card.pinned { box-shadow: 0 0 0 2px #94a3b8, 0 2px 5px rgba(0,0,0,0.35); }
+  .table-melds .card.laid { box-shadow: 0 0 0 2px var(--gold), 0 6px 12px rgba(0,0,0,0.45); transform: translateY(-4px); cursor: grab; touch-action: none; animation: layOut 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .table-melds .card.dragging { opacity: 0; }
 
   /* One height in every phase: the border is always there (`.mine` only colours it), the sub line is
      reserved when empty, and the last action is one clipped line. */

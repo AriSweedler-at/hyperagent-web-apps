@@ -11,7 +11,13 @@
 import { err, ok, type Result } from '../../../../shared/lib/result.ts';
 import type { Rng } from '../../../../shared/lib/rng.ts';
 import { makeDeck, pretty, shuffle } from './cards.ts';
-import { bestMeldingWithLayoffs } from './layoff.ts';
+import {
+  bestMeldingWithLayoffs,
+  canTakeBack,
+  extendedMelds,
+  fitsOnto,
+  layoffMeldingFrom,
+} from './layoff.ts';
 import { meldingFromGroups } from './melds.ts';
 import { bestMelding } from './melds.algorithms.ts';
 import {
@@ -24,6 +30,8 @@ import {
   type Card,
   type Cards,
   type CreateGameOptions,
+  type Knock,
+  type LayoffEntry,
   type LayoffMelding,
   type MeldGroups,
   type Now,
@@ -121,15 +129,35 @@ const dealHand = (state: State, rng: Rng): State => {
   };
 };
 
-// The three phases a hand is played in; a round over or a game over is neither.
+// The phases a hand is played in, the answer to a knock included; a round over or a game over is neither.
 const inPlay = (phase: Phase): boolean =>
-  phase === 'upcard' || phase === 'draw' || phase === 'discard';
+  phase === 'upcard' || phase === 'draw' || phase === 'discard' || phase === 'layoff';
+
+/**
+ * The cards `seat` still holds as their own: while answering a knock (§7b) the cards laid off
+ * stay in the hand until the round scores, so what melds and counts is the hand without them.
+ */
+const keptHand = (state: State, seat: Seat): Cards => {
+  const k = state.knock ?? null;
+  if (state.phase !== 'layoff' || k === null || seat === k.by) return state.hands[seat];
+  const laid = new Set(k.laidOff.map((e) => e.cardId));
+  return state.hands[seat].filter((c) => !laid.has(c.id));
+};
+
+/** The knock's layoffs with their cards, from the defender's hand. */
+const laidEntries = (state: State, k: Knock): ReadonlyArray<LayoffEntry> =>
+  k.laidOff.flatMap((e) => {
+    const card = cardById(state.hands[otherPlayer(k.by)], e.cardId);
+    return card === null ? [] : [{ card, onto: e.onto }];
+  });
 
 // Choosing how to arrange your own melds is a declaration, not a move: it is allowed any time
 // during play, including while waiting for the opponent.
 const setMelds = (state: State, seat: Seat, groups: MeldGroups): Applied => {
   if (!inPlay(state.phase)) return err('You can only rearrange melds during play.');
-  const myHand = state.hands[seat];
+  if (state.phase === 'layoff' && state.knock?.by === seat)
+    return err('Your melds are on the table.');
+  const myHand = keptHand(state, seat);
   const m = meldingFromGroups(myHand, groups);
   if (!m) return err("That meld arrangement doesn't fit your hand.");
   const auto = bestMelding(myHand);
@@ -349,8 +377,10 @@ const finishVoid = (state: State, now: Now): State => ({
 /**
  * Knock with `card` discarded and `remaining` kept. The player's chosen arrangement is honoured
  * when it still fits the kept cards and scores the same, since it decides what the opponent can
- * lay off. Gin (no deadwood) allows no layoff and scores GIN_BONUS plus the opponent's deadwood;
- * an opponent at or under the knocker's count undercuts for the difference plus UNDERCUT_BONUS.
+ * lay off. Gin (no deadwood) allows no layoff and scores at once (`finishKnock`): GIN_BONUS plus
+ * the opponent's deadwood. Any other knock opens the `layoff` phase (§7b): the melds are laid out,
+ * the turn passes to the defender, who lays off by hand and finishes, and only then does the round
+ * score, with the layoffs as laid.
  */
 const knock = (state: State, seat: Seat, card: Card, remaining: Cards, now: Now): Applied => {
   const me = state.players[seat];
@@ -363,18 +393,94 @@ const knock = (state: State, seat: Seat, card: Card, remaining: Cards, now: Now)
     return err(
       `You need ${String(KNOCK_LIMIT)} or fewer deadwood points to knock (you'd have ${String(mine.value)}).`,
     );
-  const gin = mine.value === 0;
-  const oppHand = state.hands[opp];
-  const oppAlone = bestMelding(oppHand);
-  const theirs: LayoffMelding = gin
-    ? {
+  const k: Knock = { by: seat, card: card.id, melding: mine, laidOff: [] };
+  if (mine.value === 0) {
+    const oppAlone = bestMelding(state.hands[opp]);
+    return finishKnock(
+      state,
+      k,
+      {
         melds: oppAlone.melds,
         laidOff: [],
         deadwood: oppAlone.deadwood,
         value: oppAlone.value,
         extendedMelds: mine.melds,
-      }
-    : bestMeldingWithLayoffs(oppHand, mine.melds);
+      },
+      now,
+    );
+  }
+  return ok({
+    ...state,
+    phase: 'layoff',
+    turn: opp,
+    knock: k,
+    ready: [false, false],
+    lastAction: {
+      text: `${me.name} knocked with ${String(mine.value)}. ${state.players[opp].name} may lay off.`,
+      by: seat,
+    },
+  });
+};
+
+/**
+ * The defender's answer to a knock (§7b): lay a card off onto a meld it extends (a fourth to a set,
+ * the next rank either end of a run, the meld as extended so far), take a laid card back while its
+ * meld stays a meld without it, or finish, which scores the round with the layoffs as laid.
+ */
+const layoffPhase = (state: State, seat: Seat, action: Action, now: Now): Applied => {
+  const k = state.knock ?? null;
+  if (k === null) return err('No knock to answer.');
+  const hand = state.hands[seat];
+  const entries = laidEntries(state, k);
+  const name = state.players[seat].name;
+  if (action.type === 'layOff') {
+    const card = cardById(hand, action.cardId);
+    if (!card) return err("That card isn't in your hand.");
+    if (k.laidOff.some((e) => e.cardId === card.id)) return err('That card is laid off already.');
+    const meld = extendedMelds(k.melding.melds, entries)[action.onto];
+    if (meld === undefined) return err('No such meld.');
+    if (!fitsOnto(card, meld)) return err(`The ${pretty(card)} doesn't fit that meld.`);
+    return ok({
+      ...state,
+      knock: { ...k, laidOff: [...k.laidOff, { cardId: card.id, onto: action.onto }] },
+      lastAction: { text: `${name} laid off the ${pretty(card)}.`, by: seat },
+    });
+  }
+  if (action.type === 'takeBack') {
+    const card = cardById(hand, action.cardId);
+    if (!card || !k.laidOff.some((e) => e.cardId === card.id))
+      return err("That card isn't laid off.");
+    if (!canTakeBack(k.melding.melds, entries, card.id))
+      return err('Take back the cards laid off after it first.');
+    return ok({
+      ...state,
+      knock: { ...k, laidOff: k.laidOff.filter((e) => e.cardId !== card.id) },
+      lastAction: { text: `${name} took the ${pretty(card)} back.`, by: seat },
+    });
+  }
+  if (action.type === 'finishLayoff')
+    return finishKnock(state, k, layoffMeldingFrom(hand, k.melding.melds, entries), now);
+  return err('Lay off onto the melds, take a card back, or finish.');
+};
+
+/** `state` without its `knock` key: outside the layoff phase the key is absent, as every legacy state is. */
+const withoutKnock = (state: State): State => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the key is dropped by the rest
+  const { knock: _answered, ...rest } = state;
+  return rest;
+};
+
+/**
+ * Score the knock `k` against the defender's answer `theirs`: an opponent at or under the knocker's
+ * count undercuts for the difference plus UNDERCUT_BONUS; gin scores GIN_BONUS plus the opponent's
+ * deadwood; a knock scores the difference. The result, the round line and the totals follow.
+ */
+const finishKnock = (state: State, k: Knock, theirs: LayoffMelding, now: Now): Applied => {
+  const seat = k.by;
+  const me = state.players[seat];
+  const opp = otherPlayer(seat);
+  const mine = k.melding;
+  const gin = mine.value === 0;
   const outcome: Outcome = gin ? 'gin' : theirs.value <= mine.value ? 'undercut' : 'knock';
   const none: Pair<number> = [0, 0];
   const scores: Pair<number> =
@@ -394,7 +500,7 @@ const knock = (state: State, seat: Seat, card: Card, remaining: Cards, now: Now)
     void: false,
     knockerIdx: seat,
     outcome,
-    knockCard: card.id,
+    knockCard: k.card,
     knocker: { melds: mine.melds, deadwood: mine.deadwood, value: mine.value },
     opponent: {
       melds: theirs.melds,
@@ -424,14 +530,30 @@ const knock = (state: State, seat: Seat, card: Card, remaining: Cards, now: Now)
         ? `${me.name} knocked but was undercut by ${state.players[opp].name}!`
         : `${me.name} knocked with ${String(mine.value)}.`;
   return ok({
-    ...state,
+    ...withoutKnock(state),
     players,
     result,
     rounds: [...state.rounds, round],
     phase: 'roundOver',
+    turn: seat,
     ready: [false, false],
     lastAction: { text, by: seat },
   });
+};
+
+/**
+ * The layoffs the engine used to make by itself (`bestMeldingWithLayoffs`), as the actions that
+ * make them, then `finishLayoff`: what a harness, a story or a driver plays through the phase to
+ * land where the automatic layoff landed. Empty outside the phase.
+ */
+const bestLayoffActions = (state: State): ReadonlyArray<Action> => {
+  const k = state.knock ?? null;
+  if (state.phase !== 'layoff' || k === null) return [];
+  const theirs = bestMeldingWithLayoffs(state.hands[otherPlayer(k.by)], k.melding.melds);
+  return [
+    ...theirs.laidOff.map((e): Action => ({ type: 'layOff', cardId: e.card.id, onto: e.onto })),
+    { type: 'finishLayoff' },
+  ];
 };
 
 const discardPhase = (state: State, seat: Seat, action: Action, now: Now): Applied => {
@@ -484,6 +606,8 @@ const applyAction = (state: State, seat: Seat, action: Action, rng: Rng, now: No
       return drawPhase(state, seat, action);
     case 'discard':
       return discardPhase(state, seat, action, now);
+    case 'layoff':
+      return layoffPhase(state, seat, action, now);
   }
 };
 
@@ -492,6 +616,22 @@ const legalActions = (view: View): ReadonlyArray<Action> => {
   if (view.phase === 'roundOver' || view.phase === 'gameOver')
     return view.ready[view.me.idx] ? [] : [{ type: 'ready' }];
   if (!view.isMyTurn) return [];
+  if (view.phase === 'layoff') {
+    const lo = view.layoff;
+    if (lo === undefined) return [];
+    const laid = new Set(lo.laidOff.map((e) => e.card.id));
+    const takeBacks = lo.laidOff.flatMap((e): ReadonlyArray<Action> =>
+      canTakeBack(lo.melds, lo.laidOff, e.card.id) ? [{ type: 'takeBack', cardId: e.card.id }] : [],
+    );
+    const layOffs = view.me.hand
+      .filter((c) => !laid.has(c.id))
+      .flatMap((c): ReadonlyArray<Action> =>
+        lo.extended.flatMap((m, onto): ReadonlyArray<Action> =>
+          fitsOnto(c, m) ? [{ type: 'layOff', cardId: c.id, onto }] : [],
+        ),
+      );
+    return [...takeBacks, ...layOffs, { type: 'finishLayoff' }];
+  }
   if (view.phase === 'upcard') return [{ type: 'takeUpcard' }, { type: 'passUpcard' }];
   if (view.phase === 'draw')
     return !view.forceStock && view.discardTop
@@ -514,6 +654,9 @@ const legalActions = (view: View): ReadonlyArray<Action> => {
 
 export {
   inPlay,
+  keptHand,
+  laidEntries,
+  bestLayoffActions,
   STOCK_DRAW_FINAL_MSG,
   otherPlayer,
   createGame,

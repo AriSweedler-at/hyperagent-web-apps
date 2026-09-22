@@ -59,15 +59,39 @@ export const selectCard = async (page: Page, id: string): Promise<void> => {
   await expect(card).toHaveClass(/selected/);
 };
 
+type HookAction = Readonly<{ type: string; cardId?: string; onto?: number }>;
+
+/**
+ * The defender's answer to a knock (docs/design/gin-arrangement-and-discards.md §7b), as the
+ * engine used to make it by itself: the layoffs `__gin.layoffs()` names, through `__gin.act`,
+ * then the Done button.
+ */
+export const layOffAll = async (page: Page): Promise<void> => {
+  const acts = await page.evaluate<ReadonlyArray<HookAction>>('window.__gin.layoffs()');
+  await acts
+    .filter((a) => a.type === 'layOff')
+    .reduce(
+      (done, a) => done.then(() => page.evaluate(`window.__gin.act(${JSON.stringify(a)})`)),
+      Promise.resolve<unknown>(null),
+    );
+  await page.locator('#actions [data-act="finishLayoff"]').click();
+};
+
 /**
  * Turns until the round is over: a knock or, when the stock runs out, a void hand. Each turn starts
  * under the curtain when the phone changed hands (not after a redeal to the seat already revealed);
- * an upcard decision is passed, a draw comes from the stock and is accepted.
+ * an upcard decision is passed, a draw comes from the stock and is accepted; a knock's layoff
+ * phase is answered with every legal layoff, then finished.
  */
 export const playToRoundOver = async (page: Page, turn = 1): Promise<void> => {
   if (turn > 40) throw new Error('no round end within 40 turns');
   if (await page.locator('#curtainOverlay').isVisible()) await ginReveal(page);
   const before = await readView(page);
+  if (before?.phase === 'layoff') {
+    await layOffAll(page);
+    await expect(page.locator('#roundResultOverlay')).toBeVisible();
+    return;
+  }
   if (before?.phase === 'upcard') {
     await page.locator('#actions [data-act="passUpcard"]').click();
     return playToRoundOver(page, turn + 1);

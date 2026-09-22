@@ -8,7 +8,8 @@
 // (docs/design/gin-arrangement-and-discards.md §7). gin.legacy.test.ts pins both legs on that
 // position and gin.melds.test.ts allows the current leg only to do better there.
 import { isSet, sortMeld } from './cards.ts';
-import { meldSolver } from './melds.algorithms.ts';
+import { isValidMeldGroup } from './melds.ts';
+import { bestMelding, meldSolver } from './melds.algorithms.ts';
 import type { Card, Cards, Layoff, LayoffEntry, LayoffMelding, Meld } from './types.ts';
 
 /** A set takes a fourth card of its rank in a new suit; a run takes the next rank either side. */
@@ -117,4 +118,50 @@ const bestMeldingWithLayoffs = (cards: Cards, knockerMelds: ReadonlyArray<Meld>)
     .reduce((best, m) => (m.value < best.value ? m : best), nothing);
 };
 
-export { fitsOnto, maximalLayoff, bestMeldingWithLayoffs };
+// ---- laying off by hand (docs/design/gin-arrangement-and-discards.md §7b) ----------------------
+
+/** The knocker's melds with the cards laid off onto each appended, each sorted as a meld. */
+const extendedMelds = (
+  melds: ReadonlyArray<Meld>,
+  laidOff: ReadonlyArray<LayoffEntry>,
+): ReadonlyArray<Meld> =>
+  melds.map((m, i) => sortMeld([...m, ...laidOff.filter((e) => e.onto === i).map((e) => e.card)]));
+
+/** Whether the card laid off as `cardId` can be taken back: its meld stays a meld with the others laid on it. */
+const canTakeBack = (
+  melds: ReadonlyArray<Meld>,
+  laidOff: ReadonlyArray<LayoffEntry>,
+  cardId: string,
+): boolean => {
+  const entry = laidOff.find((e) => e.card.id === cardId);
+  if (entry === undefined) return false;
+  const rest = laidOff.filter((e) => e.card.id !== cardId);
+  const meld = extendedMelds(melds, rest)[entry.onto];
+  return meld !== undefined && isValidMeldGroup(meld);
+};
+
+/** The defender's answer as laid: the best melding of the kept cards, the entries, the extended melds. */
+const layoffMeldingFrom = (
+  hand: Cards,
+  knockerMelds: ReadonlyArray<Meld>,
+  laidOff: ReadonlyArray<LayoffEntry>,
+): LayoffMelding => {
+  const laidIds = new Set(laidOff.map((e) => e.card.id));
+  const m = bestMelding(hand.filter((c) => !laidIds.has(c.id)));
+  return {
+    melds: m.melds,
+    laidOff,
+    deadwood: m.deadwood,
+    value: m.value,
+    extendedMelds: extendedMelds(knockerMelds, laidOff),
+  };
+};
+
+export {
+  fitsOnto,
+  maximalLayoff,
+  bestMeldingWithLayoffs,
+  extendedMelds,
+  canTakeBack,
+  layoffMeldingFrom,
+};

@@ -27,16 +27,30 @@ import {
 
 import MARKUP from '../../index.html?raw';
 
-type Painted = Readonly<{ page: GinPage; modes: ReadonlyArray<FakeEl> }>;
+type Painted = Readonly<{
+  page: GinPage;
+  modes: ReadonlyArray<FakeEl>;
+  /** `#tableMelds .meld-group`: three groups declared for the paint's query (the knock positions have three melds). */
+  groups: ReadonlyArray<FakeEl>;
+}>;
 
-/** The story painted on the page fake; the arrange sheet's mode buttons are declared for the paint's query. */
+/** The story painted on the page fake; the arrange sheet's mode buttons and the table's meld groups are declared for the paint's queries. */
 const painted = (story: Story): Painted => {
   const modes = ['suit', 'rank', 'manual'].map((m) =>
     fakeEl(`mode-${m}`, { classes: ['btn'], attrs: { 'data-sort': m } }),
   );
-  const page = ginPage(MARKUP, { arrangeModes: { queries: { 'button[data-sort]': modes } } });
+  const groups = [0, 1, 2].map((i) =>
+    fakeEl(`table-meld-${String(i)}`, {
+      classes: ['meld-group', `m${String(i)}`, 'locked'],
+      attrs: { 'data-onto': String(i) },
+    }),
+  );
+  const page = ginPage(MARKUP, {
+    arrangeModes: { queries: { 'button[data-sort]': modes } },
+    tableMelds: { queries: { '.meld-group': groups } },
+  });
   paint(page.doc, story.app, slotHandView);
-  return { page, modes };
+  return { page, modes, groups };
 };
 const hand = (story: Story): string => painted(story).page.get('hand').text();
 
@@ -98,8 +112,20 @@ const laidOffOnPage = (page: GinPage): ReadonlyArray<string> => {
   return [...(laid?.[1] ?? '').matchAll(CARD)].map((m) => m[2] ?? '');
 };
 
+/** `#tableMelds` as painted: each group's card ids and the laid-off ones, while the knock is answered. */
+const layoffOnPage = (page: GinPage, groups: ReadonlyArray<FakeEl>): Partial<StoryFacts> => {
+  if (page.get('tableMelds').hidden()) return {};
+  const melds = groups.map((g) => cards(g.text()).map(([, id]) => id));
+  const laid = groups.flatMap((g) =>
+    cards(g.text())
+      .filter(([classes]) => classes.includes('laid'))
+      .map(([, id]) => id),
+  );
+  return { layoff: { melds, laid } };
+};
+
 /** The facts as the painted page shows them, in the catalogue's terms. */
-const factsOnPage = ({ page, modes }: Painted): StoryFacts => {
+const factsOnPage = ({ page, modes, groups }: Painted): StoryFacts => {
   const html = page.get('hand').text();
   const stock = page.get('stockPile');
   const disc = page.get('discardPile');
@@ -130,6 +156,7 @@ const factsOnPage = ({ page, modes }: Painted): StoryFacts => {
     statusSub: page.get('statusSub').text(),
     sheet,
     ...(sheet === 'roundResultOverlay' ? { laidOff: laidOffOnPage(page) } : {}),
+    ...layoffOnPage(page, groups),
     ...(sheet === 'discardsOverlay'
       ? {
           dc: {
@@ -176,6 +203,8 @@ const IDS = [
   'discarded-kept-picture',
   'discards-open',
   'discards-with-hand',
+  'layoff-mine',
+  'layoff-theirs',
   'round-over-table',
   'round-over-laid-off',
   'round-over-laid-off-defender',
@@ -323,7 +352,12 @@ describe('every story painted on the page fake', () => {
       const p = painted(story);
       expect(p.page.get('tableScreen').hidden()).toBe(false);
       expect(factsOnPage(p)).toEqual(story.facts);
-      expect(story.facts.slots).toBe(11);
+      // Eleven cells, less one per card the defender (whose turn the layoff phase is) laid off (§7b).
+      const laid =
+        story.facts.layoff !== undefined && story.app.view?.isMyTurn === true
+          ? story.facts.layoff.laid.length
+          : 0;
+      expect(story.facts.slots).toBe(11 - laid);
     });
   });
 

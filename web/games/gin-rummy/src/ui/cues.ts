@@ -29,7 +29,9 @@ export const statusFor = (view: View, selection: Selection): Status => {
           ? 'Deciding on the upcard…'
           : view.phase === 'draw'
             ? 'Drawing a card…'
-            : 'Choosing a discard…',
+            : view.phase === 'layoff'
+              ? 'Laying off…'
+              : 'Choosing a discard…',
     };
   }
   switch (view.phase) {
@@ -50,6 +52,9 @@ export const statusFor = (view: View, selection: Selection): Status => {
             ? 'Discard it, or knock if you can'
             : 'Tap a card to select it',
       };
+    // The answer to a knock (docs/design/gin-arrangement-and-discards.md §7b): no legacy phase.
+    case 'layoff':
+      return { main: 'Your turn', sub: `Lay off onto ${view.opp.name}'s melds, then Done` };
     case 'gameOver':
       return { main: '', sub: '' };
   }
