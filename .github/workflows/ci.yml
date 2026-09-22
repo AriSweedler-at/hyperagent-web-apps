@@ -4,7 +4,9 @@
 # browser spec on both emulated origins against a fresh build of dist/ (both game pages are the
 # Vite-built module pages since docs/MIGRATION.md steps 7 and 13; the gin DOM-parity spec compares
 # the served page with the frozen legacy page the harness aliases in), the two-peer games through a
-# local PeerServer (the merge gate for online play, docs/MIGRATION.md step 3), and the stories spec
+# local PeerServer (the merge gate for online play, docs/MIGRATION.md step 3), the relay-forced
+# games through a coturn the harness starts (installed from apt here; e2e/gin-relay.spec.ts,
+# e2e/fidice-relay.spec.ts), and the stories spec
 # (e2e/gin-stories.spec.ts) against the committed per-platform screenshot baselines under
 # e2e/__screenshots__, whose -linux.png files the workflow_dispatch job stories-baselines.yml records
 # on the branch for the PR author to commit before this job can pass; job "broker" repeats the
@@ -82,11 +84,21 @@ jobs:
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+      # The @relay specs play through a TURN relay of the harness's own: playwright.config.ts starts
+      # `turnserver` on :3478 with static credentials (e2e/fixtures/site.ts turnServerCommand). The
+      # Debian package also starts a system turnserver on :3478, which is stopped so the harness can
+      # bind its own; the config refuses to run under CI with the binary missing rather than skip.
+      - name: Install coturn for the relay-forced games
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y coturn
+          sudo systemctl disable --now coturn || true
       # `npm run test:e2e` builds dist/ first (deterministic, under a second), so the specs run
       # against the same output "check" uploaded. Projects: pages and proxy; gin-online, gin-resume
       # and fidice-online on both are the proof that the served module pages play real two-peer
-      # games on both origins, and gin-dom-parity that the gin page paints what the legacy page did.
-      - name: Browser specs on both origins against dist (local PeerServer)
+      # games on both origins, gin-relay and fidice-relay that they do so through a TURN relay when
+      # forced to, and gin-dom-parity that the gin page paints what the legacy page did.
+      - name: Browser specs on both origins against dist (local PeerServer and TURN)
         run: npm run test:e2e
       - name: Upload Playwright report
         if: failure()
@@ -113,8 +125,14 @@ jobs:
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Online specs through 0.peerjs.com (advisory)
-        run: npm run test:e2e -- --grep @online
+      # The broker is the real one here; the TURN relay stays the local coturn (see job e2e).
+      - name: Install coturn for the relay-forced games
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y coturn
+          sudo systemctl disable --now coturn || true
+      - name: Online and relay-forced specs through 0.peerjs.com (advisory)
+        run: npm run test:e2e -- --grep "@online|@relay"
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4

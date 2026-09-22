@@ -236,11 +236,20 @@ of the shim script itself (`sh -n`).
 `ci.yml` on `push` and `pull_request`. Job `check`: checkout, `setup-node@v4 {node-version-file:
 .nvmrc, cache: npm}`, `npm ci`, `npm run typecheck` (`tsc -b`), `npm run lint` (eslint + prettier
 --check), `npm test -- --coverage`, `npm run build`, dist tests, upload `dist`. Job `e2e` (needs
-check): download dist, `npx playwright install --with-deps chromium`, `npm run test:e2e`
-(projects pages + proxy + next; PeerServer from the `peer` package on :9000; retries 1; trace on
-first retry; report uploaded). Job `broker` (needs check, `continue-on-error: true`): the two-peer
-specs without `?peer=` through 0.peerjs.com, so signalling regressions surface at review without
-blocking on a third party. Job `deploy` as above. Branch protection on `main` requires `check` and
+check): download dist, `npx playwright install --with-deps chromium`, `apt-get install coturn`
+(the system service it starts is stopped), `npm run test:e2e` (projects pages + proxy + next;
+PeerServer from the `peer` package on :9000; coturn on :3478 started by `playwright.config.ts`
+with one static long-term credential, loopback only, no TLS, its relay ports right above (`e2e/fixtures/site.ts`
+`turnServerCommand`), reached through an ICE list the config writes under `e2e/fixtures/.generated/`;
+retries 1; trace on first retry; report uploaded). The `@relay` specs (`e2e/gin-relay.spec.ts`,
+`e2e/fidice-relay.spec.ts`) play both games with `?ice-policy=relay` through that relay and read the
+selected candidate pair off every `RTCPeerConnection` the page built (`e2e/browser/record-pc.js`
+keeps them; `selected-pairs.js` reads `getStats()` as `ice.ts` `describe()` does); without
+`turnserver` on PATH they skip with the install line, and under `CI` the config refuses to start
+instead, so a broken install cannot pass as a skip. Job `broker` (needs check, `continue-on-error:
+true`): the two-peer and relay-forced specs without `?peer=` through 0.peerjs.com (the relay stays
+local), so signalling regressions surface at review without blocking on a third party. Job `deploy`
+as above. Branch protection on `main` requires `check` and
 `e2e`. Installs in every job use the composite action `.github/actions/npm-ci`. The owner's npm registry is
 Airtable's Socket Firewall in registry mode, so `package-lock.json` records that host in every
 `resolved` URL and is committed exactly as written; it is never rewritten. Runners cannot
@@ -251,9 +260,9 @@ scanned too, and restores the pristine lockfile afterwards. The lockfile's integ
 verified against what is downloaded either way. `nightly.yml` (`cron 23 9 * * *` and
 `workflow_dispatch`; by hand `gh workflow run nightly.yml`) runs `npm run test:live`
 (`E2E_TARGET=live E2E_BROKER=cloud playwright test --grep "@online|@relay"`, no build): the online
-specs against both live origins through the real broker and `turn.sweedler.com`, plus one gin game
-with `iceTransportPolicy: 'relay'` forced via the `?ice-policy=relay` hook (`e2e/gin-relay.spec.ts`;
-hermetic runs skip that game and assert only that the hook reaches `new Peer`). On failure it
+specs against both live origins through the real broker and `turn.sweedler.com`, plus the same
+relay-forced games through that relay instead of the local coturn (live, `gameQuery()` drops
+`?ice=`, so `{ ice: 'turn' }` is moot and the deployed credentials are what carry the game). On failure it
 uploads the report and comments the run URL on the open issue labelled `nightly`, creating
 "Nightly live run failed" when none is open; a green run closes it.
 

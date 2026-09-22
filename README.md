@@ -110,12 +110,19 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    the same log.
 6. **Hermetic two-peer e2e** (`npm run test:e2e`; first time `npx playwright install chromium`):
    builds `dist/`, starts `tools/serve-dist.ts` (:4173), `tools/proxy-dev.ts` (:8787, the real
-   Worker over :4173) and a PeerServer (:9000), then runs every spec in `e2e/` on projects `pages`
+   Worker over :4173), a PeerServer (:9000) and, when `turnserver` is on PATH, a coturn TURN relay
+   (:3478, static credentials, loopback only), then runs every spec in `e2e/` on projects `pages`
    and `proxy`: smoke on every page (zero uncaught exceptions, zero failed requests outside an
    allowlist), gin local and scorer, and the `@online` specs (gin join/deal/turns, host reload and
    guest rejoin, fidice lobby/start) in a host and a guest context that meet through `?peer=` and
    take a STUN-only ICE list through `?ice=`; fonts and CDNs are answered from local copies and
-   `Math.random` is seeded. `e2e/gin-dom-parity.spec.ts` plays the same game on the served gin page
+   `Math.random` is seeded. The `@relay` specs (`e2e/gin-relay.spec.ts`, `e2e/fidice-relay.spec.ts`)
+   open both pages with `?ice-policy=relay` and an ICE list naming that relay (written per run under
+   `e2e/fixtures/.generated/`, since its port follows the offset), so every candidate must cross it:
+   both games still join and play, "Connected via relay" shows, and the selected candidate pair read
+   off each `RTCPeerConnection` is a relay one. Without coturn they skip with the install line
+   (`brew install coturn` / `apt-get install coturn`); `E2E_TURN=off` leaves the relay out on
+   purpose. `e2e/gin-dom-parity.spec.ts` plays the same game on the served gin page
    and on the frozen legacy page (aliased in by the harness) and compares 84 checkpoints. The report
    lands in `playwright-report/` (`npx playwright show-report`). The two contexts connect over the
    machine's own addresses: a Cloudflare WARP-style tunnel that drops loopback UDP times them out.
@@ -141,15 +148,16 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    ```
 
 8. **Advisory broker** (CI job `broker`, `continue-on-error`):
-   `E2E_BROKER=cloud npm run test:e2e -- --grep @online` plays the same specs through 0.peerjs.com,
-   so a signalling regression is visible at review without a third party blocking a merge.
+   `E2E_BROKER=cloud npm run test:e2e -- --grep "@online|@relay"` plays the same specs through
+   0.peerjs.com (the TURN relay stays the local coturn), so a signalling regression is visible at
+   review without a third party blocking a merge.
 9. **Nightly** (`.github/workflows/nightly.yml`, 09:23 UTC or `gh workflow run nightly.yml`):
    `npm run test:live` aims both projects at the live origins with nothing local started and runs
-   the `@online` specs through the real broker and `turn.sweedler.com`, plus
-   `e2e/gin-relay.spec.ts`: a gin game opened with `?ice-policy=relay`, so every candidate must
-   cross the Cloudflare relay and "Connected via relay" must show on both pages. A failure
-   comments the run URL on the open issue labelled `nightly` (creating it when missing); a green
-   run closes it.
+   the `@online` specs through the real broker and `turn.sweedler.com`, plus the `@relay` specs
+   through that relay instead of the local one, so "Connected via relay" there means the deployed
+   credentials work. A failure comments the run URL on the open issue labelled `nightly` (creating
+   it when missing); a green run closes it. Nothing on a PR depends on Cloudflare: the relay-forced
+   games are proven by CI through coturn.
 
 **Moving a golden.** A PR that changes what a golden pins says so in its body and touches only that
 golden. Computed styles: `npm run build`, then

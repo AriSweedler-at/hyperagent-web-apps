@@ -729,10 +729,25 @@ parity and e2e gates.
   asserts the shape of what arrived (Cloudflare's STUN server, a TURN entry with username and
   credential, unified-plan, the policy when forced, no broker override) where a local run asserts
   the fixture byte for byte; `gin-dom-parity` and `computed-styles` skip live with a reason.
-  `e2e/gin-relay.spec.ts` (`@relay @online`) plays the relay-forced gin game live only: the local
-  harness has a STUN-only fixture and no TURN server, so a relay-forced pair cannot connect there;
-  its second, hermetic `@relay` test hosts a room with the hook on both projects and asserts the
-  option reached `new Peer` without attempting a join. What nightly proves: the deployed pages on
+  `e2e/gin-relay.spec.ts` (`@relay @online`) played the relay-forced gin game live only at first:
+  the local harness had a STUN-only fixture and no TURN server, so a relay-forced pair could not
+  connect there; its second, hermetic `@relay` test hosts a room with the hook on both projects and
+  asserts the option reached `new Peer` without attempting a join. Follow-up (2026-09-21, after
+  issue #19: Cloudflare's bot protection on the sweedler.com zone challenged the runner, and the
+  owner asked that no test depend on Cloudflare): the harness starts its own TURN relay, coturn
+  (`turnserver` on PATH; `brew install coturn` / `apt-get install coturn`, which CI's `e2e` and
+  `broker` jobs do) on 3478+`E2E_PORT_OFFSET` with one static long-term credential, loopback only,
+  no TLS (`e2e/fixtures/site.ts` `turnServerCommand`), and `playwright.config.ts` writes the ICE
+  list naming it under `e2e/fixtures/.generated/` (gitignored: the port follows the offset) beside
+  the committed STUN-only fixture; `openGame(..., { relay: true, ice: 'turn' })` opens a page with
+  `?ice-policy=relay` and that list, and `expectPeerOptions` knows both lists. The relay-forced gin
+  game is hermetic and runs on every PR, `e2e/fidice-relay.spec.ts` plays the fidice twin (lobby,
+  both seats, the guest's "Connected via relay", start, same round; the host side has no path probe),
+  and both read the selected candidate pair off every `RTCPeerConnection` the page built
+  (`e2e/browser/record-pc.js` keeps them, `selected-pairs.js` reads `getStats()` as `ice.ts`
+  `describe()` does): the local end is `relay` on both sides. Without coturn they skip with the
+  install line; under `CI` the config refuses to run instead. Live, they still play through
+  `turn.sweedler.com`. What nightly proves: the deployed pages on
   both origins play a real two-peer game (gin join/deal/turn, gin resume/rejoin, fidice lobby/start)
   through the public broker with the credentials they fetched, and one gin game connects through
   the Cloudflare relay alone and says so ("Connected via relay" on both pages). A failure comments
