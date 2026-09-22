@@ -20,6 +20,7 @@ import { shareText, type ShareNavigatorLike } from '../../shared/edge/share.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
 import { realTransport } from '../../shared/edge/transport.ts';
 import type { Timer } from '../../shared/lib/clock.ts';
+import { joinCodeFrom, withoutJoin } from '../../shared/lib/invite.ts';
 import type { Rng } from '../../shared/lib/rng.ts';
 import { bestLayoffActions, legalActions } from './src/engine/index.ts';
 import type { Action } from './src/engine/types.ts';
@@ -448,11 +449,10 @@ const boot = (): void => {
   // into the join form once the home screen is up and leaves the address bar, so a reload or a
   // bookmark of this page lands on the ordinary home screen (the other hooks, `?peer=` and
   // `?ice=`, stay).
-  const join = params.get('join');
+  const join = joinCodeFrom(location.search);
   if (join !== null) {
     dispatch({ type: 'join/link', code: join });
-    params.delete('join');
-    const query = params.toString();
+    const query = withoutJoin(location.search);
     history.replaceState(
       null,
       '',
