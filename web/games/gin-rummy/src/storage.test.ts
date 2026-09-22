@@ -245,3 +245,47 @@ describe('the Score Counter', () => {
     });
   });
 });
+
+describe('the handoff mark on a host save', () => {
+  test('is written only when true, after the legacy keys, and reads back; a save without it is unchanged', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    const handed = {
+      role: 'host',
+      code: 'ABCD',
+      myName: 'Ann',
+      target: 100,
+      game,
+      oppName: 'Bob',
+      handoff: true,
+    } as const;
+    expect(writeSave(store, handed).ok).toBe(true);
+    expect(s.map.get(STORAGE_KEYS.save)).toBe(
+      `{"role":"host","code":"ABCD","myName":"Ann","target":100,"game":${JSON.stringify(game)},"oppName":"Bob","handoff":true}`,
+    );
+    expect(readSave(store)).toEqual({ ok: true, value: handed });
+    // The legacy literal, byte for byte, when the mark is absent.
+    const plain = {
+      role: 'host',
+      code: 'ABCD',
+      myName: 'Ann',
+      target: 100,
+      game,
+      oppName: 'Bob',
+    } as const;
+    expect(writeSave(store, plain).ok).toBe(true);
+    expect(s.map.get(STORAGE_KEYS.save)).toBe(
+      `{"role":"host","code":"ABCD","myName":"Ann","target":100,"game":${JSON.stringify(game)},"oppName":"Bob"}`,
+    );
+    expect(readSave(store)).toEqual({ ok: true, value: plain });
+    // Anything but `true` under the key is refused.
+    s.map.set(
+      STORAGE_KEYS.save,
+      '{"role":"host","code":"ABCD","myName":"Ann","target":100,"game":null,"oppName":null,"handoff":false}',
+    );
+    expect(readSave(store)).toEqual({
+      ok: false,
+      error: { kind: 'invalid', key: STORAGE_KEYS.save, reason: '$.handoff: expected one of true' },
+    });
+  });
+});

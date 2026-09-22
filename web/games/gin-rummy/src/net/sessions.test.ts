@@ -41,6 +41,7 @@ import {
   HostSession,
   OPENING_MSG,
   WAITING_MSG,
+  handoffMsg,
   reconnectingMsg,
   reopenedMsg,
   type HostContext,
@@ -196,6 +197,7 @@ const hostCtx = (over: Partial<HostContext> = {}): HostContext => ({
   myName: 'Ann',
   target: 100,
   hasGame: false,
+  handoff: false,
   oppName: null,
   oppConnected: false,
   ...over,
@@ -301,6 +303,15 @@ describe('HostSession', () => {
     ]);
     expect(reopenedMsg(CODE, null)).toBe(
       `Room ${CODE} reopened — waiting for your opponent to rejoin…`,
+    );
+    // A pass-and-play game handed to the room: nobody has joined yet, so the invite is to send.
+    const handed = world({ ice: STUN_ONLY });
+    startHost(handed, cell(hostCtx({ hasGame: true, oppName: 'Bob', handoff: true })));
+    await settle();
+    handed.broker.flush();
+    expect(handed.log[1]).toEqual(['status', `${handoffMsg(CODE, 'Bob')} ${NO_RELAY_HINT}`]);
+    expect(handoffMsg(CODE, null)).toBe(
+      `Room ${CODE} is open — send your opponent the invite to carry on this game…`,
     );
     // Once the opponent is connected the open handler only persists.
     const quiet = world();
@@ -550,6 +561,13 @@ describe('HostSession', () => {
         fn({ type: 'negotiation-failed', message: '' });
       });
       expect(w.log.at(-1)).toEqual(['guestGone', null]);
+      // A handoff has a hand but nobody has joined it yet: the invited seat's failed attempt is
+      // still the ICE-failed text, not an opponent lost.
+      ctx.value = hostCtx({ hasGame: true, oppName: 'Bob', handoff: true });
+      hostConn?.errors.forEach((fn) => {
+        fn({ type: 'negotiation-failed', message: '' });
+      });
+      expect(w.log.at(-1)).toEqual(['guestGone', `${ICE_FAILED_MSG} ${NO_RELAY_HINT}`]);
     });
   });
 });

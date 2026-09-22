@@ -69,6 +69,7 @@ const connectedTable = (): Table => {
         myName: 'Ann',
         target: 100,
         hasGame: false,
+        handoff: false,
         oppName: null,
         oppConnected: false,
       }),

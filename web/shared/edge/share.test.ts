@@ -53,4 +53,29 @@ describe('shareText', () => {
       ),
     ).toBe('failed');
   });
+
+  test('a url rides beside the text on the sheet; the clipboard gets the text, then the url', async () => {
+    const withUrl: SharePayload = {
+      ...payload,
+      url: 'https://games.sweedler.com/gin-rummy/?join=ABCD',
+    };
+    const shared: SharePayload[] = [];
+    const copied: string[] = [];
+    const clipboard = {
+      writeText: (t: string) => {
+        copied.push(t);
+        return Promise.resolve();
+      },
+    };
+    const share = (p: SharePayload): Promise<void> => {
+      shared.push(p);
+      return Promise.resolve();
+    };
+    expect(await shareText({ share, clipboard }, withUrl)).toBe('shared');
+    expect(shared).toEqual([withUrl]);
+    expect(await shareText({ clipboard }, withUrl)).toBe('copied');
+    expect(copied).toEqual([
+      'Join my game — room code ABCD. https://games.sweedler.com/gin-rummy/?join=ABCD',
+    ]);
+  });
 });

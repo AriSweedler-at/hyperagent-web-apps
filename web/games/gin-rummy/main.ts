@@ -30,7 +30,13 @@ import { isGuestFrame } from './src/protocol.ts';
 import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
 import { soundEnabled } from './src/storage.ts';
 import { slotHandView } from './src/ui/hand/SlotHandView.ts';
-import { fillNameInputs, fillP2NameInput, inviteText, setCodeInput } from './src/ui/home.ts';
+import {
+  fillNameInputs,
+  fillP2NameInput,
+  inviteText,
+  inviteUrl,
+  setCodeInput,
+} from './src/ui/home.ts';
 import {
   bindAll,
   fmtTime,
@@ -274,15 +280,19 @@ const boot = (): void => {
     toggleSound: () => {
       fx.toggle();
     },
-    share: (code) => {
-      // The legacy handler: the share sheet, else the clipboard with a toast, else the code itself.
-      const pageUrl = location.href.split('?')[0] ?? location.href;
-      void shareText(navigator, { title: 'Gin Rummy', text: inviteText(code, pageUrl) }).then(
-        (outcome) => {
-          if (outcome === 'copied') toast(INVITE_COPIED_MSG, null);
-          else if (outcome === 'failed') toast(roomCodeMsg(code), SHARE_FALLBACK_MS);
-        },
-      );
+    share: (code, name) => {
+      // The legacy handler: the share sheet (a phone's OS menu), else the clipboard with a toast
+      // (desktop), else the code itself. The invite carries the link with the code (`?join=`) and
+      // the invited seat's name; origin and path, so a fragment on this page never lands in it.
+      const pageUrl = `${location.origin}${location.pathname}`;
+      void shareText(navigator, {
+        title: 'Gin Rummy',
+        text: inviteText(code),
+        url: inviteUrl(code, pageUrl, name),
+      }).then((outcome) => {
+        if (outcome === 'copied') toast(INVITE_COPIED_MSG, null);
+        else if (outcome === 'failed') toast(roomCodeMsg(code), SHARE_FALLBACK_MS);
+      });
     },
     page: {
       fillName: (name) => {
@@ -392,6 +402,22 @@ const boot = (): void => {
   };
 
   dispatch({ type: 'home/init', home: readHome(store) });
+  // An invite link (`?join=<code>&name=<seat>`, docs/ARCHITECTURE.md "Documented test hooks"): the
+  // code and the invited seat's name go into the join form once the home screen is up, and both
+  // leave the address bar, so a reload or a bookmark of this page lands on the ordinary home
+  // screen (the other hooks, `?peer=` and `?ice=`, stay).
+  const join = params.get('join');
+  if (join !== null) {
+    dispatch({ type: 'join/link', code: join, name: params.get('name') });
+    params.delete('join');
+    params.delete('name');
+    const query = params.toString();
+    history.replaceState(
+      null,
+      '',
+      `${location.pathname}${query === '' ? '' : `?${query}`}${location.hash}`,
+    );
+  }
 };
 
 boot();

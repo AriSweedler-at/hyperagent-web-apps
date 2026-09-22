@@ -6,7 +6,8 @@
 // through to the clipboard; a clipboard that failed reports `failed` so the page can show the
 // code itself.
 
-export type SharePayload = Readonly<{ title: string; text: string }>;
+/** `url` rides beside `text` on the share sheet; the clipboard gets `text`, then `url`. */
+export type SharePayload = Readonly<{ title: string; text: string; url?: string }>;
 
 export type ShareNavigatorLike = Readonly<{
   share?: (payload: SharePayload) => Promise<void>;
@@ -33,7 +34,9 @@ export const shareText = async (
   }
   try {
     if (nav.clipboard === undefined) return 'failed';
-    await nav.clipboard.writeText(payload.text);
+    await nav.clipboard.writeText(
+      payload.url === undefined ? payload.text : `${payload.text} ${payload.url}`,
+    );
     return 'copied';
   } catch {
     return 'failed';
