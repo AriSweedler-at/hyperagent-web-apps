@@ -131,7 +131,7 @@ build. A deploy that changes a page's hash (the rollback revert included) theref
 with the cached page requesting an `app-[hash].js` that 404s, an empty page, for up to 10 minutes
 until they reload. A self-contained legacy page has no such window.
 
-Deploy: `.github/workflows/ci.yml` job `deploy` runs only on push to `main`, `needs: [check, e2e]`,
+Deploy: `.github/workflows/ci.yml` job `deploy` runs only on push to `main`, `needs: [check, coverage, e2e]`,
 `permissions: {contents: read, pages: write, id-token: write}`, `concurrency: {group: pages}`,
 steps `actions/configure-pages@v5`, `actions/upload-pages-artifact@v3 {path: dist}`,
 `actions/deploy-pages@v4`, and prints both served URLs in the job summary. One-time console
@@ -244,9 +244,12 @@ of the shim script itself (`sh -n`).
 
 `ci.yml` on `push` and `pull_request`. Job `check`: checkout, `setup-node@v4 {node-version-file:
 .nvmrc, cache: npm}`, `npm ci`, `npm run typecheck` (`tsc -b`), `npm run lint` (eslint + prettier
---check), `npm test -- --coverage`, `npm run build`, dist tests, upload `dist`. Job `e2e` (needs
-check): download dist, `npx playwright install --with-deps chromium`, `apt-get install coturn`
-(the system service it starts is stopped), `npm run test:e2e` (projects pages + proxy;
+--check), `npm test`, `npm run build`, dist tests, upload `dist`. Job `coverage` (parallel):
+`npm test -- --coverage` against the ratchets. Job `e2e` (parallel, its own build): Chromium from
+`.github/actions/playwright-chromium` (actions/cache by Playwright version; `--with-deps` only on a
+miss), `apt-get install coturn` (the system service it starts is stopped), `npm run
+test:integration`, `npm run test:e2e` (four workers under CI; projects pages + proxy, the page-only
+specs on pages alone: `PAGE_ONLY_SPECS`;
 PeerServer from the `peer` package on :9000; coturn on :3478 started by `playwright.config.ts`
 with one static long-term credential, loopback only, no TLS, its relay ports right above (`e2e/fixtures/site.ts`
 `turnServerCommand`), reached through an ICE list the config writes under `e2e/fixtures/.generated/`;
@@ -302,7 +305,7 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
    sessions over `transport.fake.ts` + `fakeClock` replay every recorded sequence; frozen-constant
    tests for prefixes, alphabets, storage keys and `t` tags.
 3. Parity (permanent): `describe.each([['legacy', gin-engine.cjs], ['current', engine]])` runs the
-   same assertions on both; 1000 seeded gin games and 12 seeded fidice bot games replay through both
+   same assertions on both; 400 seeded gin games (1000 nightly) and 12 seeded fidice bot games replay through both
    with state and views deep-equal (known defects preserved and named); DOM-snapshot parity
    (normalised innerHTML of `#hand`, `#actions`, `#statusBanner`, `#oppCards`, `#rrBody`, `#app` over
    ~60 recorded views); computed-style goldens (~60 selectors at 390x844 and 1280x800) recorded
@@ -724,7 +727,7 @@ Step 10 (gin engine): `web/games/gin-rummy/src/engine/**`:
   (commented in place) so the 100% statement threshold holds.
 - `tsconfig.web.json` no longer excludes `engine/**`; `tsconfig.node.json` lists the gin engine for
   the parity suites. Coverage: `engine/**` at 90% lines, functions and statements,
-  `melds.algorithms.ts` at 100%. The 1000-game replay runs as four 250-game shards
+  `melds.algorithms.ts` at 100%. The replay (400 games on every push, 1000 in the nightly) runs as four shards
   (`test/parity/gin.replay.{1..4}.test.ts`, one line each over `gin.replay.ts`) so vitest spreads
   it across workers: ~15 s wall on a 16-core laptop instead of ~55 s in one worker;
   `GIN_REPLAY_GAMES=<n>` shortens a local run.

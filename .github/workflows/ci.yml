@@ -1,25 +1,30 @@
-# Runs on every push to main and every pull request. Job "check" is the same gate as the local
-# pre-push hook (typecheck, lint, unit tests, build, dist guards) plus coverage and a sanity check
-# of the hook shims; it uploads dist/ as the artifact job "deploy" publishes. Job "e2e" plays every
-# browser spec on both emulated origins against a fresh build of dist/ (both game pages are the
-# Vite-built module pages since docs/MIGRATION.md steps 7 and 13; the gin DOM-parity spec compares
-# the served page with the frozen legacy page the harness aliases in), the two-peer games through a
-# local PeerServer (the merge gate for online play, docs/MIGRATION.md step 3), the relay-forced
-# games through a coturn the harness starts (installed from apt here; e2e/gin-relay.spec.ts,
-# e2e/fidice-relay.spec.ts), and the stories spec
+# Runs on every push to main and every pull request. Four jobs start at once and the deploy waits
+# for three of them, so a push reaches GitHub Pages in about the time of the slowest job rather
+# than their sum. Job "check" is the local pre-push gate (typecheck, lint, unit tests, build, dist
+# guards, the hook shims) and uploads dist/ as the artifact "deploy" publishes. Job "coverage" runs
+# the unit tests again under v8 coverage against vitest.config.ts's ratchets; it is a gate too, in
+# parallel, because instrumentation roughly doubles the suite's time. Job "e2e" plays every browser
+# spec against a fresh build of dist/: the pure-UI specs on the `pages` origin only and the specs
+# about origins, signalling and the relay on both emulated origins (playwright.config.ts
+# `testIgnore`), the two-peer games through a local PeerServer (the merge gate for online play,
+# docs/MIGRATION.md step 3), the relay-forced games through a coturn the harness starts (installed
+# from apt here; e2e/gin-relay.spec.ts, e2e/fidice-relay.spec.ts), the stories spec
 # (e2e/gin-stories.spec.ts) against the committed per-platform screenshot baselines under
 # e2e/__screenshots__, whose -linux.png files the workflow_dispatch job stories-baselines.yml records
-# on the branch for the PR author to commit before this job can pass; job "broker" repeats the
-# online specs through the real 0.peerjs.com and is advisory (continue-on-error), so a third-party
-# outage never blocks a merge but a signalling regression is visible at review. Job "deploy"
-# (docs/MIGRATION.md step 4) publishes the checked dist/ to GitHub Pages on a push to main once
-# check and e2e are green; Settings > Pages > Source must be "GitHub Actions" for it to take
-# effect (see README "Deploy"). Dependency installs go through .github/actions/npm-ci: the
-# lockfile names Airtable's Socket Firewall registry, which runners cannot reach, so npm
-# substitutes the public registry at install time and Socket Firewall Free scans what it downloads.
-# nightly.yml is the other workflow: it plays the same online and relay-forced specs every night
-# with the deployed GitHub Pages page as the subject and every server local (no Cloudflare service
-# is in any test, issue #19), and reports on a pinned issue.
+# on the branch for the PR author to commit before this job can pass, and the transport integration
+# test (the real PeerJS through a local PeerServer in Chromium), which lives here because this job
+# already has the browser. Chromium is restored from actions/cache by Playwright version, so only a
+# version bump downloads it. Job "broker" repeats the online specs through the real 0.peerjs.com
+# and is advisory (continue-on-error), so a third-party outage never blocks a merge but a signalling
+# regression is visible at review. Job "deploy" (docs/MIGRATION.md step 4) publishes the checked
+# dist/ to GitHub Pages on a push to main once check, coverage and e2e are green; Settings > Pages
+# > Source must be "GitHub Actions" for it to take effect (see README "Deploy"). Dependency
+# installs go through .github/actions/npm-ci: the lockfile names Airtable's Socket Firewall
+# registry, which runners cannot reach, so npm substitutes the public registry at install time and
+# Socket Firewall Free scans what it downloads. nightly.yml is the other workflow: it plays the
+# same online and relay-forced specs every night with the deployed GitHub Pages page as the subject
+# and every server local (no Cloudflare service is in any test, issue #19), and reports on a pinned
+# issue.
 name: CI
 
 on:
@@ -46,15 +51,8 @@ jobs:
         run: npm run typecheck
       - name: Lint and format check
         run: npm run lint
-      - name: Unit tests with coverage
-        run: npm test -- --coverage
-      # The real Transport (PeerJS) needs a browser: a PeerServer, a Vite dev server and Chromium
-      # are started by the test itself (docs/MIGRATION.md step 5). It skips where loopback WebRTC
-      # is blocked; the runner has none of that, so here it runs for real.
-      - name: Install Chromium for the transport integration test
-        run: npx playwright install --with-deps chromium
-      - name: Transport integration (real PeerJS through a local PeerServer)
-        run: npm run test:integration
+      - name: Unit tests
+        run: npm test
       - name: Build dist
         run: npm run build
       - name: Dist guards (relative asset URLs, paths on both origins, module pages and the landing page's parity with web/)
@@ -71,8 +69,23 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # The same suite as "check" runs, under v8 coverage against the ratchets in vitest.config.ts;
+  # its own job so the instrumentation's minute is spent beside "e2e", not before it.
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Unit tests with coverage
+        run: npm test -- --coverage
+
   e2e:
-    needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -84,7 +97,12 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-chromium
+      # The real Transport (PeerJS) needs a browser: a PeerServer, a Vite dev server and Chromium
+      # are started by the test itself (docs/MIGRATION.md step 5). It skips where loopback WebRTC
+      # is blocked; the runner has none of that, so here it runs for real.
+      - name: Transport integration (real PeerJS through a local PeerServer)
+        run: npm run test:integration
       # The @relay specs play through a TURN relay of the harness's own: playwright.config.ts starts
       # `turnserver` on :3478 with static credentials (e2e/fixtures/site.ts turnServerCommand). The
       # Debian package also starts a system turnserver on :3478, which is stopped so the harness can
@@ -110,7 +128,6 @@ jobs:
           retention-days: 7
 
   broker:
-    needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: true
@@ -125,7 +142,7 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-chromium
       # The broker is the real one here; the TURN relay stays the local coturn (see job e2e).
       - name: Install coturn for the relay-forced games
         run: |
@@ -146,7 +163,7 @@ jobs:
   # the whole input. Requires Settings > Pages > Source = GitHub Actions (one-time; README "Deploy").
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [check, e2e]
+    needs: [check, coverage, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

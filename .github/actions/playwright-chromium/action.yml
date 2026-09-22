@@ -1,0 +1,27 @@
+# Chromium for the browser specs, restored from actions/cache by the installed Playwright version so
+# a run downloads the browser only after a version bump. The OS packages Playwright's `install-deps`
+# brings are installed every run: they include the fonts the screenshots depend on (Noto Color Emoji
+# among them; a cache hit without them rendered the result sheet's stopwatch glyph from a fallback
+# font and shifted every baseline by a pixel), and the runner image does not carry them.
+name: Playwright Chromium
+description: Restore Playwright's Chromium from the cache (or download it) and install its OS dependencies
+runs:
+  using: composite
+  steps:
+    - name: Read the Playwright version
+      id: pw
+      shell: bash
+      run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+    - name: Restore Chromium
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-chromium-${{ steps.pw.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+    - name: Download Chromium
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npx playwright install chromium
+    - name: Install Chromium's OS dependencies (fonts among them)
+      shell: bash
+      run: npx playwright install-deps chromium

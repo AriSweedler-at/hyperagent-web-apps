@@ -21,7 +21,9 @@
 // workers at once: `gin.replay.<n>.test.ts` is one line, `replayShard(n)`. Each shard asserts the
 // outcome coverage, that the legacy leak shows at least once, that the current engine never marks
 // a card fresh right after a redeal, and that the stock-undo normaliser fired, over its own range.
-// GIN_REPLAY_GAMES overrides the game count for a quicker local run (CI runs the default 1000).
+// GIN_REPLAY_GAMES sets the game count: 400 by default (every push and PR; the four shards take
+// about six seconds beside each other and every outcome still shows in each), 1000 in
+// .github/workflows/nightly.yml, and lower for a quick local run.
 import { describe, expect, test } from 'vitest';
 
 import * as current from '../../web/games/gin-rummy/src/engine/index.ts';
@@ -32,7 +34,7 @@ import { multiFit } from './gin.layoffs.ts';
 import { actor, policy } from './gin.policy.ts';
 
 const legacy = loadLegacyGin();
-const GAMES = Number(process.env['GIN_REPLAY_GAMES'] ?? 1000);
+const GAMES = Number(process.env['GIN_REPLAY_GAMES'] ?? 400);
 const SHARDS = 4;
 /** A seeded game averages ~430 steps; the cap only exists to turn a hang into a failure. */
 const STEP_CAP = 5000;
