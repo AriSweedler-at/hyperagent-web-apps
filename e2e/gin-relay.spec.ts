@@ -1,37 +1,37 @@
 // The relay-forced game (docs/MIGRATION.md step 15, docs/ARCHITECTURE.md "CI"): host and guest
-// open gin with `?ice-policy=relay`, so every ICE candidate must go through TURN, and the game
-// still joins, deals and toasts "Connected via relay" on both sides. That needs real TURN
-// credentials, which only the deployed pages have (they fetch turn.sweedler.com): the local harness
-// serves a STUN-only fixture, so a relay-forced pair can never connect there and the game runs
-// only under E2E_TARGET=live (the nightly). The hook itself is proven hermetically below, and in
-// web/shared/edge/ice.test.ts and transport.test.ts: a page opened with the hook hands PeerJS
-// `iceTransportPolicy: 'relay'`, which is asserted the moment the room is registered, with no join
-// attempted, so the check stays well under the broker timeout on every project.
+// open gin with `?ice-policy=relay` and an ICE list naming the harness's own TURN relay (coturn on
+// PORTS.turn, started by playwright.config.ts), so every ICE candidate must go through that relay,
+// and the game still joins, deals and toasts "Connected via relay" on both sides; the selected
+// candidate pair, read off the RTCPeerConnection, says so too. Hermetic: it plays on every PR, and
+// skips only where coturn is not installed (the nightly, E2E_TARGET=live, was the one place it
+// could run when the credentials had to come from turn.sweedler.com, issue #19; live, the same
+// spec still plays through that relay). The hook itself is also proven alone below, and in
+// web/shared/edge/ice.test.ts and transport.test.ts: a page opened with it hands PeerJS
+// `iceTransportPolicy: 'relay'`, asserted the moment the room is registered, with no join attempted.
 import { ginHostDeals, readTable } from './fixtures/gin.ts';
-import { expectPeerOptions, openGame } from './fixtures/player.ts';
-import { isLive } from './fixtures/site.ts';
+import { expectPeerOptions, openGame, type GameHooks } from './fixtures/player.ts';
+import { RELAY_TOAST, expectRelayPath, skipWithoutRelay } from './fixtures/relay.ts';
 import { expect, hostRoom, joinByCode, test } from './fixtures/two-players.ts';
 
-/** Gin's PATH_RELAY_MSG (src/net/peerjs.ts), written to #toast PATH_TOAST_MS after the channel opens. */
-const RELAY_TOAST = 'Connected via relay';
+const RELAY_GAME: GameHooks = { relay: true, ice: 'turn' };
 
 test(
   'relay-forced: host and guest connect through TURN, both toast the relay path, both see the deal',
   { tag: ['@relay', '@online'] },
   async ({ players, project }) => {
-    test.skip(
-      !isLive(),
-      'a relay-forced pair needs a TURN server: the local harness has only the STUN-only fixture (run with E2E_TARGET=live)',
-    );
+    skipWithoutRelay();
     const { host, guest } = players;
-    await openGame(host, project, 'gin-rummy', { relay: true });
-    await openGame(guest, project, 'gin-rummy', { relay: true });
+    await openGame(host, project, 'gin-rummy', RELAY_GAME);
+    await openGame(guest, project, 'gin-rummy', RELAY_GAME);
 
     const code = await hostRoom(host, 'gin-rummy', 'Host');
     await joinByCode(guest, 'gin-rummy', code, 'Guest');
     // #toast keeps its text after the `show` class drops, so the assertion cannot miss the window.
     await expect(host.page.locator('#toast')).toHaveText(RELAY_TOAST);
     await expect(guest.page.locator('#toast')).toHaveText(RELAY_TOAST);
+    // The connection agrees with the toast: both ends of the selected pair are relay candidates.
+    await expectRelayPath(host.page, 'host');
+    await expectRelayPath(guest.page, 'guest');
 
     await ginHostDeals(host.page, guest.page);
     const [hostTable, guestTable] = await Promise.all([
@@ -43,9 +43,9 @@ test(
     expect(hostTable).toMatchObject({ handSize: 10, oppCount: '10' });
     expect(guestTable).toMatchObject({ handSize: 10, oppCount: '10' });
 
-    // Both Peers were built with the forced policy (and, live, turn.sweedler.com's servers).
-    expectPeerOptions((await host.peerCalls()).at(-1), 0, { relay: true });
-    expectPeerOptions((await guest.peerCalls()).at(-1), 0, { relay: true });
+    // Both Peers were built with the forced policy and the TURN list (live, turn.sweedler.com's).
+    expectPeerOptions((await host.peerCalls()).at(-1), 0, RELAY_GAME);
+    expectPeerOptions((await guest.peerCalls()).at(-1), 0, RELAY_GAME);
   },
 );
 
