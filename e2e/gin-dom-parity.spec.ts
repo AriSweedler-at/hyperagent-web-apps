@@ -7,7 +7,7 @@
 // the `pages` project.
 import { expect, test } from '@playwright/test';
 
-import { LEGACY_GIN_PAGE, PAGES_BASE_PATH, PAGES_ORIGIN, isLive } from './fixtures/site.ts';
+import { LEGACY_GIN_PAGE, PAGES_BASE_PATH, PAGES_ORIGIN, isDeployed } from './fixtures/site.ts';
 import { PROMPTS, openPair, runParity } from '../tools/parity/gin-dom-parity.ts';
 
 test('the served gin page paints what the legacy page paints, checkpoint for checkpoint', async ({
@@ -16,8 +16,8 @@ test('the served gin page paints what the legacy page paints, checkpoint for che
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'pages', 'runs once, on the origin that serves both pages');
   test.skip(
-    isLive(),
-    'needs the local serve-dist aliases: the deployed site publishes no legacy page',
+    isDeployed(),
+    'compares the local build with the legacy page; the deployed run has another subject',
   );
   test.setTimeout(240_000);
   const legacyUrl = `${PAGES_ORIGIN}${PAGES_BASE_PATH}${LEGACY_GIN_PAGE}`;

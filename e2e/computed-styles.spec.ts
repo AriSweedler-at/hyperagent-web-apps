@@ -8,7 +8,7 @@
 // the values are a function of the CSS alone, and both origins serve the same bytes.
 import { expect, test } from '@playwright/test';
 
-import { PAGES_BASE_PATH, PAGES_ORIGIN, PEER_SERVER, isLive } from './fixtures/site.ts';
+import { PAGES_BASE_PATH, PAGES_ORIGIN, PEER_SERVER, isDeployed } from './fixtures/site.ts';
 import {
   GAMES,
   VIEWPORTS,
@@ -37,8 +37,8 @@ GAMES.forEach((game) => {
         'runs once: the styles are the same bytes on both origins',
       );
       test.skip(
-        isLive(),
-        'the capture drives the local pages server and PeerServer, not the deployed site',
+        isDeployed(),
+        'the capture drives the local build, not the deployed page the run is about',
       );
       test.setTimeout(150_000);
       const expected = readGolden(game, viewport);

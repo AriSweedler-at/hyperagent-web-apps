@@ -6,14 +6,13 @@
 import { expect, type Page } from '@playwright/test';
 
 import { selectedPairs } from './peer-connections.ts';
-import { TURN_SKIP_REASON, isLive, turnStatus } from './site.ts';
+import { TURN_SKIP_REASON, turnStatus } from './site.ts';
 import { test } from './two-players.ts';
 
 export const RELAY_TOAST = 'Connected via relay';
 
-/** Skip unless a TURN relay is at hand: the harness's coturn, or turn.sweedler.com under E2E_TARGET=live. */
+/** Skip unless the harness's coturn is at hand (the deployed run relays through it too). */
 export const skipWithoutRelay = (): void => {
-  if (isLive()) return;
   const status = turnStatus();
   if (status !== 'on') test.skip(true, TURN_SKIP_REASON[status]);
 };

@@ -46,7 +46,7 @@ test(
       holderSeat ?? '',
     );
 
-    // Both Peers were built with the forced policy and the TURN list (live, turn.sweedler.com's).
+    // Both Peers were built with the forced policy and the TURN list.
     const hostCall = (await host.peerCalls()).at(-1);
     const guestCall = (await guest.peerCalls()).at(-1);
     expect(hostCall?.id).toBe(`fidice-${code.toLowerCase()}`);

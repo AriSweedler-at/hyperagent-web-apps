@@ -17,8 +17,9 @@
 # effect (see README "Deploy"). Dependency installs go through .github/actions/npm-ci: the
 # lockfile names Airtable's Socket Firewall registry, which runners cannot reach, so npm
 # substitutes the public registry at install time and Socket Firewall Free scans what it downloads.
-# nightly.yml is the other workflow: it plays the deployed origins every night through the real
-# broker and turn.sweedler.com, including a relay-forced game, and reports on a pinned issue.
+# nightly.yml is the other workflow: it plays the same online and relay-forced specs every night
+# with the deployed GitHub Pages page as the subject and every server local (no Cloudflare service
+# is in any test, issue #19), and reports on a pinned issue.
 name: CI
 
 on:

@@ -3,10 +3,10 @@
 // PORTS.turn, started by playwright.config.ts), so every ICE candidate must go through that relay,
 // and the game still joins, deals and toasts "Connected via relay" on both sides; the selected
 // candidate pair, read off the RTCPeerConnection, says so too. Hermetic: it plays on every PR, and
-// skips only where coturn is not installed (the nightly, E2E_TARGET=live, was the one place it
-// could run when the credentials had to come from turn.sweedler.com, issue #19; live, the same
-// spec still plays through that relay). The hook itself is also proven alone below, and in
-// web/shared/edge/ice.test.ts and transport.test.ts: a page opened with it hands PeerJS
+// skips only where coturn is not installed (until issue #19 the relay was turn.sweedler.com and the
+// nightly the one place this could run; now the nightly, E2E_TARGET=deployed, plays this same spec
+// with the deployed gin page and this same local relay). The hook itself is also proven alone
+// below, and in web/shared/edge/ice.test.ts and transport.test.ts: a page opened with it hands PeerJS
 // `iceTransportPolicy: 'relay'`, asserted the moment the room is registered, with no join attempted.
 import { ginHostDeals, readTable } from './fixtures/gin.ts';
 import { expectPeerOptions, openGame, type GameHooks } from './fixtures/player.ts';
@@ -43,7 +43,7 @@ test(
     expect(hostTable).toMatchObject({ handSize: 10, oppCount: '10' });
     expect(guestTable).toMatchObject({ handSize: 10, oppCount: '10' });
 
-    // Both Peers were built with the forced policy and the TURN list (live, turn.sweedler.com's).
+    // Both Peers were built with the forced policy and the TURN list.
     expectPeerOptions((await host.peerCalls()).at(-1), 0, RELAY_GAME);
     expectPeerOptions((await guest.peerCalls()).at(-1), 0, RELAY_GAME);
   },

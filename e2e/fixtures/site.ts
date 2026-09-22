@@ -2,10 +2,12 @@
 // `pages` mirrors GitHub Pages: the site under /hyperagent-web-apps/ on tools/serve-dist.ts.
 // `proxy` mirrors games.sweedler.com: short game URLs on tools/proxy-dev.ts, which runs the real
 // Worker against the pages origin. Both serve dist/, the only build tree since docs/MIGRATION.md
-// step 13 cut the last page over. `E2E_TARGET=live` (the nightly, .github/workflows/nightly.yml)
-// swaps both for the deployed origins below: nothing local is started, and the pages fetch their
-// ICE servers from turn.sweedler.com. Everything the harness needs to know about URLs is here, so
-// specs never spell out an absolute site path themselves.
+// step 13 cut the last page over. `E2E_TARGET=deployed` (the nightly, .github/workflows/nightly.yml)
+// aims `pages` at the deployed GitHub Pages origin instead and defines no `proxy` project
+// (games.sweedler.com is a Cloudflare Worker, and no test depends on Cloudflare: issue #19); every
+// server stays local, and the deployed page reaches them through its `?peer=` and `?ice=` hooks.
+// Everything the harness needs to know about URLs is here, so specs never spell out an absolute
+// site path themselves.
 //
 // Every local port is a fixed base plus one offset, `E2E_PORT_OFFSET` (default 0): pages 4173+o,
 // proxy 8787+o, PeerServer 9000+o, and the TURN relay (coturn) 3478+o with its relay ports right
@@ -45,24 +47,36 @@ export const LOCAL_HOST = '127.0.0.1';
 
 export const PAGES_ORIGIN = `http://${LOCAL_HOST}:${String(PORTS.pages)}`;
 export const PROXY_ORIGIN = `http://${LOCAL_HOST}:${String(PORTS.proxy)}`;
-/** The deployed origins the nightly plays (GitHub Pages, and the Cloudflare Worker in front of it). */
-export const LIVE_ORIGINS: Readonly<Record<Project, string>> = {
-  pages: 'https://arisweedler-at.github.io',
-  proxy: 'https://games.sweedler.com',
-};
-const LOCAL_ORIGINS: Readonly<Record<Project, string>> = {
-  pages: PAGES_ORIGIN,
-  proxy: PROXY_ORIGIN,
-};
+/** The deployed GitHub Pages origin, the `pages` project's under `E2E_TARGET=deployed`. */
+export const DEPLOYED_PAGES_ORIGIN = 'https://arisweedler-at.github.io';
 
-/** `E2E_TARGET=live` plays the deployed site instead of the emulated one. */
-export const isLive = (): boolean => process.env['E2E_TARGET'] === 'live';
-
-/** A project's baseURL: the site root under the Pages mount, or the proxy's root. */
-export const baseUrl = (project: Project): string => {
-  const origin = (isLive() ? LIVE_ORIGINS : LOCAL_ORIGINS)[project];
-  return project === 'pages' ? `${origin}${PAGES_BASE_PATH}` : `${origin}/`;
+export type Target = 'local' | 'deployed';
+/**
+ * `E2E_TARGET`, parsed once: unset or empty is `local`. The retired `live` (both deployed origins
+ * through the real broker and turn.sweedler.com) is refused like any other value, so an old
+ * command line fails at once instead of quietly playing the emulated site.
+ */
+const target = (): Target => {
+  const raw = process.env['E2E_TARGET'];
+  if (raw === undefined || raw === '' || raw === 'local') return 'local';
+  if (raw === 'deployed') return 'deployed';
+  throw new Error(`E2E_TARGET must be "local" or "deployed", got ${JSON.stringify(raw)}`);
 };
+export const TARGET: Target = target();
+/**
+ * The deployed page is the subject: `pages` is DEPLOYED_PAGES_ORIGIN, the local servers still run
+ * (serve-dist for the ICE lists, PeerServer, coturn) and the page is opened with hooks naming them.
+ */
+export const isDeployed = (): boolean => TARGET === 'deployed';
+
+/** The Playwright projects this run defines: no `proxy` against the deployed site (it is Cloudflare). */
+export const PROJECTS: ReadonlyArray<Project> = isDeployed() ? ['pages'] : ['pages', 'proxy'];
+
+/** A project's baseURL: the site root under the Pages mount (deployed or emulated), or the emulated proxy's root. */
+export const baseUrl = (project: Project): string =>
+  project === 'proxy'
+    ? `${PROXY_ORIGIN}/`
+    : `${isDeployed() ? DEPLOYED_PAGES_ORIGIN : PAGES_ORIGIN}${PAGES_BASE_PATH}`;
 /** Local PeerServer (`peer` package) that `?peer=host:port` aims the pages at. */
 export const PEER_HOST = LOCAL_HOST;
 export const PEER_PORT = PORTS.peer;
@@ -170,7 +184,6 @@ export const LEGACY_ALIASES: Readonly<Record<string, string>> = {
   'legacy/shared/ice.js': 'legacy/shared/ice.js',
 };
 
-export const PROJECTS: ReadonlyArray<Project> = ['pages', 'proxy'];
 export const PAGES: ReadonlyArray<PageName> = ['landing', 'gin-rummy', 'fidice'];
 
 export const EXPECTED_TITLES: Readonly<Record<PageName, string>> = {

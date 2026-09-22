@@ -5,9 +5,10 @@
 // `?ice-policy=relay` hook for the relay-forced game and `{ ice: 'turn' }` names the ICE list with
 // the harness's own TURN relay instead (e2e/fixtures/site.ts ICE_TURN_FIXTURE). The
 // RTCPeerConnection recorder (e2e/browser/record-pc.js) lets a spec read the selected candidate
-// pair off the real connection. Under `E2E_TARGET=live` the URL hooks stay off: the deployed pages
-// meet on 0.peerjs.com and fetch their ICE servers from turn.sweedler.com, so `expectPeerOptions`
-// checks the shape of what arrived rather than the fixture's exact bytes.
+// pair off the real connection. Under `E2E_TARGET=deployed` the page is the deployed one and the
+// hooks are the same: a public https page reaching 127.0.0.1 needs Chromium's Local Network Access
+// permission, granted to the context here, and the options `new Peer` receives are still the
+// harness's fixtures byte for byte.
 import {
   expect,
   type Browser,
@@ -28,7 +29,7 @@ import {
   PEER_HOST,
   PEER_PORT,
   PEER_SERVER,
-  isLive,
+  isDeployed,
   pagePath,
   type PageName,
   type Project,
@@ -46,11 +47,8 @@ export type Player = Readonly<{
   peerCalls: () => Promise<ReadonlyArray<PeerCall>>;
 }>;
 
-/**
- * `E2E_BROKER=cloud` drops `?peer=` so the pages use 0.peerjs.com (the advisory CI job `broker`);
- * a live run has no local PeerServer either.
- */
-export const usesLocalBroker = (): boolean => process.env['E2E_BROKER'] !== 'cloud' && !isLive();
+/** `E2E_BROKER=cloud` drops `?peer=` so the pages use 0.peerjs.com (the advisory CI job `broker`). */
+export const usesLocalBroker = (): boolean => process.env['E2E_BROKER'] !== 'cloud';
 
 /**
  * Against the local PeerServer the seeds repeat from run to run. On the shared public broker two
@@ -77,8 +75,7 @@ const iceServers = (hooks: GameHooks): ReadonlyArray<unknown> =>
   hooks.ice === 'turn' ? ICE_TURN_FIXTURE.iceServers : ICE_FIXTURE.iceServers;
 
 export const gameQuery = (hooks: GameHooks = {}): string => {
-  // Live pages fetch turn.sweedler.com (the credentials the relay-forced game needs).
-  const params = new URLSearchParams(isLive() ? {} : { ice: iceUrl(hooks) });
+  const params = new URLSearchParams({ ice: iceUrl(hooks) });
   if (usesLocalBroker()) params.set('peer', PEER_SERVER);
   if (hooks.relay === true) params.set('ice-policy', 'relay');
   const query = params.toString();
@@ -91,7 +88,13 @@ export const newPlayer = async (
   testInfo: TestInfo,
 ): Promise<Player> => {
   const seed = seedFor([...RUN_SALT, testInfo.project.name, ...testInfo.titlePath, role]);
-  const context = await browser.newContext();
+  // What a deployed page needs before it may reach the harness: Chromium (Local Network Access,
+  // since 142) asks the user before a public site fetches from or opens a socket to a loopback
+  // address, and the `?ice=` list and the `?peer=` broker are both on 127.0.0.1. Emulated pages
+  // are loopback themselves and need nothing.
+  const context = await browser.newContext(
+    isDeployed() ? { permissions: ['local-network-access'] } : {},
+  );
   await context.addInitScript({ content: seedScript(seed) });
   await context.addInitScript({ path: RECORD_PEER_SCRIPT });
   await context.addInitScript({ path: RECORD_PC_SCRIPT });
@@ -130,42 +133,11 @@ const expectedPeerOptions = (
   ...(usesLocalBroker() ? { host: PEER_HOST, port: PEER_PORT, path: '/', secure: false } : {}),
 });
 
-const urlsOf = (server: unknown): ReadonlyArray<unknown> => {
-  if (typeof server !== 'object' || server === null) return [];
-  const urls: unknown = (server as Readonly<Record<string, unknown>>)['urls'];
-  return Array.isArray(urls) ? urls : [urls];
-};
-
-/**
- * Assert the options a recorded `new Peer(...)` carried. Locally that is the fixture, byte for
- * byte. Live, the credentials come from turn.sweedler.com and change per fetch, so the check is
- * the shape: Cloudflare's STUN server, a TURN entry with username and credential, unified-plan,
- * the policy when forced, and no broker override.
- */
+/** Assert the options a recorded `new Peer(...)` carried: the fixture the hooks named, byte for byte. */
 export const expectPeerOptions = (
   call: PeerCall | undefined,
   debug: number,
   hooks: GameHooks = {},
 ): void => {
-  if (!isLive()) {
-    expect(call?.options).toEqual(expectedPeerOptions(debug, hooks));
-    return;
-  }
-  const options = call?.options ?? {};
-  expect(Object.keys(options).sort()).toEqual(['config', 'debug']);
-  expect(options['debug']).toBe(debug);
-  const config = options['config'] as Readonly<Record<string, unknown>>;
-  expect(config['sdpSemantics']).toBe('unified-plan');
-  expect(config['iceTransportPolicy']).toBe(hooks.relay === true ? 'relay' : undefined);
-  const servers: ReadonlyArray<unknown> = Array.isArray(config['iceServers'])
-    ? config['iceServers']
-    : [];
-  expect(servers.flatMap(urlsOf)).toContain('stun:stun.cloudflare.com:3478');
-  const turn = servers.filter((server) =>
-    urlsOf(server).some((url) => typeof url === 'string' && /^turns?:/.test(url)),
-  );
-  expect(turn.length, 'a TURN entry from turn.sweedler.com').toBeGreaterThan(0);
-  turn.forEach((server) => {
-    expect(server).toMatchObject({ username: expect.any(String), credential: expect.any(String) });
-  });
+  expect(call?.options).toEqual(expectedPeerOptions(debug, hooks));
 };

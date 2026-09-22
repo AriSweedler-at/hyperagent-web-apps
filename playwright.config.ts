@@ -9,13 +9,16 @@
 // the built site: `npm run test:e2e` is `npm run build && playwright test`, so dist/ is fresh; a
 // bare `playwright test` reuses it. Online specs meet on a local PeerServer (`peer` package) on
 // :9000, which the pages reach through their `?peer=` hook; `E2E_BROKER=cloud` leaves it out so
-// the advisory CI job `broker` plays through 0.peerjs.com instead. `E2E_TARGET=live`
-// (.github/workflows/nightly.yml) aims both projects at the deployed origins (e2e/fixtures/site.ts
-// LIVE_ORIGINS), starts nothing local and implies the cloud broker; specs that need the local
-// servers skip themselves with a reason. The @relay specs (gin and fidice with `?ice-policy=relay`)
-// relay through a coturn of the harness's own on :3478 (`turnserver` on PATH, else they skip with
-// the install line; `E2E_TURN=off` leaves it out), reached through an ICE list this file writes
-// under e2e/fixtures/.generated/ because the relay's port follows the offset.
+// the advisory CI job `broker` plays through 0.peerjs.com instead. `E2E_TARGET=deployed`
+// (.github/workflows/nightly.yml) makes the deployed GitHub Pages page the subject: `pages` is the
+// deployed origin (e2e/fixtures/site.ts DEPLOYED_PAGES_ORIGIN), there is no `proxy` project (that
+// origin is a Cloudflare Worker, and no test depends on Cloudflare: issue #19), proxy-dev is not
+// started, and the deployed page reaches this same serve-dist, PeerServer and TURN relay through
+// its hooks; specs about the local build skip themselves with a reason. The @relay specs (gin and
+// fidice with `?ice-policy=relay`) relay through a coturn of the harness's own on :3478
+// (`turnserver` on PATH, else they skip with the install line; `E2E_TURN=off` leaves it out),
+// reached through an ICE list this file writes under e2e/fixtures/.generated/ because the relay's
+// port follows the offset.
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 import { defineConfig } from '@playwright/test';
@@ -31,28 +34,25 @@ import {
   PEER_PORT,
   PEER_SERVER,
   PORTS,
+  PROJECTS,
   PROXY_ORIGIN,
   TURN_SKIP_REASON,
   baseUrl,
-  isLive,
+  isDeployed,
   turnServerCommand,
   turnStatus,
 } from './e2e/fixtures/site.ts';
 
 const CI = process.env['CI'] !== undefined && process.env['CI'] !== '';
-const live = isLive();
-// A live run meets on 0.peerjs.com: no PeerServer to start, and the fixtures drop `?peer=` too.
-if (live) process.env['E2E_BROKER'] = 'cloud';
+const deployed = isDeployed();
 const cloudBroker = process.env['E2E_BROKER'] === 'cloud';
-// The local TURN relay: coturn when installed, unless asked off; a live run relays through
-// turn.sweedler.com. CI installs coturn, so a missing binary there is a broken job, not a skip.
-const turn = live ? 'off' : turnStatus();
+// The local TURN relay: coturn when installed, unless asked off. CI installs coturn, so a missing
+// binary there is a broken job, not a skip.
+const turn = turnStatus();
 if (CI && turn === 'missing') throw new Error(TURN_SKIP_REASON.missing);
 // The ICE list naming the relay is written per run: its port is PORTS.turn, offset included.
-if (!live) {
-  mkdirSync(GENERATED_DIR, { recursive: true });
-  writeFileSync(ICE_TURN_FILE, `${JSON.stringify(ICE_TURN_FIXTURE, null, 2)}\n`);
-}
+mkdirSync(GENERATED_DIR, { recursive: true });
+writeFileSync(ICE_TURN_FILE, `${JSON.stringify(ICE_TURN_FIXTURE, null, 2)}\n`);
 const node = 'node --experimental-strip-types';
 /** The two e2e ICE lists and, on the pages origin, the frozen legacy gin page for the DOM-parity spec. */
 const aliasArgs = (aliases: Readonly<Record<string, string>>): string =>
@@ -87,45 +87,45 @@ export default defineConfig({
       args: ['--disable-features=WebRtcHideLocalIpsWithMdns', '--no-first-run'],
     },
   },
-  projects: [
-    { name: 'pages', use: { baseURL: baseUrl('pages') } },
-    { name: 'proxy', use: { baseURL: baseUrl('proxy') } },
+  projects: PROJECTS.map((name) => ({ name, use: { baseURL: baseUrl(name) } })),
+  webServer: [
+    // Deployed, serve-dist still runs: it is where the deployed page fetches its `?ice=` lists.
+    {
+      command: `${node} tools/serve-dist.ts --root dist --base ${PAGES_BASE_PATH} ${pagesAliases} --port ${String(PORTS.pages)}`,
+      url: `${PAGES_ORIGIN}${PAGES_BASE_PATH}`,
+      reuseExistingServer: !CI,
+      timeout: 30_000,
+    },
+    ...(deployed
+      ? []
+      : [
+          {
+            command: `${node} tools/proxy-dev.ts --upstream ${PAGES_ORIGIN} --port ${String(PORTS.proxy)}`,
+            url: `${PROXY_ORIGIN}/`,
+            reuseExistingServer: !CI,
+            timeout: 30_000,
+          },
+        ]),
+    ...(cloudBroker
+      ? []
+      : [
+          {
+            command: `peerjs --host ${PEER_HOST} --port ${String(PEER_PORT)} --path /`,
+            url: `http://${PEER_SERVER}/`,
+            reuseExistingServer: !CI,
+            timeout: 30_000,
+          },
+        ]),
+    // Readiness by port: coturn answers on TCP too, and an HTTP probe has nothing to fetch.
+    ...(turn === 'on'
+      ? [
+          {
+            command: turnServerCommand(),
+            port: PORTS.turn,
+            reuseExistingServer: !CI,
+            timeout: 30_000,
+          },
+        ]
+      : []),
   ],
-  webServer: live
-    ? []
-    : [
-        {
-          command: `${node} tools/serve-dist.ts --root dist --base ${PAGES_BASE_PATH} ${pagesAliases} --port ${String(PORTS.pages)}`,
-          url: `${PAGES_ORIGIN}${PAGES_BASE_PATH}`,
-          reuseExistingServer: !CI,
-          timeout: 30_000,
-        },
-        {
-          command: `${node} tools/proxy-dev.ts --upstream ${PAGES_ORIGIN} --port ${String(PORTS.proxy)}`,
-          url: `${PROXY_ORIGIN}/`,
-          reuseExistingServer: !CI,
-          timeout: 30_000,
-        },
-        ...(cloudBroker
-          ? []
-          : [
-              {
-                command: `peerjs --host ${PEER_HOST} --port ${String(PEER_PORT)} --path /`,
-                url: `http://${PEER_SERVER}/`,
-                reuseExistingServer: !CI,
-                timeout: 30_000,
-              },
-            ]),
-        // Readiness by port: coturn answers on TCP too, and an HTTP probe has nothing to fetch.
-        ...(turn === 'on'
-          ? [
-              {
-                command: turnServerCommand(),
-                port: PORTS.turn,
-                reuseExistingServer: !CI,
-                timeout: 30_000,
-              },
-            ]
-          : []),
-      ],
 });
