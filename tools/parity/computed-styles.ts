@@ -40,7 +40,14 @@ import { seedScript } from '../../e2e/fixtures/seed.ts';
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
 import { REPO_ROOT, isMain } from '../legacy/extract.ts';
 import { startServer } from '../serve-dist.ts';
-import { EPOCH, SEED, acceptIfShown, clockScript, readView } from './gin-dom-parity.ts';
+import {
+  EPOCH,
+  SEED,
+  acceptIfShown,
+  answerKnock,
+  clockScript,
+  readView,
+} from './gin-dom-parity.ts';
 
 export type Game = 'gin-rummy' | 'fidice';
 export const GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice'];
@@ -830,6 +837,8 @@ const driveGin = async (page: Page, shot: Shot): Promise<void> => {
       await click(page, `#hand .card[data-card="${knock.id}"]`);
       await shot('turn: knock available');
       await click(page, '#actions [data-act="knock"]');
+      // The knock is answered as the engine used to answer it (§7b), then the sheet is up.
+      await answerKnock(page);
       await shot('round over: result sheet');
       return 'knocked';
     }

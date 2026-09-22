@@ -50,7 +50,7 @@ import { SUITS, idsOf, inPlay, makeCard, type Rank } from '../engine/index.ts';
 import { SUIT_SYMBOL, backHtml, cardHtml, isRed, pretty, rankLabel } from './cards.ts';
 import { deadwoodText, fmtDuration, statusWith, type Selection } from './cues.ts';
 import type { HandView } from './hand/HandView.ts';
-import { meldGroupsHtml } from './hand/meldGroups.ts';
+import { meldGroupClass, meldGroupsHtml } from './hand/meldGroups.ts';
 import { arrangedOf } from './hand/arrange.ts';
 import { bindDrag } from './hand/dragger.ts';
 import { flipCards } from './hand/flip.ts';
@@ -247,6 +247,61 @@ const paintPiles = (doc: DocumentLike, v: View): void => {
   toggleClass(disc, 'blocked', canDrawStock && v.forceStock);
 };
 
+/**
+ * The knocker's melds on the table while the defender lays off (docs/design/gin-arrangement-and-
+ * discards.md §7b): the piles keep their boxes, unseen, and `#tableMelds` lays over them, one
+ * `.meld-group.locked` per meld (built once per knock, so the groups drop in once), each rebuilt
+ * only when its cards changed (so a card laid off drops onto it and the others hold still). The
+ * knocker's cards are `pinned`, the laid-off ones `laid` (the one being dragged `dragging`), and
+ * the group a dragged card fits carries `drop` while the card is over it.
+ */
+const paintTableMelds = (doc: DocumentLike, app: App, v: View): void => {
+  const lo = v.layoff;
+  const laying = v.phase === 'layoff' && lo !== undefined;
+  const melds = requireId(doc, 'tableMelds');
+  toggleClass(requireId(doc, 'tableCenter'), 'laying', laying);
+  toggleClass(melds, 'hidden', !laying);
+  if (!laying) {
+    setAttr(melds, 'data-key', null);
+    return;
+  }
+  const shell = `${String(v.handNumber)}:${String(lo.knocker)}:${String(lo.melds.length)}`;
+  if (dataOf(melds, 'key') !== shell) {
+    setAttr(melds, 'data-key', shell);
+    setHtml(
+      melds,
+      trustedHtml(
+        lo.melds
+          .map((_, i) => `<div class="${meldGroupClass(i)} locked" data-onto="${String(i)}"></div>`)
+          .join(''),
+      ),
+    );
+  }
+  const laid = new Set(lo.laidOff.map((e) => e.card.id));
+  const dragging = app.drag?.from === 'table' ? app.drag.cardId : null;
+  queryAllIn(melds, '.meld-group').forEach((group, i) => {
+    const cards = lo.extended[i] ?? [];
+    const key = `${idsOf(cards).join(' ')}:${dragging ?? ''}`;
+    if (dataOf(group, 'key') !== key) {
+      setAttr(group, 'data-key', key);
+      setHtml(
+        group,
+        trustedHtml(
+          cards
+            .map((c) =>
+              cardHtml(c, {
+                mini: true,
+                extra: laid.has(c.id) ? (c.id === dragging ? 'laid dragging' : 'laid') : 'pinned',
+              }),
+            )
+            .join(''),
+        ),
+      );
+    }
+    toggleClass(group, 'drop', app.drag?.onto === i);
+  });
+};
+
 const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
   const status = statusWith(v, app.selectedCard, app.draw);
   setText(requireId(doc, 'statusMain'), status.main);
@@ -295,6 +350,13 @@ export const actionsHtml = (v: View, selection: Selection): SafeHtml => {
     return trustedHtml(
       `<button class="btn btn-primary grow" data-act="showResult">Show results</button>`,
     );
+  // The answer to a knock (§7b): the defender finishes when their layoffs are laid.
+  if (v.phase === 'layoff')
+    return v.isMyTurn
+      ? trustedHtml(
+          `<button class="btn btn-primary grow" data-act="finishLayoff">Done laying off</button>`,
+        )
+      : safeHtml`<div class="waiting-note">Waiting for ${v.opp.name} to lay off…</div>`;
   const waiting = v.isMyTurn ? trustedHtml('') : safeHtml`Waiting for ${v.opp.name}…`;
   return safeHtml`<div class="waiting-note">${waiting}</div>`;
 };
@@ -587,6 +649,7 @@ const paintGame = (doc: DocumentLike, app: App, handView: HandView): void => {
   }
   paintOpponent(doc, app, v);
   paintPiles(doc, v);
+  paintTableMelds(doc, app, v);
   paintStatus(doc, app, v);
   paintHand(doc, app, v, handView);
   paintArrange(doc, app);

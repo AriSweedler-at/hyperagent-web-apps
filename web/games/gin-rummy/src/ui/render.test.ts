@@ -14,6 +14,7 @@ import {
   makeCard,
   makeDeck,
   viewFor,
+  bestLayoffActions,
 } from '../engine/index.ts';
 import type { Action, Card, Rank, Seat, State, View } from '../engine/index.ts';
 import { cardHtml, pretty } from './cards.ts';
@@ -88,9 +89,13 @@ const bestDiscard = (v: View, legal: ReadonlyArray<Action>): Action | undefined 
  * Knock when possible, else pass the upcard, draw from the stock, discard for the least deadwood;
  * between hands the seat that is not ready yet continues.
  */
+/** A knock answered as the engine used to answer it by itself: the best layoffs, then finished (§7b). */
+const settled = (s: State): State => bestLayoffActions(s).reduce((g, a) => apply(g, g.turn, a), s);
+
 const playUntil = (s: State, stop: (s: State) => boolean, budget = 2000): State => {
   if (stop(s)) return s;
   if (budget === 0) throw new Error('the game never reached the state asked for');
+  if (s.phase === 'layoff') return playUntil(settled(s), stop, budget - 1);
   const between = s.phase === 'roundOver' || s.phase === 'gameOver';
   const seat: Seat = between ? (s.ready[0] ? 1 : 0) : s.turn;
   const v = viewFor(s, seat);
@@ -396,7 +401,7 @@ describe('the table', () => {
       pendingDraw: null,
       meldPref: [null, null],
     };
-    const knockedOn = apply(position, 0, { type: 'knock', cardId: 'KC' });
+    const knockedOn = settled(apply(position, 0, { type: 'knock', cardId: 'KC' }));
     const result = knockedOn.result;
     if (result === null || result.void) throw new Error('the knock did not score');
     expect(result.opponent.laidOff.map((x) => x.card.id)).toEqual(['4S', '5S']);

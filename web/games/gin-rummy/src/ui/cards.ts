@@ -13,6 +13,8 @@ export type CardOptions = Readonly<{
   dim?: boolean;
   fresh?: boolean;
   locked?: boolean;
+  /** Classes of the port's own, appended after the legacy ones (`pinned`, `laid`, `dragging`: the table's melds). */
+  extra?: string;
 }>;
 
 export const isRed = (suit: Suit): boolean => suit === 'H' || suit === 'D';
@@ -28,6 +30,7 @@ export const cardClass = (card: Card, opts: CardOptions = {}): string =>
     opts.dim === true ? 'dim' : '',
     opts.fresh === true ? 'fresh' : '',
     opts.locked === true ? 'locked' : '',
+    opts.extra ?? '',
   ]
     .filter((c) => c !== '')
     .join(' ');

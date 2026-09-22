@@ -191,11 +191,13 @@ describe('decodeAction', () => {
   test('every plain type, the two card types and setMelds, in the legacy key order', () => {
     ACTION_TYPES.forEach((type) => {
       const input =
-        type === 'discard' || type === 'knock'
+        type === 'discard' || type === 'knock' || type === 'takeBack'
           ? { type, cardId: 'AS' }
-          : type === 'setMelds'
-            ? { type, melds: [['AS', 'AH', 'AD']] }
-            : { type };
+          : type === 'layOff'
+            ? { type, cardId: 'AS', onto: 1 }
+            : type === 'setMelds'
+              ? { type, melds: [['AS', 'AH', 'AD']] }
+              : { type };
       const r = decodeAction({ ...input, extra: true });
       expect(r.ok && JSON.stringify(r.value)).toBe(JSON.stringify(input));
     });
@@ -203,9 +205,12 @@ describe('decodeAction', () => {
 
   test('refuses an unknown type, a card action without its card, setMelds without melds', () => {
     expect(failureOf(decodeAction({ type: 'cheat' }))).toBe(
-      '$.type: expected one of "ready" | "takeUpcard" | "passUpcard" | "drawStock" | "drawDiscard" | "undoDraw" | "discard" | "knock" | "setMelds"',
+      '$.type: expected one of "ready" | "takeUpcard" | "passUpcard" | "drawStock" | "drawDiscard" | "undoDraw" | "discard" | "knock" | "setMelds" | "layOff" | "takeBack" | "finishLayoff"',
     );
     expect(failureOf(decodeAction({ type: 'discard' }))).toBe('$.cardId: expected string');
+    expect(failureOf(decodeAction({ type: 'layOff', cardId: 'AS' }))).toContain(
+      '$.onto: expected integer',
+    );
     expect(failureOf(decodeAction({ type: 'knock', cardId: 7 }))).toBe('$.cardId: expected string');
     expect(failureOf(decodeAction({ type: 'setMelds' }))).toBe('$.melds: expected array');
     expect(failureOf(decodeAction({ type: 'setMelds', melds: [['AS', null]] }))).toBe(

@@ -155,6 +155,8 @@ const laidEntries = (state: State, k: Knock): ReadonlyArray<LayoffEntry> =>
 // during play, including while waiting for the opponent.
 const setMelds = (state: State, seat: Seat, groups: MeldGroups): Applied => {
   if (!inPlay(state.phase)) return err('You can only rearrange melds during play.');
+  if (state.phase === 'layoff' && state.knock?.by === seat)
+    return err('Your melds are on the table.');
   const myHand = keptHand(state, seat);
   const m = meldingFromGroups(myHand, groups);
   if (!m) return err("That meld arrangement doesn't fit your hand.");
@@ -430,40 +432,42 @@ const layoffPhase = (state: State, seat: Seat, action: Action, now: Now): Applie
   if (k === null) return err('No knock to answer.');
   const hand = state.hands[seat];
   const entries = laidEntries(state, k);
-  switch (action.type) {
-    case 'layOff': {
-      const card = cardById(hand, action.cardId);
-      if (!card) return err("That card isn't in your hand.");
-      if (k.laidOff.some((e) => e.cardId === card.id)) return err('That card is laid off already.');
-      const meld = extendedMelds(k.melding.melds, entries)[action.onto];
-      if (meld === undefined) return err('No such meld.');
-      if (!fitsOnto(card, meld)) return err(`The ${pretty(card)} doesn't fit that meld.`);
-      return ok({
-        ...state,
-        knock: { ...k, laidOff: [...k.laidOff, { cardId: card.id, onto: action.onto }] },
-        lastAction: { text: `${state.players[seat].name} laid off the ${pretty(card)}.`, by: seat },
-      });
-    }
-    case 'takeBack': {
-      const card = cardById(hand, action.cardId);
-      if (!card || !k.laidOff.some((e) => e.cardId === card.id))
-        return err("That card isn't laid off.");
-      if (!canTakeBack(k.melding.melds, entries, card.id))
-        return err('Take back the cards laid off after it first.');
-      return ok({
-        ...state,
-        knock: { ...k, laidOff: k.laidOff.filter((e) => e.cardId !== card.id) },
-        lastAction: {
-          text: `${state.players[seat].name} took the ${pretty(card)} back.`,
-          by: seat,
-        },
-      });
-    }
-    case 'finishLayoff':
-      return finishKnock(state, k, layoffMeldingFrom(hand, k.melding.melds, entries), now);
-    default:
-      return err('Lay off onto the melds, take a card back, or finish.');
+  const name = state.players[seat].name;
+  if (action.type === 'layOff') {
+    const card = cardById(hand, action.cardId);
+    if (!card) return err("That card isn't in your hand.");
+    if (k.laidOff.some((e) => e.cardId === card.id)) return err('That card is laid off already.');
+    const meld = extendedMelds(k.melding.melds, entries)[action.onto];
+    if (meld === undefined) return err('No such meld.');
+    if (!fitsOnto(card, meld)) return err(`The ${pretty(card)} doesn't fit that meld.`);
+    return ok({
+      ...state,
+      knock: { ...k, laidOff: [...k.laidOff, { cardId: card.id, onto: action.onto }] },
+      lastAction: { text: `${name} laid off the ${pretty(card)}.`, by: seat },
+    });
   }
+  if (action.type === 'takeBack') {
+    const card = cardById(hand, action.cardId);
+    if (!card || !k.laidOff.some((e) => e.cardId === card.id))
+      return err("That card isn't laid off.");
+    if (!canTakeBack(k.melding.melds, entries, card.id))
+      return err('Take back the cards laid off after it first.');
+    return ok({
+      ...state,
+      knock: { ...k, laidOff: k.laidOff.filter((e) => e.cardId !== card.id) },
+      lastAction: { text: `${name} took the ${pretty(card)} back.`, by: seat },
+    });
+  }
+  if (action.type === 'finishLayoff')
+    return finishKnock(state, k, layoffMeldingFrom(hand, k.melding.melds, entries), now);
+  return err('Lay off onto the melds, take a card back, or finish.');
+};
+
+/** `state` without its `knock` key: outside the layoff phase the key is absent, as every legacy state is. */
+const withoutKnock = (state: State): State => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the key is dropped by the rest
+  const { knock: _answered, ...rest } = state;
+  return rest;
 };
 
 /**
@@ -526,13 +530,12 @@ const finishKnock = (state: State, k: Knock, theirs: LayoffMelding, now: Now): A
         ? `${me.name} knocked but was undercut by ${state.players[opp].name}!`
         : `${me.name} knocked with ${String(mine.value)}.`;
   return ok({
-    ...state,
+    ...withoutKnock(state),
     players,
     result,
     rounds: [...state.rounds, round],
     phase: 'roundOver',
     turn: seat,
-    knock: null,
     ready: [false, false],
     lastAction: { text, by: seat },
   });

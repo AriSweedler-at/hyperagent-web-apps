@@ -6,7 +6,7 @@ import { STOCK_DRAW_FINAL_MSG, applyAction, createGame, viewFor } from '../engin
 import type { Action, Seat, State, View } from '../engine/index.ts';
 import { CONNECTED_MSG, connectingMsg } from '../net/guest.ts';
 import { OPENING_MSG, WAITING_MSG, handoffMsg } from '../net/host.ts';
-import { DEFAULT_PRESET, presetById } from '../sandbox.ts';
+import { DEFAULT_PRESET, dealMap, parseMap, presetById } from '../sandbox.ts';
 import { STORAGE_KEYS } from '../storage.ts';
 import { arrangedOf } from './hand/arrange.ts';
 import { engineOf } from './hand/picture.ts';
@@ -1963,7 +1963,7 @@ describe('a loose card dragged by hand', () => {
 
   test('the drag begins on a loose card in play, cancelling the long press; never on a meld, out of play or while a card waits', () => {
     const started = run(accepted, { type: 'card/dragStart', cardId: last });
-    expect(started.app.drag).toEqual({ cardId: last });
+    expect(started.app.drag).toEqual({ cardId: last, from: 'hand', onto: null });
     expect(started.effects).toEqual([{ type: 'cancelTimer', id: 'cardPress' }]);
     if (meldCard !== null)
       expect(run(accepted, { type: 'card/dragStart', cardId: meldCard }).app).toBe(accepted);
@@ -2005,5 +2005,94 @@ describe('a loose card dragged by hand', () => {
     expect(ended.effects).toEqual([]);
     expect(run(accepted, { type: 'card/dragEnd' }).app).toBe(accepted);
     expect(run(ended.app, { type: 'card/tap', cardId: last }).app.selectedCard).toBe(last);
+  });
+});
+
+describe('laying off by hand (§7b)', () => {
+  /** Ann knocks with the KC on A-2-3♠, 4-5-6♥, 7-8-9♦; Bob holds 4S 5S beside two melds and QD KD. */
+  const MAP =
+    'p1: AS 2S 3S 4H 5H 6H 7D 8D 9D 2C KC\np2: 4S 5S 10H JH QH 7C 8C 9C QD KD\nphase: discard\ndrawn: KC';
+  const parsed = parseMap(MAP);
+  if (!parsed.ok) throw new Error(parsed.error);
+  const dealt = dealMap(parsed.value, [PLAYERS[0], PLAYERS[1]], () => NOW);
+  const knocked = play(dealt, [[0, { type: 'knock', cardId: 'KC' }]]);
+  const spades = knocked.knock?.melding.melds.findIndex((m) => m[0]?.id === 'AS') ?? -1;
+  /** Bob's table: the phone revealed to him, the knock awaiting his answer. */
+  const bob = (game: State): App =>
+    run(
+      {
+        ...initialApp,
+        role: 'local',
+        oppConnected: true,
+        game,
+        view: viewFor(game, 1),
+        screen: 'tableScreen',
+        revealed: 1,
+      },
+      { type: 'render' },
+    ).app;
+  const answering = bob(knocked);
+  const laidOne = bob(play(knocked, [[1, { type: 'layOff', cardId: '4S', onto: spades }]]));
+
+  test('the view and the picture: the melds on the table, the laid card off the hand, Done the one action', () => {
+    expect(answering.view?.phase).toBe('layoff');
+    expect(answering.view?.layoff?.extended.map((m) => m.map((c) => c.id).join(' '))).toContain(
+      'AS 2S 3S',
+    );
+    expect(answering.picture?.loose.map((c) => c.id)).toContain('4S');
+    expect(laidOne.view?.layoff?.laidOff.map((e) => e.card.id)).toEqual(['4S']);
+    // The laid card leaves its cell in place; the other nine stay.
+    expect(laidOne.picture?.loose.map((c) => c.id)).not.toContain('4S');
+    expect(laidOne.picture?.loose.length).toBe((answering.picture?.loose.length ?? 0) - 1);
+    expect(run(answering, { type: 'action/click', act: 'finishLayoff' }).app.game?.phase).toBe(
+      'roundOver',
+    );
+  });
+
+  test('a hand card over the meld it fits lights it and lays off on release; over another it lights nothing', () => {
+    const started = run(laidOne, { type: 'card/dragStart', cardId: '5S' }).app;
+    expect(started.drag).toEqual({ cardId: '5S', from: 'hand', onto: null });
+    const lit = run(started, { type: 'card/dragOnto', onto: spades });
+    expect(lit.app.drag?.onto).toBe(spades);
+    const other = (spades + 1) % 3;
+    expect(run(started, { type: 'card/dragOnto', onto: other }).app.drag?.onto).toBeNull();
+    expect(run(lit.app, { type: 'card/dragOnto', onto: null }).app.drag?.onto).toBeNull();
+    // Released over the spades: laid off through the engine, the drag over, the tap sound.
+    const laid = run(lit.app, { type: 'card/dragEnd', over: spades });
+    expect(laid.app.drag).toBeNull();
+    expect(laid.app.game?.knock?.laidOff.map((e) => e.cardId)).toEqual(['4S', '5S']);
+    expect(laid.app.view?.me.deadwoodValue).toBe(20);
+    expect(kinds(laid.effects)).toContain('fx');
+    // Released over a meld it does not fit, or over none: nothing laid, the card back in its cell.
+    expect(run(started, { type: 'card/dragEnd', over: other }).app.game?.knock?.laidOff).toEqual([
+      { cardId: '4S', onto: spades },
+    ]);
+    expect(run(started, { type: 'card/dragEnd', over: null }).app.drag).toBeNull();
+  });
+
+  test("a laid card drags back off the melds while its meld stays a meld; the knocker's cards never drag", () => {
+    const fromTable = run(laidOne, { type: 'card/dragStart', cardId: '4S', from: 'table' });
+    expect(fromTable.app.drag).toEqual({ cardId: '4S', from: 'table', onto: null });
+    // Over the melds it lights nothing; released off them it comes back.
+    expect(run(fromTable.app, { type: 'card/dragOnto', onto: spades }).app.drag?.onto).toBeNull();
+    const back = run(fromTable.app, { type: 'card/dragEnd', over: null });
+    expect(back.app.game?.knock?.laidOff).toEqual([]);
+    expect(back.app.picture?.loose.map((c) => c.id)).toContain('4S');
+    // Released over a meld: nothing happens.
+    expect(
+      run(fromTable.app, { type: 'card/dragEnd', over: spades }).app.game?.knock?.laidOff,
+    ).toEqual([{ cardId: '4S', onto: spades }]);
+    // A pinned card (the knocker's) starts no drag; a held 5S holds the 4S on.
+    expect(run(laidOne, { type: 'card/dragStart', cardId: 'AS', from: 'table' }).app).toBe(laidOne);
+    const both = bob(
+      play(knocked, [
+        [1, { type: 'layOff', cardId: '4S', onto: spades }],
+        [1, { type: 'layOff', cardId: '5S', onto: spades }],
+      ]),
+    );
+    expect(run(both, { type: 'card/dragStart', cardId: '4S', from: 'table' }).app).toBe(both);
+    expect(run(both, { type: 'card/dragStart', cardId: '5S', from: 'table' }).app.drag?.from).toBe(
+      'table',
+    );
   });
 });

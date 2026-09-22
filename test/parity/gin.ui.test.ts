@@ -84,7 +84,14 @@ const gameViews = (seed: number): ReadonlyArray<readonly [View, View]> => {
     );
     const r = engine.applyAction(state, seat, action, rng, now);
     if (!r.ok) throw new Error(r.error);
-    return step(r.value, all);
+    // RULE CHANGE (§7b): a knock opens the layoff phase, which the legacy UI never rendered; the
+    // best layoffs are played and finished at once, so the views compared are the legacy's.
+    const next = engine.bestLayoffActions(r.value).reduce((s, a) => {
+      const done = engine.applyAction(s, s.turn, a, rng, now);
+      if (!done.ok) throw new Error(done.error);
+      return done.value;
+    }, r.value);
+    return step(next, all);
   };
   return step(
     engine.createGame({ players: PLAYERS, target: 100, dealer: (seed % 2) as Seat }, rng, now),

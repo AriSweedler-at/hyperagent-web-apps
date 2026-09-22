@@ -50,6 +50,8 @@ const FACTS = `(() => {
   const laidOff = sheet === 'roundResultOverlay' ? { laidOff: all('#rrBody .meld-group.laid .card').map((c) => c.getAttribute('data-card')) } : {};
   const ids = (s) => all(s).map((c) => c.getAttribute('data-card'));
   const dc = sheet === 'discardsOverlay' ? { dc: { seen: ids('#discardsGrid .dc.seen'), held: ids('#discardsGrid .dc.held'), top: ids('#discardsGrid .dc.top')[0] ?? null, withHand: document.getElementById('discardsHandToggle').checked } } : {};
+  const melds = document.getElementById('tableMelds');
+  const layoff = melds.classList.contains('hidden') ? {} : { layoff: { melds: all('#tableMelds .meld-group').map((g) => Array.from(g.querySelectorAll('.card')).map((c) => c.getAttribute('data-card'))), laid: ids('#tableMelds .card.laid') } };
   const arrangeBtn = document.getElementById('arrangeBtn');
   const activeSort = document.querySelector('#arrangeModes button.active');
   return {
@@ -70,6 +72,7 @@ const FACTS = `(() => {
     sheet,
     ...laidOff,
     ...dc,
+    ...layoff,
   };
 })()`;
 /** `#app` holds its content, and the actions row is on screen once the window is scrolled to its end. */
@@ -103,10 +106,11 @@ type Rects = Readonly<Record<string, readonly [number, number, number, number]>>
 
 const near = (a: number, b: number): boolean => Math.abs(a - b) <= 0.5;
 
-const openStory = async (page: Page, id: string): Promise<void> => {
+/** `slots`: eleven cells, less one per card the defender laid off onto the knocker's melds (§7b). */
+const openStory = async (page: Page, id: string, slots = 11): Promise<void> => {
   await page.goto(`${pagePath('pages', 'gin-rummy')}?story=${id}`);
   await expect(page.locator('#tableScreen')).toBeVisible();
-  await expect(page.locator('#hand .slot')).toHaveCount(11);
+  await expect(page.locator('#hand .slot')).toHaveCount(slots);
 };
 
 /**
@@ -114,8 +118,13 @@ const openStory = async (page: Page, id: string): Promise<void> => {
  * `#app` never scrolls; the document scrolls only for a third row on a phone too short for it
  * (theme.css's `:has(#hand[data-rows="3"])` fallback), and then to a reachable actions row.
  */
-const expectGeometry = async (page: Page, vp: Viewport, rows: number): Promise<void> => {
-  const laid = await expectHandRows(page, vp.columns);
+const expectGeometry = async (
+  page: Page,
+  vp: Viewport,
+  rows: number,
+  cells: number,
+): Promise<void> => {
+  const laid = await expectHandRows(page, vp.columns, cells);
   if (vp.columns === 6) expect(laid, 'rows vs the catalogue').toBe(rows);
   const g = await page.evaluate<Geometry>(GEOMETRY);
   expect(g.app, '#app scrolls').toBe(true);
@@ -150,18 +159,18 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
           'runs once: the stories are the same bytes on both origins',
         );
         const watched = watchPage(page, ALLOWED_FAILURES);
-        await openStory(page, story.id);
+        await openStory(page, story.id, story.facts.slots);
 
         // The facts, the geometry, and the owner's sentence: the same card in the same place.
         expect(await page.evaluate<StoryFacts>(FACTS)).toEqual(story.facts);
-        await expectGeometry(page, vp, story.facts.rows);
+        await expectGeometry(page, vp, story.facts.rows, story.facts.slots);
         if (story.sameHandAs !== undefined) {
           const other = storyById(story.sameHandAs);
           expect(other, story.sameHandAs).not.toBeNull();
           const mine = await page.evaluate<Rects>(RECTS);
           await openStory(page, story.sameHandAs);
           expectSameRects(mine, await page.evaluate<Rects>(RECTS), story.id);
-          await openStory(page, story.id);
+          await openStory(page, story.id, story.facts.slots);
         }
 
         if (vp.shot && story.screenshot) {

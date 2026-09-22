@@ -136,13 +136,13 @@ describe('decodeFrame', () => {
     [
       'state with a damaged view',
       { t: 'state', view: { ...(viaJson(view) as object), phase: 'x' } },
-      '$.view.phase: expected one of "upcard" | "draw" | "discard" | "roundOver" | "gameOver"',
+      '$.view.phase: expected one of "upcard" | "draw" | "discard" | "layoff" | "roundOver" | "gameOver"',
     ],
     ['action without an action', { t: 'action' }, '$.action: expected object'],
     [
       'action of an unknown type',
       { t: 'action', action: { type: 'cheat' } },
-      '$.action.type: expected one of "ready" | "takeUpcard" | "passUpcard" | "drawStock" | "drawDiscard" | "undoDraw" | "discard" | "knock" | "setMelds"',
+      '$.action.type: expected one of "ready" | "takeUpcard" | "passUpcard" | "drawStock" | "drawDiscard" | "undoDraw" | "discard" | "knock" | "setMelds" | "layOff" | "takeBack" | "finishLayoff"',
     ],
     [
       'knock without a card',

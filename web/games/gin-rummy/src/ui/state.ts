@@ -22,7 +22,15 @@
 // session's own close still raises the "disconnected" toast the legacy raised.
 import { randomCode, sanitiseCode, validateCode } from '../../../../shared/lib/roomCode.ts';
 import type { Rng } from '../../../../shared/lib/rng.ts';
-import { applyAction, createGame, idsOf, inPlay, viewFor } from '../engine/index.ts';
+import {
+  applyAction,
+  canTakeBack,
+  createGame,
+  fitsOnto,
+  idsOf,
+  inPlay,
+  viewFor,
+} from '../engine/index.ts';
 import type { Action, Now, Seat, State, View } from '../engine/types.ts';
 import type { GuestContext } from '../net/guest.ts';
 import { connectingMsg } from '../net/guest.ts';
@@ -209,10 +217,12 @@ export type App = Readonly<{
   /** The melds the player made by hand this hand (arrange.ts). Not saved, not on the wire. */
   human: HumanMelds | null;
   /**
-   * The loose card being dragged (ui/hand/dragger.ts, docs/design/gin-arrangement-and-discards.md
-   * §5d): its cell is emptied for the ghost, a tap is ignored until it lands. Session only.
+   * The card being dragged (ui/hand/dragger.ts, docs/design/gin-arrangement-and-discards.md §5d,
+   * §7b): a loose card of the hand (`from: 'hand'`; its cell is emptied for the ghost) or a card
+   * laid off onto the knocker's melds (`from: 'table'`); `onto` is the meld the card is over and
+   * fits, lit as its drop target. A tap is ignored until the drag ends. Session only.
    */
-  drag: Readonly<{ cardId: string }> | null;
+  drag: Readonly<{ cardId: string; from: 'hand' | 'table'; onto: number | null }> | null;
   /** How the hand is arranged (`ginRummy_sort`). */
   sort: SortMode;
   /** `#arrangeOverlay` open. */
@@ -362,13 +372,18 @@ export type Intent =
   | Readonly<{ type: 'submenu/pick'; mode: string }>
   /** A click outside `#tabPlayWrap`. */
   | Readonly<{ type: 'submenu/dismiss' }>
-  // ---- a loose card dragged by hand (ui/hand/dragger.ts) ----
-  /** The pointer moved off a pressed loose card: its cell empties for the ghost. */
-  | Readonly<{ type: 'card/dragStart'; cardId: string }>
+  // ---- a card dragged by hand (ui/hand/dragger.ts) ----
+  /** The pointer moved off a pressed card: a loose card of the hand, or a laid-off card on the table (§7b). */
+  | Readonly<{ type: 'card/dragStart'; cardId: string; from?: 'hand' | 'table' }>
   /** The pointer is over loose index `index`: the card moves there, the order is manual from now on. */
   | Readonly<{ type: 'card/dragOver'; index: number }>
-  /** The ghost landed: the card shows in its cell again. */
-  | Readonly<{ type: 'card/dragEnd' }>
+  /** The pointer is over the knocker's meld `onto` (null: over none): lit when the card fits it. */
+  | Readonly<{ type: 'card/dragOnto'; onto: number | null }>
+  /**
+   * The drag ended with the pointer over meld `over` (null: over none): a hand card over a meld it
+   * fits is laid off, a table card released off the melds is taken back, else the card shows again.
+   */
+  | Readonly<{ type: 'card/dragEnd'; over?: number | null }>
   // ---- the sandbox (src/sandbox.ts), shown while the first player is named `sandbox` ----
   /** `#sbPreset`: a preset's map into the editor. */
   | Readonly<{ type: 'sandbox/preset'; id: string }>
@@ -983,9 +998,19 @@ const actionClick = (app: App, which: string, ctx: Context): Step => {
         : act(app, { type: which, cardId: app.selectedCard }, ctx);
     case 'showResult':
       return pure({ ...app, resultDismissed: false });
+    case 'finishLayoff':
+      return act(app, { type: 'finishLayoff' }, ctx);
     default:
       return pure(app);
   }
+};
+
+/** Whether the defender's card `cardId` fits the knocker's meld `onto` as extended so far (§7b). */
+const fitsMeld = (v: View, cardId: string, onto: number | null): boolean => {
+  const lo = v.layoff;
+  const card = v.me.hand.find((c) => c.id === cardId);
+  const meld = onto === null || lo === undefined ? undefined : lo.extended[onto];
+  return v.isMyTurn && card !== undefined && meld !== undefined && fitsOnto(card, meld);
 };
 
 // ---- the reducer -------------------------------------------------------------------------------
@@ -1315,18 +1340,30 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       );
     }
     case 'card/dragStart': {
-      // A loose card, in play, no drawn card waiting: its cell empties and the long press is off.
       const v = app.view;
+      if (v === null || !inPlay(v.phase) || app.draw !== null) return pure(app);
+      const from = intent.from ?? 'hand';
+      if (from === 'table') {
+        // A laid-off card comes back only while the defender answers and its meld stays a meld.
+        const lo = v.layoff;
+        const free =
+          lo !== undefined && v.isMyTurn && canTakeBack(lo.melds, lo.laidOff, intent.cardId);
+        return free
+          ? pure({ ...app, drag: { cardId: intent.cardId, from, onto: null } })
+          : pure(app);
+      }
+      // A loose card: its cell empties and the long press is off.
       const loose = app.picture?.loose.some((c) => c.id === intent.cardId) === true;
-      if (v === null || !inPlay(v.phase) || app.draw !== null || !loose) return pure(app);
+      if (!loose) return pure(app);
       return step(
-        { ...app, drag: { cardId: intent.cardId } },
+        { ...app, drag: { cardId: intent.cardId, from, onto: null } },
         { type: 'cancelTimer', id: 'cardPress' },
       );
     }
     case 'card/dragOver': {
-      if (app.drag === null || app.picture === null) return pure(app);
-      const moved = moveLoose(app.picture, app.drag.cardId, intent.index);
+      const d = app.drag;
+      if (d?.from !== 'hand' || d.onto !== null || app.picture === null) return pure(app);
+      const moved = moveLoose(app.picture, d.cardId, intent.index);
       if (samePicture(moved, app.picture)) return pure(app);
       // A card moved by hand makes the order manual, remembered once.
       return step(
@@ -1334,8 +1371,30 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
         ...(app.sort === 'manual' ? [] : [{ type: 'writeSort', sort: 'manual' } as const]),
       );
     }
-    case 'card/dragEnd':
-      return app.drag === null ? pure(app) : pure({ ...app, drag: null });
+    case 'card/dragOnto': {
+      const d = app.drag;
+      const v = app.view;
+      if (d === null || v === null) return pure(app);
+      // Only a meld the card fits lights up; a laid-off card back over the melds lights none.
+      const onto = d.from === 'hand' && fitsMeld(v, d.cardId, intent.onto) ? intent.onto : null;
+      return onto === d.onto ? pure(app) : pure({ ...app, drag: { ...d, onto } });
+    }
+    case 'card/dragEnd': {
+      const d = app.drag;
+      if (d === null) return pure(app);
+      const cleared: App = { ...app, drag: null };
+      const over = intent.over ?? null;
+      if (
+        d.from === 'hand' &&
+        over !== null &&
+        app.view !== null &&
+        fitsMeld(app.view, d.cardId, over)
+      )
+        return act(cleared, { type: 'layOff', cardId: d.cardId, onto: over }, ctx);
+      if (d.from === 'table' && over === null)
+        return act(cleared, { type: 'takeBack', cardId: d.cardId }, ctx);
+      return pure(cleared);
+    }
     case 'card/press': {
       // The App is returned as is: main.ts skips the paint, so the pressed element survives to
       // receive its click (a plain tap) or the timer below (a long press).

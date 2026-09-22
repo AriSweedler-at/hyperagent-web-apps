@@ -27,9 +27,15 @@ export const DESKTOP_COLUMNS = 11;
 
 export const cardsOf = (p: Picture): Cards => [...p.groups.flat(), ...p.loose];
 
-/** The cards the ten slots hold: the drawn card sits in the ghost cell, not on the table, while `shown`. */
-export const onTable = (v: HandModel, stage: DrawStage | null): Cards =>
-  stage?.kind === 'shown' ? v.me.hand.filter((c) => c.id !== stage.cardId) : v.me.hand;
+/**
+ * The cards the slots hold: the drawn card sits in the ghost cell, not on the table, while
+ * `shown`, and a card laid off onto the knocker's melds (§7b) sits on those, not in the hand.
+ */
+export const onTable = (v: HandModel, stage: DrawStage | null): Cards => {
+  const laid = new Set((v.layoff?.laidOff ?? []).map((e) => e.card.id));
+  const off = stage?.kind === 'shown' ? stage.cardId : null;
+  return v.me.hand.filter((c) => c.id !== off && !laid.has(c.id));
+};
 
 /**
  * The engine's melding over the on-table cards, nothing made by hand. While `shown` the view

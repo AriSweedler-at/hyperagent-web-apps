@@ -11,7 +11,7 @@ import type { Picture } from './picture.ts';
 /** What a hand view reads: a `View` satisfies it. */
 export type HandModel = Pick<
   View,
-  'me' | 'phase' | 'isMyTurn' | 'lastDrawnId' | 'drawnFromDiscard'
+  'me' | 'phase' | 'isMyTurn' | 'lastDrawnId' | 'drawnFromDiscard' | 'layoff'
 >;
 
 export type HandView = Readonly<{

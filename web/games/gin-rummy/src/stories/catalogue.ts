@@ -19,6 +19,8 @@ import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import {
   HAND_SIZE,
   applyAction,
+  bestLayoffActions,
+  keptHand,
   createGame,
   idsOf,
   inPlay,
@@ -58,6 +60,11 @@ export type SheetState =
   'none' | 'meldOverlay' | 'arrangeOverlay' | 'discardsOverlay' | 'roundResultOverlay';
 /** `#arrangeBtn`: disabled, enabled, or enabled and marked `due` (the picture differs from the arrangement asked for). */
 export type ArrangeState = 'off' | 'idle' | 'due';
+/** `#tableMelds` while a knock is answered (§7b): each group's card ids as extended, and the laid-off ids. */
+export type LayoffFacts = Readonly<{
+  melds: ReadonlyArray<ReadonlyArray<string>>;
+  laid: ReadonlyArray<string>;
+}>;
 
 /** What the table must show for a story, in the terms the DOM exposes. */
 export type StoryFacts = Readonly<{
@@ -84,6 +91,8 @@ export type StoryFacts = Readonly<{
   sheet: SheetState;
   /** With the result sheet open: `#rrBody .meld-group.laid .card` ids, the cards laid off. */
   laidOff?: ReadonlyArray<string>;
+  /** While a knock is answered: the knocker's melds on the table and the cards laid off so far. */
+  layoff?: LayoffFacts;
   /** With the discarded-cards sheet open: the greyed chips, the ringed top, the toggle. */
   dc?: Readonly<{
     seen: ReadonlyArray<string>;
@@ -232,7 +241,10 @@ if (knockable === null) throw new Error('no seed from SEED offers a knock');
 const knockState = knockable.state;
 const knockSeat = knockable.seat;
 /** The knocker's table once the hand is scored. */
-const knocked = play(knockState, knockSeat, { type: 'knock', cardId: knockable.cardId });
+/** A knock answered as the engine used to answer it by itself: the best layoffs, then finished (§7b). */
+const settled = (state: State): State =>
+  bestLayoffActions(state).reduce((s, a) => play(s, s.turn, a), state);
+const knocked = settled(play(knockState, knockSeat, { type: 'knock', cardId: knockable.cardId }));
 
 /** Ann's accepted stock draw from `seed`, and the draw phase before it. */
 const acceptedOf = (seed: number): Readonly<{ before: State; after: State }> => {
@@ -325,14 +337,28 @@ const ginState = dealtAround(GIN_HAND, null, GIN_DISCARD);
  */
 const LAID_OFF_KNOCKER = cardsOfText('AS 2S 3S 4H 5H 6H 7D 8D 9D 2C KC');
 const LAID_OFF_DEFENDER = cardsOfText('4S 5S 10H JH QH 7C 8C 9C QD KD');
-const laidOffKnocked = play(dealtAround(LAID_OFF_KNOCKER, LAID_OFF_DEFENDER, 'KC'), 0, {
-  type: 'knock',
-  cardId: 'KC',
-});
+const laidOffKnocked = settled(
+  play(dealtAround(LAID_OFF_KNOCKER, LAID_OFF_DEFENDER, 'KC'), 0, {
+    type: 'knock',
+    cardId: 'KC',
+  }),
+);
 
 // ---- the three-row hand --------------------------------------------------------------------------
 
 /** A run of seven spades declared as one meld: on a phone it wraps into its own two rows (§6). */
+// ---- the knock being answered (§7b) --------------------------------------------------------------
+
+/** Ann's knock on the chain position, awaiting Bob's layoffs: the 4S laid off already, the 5S fits now. */
+const layoffOpen = play(dealtAround(LAID_OFF_KNOCKER, LAID_OFF_DEFENDER, 'KC'), 0, {
+  type: 'knock',
+  cardId: 'KC',
+});
+const spadeRunAt = (layoffOpen.knock?.melding.melds ?? []).findIndex(
+  (m) => idsOf(m).join(' ') === 'AS 2S 3S',
+);
+const layoffOneLaid = play(layoffOpen, 1, { type: 'layOff', cardId: '4S', onto: spadeRunAt });
+
 const SEVEN_RUN = '4S 5S 6S 7S 8S 9S 10S';
 const KINGS = 'KC KD KH';
 const threeRows = play(dealtAround(cardsOfText(`${SEVEN_RUN} ${KINGS} 2C`), null, '2C'), 0, {
@@ -373,6 +399,8 @@ const actionsOf = (
   selectedId: string | null,
 ): ReadonlyArray<StoryAction> => {
   if (state.phase === 'roundOver') return [{ act: 'showResult', enabled: true }];
+  if (state.phase === 'layoff')
+    return state.turn === seat ? [{ act: 'finishLayoff', enabled: true }] : [];
   if (state.turn !== seat) return [];
   if (state.phase === 'upcard')
     return [
@@ -449,7 +477,8 @@ const factsOf = (
 ): StoryFacts => {
   const view = viewFor(state, seat);
   const sheet = sheetOf(state, app);
-  const hand = state.hands[seat];
+  // The cards laid off onto the knocker's melds (§7b) sit on the table, not in the hand's cells.
+  const hand = keptHand(state, seat);
   const mine = state.turn === seat;
   const shown = stage?.kind === 'shown' ? stage : null;
   const drawing = mine && (state.phase === 'upcard' || state.phase === 'draw');
@@ -480,7 +509,7 @@ const factsOf = (
   const arrangeable = inPlay(view.phase) && stage === null;
   const asked = arrangedOf(view, stage, human, sort, picture);
   return {
-    slots: Math.max(hand.length, HAND_SIZE + 1),
+    slots: hand.length > HAND_SIZE ? hand.length : hand.length + 1,
     handCards: hand.length,
     ghost,
     freshId: shown === null ? kept : shown.cardId,
@@ -509,6 +538,14 @@ const factsOf = (
     sheet,
     ...laidOffOf(state, sheet),
     ...dcOf(state, seat, sheet, app),
+    ...(view.layoff === undefined
+      ? {}
+      : {
+          layoff: {
+            melds: view.layoff.extended.map(idsOf),
+            laid: idsOf(view.layoff.laidOff.map((e) => e.card)),
+          },
+        }),
   };
 };
 
@@ -565,6 +602,8 @@ const OPEN_SUB = 'Tap the stock or the discard pile';
 const SELECTED_SUB = 'Discard it, or knock if you can';
 const ACCEPTED_SUB = 'Tap a card to select it';
 const THEIRS_SUB = 'Drawing a card…';
+const LAYOFF_MINE_SUB = "Lay off onto Ann's melds, then Done";
+const LAYOFF_THEIRS_SUB = 'Laying off…';
 
 /**
  * The sixteen stories of docs/design/gin-draw-ghost-slot.md §7 in its order, with the stories of
@@ -791,6 +830,21 @@ export const STORIES: ReadonlyArray<Story> = [
     picture: acceptedFrom(knockable.before, knockState, knockSeat),
     statusSub: ACCEPTED_SUB,
     app: { discardsOpen: true, discardsWithHand: true },
+  }),
+  story({
+    id: 'layoff-mine',
+    title:
+      "Answering Ann's knock: her melds on the table, my 4S laid off on the spades, the 5S mine to lay off, Done",
+    state: layoffOneLaid,
+    seat: 1,
+    statusSub: LAYOFF_MINE_SUB,
+  }),
+  story({
+    id: 'layoff-theirs',
+    title: "My knock being answered: my melds on the table, Bob's 4S on my spades, waiting",
+    state: layoffOneLaid,
+    seat: 0,
+    statusSub: LAYOFF_THEIRS_SUB,
   }),
   story({
     id: 'round-over-table',
