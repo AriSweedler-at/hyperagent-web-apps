@@ -230,7 +230,14 @@
   .card.mini { --card-w: var(--mini-w); }
   .card.big { --card-w: var(--pile-w); }
   .card.empty { background: rgba(255,255,255,0.06); border: 2px dashed rgba(255,255,255,0.2); box-shadow: none; }
-  .card.back { background: repeating-linear-gradient(45deg, #1d4ed8 0 6px, #1e40af 6px 12px); border: calc(var(--card-w) * 0.062) solid #f1f5f9; }
+  /* The card back is one picture scaled to the card (docs/design/gin-card-backs.md; the owner: the
+     stripes were a fixed 12px, so the stock and the opponent's strip showed different patterns), one
+     of the presets `body[data-card-back]` names (src/cardBack.ts). The SVGs under backs/ are inlined
+     by the build (under Vite's 4KB limit), so the goldens see no URL. */
+  .card.back { background: #1e3a8a url(./backs/default.svg) center / 100% 100% no-repeat; border: calc(var(--card-w) * 0.062) solid #f1f5f9; }
+  body[data-card-back="blue-stripe"] .card.back { background-image: url(./backs/blue-stripe.svg); }
+  body[data-card-back="yu-gi-oh"] .card.back { background-image: url(./backs/yu-gi-oh.svg); background-color: #4a2210; }
+  body[data-card-back="empty"] .card.back { background-image: none; }
   .card.back.tiny { --card-w: var(--tiny-w); }
   .hand.active .card { cursor: pointer; }
   .card.selected { transform: translateY(-12px); box-shadow: 0 0 0 3px var(--gold), 0 8px 16px rgba(0,0,0,0.45); }

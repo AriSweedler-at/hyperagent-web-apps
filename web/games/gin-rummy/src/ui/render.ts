@@ -116,6 +116,8 @@ export const paintScreen = (doc: PageLike, app: App): void => {
     toggleClass(requireId(doc, id), 'hidden', id !== app.screen);
   });
   toggleClass(doc.body, 'fixed-screen', app.screen === 'tableScreen');
+  // The card back: theme.css draws every `.card.back` from `body[data-card-back]` (src/cardBack.ts).
+  setAttr(doc.body, 'data-card-back', app.cardBack);
 };
 
 /** `#roomCode`, `#hostWaitStatus` (+ its pulse), `#startGameBtn`, `#guestWaitStatus` (+ its pulse). */

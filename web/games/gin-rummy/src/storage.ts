@@ -11,6 +11,7 @@
 // `safeSet` wrote them. One key is this page's own: `ginRummy_p2Name`, the pass-and-play second
 // name, remembered under `rememberName`'s rule; the legacy read `#p2NameInput` only at the Start
 // button and never stored it, so no capture exists for it.
+import { CARD_BACKS, type CardBack } from './cardBack.ts';
 import { SORT_MODES, type SortMode } from './sort.ts';
 import type { Store, StorageError } from '../../../shared/edge/storage.ts';
 
@@ -52,8 +53,10 @@ export const STORAGE_KEYS = {
   playMode: 'ginRummy_playMode',
   /** `on` or `off` (bare string); anything but `off` counts as on. */
   sound: 'ginRummy_sound',
-  /** How the hand is arranged: `melds`, `rank` or `suit` (bare string). This page's own key. */
+  /** How the hand is arranged: `suit`, `rank` or `manual` (bare string). This page's own key. */
   sort: 'ginRummy_sort',
+  /** The card back (src/cardBack.ts, bare string). This page's own key; set from the console for now. */
+  cardBack: 'ginRummy_cardBack',
   /**
    * The Score Counter's session. Its players' names are `name` and `p2Name` above (the legacy
    * `ginRummy_scorerNames` list is retired: the Score Counter scores the two pass-and-play players).
@@ -71,6 +74,7 @@ export const DEFAULT_PLAY_MODE: PlayMode = 'online';
 export const SOUND_STATES = ['on', 'off'] as const;
 export type SoundState = (typeof SOUND_STATES)[number];
 export { DEFAULT_SORT, SORT_MODES, type SortMode } from './sort.ts';
+export { CARD_BACKS, DEFAULT_CARD_BACK, type CardBack } from './cardBack.ts';
 /** `rememberName` sliced what it stored to this many characters. */
 export const NAME_MAX = 20;
 
@@ -135,6 +139,7 @@ export const decodeHomeTab: Decoder<HomeTab> = literal(...HOME_TABS);
 export const decodePlayMode: Decoder<PlayMode> = literal(...PLAY_MODES);
 export const decodeSoundState: Decoder<SoundState> = literal(...SOUND_STATES);
 export const decodeSort: Decoder<SortMode> = literal(...SORT_MODES);
+export const decodeCardBack: Decoder<CardBack> = literal(...CARD_BACKS);
 
 const scorerPlayer = object({ id: string, name: string });
 const scorerRound = object({
@@ -240,6 +245,11 @@ export const readSort = (store: Store): Result<SortMode, StorageError> =>
 
 export const writeSort = (store: Store, sort: SortMode): Result<null, StorageError> =>
   store.writeText(STORAGE_KEYS.sort, sort);
+
+export const readCardBack = (store: Store): Result<CardBack, StorageError> =>
+  readTextWith(store, STORAGE_KEYS.cardBack, decodeCardBack);
+export const writeCardBack = (store: Store, back: CardBack): Result<null, StorageError> =>
+  store.writeText(STORAGE_KEYS.cardBack, back);
 
 /** `safeGet(FX_KEY) !== 'off'`: on unless the key says off (missing or unreadable counts as on). */
 export const soundEnabled = (store: Store): boolean => {

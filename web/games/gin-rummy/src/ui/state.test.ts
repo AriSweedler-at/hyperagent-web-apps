@@ -91,6 +91,7 @@ const home: HomeSnapshot = {
   homeTab: 'play',
   playMode: 'online',
   sort: 'suit',
+  cardBack: 'default',
   save: null,
   scorer: null,
 };
@@ -1284,6 +1285,7 @@ describe('storage', () => {
     storage.setItem(STORAGE_KEYS.p2Name, 'Bob');
     storage.setItem(STORAGE_KEYS.homeTab, 'rules');
     storage.setItem(STORAGE_KEYS.playMode, 'local');
+    storage.setItem(STORAGE_KEYS.cardBack, 'yu-gi-oh');
     storage.setItem(STORAGE_KEYS.save, '{"role":"guest","code":"KQZM","myName":"Jeff"}');
     storage.setItem(
       STORAGE_KEYS.scorerState,
@@ -1303,6 +1305,7 @@ describe('storage', () => {
       homeTab: 'rules',
       playMode: 'local',
       sort: 'suit',
+      cardBack: 'yu-gi-oh',
       save: { role: 'guest', code: 'KQZM', myName: 'Jeff' },
       scorer: {
         players: [
@@ -1408,11 +1411,13 @@ describe('runEffect', () => {
     runEffect(initialApp, { type: 'rememberP2Name', name: 'Bob' }, deps);
     runEffect(initialApp, { type: 'writeHomeTab', tab: 'score' }, deps);
     runEffect(initialApp, { type: 'writePlayMode', mode: 'local' }, deps);
+    runEffect(initialApp, { type: 'writeCardBack', back: 'empty' }, deps);
     expect([...storage.map.entries()]).toEqual([
       [STORAGE_KEYS.name, 'Ann'],
       [STORAGE_KEYS.p2Name, 'Bob'],
       [STORAGE_KEYS.homeTab, 'score'],
       [STORAGE_KEYS.playMode, 'local'],
+      [STORAGE_KEYS.cardBack, 'empty'],
     ]);
     runEffect(initialApp, { type: 'rememberName', name: '' }, deps);
     expect(storage.map.has(STORAGE_KEYS.name)).toBe(false);
@@ -2094,5 +2099,17 @@ describe('laying off by hand (§7b)', () => {
     expect(run(both, { type: 'card/dragStart', cardId: '5S', from: 'table' }).app.drag?.from).toBe(
       'table',
     );
+  });
+});
+
+describe('the card back', () => {
+  test("home/init reads it; the console hook's intent shows a preset and remembers it", () => {
+    expect(
+      run(initialApp, { type: 'home/init', home: { ...home, cardBack: 'blue-stripe' } }).app
+        .cardBack,
+    ).toBe('blue-stripe');
+    const set = run(initialApp, { type: 'cardBack/set', back: 'yu-gi-oh' });
+    expect(set.app.cardBack).toBe('yu-gi-oh');
+    expect(set.effects).toEqual([{ type: 'writeCardBack', back: 'yu-gi-oh' }]);
   });
 });

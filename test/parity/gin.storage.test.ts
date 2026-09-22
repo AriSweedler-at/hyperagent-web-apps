@@ -78,7 +78,11 @@ describe('the captured legacy payloads', () => {
     // second name or an arrangement, so no capture exists for them. `ginRummy_scorerNames` is
     // retired (the Score Counter scores the two pass-and-play names): its capture stays as the
     // record of what the legacy wrote, and nothing reads it.
-    const ours: ReadonlyArray<string> = [STORAGE_KEYS.p2Name, STORAGE_KEYS.sort];
+    const ours: ReadonlyArray<string> = [
+      STORAGE_KEYS.p2Name,
+      STORAGE_KEYS.sort,
+      STORAGE_KEYS.cardBack,
+    ];
     const retired: ReadonlyArray<string> = ['ginRummy_scorerNames'];
     const legacyKeys = Object.values(STORAGE_KEYS).filter((k) => !ours.includes(k));
     expect(legacyKeys).toHaveLength(6);

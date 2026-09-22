@@ -48,9 +48,13 @@ import {
 } from '../protocol.ts';
 import type { ScorerState } from '../scorer/scores.ts';
 import {
+  DEFAULT_CARD_BACK,
   DEFAULT_SORT,
+  readCardBack,
   readSort,
+  writeCardBack,
   writeSort,
+  type CardBack,
   type SortMode,
   DEFAULT_HOME_TAB,
   DEFAULT_PLAY_MODE,
@@ -225,6 +229,8 @@ export type App = Readonly<{
   drag: Readonly<{ cardId: string; from: 'hand' | 'table'; onto: number | null }> | null;
   /** How the hand is arranged (`ginRummy_sort`). */
   sort: SortMode;
+  /** The card back drawn on every face-down card (`ginRummy_cardBack`, src/cardBack.ts). */
+  cardBack: CardBack;
   /** `#arrangeOverlay` open. */
   arrangeOpen: boolean;
   /** `#discardsOverlay` open, and whether it greys the cards in my hand too. Session only. */
@@ -278,6 +284,7 @@ export const initialApp: App = {
   human: null,
   drag: null,
   sort: DEFAULT_SORT,
+  cardBack: DEFAULT_CARD_BACK,
   arrangeOpen: false,
   discardsOpen: false,
   discardsWithHand: false,
@@ -328,6 +335,8 @@ export type HomeSnapshot = Readonly<{
   playMode: StoredPlayMode;
   /** How the hand is arranged: this page's own key, so a legacy session has the default. */
   sort: SortMode;
+  /** The card back: this page's own key; a bad value read as the default (main.ts logs it). */
+  cardBack: CardBack;
   save: Save | null;
   scorer: ScorerState | null;
 }>;
@@ -384,6 +393,8 @@ export type Intent =
    * fits is laid off, a table card released off the melds is taken back, else the card shows again.
    */
   | Readonly<{ type: 'card/dragEnd'; over?: number | null }>
+  /** `__gin.cardBack(name)` (the console, for now): a valid preset is shown and remembered. */
+  | Readonly<{ type: 'cardBack/set'; back: CardBack }>
   // ---- the sandbox (src/sandbox.ts), shown while the first player is named `sandbox` ----
   /** `#sbPreset`: a preset's map into the editor. */
   | Readonly<{ type: 'sandbox/preset'; id: string }>
@@ -476,6 +487,7 @@ export type Effect =
   | Readonly<{ type: 'writeHomeTab'; tab: HomeTab }>
   | Readonly<{ type: 'writePlayMode'; mode: StoredPlayMode }>
   | Readonly<{ type: 'writeSort'; sort: SortMode }>
+  | Readonly<{ type: 'writeCardBack'; back: CardBack }>
   /** `ms` null is the default duration. */
   | Readonly<{ type: 'toast'; message: string; ms: number | null }>
   /** To the current session's channel, if open. */
@@ -885,6 +897,7 @@ const initHome = (app: App, home: HomeSnapshot): Step =>
             homeTab: home.homeTab,
             playMode: home.playMode,
             sort: home.sort,
+            cardBack: home.cardBack,
           },
           ...(home.name === null ? [] : [{ type: 'fillName', name: home.name } as const]),
           ...(home.p2Name === null ? [] : [{ type: 'fillP2Name', name: home.p2Name } as const]),
@@ -1126,6 +1139,8 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       );
     case 'submenu/dismiss':
       return pure({ ...app, submenuOpen: false });
+    case 'cardBack/set':
+      return step({ ...app, cardBack: intent.back }, { type: 'writeCardBack', back: intent.back });
     // ---- the sandbox ----
     case 'sandbox/preset': {
       const preset = presetById(intent.id);
@@ -1488,6 +1503,7 @@ export const readHome = (store: Store): HomeSnapshot => {
   const tab = readHomeTab(store);
   const mode = readPlayMode(store);
   const sort = readSort(store);
+  const back = readCardBack(store);
   const save = readSave(store);
   const scorer = readScorerState(store);
   return {
@@ -1496,6 +1512,7 @@ export const readHome = (store: Store): HomeSnapshot => {
     homeTab: tab.ok ? tab.value : DEFAULT_HOME_TAB,
     playMode: mode.ok ? mode.value : DEFAULT_PLAY_MODE,
     sort: sort.ok ? sort.value : DEFAULT_SORT,
+    cardBack: back.ok ? back.value : DEFAULT_CARD_BACK,
     save: save.ok ? save.value : null,
     scorer: scorer.ok ? scorer.value : null,
   };
@@ -1586,6 +1603,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'writeSort':
       writeSort(deps.store, effect.sort);
+      return;
+    case 'writeCardBack':
+      writeCardBack(deps.store, effect.back);
       return;
     case 'toast':
       deps.toast(effect.message, effect.ms);
