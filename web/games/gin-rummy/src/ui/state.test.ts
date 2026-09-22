@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { createStore, type StorageLike } from '../../../../shared/edge/storage.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { STOCK_DRAW_FINAL_MSG, applyAction, createGame, viewFor } from '../engine/index.ts';
-import type { Action, Seat, State } from '../engine/index.ts';
+import type { Action, Seat, State, View } from '../engine/index.ts';
 import { CONNECTED_MSG, connectingMsg } from '../net/guest.ts';
 import { OPENING_MSG, WAITING_MSG, handoffMsg } from '../net/host.ts';
 import { STORAGE_KEYS } from '../storage.ts';
@@ -1810,5 +1810,38 @@ describe('the arrangement: the sheet, the sort modes and the long press', () => 
     ).toBeNull();
     expect(saveFor(marked)).not.toHaveProperty('human');
     expect(saveFor(marked)).not.toHaveProperty('picture');
+  });
+});
+
+describe('the discarded-cards sheet', () => {
+  const table: App = {
+    ...initialApp,
+    role: 'local',
+    oppConnected: true,
+    game: drawn,
+    view: viewFor(drawn, 0),
+    screen: 'tableScreen',
+    revealed: 0,
+  };
+
+  test('opens with a tap cue when the view lists the discards, toggles the hand, closes', () => {
+    const open = run(table, { type: 'discards/open' });
+    expect(open.app.discardsOpen).toBe(true);
+    expect(kinds(open.effects)).toEqual(['fx']);
+    const toggled = run(open.app, { type: 'discards/toggleHand' }).app;
+    expect(toggled.discardsWithHand).toBe(true);
+    expect(run(toggled, { type: 'discards/toggleHand' }).app.discardsWithHand).toBe(false);
+    const closed = run(toggled, { type: 'discards/close' }).app;
+    expect(closed.discardsOpen).toBe(false);
+    // The toggle is remembered for the next opening within the session.
+    expect(closed.discardsWithHand).toBe(true);
+  });
+
+  test("a legacy host's view without discardIds keeps the sheet shut", () => {
+    const legacy = Object.fromEntries(
+      Object.entries(viewFor(drawn, 0)).filter(([k]) => k !== 'discardIds'),
+    ) as View;
+    const guest: App = { ...table, role: 'guest', game: null, view: legacy };
+    expect(run(guest, { type: 'discards/open' }).app).toBe(guest);
   });
 });

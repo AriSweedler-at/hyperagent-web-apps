@@ -129,6 +129,12 @@ export const setDisabled = (el: Element, disabled: boolean): void => {
   el.toggleAttribute('disabled', disabled);
 };
 
+/** A checkbox's `checked` property (the attribute would only set its default). */
+export const setChecked = (el: Element, checked: boolean): void => {
+  const input = el as HTMLInputElement;
+  input.checked = checked;
+};
+
 export const setAttr = (el: Element, name: string, value: string | null): void => {
   if (value === null) el.removeAttribute(name);
   else el.setAttribute(name, value);

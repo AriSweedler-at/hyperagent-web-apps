@@ -213,6 +213,7 @@ const decodeView: Decoder<View> = object({
   meldOptions: arrayOf(arrangement),
   activeMeldSig: string,
   knockLimit: count,
+  discardIds: optional(arrayOf(string)),
 });
 
 const ACTION_TYPES = [

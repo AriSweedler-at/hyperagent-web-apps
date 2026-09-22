@@ -567,4 +567,22 @@ stories spec 81/81 at three viewports (facts, `expectHandRows`, `rows` vs the DO
 gin-draw, gin-discard (new), gin-arrange (new; `?story=<id>&live`, which now runs the reducer's
 timers and toasts), gin-geometry (five viewports, the hand's frame within a turn), gin-local green.
 Darwin PNGs re-recorded with `--update-snapshots=all` (the 0.002 ratio hid the Arrange pill: 48 of 52
-files changed); the linux set comes from the dispatch job.
+files changed); the linux set comes from the dispatch job, which now records with `=all` too.
+
+PR 3 landed on 2026-09-22 (branch `gin-discards-sheet`): §8 in full. `View.discardIds` is optional
+and emitted last (types.ts, view.ts, decode.ts `optional(arrayOf(string))`, gin.api.ts;
+`gin.replay.ts compareSeat` splits it off the current view and checks it against the state before
+the legacy comparison), so every corpus frame and save still round-trips byte for byte and a legacy
+host leaves the button disabled. `#discardsBtn.pile-peek` sits beside the discard pile absolutely
+(both piles keep their boxes: the geometry frame and dom-parity are untouched), `#discardsOverlay`
+holds `discardsHtml` (four `.dc-row`s of thirteen `.dc` chips: `seen`, `held`, `top`) with
+`discardsSubText` and the `#discardsHandToggle` checkbox (`setChecked` in dom.ts, `checked` on the
+page fake); `App.discardsOpen | discardsWithHand` with `discards/open|close|toggleHand`. Facts gain
+`sheet: 'discardsOverlay'` and `dc: { seen, held, top, withHand }` (chips in deck order); stories
+`discards-open` and `discards-with-hand` over the knock deal. Flows: gin-discard's sheet block after
+the deal (the upcard alone greyed and ringed, the toggle greys the ten, both closes), gin-online's
+guest check (the guest's greyed chips equal the host's, the top ringed). Oracles: `npm run check`
+green (79 files, 2015 tests, dist 33); computed-styles re-recorded (gin ×2; fidice byte-identical)
+and checked; gin-dom-parity 84 checkpoints, 0 mismatches; the stories spec 87/87 at three
+viewports; the flow specs 20/20. Darwin PNGs re-recorded (`=all`, 46 changed, 4 new); the linux set
+from the dispatch job. Next: the simplification pass (Sean Parent style, `/ari-code-comments`).

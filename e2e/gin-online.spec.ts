@@ -56,6 +56,23 @@ test(
     await expect(host.page.locator('#oppCards .opp-count')).toHaveText('10');
     await expect(guest.page.locator('#discardPile .card')).toHaveAttribute('data-card', discarded);
 
+    // The discarded-cards sheet (docs/design/gin-arrangement-and-discards.md §8): the guest's view
+    // carries the same discarded ids as the host's, so both sheets grey the same chips.
+    const seenOn = async (page: typeof host.page): Promise<ReadonlyArray<string | null>> => {
+      await page.locator('#discardsBtn').click();
+      await expect(page.locator('#discardsOverlay')).toBeVisible();
+      const seen = await page.evaluate<ReadonlyArray<string | null>>(
+        "Array.from(document.querySelectorAll('#discardsGrid .dc.seen')).map((c) => c.getAttribute('data-card'))",
+      );
+      await expect(page.locator('#discardsGrid .dc.top')).toHaveAttribute('data-card', discarded);
+      await page.locator('#closeDiscardsBtn').click();
+      await expect(page.locator('#discardsOverlay')).toBeHidden();
+      return seen;
+    };
+    const hostSeen = await seenOn(host.page);
+    expect(hostSeen).toContain(discarded);
+    expect(await seenOn(guest.page)).toEqual(hostSeen);
+
     // PeerJS was constructed with the harness's broker and ICE configuration on both sides.
     const hostCall = (await host.peerCalls()).at(-1);
     const guestCall = (await guest.peerCalls()).at(-1);

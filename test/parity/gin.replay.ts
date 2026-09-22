@@ -90,7 +90,9 @@ const replay = (seed: number): Replay => {
     // as final, as the current engine has it, and the policy never chooses that undo.
     const normalised = L.pendingDraw?.from === 'stock' && legacyView.canUndo;
     const vL: GinView = normalised ? { ...legacyView, canUndo: false } : legacyView;
-    const vC: View = current.viewFor(C, seat);
+    // ADDITION (the discards sheet): the current view lists the discarded ids; the legacy never did.
+    const { discardIds, ...vC }: View = current.viewFor(C, seat);
+    expect(discardIds).toEqual(C.discard.map((c) => c.id));
     expectSame(`${label}: viewFor(${String(seat)})`, masked(vC), masked(vL));
     const aL = legacy.legalActions(legacyView).filter((a) => !normalised || a.type !== 'undoDraw');
     expectSame(

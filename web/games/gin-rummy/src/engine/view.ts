@@ -122,6 +122,7 @@ const viewFor = (state: State, seat: Seat): View => {
     meldOptions,
     activeMeldSig: meldSig(melding.melds),
     knockLimit: KNOCK_LIMIT,
+    discardIds: state.discard.map((c) => c.id),
   };
 };
 

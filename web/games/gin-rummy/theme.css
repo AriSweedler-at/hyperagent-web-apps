@@ -83,7 +83,11 @@
   .conn-dot { width: 10px; height: 10px; border-radius: 50%; background: #64748b; flex-shrink: 0; box-shadow: 0 0 0 3px rgba(255,255,255,0.06); }
   .conn-dot.on { background: var(--accent); } .conn-dot.off { background: var(--danger); }
 
-  .table-center { display: flex; justify-content: center; gap: 26px; padding: 10px 0 4px; flex-shrink: 0; }
+  .table-center { position: relative; display: flex; justify-content: center; gap: 26px; padding: 10px 0 4px; flex-shrink: 0; }
+  /* The peek at the discarded cards sits beside the discard pile, absolutely, so both piles keep
+     their centred boxes: half the pile gap, then the pile's min-width formula, then a margin. */
+  .pile-peek { position: absolute; top: 50%; transform: translateY(-50%); left: calc(50% + 13px + max(var(--pile-w) / 2 + 12px, 46px) + 6px); width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.15); background: var(--card-2); color: var(--text); font-size: 1rem; cursor: pointer; }
+  .pile-peek:disabled { opacity: 0.4; cursor: default; }
   /* min-width: the box is the card's, not the label's, so "Stock · 9" and "Stock · 31" are one width;
      the 92px floor is wider than "STOCK · 30" at the 64px pile floor, where the card alone is not. */
   .pile { display: flex; flex-direction: column; align-items: center; gap: 6px; border-radius: 16px; padding: 8px; min-width: max(calc(var(--pile-w) + 24px), 92px); transition: transform 0.1s; position: relative; }
@@ -170,6 +174,7 @@
     }
     .hand { grid-template-columns: repeat(11, calc(var(--card-w) + 6px)); }
     .table-center { gap: 40px; }
+    .pile-peek { left: calc(50% + 20px + max(var(--pile-w) / 2 + 12px, 46px) + 8px); }
   }
   /* Where the floor sizes cannot fit, the page scrolls rather than clipping the hand and the actions
      row behind overflow: hidden with no way to reach them. At the 40px card / 64px pile floor the
@@ -233,6 +238,18 @@
   #roundResultOverlay .sheet { display: flex; flex-direction: column; overflow: hidden; }
   #rrBody { overflow-y: auto; min-height: 0; flex: 1; }
   .rr-melds .meld-group { padding: 2px 3px 4px; gap: 3px; }
+  /* The discarded-cards sheet: four suit rows of thirteen chips; a discarded (`seen`) or, when
+     included, a held card greys out, and the top of the pile is ringed (what a draw would take). */
+  .dc-grid { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+  .dc-row { display: grid; grid-template-columns: 16px repeat(13, minmax(0, 1fr)); gap: 2px; }
+  .dc-suit { text-align: center; font-size: 0.9rem; color: var(--text); }
+  .dc { height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 4px; background: #fdfdf7; color: #111; font-size: 0.7rem; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.35); }
+  .dc-row.red .dc, .dc-row.red .dc-suit { color: #c81e1e; }
+  .dc.seen, .dc.held { opacity: 0.22; filter: grayscale(1); box-shadow: none; }
+  .dc.held { opacity: 0.4; box-shadow: inset 0 0 0 1px var(--gold); }
+  .dc.top { opacity: 0.75; box-shadow: 0 0 0 2px var(--accent); }
+  .dc-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+  .dc-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
   .sort-modes { display: flex; gap: 8px; margin-top: 12px; }
   .sort-modes .btn { flex: 1; padding-left: 6px; padding-right: 6px; }
   .sort-modes .btn.active { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #08260f; }

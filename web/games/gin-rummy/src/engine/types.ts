@@ -198,4 +198,9 @@ export type View = Readonly<{
   meldOptions: ReadonlyArray<Arrangement>;
   activeMeldSig: string;
   knockLimit: number;
+  /**
+   * Every discarded card this hand, oldest first (docs/design/gin-arrangement-and-discards.md §8).
+   * Optional and last: a legacy frame or save without it decodes and re-encodes byte for byte.
+   */
+  discardIds?: ReadonlyArray<string>;
 }>;

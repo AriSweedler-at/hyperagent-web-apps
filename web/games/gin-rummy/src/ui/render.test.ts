@@ -43,6 +43,8 @@ import {
   showToast,
   standingsHtml,
   type PageLike,
+  discardsHtml,
+  discardsSubText,
 } from './render.ts';
 import { state as stateFrame } from '../protocol.ts';
 import { RULES_ITEMS, RULES_LIST_HTML } from './rules.ts';
@@ -711,5 +713,49 @@ describe('bindAll', () => {
       { type: 'rules/close' },
       { type: 'history/close' },
     ]);
+  });
+});
+
+describe('discardsHtml', () => {
+  const v = viewFor(drawn, 0);
+  const html = (withHand: boolean): string => discardsHtml(v, withHand).markup;
+
+  test('52 chips in four suit rows, spades to clubs, ace to king; the pile greyed, its top ringed', () => {
+    const chips = [
+      ...html(false).matchAll(/<span class="dc([^"]*)" data-card="([^"]+)">([^<]+)<\/span>/g),
+    ];
+    expect(chips).toHaveLength(52);
+    expect(chips.slice(0, 3).map((m) => m[2])).toEqual(['AS', '2S', '3S']);
+    expect(chips.at(-1)?.[2]).toBe('KC');
+    expect(chips.map((m) => m[3]).slice(9, 13)).toEqual(['10', 'J', 'Q', 'K']);
+    expect(html(false).match(/<div class="dc-row (black|red)">/g)).toEqual([
+      '<div class="dc-row black">',
+      '<div class="dc-row red">',
+      '<div class="dc-row red">',
+      '<div class="dc-row black">',
+    ]);
+    const seen = chips.filter((m) => (m[1] ?? '').includes(' seen')).map((m) => m[2]);
+    expect(new Set(seen)).toEqual(new Set(v.discardIds));
+    expect(chips.filter((m) => (m[1] ?? '').includes(' top')).map((m) => m[2])).toEqual([
+      v.discardTop?.id,
+    ]);
+    expect(html(false)).not.toContain(' held');
+  });
+
+  test('with the hand included, my cards are held; a view without discardIds greys nothing', () => {
+    const held = [
+      ...html(true).matchAll(/<span class="dc[^"]* held[^"]*" data-card="([^"]+)">/g),
+    ].map((m) => m[1]);
+    expect(new Set(held)).toEqual(new Set(v.me.hand.map((c) => c.id)));
+    expect(discardsSubText(v, false)).toBe(`${String(v.discardIds?.length ?? 0)} of 52 discarded`);
+    expect(discardsSubText(v, true)).toBe(
+      `${String(v.discardIds?.length ?? 0)} of 52 discarded · 11 in your hand`,
+    );
+    // A legacy host's frame: the key is absent, not undefined.
+    const legacy = Object.fromEntries(
+      Object.entries(v).filter(([k]) => k !== 'discardIds'),
+    ) as View;
+    expect(discardsHtml(legacy, false).markup).not.toContain(' seen');
+    expect(discardsSubText(legacy, false)).toBe('0 of 52 discarded');
   });
 });

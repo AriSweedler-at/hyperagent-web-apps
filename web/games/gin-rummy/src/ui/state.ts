@@ -185,6 +185,9 @@ export type App = Readonly<{
   sort: SortMode;
   /** `#arrangeOverlay` open. */
   arrangeOpen: boolean;
+  /** `#discardsOverlay` open, and whether it greys the cards in my hand too. Session only. */
+  discardsOpen: boolean;
+  discardsWithHand: boolean;
 }>;
 
 export const DEFAULT_NAME = 'Ari';
@@ -227,6 +230,8 @@ export const initialApp: App = {
   human: null,
   sort: DEFAULT_SORT,
   arrangeOpen: false,
+  discardsOpen: false,
+  discardsWithHand: false,
 };
 
 /** The Play tab opens its submenu after this long a press. */
@@ -355,6 +360,10 @@ export type Intent =
   | Readonly<{ type: 'meld/open' }>
   | Readonly<{ type: 'meld/close' }>
   | Readonly<{ type: 'meld/choose'; index: number }>
+  /** `#discardsBtn`, `#closeDiscardsBtn`, `#discardsHandToggle`. */
+  | Readonly<{ type: 'discards/open' }>
+  | Readonly<{ type: 'discards/close' }>
+  | Readonly<{ type: 'discards/toggleHand' }>
   /** `#arrangeBtn`. */
   | Readonly<{ type: 'arrange/open' }>
   | Readonly<{ type: 'arrange/close' }>
@@ -1164,6 +1173,14 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     }
     case 'arrange/close':
       return pure({ ...app, arrangeOpen: false });
+    case 'discards/open':
+      return app.view?.discardIds === undefined
+        ? pure(app)
+        : step({ ...app, discardsOpen: true }, { type: 'fx', cue: 'tap' });
+    case 'discards/close':
+      return pure({ ...app, discardsOpen: false });
+    case 'discards/toggleHand':
+      return pure({ ...app, discardsWithHand: !app.discardsWithHand });
     case 'hand/arrange': {
       const v = app.view;
       const chosen: App = { ...app, sort: intent.mode, arrangeOpen: false };
