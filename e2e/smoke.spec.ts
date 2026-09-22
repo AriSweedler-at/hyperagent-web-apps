@@ -4,6 +4,7 @@
 // requests outside the allowlist (e2e/fixtures/offline.ts). The landing page's card links must
 // also resolve on the origin they are clicked from: on the proxy that means the Worker's
 // /games/XXX -> /XXX redirect.
+import { HOOKS, LANDING_HREFS } from '../tools/games.ts';
 import { EXPECTED_TITLES, PAGES, pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -17,8 +18,7 @@ PAGES.forEach((name) => {
     const ice = watched.responses().filter((response) => response.url.endsWith('shared/ice.js'));
     if (name !== 'landing') {
       // docs/MIGRATION.md steps 9 and 12: no classic scripts; the documented hook shows the boot finished.
-      const hook = name === 'fidice' ? 'window.__fidice' : 'window.__gin';
-      await expect.poll(() => page.evaluate<string>(`typeof ${hook}`)).toBe('object');
+      await expect.poll(() => page.evaluate<string>(`typeof ${HOOKS[name]}`)).toBe('object');
       expect(await page.evaluate<string>('typeof Peer')).toBe('undefined');
       expect(await page.evaluate<string>('typeof window.HyperIce')).toBe('undefined');
       expect(ice, 'shared/ice.js must not be requested').toEqual([]);
@@ -37,7 +37,7 @@ test('landing: every card link resolves on this origin', async ({ player, projec
   await page.goto(pagePath(project, 'landing'));
   const cards = await page.locator('a.card').all();
   const hrefs = await Promise.all(cards.map((card) => card.getAttribute('href')));
-  expect(hrefs).toEqual(['games/gin-rummy/', 'games/fidice/']);
+  expect(hrefs).toEqual(LANDING_HREFS);
   await Promise.all(
     hrefs.map(async (href) => {
       const target = new URL(href ?? '', page.url()).toString();

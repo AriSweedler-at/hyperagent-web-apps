@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest';
 
-import { fakeClock } from '../../../../shared/edge/clock.fake.ts';
-import { fakeBroker } from '../../../../shared/edge/transport.fake.ts';
-import type { Connection } from '../../../../shared/edge/transport.ts';
+import { fakeClock } from './clock.fake.ts';
+import { fakeBroker } from './transport.fake.ts';
+import type { Connection } from './transport.ts';
 import {
   ICE_FAILED_MSG,
   NO_RELAY_HINT,
@@ -23,7 +23,7 @@ import {
   whenTransportReady,
   type IceLoader,
   type IceResult,
-} from './peerjs.ts';
+} from './peer.ts';
 
 const STUN_ONLY: IceResult = { iceServers: [], source: 'fallback', hasTurn: false, error: null };
 const WITH_TURN: IceResult = { iceServers: [], source: 'remote', hasTurn: true, error: null };

@@ -69,10 +69,10 @@ export const setCodeInput = (doc: DocumentLike, value: string): void => {
 /**
  * The invite `#shareCodeBtn` shares: the page (`pageUrl` is its origin and path) with the code to
  * join, and nothing else (the owner: the link is the invite; a line of text beside it and the
- * invited seat's name were noise). main.ts reads `?join=` at boot.
+ * invited seat's name were noise). main.ts reads `?join=` at boot. The builder is every game's
+ * (web/shared/lib/invite.ts) and keeps its gin name here for the painters and tests that use it.
  */
-export const inviteUrl = (code: string, pageUrl: string): string =>
-  `${pageUrl}?join=${encodeURIComponent(code)}`;
+export { inviteUrl } from '../../../../shared/lib/invite.ts';
 
 /** `tabPlayBtn`, `tabRulesBtn`, `tabScoreBtn`. */
 export const tabButtonId = (tab: HomeTab): string =>

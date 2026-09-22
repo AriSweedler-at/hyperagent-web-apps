@@ -38,6 +38,7 @@ import { PeerServer } from 'peer';
 import { routeOffline } from '../../e2e/fixtures/offline.ts';
 import { seedScript } from '../../e2e/fixtures/seed.ts';
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
+import { GAMES, type Game } from '../games.ts';
 import { REPO_ROOT, isMain } from '../legacy/extract.ts';
 import { startServer } from '../serve-dist.ts';
 import {
@@ -49,8 +50,7 @@ import {
   readView,
 } from './gin-dom-parity.ts';
 
-export type Game = 'gin-rummy' | 'fidice';
-export const GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice'];
+export { GAMES, type Game };
 
 export type Viewport = Readonly<{ width: number; height: number }>;
 /** A phone (iPhone 12-class) and a laptop window. */

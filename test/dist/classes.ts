@@ -7,10 +7,10 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { posix, resolve, sep } from 'node:path';
 
+import { GAMES, type Game } from '../../tools/games.ts';
 import { REPO_ROOT, readDist, referencesIn, type DistRoot } from './dist.ts';
 
-export type Game = 'gin-rummy' | 'fidice';
-export const GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice'];
+export { GAMES, type Game };
 
 const CLASS_NAME = /^[A-Za-z_][\w-]*$/;
 const words = (text: string): ReadonlyArray<string> =>

@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['web/**/*.test.ts', 'test/**/*.test.ts', 'infra/**/*.test.ts'],
+    include: ['web/**/*.test.ts', 'test/**/*.test.ts', 'infra/**/*.test.ts', 'tools/**/*.test.ts'],
     // test/dist/** reads the build output; vitest.dist.config.ts runs it after `npm run build`.
     // test/integration/** needs a PeerServer and Chromium; vitest.integration.config.ts runs it.
     exclude: ['**/node_modules/**', 'test/dist/**', 'test/integration/**'],

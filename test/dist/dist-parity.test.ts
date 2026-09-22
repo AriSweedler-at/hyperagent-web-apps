@@ -12,12 +12,12 @@ import { resolve } from 'node:path';
 
 import { expect, test } from 'vitest';
 
+import { GAMES, LEGACY_GAMES } from '../../tools/games.ts';
 import { REPO_ROOT, describeDist, distFiles, distHasFile, readDist, referencesIn } from './dist.ts';
 
 const sha256 = (path: string): string =>
   createHash('sha256').update(readFileSync(path)).digest('hex');
 
-const GAMES = ['gin-rummy', 'fidice'] as const;
 const legacyPage = (game: string): string => resolve(REPO_ROOT, 'legacy', game, 'index.html');
 
 describeDist('dist parity with legacy/ and web/', (root) => {
@@ -50,9 +50,11 @@ describeDist('dist parity with legacy/ and web/', (root) => {
 
     test(`the ${game} page is the built module page, not the legacy bundle`, () => {
       const html = readDist(root, `games/${game}/index.html`);
-      expect(sha256(resolve(root.dir, 'games', game, 'index.html'))).not.toBe(
-        sha256(legacyPage(game)),
-      );
+      if (LEGACY_GAMES.includes(game)) {
+        expect(sha256(resolve(root.dir, 'games', game, 'index.html'))).not.toBe(
+          sha256(legacyPage(game)),
+        );
+      }
       expect(html).toMatch(/<script type="module" crossorigin src="\.\/app-[\w-]+\.js"><\/script>/);
       expect(html).toMatch(
         new RegExp(
@@ -133,7 +135,7 @@ describeDist('dist parity with legacy/ and web/', (root) => {
   });
 
   test('legacy/ is retained, unserved, as the frozen oracle source (legacy/README.md)', () => {
-    GAMES.forEach((game) => {
+    LEGACY_GAMES.forEach((game) => {
       expect(existsSync(legacyPage(game)), game).toBe(true);
       // The classic PeerJS CDN script both legacy pages carried, which the built pages must not.
       expect(readFileSync(legacyPage(game), 'utf8')).toContain('peerjs.min.js');

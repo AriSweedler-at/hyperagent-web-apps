@@ -155,6 +155,16 @@ const functionalOff = Object.fromEntries(
 const GAME_SRC = './web/games/*/src';
 // Both protocol modules (see PURE above); they leave the net/ zone and join the protocol zone.
 const PROTOCOL = [`${GAME_SRC}/protocol.ts`, `${GAME_SRC}/net/protocol.ts`];
+// The games, spelled here too because this file is plain JavaScript (tools/games.ts is the typed
+// registry): one zone per ordered pair keeps every game out of every other.
+const GAMES = ['gin-rummy', 'fidice'];
+const gamePairZones = GAMES.flatMap((target) =>
+  GAMES.filter((from) => from !== target).map((from) => ({
+    target: `./web/games/${target}`,
+    from: `./web/games/${from}`,
+    message: 'games never import each other.',
+  })),
+);
 const zones = [
   {
     target: './web/shared/lib',
@@ -167,16 +177,7 @@ const zones = [
     from: './web/games',
     message: 'shared code never imports a game.',
   },
-  {
-    target: './web/games/gin-rummy',
-    from: './web/games/fidice',
-    message: 'games never import each other.',
-  },
-  {
-    target: './web/games/fidice',
-    from: './web/games/gin-rummy',
-    message: 'games never import each other.',
-  },
+  ...gamePairZones,
   {
     target: [`${GAME_SRC}/engine/**`, `${GAME_SRC}/domain/**`, `${GAME_SRC}/bots/**`],
     from: [
@@ -231,14 +232,16 @@ const zones = [
       `${GAME_SRC}/app/**`,
       `${GAME_SRC}/storage.ts`,
     ],
-    // The two fakes are for the session tests beside the modules (docs/MIGRATION.md step 12).
+    // The two fakes are for the session tests beside the modules (docs/MIGRATION.md step 12);
+    // peer.ts is the peer plumbing every game's sessions share (watchdog, keep-alive, path toast).
     except: [
       '**/web/shared/edge/transport.ts',
       '**/web/shared/edge/transport.fake.ts',
       '**/web/shared/edge/clock.ts',
       '**/web/shared/edge/clock.fake.ts',
+      '**/web/shared/edge/peer.ts',
     ],
-    message: 'net/ imports protocol, engine/domain and only the transport and clock edges.',
+    message: 'net/ imports protocol, engine/domain and only the transport, clock and peer edges.',
   },
   {
     // Every ui/ module except ui/state.ts, which the reducer zone below owns, and the tests beside

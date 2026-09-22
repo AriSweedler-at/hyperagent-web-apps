@@ -76,15 +76,19 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 | Layer | May import | Contract |
 |---|---|---|
 | `web/shared/lib` | itself | Leaf modules. `Result<T,E>` (`ok/err/map/andThen`), `Rng = () => number`, `mulberry32`, JSON decoders, `roomCode` constants (`'ginrummy-ari-'`, `'fidice-'`, alphabets). |
+| `web/shared/lib/invite.ts` | itself | The invite link: `inviteUrl(code, pageUrl)` is `<pageUrl>?join=<code>` (pure). |
+| `web/shared/edge/invite.ts` | itself | `joinCodeFrom(search)` and `withoutJoin(search)`: a boot reads the code and drops it from the address bar through the platform's `URLSearchParams`. |
+| `web/shared/edge/peer.ts` | shared/lib, `@shared/edge/transport` | The peer plumbing every game's sessions share: `NetDeps`, `whenTransportReady`, `peerWatchdog`, `keepPeerAlive`, `announcePath`, `describePeerError`, the legacy timings and strings. Each game's `net/peerjs.ts` re-exports it (gin) or takes its types (fidice). |
 | `engine` / `domain` / `bots` | shared/lib, siblings | Pure. `applyAction(state, seat, action, rng): Result<State, RuleError>` (gin), `apply(s, actor, action, rng): Result` (fidice). Return new state; never mutate. `viewFor` / `redactFor` are the only redaction. |
 | `protocol.ts` | engine/domain types, shared/lib | Trust boundary. Every inbound frame passes a decoder returning `Result`; outbound frames are built here. Shapes frozen by wire goldens; a future change adds a version field here. |
 | `scorer/` (not `main.ts`) | engine types, shared/lib, siblings | Pure maths under the pure profile: the Score Counter's `computeRoundScores`, standings, voice parser, CSV text and `fmtDuration` (which `ui/cues.ts` re-exports). `scorer/main.ts` is its screen, an edge. |
-| `net/` | protocol, engine/domain, `@shared/edge/transport`, `@shared/edge/clock` | Never imports `peerjs`. `Transport`, `Clock`, `Rng`, `NewId` are injected so protocol tests run on `transport.fake.ts`. |
+| `net/` | protocol, engine/domain, `@shared/edge/transport`, `@shared/edge/clock`, `@shared/edge/peer` | Never imports `peerjs`. `Transport`, `Clock`, `Rng`, `NewId` are injected so protocol tests run on `transport.fake.ts`. |
 | `ui/` / `view/` | engine/domain types, shared/lib, `@shared/edge/dom` | Render a view to strings/VNodes; DOM writes only in `render.ts` / `vdom.ts`. `HandView { render(model, selection): string }` is the only way a hand is drawn. |
 | `storage.ts` / `app/effects.ts` | shared/lib, `@shared/edge/storage` | Only modules that touch localStorage; every read goes through a decoder. |
 | `ui/state.ts` / `app/controller.ts` | everything below | Reducer over intents; imported only by `main.ts` and tests. |
 | `main.ts` | everything | Constructs adapters (PeerJS, Web Audio, storage, clock, `Math.random`). No logic. Module scripts are deferred, so it boots directly. |
 | `*.algorithms.ts` | shared/lib | The only files where loops, `let` and local mutation are allowed. Pure, functions only, 100% line coverage, and each export carries a comment saying why the functional form is unfit (hot DP, node-capped DFS, cartesian enumeration). |
+| `tools/games.ts` | shared/lib (types) | The harness's registry of the games: `GAMES`, `LEGACY_GAMES`, `PAGE_TITLES`, `HOOKS`, `LANDING_HREFS` over `roomCode.ts`'s `Game` union. The e2e fixtures, the dist guards and the computed-style oracle enumerate from it; `eslint.config.js` spells its own `GAMES` (plain JS) for the pairwise zones. |
 
 Games never import each other. `infra/` shares only the pure `mapPath()` with tests.
 
@@ -96,10 +100,12 @@ used to make by itself, which the drivers play a knock's layoff phase through, a
 `window.__fidice`,
 `window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
 `?ice=<url>` (ICE config override), `?ice-policy=relay` (port-only: `iceTransportPolicy: 'relay'`
-inside the Peer `config`, for the `@relay` specs' relay-forced games), `?join=<code>` (gin only:
-the invite link `#shareCodeBtn` shares, the link alone with no text beside it; `main.ts` dispatches
-`join/link` after `home/init`, so the code sits in the join form on the Play tab in online mode,
-then drops it from the address bar with `history.replaceState`), `?story=<id>` (gin only: `main.ts`
+inside the Peer `config`, for the `@relay` specs' relay-forced games), `?join=<code>` (every
+game's invite convention, built by `web/shared/lib/invite.ts` and read by `web/shared/edge/invite.ts`; fidice keeps its `#join=` /
+`#watch=` fragments for now. Gin: the invite link `#shareCodeBtn` shares, the link alone with no
+text beside it; `main.ts` dispatches `join/link` after `home/init`, so the code sits in the join
+form on the Play tab in online mode, then drops it from the address bar with
+`history.replaceState`, the other parameters kept), `?story=<id>` (gin only: `main.ts`
 reads it before anything else and, when present, imports `src/stories/boot.ts` and returns, so the
 page paints one catalogued table state from `src/stories/catalogue.ts` with the real `paint` and
 constructs no store, network, ICE or timer; `?story=` alone lists the stories as links, `&nav` adds
