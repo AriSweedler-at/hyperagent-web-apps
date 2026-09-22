@@ -1,7 +1,7 @@
 // The remote handoff: a pass-and-play game in progress goes on as a hosted room, seat 0 keeping
 // this device and seat 1 joining from its own through the invite, a link that carries the room
-// code and the invited seat's name (`?join=&name=`, docs/ARCHITECTURE.md "Documented test
-// hooks"). The offer sits on the home screen's resume box and on the pass-and-play curtain (the
+// code (`?join=`, docs/ARCHITECTURE.md "Documented test hooks") and nothing else. The offer sits
+// on the home screen's resume box and on the pass-and-play curtain (the
 // moment the phone would change hands). `#shareCodeBtn` hands the invite to the share sheet where
 // there is one (a phone's OS menu) and to the clipboard otherwise (desktop); an invite link fills
 // the join form and leaves the address bar; the offer survives a reload of the waiting room; and
@@ -56,8 +56,7 @@ const pageUrlOf = (page: Page): string => {
 };
 
 /** The invite link for `code`, as the host page builds it. */
-const inviteLinkOf = (page: Page, code: string): string =>
-  `${pageUrlOf(page)}?join=${code}&name=Bob`;
+const inviteLinkOf = (page: Page, code: string): string => `${pageUrlOf(page)}?join=${code}`;
 
 /**
  * The room is open under its final code: the page re-rolls the code (and rewrites `#roomCode`)
@@ -100,7 +99,7 @@ const cancelAndResume = async (page: Page): Promise<TableView> => {
   return readTable(page);
 };
 
-test('a pass-and-play game is offered online; the share sheet gets the invite with its link; the offer survives a reload; cancel gives the game back', async ({
+test('a pass-and-play game is offered online; the share sheet gets the link alone; the offer survives a reload; cancel gives the game back', async ({
   player,
   project,
 }) => {
@@ -110,11 +109,7 @@ test('a pass-and-play game is offered online; the share sheet gets the invite wi
   await page.locator('#shareCodeBtn').click();
   await expect
     .poll(() => page.evaluate('window.__shared'))
-    .toEqual({
-      title: 'Gin Rummy',
-      text: `Join my Gin Rummy game — room code ${code}.`,
-      url: inviteLinkOf(page, code),
-    });
+    .toEqual({ title: 'Gin Rummy', url: inviteLinkOf(page, code) });
 
   // A reload while the room waits: the offer comes back as the handoff, under the same code the
   // invite carries, not as a room to host.
@@ -128,18 +123,13 @@ test('a pass-and-play game is offered online; the share sheet gets the invite wi
   expect(await cancelAndResume(page)).toEqual(before);
 });
 
-test('without a share sheet (desktop) the invite is copied: the text, then the link', async ({
-  player,
-  project,
-}) => {
+test('without a share sheet (desktop) the link is copied', async ({ player, project }) => {
   const { page } = player;
   await page.addInitScript({ content: DESKTOP });
   const { code } = await handOff(page, gameUrl(project));
   await page.locator('#shareCodeBtn').click();
   await expect(page.locator('#toast')).toHaveText('Invite copied to clipboard');
-  expect(await page.evaluate('window.__copied')).toBe(
-    `Join my Gin Rummy game — room code ${code}. ${inviteLinkOf(page, code)}`,
-  );
+  expect(await page.evaluate('window.__copied')).toBe(inviteLinkOf(page, code));
 });
 
 test('the curtain offers the game online from the table: no reload, the curtain marks cleared, cancel gives it back', async ({
@@ -162,7 +152,7 @@ test('the curtain offers the game online from the table: no reload, the curtain 
   expect(await cancelAndResume(page)).toEqual(before);
 });
 
-test('an invite link fills the join form: the code, the invited name, the Play tab, online; nothing stored, and the link leaves the address bar', async ({
+test('an invite link fills the join form: the code, the Play tab, online; nothing stored, and the link leaves the address bar', async ({
   player,
   project,
 }) => {
@@ -171,11 +161,10 @@ test('an invite link fills the join form: the code, the invited name, the Play t
   await page.evaluate(
     "localStorage.setItem('ginRummy_homeTab', 'rules'); localStorage.setItem('ginRummy_playMode', 'local');",
   );
-  await page.goto(gameUrl(project, { join: 'kqzm', name: 'Bob' }));
+  await page.goto(gameUrl(project, { join: 'kqzm' }));
   await expect(page.locator('#playPanel')).toBeVisible();
   await expect(page.locator('#onlineModeContent')).toBeVisible();
   await expect(page.locator('#codeInput')).toHaveValue('KQZM');
-  await expect(page.locator('#nameInput')).toHaveValue('Bob');
   expect(await page.evaluate("localStorage.getItem('ginRummy_playMode')")).toBe('local');
   expect(await page.evaluate("localStorage.getItem('ginRummy_homeTab')")).toBe('rules');
   expect(await page.evaluate("localStorage.getItem('ginRummy_name')")).toBeNull();
@@ -183,7 +172,6 @@ test('an invite link fills the join form: the code, the invited name, the Play t
   // ordinary home screen (the stored Rules tab and pass-and-play mode).
   const url = new URL(page.url());
   expect(url.searchParams.has('join')).toBe(false);
-  expect(url.searchParams.has('name')).toBe(false);
   expect(url.search).toBe(gameQuery());
   await page.reload();
   await expect(page.locator('#rulesPanel')).toBeVisible();
@@ -197,10 +185,10 @@ test(
     const { host, guest } = players;
     const { code, before } = await handOff(host.page, gameUrl(project));
 
-    // The link puts the code and Bob's name in the form; Bob joins as himself.
-    await guest.page.goto(gameUrl(project, { join: code, name: 'Bob' }));
+    // The link puts the code in the form; Bob types his name and joins as himself.
+    await guest.page.goto(gameUrl(project, { join: code }));
     await expect(guest.page.locator('#codeInput')).toHaveValue(code);
-    await expect(guest.page.locator('#nameInput')).toHaveValue('Bob');
+    await guest.page.locator('#nameInput').fill('Bob');
     await guest.page.locator('#joinBtn').click();
     await expect(guest.page.locator('#guestWaitScreen')).toBeVisible();
 

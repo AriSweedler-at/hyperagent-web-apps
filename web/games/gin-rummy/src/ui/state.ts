@@ -324,11 +324,8 @@ export type Intent =
   | Readonly<{ type: 'submenu/dismiss' }>
   /** `#codeInput` input: the raw value and the InputEvent's type. */
   | Readonly<{ type: 'code/typed'; value: string; inputType: string }>
-  /**
-   * `?join=<code>&name=<seat>` at boot (an invite link): the code into `#codeInput`, the Play tab,
-   * online mode, and the invited seat's name (when the link carries one) into `#nameInput`.
-   */
-  | Readonly<{ type: 'join/link'; code: string; name: string | null }>
+  /** `?join=<code>` at boot (an invite link): the code into `#codeInput`, the Play tab, online mode. */
+  | Readonly<{ type: 'join/link'; code: string }>
   /** `#soundBtn`. */
   | Readonly<{ type: 'sound/toggle' }>
   /** `#shareCodeBtn`. */
@@ -427,8 +424,8 @@ export type Effect =
   | Readonly<{ type: 'cancelTimer'; id: TimerId }>
   /** `fx.toggle()`. */
   | Readonly<{ type: 'toggleSound' }>
-  /** The invite for `code` through the share sheet or the clipboard; `name` is the invited seat's. */
-  | Readonly<{ type: 'share'; code: string; name: string | null }>
+  /** The invite for `code` (its link) through the share sheet or the clipboard. */
+  | Readonly<{ type: 'share'; code: string }>
   /** The first player's name into every input that shows it (`initHome`, and after a keystroke). */
   | Readonly<{ type: 'fillName'; name: string }>
   /** The second player's name into every input that shows it. */
@@ -1025,35 +1022,16 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       return step({ ...app, codeDraft: value }, { type: 'setCode', value });
     }
     case 'join/link': {
-      // The invite link: the code (and the invited seat's name) are in the form; the mode is
-      // shown, not stored. The name counts as typed, so `join/click` keeps it.
+      // The invite link: the code is in the form; the mode is shown, not stored.
       const code = sanitiseCode('gin-rummy', intent.code);
-      const name = (intent.name ?? '').trim().slice(0, NAME_MAX);
-      return then(
-        setHomeTab(
-          {
-            ...app,
-            playMode: 'online',
-            codeDraft: code,
-            nameTouched: name !== '' || app.nameTouched,
-          },
-          'play',
-          false,
-        ),
-        (a) =>
-          step(
-            a,
-            { type: 'setCode', value: code },
-            ...(name === '' ? [] : [{ type: 'fillName', name } as const]),
-          ),
+      return then(setHomeTab({ ...app, playMode: 'online', codeDraft: code }, 'play', false), (a) =>
+        step(a, { type: 'setCode', value: code }),
       );
     }
     case 'sound/toggle':
       return step(app, { type: 'toggleSound' });
     case 'share/click':
-      return app.code === null
-        ? pure(app)
-        : step(app, { type: 'share', code: app.code, name: app.oppName });
+      return app.code === null ? pure(app) : step(app, { type: 'share', code: app.code });
     case 'rules/open':
       return pure({ ...app, rulesOpen: true });
     case 'rules/close':
@@ -1351,8 +1329,8 @@ export type EffectDeps = Readonly<{
     cancel: (id: TimerId) => void;
   }>;
   toggleSound: () => void;
-  /** The invite for the room `code`; `name` is the invited seat's, when there is one. */
-  share: (code: string, name: string | null) => void;
+  /** The invite for the room `code`: its link, through the share sheet or the clipboard. */
+  share: (code: string) => void;
   /** The three input writes the paint does not own (they would fight the player's typing). */
   page: Readonly<{
     fillName: (name: string) => void;
@@ -1437,7 +1415,7 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       deps.toggleSound();
       return;
     case 'share':
-      deps.share(effect.code, effect.name);
+      deps.share(effect.code);
       return;
     case 'fillName':
       deps.page.fillName(effect.name);
