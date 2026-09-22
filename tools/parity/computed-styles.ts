@@ -246,6 +246,9 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.mode-switch',
     '.mode-btn',
     '.mode-btn.active',
+    '#sbPreset',
+    '#sbMap',
+    '.sb-help',
     '.voice-fab',
   ],
   fidice: [

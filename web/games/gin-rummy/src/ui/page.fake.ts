@@ -38,7 +38,7 @@ const optionsFromMarkup = (markup: string): ReadonlyMap<string, FakeElOptions> =
 
 export type GinPage = FakePage &
   Readonly<{
-    /** The four mode buttons: the switch's and the submenu's, online then local. */
+    /** The six mode buttons: the switch's and the submenu's, online, local, then sandbox. */
     modeButtons: ReadonlyArray<FakeEl>;
     submenuButtons: ReadonlyArray<FakeEl>;
     stockLabel: FakeEl;
@@ -55,17 +55,36 @@ export const ginPage = (
   more: ReadonlyArray<FakeEl> = [],
 ): GinPage => {
   const fromMarkup = optionsFromMarkup(markup);
-  const modeButtons = ['online', 'local'].map((mode) =>
-    fakeEl(`modeSwitch-${mode}`, { classes: ['mode-btn'], attrs: { 'data-mode': mode } }),
+  const modeButtons = ['online', 'local', 'sandbox'].map((mode) =>
+    fakeEl(`modeSwitch-${mode}`, {
+      classes: ['mode-btn', ...(mode === 'sandbox' ? ['hidden'] : [])],
+      attrs: { 'data-mode': mode },
+    }),
   );
-  const submenuButtons = ['online', 'local'].map((mode) =>
-    fakeEl(`submenu-${mode}`, { attrs: { 'data-mode': mode } }),
+  const submenuButtons = ['online', 'local', 'sandbox'].map((mode) =>
+    fakeEl(`submenu-${mode}`, {
+      classes: mode === 'sandbox' ? ['hidden'] : [],
+      attrs: { 'data-mode': mode },
+    }),
   );
+  const sandboxOnly = (buttons: ReadonlyArray<FakeEl>): ReadonlyArray<FakeEl> =>
+    buttons.slice(2, 3);
   const stockLabel = fakeEl('stockLabel', { classes: ['pile-label'] });
   const discardLabel = fakeEl('discardLabel', { classes: ['pile-label'] });
   const declared: Readonly<Record<string, FakeElOptions>> = {
-    playModeSwitch: { queries: { '.mode-btn': modeButtons } },
-    playSubmenu: { queries: { button: submenuButtons, 'button[data-mode]': submenuButtons } },
+    playModeSwitch: {
+      queries: {
+        '.mode-btn': modeButtons,
+        '.mode-btn[data-mode="sandbox"]': sandboxOnly(modeButtons),
+      },
+    },
+    playSubmenu: {
+      queries: {
+        button: submenuButtons,
+        'button[data-mode]': submenuButtons,
+        'button[data-mode="sandbox"]': sandboxOnly(submenuButtons),
+      },
+    },
     stockPile: { queries: { '.pile-label': [stockLabel] } },
     discardPile: { queries: { '.pile-label': [discardLabel] } },
   };

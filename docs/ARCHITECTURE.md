@@ -88,7 +88,8 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 
 Games never import each other. `infra/` shares only the pure `mapPath()` with tests.
 
-Documented test hooks that are part of the contract: `window.__gin`, `window.__fidice`,
+Documented test hooks that are part of the contract: `window.__gin` (including `__gin.sandbox(map)`
+and `__gin.sandboxMap()`, the sandbox's console entry points: docs/design/gin-sandbox.md), `window.__fidice`,
 `window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
 `?ice=<url>` (ICE config override), `?ice-policy=relay` (port-only: `iceTransportPolicy: 'relay'`
 inside the Peer `config`, for the `@relay` specs' relay-forced games), `?join=<code>` (gin only:

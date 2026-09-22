@@ -8,8 +8,9 @@
 // ghost draw slot (docs/design/gin-draw-ghost-slot.md §9): it diverges by design (slots, the ghost
 // cell, the undo button in the actions row, one pile size, shorter labels), while everything the
 // table opens (the sheets, the overlays, the toast) still compares at every checkpoint. Only
-// whitespace, the two rules slots' ids and the `#handoffBtn` and `#curtainHandoffBtn` buttons
-// (the new page's markup additions) are normalised.
+// whitespace, the two rules slots' ids, the `#handoffBtn` and `#curtainHandoffBtn` buttons and
+// the sandbox (its two mode buttons and `#sandboxModeContent`; the new page's markup additions)
+// are normalised.
 // What is read from the pages is compared; what is decided (which card
 // to discard) is read from the legacy page's `window.__gin` hook and applied to both, so the two
 // never diverge on a choice; after a draw the new page's ghost card is accepted (`acceptIfShown`)
@@ -63,6 +64,11 @@ export const normalise = (html: string): string =>
   html
     .replace(/ id="rules(Overlay)?List"/g, '')
     .replace(/<button[^>]*\bid="(curtainH|h)andoffBtn"[^>]*>[^<]*<\/button>/g, '')
+    // The sandbox (src/sandbox.ts): a third mode button in the switch and the submenu, and its
+    // panel up to the marker comment that closes it.
+    .replace(/<button[^>]*\bdata-mode="sandbox"[^>]*>[^<]*<\/button>/g, '')
+    .replace(/<!-- The sandbox[^>]*-->/g, '')
+    .replace(/<div id="sandboxModeContent"[\s\S]*?<!-- \/sandbox -->/g, '')
     // The Score Counter's players: the legacy grew rows and an "+ Add player" button, the page has
     // two fixed inputs sharing pass-and-play's names; everything up to the Start button is blanked.
     .replace(

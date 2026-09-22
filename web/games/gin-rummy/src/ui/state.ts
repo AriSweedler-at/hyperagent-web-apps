@@ -61,10 +61,19 @@ import {
   writePlayMode,
   writeSave,
   type HomeTab,
-  type PlayMode,
+  type PlayMode as StoredPlayMode,
   type Save,
   type Store,
 } from '../storage.ts';
+import {
+  DEFAULT_PRESET,
+  dealMap,
+  formatMap,
+  parseMap,
+  presetById,
+  randomMap,
+  unlocksSandbox,
+} from '../sandbox.ts';
 import { INITIAL_CUES, nextCue, oppDrawCue, selectionIn, type Cue, type CueState } from './cues.ts';
 import { drawSource, settleDraw, type DrawStage } from './hand/draw.ts';
 import { arrangedOf, declarable, toggleMeld, type HumanMelds } from './hand/arrange.ts';
@@ -74,6 +83,18 @@ import { settlePicture, type Picture } from './hand/picture.ts';
 
 // ui/home.ts paints the tabs from the same list storage.ts decodes; ui/ may not import storage.ts.
 export { HOME_TABS, type HomeTab };
+/** The stored modes plus the sandbox (src/sandbox.ts), which is shown, never stored. */
+export type PlayMode = StoredPlayMode | 'sandbox';
+
+/** `#sandboxModeContent`: the map being edited, the preset it came from, what is wrong with it. */
+export type Sandbox = Readonly<{
+  /** A preset's id, `random`, or `''` once the map was edited by hand. */
+  preset: string;
+  map: string;
+  error: string | null;
+  /** `#sandboxHelpOverlay` open. */
+  helpOpen: boolean;
+}>;
 
 export type Role = 'host' | 'guest' | 'local';
 
@@ -128,6 +149,12 @@ export type App = Readonly<{
   revealed: Seat | null;
   homeTab: HomeTab;
   playMode: PlayMode;
+  /**
+   * The first player's name as last read from `ginRummy_name` or typed into any of its inputs:
+   * the sandbox mode shows while it is `sandbox` (src/sandbox.ts `unlocksSandbox`).
+   */
+  p1Name: string;
+  sandbox: Sandbox;
   /** The round-result sheet was put away with "Look at the table". */
   resultDismissed: boolean;
   // ---- what the legacy kept in the DOM or in closures ----
@@ -212,6 +239,8 @@ export const initialApp: App = {
   revealed: null,
   homeTab: DEFAULT_HOME_TAB,
   playMode: DEFAULT_PLAY_MODE,
+  p1Name: '',
+  sandbox: { preset: DEFAULT_PRESET.id, map: DEFAULT_PRESET.map, error: null, helpOpen: false },
   resultDismissed: false,
   screen: 'homeScreen',
   netAttempt: 0,
@@ -240,6 +269,11 @@ export const initialApp: App = {
 
 /** The Play tab opens its submenu after this long a press. */
 export const LONG_PRESS_MS = 450;
+export const SANDBOX_COPIED_MSG = 'Copied for the console';
+/** The console call that deals `map`: what `#sbCopyBtn` copies. */
+export const consoleCall = (map: string): string => `__gin.sandbox(\`${map}\`)`;
+/** The sandbox mode shows while the first player is named `sandbox`. */
+export const sandboxUnlocked = (app: App): boolean => unlocksSandbox(app.p1Name);
 export const INVITE_COPIED_MSG = 'Invite copied to clipboard';
 export const roomCodeMsg = (code: string): string => `Room code: ${code}`;
 /** `shareCodeBtn`'s fallback toast lasts this long. */
@@ -275,7 +309,7 @@ export type HomeSnapshot = Readonly<{
   /** The pass-and-play second name: this page's own key, so a legacy session has none. */
   p2Name: string | null;
   homeTab: HomeTab;
-  playMode: PlayMode;
+  playMode: StoredPlayMode;
   /** How the hand is arranged: this page's own key, so a legacy session has the default. */
   sort: SortMode;
   save: Save | null;
@@ -290,7 +324,7 @@ export type Intent =
   | Readonly<{ type: 'p2name/typed'; value: string }>
   /** `setHomeTab(tab, { persist })`: an unknown tab is `play`. */
   | Readonly<{ type: 'tab/set'; tab: string; persist?: boolean }>
-  /** `setPlayMode(mode)`: anything but `local` is `online`. */
+  /** `setPlayMode(mode)`: `sandbox` while unlocked, `local`, else `online`. */
   | Readonly<{ type: 'mode/set'; mode: string }>
   /** `#hostBtn`: the raw input values. */
   | Readonly<{ type: 'host/click'; name: string; target: string }>
@@ -322,6 +356,21 @@ export type Intent =
   | Readonly<{ type: 'submenu/pick'; mode: string }>
   /** A click outside `#tabPlayWrap`. */
   | Readonly<{ type: 'submenu/dismiss' }>
+  // ---- the sandbox (src/sandbox.ts), shown while the first player is named `sandbox` ----
+  /** `#sbPreset`: a preset's map into the editor. */
+  | Readonly<{ type: 'sandbox/preset'; id: string }>
+  /** `#sbMap` input. */
+  | Readonly<{ type: 'sandbox/typed'; value: string }>
+  /** `#sbRandomBtn`, or `random` in `#sbPreset`: a fresh deal from the rng into the editor. */
+  | Readonly<{ type: 'sandbox/random' }>
+  | Readonly<{ type: 'sandbox/help'; open: boolean }>
+  /** `#sbCopyBtn`: the map as a console call to the clipboard. */
+  | Readonly<{ type: 'sandbox/copy' }>
+  /**
+   * `#sbStartBtn` (the names from the pass-and-play inputs) or the console's `__gin.sandbox(map)`
+   * (no names: Player 1 and Player 2): the map dealt as a pass-and-play game, or its error shown.
+   */
+  | Readonly<{ type: 'sandbox/start'; map: string; p1?: string; p2?: string }>
   /** `#codeInput` input: the raw value and the InputEvent's type. */
   | Readonly<{ type: 'code/typed'; value: string; inputType: string }>
   /** `?join=<code>` at boot (an invite link): the code into `#codeInput`, the Play tab, online mode. */
@@ -397,7 +446,7 @@ export type Effect =
   | Readonly<{ type: 'rememberName'; name: string }>
   | Readonly<{ type: 'rememberP2Name'; name: string }>
   | Readonly<{ type: 'writeHomeTab'; tab: HomeTab }>
-  | Readonly<{ type: 'writePlayMode'; mode: PlayMode }>
+  | Readonly<{ type: 'writePlayMode'; mode: StoredPlayMode }>
   | Readonly<{ type: 'writeSort'; sort: SortMode }>
   /** `ms` null is the default duration. */
   | Readonly<{ type: 'toast'; message: string; ms: number | null }>
@@ -431,7 +480,9 @@ export type Effect =
   /** The second player's name into every input that shows it. */
   | Readonly<{ type: 'fillP2Name'; name: string }>
   /** `#codeInput`'s value after sanitising. */
-  | Readonly<{ type: 'setCode'; value: string }>;
+  | Readonly<{ type: 'setCode'; value: string }>
+  /** `text` to the clipboard (`#sbCopyBtn`: the sandbox map as a console call). */
+  | Readonly<{ type: 'copy'; text: string }>;
 
 export type TimerId = 'longPress' | 'cardPress';
 
@@ -473,6 +524,18 @@ const nameOr = (raw: string, fallback: string): string => {
   const trimmed = raw.trim();
   return (trimmed === '' ? fallback : trimmed).slice(0, NAME_MAX);
 };
+
+const withSandbox = (app: App, over: Partial<Sandbox>): App => ({
+  ...app,
+  sandbox: { ...app.sandbox, ...over },
+});
+
+/** The first name as typed; a sandbox that the name no longer unlocks falls back to pass-and-play. */
+const withP1Name = (app: App, value: string): App => ({
+  ...app,
+  p1Name: value,
+  playMode: app.playMode === 'sandbox' && !unlocksSandbox(value) ? 'local' : app.playMode,
+});
 
 const showScreen = (app: App, screen: ScreenId): Step =>
   step({ ...app, screen }, { type: 'scrollTop' });
@@ -584,8 +647,8 @@ const localAct = (app: App, action: Action, ctx: Context): Step => {
   return localBroadcast({ ...app, game: res.value, resultDismissed: false }, false);
 };
 
-/** `startLocal(p1, p2, target, savedGame)` with the game already made. */
-const startLocal = (app: App, game: State): Step =>
+/** `startLocal(p1, p2, target, savedGame)` with the game already made; `human` is the sandbox's hand-made melds. */
+const startLocal = (app: App, game: State, human: HumanMelds | null = null): Step =>
   then(
     step(
       {
@@ -597,6 +660,7 @@ const startLocal = (app: App, game: State): Step =>
         revealed: null,
         resultDismissed: false,
         ...HAND_CLEARED,
+        human,
       },
       { type: 'wakeLock', hold: true },
     ),
@@ -788,6 +852,7 @@ const initHome = (app: App, home: HomeSnapshot): Step =>
           {
             ...a,
             savedName: home.name,
+            p1Name: home.name ?? '',
             nameTouched: home.name !== null ? true : a.nameTouched,
             homeTab: home.homeTab,
             playMode: home.playMode,
@@ -922,13 +987,13 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     // names); the fill writes only inputs whose value differs, so the one being typed in is left alone.
     case 'name/typed':
       return step(
-        { ...app, nameTouched: true },
+        withP1Name({ ...app, nameTouched: true }, intent.value),
         { type: 'rememberName', name: intent.value.trim() },
         { type: 'fillName', name: intent.value },
       );
     case 'p1name/typed':
       return step(
-        app,
+        withP1Name(app, intent.value),
         { type: 'rememberName', name: intent.value.trim() },
         { type: 'fillName', name: intent.value },
       );
@@ -941,7 +1006,10 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'tab/set':
       return setHomeTab(app, intent.tab, intent.persist !== false);
     case 'mode/set': {
-      const mode: PlayMode = intent.mode === 'local' ? 'local' : 'online';
+      // The sandbox is shown, never stored: a reload lands on the stored mode.
+      if (intent.mode === 'sandbox')
+        return pure(sandboxUnlocked(app) ? { ...app, playMode: 'sandbox' } : app);
+      const mode: StoredPlayMode = intent.mode === 'local' ? 'local' : 'online';
       return step({ ...app, playMode: mode }, { type: 'writePlayMode', mode });
     }
     case 'host/click':
@@ -1020,6 +1088,47 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       );
     case 'submenu/dismiss':
       return pure({ ...app, submenuOpen: false });
+    // ---- the sandbox ----
+    case 'sandbox/preset': {
+      const preset = presetById(intent.id);
+      return preset === null
+        ? pure(app)
+        : pure(withSandbox(app, { preset: preset.id, map: preset.map, error: null }));
+    }
+    case 'sandbox/typed':
+      return pure(withSandbox(app, { preset: '', map: intent.value, error: null }));
+    case 'sandbox/random':
+      return pure(
+        withSandbox(app, { preset: 'random', map: formatMap(randomMap(ctx.rng)), error: null }),
+      );
+    case 'sandbox/help':
+      return pure(withSandbox(app, { helpOpen: intent.open }));
+    case 'sandbox/copy':
+      return step(
+        app,
+        { type: 'copy', text: consoleCall(app.sandbox.map) },
+        toast(SANDBOX_COPIED_MSG),
+      );
+    case 'sandbox/start': {
+      const parsed = parseMap(intent.map);
+      if (!parsed.ok) return pure(withSandbox(app, { map: intent.map, error: parsed.error }));
+      const p1 = nameOr(intent.p1 ?? '', 'Player 1');
+      const p2raw = nameOr(intent.p2 ?? '', 'Player 2');
+      const p2 = p2raw.toLowerCase() === p1.toLowerCase() ? `${p2raw} 2` : p2raw;
+      const game = dealMap(
+        parsed.value,
+        [
+          { id: 'p1', name: p1 },
+          { id: 'p2', name: p2 },
+        ],
+        ctx.now,
+      );
+      const human: HumanMelds | null =
+        parsed.value.melds.length === 0
+          ? null
+          : { hand: game.handNumber, groups: parsed.value.melds.map(idsOf) };
+      return startLocal(withSandbox(app, { map: intent.map, error: null }), game, human);
+    }
     case 'code/typed': {
       // A keyboard suggestion that swapped earlier letters arrives as a replacement: keep the last good code.
       const value =
@@ -1338,6 +1447,8 @@ export type EffectDeps = Readonly<{
   toggleSound: () => void;
   /** The invite for the room `code`: its link, through the share sheet or the clipboard. */
   share: (code: string) => void;
+  /** `text` to the clipboard, silently (the reducer toasts). */
+  copy: (text: string) => void;
   /** The three input writes the paint does not own (they would fight the player's typing). */
   page: Readonly<{
     fillName: (name: string) => void;
@@ -1432,6 +1543,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'setCode':
       deps.page.setCode(effect.value);
+      return;
+    case 'copy':
+      deps.copy(effect.text);
       return;
   }
 };

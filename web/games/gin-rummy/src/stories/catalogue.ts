@@ -26,17 +26,8 @@ import {
   makeDeck,
   viewFor,
 } from '../engine/index.ts';
-import type {
-  Action,
-  Card,
-  Cards,
-  PendingDraw,
-  Rank,
-  Seat,
-  State,
-  Suit,
-  View,
-} from '../engine/types.ts';
+import type { Action, Cards, PendingDraw, Seat, State, View } from '../engine/types.ts';
+import { cardsOfText } from '../sandbox.ts';
 import { DEFAULT_SORT, type SortMode } from '../storage.ts';
 import { arrangedOf, toggleMeld, type HumanMelds } from '../ui/hand/arrange.ts';
 import type { DrawStage } from '../ui/hand/draw.ts';
@@ -321,23 +312,13 @@ const ginState = dealtAround(GIN_HAND, null, GIN_DISCARD);
 
 // ---- the laid-off hand -------------------------------------------------------------------------
 
-const RANKS: Readonly<Record<string, Rank>> = { A: 1, J: 11, Q: 12, K: 13 };
-const isSuit = (s: string): s is Suit => s === 'S' || s === 'H' || s === 'D' || s === 'C';
-const cardOf = (id: string): Card => {
-  const suit = id.slice(-1);
-  const label = id.slice(0, -1);
-  if (!isSuit(suit)) throw new Error(`bad card id ${id}`);
-  return makeCard(RANKS[label] ?? (Number(label) as Rank), suit);
-};
-const cardsOfIds = (ids: string): Cards => ids.split(' ').map(cardOf);
-
 /**
  * The chain position of test/parity/gin.legacy.test.ts: Ann knocks with the KC on A-2-3 of spades,
  * 4-5-6 of hearts and 7-8-9 of diamonds (the 2C her deadwood); Bob lays off 4S then 5S onto the
  * spades and counts QD KD, twenty.
  */
-const LAID_OFF_KNOCKER = cardsOfIds('AS 2S 3S 4H 5H 6H 7D 8D 9D 2C KC');
-const LAID_OFF_DEFENDER = cardsOfIds('4S 5S 10H JH QH 7C 8C 9C QD KD');
+const LAID_OFF_KNOCKER = cardsOfText('AS 2S 3S 4H 5H 6H 7D 8D 9D 2C KC');
+const LAID_OFF_DEFENDER = cardsOfText('4S 5S 10H JH QH 7C 8C 9C QD KD');
 const laidOffKnocked = play(dealtAround(LAID_OFF_KNOCKER, LAID_OFF_DEFENDER, 'KC'), 0, {
   type: 'knock',
   cardId: 'KC',
@@ -348,7 +329,7 @@ const laidOffKnocked = play(dealtAround(LAID_OFF_KNOCKER, LAID_OFF_DEFENDER, 'KC
 /** A run of seven spades declared as one meld: on a phone it wraps into its own two rows (§6). */
 const SEVEN_RUN = '4S 5S 6S 7S 8S 9S 10S';
 const KINGS = 'KC KD KH';
-const threeRows = play(dealtAround(cardsOfIds(`${SEVEN_RUN} ${KINGS} 2C`), null, '2C'), 0, {
+const threeRows = play(dealtAround(cardsOfText(`${SEVEN_RUN} ${KINGS} 2C`), null, '2C'), 0, {
   type: 'setMelds',
   melds: [SEVEN_RUN.split(' '), KINGS.split(' ')],
 });

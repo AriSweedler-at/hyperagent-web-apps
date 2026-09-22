@@ -12,6 +12,7 @@
 // only while the Play tab is the current one and are otherwise left as they were.
 import {
   dataOf,
+  escapeHtml,
   inputDataOf,
   inputTypeOf,
   isWithin,
@@ -22,18 +23,22 @@ import {
   queryAllIn,
   readValue,
   requireId,
+  setHtml,
   setText,
   setValue,
   stopPropagation,
   targetValueOf,
   toggleClass,
+  trustedHtml,
   type DocumentLike,
   type PageLike,
 } from '../../../../shared/edge/dom.ts';
+import { PRESETS } from '../sandbox.ts';
 import {
   HOME_TABS,
   handoffLabel,
   resumeLabel,
+  sandboxUnlocked,
   type App,
   type HomeTab,
   type Intent,
@@ -82,10 +87,39 @@ export const blocksCodeInput = (inputType: string, data: string | null): boolean
   inputType === 'insertReplacementText' ||
   (inputType === 'insertText' && data !== null && data.length > 1);
 
-/** `renderPlayMode()`: the two mode panels and the `active` marks on both sets of mode buttons. */
+/** `#sbPreset`'s options, once at boot: every preset by its title, then a random deal. */
+export const renderSandbox = (doc: DocumentLike): void => {
+  const options = PRESETS.map(
+    (p) => `<option value="${p.id}">${escapeHtml(p.title)}</option>`,
+  ).join('');
+  setHtml(
+    requireId(doc, 'sbPreset'),
+    trustedHtml(`${options}<option value="random">🎲 A random deal</option>`),
+  );
+};
+
+/**
+ * The sandbox: its two mode buttons show while the first player is named `sandbox`; the editor
+ * paints the map (written only when it differs, so typing is left alone) and its error.
+ */
+const paintSandbox = (doc: DocumentLike, app: App): void => {
+  const unlocked = sandboxUnlocked(app);
+  [
+    ...queryAllIn(requireId(doc, 'playModeSwitch'), '.mode-btn[data-mode="sandbox"]'),
+    ...queryAllIn(requireId(doc, 'playSubmenu'), 'button[data-mode="sandbox"]'),
+  ].forEach((b) => {
+    toggleClass(b, 'hidden', !unlocked);
+  });
+  setValue(requireId(doc, 'sbPreset'), app.sandbox.preset);
+  setValue(requireId(doc, 'sbMap'), app.sandbox.map);
+  setText(requireId(doc, 'sbError'), app.sandbox.error ?? '');
+};
+
+/** `renderPlayMode()`: the three mode panels and the `active` marks on both sets of mode buttons. */
 const paintPlayMode = (doc: DocumentLike, app: App): void => {
   toggleClass(requireId(doc, 'onlineModeContent'), 'hidden', app.playMode !== 'online');
   toggleClass(requireId(doc, 'localModeContent'), 'hidden', app.playMode !== 'local');
+  toggleClass(requireId(doc, 'sandboxModeContent'), 'hidden', app.playMode !== 'sandbox');
   [
     ...queryAllIn(requireId(doc, 'playModeSwitch'), '.mode-btn'),
     ...queryAllIn(requireId(doc, 'playSubmenu'), 'button'),
@@ -101,6 +135,7 @@ export const paintHome = (doc: DocumentLike, app: App): void => {
     toggleClass(requireId(doc, `${t}Panel`), 'hidden', t !== app.homeTab);
   });
   if (app.homeTab === 'play') paintPlayMode(doc, app);
+  paintSandbox(doc, app);
   toggleClass(requireId(doc, 'playSubmenu'), 'force-open', app.submenuOpen);
   toggleClass(requireId(doc, 'resumeBox'), 'hidden', app.resume === null);
   if (app.resume !== null) setText(requireId(doc, 'resumeBtn'), resumeLabel(app.resume));
@@ -163,6 +198,32 @@ export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): voi
       p1: readValue(p1NameInput),
       p2: readValue(p2NameInput),
       target: readValue(requireId(doc, 'localTargetInput')),
+    });
+  });
+  // The sandbox's controls; the names come from the pass-and-play inputs, as its game does.
+  const sbMap = requireId(doc, 'sbMap');
+  listenId(doc, 'sbPreset', 'change', (e) => {
+    const id = targetValueOf(e);
+    dispatch(id === 'random' ? { type: 'sandbox/random' } : { type: 'sandbox/preset', id });
+  });
+  listen(sbMap, 'input', () => {
+    dispatch({ type: 'sandbox/typed', value: readValue(sbMap) });
+  });
+  listenId(doc, 'sbRandomBtn', 'click', () => {
+    dispatch({ type: 'sandbox/random' });
+  });
+  listenId(doc, 'sbCopyBtn', 'click', () => {
+    dispatch({ type: 'sandbox/copy' });
+  });
+  listenId(doc, 'sbHelpBtn', 'click', () => {
+    dispatch({ type: 'sandbox/help', open: true });
+  });
+  listenId(doc, 'sbStartBtn', 'click', () => {
+    dispatch({
+      type: 'sandbox/start',
+      map: readValue(sbMap),
+      p1: readValue(p1NameInput),
+      p2: readValue(p2NameInput),
     });
   });
   listenId(doc, 'tabRulesBtn', 'click', () => {

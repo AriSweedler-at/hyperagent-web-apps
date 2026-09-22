@@ -87,6 +87,11 @@ const SHEETS: ReadonlyArray<Sheet> = [
   { overlay: 'meldOverlay', close: 'closeMeldBtn', intent: { type: 'meld/close' } },
   { overlay: 'arrangeOverlay', close: 'closeArrangeBtn', intent: { type: 'arrange/close' } },
   { overlay: 'discardsOverlay', close: 'closeDiscardsBtn', intent: { type: 'discards/close' } },
+  {
+    overlay: 'sandboxHelpOverlay',
+    close: 'closeSandboxHelpBtn',
+    intent: { type: 'sandbox/help', open: false },
+  },
 ];
 
 const paintSheet = (doc: DocumentLike, overlay: string, open: boolean): void => {
@@ -543,6 +548,7 @@ export const historyHtml = (v: View | null): SafeHtml => {
 
 const paintOverlays = (doc: DocumentLike, app: App): void => {
   paintSheet(doc, 'rulesOverlay', app.rulesOpen);
+  paintSheet(doc, 'sandboxHelpOverlay', app.sandbox.helpOpen);
   paintSheet(doc, 'historyOverlay', app.history !== null);
   if (app.history === 'game') setHtml(requireId(doc, 'historyList'), historyHtml(app.view));
 };
