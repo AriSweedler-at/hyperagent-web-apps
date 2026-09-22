@@ -311,8 +311,8 @@ const undoDraw = (state: State, seat: Seat): Applied => {
   return ok({
     ...state,
     hands: setAt(state.hands, seat, without(hand, drawnCard.id)),
-    discard: pd.from === 'discard' ? [...state.discard, drawnCard] : state.discard,
-    stock: pd.from === 'stock' ? [...state.stock, drawnCard] : state.stock,
+    discard: [...state.discard, drawnCard],
+    stock: state.stock,
     phase: pd.prevPhase,
     upcardStage: pd.prevUpcardStage,
     forceStock: pd.prevForceStock,
