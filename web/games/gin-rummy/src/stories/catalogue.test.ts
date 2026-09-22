@@ -437,7 +437,11 @@ describe('every story painted on the page fake', () => {
     expect(html).toMatch(/<div class="group n[12]"><div class="slot dead">/);
     expect(slotCards(html).filter((c) => c !== null)).toHaveLength(10);
     expect(story.facts.arrange).toBe('due');
-    expect(story.facts.freshId).toBe(must('accepted-two-ways').facts.freshId);
+    // The dot went with the discard: it is the opponent's turn (SlotHandView.ts).
+    expect(story.facts.freshId).toBeNull();
+    expect(must('after-discard-theirs').facts.freshId).toBeNull();
+    expect(must('round-over-table').facts.freshId).toBeNull();
+    expect(must('accepted-two-ways').facts.freshId).not.toBeNull();
   });
 
   test('the chooser and the arrange sheet paint over their hands', () => {

@@ -6,8 +6,10 @@
 // and an eleventh `.slot.ghost` where a drawn card lands before the player accepts it. A group is
 // one grid item, so the browser never splits a meld across two rows; the grid's dense flow lets a
 // later loose card or the ghost fill a hole a meld left. The ghost cell is never a `.card`, so
-// `#hand .card` keeps counting real cards for the fixtures and the drivers. Strings only: the DOM
-// write is render.ts's.
+// `#hand .card` keeps counting real cards for the fixtures and the drivers. The `fresh` dot marks
+// the drawn card only while its holder chooses the discard: once they have discarded it is gone
+// (the owner: it must not wait for the opponent's move), so a view of the opponent's turn, a
+// round over or the other seat's hand carries no dot. Strings only: the DOM write is render.ts's.
 import { isValidMeldGroup } from '../../engine/melds.ts';
 import { HAND_SIZE, type Card, type Cards } from '../../engine/types.ts';
 import { cardHtml } from '../cards.ts';
@@ -42,7 +44,7 @@ export const slotHandView: HandView = {
     const card = (c: Card): string =>
       cardHtml(c, {
         selected: stage === null && selection === c.id,
-        fresh: model.lastDrawnId === c.id,
+        fresh: model.lastDrawnId === c.id && model.isMyTurn && model.phase === 'discard',
         locked: model.drawnFromDiscard === c.id && model.phase === 'discard' && model.isMyTurn,
       });
     const slot = (c: Card, cls: string, head: boolean, tail: boolean): string =>

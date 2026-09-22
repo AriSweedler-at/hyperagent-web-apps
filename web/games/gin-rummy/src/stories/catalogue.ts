@@ -477,8 +477,13 @@ const factsOf = (
             ? 'open'
             : 'hidden';
   const lastDrawn = state.lastDrawn ?? null;
+  // The dot stays on the kept card only while its holder chooses the discard (SlotHandView.ts).
   const kept =
-    lastDrawn !== null && lastDrawn.p === seat && hand.some((c) => c.id === lastDrawn.id)
+    lastDrawn !== null &&
+    lastDrawn.p === seat &&
+    mine &&
+    state.phase === 'discard' &&
+    hand.some((c) => c.id === lastDrawn.id)
       ? lastDrawn.id
       : null;
   const canDrawStock = mine && state.phase === 'draw';
@@ -765,7 +770,7 @@ export const STORIES: ReadonlyArray<Story> = [
   }),
   story({
     id: 'after-discard-theirs',
-    title: 'After my discard: their draw, the dot still on the card I kept, the picture kept',
+    title: 'After my discard: their draw, no dot on the card I kept, the picture kept',
     state: discarded,
     seat: 0,
     picture: discardedFrom(acceptedPicture, discarded, 0),
