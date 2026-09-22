@@ -29,7 +29,8 @@ import { HostSession, type HostEvents } from './src/net/host.ts';
 import type { NetDeps } from './src/net/peerjs.ts';
 import { isGuestFrame } from './src/protocol.ts';
 import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
-import { soundEnabled } from './src/storage.ts';
+import { STORAGE_KEYS, soundEnabled } from './src/storage.ts';
+import { badCardBackMsg, isCardBack } from './src/cardBack.ts';
 import { formatMap, mapOf } from './src/sandbox.ts';
 import { slotHandView } from './src/ui/hand/SlotHandView.ts';
 import {
@@ -55,6 +56,7 @@ import {
   hostContextOf,
   initialApp,
   readHome,
+  type HomeSnapshot,
   reduce,
   roomCodeMsg,
   runEffect,
@@ -102,6 +104,16 @@ const boot = (): void => {
   // (src/scorer/main.ts) registering itself as the legacy `window.__scorer` did.
   const page = window as Window & { __rng?: Rng; __gin?: unknown; __scorer?: Scorer };
   const store = browserStore();
+  // The card back (src/cardBack.ts): a value the console left in storage that names no preset is
+  // logged and dropped before every home read, so the default stands and a reload logs it once.
+  const homeSnapshot = (): HomeSnapshot => {
+    const storedBack = store.readText(STORAGE_KEYS.cardBack);
+    if (storedBack.ok && !isCardBack(storedBack.value)) {
+      console.error(badCardBackMsg(storedBack.value));
+      store.remove(STORAGE_KEYS.cardBack);
+    }
+    return readHome(store);
+  };
   const rng: Rng = page.__rng ?? Math.random;
   const now = (): number => realClock.now();
   // The DOM lib types `vibrate` over a mutable array and `AudioNode.connect` over full nodes; the
@@ -344,7 +356,7 @@ const boot = (): void => {
         dispatch({ type: 'screen/show', screen });
       },
       initHome: () => {
-        dispatch({ type: 'home/init', home: readHome(store) });
+        dispatch({ type: 'home/init', home: homeSnapshot() });
       },
       showScoreTab: () => {
         dispatch({ type: 'tab/set', tab: 'score' });
@@ -398,7 +410,7 @@ const boot = (): void => {
       dispatch({ type: 'screen/show', screen });
     },
     initHome: () => {
-      dispatch({ type: 'home/init', home: readHome(store) });
+      dispatch({ type: 'home/init', home: homeSnapshot() });
     },
     fx,
     setHomeTab: (tab: string, opts?: Readonly<{ persist?: boolean }>) => {
@@ -420,10 +432,18 @@ const boot = (): void => {
       dispatch({ type: 'sandbox/start', map });
     },
     sandboxMap: (): string | null => (app.game === null ? null : formatMap(mapOf(app.game))),
+    /** The card back, from the console for now: a preset is shown and remembered; anything else is logged and refused. */
+    cardBack: (name: string): void => {
+      if (!isCardBack(name)) {
+        console.error(badCardBackMsg(name));
+        return;
+      }
+      dispatch({ type: 'cardBack/set', back: name });
+    },
     dispatch,
   };
 
-  dispatch({ type: 'home/init', home: readHome(store) });
+  dispatch({ type: 'home/init', home: homeSnapshot() });
   // An invite link (`?join=<code>`, docs/ARCHITECTURE.md "Documented test hooks"): the code goes
   // into the join form once the home screen is up and leaves the address bar, so a reload or a
   // bookmark of this page lands on the ordinary home screen (the other hooks, `?peer=` and

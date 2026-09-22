@@ -20,6 +20,7 @@ export default defineConfig({
         'web/games/gin-rummy/src/engine/**/*.ts',
         'web/games/gin-rummy/src/protocol.ts',
         'web/games/gin-rummy/src/storage.ts',
+        'web/games/gin-rummy/src/cardBack.ts',
         'web/games/gin-rummy/src/ui/**/*.ts',
         'web/games/gin-rummy/src/stories/catalogue.ts',
         'web/games/gin-rummy/src/scorer/**/*.ts',
@@ -98,6 +99,12 @@ export default defineConfig({
           functions: 95,
           statements: 95,
           branches: 97,
+        },
+        'web/games/gin-rummy/src/cardBack.ts': {
+          lines: 100,
+          functions: 100,
+          statements: 100,
+          branches: 100,
         },
         'web/games/gin-rummy/src/ui/**': { lines: 94, functions: 94, statements: 94, branches: 90 },
         // The stories catalogue (docs/design/gin-draw-ghost-slot.md §7): pure builders its own test

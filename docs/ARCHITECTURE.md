@@ -90,8 +90,10 @@ Games never import each other. `infra/` shares only the pure `mapPath()` with te
 
 Documented test hooks that are part of the contract: `window.__gin` (including `__gin.sandbox(map)`
 and `__gin.sandboxMap()`, the sandbox's console entry points: docs/design/gin-sandbox.md, and
-`__gin.legal()`, the engine's legal actions for my view, which the e2e driver plays a knock's layoff
-phase through), `window.__fidice`,
+`__gin.legal()`, the engine's legal actions for my view, `__gin.layoffs()`, the layoffs the engine
+used to make by itself, which the drivers play a knock's layoff phase through, and
+`__gin.cardBack(name)`, the card-back preset from the console: docs/design/gin-card-backs.md),
+`window.__fidice`,
 `window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
 `?ice=<url>` (ICE config override), `?ice-policy=relay` (port-only: `iceTransportPolicy: 'relay'`
 inside the Peer `config`, for the `@relay` specs' relay-forced games), `?join=<code>` (gin only:

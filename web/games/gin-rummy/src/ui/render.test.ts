@@ -250,6 +250,8 @@ describe('the table', () => {
     expect(p.discardLabel.text()).toBe('Discard');
     // One pile size: no phase class on the table screen.
     expect(p.get('tableScreen').classes()).toEqual([]);
+    // The card back preset rides on the body for theme.css.
+    expect(p.body.attr('data-card-back')).toBe('default');
     expect(p.get('stockPile').hasClass('tappable')).toBe(false);
     // Status and hand: the eleven accepted cards in slots, no ghost cell (a game resumed mid-draw).
     expect(p.get('statusMain').text()).toBe('Your turn');

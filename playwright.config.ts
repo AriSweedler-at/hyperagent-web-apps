@@ -52,6 +52,7 @@ const CI = process.env['CI'] !== undefined && process.env['CI'] !== '';
 const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/computed-styles.spec.ts',
   '**/gin-arrange.spec.ts',
+  '**/gin-card-back.spec.ts',
   '**/gin-discard.spec.ts',
   '**/gin-dom-parity.spec.ts',
   '**/gin-draw.spec.ts',

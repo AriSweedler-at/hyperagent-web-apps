@@ -7,6 +7,8 @@ import {
   ALL_KEYS,
   DEFAULT_HOME_TAB,
   DEFAULT_PLAY_MODE,
+  CARD_BACKS,
+  DEFAULT_CARD_BACK,
   DEFAULT_SORT,
   HOME_TABS,
   NAME_MAX,
@@ -61,7 +63,7 @@ const game = createGame(
 );
 
 describe('frozen constants', () => {
-  test('the six kept legacy keys, the second name and the sort, the tabs, modes, sound states and the name cap', () => {
+  test('the six kept legacy keys, the second name, the sort and the card back, the tabs, modes, sound states and the name cap', () => {
     expect(ALL_KEYS).toEqual([
       'ginRummyMP_v1',
       'ginRummy_name',
@@ -70,6 +72,7 @@ describe('frozen constants', () => {
       'ginRummy_playMode',
       'ginRummy_sound',
       'ginRummy_sort',
+      'ginRummy_cardBack',
       'ginRummyScorerState_v2',
     ]);
     expect(HOME_TABS).toEqual(['play', 'rules', 'score']);
@@ -79,6 +82,8 @@ describe('frozen constants', () => {
     expect(SOUND_STATES).toEqual(['on', 'off']);
     expect(SORT_MODES).toEqual(['suit', 'rank', 'manual']);
     expect(DEFAULT_SORT).toBe('suit');
+    expect(CARD_BACKS).toEqual(['default', 'blue-stripe', 'yu-gi-oh', 'empty']);
+    expect(DEFAULT_CARD_BACK).toBe('default');
     expect(NAME_MAX).toBe(20);
   });
 });
