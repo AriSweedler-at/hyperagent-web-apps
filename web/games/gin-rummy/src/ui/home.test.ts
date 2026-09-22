@@ -3,12 +3,15 @@
 import { describe, expect, test } from 'vitest';
 
 import { fakeTarget } from '../../../../shared/edge/page.fake.ts';
+import { mulberry32 } from '../../../../shared/lib/rng.ts';
+import { createGame } from '../engine/index.ts';
 import {
   bindHome,
   blocksCodeInput,
   fillNameInputs,
   fillP2NameInput,
   inviteText,
+  inviteUrl,
   paintHome,
   setCodeInput,
   tabButtonId,
@@ -41,9 +44,10 @@ describe('the input writes the reducer raises as effects', () => {
 });
 
 describe('pure helpers', () => {
-  test('inviteText is the legacy share text', () => {
-    expect(inviteText('KQZM', 'https://games.sweedler.com/gin-rummy/')).toBe(
-      'Join my Gin Rummy game — room code KQZM. Open https://games.sweedler.com/gin-rummy/ and tap Join.',
+  test('inviteText names the code; inviteUrl is the page with the code to join', () => {
+    expect(inviteText('KQZM')).toBe('Join my Gin Rummy game — room code KQZM.');
+    expect(inviteUrl('KQZM', 'https://games.sweedler.com/gin-rummy/')).toBe(
+      'https://games.sweedler.com/gin-rummy/?join=KQZM',
     );
   });
 
@@ -79,6 +83,7 @@ describe('paintHome', () => {
     expect(p.submenuButtons.map((b) => b.hasClass('active'))).toEqual([true, false]);
     expect(p.get('playSubmenu').hasClass('force-open')).toBe(false);
     expect(p.get('resumeBox').hidden()).toBe(true);
+    expect(p.get('handoffBtn').hidden()).toBe(true);
 
     paintHome(p.doc, {
       ...initialApp,
@@ -93,6 +98,24 @@ describe('paintHome', () => {
     expect(p.get('playSubmenu').hasClass('force-open')).toBe(true);
     expect(p.get('resumeBox').hidden()).toBe(false);
     expect(p.get('resumeBtn').text()).toBe('Rejoin room KQZM');
+    expect(p.get('handoffBtn').hidden()).toBe(true);
+
+    // Only a pass-and-play game is offered online.
+    const game = createGame(
+      {
+        players: [
+          { id: 'p1', name: 'Ann' },
+          { id: 'p2', name: 'Bob' },
+        ],
+        target: 100,
+      },
+      mulberry32(1),
+      () => 1,
+    );
+    paintHome(p.doc, { ...initialApp, resume: { kind: 'local', game } });
+    expect(p.get('resumeBtn').text()).toBe('Resume pass & play: Ann vs Bob');
+    expect(p.get('handoffBtn').hidden()).toBe(false);
+    expect(p.get('handoffBtn').text()).toBe('Continue online: Ann hosts, Bob joins by invite');
   });
 
   test('renderPlayMode ran only on the Play tab: another tab leaves the mode marks as they were', () => {
@@ -140,6 +163,7 @@ describe('bindHome', () => {
     p.get('tabScoreBtn').fire('click');
     p.modeButtons[1]?.fire('click');
     p.get('resumeBtn').fire('click');
+    p.get('handoffBtn').fire('click');
     p.get('shareCodeBtn').fire('click');
     p.get('cancelHostBtn').fire('click');
     p.get('cancelGuestBtn').fire('click');
@@ -156,6 +180,7 @@ describe('bindHome', () => {
       { type: 'tab/set', tab: 'score' },
       { type: 'mode/set', mode: 'local' },
       { type: 'resume/click' },
+      { type: 'handoff/click' },
       { type: 'share/click' },
       { type: 'cancel' },
       { type: 'cancel' },

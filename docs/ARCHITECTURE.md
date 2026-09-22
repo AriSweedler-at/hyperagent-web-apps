@@ -91,7 +91,9 @@ Games never import each other. `infra/` shares only the pure `mapPath()` with te
 Documented test hooks that are part of the contract: `window.__gin`, `window.__fidice`,
 `window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
 `?ice=<url>` (ICE config override), `?ice-policy=relay` (port-only: `iceTransportPolicy: 'relay'`
-inside the Peer `config`, for the `@relay` specs' relay-forced games), `?story=<id>` (gin only: `main.ts`
+inside the Peer `config`, for the `@relay` specs' relay-forced games), `?join=<code>` (gin only: the
+invite link `#shareCodeBtn` shares; `main.ts` dispatches `join/link` after `home/init`, so the code
+sits in the join form on the Play tab in online mode), `?story=<id>` (gin only: `main.ts`
 reads it before anything else and, when present, imports `src/stories/boot.ts` and returns, so the
 page paints one catalogued table state from `src/stories/catalogue.ts` with the real `paint` and
 constructs no store, network, ICE or timer; `?story=` alone lists the stories as links, `&nav` adds

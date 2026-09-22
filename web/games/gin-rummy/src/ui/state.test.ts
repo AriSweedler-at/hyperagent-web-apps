@@ -24,6 +24,7 @@ import {
   WAITING_FOR_GUEST_MSG,
   guestContextOf,
   guestGoneMsg,
+  handoffLabel,
   hostContextOf,
   hostRoomMsg,
   initialApp,
@@ -1295,6 +1296,7 @@ describe('the sessions read back', () => {
       myName: 'Ann',
       target: 100,
       hasGame: true,
+      handoff: false,
       oppName: 'Jeff',
       oppConnected: true,
     });
@@ -1362,6 +1364,9 @@ describe('runEffect', () => {
     expect(storage.map.has(STORAGE_KEYS.save)).toBe(true);
     runEffect(initialApp, { type: 'clearSave' }, deps);
     expect(storage.map.has(STORAGE_KEYS.save)).toBe(false);
+    runEffect(initialApp, { type: 'saveLocal', game: drawn }, deps);
+    expect(storage.map.get(STORAGE_KEYS.save)).toBe(JSON.stringify({ role: 'local', game: drawn }));
+    runEffect(initialApp, { type: 'clearSave' }, deps);
     runEffect(initialApp, { type: 'rememberName', name: 'Ann' }, deps);
     runEffect(initialApp, { type: 'rememberP2Name', name: 'Bob' }, deps);
     runEffect(initialApp, { type: 'writeHomeTab', tab: 'score' }, deps);
@@ -1437,5 +1442,106 @@ describe('runEffect', () => {
       deps,
     );
     expect(log).toEqual([['confirm', 'sure?']]);
+  });
+});
+
+describe('the remote handoff of a pass-and-play game', () => {
+  const offered = (): App =>
+    run(initialApp, { type: 'home/init', home: { ...home, save: { role: 'local', game: drawn } } })
+      .app;
+
+  test('handoffLabel names who hosts and who joins', () => {
+    expect(handoffLabel(drawn)).toBe('Continue online: Ann hosts, Jeff joins by invite');
+  });
+
+  test('handoff/click does nothing without a pass-and-play offer', () => {
+    expect(run(initialApp, { type: 'handoff/click' })).toEqual({ app: initialApp, effects: [] });
+    const hostOffer = run(initialApp, {
+      type: 'home/init',
+      home: {
+        ...home,
+        save: {
+          role: 'host',
+          code: 'LRZL',
+          myName: 'Ann',
+          target: 75,
+          game: drawn,
+          oppName: 'Jeff',
+        },
+      },
+    }).app;
+    expect(run(hostOffer, { type: 'handoff/click' })).toEqual({ app: hostOffer, effects: [] });
+  });
+
+  test('handoff/click: seat 0 hosts the game as it stands under a fresh code; seat 1 is awaited', () => {
+    const handed = run(offered(), { type: 'handoff/click' });
+    expect(handed.app).toMatchObject({
+      role: 'host',
+      myName: 'Ann',
+      target: 100,
+      game: drawn,
+      oppName: 'Jeff',
+      oppConnected: false,
+      view: viewFor(drawn, 0),
+      handoff: true,
+      screen: 'hostWaitScreen',
+    });
+    expect(handed.app.code).toMatch(/^[A-Z]{4}$/);
+    expect(handed.effects.at(-1)).toEqual({
+      type: 'startHost',
+      code: handed.app.code,
+      attempt: 1,
+      resume: false,
+    });
+    expect(hostContextOf(handed.app)).toMatchObject({
+      hasGame: true,
+      handoff: true,
+      oppName: 'Jeff',
+    });
+    expect(saveFor(handed.app)).toEqual({
+      role: 'host',
+      code: handed.app.code,
+      myName: 'Ann',
+      target: 100,
+      game: drawn,
+      oppName: 'Jeff',
+    });
+  });
+
+  test("the guest's join is a rejoin: the seat kept, the name refreshed, the hand broadcast; the handoff is over", () => {
+    const handed = run(offered(), { type: 'handoff/click' }).app;
+    const joined = run(handed, { type: 'host/frame', frame: { t: 'join', name: 'Bobby' } });
+    expect(joined.app).toMatchObject({
+      handoff: false,
+      oppName: 'Bobby',
+      oppConnected: true,
+      screen: 'tableScreen',
+    });
+    expect(joined.app.game?.players[1].name).toBe('Bobby');
+    expect(joined.app.game?.hands).toEqual(drawn.hands);
+    expect(kinds(joined.effects)).toEqual(expect.arrayContaining(['send', 'persist']));
+    expect(hostContextOf(joined.app).handoff).toBe(false);
+  });
+
+  test('cancelling the room before anyone joined gives the game back to pass-and-play', () => {
+    const handed = run(offered(), { type: 'handoff/click' }).app;
+    const finished = run(handed, { type: 'cancel/finish' });
+    expect(finished.app).toMatchObject({ role: null, handoff: false, netAttempt: 2 });
+    expect(finished.effects).toEqual([{ type: 'saveLocal', game: drawn }, { type: 'initHome' }]);
+    // A room opened from the home screen is cleared with its save, as before.
+    const fresh = run(initialApp, { type: 'host/click', name: 'Ann', target: '100' }).app;
+    expect(run(fresh, { type: 'cancel/finish' }).effects).toEqual([
+      { type: 'clearSave' },
+      { type: 'initHome' },
+    ]);
+  });
+
+  test('join/link: the invite code into the join form, the Play tab and online mode; nothing stored', () => {
+    const linked = run(
+      { ...initialApp, homeTab: 'rules', playMode: 'local' },
+      { type: 'join/link', code: 'kqzm9' },
+    );
+    expect(linked.app).toMatchObject({ codeDraft: 'KQZM', homeTab: 'play', playMode: 'online' });
+    expect(linked.effects).toEqual([{ type: 'setCode', value: 'KQZM' }]);
   });
 });

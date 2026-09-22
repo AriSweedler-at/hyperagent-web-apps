@@ -30,7 +30,14 @@ import {
   type DocumentLike,
   type PageLike,
 } from '../../../../shared/edge/dom.ts';
-import { HOME_TABS, resumeLabel, type App, type HomeTab, type Intent } from './state.ts';
+import {
+  HOME_TABS,
+  handoffLabel,
+  resumeLabel,
+  type App,
+  type HomeTab,
+  type Intent,
+} from './state.ts';
 
 /** `initHome`: the saved name into `#nameInput` and `#p1NameInput`. */
 export const fillNameInputs = (doc: DocumentLike, name: string): void => {
@@ -48,9 +55,11 @@ export const setCodeInput = (doc: DocumentLike, value: string): void => {
   setValue(requireId(doc, 'codeInput'), value);
 };
 
-/** The invite `#shareCodeBtn` shares; `pageUrl` is the page's URL without its query. */
-export const inviteText = (code: string, pageUrl: string): string =>
-  `Join my Gin Rummy game — room code ${code}. Open ${pageUrl} and tap Join.`;
+/** The invite `#shareCodeBtn` shares, beside the link. */
+export const inviteText = (code: string): string => `Join my Gin Rummy game — room code ${code}.`;
+
+/** The invite's link: the page (`pageUrl` is its URL without a query) with the code main.ts reads at boot. */
+export const inviteUrl = (code: string, pageUrl: string): string => `${pageUrl}?join=${code}`;
 
 /** `tabPlayBtn`, `tabRulesBtn`, `tabScoreBtn`. */
 export const tabButtonId = (tab: HomeTab): string =>
@@ -86,6 +95,10 @@ export const paintHome = (doc: DocumentLike, app: App): void => {
   toggleClass(requireId(doc, 'playSubmenu'), 'force-open', app.submenuOpen);
   toggleClass(requireId(doc, 'resumeBox'), 'hidden', app.resume === null);
   if (app.resume !== null) setText(requireId(doc, 'resumeBtn'), resumeLabel(app.resume));
+  // Only a pass-and-play game can go online: a room is already one, the scorer has no table.
+  const handoffBtn = requireId(doc, 'handoffBtn');
+  toggleClass(handoffBtn, 'hidden', app.resume?.kind !== 'local');
+  if (app.resume?.kind === 'local') setText(handoffBtn, handoffLabel(app.resume.game));
 };
 
 /** Every control of the home screen and the two waiting screens, as the legacy registered them. */
@@ -170,6 +183,9 @@ export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): voi
   });
   listenId(doc, 'resumeBtn', 'click', () => {
     dispatch({ type: 'resume/click' });
+  });
+  listenId(doc, 'handoffBtn', 'click', () => {
+    dispatch({ type: 'handoff/click' });
   });
   listenId(doc, 'shareCodeBtn', 'click', () => {
     dispatch({ type: 'share/click' });

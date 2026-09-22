@@ -8,7 +8,8 @@
 // ghost draw slot (docs/design/gin-draw-ghost-slot.md §9): it diverges by design (slots, the ghost
 // cell, the undo button in the actions row, one pile size, shorter labels), while everything the
 // table opens (the sheets, the overlays, the toast) still compares at every checkpoint. Only
-// whitespace and the two rules slots' ids (the new page's one markup addition) are normalised.
+// whitespace, the two rules slots' ids and the `#handoffBtn` button (the new page's markup
+// additions) are normalised.
 // What is read from the pages is compared; what is decided (which card
 // to discard) is read from the legacy page's `window.__gin` hook and applied to both, so the two
 // never diverge on a choice; after a draw the new page's ghost card is accepted (`acceptIfShown`)
@@ -52,10 +53,14 @@ export const SNAPSHOT_IDS: ReadonlyArray<string> = [
   'scResOverlay',
 ];
 
-/** Whitespace runs and the rules slots' ids are the only differences allowed. */
+/**
+ * Whitespace runs, the rules slots' ids and the `#handoffBtn` button (the pass-and-play game
+ * offered online, which the legacy page never had) are the only differences allowed.
+ */
 export const normalise = (html: string): string =>
   html
     .replace(/ id="rules(Overlay)?List"/g, '')
+    .replace(/<button[^>]*\bid="handoffBtn"[^>]*>[^<]*<\/button>/g, '')
     .replace(/>\s+</g, '><')
     .replace(/\s+/g, ' ')
     .trim();

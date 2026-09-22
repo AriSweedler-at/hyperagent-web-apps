@@ -157,6 +157,12 @@ export type App = Readonly<{
    * whether the drawn card is awaited or shown. Not saved, not on the wire.
    */
   draw: DrawStage | null;
+  /**
+   * The hosted game came from a pass-and-play save (`#handoffBtn`) and its remote seat has not
+   * joined yet: the wait screen tells the player to send the invite, and cancelling the room gives
+   * the game back to pass-and-play. Cleared by the guest's join and by every leave and cancel.
+   */
+  handoff: boolean;
 }>;
 
 export const DEFAULT_NAME = 'Ari';
@@ -194,6 +200,7 @@ export const initialApp: App = {
   longPressed: false,
   codeDraft: '',
   draw: null,
+  handoff: false,
 };
 
 /** The Play tab opens its submenu after this long a press. */
@@ -255,6 +262,8 @@ export type Intent =
   | Readonly<{ type: 'local/click'; p1: string; p2: string; target: string }>
   /** `#resumeBtn`: whatever `app.resume` offers. */
   | Readonly<{ type: 'resume/click' }>
+  /** `#handoffBtn`: the pass-and-play game offered goes on as a hosted room. */
+  | Readonly<{ type: 'handoff/click' }>
   /** `#cancelHostBtn` / `#cancelGuestBtn`. */
   | Readonly<{ type: 'cancel' }>
   | Readonly<{ type: 'cancel/finish' }>
@@ -274,6 +283,8 @@ export type Intent =
   | Readonly<{ type: 'submenu/dismiss' }>
   /** `#codeInput` input: the raw value and the InputEvent's type. */
   | Readonly<{ type: 'code/typed'; value: string; inputType: string }>
+  /** `?join=<code>` at boot (an invite link): the code into `#codeInput`, the Play tab, online. */
+  | Readonly<{ type: 'join/link'; code: string }>
   /** `#soundBtn`. */
   | Readonly<{ type: 'sound/toggle' }>
   /** `#shareCodeBtn`. */
@@ -326,6 +337,8 @@ export type Intent =
 export type Effect =
   | Readonly<{ type: 'persist' }>
   | Readonly<{ type: 'clearSave' }>
+  /** A handed-off game given back to pass-and-play: the room was cancelled before anyone joined. */
+  | Readonly<{ type: 'saveLocal'; game: State }>
   | Readonly<{ type: 'rememberName'; name: string }>
   | Readonly<{ type: 'rememberP2Name'; name: string }>
   | Readonly<{ type: 'writeHomeTab'; tab: HomeTab }>
@@ -602,7 +615,7 @@ const hostFrame = (app: App, frame: GuestFrame, ctx: Context): Step => {
   switch (frame.t) {
     case 'join': {
       const name = guestNameFor(frame.name, app.myName);
-      const connected = { ...app, oppConnected: true, oppName: name };
+      const connected = { ...app, oppConnected: true, oppName: name, handoff: false };
       if (app.game !== null) {
         // Rejoin: keep the seat, refresh the name.
         return broadcast({ ...connected, game: renameGuest(app.game, name) });
@@ -681,6 +694,10 @@ export const resumeLabel = (resume: Resume): string => {
   }
 };
 
+/** `#handoffBtn`'s label: seat 0 keeps this device and hosts; seat 1 joins through the invite. */
+export const handoffLabel = (game: State): string =>
+  `Continue online: ${game.players[0].name} hosts, ${game.players[1].name} joins by invite`;
+
 /** `setHomeTab(tab, opts)`. */
 const setHomeTab = (app: App, tab: string, persist: boolean): Step => {
   const known = HOME_TABS.find((t) => t === tab) ?? DEFAULT_HOME_TAB;
@@ -738,6 +755,27 @@ const resume = (app: App, offer: Resume, ctx: Context): Step => {
   }
 };
 
+/**
+ * `#handoffBtn`: the pass-and-play game goes on as a hosted room with a fresh code. Seat 0 keeps
+ * this device as the host; seat 1 joins from its own through the invite, and the host's join
+ * handler takes it as a rejoin (the seat is kept, the name refreshed, the hand broadcast).
+ */
+const handoff = (app: App, game: State, ctx: Context): Step =>
+  startHost(
+    {
+      ...app,
+      myName: game.players[0].name,
+      target: game.target,
+      game,
+      oppName: game.players[1].name,
+      oppConnected: false,
+      view: viewFor(game, 0),
+      handoff: true,
+    },
+    null,
+    ctx,
+  );
+
 /** `leaveGame()` after the confirm and the network close: the reset, then home. */
 const leaveFinish = (app: App): Step =>
   step(
@@ -753,16 +791,22 @@ const leaveFinish = (app: App): Step =>
       curtain: null,
       meldChooser: false,
       draw: null,
+      handoff: false,
     },
     { type: 'clearSave' },
     { type: 'initHome' },
   );
 
-/** `#cancelHostBtn` / `#cancelGuestBtn` after the Peer is destroyed. */
+/**
+ * `#cancelHostBtn` / `#cancelGuestBtn` after the Peer is destroyed. A handed-off game nobody
+ * joined goes back to pass-and-play instead of being cleared with the room.
+ */
 const cancelFinish = (app: App): Step =>
   step(
-    { ...app, role: null, netAttempt: app.netAttempt + 1 },
-    { type: 'clearSave' },
+    { ...app, role: null, netAttempt: app.netAttempt + 1, handoff: false },
+    app.handoff && app.game !== null
+      ? { type: 'saveLocal', game: app.game }
+      : { type: 'clearSave' },
     { type: 'initHome' },
   );
 
@@ -848,6 +892,8 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     }
     case 'resume/click':
       return app.resume === null ? pure(app) : resume(app, app.resume, ctx);
+    case 'handoff/click':
+      return app.resume?.kind === 'local' ? handoff(app, app.resume.game, ctx) : pure(app);
     case 'cancel':
       return step(app, { type: 'closeNet' }, { type: 'then', intent: { type: 'cancel/finish' } });
     case 'cancel/finish':
@@ -886,6 +932,13 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
           ? app.codeDraft
           : sanitiseCode('gin-rummy', intent.value);
       return step({ ...app, codeDraft: value }, { type: 'setCode', value });
+    }
+    case 'join/link': {
+      // The invite link: the code is in the form; the mode is shown, not stored.
+      const code = sanitiseCode('gin-rummy', intent.code);
+      return then(setHomeTab({ ...app, playMode: 'online', codeDraft: code }, 'play', false), (a) =>
+        step(a, { type: 'setCode', value: code }),
+      );
     }
     case 'sound/toggle':
       return step(app, { type: 'toggleSound' });
@@ -1079,6 +1132,7 @@ export const hostContextOf = (app: App): HostContext => ({
   myName: app.myName,
   target: app.target,
   hasGame: app.game !== null,
+  handoff: app.handoff,
   oppName: app.oppName,
   oppConnected: app.oppConnected,
 });
@@ -1133,6 +1187,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
     }
     case 'clearSave':
       clearSave(deps.store);
+      return;
+    case 'saveLocal':
+      writeSave(deps.store, { role: 'local', game: effect.game });
       return;
     case 'rememberName':
       writeName(deps.store, effect.name);

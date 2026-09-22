@@ -30,7 +30,7 @@ import { isGuestFrame } from './src/protocol.ts';
 import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
 import { soundEnabled } from './src/storage.ts';
 import { slotHandView } from './src/ui/hand/SlotHandView.ts';
-import { fillNameInputs, fillP2NameInput, inviteText, setCodeInput } from './src/ui/home.ts';
+import { fillNameInputs, fillP2NameInput, inviteText, inviteUrl, setCodeInput } from './src/ui/home.ts';
 import {
   bindAll,
   fmtTime,
@@ -275,14 +275,17 @@ const boot = (): void => {
       fx.toggle();
     },
     share: (code) => {
-      // The legacy handler: the share sheet, else the clipboard with a toast, else the code itself.
+      // The legacy handler: the share sheet (a phone's OS menu), else the clipboard with a toast
+      // (desktop), else the code itself. The invite carries the link with the code (`?join=`).
       const pageUrl = location.href.split('?')[0] ?? location.href;
-      void shareText(navigator, { title: 'Gin Rummy', text: inviteText(code, pageUrl) }).then(
-        (outcome) => {
-          if (outcome === 'copied') toast(INVITE_COPIED_MSG, null);
-          else if (outcome === 'failed') toast(roomCodeMsg(code), SHARE_FALLBACK_MS);
-        },
-      );
+      void shareText(navigator, {
+        title: 'Gin Rummy',
+        text: inviteText(code),
+        url: inviteUrl(code, pageUrl),
+      }).then((outcome) => {
+        if (outcome === 'copied') toast(INVITE_COPIED_MSG, null);
+        else if (outcome === 'failed') toast(roomCodeMsg(code), SHARE_FALLBACK_MS);
+      });
     },
     page: {
       fillName: (name) => {
@@ -392,6 +395,10 @@ const boot = (): void => {
   };
 
   dispatch({ type: 'home/init', home: readHome(store) });
+  // An invite link (`?join=<code>`, docs/ARCHITECTURE.md "Documented test hooks"): the code goes
+  // into the join form once the home screen is up.
+  const join = params.get('join');
+  if (join !== null) dispatch({ type: 'join/link', code: join });
 };
 
 boot();

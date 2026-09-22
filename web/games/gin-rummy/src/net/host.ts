@@ -45,6 +45,15 @@ export const reconnectingMsg = (tries: number): string =>
   `Reconnecting to the connection service (attempt ${String(tries)})…`;
 export const reopenedMsg = (code: string, oppName: string | null): string =>
   `Room ${code} reopened — waiting for ${oppName ?? 'your opponent'} to rejoin…`;
+/** A pass-and-play game handed to a room (ui/state.ts `handoff`): nobody has joined it yet. */
+export const handoffMsg = (code: string, oppName: string | null): string =>
+  `Room ${code} is open — send ${oppName ?? 'your opponent'} the invite to carry on this game…`;
+
+/** The status when the Peer opens and no guest is connected. */
+const openedMsg = (ctx: HostContext, code: string): string => {
+  if (!ctx.hasGame) return WAITING_MSG;
+  return ctx.handoff ? handoffMsg(code, ctx.oppName) : reopenedMsg(code, ctx.oppName);
+};
 
 /** What the session reads off the app when an event lands (the legacy read `app` directly). */
 export type HostContext = Readonly<{
@@ -56,6 +65,8 @@ export type HostContext = Readonly<{
   target: number;
   /** `app.game !== null`: a hand has been dealt (a rejoining guest keeps its seat). */
   hasGame: boolean;
+  /** The hand came from pass-and-play and its remote seat has never joined: the invite is to send. */
+  handoff: boolean;
   oppName: string | null;
   oppConnected: boolean;
 }>;
@@ -138,10 +149,7 @@ export class HostSession {
     });
     peer.on('open', () => {
       const ctx = deps.read();
-      if (!ctx.oppConnected)
-        events.status(
-          (ctx.hasGame ? reopenedMsg(opts.code, ctx.oppName) : WAITING_MSG) + relayHint(ice),
-        );
+      if (!ctx.oppConnected) events.status(openedMsg(ctx, opts.code) + relayHint(ice));
       events.persist();
     });
     peer.on('error', (e) => {
