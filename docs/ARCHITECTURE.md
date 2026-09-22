@@ -240,7 +240,7 @@ of the shim script itself (`sh -n`).
 .nvmrc, cache: npm}`, `npm ci`, `npm run typecheck` (`tsc -b`), `npm run lint` (eslint + prettier
 --check), `npm test -- --coverage`, `npm run build`, dist tests, upload `dist`. Job `e2e` (needs
 check): download dist, `npx playwright install --with-deps chromium`, `apt-get install coturn`
-(the system service it starts is stopped), `npm run test:e2e` (projects pages + proxy + next;
+(the system service it starts is stopped), `npm run test:e2e` (projects pages + proxy;
 PeerServer from the `peer` package on :9000; coturn on :3478 started by `playwright.config.ts`
 with one static long-term credential, loopback only, no TLS, its relay ports right above (`e2e/fixtures/site.ts`
 `turnServerCommand`), reached through an ICE list the config writes under `e2e/fixtures/.generated/`;
