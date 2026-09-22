@@ -52,6 +52,8 @@ import { deadwoodText, fmtDuration, statusWith, type Selection } from './cues.ts
 import type { HandView } from './hand/HandView.ts';
 import { meldGroupsHtml } from './hand/meldGroups.ts';
 import { arrangedOf } from './hand/arrange.ts';
+import { bindDrag } from './hand/dragger.ts';
+import { flipCards } from './hand/flip.ts';
 import { phoneRows, samePicture } from './hand/picture.ts';
 import { SORT_MODES, type SortMode } from '../sort.ts';
 import { bindHome, paintHome } from './home.ts';
@@ -307,7 +309,15 @@ const paintHand = (doc: DocumentLike, app: App, v: View, handView: HandView): vo
   const hand = requireId(doc, 'hand');
   const arranged = arrangedOf(v, app.draw, app.human, app.sort, app.picture);
   const picture = app.picture ?? arranged;
-  setHtml(hand, trustedHtml(handView.render(v, app.selectedCard, app.draw, picture)));
+  // The cards glide to their new cells (flip.ts) rather than snap; the dragged card's cell is emptied.
+  flipCards(hand, () => {
+    setHtml(
+      hand,
+      trustedHtml(
+        handView.render(v, app.selectedCard, app.draw, picture, app.drag?.cardId ?? null),
+      ),
+    );
+  });
   toggleClass(hand, 'active', v.isMyTurn && v.phase === 'discard');
   // The phone's row count (docs/design/gin-arrangement-and-discards.md §6): theme.css lets the page
   // scroll for a third row where the viewport is too short for one.
@@ -639,6 +649,8 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
       dispatch({ type: 'card/release' });
     });
   });
+  // A loose card dragged by hand: the ghost, the glide of the others, the landing (dragger.ts).
+  bindDrag(doc, dispatch);
   listenId(doc, 'meldOptionList', 'click', (e) => {
     const btn = closestFrom(e, '[data-meld-opt]');
     const index = btn === null ? null : dataOf(btn, 'meld-opt');

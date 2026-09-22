@@ -240,6 +240,38 @@ you can arrange by: suit, rank, manually (where you have to click and drag cards
   hand's engine arrangement with its loose cards reversed by hand, `sort: manual`, Arrange idle)
   takes its place. `sorted-by-rank` and `arrange-sheet-open` stand, re-recorded.
 
+## 5d. Drag and drop, with motion (the owner, 2026-09-22)
+
+"When you click and drag cards around, they should have a little bit of momentum, and be angled as
+they have speed. So like you can pull it left quickly and it will tilt to the left a bit. And the
+cards shouldn't immediately snap around, but they should move via transitions."
+
+- `ui/hand/drag.ts` (pure): `DRAG_THRESHOLD` 8px turns a press into a drag; `follow(motion,
+  target)` moves the ghost `FOLLOW` (0.35) of the gap each frame, its speed the step; `tiltOf(vx)`
+  is `TILT_PER_PX` (1.2°) per pixel of horizontal speed per frame, capped at `MAX_TILT` (14°), so
+  a fast pull left leans the card left and it straightens as it catches up; `ghostTransform`; and
+  `dropIndex(pointer, cells, current)`, the loose index the pointer would drop the card at (the
+  other loose cells that precede it in reading order, row by row, left to right).
+- `ui/hand/dragger.ts` (DOM, through the edge): pointer events on `#hand`. A press on a loose card
+  (never a meld's) opens a session; past the threshold the drag begins: `card/release` (the long
+  press is off), `card/dragStart` (the paint empties the cell: `slot dead dragging`), a clone of
+  the card fixed over it as `.drag-ghost`, the pointer captured, a frame loop applying the motion.
+  Each move dispatches `card/dragOver {index}` when `dropIndex` changed; on release the ghost
+  glides (`landing`, 180ms) to the card's cell and `card/dragEnd` shows the card again. A press
+  that never moves is a tap or a long press as before.
+- `ui/hand/flip.ts`: every hand repaint records the cards' rects, repaints, and glides each card
+  that changed cells from its old rect (an inverted transform, laid out, then released under a
+  200ms transition). So a sort, a chooser pick, a long press and the cards a drag passes all move
+  by transition.
+- Reducer: `App.drag = { cardId } | null` (session only, cleared with the hand). `card/dragStart`
+  needs play, no drawn card waiting and a loose card; `card/dragOver` is `moveLoose(picture,
+  cardId, index)` and, the first time a card moves, `sort: 'manual'` with `writeSort`; a tap is
+  ignored while a drag stands (the release fires a click). `card/dragEnd` clears it.
+- Oracles: `drag.test.ts` (the threshold, the motion, the tilt, the transform, the drop index),
+  `picture.test.ts` (`moveLoose`), `state.test.ts` (the three intents and the ignored tap), and
+  e2e/gin-arrange.spec.ts (a drag over the live story: the ghost leans left on a fast pull left,
+  the cell empties, the card lands first, Manual is active; both viewports).
+
 ## 6. Hand layout
 
 DOM (`SlotHandView.render`): each group is one grid item; loose cards and the ghost are bare cells:

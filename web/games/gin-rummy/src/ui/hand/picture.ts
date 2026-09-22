@@ -97,6 +97,15 @@ export const settlePicture = (
   return fresh();
 };
 
+/** `p` with the loose card `id` at loose index `to` (clamped), the rest in their order; `p` itself when `id` is not loose. */
+export const moveLoose = (p: Picture, id: string, to: number): Picture => {
+  const card = p.loose.find((c) => c.id === id);
+  if (card === undefined) return p;
+  const rest = p.loose.filter((c) => c.id !== id);
+  const at = Math.max(0, Math.min(rest.length, to));
+  return { ...p, loose: [...rest.slice(0, at), card, ...rest.slice(at)] };
+};
+
 /**
  * The grid items' widths in DOM order: each group's length, one per loose card, and one for the
  * ghost cell, which the grid keeps while the table holds ten cards or fewer.

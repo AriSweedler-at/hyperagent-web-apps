@@ -1944,3 +1944,66 @@ describe('the sandbox', () => {
     expect(bad.effects).toEqual([]);
   });
 });
+
+describe('a loose card dragged by hand', () => {
+  const local = (game: State): App => ({
+    ...initialApp,
+    role: 'local',
+    oppConnected: true,
+    game,
+    view: viewFor(game, 0),
+    screen: 'tableScreen',
+    revealed: 0,
+  });
+  const accepted = run(local(drawn), { type: 'render' }).app;
+  const loose = accepted.picture?.loose ?? [];
+  if (loose.length < 2) throw new Error('the drawn hand needs two loose cards');
+  const last = loose[loose.length - 1]?.id ?? '';
+  const meldCard = accepted.picture?.groups[0]?.[0]?.id ?? null;
+
+  test('the drag begins on a loose card in play, cancelling the long press; never on a meld, out of play or while a card waits', () => {
+    const started = run(accepted, { type: 'card/dragStart', cardId: last });
+    expect(started.app.drag).toEqual({ cardId: last });
+    expect(started.effects).toEqual([{ type: 'cancelTimer', id: 'cardPress' }]);
+    if (meldCard !== null)
+      expect(run(accepted, { type: 'card/dragStart', cardId: meldCard }).app).toBe(accepted);
+    const over = { ...accepted, view: { ...viewFor(drawn, 0), phase: 'roundOver' as const } };
+    expect(run(over, { type: 'card/dragStart', cardId: last }).app).toBe(over);
+    const waiting = { ...accepted, draw: { kind: 'waiting' as const, from: 'stock' as const } };
+    expect(run(waiting, { type: 'card/dragStart', cardId: last }).app).toBe(waiting);
+  });
+
+  test('over another loose index the card moves there and the order turns manual, written once; the same place changes nothing', () => {
+    const started = run(accepted, { type: 'card/dragStart', cardId: last }).app;
+    const moved = run(started, { type: 'card/dragOver', index: 0 });
+    expect(moved.app.picture?.loose.map((c) => c.id)).toEqual([
+      last,
+      ...loose.slice(0, -1).map((c) => c.id),
+    ]);
+    expect(moved.app.picture?.groups).toEqual(accepted.picture?.groups);
+    expect(moved.app.sort).toBe('manual');
+    expect(moved.effects).toEqual([{ type: 'writeSort', sort: 'manual' }]);
+    expect(run(moved.app, { type: 'card/dragOver', index: 0 })).toEqual({
+      app: moved.app,
+      effects: [],
+    });
+    const again = run(moved.app, { type: 'card/dragOver', index: 1 });
+    expect(again.app.picture?.loose[1]?.id).toBe(last);
+    expect(again.effects).toEqual([]);
+    // Nothing moves without a drag.
+    expect(run(accepted, { type: 'card/dragOver', index: 0 })).toEqual({
+      app: accepted,
+      effects: [],
+    });
+  });
+
+  test('while the drag stands a tap selects nothing; the end shows the card again', () => {
+    const started = run(accepted, { type: 'card/dragStart', cardId: last }).app;
+    expect(run(started, { type: 'card/tap', cardId: last })).toEqual({ app: started, effects: [] });
+    const ended = run(started, { type: 'card/dragEnd' });
+    expect(ended.app.drag).toBeNull();
+    expect(ended.effects).toEqual([]);
+    expect(run(accepted, { type: 'card/dragEnd' }).app).toBe(accepted);
+    expect(run(ended.app, { type: 'card/tap', cardId: last }).app.selectedCard).toBe(last);
+  });
+});

@@ -20,5 +20,7 @@ export type HandView = Readonly<{
     selection: Selection,
     stage?: DrawStage | null,
     picture?: Picture | null,
+    /** The loose card being dragged (ui/hand/dragger.ts): its cell is emptied for the ghost. */
+    dragging?: string | null,
   ) => string;
 }>;
