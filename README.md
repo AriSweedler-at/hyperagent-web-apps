@@ -196,8 +196,10 @@ A game is a folder; nothing under `web/shared` changes and the proxy needs nothi
    boundary: every inbound frame through a `Result` decoder. `net/{host,guest}.ts` are edges that
    take a `Transport` and never import `peerjs`. `ui/` or `view/` render to strings or VNodes with
    DOM writes in one module. `storage.ts` (or `app/effects.ts`, fidice's shape; both are the eslint
-   storage zone) is the only localStorage reader, through `@shared/edge/storage` with a decoder on
-   every read. A loop goes into `*.algorithms.ts` with a reason comment and 100% line coverage.
+   storage zone) is the only localStorage reader, through `web/shared/edge/storage.ts` with a
+   decoder on every read. Imports are relative with an explicit `.ts`
+   (`../../../../shared/edge/storage.ts`); no `@shared` alias is wired. A loop goes into
+   `*.algorithms.ts` with a reason comment and 100% line coverage.
    `Math.random` is banned outside `main.ts` and `web/shared/edge`; the pure layers (`engine/`,
    `domain/`, `bots/`, `protocol.ts`, the scorer maths, `*.algorithms.ts`) also ban `Date.now`:
    inject a clock.
@@ -206,10 +208,11 @@ A game is a folder; nothing under `web/shared` changes and the proxy needs nothi
 6. A class TypeScript builds in a way the extraction cannot see, a hook with no rule, or dead CSS
    gets a row in `web/shared/styles/CONTRACT.md`; otherwise `class-contract.test.ts` fails after the
    build.
-7. Join the per-game lists the harness enumerates: `GAMES` in `test/dist/classes.ts`,
-   `test/dist/dist-parity.test.ts` and `tools/parity/computed-styles.ts` (then record the game's two
-   goldens), and `PAGES` with `EXPECTED_TITLES` in `e2e/fixtures/site.ts` so smoke covers the page.
-   Add a card to `web/index.html`.
+7. Join the registry the harness enumerates: add the game to the `Game` union in
+   `web/shared/lib/roomCode.ts` (with its room-code row), then to `GAMES`, `PAGE_TITLES` and `HOOKS`
+   in `tools/games.ts` (`LEGACY_GAMES` only if it has a frozen `legacy/<g>/index.html`); the e2e
+   fixtures, the dist guards and `tools/parity/computed-styles.ts` read those lists (then record the
+   game's two goldens). Add a card to `web/index.html`.
 8. One e2e spec per mode: `e2e/<g>-local.spec.ts` and `e2e/<g>-online.spec.ts` tagged `@online`
    (host and guest through `e2e/fixtures/two-players.ts`; `expectPeerOptions` on the recorded
    `new Peer` call). Both run on both projects, and the online one against the deployed page in
