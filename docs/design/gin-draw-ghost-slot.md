@@ -112,7 +112,9 @@ null)`; `defaultHandView` ignores it and stays byte-identical for the legacy `#h
    model.me.deadwood }`. While shown, the eleventh card is absent from the hold by construction.
 2. Slots: each meld `i` yields `slot(c, m${i % 5}, first, last)` per card, then deadwood
    `slot(c, 'dead', false, false)`. Card flags: `selected: stage === null && selection === c.id`;
-   `fresh: model.lastDrawnId === c.id`; `locked` as `defaultHandView` computes it.
+   `fresh: model.lastDrawnId === c.id && model.isMyTurn && model.phase === 'discard'` (the dot
+   goes with the discard, PR #36; it used to persist into the opponent's turn); `locked` as
+   `defaultHandView` computes it.
 3. Ghost slot, emitted whenever the hand holds 10 cards (11 grid cells always), omitted at 11:
    `shown` → `<div class="slot ghost shown">` + `cardHtml(card, { fresh: true, locked: stage.from
    === 'discard' })` with `card = model.me.hand.find(c => c.id === stage.cardId)` (falls back to
@@ -214,7 +216,7 @@ drawn card lands in cell 11 and the held ten paint from the hold. At 375x667 the
   cards paint from the view. Tap `#deadwoodInfo` (2+ meldings): chooser as today; choosing
   re-broadcasts, the stage stays `shown`, the held picture stays.
 - Accepted: today's behaviour (toggle selection; LOCKED_CARD_MSG on the locked card; ↩ while
-  `canUndo`; Discard / Knock unchanged; the dot persists on the kept card into the opponent's turn).
+  `canUndo`; Discard / Knock unchanged; the dot leaves the kept card with the discard, PR #36).
 - Their turn and `roundOver`: taps ignored as today, ghost cell hidden. Pass-and-play: discarding
   requires accepting, so the phone never changes hands mid-ghost; the curtain path is unchanged.
 
@@ -250,7 +252,7 @@ pairs assert equal `(slotIndex, cardId)` over the first ten slots (vitest) and e
 - `accepted-knock` (seed searched with `Array.from(...).find`): Knock enabled with `(n)`;
   `accepted-gin` (hand-built View, 0 deadwood): `GIN!` label.
 - `undo-back-to-draw` (sameHandAs draw-mine-open; no screenshot): DOM-identical to it.
-- `after-discard-theirs`: 10 cards, ghost hidden, the fresh dot still on the kept card.
+- `after-discard-theirs`: 10 cards, ghost hidden, no dot on the kept card (since PR #36).
 - `round-over-table`: Show results, ghost hidden.
 
 ## 8. Test harness
