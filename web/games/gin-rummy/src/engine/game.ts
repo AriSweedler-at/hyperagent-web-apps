@@ -38,6 +38,7 @@ import {
   type State,
   type View,
 } from './types.ts';
+import type { Phase } from './types.ts';
 
 type Applied = Result<State, RuleError>;
 
@@ -120,11 +121,14 @@ const dealHand = (state: State, rng: Rng): State => {
   };
 };
 
+// The three phases a hand is played in; a round over or a game over is neither.
+const inPlay = (phase: Phase): boolean =>
+  phase === 'upcard' || phase === 'draw' || phase === 'discard';
+
 // Choosing how to arrange your own melds is a declaration, not a move: it is allowed any time
 // during play, including while waiting for the opponent.
 const setMelds = (state: State, seat: Seat, groups: MeldGroups): Applied => {
-  if (state.phase !== 'upcard' && state.phase !== 'draw' && state.phase !== 'discard')
-    return err('You can only rearrange melds during play.');
+  if (!inPlay(state.phase)) return err('You can only rearrange melds during play.');
   const myHand = state.hands[seat];
   const m = meldingFromGroups(myHand, groups);
   if (!m) return err("That meld arrangement doesn't fit your hand.");
@@ -508,4 +512,12 @@ const legalActions = (view: View): ReadonlyArray<Action> => {
   return [...undo, ...perCard];
 };
 
-export { STOCK_DRAW_FINAL_MSG, otherPlayer, createGame, dealHand, applyAction, legalActions };
+export {
+  inPlay,
+  STOCK_DRAW_FINAL_MSG,
+  otherPlayer,
+  createGame,
+  dealHand,
+  applyAction,
+  legalActions,
+};

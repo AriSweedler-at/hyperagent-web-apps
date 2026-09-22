@@ -5,7 +5,8 @@
 // declared arrangement when it still fits and scores the same as the solver's), every equally
 // scoring arrangement to choose from, what each discard would leave, and only a count of the
 // other hand.
-import { otherPlayer } from './game.ts';
+import { idsOf } from './cards.ts';
+import { inPlay, otherPlayer } from './game.ts';
 import { meldSig, meldingFromGroups } from './melds.ts';
 import { allOptimalMeldings, meldSolver, type MeldSolver } from './melds.algorithms.ts';
 import {
@@ -66,9 +67,8 @@ const viewFor = (state: State, seat: Seat): View => {
   const prefGroups = state.meldPref[seat];
   const prefMelding = prefGroups && hand.length > 0 ? meldingFromGroups(hand, prefGroups) : null;
   const melding = prefMelding?.value === autoBest.value ? prefMelding : autoBest;
-  const inPlay = state.phase === 'upcard' || state.phase === 'draw' || state.phase === 'discard';
   const meldOptions =
-    inPlay && hand.length > 0 ? withAuto(allOptimalMeldings(hand, 12), autoBest) : [];
+    inPlay(state.phase) && hand.length > 0 ? withAuto(allOptimalMeldings(hand, 12), autoBest) : [];
   const discarding =
     state.phase === 'discard' && state.turn === seat && hand.length === HAND_SIZE + 1;
   const discardOptions =
@@ -122,7 +122,7 @@ const viewFor = (state: State, seat: Seat): View => {
     meldOptions,
     activeMeldSig: meldSig(melding.melds),
     knockLimit: KNOCK_LIMIT,
-    discardIds: state.discard.map((c) => c.id),
+    discardIds: idsOf(state.discard),
   };
 };
 

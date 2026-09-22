@@ -19,6 +19,7 @@
 // soon as one is legal, so the round ends in a few turns; a void hand ends it too.
 import type { Page } from '@playwright/test';
 
+import type { Box } from './fixtures/boxes.ts';
 import {
   expectHandRows,
   ginAcceptDraw,
@@ -30,7 +31,6 @@ import { chooseDiscard, finishTurn, playToRoundOver, selectCard } from './fixtur
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
-type Box = Readonly<{ x: number; y: number; w: number; h: number }>;
 type Frame = Readonly<Record<string, Box | null>>;
 
 /** Everything above the hand: one box each, in every phase. */

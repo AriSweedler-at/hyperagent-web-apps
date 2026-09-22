@@ -9,14 +9,14 @@
 // `#hand .card` keeps counting real cards for the fixtures and the drivers. Strings only: the DOM
 // write is render.ts's.
 import { isValidMeldGroup } from '../../engine/melds.ts';
-import type { Card, Cards } from '../../engine/types.ts';
+import { HAND_SIZE, type Card, type Cards } from '../../engine/types.ts';
 import { cardHtml } from '../cards.ts';
 import type { DrawStage } from './draw.ts';
 import type { HandModel, HandView } from './HandView.ts';
 import { cardsOf, engineOf, type Picture } from './picture.ts';
 
 /** The grid always has this many cells: a ten-card hand plus the ghost slot, or eleven cards. */
-export const SLOT_COUNT = 11;
+export const SLOT_COUNT = HAND_SIZE + 1;
 
 /** `group nK`: the grid item's classes for a group of `size` cards (CONTRACT.md: template `n${len}`). */
 export const groupClass = (size: number): string => `group n${String(size)}`;

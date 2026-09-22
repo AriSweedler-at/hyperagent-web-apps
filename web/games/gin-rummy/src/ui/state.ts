@@ -22,7 +22,7 @@
 // session's own close still raises the "disconnected" toast the legacy raised.
 import { randomCode, sanitiseCode, validateCode } from '../../../../shared/lib/roomCode.ts';
 import type { Rng } from '../../../../shared/lib/rng.ts';
-import { applyAction, createGame, viewFor } from '../engine/index.ts';
+import { applyAction, createGame, idsOf, inPlay, viewFor } from '../engine/index.ts';
 import type { Action, Now, Seat, State, View } from '../engine/types.ts';
 import type { GuestContext } from '../net/guest.ts';
 import { connectingMsg } from '../net/guest.ts';
@@ -68,7 +68,7 @@ import {
 import { INITIAL_CUES, nextCue, selectionIn, type Cue, type CueState } from './cues.ts';
 import { drawSource, settleDraw, type DrawStage } from './hand/draw.ts';
 import { arrangedOf, declarable, toggleMeld, type HumanMelds } from './hand/arrange.ts';
-import { inPlay, settlePicture, type Picture } from './hand/picture.ts';
+import { settlePicture, type Picture } from './hand/picture.ts';
 
 // ---- the state ---------------------------------------------------------------------------------
 
@@ -189,6 +189,10 @@ export type App = Readonly<{
   discardsOpen: boolean;
   discardsWithHand: boolean;
 }>;
+
+// What a table leaves behind when a hand is dealt, left or lost: the ghost cell's stage, the kept
+// picture and the melds made by hand all belong to the hand that just ended.
+const HAND_CLEARED = { draw: null, picture: null, human: null } as const;
 
 export const DEFAULT_NAME = 'Ari';
 export const DEFAULT_TARGET = 100;
@@ -550,9 +554,9 @@ const hostDispatch = (app: App, seat: Seat, action: Action, ctx: Context): Step 
 const localBroadcast = (app: App, initial: boolean): Step => {
   const game = app.game;
   if (game === null) return pure(app);
-  const inPlay = game.phase !== 'roundOver' && game.phase !== 'gameOver';
-  const viewIdx: Seat = inPlay ? game.turn : (app.revealed ?? 0);
-  const curtain = inPlay && app.revealed !== game.turn ? game.turn : null;
+  const playing = inPlay(game.phase);
+  const viewIdx: Seat = playing ? game.turn : (app.revealed ?? 0);
+  const curtain = playing && app.revealed !== game.turn ? game.turn : null;
   return then(
     step(
       { ...app, view: viewFor(game, viewIdx), selectedCard: null, curtain },
@@ -591,9 +595,7 @@ const startLocal = (app: App, game: State): Step =>
         game,
         revealed: null,
         resultDismissed: false,
-        draw: null,
-        picture: null,
-        human: null,
+        ...HAND_CLEARED,
       },
       { type: 'wakeLock', hold: true },
     ),
@@ -866,10 +868,8 @@ const leaveFinish = (app: App): Step =>
       revealed: null,
       curtain: null,
       meldChooser: false,
-      draw: null,
       handoff: false,
-      picture: null,
-      human: null,
+      ...HAND_CLEARED,
     },
     { type: 'clearSave' },
     { type: 'initHome' },
@@ -1082,9 +1082,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
         ...app,
         game,
         resultDismissed: false,
-        draw: null,
-        picture: null,
-        human: null,
+        ...HAND_CLEARED,
       });
     }
     // ---- net: guest ----
@@ -1097,7 +1095,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'guest/frame':
       return guestFrame(app, intent.frame);
     case 'guest/lost': {
-      const lost = { ...app, oppConnected: false, draw: null, picture: null, human: null };
+      const lost = { ...app, oppConnected: false, ...HAND_CLEARED };
       if (lost.view !== null && lost.view.phase !== 'gameOver')
         return then(rendered(lost), (a) => step(a, toast(LOST_HOST_MSG, GONE_TOAST_MS)));
       return showScreen(withGuestStatus(lost, DISCONNECTED_MSG), 'guestWaitScreen');
@@ -1153,13 +1151,11 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       if (v === null || option === undefined) return pure(app);
       // The pick becomes hand-made, so it outlives the engine's declaration (arrange.ts), and the
       // picture is dropped so the paint after the move is that arrangement.
-      const human: HumanMelds = {
-        hand: v.handNumber,
-        groups: option.melds.map((m) => m.map((c) => c.id)),
-      };
+      const groups = option.melds.map(idsOf);
+      const human: HumanMelds = { hand: v.handNumber, groups };
       return act(
         { ...app, meldChooser: false, picture: null, human },
-        { type: 'setMelds', melds: option.melds.map((m) => m.map((c) => c.id)) },
+        { type: 'setMelds', melds: groups },
         ctx,
       );
     }
@@ -1167,7 +1163,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       // Never while the drawn card waits in the ghost cell: the ten on the table have no melding
       // of their own then. Either player's turn otherwise (UI only).
       const v = app.view;
-      return v === null || !inPlay(v) || app.draw !== null
+      return v === null || !inPlay(v.phase) || app.draw !== null
         ? pure(app)
         : step({ ...app, arrangeOpen: true }, { type: 'fx', cue: 'tap' });
     }
@@ -1185,7 +1181,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       const v = app.view;
       const chosen: App = { ...app, sort: intent.mode, arrangeOpen: false };
       const remembered: Effect = { type: 'writeSort', sort: intent.mode };
-      if (v === null || !inPlay(v) || app.draw !== null) return step(chosen, remembered);
+      if (v === null || !inPlay(v.phase) || app.draw !== null) return step(chosen, remembered);
       return then(
         step({ ...chosen, picture: arrangedOf(v, null, app.human, intent.mode) }, remembered, {
           type: 'fx',
@@ -1198,7 +1194,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       // The App is returned as is: main.ts skips the paint, so the pressed element survives to
       // receive its click (a plain tap) or the timer below (a long press).
       const v = app.view;
-      if (v === null || !inPlay(v) || app.draw !== null) return pure(app);
+      if (v === null || !inPlay(v.phase) || app.draw !== null) return pure(app);
       return step(app, {
         type: 'startTimer',
         id: 'cardPress',
@@ -1210,7 +1206,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       return step(app, { type: 'cancelTimer', id: 'cardPress' });
     case 'hand/mark': {
       const v = app.view;
-      if (v === null || !inPlay(v) || app.draw !== null) return pure(app);
+      if (v === null || !inPlay(v.phase) || app.draw !== null) return pure(app);
       const human = toggleMeld(app.human, v.handNumber, v.me.hand, intent.cardId);
       if (human === null) return step(app, toast(NO_MELD_MSG));
       // The repaint replaces the pressed card's element, so the click that ends the press never

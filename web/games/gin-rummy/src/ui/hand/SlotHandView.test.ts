@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { makeCard } from '../../engine/cards.ts';
 import { cardHtml } from '../cards.ts';
 import type { DrawStage } from './draw.ts';
-import { defaultHandView, type HandModel } from './HandView.ts';
+import type { HandModel } from './HandView.ts';
 import type { Picture } from './picture.ts';
 import { SLOT_COUNT, groupClass, slotHandView } from './SlotHandView.ts';
 
@@ -186,12 +186,5 @@ describe('slotHandView.render', () => {
     expect(slotHandView.render(discarding, 'AS', stage, before)).not.toContain('selected');
     // Locked only while discarding on my turn, as the default view has it.
     expect(slotHandView.render(model({ drawnFromDiscard: 'KC' }), null)).not.toContain('locked');
-  });
-
-  test('the default view ignores the stage and the picture: its legacy golden is unaffected', () => {
-    const stage: DrawStage = { kind: 'shown', from: 'stock', cardId: 'JH' };
-    expect(defaultHandView.render(eleven(), 'AS', stage, before)).toBe(
-      defaultHandView.render(eleven(), 'AS'),
-    );
   });
 });

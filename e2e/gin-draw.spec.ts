@@ -10,6 +10,15 @@
 import type { Page } from '@playwright/test';
 
 import {
+  type Box,
+  boxOf,
+  expectInside,
+  expectSameBoxes,
+  ghostBox,
+  heldBoxes,
+  omit,
+} from './fixtures/boxes.ts';
+import {
   expectHandRows,
   ginAcceptDraw,
   ginPassUpcard,
@@ -19,48 +28,7 @@ import {
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
-type Box = Readonly<{ x: number; y: number; w: number; h: number }>;
-type Boxes = Readonly<Record<string, Box>>;
-
-/** `data-card -> box` of the held cards (the ghost cell's card excluded). */
-const HELD_BOXES = `Object.fromEntries(Array.from(document.querySelectorAll('#hand .slot:not(.ghost) .card')).map((c) => {
-  const r = c.getBoundingClientRect();
-  return [c.getAttribute('data-card'), { x: r.x, y: r.y, w: r.width, h: r.height }];
-}))`;
-const boxOf = (selector: string): string =>
-  `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (el === null) return null;
-  const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; })()`;
 const NO_SCROLL = `['app', 'hand'].every((id) => { const el = document.getElementById(id); return el.scrollHeight <= el.clientHeight + 1; })`;
-
-const heldBoxes = (page: Page): Promise<Boxes> => page.evaluate<Boxes>(HELD_BOXES);
-const ghostBox = (page: Page): Promise<Box | null> =>
-  page.evaluate<Box | null>(boxOf('#hand .slot.ghost'));
-
-/** Every recorded card is still exactly where it was (half a pixel of tolerance for rounding). */
-const expectSameBoxes = (after: Boxes, before: Boxes): void => {
-  expect(Object.keys(after).sort()).toEqual(Object.keys(before).sort());
-  Object.entries(before).forEach(([id, box]) => {
-    const now = after[id];
-    expect(now, `card ${id} left the hand`).toBeDefined();
-    if (now === undefined) return;
-    (['x', 'y', 'w', 'h'] as const).forEach((side) => {
-      expect(Math.abs(now[side] - box[side]), `card ${id} moved (${side})`).toBeLessThanOrEqual(
-        0.5,
-      );
-    });
-  });
-};
-
-/** `inner` lies inside `outer` (the drawn card inside the ghost cell). */
-const expectInside = (inner: Box | null, outer: Box | null): void => {
-  expect(inner).not.toBeNull();
-  expect(outer).not.toBeNull();
-  if (inner === null || outer === null) return;
-  expect(inner.x).toBeGreaterThanOrEqual(outer.x - 0.5);
-  expect(inner.y).toBeGreaterThanOrEqual(outer.y - 0.5);
-  expect(inner.x + inner.w).toBeLessThanOrEqual(outer.x + outer.w + 0.5);
-  expect(inner.y + inner.h).toBeLessThanOrEqual(outer.y + outer.h + 0.5);
-};
 
 /** The geometry both layouts share: eleven cells in the rows the width implies, none scrolling. */
 const expectLayout = async (page: Page, columns: 6 | 11): Promise<void> => {
@@ -68,10 +36,6 @@ const expectLayout = async (page: Page, columns: 6 | 11): Promise<void> => {
   await expectHandRows(page, columns);
   expect(await page.evaluate<boolean>(NO_SCROLL), '#app or #hand scrolls').toBe(true);
 };
-
-/** `boxes` without the card `id`. */
-const omit = (boxes: Boxes, id: string | null): Boxes =>
-  Object.fromEntries(Object.entries(boxes).filter(([card]) => card !== id));
 
 const VIEWPORTS = {
   phone: { width: 390, height: 844, columns: 6 },

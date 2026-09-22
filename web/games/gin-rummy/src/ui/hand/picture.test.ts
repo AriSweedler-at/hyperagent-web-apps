@@ -10,7 +10,6 @@ import {
   PHONE_COLUMNS,
   cardsOf,
   engineOf,
-  inPlay,
   onTable,
   phoneRows,
   rowsOf,
@@ -278,13 +277,5 @@ describe('spansOf / rowsOf / phoneRows', () => {
     expect(phoneRows(kept)).toBe(2);
     expect(phoneRows(pic([spades, [as, ah, ad, k], [q, d9, c2]], []))).toBe(3);
     expect(phoneRows(pic([[s5, s6, s7, s8, as, ah, ad], aces], [jh]))).toBe(3);
-  });
-
-  test('inPlay: the three phases a hand is played in', () => {
-    expect(inPlay({ phase: 'upcard' })).toBe(true);
-    expect(inPlay({ phase: 'draw' })).toBe(true);
-    expect(inPlay({ phase: 'discard' })).toBe(true);
-    expect(inPlay({ phase: 'roundOver' })).toBe(false);
-    expect(inPlay({ phase: 'gameOver' })).toBe(false);
   });
 });

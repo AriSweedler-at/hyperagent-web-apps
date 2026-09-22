@@ -479,3 +479,7 @@ header names both, and its e2e job fails on this branch until the `-linux.png` f
 Goldens: none flipped (computed styles 0 differences at both viewports and both games, gin-dom-parity
 84/0). Docs: ARCHITECTURE "Documented test hooks" (`?story=`) and "Testing pyramid" 5, README Tests 7.
 CONTRACT.md untouched: the stories page names no class (inline styles only). PR D stays optional.
+
+PR D landed on 2026-09-22 inside the simplification pass (branch `gin-simplify`): `defaultHandView`
+and its `legacyHandHtml` golden are gone (`HandView` stays as the seam, `slotHandView` its one
+implementation); `legacyHandHtml` itself stays in the extracted legacy fixture, unused.
