@@ -6,7 +6,8 @@
 // scoring arrangement to choose from, what each discard would leave, and only a count of the
 // other hand.
 import { idsOf } from './cards.ts';
-import { inPlay, otherPlayer } from './game.ts';
+import { inPlay, keptHand, laidEntries, otherPlayer } from './game.ts';
+import { extendedMelds } from './layoff.ts';
 import { meldSig, meldingFromGroups } from './melds.ts';
 import { allOptimalMeldings, meldSolver, type MeldSolver } from './melds.algorithms.ts';
 import {
@@ -61,14 +62,30 @@ const copyPlayer = (p: PlayerState): PlayerState => ({ id: p.id, name: p.name, t
 const viewFor = (state: State, seat: Seat): View => {
   const opp = otherPlayer(seat);
   const hand = state.hands[seat];
-  const solver = hand.length > 0 ? meldSolver(hand) : null;
+  // While answering a knock the cards laid off are out of the melding (§7b); `me.hand` keeps them.
+  const own = keptHand(state, seat);
+  const solver = own.length > 0 ? meldSolver(own) : null;
   const autoBest = solver ? solver.melding(0) : EMPTY;
   // Honour the player's chosen arrangement while it still fits and scores the same.
   const prefGroups = state.meldPref[seat];
-  const prefMelding = prefGroups && hand.length > 0 ? meldingFromGroups(hand, prefGroups) : null;
+  const prefMelding = prefGroups && own.length > 0 ? meldingFromGroups(own, prefGroups) : null;
   const melding = prefMelding?.value === autoBest.value ? prefMelding : autoBest;
   const meldOptions =
-    inPlay(state.phase) && hand.length > 0 ? withAuto(allOptimalMeldings(hand, 12), autoBest) : [];
+    inPlay(state.phase) && own.length > 0 ? withAuto(allOptimalMeldings(own, 12), autoBest) : [];
+  const k = state.knock ?? null;
+  const layoff =
+    state.phase === 'layoff' && k !== null
+      ? (() => {
+          const laidOff = laidEntries(state, k);
+          return {
+            knocker: k.by,
+            melds: k.melding.melds,
+            extended: extendedMelds(k.melding.melds, laidOff),
+            laidOff,
+            knockerValue: k.melding.value,
+          };
+        })()
+      : null;
   const discarding =
     state.phase === 'discard' && state.turn === seat && hand.length === HAND_SIZE + 1;
   const discardOptions =
@@ -123,6 +140,7 @@ const viewFor = (state: State, seat: Seat): View => {
     activeMeldSig: meldSig(melding.melds),
     knockLimit: KNOCK_LIMIT,
     discardIds: idsOf(state.discard),
+    ...(layoff === null ? {} : { layoff }),
   };
 };
 

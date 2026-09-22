@@ -28,8 +28,10 @@ import type {
   DiscardOption,
   LastAction,
   LastDrawn,
+  Knock,
   LayoffEntry,
   LayoffMelding,
+  LayoffView,
   Meld,
   MeldGroups,
   Melding,
@@ -58,7 +60,14 @@ const pair =
   };
 
 const seat: Decoder<Seat> = literal(0, 1);
-const phase: Decoder<Phase> = literal('upcard', 'draw', 'discard', 'roundOver', 'gameOver');
+const phase: Decoder<Phase> = literal(
+  'upcard',
+  'draw',
+  'discard',
+  'layoff',
+  'roundOver',
+  'gameOver',
+);
 const upcardStage: Decoder<UpcardStage> = literal('nonDealer', 'dealer');
 const outcome = literal('gin', 'knock', 'undercut');
 const count = integer(0);
@@ -86,6 +95,13 @@ const arrangement: Decoder<Arrangement> = object({
   sig: string,
 });
 const layoffEntry: Decoder<LayoffEntry> = object({ card: decodeCard, onto: count });
+/** The knock awaiting the defender's answer (§7b), as the host's save holds it. */
+const knock: Decoder<Knock> = object({
+  by: seat,
+  card: string,
+  melding: object({ melds, deadwood: cards, value: count }),
+  laidOff: arrayOf(object({ cardId: string, onto: count })),
+});
 const layoffMelding: Decoder<LayoffMelding> = object({
   melds,
   laidOff: arrayOf(layoffEntry),
@@ -168,6 +184,17 @@ const decodeState: Decoder<State> = object({
   startedAt: timestamp,
   // The named leak (types.ts): absent until the first draw, so optional, and null after undoDraw.
   lastDrawn: optional(nullable(lastDrawn)),
+  // The knock being answered (§7b): absent in saves from before the phase, null outside it.
+  knock: optional(nullable(knock)),
+});
+
+/** What both seats see of a knock being answered (§7b). */
+const layoffView: Decoder<LayoffView> = object({
+  knocker: seat,
+  melds,
+  extended: melds,
+  laidOff: arrayOf(layoffEntry),
+  knockerValue: count,
 });
 
 const discardOption: Decoder<DiscardOption> = oneOf<DiscardOption>(
@@ -214,6 +241,7 @@ const decodeView: Decoder<View> = object({
   activeMeldSig: string,
   knockLimit: count,
   discardIds: optional(arrayOf(string)),
+  layoff: optional(layoffView),
 });
 
 const ACTION_TYPES = [
@@ -226,12 +254,24 @@ const ACTION_TYPES = [
   'discard',
   'knock',
   'setMelds',
+  'layOff',
+  'takeBack',
+  'finishLayoff',
 ] as const;
 const actionHead = object({ type: literal(...ACTION_TYPES) });
 const plainAction = object({
-  type: literal('ready', 'takeUpcard', 'passUpcard', 'drawStock', 'drawDiscard', 'undoDraw'),
+  type: literal(
+    'ready',
+    'takeUpcard',
+    'passUpcard',
+    'drawStock',
+    'drawDiscard',
+    'undoDraw',
+    'finishLayoff',
+  ),
 });
-const cardAction = object({ type: literal('discard', 'knock'), cardId: string });
+const cardAction = object({ type: literal('discard', 'knock', 'takeBack'), cardId: string });
+const layOffAction = object({ type: literal('layOff'), cardId: string, onto: count });
 const meldsAction = object({ type: literal('setMelds'), melds: meldGroups });
 
 /**
@@ -249,10 +289,14 @@ const decodeAction: Decoder<Action> = (input) => {
     case 'drawStock':
     case 'drawDiscard':
     case 'undoDraw':
+    case 'finishLayoff':
       return plainAction(input);
     case 'discard':
     case 'knock':
+    case 'takeBack':
       return cardAction(input);
+    case 'layOff':
+      return layOffAction(input);
     case 'setMelds':
       return meldsAction(input);
   }
