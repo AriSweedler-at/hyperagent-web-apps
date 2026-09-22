@@ -19,6 +19,10 @@ export type FireInit = Readonly<{
   key?: string;
   inputType?: string;
   data?: string;
+  /** A pointer event's place (viewport coordinates) and pointer. */
+  clientX?: number;
+  clientY?: number;
+  pointerId?: number;
 }>;
 
 /** How a test describes the target of a delegated event: what `closest` finds, an id, a value. */
@@ -76,6 +80,9 @@ const makeEvent = (type: string, target: unknown, init: FireInit): FakeEvent => 
     key: init.key ?? '',
     inputType: init.inputType ?? '',
     data: init.data ?? null,
+    clientX: init.clientX ?? 0,
+    clientY: init.clientY ?? 0,
+    pointerId: init.pointerId ?? 0,
     preventDefault: () => {
       flags.prevented = true;
     },

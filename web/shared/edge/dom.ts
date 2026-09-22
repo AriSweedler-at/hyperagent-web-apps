@@ -264,10 +264,13 @@ export const setStyle = (el: Element, prop: string, value: string): void => {
   styled.style?.setProperty(prop, value);
 };
 
-/** A deep clone of `el`, appended to `parent`. */
-export const cloneInto = (parent: Element, el: Element): Element => {
-  const copy = el.cloneNode(true) as HTMLElement;
-  parent.appendChild(copy);
+/** A deep clone of `el` appended to `parent`, or null where the element cannot be cloned (a fake). */
+export const cloneInto = (parent: Element, el: Element): Element | null => {
+  const source = el as Partial<Pick<HTMLElement, 'cloneNode'>>;
+  const copy = source.cloneNode?.call(el, true) as HTMLElement | undefined;
+  if (copy === undefined) return null;
+  const target = parent as Partial<Pick<HTMLElement, 'appendChild'>>;
+  target.appendChild?.call(parent, copy);
   return copy;
 };
 

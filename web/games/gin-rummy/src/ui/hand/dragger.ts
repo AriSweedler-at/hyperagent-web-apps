@@ -100,6 +100,7 @@ export const bindDrag = (doc: PageLike, dispatch: DragDispatch): void => {
     if (card === null) return { ...s, moving: true, grab: p };
     const base = rectOf(card);
     const ghost = cloneInto(doc.body, card);
+    if (ghost === null) return { ...s, moving: true, grab: p, base };
     addClass(ghost, 'drag-ghost');
     removeClass(ghost, 'selected');
     setStyle(ghost, 'left', px(base.left));

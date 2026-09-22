@@ -65,8 +65,8 @@
     "web/games/gin-rummy/src/ui/home*.ts",
     "web/games/gin-rummy/src/ui/local*.ts",
     "web/games/gin-rummy/src/ui/page.fake.ts",
-    "web/games/gin-rummy/src/ui/hand/dragger.ts",
-    "web/games/gin-rummy/src/ui/hand/flip.ts",
+    "web/games/gin-rummy/src/ui/hand/dragger*.ts",
+    "web/games/gin-rummy/src/ui/hand/flip*.ts",
     "web/games/gin-rummy/src/scorer/main*.ts",
     "web/games/gin-rummy/src/stories/boot.ts",
     "web/games/gin-rummy/src/stories/catalogue.test.ts"
