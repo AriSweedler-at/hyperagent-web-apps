@@ -19,7 +19,6 @@ import {
   readName,
   readP2Name,
   readSave,
-  readScorerNames,
   readScorerState,
   readSort,
   readSoundState,
@@ -29,7 +28,6 @@ import {
   writeP2Name,
   writePlayMode,
   writeSave,
-  writeScorerNames,
   writeScorerState,
   writeSort,
   writeSoundState,
@@ -63,7 +61,7 @@ const game = createGame(
 );
 
 describe('frozen constants', () => {
-  test('the seven legacy keys, the second name and the sort, the tabs, modes, sound states and the name cap', () => {
+  test('the six kept legacy keys, the second name and the sort, the tabs, modes, sound states and the name cap', () => {
     expect(ALL_KEYS).toEqual([
       'ginRummyMP_v1',
       'ginRummy_name',
@@ -73,7 +71,6 @@ describe('frozen constants', () => {
       'ginRummy_sound',
       'ginRummy_sort',
       'ginRummyScorerState_v2',
-      'ginRummy_scorerNames',
     ]);
     expect(HOME_TABS).toEqual(['play', 'rules', 'score']);
     expect(DEFAULT_HOME_TAB).toBe('play');
@@ -246,23 +243,6 @@ describe('the Score Counter', () => {
     expect(readScorerState(store)).toEqual({ ok: true, value: state });
     expect(writeScorerState(store, null)).toEqual({ ok: true, value: null });
     expect(s.map.has(STORAGE_KEYS.scorerState)).toBe(false);
-  });
-
-  test('the names array round-trips; fewer than two names are refused', () => {
-    const s = fakeStorage();
-    const store = createStore(s);
-    expect(writeScorerNames(store, ['Ann', 'Bob', 'Cy']).ok).toBe(true);
-    expect(s.map.get(STORAGE_KEYS.scorerNames)).toBe('["Ann","Bob","Cy"]');
-    expect(readScorerNames(store)).toEqual({ ok: true, value: ['Ann', 'Bob', 'Cy'] });
-    s.setItem(STORAGE_KEYS.scorerNames, '["Ann"]');
-    expect(readScorerNames(store)).toEqual({
-      ok: false,
-      error: {
-        kind: 'invalid',
-        key: STORAGE_KEYS.scorerNames,
-        reason: '$: expected at least two names',
-      },
-    });
   });
 });
 

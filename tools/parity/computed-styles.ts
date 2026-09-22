@@ -222,7 +222,6 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '#toast',
     '.setup-players',
     '.player-input-row',
-    '.remove-x',
     '.player-card',
     '.player-card.leader',
     '.player-head',
@@ -870,23 +869,21 @@ const driveGin = async (page: Page, shot: Shot): Promise<void> => {
   await click(page, '#leaveBtnEnd');
   await visible(page, '#homeScreen');
 
-  // ---- the Score Counter ----
+  // ---- the Score Counter: two players, the pass-and-play names ----
   await click(page, '#tabScoreBtn');
-  await click(page, '#scAddPlayerBtn');
-  await shot('scorer: setup, three rows');
+  await shot('scorer: setup, two players');
   const names = page.locator('#scPlayers input');
   await names.nth(0).fill('Ann');
   await names.nth(1).fill('Bob');
-  await names.nth(2).fill('Cy');
   await fill(page, '#scTargetInput', '30');
   await click(page, '#scStartBtn');
   await visible(page, '#scGameScreen');
   await shot('scorer: board');
+  // Ann knocks with 5 against 40: her 35 reach the target of 30, so the end screen follows.
   await click(page, '#scBoard .player-card >> nth=0 >> .chip[data-k="knock"]');
   await page.locator('#scBoard .player-card >> nth=0 >> input.dw').fill('5');
-  await page.locator('#scBoard .player-card >> nth=1 >> input.dw').fill('20');
-  await click(page, '#scBoard .player-card >> nth=2 >> .chip[data-k="gin"]');
-  await shot('scorer: entries (knock chip, gin chip, stepper)');
+  await page.locator('#scBoard .player-card >> nth=1 >> input.dw').fill('40');
+  await shot('scorer: entries (knock chip, stepper)');
   await click(page, '#scSubmitBtn');
   await shot('scorer: hand result overlay');
   await click(page, '#scResContinue');

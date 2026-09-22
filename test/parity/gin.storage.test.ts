@@ -11,7 +11,6 @@ import {
   readName,
   readPlayMode,
   readSave,
-  readScorerNames,
   readScorerState,
   readSoundState,
   soundEnabled,
@@ -19,7 +18,6 @@ import {
   writeName,
   writePlayMode,
   writeSave,
-  writeScorerNames,
   writeScorerState,
   writeSoundState,
 } from '../../web/games/gin-rummy/src/storage.ts';
@@ -72,20 +70,21 @@ const roundTrips: Readonly<Record<string, RoundTrip>> = {
     const read = readScorerState(store);
     return { read, written: read.ok && writeScorerState(store, read.value).ok };
   },
-  [STORAGE_KEYS.scorerNames]: (store) => {
-    const read = readScorerNames(store);
-    return { read, written: read.ok && writeScorerNames(store, read.value).ok };
-  },
 };
 
 describe('the captured legacy payloads', () => {
   test('cover all seven legacy keys, the three save roles and both sound states', () => {
     // `ginRummy_p2Name` and `ginRummy_sort` are this page's own keys: the legacy never stored the
-    // second name or an arrangement, so no capture exists for them.
+    // second name or an arrangement, so no capture exists for them. `ginRummy_scorerNames` is
+    // retired (the Score Counter scores the two pass-and-play names): its capture stays as the
+    // record of what the legacy wrote, and nothing reads it.
     const ours: ReadonlyArray<string> = [STORAGE_KEYS.p2Name, STORAGE_KEYS.sort];
+    const retired: ReadonlyArray<string> = ['ginRummy_scorerNames'];
     const legacyKeys = Object.values(STORAGE_KEYS).filter((k) => !ours.includes(k));
-    expect(legacyKeys).toHaveLength(7);
-    expect(new Set(captures.map((c) => c.key))).toEqual(new Set(legacyKeys));
+    expect(legacyKeys).toHaveLength(6);
+    expect(new Set(captures.map((c) => c.key).filter((k) => !retired.includes(k)))).toEqual(
+      new Set(legacyKeys),
+    );
     const roles = captures
       .filter((c) => c.key === STORAGE_KEYS.save)
       .map((c) => (JSON.parse(c.raw) as { role: string }).role);
@@ -98,21 +97,20 @@ describe('the captured legacy payloads', () => {
     ).toEqual(['off', 'on']);
   });
 
-  test.each(captures.map((c) => [label(c), c] as const))(
-    '%s decodes through its reader and writes back byte for byte',
-    (_name, c) => {
-      const storage = fakeStorage();
-      storage.setItem(c.key, c.raw);
-      const trip = roundTrips[c.key];
-      expect(trip).toBeDefined();
-      if (trip === undefined) return;
-      const { read, written } = trip(createStore(storage));
-      expect(read.ok, JSON.stringify(read.error)).toBe(true);
-      expect(written).toBe(true);
-      expect(storage.map.get(c.key)).toBe(c.raw);
-      expect([...storage.map.keys()]).toEqual([c.key]);
-    },
-  );
+  test.each(
+    captures.filter((c) => c.key !== 'ginRummy_scorerNames').map((c) => [label(c), c] as const),
+  )('%s decodes through its reader and writes back byte for byte', (_name, c) => {
+    const storage = fakeStorage();
+    storage.setItem(c.key, c.raw);
+    const trip = roundTrips[c.key];
+    expect(trip).toBeDefined();
+    if (trip === undefined) return;
+    const { read, written } = trip(createStore(storage));
+    expect(read.ok, JSON.stringify(read.error)).toBe(true);
+    expect(written).toBe(true);
+    expect(storage.map.get(c.key)).toBe(c.raw);
+    expect([...storage.map.keys()]).toEqual([c.key]);
+  });
 
   test('the sound captures read as the legacy `!== "off"` did', () => {
     captures
@@ -159,8 +157,6 @@ describe('garbage under each key is refused with the key and the reason', () => 
       '{"players":[{"id":"a","name":"A"},{"id":"b","name":"B"}],"target":100,"rounds":[{"deadwood":{},"knockerId":"a","knockType":"undercut","scores":{},"ts":1}],"startedAt":1}',
       '$.rounds[0].knockType: expected one of "knock" | "gin"',
     ],
-    [STORAGE_KEYS.scorerNames, '["Solo"]', '$: expected at least two names'],
-    [STORAGE_KEYS.scorerNames, '{"0":"a","1":"b"}', '$: expected array'],
   ];
 
   test.each(garbage.map(([key, raw, reason]) => [key, raw, reason] as const))(

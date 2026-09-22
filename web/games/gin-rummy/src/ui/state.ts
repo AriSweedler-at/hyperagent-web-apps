@@ -420,8 +420,8 @@ export type Effect =
   | Readonly<{ type: 'initHome' }>
   /** `showScreen`'s `window.scrollTo(0, 0)`. */
   | Readonly<{ type: 'scrollTop' }>
-  /** `window.__scorer.onShown()` / `.resume()`. */
-  | Readonly<{ type: 'scorer'; call: 'shown' | 'resume' }>
+  /** `window.__scorer.resume()`: the resume box's Score Counter session. */
+  | Readonly<{ type: 'scorer'; call: 'resume' }>
   /** Arm a named timer that dispatches `then` after `ms`; arming again restarts it. */
   | Readonly<{ type: 'startTimer'; id: TimerId; ms: number; then: Intent }>
   | Readonly<{ type: 'cancelTimer'; id: TimerId }>
@@ -429,9 +429,9 @@ export type Effect =
   | Readonly<{ type: 'toggleSound' }>
   /** The invite for `code` through the share sheet or the clipboard; `name` is the invited seat's. */
   | Readonly<{ type: 'share'; code: string; name: string | null }>
-  /** `initHome`: the saved name into `#nameInput` and `#p1NameInput`. */
+  /** The first player's name into every input that shows it (`initHome`, and after a keystroke). */
   | Readonly<{ type: 'fillName'; name: string }>
-  /** `initHome`: the saved pass-and-play second name into `#p2NameInput`. */
+  /** The second player's name into every input that shows it. */
   | Readonly<{ type: 'fillP2Name'; name: string }>
   /** `#codeInput`'s value after sanitising. */
   | Readonly<{ type: 'setCode'; value: string }>;
@@ -772,7 +772,6 @@ const setHomeTab = (app: App, tab: string, persist: boolean): Step => {
   return step(
     { ...app, homeTab: known },
     ...(persist ? [{ type: 'writeHomeTab', tab: known } as const] : []),
-    ...(known === 'score' ? [{ type: 'scorer', call: 'shown' } as const] : []),
   );
 };
 
@@ -914,15 +913,27 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     // ---- home ----
     case 'home/init':
       return initHome(app, intent.home);
+    // A name typed into any of its inputs is remembered trimmed and shown, as typed, in the others
+    // (the online name, pass-and-play's seats and the Score Counter's players are the same two
+    // names); the fill writes only inputs whose value differs, so the one being typed in is left alone.
     case 'name/typed':
       return step(
         { ...app, nameTouched: true },
         { type: 'rememberName', name: intent.value.trim() },
+        { type: 'fillName', name: intent.value },
       );
     case 'p1name/typed':
-      return step(app, { type: 'rememberName', name: intent.value.trim() });
+      return step(
+        app,
+        { type: 'rememberName', name: intent.value.trim() },
+        { type: 'fillName', name: intent.value },
+      );
     case 'p2name/typed':
-      return step(app, { type: 'rememberP2Name', name: intent.value.trim() });
+      return step(
+        app,
+        { type: 'rememberP2Name', name: intent.value.trim() },
+        { type: 'fillP2Name', name: intent.value },
+      );
     case 'tab/set':
       return setHomeTab(app, intent.tab, intent.persist !== false);
     case 'mode/set': {
@@ -1334,7 +1345,7 @@ export type EffectDeps = Readonly<{
   }>;
   confirm: (message: string) => boolean;
   scrollTop: () => void;
-  scorer: Readonly<{ shown: () => void; resume: () => void }>;
+  scorer: Readonly<{ resume: () => void }>;
   timers: Readonly<{
     start: (id: TimerId, ms: number, then: Intent) => void;
     cancel: (id: TimerId) => void;

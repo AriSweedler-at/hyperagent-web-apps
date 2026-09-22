@@ -39,15 +39,22 @@ import {
   type Intent,
 } from './state.ts';
 
-/** `initHome`: the saved name into `#nameInput` and `#p1NameInput`. */
+/**
+ * The first player's name into every input that shows it: the online name, pass-and-play's first
+ * seat and the Score Counter's first player (one name, `ginRummy_name`). `setValue` leaves the
+ * input being typed in alone, so the fill after a keystroke moves only the other inputs.
+ */
 export const fillNameInputs = (doc: DocumentLike, name: string): void => {
-  setValue(requireId(doc, 'nameInput'), name);
-  setValue(requireId(doc, 'p1NameInput'), name);
+  ['nameInput', 'p1NameInput', 'scP1NameInput'].forEach((id) => {
+    setValue(requireId(doc, id), name);
+  });
 };
 
-/** `initHome`: the saved pass-and-play second name into `#p2NameInput`. */
+/** The second player's name into pass-and-play's second seat and the Score Counter's second player. */
 export const fillP2NameInput = (doc: DocumentLike, name: string): void => {
-  setValue(requireId(doc, 'p2NameInput'), name);
+  ['p2NameInput', 'scP2NameInput'].forEach((id) => {
+    setValue(requireId(doc, id), name);
+  });
 };
 
 /** `#codeInput` after the reducer sanitised what was typed. */
@@ -117,6 +124,15 @@ export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): voi
   const p1NameInput = requireId(doc, 'p1NameInput');
   listen(p1NameInput, 'input', () => {
     dispatch({ type: 'p1name/typed', value: readValue(p1NameInput) });
+  });
+  // The Score Counter's two players are the pass-and-play players: the same intents, the same keys.
+  const scP1NameInput = requireId(doc, 'scP1NameInput');
+  listen(scP1NameInput, 'input', () => {
+    dispatch({ type: 'p1name/typed', value: readValue(scP1NameInput) });
+  });
+  const scP2NameInput = requireId(doc, 'scP2NameInput');
+  listen(scP2NameInput, 'input', () => {
+    dispatch({ type: 'p2name/typed', value: readValue(scP2NameInput) });
   });
   const p2NameInput = requireId(doc, 'p2NameInput');
   listen(p2NameInput, 'input', () => {

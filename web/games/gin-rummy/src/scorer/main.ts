@@ -1,27 +1,24 @@
 // The Score Counter's screens (docs/MIGRATION.md step 12; docs/ARCHITECTURE.md "Module
 // boundaries": `scorer/main.ts` is the screen, an edge, over the pure scorer/{scores,voice,csv,
 // format}.ts). The legacy scorer IIFE (legacy/gin-rummy/index.html) kept score for a game played
-// with real cards, any number of players, in a module-level `state` and a `cur` entry, and wrote
+// with real cards, any number of players (two now: the pass-and-play players, whose names the home
+// screen owns), in a module-level `state` and a `cur` entry, and wrote
 // its screens directly; this is that IIFE with its state in a closure, its DOM writes through
 // @shared/edge/dom, and everything it reached for by injection: storage, the clock, the rng for
 // player ids, the sound cues, the toast, the dialogs, the app's screens (the legacy called
 // `window.__gin`), the CSV download and SpeechRecognition. `createScorer` returns what the legacy
-// exposed as `window.__scorer` (`saved`, `onShown`, `resume`) plus `bind`.
+// exposed as `window.__scorer` (`saved`, `resume`) plus `bind`.
 //
 // KNOWN LEGACY DEBT, preserved until docs/MIGRATION.md step 15: editing a hand from the history
 // goes through `prompt()` dialogs and deleting one through `confirm()`, as the legacy did.
 import {
   addClass,
-  appendHtml,
-  childCount,
-  clear,
   listen,
   listenId,
   queryAllIn,
   queryIn,
   readValue,
   removeClass,
-  removeElement,
   requireId,
   safeHtml,
   selectText,
@@ -34,14 +31,7 @@ import {
   type SafeHtml,
 } from '../../../../shared/edge/dom.ts';
 import type { Rng } from '../../../../shared/lib/rng.ts';
-import {
-  readName,
-  readScorerNames,
-  readScorerState,
-  writeScorerNames,
-  writeScorerState,
-  type Store,
-} from '../storage.ts';
+import { readScorerState, writeScorerState, type Store } from '../storage.ts';
 import { csvFileName, exportCsv } from './csv.ts';
 import { fmtDuration } from './format.ts';
 import {
@@ -110,8 +100,6 @@ export type ScorerDeps = Readonly<{
 export type Scorer = Readonly<{
   /** `loadSaved()`: the session under `ginRummyScorerState_v2`, or null. */
   saved: () => ScorerState | null;
-  /** The Score tab was shown: seed the player rows the first time only. */
-  onShown: () => void;
   /** The resume box: back to the board, or the end screen when the target was reached. */
   resume: () => void;
   /** Register every control's handler, once, at boot. */
@@ -127,8 +115,6 @@ type Entry = Readonly<{
   knockType: KnockType | null;
 }>;
 
-export const NEED_TWO_MSG = 'You need at least two players.';
-export const ADD_TWO_MSG = 'Add at least two players.';
 export const PICK_KNOCKER_MSG = 'Select who Knocked or went Gin first.';
 export const NOTHING_TO_EXPORT_MSG = 'No hands scored yet — nothing to export.';
 export const EXPORTED_MSG = 'Exported the game as a CSV file.';
@@ -288,44 +274,17 @@ export const createScorer = (deps: ScorerDeps): Scorer => {
   };
 
   // ---- setup ----
-  const addPlayerRow = (value: string): void => {
-    const container = requireId(doc, 'scPlayers');
-    const n = childCount(container) + 1;
-    appendHtml(
-      container,
-      safeHtml`<div class="player-input-row"><input type="text" placeholder="Player ${n} name" value="${value}" maxlength="20"><button class="remove-x" type="button">✕</button></div>`,
-    );
-    const row = queryAllIn(container, '.player-input-row').at(-1);
-    const remove = row === undefined ? null : queryIn(row, '.remove-x');
-    if (row === undefined || remove === null) return;
-    listen(remove, 'click', () => {
-      if (childCount(container) > 2) removeElement(row);
-      else toast(NEED_TWO_MSG);
-    });
-  };
-
-  const populateDefaultPlayers = (): void => {
-    clear(requireId(doc, 'scPlayers'));
-    const stored = readScorerNames(store);
-    const name = readName(store);
-    const names: ReadonlyArray<string> = stored.ok
-      ? name.ok
-        ? [name.value, ...stored.value.slice(1)]
-        : stored.value
-      : [name.ok ? name.value : 'Player 1', 'Player 2'];
-    names.forEach(addPlayerRow);
+  // The two players are pass-and-play's two names: `#scP1NameInput` and `#scP2NameInput` are
+  // filled by `home/init` and by every keystroke in any name input (ui/home.ts), so this module
+  // never seeds them. Only the target is reset for a fresh setup.
+  const resetTarget = (): void => {
     setValue(requireId(doc, 'scTargetInput'), '100');
-  };
-
-  /** Only seed defaults the first time, so switching tabs never wipes a list in progress. */
-  const onShown = (): void => {
-    if (childCount(requireId(doc, 'scPlayers')) === 0) populateDefaultPlayers();
   };
 
   const openFreshSetup = (): void => {
     screens.show('homeScreen');
     screens.showScoreTab();
-    populateDefaultPlayers();
+    resetTarget();
   };
 
   // ---- the board ----
@@ -423,14 +382,14 @@ export const createScorer = (deps: ScorerDeps): Scorer => {
     if (state !== null && winnerOf(state) !== null) openEnd(ranked(state));
   };
 
+  /** `(value.trim() || fallback)`: the same fallbacks as pass-and-play's Start. */
+  const nameOr = (id: string, fallback: string): string => {
+    const trimmed = readValue(requireId(doc, id)).trim();
+    return trimmed === '' ? fallback : trimmed;
+  };
+
   const startScoring = (): void => {
-    const names = queryAllIn(requireId(doc, 'scPlayers'), 'input')
-      .map((i) => readValue(i).trim())
-      .filter((n) => n !== '');
-    if (names.length < 2) {
-      toast(ADD_TWO_MSG);
-      return;
-    }
+    const names = [nameOr('scP1NameInput', 'Player 1'), nameOr('scP2NameInput', 'Player 2')];
     const players = names.map((n) => ({ id: uid(), name: n }));
     state = {
       players,
@@ -438,7 +397,6 @@ export const createScorer = (deps: ScorerDeps): Scorer => {
       rounds: [],
       startedAt: deps.now(),
     };
-    writeScorerNames(store, names);
     save();
     resetCur(players);
     openGame();
@@ -646,9 +604,6 @@ export const createScorer = (deps: ScorerDeps): Scorer => {
   };
 
   const bind = (): void => {
-    listenId(doc, 'scAddPlayerBtn', 'click', () => {
-      addPlayerRow('');
-    });
     listenId(doc, 'scStartBtn', 'click', startScoring);
     listenId(doc, 'scSubmitBtn', 'click', submitRound);
     listenId(doc, 'scResContinue', 'click', afterResult);
@@ -680,5 +635,5 @@ export const createScorer = (deps: ScorerDeps): Scorer => {
     else openGame();
   };
 
-  return { saved: loadSaved, onShown, resume, bind, state: () => state };
+  return { saved: loadSaved, resume, bind, state: () => state };
 };

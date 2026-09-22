@@ -1,4 +1,5 @@
-// The gin page's localStorage (docs/MIGRATION.md step 11): the seven keys the legacy page wrote
+// The gin page's localStorage (docs/MIGRATION.md step 11): six of the seven keys the legacy page wrote
+// (`ginRummy_scorerNames` is retired: the Score Counter scores the two pass-and-play names)
 // (legacy/gin-rummy/index.html: `persist()`, `rememberName`, `setHomeTab`, `setPlayMode`,
 // `fx.toggle`, the scorer's `save()` and `startScoring`), frozen here, each behind a decoder that
 // accepts every payload captured from a real legacy session (test/fixtures/legacy/gin-storage,
@@ -53,10 +54,11 @@ export const STORAGE_KEYS = {
   sound: 'ginRummy_sound',
   /** How the hand is arranged: `melds`, `rank` or `suit` (bare string). This page's own key. */
   sort: 'ginRummy_sort',
-  /** The Score Counter's session. */
+  /**
+   * The Score Counter's session. Its players' names are `name` and `p2Name` above (the legacy
+   * `ginRummy_scorerNames` list is retired: the Score Counter scores the two pass-and-play players).
+   */
   scorerState: 'ginRummyScorerState_v2',
-  /** The names the Score Counter was last started with (JSON array). */
-  scorerNames: 'ginRummy_scorerNames',
 } as const;
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
@@ -149,12 +151,6 @@ export const decodeScorerState: Decoder<ScorerState> = object({
   rounds: arrayOf(scorerRound),
   startedAt: integer(0),
 });
-/** `populateDefaultPlayers` used the stored names only when there were at least two. */
-export const decodeScorerNames: Decoder<ReadonlyArray<string>> = refine(
-  arrayOf(string),
-  (names) => names.length >= 2,
-  'at least two names',
-);
 
 const invalid = (key: string, error: Parameters<typeof formatError>[0]): StorageError => ({
   kind: 'invalid',
@@ -278,13 +274,5 @@ export const writeScorerState = (
         })),
         startedAt: state.startedAt,
       });
-
-export const readScorerNames = (store: Store): Result<ReadonlyArray<string>, StorageError> =>
-  store.readJson(STORAGE_KEYS.scorerNames, decodeScorerNames);
-
-export const writeScorerNames = (
-  store: Store,
-  names: ReadonlyArray<string>,
-): Result<null, StorageError> => store.writeJson(STORAGE_KEYS.scorerNames, names);
 
 export const ALL_KEYS: ReadonlyArray<StorageKey> = Object.values(STORAGE_KEYS);

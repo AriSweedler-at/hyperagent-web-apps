@@ -272,7 +272,6 @@
   .setup-players { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
   .player-input-row { display: flex; gap: 8px; align-items: center; }
   .player-input-row input { flex: 1; }
-  .remove-x { background: rgba(248,113,113,0.15); color: var(--danger); border: none; border-radius: 12px; width: 46px; height: 46px; font-size: 1.2rem; font-weight: 700; flex-shrink: 0; }
   .player-card { background: var(--card); border-radius: var(--radius); padding: 14px 16px; border: 1px solid rgba(255,255,255,0.05); }
   .player-card.leader { border: 2px solid var(--gold); box-shadow: 0 0 0 1px rgba(251,191,36,0.3), 0 4px 14px rgba(0,0,0,0.3); }
   .player-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
