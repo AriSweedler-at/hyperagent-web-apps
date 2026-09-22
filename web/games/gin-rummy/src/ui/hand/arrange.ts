@@ -7,7 +7,7 @@
 // first a hand-made meld it can join, else the meld with it among the cards no hand-made meld
 // holds that leaves the least deadwood, else nothing. A long press on a card in a hand-made meld
 // dissolves that meld. Pure; imported by ui/state.ts, ui/render.ts and stories/catalogue.ts.
-import { sortMeld } from '../../engine/cards.ts';
+import { idsOf, sortMeld } from '../../engine/cards.ts';
 import { allMelds, isValidMeldGroup } from '../../engine/melds.ts';
 import { bestMelding } from '../../engine/melds.algorithms.ts';
 import { SUITS, type Card, type Cards, type Meld, type View } from '../../engine/index.ts';
@@ -19,7 +19,6 @@ import type { SortMode } from '../../sort.ts';
 /** The melds the player made by hand in hand number `hand`: card ids, each group a meld, no card in two. */
 export type HumanMelds = Readonly<{ hand: number; groups: ReadonlyArray<ReadonlyArray<string>> }>;
 
-const ids = (cards: Cards): ReadonlyArray<string> => cards.map((c) => c.id);
 const has = (cards: Cards, id: string): boolean => cards.some((c) => c.id === id);
 
 /**
@@ -68,17 +67,17 @@ export const arrangedOf = (
   const table = onTable(v, stage);
   const mine = standing(human, v.handNumber, table);
   if (mine.length === 0) return sorted(engineOf(v, stage), sort);
-  const taken = new Set(ids(mine.flat()));
+  const taken = new Set(idsOf(mine.flat()));
   const rest = bestMelding(table.filter((c) => !taken.has(c.id)));
   return sorted(
-    { groups: [...mine, ...rest.melds], loose: rest.deadwood, human: ids(mine.flat()) },
+    { groups: [...mine, ...rest.melds], loose: rest.deadwood, human: idsOf(mine.flat()) },
     sort,
   );
 };
 
 /** The deadwood `groups` leave in `hand`: what a knock would count if the engine declared them. */
 const deadwoodLeft = (hand: Cards, groups: ReadonlyArray<Meld>): number => {
-  const taken = new Set(ids(groups.flat()));
+  const taken = new Set(idsOf(groups.flat()));
   return bestMelding(hand.filter((c) => !taken.has(c.id))).value;
 };
 
@@ -98,14 +97,14 @@ export const toggleMeld = (
   if (card === undefined) return null;
   const mine = standing(human, hand, held);
   const own = mine.findIndex((g) => has(g, cardId));
-  if (own >= 0) return { hand, groups: mine.filter((_, i) => i !== own).map(ids) };
+  if (own >= 0) return { hand, groups: mine.filter((_, i) => i !== own).map(idsOf) };
   const extended = mine.findIndex((g) => isValidMeldGroup([...g, card]));
   if (extended >= 0)
     return {
       hand,
-      groups: mine.map((g, i) => (i === extended ? ids(sortMeld([...g, card])) : ids(g))),
+      groups: mine.map((g, i) => (i === extended ? idsOf(sortMeld([...g, card])) : idsOf(g))),
     };
-  const taken = new Set(ids(mine.flat()));
+  const taken = new Set(idsOf(mine.flat()));
   const free = held.filter((c) => !taken.has(c.id));
   const best = allMelds(free)
     .filter((m) => has(m, cardId))
@@ -113,7 +112,7 @@ export const toggleMeld = (
       const left = deadwoodLeft(free, [meld]);
       return acc === null || left < acc.left ? { meld, left } : acc;
     }, null);
-  return best === null ? null : { hand, groups: [...mine.map(ids), ids(sortMeld(best.meld))] };
+  return best === null ? null : { hand, groups: [...mine.map(idsOf), idsOf(sortMeld(best.meld))] };
 };
 
 /**
@@ -126,5 +125,5 @@ export const declarable = (
 ): ReadonlyArray<ReadonlyArray<string>> | null =>
   deadwoodLeft(hand, picture.groups) === bestMelding(hand).value &&
   picture.groups.every((g) => isValidMeldGroup(g))
-    ? picture.groups.map(ids)
+    ? picture.groups.map(idsOf)
     : null;

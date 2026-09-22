@@ -373,9 +373,10 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
 - Swappable hand display: `ui/hand/HandView.ts` is the interface `render.ts` consumes; a new view is
   a second module and a `main.ts` choice. Landed: `ui/hand/SlotHandView.ts`, the eleven fixed
   cells with the ghost draw slot (docs/design/gin-draw-ghost-slot.md, PR A), is what `main.ts`
-  paints; `render.ts` hands it the App's `draw` stage as the interface's optional third argument.
-  `defaultHandView` stays as test-only code for its legacy string golden until the design's PR D,
-  and `#tableScreen` left the DOM-snapshot oracle's scope (the table diverges by design; every
+  paints; `render.ts` hands it the App's `draw` stage and the kept picture as the interface's
+  optional third and fourth arguments. The legacy `defaultHandView` and its `#hand` string golden
+  were retired in the simplification pass (the design's PR D): `HandView` is the seam, `slotHandView`
+  its one implementation, and `#tableScreen` left the DOM-snapshot oracle's scope (the table diverges by design; every
   sheet and overlay it opens still compares). The fixed-geometry proofs are `e2e/gin-draw.spec.ts`
   (no card moves on a draw) and `e2e/gin-geometry.spec.ts` (no scroll, one frame in every phase).
 - Phone layout stability: done, by CSS (the design's PR B). `#tableScreen` bounds `--card-w` and

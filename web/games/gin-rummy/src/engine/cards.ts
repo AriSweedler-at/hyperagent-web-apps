@@ -16,6 +16,7 @@ const makeCard = (r: Rank, s: Suit): Card => ({ id: rankLabel(r) + s, r, s });
 /** Face cards count 10; every other card its rank (the ace 1). */
 const cardValue = (c: Card): number => Math.min(c.r, 10);
 const sumValue = (cards: Cards): number => cards.reduce((a, c) => a + cardValue(c), 0);
+const idsOf = (cards: Cards): ReadonlyArray<string> => cards.map((c) => c.id);
 const pretty = (c: Card): string => rankLabel(c.r) + SUIT_SYMBOL[c.s];
 
 /** The 52 cards, suit-major in SUITS order, ace to king within a suit. */
@@ -57,6 +58,7 @@ export {
   makeCard,
   cardValue,
   sumValue,
+  idsOf,
   pretty,
   makeDeck,
   shuffle,

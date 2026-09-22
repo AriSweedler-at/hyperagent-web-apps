@@ -12,35 +12,10 @@
 // fixture seeds Math.random per title, so the deal is the same on every run.
 import type { Page } from '@playwright/test';
 
+import { expectSameBoxes, slotBoxes } from './fixtures/boxes.ts';
 import { ginAcceptDraw, ginStartLocal, ginTakeUpcard } from './fixtures/gin.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
-
-type Box = Readonly<{ x: number; y: number; w: number; h: number }>;
-type Boxes = Readonly<Record<string, Box>>;
-
-/** `data-card -> slot box` of every slot holding a card: the cell, not the card (a selection lifts the card). */
-const SLOT_BOXES = `Object.fromEntries(Array.from(document.querySelectorAll('#hand .slot')).flatMap((s) => {
-  const c = s.querySelector('.card');
-  if (c === null) return [];
-  const r = s.getBoundingClientRect();
-  return [[c.getAttribute('data-card'), { x: r.x, y: r.y, w: r.width, h: r.height }]];
-}))`;
-const slotBoxes = (page: Page): Promise<Boxes> => page.evaluate<Boxes>(SLOT_BOXES);
-
-const expectSameBoxes = (after: Boxes, before: Boxes, when: string): void => {
-  expect(Object.keys(after).sort(), when).toEqual(Object.keys(before).sort());
-  Object.entries(before).forEach(([id, box]) => {
-    const now = after[id];
-    if (now === undefined) return;
-    (['x', 'y', 'w', 'h'] as const).forEach((side) => {
-      expect(
-        Math.abs(now[side] - box[side]),
-        `${when}: card ${id} moved (${side})`,
-      ).toBeLessThanOrEqual(0.5);
-    });
-  });
-};
 
 const VIEWPORTS = {
   phone: { width: 390, height: 844 },

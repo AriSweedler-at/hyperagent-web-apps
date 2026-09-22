@@ -20,6 +20,8 @@ import {
   HAND_SIZE,
   applyAction,
   createGame,
+  idsOf,
+  inPlay,
   makeCard,
   makeDeck,
   viewFor,
@@ -41,7 +43,6 @@ import type { DrawStage } from '../ui/hand/draw.ts';
 import {
   cardsOf,
   engineOf,
-  inPlay,
   phoneRows,
   samePicture,
   settlePicture,
@@ -286,7 +287,7 @@ const GIN_DISCARD = '2C';
  * counts as drawn from the stock (fresh, not undoable) and the engine computes the view.
  */
 const dealtAround = (mine: Cards, theirs: Cards | null, drawnFromStock: string): State => {
-  const held = new Set([...mine, ...(theirs ?? [])].map((c) => c.id));
+  const held = new Set(idsOf([...mine, ...(theirs ?? [])]));
   const rest = makeDeck().filter((c) => !held.has(c.id));
   const bob = theirs ?? rest.slice(0, HAND_SIZE);
   const undealt = theirs === null ? rest.slice(HAND_SIZE) : rest;
@@ -423,13 +424,13 @@ const dcOf = (
 ): Partial<StoryFacts> => {
   if (sheet !== 'discardsOverlay') return {};
   const withHand = app.discardsWithHand === true;
-  const deck = makeDeck().map((c) => c.id);
+  const deck = idsOf(makeDeck());
   const inDeckOrder = (ids: ReadonlyArray<string>): ReadonlyArray<string> =>
     deck.filter((id) => ids.includes(id));
   return {
     dc: {
-      seen: inDeckOrder(state.discard.map((c) => c.id)),
-      held: withHand ? inDeckOrder(state.hands[seat].map((c) => c.id)) : [],
+      seen: inDeckOrder(idsOf(state.discard)),
+      held: withHand ? inDeckOrder(idsOf(state.hands[seat])) : [],
       top: state.discard.at(-1)?.id ?? null,
       withHand,
     },
@@ -484,7 +485,7 @@ const factsOf = (
   const canDrawDiscard = canDrawStock && !state.forceStock && state.discard.length > 0;
   const selectedId = stage === null ? selected : null;
   const { picture, human, sort } = arrangement;
-  const arrangeable = inPlay(view) && stage === null;
+  const arrangeable = inPlay(view.phase) && stage === null;
   const asked = arrangedOf(view, stage, human, sort);
   return {
     slots: Math.max(hand.length, HAND_SIZE + 1),
@@ -500,9 +501,7 @@ const factsOf = (
           ? shown.cardId
           : null,
     selectedId,
-    human: cardsOf(picture)
-      .filter((c) => picture.human.includes(c.id))
-      .map((c) => c.id),
+    human: idsOf(cardsOf(picture).filter((c) => picture.human.includes(c.id))),
     rows: phoneRows(picture),
     arrange: !arrangeable ? 'off' : samePicture(picture, asked) ? 'idle' : 'due',
     sort,
@@ -833,7 +832,5 @@ export const heldCards = (story: Story): ReadonlyArray<string> => {
   if (view === null) return [];
   const picture =
     story.app.picture ?? arrangedOf(view, story.app.draw, story.app.human, story.app.sort);
-  return cardsOf(picture)
-    .map((c) => c.id)
-    .slice(0, HAND_SIZE);
+  return idsOf(cardsOf(picture)).slice(0, HAND_SIZE);
 };

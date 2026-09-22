@@ -8,8 +8,9 @@
 // `rowsOf` mirrors the grid's dense auto-placement (§6) so the paint can say how many rows the
 // phone lays the hand in. Pure; imported by ui/state.ts, ui/hand/SlotHandView.ts, ui/render.ts
 // and stories/catalogue.ts. Not saved, not on the wire.
+import { idsOf } from '../../engine/cards.ts';
 import { isValidMeldGroup } from '../../engine/melds.ts';
-import { HAND_SIZE, type Cards, type View } from '../../engine/types.ts';
+import { HAND_SIZE, type Cards } from '../../engine/types.ts';
 import type { DrawStage } from './draw.ts';
 import type { HandModel } from './HandView.ts';
 
@@ -46,15 +47,14 @@ export const engineOf = (v: HandModel, stage: DrawStage | null): Picture => {
   };
 };
 
-const ids = (cards: Cards): ReadonlyArray<string> => cards.map((c) => c.id);
 const sameIds = (a: ReadonlyArray<string>, b: ReadonlyArray<string>): boolean =>
   a.length === b.length && a.every((id, i) => id === b[i]);
 
 /** Group by group, then the loose cards, then the hand-made marks: the same ids in the same order. */
 export const samePicture = (a: Picture, b: Picture): boolean =>
   a.groups.length === b.groups.length &&
-  a.groups.every((g, i) => sameIds(ids(g), ids(b.groups[i] ?? []))) &&
-  sameIds(ids(a.loose), ids(b.loose)) &&
+  a.groups.every((g, i) => sameIds(idsOf(g), idsOf(b.groups[i] ?? []))) &&
+  sameIds(idsOf(a.loose), idsOf(b.loose)) &&
   sameIds([...a.human].sort(), [...b.human].sort());
 
 /** `p` without the card `id`: it leaves its group or the loose cards, nothing else moves. */
@@ -84,8 +84,8 @@ export const settlePicture = (
   const turnStart = v.isMyTurn && (v.phase === 'draw' || v.phase === 'upcard');
   if (prev === null || turnStart) return fresh();
   const before = cardsOf(prev);
-  const tableIds = new Set(ids(table));
-  const beforeIds = new Set(ids(before));
+  const tableIds = new Set(idsOf(table));
+  const beforeIds = new Set(idsOf(before));
   const added = table.filter((c) => !beforeIds.has(c.id));
   const gone = before.filter((c) => !tableIds.has(c.id));
   if (added.length === 0 && gone.length === 0) return prev;
@@ -178,7 +178,3 @@ export const rowsOf = (spans: ReadonlyArray<number>, cols: number): ReadonlyArra
 
 /** The rows a phone lays `p` in: the `#hand[data-rows]` value. */
 export const phoneRows = (p: Picture): number => rowsOf(spansOf(p), PHONE_COLUMNS).length;
-
-/** A hand can be arranged only in the phases it is played. */
-export const inPlay = (v: Pick<View, 'phase'>): boolean =>
-  v.phase === 'upcard' || v.phase === 'draw' || v.phase === 'discard';

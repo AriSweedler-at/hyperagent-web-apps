@@ -22,7 +22,6 @@ import {
   type CueRole,
   type CueState,
 } from '../../web/games/gin-rummy/src/ui/cues.ts';
-import { defaultHandView } from '../../web/games/gin-rummy/src/ui/hand/HandView.ts';
 import { meldGroupsHtml } from '../../web/games/gin-rummy/src/ui/hand/meldGroups.ts';
 import { RULES_ITEMS, RULES_LIST_HTML } from '../../web/games/gin-rummy/src/ui/rules.ts';
 import { mulberry32 } from '../../web/shared/lib/rng.ts';
@@ -145,26 +144,6 @@ const selectionsFor = (view: View): ReadonlyArray<string | null> => [
   null,
   ...view.me.hand.map((c) => c.id),
 ];
-
-describe('defaultHandView.render', () => {
-  test('equals the legacy #hand markup over every seeded view and every selection', () => {
-    const checked = allViews.reduce((n, view) => {
-      return selectionsFor(view).reduce((m, selection) => {
-        app.selectedCard = selection;
-        expect(defaultHandView.render(view, selection)).toBe(ui.legacyHandHtml(view));
-        return m + 1;
-      }, n);
-    }, 0);
-    expect(checked).toBeGreaterThan(5000);
-    // The corpus reaches the marked states: a fresh card, a locked card, a selected card.
-    const marked = allViews
-      .map((v) => defaultHandView.render(v, v.me.hand[0]?.id ?? null))
-      .join('');
-    expect(marked).toContain(' fresh');
-    expect(marked).toContain(' locked');
-    expect(marked).toContain(' selected');
-  });
-});
 
 describe('statusFor / deadwoodText', () => {
   test('equal the legacy readouts over every seeded view and selection', () => {

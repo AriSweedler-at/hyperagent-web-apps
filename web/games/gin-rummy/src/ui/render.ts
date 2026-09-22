@@ -46,13 +46,13 @@ import {
   type Melding,
   type View,
 } from '../engine/types.ts';
-import { SUITS, makeCard, type Rank } from '../engine/index.ts';
+import { SUITS, idsOf, inPlay, makeCard, type Rank } from '../engine/index.ts';
 import { SUIT_SYMBOL, backHtml, cardHtml, isRed, pretty, rankLabel } from './cards.ts';
 import { deadwoodText, fmtDuration, statusWith, type Selection } from './cues.ts';
 import type { HandView } from './hand/HandView.ts';
 import { meldGroupsHtml } from './hand/meldGroups.ts';
 import { arrangedOf } from './hand/arrange.ts';
-import { inPlay, phoneRows, samePicture } from './hand/picture.ts';
+import { phoneRows, samePicture } from './hand/picture.ts';
 import { SORT_MODES, type SortMode } from '../sort.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
@@ -78,6 +78,32 @@ export const renderRules = (doc: DocumentLike): void => {
 };
 
 /** `showScreen(id)`: every screen but `id` gets `hidden`; the table locks the body to the viewport. */
+// A sheet is an overlay a flag shows; the same flag's close intent answers its button and a tap
+// on its backdrop (the overlay element itself, never its children).
+type Sheet = Readonly<{ overlay: string; close: string; intent: Intent }>;
+const SHEETS: ReadonlyArray<Sheet> = [
+  { overlay: 'rulesOverlay', close: 'closeRulesBtn', intent: { type: 'rules/close' } },
+  { overlay: 'historyOverlay', close: 'closeHistoryBtn', intent: { type: 'history/close' } },
+  { overlay: 'meldOverlay', close: 'closeMeldBtn', intent: { type: 'meld/close' } },
+  { overlay: 'arrangeOverlay', close: 'closeArrangeBtn', intent: { type: 'arrange/close' } },
+  { overlay: 'discardsOverlay', close: 'closeDiscardsBtn', intent: { type: 'discards/close' } },
+];
+
+const paintSheet = (doc: DocumentLike, overlay: string, open: boolean): void => {
+  toggleClass(requireId(doc, overlay), 'hidden', !open);
+};
+
+const bindSheets = (doc: PageLike, dispatch: Dispatch): void => {
+  SHEETS.forEach(({ overlay, close, intent }) => {
+    listenId(doc, close, 'click', () => {
+      dispatch(intent);
+    });
+    listenId(doc, overlay, 'click', (e) => {
+      if (targetIdOf(e) === overlay) dispatch(intent);
+    });
+  });
+};
+
 export const paintScreen = (doc: PageLike, app: App): void => {
   SCREENS.forEach((id) => {
     toggleClass(requireId(doc, id), 'hidden', id !== app.screen);
@@ -167,7 +193,7 @@ const RANKS: ReadonlyArray<Rank> = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
  */
 export const discardsHtml = (v: View, withHand: boolean): SafeHtml => {
   const seen = new Set(v.discardIds ?? []);
-  const held = new Set(withHand ? v.me.hand.map((c) => c.id) : []);
+  const held = new Set(withHand ? idsOf(v.me.hand) : []);
   const top = v.discardTop?.id ?? null;
   const chip = (id: string, label: string): string =>
     `<span class="dc${seen.has(id) ? ' seen' : ''}${held.has(id) ? ' held' : ''}${id === top ? ' top' : ''}" data-card="${id}">${label}</span>`;
@@ -186,7 +212,7 @@ export const discardsSubText = (v: View, withHand: boolean): string =>
 const paintDiscards = (doc: DocumentLike, app: App, v: View): void => {
   // Without `discardIds` (a legacy host's frames) the sheet has nothing to show.
   setDisabled(requireId(doc, 'discardsBtn'), v.discardIds === undefined);
-  toggleClass(requireId(doc, 'discardsOverlay'), 'hidden', !app.discardsOpen);
+  paintSheet(doc, 'discardsOverlay', app.discardsOpen);
   if (!app.discardsOpen) return;
   setHtml(requireId(doc, 'discardsGrid'), discardsHtml(v, app.discardsWithHand));
   setText(requireId(doc, 'discardsSub'), discardsSubText(v, app.discardsWithHand));
@@ -284,14 +310,14 @@ const paintHand = (doc: DocumentLike, app: App, v: View, handView: HandView): vo
   // Arrange opens its sheet in play, never while the drawn card waits in the ghost cell; `due`
   // is the cue that the kept picture differs from the arrangement the player asked for.
   const arrange = requireId(doc, 'arrangeBtn');
-  const arrangeable = inPlay(v) && app.draw === null;
+  const arrangeable = inPlay(v.phase) && app.draw === null;
   setDisabled(arrange, !arrangeable);
   toggleClass(arrange, 'due', arrangeable && !samePicture(picture, arranged));
   setHtml(requireId(doc, 'actions'), actionsHtml(v, app.selectedCard));
 };
 
 const paintArrange = (doc: DocumentLike, app: App): void => {
-  toggleClass(requireId(doc, 'arrangeOverlay'), 'hidden', !app.arrangeOpen);
+  paintSheet(doc, 'arrangeOverlay', app.arrangeOpen);
   queryAllIn(requireId(doc, 'arrangeModes'), 'button[data-sort]').forEach((b) => {
     toggleClass(b, 'active', dataOf(b, 'sort') === app.sort);
   });
@@ -427,7 +453,7 @@ export const meldChooserSub = (v: View): string =>
   `${String(v.meldOptions.length)} ways to meld for the same ${String(v.me.deadwoodValue)} deadwood. Your score is identical either way — but the melds you declare decide what ${v.opp.name} can lay off if you knock.`;
 
 const paintMeldChooser = (doc: DocumentLike, app: App, v: View): void => {
-  toggleClass(requireId(doc, 'meldOverlay'), 'hidden', !app.meldChooser);
+  paintSheet(doc, 'meldOverlay', app.meldChooser);
   if (!app.meldChooser) return;
   setText(requireId(doc, 'meldSub'), meldChooserSub(v));
   setHtml(
@@ -516,8 +542,8 @@ export const historyHtml = (v: View | null): SafeHtml => {
 };
 
 const paintOverlays = (doc: DocumentLike, app: App): void => {
-  toggleClass(requireId(doc, 'rulesOverlay'), 'hidden', !app.rulesOpen);
-  toggleClass(requireId(doc, 'historyOverlay'), 'hidden', app.history === null);
+  paintSheet(doc, 'rulesOverlay', app.rulesOpen);
+  paintSheet(doc, 'historyOverlay', app.history !== null);
   if (app.history === 'game') setHtml(requireId(doc, 'historyList'), historyHtml(app.view));
 };
 
@@ -528,7 +554,7 @@ const paintGame = (doc: DocumentLike, app: App, handView: HandView): void => {
   const v = app.view;
   if (v === null) {
     // `leaveGame()` hid the result sheet; nothing else of the table is touched without a view.
-    toggleClass(requireId(doc, 'roundResultOverlay'), 'hidden', true);
+    paintSheet(doc, 'roundResultOverlay', false);
     return;
   }
   if (v.phase === 'gameOver') {
@@ -585,23 +611,11 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   listenId(doc, 'discardsBtn', 'click', () => {
     dispatch({ type: 'discards/open' });
   });
-  listenId(doc, 'closeDiscardsBtn', 'click', () => {
-    dispatch({ type: 'discards/close' });
-  });
-  listenId(doc, 'discardsOverlay', 'click', (e) => {
-    if (targetIdOf(e) === 'discardsOverlay') dispatch({ type: 'discards/close' });
-  });
   listenId(doc, 'discardsHandToggle', 'change', () => {
     dispatch({ type: 'discards/toggleHand' });
   });
   listenId(doc, 'arrangeBtn', 'click', () => {
     dispatch({ type: 'arrange/open' });
-  });
-  listenId(doc, 'closeArrangeBtn', 'click', () => {
-    dispatch({ type: 'arrange/close' });
-  });
-  listenId(doc, 'arrangeOverlay', 'click', (e) => {
-    if (targetIdOf(e) === 'arrangeOverlay') dispatch({ type: 'arrange/close' });
   });
   listenId(doc, 'arrangeModes', 'click', (e) => {
     const btn = closestFrom(e, 'button[data-sort]');
@@ -618,12 +632,6 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
     listenId(doc, 'hand', ev, () => {
       dispatch({ type: 'card/release' });
     });
-  });
-  listenId(doc, 'closeMeldBtn', 'click', () => {
-    dispatch({ type: 'meld/close' });
-  });
-  listenId(doc, 'meldOverlay', 'click', (e) => {
-    if (targetIdOf(e) === 'meldOverlay') dispatch({ type: 'meld/close' });
   });
   listenId(doc, 'meldOptionList', 'click', (e) => {
     const btn = closestFrom(e, '[data-meld-opt]');
@@ -653,22 +661,10 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   listenId(doc, 'rulesBtnGame', 'click', () => {
     dispatch({ type: 'rules/open' });
   });
-  listenId(doc, 'closeRulesBtn', 'click', () => {
-    dispatch({ type: 'rules/close' });
-  });
   ['historyBtn', 'historyBtnEnd'].forEach((id) => {
     listenId(doc, id, 'click', () => {
       dispatch({ type: 'history/open', who: 'game' });
     });
-  });
-  listenId(doc, 'closeHistoryBtn', 'click', () => {
-    dispatch({ type: 'history/close' });
-  });
-  listenId(doc, 'rulesOverlay', 'click', (e) => {
-    if (targetIdOf(e) === 'rulesOverlay') dispatch({ type: 'rules/close' });
-  });
-  listenId(doc, 'historyOverlay', 'click', (e) => {
-    if (targetIdOf(e) === 'historyOverlay') dispatch({ type: 'history/close' });
   });
 };
 
@@ -677,4 +673,5 @@ export const bindAll = (doc: PageLike, dispatch: Dispatch): void => {
   bindHome(doc, dispatch);
   bindLocal(doc, dispatch);
   bindTable(doc, dispatch);
+  bindSheets(doc, dispatch);
 };
