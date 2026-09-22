@@ -325,11 +325,13 @@ class="pile-peek" id="discardsBtn" title="Discarded cards" aria-label="Discarded
 dom-parity are unaffected); outside `#discardPile` and no `.card`, so the fixtures are untouched.
 CSS:
 `.table-center { position: relative; } .pile-peek { position: absolute; top: 50%; transform:
-translateY(-50%); left: calc(50% + 13px + max(var(--pile-w) / 2 + 12px, 46px) + 6px); width: 36px;
+translateY(-50%); left: calc(50% + 13px + max(var(--pile-w) + 24px, 92px) + 6px); width: 36px;
 height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.15); background:
 var(--card-2); color: var(--text); font-size: 1rem; }`, `:disabled { opacity: 0.4 }`, from 900px
-`left: calc(50% + 20px + max(var(--pile-w) / 2 + 12px, 46px) + 8px)` (13/20 = half the pile gap;
-`max(...)` mirrors `.pile`'s `min-width`). Phone: 268-304 of 346. Disabled without `discardIds`.
+`left: calc(50% + 20px + max(var(--pile-w) + 24px, 92px) + 8px)` (13/20 = half the pile gap;
+`max(...)` is `.pile`'s whole `min-width`; the first cut used half of it and the button sat on the
+discard pile's card, caught by the live check after #29). Phone: 300-336 of 346 at the 84px pile.
+Disabled without `discardIds`.
 
 STATE. `App.discardsOpen`, `App.discardsWithHand` (false; session-only, not saved). Intents
 `discards/open` (fx tap), `discards/close`, `discards/toggleHand`: one-line cases like `rules/open`.
