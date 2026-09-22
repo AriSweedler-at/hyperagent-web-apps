@@ -119,6 +119,11 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    and on the frozen legacy page (aliased in by the harness) and compares 84 checkpoints. The report
    lands in `playwright-report/` (`npx playwright show-report`). The two contexts connect over the
    machine's own addresses: a Cloudflare WARP-style tunnel that drops loopback UDP times them out.
+   Every harness port is a base plus `E2E_PORT_OFFSET` (default 0; `e2e/fixtures/site.ts` `PORTS`):
+   pages 4173+o, proxy 8787+o, PeerServer 9000+o, TURN 3478+o. To run a second e2e beside one
+   that holds the defaults (another worktree, a lingering `npm run serve`), set the offset once and
+   the servers, readiness URLs and `?peer=`/`?ice=` hooks all follow:
+   `E2E_PORT_OFFSET=1000 npm run test:e2e -- e2e/smoke.spec.ts` binds 5173/9787/10000.
 7. **Stories** (`e2e/gin-stories.spec.ts`, `pages` project; `docs/design/gin-draw-ghost-slot.md`
    §7-§8): sixteen catalogued table states of the gin page
    (`web/games/gin-rummy/src/stories/catalogue.ts`, one seeded deal played through the engine),

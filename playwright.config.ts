@@ -1,16 +1,18 @@
 // Browser harness (docs/ARCHITECTURE.md "Testing pyramid", "Two origins"). Every spec runs on two
 // projects: `pages` (GitHub Pages emulated by tools/serve-dist.ts, dist/ under /hyperagent-web-apps/
 // on :4173) and `proxy` (games.sweedler.com emulated by tools/proxy-dev.ts on :8787, running the
-// real Worker against :4173). dist/ is the only tree since docs/MIGRATION.md step 13 cut the last
-// page over (the dark `next` project that played a port before its flip is retired); the pages
-// origin also publishes the frozen legacy gin page under legacy/ through serve-dist aliases for
-// e2e/gin-dom-parity.spec.ts. The specs exercise the built site: `npm run test:e2e` is
-// `npm run build && playwright test`, so dist/ is fresh; a bare `playwright test` reuses it. Online
-// specs meet on a local PeerServer (`peer` package) on :9000, which the pages reach through their
-// `?peer=` hook; `E2E_BROKER=cloud` leaves it out so the advisory CI job `broker` plays through
-// 0.peerjs.com instead. `E2E_TARGET=live` (.github/workflows/nightly.yml) aims both projects at
-// the deployed origins (e2e/fixtures/site.ts LIVE_ORIGINS), starts nothing local and implies the
-// cloud broker; specs that need the local servers skip themselves with a reason.
+// real Worker against :4173). Every port here is e2e/fixtures/site.ts PORTS, the bases named above
+// plus `E2E_PORT_OFFSET`, so a second run can sit beside one that holds the defaults. dist/ is the
+// only tree since docs/MIGRATION.md step 13 cut the last page over (the dark `next` project that
+// played a port before its flip is retired); the pages origin also publishes the frozen legacy gin
+// page under legacy/ through serve-dist aliases for e2e/gin-dom-parity.spec.ts. The specs exercise
+// the built site: `npm run test:e2e` is `npm run build && playwright test`, so dist/ is fresh; a
+// bare `playwright test` reuses it. Online specs meet on a local PeerServer (`peer` package) on
+// :9000, which the pages reach through their `?peer=` hook; `E2E_BROKER=cloud` leaves it out so
+// the advisory CI job `broker` plays through 0.peerjs.com instead. `E2E_TARGET=live`
+// (.github/workflows/nightly.yml) aims both projects at the deployed origins (e2e/fixtures/site.ts
+// LIVE_ORIGINS), starts nothing local and implies the cloud broker; specs that need the local
+// servers skip themselves with a reason.
 import { defineConfig } from '@playwright/test';
 
 import {
@@ -20,6 +22,7 @@ import {
   PEER_HOST,
   PEER_PORT,
   PEER_SERVER,
+  PORTS,
   PROXY_ORIGIN,
   baseUrl,
   isLive,
@@ -68,13 +71,13 @@ export default defineConfig({
     ? []
     : [
         {
-          command: `${node} tools/serve-dist.ts --root dist --base ${PAGES_BASE_PATH} ${pagesAliases} --port ${new URL(PAGES_ORIGIN).port}`,
+          command: `${node} tools/serve-dist.ts --root dist --base ${PAGES_BASE_PATH} ${pagesAliases} --port ${String(PORTS.pages)}`,
           url: `${PAGES_ORIGIN}${PAGES_BASE_PATH}`,
           reuseExistingServer: !CI,
           timeout: 30_000,
         },
         {
-          command: `${node} tools/proxy-dev.ts --upstream ${PAGES_ORIGIN} --port ${new URL(PROXY_ORIGIN).port}`,
+          command: `${node} tools/proxy-dev.ts --upstream ${PAGES_ORIGIN} --port ${String(PORTS.proxy)}`,
           url: `${PROXY_ORIGIN}/`,
           reuseExistingServer: !CI,
           timeout: 30_000,
