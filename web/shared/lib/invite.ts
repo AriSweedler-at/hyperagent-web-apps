@@ -18,7 +18,8 @@ export const inviteUrl = (code: string, pageUrl: string): string =>
  * nothing past U+10FFFF), which is exactly what `decodeURIComponent` accepts without throwing. Every
  * other `%` stays as it is, as the WHATWG percent-decoder leaves a `%` that no two hex digits follow.
  * (An escape that is two hex digits but not valid UTF-8, `%E0` alone, would become U+FFFD there;
- * here it stays raw. No browser writes one into `location.search`.)
+ * here it stays raw. The URL parser keeps such an escape, so only a hand-typed link carries one:
+ * nothing in the app or the harness emits it, and either spelling is a garbage value.)
  */
 const UTF8_ESCAPE =
   /%[0-7][\da-f]|%c[2-9a-f]%[89ab][\da-f]|%d[\da-f]%[89ab][\da-f]|%e0%[ab][\da-f]%[89ab][\da-f]|%e[1-9a-cef]%[89ab][\da-f]%[89ab][\da-f]|%ed%[89][\da-f]%[89ab][\da-f]|%f0%[9ab][\da-f]%[89ab][\da-f]%[89ab][\da-f]|%f[1-3]%[89ab][\da-f]%[89ab][\da-f]%[89ab][\da-f]|%f4%8[\da-f]%[89ab][\da-f]%[89ab][\da-f]/gi;

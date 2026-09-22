@@ -176,8 +176,9 @@ until re-recorded). Legacy cuts: `npm run fixtures:legacy`, and the PR says why 
 
 ## Add a game
 
-A game is a folder; nothing under `web/shared` changes and the proxy needs nothing
-(`docs/ARCHITECTURE.md` "Conventions for small diffs" and "Module boundaries").
+A game is a folder; under `web/shared` only the `Game` row in `web/shared/lib/roomCode.ts`
+changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for small diffs" and
+"Module boundaries").
 
 1. `web/games/<g>/index.html`: the markup, `<link rel="stylesheet">` to
    `../../shared/styles/tokens.css`, `../../shared/styles/base.css` and `./theme.css` in that order,
