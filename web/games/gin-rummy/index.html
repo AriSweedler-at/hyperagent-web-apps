@@ -101,8 +101,10 @@
       </div>
       <div class="card-box">
         <label>Players</label>
-        <div class="setup-players" id="scPlayers"></div>
-        <button class="btn btn-secondary btn-block" id="scAddPlayerBtn" style="margin-top:4px;">+ Add player</button>
+        <div class="setup-players" id="scPlayers">
+          <div class="player-input-row"><input type="text" id="scP1NameInput" placeholder="Player 1 name" maxlength="20"></div>
+          <div class="player-input-row"><input type="text" id="scP2NameInput" placeholder="Player 2 name" maxlength="20"></div>
+        </div>
       </div>
       <button class="btn btn-primary" id="scStartBtn">Start scoring</button>
     </div>

@@ -1,5 +1,7 @@
-// The standalone scorer (Score tab): start a session for two players, record one hand through
-// the board's controls, and the totals and hand counter update; the session persists.
+// The standalone scorer (Score tab): its two players are pass-and-play's two names (typed in
+// either place, shown in the other, kept in localStorage under `ginRummy_name`/`ginRummy_p2Name`);
+// start a session for them, record one hand through the board's controls, and the totals and hand
+// counter update; the session persists.
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -13,7 +15,22 @@ test('scorer: add a round via the scorer tab and the totals update', async ({
   await expect(page.locator('#scorePanel')).toBeVisible();
   const names = page.locator('#scPlayers input');
   await expect(names).toHaveCount(2);
+  await expect(page.locator('#scAddPlayerBtn')).toHaveCount(0);
   await names.nth(0).fill('Ann');
+  await names.nth(1).fill('Bob');
+  // The same two names as pass-and-play, live and across a reload.
+  await expect(page.locator('#p1NameInput')).toHaveValue('Ann');
+  await expect(page.locator('#p2NameInput')).toHaveValue('Bob');
+  await expect(page.locator('#nameInput')).toHaveValue('Ann');
+  await page.locator('#tabPlayBtn').click();
+  await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
+  await page.locator('#p2NameInput').fill('Bo');
+  await page.locator('#tabScoreBtn').click();
+  await expect(names.nth(1)).toHaveValue('Bo');
+  await page.reload();
+  await page.locator('#tabScoreBtn').click();
+  await expect(names.nth(0)).toHaveValue('Ann');
+  await expect(names.nth(1)).toHaveValue('Bo');
   await names.nth(1).fill('Bob');
   await expect(page.locator('#scTargetInput')).toHaveValue('100');
   await page.locator('#scStartBtn').click();

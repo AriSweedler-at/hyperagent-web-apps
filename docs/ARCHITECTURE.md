@@ -883,7 +883,8 @@ Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage r
   first draw, so the wire and storage shapes are unchanged), and the parity suites split on it:
   `gin.legacy.test.ts` pins the leak on the legacy leg only and the reset on the current one, and
   `gin.replay.ts` normalises the legacy state after each redeal and asserts legacy leaks > 0,
-  current leaks == 0 per shard. The DOM oracle `tools/parity/gin-dom-parity.ts` read 84 checkpoints,
+  current leaks == 0 per shard. The DOM oracle `tools/parity/gin-dom-parity.ts` read 82 checkpoints (84 before the Score
+  Counter took pass-and-play's two names and lost its add/remove steps),
   0 mismatches against the frozen legacy page with no mask: its seeded game has no void hand, so the
   only redeal it drives is the rematch, which redeals over a state whose `lastDrawn` key exists
   (the legacy keeps the stale draw, the current engine has null); with SEED 12 no card came back

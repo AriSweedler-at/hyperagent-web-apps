@@ -180,7 +180,6 @@ describe('home', () => {
       { type: 'scrollTop' },
       { type: 'fillName', name: 'Ann' },
       { type: 'fillP2Name', name: 'Bob' },
-      { type: 'scorer', call: 'shown' },
     ]);
     const plain = run(initialApp, { type: 'home/init', home });
     expect(plain.app.nameTouched).toBe(false);
@@ -195,9 +194,7 @@ describe('home', () => {
     expect(run(initialApp, { type: 'tab/set', tab: 'settings' }).effects).toEqual([
       { type: 'writeHomeTab', tab: 'play' },
     ]);
-    expect(run(initialApp, { type: 'tab/set', tab: 'score', persist: false }).effects).toEqual([
-      { type: 'scorer', call: 'shown' },
-    ]);
+    expect(run(initialApp, { type: 'tab/set', tab: 'score', persist: false }).effects).toEqual([]);
   });
 
   test('mode/set: local or online, persisted', () => {
@@ -208,25 +205,37 @@ describe('home', () => {
     expect(run(initialApp, { type: 'mode/set', mode: 'bots' }).app.playMode).toBe('online');
   });
 
-  test('typing a name remembers it trimmed and marks it touched; the pass-and-play name only remembers', () => {
+  test('typing a name remembers it trimmed, shows it as typed in the other inputs, and marks the online one touched', () => {
     expect(run(initialApp, { type: 'name/typed', value: '  Zoë ' })).toEqual({
       app: { ...initialApp, nameTouched: true },
-      effects: [{ type: 'rememberName', name: 'Zoë' }],
+      effects: [
+        { type: 'rememberName', name: 'Zoë' },
+        { type: 'fillName', name: '  Zoë ' },
+      ],
     });
     expect(run(initialApp, { type: 'p1name/typed', value: '' })).toEqual({
       app: initialApp,
-      effects: [{ type: 'rememberName', name: '' }],
+      effects: [
+        { type: 'rememberName', name: '' },
+        { type: 'fillName', name: '' },
+      ],
     });
   });
 
-  test('typing the second pass-and-play name remembers it trimmed under its own key and touches nothing', () => {
+  test('typing the second name remembers it trimmed under its own key, fills its other input and touches nothing', () => {
     expect(run(initialApp, { type: 'p2name/typed', value: ' Bob ' })).toEqual({
       app: initialApp,
-      effects: [{ type: 'rememberP2Name', name: 'Bob' }],
+      effects: [
+        { type: 'rememberP2Name', name: 'Bob' },
+        { type: 'fillP2Name', name: ' Bob ' },
+      ],
     });
     expect(run(initialApp, { type: 'p2name/typed', value: '' })).toEqual({
       app: initialApp,
-      effects: [{ type: 'rememberP2Name', name: '' }],
+      effects: [
+        { type: 'rememberP2Name', name: '' },
+        { type: 'fillP2Name', name: '' },
+      ],
     });
     // A saved second name alone fills its input and nothing else.
     expect(run(initialApp, { type: 'home/init', home: { ...home, p2Name: 'Bob' } })).toMatchObject({
@@ -1345,7 +1354,7 @@ describe('runEffect', () => {
         return answer.yes;
       },
       scrollTop: note('scrollTop'),
-      scorer: { shown: note('scorer.shown'), resume: note('scorer.resume') },
+      scorer: { resume: note('scorer.resume') },
       timers: { start: note('timers.start'), cancel: note('timers.cancel') },
       toggleSound: note('toggleSound'),
       share: note('share'),
@@ -1401,7 +1410,6 @@ describe('runEffect', () => {
       { type: 'confirm', message: 'sure?', then: { type: 'leave/confirmed' } },
       { type: 'then', intent: { type: 'cancel/finish' } },
       { type: 'scrollTop' },
-      { type: 'scorer', call: 'shown' },
       { type: 'scorer', call: 'resume' },
       { type: 'startTimer', id: 'longPress', ms: 450, then: { type: 'submenu/longPress' } },
       { type: 'cancelTimer', id: 'longPress' },
@@ -1427,7 +1435,6 @@ describe('runEffect', () => {
       ['dispatch', { type: 'leave/confirmed' }],
       ['dispatch', { type: 'cancel/finish' }],
       ['scrollTop'],
-      ['scorer.shown'],
       ['scorer.resume'],
       ['timers.start', 'longPress', 450, { type: 'submenu/longPress' }],
       ['timers.cancel', 'longPress'],

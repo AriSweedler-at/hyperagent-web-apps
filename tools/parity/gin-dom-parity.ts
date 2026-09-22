@@ -54,14 +54,21 @@ export const SNAPSHOT_IDS: ReadonlyArray<string> = [
 ];
 
 /**
- * Whitespace runs, the rules slots' ids and the `#handoffBtn` and `#curtainHandoffBtn` buttons
- * (the pass-and-play game offered online, which the legacy page never had) are the only
- * differences allowed.
+ * Whitespace runs, the rules slots' ids, the `#handoffBtn` and `#curtainHandoffBtn` buttons (the
+ * pass-and-play game offered online, which the legacy page never had) and the Score Counter's
+ * player inputs (two fixed ones sharing pass-and-play's names, where the legacy grew a list) are
+ * the only differences allowed.
  */
 export const normalise = (html: string): string =>
   html
     .replace(/ id="rules(Overlay)?List"/g, '')
     .replace(/<button[^>]*\bid="(curtainH|h)andoffBtn"[^>]*>[^<]*<\/button>/g, '')
+    // The Score Counter's players: the legacy grew rows and an "+ Add player" button, the page has
+    // two fixed inputs sharing pass-and-play's names; everything up to the Start button is blanked.
+    .replace(
+      /(<div class="setup-players" id="scPlayers">)[\s\S]*?(<button[^>]*\bid="scStartBtn")/g,
+      '$1</div></div>$2',
+    )
     .replace(/>\s+</g, '><')
     .replace(/\s+/g, ' ')
     .trim();
@@ -376,12 +383,10 @@ const drive = async (pair: Pair, checkpoints: string[], mismatches: Mismatch[]):
   await check('left: home');
 
   // ---- the Score Counter ----
+  // Two players only on this page (the legacy list grew and shrank; its rows are blanked by
+  // `normalise`), so the add and remove steps are gone with the button.
   await both(click('#tabScoreBtn'));
   await check('scorer: setup');
-  await both(click('#scAddPlayerBtn'));
-  await check('scorer: third row added');
-  await both(click('#scPlayers .remove-x >> nth=2'));
-  await check('scorer: third row removed');
   await both(async (page) => {
     const names = page.locator('#scPlayers input');
     await names.nth(0).fill('Ann');

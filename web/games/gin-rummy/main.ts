@@ -66,7 +66,7 @@ import {
 /** The legacy `toast(msg, ms)` default. */
 const TOAST_MS = 2600;
 
-type Scorer = Readonly<{ onShown: () => void; resume: () => void }>;
+type Scorer = Readonly<{ resume: () => void }>;
 
 /** `exportGame()`'s download: a Blob behind an anchor clicked once, its URL revoked 2 s later. */
 const downloadText = (fileName: string, text: string): void => {
@@ -265,7 +265,6 @@ const boot = (): void => {
       window.scrollTo(0, 0);
     },
     scorer: {
-      shown: () => page.__scorer?.onShown(),
       resume: () => page.__scorer?.resume(),
     },
     timers: {

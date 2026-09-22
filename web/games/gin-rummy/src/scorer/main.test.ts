@@ -10,12 +10,10 @@ import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { STORAGE_KEYS } from '../storage.ts';
 import { ginPage, type GinPage } from '../ui/page.fake.ts';
 import {
-  ADD_TWO_MSG,
   EXPORTED_MSG,
   LEAVE_MSG,
   LISTENING_MSG,
   MIC_BLOCKED_MSG,
-  NEED_TWO_MSG,
   NOTHING_TO_EXPORT_MSG,
   NO_SPEECH_MSG,
   NO_SUCH_PLAYER_MSG,
@@ -86,8 +84,6 @@ type Harness = Readonly<{
   /** The history buttons handed out at the last render. */
   edits: () => ReadonlyArray<FakeEl>;
   dels: () => ReadonlyArray<FakeEl>;
-  /** The remove button of each player row. */
-  removes: ReadonlyArray<FakeEl>;
   answers: { prompt: (string | null)[]; confirm: boolean };
   recognizer: { last: SpeechRecognizerLike | null; startThrows: boolean };
   speech: 'supported' | 'none';
@@ -95,7 +91,6 @@ type Harness = Readonly<{
 
 const harness = (
   options: Readonly<{
-    playerRows?: number;
     names?: ReadonlyArray<string>;
     target?: string;
     speech?: 'supported' | 'none';
@@ -111,21 +106,11 @@ const harness = (
   const storage = fakeStorage();
   Object.entries(options.stored ?? {}).forEach(([k, v]) => storage.map.set(k, v));
   const state = { cards: [] as Card[], edits: [] as FakeEl[], dels: [] as FakeEl[] };
-  const playerCount = options.names?.length ?? 2;
-  const removes = Array.from({ length: options.playerRows ?? playerCount }, (_, i) =>
-    fakeEl(`rm${String(i)}`, { classes: ['remove-x'] }),
-  );
-  const rows = removes.map((rm, i) =>
-    fakeEl(`row${String(i)}`, { classes: ['player-input-row'], queries: { '.remove-x': [rm] } }),
-  );
-  const inputs = (options.names ?? ['Ann', 'Bob']).map((name, i) =>
-    fakeEl(`in${String(i)}`, { value: name }),
-  );
+  const names = options.names ?? ['Ann', 'Bob'];
+  const playerCount = 2;
   const page = ginPage(MARKUP, {
-    scPlayers: {
-      children: rows,
-      queries: { '.player-input-row': rows, input: inputs },
-    },
+    scP1NameInput: { value: names[0] ?? '' },
+    scP2NameInput: { value: names[1] ?? '' },
     scTargetInput: { value: options.target ?? '100' },
     scBoard: {
       queries: {
@@ -220,7 +205,6 @@ const harness = (
     cards: () => state.cards,
     edits: () => state.edits,
     dels: () => state.dels,
-    removes,
     answers,
     recognizer,
     speech,
@@ -238,51 +222,19 @@ const started = (over: Parameters<typeof harness>[0] = {}): Harness => {
 };
 
 describe('setup', () => {
-  test('onShown seeds two rows the first time only; the stored names and the saved name win', () => {
-    const h = harness({ playerRows: 0 });
-    h.scorer.onShown();
-    expect(h.page.get('scPlayers').text()).toBe(
-      '<div class="player-input-row"><input type="text" placeholder="Player 1 name" value="Player 1" maxlength="20"><button class="remove-x" type="button">✕</button></div>' +
-        '<div class="player-input-row"><input type="text" placeholder="Player 1 name" value="Player 2" maxlength="20"><button class="remove-x" type="button">✕</button></div>',
-    );
+  test('the two players are the shared name inputs, which this module never seeds', () => {
+    const h = harness({ names: ['Ann', 'Bob'] });
+    expect(h.page.get('scP1NameInput').value()).toBe('Ann');
+    expect(h.page.get('scP2NameInput').value()).toBe('Bob');
     expect(h.page.get('scTargetInput').value()).toBe('100');
-    const seeded = harness({
-      playerRows: 0,
-      stored: {
-        [STORAGE_KEYS.scorerNames]: JSON.stringify(['Zed', 'Bob', 'Cy']),
-        [STORAGE_KEYS.name]: 'Ann',
-      },
-    });
-    seeded.scorer.onShown();
-    expect(seeded.page.get('scPlayers').text()).toMatch(/value="Ann".*value="Bob".*value="Cy"/);
-    const named = harness({ playerRows: 0, stored: { [STORAGE_KEYS.name]: 'Ann' } });
-    named.scorer.onShown();
-    expect(named.page.get('scPlayers').text()).toMatch(/value="Ann".*value="Player 2"/);
-    // Rows already there: nothing is wiped.
-    const busy = harness({ playerRows: 2 });
-    busy.scorer.onShown();
-    expect(busy.page.get('scPlayers').text()).toBe('');
+    expect(h.page.get('scPlayers').text()).toBe('');
   });
 
-  test('a row is removed only while more than two remain; names are escaped', () => {
-    const two = harness({ playerRows: 2 });
-    two.page.get('scAddPlayerBtn').fire('click');
-    expect(two.page.get('scPlayers').text()).toContain('placeholder="Player 3 name" value=""');
-    two.removes[1]?.fire('click');
-    expect(toasts(two)).toEqual([NEED_TWO_MSG]);
-    expect(two.page.get('scPlayers').el.children).toHaveLength(2);
-    const three = harness({ playerRows: 3 });
-    three.page.get('scAddPlayerBtn').fire('click');
-    three.removes[2]?.fire('click');
-    expect(toasts(three)).toEqual([]);
-    expect(toasts(three)).toEqual([]);
-  });
-
-  test('starting needs two names; it stores them, saves the session and opens the board', () => {
-    const one = harness({ names: ['Ann', ''] });
+  test('starting takes the two names, Player 1 and Player 2 where one is blank, saves the session and opens the board', () => {
+    const one = harness({ names: ['Ann', '  '] });
     one.page.get('scStartBtn').fire('click');
-    expect(toasts(one)).toEqual([ADD_TWO_MSG]);
-    expect(one.scorer.state()).toBeNull();
+    expect(toasts(one)).toEqual([]);
+    expect(one.scorer.state()?.players.map((p) => p.name)).toEqual(['Ann', 'Player 2']);
     const h = started({ target: '75' });
     const s = h.scorer.state();
     expect(s).toMatchObject({ target: 75, rounds: [], startedAt: NOW + 1000 });
@@ -290,7 +242,8 @@ describe('setup', () => {
     s?.players.forEach((p) => {
       expect(p.id).toMatch(/^[a-z0-9]{1,7}$/);
     });
-    expect(h.storage.map.get(STORAGE_KEYS.scorerNames)).toBe('["Ann","Bob"]');
+    // The names live under pass-and-play's keys, written as they are typed (ui/home.ts), not here.
+    expect(h.storage.map.has('ginRummy_scorerNames')).toBe(false);
     expect(h.storage.map.get(STORAGE_KEYS.scorerState)).toBe(JSON.stringify(s));
     expect(h.log).toContainEqual(['show', 'scGameScreen']);
     expect(h.page.get('scRoundBadge').text()).toBe('Hand 1');
@@ -455,7 +408,9 @@ describe('the board', () => {
     expect(h.scorer.state()).toBeNull();
     expect(h.storage.map.has(STORAGE_KEYS.scorerState)).toBe(false);
     expect(h.log.slice(-2)).toEqual([['show', 'homeScreen'], ['showScoreTab']]);
-    expect(h.page.get('scPlayers').text()).toMatch(/value="Ann".*value="Bob"/);
+    // The names stay (they are the shared inputs); the target goes back to its default.
+    expect(h.page.get('scP1NameInput').value()).toBe('Ann');
+    expect(h.page.get('scTargetInput').value()).toBe('100');
   });
 });
 

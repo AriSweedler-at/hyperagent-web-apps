@@ -47,7 +47,7 @@ const depsOver = (store: EffectDeps['store'], dispatch: (i: Intent) => void): Ef
   net: { startHost: quiet, startGuest: quiet, send: quiet, close: quiet },
   confirm: () => true,
   scrollTop: quiet,
-  scorer: { shown: quiet, resume: quiet },
+  scorer: { resume: quiet },
   timers: { start: quiet, cancel: quiet },
   toggleSound: quiet,
   share: quiet,
