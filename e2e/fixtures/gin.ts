@@ -147,6 +147,71 @@ export const ginTakeUpcard = async (page: Page): Promise<void> => {
   await expect(page.locator('#hand .slot.ghost.shown .card.locked')).toHaveCount(1);
 };
 
+export type HandGeometry = Readonly<{
+  sizes: ReadonlyArray<string>;
+  tops: ReadonlyArray<number>;
+  /** The rounded tops of each `.group`'s slots, in DOM order. */
+  groups: ReadonlyArray<ReadonlyArray<number>>;
+  dataRows: string | null;
+  handFits: boolean;
+}>;
+const HAND_GEOMETRY = `(() => {
+  const rect = (el) => el.getBoundingClientRect();
+  const tenth = (n) => Math.round(n * 10) / 10;
+  const slots = Array.from(document.querySelectorAll('#hand .slot')).map(rect);
+  const hand = document.getElementById('hand');
+  return {
+    sizes: Array.from(new Set(slots.map((r) => tenth(r.width) + 'x' + tenth(r.height)))),
+    tops: slots.map((r) => Math.round(r.top)),
+    groups: Array.from(document.querySelectorAll('#hand .group')).map((g) => Array.from(g.querySelectorAll('.slot')).map((s) => Math.round(rect(s).top))),
+    dataRows: hand.getAttribute('data-rows'),
+    handFits: hand.scrollHeight <= hand.clientHeight + 1,
+  };
+})()`;
+
+/**
+ * The hand grid as docs/design/gin-arrangement-and-discards.md §6 lays it out: eleven cells of
+ * one size, a meld never split across rows (a run of seven or more wraps inside its own cell on a
+ * phone, into as few rows as it needs), no row wider than `columns`, one row on the laptop, and
+ * on a phone the two or three rows `#hand[data-rows]` announces. Returns the row count.
+ */
+export const expectHandRows = async (page: Page, columns: 6 | 11): Promise<number> => {
+  const g = await page.evaluate<HandGeometry>(HAND_GEOMETRY);
+  expect(g.tops, 'eleven cells').toHaveLength(11);
+  expect(g.sizes, 'one cell size').toHaveLength(1);
+  expect(g.handFits, '#hand scrolls').toBe(true);
+  g.groups.forEach((tops, i) => {
+    expect(new Set(tops).size, `group ${String(i)} spans rows`).toBe(
+      Math.ceil(tops.length / columns),
+    );
+  });
+  const perRow = g.tops.reduce<ReadonlyMap<number, number>>(
+    (m, t) => new Map([...m, [t, (m.get(t) ?? 0) + 1] as const]),
+    new Map<number, number>(),
+  );
+  perRow.forEach((n, top) => {
+    expect(n, `the row at ${String(top)} holds ${String(n)} cells`).toBeLessThanOrEqual(columns);
+  });
+  const rows = perRow.size;
+  if (columns === 11) expect(rows, 'one row on the laptop').toBe(1);
+  else {
+    expect([2, 3], 'phone rows').toContain(rows);
+    expect(g.dataRows, 'data-rows').toBe(String(rows));
+  }
+  return rows;
+};
+
+/** Hold the pointer on a card past the long-press timer: a meld with it by hand, or that meld dissolved. */
+export const ginLongPress = async (page: Page, cardId: string): Promise<void> => {
+  const card = page.locator(`#hand .card[data-card="${cardId}"]`);
+  const box = await card.boundingBox();
+  if (box === null) throw new Error(`card ${cardId} has no box`);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(650);
+  await page.mouse.up();
+};
+
 /**
  * One legal turn from the draw phase: draw from the stock, accept the card from the ghost slot
  * (the owner's two-tap flow), then discard. Returns the discarded id.

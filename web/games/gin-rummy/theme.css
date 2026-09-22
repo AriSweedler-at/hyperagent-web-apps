@@ -111,10 +111,24 @@
   .hand-header .dw { color: var(--gold); white-space: nowrap; flex-shrink: 0; }
   .hand-header .dw.tappable-dw { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
   .hand-header .dw .alt-badge { background: rgba(251,191,36,0.2); border-radius: 999px; padding: 2px 7px; margin-left: 5px; font-size: 0.78rem; }
+  /* A 20px pill inside the fixed 24px header; ::after widens the hit area to 44px. The enabled state
+     is the cue that the hand is not in the engine's arrangement (docs/design/gin-arrangement-and-discards.md §5). */
+  .arrange-btn { position: relative; flex-shrink: 0; margin: 0 8px; padding: 0 9px; height: 20px; line-height: 18px; border-radius: 999px; font: inherit; font-size: 0.72rem; font-weight: 700; color: var(--text); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); cursor: pointer; }
+  .arrange-btn::after { content: ""; position: absolute; inset: -12px -6px; }
+  .arrange-btn:disabled { opacity: 0.35; cursor: default; }
+  .arrange-btn.due { border-color: rgba(74,222,128,0.7); color: var(--accent); }
   /* Eleven fixed cells: ten cards and the ghost draw slot, or eleven cards once a draw is accepted.
-     Six columns fit a phone (two rows); 14px of top padding is room for the lift and the dot. */
-  .hand { display: grid; grid-template-columns: repeat(6, calc(var(--card-w) + 6px)); grid-auto-rows: calc(var(--card-w) * 1.44 + 9px); gap: 8px 0; justify-content: center; padding: 14px 0 2px; overflow: visible; }
-  .slot { position: relative; display: flex; align-items: flex-start; justify-content: center; padding: 0 3px 6px; border-bottom: 3px solid transparent; }
+     Six columns fit a phone (two rows); 14px of top padding is room for the lift and the dot. A meld
+     is one grid item (.group.nK) spanning its length, so it never splits across rows; dense flow lets a
+     later loose card or the ghost fill a hole an earlier meld left, so two rows suffice unless the
+     melds cannot share two (docs/design/gin-arrangement-and-discards.md §6). */
+  .hand { display: grid; grid-template-columns: repeat(6, calc(var(--card-w) + 6px)); grid-auto-rows: calc(var(--card-w) * 1.44 + 9px); grid-auto-flow: row dense; gap: 8px 0; justify-content: center; padding: 14px 0 2px; overflow: visible; }
+  .group { display: flex; flex-wrap: wrap; align-content: flex-start; row-gap: 8px; }
+  .group.n1 { grid-column: span 1; } .group.n2 { grid-column: span 2; } .group.n3 { grid-column: span 3; }
+  .group.n4 { grid-column: span 4; } .group.n5 { grid-column: span 5; } .group.n6 { grid-column: span 6; }
+  .group.n7 { grid-column: span 7; } .group.n8 { grid-column: span 8; } .group.n9 { grid-column: span 9; }
+  .group.n10 { grid-column: span 10; } .group.n11 { grid-column: span 11; }
+  .slot { position: relative; display: flex; align-items: flex-start; justify-content: center; width: calc(var(--card-w) + 6px); padding: 0 3px 6px; border-bottom: 3px solid transparent; }
   .slot.head { border-radius: 10px 0 0 10px; }
   .slot.tail { border-radius: 0 10px 10px 0; }
   .slot.m0 { border-bottom-color: #4ade80; background: rgba(74,222,128,0.10); }
@@ -123,6 +137,8 @@
   .slot.m3 { border-bottom-color: #fb923c; background: rgba(251,146,60,0.10); }
   .slot.m4 { border-bottom-color: #a78bfa; background: rgba(167,139,250,0.10); }
   .slot.dead { border-bottom-color: transparent; }
+  /* A meld the player made by hand (arrange.ts) carries a gold bar above its cells. */
+  .slot.human::after { content: ""; position: absolute; top: -4px; left: 4px; right: 4px; height: 3px; border-radius: 2px; background: var(--gold); }
   /* The ghost slot keeps its cell in every phase; it shows only while a draw is possible, awaited or made. */
   .slot.ghost { visibility: hidden; }
   .slot.ghost.open, .slot.ghost.pending, .slot.ghost.shown { visibility: visible; }
@@ -142,6 +158,10 @@
   .waiting-note { flex: 1; text-align: center; color: var(--muted); font-size: 0.85rem; align-self: center; }
   /* The laptop layout: one row of eleven 70px cells (770px) inside the 816px the wider #app leaves,
      bigger piles, and the same height bound so a short window (a 720px laptop) still never scrolls. */
+  /* A run of seven or more wraps inside its own two-row cell on a phone. */
+  @media (max-width: 899px) {
+    .group.n7, .group.n8, .group.n9, .group.n10, .group.n11 { grid-column: span 6; grid-row: span 2; }
+  }
   @media (min-width: 900px) {
     body.fixed-screen #app { max-width: 860px; }
     #tableScreen {
@@ -162,6 +182,13 @@
     body.fixed-screen, body.fixed-screen #app { height: auto; max-height: none; overflow: visible; }
     body.fixed-screen #app { min-height: 100dvh; }
     #tableScreen { overflow: visible; }
+  }
+  /* A third row (render.ts writes the phone's row count to #hand[data-rows]) needs one more row at
+     the 40px floor: 661 + 74.6px. A phone whose height fits only two scrolls to the actions row. */
+  @media (max-height: 736px) and (max-width: 899px) {
+    body.fixed-screen:has(#hand[data-rows="3"]), body.fixed-screen:has(#hand[data-rows="3"]) #app { height: auto; max-height: none; overflow: visible; }
+    body.fixed-screen:has(#hand[data-rows="3"]) #app { min-height: 100dvh; }
+    body.fixed-screen:has(#hand[data-rows="3"]) #tableScreen { overflow: visible; }
   }
 
   /* ---------- cards ---------- */
@@ -206,6 +233,9 @@
   #roundResultOverlay .sheet { display: flex; flex-direction: column; overflow: hidden; }
   #rrBody { overflow-y: auto; min-height: 0; flex: 1; }
   .rr-melds .meld-group { padding: 2px 3px 4px; gap: 3px; }
+  .sort-modes { display: flex; gap: 8px; margin-top: 12px; }
+  .sort-modes .btn { flex: 1; padding-left: 6px; padding-right: 6px; }
+  .sort-modes .btn.active { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #08260f; }
   .rr-totals { display: flex; justify-content: space-around; padding: 8px 0 0; color: var(--muted); font-size: 0.9rem; }
   .rr-totals strong { color: var(--text); font-size: 1.05rem; }
   .history-round { padding: 10px 4px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.88rem; }

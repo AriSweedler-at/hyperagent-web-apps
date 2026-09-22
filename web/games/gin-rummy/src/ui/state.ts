@@ -40,6 +40,10 @@ import {
 } from '../protocol.ts';
 import type { ScorerState } from '../scorer/scores.ts';
 import {
+  DEFAULT_SORT,
+  readSort,
+  writeSort,
+  type SortMode,
   DEFAULT_HOME_TAB,
   DEFAULT_PLAY_MODE,
   HOME_TABS,
@@ -62,7 +66,9 @@ import {
   type Store,
 } from '../storage.ts';
 import { INITIAL_CUES, nextCue, selectionIn, type Cue, type CueState } from './cues.ts';
-import { drawSource, holdOf, settleDraw, type DrawStage } from './hand/draw.ts';
+import { drawSource, settleDraw, type DrawStage } from './hand/draw.ts';
+import { arrangedOf, declarable, toggleMeld, type HumanMelds } from './hand/arrange.ts';
+import { inPlay, settlePicture, type Picture } from './hand/picture.ts';
 
 // ---- the state ---------------------------------------------------------------------------------
 
@@ -155,8 +161,8 @@ export type App = Readonly<{
   /** `#codeInput` as last sanitised (the legacy `lastGoodCode`). */
   codeDraft: string;
   /**
-   * The ghost draw slot (docs/design/gin-draw-ghost-slot.md §3): the held ten-card picture and
-   * whether the drawn card is awaited or shown. Not saved, not on the wire.
+   * The ghost draw slot (docs/design/gin-draw-ghost-slot.md §3): whether the drawn card is
+   * awaited or shown. Not saved, not on the wire.
    */
   draw: DrawStage | null;
   /**
@@ -167,6 +173,18 @@ export type App = Readonly<{
    * resumes the offer. Cleared by the guest's join and by every leave and cancel.
    */
   handoff: boolean;
+  /**
+   * The hand as the cells show it (docs/design/gin-arrangement-and-discards.md §5): kept through
+   * a selection, a draw, an accept and a discard, re-melded at the start of my turn, on Arrange
+   * and on a chooser pick. Null until the first paint of a view. Not saved, not on the wire.
+   */
+  picture: Picture | null;
+  /** The melds the player made by hand this hand (arrange.ts). Not saved, not on the wire. */
+  human: HumanMelds | null;
+  /** How the hand is arranged (`ginRummy_sort`). */
+  sort: SortMode;
+  /** `#arrangeOverlay` open. */
+  arrangeOpen: boolean;
 }>;
 
 export const DEFAULT_NAME = 'Ari';
@@ -205,6 +223,10 @@ export const initialApp: App = {
   codeDraft: '',
   draw: null,
   handoff: false,
+  picture: null,
+  human: null,
+  sort: DEFAULT_SORT,
+  arrangeOpen: false,
 };
 
 /** The Play tab opens its submenu after this long a press. */
@@ -224,6 +246,7 @@ export const LOST_HOST_MSG = 'Lost connection to the host — reconnecting…';
 export const DISCONNECTED_MSG = 'Disconnected from the host — reconnecting…';
 export const FORCE_STOCK_MSG = 'Both players passed — you must draw from the stock.';
 export const LOCKED_CARD_MSG = "You can't discard the card you just took from the discard pile.";
+export const NO_MELD_MSG = 'No meld to make with that card.';
 export const ONE_WAY_MSG = 'This hand can only be melded one way.';
 export const LEAVE_LOCAL_MSG = 'End this game? Scores will be cleared.';
 export const LEAVE_ONLINE_MSG = 'Leave this game? The room will close.';
@@ -244,6 +267,8 @@ export type HomeSnapshot = Readonly<{
   p2Name: string | null;
   homeTab: HomeTab;
   playMode: PlayMode;
+  /** How the hand is arranged: this page's own key, so a legacy session has the default. */
+  sort: SortMode;
   save: Save | null;
   scorer: ScorerState | null;
 }>;
@@ -330,6 +355,16 @@ export type Intent =
   | Readonly<{ type: 'meld/open' }>
   | Readonly<{ type: 'meld/close' }>
   | Readonly<{ type: 'meld/choose'; index: number }>
+  /** `#arrangeBtn`. */
+  | Readonly<{ type: 'arrange/open' }>
+  | Readonly<{ type: 'arrange/close' }>
+  /** A sort mode in `#arrangeOverlay`: remembered, and the hand arranged by it now. */
+  | Readonly<{ type: 'hand/arrange'; mode: SortMode }>
+  /** A card's pointerdown: the long-press timer starts. */
+  | Readonly<{ type: 'card/press'; cardId: string }>
+  | Readonly<{ type: 'card/release' }>
+  /** The long press fired: a meld with the card by hand, or that meld dissolved. */
+  | Readonly<{ type: 'hand/mark'; cardId: string }>
   /** `#curtainBtn`. */
   | Readonly<{ type: 'curtain/reveal' }>
   | Readonly<{ type: 'leave/request' }>
@@ -353,6 +388,7 @@ export type Effect =
   | Readonly<{ type: 'rememberP2Name'; name: string }>
   | Readonly<{ type: 'writeHomeTab'; tab: HomeTab }>
   | Readonly<{ type: 'writePlayMode'; mode: PlayMode }>
+  | Readonly<{ type: 'writeSort'; sort: SortMode }>
   /** `ms` null is the default duration. */
   | Readonly<{ type: 'toast'; message: string; ms: number | null }>
   /** To the current session's channel, if open. */
@@ -387,7 +423,7 @@ export type Effect =
   /** `#codeInput`'s value after sanitising. */
   | Readonly<{ type: 'setCode'; value: string }>;
 
-export type TimerId = 'longPress';
+export type TimerId = 'longPress' | 'cardPress';
 
 export type Step = Readonly<{ app: App; effects: ReadonlyArray<Effect> }>;
 
@@ -434,8 +470,8 @@ const showScreen = (app: App, screen: ScreenId): Step =>
 /**
  * The state side of the legacy `render()`: nothing without a view; else the cue machine steps
  * (its cue is played), the screen is the table or, at gameOver, the end screen, a selection
- * that left the hand is dropped, and the draw stage settles against the view. The paint itself
- * is main.ts's after every intent.
+ * that left the hand is dropped, and the draw stage, then the picture, settle against the view.
+ * The paint itself is main.ts's after every intent.
  */
 const rendered = (app: App): Step => {
   const view = app.view;
@@ -443,8 +479,12 @@ const rendered = (app: App): Step => {
   const cued = nextCue(app.cues, view, app.role === 'local' ? 'local' : 'online');
   const selectedCard = selectionIn(view, app.selectedCard);
   const screen: ScreenId = view.phase === 'gameOver' ? 'endgameScreen' : 'tableScreen';
+  const draw = settleDraw(app.draw, view);
+  const picture = settlePicture(app.picture, view, draw, () =>
+    arrangedOf(view, draw, app.human, app.sort),
+  );
   return step(
-    { ...app, cues: cued.state, selectedCard, screen, draw: settleDraw(app.draw, view) },
+    { ...app, cues: cued.state, selectedCard, screen, draw, picture },
     ...(cued.cue === null ? [] : [{ type: 'fx', cue: cued.cue } as const]),
     { type: 'scrollTop' },
   );
@@ -543,6 +583,8 @@ const startLocal = (app: App, game: State): Step =>
         revealed: null,
         resultDismissed: false,
         draw: null,
+        picture: null,
+        human: null,
       },
       { type: 'wakeLock', hold: true },
     ),
@@ -578,9 +620,10 @@ const startGuest = (app: App, code: string): Step => {
 };
 
 /**
- * `act(action)`: a tap, then by role. A draw (the stock, the discard pile, the upcard) first holds
- * the ten-card picture on screen, so the slot view keeps it until the player accepts the card
- * (docs/design/gin-draw-ghost-slot.md §3); the stage settles in `rendered` or clears in `refuse`.
+ * `act(action)`: a tap, then by role. A draw (the stock, the discard pile, the upcard) first opens
+ * the ghost cell for the card, so the ten cards on screen keep their places until the player
+ * accepts it (docs/design/gin-draw-ghost-slot.md §3); the stage settles in `rendered` or clears in
+ * `refuse`.
  * A second draw while one is `waiting` (a guest's round trip: the view stays in the draw phase
  * until the host's state frame lands) is ignored, or the host would refuse the duplicate with a
  * toast that clears the stage and collapses the ghost card without the player's accept tap.
@@ -589,9 +632,7 @@ const act = (app: App, action: Action, ctx: Context): Step => {
   const from = drawSource(action);
   if (from !== null && app.draw?.kind === 'waiting') return pure(app);
   const held: App =
-    from !== null && app.view !== null
-      ? { ...app, draw: { kind: 'waiting', from, hold: holdOf(app.view.me) } }
-      : app;
+    from !== null && app.view !== null ? { ...app, draw: { kind: 'waiting', from } } : app;
   return then(step(held, { type: 'fx', cue: 'tap' }), (a) => {
     switch (a.role) {
       case 'local':
@@ -736,6 +777,7 @@ const initHome = (app: App, home: HomeSnapshot): Step =>
             nameTouched: home.name !== null ? true : a.nameTouched,
             homeTab: home.homeTab,
             playMode: home.playMode,
+            sort: home.sort,
           },
           ...(home.name === null ? [] : [{ type: 'fillName', name: home.name } as const]),
           ...(home.p2Name === null ? [] : [{ type: 'fillP2Name', name: home.p2Name } as const]),
@@ -817,6 +859,8 @@ const leaveFinish = (app: App): Step =>
       meldChooser: false,
       draw: null,
       handoff: false,
+      picture: null,
+      human: null,
     },
     { type: 'clearSave' },
     { type: 'initHome' },
@@ -1025,7 +1069,14 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
         ctx.rng,
         ctx.now,
       );
-      return broadcast({ ...app, game, resultDismissed: false, draw: null });
+      return broadcast({
+        ...app,
+        game,
+        resultDismissed: false,
+        draw: null,
+        picture: null,
+        human: null,
+      });
     }
     // ---- net: guest ----
     case 'guest/start':
@@ -1037,7 +1088,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'guest/frame':
       return guestFrame(app, intent.frame);
     case 'guest/lost': {
-      const lost = { ...app, oppConnected: false, draw: null };
+      const lost = { ...app, oppConnected: false, draw: null, picture: null, human: null };
       if (lost.view !== null && lost.view.phase !== 'gameOver')
         return then(rendered(lost), (a) => step(a, toast(LOST_HOST_MSG, GONE_TOAST_MS)));
       return showScreen(withGuestStatus(lost, DISCONNECTED_MSG), 'guestWaitScreen');
@@ -1088,13 +1139,73 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'meld/close':
       return pure({ ...app, meldChooser: false });
     case 'meld/choose': {
-      const option = app.view?.meldOptions[intent.index];
-      if (option === undefined) return pure(app);
+      const v = app.view;
+      const option = v?.meldOptions[intent.index];
+      if (v === null || option === undefined) return pure(app);
+      // The pick becomes hand-made, so it outlives the engine's declaration (arrange.ts), and the
+      // picture is dropped so the paint after the move is that arrangement.
+      const human: HumanMelds = {
+        hand: v.handNumber,
+        groups: option.melds.map((m) => m.map((c) => c.id)),
+      };
       return act(
-        { ...app, meldChooser: false },
+        { ...app, meldChooser: false, picture: null, human },
         { type: 'setMelds', melds: option.melds.map((m) => m.map((c) => c.id)) },
         ctx,
       );
+    }
+    case 'arrange/open': {
+      // Never while the drawn card waits in the ghost cell: the ten on the table have no melding
+      // of their own then. Either player's turn otherwise (UI only).
+      const v = app.view;
+      return v === null || !inPlay(v) || app.draw !== null
+        ? pure(app)
+        : step({ ...app, arrangeOpen: true }, { type: 'fx', cue: 'tap' });
+    }
+    case 'arrange/close':
+      return pure({ ...app, arrangeOpen: false });
+    case 'hand/arrange': {
+      const v = app.view;
+      const chosen: App = { ...app, sort: intent.mode, arrangeOpen: false };
+      const remembered: Effect = { type: 'writeSort', sort: intent.mode };
+      if (v === null || !inPlay(v) || app.draw !== null) return step(chosen, remembered);
+      return then(
+        step({ ...chosen, picture: arrangedOf(v, null, app.human, intent.mode) }, remembered, {
+          type: 'fx',
+          cue: 'tap',
+        }),
+        rendered,
+      );
+    }
+    case 'card/press': {
+      // The App is returned as is: main.ts skips the paint, so the pressed element survives to
+      // receive its click (a plain tap) or the timer below (a long press).
+      const v = app.view;
+      if (v === null || !inPlay(v) || app.draw !== null) return pure(app);
+      return step(app, {
+        type: 'startTimer',
+        id: 'cardPress',
+        ms: LONG_PRESS_MS,
+        then: { type: 'hand/mark', cardId: intent.cardId },
+      });
+    }
+    case 'card/release':
+      return step(app, { type: 'cancelTimer', id: 'cardPress' });
+    case 'hand/mark': {
+      const v = app.view;
+      if (v === null || !inPlay(v) || app.draw !== null) return pure(app);
+      const human = toggleMeld(app.human, v.handNumber, v.me.hand, intent.cardId);
+      if (human === null) return step(app, toast(NO_MELD_MSG));
+      // The repaint replaces the pressed card's element, so the click that ends the press never
+      // reaches a card: a long press selects nothing.
+      const picture = arrangedOf(v, null, human, app.sort);
+      const marked: App = { ...app, human, picture, selectedCard: null };
+      // Declared to the engine too when it scores as well as the solver, so a knock lays off
+      // against these melds; a worse arrangement stays a picture and the knock counts the best.
+      const groups = declarable(v.me.hand, picture);
+      return groups === null
+        ? then(step(marked, { type: 'fx', cue: 'tap' }), rendered)
+        : act(marked, { type: 'setMelds', melds: groups }, ctx);
     }
     case 'curtain/reveal': {
       if (app.game === null) return pure(app);
@@ -1158,6 +1269,7 @@ export const readHome = (store: Store): HomeSnapshot => {
   const p2Name = readP2Name(store);
   const tab = readHomeTab(store);
   const mode = readPlayMode(store);
+  const sort = readSort(store);
   const save = readSave(store);
   const scorer = readScorerState(store);
   return {
@@ -1165,6 +1277,7 @@ export const readHome = (store: Store): HomeSnapshot => {
     p2Name: p2Name.ok ? p2Name.value : null,
     homeTab: tab.ok ? tab.value : DEFAULT_HOME_TAB,
     playMode: mode.ok ? mode.value : DEFAULT_PLAY_MODE,
+    sort: sort.ok ? sort.value : DEFAULT_SORT,
     save: save.ok ? save.value : null,
     scorer: scorer.ok ? scorer.value : null,
   };
@@ -1250,6 +1363,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'writePlayMode':
       writePlayMode(deps.store, effect.mode);
+      return;
+    case 'writeSort':
+      writeSort(deps.store, effect.sort);
       return;
     case 'toast':
       deps.toast(effect.message, effect.ms);

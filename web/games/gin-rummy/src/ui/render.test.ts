@@ -302,7 +302,9 @@ describe('the table', () => {
     if (v === null || shownApp.draw === null) throw new Error('the draw did not show');
     paintAll(p.doc, shownApp);
     expect(p.get('statusSub').text()).toBe('Tap the new card to keep it, or pick a discard');
-    expect(p.get('hand').text()).toBe(slotHandView.render(v, null, shownApp.draw));
+    expect(p.get('hand').text()).toBe(
+      slotHandView.render(v, null, shownApp.draw, shownApp.picture),
+    );
     // The ten held cards paint as they were before the draw; the eleventh sits in the ghost cell.
     expect(
       p
@@ -327,11 +329,7 @@ describe('the table', () => {
     // A guest awaiting the host's state frame: the pending cell and "Drawing…".
     const pending = {
       ...local(passed, 0),
-      draw: {
-        kind: 'waiting',
-        from: 'stock',
-        hold: { melds: before.me.melds, deadwood: before.me.deadwood },
-      } as const,
+      draw: { kind: 'waiting', from: 'stock' } as const,
     };
     paintAll(p.doc, pending);
     expect(p.get('statusSub').text()).toBe('Drawing…');

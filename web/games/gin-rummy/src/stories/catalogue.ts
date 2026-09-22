@@ -1,18 +1,20 @@
 // The stories catalogue (docs/design/gin-draw-ghost-slot.md §7, docs/design/gin-arrangement-and-
-// discards.md §10): eighteen table states of the gin page, each an `App` the real paint renders as
-// it is (`?story=<id>`, src/stories/boot.ts) and a record of what the table must then show. Every
+// discards.md §10): table states of the gin page, each an `App` the real paint renders as it is
+// (`?story=<id>`, src/stories/boot.ts) and a record of what the table must then show. Every
 // state is played through the engine alone from one seeded deal (`mulberry32(SEED)`, dealer 1, so
 // Ann in seat 0 decides on the upcard first); the knock story searches the seeds from SEED up with
-// a least-deadwood policy and takes the first deal that offers a knock, the gin story rebuilds the
-// deal's hands around a gin so the engine still computes its view, and the two laid-off stories
-// rebuild them around the chain position of test/parity/gin.legacy.test.ts (4S then 5S onto A-2-3
-// of spades). The facts are derived from the engine state and the draw stage (never
-// from the renderer), so the test beside this file (facts against the painted markup) and
-// e2e/gin-stories.spec.ts (facts against the served DOM, geometry, screenshots) are independent
-// oracles of the paint. `sameHandAs` names the story whose first ten slots must hold the same
-// cards in the same places: the owner's "no cards would move position until you took an action"
-// as an assertion. Pure data and pure builders: no DOM, no clock, no `?raw`, so vitest, Playwright
-// and the page's own chunk all import it. Outside src/ui/** on purpose (the ui/ coverage ratchet).
+// a least-deadwood policy and takes the first deal that offers a knock, the two-ways story the
+// first deal whose accepted hand melds two ways, the gin story rebuilds the deal's hands around a
+// gin so the engine still computes its view, the three-rows story around a run of seven, and the
+// two laid-off stories around the chain position of test/parity/gin.legacy.test.ts (4S then 5S
+// onto A-2-3 of spades). The facts are derived from the engine state, the draw stage and the
+// picture (never from the renderer), so the test beside this file (facts against the painted
+// markup) and e2e/gin-stories.spec.ts (facts against the served DOM, geometry, screenshots) are
+// independent oracles of the paint. `sameHandAs` names the story whose first ten slots must hold
+// the same cards in the same places: the owner's "no cards would move position until you took an
+// action" as an assertion. Pure data and pure builders: no DOM, no clock, no `?raw`, so vitest,
+// Playwright and the page's own chunk all import it. Outside src/ui/** on purpose (the ui/
+// coverage ratchet).
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import {
   HAND_SIZE,
@@ -33,10 +35,21 @@ import type {
   Suit,
   View,
 } from '../engine/types.ts';
-import { holdOf, type DrawStage } from '../ui/hand/draw.ts';
+import { DEFAULT_SORT, type SortMode } from '../storage.ts';
+import { arrangedOf, toggleMeld, type HumanMelds } from '../ui/hand/arrange.ts';
+import type { DrawStage } from '../ui/hand/draw.ts';
+import {
+  cardsOf,
+  engineOf,
+  inPlay,
+  phoneRows,
+  samePicture,
+  settlePicture,
+  type Picture,
+} from '../ui/hand/picture.ts';
 import { initialApp, type App } from '../ui/state.ts';
 
-/** The seed of the deal every story but the knock search plays from. */
+/** The seed of the deal every story but the seed searches plays from. */
 export const SEED = 12;
 /** The clock every story reads: the epoch of the other gin oracles. */
 export const EPOCH = 1_700_000_000_000;
@@ -50,7 +63,9 @@ const PLAYERS = [
 export type GhostState = 'none' | 'hidden' | 'open' | 'pending' | 'shown';
 export type StoryAction = Readonly<{ act: string; enabled: boolean }>;
 /** The one sheet open over the table, by its overlay's id, or `none`. */
-export type SheetState = 'none' | 'meldOverlay' | 'roundResultOverlay';
+export type SheetState = 'none' | 'meldOverlay' | 'arrangeOverlay' | 'roundResultOverlay';
+/** `#arrangeBtn`: disabled, enabled, or enabled and marked `due` (the picture differs from the arrangement asked for). */
+export type ArrangeState = 'off' | 'idle' | 'due';
 
 /** What the table must show for a story, in the terms the DOM exposes. */
 export type StoryFacts = Readonly<{
@@ -62,6 +77,13 @@ export type StoryFacts = Readonly<{
   freshId: string | null;
   lockedId: string | null;
   selectedId: string | null;
+  /** `#hand .slot.human .card` ids in order: the melds the player made by hand. */
+  human: ReadonlyArray<string>;
+  /** `#hand[data-rows]`: the rows a phone lays the hand in. */
+  rows: number;
+  arrange: ArrangeState;
+  /** The `.active` button of `#arrangeModes`. */
+  sort: SortMode;
   stock: 'tappable' | 'idle';
   discard: 'tappable' | 'blocked' | 'idle';
   /** `#actions [data-act]` in order, with whether each is enabled. */
@@ -156,26 +178,45 @@ const discarded = play(drewStock, 0, {
   cardId: bestDiscard(drewStock, 0, drawnId),
 });
 
+// ---- pictures --------------------------------------------------------------------------------------
+
+/** The turn-start arrangement of `seat` over `state`: the engine's melding, nothing hand-made. */
+const startOf = (state: State, seat: Seat): Picture => engineOf(viewFor(state, seat), null);
+
+/** The picture after a draw from `before` was accepted: the turn-start picture, the drawn card loose at its end. */
+const acceptedFrom = (before: State, after: State, seat: Seat): Picture =>
+  settlePicture(startOf(before, seat), viewFor(after, seat), null, () => startOf(after, seat));
+
+/** The picture after a discard from `accepted`: the discarded card gone in place. */
+const discardedFrom = (accepted: Picture, after: State, seat: Seat): Picture =>
+  settlePicture(accepted, viewFor(after, seat), null, () => startOf(after, seat));
+
+/** Ann's accepted stock draw, the drawn card loose at the end: the picture the accepted stories keep. */
+const acceptedPicture = acceptedFrom(openDraw, drewStock, 0);
+
 /**
  * Turns after a stock draw, both seats discarding for the least deadwood and drawing from the
  * stock, until the player who just drew can knock; null when the hand ends first or `budget` is
- * spent.
+ * spent. `before` is the draw phase the knock turn started from.
  */
 const untilKnock = (
-  state: State,
+  beforeDraw: State,
   budget: number,
-): Readonly<{ state: State; seat: Seat; cardId: string }> | null => {
-  if (state.phase !== 'discard' || budget === 0) return null;
+): Readonly<{ before: State; state: State; seat: Seat; cardId: string }> | null => {
+  if (beforeDraw.phase !== 'draw' || budget === 0) return null;
+  const state = play(beforeDraw, beforeDraw.turn, { type: 'drawStock' });
+  if (state.phase !== 'discard') return null;
   const seat = state.turn;
   const cardId = knockCard(state, seat);
-  if (cardId !== null) return { state, seat, cardId };
-  const next = play(state, seat, { type: 'discard', cardId: bestDiscard(state, seat) });
-  if (next.phase !== 'draw') return null;
-  return untilKnock(play(next, next.turn, { type: 'drawStock' }), budget - 1);
+  if (cardId !== null) return { before: beforeDraw, state, seat, cardId };
+  return untilKnock(
+    play(state, seat, { type: 'discard', cardId: bestDiscard(state, seat) }),
+    budget - 1,
+  );
 };
 
 const knockAfter = (seed: number): ReturnType<typeof untilKnock> =>
-  untilKnock(play(openingOf(seed).openDraw, 0, { type: 'drawStock' }), 40);
+  untilKnock(openingOf(seed).openDraw, 40);
 
 /** The first seed from SEED whose deal offers a knock within forty policy turns. */
 export const KNOCK_SEED =
@@ -186,6 +227,32 @@ const knockState = knockable.state;
 const knockSeat = knockable.seat;
 /** The knocker's table once the hand is scored. */
 const knocked = play(knockState, knockSeat, { type: 'knock', cardId: knockable.cardId });
+
+/** Ann's accepted stock draw from `seed`, and the draw phase before it. */
+const acceptedOf = (seed: number): Readonly<{ before: State; after: State }> => {
+  const before = openingOf(seed).openDraw;
+  return { before, after: play(before, 0, { type: 'drawStock' }) };
+};
+
+/** The first seed from SEED whose accepted first draw melds at least two ways. */
+export const TWO_WAYS_SEED = Array.from({ length: 128 }, (_, i) => SEED + i).find(
+  (seed) => viewFor(acceptedOf(seed).after, 0).meldOptions.length >= 2,
+);
+if (TWO_WAYS_SEED === undefined) throw new Error('no seed from SEED melds two ways');
+const twoWays = acceptedOf(TWO_WAYS_SEED);
+/** The two-ways hand as accepted: it melds, so it carries the stories that need a meld. */
+const twoWaysPicture = acceptedFrom(twoWays.before, twoWays.after, 0);
+/** A card out of that picture's first meld, discarded: the broken group stays in place. */
+const meldCard = twoWaysPicture.groups[0]?.[0];
+if (meldCard === undefined) throw new Error('the two-ways hand melds nothing before the draw');
+const discardedFromMeld = play(twoWays.after, 0, { type: 'discard', cardId: meldCard.id });
+
+/**
+ * A long press on the first card of that meld: the meld made by hand, and the solver melds the
+ * rest.
+ */
+const humanMeld = toggleMeld(null, twoWays.after.handNumber, twoWays.after.hands[0], meldCard.id);
+if (humanMeld === null) throw new Error('the first meld card of the two-ways hand joins no meld');
 
 // ---- the gin hand ------------------------------------------------------------------------------------
 
@@ -253,17 +320,28 @@ const cardOf = (id: string): Card => {
   if (!isSuit(suit)) throw new Error(`bad card id ${id}`);
   return makeCard(RANKS[label] ?? (Number(label) as Rank), suit);
 };
+const cardsOfIds = (ids: string): Cards => ids.split(' ').map(cardOf);
 
 /**
  * The chain position of test/parity/gin.legacy.test.ts: Ann knocks with the KC on A-2-3 of spades,
  * 4-5-6 of hearts and 7-8-9 of diamonds (the 2C her deadwood); Bob lays off 4S then 5S onto the
  * spades and counts QD KD, twenty.
  */
-const LAID_OFF_KNOCKER = 'AS 2S 3S 4H 5H 6H 7D 8D 9D 2C KC'.split(' ').map(cardOf);
-const LAID_OFF_DEFENDER = '4S 5S 10H JH QH 7C 8C 9C QD KD'.split(' ').map(cardOf);
+const LAID_OFF_KNOCKER = cardsOfIds('AS 2S 3S 4H 5H 6H 7D 8D 9D 2C KC');
+const LAID_OFF_DEFENDER = cardsOfIds('4S 5S 10H JH QH 7C 8C 9C QD KD');
 const laidOffKnocked = play(dealtAround(LAID_OFF_KNOCKER, LAID_OFF_DEFENDER, 'KC'), 0, {
   type: 'knock',
   cardId: 'KC',
+});
+
+// ---- the three-row hand --------------------------------------------------------------------------
+
+/** A run of seven spades declared as one meld: on a phone it wraps into its own two rows (§6). */
+const SEVEN_RUN = '4S 5S 6S 7S 8S 9S 10S';
+const KINGS = 'KC KD KH';
+const threeRows = play(dealtAround(cardsOfIds(`${SEVEN_RUN} ${KINGS} 2C`), null, '2C'), 0, {
+  type: 'setMelds',
+  melds: [SEVEN_RUN.split(' '), KINGS.split(' ')],
 });
 
 // ---- apps and facts ---------------------------------------------------------------------------------
@@ -281,17 +359,15 @@ const tableApp = (game: State, seat: Seat, over: Partial<App> = {}): App => ({
   ...over,
 });
 
-/** The `shown` stage for a draw just made from `before`: the hold is the picture before the draw. */
+/** The `shown` stage for a draw just made from `before`, and the picture from before the draw the ten slots keep. */
 const shownFrom = (
   before: State,
   after: State,
   seat: Seat,
   from: 'stock' | 'discard',
-): DrawStage => ({
-  kind: 'shown',
-  from,
-  cardId: after.lastDrawn?.id ?? '',
-  hold: holdOf(viewFor(before, seat).me),
+): Readonly<{ stage: DrawStage; picture: Picture }> => ({
+  stage: { kind: 'shown', from, cardId: after.lastDrawn?.id ?? '' },
+  picture: startOf(before, seat),
 });
 
 const actionsOf = (
@@ -318,13 +394,15 @@ const actionsOf = (
   ];
 };
 
-/** The sheet the app's flags open over `state`: the chooser, or the result while not put away. */
+/** The sheet the app's flags open over `state`: a chooser, or the result while not put away. */
 const sheetOf = (state: State, app: Partial<App>): SheetState =>
   app.meldChooser === true
     ? 'meldOverlay'
-    : state.phase === 'roundOver' && state.result !== null && app.resultDismissed !== true
-      ? 'roundResultOverlay'
-      : 'none';
+    : app.arrangeOpen === true
+      ? 'arrangeOverlay'
+      : state.phase === 'roundOver' && state.result !== null && app.resultDismissed !== true
+        ? 'roundResultOverlay'
+        : 'none';
 
 /** With the result sheet open over a scored hand: the ids of the cards the defender laid off. */
 const laidOffOf = (state: State, sheet: SheetState): Partial<StoryFacts> => {
@@ -334,15 +412,18 @@ const laidOffOf = (state: State, sheet: SheetState): Partial<StoryFacts> => {
     : {};
 };
 
+type Arrangement = Readonly<{ picture: Picture; human: HumanMelds | null; sort: SortMode }>;
+
 /**
- * The facts of `seat`'s table over `state` under `stage` with `selected` and the app's overlay
- * flags, from the engine alone.
+ * The facts of `seat`'s table over `state` under `stage` with `selected`, the arrangement and the
+ * app's overlay flags, from the engine and the picture alone.
  */
 const factsOf = (
   state: State,
   seat: Seat,
   stage: DrawStage | null,
   selected: string | null,
+  arrangement: Arrangement,
   statusSub: string,
   app: Partial<App>,
 ): StoryFacts => {
@@ -370,6 +451,9 @@ const factsOf = (
   const canDrawStock = mine && state.phase === 'draw';
   const canDrawDiscard = canDrawStock && !state.forceStock && state.discard.length > 0;
   const selectedId = stage === null ? selected : null;
+  const { picture, human, sort } = arrangement;
+  const arrangeable = inPlay(view) && stage === null;
+  const asked = arrangedOf(view, stage, human, sort);
   return {
     slots: Math.max(hand.length, HAND_SIZE + 1),
     handCards: hand.length,
@@ -384,6 +468,12 @@ const factsOf = (
           ? shown.cardId
           : null,
     selectedId,
+    human: cardsOf(picture)
+      .filter((c) => picture.human.includes(c.id))
+      .map((c) => c.id),
+    rows: phoneRows(picture),
+    arrange: !arrangeable ? 'off' : samePicture(picture, asked) ? 'idle' : 'due',
+    sort,
     stock: canDrawStock ? 'tappable' : 'idle',
     discard:
       (mine && state.phase === 'upcard') || canDrawDiscard
@@ -405,6 +495,10 @@ type Spec = Readonly<{
   seat: Seat;
   statusSub: string;
   stage?: DrawStage;
+  /** The kept picture; the arrangement asked for (`human`, `sort`) when absent. */
+  picture?: Picture;
+  human?: HumanMelds;
+  sort?: SortMode;
   selected?: string;
   app?: Partial<App>;
   sameHandAs?: string;
@@ -414,11 +508,29 @@ type Spec = Readonly<{
 const story = (spec: Spec): Story => {
   const stage = spec.stage ?? null;
   const selected = spec.selected ?? null;
+  const human = spec.human ?? null;
+  const sort = spec.sort ?? DEFAULT_SORT;
+  const picture = spec.picture ?? arrangedOf(viewFor(spec.state, spec.seat), stage, human, sort);
   return {
     id: spec.id,
     title: spec.title,
-    app: tableApp(spec.state, spec.seat, { draw: stage, selectedCard: selected, ...spec.app }),
-    facts: factsOf(spec.state, spec.seat, stage, selected, spec.statusSub, spec.app ?? {}),
+    app: tableApp(spec.state, spec.seat, {
+      draw: stage,
+      selectedCard: selected,
+      picture,
+      human,
+      sort,
+      ...spec.app,
+    }),
+    facts: factsOf(
+      spec.state,
+      spec.seat,
+      stage,
+      selected,
+      { picture, human, sort },
+      spec.statusSub,
+      spec.app ?? {},
+    ),
     ...(spec.sameHandAs === undefined ? {} : { sameHandAs: spec.sameHandAs }),
     screenshot: spec.screenshot !== false,
   };
@@ -427,10 +539,14 @@ const story = (spec: Spec): Story => {
 const SHOWN_SUB = 'Tap the new card to keep it, or pick a discard';
 const OPEN_SUB = 'Tap the stock or the discard pile';
 const SELECTED_SUB = 'Discard it, or knock if you can';
+const ACCEPTED_SUB = 'Tap a card to select it';
+const THEIRS_SUB = 'Drawing a card…';
 
 /**
- * The sixteen stories of docs/design/gin-draw-ghost-slot.md §7, in its order, then the two laid-off
- * stories of docs/design/gin-arrangement-and-discards.md §10.
+ * The sixteen stories of docs/design/gin-draw-ghost-slot.md §7 in its order, with the stories of
+ * docs/design/gin-arrangement-and-discards.md §10 (the kept picture, Arrange, the chooser, the
+ * three-row hand, the hand-made meld, the sort modes, the laid-off result) placed where they
+ * belong in a turn.
  */
 export const STORIES: ReadonlyArray<Story> = [
   story({
@@ -452,7 +568,7 @@ export const STORIES: ReadonlyArray<Story> = [
     title: 'Their draw: nothing to tap, the ghost cell hidden, the waiting note',
     state: bothPassed,
     seat: 1,
-    statusSub: 'Drawing a card…',
+    statusSub: THEIRS_SUB,
   }),
   story({
     id: 'draw-mine-open',
@@ -474,7 +590,7 @@ export const STORIES: ReadonlyArray<Story> = [
       'Drew from the stock: the card waits in the ghost cell with the dot, the ten cards unmoved',
     state: drewStock,
     seat: 0,
-    stage: shownFrom(openDraw, drewStock, 0, 'stock'),
+    ...shownFrom(openDraw, drewStock, 0, 'stock'),
     statusSub: SHOWN_SUB,
     sameHandAs: 'draw-mine-open',
   }),
@@ -483,7 +599,7 @@ export const STORIES: ReadonlyArray<Story> = [
     title: 'Took the discard: the card waits locked in the ghost cell, the ten cards unmoved',
     state: drewDiscard,
     seat: 0,
-    stage: shownFrom(openDraw, drewDiscard, 0, 'discard'),
+    ...shownFrom(openDraw, drewDiscard, 0, 'discard'),
     statusSub: SHOWN_SUB,
     sameHandAs: 'draw-mine-open',
   }),
@@ -492,7 +608,7 @@ export const STORIES: ReadonlyArray<Story> = [
     title: 'Took the upcard: the card waits locked in the ghost cell, the ten cards unmoved',
     state: tookUpcard,
     seat: 0,
-    stage: shownFrom(dealt, tookUpcard, 0, 'discard'),
+    ...shownFrom(dealt, tookUpcard, 0, 'discard'),
     statusSub: SHOWN_SUB,
     sameHandAs: 'upcard-mine',
   }),
@@ -501,22 +617,33 @@ export const STORIES: ReadonlyArray<Story> = [
     title: "A guest's draw awaiting the host's state: the ghost cell pending",
     state: openDraw,
     seat: 0,
-    stage: { kind: 'waiting', from: 'stock', hold: holdOf(viewFor(openDraw, 0).me) },
+    stage: { kind: 'waiting', from: 'stock' },
     statusSub: 'Drawing…',
     app: { role: 'guest', game: null, code: 'ABCD', oppName: PLAYERS[1].name },
   }),
   story({
     id: 'accepted-fresh',
-    title: 'Accepted the draw: eleven cards re-melded, the dot on the new one, Discard disabled',
+    title:
+      'Accepted the draw: the ten cards unmoved, the new one loose at the end with the dot, Discard disabled',
     state: drewStock,
     seat: 0,
-    statusSub: 'Tap a card to select it',
+    picture: acceptedPicture,
+    statusSub: ACCEPTED_SUB,
+    sameHandAs: 'draw-mine-open',
+  }),
+  story({
+    id: 'arranged-after-accept',
+    title: "Arranged after the accept: the engine's melding of the eleven, Arrange idle",
+    state: drewStock,
+    seat: 0,
+    statusSub: ACCEPTED_SUB,
   }),
   story({
     id: 'accepted-selected',
     title: 'A card selected for the discard: Discard enabled, the deadwood-after readout',
     state: drewStock,
     seat: 0,
+    picture: acceptedPicture,
     selected: bestDiscard(drewStock, 0),
     statusSub: SELECTED_SUB,
   }),
@@ -525,6 +652,7 @@ export const STORIES: ReadonlyArray<Story> = [
     title: 'A knock available: Knock enabled with the deadwood count',
     state: knockState,
     seat: knockSeat,
+    picture: acceptedFrom(knockable.before, knockState, knockSeat),
     selected: knockable.cardId,
     statusSub: SELECTED_SUB,
   }),
@@ -535,6 +663,63 @@ export const STORIES: ReadonlyArray<Story> = [
     seat: 0,
     selected: GIN_DISCARD,
     statusSub: SELECTED_SUB,
+  }),
+  story({
+    id: 'accepted-two-ways',
+    title: 'The accepted hand melds two ways: the ⇄ badge on the deadwood readout',
+    state: twoWays.after,
+    seat: 0,
+    picture: twoWaysPicture,
+    statusSub: ACCEPTED_SUB,
+  }),
+  story({
+    id: 'meld-chooser-open',
+    title: 'The meld chooser open over the two-ways hand: one option in use',
+    state: twoWays.after,
+    seat: 0,
+    picture: twoWaysPicture,
+    statusSub: ACCEPTED_SUB,
+    app: { meldChooser: true },
+  }),
+  story({
+    id: 'human-meld',
+    title: 'A meld made by hand (long press): its cells marked, the solver melds the rest',
+    state: twoWays.after,
+    seat: 0,
+    human: humanMeld,
+    statusSub: ACCEPTED_SUB,
+  }),
+  story({
+    id: 'sorted-by-rank',
+    title: 'The accepted hand arranged by rank: groups by their lowest card, then the loose cards',
+    state: drewStock,
+    seat: 0,
+    sort: 'rank',
+    statusSub: ACCEPTED_SUB,
+  }),
+  story({
+    id: 'sorted-by-suit',
+    title: 'The accepted hand arranged by suit: spades, hearts, diamonds, clubs',
+    state: drewStock,
+    seat: 0,
+    sort: 'suit',
+    statusSub: ACCEPTED_SUB,
+  }),
+  story({
+    id: 'arrange-sheet-open',
+    title: 'The arrange sheet: the three sort modes, the current one active, the long-press hint',
+    state: drewStock,
+    seat: 0,
+    picture: acceptedPicture,
+    statusSub: ACCEPTED_SUB,
+    app: { arrangeOpen: true },
+  }),
+  story({
+    id: 'hand-three-rows',
+    title: 'A run of seven with three kings: three rows on a phone, one on a laptop',
+    state: threeRows,
+    seat: 0,
+    statusSub: ACCEPTED_SUB,
   }),
   story({
     id: 'undo-back-to-draw',
@@ -548,10 +733,19 @@ export const STORIES: ReadonlyArray<Story> = [
   }),
   story({
     id: 'after-discard-theirs',
-    title: 'After my discard: their draw, the dot still on the card I kept',
+    title: 'After my discard: their draw, the dot still on the card I kept, the picture kept',
     state: discarded,
     seat: 0,
-    statusSub: 'Drawing a card…',
+    picture: discardedFrom(acceptedPicture, discarded, 0),
+    statusSub: THEIRS_SUB,
+  }),
+  story({
+    id: 'discarded-kept-picture',
+    title: 'Discarded out of a meld: the broken group stays in place with dead cells, Arrange due',
+    state: discardedFromMeld,
+    seat: 0,
+    picture: discardedFrom(twoWaysPicture, discardedFromMeld, 0),
+    statusSub: THEIRS_SUB,
   }),
   story({
     id: 'round-over-table',
@@ -582,13 +776,13 @@ export const STORIES: ReadonlyArray<Story> = [
 
 export const storyById = (id: string): Story | null => STORIES.find((s) => s.id === id) ?? null;
 
-/**
- * The card ids of the first ten slots as the engine orders them: the held picture (the hold's
- * melds then its deadwood while a draw is staged, else the view's), which `sameHandAs` pairs share.
- */
+/** The card ids of the first ten slots as the picture orders them, which `sameHandAs` pairs share. */
 export const heldCards = (story: Story): ReadonlyArray<string> => {
   const view = story.app.view;
   if (view === null) return [];
-  const hold = story.app.draw === null ? holdOf(view.me) : story.app.draw.hold;
-  return [...hold.melds.flat(), ...hold.deadwood].map((c) => c.id).slice(0, HAND_SIZE);
+  const picture =
+    story.app.picture ?? arrangedOf(view, story.app.draw, story.app.human, story.app.sort);
+  return cardsOf(picture)
+    .map((c) => c.id)
+    .slice(0, HAND_SIZE);
 };

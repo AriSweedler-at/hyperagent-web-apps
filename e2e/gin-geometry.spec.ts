@@ -7,8 +7,11 @@
 // document, `#app`, `#tableScreen` and `#hand` hold their content without overflow, the actions row
 // ends inside the viewport, the eleven slot cells are one size in the rows the width implies (six
 // columns in two rows on a phone, one row of eleven on the laptop), and the frame (topbar, opponent
-// strip, both piles, status banner, last-action line, hand area, hand header, hand grid and actions
-// row) keeps the bounding boxes it had at the start. Two viewports the floor sizes cannot fit (a
+// strip, both piles, status banner, last-action line) keeps the bounding boxes it had at the start,
+// and the hand's frame (hand area, hand header, hand grid, actions row) keeps its boxes within a
+// turn, from the draw through the shown card, the accept and the selection: the row count may
+// change only where the picture is re-arranged (a turn start, a discard; docs/design/gin-
+// arrangement-and-discards.md §6). Two viewports the floor sizes cannot fit (a
 // phone in landscape, a phone with the browser's toolbar shown) exercise theme.css's fallback: the
 // document scrolls (`#app` and `#tableScreen` clip nothing) and the actions row is reachable at the
 // bottom of that scroll. The turns after the first are played through the documented `window.__gin`
@@ -16,7 +19,13 @@
 // soon as one is legal, so the round ends in a few turns; a void hand ends it too.
 import type { Page } from '@playwright/test';
 
-import { ginAcceptDraw, ginPassUpcard, ginReveal, ginStartLocal } from './fixtures/gin.ts';
+import {
+  expectHandRows,
+  ginAcceptDraw,
+  ginPassUpcard,
+  ginReveal,
+  ginStartLocal,
+} from './fixtures/gin.ts';
 import { chooseDiscard, finishTurn, playToRoundOver, selectCard } from './fixtures/gin-play.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
@@ -24,19 +33,23 @@ import { expect, test } from './fixtures/two-players.ts';
 type Box = Readonly<{ x: number; y: number; w: number; h: number }>;
 type Frame = Readonly<Record<string, Box | null>>;
 
-/** Everything on the table that is not a card: one box each, in every phase. */
-const FRAME_SELECTORS: ReadonlyArray<string> = [
+/** Everything above the hand: one box each, in every phase. */
+const FIXED_SELECTORS: ReadonlyArray<string> = [
   '#tableScreen .topbar',
   '#tableScreen .opp-strip',
   '#stockPile',
   '#discardPile',
   '#statusBanner',
   '#lastAction',
+];
+/** The hand's frame: one box each within a turn. */
+const HAND_SELECTORS: ReadonlyArray<string> = [
   '#tableScreen .hand-area',
   '#tableScreen .hand-header',
   '#hand',
   '#actions',
 ];
+const FRAME_SELECTORS: ReadonlyArray<string> = [...FIXED_SELECTORS, ...HAND_SELECTORS];
 /** The frame's boxes in document coordinates, so a scrolled page compares with an unscrolled one. */
 const FRAME = `Object.fromEntries(${JSON.stringify(FRAME_SELECTORS)}.map((sel) => {
   const el = document.querySelector(sel);
@@ -58,24 +71,24 @@ const FITS = `(() => {
     document: document.documentElement.scrollHeight <= window.innerHeight + 1,
     app: fits('app'), tableScreen: fits('tableScreen'), hand: fits('hand'),
     actionsReachable: actions.bottom <= window.innerHeight + 0.5,
+    // A third row on a phone too short for it may scroll the document (theme.css's :has fallback).
+    tallHand: document.getElementById('hand').getAttribute('data-rows') === '3' && window.innerHeight <= 736 && window.innerWidth < 900,
   };
-})()`;
-/** The slot cells' sizes (rounded to a tenth) and their tops, in DOM order. */
-const SLOTS = `(() => {
-  const slots = Array.from(document.querySelectorAll('#hand .slot')).map((s) => s.getBoundingClientRect());
-  const tenth = (n) => Math.round(n * 10) / 10;
-  return { sizes: Array.from(new Set(slots.map((r) => tenth(r.width) + 'x' + tenth(r.height)))), tops: slots.map((r) => Math.round(r.top)) };
 })()`;
 
 type Fits = Readonly<
-  Record<'document' | 'app' | 'tableScreen' | 'hand' | 'actionsReachable', boolean>
+  Record<'document' | 'app' | 'tableScreen' | 'hand' | 'actionsReachable' | 'tallHand', boolean>
 >;
-type Slots = Readonly<{ sizes: ReadonlyArray<string>; tops: ReadonlyArray<number> }>;
 const frameOf = (page: Page): Promise<Frame> => page.evaluate<Frame>(FRAME);
 
-/** Every frame box is where it was, to half a pixel. */
-const expectSameFrame = (now: Frame, start: Frame, phase: string): void => {
-  FRAME_SELECTORS.forEach((sel) => {
+/** Every box of `selectors` is where it was, to half a pixel. */
+const expectSameFrame = (
+  now: Frame,
+  start: Frame,
+  phase: string,
+  selectors: ReadonlyArray<string> = FRAME_SELECTORS,
+): void => {
+  selectors.forEach((sel) => {
     const a = now[sel];
     const b = start[sel];
     expect(a, `${sel} missing at ${phase}`).not.toBeNull();
@@ -91,34 +104,26 @@ const expectSameFrame = (now: Frame, start: Frame, phase: string): void => {
 };
 
 /**
- * No scroll anywhere (or, where the viewport is under the floor, only the document's), eleven
- * same-size cells in `rows` rows: a phone's first six share a top.
+ * No scroll anywhere (or, where the viewport is under the floor or a third row needs it, only the
+ * document's), eleven same-size cells in the rows the width implies (`expectHandRows`).
  */
 const expectGeometry = async (page: Page, vp: Viewport, phase: string): Promise<void> => {
-  const { rows } = vp;
   const fits = await page.evaluate<Fits>(FITS);
   expect(fits, `overflow at ${phase}`).toEqual({
-    document: !vp.scrolls,
+    document: !vp.scrolls && !fits.tallHand,
     app: true,
     tableScreen: true,
     hand: true,
     actionsReachable: true,
+    tallHand: fits.tallHand,
   });
-  const slots = await page.evaluate<Slots>(SLOTS);
-  expect(slots.tops, `slot count at ${phase}`).toHaveLength(11);
-  expect(slots.sizes, `slot sizes at ${phase}`).toHaveLength(1);
-  const distinct = new Set(slots.tops);
-  expect(distinct.size, `rows at ${phase}`).toBe(rows);
-  if (rows === 2) {
-    expect(new Set(slots.tops.slice(0, 6)).size, `first row at ${phase}`).toBe(1);
-    expect(new Set(slots.tops.slice(6)).size, `second row at ${phase}`).toBe(1);
-  }
+  await expectHandRows(page, vp.columns);
 };
 
 type Viewport = Readonly<{
   width: number;
   height: number;
-  rows: 1 | 2;
+  columns: 6 | 11;
   /** The names the two seats play as; the inputs take 20 characters. */
   names: Readonly<[string, string]>;
   /** Under the floor sizes' height: the document scrolls to the actions row instead of clipping it. */
@@ -127,12 +132,12 @@ type Viewport = Readonly<{
 const SHORT_NAMES: Readonly<[string, string]> = ['Ann', 'Bob'];
 const LONG_NAMES: Readonly<[string, string]> = ['Bartholomew Jefferso', 'Grandma Rosalind Que'];
 const VIEWPORTS: Readonly<Record<string, Viewport>> = {
-  phone: { width: 390, height: 844, rows: 2, names: SHORT_NAMES, scrolls: false },
-  desktop: { width: 1280, height: 800, rows: 1, names: SHORT_NAMES, scrolls: false },
-  'phone-short': { width: 375, height: 667, rows: 2, names: LONG_NAMES, scrolls: false },
+  phone: { width: 390, height: 844, columns: 6, names: SHORT_NAMES, scrolls: false },
+  desktop: { width: 1280, height: 800, columns: 11, names: SHORT_NAMES, scrolls: false },
+  'phone-short': { width: 375, height: 667, columns: 6, names: LONG_NAMES, scrolls: false },
   // An iPhone SE with Safari's toolbar shown, and a phone in landscape: the floor's 658px do not fit.
-  'phone-toolbar': { width: 375, height: 553, rows: 2, names: SHORT_NAMES, scrolls: true },
-  'phone-landscape': { width: 844, height: 390, rows: 2, names: SHORT_NAMES, scrolls: true },
+  'phone-toolbar': { width: 375, height: 553, columns: 6, names: SHORT_NAMES, scrolls: true },
+  'phone-landscape': { width: 844, height: 390, columns: 6, names: SHORT_NAMES, scrolls: true },
 };
 
 Object.entries(VIEWPORTS).forEach(([name, vp]) => {
@@ -147,9 +152,12 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await ginStartLocal(page, pagePath(project, 'gin-rummy'), vp, vp.names);
       await expectGeometry(page, vp, 'upcard');
       const start = await frameOf(page);
-      const check = async (phase: string): Promise<void> => {
+      // The frame above the hand holds in every phase; the hand's frame holds within a turn.
+      const check = async (phase: string, turn: Frame | null = null): Promise<void> => {
         await expectGeometry(page, vp, phase);
-        expectSameFrame(await frameOf(page), start, phase);
+        const now = await frameOf(page);
+        expectSameFrame(now, start, phase, FIXED_SELECTORS);
+        if (turn !== null) expectSameFrame(now, turn, phase, HAND_SELECTORS);
       };
 
       // Both pass: the first player draws from the stock.
@@ -160,18 +168,19 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await ginReveal(page);
       await expect(page.locator('#hand .slot.ghost.open')).toHaveCount(1);
       await check('draw');
+      const turn = await frameOf(page);
 
       await page.locator('#stockPile').click();
       await expect(page.locator('#hand .slot.ghost.shown .card.fresh')).toHaveCount(1);
-      await check('shown');
+      await check('shown', turn);
 
       await ginAcceptDraw(page);
       await expect(page.locator('#statusSub')).toHaveText('Tap a card to select it');
-      await check('accepted');
+      await check('accepted', turn);
 
       const pick = await chooseDiscard(page);
       await selectCard(page, pick.id);
-      await check('selected');
+      await check('selected', turn);
       if ((await finishTurn(page, pick.knock)) === 'next') {
         await check('next turn, under the curtain');
         await playToRoundOver(page);

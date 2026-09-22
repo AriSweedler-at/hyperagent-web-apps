@@ -7,9 +7,11 @@ import {
   ALL_KEYS,
   DEFAULT_HOME_TAB,
   DEFAULT_PLAY_MODE,
+  DEFAULT_SORT,
   HOME_TABS,
   NAME_MAX,
   PLAY_MODES,
+  SORT_MODES,
   SOUND_STATES,
   STORAGE_KEYS,
   clearSave,
@@ -19,6 +21,7 @@ import {
   readSave,
   readScorerNames,
   readScorerState,
+  readSort,
   readSoundState,
   soundEnabled,
   writeHomeTab,
@@ -28,6 +31,7 @@ import {
   writeSave,
   writeScorerNames,
   writeScorerState,
+  writeSort,
   writeSoundState,
 } from './storage.ts';
 
@@ -59,7 +63,7 @@ const game = createGame(
 );
 
 describe('frozen constants', () => {
-  test('the seven legacy keys and the second name, the tabs, modes, sound states and the name cap', () => {
+  test('the seven legacy keys, the second name and the sort, the tabs, modes, sound states and the name cap', () => {
     expect(ALL_KEYS).toEqual([
       'ginRummyMP_v1',
       'ginRummy_name',
@@ -67,6 +71,7 @@ describe('frozen constants', () => {
       'ginRummy_homeTab',
       'ginRummy_playMode',
       'ginRummy_sound',
+      'ginRummy_sort',
       'ginRummyScorerState_v2',
       'ginRummy_scorerNames',
     ]);
@@ -75,7 +80,22 @@ describe('frozen constants', () => {
     expect(PLAY_MODES).toEqual(['online', 'local']);
     expect(DEFAULT_PLAY_MODE).toBe('online');
     expect(SOUND_STATES).toEqual(['on', 'off']);
+    expect(SORT_MODES).toEqual(['melds', 'rank', 'suit']);
+    expect(DEFAULT_SORT).toBe('melds');
     expect(NAME_MAX).toBe(20);
+  });
+});
+
+describe('the sort preference', () => {
+  test('round trip as a bare string; a missing or unknown value reads as an error', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    expect(readSort(store).ok).toBe(false);
+    expect(writeSort(store, 'suit').ok).toBe(true);
+    expect(s.map.get(STORAGE_KEYS.sort)).toBe('suit');
+    expect(readSort(store)).toEqual({ ok: true, value: 'suit' });
+    s.setItem(STORAGE_KEYS.sort, 'colour');
+    expect(readSort(store).ok).toBe(false);
   });
 });
 

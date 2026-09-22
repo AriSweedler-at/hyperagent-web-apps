@@ -80,9 +80,10 @@ const roundTrips: Readonly<Record<string, RoundTrip>> = {
 
 describe('the captured legacy payloads', () => {
   test('cover all seven legacy keys, the three save roles and both sound states', () => {
-    // `ginRummy_p2Name` is this page's own key: the legacy never stored the second name, so no
-    // capture exists for it.
-    const legacyKeys = Object.values(STORAGE_KEYS).filter((k) => k !== STORAGE_KEYS.p2Name);
+    // `ginRummy_p2Name` and `ginRummy_sort` are this page's own keys: the legacy never stored the
+    // second name or an arrangement, so no capture exists for them.
+    const ours: ReadonlyArray<string> = [STORAGE_KEYS.p2Name, STORAGE_KEYS.sort];
+    const legacyKeys = Object.values(STORAGE_KEYS).filter((k) => !ours.includes(k));
     expect(legacyKeys).toHaveLength(7);
     expect(new Set(captures.map((c) => c.key))).toEqual(new Set(legacyKeys));
     const roles = captures

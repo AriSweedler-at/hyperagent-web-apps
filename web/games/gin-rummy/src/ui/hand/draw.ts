@@ -1,23 +1,18 @@
 // The ghost draw slot's state (docs/design/gin-draw-ghost-slot.md §3): while the player draws, the
-// ten cards on screen must not move until they act, so the App holds the picture painted at the
-// moment of the draw (`HandHold`) and a stage: `waiting` between the tap and the view that carries
-// the drawn card (a guest's round trip; host and pass-and-play settle inside one dispatch), then
-// `shown` while the eleventh card sits in the ghost slot. Pure and imported by ui/state.ts (which
-// sets and settles it) and ui/hand/SlotHandView.ts (which paints it): no cycle. Not in the save and
-// not on the wire: only the engine `State` survives a reload (a game resumed mid-draw paints the
-// accepted eleven cards, a documented degradation).
-import type { Action, Cards, Meld, View } from '../../engine/types.ts';
+// ten cards on screen must not move until they act, so the App holds a stage: `waiting` between
+// the tap and the view that carries the drawn card (a guest's round trip; host and pass-and-play
+// settle inside one dispatch), then `shown` while the eleventh card sits in the ghost slot. The
+// ten cards themselves keep their places through `App.picture` (picture.ts rule b). Pure and
+// imported by ui/state.ts (which sets and settles it) and ui/hand/SlotHandView.ts (which paints
+// it): no cycle. Not in the save and not on the wire: only the engine `State` survives a reload (a
+// game resumed mid-draw paints the accepted eleven cards, a documented degradation).
+import type { Action, View } from '../../engine/types.ts';
 
 export type DrawSource = 'stock' | 'discard';
 
-/** The ten-card picture on screen when the player drew: painted until they accept. */
-export type HandHold = Readonly<{ melds: ReadonlyArray<Meld>; deadwood: Cards }>;
-
 export type DrawStage =
-  | Readonly<{ kind: 'waiting'; from: DrawSource; hold: HandHold }>
-  | Readonly<{ kind: 'shown'; from: DrawSource; cardId: string; hold: HandHold }>;
-
-export const holdOf = (me: View['me']): HandHold => ({ melds: me.melds, deadwood: me.deadwood });
+  | Readonly<{ kind: 'waiting'; from: DrawSource }>
+  | Readonly<{ kind: 'shown'; from: DrawSource; cardId: string }>;
 
 /** Where an action draws from, or null for an action that is not a draw. */
 export const drawSource = (a: Action): DrawSource | null =>
@@ -41,7 +36,7 @@ export const settleDraw = (stage: DrawStage | null, v: View): DrawStage | null =
   if (drawnId !== null)
     return stage.kind === 'shown' && stage.cardId === drawnId
       ? stage
-      : { kind: 'shown', from: stage.from, cardId: drawnId, hold: stage.hold };
+      : { kind: 'shown', from: stage.from, cardId: drawnId };
   const untouched =
     stage.kind === 'waiting' && v.isMyTurn && (v.phase === 'draw' || v.phase === 'upcard');
   return untouched ? stage : null;

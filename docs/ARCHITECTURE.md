@@ -98,7 +98,10 @@ drops both from the address bar with `history.replaceState`), `?story=<id>` (gin
 reads it before anything else and, when present, imports `src/stories/boot.ts` and returns, so the
 page paints one catalogued table state from `src/stories/catalogue.ts` with the real `paint` and
 constructs no store, network, ICE or timer; `?story=` alone lists the stories as links, `&nav` adds
-a prev/index/next bar; "Testing pyramid" 5), and `globalThis.__peerCalls`:
+a prev/index/next bar, `&live` binds the page's controls to the reducer over the story's App and
+repaints after each intent while dropping every effect, so a UI-only flow such as the meld chooser,
+the Arrange sheet or a long press runs from a catalogued state: e2e/gin-arrange.spec.ts; "Testing
+pyramid" 5), and `globalThis.__peerCalls`:
 `web/shared/edge/transport.ts`
 pushes the arguments of every `new Peer(...)` it makes (`[id, options]` for a host, `[options]` for
 a guest, `options` the exact object handed to PeerJS) onto that array, creating it if absent, so a

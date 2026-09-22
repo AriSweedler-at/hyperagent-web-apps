@@ -10,6 +10,7 @@
 // `safeSet` wrote them. One key is this page's own: `ginRummy_p2Name`, the pass-and-play second
 // name, remembered under `rememberName`'s rule; the legacy read `#p2NameInput` only at the Start
 // button and never stored it, so no capture exists for it.
+import { SORT_MODES, type SortMode } from './sort.ts';
 import type { Store, StorageError } from '../../../shared/edge/storage.ts';
 
 // ui/state.ts names the Store through this module (docs/MIGRATION.md step 12): the reducer may
@@ -50,6 +51,8 @@ export const STORAGE_KEYS = {
   playMode: 'ginRummy_playMode',
   /** `on` or `off` (bare string); anything but `off` counts as on. */
   sound: 'ginRummy_sound',
+  /** How the hand is arranged: `melds`, `rank` or `suit` (bare string). This page's own key. */
+  sort: 'ginRummy_sort',
   /** The Score Counter's session. */
   scorerState: 'ginRummyScorerState_v2',
   /** The names the Score Counter was last started with (JSON array). */
@@ -65,6 +68,7 @@ export type PlayMode = (typeof PLAY_MODES)[number];
 export const DEFAULT_PLAY_MODE: PlayMode = 'online';
 export const SOUND_STATES = ['on', 'off'] as const;
 export type SoundState = (typeof SOUND_STATES)[number];
+export { DEFAULT_SORT, SORT_MODES, type SortMode } from './sort.ts';
 /** `rememberName` sliced what it stored to this many characters. */
 export const NAME_MAX = 20;
 
@@ -128,6 +132,7 @@ export const decodeName: Decoder<string> = refine(string, (s) => s !== '', 'a no
 export const decodeHomeTab: Decoder<HomeTab> = literal(...HOME_TABS);
 export const decodePlayMode: Decoder<PlayMode> = literal(...PLAY_MODES);
 export const decodeSoundState: Decoder<SoundState> = literal(...SOUND_STATES);
+export const decodeSort: Decoder<SortMode> = literal(...SORT_MODES);
 
 const scorerPlayer = object({ id: string, name: string });
 const scorerRound = object({
@@ -233,6 +238,12 @@ export const writePlayMode = (store: Store, mode: PlayMode): Result<null, Storag
 
 export const readSoundState = (store: Store): Result<SoundState, StorageError> =>
   readTextWith(store, STORAGE_KEYS.sound, decodeSoundState);
+
+export const readSort = (store: Store): Result<SortMode, StorageError> =>
+  readTextWith(store, STORAGE_KEYS.sort, decodeSort);
+
+export const writeSort = (store: Store, sort: SortMode): Result<null, StorageError> =>
+  store.writeText(STORAGE_KEYS.sort, sort);
 
 /** `safeGet(FX_KEY) !== 'off'`: on unless the key says off (missing or unreadable counts as on). */
 export const soundEnabled = (store: Store): boolean => {

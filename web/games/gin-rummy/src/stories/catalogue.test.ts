@@ -1,12 +1,14 @@
 // The catalogue against the paint (docs/design/gin-draw-ghost-slot.md §8): every story paints on
 // the page fake built from the page's own markup, and the facts the catalogue derived from the
-// engine are read back out of the painted strings (the slot and card counts, the ghost cell's
-// class, the fresh, locked and selected cards, the piles' classes, the buttons and their state,
-// the status line). The `sameHandAs` pairs must hold the same card in each of the first ten slots,
-// as the engine orders them and as the paint wrote them. No jsdom (docs/ARCHITECTURE.md "Testing
+// engine and the picture are read back out of the painted strings (the slot and card counts, the
+// ghost cell's class, the fresh, locked, selected and hand-made cards, the phone rows, the Arrange
+// button, the sort mode, the piles' classes, the buttons and their state, the status line, the
+// open sheet). The `sameHandAs` pairs must hold the same card in each of the first ten slots, as
+// the picture orders them and as the paint wrote them. No jsdom (docs/ARCHITECTURE.md "Testing
 // pyramid"); e2e/gin-stories.spec.ts repeats the facts against the served DOM.
 import { describe, expect, test } from 'vitest';
 
+import { fakeEl, type FakeEl } from '../../../../shared/edge/page.fake.ts';
 import { slotHandView } from '../ui/hand/SlotHandView.ts';
 import { ginPage, type GinPage } from '../ui/page.fake.ts';
 import { paint } from '../ui/render.ts';
@@ -14,6 +16,7 @@ import {
   KNOCK_SEED,
   SEED,
   STORIES,
+  TWO_WAYS_SEED,
   heldCards,
   storyById,
   type GhostState,
@@ -24,11 +27,18 @@ import {
 
 import MARKUP from '../../index.html?raw';
 
-const painted = (story: Story): GinPage => {
-  const page = ginPage(MARKUP);
+type Painted = Readonly<{ page: GinPage; modes: ReadonlyArray<FakeEl> }>;
+
+/** The story painted on the page fake; the arrange sheet's mode buttons are declared for the paint's query. */
+const painted = (story: Story): Painted => {
+  const modes = ['melds', 'rank', 'suit'].map((m) =>
+    fakeEl(`mode-${m}`, { classes: ['btn'], attrs: { 'data-sort': m } }),
+  );
+  const page = ginPage(MARKUP, { arrangeModes: { queries: { 'button[data-sort]': modes } } });
   paint(page.doc, story.app, slotHandView);
-  return page;
+  return { page, modes };
 };
+const hand = (story: Story): string => painted(story).page.get('hand').text();
 
 const KEBAB = /^[a-z]+(?:-[a-z]+)*$/;
 const CARD = /<div class="card ([^"]*)" data-card="([^"]+)">/g;
@@ -36,25 +46,26 @@ const SLOT = /<div class="slot ([^"]*)">(?:<div class="card [^"]*" data-card="([
 const BUTTON = /<button [^>]*data-act="([^"]+)"([^>]*)>/g;
 
 /** `(classes, id)` of every card in `#hand`, in order. */
-const cards = (hand: string): ReadonlyArray<readonly [ReadonlyArray<string>, string]> =>
-  [...hand.matchAll(CARD)].map((m) => [(m[1] ?? '').split(' '), m[2] ?? ''] as const);
+const cards = (html: string): ReadonlyArray<readonly [ReadonlyArray<string>, string]> =>
+  [...html.matchAll(CARD)].map((m) => [(m[1] ?? '').split(' '), m[2] ?? ''] as const);
 
 /** The one card carrying `flag`, or null; two would be a paint bug. */
-const flagged = (hand: string, flag: string): string | null => {
-  const ids = cards(hand)
+const flagged = (html: string, flag: string): string | null => {
+  const ids = cards(html)
     .filter(([classes]) => classes.includes(flag))
     .map(([, id]) => id);
   expect(ids.length, `${flag} cards`).toBeLessThanOrEqual(1);
   return ids[0] ?? null;
 };
 
-/** The card id in each slot, in order (null for the ghost cell without a card). */
-const slotCards = (hand: string): ReadonlyArray<string | null> =>
-  [...hand.matchAll(SLOT)].map((m) => m[2] ?? null);
+/** `(slot classes, card id)` per slot, in order (null for the ghost cell without a card). */
+const slots = (html: string): ReadonlyArray<readonly [ReadonlyArray<string>, string | null]> =>
+  [...html.matchAll(SLOT)].map((m) => [(m[1] ?? '').split(' '), m[2] ?? null] as const);
+const slotCards = (html: string): ReadonlyArray<string | null> => slots(html).map(([, id]) => id);
 
 /** The ghost cell's class as painted: `none` without a cell, `hidden` for the bare cell. */
-const ghostOnPage = (hand: string): GhostState => {
-  const cell = /<div class="slot ghost( open| pending| shown)?">/.exec(hand);
+const ghostOnPage = (html: string): GhostState => {
+  const cell = /<div class="slot ghost( open| pending| shown)?">/.exec(html);
   if (cell === null) return 'none';
   const kind = (cell[1] ?? '').trim();
   return kind === 'open' || kind === 'pending' || kind === 'shown' ? kind : 'hidden';
@@ -64,9 +75,11 @@ const ghostOnPage = (hand: string): GhostState => {
 const sheetOnPage = (page: GinPage): SheetState =>
   !page.get('meldOverlay').hidden()
     ? 'meldOverlay'
-    : !page.get('roundResultOverlay').hidden()
-      ? 'roundResultOverlay'
-      : 'none';
+    : !page.get('arrangeOverlay').hidden()
+      ? 'arrangeOverlay'
+      : !page.get('roundResultOverlay').hidden()
+        ? 'roundResultOverlay'
+        : 'none';
 
 /** The ids of the mini cards under the result sheet's "Laid off onto" label (the deadwood label follows). */
 const laidOffOnPage = (page: GinPage): ReadonlyArray<string> => {
@@ -77,18 +90,28 @@ const laidOffOnPage = (page: GinPage): ReadonlyArray<string> => {
 };
 
 /** The facts as the painted page shows them, in the catalogue's terms. */
-const factsOnPage = (page: GinPage): StoryFacts => {
-  const hand = page.get('hand').text();
+const factsOnPage = ({ page, modes }: Painted): StoryFacts => {
+  const html = page.get('hand').text();
   const stock = page.get('stockPile');
   const disc = page.get('discardPile');
   const sheet = sheetOnPage(page);
+  const arrange = page.get('arrangeBtn');
+  const active = modes.filter((b) => b.hasClass('active'));
+  expect(active.length, 'active sort modes').toBe(1);
+  const sort = active[0]?.attr('data-sort');
   return {
-    slots: (hand.match(/<div class="slot /g) ?? []).length,
-    handCards: cards(hand).length,
-    ghost: ghostOnPage(hand),
-    freshId: flagged(hand, 'fresh'),
-    lockedId: flagged(hand, 'locked'),
-    selectedId: flagged(hand, 'selected'),
+    slots: slots(html).length,
+    handCards: cards(html).length,
+    ghost: ghostOnPage(html),
+    freshId: flagged(html, 'fresh'),
+    lockedId: flagged(html, 'locked'),
+    selectedId: flagged(html, 'selected'),
+    human: slots(html).flatMap(([classes, id]) =>
+      classes.includes('human') && id !== null ? [id] : [],
+    ),
+    rows: Number(page.get('hand').attr('data-rows')),
+    arrange: arrange.disabled() ? 'off' : arrange.hasClass('due') ? 'due' : 'idle',
+    sort: sort === 'rank' || sort === 'suit' ? sort : 'melds',
     stock: stock.hasClass('tappable') ? 'tappable' : 'idle',
     discard: disc.hasClass('tappable') ? 'tappable' : disc.hasClass('blocked') ? 'blocked' : 'idle',
     actions: [...page.get('actions').text().matchAll(BUTTON)].map((m) => ({
@@ -99,6 +122,12 @@ const factsOnPage = (page: GinPage): StoryFacts => {
     sheet,
     ...(sheet === 'roundResultOverlay' ? { laidOff: laidOffOnPage(page) } : {}),
   };
+};
+
+const must = (id: string): Story => {
+  const story = storyById(id);
+  if (story === null) throw new Error(`no story ${id}`);
+  return story;
 };
 
 const IDS = [
@@ -112,18 +141,27 @@ const IDS = [
   'taken-upcard-shown',
   'drawn-pending-guest',
   'accepted-fresh',
+  'arranged-after-accept',
   'accepted-selected',
   'accepted-knock',
   'accepted-gin',
+  'accepted-two-ways',
+  'meld-chooser-open',
+  'human-meld',
+  'sorted-by-rank',
+  'sorted-by-suit',
+  'arrange-sheet-open',
+  'hand-three-rows',
   'undo-back-to-draw',
   'after-discard-theirs',
+  'discarded-kept-picture',
   'round-over-table',
   'round-over-laid-off',
   'round-over-laid-off-defender',
 ];
 
 describe('the catalogue', () => {
-  test('eighteen stories with the ids of docs/design/gin-draw-ghost-slot.md §7 and gin-arrangement-and-discards.md §10, unique and kebab-case', () => {
+  test('the stories of docs/design/gin-draw-ghost-slot.md §7 and gin-arrangement-and-discards.md §10, unique and kebab-case', () => {
     expect(STORIES.map((s) => s.id)).toEqual(IDS);
     expect(new Set(STORIES.map((s) => s.id)).size).toBe(STORIES.length);
     STORIES.forEach((s) => {
@@ -151,42 +189,72 @@ describe('the catalogue', () => {
       'drawn-stock-shown',
       'drawn-discard-shown',
       'taken-upcard-shown',
+      'accepted-fresh',
       'undo-back-to-draw',
     ]);
   });
 
-  test('the deal is seeded: the knock search starts at SEED and finds a seed that offers one', () => {
+  test('the deals are seeded: the knock and two-ways searches start at SEED and find a seed', () => {
     expect(SEED).toBe(12);
     expect(KNOCK_SEED).toBeGreaterThanOrEqual(SEED);
+    expect(TWO_WAYS_SEED).toBeGreaterThanOrEqual(SEED);
     // The knock follows a stock draw, which is final: no undo button.
-    const knock = storyById('accepted-knock');
-    expect(knock?.facts.actions).toEqual([
+    expect(must('accepted-knock').facts.actions).toEqual([
       { act: 'discard', enabled: true },
       { act: 'knock', enabled: true },
     ]);
+    expect(must('accepted-two-ways').app.view?.meldOptions.length).toBeGreaterThanOrEqual(2);
   });
 
   test('only a draw from the discard pile offers the undo button (docs/design/gin-arrangement-and-discards.md §4)', () => {
     const undoable = STORIES.filter((s) => s.facts.actions.some((a) => a.act === 'undoDraw'));
     expect(undoable.map((s) => s.id)).toEqual(['drawn-discard-shown', 'taken-upcard-shown']);
-    expect(storyById('undo-back-to-draw')?.app.game?.discard.length).toBe(
-      storyById('draw-mine-open')?.app.game?.discard.length,
+    expect(must('undo-back-to-draw').app.game?.discard.length).toBe(
+      must('draw-mine-open').app.game?.discard.length,
     );
   });
 
-  test('the sheet fact: the result sheet open on the laid-off stories only', () => {
+  test('the sheet fact: the chooser, the arrange sheet and the result sheet each on their stories only', () => {
+    const sheets: Readonly<Record<string, SheetState>> = {
+      'meld-chooser-open': 'meldOverlay',
+      'arrange-sheet-open': 'arrangeOverlay',
+      'round-over-laid-off': 'roundResultOverlay',
+      'round-over-laid-off-defender': 'roundResultOverlay',
+    };
     STORIES.forEach((s) => {
-      expect(s.facts.sheet, s.id).toBe(
-        s.id.startsWith('round-over-laid-off') ? 'roundResultOverlay' : 'none',
-      );
+      expect(s.facts.sheet, s.id).toBe(sheets[s.id] ?? 'none');
       expect('laidOff' in s.facts, s.id).toBe(s.facts.sheet === 'roundResultOverlay');
     });
+  });
+
+  test('the arrange fact: off out of play and while a draw shows, due where the picture differs from what was asked', () => {
+    const due = STORIES.filter((s) => s.facts.arrange === 'due').map((s) => s.id);
+    expect(due).toEqual(
+      expect.arrayContaining(['accepted-fresh', 'accepted-selected', 'discarded-kept-picture']),
+    );
+    expect(due).not.toContain('arranged-after-accept');
+    expect(due).not.toContain('human-meld');
+    STORIES.forEach((s) => {
+      const shown = s.app.draw !== null;
+      const over = s.app.view?.phase === 'roundOver';
+      if (shown || over) expect(s.facts.arrange, s.id).toBe('off');
+    });
+    expect(STORIES.filter((s) => s.facts.human.length > 0).map((s) => s.id)).toEqual([
+      'human-meld',
+    ]);
+    expect(STORIES.map((s) => [s.id, s.facts.sort]).filter(([, sort]) => sort !== 'melds')).toEqual(
+      [
+        ['sorted-by-rank', 'rank'],
+        ['sorted-by-suit', 'suit'],
+      ],
+    );
   });
 
   test('every story is a table screen with a view; the guest story has no game', () => {
     STORIES.forEach((s) => {
       expect(s.app.screen, s.id).toBe('tableScreen');
       expect(s.app.view, s.id).not.toBeNull();
+      expect(s.app.picture, s.id).not.toBeNull();
       expect(s.app.role, s.id).toBe(s.id === 'drawn-pending-guest' ? 'guest' : 'local');
       expect(s.app.game === null, s.id).toBe(s.id === 'drawn-pending-guest');
     });
@@ -196,71 +264,148 @@ describe('the catalogue', () => {
 describe('every story painted on the page fake', () => {
   STORIES.forEach((story) => {
     test(`${story.id}: paints without throwing and shows its facts`, () => {
-      const page = painted(story);
-      expect(page.get('tableScreen').hidden()).toBe(false);
-      expect(factsOnPage(page)).toEqual(story.facts);
+      const p = painted(story);
+      expect(p.page.get('tableScreen').hidden()).toBe(false);
+      expect(factsOnPage(p)).toEqual(story.facts);
       expect(story.facts.slots).toBe(11);
     });
   });
 
-  test('the shown stories paint the drawn card fresh in the ghost cell and the held ten from the hold', () => {
+  test('the shown stories paint the drawn card fresh in the ghost cell and the kept ten before it', () => {
     ['drawn-stock-shown', 'drawn-discard-shown', 'taken-upcard-shown'].forEach((id) => {
-      const story = storyById(id);
-      if (story === null) throw new Error(id);
-      const hand = painted(story).get('hand').text();
-      expect(hand).toContain('<div class="slot ghost shown"><div class="card ');
-      expect(slotCards(hand).slice(0, 10)).toEqual(heldCards(story));
-      expect(slotCards(hand)[10]).toBe(story.facts.freshId);
+      const html = hand(must(id));
+      expect(html).toContain('<div class="slot ghost shown"><div class="card ');
+      expect(slotCards(html).slice(0, 10)).toEqual(heldCards(must(id)));
+      expect(slotCards(html)[10]).toBe(must(id).facts.freshId);
     });
   });
 
-  test('sameHandAs pairs hold the same card in each of the first ten slots, by the engine and by the paint', () => {
+  test('sameHandAs pairs hold the same card in each of the first ten slots, by the picture and by the paint', () => {
     STORIES.filter((s) => s.sameHandAs !== undefined).forEach((story) => {
-      const other = storyById(story.sameHandAs ?? '');
-      if (other === null) throw new Error(story.id);
+      const other = must(story.sameHandAs ?? '');
       expect(heldCards(story), story.id).toEqual(heldCards(other));
       expect(heldCards(story)).toHaveLength(10);
-      const mine = slotCards(painted(story).get('hand').text()).slice(0, 10);
-      const theirs = slotCards(painted(other).get('hand').text()).slice(0, 10);
+      const mine = slotCards(hand(story)).slice(0, 10);
+      const theirs = slotCards(hand(other)).slice(0, 10);
       expect(mine, story.id).toEqual(theirs);
       expect(mine).toEqual(heldCards(story));
     });
   });
 
   test('undo-back-to-draw paints the same hand markup as draw-mine-open', () => {
-    const undo = storyById('undo-back-to-draw');
-    const open = storyById('draw-mine-open');
-    if (undo === null || open === null) throw new Error('missing story');
-    expect(painted(undo).get('hand').text()).toBe(painted(open).get('hand').text());
-    expect(painted(undo).get('actions').text()).toBe(painted(open).get('actions').text());
+    const undo = painted(must('undo-back-to-draw')).page;
+    const open = painted(must('draw-mine-open')).page;
+    expect(undo.get('hand').text()).toBe(open.get('hand').text());
+    expect(undo.get('actions').text()).toBe(open.get('actions').text());
+  });
+
+  test('accepted-fresh keeps the ten and appends the drawn card loose; arranged-after-accept re-melds the eleven', () => {
+    const fresh = must('accepted-fresh');
+    const freshSlots = slots(hand(fresh));
+    expect(freshSlots).toHaveLength(11);
+    expect(freshSlots[10]?.[0]).toEqual(['dead']);
+    expect(freshSlots[10]?.[1]).toBe(fresh.facts.freshId);
+    expect(fresh.facts.arrange).toBe('due');
+    const arranged = must('arranged-after-accept');
+    expect(arranged.facts.arrange).toBe('idle');
+    expect(arranged.facts.freshId).toBe(fresh.facts.freshId);
+    expect(hand(arranged)).not.toBe(hand(fresh));
+    expect(new Set(slotCards(hand(arranged)))).toEqual(new Set(slotCards(hand(fresh))));
   });
 
   test('the accepted stories paint eleven card slots and no ghost cell; the gin story says GIN!', () => {
-    ['accepted-fresh', 'accepted-selected', 'accepted-knock', 'accepted-gin'].forEach((id) => {
-      const story = storyById(id);
-      if (story === null) throw new Error(id);
-      const hand = painted(story).get('hand').text();
-      expect(hand).not.toContain('ghost');
-      expect(slotCards(hand).filter((c) => c !== null)).toHaveLength(11);
+    [
+      'accepted-fresh',
+      'arranged-after-accept',
+      'accepted-selected',
+      'accepted-knock',
+      'accepted-gin',
+      'accepted-two-ways',
+      'human-meld',
+      'sorted-by-rank',
+      'sorted-by-suit',
+      'hand-three-rows',
+    ].forEach((id) => {
+      const html = hand(must(id));
+      expect(html, id).not.toContain('ghost');
+      expect(
+        slotCards(html).filter((c) => c !== null),
+        id,
+      ).toHaveLength(11);
     });
-    const gin = storyById('accepted-gin');
-    if (gin === null) throw new Error('accepted-gin');
-    const page = painted(gin);
-    expect(page.get('actions').text()).toContain('>GIN! <small>(0)</small></button>');
-    expect(page.get('deadwoodInfo').text()).toBe('Deadwood after discard: 0');
-    const knock = storyById('accepted-knock');
-    if (knock === null) throw new Error('accepted-knock');
-    expect(painted(knock).get('actions').text()).toMatch(
+    const gin = painted(must('accepted-gin')).page;
+    expect(gin.get('actions').text()).toContain('>GIN! <small>(0)</small></button>');
+    expect(gin.get('deadwoodInfo').text()).toBe('Deadwood after discard: 0');
+    expect(painted(must('accepted-knock')).page.get('actions').text()).toMatch(
       />Knock <small>\(\d+\)<\/small><\/button>/,
+    );
+  });
+
+  test('human-meld: the hand-made meld is the first group, its cells marked human, Arrange idle', () => {
+    const story = must('human-meld');
+    const html = hand(story);
+    const first = slots(html).filter(([classes]) => classes.includes('human'));
+    expect(first.map(([, id]) => id)).toEqual(story.facts.human);
+    expect(story.facts.human.length).toBeGreaterThanOrEqual(3);
+    expect(html.startsWith('<div class="group n')).toBe(true);
+    expect(slotCards(html).slice(0, story.facts.human.length)).toEqual(story.facts.human);
+    expect(story.facts.arrange).toBe('idle');
+  });
+
+  test('the sort stories: the loose cards ascend by rank, then by suit', () => {
+    const view = must('sorted-by-rank').app.view;
+    if (view === null) throw new Error('no view');
+    const byId = new Map(view.me.hand.map((c) => [c.id, c]));
+    const looseOf = (id: string): ReadonlyArray<string> =>
+      slots(hand(must(id)))
+        .filter(([classes]) => classes.includes('dead'))
+        .flatMap(([, card]) => (card === null ? [] : [card]));
+    const ranks = looseOf('sorted-by-rank').map((id) => byId.get(id)?.r ?? 0);
+    expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
+    const suits = looseOf('sorted-by-suit').map((id) => 'SHDC'.indexOf(byId.get(id)?.s ?? ''));
+    expect([...suits].sort((a, b) => a - b)).toEqual(suits);
+    expect(
+      painted(must('sorted-by-suit'))
+        .modes.find((b) => b.hasClass('active'))
+        ?.attr('data-sort'),
+    ).toBe('suit');
+  });
+
+  test('hand-three-rows: the run of seven is one group, three rows on a phone', () => {
+    const story = must('hand-three-rows');
+    expect(hand(story)).toContain('<div class="group n7">');
+    expect(story.facts.rows).toBe(3);
+    STORIES.filter((s) => s.id !== 'hand-three-rows').forEach((s) => {
+      expect(s.facts.rows, s.id).toBe(2);
+    });
+  });
+
+  test('discarded-kept-picture: the broken group stays in place as dead cells, Arrange due', () => {
+    const story = must('discarded-kept-picture');
+    const html = hand(story);
+    expect(html).toMatch(/<div class="group n[12]"><div class="slot dead">/);
+    expect(slotCards(html).filter((c) => c !== null)).toHaveLength(10);
+    expect(story.facts.arrange).toBe('due');
+    expect(story.facts.freshId).toBe(must('accepted-two-ways').facts.freshId);
+  });
+
+  test('the chooser and the arrange sheet paint over their hands', () => {
+    const chooser = painted(must('meld-chooser-open')).page;
+    expect(chooser.get('meldOverlay').hidden()).toBe(false);
+    expect(chooser.get('meldOptionList').text()).toContain('(in use)');
+    expect(chooser.get('deadwoodInfo').text()).toMatch(/⇄ \d+ ways/);
+    const sheet = painted(must('arrange-sheet-open'));
+    expect(sheet.page.get('arrangeOverlay').hidden()).toBe(false);
+    expect(sheet.modes.filter((b) => b.hasClass('active')).map((b) => b.attr('data-sort'))).toEqual(
+      ['melds'],
     );
   });
 
   test('the laid-off stories open the sheet naming 4S 5S laid off onto the spades, from both seats', () => {
     ['round-over-laid-off', 'round-over-laid-off-defender'].forEach((id) => {
-      const story = storyById(id);
-      if (story === null) throw new Error(id);
+      const story = must(id);
       expect(story.facts.laidOff).toEqual(['4S', '5S']);
-      const page = painted(story);
+      const page = painted(story).page;
       expect(page.get('roundResultOverlay').hidden()).toBe(false);
       expect(page.get('rrTitle').text()).toBe('Ann knocked');
       expect(page.get('rrBody').text()).toContain(
@@ -270,23 +415,19 @@ describe('every story painted on the page fake', () => {
       expect(laidOffOnPage(page)).toEqual(['4S', '5S']);
       expect(page.get('actions').text()).toContain('data-act="showResult"');
     });
-    expect(storyById('round-over-laid-off')?.app.view?.me.name).toBe('Ann');
-    expect(storyById('round-over-laid-off-defender')?.app.view?.me.name).toBe('Bob');
+    expect(must('round-over-laid-off').app.view?.me.name).toBe('Ann');
+    expect(must('round-over-laid-off-defender').app.view?.me.name).toBe('Bob');
   });
 
   test('round-over-table keeps the result sheet put away and offers Show results', () => {
-    const story = storyById('round-over-table');
-    if (story === null) throw new Error('round-over-table');
-    const page = painted(story);
+    const page = painted(must('round-over-table')).page;
     expect(page.get('roundResultOverlay').hidden()).toBe(true);
     expect(page.get('actions').text()).toContain('data-act="showResult"');
     expect(page.get('statusBanner').hasClass('mine')).toBe(false);
   });
 
   test('the guest story shows the pending cell, the connection dot and the Drawing… line', () => {
-    const story = storyById('drawn-pending-guest');
-    if (story === null) throw new Error('drawn-pending-guest');
-    const page = painted(story);
+    const page = painted(must('drawn-pending-guest')).page;
     expect(page.get('hand').text()).toContain('<div class="slot ghost pending"></div>');
     expect(page.get('connDot').attr('class')).toBe('conn-dot on');
     expect(page.get('statusMain').text()).toBe('Your turn');
