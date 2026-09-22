@@ -154,6 +154,71 @@ mid-turn: `picture` null → the engine's at the first paint (the ghost's docume
 them required); `slotHandView` paints `picture ?? engineOf(model, stage)`. Catalogue: `Spec.
 picture?`, `heldCards` reads `app.picture ?? engineOf(view, draw)`, `shownFrom` returns both.
 
+## 5b. Hand-made melds and sort modes (the owner's additions, 2026-09-21)
+
+The owner, mid-implementation: "fix the 'rearrange hands' mechanism. There are bugs in it. And it
+should also have a feature where you can choose to sort hand by number or by suit or you should be
+able to manually select or deselect a meld (but still auto add the melds with the unselected
+cards). You basically can long press a card and be like 'make a meld with this' (if you can) and it
+will basically do that if you can make a meld with it and the non-meld-marked cards (unless the
+meld-marked cards add the existing card to meld). its the difference between CPU made melds and
+human made melds".
+
+THE BUG. The chooser's pick is `State.meldPref`, and `viewFor` (and `knock`) honour it only while
+`meldingFromGroups(hand, pref)` fits and scores exactly the solver's best. The next draw adds a
+card the solver melds better, the next discard removes one of the declared cards: either way the
+pref is dropped and the hand snaps back to the solver's arrangement one move after the pick. The
+engine stays as it is (the legacy behaves the same; parity legs compare views); the fix is in the
+UI model: a pick becomes hand-made melds, which the arrangement below honours for the rest of the
+hand.
+
+MODULE `src/ui/hand/arrange.ts` (pure):
+
+- `SortMode = 'melds' | 'rank' | 'suit'` (storage.ts, key `ginRummy_sort`, default `melds`);
+  `sorted(picture, mode)`: `melds` leaves the solver's order; `rank` and `suit` order every group by
+  its lowest card and the loose cards by the same key (rank then suit; suit in SUITS order then
+  rank).
+- `HumanMelds = { hand: number; groups: string[][] }` on `App.human` (not saved, not on the wire):
+  the melds the player made by hand in hand number `hand`. `standing(human, hand, held)` keeps the
+  cards still held in each group and drops a group that is no longer a meld (a discarded card out
+  of a hand-made set of three dissolves it; a run of four loses its end and stands as three).
+- `arrangedOf(view, stage, human, sort)`: the arrangement the player asked for over the on-table
+  cards: the standing hand-made melds first, then `bestMelding` of the other cards (the engine's
+  own melding, honouring the chooser, when nothing is hand-made), in `sort` order. `Picture.human`
+  carries the ids in hand-made groups; the slot view marks them `.slot.human` (a gold bar above).
+- `toggleMeld(human, hand, held, cardId)`: the long press. In a hand-made meld: that meld
+  dissolves. Else a hand-made meld it extends takes it (a fourth to a set, an end to a run). Else,
+  among `allMelds` of the cards no hand-made meld holds that contain the card, the one that leaves
+  the least deadwood (`bestMelding` of the rest; the solver's order breaks ties) becomes hand-made.
+  Null when the card joins no meld: the toast `NO_MELD_MSG`.
+- `declarable(hand, picture)`: the groups to send as `setMelds` when they score as well as the
+  solver (the engine refuses worse ones, and the knock counts the best anyway), else null.
+
+STATE. `settlePicture(prev, view, stage, fresh)` takes the arrangement as a thunk: rules (a) and
+(e) call `arrangedOf(view, draw, human, sort)`. Intents: `arrange/open` (`#arrangeBtn`, in play, no
+stage) and `arrange/close` for `#arrangeOverlay`; `hand/arrange {mode}` remembers the mode
+(`writeSort`), closes the sheet and re-arranges at once; `card/press {cardId}` arms the `cardPress`
+timer (`LONG_PRESS_MS`) and `card/release` cancels it; `hand/mark {cardId}` (the timer) toggles the
+meld, re-arranges, and declares the groups to the engine through `act(setMelds)` when
+`declarable`. main.ts (and the `&live` boot) repaint only when the App changed: `card/press` returns
+the App as is, so the pressed element survives to receive its click, while the repaint after
+`hand/mark` replaces it, so the click that ends a long press reaches no card and selects nothing.
+`meld/choose` sets `human` to the option's melds. The Arrange button is enabled in play without a
+stage and carries `.due` while the picture differs from `arrangedOf` (the cue that a re-arrange
+would move cards).
+
+SHEET. `#arrangeOverlay`: title, the hint "Melds stay together. Long-press a card to make a meld
+with it by hand, and again to break it.", `#arrangeModes` with three `.btn` (`data-sort`, the
+current one `.active`), Close. Choosing a mode arranges now and closes.
+
+FACTS AND STORIES. `StoryFacts` gains `human` (the `.slot.human .card` ids), `rows`
+(`#hand[data-rows]`), `arrange: 'off' | 'idle' | 'due'`, `sort` (the active mode button) and
+`sheet: 'arrangeOverlay'`. Stories: `human-meld`, `sorted-by-rank`, `sorted-by-suit`,
+`arrange-sheet-open`, `accepted-two-ways` and `meld-chooser-open` (the two-ways deal is the first
+seed from SEED whose accepted first draw melds two ways: `TWO_WAYS_SEED`; it carries every story
+that needs a meld, since seed 12's accepted hand melds nothing). Flows: e2e/gin-arrange.spec.ts
+over `?story=<id>&live` (the chooser pick, the sort modes, the long press and the toast).
+
 ## 6. Hand layout
 
 DOM (`SlotHandView.render`): each group is one grid item; loose cards and the ghost are bare cells:
@@ -476,5 +541,30 @@ Where the doc was off: §12 places the `.actions .btn` flip at "turn: accepted t
 (fresh)"; the golden records it at "12 turn: drew from the stock (ghost slot shown)" (the first
 match is now the disabled Discard, the `.btn:disabled` hash) and "17 turn: knock available" (the
 enabled `btn-secondary` Discard), and checkpoint 13 gains no entry because its first match equals
-12's. §7's "31 vs 23" hand names no cards; the one above is a hand those figures fit. Next: PR 2
-(the kept picture, Arrange), PR 3 (the discards sheet).
+12's. §7's "31 vs 23" hand names no cards; the one above is a hand those figures fit. Next: PR 3 (the discards sheet).
+
+PR 2 landed on 2026-09-22 (branch `gin-picture-arrange`): §5, §5b and §6 in full and the PR 2 items
+of §10-§13, plus the owner's mid-implementation additions (§5b). `picture.ts` (`Picture` with
+`human`, `settlePicture(prev, view, stage, fresh)` with the arrangement as a thunk, `rowsOf` and
+`phoneRows`), `arrange.ts` (`SortMode` from `src/sort.ts`, `HumanMelds`, `standing`, `sorted`,
+`arrangedOf`, `toggleMeld`, `declarable`), `DrawStage` without `hold`, `HandView.render(model,
+selection, stage?, picture?)`, `SlotHandView` with `.group.nK` items and `.slot.human`, `App.picture
+| human | sort | arrangeOpen`, the intents `arrange/open|close`, `hand/arrange {mode}`,
+`card/press|release`, `hand/mark`, `writeSort` (`ginRummy_sort` in storage.ts), the header's
+`#arrangeBtn` (`.due` cue) and the `#arrangeOverlay` sheet, the dense grid with the `:has()` third-
+row fallback. Two things found on the way: main.ts (and the `&live` boot) must not repaint on an
+unchanged App, or a card's pointerdown replaces the element and the browser drops its click (every
+card tap died until then); and `tools/parity/computed-styles.ts` swallowed a driver error as a
+silent exit 0 (a `catch` now reports it). Stories: 27 (nine new: `arranged-after-accept`,
+`accepted-two-ways`, `meld-chooser-open`, `human-meld`, `sorted-by-rank`, `sorted-by-suit`,
+`arrange-sheet-open`, `hand-three-rows`, `discarded-kept-picture`); `accepted-fresh` gained
+`sameHandAs: 'draw-mine-open'` (an accept moves nothing). The two-ways deal (`TWO_WAYS_SEED`)
+carries every story that needs a meld: seed 12's accepted hand melds nothing. Oracles: `npm run
+check` green (79 files, 1996 tests); coverage `ui/hand` 100 / 99.3 / 100 / 100 and `stories`
+93.4 / 91.1 / 95.2 / 100 over their ratchets; computed-styles re-recorded (gin ×2; fidice
+byte-identical) then `--check` 0 differences; gin-dom-parity 84 checkpoints, 0 mismatches; the
+stories spec 81/81 at three viewports (facts, `expectHandRows`, `rows` vs the DOM, `sameHandAs`);
+gin-draw, gin-discard (new), gin-arrange (new; `?story=<id>&live`, which now runs the reducer's
+timers and toasts), gin-geometry (five viewports, the hand's frame within a turn), gin-local green.
+Darwin PNGs re-recorded with `--update-snapshots=all` (the 0.002 ratio hid the Arrange pill: 48 of 52
+files changed); the linux set comes from the dispatch job.

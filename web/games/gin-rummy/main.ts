@@ -90,7 +90,7 @@ const boot = (): void => {
   const story = params.get('story');
   if (story !== null) {
     void import('./src/stories/boot.ts').then((stories) => {
-      stories.bootStory(document, story, params.has('nav'));
+      stories.bootStory(document, story, params.has('nav'), params.has('live'));
     });
     return;
   }
@@ -168,11 +168,15 @@ const boot = (): void => {
 
   const dispatch = (intent: Intent): void => {
     const step = reduce(app, intent, { rng, now });
+    // The paint is a function of the App, so an unchanged App needs none. This matters on a
+    // card's pointerdown: a repaint would replace the element under the pointer, and the
+    // browser would then drop the click that was to follow.
+    const changed = step.app !== app;
     app = step.app;
     step.effects.forEach((effect) => {
       runEffect(app, effect, deps);
     });
-    repaint();
+    if (changed) repaint();
   };
 
   const hostEvents: HostEvents = {

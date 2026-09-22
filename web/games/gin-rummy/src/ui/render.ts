@@ -26,6 +26,7 @@ import {
   queryIn,
   requireId,
   safeHtml,
+  queryAllIn,
   setAttr,
   setDisabled,
   setHtml,
@@ -48,6 +49,9 @@ import { backHtml, cardHtml, pretty } from './cards.ts';
 import { deadwoodText, fmtDuration, statusWith, type Selection } from './cues.ts';
 import type { HandView } from './hand/HandView.ts';
 import { meldGroupsHtml } from './hand/meldGroups.ts';
+import { arrangedOf } from './hand/arrange.ts';
+import { inPlay, phoneRows, samePicture } from './hand/picture.ts';
+import { SORT_MODES, type SortMode } from '../sort.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { RULES_ITEMS } from './rules.ts';
@@ -230,9 +234,27 @@ const paintHand = (doc: DocumentLike, app: App, v: View, handView: HandView): vo
   toggleClass(dw, 'tappable-dw', altCount > 1);
   setAttr(dw, 'title', altCount > 1 ? 'Tap to choose which melds you declare' : '');
   const hand = requireId(doc, 'hand');
-  setHtml(hand, trustedHtml(handView.render(v, app.selectedCard, app.draw)));
+  const arranged = arrangedOf(v, app.draw, app.human, app.sort);
+  const picture = app.picture ?? arranged;
+  setHtml(hand, trustedHtml(handView.render(v, app.selectedCard, app.draw, picture)));
   toggleClass(hand, 'active', v.isMyTurn && v.phase === 'discard');
+  // The phone's row count (docs/design/gin-arrangement-and-discards.md §6): theme.css lets the page
+  // scroll for a third row where the viewport is too short for one.
+  setAttr(hand, 'data-rows', String(phoneRows(picture)));
+  // Arrange opens its sheet in play, never while the drawn card waits in the ghost cell; `due`
+  // is the cue that the kept picture differs from the arrangement the player asked for.
+  const arrange = requireId(doc, 'arrangeBtn');
+  const arrangeable = inPlay(v) && app.draw === null;
+  setDisabled(arrange, !arrangeable);
+  toggleClass(arrange, 'due', arrangeable && !samePicture(picture, arranged));
   setHtml(requireId(doc, 'actions'), actionsHtml(v, app.selectedCard));
+};
+
+const paintArrange = (doc: DocumentLike, app: App): void => {
+  toggleClass(requireId(doc, 'arrangeOverlay'), 'hidden', !app.arrangeOpen);
+  queryAllIn(requireId(doc, 'arrangeModes'), 'button[data-sort]').forEach((b) => {
+    toggleClass(b, 'active', dataOf(b, 'sort') === app.sort);
+  });
 };
 
 // ---- the round result --------------------------------------------------------------------------
@@ -478,6 +500,7 @@ const paintGame = (doc: DocumentLike, app: App, handView: HandView): void => {
   paintPiles(doc, v);
   paintStatus(doc, app, v);
   paintHand(doc, app, v, handView);
+  paintArrange(doc, app);
   paintRoundResult(doc, app, v);
   paintMeldChooser(doc, app, v);
 };
@@ -497,6 +520,8 @@ export const paint = (doc: PageLike, app: App, handView: HandView): void => {
 
 // ---- input wiring --------------------------------------------------------------------------------
 
+const isSortMode = (mode: string | null): mode is SortMode => SORT_MODES.some((s) => s === mode);
+
 /** The table's, the sheets' and the endgame's controls, each an intent (the legacy click handlers). */
 export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   listenId(doc, 'stockPile', 'click', () => {
@@ -515,6 +540,31 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   });
   listenId(doc, 'deadwoodInfo', 'click', () => {
     dispatch({ type: 'meld/open' });
+  });
+  listenId(doc, 'arrangeBtn', 'click', () => {
+    dispatch({ type: 'arrange/open' });
+  });
+  listenId(doc, 'closeArrangeBtn', 'click', () => {
+    dispatch({ type: 'arrange/close' });
+  });
+  listenId(doc, 'arrangeOverlay', 'click', (e) => {
+    if (targetIdOf(e) === 'arrangeOverlay') dispatch({ type: 'arrange/close' });
+  });
+  listenId(doc, 'arrangeModes', 'click', (e) => {
+    const btn = closestFrom(e, 'button[data-sort]');
+    const mode = btn === null ? null : dataOf(btn, 'sort');
+    if (isSortMode(mode)) dispatch({ type: 'hand/arrange', mode });
+  });
+  // A long press on a card (the pointer held for the reducer's timer) makes or breaks a meld by hand.
+  listenId(doc, 'hand', 'pointerdown', (e) => {
+    const card = closestFrom(e, '.card');
+    const id = card === null ? null : dataOf(card, 'card');
+    if (id !== null) dispatch({ type: 'card/press', cardId: id });
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => {
+    listenId(doc, 'hand', ev, () => {
+      dispatch({ type: 'card/release' });
+    });
   });
   listenId(doc, 'closeMeldBtn', 'click', () => {
     dispatch({ type: 'meld/close' });

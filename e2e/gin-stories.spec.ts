@@ -2,12 +2,15 @@
 // docs/ARCHITECTURE.md "Testing pyramid" 5). Every story of web/games/gin-rummy/src/stories/
 // catalogue.ts is opened through the page's `?story=<id>` hook at a phone, a laptop and a short
 // phone, and four things are asserted from the DOM a player sees: the facts the catalogue derived
-// from the engine (slot and card counts, the ghost cell's class, the fresh, locked and selected
-// cards, the piles, the buttons and their state, the status line); the geometry (`#app` and
-// `#hand` never scroll, the eleven cells are one size, in two rows of six and five on a phone and
-// one row on the laptop); the stability the owner asked for (a story with `sameHandAs` holds the
-// same card at the same pixel rectangle in each of the first ten slots as that story, so a draw
-// moves nothing); and, at the two screenshot viewports, a screenshot compared against the committed
+// from the engine and the picture (slot and card counts, the ghost cell's class, the fresh, locked,
+// selected and hand-made cards, the phone row count, the Arrange button, the sort mode, the piles,
+// the buttons and their state, the status line, the open sheet); the geometry (`#app` and `#hand`
+// never scroll, the eleven cells are one size, a meld never splits a row, the rows on a phone are
+// the ones `data-rows` announces and one on the laptop: e2e/fixtures/gin.ts `expectHandRows`; a
+// three-row hand on a phone too short for it scrolls the document to a reachable actions row
+// instead); the stability the owner asked for (a story with `sameHandAs` holds the same card at
+// the same pixel rectangle in each of the first ten slots as that story, so a draw and an accept
+// move nothing); and, at the two screenshot viewports, a screenshot compared against the committed
 // per-platform baseline (`e2e/__screenshots__/gin-stories.spec.ts/<id>--<viewport>-<platform>.png`,
 // playwright.config.ts `snapshotPathTemplate`); a story with a sheet open shoots `body` at both
 // viewports, since the overlays are siblings of `#app`. A missing baseline fails: CI is never
@@ -21,16 +24,17 @@ import {
   storyById,
   type StoryFacts,
 } from '../web/games/gin-rummy/src/stories/catalogue.ts';
+import { expectHandRows } from './fixtures/gin.ts';
 import { ALLOWED_FAILURES } from './fixtures/offline.ts';
 import { pagePath } from './fixtures/site.ts';
 import { watchPage } from './fixtures/watch.ts';
 
-type Viewport = Readonly<{ width: number; height: number; rows: 1 | 2; shot: boolean }>;
+type Viewport = Readonly<{ width: number; height: number; columns: 6 | 11; shot: boolean }>;
 const VIEWPORTS: Readonly<Record<string, Viewport>> = {
-  phone: { width: 390, height: 844, rows: 2, shot: true },
-  desktop: { width: 1280, height: 800, rows: 1, shot: true },
-  // Geometry only: an iPhone SE, where the cards shrink to their floor.
-  'phone-short': { width: 375, height: 667, rows: 2, shot: false },
+  phone: { width: 390, height: 844, columns: 6, shot: true },
+  desktop: { width: 1280, height: 800, columns: 11, shot: true },
+  // Geometry only: an iPhone SE, where the cards shrink to their floor and a third row scrolls.
+  'phone-short': { width: 375, height: 667, columns: 6, shot: false },
 };
 
 /** The facts as the served DOM shows them, in the catalogue's terms. */
@@ -42,8 +46,10 @@ const FACTS = `(() => {
   const stock = document.getElementById('stockPile').classList;
   const disc = document.getElementById('discardPile').classList;
   const open = (id) => !document.getElementById(id).classList.contains('hidden');
-  const sheet = open('meldOverlay') ? 'meldOverlay' : open('roundResultOverlay') ? 'roundResultOverlay' : 'none';
+  const sheet = open('meldOverlay') ? 'meldOverlay' : open('arrangeOverlay') ? 'arrangeOverlay' : open('roundResultOverlay') ? 'roundResultOverlay' : 'none';
   const laidOff = sheet === 'roundResultOverlay' ? { laidOff: all('#rrBody .meld-group.laid .card').map((c) => c.getAttribute('data-card')) } : {};
+  const arrangeBtn = document.getElementById('arrangeBtn');
+  const activeSort = document.querySelector('#arrangeModes button.active');
   return {
     slots: all('#hand .slot').length,
     handCards: all('#hand .slot .card[data-card]').length,
@@ -51,6 +57,10 @@ const FACTS = `(() => {
     freshId: one('#hand .card.fresh'),
     lockedId: one('#hand .card.locked'),
     selectedId: one('#hand .card.selected'),
+    human: all('#hand .slot.human .card').map((c) => c.getAttribute('data-card')),
+    rows: Number(document.getElementById('hand').getAttribute('data-rows')),
+    arrange: arrangeBtn.disabled ? 'off' : arrangeBtn.classList.contains('due') ? 'due' : 'idle',
+    sort: activeSort === null ? 'melds' : activeSort.getAttribute('data-sort'),
     stock: stock.contains('tappable') ? 'tappable' : 'idle',
     discard: disc.contains('tappable') ? 'tappable' : disc.contains('blocked') ? 'blocked' : 'idle',
     actions: all('#actions [data-act]').map((b) => ({ act: b.getAttribute('data-act'), enabled: !b.disabled })),
@@ -59,11 +69,19 @@ const FACTS = `(() => {
     ...laidOff,
   };
 })()`;
-/** Nothing scrolls, and every slot cell's size and top. */
+/** `#app` holds its content, and the actions row is on screen once the window is scrolled to its end. */
 const GEOMETRY = `(() => {
-  const fits = (id) => { const el = document.getElementById(id); return el.scrollHeight <= el.clientHeight + 1; };
-  const slots = Array.from(document.querySelectorAll('#hand .slot')).map((s) => s.getBoundingClientRect());
-  return { app: fits('app'), hand: fits('hand'), sizes: slots.map((r) => [r.width, r.height]), tops: slots.map((r) => r.top) };
+  const app = document.getElementById('app');
+  const before = window.scrollY;
+  window.scrollTo(0, document.documentElement.scrollHeight);
+  const actions = document.getElementById('actions').getBoundingClientRect();
+  window.scrollTo(0, before);
+  return {
+    app: app.scrollHeight <= app.clientHeight + 1,
+    document: document.documentElement.scrollHeight <= window.innerHeight + 1,
+    actionsReachable: actions.bottom <= window.innerHeight + 0.5,
+    short: window.innerHeight <= 736,
+  };
 })()`;
 /** `data-card -> [x, y, w, h]` of the cards in the first ten slots. */
 const RECTS = `Object.fromEntries(Array.from(document.querySelectorAll('#hand .slot')).slice(0, 10).map((s) => {
@@ -74,9 +92,9 @@ const RECTS = `Object.fromEntries(Array.from(document.querySelectorAll('#hand .s
 
 type Geometry = Readonly<{
   app: boolean;
-  hand: boolean;
-  sizes: ReadonlyArray<readonly [number, number]>;
-  tops: ReadonlyArray<number>;
+  document: boolean;
+  actionsReachable: boolean;
+  short: boolean;
 }>;
 type Rects = Readonly<Record<string, readonly [number, number, number, number]>>;
 
@@ -88,27 +106,19 @@ const openStory = async (page: Page, id: string): Promise<void> => {
   await expect(page.locator('#hand .slot')).toHaveCount(11);
 };
 
-const expectGeometry = async (page: Page, vp: Viewport): Promise<void> => {
+/**
+ * The hand grid (`expectHandRows`), the phone rows the catalogue computed (`rows`), and the page:
+ * `#app` never scrolls; the document scrolls only for a third row on a phone too short for it
+ * (theme.css's `:has(#hand[data-rows="3"])` fallback), and then to a reachable actions row.
+ */
+const expectGeometry = async (page: Page, vp: Viewport, rows: number): Promise<void> => {
+  const laid = await expectHandRows(page, vp.columns);
+  if (vp.columns === 6) expect(laid, 'rows vs the catalogue').toBe(rows);
   const g = await page.evaluate<Geometry>(GEOMETRY);
   expect(g.app, '#app scrolls').toBe(true);
-  expect(g.hand, '#hand scrolls').toBe(true);
-  expect(g.sizes).toHaveLength(11);
-  const [first] = g.sizes;
-  if (first === undefined) return;
-  g.sizes.forEach(([w, h], i) => {
-    expect(
-      near(w, first[0]) && near(h, first[1]),
-      `slot ${String(i)} is ${String(w)}x${String(h)}`,
-    ).toBe(true);
-  });
-  const tops = g.tops.map((t) => Math.round(t));
-  if (vp.rows === 1) {
-    expect(new Set(tops).size, 'one row').toBe(1);
-    return;
-  }
-  expect(new Set(tops.slice(0, 6)).size, 'the first six share a top').toBe(1);
-  expect(new Set(tops.slice(6)).size, 'the last five share a top').toBe(1);
-  expect(tops[6], 'two rows').toBeGreaterThan(tops[0] ?? 0);
+  expect(g.actionsReachable, 'the actions row is off screen').toBe(true);
+  const mayScroll = vp.columns === 6 && rows === 3 && g.short;
+  if (!mayScroll) expect(g.document, 'the page scrolls').toBe(true);
 };
 
 const expectSameRects = (now: Rects, then: Rects, id: string): void => {
@@ -141,7 +151,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
 
         // The facts, the geometry, and the owner's sentence: the same card in the same place.
         expect(await page.evaluate<StoryFacts>(FACTS)).toEqual(story.facts);
-        await expectGeometry(page, vp);
+        await expectGeometry(page, vp, story.facts.rows);
         if (story.sameHandAs !== undefined) {
           const other = storyById(story.sameHandAs);
           expect(other, story.sameHandAs).not.toBeNull();

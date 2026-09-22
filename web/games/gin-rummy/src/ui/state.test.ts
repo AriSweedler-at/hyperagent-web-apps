@@ -7,7 +7,8 @@ import type { Action, Seat, State } from '../engine/index.ts';
 import { CONNECTED_MSG, connectingMsg } from '../net/guest.ts';
 import { OPENING_MSG, WAITING_MSG, handoffMsg } from '../net/host.ts';
 import { STORAGE_KEYS } from '../storage.ts';
-import { holdOf } from './hand/draw.ts';
+import { arrangedOf } from './hand/arrange.ts';
+import { engineOf } from './hand/picture.ts';
 import {
   DISCONNECTED_MSG,
   FORCE_STOCK_MSG,
@@ -18,6 +19,7 @@ import {
   LONG_PRESS_MS,
   LOST_HOST_MSG,
   NOT_CONNECTED_MSG,
+  NO_MELD_MSG,
   OPPONENT_LEFT_MSG,
   ROOM_FULL_MSG,
   SCREENS,
@@ -85,6 +87,7 @@ const home: HomeSnapshot = {
   p2Name: null,
   homeTab: 'play',
   playMode: 'online',
+  sort: 'melds',
   save: null,
   scorer: null,
 };
@@ -854,7 +857,8 @@ describe('the ghost draw slot', () => {
     [0, { type: 'passUpcard' }],
     [1, { type: 'passUpcard' }],
   ]);
-  const preDraw = holdOf(viewFor(passed, 0).me);
+  /** The picture before the draw: the engine's melding of the ten. */
+  const preDraw = engineOf(viewFor(passed, 0), null);
   /** Ann passed, Jeff took the upcard and discarded: Ann's open draw, both piles tappable. */
   const openDraw = play(dealt, [
     [0, { type: 'passUpcard' }],
@@ -866,14 +870,11 @@ describe('the ghost draw slot', () => {
     const { app, effects } = run(local(passed), { type: 'stock/tap' });
     const view = app.view;
     expect(view?.phase).toBe('discard');
-    expect(app.draw).toEqual({
-      kind: 'shown',
-      from: 'stock',
-      cardId: view?.lastDrawnId,
-      hold: preDraw,
-    });
-    // The hold is the picture before the draw, not the re-melded eleven.
-    expect(app.draw?.hold).not.toEqual(holdOf(view?.me ?? viewFor(passed, 0).me));
+    expect(app.draw).toEqual({ kind: 'shown', from: 'stock', cardId: view?.lastDrawnId });
+    // The picture is the one before the draw, not the re-melded eleven (picture.ts rule b).
+    expect(app.picture).toEqual(preDraw);
+    if (view === null) throw new Error('no view');
+    expect(app.picture).not.toEqual(engineOf(view, null));
     expect(app.selectedCard).toBeNull();
     expect(kinds(effects)).toEqual(['fx', 'persist', 'scrollTop']);
   });
@@ -884,8 +885,8 @@ describe('the ghost draw slot', () => {
       kind: 'shown',
       from: 'discard',
       cardId: tapped.game?.drawnFromDiscard,
-      hold: holdOf(viewFor(dealt, 0).me),
     });
+    expect(tapped.picture).toEqual(engineOf(viewFor(dealt, 0), null));
     const button = run(local(dealt), { type: 'action/click', act: 'takeUpcard' }).app;
     expect(button.draw).toEqual(tapped.draw);
     const drawPile = run(
@@ -986,7 +987,7 @@ describe('the ghost draw slot', () => {
       screen: 'tableScreen',
     };
     const waiting = run(guest, { type: 'stock/tap' });
-    expect(waiting.app.draw).toEqual({ kind: 'waiting', from: 'stock', hold: preDraw });
+    expect(waiting.app.draw).toEqual({ kind: 'waiting', from: 'stock' });
     expect(waiting.effects).toEqual([
       { type: 'fx', cue: 'tap' },
       { type: 'send', frame: { t: 'action', action: { type: 'drawStock' } } },
@@ -995,12 +996,9 @@ describe('the ghost draw slot', () => {
     expect(rerendered.draw).toEqual(waiting.app.draw);
     const view = viewFor(drawn, 0);
     const shown = run(rerendered, { type: 'guest/frame', frame: { t: 'state', view } }).app;
-    expect(shown.draw).toEqual({
-      kind: 'shown',
-      from: 'stock',
-      cardId: view.lastDrawnId,
-      hold: preDraw,
-    });
+    expect(shown.draw).toEqual({ kind: 'shown', from: 'stock', cardId: view.lastDrawnId });
+    // The guest's picture is the one it painted before the draw, kept through the state frame.
+    expect(shown.picture).toEqual(preDraw);
     const refused = run(waiting.app, { type: 'guest/frame', frame: { t: 'toast', msg: 'no' } });
     expect(refused.app.draw).toBeNull();
     expect(toasts(refused.effects)).toEqual([['no', null]]);
@@ -1025,7 +1023,7 @@ describe('the ghost draw slot', () => {
       screen: 'tableScreen',
     };
     const twice = run(guest, { type: 'stock/tap' }, { type: 'stock/tap' });
-    expect(twice.app.draw).toEqual({ kind: 'waiting', from: 'stock', hold: preDraw });
+    expect(twice.app.draw).toEqual({ kind: 'waiting', from: 'stock' });
     expect(twice.effects).toEqual([
       { type: 'fx', cue: 'tap' },
       { type: 'send', frame: { t: 'action', action: { type: 'drawStock' } } },
@@ -1057,12 +1055,7 @@ describe('the ghost draw slot', () => {
     // refusal toast follows to clear it.
     const view = viewFor(drawn, 0);
     const shown = run(twice.app, { type: 'guest/frame', frame: { t: 'state', view } }).app;
-    expect(shown.draw).toEqual({
-      kind: 'shown',
-      from: 'stock',
-      cardId: view.lastDrawnId,
-      hold: preDraw,
-    });
+    expect(shown.draw).toEqual({ kind: 'shown', from: 'stock', cardId: view.lastDrawnId });
     // Undo is not a draw: it is never swallowed by the wait (the upcard path, which undoes).
     expect(
       kinds(run(upcardTwice.app, { type: 'action/click', act: 'undoDraw' }).effects),
@@ -1277,6 +1270,7 @@ describe('storage', () => {
       p2Name: 'Bob',
       homeTab: 'rules',
       playMode: 'local',
+      sort: 'melds',
       save: { role: 'guest', code: 'KQZM', myName: 'Jeff' },
       scorer: {
         players: [
@@ -1684,5 +1678,137 @@ describe('the remote handoff of a pass-and-play game', () => {
     expect(
       run(initialApp, { type: 'join/link', code: 'KQZM', name: 'x'.repeat(30) }).effects.at(-1),
     ).toEqual({ type: 'fillName', name: 'x'.repeat(20) });
+  });
+});
+
+describe('the arrangement: the sheet, the sort modes and the long press', () => {
+  const local = (game: State, seat: Seat = 0): App => ({
+    ...initialApp,
+    role: 'local',
+    oppConnected: true,
+    game,
+    view: viewFor(game, seat),
+    screen: 'tableScreen',
+    revealed: seat,
+  });
+  const passed = play(dealt, [
+    [0, { type: 'passUpcard' }],
+    [1, { type: 'passUpcard' }],
+  ]);
+  /** The first seed whose drawn hand melds: the long-press tests need a meld to make. */
+  const meldy = Array.from({ length: 40 }, (_, i) =>
+    play(
+      createGame({ players: PLAYERS, target: 100, dealer: 1 }, mulberry32(i), () => NOW),
+      [
+        [0, { type: 'passUpcard' }],
+        [1, { type: 'passUpcard' }],
+        [0, { type: 'drawStock' }],
+      ],
+    ),
+  ).find((g) => viewFor(g, 0).me.melds.length > 0);
+  if (meldy === undefined) throw new Error('no seed under forty deals a meld');
+  const accepted = run(local(meldy), { type: 'render' }).app;
+  const v = accepted.view;
+  if (v === null) throw new Error('no view');
+
+  test('the sheet opens in play without a draw stage and closes; never while the drawn card waits', () => {
+    const open = run(accepted, { type: 'arrange/open' });
+    expect(open.app.arrangeOpen).toBe(true);
+    expect(kinds(open.effects)).toEqual(['fx']);
+    expect(run(open.app, { type: 'arrange/close' }).app.arrangeOpen).toBe(false);
+    const shown = run(local(passed), { type: 'stock/tap' }).app;
+    expect(shown.draw?.kind).toBe('shown');
+    expect(run(shown, { type: 'arrange/open' }).app).toBe(shown);
+  });
+
+  test('a sort mode is remembered, closes the sheet and re-arranges the picture at once', () => {
+    const open = run(accepted, { type: 'arrange/open' }).app;
+    const sorted = run(open, { type: 'hand/arrange', mode: 'suit' });
+    expect(sorted.app.sort).toBe('suit');
+    expect(sorted.app.arrangeOpen).toBe(false);
+    expect(sorted.effects).toEqual(
+      expect.arrayContaining([
+        { type: 'writeSort', sort: 'suit' },
+        { type: 'fx', cue: 'tap' },
+      ]),
+    );
+    expect(sorted.app.picture).toEqual(arrangedOf(v, null, null, 'suit'));
+    // Out of play the mode is still remembered, the picture untouched.
+    const over = { ...accepted, view: { ...v, phase: 'roundOver' as const } };
+    const later = run(over, { type: 'hand/arrange', mode: 'rank' });
+    expect(later.app.sort).toBe('rank');
+    expect(later.app.picture).toBe(over.picture);
+    expect(kinds(later.effects)).toEqual(['writeSort']);
+  });
+
+  test('a press arms the timer without changing the App; a release cancels it', () => {
+    const id = v.me.hand[0]?.id ?? '';
+    const pressed = run(accepted, { type: 'card/press', cardId: id });
+    expect(pressed.app).toBe(accepted);
+    expect(pressed.effects).toEqual([
+      {
+        type: 'startTimer',
+        id: 'cardPress',
+        ms: LONG_PRESS_MS,
+        then: { type: 'hand/mark', cardId: id },
+      },
+    ]);
+    expect(run(accepted, { type: 'card/release' }).effects).toEqual([
+      { type: 'cancelTimer', id: 'cardPress' },
+    ]);
+    const shown = run(local(passed), { type: 'stock/tap' }).app;
+    expect(run(shown, { type: 'card/press', cardId: id }).effects).toEqual([]);
+  });
+
+  test('a long press makes the meld by hand, marks it and declares it when it scores as the solver; again dissolves it', () => {
+    const meld = v.me.melds[0];
+    if (meld === undefined) throw new Error('meldy melds nothing');
+    const id = meld[0]?.id ?? '';
+    const marked = run(accepted, { type: 'hand/mark', cardId: id });
+    expect(marked.app.human?.groups).toEqual([meld.map((c) => c.id)]);
+    expect(marked.app.picture?.human).toEqual(meld.map((c) => c.id));
+    expect(marked.app.picture?.groups[0]).toEqual(meld);
+    expect(marked.app.selectedCard).toBeNull();
+    // The engine's own meld scores as the solver: declared, so the game's meldPref names it.
+    expect(marked.app.game?.meldPref[0]?.[0]).toEqual(meld.map((c) => c.id));
+    expect(kinds(marked.effects)).toContain('persist');
+    const dissolved = run(marked.app, { type: 'hand/mark', cardId: id });
+    expect(dissolved.app.human).toEqual({ hand: meldy.handNumber, groups: [] });
+    expect(dissolved.app.picture?.human).toEqual([]);
+  });
+
+  test('a long press on a card that melds nothing toasts and changes nothing else', () => {
+    const lone = v.me.deadwood.find(
+      (c) =>
+        !v.me.hand.some(
+          (o) => o.id !== c.id && (o.r === c.r || (o.s === c.s && Math.abs(o.r - c.r) === 1)),
+        ),
+    );
+    if (lone === undefined) return;
+    const pressed = run(accepted, { type: 'hand/mark', cardId: lone.id });
+    expect(pressed.app.human).toBeNull();
+    expect(pressed.app.picture).toBe(accepted.picture);
+    expect(toasts(pressed.effects)).toEqual([[NO_MELD_MSG, null]]);
+  });
+
+  test('a chooser pick becomes hand-made, so it outlives the engine dropping its declaration', () => {
+    const options = v.meldOptions;
+    if (options.length < 2) return;
+    const picked = run(accepted, { type: 'meld/choose', index: 1 });
+    expect(picked.app.human?.groups).toEqual(options[1]?.melds.map((m) => m.map((c) => c.id)));
+    expect(picked.app.meldChooser).toBe(false);
+  });
+
+  test('a new deal and leaving drop the hand-made melds; the save never carries them', () => {
+    const meld = v.me.melds[0];
+    if (meld === undefined) throw new Error('meldy melds nothing');
+    const marked = run(accepted, { type: 'hand/mark', cardId: meld[0]?.id ?? '' }).app;
+    expect(marked.human).not.toBeNull();
+    expect(run(marked, { type: 'leave/finish' }).app.human).toBeNull();
+    expect(
+      run(marked, { type: 'local/click', p1: 'A', p2: 'B', target: '1' }).app.human,
+    ).toBeNull();
+    expect(saveFor(marked)).not.toHaveProperty('human');
+    expect(saveFor(marked)).not.toHaveProperty('picture');
   });
 });

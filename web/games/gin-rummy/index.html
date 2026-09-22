@@ -198,7 +198,7 @@
     <div class="last-action" id="lastAction"></div>
 
     <div class="hand-area">
-      <div class="hand-header"><span id="myName">You</span><span class="dw" id="deadwoodInfo">Deadwood: —</span></div>
+      <div class="hand-header"><span id="myName">You</span><button class="arrange-btn" id="arrangeBtn" title="Arrange your hand by melds" disabled>Arrange</button><span class="dw" id="deadwoodInfo">Deadwood: —</span></div>
       <div class="hand" id="hand"></div>
       <div class="actions" id="actions"></div>
     </div>
@@ -260,6 +260,21 @@
     <div class="sheet-sub" id="meldSub"></div>
     <div id="meldOptionList" style="display:flex; flex-direction:column; gap:10px; overflow-y:auto; min-height:0; flex:1;"></div>
     <button class="btn btn-ghost btn-block btn-sm" id="closeMeldBtn" style="margin-top:14px;">Close</button>
+  </div>
+</div>
+
+<!-- ARRANGE -->
+<div id="arrangeOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div style="text-align:center; font-size:2rem;">🃏</div>
+    <div class="sheet-title">Arrange your hand</div>
+    <div class="sheet-sub">Melds stay together. Long-press a card to make a meld with it by hand, and again to break it.</div>
+    <div class="sort-modes" id="arrangeModes">
+      <button class="btn btn-secondary btn-sm" data-sort="melds">By melds</button>
+      <button class="btn btn-secondary btn-sm" data-sort="rank">By rank</button>
+      <button class="btn btn-secondary btn-sm" data-sort="suit">By suit</button>
+    </div>
+    <button class="btn btn-ghost btn-block btn-sm" id="closeArrangeBtn" style="margin-top:14px;">Close</button>
   </div>
 </div>
 

@@ -5,7 +5,13 @@
 // story, so the catalogue lands in its own chunk under dist/shared/assets/ and the game's entry
 // carries none of it. `?story=` alone lists the stories as links; `&nav` adds a prev/index/next
 // bar (inline styles: the page's stylesheet must not learn a class for it, the class contract
-// would demand a rule). e2e/gin-stories.spec.ts opens each story without `nav`.
+// would demand a rule). `&live` (docs/design/gin-arrangement-and-discards.md §11) binds the page's
+// controls to the reducer over the story's App and repaints after every intent, running only the
+// reducer's timers (the long press) and its toasts (shown, never hidden) and dropping every other
+// effect: a UI-only flow (the meld chooser, Arrange, a long press, a selection) can be driven from
+// a catalogued state without a game, a store or a network; an intent that needs another effect (a
+// persist, a send, a confirm) does nothing beyond its state change. e2e/gin-stories.spec.ts opens each story without either
+// flag; e2e/gin-arrange.spec.ts uses `live`.
 import {
   appendHtml,
   escapeHtml,
@@ -14,9 +20,11 @@ import {
   trustedHtml,
   type PageLike,
 } from '../../../../shared/edge/dom.ts';
+import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { slotHandView } from '../ui/hand/SlotHandView.ts';
-import { paint, renderRules } from '../ui/render.ts';
-import { STORIES, storyById, type Story } from './catalogue.ts';
+import { bindAll, paint, renderRules, showToast } from '../ui/render.ts';
+import { reduce, type App, type Effect, type Intent, type TimerId } from '../ui/state.ts';
+import { EPOCH, SEED, STORIES, storyById, type Story } from './catalogue.ts';
 
 const href = (id: string, nav: boolean): string =>
   `?story=${encodeURIComponent(id)}${nav ? '&nav' : ''}`;
@@ -53,8 +61,46 @@ const navHtml = (story: Story): string => {
   );
 };
 
-/** Paint the story `id` names, or the index when it names none; `nav` adds the bar. */
-export const bootStory = (doc: PageLike, id: string, nav: boolean): void => {
+/**
+ * The reducer over the story's App behind the page's controls, repainting after each intent that
+ * changed it; of the effects only the named timers (the long press needs its `cardPress` timer, on
+ * the page's own clock) and the toasts run.
+ */
+const bindLive = (doc: PageLike, initial: App): void => {
+  /* eslint-disable functional/immutable-data -- the two cells the live page keeps, as main.ts
+     keeps them: the App between intents and the armed timers */
+  const ctx = { rng: mulberry32(SEED), now: (): number => EPOCH };
+  const held = { app: initial };
+  const timers = new Map<TimerId, ReturnType<typeof setTimeout>>();
+  const runTimer = (effect: Effect, dispatch: (intent: Intent) => void): void => {
+    if (effect.type === 'toast') showToast(doc, effect.message);
+    if (effect.type !== 'startTimer' && effect.type !== 'cancelTimer') return;
+    clearTimeout(timers.get(effect.id));
+    timers.delete(effect.id);
+    if (effect.type === 'startTimer')
+      timers.set(
+        effect.id,
+        setTimeout(() => {
+          dispatch(effect.then);
+        }, effect.ms),
+      );
+  };
+  const dispatch = (intent: Intent): void => {
+    const step = reduce(held.app, intent, ctx);
+    step.effects.forEach((effect) => {
+      runTimer(effect, dispatch);
+    });
+    // As main.ts: no repaint for an unchanged App, or a card's pointerdown would kill its click.
+    if (step.app === held.app) return;
+    held.app = step.app;
+    paint(doc, held.app, slotHandView);
+  };
+  bindAll(doc, dispatch);
+  /* eslint-enable functional/immutable-data */
+};
+
+/** Paint the story `id` names, or the index when it names none; `nav` adds the bar, `live` the controls. */
+export const bootStory = (doc: PageLike, id: string, nav: boolean, live = false): void => {
   renderRules(doc);
   const story = storyById(id);
   if (story === null) {
@@ -62,5 +108,6 @@ export const bootStory = (doc: PageLike, id: string, nav: boolean): void => {
     return;
   }
   paint(doc, story.app, slotHandView);
+  if (live) bindLive(doc, story.app);
   if (nav) appendHtml(doc.body, trustedHtml(navHtml(story)));
 };

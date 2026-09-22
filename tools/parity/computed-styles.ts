@@ -146,11 +146,17 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.hand-header .dw',
     '.hand-header .dw.tappable-dw',
     '.alt-badge',
+    '.arrange-btn',
+    '.arrange-btn:disabled',
+    '.arrange-btn.due',
     '.hand',
     '.hand.active',
+    '.group',
+    '.group.n3',
     '.slot',
     '.slot.m0',
     '.slot.dead',
+    '.slot.human::after',
     '.slot.head',
     '.slot.ghost',
     '.slot.ghost.open',
@@ -1259,6 +1265,10 @@ if (isMain(import.meta.url)) {
       Promise.resolve([]),
     );
     process.exitCode = results.every((ok) => ok) ? 0 : 1;
+  } catch (e: unknown) {
+    // `process.exit()` below would otherwise swallow a driver error as a silent success.
+    console.error(e);
+    process.exitCode = 1;
   } finally {
     await browser.close();
     await harness.close();

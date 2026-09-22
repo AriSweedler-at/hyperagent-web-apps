@@ -8,12 +8,14 @@
 // SlotHandView.ts (the ghost draw slot, docs/design/gin-draw-ghost-slot.md), main.ts's choice
 // since PR A of that design; this one stays for its legacy string golden
 // (test/parity/gin.ui.test.ts) until the design's PR D retires it. The optional `stage` is the
-// draw slot's; the default view ignores it.
+// draw slot's and `picture` the kept arrangement (docs/design/gin-arrangement-and-discards.md
+// §5); the default view ignores both.
 import type { View } from '../../engine/types.ts';
 import { cardHtml } from '../cards.ts';
 import type { Selection } from '../cues.ts';
 import type { DrawStage } from './draw.ts';
 import { meldGroupClass } from './meldGroups.ts';
+import type { Picture } from './picture.ts';
 
 /** What a hand view reads: a `View` satisfies it. */
 export type HandModel = Pick<
@@ -22,7 +24,12 @@ export type HandModel = Pick<
 >;
 
 export type HandView = Readonly<{
-  render: (model: HandModel, selection: Selection, stage?: DrawStage | null) => string;
+  render: (
+    model: HandModel,
+    selection: Selection,
+    stage?: DrawStage | null,
+    picture?: Picture | null,
+  ) => string;
 }>;
 
 export const defaultHandView: HandView = {
