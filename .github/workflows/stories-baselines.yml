@@ -43,7 +43,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       # Builds dist/ first (test:e2e), starts the pages server, records or rewrites every baseline.
       - name: Record the linux baselines of every story at both screenshot viewports
-        run: npm run test:e2e -- e2e/gin-stories.spec.ts --project pages --update-snapshots
+        run: npm run test:e2e -- e2e/gin-stories.spec.ts --project pages --update-snapshots=all
       - name: Upload the baselines
         uses: actions/upload-artifact@v4
         with:
