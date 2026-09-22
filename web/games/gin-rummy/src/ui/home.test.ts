@@ -44,9 +44,19 @@ describe('the input writes the reducer raises as effects', () => {
 });
 
 describe('pure helpers', () => {
-  test('inviteText names the code; inviteUrl is the page with the code to join', () => {
+  test('inviteText names the code; inviteUrl is the page with the code to join and the invited seat', () => {
     expect(inviteText('KQZM')).toBe('Join my Gin Rummy game — room code KQZM.');
-    expect(inviteUrl('KQZM', 'https://games.sweedler.com/gin-rummy/')).toBe(
+    expect(inviteUrl('KQZM', 'https://games.sweedler.com/gin-rummy/', null)).toBe(
+      'https://games.sweedler.com/gin-rummy/?join=KQZM',
+    );
+    expect(inviteUrl('KQZM', 'https://games.sweedler.com/gin-rummy/', 'Bob')).toBe(
+      'https://games.sweedler.com/gin-rummy/?join=KQZM&name=Bob',
+    );
+    // The name is a query value: encoded, and an empty one is left out.
+    expect(inviteUrl('KQZM', 'https://games.sweedler.com/gin-rummy/', 'Bo & B')).toBe(
+      'https://games.sweedler.com/gin-rummy/?join=KQZM&name=Bo+%26+B',
+    );
+    expect(inviteUrl('KQZM', 'https://games.sweedler.com/gin-rummy/', '')).toBe(
       'https://games.sweedler.com/gin-rummy/?join=KQZM',
     );
   });

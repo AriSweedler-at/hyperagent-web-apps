@@ -22,6 +22,7 @@ import {
   literal,
   nullable,
   object,
+  optional,
   record,
   refine,
   string,
@@ -77,6 +78,12 @@ export type HostSave = Readonly<{
   /** null while the room waits for its first guest. */
   game: State | null;
   oppName: string | null;
+  /**
+   * The game came from pass-and-play (ui/state.ts `handoff`) and its remote seat has not joined:
+   * a reload resumes the offer, and cancelling gives the game back to pass-and-play. Written only
+   * when true, so every other host save keeps the legacy literal byte for byte.
+   */
+  handoff?: true;
 }>;
 export type GuestSave = Readonly<{ role: 'guest'; code: string; myName: string }>;
 export type Save = LocalSave | HostSave | GuestSave;
@@ -95,6 +102,7 @@ const hostSave: Decoder<HostSave> = object({
   target: integer(1),
   game: nullable(decodeState),
   oppName: nullable(string),
+  handoff: optional(literal(true)),
 });
 const guestSave: Decoder<GuestSave> = object({
   role: literal('guest'),
@@ -179,6 +187,7 @@ const saveLiteral = (save: Save): Save => {
         target: save.target,
         game: save.game,
         oppName: save.oppName,
+        ...(save.handoff === true ? { handoff: true } : {}),
       };
     case 'guest':
       return { role: 'guest', code: save.code, myName: save.myName };

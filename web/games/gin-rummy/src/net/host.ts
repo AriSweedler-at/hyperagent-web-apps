@@ -210,8 +210,10 @@ export class HostSession {
     });
     conn.onError((e) => {
       if (this.conn !== conn) return;
-      // ICE failed before the channel ever opened: nobody joined, so 'Opponent left' would be wrong.
-      if (!conn.open() && e.type === 'negotiation-failed' && !deps.read().hasGame) {
+      // ICE failed before the channel ever opened: nobody joined (no hand yet, or a handoff whose
+      // invited seat has not made it in), so 'Opponent left' would be wrong.
+      const ctx = deps.read();
+      if (!conn.open() && e.type === 'negotiation-failed' && (!ctx.hasGame || ctx.handoff)) {
         events.guestGone(ICE_FAILED_MSG + relayHint(ice));
         return;
       }

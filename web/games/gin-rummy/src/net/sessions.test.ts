@@ -561,6 +561,13 @@ describe('HostSession', () => {
         fn({ type: 'negotiation-failed', message: '' });
       });
       expect(w.log.at(-1)).toEqual(['guestGone', null]);
+      // A handoff has a hand but nobody has joined it yet: the invited seat's failed attempt is
+      // still the ICE-failed text, not an opponent lost.
+      ctx.value = hostCtx({ hasGame: true, oppName: 'Bob', handoff: true });
+      hostConn?.errors.forEach((fn) => {
+        fn({ type: 'negotiation-failed', message: '' });
+      });
+      expect(w.log.at(-1)).toEqual(['guestGone', `${ICE_FAILED_MSG} ${NO_RELAY_HINT}`]);
     });
   });
 });

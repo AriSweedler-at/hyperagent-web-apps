@@ -27,7 +27,7 @@ import type { Action, Now, Seat, State, View } from '../engine/types.ts';
 import type { GuestContext } from '../net/guest.ts';
 import { connectingMsg } from '../net/guest.ts';
 import type { HostContext } from '../net/host.ts';
-import { OPENING_MSG } from '../net/host.ts';
+import { OPENING_MSG, handoffMsg } from '../net/host.ts';
 import {
   DEFAULT_GUEST_NAME,
   action as actionFrame,
@@ -97,6 +97,8 @@ export type Resume =
       target: number;
       game: State;
       oppName: string | null;
+      /** The save's `handoff` mark: the offer reads as the handoff, and the room resumes as one. */
+      handoff: boolean;
     }>
   | Readonly<{ kind: 'guest'; code: string; myName: string }>;
 
@@ -158,9 +160,11 @@ export type App = Readonly<{
    */
   draw: DrawStage | null;
   /**
-   * The hosted game came from a pass-and-play save (`#handoffBtn`) and its remote seat has not
-   * joined yet: the wait screen tells the player to send the invite, and cancelling the room gives
-   * the game back to pass-and-play. Cleared by the guest's join and by every leave and cancel.
+   * The hosted game came from pass-and-play (`#handoffBtn`, `#curtainHandoffBtn`) and its remote
+   * seat has not joined yet: the wait screen tells the player to send the invite, a guest that
+   * drops before its join leaves the wait screen as it is, and cancelling the room gives the game
+   * back to pass-and-play. Saved with the host save (storage.ts `HostSave.handoff`), so a reload
+   * resumes the offer. Cleared by the guest's join and by every leave and cancel.
    */
   handoff: boolean;
 }>;
@@ -262,7 +266,10 @@ export type Intent =
   | Readonly<{ type: 'local/click'; p1: string; p2: string; target: string }>
   /** `#resumeBtn`: whatever `app.resume` offers. */
   | Readonly<{ type: 'resume/click' }>
-  /** `#handoffBtn`: the pass-and-play game offered goes on as a hosted room. */
+  /**
+   * `#handoffBtn` (the home screen's offer) / `#curtainHandoffBtn` (the pass-and-play curtain):
+   * the pass-and-play game goes on as a hosted room.
+   */
   | Readonly<{ type: 'handoff/click' }>
   /** `#cancelHostBtn` / `#cancelGuestBtn`. */
   | Readonly<{ type: 'cancel' }>
@@ -283,8 +290,11 @@ export type Intent =
   | Readonly<{ type: 'submenu/dismiss' }>
   /** `#codeInput` input: the raw value and the InputEvent's type. */
   | Readonly<{ type: 'code/typed'; value: string; inputType: string }>
-  /** `?join=<code>` at boot (an invite link): the code into `#codeInput`, the Play tab, online. */
-  | Readonly<{ type: 'join/link'; code: string }>
+  /**
+   * `?join=<code>&name=<seat>` at boot (an invite link): the code into `#codeInput`, the Play tab,
+   * online mode, and the invited seat's name (when the link carries one) into `#nameInput`.
+   */
+  | Readonly<{ type: 'join/link'; code: string; name: string | null }>
   /** `#soundBtn`. */
   | Readonly<{ type: 'sound/toggle' }>
   /** `#shareCodeBtn`. */
@@ -368,8 +378,8 @@ export type Effect =
   | Readonly<{ type: 'cancelTimer'; id: TimerId }>
   /** `fx.toggle()`. */
   | Readonly<{ type: 'toggleSound' }>
-  /** The invite for `code` through the share sheet or the clipboard. */
-  | Readonly<{ type: 'share'; code: string }>
+  /** The invite for `code` through the share sheet or the clipboard; `name` is the invited seat's. */
+  | Readonly<{ type: 'share'; code: string; name: string | null }>
   /** `initHome`: the saved name into `#nameInput` and `#p1NameInput`. */
   | Readonly<{ type: 'fillName'; name: string }>
   /** `initHome`: the saved pass-and-play second name into `#p2NameInput`. */
@@ -599,8 +609,13 @@ const act = (app: App, action: Action, ctx: Context): Step => {
   });
 };
 
-/** `onGuestGone()` after `oppConnected` was cleared. */
+/**
+ * `onGuestGone()` after `oppConnected` was cleared. During a handoff nobody has joined yet (the
+ * hand is there, but the room still waits for the invite to be followed), so a channel that closed
+ * or failed before its join leaves the wait screen saying to send the invite, with no toast.
+ */
 const guestGone = (app: App): Step => {
+  if (app.handoff) return pure(withHostStatus(app, handoffMsg(app.code ?? '', app.oppName)));
   if (app.game !== null && app.view !== null && app.view.phase !== 'gameOver')
     return then(rendered(app), (a) =>
       step(a, toast(guestGoneMsg(a.oppName, a.code), GONE_TOAST_MS)),
@@ -673,6 +688,7 @@ export const resumeFor = (save: Save | null, scorer: ScorerState | null): Resume
             target: save.target,
             game: save.game,
             oppName: save.oppName,
+            handoff: save.handoff === true,
           }
         : null;
     case 'guest':
@@ -688,7 +704,7 @@ export const resumeLabel = (resume: Resume): string => {
     case 'local':
       return `Resume pass & play: ${resume.game.players.map((p) => p.name).join(' vs ')}`;
     case 'host':
-      return `Resume hosting room ${resume.code}`;
+      return resume.handoff ? handoffLabel(resume.game) : `Resume hosting room ${resume.code}`;
     case 'guest':
       return `Rejoin room ${resume.code}`;
   }
@@ -746,6 +762,8 @@ const resume = (app: App, offer: Resume, ctx: Context): Step => {
           game: offer.game,
           oppName: offer.oppName,
           view: viewFor(offer.game, 0),
+          // A handoff nobody joined resumes as one, under the code the invite already carries.
+          handoff: offer.handoff,
         },
         offer.code,
         ctx,
@@ -756,9 +774,11 @@ const resume = (app: App, offer: Resume, ctx: Context): Step => {
 };
 
 /**
- * `#handoffBtn`: the pass-and-play game goes on as a hosted room with a fresh code. Seat 0 keeps
- * this device as the host; seat 1 joins from its own through the invite, and the host's join
- * handler takes it as a rejoin (the seat is kept, the name refreshed, the hand broadcast).
+ * `#handoffBtn` / `#curtainHandoffBtn`: the pass-and-play game goes on as a hosted room with a
+ * fresh code. Seat 0 keeps this device as the host; seat 1 joins from its own through the invite,
+ * and the host's join handler takes it as a rejoin (the seat is kept, the name refreshed, the hand
+ * broadcast). From the table the pass-and-play marks (the curtain, the revealed seat, the draw
+ * stage, a selection, the meld chooser) are cleared as a leave clears them.
  */
 const handoff = (app: App, game: State, ctx: Context): Step =>
   startHost(
@@ -770,6 +790,11 @@ const handoff = (app: App, game: State, ctx: Context): Step =>
       oppName: game.players[1].name,
       oppConnected: false,
       view: viewFor(game, 0),
+      selectedCard: null,
+      revealed: null,
+      curtain: null,
+      meldChooser: false,
+      draw: null,
       handoff: true,
     },
     null,
@@ -893,6 +918,8 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'resume/click':
       return app.resume === null ? pure(app) : resume(app, app.resume, ctx);
     case 'handoff/click':
+      // The home screen's offer, or the game in play on the pass-and-play curtain.
+      if (app.role === 'local' && app.game !== null) return handoff(app, app.game, ctx);
       return app.resume?.kind === 'local' ? handoff(app, app.resume.game, ctx) : pure(app);
     case 'cancel':
       return step(app, { type: 'closeNet' }, { type: 'then', intent: { type: 'cancel/finish' } });
@@ -934,16 +961,35 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       return step({ ...app, codeDraft: value }, { type: 'setCode', value });
     }
     case 'join/link': {
-      // The invite link: the code is in the form; the mode is shown, not stored.
+      // The invite link: the code (and the invited seat's name) are in the form; the mode is
+      // shown, not stored. The name counts as typed, so `join/click` keeps it.
       const code = sanitiseCode('gin-rummy', intent.code);
-      return then(setHomeTab({ ...app, playMode: 'online', codeDraft: code }, 'play', false), (a) =>
-        step(a, { type: 'setCode', value: code }),
+      const name = (intent.name ?? '').trim().slice(0, NAME_MAX);
+      return then(
+        setHomeTab(
+          {
+            ...app,
+            playMode: 'online',
+            codeDraft: code,
+            nameTouched: name !== '' || app.nameTouched,
+          },
+          'play',
+          false,
+        ),
+        (a) =>
+          step(
+            a,
+            { type: 'setCode', value: code },
+            ...(name === '' ? [] : [{ type: 'fillName', name } as const]),
+          ),
       );
     }
     case 'sound/toggle':
       return step(app, { type: 'toggleSound' });
     case 'share/click':
-      return app.code === null ? pure(app) : step(app, { type: 'share', code: app.code });
+      return app.code === null
+        ? pure(app)
+        : step(app, { type: 'share', code: app.code, name: app.oppName });
     case 'rules/open':
       return pure({ ...app, rulesOpen: true });
     case 'rules/close':
@@ -1097,6 +1143,7 @@ export const saveFor = (app: App): Save | null => {
         target: app.target,
         game: app.game,
         oppName: app.oppName,
+        ...(app.handoff ? { handoff: true } : {}),
       };
     case 'guest':
       return { role: 'guest', code: app.code ?? '', myName: app.myName };
@@ -1167,7 +1214,8 @@ export type EffectDeps = Readonly<{
     cancel: (id: TimerId) => void;
   }>;
   toggleSound: () => void;
-  share: (code: string) => void;
+  /** The invite for the room `code`; `name` is the invited seat's, when there is one. */
+  share: (code: string, name: string | null) => void;
   /** The three input writes the paint does not own (they would fight the player's typing). */
   page: Readonly<{
     fillName: (name: string) => void;
@@ -1249,7 +1297,7 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       deps.toggleSound();
       return;
     case 'share':
-      deps.share(effect.code);
+      deps.share(effect.code, effect.name);
       return;
     case 'fillName':
       deps.page.fillName(effect.name);

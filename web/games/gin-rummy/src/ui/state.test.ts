@@ -5,7 +5,7 @@ import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { STOCK_DRAW_FINAL_MSG, applyAction, createGame, viewFor } from '../engine/index.ts';
 import type { Action, Seat, State } from '../engine/index.ts';
 import { CONNECTED_MSG, connectingMsg } from '../net/guest.ts';
-import { OPENING_MSG, WAITING_MSG } from '../net/host.ts';
+import { OPENING_MSG, WAITING_MSG, handoffMsg } from '../net/host.ts';
 import { STORAGE_KEYS } from '../storage.ts';
 import { holdOf } from './hand/draw.ts';
 import {
@@ -305,8 +305,11 @@ describe('home', () => {
       effects: [{ type: 'toggleSound' }],
     });
     expect(run(initialApp, { type: 'share/click' }).effects).toEqual([]);
+    expect(
+      run({ ...initialApp, code: 'ABCD', oppName: 'Jeff' }, { type: 'share/click' }).effects,
+    ).toEqual([{ type: 'share', code: 'ABCD', name: 'Jeff' }]);
     expect(run({ ...initialApp, code: 'ABCD' }, { type: 'share/click' }).effects).toEqual([
-      { type: 'share', code: 'ABCD' },
+      { type: 'share', code: 'ABCD', name: null },
     ]);
     const opened = run(initialApp, { type: 'rules/open' }, { type: 'history/open', who: 'game' });
     expect(opened.app).toMatchObject({ rulesOpen: true, history: 'game' });
@@ -1162,7 +1165,9 @@ describe('resume', () => {
       target: 75,
       game: drawn,
       oppName: 'Jeff',
+      handoff: false,
     });
+    expect(resumeFor({ ...hostSave, handoff: true }, null)).toMatchObject({ handoff: true });
     expect(resumeFor({ ...hostSave, game: null }, null)).toBeNull();
     expect(resumeFor({ ...hostSave, game: over }, null)).toBeNull();
     expect(resumeFor({ role: 'guest', code: 'KQZM', myName: 'Jeff' }, null)).toEqual({
@@ -1175,7 +1180,12 @@ describe('resume', () => {
   test('resumeLabel is the legacy button text', () => {
     expect(resumeLabel({ kind: 'scorer', state: scorer })).toBe('Resume scoring: Ann vs Bo');
     expect(resumeLabel({ kind: 'local', game: drawn })).toBe('Resume pass & play: Ann vs Jeff');
-    expect(resumeLabel({ kind: 'host', ...hostSave })).toBe('Resume hosting room LRZL');
+    expect(resumeLabel({ kind: 'host', ...hostSave, handoff: false })).toBe(
+      'Resume hosting room LRZL',
+    );
+    expect(resumeLabel({ kind: 'host', ...hostSave, handoff: true })).toBe(
+      'Continue online: Ann hosts, Jeff joins by invite',
+    );
     expect(resumeLabel({ kind: 'guest', code: 'KQZM', myName: 'Jeff' })).toBe('Rejoin room KQZM');
   });
 
@@ -1402,7 +1412,7 @@ describe('runEffect', () => {
       { type: 'startTimer', id: 'longPress', ms: 450, then: { type: 'submenu/longPress' } },
       { type: 'cancelTimer', id: 'longPress' },
       { type: 'toggleSound' },
-      { type: 'share', code: 'ABCD' },
+      { type: 'share', code: 'ABCD', name: 'Jeff' },
       { type: 'fillName', name: 'Ann' },
       { type: 'fillP2Name', name: 'Bob' },
       { type: 'setCode', value: 'AB' },
@@ -1428,7 +1438,7 @@ describe('runEffect', () => {
       ['timers.start', 'longPress', 450, { type: 'submenu/longPress' }],
       ['timers.cancel', 'longPress'],
       ['toggleSound'],
-      ['share', 'ABCD'],
+      ['share', 'ABCD', 'Jeff'],
       ['page.fillName', 'Ann'],
       ['page.fillP2Name', 'Bob'],
       ['page.setCode', 'AB'],
@@ -1505,7 +1515,114 @@ describe('the remote handoff of a pass-and-play game', () => {
       target: 100,
       game: drawn,
       oppName: 'Jeff',
+      handoff: true,
     });
+  });
+
+  test('the saved handoff resumes as the offer after a reload: the same code, the invite wording, and cancel still gives the game back', () => {
+    const handed = run(offered(), { type: 'handoff/click' }).app;
+    const save = saveFor(handed);
+    // Back on the home screen after a reload: the offer reads as the handoff, not a room to host.
+    const reloaded = run(initialApp, { type: 'home/init', home: { ...home, save } });
+    expect(reloaded.app.resume).toEqual({
+      kind: 'host',
+      code: handed.code,
+      myName: 'Ann',
+      target: 100,
+      game: drawn,
+      oppName: 'Jeff',
+      handoff: true,
+    });
+    if (reloaded.app.resume === null) throw new Error('no offer');
+    expect(resumeLabel(reloaded.app.resume)).toBe(
+      'Continue online: Ann hosts, Jeff joins by invite',
+    );
+    // Resuming reopens the room under the code the invite already carries, still as a handoff.
+    const resumed = run(reloaded.app, { type: 'resume/click' });
+    expect(resumed.app).toMatchObject({
+      role: 'host',
+      code: handed.code,
+      handoff: true,
+      screen: 'hostWaitScreen',
+    });
+    expect(resumed.effects.at(-1)).toEqual({
+      type: 'startHost',
+      code: handed.code,
+      attempt: 1,
+      resume: true,
+    });
+    expect(hostContextOf(resumed.app).handoff).toBe(true);
+    expect(saveFor(resumed.app)).toEqual(save);
+    expect(run(resumed.app, { type: 'cancel/finish' }).effects).toEqual([
+      { type: 'saveLocal', game: drawn },
+      { type: 'initHome' },
+    ]);
+    // A host save without the mark is the ordinary room, as before.
+    const plain = run(initialApp, {
+      type: 'home/init',
+      home: {
+        ...home,
+        save: {
+          role: 'host',
+          code: 'LRZL',
+          myName: 'Ann',
+          target: 100,
+          game: drawn,
+          oppName: 'Jeff',
+        },
+      },
+    });
+    expect(plain.app.resume).toMatchObject({ kind: 'host', handoff: false });
+    if (plain.app.resume === null) throw new Error('no offer');
+    expect(resumeLabel(plain.app.resume)).toBe('Resume hosting room LRZL');
+    expect(run(plain.app, { type: 'resume/click' }).app.handoff).toBe(false);
+  });
+
+  test('a guest that drops before its join leaves the handoff waiting for the invite: no table, no toast', () => {
+    const handed = run(offered(), { type: 'handoff/click' }).app;
+    const code = handed.code ?? '';
+    const gone = run(handed, { type: 'host/guestGone', iceFailed: null });
+    expect(gone.app).toMatchObject({
+      screen: 'hostWaitScreen',
+      handoff: true,
+      oppConnected: false,
+      hostStatus: { text: handoffMsg(code, 'Jeff') },
+    });
+    expect(gone.effects).toEqual([]);
+    // ICE failed before the channel opened: the session's text, still on the wait screen.
+    const failed = run(handed, { type: 'host/guestGone', iceFailed: 'ICE failed' });
+    expect(failed.app).toMatchObject({ screen: 'hostWaitScreen', handoff: true });
+    expect(failed.app.hostStatus.text).toBe('ICE failed');
+  });
+
+  test('handoff/click from the pass-and-play table: the game in play goes online, its curtain and draw marks cleared', () => {
+    const playing = run(offered(), { type: 'resume/click' }).app;
+    expect(playing).toMatchObject({ role: 'local', game: drawn, screen: 'tableScreen' });
+    expect(playing.curtain).not.toBeNull();
+    const handed = run(
+      { ...playing, selectedCard: drawn.hands[0][0]?.id ?? null },
+      { type: 'handoff/click' },
+    );
+    expect(handed.app).toMatchObject({
+      role: 'host',
+      myName: 'Ann',
+      oppName: 'Jeff',
+      oppConnected: false,
+      game: drawn,
+      view: viewFor(drawn, 0),
+      handoff: true,
+      screen: 'hostWaitScreen',
+      curtain: null,
+      revealed: null,
+      draw: null,
+      selectedCard: null,
+      meldChooser: false,
+    });
+    expect(handed.app.code).toMatch(/^[A-Z]{4}$/);
+    expect(kinds(handed.effects)).toContain('startHost');
+    // Not from an online table.
+    const online = hosting();
+    expect(run(online, { type: 'handoff/click' })).toEqual({ app: online, effects: [] });
   });
 
   test("the guest's join is a rejoin: the seat kept, the name refreshed, the hand broadcast; the handoff is over", () => {
@@ -1539,9 +1656,33 @@ describe('the remote handoff of a pass-and-play game', () => {
   test('join/link: the invite code into the join form, the Play tab and online mode; nothing stored', () => {
     const linked = run(
       { ...initialApp, homeTab: 'rules', playMode: 'local' },
-      { type: 'join/link', code: 'kqzm9' },
+      { type: 'join/link', code: 'kqzm9', name: null },
     );
-    expect(linked.app).toMatchObject({ codeDraft: 'KQZM', homeTab: 'play', playMode: 'online' });
+    expect(linked.app).toMatchObject({
+      codeDraft: 'KQZM',
+      homeTab: 'play',
+      playMode: 'online',
+      nameTouched: false,
+    });
     expect(linked.effects).toEqual([{ type: 'setCode', value: 'KQZM' }]);
+  });
+
+  test("join/link with the invited seat's name: the name into #nameInput, counted as typed so join/click keeps it", () => {
+    const linked = run(initialApp, { type: 'join/link', code: 'KQZM', name: ' Bob ' });
+    expect(linked.app.nameTouched).toBe(true);
+    expect(linked.effects).toEqual([
+      { type: 'setCode', value: 'KQZM' },
+      { type: 'fillName', name: 'Bob' },
+    ]);
+    expect(run(linked.app, { type: 'join/click', name: 'Bob', code: 'KQZM' }).app.myName).toBe(
+      'Bob',
+    );
+    // A blank name is no name; a long one is cut as the inputs cut it.
+    expect(run(initialApp, { type: 'join/link', code: 'KQZM', name: '  ' }).effects).toEqual([
+      { type: 'setCode', value: 'KQZM' },
+    ]);
+    expect(
+      run(initialApp, { type: 'join/link', code: 'KQZM', name: 'x'.repeat(30) }).effects.at(-1),
+    ).toEqual({ type: 'fillName', name: 'x'.repeat(20) });
   });
 });

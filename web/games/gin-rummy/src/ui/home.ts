@@ -58,8 +58,15 @@ export const setCodeInput = (doc: DocumentLike, value: string): void => {
 /** The invite `#shareCodeBtn` shares, beside the link. */
 export const inviteText = (code: string): string => `Join my Gin Rummy game — room code ${code}.`;
 
-/** The invite's link: the page (`pageUrl` is its URL without a query) with the code main.ts reads at boot. */
-export const inviteUrl = (code: string, pageUrl: string): string => `${pageUrl}?join=${code}`;
+/**
+ * The invite's link: the page (`pageUrl` is its origin and path) with the code and, when the room
+ * has a seat waiting for a named player (a handoff), that name; main.ts reads both at boot.
+ */
+export const inviteUrl = (code: string, pageUrl: string, name: string | null): string => {
+  const params = new URLSearchParams({ join: code });
+  if (name !== null && name !== '') params.set('name', name);
+  return `${pageUrl}?${params.toString()}`;
+};
 
 /** `tabPlayBtn`, `tabRulesBtn`, `tabScoreBtn`. */
 export const tabButtonId = (tab: HomeTab): string =>
