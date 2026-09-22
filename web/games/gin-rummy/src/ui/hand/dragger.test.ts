@@ -103,6 +103,8 @@ describe('bindDrag', () => {
     expect(t.ghost.hasClass('selected')).toBe(false);
     expect(t.ghost.style('left')).toBe('0px');
     expect(t.ghost.style('width')).toBe('0px');
+    // Its face is the card's: the card's width is its `--card-w` (the body's default would shrink it).
+    expect(t.ghost.style('--card-w')).toBe('0px');
     // The same index again: silent.
     t.hand.fire('pointermove', on(card, slot, 130, 100));
     expect(t.intents).toHaveLength(3);

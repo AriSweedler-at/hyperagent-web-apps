@@ -150,6 +150,18 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await page.mouse.move(from.x + from.width / 2 - 20, from.y + from.height / 2, { steps: 2 });
       await expect(ghost).toHaveCount(1);
       await expect(page.locator(`#hand .slot.dragging .card[data-card="${last}"]`)).toHaveCount(1);
+      // The ghost's face is the card's: the same font (every glyph is an em of it) and corners,
+      // though it sits on the body, where `--card-w` is the off-table default; within a hundredth
+      // of a pixel, the ghost being sized from the card's measured rect.
+      const face = (sel: string): Promise<ReadonlyArray<number>> =>
+        page.evaluate<ReadonlyArray<number>>(
+          `(() => { const c = document.querySelector('${sel}'); const s = getComputedStyle(c); return [s.fontSize, s.borderRadius, getComputedStyle(c.querySelector('.rank')).fontSize].map(parseFloat); })()`,
+        );
+      const ghostFace = await face('.drag-ghost');
+      const cardFace = await face(`#hand .slot.dragging .card[data-card="${last}"]`);
+      ghostFace.forEach((v, i) => {
+        expect(Math.abs(v - (cardFace[i] ?? NaN))).toBeLessThan(0.1);
+      });
       // A fast pull to the left: the ghost leans left (a negative rotate) as it trails the pointer.
       await page.mouse.move(to.x + 4, to.y + to.height / 2, { steps: 2 });
       expect(
