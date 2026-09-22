@@ -64,6 +64,8 @@ export const normalise = (html: string): string =>
   html
     .replace(/ id="rules(Overlay)?List"/g, '')
     .replace(/<button[^>]*\bid="(curtainH|h)andoffBtn"[^>]*>[^<]*<\/button>/g, '')
+    // The result sheet's body is built once per result and keyed so its lay-out animation runs once.
+    .replace(/ data-result-key="[^"]*"/g, '')
     // The sandbox (src/sandbox.ts): a third mode button in the switch and the submenu, and its
     // panel up to the marker comment that closes it.
     .replace(/<button[^>]*\bdata-mode="sandbox"[^>]*>[^<]*<\/button>/g, '')

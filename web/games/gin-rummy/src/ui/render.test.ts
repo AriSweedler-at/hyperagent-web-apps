@@ -430,6 +430,16 @@ describe('the table', () => {
     expect(p.get('rrTitle').text()).toBe(text?.title);
     expect(p.get('rrSub').text()).toBe(text?.sub);
     expect(p.get('rrBody').text()).toBe(text?.body.markup);
+    // The body is built once per result and seat (its melds lay themselves out on first paint):
+    // the key names the hand, the result and the seat, and a repaint of the same leaves it.
+    const ts = v.result?.void === false ? v.result.ts : 0;
+    const key = `${String(v.handNumber)}:${String(ts)}:0`;
+    expect(p.get('rrBody').attr('data-result-key')).toBe(key);
+    paintAll(p.doc, local(knocked, 0));
+    expect(p.get('rrBody').attr('data-result-key')).toBe(key);
+    paintAll(p.doc, local(knocked, 1));
+    expect(p.get('rrBody').attr('data-result-key')).toBe(`${String(v.handNumber)}:${String(ts)}:1`);
+    expect(p.get('rrBody').text()).toBe(roundResultText(viewFor(knocked, 1))?.body.markup);
     expect(p.get('rrTitle').text()).toMatch(/^(Ann|Bob) (knocked|went Gin!)$|undercut/);
     expect(p.get('rrSub').text()).toMatch(/ · ⏱ 0s$/);
     expect(p.get('rrBody').text()).toContain('<small>(knocked)</small>');

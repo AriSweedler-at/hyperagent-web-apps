@@ -434,7 +434,14 @@ const paintRoundResult = (doc: DocumentLike, app: App, v: View): void => {
   if (text === null) return;
   setText(requireId(doc, 'rrTitle'), text.title);
   setText(requireId(doc, 'rrSub'), text.sub);
-  setHtml(requireId(doc, 'rrBody'), text.body);
+  // The body is built once per result: its melds lay themselves out when they first appear
+  // (theme.css `layOut`), and a repaint (a toast, a tap, a frame) must not replay that.
+  const body = requireId(doc, 'rrBody');
+  const key = `${String(v.handNumber)}:${String(v.result?.ts ?? 0)}:${String(v.me.idx)}`;
+  if (dataOf(body, 'result-key') !== key) {
+    setAttr(body, 'data-result-key', key);
+    setHtml(body, text.body);
+  }
   const btn = requireId(doc, 'rrContinueBtn');
   setDisabled(btn, v.ready[v.me.idx]);
   setText(btn, continueLabel(v));
