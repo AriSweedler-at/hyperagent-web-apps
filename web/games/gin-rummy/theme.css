@@ -233,10 +233,13 @@
   /* The card back is one picture scaled to the card (docs/design/gin-card-backs.md; the owner: the
      stripes were a fixed 12px, so the stock and the opponent's strip showed different patterns), one
      of the presets `body[data-card-back]` names (src/cardBack.ts). The SVGs under backs/ are inlined
-     by the build (under Vite's 4KB limit), so the goldens see no URL. */
+     by the build (under Vite's 4KB limit), so the goldens see no URL. A raster back (yu-gi-oh, the
+     picture the owner supplied) is a committed source drawn at 112px for 1x, 2x and 3x screens by
+     tools/card-backs.ts; the plain url() line is the fallback where image-set() is unknown. */
   .card.back { background: #1e3a8a url(./backs/default.svg) center / 100% 100% no-repeat; border: calc(var(--card-w) * 0.062) solid #f1f5f9; }
   body[data-card-back="blue-stripe"] .card.back { background-image: url(./backs/blue-stripe.svg); }
-  body[data-card-back="yu-gi-oh"] .card.back { background-image: url(./backs/yu-gi-oh.svg); background-color: #4a2210; }
+  body[data-card-back="yu-gi-oh"] .card.back { background-image: url(./backs/yu-gi-oh-224.jpg); background-color: #2a0d04; }
+  body[data-card-back="yu-gi-oh"] .card.back { background-image: image-set(url(./backs/yu-gi-oh-112.jpg) 1x, url(./backs/yu-gi-oh-224.jpg) 2x, url(./backs/yu-gi-oh-336.jpg) 3x); }
   body[data-card-back="empty"] .card.back { background-image: none; }
   .card.back.tiny { --card-w: var(--tiny-w); }
   .hand.active .card { cursor: pointer; }
