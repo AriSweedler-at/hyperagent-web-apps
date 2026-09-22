@@ -292,22 +292,36 @@
   .tab-wrap { position: relative; flex: 1.2; display: flex; }
   .tab-btn { flex: 1; background: transparent; border: none; color: var(--muted); font-weight: 700; font-size: 0.85rem; padding: 11px 6px; border-radius: 10px; white-space: nowrap; }
   .tab-btn.active { background: var(--card-2); color: var(--text); }
+  /* The Play tab has a submenu; the caret says so (hover on a desktop, a long press on a phone). */
+  .tab-wrap .tab-btn::after { content: " \25BE"; opacity: 0.55; font-size: 0.8em; }
   .tab-panel.hidden { display: none !important; }
+  /* The submenu is a fold of the tab bar under the Play tab: its dark surface, its buttons as tab
+     buttons. Its ::before bridges the 6px gap up to the tab, so a pointer crossing the gap keeps
+     `.tab-wrap:hover` (without it the menu hid, and its pointer-events: none then kept it hidden,
+     the moment the pointer left the tab). On the Play tab itself the mode row below is the menu,
+     so a hover shows nothing. */
   .tab-submenu {
     position: absolute; top: calc(100% + 6px); left: 0; min-width: 180px; z-index: 30;
-    background: var(--card); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 6px;
-    display: flex; flex-direction: column; gap: 4px; box-shadow: 0 10px 26px rgba(0,0,0,0.45);
+    background: var(--card); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 4px;
+    display: flex; flex-direction: column; gap: 2px; box-shadow: 0 10px 26px rgba(0,0,0,0.45);
     opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(-4px); transition: opacity 0.12s, transform 0.12s;
   }
+  .tab-submenu::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
   .tab-submenu.force-open { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
   @media (hover: hover) {
-    .tab-wrap:hover .tab-submenu { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
+    .tab-wrap:hover .tab-btn:not(.active) + .tab-submenu { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
+    .tab-submenu button:hover { background: rgba(255,255,255,0.07); color: var(--text); }
   }
-  .tab-submenu button { background: var(--card-2); border: none; color: var(--text); text-align: left; padding: 11px 12px; border-radius: 9px; font-weight: 600; font-size: 0.85rem; }
+  .tab-submenu button { background: transparent; border: none; color: var(--muted); text-align: left; padding: 11px 12px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; white-space: nowrap; }
+  .tab-submenu button.active { background: var(--card-2); color: var(--text); }
   .tab-submenu button:active { filter: brightness(0.9); }
-  .mode-switch { display: flex; gap: 8px; margin-bottom: 14px; }
-  .mode-btn { flex: 1; background: var(--card-2); border: none; color: var(--muted); font-weight: 700; padding: 11px 6px; border-radius: 12px; font-size: 0.85rem; }
-  .mode-btn.active { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #08260f; }
+  /* The play mode is the tab bar's second row: while the Play panel is up the bar squares its
+     bottom off and the switch continues its surface beneath a hairline, its two modes as smaller
+     tab buttons. */
+  .tabbar:has(+ #playPanel:not(.hidden)) { margin-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .mode-switch { display: flex; gap: 6px; margin: 0 0 16px; padding: 4px; background: rgba(0,0,0,0.22); border-top: 1px solid rgba(255,255,255,0.07); border-radius: 0 0 14px 14px; }
+  .mode-btn { flex: 1; background: transparent; border: none; color: var(--muted); font-weight: 700; padding: 9px 6px; border-radius: 10px; font-size: 0.8rem; white-space: nowrap; }
+  .mode-btn.active { background: var(--card-2); color: var(--text); }
 
   /* ---------- voice input FAB ---------- */
   .voice-fab {

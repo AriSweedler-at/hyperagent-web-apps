@@ -56,6 +56,7 @@ const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/gin-dom-parity.spec.ts',
   '**/gin-draw.spec.ts',
   '**/gin-geometry.spec.ts',
+  '**/gin-home.spec.ts',
   '**/gin-local.spec.ts',
   '**/gin-scorer.spec.ts',
   '**/gin-stories.spec.ts',
