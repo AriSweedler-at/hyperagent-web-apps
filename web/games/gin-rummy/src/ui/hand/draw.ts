@@ -28,14 +28,16 @@ export const drawSource = (a: Action): DrawSource | null =>
       : null;
 
 /**
- * Settle a stage against a freshly painted view: a view that carries my undoable draw shows it
- * (the same stage when it already does); a `waiting` stage survives a view that still awaits the
- * draw (a re-render during a guest's round trip); anything else (an accept, an undo, a refusal
- * that repainted, the opponent's turn) clears it.
+ * Settle a stage against a freshly painted view: a view that carries my draw (`lastDrawnId`: mine,
+ * in hand, cleared by an undo and by a deal) shows it (the same stage when it already does); a
+ * `waiting` stage survives a view that still awaits the draw (a re-render during a guest's round
+ * trip); anything else (an accept, an undo, a refusal that repainted, the opponent's turn) clears
+ * it. Not keyed on `canUndo`: a stock draw cannot be undone and still sits in the ghost cell
+ * (docs/design/gin-arrangement-and-discards.md §4).
  */
 export const settleDraw = (stage: DrawStage | null, v: View): DrawStage | null => {
   if (stage === null) return null;
-  const drawnId = v.isMyTurn && v.phase === 'discard' && v.canUndo ? v.lastDrawnId : null;
+  const drawnId = v.isMyTurn && v.phase === 'discard' ? v.lastDrawnId : null;
   if (drawnId !== null)
     return stage.kind === 'shown' && stage.cardId === drawnId
       ? stage

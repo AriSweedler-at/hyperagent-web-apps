@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import { createStore, type StorageLike } from '../../../../shared/edge/storage.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
-import { applyAction, createGame, viewFor } from '../engine/index.ts';
+import { STOCK_DRAW_FINAL_MSG, applyAction, createGame, viewFor } from '../engine/index.ts';
 import type { Action, Seat, State } from '../engine/index.ts';
 import { CONNECTED_MSG, connectingMsg } from '../net/guest.ts';
 import { OPENING_MSG, WAITING_MSG } from '../net/host.ts';
@@ -851,6 +851,12 @@ describe('the ghost draw slot', () => {
     [1, { type: 'passUpcard' }],
   ]);
   const preDraw = holdOf(viewFor(passed, 0).me);
+  /** Ann passed, Jeff took the upcard and discarded: Ann's open draw, both piles tappable. */
+  const openDraw = play(dealt, [
+    [0, { type: 'passUpcard' }],
+    [1, { type: 'takeUpcard' }],
+    [1, { type: 'discard', cardId: dealt.hands[1][0]?.id ?? '' }],
+  ]);
 
   test('a stock draw shows the drawn card over the ten cards held as they were before the draw', () => {
     const { app, effects } = run(local(passed), { type: 'stock/tap' });
@@ -917,8 +923,22 @@ describe('the ghost draw slot', () => {
     expect(run(shown, { type: 'meld/open' }).app.draw).toBe(shown.draw);
   });
 
-  test('the undo button undoes the draw through act: the view is back in the draw phase, no stage', () => {
+  test('a stock draw is final: no ↩, and `undoDraw` through act toasts with the shown stage kept', () => {
     const shown = run(local(passed), { type: 'stock/tap' }).app;
+    expect(shown.view?.canUndo).toBe(false);
+    expect(shown.draw?.kind).toBe('shown');
+    const refused = run(shown, { type: 'action/click', act: 'undoDraw' });
+    expect(refused.app.draw).toBe(shown.draw);
+    expect(refused.app.view).toBe(shown.view);
+    expect(refused.app.game).toBe(shown.game);
+    expect(kinds(refused.effects)).toEqual(['fx', 'toast']);
+    expect(toasts(refused.effects)).toEqual([[STOCK_DRAW_FINAL_MSG, null]]);
+  });
+
+  test('the undo button undoes a discard-pile draw through act: the view is back in the draw phase, no stage', () => {
+    const shown = run(local(openDraw), { type: 'discard/tap' }).app;
+    expect(shown.draw).toMatchObject({ kind: 'shown', from: 'discard' });
+    expect(shown.view?.canUndo).toBe(true);
     const undone = run(shown, { type: 'action/click', act: 'undoDraw' });
     expect(undone.app.view?.phase).toBe('draw');
     expect(undone.app.view?.canUndo).toBe(false);
@@ -1039,10 +1059,10 @@ describe('the ghost draw slot', () => {
       cardId: view.lastDrawnId,
       hold: preDraw,
     });
-    // Undo is not a draw: it is never swallowed by the wait.
-    expect(kinds(run(twice.app, { type: 'action/click', act: 'undoDraw' }).effects)).toContain(
-      'send',
-    );
+    // Undo is not a draw: it is never swallowed by the wait (the upcard path, which undoes).
+    expect(
+      kinds(run(upcardTwice.app, { type: 'action/click', act: 'undoDraw' }).effects),
+    ).toContain('send');
   });
 
   test('a new game, a new deal and leaving clear the stage; the save never carries it', () => {

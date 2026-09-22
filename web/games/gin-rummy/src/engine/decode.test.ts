@@ -51,7 +51,11 @@ describe('decodeState / decodeView round-trip the engine text', () => {
   });
 
   test('a state with lastDrawn: null (after undoDraw) keeps the null', () => {
-    const undone = applyAction(midHand(), 0, { type: 'undoDraw' }, mulberry32(0), now);
+    // Only a draw from the discard pile undoes (docs/design/gin-arrangement-and-discards.md §4).
+    const g0 = createGame({ players: PLAYERS, target: 100, dealer: 1 }, mulberry32(3), now);
+    const took = applyAction(g0, 0, { type: 'takeUpcard' }, mulberry32(0), now);
+    if (!took.ok) throw new Error(took.error);
+    const undone = applyAction(took.value, 0, { type: 'undoDraw' }, mulberry32(0), now);
     expect(undone.ok).toBe(true);
     if (!undone.ok) return;
     expect(undone.value.lastDrawn).toBeNull();

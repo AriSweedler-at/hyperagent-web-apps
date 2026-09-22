@@ -382,9 +382,14 @@ const toast = (message: string, ms: number | null = null): Effect => ({
   message,
   ms,
 });
-/** A refused move: the toast, and a draw that was awaited never leaves the ghost slot pending. */
+/**
+ * A refused move: the toast, and a draw that was awaited never leaves the ghost slot pending. A
+ * `shown` stage is kept: only `__gin.act` can send a move the engine refuses while the drawn card
+ * sits in the ghost cell (the undo of a stock draw, say), and the card must not collapse into the
+ * hand over a toast (docs/design/gin-arrangement-and-discards.md §4).
+ */
 const refuse = (app: App, message: string): Step =>
-  step(app.draw === null ? app : { ...app, draw: null }, toast(message));
+  step(app.draw?.kind === 'waiting' ? { ...app, draw: null } : app, toast(message));
 
 // ---- helpers, as the legacy had them ------------------------------------------------------------
 

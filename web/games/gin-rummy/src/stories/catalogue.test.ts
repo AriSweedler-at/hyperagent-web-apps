@@ -17,6 +17,7 @@ import {
   heldCards,
   storyById,
   type GhostState,
+  type SheetState,
   type Story,
   type StoryFacts,
 } from './catalogue.ts';
@@ -59,11 +60,28 @@ const ghostOnPage = (hand: string): GhostState => {
   return kind === 'open' || kind === 'pending' || kind === 'shown' ? kind : 'hidden';
 };
 
+/** The one overlay not hidden, by id, or `none`. */
+const sheetOnPage = (page: GinPage): SheetState =>
+  !page.get('meldOverlay').hidden()
+    ? 'meldOverlay'
+    : !page.get('roundResultOverlay').hidden()
+      ? 'roundResultOverlay'
+      : 'none';
+
+/** The ids of the mini cards under the result sheet's "Laid off onto" label (the deadwood label follows). */
+const laidOffOnPage = (page: GinPage): ReadonlyArray<string> => {
+  const laid = /<div class="meld-group laid">(.*?)<\/div><div class="rr-label">/.exec(
+    page.get('rrBody').text(),
+  );
+  return [...(laid?.[1] ?? '').matchAll(CARD)].map((m) => m[2] ?? '');
+};
+
 /** The facts as the painted page shows them, in the catalogue's terms. */
 const factsOnPage = (page: GinPage): StoryFacts => {
   const hand = page.get('hand').text();
   const stock = page.get('stockPile');
   const disc = page.get('discardPile');
+  const sheet = sheetOnPage(page);
   return {
     slots: (hand.match(/<div class="slot /g) ?? []).length,
     handCards: cards(hand).length,
@@ -78,6 +96,8 @@ const factsOnPage = (page: GinPage): StoryFacts => {
       enabled: !/\bdisabled\b/.test(m[2] ?? ''),
     })),
     statusSub: page.get('statusSub').text(),
+    sheet,
+    ...(sheet === 'roundResultOverlay' ? { laidOff: laidOffOnPage(page) } : {}),
   };
 };
 
@@ -98,10 +118,12 @@ const IDS = [
   'undo-back-to-draw',
   'after-discard-theirs',
   'round-over-table',
+  'round-over-laid-off',
+  'round-over-laid-off-defender',
 ];
 
 describe('the catalogue', () => {
-  test('sixteen stories with the ids of docs/design/gin-draw-ghost-slot.md §7, unique and kebab-case', () => {
+  test('eighteen stories with the ids of docs/design/gin-draw-ghost-slot.md §7 and gin-arrangement-and-discards.md §10, unique and kebab-case', () => {
     expect(STORIES.map((s) => s.id)).toEqual(IDS);
     expect(new Set(STORIES.map((s) => s.id)).size).toBe(STORIES.length);
     STORIES.forEach((s) => {
@@ -136,12 +158,29 @@ describe('the catalogue', () => {
   test('the deal is seeded: the knock search starts at SEED and finds a seed that offers one', () => {
     expect(SEED).toBe(12);
     expect(KNOCK_SEED).toBeGreaterThanOrEqual(SEED);
+    // The knock follows a stock draw, which is final: no undo button.
     const knock = storyById('accepted-knock');
     expect(knock?.facts.actions).toEqual([
-      { act: 'undoDraw', enabled: true },
       { act: 'discard', enabled: true },
       { act: 'knock', enabled: true },
     ]);
+  });
+
+  test('only a draw from the discard pile offers the undo button (docs/design/gin-arrangement-and-discards.md §4)', () => {
+    const undoable = STORIES.filter((s) => s.facts.actions.some((a) => a.act === 'undoDraw'));
+    expect(undoable.map((s) => s.id)).toEqual(['drawn-discard-shown', 'taken-upcard-shown']);
+    expect(storyById('undo-back-to-draw')?.app.game?.discard.length).toBe(
+      storyById('draw-mine-open')?.app.game?.discard.length,
+    );
+  });
+
+  test('the sheet fact: the result sheet open on the laid-off stories only', () => {
+    STORIES.forEach((s) => {
+      expect(s.facts.sheet, s.id).toBe(
+        s.id.startsWith('round-over-laid-off') ? 'roundResultOverlay' : 'none',
+      );
+      expect('laidOff' in s.facts, s.id).toBe(s.facts.sheet === 'roundResultOverlay');
+    });
   });
 
   test('every story is a table screen with a view; the guest story has no game', () => {
@@ -214,6 +253,25 @@ describe('every story painted on the page fake', () => {
     expect(painted(knock).get('actions').text()).toMatch(
       />Knock <small>\(\d+\)<\/small><\/button>/,
     );
+  });
+
+  test('the laid-off stories open the sheet naming 4S 5S laid off onto the spades, from both seats', () => {
+    ['round-over-laid-off', 'round-over-laid-off-defender'].forEach((id) => {
+      const story = storyById(id);
+      if (story === null) throw new Error(id);
+      expect(story.facts.laidOff).toEqual(['4S', '5S']);
+      const page = painted(story);
+      expect(page.get('roundResultOverlay').hidden()).toBe(false);
+      expect(page.get('rrTitle').text()).toBe('Ann knocked');
+      expect(page.get('rrBody').text()).toContain(
+        '<div class="rr-label">Laid off onto Ann\'s melds</div><div class="meld-group laid">',
+      );
+      expect(page.get('rrBody').text()).toContain('<div class="rr-label">Deadwood · 20</div>');
+      expect(laidOffOnPage(page)).toEqual(['4S', '5S']);
+      expect(page.get('actions').text()).toContain('data-act="showResult"');
+    });
+    expect(storyById('round-over-laid-off')?.app.view?.me.name).toBe('Ann');
+    expect(storyById('round-over-laid-off-defender')?.app.view?.me.name).toBe('Bob');
   });
 
   test('round-over-table keeps the result sheet put away and offers Show results', () => {

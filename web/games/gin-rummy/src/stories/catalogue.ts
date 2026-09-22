@@ -1,10 +1,12 @@
-// The stories catalogue (docs/design/gin-draw-ghost-slot.md §7): sixteen table states of the gin
-// page, each an `App` the real paint renders as it is (`?story=<id>`, src/stories/boot.ts) and a
-// record of what the table must then show. Every state is played through the engine alone from
-// one seeded deal (`mulberry32(SEED)`, dealer 1, so Ann in seat 0 decides on the upcard first);
-// the knock story searches the seeds from SEED up with a least-deadwood policy and takes the first
-// deal that offers a knock, and the gin story rebuilds the deal's hands around a gin so the engine
-// still computes its view. The facts are derived from the engine state and the draw stage (never
+// The stories catalogue (docs/design/gin-draw-ghost-slot.md §7, docs/design/gin-arrangement-and-
+// discards.md §10): eighteen table states of the gin page, each an `App` the real paint renders as
+// it is (`?story=<id>`, src/stories/boot.ts) and a record of what the table must then show. Every
+// state is played through the engine alone from one seeded deal (`mulberry32(SEED)`, dealer 1, so
+// Ann in seat 0 decides on the upcard first); the knock story searches the seeds from SEED up with
+// a least-deadwood policy and takes the first deal that offers a knock, the gin story rebuilds the
+// deal's hands around a gin so the engine still computes its view, and the two laid-off stories
+// rebuild them around the chain position of test/parity/gin.legacy.test.ts (4S then 5S onto A-2-3
+// of spades). The facts are derived from the engine state and the draw stage (never
 // from the renderer), so the test beside this file (facts against the painted markup) and
 // e2e/gin-stories.spec.ts (facts against the served DOM, geometry, screenshots) are independent
 // oracles of the paint. `sameHandAs` names the story whose first ten slots must hold the same
@@ -20,7 +22,17 @@ import {
   makeDeck,
   viewFor,
 } from '../engine/index.ts';
-import type { Action, Cards, PendingDraw, Seat, State, View } from '../engine/types.ts';
+import type {
+  Action,
+  Card,
+  Cards,
+  PendingDraw,
+  Rank,
+  Seat,
+  State,
+  Suit,
+  View,
+} from '../engine/types.ts';
 import { holdOf, type DrawStage } from '../ui/hand/draw.ts';
 import { initialApp, type App } from '../ui/state.ts';
 
@@ -37,6 +49,8 @@ const PLAYERS = [
 /** The ghost cell's class, or `none` when the eleven cards fill the grid and no cell is emitted. */
 export type GhostState = 'none' | 'hidden' | 'open' | 'pending' | 'shown';
 export type StoryAction = Readonly<{ act: string; enabled: boolean }>;
+/** The one sheet open over the table, by its overlay's id, or `none`. */
+export type SheetState = 'none' | 'meldOverlay' | 'roundResultOverlay';
 
 /** What the table must show for a story, in the terms the DOM exposes. */
 export type StoryFacts = Readonly<{
@@ -53,6 +67,9 @@ export type StoryFacts = Readonly<{
   /** `#actions [data-act]` in order, with whether each is enabled. */
   actions: ReadonlyArray<StoryAction>;
   statusSub: string;
+  sheet: SheetState;
+  /** With the result sheet open: `#rrBody .meld-group.laid .card` ids, the cards laid off. */
+  laidOff?: ReadonlyArray<string>;
 }>;
 
 export type Story = Readonly<{
@@ -130,7 +147,8 @@ const openDraw = opening.openDraw;
 const tookUpcard = play(dealt, 0, { type: 'takeUpcard' });
 const drewStock = play(openDraw, 0, { type: 'drawStock' });
 const drewDiscard = play(openDraw, 0, { type: 'drawDiscard' });
-const undone = play(drewStock, 0, { type: 'undoDraw' });
+/** Only a draw from the discard pile undoes (docs/design/gin-arrangement-and-discards.md §4). */
+const undone = play(drewDiscard, 0, { type: 'undoDraw' });
 const drawnId = drewStock.lastDrawn?.id ?? '';
 /** Ann discards for the least deadwood but keeps the card she drew, so its dot survives her turn. */
 const discarded = play(drewStock, 0, {
@@ -188,16 +206,18 @@ const GIN_HAND: Cards = [
 const GIN_DISCARD = '2C';
 
 /**
- * Ann's discard phase with the gin hand dealt around: the rest of the deck is Bob's ten, the
- * upcard and the stock, the deuce counts as drawn from the stock (fresh, undoable) and the engine
- * computes the view, so `GIN!` comes from its own `isGin`.
+ * Ann's discard phase with `mine` (eleven cards) dealt around: `theirs` is Bob's ten (the next ten
+ * of the deck when null), then one card is the upcard and the rest the stock; the card named
+ * counts as drawn from the stock (fresh, not undoable) and the engine computes the view.
  */
-const ginState = ((): State => {
-  const ginIds = new Set(GIN_HAND.map((c) => c.id));
-  const rest = makeDeck().filter((c) => !ginIds.has(c.id));
+const dealtAround = (mine: Cards, theirs: Cards | null, drawnFromStock: string): State => {
+  const held = new Set([...mine, ...(theirs ?? [])].map((c) => c.id));
+  const rest = makeDeck().filter((c) => !held.has(c.id));
+  const bob = theirs ?? rest.slice(0, HAND_SIZE);
+  const undealt = theirs === null ? rest.slice(HAND_SIZE) : rest;
   const pendingDraw: PendingDraw = {
     from: 'stock',
-    cardId: GIN_DISCARD,
+    cardId: drawnFromStock,
     prevPhase: 'draw',
     prevUpcardStage: null,
     prevForceStock: false,
@@ -205,9 +225,9 @@ const ginState = ((): State => {
   };
   return {
     ...drewStock,
-    hands: [GIN_HAND, rest.slice(0, HAND_SIZE)],
-    discard: rest.slice(HAND_SIZE, HAND_SIZE + 1),
-    stock: rest.slice(HAND_SIZE + 1),
+    hands: [mine, bob],
+    discard: undealt.slice(0, 1),
+    stock: undealt.slice(1),
     turn: 0,
     phase: 'discard',
     upcardStage: null,
@@ -215,10 +235,36 @@ const ginState = ((): State => {
     forceStock: false,
     pendingDraw,
     meldPref: [null, null],
-    lastDrawn: { p: 0, id: GIN_DISCARD },
+    lastDrawn: { p: 0, id: drawnFromStock },
     lastAction: { text: `${PLAYERS[0].name} drew from the stock.`, by: 0 },
   };
-})();
+};
+
+/** The gin hand dealt around, so `GIN!` comes from the engine's own `isGin`. */
+const ginState = dealtAround(GIN_HAND, null, GIN_DISCARD);
+
+// ---- the laid-off hand -------------------------------------------------------------------------
+
+const RANKS: Readonly<Record<string, Rank>> = { A: 1, J: 11, Q: 12, K: 13 };
+const isSuit = (s: string): s is Suit => s === 'S' || s === 'H' || s === 'D' || s === 'C';
+const cardOf = (id: string): Card => {
+  const suit = id.slice(-1);
+  const label = id.slice(0, -1);
+  if (!isSuit(suit)) throw new Error(`bad card id ${id}`);
+  return makeCard(RANKS[label] ?? (Number(label) as Rank), suit);
+};
+
+/**
+ * The chain position of test/parity/gin.legacy.test.ts: Ann knocks with the KC on A-2-3 of spades,
+ * 4-5-6 of hearts and 7-8-9 of diamonds (the 2C her deadwood); Bob lays off 4S then 5S onto the
+ * spades and counts QD KD, twenty.
+ */
+const LAID_OFF_KNOCKER = 'AS 2S 3S 4H 5H 6H 7D 8D 9D 2C KC'.split(' ').map(cardOf);
+const LAID_OFF_DEFENDER = '4S 5S 10H JH QH 7C 8C 9C QD KD'.split(' ').map(cardOf);
+const laidOffKnocked = play(dealtAround(LAID_OFF_KNOCKER, LAID_OFF_DEFENDER, 'KC'), 0, {
+  type: 'knock',
+  cardId: 'KC',
+});
 
 // ---- apps and facts ---------------------------------------------------------------------------------
 
@@ -265,21 +311,43 @@ const actionsOf = (
   const option = selectedId === null ? undefined : view.discardOptions?.[selectedId];
   const scored = option !== undefined && !('locked' in option) ? option : null;
   return [
-    ...(state.pendingDraw === null ? [] : [{ act: 'undoDraw', enabled: true }]),
+    // Only a draw from the discard pile undoes (docs/design/gin-arrangement-and-discards.md §4).
+    ...(state.pendingDraw?.from === 'discard' ? [{ act: 'undoDraw', enabled: true }] : []),
     { act: 'discard', enabled: scored !== null },
     { act: 'knock', enabled: scored?.canKnock === true },
   ];
 };
 
-/** The facts of `seat`'s table over `state` under `stage` with `selected`, from the engine alone. */
+/** The sheet the app's flags open over `state`: the chooser, or the result while not put away. */
+const sheetOf = (state: State, app: Partial<App>): SheetState =>
+  app.meldChooser === true
+    ? 'meldOverlay'
+    : state.phase === 'roundOver' && state.result !== null && app.resultDismissed !== true
+      ? 'roundResultOverlay'
+      : 'none';
+
+/** With the result sheet open over a scored hand: the ids of the cards the defender laid off. */
+const laidOffOf = (state: State, sheet: SheetState): Partial<StoryFacts> => {
+  const result = state.result;
+  return sheet === 'roundResultOverlay' && result !== null && !result.void
+    ? { laidOff: result.opponent.laidOff.map((x) => x.card.id) }
+    : {};
+};
+
+/**
+ * The facts of `seat`'s table over `state` under `stage` with `selected` and the app's overlay
+ * flags, from the engine alone.
+ */
 const factsOf = (
   state: State,
   seat: Seat,
   stage: DrawStage | null,
   selected: string | null,
   statusSub: string,
+  app: Partial<App>,
 ): StoryFacts => {
   const view = viewFor(state, seat);
+  const sheet = sheetOf(state, app);
   const hand = state.hands[seat];
   const mine = state.turn === seat;
   const shown = stage?.kind === 'shown' ? stage : null;
@@ -325,6 +393,8 @@ const factsOf = (
           : 'idle',
     actions: actionsOf(state, seat, view, selectedId),
     statusSub,
+    sheet,
+    ...laidOffOf(state, sheet),
   };
 };
 
@@ -348,7 +418,7 @@ const story = (spec: Spec): Story => {
     id: spec.id,
     title: spec.title,
     app: tableApp(spec.state, spec.seat, { draw: stage, selectedCard: selected, ...spec.app }),
-    facts: factsOf(spec.state, spec.seat, stage, selected, spec.statusSub),
+    facts: factsOf(spec.state, spec.seat, stage, selected, spec.statusSub, spec.app ?? {}),
     ...(spec.sameHandAs === undefined ? {} : { sameHandAs: spec.sameHandAs }),
     screenshot: spec.screenshot !== false,
   };
@@ -358,7 +428,10 @@ const SHOWN_SUB = 'Tap the new card to keep it, or pick a discard';
 const OPEN_SUB = 'Tap the stock or the discard pile';
 const SELECTED_SUB = 'Discard it, or knock if you can';
 
-/** The sixteen stories of docs/design/gin-draw-ghost-slot.md §7, in its order. */
+/**
+ * The sixteen stories of docs/design/gin-draw-ghost-slot.md §7, in its order, then the two laid-off
+ * stories of docs/design/gin-arrangement-and-discards.md §10.
+ */
 export const STORIES: ReadonlyArray<Story> = [
   story({
     id: 'upcard-mine',
@@ -465,7 +538,8 @@ export const STORIES: ReadonlyArray<Story> = [
   }),
   story({
     id: 'undo-back-to-draw',
-    title: 'Undid the draw: the open ghost cell again, the same ten cards in the same cells',
+    title:
+      'Undid the draw from the discard pile: the open ghost cell again, the same ten cards in the same cells',
     state: undone,
     seat: 0,
     statusSub: OPEN_SUB,
@@ -486,6 +560,23 @@ export const STORIES: ReadonlyArray<Story> = [
     seat: knockSeat,
     statusSub: 'See results',
     app: { resultDismissed: true },
+  }),
+  story({
+    id: 'round-over-laid-off',
+    title:
+      "Round over, the knocker's seat: the result sheet with the cards laid off onto her melds",
+    state: laidOffKnocked,
+    seat: 0,
+    statusSub: 'See results',
+    app: { resultDismissed: false },
+  }),
+  story({
+    id: 'round-over-laid-off-defender',
+    title: "Round over, the defender's seat: the same sheet, the laid-off cards under his deadwood",
+    state: laidOffKnocked,
+    seat: 1,
+    statusSub: 'See results',
+    app: { resultDismissed: false },
   }),
 ];
 
