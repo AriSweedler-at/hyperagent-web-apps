@@ -12,11 +12,12 @@
 // phone in landscape, a phone with the browser's toolbar shown) exercise theme.css's fallback: the
 // document scrolls (`#app` and `#tableScreen` clip nothing) and the actions row is reachable at the
 // bottom of that scroll. The turns after the first are played through the documented `window.__gin`
-// hook (docs/ARCHITECTURE.md): the least-deadwood discard, a knock as soon as one is legal, so the
-// round ends in a few turns; a void hand ends it too.
+// hook (docs/ARCHITECTURE.md; e2e/fixtures/gin-play.ts): the least-deadwood discard, a knock as
+// soon as one is legal, so the round ends in a few turns; a void hand ends it too.
 import type { Page } from '@playwright/test';
 
 import { ginAcceptDraw, ginPassUpcard, ginReveal, ginStartLocal } from './fixtures/gin.ts';
+import { chooseDiscard, finishTurn, playToRoundOver, selectCard } from './fixtures/gin-play.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -70,16 +71,7 @@ type Fits = Readonly<
   Record<'document' | 'app' | 'tableScreen' | 'hand' | 'actionsReachable', boolean>
 >;
 type Slots = Readonly<{ sizes: ReadonlyArray<string>; tops: ReadonlyArray<number> }>;
-type HookView = Readonly<{
-  phase: string;
-  discardOptions: Readonly<
-    Record<string, Readonly<{ locked?: boolean; deadwood?: number; canKnock?: boolean }>>
-  > | null;
-}>;
-
 const frameOf = (page: Page): Promise<Frame> => page.evaluate<Frame>(FRAME);
-const readView = (page: Page): Promise<HookView | null> =>
-  page.evaluate<HookView | null>('window.__gin.app.view');
 
 /** Every frame box is where it was, to half a pixel. */
 const expectSameFrame = (now: Frame, start: Frame, phase: string): void => {
@@ -121,56 +113,6 @@ const expectGeometry = async (page: Page, vp: Viewport, phase: string): Promise<
     expect(new Set(slots.tops.slice(0, 6)).size, `first row at ${phase}`).toBe(1);
     expect(new Set(slots.tops.slice(6)).size, `second row at ${phase}`).toBe(1);
   }
-};
-
-/** The discard that leaves the least deadwood, or the one that lets the player knock. */
-const chooseDiscard = async (page: Page): Promise<Readonly<{ id: string; knock: boolean }>> => {
-  const view = await readView(page);
-  const options = Object.entries(view?.discardOptions ?? {})
-    .filter(([, o]) => o.locked !== true)
-    .map(([id, o]) => ({ id, deadwood: o.deadwood ?? Infinity, knock: o.canKnock === true }));
-  const knock = options.find((o) => o.knock);
-  const best = [...options].sort((a, b) => a.deadwood - b.deadwood)[0];
-  const pick = knock ?? best;
-  if (pick === undefined) throw new Error(`no discard in phase ${view?.phase ?? 'none'}`);
-  return { id: pick.id, knock: pick.knock };
-};
-
-/**
- * Discard the selected card, or knock with it. The reducer runs in the click, so the view read
- * after it is the outcome: the round is over (a knock, or a void hand when the stock ran out; the
- * result sheet is up) or the curtain is up for the next player.
- */
-const finishTurn = async (page: Page, knock: boolean): Promise<'over' | 'next'> => {
-  await page.locator(`#actions [data-act="${knock ? 'knock' : 'discard'}"]`).click();
-  const after = await readView(page);
-  if (after?.phase === 'roundOver') {
-    await expect(page.locator('#roundResultOverlay')).toBeVisible();
-    return 'over';
-  }
-  await expect(page.locator('#curtainOverlay')).toBeVisible();
-  return 'next';
-};
-
-const select = async (page: Page, id: string): Promise<void> => {
-  const card = page.locator(`#hand .card[data-card="${id}"]`);
-  await card.click();
-  await expect(card).toHaveClass(/selected/);
-};
-
-/** Turns from under the curtain until the round is over: a knock or, when the stock runs out, a void hand. */
-const playToRoundOver = async (page: Page, turn = 1): Promise<void> => {
-  if (turn > 40) throw new Error('no round end within 40 turns');
-  await ginReveal(page);
-  const before = await readView(page);
-  if (before?.phase === 'draw') {
-    await page.locator('#stockPile').click();
-    await ginAcceptDraw(page);
-  }
-  const pick = await chooseDiscard(page);
-  await select(page, pick.id);
-  if ((await finishTurn(page, pick.knock)) === 'over') return;
-  return playToRoundOver(page, turn + 1);
 };
 
 type Viewport = Readonly<{
@@ -228,7 +170,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await check('accepted');
 
       const pick = await chooseDiscard(page);
-      await select(page, pick.id);
+      await selectCard(page, pick.id);
       await check('selected');
       if ((await finishTurn(page, pick.knock)) === 'next') {
         await check('next turn, under the curtain');

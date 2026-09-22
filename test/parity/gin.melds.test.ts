@@ -72,8 +72,9 @@ const compareHand = (seed: number): boolean => {
     expect(layoff.laidOff.length, `${label}: maximalLayoff`).toBeGreaterThanOrEqual(
       legacyLayoff.laidOff.length,
     );
+    expect(legacyWithLayoffs, `${label}: legacy bestMeldingWithLayoffs`).not.toBeNull();
     expect(withLayoffs.value, `${label}: bestMeldingWithLayoffs`).toBeLessThanOrEqual(
-      legacyWithLayoffs.value,
+      legacyWithLayoffs?.value ?? -1,
     );
   } else {
     same(`${label}: maximalLayoff`, layoff, legacyLayoff);
