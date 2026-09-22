@@ -28,6 +28,7 @@ import {
   safeHtml,
   queryAllIn,
   setAttr,
+  setChecked,
   setDisabled,
   setHtml,
   setText,
@@ -45,7 +46,8 @@ import {
   type Melding,
   type View,
 } from '../engine/types.ts';
-import { backHtml, cardHtml, pretty } from './cards.ts';
+import { SUITS, makeCard, type Rank } from '../engine/index.ts';
+import { SUIT_SYMBOL, backHtml, cardHtml, isRed, pretty, rankLabel } from './cards.ts';
 import { deadwoodText, fmtDuration, statusWith, type Selection } from './cues.ts';
 import type { HandView } from './hand/HandView.ts';
 import { meldGroupsHtml } from './hand/meldGroups.ts';
@@ -151,6 +153,44 @@ const ensurePile = (
   }
   const lab = queryIn(el, '.pile-label');
   if (lab !== null) setText(lab, label);
+};
+
+// ---- the discarded cards --------------------------------------------------------------------------
+
+const RANKS: ReadonlyArray<Rank> = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+
+/**
+ * The 52 cards in four suit rows (docs/design/gin-arrangement-and-discards.md §8): a chip per card,
+ * `seen` when it was discarded this hand, `top` for the top of the pile (what a draw would take),
+ * `held` when `withHand` and it is in my hand. Empty when the view carries no `discardIds` (a
+ * legacy host).
+ */
+export const discardsHtml = (v: View, withHand: boolean): SafeHtml => {
+  const seen = new Set(v.discardIds ?? []);
+  const held = new Set(withHand ? v.me.hand.map((c) => c.id) : []);
+  const top = v.discardTop?.id ?? null;
+  const chip = (id: string, label: string): string =>
+    `<span class="dc${seen.has(id) ? ' seen' : ''}${held.has(id) ? ' held' : ''}${id === top ? ' top' : ''}" data-card="${id}">${label}</span>`;
+  const rows = SUITS.map(
+    (s) =>
+      `<div class="dc-row ${isRed(s) ? 'red' : 'black'}"><span class="dc-suit">${SUIT_SYMBOL[s]}</span>${RANKS.map((r) => chip(makeCard(r, s).id, rankLabel(r))).join('')}</div>`,
+  );
+  return trustedHtml(rows.join(''));
+};
+
+/** `#discardsSub`: how many of the 52 are gone, and how many of mine are greyed with them. */
+export const discardsSubText = (v: View, withHand: boolean): string =>
+  `${String((v.discardIds ?? []).length)} of 52 discarded` +
+  (withHand ? ` · ${String(v.me.hand.length)} in your hand` : '');
+
+const paintDiscards = (doc: DocumentLike, app: App, v: View): void => {
+  // Without `discardIds` (a legacy host's frames) the sheet has nothing to show.
+  setDisabled(requireId(doc, 'discardsBtn'), v.discardIds === undefined);
+  toggleClass(requireId(doc, 'discardsOverlay'), 'hidden', !app.discardsOpen);
+  if (!app.discardsOpen) return;
+  setHtml(requireId(doc, 'discardsGrid'), discardsHtml(v, app.discardsWithHand));
+  setText(requireId(doc, 'discardsSub'), discardsSubText(v, app.discardsWithHand));
+  setChecked(requireId(doc, 'discardsHandToggle'), app.discardsWithHand);
 };
 
 const paintPiles = (doc: DocumentLike, v: View): void => {
@@ -501,6 +541,7 @@ const paintGame = (doc: DocumentLike, app: App, handView: HandView): void => {
   paintStatus(doc, app, v);
   paintHand(doc, app, v, handView);
   paintArrange(doc, app);
+  paintDiscards(doc, app, v);
   paintRoundResult(doc, app, v);
   paintMeldChooser(doc, app, v);
 };
@@ -540,6 +581,18 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   });
   listenId(doc, 'deadwoodInfo', 'click', () => {
     dispatch({ type: 'meld/open' });
+  });
+  listenId(doc, 'discardsBtn', 'click', () => {
+    dispatch({ type: 'discards/open' });
+  });
+  listenId(doc, 'closeDiscardsBtn', 'click', () => {
+    dispatch({ type: 'discards/close' });
+  });
+  listenId(doc, 'discardsOverlay', 'click', (e) => {
+    if (targetIdOf(e) === 'discardsOverlay') dispatch({ type: 'discards/close' });
+  });
+  listenId(doc, 'discardsHandToggle', 'change', () => {
+    dispatch({ type: 'discards/toggleHand' });
   });
   listenId(doc, 'arrangeBtn', 'click', () => {
     dispatch({ type: 'arrange/open' });

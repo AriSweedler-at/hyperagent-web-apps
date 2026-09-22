@@ -135,6 +135,8 @@ export type GinView = {
   meldOptions: Arrangement[];
   activeMeldSig: string;
   knockLimit: number;
+  /** The current engine's addition (docs/design/gin-arrangement-and-discards.md §8); the legacy view has none. */
+  discardIds?: string[];
 };
 
 export type ApplyResult = { ok: true; privateCard?: string } | { ok: false; error: string };

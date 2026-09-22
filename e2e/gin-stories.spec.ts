@@ -46,8 +46,10 @@ const FACTS = `(() => {
   const stock = document.getElementById('stockPile').classList;
   const disc = document.getElementById('discardPile').classList;
   const open = (id) => !document.getElementById(id).classList.contains('hidden');
-  const sheet = open('meldOverlay') ? 'meldOverlay' : open('arrangeOverlay') ? 'arrangeOverlay' : open('roundResultOverlay') ? 'roundResultOverlay' : 'none';
+  const sheet = open('meldOverlay') ? 'meldOverlay' : open('arrangeOverlay') ? 'arrangeOverlay' : open('discardsOverlay') ? 'discardsOverlay' : open('roundResultOverlay') ? 'roundResultOverlay' : 'none';
   const laidOff = sheet === 'roundResultOverlay' ? { laidOff: all('#rrBody .meld-group.laid .card').map((c) => c.getAttribute('data-card')) } : {};
+  const ids = (s) => all(s).map((c) => c.getAttribute('data-card'));
+  const dc = sheet === 'discardsOverlay' ? { dc: { seen: ids('#discardsGrid .dc.seen'), held: ids('#discardsGrid .dc.held'), top: ids('#discardsGrid .dc.top')[0] ?? null, withHand: document.getElementById('discardsHandToggle').checked } } : {};
   const arrangeBtn = document.getElementById('arrangeBtn');
   const activeSort = document.querySelector('#arrangeModes button.active');
   return {
@@ -67,6 +69,7 @@ const FACTS = `(() => {
     statusSub: document.getElementById('statusSub').textContent,
     sheet,
     ...laidOff,
+    ...dc,
   };
 })()`;
 /** `#app` holds its content, and the actions row is on screen once the window is scrolled to its end. */

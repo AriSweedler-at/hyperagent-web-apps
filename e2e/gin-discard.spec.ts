@@ -4,10 +4,12 @@
 // and a laptop viewport: the upcard is taken and accepted (the ten keep their boxes, the taken
 // card fills the ghost cell's), a free card is selected, and then everything else on the table is
 // tapped (another card, the same card, the locked card, both piles, the rules, the history, the
-// arrange sheet and, when the hand melds two ways, the chooser) while every slot cell holds its
-// box; the discard goes through, the curtain passes the phone, and the other seat's turn starts
-// with Arrange idle (its hand is the engine's arrangement). The `player` fixture seeds Math.random
-// per title, so the deal is the same on every run.
+// arrange sheet, the discarded-cards sheet and, when the hand melds two ways, the chooser) while
+// every slot cell holds its box; the discard goes through, the curtain passes the phone, and the
+// other seat's turn starts with Arrange idle (its hand is the engine's arrangement). The
+// discarded-cards sheet (§8) is checked after the deal: the upcard is the one chip greyed and
+// ringed, the toggle greys the ten held cards too, and both ways of closing work. The `player`
+// fixture seeds Math.random per title, so the deal is the same on every run.
 import type { Page } from '@playwright/test';
 
 import { ginAcceptDraw, ginStartLocal, ginTakeUpcard } from './fixtures/gin.ts';
@@ -55,6 +57,30 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await ginStartLocal(page, pagePath(project, 'gin-rummy'), vp);
+
+      // The discarded-cards sheet after the deal: the upcard alone, greyed and ringed; the toggle
+      // greys my ten as well; the button and the backdrop both close it.
+      const upcard = await page.locator('#discardPile .card').getAttribute('data-card');
+      await page.locator('#discardsBtn').click();
+      await expect(page.locator('#discardsOverlay')).toBeVisible();
+      await expect(page.locator('#discardsGrid .dc')).toHaveCount(52);
+      await expect(page.locator('#discardsGrid .dc.seen')).toHaveCount(1);
+      await expect(page.locator('#discardsGrid .dc.top')).toHaveAttribute(
+        'data-card',
+        upcard ?? '',
+      );
+      await expect(page.locator('#discardsGrid .dc.held')).toHaveCount(0);
+      await expect(page.locator('#discardsSub')).toHaveText('1 of 52 discarded');
+      await page.locator('#discardsHandToggle').check();
+      await expect(page.locator('#discardsGrid .dc.held')).toHaveCount(10);
+      await expect(page.locator('#discardsSub')).toHaveText('1 of 52 discarded · 10 in your hand');
+      await page.locator('#closeDiscardsBtn').click();
+      await expect(page.locator('#discardsOverlay')).toBeHidden();
+      await page.locator('#discardsBtn').click();
+      await expect(page.locator('#discardsOverlay')).toBeVisible();
+      await page.locator('#discardsOverlay').click({ position: { x: 4, y: 4 } });
+      await expect(page.locator('#discardsOverlay')).toBeHidden();
+
       const ghost = page.locator('#hand .slot.ghost');
       const ghostBox = await ghost.boundingBox();
       await ginTakeUpcard(page);
@@ -123,6 +149,11 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await page.locator('#closeArrangeBtn').click();
       await expect(page.locator('#arrangeOverlay')).toBeHidden();
       await still('the arrange sheet');
+      await page.locator('#discardsBtn').click();
+      await expect(page.locator('#discardsOverlay')).toBeVisible();
+      await page.locator('#closeDiscardsBtn').click();
+      await expect(page.locator('#discardsOverlay')).toBeHidden();
+      await still('the discarded-cards sheet');
       if ((await page.locator('#deadwoodInfo.tappable-dw').count()) === 1) {
         await page.locator('#deadwoodInfo').click();
         await expect(page.locator('#meldOverlay')).toBeVisible();

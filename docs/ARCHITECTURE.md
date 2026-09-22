@@ -735,6 +735,10 @@ Step 11 (gin protocol, storage and pure UI/scorer helpers): `web/games/gin-rummy
   carries a `State`), so both promise byte-identical re-encoding without knowing the shapes.
 - `web/shared/lib/json`: `object()` leaves an absent optional key out of its output and types it
   optional (`Shape<F>`); `record()` decodes id-keyed maps, refusing the three prototype-chain keys.
+  This is what lets a view grow without a version field: `View.discardIds` (the discarded-cards
+  sheet, docs/design/gin-arrangement-and-discards.md §8) is optional and emitted last, so a legacy
+  frame or save without it decodes and re-encodes byte for byte, a new frame round-trips with it,
+  and a page fed by a legacy host simply leaves the sheet's button disabled.
 - `protocol.ts` caps a join name at 20 characters and a toast at 500 rather than coercing as the
   legacy host did; `guestNameFor` applies the host's normalisation after the decode.
 - `storage.ts` imports the engine decoder and the scorer's types beside `web/shared/lib` and

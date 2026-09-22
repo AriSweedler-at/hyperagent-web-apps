@@ -77,9 +77,18 @@ const sheetOnPage = (page: GinPage): SheetState =>
     ? 'meldOverlay'
     : !page.get('arrangeOverlay').hidden()
       ? 'arrangeOverlay'
-      : !page.get('roundResultOverlay').hidden()
-        ? 'roundResultOverlay'
-        : 'none';
+      : !page.get('discardsOverlay').hidden()
+        ? 'discardsOverlay'
+        : !page.get('roundResultOverlay').hidden()
+          ? 'roundResultOverlay'
+          : 'none';
+
+const CHIP = /<span class="dc([^"]*)" data-card="([^"]+)">/g;
+/** The discarded-cards sheet as painted: the chips with `flag`, in the grid's (deck) order. */
+const chipsOnPage = (page: GinPage, flag: string): ReadonlyArray<string> =>
+  [...page.get('discardsGrid').text().matchAll(CHIP)]
+    .filter((m) => (m[1] ?? '').split(' ').includes(flag))
+    .map((m) => m[2] ?? '');
 
 /** The ids of the mini cards under the result sheet's "Laid off onto" label (the deadwood label follows). */
 const laidOffOnPage = (page: GinPage): ReadonlyArray<string> => {
@@ -121,6 +130,16 @@ const factsOnPage = ({ page, modes }: Painted): StoryFacts => {
     statusSub: page.get('statusSub').text(),
     sheet,
     ...(sheet === 'roundResultOverlay' ? { laidOff: laidOffOnPage(page) } : {}),
+    ...(sheet === 'discardsOverlay'
+      ? {
+          dc: {
+            seen: chipsOnPage(page, 'seen'),
+            held: chipsOnPage(page, 'held'),
+            top: chipsOnPage(page, 'top')[0] ?? null,
+            withHand: page.get('discardsHandToggle').checked(),
+          },
+        }
+      : {}),
   };
 };
 
@@ -155,6 +174,8 @@ const IDS = [
   'undo-back-to-draw',
   'after-discard-theirs',
   'discarded-kept-picture',
+  'discards-open',
+  'discards-with-hand',
   'round-over-table',
   'round-over-laid-off',
   'round-over-laid-off-defender',
@@ -218,13 +239,43 @@ describe('the catalogue', () => {
     const sheets: Readonly<Record<string, SheetState>> = {
       'meld-chooser-open': 'meldOverlay',
       'arrange-sheet-open': 'arrangeOverlay',
+      'discards-open': 'discardsOverlay',
+      'discards-with-hand': 'discardsOverlay',
       'round-over-laid-off': 'roundResultOverlay',
       'round-over-laid-off-defender': 'roundResultOverlay',
     };
     STORIES.forEach((s) => {
       expect(s.facts.sheet, s.id).toBe(sheets[s.id] ?? 'none');
       expect('laidOff' in s.facts, s.id).toBe(s.facts.sheet === 'roundResultOverlay');
+      expect('dc' in s.facts, s.id).toBe(s.facts.sheet === 'discardsOverlay');
     });
+  });
+
+  test('the discards stories: every discard of the hand greyed, the top ringed, my hand only when included', () => {
+    const open = must('discards-open');
+    const game = open.app.game;
+    if (game === null) throw new Error('no game');
+    expect(open.facts.dc?.seen).toHaveLength(game.discard.length);
+    expect(open.facts.dc?.seen.length).toBeGreaterThan(1);
+    expect(open.facts.dc?.top).toBe(game.discard.at(-1)?.id);
+    expect(open.facts.dc?.held).toEqual([]);
+    expect(open.facts.dc?.withHand).toBe(false);
+    const withHand = must('discards-with-hand');
+    expect(withHand.facts.dc?.held).toHaveLength(11);
+    expect(withHand.facts.dc?.withHand).toBe(true);
+    const page = painted(withHand).page;
+    expect(page.get('discardsOverlay').hidden()).toBe(false);
+    expect(
+      (
+        page
+          .get('discardsGrid')
+          .text()
+          .match(/<span class="dc[ "]/g) ?? []
+      ).length,
+    ).toBe(52);
+    expect(page.get('discardsSub').text()).toBe(
+      `${String(game.discard.length)} of 52 discarded · 11 in your hand`,
+    );
   });
 
   test('the arrange fact: off out of play and while a draw shows, due where the picture differs from what was asked', () => {

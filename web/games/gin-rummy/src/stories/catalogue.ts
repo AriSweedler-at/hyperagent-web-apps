@@ -63,7 +63,8 @@ const PLAYERS = [
 export type GhostState = 'none' | 'hidden' | 'open' | 'pending' | 'shown';
 export type StoryAction = Readonly<{ act: string; enabled: boolean }>;
 /** The one sheet open over the table, by its overlay's id, or `none`. */
-export type SheetState = 'none' | 'meldOverlay' | 'arrangeOverlay' | 'roundResultOverlay';
+export type SheetState =
+  'none' | 'meldOverlay' | 'arrangeOverlay' | 'discardsOverlay' | 'roundResultOverlay';
 /** `#arrangeBtn`: disabled, enabled, or enabled and marked `due` (the picture differs from the arrangement asked for). */
 export type ArrangeState = 'off' | 'idle' | 'due';
 
@@ -92,6 +93,13 @@ export type StoryFacts = Readonly<{
   sheet: SheetState;
   /** With the result sheet open: `#rrBody .meld-group.laid .card` ids, the cards laid off. */
   laidOff?: ReadonlyArray<string>;
+  /** With the discarded-cards sheet open: the greyed chips, the ringed top, the toggle. */
+  dc?: Readonly<{
+    seen: ReadonlyArray<string>;
+    held: ReadonlyArray<string>;
+    top: string | null;
+    withHand: boolean;
+  }>;
 }>;
 
 export type Story = Readonly<{
@@ -394,15 +402,39 @@ const actionsOf = (
   ];
 };
 
-/** The sheet the app's flags open over `state`: a chooser, or the result while not put away. */
+/** The sheet the app's flags open over `state`: a chooser, the discards, or the result while not put away. */
 const sheetOf = (state: State, app: Partial<App>): SheetState =>
   app.meldChooser === true
     ? 'meldOverlay'
     : app.arrangeOpen === true
       ? 'arrangeOverlay'
-      : state.phase === 'roundOver' && state.result !== null && app.resultDismissed !== true
-        ? 'roundResultOverlay'
-        : 'none';
+      : app.discardsOpen === true
+        ? 'discardsOverlay'
+        : state.phase === 'roundOver' && state.result !== null && app.resultDismissed !== true
+          ? 'roundResultOverlay'
+          : 'none';
+
+/** With the discarded-cards sheet open: the pile's ids in deck order, my hand when included, the top. */
+const dcOf = (
+  state: State,
+  seat: Seat,
+  sheet: SheetState,
+  app: Partial<App>,
+): Partial<StoryFacts> => {
+  if (sheet !== 'discardsOverlay') return {};
+  const withHand = app.discardsWithHand === true;
+  const deck = makeDeck().map((c) => c.id);
+  const inDeckOrder = (ids: ReadonlyArray<string>): ReadonlyArray<string> =>
+    deck.filter((id) => ids.includes(id));
+  return {
+    dc: {
+      seen: inDeckOrder(state.discard.map((c) => c.id)),
+      held: withHand ? inDeckOrder(state.hands[seat].map((c) => c.id)) : [],
+      top: state.discard.at(-1)?.id ?? null,
+      withHand,
+    },
+  };
+};
 
 /** With the result sheet open over a scored hand: the ids of the cards the defender laid off. */
 const laidOffOf = (state: State, sheet: SheetState): Partial<StoryFacts> => {
@@ -485,6 +517,7 @@ const factsOf = (
     statusSub,
     sheet,
     ...laidOffOf(state, sheet),
+    ...dcOf(state, seat, sheet, app),
   };
 };
 
@@ -746,6 +779,24 @@ export const STORIES: ReadonlyArray<Story> = [
     seat: 0,
     picture: discardedFrom(twoWaysPicture, discardedFromMeld, 0),
     statusSub: THEIRS_SUB,
+  }),
+  story({
+    id: 'discards-open',
+    title: 'The discarded cards: four suit rows, the pile greyed, its top ringed',
+    state: knockState,
+    seat: knockSeat,
+    picture: acceptedFrom(knockable.before, knockState, knockSeat),
+    statusSub: ACCEPTED_SUB,
+    app: { discardsOpen: true },
+  }),
+  story({
+    id: 'discards-with-hand',
+    title: 'The discarded cards with my hand included: my eleven greyed in gold',
+    state: knockState,
+    seat: knockSeat,
+    picture: acceptedFrom(knockable.before, knockState, knockSeat),
+    statusSub: ACCEPTED_SUB,
+    app: { discardsOpen: true, discardsWithHand: true },
   }),
   story({
     id: 'round-over-table',

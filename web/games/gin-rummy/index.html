@@ -189,6 +189,7 @@
     <div class="table-center">
       <div class="pile stock" id="stockPile"></div>
       <div class="pile discard" id="discardPile"></div>
+      <button class="pile-peek" id="discardsBtn" title="Discarded cards" aria-label="Discarded cards" disabled>🔍</button>
     </div>
 
     <div class="status-banner" id="statusBanner">
@@ -275,6 +276,18 @@
       <button class="btn btn-secondary btn-sm" data-sort="suit">By suit</button>
     </div>
     <button class="btn btn-ghost btn-block btn-sm" id="closeArrangeBtn" style="margin-top:14px;">Close</button>
+  </div>
+</div>
+
+<!-- DISCARDED CARDS -->
+<div id="discardsOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div style="text-align:center; font-size:2rem;">🔍</div>
+    <div class="sheet-title">Discarded cards</div>
+    <div class="sheet-sub" id="discardsSub"></div>
+    <div class="dc-grid" id="discardsGrid"></div>
+    <label class="dc-toggle"><input type="checkbox" id="discardsHandToggle"> Include the cards in my hand</label>
+    <button class="btn btn-ghost btn-block btn-sm" id="closeDiscardsBtn" style="margin-top:14px;">Close</button>
   </div>
 </div>
 

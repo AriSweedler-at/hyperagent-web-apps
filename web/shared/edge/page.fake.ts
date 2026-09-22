@@ -57,6 +57,8 @@ export type FakeEl = Readonly<{
   value: () => string;
   style: (name: string) => string | null;
   disabled: () => boolean;
+  /** The `checked` property as `setChecked` wrote it. */
+  checked: () => boolean;
   /** `el.remove()` was called. */
   removed: () => boolean;
   /** Event types with a listener, in registration order. */
@@ -108,7 +110,12 @@ export const fakeEl = (id: string, options: FakeElOptions = {}): FakeEl => {
   const attrs = new Map<string, string>(Object.entries(options.attrs ?? {}));
   const styles = new Map<string, string>();
   const listeners = new Map<string, Listener[]>();
-  const state = { content: options.text ?? '', value: options.value ?? '', removed: false };
+  const state = {
+    content: options.text ?? '',
+    value: options.value ?? '',
+    removed: false,
+    checked: false,
+  };
   const children = options.children ?? [];
   const query = (selector: string): ReadonlyArray<FakeEl> => {
     const found = options.queries?.[selector];
@@ -127,6 +134,12 @@ export const fakeEl = (id: string, options: FakeElOptions = {}): FakeEl => {
     },
     set value(v: string) {
       state.value = v;
+    },
+    get checked() {
+      return state.checked;
+    },
+    set checked(v: boolean) {
+      state.checked = v;
     },
     replaceChildren: (...nodes: ReadonlyArray<string>) => {
       state.content = nodes.join('');
@@ -201,6 +214,7 @@ export const fakeEl = (id: string, options: FakeElOptions = {}): FakeEl => {
     value: () => state.value,
     style: (name) => styles.get(name) ?? null,
     disabled: () => attrs.has('disabled'),
+    checked: () => state.checked,
     removed: () => state.removed,
     listenerTypes: () => [...listeners.keys()],
     fire,
