@@ -8,10 +8,12 @@
 // specs never spell out an absolute site path themselves.
 //
 // Every local port is a fixed base plus one offset, `E2E_PORT_OFFSET` (default 0): pages 4173+o,
-// proxy 8787+o, PeerServer 9000+o, and 3478+o reserved for the TURN server the relay spec will
-// start. playwright.config.ts derives its webServer commands and readiness URLs from the same
+// proxy 8787+o, PeerServer 9000+o, and the TURN relay (coturn) 3478+o with its relay ports right
+// above it. playwright.config.ts derives its webServer commands and readiness URLs from the same
 // values, so `E2E_PORT_OFFSET=1000 npm run test:e2e` runs a second harness beside one that holds
 // the default ports (another checkout, a stuck `npm run serve`), with nothing else to pass.
+import { accessSync, constants } from 'node:fs';
+import { delimiter, join } from 'node:path';
 
 export type Project = 'pages' | 'proxy';
 export type PageName = 'landing' | 'gin-rummy' | 'fidice';
@@ -65,12 +67,95 @@ export const baseUrl = (project: Project): string => {
 export const PEER_HOST = LOCAL_HOST;
 export const PEER_PORT = PORTS.peer;
 export const PEER_SERVER = `${PEER_HOST}:${String(PEER_PORT)}`;
-/** Reserved for the coturn the relay spec starts (e2e/gin-relay.spec.ts); nothing binds it yet. */
+/**
+ * The TURN relay the harness runs for the @relay specs (docs/ARCHITECTURE.md "CI"): coturn on
+ * PORTS.turn, started by playwright.config.ts when `turnserver` is on PATH, with one static
+ * long-term credential, loopback only, no TLS, and its relay ports right above the listening port
+ * so they follow the offset too. The pages reach it through the generated ICE list below.
+ */
+export const TURN_HOST = LOCAL_HOST;
 export const TURN_PORT = PORTS.turn;
+export const TURN_USER = 'e2e';
+export const TURN_CREDENTIAL = 'e2e-secret';
+export const TURN_REALM = 'e2e.local';
+/** The UDP ports coturn relays on: 64 right above the listening port (two games, a few interfaces each). */
+export const TURN_RELAY_PORTS = { min: PORTS.turn + 1, max: PORTS.turn + 64 } as const;
+/** Where playwright.config.ts writes what the offset decides (gitignored): the TURN ICE list and coturn's pidfile. */
+export const GENERATED_DIR = 'e2e/fixtures/.generated';
+export const TURN_PIDFILE = `${GENERATED_DIR}/turnserver.pid`;
+export const ICE_TURN_FILE = `${GENERATED_DIR}/e2e-ice-turn.json`;
+
+/**
+ * The `turnserver` command line for PORTS.turn: no config file (-n), listen and relay on loopback
+ * only, long-term credentials for the one static user, fingerprints, no TLS listener, no TCP
+ * relay, peers on loopback allowed (both browsers are), the log on stdout. `--no-cli` matters on
+ * Ubuntu's coturn 4.6, whose CLI otherwise binds 5766; Homebrew's 4.18 has it off and logs the
+ * flag as deprecated, harmlessly.
+ */
+export const turnServerCommand = (): string =>
+  [
+    'turnserver',
+    '-n',
+    `--listening-ip ${TURN_HOST}`,
+    `--listening-port ${String(TURN_PORT)}`,
+    `--relay-ip ${TURN_HOST}`,
+    `--min-port ${String(TURN_RELAY_PORTS.min)}`,
+    `--max-port ${String(TURN_RELAY_PORTS.max)}`,
+    '--lt-cred-mech',
+    `--user ${TURN_USER}:${TURN_CREDENTIAL}`,
+    `--realm ${TURN_REALM}`,
+    '--fingerprint',
+    '--no-tls',
+    '--no-tcp-relay',
+    '--no-cli',
+    '--allow-loopback-peers',
+    '--no-multicast-peers',
+    '--log-file stdout',
+    '--simple-log',
+    `--pidfile ${TURN_PIDFILE}`,
+  ].join(' ');
+
+export type TurnStatus = 'on' | 'off' | 'missing';
+const isExecutable = (file: string): boolean => {
+  try {
+    accessSync(file, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+};
+/** `turnserver` on PATH, as the shell running the webServer command will find it. */
+export const turnServerOnPath = (): boolean =>
+  (process.env['PATH'] ?? '')
+    .split(delimiter)
+    .filter((dir) => dir !== '')
+    .some((dir) => isExecutable(join(dir, 'turnserver')));
+/** Whether the harness starts coturn: `E2E_TURN=off` leaves it out on purpose; `missing` is no `turnserver` on PATH. */
+export const turnStatus = (): TurnStatus =>
+  process.env['E2E_TURN'] === 'off' ? 'off' : turnServerOnPath() ? 'on' : 'missing';
+/** Why a @relay spec skips, per status; the `missing` line names the install on both platforms. */
+export const TURN_SKIP_REASON: Readonly<Record<Exclude<TurnStatus, 'on'>, string>> = {
+  missing: 'coturn not installed: brew install coturn (macOS) / apt-get install coturn (ubuntu)',
+  off: 'the local TURN relay is off (E2E_TURN=off)',
+};
+
 /** STUN-only ICE list served by serve-dist from e2e/fixtures/e2e-ice.json (`--alias`). */
 export const ICE_URL = `${PAGES_ORIGIN}${PAGES_BASE_PATH}e2e-ice.json`;
 /** What e2e/fixtures/e2e-ice.json holds; test/tools/serve-dist.test.ts pins the file to it. */
 export const ICE_FIXTURE = { iceServers: [{ urls: 'stun:127.0.0.1:3478' }] } as const;
+/** The ICE list naming the local TURN relay, served by serve-dist from ICE_TURN_FILE (`{ ice: 'turn' }` in player.ts). */
+export const ICE_TURN_URL = `${PAGES_ORIGIN}${PAGES_BASE_PATH}e2e-ice-turn.json`;
+/** What ICE_TURN_FILE holds: a STUN entry on the relay's port (coturn answers Binding too) and the relay with its credentials. */
+export const ICE_TURN_FIXTURE = {
+  iceServers: [
+    { urls: `stun:${TURN_HOST}:${String(TURN_PORT)}` },
+    {
+      urls: `turn:${TURN_HOST}:${String(TURN_PORT)}`,
+      username: TURN_USER,
+      credential: TURN_CREDENTIAL,
+    },
+  ],
+} as const;
 
 /**
  * The frozen legacy gin page (docs/MIGRATION.md step 13: no longer served, kept as the oracle

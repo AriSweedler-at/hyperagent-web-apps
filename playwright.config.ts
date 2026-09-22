@@ -12,10 +12,18 @@
 // the advisory CI job `broker` plays through 0.peerjs.com instead. `E2E_TARGET=live`
 // (.github/workflows/nightly.yml) aims both projects at the deployed origins (e2e/fixtures/site.ts
 // LIVE_ORIGINS), starts nothing local and implies the cloud broker; specs that need the local
-// servers skip themselves with a reason.
+// servers skip themselves with a reason. The @relay specs (gin and fidice with `?ice-policy=relay`)
+// relay through a coturn of the harness's own on :3478 (`turnserver` on PATH, else they skip with
+// the install line; `E2E_TURN=off` leaves it out), reached through an ICE list this file writes
+// under e2e/fixtures/.generated/ because the relay's port follows the offset.
+import { mkdirSync, writeFileSync } from 'node:fs';
+
 import { defineConfig } from '@playwright/test';
 
 import {
+  GENERATED_DIR,
+  ICE_TURN_FILE,
+  ICE_TURN_FIXTURE,
   LEGACY_ALIASES,
   PAGES_BASE_PATH,
   PAGES_ORIGIN,
@@ -24,8 +32,11 @@ import {
   PEER_SERVER,
   PORTS,
   PROXY_ORIGIN,
+  TURN_SKIP_REASON,
   baseUrl,
   isLive,
+  turnServerCommand,
+  turnStatus,
 } from './e2e/fixtures/site.ts';
 
 const CI = process.env['CI'] !== undefined && process.env['CI'] !== '';
@@ -33,13 +44,26 @@ const live = isLive();
 // A live run meets on 0.peerjs.com: no PeerServer to start, and the fixtures drop `?peer=` too.
 if (live) process.env['E2E_BROKER'] = 'cloud';
 const cloudBroker = process.env['E2E_BROKER'] === 'cloud';
+// The local TURN relay: coturn when installed, unless asked off; a live run relays through
+// turn.sweedler.com. CI installs coturn, so a missing binary there is a broken job, not a skip.
+const turn = live ? 'off' : turnStatus();
+if (CI && turn === 'missing') throw new Error(TURN_SKIP_REASON.missing);
+// The ICE list naming the relay is written per run: its port is PORTS.turn, offset included.
+if (!live) {
+  mkdirSync(GENERATED_DIR, { recursive: true });
+  writeFileSync(ICE_TURN_FILE, `${JSON.stringify(ICE_TURN_FIXTURE, null, 2)}\n`);
+}
 const node = 'node --experimental-strip-types';
-/** The e2e ICE fixture and, on the pages origin, the frozen legacy gin page for the DOM-parity spec. */
+/** The two e2e ICE lists and, on the pages origin, the frozen legacy gin page for the DOM-parity spec. */
 const aliasArgs = (aliases: Readonly<Record<string, string>>): string =>
   Object.entries(aliases)
     .map(([path, file]) => `--alias ${path}=${file}`)
     .join(' ');
-const pagesAliases = aliasArgs({ 'e2e-ice.json': 'e2e/fixtures/e2e-ice.json', ...LEGACY_ALIASES });
+const pagesAliases = aliasArgs({
+  'e2e-ice.json': 'e2e/fixtures/e2e-ice.json',
+  'e2e-ice-turn.json': ICE_TURN_FILE,
+  ...LEGACY_ALIASES,
+});
 
 export default defineConfig({
   testDir: 'e2e',
@@ -92,5 +116,16 @@ export default defineConfig({
                 timeout: 30_000,
               },
             ]),
+        // Readiness by port: coturn answers on TCP too, and an HTTP probe has nothing to fetch.
+        ...(turn === 'on'
+          ? [
+              {
+                command: turnServerCommand(),
+                port: PORTS.turn,
+                reuseExistingServer: !CI,
+                timeout: 30_000,
+              },
+            ]
+          : []),
       ],
 });
