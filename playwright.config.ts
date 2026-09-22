@@ -1,7 +1,11 @@
-// Browser harness (docs/ARCHITECTURE.md "Testing pyramid", "Two origins"). Every spec runs on two
-// projects: `pages` (GitHub Pages emulated by tools/serve-dist.ts, dist/ under /hyperagent-web-apps/
-// on :4173) and `proxy` (games.sweedler.com emulated by tools/proxy-dev.ts on :8787, running the
-// real Worker against :4173). Every port here is e2e/fixtures/site.ts PORTS, the bases named above
+// Browser harness (docs/ARCHITECTURE.md "Testing pyramid", "Two origins"). Two projects: `pages`
+// (GitHub Pages emulated by tools/serve-dist.ts, dist/ under /hyperagent-web-apps/ on :4173) and
+// `proxy` (games.sweedler.com emulated by tools/proxy-dev.ts on :8787, running the real Worker
+// against :4173). A spec about an origin (the smoke test, the two-peer games, the resume, the
+// handoff's invite link, the relay-forced games) runs on both; a spec about the page alone (the
+// hand's geometry and flows, the stories, the scorer, the two parity oracles) runs on `pages`
+// only (PAGE_ONLY_SPECS), since both origins serve the same bytes and the second run only cost CI
+// minutes. Every port here is e2e/fixtures/site.ts PORTS, the bases named above
 // plus `E2E_PORT_OFFSET`, so a second run can sit beside one that holds the defaults. dist/ is the
 // only tree since docs/MIGRATION.md step 13 cut the last page over (the dark `next` project that
 // played a port before its flip is retired); the pages origin also publishes the frozen legacy gin
@@ -44,6 +48,18 @@ import {
 } from './e2e/fixtures/site.ts';
 
 const CI = process.env['CI'] !== undefined && process.env['CI'] !== '';
+/** Specs about the page alone, not its origin: they run on `pages` only. */
+const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
+  '**/computed-styles.spec.ts',
+  '**/gin-arrange.spec.ts',
+  '**/gin-discard.spec.ts',
+  '**/gin-dom-parity.spec.ts',
+  '**/gin-draw.spec.ts',
+  '**/gin-geometry.spec.ts',
+  '**/gin-local.spec.ts',
+  '**/gin-scorer.spec.ts',
+  '**/gin-stories.spec.ts',
+];
 const deployed = isDeployed();
 const cloudBroker = process.env['E2E_BROKER'] === 'cloud';
 // The local TURN relay: coturn when installed, unless asked off. CI installs coturn, so a missing
@@ -72,6 +88,9 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 10_000 },
   retries: 1,
+  // Playwright's CI default is one worker; the runner has four cores and every spec starts its own
+  // browser contexts against the shared servers, so four run side by side.
+  ...(CI ? { workers: 4 } : {}),
   forbidOnly: CI,
   reporter: [['list'], ['html', { open: 'never' }]],
   // Screenshot baselines (e2e/gin-stories.spec.ts) are committed per platform, since Chromium's
@@ -87,7 +106,11 @@ export default defineConfig({
       args: ['--disable-features=WebRtcHideLocalIpsWithMdns', '--no-first-run'],
     },
   },
-  projects: PROJECTS.map((name) => ({ name, use: { baseURL: baseUrl(name) } })),
+  projects: PROJECTS.map((name) => ({
+    name,
+    use: { baseURL: baseUrl(name) },
+    ...(name === 'proxy' ? { testIgnore: [...PAGE_ONLY_SPECS] } : {}),
+  })),
   webServer: [
     // Deployed, serve-dist still runs: it is where the deployed page fetches its `?ice=` lists.
     {

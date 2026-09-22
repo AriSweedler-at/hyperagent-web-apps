@@ -1,0 +1,23 @@
+# Chromium for the browser specs, restored from actions/cache by the installed Playwright version so
+# a run downloads it only after a version bump. On a miss `--with-deps` also installs the OS
+# libraries Chromium needs; on a hit the runner image already has them (every prior run launched
+# Chromium on this image), so nothing runs.
+name: Playwright Chromium
+description: Restore Playwright's Chromium from the cache, or install it with its OS dependencies
+runs:
+  using: composite
+  steps:
+    - name: Read the Playwright version
+      id: pw
+      shell: bash
+      run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+    - name: Restore Chromium
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-chromium-${{ steps.pw.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+    - name: Install Chromium and its OS dependencies
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npx playwright install --with-deps chromium

@@ -131,7 +131,7 @@ build. A deploy that changes a page's hash (the rollback revert included) theref
 with the cached page requesting an `app-[hash].js` that 404s, an empty page, for up to 10 minutes
 until they reload. A self-contained legacy page has no such window.
 
-Deploy: `.github/workflows/ci.yml` job `deploy` runs only on push to `main`, `needs: [check, e2e]`,
+Deploy: `.github/workflows/ci.yml` job `deploy` runs only on push to `main`, `needs: [check, coverage, e2e]`,
 `permissions: {contents: read, pages: write, id-token: write}`, `concurrency: {group: pages}`,
 steps `actions/configure-pages@v5`, `actions/upload-pages-artifact@v3 {path: dist}`,
 `actions/deploy-pages@v4`, and prints both served URLs in the job summary. One-time console
@@ -244,9 +244,12 @@ of the shim script itself (`sh -n`).
 
 `ci.yml` on `push` and `pull_request`. Job `check`: checkout, `setup-node@v4 {node-version-file:
 .nvmrc, cache: npm}`, `npm ci`, `npm run typecheck` (`tsc -b`), `npm run lint` (eslint + prettier
---check), `npm test -- --coverage`, `npm run build`, dist tests, upload `dist`. Job `e2e` (needs
-check): download dist, `npx playwright install --with-deps chromium`, `apt-get install coturn`
-(the system service it starts is stopped), `npm run test:e2e` (projects pages + proxy;
+--check), `npm test`, `npm run build`, dist tests, upload `dist`. Job `coverage` (parallel):
+`npm test -- --coverage` against the ratchets. Job `e2e` (parallel, its own build): Chromium from
+`.github/actions/playwright-chromium` (actions/cache by Playwright version; `--with-deps` only on a
+miss), `apt-get install coturn` (the system service it starts is stopped), `npm run
+test:integration`, `npm run test:e2e` (four workers under CI; projects pages + proxy, the page-only
+specs on pages alone: `PAGE_ONLY_SPECS`;
 PeerServer from the `peer` package on :9000; coturn on :3478 started by `playwright.config.ts`
 with one static long-term credential, loopback only, no TLS, its relay ports right above (`e2e/fixtures/site.ts`
 `turnServerCommand`), reached through an ICE list the config writes under `e2e/fixtures/.generated/`;
