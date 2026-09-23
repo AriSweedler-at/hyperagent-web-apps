@@ -260,12 +260,12 @@ describe('the worst cases: fifteen singletons under doubles', () => {
     ).toBe(0);
   });
 
-  test('legalFirstMoves stays fast (the recompute-per-call bound)', () => {
-    // The pure tsconfig has no `performance`; a Date works for a coarse bound.
-    const t0 = new Date().getTime();
+  test('legalFirstMoves offers every singleton on both worst-case boards', () => {
+    // No wall-clock bound: CI's coverage job ran these at 222 ms under v8 instrumentation where
+    // node alone takes 40-70 ms, so a duration pin flakes; the level-set counts above are the
+    // guard against recomputing the levels per first move (15^4 sequences, not 1654 boards).
     expect(legalFirstMoves(e1, 0, [1, 1, 1, 1], R)).toHaveLength(15);
     expect(legalFirstMoves(p27, 0, [1, 1, 1, 1], R)).toHaveLength(15);
-    expect(new Date().getTime() - t0).toBeLessThan(150);
   });
 });
 
