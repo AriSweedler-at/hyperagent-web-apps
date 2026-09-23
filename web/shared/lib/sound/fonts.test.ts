@@ -60,11 +60,12 @@ describe('the fonts', () => {
     });
   });
 
+  // Over the font's own entries, not every cue: a partial font is allowed (§4, §8), and the next
+  // test pins that its uncomposed cues resolve to the default.
   test('the shipped fonts differ from the default on every cue they compose', () => {
     SOUND_FONTS.filter((n) => n !== 'default').forEach((name) => {
-      const font = fontByName(name);
-      SOUND_CUES.forEach((cue) => {
-        expect(resolveSound(font, cue), `${name}.${cue}`).not.toEqual(DEFAULT_SOUNDS[cue]);
+      Object.entries(fontByName(name).sounds).forEach(([cue, sound]) => {
+        expect(sound, `${name}.${cue}`).not.toEqual(DEFAULT_SOUNDS[cue as SoundCue]);
       });
     });
   });

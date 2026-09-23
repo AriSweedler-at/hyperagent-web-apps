@@ -133,8 +133,9 @@ export const CUES: Readonly<Record<Cue | 'tap', CueSpec>> = {
 ```
 
 Backgammon's table (its `src/ui/sound.ts`, written with the page): `select → tap`, `move → move`,
-`roll → roll`, `hit → capture` (the hitter) and `hit → bad` (the player hit; the reducer decides
-which seat hears what), `bearOff → score`, `undo → undo`, `opening → start`, `yourTurn → turn`,
+`roll → roll`, `hit → capture` (the hitter) and `wasHit → bad` (the player hit: two events, one
+per seat, since a table holds one cue per event; the reducer decides which seat hears what),
+`bearOff → score`, `undo → undo`, `opening → start`, `yourTurn → turn`,
 `double → challenge`, `take → good`, `pass → neutral`, `gammon → great`, `win → victory`,
 `lose → loss`, `guestJoined → connection`, `guestGone → disconnect`, `shared → invite`.
 

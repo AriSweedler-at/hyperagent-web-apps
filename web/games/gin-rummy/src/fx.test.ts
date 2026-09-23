@@ -198,11 +198,13 @@ describe('createFx', () => {
     fx.toggle('felt');
     expect(fx.enabled()).toBe(false);
     expect(storage.map.get(STORAGE_KEYS.sound)).toBe('off');
+    expect(storage.map.has(STORAGE_KEYS.soundFont)).toBe(false);
     expect(toggles).toEqual([false]);
     expect(calls).toEqual([]);
     fx.toggle('felt');
     expect(fx.enabled()).toBe(true);
     expect(storage.map.get(STORAGE_KEYS.sound)).toBe('on');
+    expect(storage.map.has(STORAGE_KEYS.soundFont)).toBe(false);
     expect(toggles).toEqual([false, true]);
     const felt = resolveSound(fontByName('felt'), 'tap');
     expect(felt.kind).toBe('synth');
