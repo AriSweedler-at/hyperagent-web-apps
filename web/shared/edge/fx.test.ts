@@ -374,6 +374,19 @@ describe('createAudioCues', () => {
   });
 });
 
+describe('createAudioCues.context', () => {
+  test('is the one context, made and resumed on demand; null while disabled or without a constructor', () => {
+    const f = fakeContext('suspended');
+    const cues = createAudioCues({ makeContext: () => f.ctx, enabled: false });
+    expect(cues.context()).toBeNull();
+    cues.setEnabled(true);
+    expect(cues.context()).toBe(f.ctx);
+    expect(cues.context()).toBe(f.ctx);
+    expect(f.resumed()).toBe(2);
+    expect(createAudioCues({ makeContext: undefined }).context()).toBeNull();
+  });
+});
+
 describe('createAudioCues.warm', () => {
   test('creates and resumes the context without scheduling a note; nothing while disabled', () => {
     let made = 0;

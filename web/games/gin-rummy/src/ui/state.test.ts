@@ -92,6 +92,7 @@ const home: HomeSnapshot = {
   playMode: 'online',
   sort: 'suit',
   cardBack: 'default',
+  soundFont: 'default',
   save: null,
   scorer: null,
 };
@@ -1286,6 +1287,7 @@ describe('storage', () => {
     storage.setItem(STORAGE_KEYS.homeTab, 'rules');
     storage.setItem(STORAGE_KEYS.playMode, 'local');
     storage.setItem(STORAGE_KEYS.cardBack, 'yu-gi-oh');
+    storage.setItem(STORAGE_KEYS.soundFont, 'arcade');
     storage.setItem(STORAGE_KEYS.save, '{"role":"guest","code":"KQZM","myName":"Jeff"}');
     storage.setItem(
       STORAGE_KEYS.scorerState,
@@ -1306,6 +1308,7 @@ describe('storage', () => {
       playMode: 'local',
       sort: 'suit',
       cardBack: 'yu-gi-oh',
+      soundFont: 'arcade',
       save: { role: 'guest', code: 'KQZM', myName: 'Jeff' },
       scorer: {
         players: [
@@ -1321,7 +1324,13 @@ describe('storage', () => {
     storage.setItem(STORAGE_KEYS.homeTab, 'settings');
     storage.setItem(STORAGE_KEYS.save, 'not json');
     storage.setItem(STORAGE_KEYS.p2Name, '');
-    expect(readHome(store)).toMatchObject({ homeTab: 'play', save: null, p2Name: null });
+    storage.setItem(STORAGE_KEYS.soundFont, 'plaid');
+    expect(readHome(store)).toMatchObject({
+      homeTab: 'play',
+      save: null,
+      p2Name: null,
+      soundFont: 'default',
+    });
   });
 });
 
@@ -1412,18 +1421,30 @@ describe('runEffect', () => {
     runEffect(initialApp, { type: 'writeHomeTab', tab: 'score' }, deps);
     runEffect(initialApp, { type: 'writePlayMode', mode: 'local' }, deps);
     runEffect(initialApp, { type: 'writeCardBack', back: 'empty' }, deps);
+    runEffect(initialApp, { type: 'writeSoundFont', font: 'felt' }, deps);
     expect([...storage.map.entries()]).toEqual([
       [STORAGE_KEYS.name, 'Ann'],
       [STORAGE_KEYS.p2Name, 'Bob'],
       [STORAGE_KEYS.homeTab, 'score'],
       [STORAGE_KEYS.playMode, 'local'],
       [STORAGE_KEYS.cardBack, 'empty'],
+      [STORAGE_KEYS.soundFont, 'felt'],
     ]);
     runEffect(initialApp, { type: 'rememberName', name: '' }, deps);
     expect(storage.map.has(STORAGE_KEYS.name)).toBe(false);
     expect(storage.map.get(STORAGE_KEYS.p2Name)).toBe('Bob');
     runEffect(initialApp, { type: 'rememberP2Name', name: '' }, deps);
     expect(storage.map.has(STORAGE_KEYS.p2Name)).toBe(false);
+  });
+
+  test("the fx effect carries the App's font to the player, so the reducer is the source of truth", () => {
+    const { deps, log } = recorded();
+    runEffect({ ...initialApp, soundFont: 'felt' }, { type: 'fx', cue: 'tap' }, deps);
+    runEffect(initialApp, { type: 'fx', cue: 'win' }, deps);
+    expect(log).toEqual([
+      ['fx', 'tap', 'felt'],
+      ['fx', 'win', 'default'],
+    ]);
   });
 
   test('every other effect reaches its adapter; confirm dispatches only on yes; initHome re-reads storage', () => {
@@ -1456,7 +1477,7 @@ describe('runEffect', () => {
     expect(log).toEqual([
       ['toast', 'hi', 4000],
       ['send', { t: 'full' }],
-      ['fx', 'gin'],
+      ['fx', 'gin', 'default'],
       ['wakeLock', true],
       ['startHost', 'ABCD', 2, false],
       ['startGuest', 'ABCD', 3],
@@ -2134,5 +2155,16 @@ describe('the card back', () => {
     const set = run(initialApp, { type: 'cardBack/set', back: 'yu-gi-oh' });
     expect(set.app.cardBack).toBe('yu-gi-oh');
     expect(set.effects).toEqual([{ type: 'writeCardBack', back: 'yu-gi-oh' }]);
+  });
+});
+
+describe('the sound font', () => {
+  test("home/init reads it; the console hook's intent plays it from now on and remembers it", () => {
+    expect(
+      run(initialApp, { type: 'home/init', home: { ...home, soundFont: 'arcade' } }).app.soundFont,
+    ).toBe('arcade');
+    const set = run(initialApp, { type: 'soundFont/set', font: 'felt' });
+    expect(set.app.soundFont).toBe('felt');
+    expect(set.effects).toEqual([{ type: 'writeSoundFont', font: 'felt' }]);
   });
 });

@@ -50,12 +50,16 @@ import type { ScorerState } from '../scorer/scores.ts';
 import {
   DEFAULT_CARD_BACK,
   DEFAULT_SORT,
+  DEFAULT_SOUND_FONT,
   readCardBack,
   readSort,
+  readSoundFont,
   writeCardBack,
   writeSort,
+  writeSoundFont,
   type CardBack,
   type SortMode,
+  type SoundFontName,
   DEFAULT_HOME_TAB,
   DEFAULT_PLAY_MODE,
   HOME_TABS,
@@ -232,6 +236,8 @@ export type App = Readonly<{
   sort: SortMode;
   /** The card back drawn on every face-down card (`ginRummy_cardBack`, src/cardBack.ts). */
   cardBack: CardBack;
+  /** The font every cue plays in (`ginRummy_soundFont`, docs/design/sound-fonts.md §6). */
+  soundFont: SoundFontName;
   /** `#arrangeOverlay` open. */
   arrangeOpen: boolean;
   /** `#discardsOverlay` open, and whether it greys the cards in my hand too. Session only. */
@@ -286,6 +292,7 @@ export const initialApp: App = {
   drag: null,
   sort: DEFAULT_SORT,
   cardBack: DEFAULT_CARD_BACK,
+  soundFont: DEFAULT_SOUND_FONT,
   arrangeOpen: false,
   discardsOpen: false,
   discardsWithHand: false,
@@ -338,6 +345,8 @@ export type HomeSnapshot = Readonly<{
   sort: SortMode;
   /** The card back: this page's own key; a bad value read as the default (main.ts logs it). */
   cardBack: CardBack;
+  /** The sound font: this page's own key; a bad value read as the default (main.ts logs it). */
+  soundFont: SoundFontName;
   save: Save | null;
   scorer: ScorerState | null;
 }>;
@@ -396,6 +405,8 @@ export type Intent =
   | Readonly<{ type: 'card/dragEnd'; over?: DropTarget | null }>
   /** `__gin.cardBack(name)` (the console, for now): a valid preset is shown and remembered. */
   | Readonly<{ type: 'cardBack/set'; back: CardBack }>
+  /** `__gin.soundFont(name)` (the console, for now): a valid font plays from now on and is remembered. */
+  | Readonly<{ type: 'soundFont/set'; font: SoundFontName }>
   // ---- the sandbox (src/sandbox.ts), shown while the first player is named `sandbox` ----
   /** `#sbPreset`: a preset's map into the editor. */
   | Readonly<{ type: 'sandbox/preset'; id: string }>
@@ -489,6 +500,7 @@ export type Effect =
   | Readonly<{ type: 'writePlayMode'; mode: StoredPlayMode }>
   | Readonly<{ type: 'writeSort'; sort: SortMode }>
   | Readonly<{ type: 'writeCardBack'; back: CardBack }>
+  | Readonly<{ type: 'writeSoundFont'; font: SoundFontName }>
   /** `ms` null is the default duration. */
   | Readonly<{ type: 'toast'; message: string; ms: number | null }>
   /** To the current session's channel, if open. */
@@ -899,6 +911,7 @@ const initHome = (app: App, home: HomeSnapshot): Step =>
             playMode: home.playMode,
             sort: home.sort,
             cardBack: home.cardBack,
+            soundFont: home.soundFont,
           },
           ...(home.name === null ? [] : [{ type: 'fillName', name: home.name } as const]),
           ...(home.p2Name === null ? [] : [{ type: 'fillP2Name', name: home.p2Name } as const]),
@@ -1154,6 +1167,11 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       return pure({ ...app, submenuOpen: false });
     case 'cardBack/set':
       return step({ ...app, cardBack: intent.back }, { type: 'writeCardBack', back: intent.back });
+    case 'soundFont/set':
+      return step(
+        { ...app, soundFont: intent.font },
+        { type: 'writeSoundFont', font: intent.font },
+      );
     // ---- the sandbox ----
     case 'sandbox/preset': {
       const preset = presetById(intent.id);
@@ -1535,6 +1553,7 @@ export const readHome = (store: Store): HomeSnapshot => {
   const mode = readPlayMode(store);
   const sort = readSort(store);
   const back = readCardBack(store);
+  const font = readSoundFont(store);
   const save = readSave(store);
   const scorer = readScorerState(store);
   return {
@@ -1544,6 +1563,7 @@ export const readHome = (store: Store): HomeSnapshot => {
     playMode: mode.ok ? mode.value : DEFAULT_PLAY_MODE,
     sort: sort.ok ? sort.value : DEFAULT_SORT,
     cardBack: back.ok ? back.value : DEFAULT_CARD_BACK,
+    soundFont: font.ok ? font.value : DEFAULT_SOUND_FONT,
     save: save.ok ? save.value : null,
     scorer: scorer.ok ? scorer.value : null,
   };
@@ -1577,7 +1597,8 @@ export const guestContextOf = (app: App): GuestContext => ({
 export type EffectDeps = Readonly<{
   store: Store;
   toast: (message: string, ms: number | null) => void;
-  fx: (cue: Cue | 'tap') => void;
+  /** A cue in the App's font: the reducer's state is the source of truth for both. */
+  fx: (cue: Cue | 'tap', font: SoundFontName) => void;
   wakeLock: (hold: boolean) => void;
   net: Readonly<{
     startHost: (code: string, attempt: number, resume: boolean) => void;
@@ -1638,6 +1659,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
     case 'writeCardBack':
       writeCardBack(deps.store, effect.back);
       return;
+    case 'writeSoundFont':
+      writeSoundFont(deps.store, effect.font);
+      return;
     case 'toast':
       deps.toast(effect.message, effect.ms);
       return;
@@ -1645,7 +1669,7 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       deps.net.send(effect.frame);
       return;
     case 'fx':
-      deps.fx(effect.cue);
+      deps.fx(effect.cue, app.soundFont);
       return;
     case 'wakeLock':
       deps.wakeLock(effect.hold);

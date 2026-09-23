@@ -55,6 +55,7 @@
     "web/games/gin-rummy/src/**/*.ts",
     "web/shared/edge/storage.ts",
     "web/shared/edge/fx.ts",
+    "web/shared/edge/sound.ts",
     "infra/games-proxy/**/*.ts"
   ],
   // The gin paint and wiring (ui/{render,home,local}.ts and scorer/main.ts, step 12) are written

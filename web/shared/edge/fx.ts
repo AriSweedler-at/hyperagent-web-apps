@@ -1,7 +1,12 @@
 // Feedback effects that degrade silently: the screen wake lock that keeps a host phone awake in
 // the lobby, vibration, and the oscillator cues the legacy gin `fx` object plays. Every browser
 // API is injected as a structural type so tests run on fakes and a browser without the feature
-// (or one that throws) simply does nothing, exactly as the legacy try/catch wrappers behave.
+// (or one that throws) simply does nothing, exactly as the legacy try/catch wrappers behave. The
+// note and voice types live in web/shared/lib/sound/sound.ts since the fonts (docs/design/
+// sound-fonts.md) needed them below the edge; they are re-exported here for the cues' callers.
+import type { Note, OscillatorType } from '../lib/sound/sound.ts';
+
+export type { Note, OscillatorType };
 
 export type WakeLockSentinelLike = Readonly<{
   release: () => Promise<void>;
@@ -58,8 +63,6 @@ export const vibrate = (nav: NavigatorLike, pattern: number | ReadonlyArray<numb
 
 // --- audio ---------------------------------------------------------------------------------
 
-export type OscillatorType = 'sine' | 'square' | 'sawtooth' | 'triangle';
-
 export type AudioParamLike = Readonly<{
   setValueAtTime: (value: number, time: number) => unknown;
   exponentialRampToValueAtTime: (value: number, time: number) => unknown;
@@ -77,6 +80,12 @@ export type OscillatorLike = AudioNodeLike &
 
 export type GainLike = AudioNodeLike & Readonly<{ gain: AudioParamLike }>;
 
+/** A decoded sample; the edge only holds it and hands it to a source. */
+export type AudioBufferLike = Readonly<{ duration: number }>;
+
+export type BufferSourceLike = AudioNodeLike &
+  Readonly<{ buffer: AudioBufferLike | null; start: (time: number) => void }>;
+
 export type AudioContextLike = Readonly<{
   /** 'suspended' | 'running' | 'closed' in browsers; typed open so fakes need no cast. */
   state: string;
@@ -85,10 +94,10 @@ export type AudioContextLike = Readonly<{
   resume: () => Promise<void>;
   createOscillator: () => OscillatorLike;
   createGain: () => GainLike;
+  /** The sample seam (sound.ts); optional, so a fake for the oscillator cues needs neither. */
+  decodeAudioData?: (data: ArrayBuffer) => Promise<AudioBufferLike>;
+  createBufferSource?: () => BufferSourceLike;
 }>;
-
-/** One note: frequency in Hz, duration in seconds, and the gap to the next note (defaults to `dur`). */
-export type Note = Readonly<{ freq: number; dur: number; gap?: number }>;
 
 export type AudioCues = Readonly<{
   /** Play one tone `start` seconds from now; silent when disabled or the context is not running. */
@@ -99,6 +108,11 @@ export type AudioCues = Readonly<{
   warm: () => void;
   setEnabled: (enabled: boolean) => void;
   enabled: () => boolean;
+  /**
+   * The context the cues play through, made and resumed as `warm` does, or null while disabled or
+   * without one: the sample player (sound.ts) decodes into it and plays from it.
+   */
+  context: () => AudioContextLike | null;
 }>;
 
 export type AudioCueOptions = Readonly<{
@@ -164,5 +178,6 @@ export const createAudioCues = (options: AudioCueOptions): AudioCues => {
       enabled = value;
     },
     enabled: () => enabled,
+    context: ensure,
   };
 };

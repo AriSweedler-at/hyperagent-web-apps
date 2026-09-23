@@ -9,6 +9,8 @@ import {
   DEFAULT_PLAY_MODE,
   CARD_BACKS,
   DEFAULT_CARD_BACK,
+  DEFAULT_SOUND_FONT,
+  SOUND_FONTS,
   DEFAULT_SORT,
   HOME_TABS,
   NAME_MAX,
@@ -23,6 +25,7 @@ import {
   readSave,
   readScorerState,
   readSort,
+  readSoundFont,
   readSoundState,
   soundEnabled,
   writeHomeTab,
@@ -32,6 +35,7 @@ import {
   writeSave,
   writeScorerState,
   writeSort,
+  writeSoundFont,
   writeSoundState,
 } from './storage.ts';
 
@@ -63,7 +67,7 @@ const game = createGame(
 );
 
 describe('frozen constants', () => {
-  test('the six kept legacy keys, the second name, the sort and the card back, the tabs, modes, sound states and the name cap', () => {
+  test('the six kept legacy keys, the second name, the sort, the card back and the sound font, the tabs, modes, sound states and the name cap', () => {
     expect(ALL_KEYS).toEqual([
       'ginRummyMP_v1',
       'ginRummy_name',
@@ -73,6 +77,7 @@ describe('frozen constants', () => {
       'ginRummy_sound',
       'ginRummy_sort',
       'ginRummy_cardBack',
+      'ginRummy_soundFont',
       'ginRummyScorerState_v2',
     ]);
     expect(HOME_TABS).toEqual(['play', 'rules', 'score']);
@@ -84,6 +89,8 @@ describe('frozen constants', () => {
     expect(DEFAULT_SORT).toBe('suit');
     expect(CARD_BACKS).toEqual(['default', 'blue-stripe', 'yu-gi-oh', 'empty']);
     expect(DEFAULT_CARD_BACK).toBe('default');
+    expect(SOUND_FONTS).toEqual(['default', 'felt', 'arcade']);
+    expect(DEFAULT_SOUND_FONT).toBe('default');
     expect(NAME_MAX).toBe(20);
   });
 });
@@ -98,6 +105,31 @@ describe('the sort preference', () => {
     expect(readSort(store)).toEqual({ ok: true, value: 'suit' });
     s.setItem(STORAGE_KEYS.sort, 'colour');
     expect(readSort(store).ok).toBe(false);
+  });
+});
+
+describe('the sound font preference', () => {
+  test('round trip as a bare string; a missing or unknown value reads as an error', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    expect(readSoundFont(store)).toEqual({
+      ok: false,
+      error: { kind: 'missing', key: STORAGE_KEYS.soundFont },
+    });
+    SOUND_FONTS.forEach((font) => {
+      expect(writeSoundFont(store, font).ok).toBe(true);
+      expect(s.map.get(STORAGE_KEYS.soundFont)).toBe(font);
+      expect(readSoundFont(store)).toEqual({ ok: true, value: font });
+    });
+    s.setItem(STORAGE_KEYS.soundFont, 'plaid');
+    expect(readSoundFont(store)).toEqual({
+      ok: false,
+      error: {
+        kind: 'invalid',
+        key: STORAGE_KEYS.soundFont,
+        reason: '$: expected one of "default" | "felt" | "arcade"',
+      },
+    });
   });
 });
 

@@ -12,6 +12,7 @@
 // name, remembered under `rememberName`'s rule; the legacy read `#p2NameInput` only at the Start
 // button and never stored it, so no capture exists for it.
 import { CARD_BACKS, type CardBack } from './cardBack.ts';
+import { SOUND_FONTS, type SoundFontName } from '../../../shared/lib/sound/fonts.ts';
 import { SORT_MODES, type SortMode } from './sort.ts';
 import type { Store, StorageError } from '../../../shared/edge/storage.ts';
 
@@ -58,6 +59,11 @@ export const STORAGE_KEYS = {
   /** The card back (src/cardBack.ts, bare string). This page's own key; set from the console for now. */
   cardBack: 'ginRummy_cardBack',
   /**
+   * The sound font (web/shared/lib/sound/fonts.ts, bare string). This page's own key, so another
+   * game on the origin keeps its own choice (docs/design/sound-fonts.md §6); set from the console for now.
+   */
+  soundFont: 'ginRummy_soundFont',
+  /**
    * The Score Counter's session. Its players' names are `name` and `p2Name` above (the legacy
    * `ginRummy_scorerNames` list is retired: the Score Counter scores the two pass-and-play players).
    */
@@ -75,6 +81,11 @@ export const SOUND_STATES = ['on', 'off'] as const;
 export type SoundState = (typeof SOUND_STATES)[number];
 export { DEFAULT_SORT, SORT_MODES, type SortMode } from './sort.ts';
 export { CARD_BACKS, DEFAULT_CARD_BACK, type CardBack } from './cardBack.ts';
+export {
+  DEFAULT_SOUND_FONT,
+  SOUND_FONTS,
+  type SoundFontName,
+} from '../../../shared/lib/sound/fonts.ts';
 /** `rememberName` sliced what it stored to this many characters. */
 export const NAME_MAX = 20;
 
@@ -140,6 +151,7 @@ export const decodePlayMode: Decoder<PlayMode> = literal(...PLAY_MODES);
 export const decodeSoundState: Decoder<SoundState> = literal(...SOUND_STATES);
 export const decodeSort: Decoder<SortMode> = literal(...SORT_MODES);
 export const decodeCardBack: Decoder<CardBack> = literal(...CARD_BACKS);
+export const decodeSoundFont: Decoder<SoundFontName> = literal(...SOUND_FONTS);
 
 const scorerPlayer = object({ id: string, name: string });
 const scorerRound = object({
@@ -250,6 +262,11 @@ export const readCardBack = (store: Store): Result<CardBack, StorageError> =>
   readTextWith(store, STORAGE_KEYS.cardBack, decodeCardBack);
 export const writeCardBack = (store: Store, back: CardBack): Result<null, StorageError> =>
   store.writeText(STORAGE_KEYS.cardBack, back);
+
+export const readSoundFont = (store: Store): Result<SoundFontName, StorageError> =>
+  readTextWith(store, STORAGE_KEYS.soundFont, decodeSoundFont);
+export const writeSoundFont = (store: Store, font: SoundFontName): Result<null, StorageError> =>
+  store.writeText(STORAGE_KEYS.soundFont, font);
 
 /** `safeGet(FX_KEY) !== 'off'`: on unless the key says off (missing or unreadable counts as on). */
 export const soundEnabled = (store: Store): boolean => {
