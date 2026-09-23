@@ -12,16 +12,18 @@ pages got here.
 
 ## Play
 
-| Game                         | GitHub Pages                                                           | games.sweedler.com                     | Source                  |
-| ---------------------------- | ---------------------------------------------------------------------- | -------------------------------------- | ----------------------- |
-| Gin Rummy                    | https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/  | https://games.sweedler.com/gin-rummy/  | `web/games/gin-rummy/`  |
-| Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/     | https://games.sweedler.com/fidice/     | `web/games/fidice/`     |
-| Sheshbesh (backgammon)       | https://arisweedler-at.github.io/hyperagent-web-apps/games/backgammon/ | https://games.sweedler.com/backgammon/ | `web/games/backgammon/` |
+| Game                         | GitHub Pages                                                           | games.sweedler.com                                                               | Source                  |
+| ---------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------- |
+| Gin Rummy                    | https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/  | https://games.sweedler.com/gin-rummy/                                            | `web/games/gin-rummy/`  |
+| Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/     | https://games.sweedler.com/fidice/                                               | `web/games/fidice/`     |
+| Sheshbesh (backgammon)       | https://arisweedler-at.github.io/hyperagent-web-apps/games/backgammon/ | https://games.sweedler.com/backgammon/ and https://games.sweedler.com/sheshbesh/ | `web/games/backgammon/` |
 
 Both origins serve the same `dist/`. `games.sweedler.com` is the Cloudflare Worker in
-`infra/games-proxy/`: `/gin-rummy/`, `/fidice/` and `/backgammon/` are the short URLs,
-`/games/<name>/` redirects to them and `/shared/...` maps to the site's `shared/` directory. A host
-on one origin and a guest on the other still meet: peer ids carry no origin.
+`infra/games-proxy/`: `/gin-rummy/`, `/fidice/` and `/backgammon/` are the short URLs, `/games/<name>/`
+redirects to them and `/shared/...` maps to the site's `shared/` directory. Sheshbesh answers to two
+names: `/sheshbesh/` is the backgammon page served in place by the Worker, and on GitHub Pages
+`games/sheshbesh/` forwards to `games/backgammon/`; only `/backgammon/` is linked from the landing
+page. A host on one origin and a guest on the other still meet: peer ids carry no origin.
 
 Sheshbesh plays portes (the Greek set's first game: no doubling cube, a gammon doubles) or Western
 backgammon (the cube, the triple game, the Crawford rule) as a match to 1, 3, 5 or 7 points, on one
@@ -232,6 +234,12 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    nightly, for free.
 9. The proxy needs nothing: the Worker's catch-all maps `games.sweedler.com/<g>/` to
    `/hyperagent-web-apps/games/<g>/`.
+
+A second URL name for a game (`sheshbesh` for backgammon) is an alias, not a game: one row in
+`ALIASES` in `tools/games.ts` and the same row in `infra/games-proxy/worker.ts` (its test pins the
+two equal), plus the stub `web/games/<alias>/index.html` copied from `web/games/sheshbesh/`. No
+landing card, no `GAMES`, room-code, title or hook row (`docs/ARCHITECTURE.md` "Two origins",
+Aliases). The Worker must be redeployed for the alias to answer on games.sweedler.com.
 
 ## Deploy
 

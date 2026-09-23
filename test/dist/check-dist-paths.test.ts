@@ -10,6 +10,7 @@ import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
 import { mapPath, unmapPath } from '../../infra/games-proxy/worker.ts';
 import { GAMES, LANDING_HREFS } from '../../tools/games.ts';
 import {
+  ALIAS_PAGES,
   allReferences,
   classify,
   describeDist,
@@ -53,6 +54,25 @@ describeDist('dist paths on both origins', (root) => {
   test('every game page is built', () => {
     GAMES.forEach((game) => {
       expect(distHasFile(root, `games/${game}/index.html`), game).toBe(true);
+    });
+  });
+
+  test('each alias reaches its game page on both origins: the stub forwards on Pages, the Worker serves it in place', () => {
+    ALIAS_PAGES.forEach(({ alias, game, page }) => {
+      const gamePage = `${PAGES_BASE_PATH}games/${game}/`;
+      // Pages: the stub is built, and `../<game>/` from it is the game's directory URL.
+      expect(distHasFile(root, page), page).toBe(true);
+      expect(resolvedPath(`${ORIGIN}${PAGES_BASE_PATH}${page}`, `../${game}/`)).toBe(gamePage);
+      // Proxy: /<alias>/ is the game page itself, never the stub; /<alias> and /games/<alias>/
+      // redirect there; and the stub's link, were it served, would map to the same page.
+      expect(throughProxy(`/${alias}/`)).toBe(gamePage);
+      expect(throughProxy(`/${alias}`)).toBe(gamePage);
+      expect(throughProxy(`/games/${alias}/`)).toBe(gamePage);
+      const stubOnProxy = `${ORIGIN}${unmapPath(`${PAGES_BASE_PATH}${page}`)}`;
+      expect(throughProxy(resolvedPath(stubOnProxy, `../${game}/`))).toBe(gamePage);
+      // The alias's page and bundle URLs on the proxy are fetches, not redirects (one round trip).
+      expect(mapPath(`/${alias}/`).kind).toBe('fetch');
+      expect(mapPath(`/${alias}/app-abc.js`).kind).toBe('fetch');
     });
   });
 

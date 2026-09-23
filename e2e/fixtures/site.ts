@@ -191,10 +191,23 @@ export const PAGES: ReadonlyArray<PageName> = ['landing', ...GAMES];
 
 export const EXPECTED_TITLES: Readonly<Record<PageName, string>> = PAGE_TITLES;
 
+/** Path of a folder under games/ relative to the project's baseURL (`games/fidice/` on pages, `fidice/` on proxy); a game or an alias (tools/games.ts ALIASES). */
+export const folderPath = (project: Project, name: string): string =>
+  project === 'proxy' ? `${name}/` : `games/${name}/`;
+
 /** Path of a page relative to the project's baseURL (`games/fidice/` on pages, `fidice/` on proxy). */
-export const pagePath = (project: Project, page: PageName): string => {
-  if (page === 'landing') return '';
-  return project === 'proxy' ? `${page}/` : `games/${page}/`;
+export const pagePath = (project: Project, page: PageName): string =>
+  page === 'landing' ? '' : folderPath(project, page);
+
+/**
+ * The title of a page named at run time (the game an alias forwards to): its PAGE_TITLES row, or
+ * an error naming the missing row, so a spec never compares against `undefined`.
+ */
+export const titleOf = (page: string): string => {
+  const titles: Readonly<Record<string, string>> = EXPECTED_TITLES;
+  const title = titles[page];
+  if (title === undefined) throw new Error(`${page} has no PAGE_TITLES row in tools/games.ts`);
+  return title;
 };
 
 export const asProject = (name: string): Project => {

@@ -9,7 +9,19 @@ import { resolve, sep } from 'node:path';
 
 import { describe, test } from 'vitest';
 
+import { ALIASES } from '../../tools/games.ts';
+
 export const REPO_ROOT = resolve(import.meta.dirname, '..', '..');
+
+/** The stub an alias (tools/games.ts ALIASES) builds to: games/<alias>/index.html, forwarding to ../<game>/. */
+export const aliasPage = (alias: string): string => `games/${alias}/index.html`;
+
+/** Every alias stub in the tree, alias -> game; the file each is checked for is aliasPage(alias). */
+export const ALIAS_PAGES: ReadonlyArray<Readonly<{ alias: string; game: string; page: string }>> =
+  Object.entries(ALIASES).map(([alias, game]) => ({ alias, game, page: aliasPage(alias) }));
+
+/** True for an alias stub: its one `../<game>/` link is checked by the alias tests, not the generic ones. */
+export const isAliasPage = (file: string): boolean => ALIAS_PAGES.some(({ page }) => page === file);
 
 export type DistRoot = Readonly<{ name: 'dist'; dir: string; build: string }>;
 

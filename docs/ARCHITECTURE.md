@@ -55,12 +55,13 @@ and tests that prove it land before the code they protect.
 │       │                        local,home,rules}.ts, ui/hand/{HandView,meldGroups}.ts, scorer/{scores,voice,csv,format,main}.ts
 │       ├── fidice/              index.html, main.ts, theme.css, src/ = the 38 modules at their // src/<path>.ts
 │       │                        marker paths (assets, domain (+probability.algorithms), bots, net, view, app)
-│       └── backgammon/          Sheshbesh (docs/design/backgammon-{rules,board}.md): index.html (static screens,
-│           └── src/             24 points in one grid), main.ts, theme.css (formatted; redeclares the eleven tokens),
-│                                engine/ (types, variants, board, moves, notation, setup, score, apply, view, decode,
-│                                index; the seeded replay beside it), protocol.ts, storage.ts, fx.ts,
-│                                net/{peerjs,host,guest}.ts (gin's sessions, three edits), ui/{state,render,board,
-│                                home,local,rules,sound,page.fake}.ts, ui/board/{layout,fly,dragger}.ts
+│       ├── backgammon/          Sheshbesh (docs/design/backgammon-{rules,board}.md): index.html (static screens,
+│       │   └── src/             24 points in one grid), main.ts, theme.css (formatted; redeclares the eleven tokens),
+│       │                        engine/ (types, variants, board, moves, notation, setup, score, apply, view, decode,
+│       │                        index; the seeded replay beside it), protocol.ts, storage.ts, fx.ts,
+│       │                        net/{peerjs,host,guest}.ts (gin's sessions, three edits), ui/{state,render,board,
+│       │                        home,local,rules,sound,page.fake}.ts, ui/board/{layout,fly,dragger}.ts
+│       └── sheshbesh/           index.html only: the alias stub forwarding to ../backgammon/ ("Two origins", Aliases)
 ├── legacy/                      MIGRATION ONLY: verbatim pages + shared/ice.js, copied into dist by the plugin
 ├── test/                        fixtures/legacy (sha256-pinned .cjs cores), fixtures/backgammon-wire (self-recorded
 │                                frames), fixtures/styles (computed-style goldens), parity/ (describe.each([legacy,
@@ -185,6 +186,28 @@ the Worker's catch-all to `/hyperagent-web-apps/games/fidice/app-x.js`) and `/sh
 4. Playwright runs every spec on project `pages` (`tools/serve-dist.ts`, dist mounted at
    `/hyperagent-web-apps/` on :4173) and project `proxy` (`tools/proxy-dev.ts` on :8787 running the
    real `worker.ts` fetch handler with `UPSTREAM=http://127.0.0.1:4173`).
+
+**Aliases.** A game may have a second URL name (`tools/games.ts` `ALIASES`: `sheshbesh` ->
+`backgammon`). An alias is not a game: no landing card, no `GAMES`, room-code, title or hook row;
+only the game's own URL is linked from the landing page. Each origin serves it its own way:
+
+- Pages: `web/games/<alias>/index.html` is a stub Vite copies to `dist/games/<alias>/` (no module
+  script, one visible `../<game>/` link for the no-script case, `<meta name="robots" content="noindex">`),
+  whose inline script runs `location.replace('../<game>/' + location.search + location.hash)`, so
+  `?join=` rides along and the address bar ends at the game's own path.
+- games.sweedler.com: the Worker serves `/<alias>/…` from `games/<game>/…` in place (a fetch, not a
+  redirect: the address bar keeps `/<alias>/`, and the page's `./app-x.js` resolves under it and maps
+  to the game's folder). `/<alias>` without its slash is a 301 to `/<alias>/` on this origin, because
+  the upstream's slash redirect would come back as the game's path and `unmapPath` (which knows no
+  alias) would send the player to `/<game>/`. `/games/<alias>/` redirects like every `/games/<x>/`.
+  The Worker keeps its own copy of the map (wrangler deploys `worker.ts` alone); `worker.test.ts`
+  pins it equal to the registry's. A new alias is a redeploy of the Worker.
+
+Guards 1 and 2 check each stub (its one reference is `../<game>/`, the forward spells the same
+target, no `/`-rooted URL anywhere in the file) and the alias's mapping on both origins;
+`dist-parity` pins that `dist/games/` holds exactly the games and the aliases, an alias folder
+being its stub alone. The smoke spec opens `<alias>/?join=…` on both projects and expects the
+game's title at the game's path on Pages and at the alias's path on the proxy.
 
 localStorage stays per-origin (unchanged). Peer ids are origin-independent, so a github.io host
 and a games.sweedler.com guest still meet on the broker.

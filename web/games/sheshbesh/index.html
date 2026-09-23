@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Sheshbesh</title>
+    <script>
+      // The Pages origin's half of the sheshbesh alias (tools/games.ts ALIASES): this stub forwards
+      // to the backgammon page beside it, query and hash intact (`?join=` rides along). No module
+      // script, no `/`-rooted URL, no other request. games.sweedler.com never serves this file: its
+      // Worker maps /sheshbesh/ onto games/backgammon/ in place.
+      location.replace('../backgammon/' + location.search + location.hash);
+    </script>
+  </head>
+  <body>
+    <p><a href="../backgammon/">Play Sheshbesh</a> (the backgammon page).</p>
+  </body>
+</html>

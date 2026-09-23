@@ -14,8 +14,16 @@ import { resolve } from 'node:path';
 
 import { expect, test } from 'vitest';
 
-import { GAMES, LEGACY_GAMES } from '../../tools/games.ts';
-import { REPO_ROOT, describeDist, distFiles, distHasFile, readDist, referencesIn } from './dist.ts';
+import { ALIASES, GAMES, LEGACY_GAMES } from '../../tools/games.ts';
+import {
+  ALIAS_PAGES,
+  REPO_ROOT,
+  describeDist,
+  distFiles,
+  distHasFile,
+  readDist,
+  referencesIn,
+} from './dist.ts';
 
 const sha256 = (path: string): string =>
   createHash('sha256').update(readFileSync(path)).digest('hex');
@@ -189,6 +197,17 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     );
     // The classic ICE loader went with the last legacy page (step 13); it is bundled now.
     expect(files).not.toContain('shared/ice.js');
+    // games/ holds one folder per game and one per alias (tools/games.ts ALIASES), nothing else;
+    // an alias folder is its stub alone, never a bundle or a map (it is not a game page).
+    const folders = [
+      ...new Set(
+        files.filter((file) => file.startsWith('games/')).map((file) => file.split('/')[1]),
+      ),
+    ];
+    expect(folders.sort()).toEqual([...GAMES, ...Object.keys(ALIASES)].sort());
+    ALIAS_PAGES.forEach(({ alias, page }) => {
+      expect(files.filter((file) => file.startsWith(`games/${alias}/`))).toEqual([page]);
+    });
     // Root-level files: the landing page, .nojekyll and (once it has a script) the landing's own
     // app-[hash].js with its map. Nothing else may sit beside them.
     const stray = files
