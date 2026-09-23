@@ -18,6 +18,7 @@ export default defineConfig({
         'web/games/fidice/src/app/**/*.ts',
         'web/games/fidice/src/view/**/*.ts',
         'web/games/gin-rummy/src/engine/**/*.ts',
+        'web/games/backgammon/src/engine/**/*.ts',
         'web/games/gin-rummy/src/protocol.ts',
         'web/games/gin-rummy/src/storage.ts',
         'web/games/gin-rummy/src/cardBack.ts',
@@ -87,6 +88,20 @@ export default defineConfig({
           functions: 100,
           statements: 100,
           branches: 97,
+        },
+        // The backgammon engine (web/games/backgammon/src/engine): the table, scenario and seeded
+        // replay tests beside it; the same targets as gin's engine, 100% lines for any algorithms file.
+        'web/games/backgammon/src/engine/**': {
+          lines: 94,
+          functions: 94,
+          statements: 93,
+          branches: 92,
+        },
+        'web/games/backgammon/src/engine/*.algorithms.ts': {
+          lines: 100,
+          functions: 100,
+          statements: 100,
+          branches: 92,
         },
         'web/games/gin-rummy/src/protocol.ts': {
           lines: 95,
