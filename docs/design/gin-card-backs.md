@@ -57,6 +57,10 @@ other.
   `homeSnapshot`: at boot and on every return home) is logged the same way and dropped from
   storage, so the default stands and a reload does not log it again.
 
+The sound font (docs/design/sound-fonts.md §6) is chosen the same way: its own key
+(`ginRummy_soundFont`), `App.soundFont` read at `home/init`, `soundFont/set` → `writeSoundFont`,
+`__gin.soundFont(name)` and the same boot drop in `homeSnapshot`; a settings panel later paints both.
+
 ## 4. Oracles
 
 - `test/card-backs.test.ts`: the derived raster files exist at the tool's sizes (§1b).

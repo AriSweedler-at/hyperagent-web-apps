@@ -31,8 +31,9 @@ import { HostSession, type HostEvents } from './src/net/host.ts';
 import type { NetDeps } from './src/net/peerjs.ts';
 import { isGuestFrame } from './src/protocol.ts';
 import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
-import { DEFAULT_SOUND_FONT, STORAGE_KEYS, soundEnabled } from './src/storage.ts';
+import { STORAGE_KEYS, soundEnabled } from './src/storage.ts';
 import { badCardBackMsg, isCardBack } from './src/cardBack.ts';
+import { badSoundFontMsg, isSoundFont } from '../../shared/lib/sound/fonts.ts';
 import { formatMap, mapOf } from './src/sandbox.ts';
 import { slotHandView } from './src/ui/hand/SlotHandView.ts';
 import {
@@ -106,13 +107,19 @@ const boot = (): void => {
   // (src/scorer/main.ts) registering itself as the legacy `window.__scorer` did.
   const page = window as Window & { __rng?: Rng; __gin?: unknown; __scorer?: Scorer };
   const store = browserStore();
-  // The card back (src/cardBack.ts): a value the console left in storage that names no preset is
-  // logged and dropped before every home read, so the default stands and a reload logs it once.
+  // The card back (src/cardBack.ts) and the sound font (docs/design/sound-fonts.md §6): a value
+  // the console left in storage that names no preset is logged and dropped before every home
+  // read, so the default stands and a reload logs it once.
   const homeSnapshot = (): HomeSnapshot => {
     const storedBack = store.readText(STORAGE_KEYS.cardBack);
     if (storedBack.ok && !isCardBack(storedBack.value)) {
       console.error(badCardBackMsg(storedBack.value));
       store.remove(STORAGE_KEYS.cardBack);
+    }
+    const storedFont = store.readText(STORAGE_KEYS.soundFont);
+    if (storedFont.ok && !isSoundFont(storedFont.value)) {
+      console.error(badSoundFontMsg(STORAGE_KEYS.soundFont, storedFont.value));
+      store.remove(STORAGE_KEYS.soundFont);
     }
     return readHome(store);
   };
@@ -255,8 +262,8 @@ const boot = (): void => {
   const deps: EffectDeps = {
     store,
     toast,
-    fx: (cue) => {
-      fx.play(cue, DEFAULT_SOUND_FONT);
+    fx: (cue, font) => {
+      fx.play(cue, font);
     },
     wakeLock: (hold) => {
       if (hold) void wakeLock.hold();
@@ -306,7 +313,7 @@ const boot = (): void => {
       cancel: cancelTimer,
     },
     toggleSound: () => {
-      fx.toggle(DEFAULT_SOUND_FONT);
+      fx.toggle(app.soundFont);
     },
     share: (code) => {
       // The legacy handler's chain: the share sheet (a phone's OS menu), else the clipboard with a
@@ -353,7 +360,7 @@ const boot = (): void => {
     now,
     rng,
     fx: (cue) => {
-      fx.play(cue, DEFAULT_SOUND_FONT);
+      fx.play(cue, app.soundFont);
     },
     toast: (message) => {
       toast(message, null);
@@ -451,6 +458,15 @@ const boot = (): void => {
       }
       dispatch({ type: 'cardBack/set', back: name });
     },
+    /** The sound font, from the console for now (docs/design/sound-fonts.md §6): a font plays from now on and is remembered; anything else is logged and refused. */
+    soundFont: (name: string): void => {
+      if (!isSoundFont(name)) {
+        console.error(badSoundFontMsg(STORAGE_KEYS.soundFont, name));
+        return;
+      }
+      dispatch({ type: 'soundFont/set', font: name });
+    },
+    soundFontName: (): string => app.soundFont,
     dispatch,
   };
 

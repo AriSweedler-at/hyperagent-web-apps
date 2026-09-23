@@ -62,6 +62,7 @@ const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/gin-local.spec.ts',
   '**/gin-sandbox.spec.ts',
   '**/gin-scorer.spec.ts',
+  '**/gin-sound-font.spec.ts',
   '**/gin-stories.spec.ts',
 ];
 const deployed = isDeployed();

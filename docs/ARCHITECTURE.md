@@ -78,6 +78,8 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 | `web/shared/lib` | itself | Leaf modules. `Result<T,E>` (`ok/err/map/andThen`), `Rng = () => number`, `mulberry32`, JSON decoders, `roomCode` constants (`'ginrummy-ari-'`, `'fidice-'`, alphabets). |
 | `web/shared/lib/invite.ts` | itself | The invite link: `inviteUrl(code, pageUrl)` is `<pageUrl>?join=<code>` (pure). |
 | `web/shared/edge/invite.ts` | itself | `joinCodeFrom(search)` and `withoutJoin(search)`: a boot reads the code and drops it from the address bar through the platform's `URLSearchParams`. |
+| `web/shared/lib/sound/` | itself | The sound fonts (docs/design/sound-fonts.md): `cues.ts` the twenty generic cues every game maps its events onto; `sound.ts` `Sound` (`synth`, `sample`, `silence`), `Note`, `OscillatorType`; `fonts.ts` `SOUND_FONTS`, `fontByName`, `resolveSound` (partial fonts fall back to the total `default`), `isSoundFont`, `badSoundFontMsg(key, value)`; `fonts/<name>.ts` the fonts as data. |
+| `web/shared/edge/sound.ts` | shared/lib, `@shared/edge/fx` | `playSound(audio, sound, deps)`: a synth through `AudioCues.seq`, a sample fetched and decoded once per URL into the cues' context, silence nothing; every failure silent. A game's `fx.ts` plays its table's cue in the App's font through it. |
 | `web/shared/edge/peer.ts` | shared/lib, `@shared/edge/transport` | The peer plumbing every game's sessions share: `NetDeps`, `whenTransportReady`, `peerWatchdog`, `keepPeerAlive`, `announcePath`, `describePeerError`, the legacy timings and strings. Each game's `net/peerjs.ts` re-exports it (gin) or takes its types (fidice). |
 | `engine` / `domain` / `bots` | shared/lib, siblings | Pure. `applyAction(state, seat, action, rng): Result<State, RuleError>` (gin), `apply(s, actor, action, rng): Result` (fidice). Return new state; never mutate. `viewFor` / `redactFor` are the only redaction. |
 | `protocol.ts` | engine/domain types, shared/lib | Trust boundary. Every inbound frame passes a decoder returning `Result`; outbound frames are built here. Shapes frozen by wire goldens; a future change adds a version field here. |
@@ -96,7 +98,10 @@ Documented test hooks that are part of the contract: `window.__gin` (including `
 and `__gin.sandboxMap()`, the sandbox's console entry points: docs/design/gin-sandbox.md, and
 `__gin.legal()`, the engine's legal actions for my view, `__gin.layoffs()`, the layoffs the engine
 used to make by itself, which the drivers play a knock's layoff phase through, and
-`__gin.cardBack(name)`, the card-back preset from the console: docs/design/gin-card-backs.md),
+`__gin.cardBack(name)`, the card-back preset from the console: docs/design/gin-card-backs.md, and
+`__gin.soundFont(name)` / `__gin.soundFontName()`, the sound font from the console, stored under the
+page's own `ginRummy_soundFont` key so another game on the origin keeps its own choice:
+docs/design/sound-fonts.md),
 `window.__fidice`,
 `window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
 `?ice=<url>` (ICE config override), `?ice-policy=relay` (port-only: `iceTransportPolicy: 'relay'`
@@ -782,7 +787,10 @@ Step 12, phase 1 (gin page, net, state, boot): `web/games/gin-rummy/`:
   `app` and session cells live in `main.ts` (the edge), which paints after every intent.
 - `ui/render.ts` is where the gin DOM writes live; it is excluded from `tsconfig.node.json` (DOM).
   `ui/sound.ts` holds the cue tables; `src/fx.ts` (audio, vibration, the `ginRummy_sound` key) is
-  the legacy `fx` object over `@shared/edge/fx`, whose `AudioCues` gained `warm()`.
+  the legacy `fx` object over `@shared/edge/fx`, whose `AudioCues` gained `warm()`. Since
+  docs/design/sound-fonts.md the table maps each event onto a generic cue and a buzz, the notes
+  live in the shared `default` font, and `fx.ts` plays through `@shared/edge/sound` in the font
+  `App.soundFont` names (`ginRummy_soundFont`).
 - Import zones: net/ may import `clock.fake.ts` (tests beside the sessions); the ui/ zone's target
   leaves `*.test.ts` out. Coverage: gin `net/**` and `fx.ts` at 90% lines, functions and statements.
 - `index.html` adds `id="rulesList"` / `id="rulesOverlayList"` to the two rules slots; every other
