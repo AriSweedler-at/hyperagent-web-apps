@@ -317,6 +317,27 @@ describe('the table', () => {
     );
   });
 
+  test('a dragged card that may be discarded lights the discard pile; over it the pile turns green; nothing without a drag', () => {
+    const p = page();
+    const v = viewFor(drawn, 0);
+    const cardId = v.me.hand[0]?.id ?? '';
+    paintAll(p.doc, local(drawn, 0, { drag: { cardId, from: 'hand', onto: null } }));
+    expect(p.get('discardPile').hasClass('drop-ready')).toBe(true);
+    expect(p.get('discardPile').hasClass('drop')).toBe(false);
+    paintAll(p.doc, local(drawn, 0, { drag: { cardId, from: 'hand', onto: 'discard' } }));
+    expect(p.get('discardPile').hasClass('drop')).toBe(true);
+    // The card just taken from the pile lights nothing; nor does a hand with no card in the air.
+    const lockedView = { ...v, drawnFromDiscard: cardId };
+    paintAll(
+      p.doc,
+      local(drawn, 0, { view: lockedView, drag: { cardId, from: 'hand', onto: 'discard' } }),
+    );
+    expect(p.get('discardPile').hasClass('drop-ready')).toBe(false);
+    expect(p.get('discardPile').hasClass('drop')).toBe(false);
+    paintAll(p.doc, local(drawn, 0));
+    expect(p.get('discardPile').hasClass('drop-ready')).toBe(false);
+  });
+
   test('the ghost draw slot: the drawn card shown over the held ten, its status, the pending cell', () => {
     const p = page();
     const before = viewFor(passed, 0);

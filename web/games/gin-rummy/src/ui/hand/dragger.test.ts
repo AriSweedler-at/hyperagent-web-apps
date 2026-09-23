@@ -16,6 +16,9 @@ type Table = Readonly<{
   meldSlot: FakeEl;
   /** A card laid off onto the knocker's melds, on the table (§7b). */
   laidCard: FakeEl;
+  /** The discard pile and the Discard button, the only measured elements: the discard targets (§5d). */
+  pile: FakeEl;
+  discardButton: FakeEl;
   ghost: FakeEl;
   intents: DragIntent[];
 }>;
@@ -48,12 +51,38 @@ const table = (cloneable: boolean): Table => {
   const melds = fakeEl('tableMelds', {
     queries: { '.meld-group': [], '.card[data-card="4S"]': [laidCard] },
   });
-  const page = fakePage([hand, melds]);
+  // The pile at 100..180 x 200..310 and the button at 300..400 x 400..440: the drag reads their
+  // rects (grown by DROP_GROW) to name the discard target; every other rect is zero.
+  const pile = fakeEl('discardPile', { classes: ['pile'] });
+  Object.assign(pile.el, {
+    getBoundingClientRect: () => ({ left: 100, top: 200, width: 80, height: 110 }),
+  });
+  const discardButton = fakeEl('discardBtn', {
+    classes: ['btn'],
+    attrs: { 'data-act': 'discard' },
+  });
+  Object.assign(discardButton.el, {
+    getBoundingClientRect: () => ({ left: 300, top: 400, width: 100, height: 40 }),
+  });
+  const actions = fakeEl('actions', { queries: { 'button[data-act="discard"]': [discardButton] } });
+  const page = fakePage([hand, melds, pile, actions]);
   const intents: DragIntent[] = [];
   bindDrag(page.doc, (i) => {
     intents.push(i);
   });
-  return { hand, melds, loose, slots, meldCard, meldSlot, laidCard, ghost, intents };
+  return {
+    hand,
+    melds,
+    loose,
+    slots,
+    meldCard,
+    meldSlot,
+    laidCard,
+    pile,
+    discardButton,
+    ghost,
+    intents,
+  };
 };
 
 /** A pointer event's init: where it is, on which card in which slot. */
@@ -121,6 +150,33 @@ describe('bindDrag', () => {
     // Once: the fallback timer finds the latch set.
     t.ghost.fire('transitionend');
     expect(t.intents).toHaveLength(4);
+  });
+
+  test('over the discard pile, or within half its box around it, or over the Discard button, the drag names the discard; released there it ends at once', () => {
+    const t = table(true);
+    const [card] = t.loose;
+    const [slot] = t.slots;
+    if (card === undefined || slot === undefined) throw new Error('no card');
+    t.hand.fire('pointerdown', on(card, slot, 100, 100));
+    t.hand.fire('pointermove', on(card, slot, 120, 100));
+    expect(t.intents.at(-1)).toEqual({ type: 'card/dragOver', index: 2 });
+    // Inside the pile's box.
+    t.hand.fire('pointermove', on(card, slot, 140, 250));
+    expect(t.intents.at(-1)).toEqual({ type: 'card/dragOnto', onto: 'discard' });
+    // Outside the box (its left edge is 100) but inside the box grown by half (80): still the pile.
+    const n = t.intents.length;
+    t.hand.fire('pointermove', on(card, slot, 85, 180));
+    expect(t.intents).toHaveLength(n);
+    // Past the grown box: no target, and the card finds its place among the loose cards again.
+    t.hand.fire('pointermove', on(card, slot, 60, 180));
+    expect(t.intents.at(-1)).toEqual({ type: 'card/dragOnto', onto: null });
+    // The Discard button is the pile too.
+    t.hand.fire('pointermove', on(card, slot, 350, 420));
+    expect(t.intents.at(-1)).toEqual({ type: 'card/dragOnto', onto: 'discard' });
+    // Released there the card leaves the hand: no glide, the end goes out at once.
+    t.hand.fire('pointerup', on(card, slot, 350, 420));
+    expect(t.intents.at(-1)).toEqual({ type: 'card/dragEnd', over: 'discard' });
+    expect(t.ghost.hasClass('landing')).toBe(false);
   });
 
   test('a transition that never ends: the fallback timer lands the ghost', () => {

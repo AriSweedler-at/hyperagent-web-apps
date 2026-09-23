@@ -14,8 +14,11 @@
 // it fits is laid off, a table card released off the melds is taken back (the card then appears
 // where it landed, dropping in), and a hand card over none glides into its cell first. The click
 // a release fires is ignored by the reducer while the drag stands. A press that never moves is a
-// tap or a long press, as before. Only the DOM edge is reached (docs/ARCHITECTURE.md "Module
-// boundaries").
+// tap or a long press, as before. In the discard phase the discard pile and the Discard button are
+// targets too (the owner: drag a card "over the discard pile"; the pile's hitbox is its box grown by
+// half in each direction, DROP_GROW, so a near miss still lands): the pointer over either says
+// `card/dragOnto 'discard'` and a release there discards the card. Only the DOM edge is reached
+// (docs/ARCHITECTURE.md "Module boundaries").
 import {
   addClass,
   afterTransition,
@@ -46,6 +49,7 @@ import {
   follow,
   ghostTransform,
   startedDrag,
+  type DropTarget,
   type Motion,
   type Point,
 } from './drag.ts';
@@ -55,12 +59,14 @@ export type DragIntent =
   | Readonly<{ type: 'card/release' }>
   | Readonly<{ type: 'card/dragStart'; cardId: string; from: 'hand' | 'table' }>
   | Readonly<{ type: 'card/dragOver'; index: number }>
-  | Readonly<{ type: 'card/dragOnto'; onto: number | null }>
-  | Readonly<{ type: 'card/dragEnd'; over: number | null }>;
+  | Readonly<{ type: 'card/dragOnto'; onto: DropTarget | null }>
+  | Readonly<{ type: 'card/dragEnd'; over: DropTarget | null }>;
 export type DragDispatch = (intent: DragIntent) => void;
 
 /** The ghost's glide to its cell on release. */
 export const LAND_MS = 180;
+/** The discard targets' hitbox: each measure of the box grown by this share, centred (the owner: "within 50% of the discard pile"). */
+export const DROP_GROW = 0.5;
 
 type Session = Readonly<{
   cardId: string;
@@ -79,10 +85,17 @@ type Session = Readonly<{
   motion: Motion;
   target: Point;
   index: number;
-  onto: number | null;
+  onto: DropTarget | null;
 }>;
 
 const px = (n: number): string => `${String(n)}px`;
+/** `r` with every measure grown by `by`, about its centre. */
+const grown = (r: Rect, by: number): Rect => ({
+  left: r.left - (r.width * by) / 2,
+  top: r.top - (r.height * by) / 2,
+  width: r.width * (1 + by),
+  height: r.height * (1 + by),
+});
 const inside = (r: Rect, p: Point): boolean =>
   (r.width > 0 || r.height > 0) &&
   p.x >= r.left &&
@@ -96,6 +109,8 @@ export const bindDrag = (doc: PageLike, dispatch: DragDispatch): void => {
      replaced whole by every pointer event and frame, as boot.ts keeps its cells */
   const hand = requireId(doc, 'hand');
   const melds = requireId(doc, 'tableMelds');
+  const pile = requireId(doc, 'discardPile');
+  const actions = requireId(doc, 'actions');
   const held: { s: Session | null } = { s: null };
   const looseCells = (): ReadonlyArray<Element> => queryAllIn(hand, ':scope > .slot.dead');
   const cardOf = (id: string): Element | null =>
@@ -105,6 +120,16 @@ export const bindDrag = (doc: PageLike, dispatch: DragDispatch): void => {
     const i = queryAllIn(melds, '.meld-group').findIndex((g) => inside(rectOf(g), p));
     return i < 0 ? null : i;
   };
+  /** The discard pile or the Discard button under the pointer, each box grown by DROP_GROW. */
+  const discardAt = (p: Point): boolean => {
+    const button = queryIn(actions, 'button[data-act="discard"]');
+    return (
+      inside(grown(rectOf(pile), DROP_GROW), p) ||
+      (button !== null && inside(grown(rectOf(button), DROP_GROW), p))
+    );
+  };
+  /** A hand card's target: a meld first (the piles hide while a knock is answered), else the discard. */
+  const targetAt = (p: Point): DropTarget | null => meldAt(p) ?? (discardAt(p) ? 'discard' : null);
 
   const frame = (): void => {
     const s = held.s;
@@ -209,7 +234,8 @@ export const bindDrag = (doc: PageLike, dispatch: DragDispatch): void => {
     const p = pointerOf(e);
     if (!pressed.moving && !startedDrag(pressed.start, p)) return;
     const s = pressed.moving ? pressed : begin(pressed, p);
-    const onto = meldAt(p);
+    // A laid-off card knows only the melds: released anywhere else it comes back to the hand.
+    const onto = s.from === 'hand' ? targetAt(p) : meldAt(p);
     if (onto !== s.onto) dispatch({ type: 'card/dragOnto', onto });
     // A hand card over no meld finds its place among the loose cards.
     const cells = looseCells();

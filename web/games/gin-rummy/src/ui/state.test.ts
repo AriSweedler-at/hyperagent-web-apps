@@ -2011,6 +2011,29 @@ describe('a loose card dragged by hand', () => {
     expect(run(accepted, { type: 'card/dragEnd' }).app).toBe(accepted);
     expect(run(ended.app, { type: 'card/tap', cardId: last }).app.selectedCard).toBe(last);
   });
+
+  test('over the discard pile the drag lights it for a card that may be discarded; released there the card is discarded, as the button would', () => {
+    const started = run(accepted, { type: 'card/dragStart', cardId: last }).app;
+    const lit = run(started, { type: 'card/dragOnto', onto: 'discard' });
+    expect(lit.app.drag).toEqual({ cardId: last, from: 'hand', onto: 'discard' });
+    expect(lit.effects).toEqual([]);
+    expect(run(lit.app, { type: 'card/dragOnto', onto: 'discard' }).app).toBe(lit.app);
+    const dropped = run(lit.app, { type: 'card/dragEnd', over: 'discard' });
+    expect(dropped.app.drag).toBeNull();
+    expect(dropped.app.selectedCard).toBeNull();
+    expect(dropped.app.game?.discard.some((c) => c.id === last)).toBe(true);
+    expect(dropped.app.game?.hands[0]).toHaveLength(10);
+    expect(dropped.app.game?.turn).toBe(1);
+    // The card just taken from the pile may not go back: the pile stays dark and a release there does nothing.
+    const locked = { ...started, view: { ...viewFor(drawn, 0), drawnFromDiscard: last } };
+    expect(run(locked, { type: 'card/dragOnto', onto: 'discard' }).app.drag?.onto).toBeNull();
+    const kept = run(locked, { type: 'card/dragEnd', over: 'discard' });
+    expect(kept.app.drag).toBeNull();
+    expect(kept.app.game).toBe(locked.game);
+    // Out of the discard phase nothing lights either.
+    const drawing = { ...started, view: { ...viewFor(drawn, 0), phase: 'draw' as const } };
+    expect(run(drawing, { type: 'card/dragOnto', onto: 'discard' }).app.drag?.onto).toBeNull();
+  });
 });
 
 describe('laying off by hand (§7b)', () => {

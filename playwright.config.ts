@@ -51,6 +51,7 @@ const CI = process.env['CI'] !== undefined && process.env['CI'] !== '';
 /** Specs about the page alone, not its origin: they run on `pages` only. */
 const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/computed-styles.spec.ts',
+  '**/gin-drag-discard.spec.ts',
   '**/gin-arrange.spec.ts',
   '**/gin-card-back.spec.ts',
   '**/gin-discard.spec.ts',

@@ -103,6 +103,16 @@
   .pile.tappable { cursor: pointer; box-shadow: 0 0 0 3px rgba(74,222,128,0.55), 0 0 22px rgba(74,222,128,0.35); animation: glow 1.4s ease-in-out infinite; }
   .pile.tappable:active { transform: scale(0.96); }
   .pile.blocked { opacity: 0.45; }
+  /* A hand card dragged in the discard phase (docs/design/gin-arrangement-and-discards.md §5d; the
+     owner: the pile "should light up yellow", the Discard button's text "should wiggle slightly",
+     and where a release would discard "should hover green"): `drop-ready` while the card is in the
+     air, `drop` on the target under the pointer. The pile's hitbox is its box grown by half in each
+     direction (dragger.ts DROP_GROW), so the glow answers a little before the pointer arrives. */
+  .pile.drop-ready { box-shadow: 0 0 0 3px rgba(251,191,36,0.6), 0 0 22px rgba(251,191,36,0.35); }
+  .pile.drop { box-shadow: 0 0 0 4px rgba(74,222,128,0.9), 0 0 26px rgba(74,222,128,0.5); background: rgba(74,222,128,0.16); }
+  .btn.drop-ready, .btn.drop-ready:disabled { opacity: 1; animation: wiggle 0.5s ease-in-out infinite; }
+  .btn.drop, .btn.drop:disabled { background: rgba(74,222,128,0.92); color: #0f2318; box-shadow: 0 0 0 3px rgba(74,222,128,0.45); animation: none; }
+  @keyframes wiggle { 0%,100% { transform: rotate(0deg); } 25% { transform: rotate(-1.6deg); } 75% { transform: rotate(1.6deg); } }
   @keyframes glow { 0%,100% { box-shadow: 0 0 0 3px rgba(74,222,128,0.5), 0 0 16px rgba(74,222,128,0.25); } 50% { box-shadow: 0 0 0 4px rgba(74,222,128,0.9), 0 0 26px rgba(74,222,128,0.5); } }
   .pile-label { font-size: 0.75rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
   /* The knocker's melds laid out over the piles while the defender lays off (docs/design/

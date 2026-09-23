@@ -57,3 +57,11 @@ const precedes = (r: Rect, p: Point): boolean =>
  */
 export const dropIndex = (p: Point, cells: ReadonlyArray<Rect>, current: number): number =>
   cells.filter((r, i) => i !== current && precedes(r, p)).length;
+
+/**
+ * Where a dragged hand card may be released to leave the hand (§5d, §7b): one of the knocker's melds
+ * by index while a knock is answered, or the discard pile (the Discard button counts as the pile)
+ * in the discard phase. The dragger names the target under the pointer; the reducer decides
+ * whether the card may go there.
+ */
+export type DropTarget = number | 'discard';

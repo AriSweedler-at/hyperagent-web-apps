@@ -59,7 +59,7 @@ import { SORT_MODES, type SortMode } from '../sort.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { RULES_ITEMS } from './rules.ts';
-import { handoffLabel, SCREENS, type App, type Intent } from './state.ts';
+import { canDropDiscard, handoffLabel, SCREENS, type App, type Intent } from './state.ts';
 
 export type { PageLike };
 export type Dispatch = (intent: Intent) => void;
@@ -406,6 +406,25 @@ const paintHand = (doc: DocumentLike, app: App, v: View, handView: HandView): vo
   setDisabled(arrange, !arrangeable);
   toggleClass(arrange, 'due', arrangeable && !samePicture(picture, arranged));
   setHtml(requireId(doc, 'actions'), actionsHtml(v, app.selectedCard));
+  paintDropTargets(doc, app, v);
+};
+
+/**
+ * While a hand card that may be discarded is dragged (§5d), the discard pile and the Discard button
+ * say they take it: `drop-ready` lights them (the pile amber, the button's text wiggling), `drop`
+ * turns the one under the pointer green, where a release discards the card (dragger.ts).
+ */
+const paintDropTargets = (doc: DocumentLike, app: App, v: View): void => {
+  const d = app.drag;
+  const ready = d !== null && d.from === 'hand' && canDropDiscard(app, v, d.cardId);
+  const over = ready && d.onto === 'discard';
+  const pile = requireId(doc, 'discardPile');
+  toggleClass(pile, 'drop-ready', ready);
+  toggleClass(pile, 'drop', over);
+  const button = queryIn(requireId(doc, 'actions'), 'button[data-act="discard"]');
+  if (button === null) return;
+  toggleClass(button, 'drop-ready', ready);
+  toggleClass(button, 'drop', over);
 };
 
 const paintArrange = (doc: DocumentLike, app: App): void => {
