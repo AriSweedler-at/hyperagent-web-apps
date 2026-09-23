@@ -82,6 +82,7 @@ describe('the captured legacy payloads', () => {
       STORAGE_KEYS.p2Name,
       STORAGE_KEYS.sort,
       STORAGE_KEYS.cardBack,
+      STORAGE_KEYS.soundFont,
     ];
     const retired: ReadonlyArray<string> = ['ginRummy_scorerNames'];
     const legacyKeys = Object.values(STORAGE_KEYS).filter((k) => !ours.includes(k));

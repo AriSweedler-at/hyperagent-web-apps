@@ -17,6 +17,7 @@ import {
 } from '../../shared/edge/fx.ts';
 import { browserIceDeps, createIce } from '../../shared/edge/ice.ts';
 import { shareText, type ShareNavigatorLike } from '../../shared/edge/share.ts';
+import { createSampleCache } from '../../shared/edge/sound.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
 import { realTransport } from '../../shared/edge/transport.ts';
 import type { Timer } from '../../shared/lib/clock.ts';
@@ -30,7 +31,7 @@ import { HostSession, type HostEvents } from './src/net/host.ts';
 import type { NetDeps } from './src/net/peerjs.ts';
 import { isGuestFrame } from './src/protocol.ts';
 import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
-import { STORAGE_KEYS, soundEnabled } from './src/storage.ts';
+import { DEFAULT_SOUND_FONT, STORAGE_KEYS, soundEnabled } from './src/storage.ts';
 import { badCardBackMsg, isCardBack } from './src/cardBack.ts';
 import { formatMap, mapOf } from './src/sandbox.ts';
 import { slotHandView } from './src/ui/hand/SlotHandView.ts';
@@ -152,6 +153,15 @@ const boot = (): void => {
 
   const fx = createFx({
     audio,
+    // The sample seam (docs/design/sound-fonts.md §3): a document-relative URL, so both origins serve it.
+    sound: {
+      fetchBuffer: (url) =>
+        fetch(url).then((r) => {
+          if (!r.ok) throw new Error(`${String(r.status)} ${url}`);
+          return r.arrayBuffer();
+        }),
+      cache: createSampleCache(),
+    },
     vibrate: (pattern) => {
       vibrate(nav, pattern);
     },
@@ -246,7 +256,7 @@ const boot = (): void => {
     store,
     toast,
     fx: (cue) => {
-      fx.play(cue);
+      fx.play(cue, DEFAULT_SOUND_FONT);
     },
     wakeLock: (hold) => {
       if (hold) void wakeLock.hold();
@@ -296,7 +306,7 @@ const boot = (): void => {
       cancel: cancelTimer,
     },
     toggleSound: () => {
-      fx.toggle();
+      fx.toggle(DEFAULT_SOUND_FONT);
     },
     share: (code) => {
       // The legacy handler's chain: the share sheet (a phone's OS menu), else the clipboard with a
@@ -343,7 +353,7 @@ const boot = (): void => {
     now,
     rng,
     fx: (cue) => {
-      fx.play(cue);
+      fx.play(cue, DEFAULT_SOUND_FONT);
     },
     toast: (message) => {
       toast(message, null);
