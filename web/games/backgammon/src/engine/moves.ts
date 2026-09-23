@@ -186,33 +186,46 @@ const survivors = ({ firsts, levels }: Explored): ReadonlyArray<Move> => {
   return firsts.filter((_, i) => (mask & (1 << i)) !== 0);
 };
 
+/** The most dice any order can play from here, and the first moves that keep that reachable. */
+type Analysis = Readonly<{ best: number; firsts: ReadonlyArray<Move> }>;
+
 /**
- * R12/R13: the first moves of every maximal play for the multiset `remaining`, sorted by
- * `moveKey`. `best` is the most dice any order can play; only orders reaching it contribute; when
+ * R12/R13: `best` is the most dice any order can play; only orders reaching it contribute; when
  * best is 1 with two different dice and either could be played alone, only the higher die's
  * moves are kept (R12); a first move stays only if the rest of its order is fully playable after
  * it, so a low die that would leave the high die dead is never offered.
  */
-export const legalFirstMoves = (
+const analyse = (
   board: Board,
   seat: Seat,
   remaining: ReadonlyArray<Die>,
   rules: VariantRules,
-): ReadonlyArray<Move> => {
+): Analysis => {
   const [first, second] = remaining;
-  if (first === undefined) return [];
+  if (first === undefined) return { best: 0, firsts: [] };
   // One die left (half of all calls): its single steps are the maximal plays.
-  if (second === undefined) return sortMoves(singleSteps(board, seat, first, rules));
+  if (second === undefined) {
+    const steps = sortMoves(singleSteps(board, seat, first, rules));
+    return { best: steps.length === 0 ? 0 : 1, firsts: steps };
+  }
   const explored = orders(remaining).map((order) => explore(board, seat, order, rules));
   const best = Math.max(...explored.map((e) => e.levels.length - 1));
-  if (best === 0) return [];
+  if (best === 0) return { best, firsts: [] };
   const full = explored.filter((e) => e.levels.length - 1 === best);
   const kept =
     best === 1 && full.length === 2
       ? full.filter((e) => e.order[0] === Math.max(...remaining))
       : full;
-  return sortMoves(kept.flatMap(survivors));
+  return { best, firsts: sortMoves(kept.flatMap(survivors)) };
 };
+
+/** The first moves of every maximal play for the multiset `remaining`, sorted by `moveKey`. */
+export const legalFirstMoves = (
+  board: Board,
+  seat: Seat,
+  remaining: ReadonlyArray<Die>,
+  rules: VariantRules,
+): ReadonlyArray<Move> => analyse(board, seat, remaining, rules).firsts;
 
 /** What the UI is offered (R13): the distinct next moves of the maximal plays consistent with `played`. */
 export const legalMoves = (state: State): ReadonlyArray<Move> =>
@@ -220,22 +233,53 @@ export const legalMoves = (state: State): ReadonlyArray<Move> =>
     ? legalFirstMoves(state.board, state.turn, remainingDice(state), rulesOf(state.variant))
     : [];
 
-/** Every maximal play as a sequence (tests and history); by heredity exactly R12/R13's set. */
+const distinctDice = (dice: ReadonlyArray<Die>): ReadonlyArray<Die> =>
+  dice.filter((d, i) => dice.indexOf(d) === i);
+
+/** Every legal sequence of exactly `depth` more single steps from `board` with `dice`. */
+const sequences = (
+  board: Board,
+  seat: Seat,
+  dice: ReadonlyArray<Die>,
+  depth: number,
+  rules: VariantRules,
+): ReadonlyArray<Play> =>
+  depth === 0
+    ? [[]]
+    : distinctDice(dice).flatMap((die) =>
+        singleSteps(board, seat, die, rules).flatMap((m) =>
+          sequences(
+            afterMove(board, seat, m, rules),
+            seat,
+            removeOne(dice, die),
+            depth - 1,
+            rules,
+          ).map((tail): Play => [m, ...tail]),
+        ),
+      );
+
+/**
+ * Every maximal play as a sequence (tests, history, `View.plays`): a legal first move followed by
+ * any legal sequence of `best - 1` more steps, since every play of the maximum length is maximal
+ * and the higher-die rule only ever decides the root. Cheaper than recursing on the level sets.
+ */
 export const maximalPlays = (
   board: Board,
   seat: Seat,
   remaining: ReadonlyArray<Die>,
   rules: VariantRules,
-): ReadonlyArray<ReadonlyArray<Move>> =>
-  legalFirstMoves(board, seat, remaining, rules).flatMap((m) => {
-    const tails = maximalPlays(
+): ReadonlyArray<Play> => {
+  const { best, firsts } = analyse(board, seat, remaining, rules);
+  return firsts.flatMap((m) =>
+    sequences(
       afterMove(board, seat, m, rules),
       seat,
       removeOne(remaining, m.die),
+      best - 1,
       rules,
-    );
-    return tails.length === 0 ? [[m]] : tails.map((t) => [m, ...t]);
-  });
+    ).map((tail): Play => [m, ...tail]),
+  );
+};
 
 const distinctBoards = (boards: ReadonlyArray<Board>): ReadonlyArray<Board> => [
   ...new Map(boards.map((b) => [boardKey(b), b] as const)).values(),
