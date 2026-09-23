@@ -2,7 +2,7 @@
   "name": "hyperagent-web-apps",
   "private": true,
   "type": "module",
-  "description": "Ari's browser games (Gin Rummy, Fidice) with their Cloudflare Workers, served by GitHub Pages",
+  "description": "Ari's browser games (Gin Rummy, Fidice, Sheshbesh backgammon) with their Cloudflare Workers, served by GitHub Pages",
   "scripts": {
     "build": "vite build",
     "preview": "npm run build && npm run serve",

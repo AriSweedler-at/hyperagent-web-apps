@@ -1,0 +1,1711 @@
+[
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 1,
+        "id": "guest",
+        "name": "Jeff"
+      },
+      "opp": {
+        "idx": 0,
+        "id": "host",
+        "name": "Ann"
+      },
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann"
+        },
+        {
+          "id": "guest",
+          "name": "Jeff"
+        }
+      ],
+      "options": {
+        "matchLength": 5,
+        "rotation": ["portes"],
+        "jacoby": false,
+        "beavers": false,
+        "automaticDoubles": false
+      },
+      "variant": "portes",
+      "gameNo": 1,
+      "phase": "toRoll",
+      "turn": 1,
+      "actor": 1,
+      "isMyTurn": true,
+      "board": {
+        "points": [
+          [1, 1],
+          [],
+          [],
+          [],
+          [],
+          [0, 0, 0, 0, 0],
+          [],
+          [0, 0, 0],
+          [],
+          [],
+          [],
+          [1, 1, 1, 1, 1],
+          [0, 0, 0, 0, 0],
+          [],
+          [],
+          [],
+          [1, 1, 1],
+          [],
+          [1, 1, 1, 1, 1],
+          [],
+          [],
+          [],
+          [],
+          [0, 0]
+        ],
+        "bar": [0, 0],
+        "off": [0, 0]
+      },
+      "opening": [2, 4],
+      "dice": null,
+      "movesLeft": [],
+      "played": [],
+      "lastPlay": [],
+      "legal": [],
+      "plays": [],
+      "playsTotal": 0,
+      "canUndo": false,
+      "canDouble": false,
+      "canBearOff": [false, false],
+      "pips": [167, 167],
+      "cube": {
+        "value": 1,
+        "owner": null
+      },
+      "match": {
+        "length": 5,
+        "score": [0, 0],
+        "crawfordDone": false,
+        "isCrawfordGame": false
+      },
+      "matchOver": false,
+      "result": null,
+      "games": [],
+      "log": [
+        {
+          "seat": null,
+          "kind": "opening",
+          "text": "Both rolled 5 — again",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "opening",
+          "text": "Ann rolled 2, Jeff rolled 4 — Jeff starts",
+          "at": 1700000000000
+        }
+      ],
+      "lastAction": {
+        "seat": 1,
+        "kind": "opening",
+        "text": "Ann rolled 2, Jeff rolled 4 — Jeff starts",
+        "at": 1700000000000
+      },
+      "startedAt": 1700000000000,
+      "endedAt": null
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 1,
+        "id": "guest",
+        "name": "Jeff"
+      },
+      "opp": {
+        "idx": 0,
+        "id": "host",
+        "name": "Ann"
+      },
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann"
+        },
+        {
+          "id": "guest",
+          "name": "Jeff"
+        }
+      ],
+      "options": {
+        "matchLength": 5,
+        "rotation": ["portes"],
+        "jacoby": false,
+        "beavers": false,
+        "automaticDoubles": false
+      },
+      "variant": "portes",
+      "gameNo": 1,
+      "phase": "moving",
+      "turn": 1,
+      "actor": 1,
+      "isMyTurn": true,
+      "board": {
+        "points": [
+          [1, 1],
+          [],
+          [],
+          [],
+          [],
+          [0, 0, 0, 0, 0],
+          [],
+          [0, 0, 0],
+          [],
+          [],
+          [],
+          [1, 1, 1, 1, 1],
+          [0, 0, 0, 0, 0],
+          [],
+          [],
+          [],
+          [1, 1, 1],
+          [],
+          [1, 1, 1, 1, 1],
+          [],
+          [],
+          [],
+          [],
+          [0, 0]
+        ],
+        "bar": [0, 0],
+        "off": [0, 0]
+      },
+      "opening": [2, 4],
+      "dice": [3, 2],
+      "movesLeft": [3, 2],
+      "played": [],
+      "lastPlay": [],
+      "legal": [
+        {
+          "from": 0,
+          "to": 2,
+          "die": 2
+        },
+        {
+          "from": 0,
+          "to": 3,
+          "die": 3
+        },
+        {
+          "from": 11,
+          "to": 13,
+          "die": 2
+        },
+        {
+          "from": 11,
+          "to": 14,
+          "die": 3
+        },
+        {
+          "from": 16,
+          "to": 18,
+          "die": 2
+        },
+        {
+          "from": 16,
+          "to": 19,
+          "die": 3
+        },
+        {
+          "from": 18,
+          "to": 20,
+          "die": 2
+        },
+        {
+          "from": 18,
+          "to": 21,
+          "die": 3
+        }
+      ],
+      "plays": [
+        [
+          {
+            "from": 0,
+            "to": 2,
+            "die": 2
+          },
+          {
+            "from": 0,
+            "to": 3,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 0,
+            "to": 2,
+            "die": 2
+          },
+          {
+            "from": 11,
+            "to": 14,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 0,
+            "to": 2,
+            "die": 2
+          },
+          {
+            "from": 16,
+            "to": 19,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 0,
+            "to": 2,
+            "die": 2
+          },
+          {
+            "from": 18,
+            "to": 21,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 0,
+            "to": 3,
+            "die": 3
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 0,
+            "to": 3,
+            "die": 3
+          },
+          {
+            "from": 11,
+            "to": 13,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 0,
+            "to": 3,
+            "die": 3
+          },
+          {
+            "from": 16,
+            "to": 18,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 0,
+            "to": 3,
+            "die": 3
+          },
+          {
+            "from": 18,
+            "to": 20,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 11,
+            "to": 13,
+            "die": 2
+          },
+          {
+            "from": 0,
+            "to": 3,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 11,
+            "to": 13,
+            "die": 2
+          },
+          {
+            "from": 11,
+            "to": 14,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 11,
+            "to": 13,
+            "die": 2
+          },
+          {
+            "from": 13,
+            "to": 16,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 11,
+            "to": 13,
+            "die": 2
+          },
+          {
+            "from": 16,
+            "to": 19,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 11,
+            "to": 13,
+            "die": 2
+          },
+          {
+            "from": 18,
+            "to": 21,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 11,
+            "to": 14,
+            "die": 3
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 11,
+            "to": 14,
+            "die": 3
+          },
+          {
+            "from": 11,
+            "to": 13,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 11,
+            "to": 14,
+            "die": 3
+          },
+          {
+            "from": 14,
+            "to": 16,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 11,
+            "to": 14,
+            "die": 3
+          },
+          {
+            "from": 16,
+            "to": 18,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 11,
+            "to": 14,
+            "die": 3
+          },
+          {
+            "from": 18,
+            "to": 20,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 16,
+            "to": 18,
+            "die": 2
+          },
+          {
+            "from": 0,
+            "to": 3,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 16,
+            "to": 18,
+            "die": 2
+          },
+          {
+            "from": 11,
+            "to": 14,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 16,
+            "to": 18,
+            "die": 2
+          },
+          {
+            "from": 16,
+            "to": 19,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 16,
+            "to": 18,
+            "die": 2
+          },
+          {
+            "from": 18,
+            "to": 21,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 16,
+            "to": 19,
+            "die": 3
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 16,
+            "to": 19,
+            "die": 3
+          },
+          {
+            "from": 11,
+            "to": 13,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 16,
+            "to": 19,
+            "die": 3
+          },
+          {
+            "from": 16,
+            "to": 18,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 16,
+            "to": 19,
+            "die": 3
+          },
+          {
+            "from": 18,
+            "to": 20,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 16,
+            "to": 19,
+            "die": 3
+          },
+          {
+            "from": 19,
+            "to": 21,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 18,
+            "to": 20,
+            "die": 2
+          },
+          {
+            "from": 0,
+            "to": 3,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 18,
+            "to": 20,
+            "die": 2
+          },
+          {
+            "from": 11,
+            "to": 14,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 18,
+            "to": 20,
+            "die": 2
+          },
+          {
+            "from": 16,
+            "to": 19,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 18,
+            "to": 20,
+            "die": 2
+          },
+          {
+            "from": 18,
+            "to": 21,
+            "die": 3
+          }
+        ],
+        [
+          {
+            "from": 18,
+            "to": 21,
+            "die": 3
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 18,
+            "to": 21,
+            "die": 3
+          },
+          {
+            "from": 11,
+            "to": 13,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 18,
+            "to": 21,
+            "die": 3
+          },
+          {
+            "from": 16,
+            "to": 18,
+            "die": 2
+          }
+        ],
+        [
+          {
+            "from": 18,
+            "to": 21,
+            "die": 3
+          },
+          {
+            "from": 18,
+            "to": 20,
+            "die": 2
+          }
+        ]
+      ],
+      "playsTotal": 35,
+      "canUndo": false,
+      "canDouble": false,
+      "canBearOff": [false, false],
+      "pips": [167, 167],
+      "cube": {
+        "value": 1,
+        "owner": null
+      },
+      "match": {
+        "length": 5,
+        "score": [0, 0],
+        "crawfordDone": false,
+        "isCrawfordGame": false
+      },
+      "matchOver": false,
+      "result": null,
+      "games": [],
+      "log": [
+        {
+          "seat": null,
+          "kind": "opening",
+          "text": "Both rolled 5 — again",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "opening",
+          "text": "Ann rolled 2, Jeff rolled 4 — Jeff starts",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 3-2",
+          "at": 1700000000000
+        }
+      ],
+      "lastAction": {
+        "seat": 1,
+        "kind": "roll",
+        "text": "Jeff rolled 3-2",
+        "at": 1700000000000
+      },
+      "startedAt": 1700000000000,
+      "endedAt": null
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 1,
+        "id": "guest",
+        "name": "Jeff"
+      },
+      "opp": {
+        "idx": 0,
+        "id": "host",
+        "name": "Ann"
+      },
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann"
+        },
+        {
+          "id": "guest",
+          "name": "Jeff"
+        }
+      ],
+      "options": {
+        "matchLength": 3,
+        "rotation": ["backgammon"],
+        "jacoby": false,
+        "beavers": false,
+        "automaticDoubles": false
+      },
+      "variant": "backgammon",
+      "gameNo": 1,
+      "phase": "moving",
+      "turn": 0,
+      "actor": 0,
+      "isMyTurn": false,
+      "board": {
+        "points": [
+          [1, 1],
+          [],
+          [],
+          [],
+          [],
+          [0, 0, 0, 0, 0],
+          [],
+          [0, 0, 0],
+          [],
+          [],
+          [],
+          [1, 1, 1, 1, 1],
+          [0, 0, 0, 0, 0],
+          [],
+          [],
+          [],
+          [1, 1, 1],
+          [],
+          [1, 1, 1, 1, 1],
+          [],
+          [],
+          [],
+          [],
+          [0, 0]
+        ],
+        "bar": [0, 0],
+        "off": [0, 0]
+      },
+      "opening": [6, 4],
+      "dice": [6, 4],
+      "movesLeft": [6, 4],
+      "played": [],
+      "lastPlay": [],
+      "legal": [],
+      "plays": [],
+      "playsTotal": 0,
+      "canUndo": false,
+      "canDouble": false,
+      "canBearOff": [false, false],
+      "pips": [167, 167],
+      "cube": {
+        "value": 1,
+        "owner": null
+      },
+      "match": {
+        "length": 3,
+        "score": [0, 0],
+        "crawfordDone": false,
+        "isCrawfordGame": false
+      },
+      "matchOver": false,
+      "result": null,
+      "games": [],
+      "log": [
+        {
+          "seat": null,
+          "kind": "opening",
+          "text": "Both rolled 4 — again",
+          "at": 1700000000000
+        },
+        {
+          "seat": null,
+          "kind": "opening",
+          "text": "Both rolled 4 — again",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "opening",
+          "text": "Ann rolled 6, Jeff rolled 4 — Ann plays 6-4",
+          "at": 1700000000000
+        }
+      ],
+      "lastAction": {
+        "seat": 0,
+        "kind": "opening",
+        "text": "Ann rolled 6, Jeff rolled 4 — Ann plays 6-4",
+        "at": 1700000000000
+      },
+      "startedAt": 1700000000000,
+      "endedAt": null
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 1,
+        "id": "guest",
+        "name": "Jeff"
+      },
+      "opp": {
+        "idx": 0,
+        "id": "host",
+        "name": "Ann"
+      },
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann"
+        },
+        {
+          "id": "guest",
+          "name": "Jeff"
+        }
+      ],
+      "options": {
+        "matchLength": 3,
+        "rotation": ["backgammon"],
+        "jacoby": false,
+        "beavers": false,
+        "automaticDoubles": false
+      },
+      "variant": "backgammon",
+      "gameNo": 1,
+      "phase": "cubeOffered",
+      "turn": 1,
+      "actor": 0,
+      "isMyTurn": false,
+      "board": {
+        "points": [
+          [1, 1],
+          [0, 0],
+          [],
+          [],
+          [],
+          [0, 0, 0, 0],
+          [],
+          [0, 0],
+          [],
+          [],
+          [],
+          [1, 1, 1, 1, 1],
+          [0, 0, 0, 0, 0],
+          [],
+          [],
+          [],
+          [1, 1, 1],
+          [],
+          [1, 1, 1, 1, 1],
+          [],
+          [],
+          [],
+          [],
+          [0, 0]
+        ],
+        "bar": [0, 0],
+        "off": [0, 0]
+      },
+      "opening": [6, 4],
+      "dice": [6, 4],
+      "movesLeft": [],
+      "played": [],
+      "lastPlay": [
+        {
+          "from": 5,
+          "to": 1,
+          "die": 4,
+          "hit": false
+        },
+        {
+          "from": 7,
+          "to": 1,
+          "die": 6,
+          "hit": false
+        }
+      ],
+      "legal": [],
+      "plays": [],
+      "playsTotal": 0,
+      "canUndo": false,
+      "canDouble": false,
+      "canBearOff": [false, false],
+      "pips": [157, 167],
+      "cube": {
+        "value": 1,
+        "owner": null
+      },
+      "match": {
+        "length": 3,
+        "score": [0, 0],
+        "crawfordDone": false,
+        "isCrawfordGame": false
+      },
+      "matchOver": false,
+      "result": null,
+      "games": [],
+      "log": [
+        {
+          "seat": null,
+          "kind": "opening",
+          "text": "Both rolled 4 — again",
+          "at": 1700000000000
+        },
+        {
+          "seat": null,
+          "kind": "opening",
+          "text": "Both rolled 4 — again",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "opening",
+          "text": "Ann rolled 6, Jeff rolled 4 — Ann plays 6-4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 6/2 8/2",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "double",
+          "text": "Jeff doubles to 2",
+          "at": 1700000000000
+        }
+      ],
+      "lastAction": {
+        "seat": 1,
+        "kind": "double",
+        "text": "Jeff doubles to 2",
+        "at": 1700000000000
+      },
+      "startedAt": 1700000000000,
+      "endedAt": null
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 1,
+        "id": "guest",
+        "name": "Jeff"
+      },
+      "opp": {
+        "idx": 0,
+        "id": "host",
+        "name": "Ann"
+      },
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann"
+        },
+        {
+          "id": "guest",
+          "name": "Jeff"
+        }
+      ],
+      "options": {
+        "matchLength": 1,
+        "rotation": ["portes"],
+        "jacoby": false,
+        "beavers": false,
+        "automaticDoubles": false
+      },
+      "variant": "portes",
+      "gameNo": 1,
+      "phase": "over",
+      "turn": 1,
+      "actor": null,
+      "isMyTurn": false,
+      "board": {
+        "points": [
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [0],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [0, 0]
+        ],
+        "bar": [0, 0],
+        "off": [0, 15]
+      },
+      "opening": [6, 5],
+      "dice": [4, 4],
+      "movesLeft": [],
+      "played": [],
+      "lastPlay": [
+        {
+          "from": 22,
+          "to": "off",
+          "die": 4,
+          "hit": false
+        }
+      ],
+      "legal": [],
+      "plays": [],
+      "playsTotal": 0,
+      "canUndo": false,
+      "canDouble": false,
+      "canBearOff": [false, true],
+      "pips": [75, 0],
+      "cube": {
+        "value": 1,
+        "owner": null
+      },
+      "match": {
+        "length": 1,
+        "score": [0, 2],
+        "crawfordDone": false,
+        "isCrawfordGame": false
+      },
+      "matchOver": true,
+      "result": {
+        "winner": 1,
+        "multiplier": 2,
+        "cube": 1,
+        "points": 2,
+        "reason": "borneOff"
+      },
+      "games": [
+        {
+          "gameNo": 1,
+          "variant": "portes",
+          "winner": 1,
+          "multiplier": 2,
+          "points": 2,
+          "reason": "borneOff",
+          "endedAt": 1700000000000
+        }
+      ],
+      "log": [
+        {
+          "seat": null,
+          "kind": "opening",
+          "text": "Both rolled 1 — again",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "opening",
+          "text": "Ann rolled 6, Jeff rolled 5 — Ann starts",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 5-2",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 6/4 8/3",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 2-3",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 24/22* 24/21*",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "hit",
+          "text": "Jeff hit Ann on the 22-point",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "hit",
+          "text": "Jeff hit Ann on the 21-point",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "noMove",
+          "text": "Ann rolled 6-6 and cannot move",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 1-5",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 22/21 21/16",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 4-6",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved bar/21",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 6-6",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 21/15 16/10 15/9 13/7",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 2-1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved bar/23 6/5",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 2-5",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 13/11 13/8",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 1-4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 5/1 6/5",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 2-3",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 13/11 13/10",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 5-1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 5/4 6/1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 5-2",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 11/9 11/6",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 6-1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 4/3 8/2",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 2-4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 10/8 10/6",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 6-1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 2/1 8/2",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 6-3",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 9/6 9/3",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 6-2",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 3/1 13/7",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 5-3",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 8/5 8/3",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 3-4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 6/2 7/4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 1-1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 8/7(3) 7/6",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 6-3",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 4/1 13/7",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 5-6",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 7/2*",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "hit",
+          "text": "Jeff hit Ann on the 2-point",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 3-4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved bar/21 7/4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 4-4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 7/3(2) 6/2(2)",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 3-5",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 4/1 13/8",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 6-5",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 6/off 5/off",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "bearOff",
+          "text": "Jeff bore off 2",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 6-2",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 8/2 13/11",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 2-5",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 2/off",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "bearOff",
+          "text": "Jeff bore off 1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 1-5",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 2/1 11/6",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 6-4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 6/2 6/off",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "bearOff",
+          "text": "Jeff bore off 1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 3-1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 2/1 6/3",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 3-6",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 6/3 6/off",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "bearOff",
+          "text": "Jeff bore off 1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 1-4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 2/1 13/9",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 6-3",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 6/3 6/off",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "bearOff",
+          "text": "Jeff bore off 1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 2-1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 3/1 9/8",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 2-4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 3/off 2/off",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "bearOff",
+          "text": "Jeff bore off 2",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 5-3",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 8/3 21/18",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 6-5",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 3/off(2)",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "bearOff",
+          "text": "Jeff bore off 2",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 2-5",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 3/1 18/13",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 3-4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 3/off(2)",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "bearOff",
+          "text": "Jeff bore off 2",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 6-1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 13/7 7/6",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 2-3",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 3/off 2/off",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "bearOff",
+          "text": "Jeff bore off 2",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "roll",
+          "text": "Ann rolled 5-6",
+          "at": 1700000000000
+        },
+        {
+          "seat": 0,
+          "kind": "move",
+          "text": "Ann moved 6/1 21/15",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "roll",
+          "text": "Jeff rolled 4-4",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "move",
+          "text": "Jeff moved 2/off",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "bearOff",
+          "text": "Jeff bore off 1",
+          "at": 1700000000000
+        },
+        {
+          "seat": 1,
+          "kind": "result",
+          "text": "Jeff wins a gammon (2 points) and takes the match 2–0",
+          "at": 1700000000000
+        }
+      ],
+      "lastAction": {
+        "seat": 1,
+        "kind": "result",
+        "text": "Jeff wins a gammon (2 points) and takes the match 2–0",
+        "at": 1700000000000
+      },
+      "startedAt": 1700000000000,
+      "endedAt": 1700000000000
+    }
+  }
+]

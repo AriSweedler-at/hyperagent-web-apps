@@ -332,47 +332,73 @@ const playMatch = (
 const seeds = (from: number, count: number): ReadonlyArray<number> =>
   Array.from({ length: count }, (_, i) => from + i);
 
+/**
+ * How many matches the three suites play together: 91 by default (60 + 25 + 6; every push and PR,
+ * about eight seconds), `BG_REPLAY_GAMES=1000` in .github/workflows/nightly.yml beside gin's
+ * `GIN_REPLAY_GAMES`, lower for a quick local run. Each suite keeps its share of the total, and the
+ * outcome-coverage assertions expect at least the default. Read off `globalThis`: this file is
+ * compiled by tsconfig.web.json (no node types) while vitest runs it in node.
+ */
+const env = (globalThis as { process?: { env?: Readonly<Record<string, string | undefined>> } })
+  .process?.env;
+const DEFAULT_MATCHES = 91;
+const SCALE = Number(env?.['BG_REPLAY_GAMES'] ?? DEFAULT_MATCHES) / DEFAULT_MATCHES;
+const share = (base: number): number => Math.max(1, Math.round(base * SCALE));
+const TIMEOUT_MS = Math.ceil(120_000 * Math.max(1, SCALE));
+
 describe('seeded random play to the end (R33)', () => {
-  test('portes: single games, every invariant every step', () => {
-    const cov = new Set<string>();
-    const steps = seeds(1, 60).map((seed) => playMatch(seed, ['portes'], 1, cov));
-    expect(steps.reduce((a, b) => a + b, 0)).toBeGreaterThan(60 * 60);
-    ['single', 'gammon', 'noMove', 'hit', 'barHit', 'higherDie', 'bigDieOff', 'undo'].forEach(
-      (c) => {
+  test(
+    'portes: single games, every invariant every step',
+    () => {
+      const cov = new Set<string>();
+      const steps = seeds(1, share(60)).map((seed) => playMatch(seed, ['portes'], 1, cov));
+      expect(steps.reduce((a, b) => a + b, 0)).toBeGreaterThan(share(60) * 60);
+      ['single', 'gammon', 'noMove', 'hit', 'barHit', 'higherDie', 'bigDieOff', 'undo'].forEach(
+        (c) => {
+          expect(cov.has(c), c).toBe(true);
+        },
+      );
+      expect(cov.has('backgammon')).toBe(false);
+      expect(cov.has('take')).toBe(false);
+    },
+    TIMEOUT_MS,
+  );
+
+  test(
+    'backgammon: matches to 3 with the cube',
+    () => {
+      const cov = new Set<string>();
+      const steps = seeds(1001, share(25)).map((seed) => playMatch(seed, ['backgammon'], 3, cov));
+      expect(steps.reduce((a, b) => a + b, 0)).toBeGreaterThan(share(25) * 100);
+      [
+        'single',
+        'gammon',
+        'backgammon',
+        'noMove',
+        'hit',
+        'barHit',
+        'higherDie',
+        'bigDieOff',
+        'undo',
+        'take',
+        'pass',
+        'crawford',
+      ].forEach((c) => {
         expect(cov.has(c), c).toBe(true);
-      },
-    );
-    expect(cov.has('backgammon')).toBe(false);
-    expect(cov.has('take')).toBe(false);
-  }, 120_000);
+      });
+    },
+    TIMEOUT_MS,
+  );
 
-  test('backgammon: matches to 3 with the cube', () => {
-    const cov = new Set<string>();
-    const steps = seeds(1001, 25).map((seed) => playMatch(seed, ['backgammon'], 3, cov));
-    expect(steps.reduce((a, b) => a + b, 0)).toBeGreaterThan(25 * 100);
-    [
-      'single',
-      'gammon',
-      'backgammon',
-      'noMove',
-      'hit',
-      'barHit',
-      'higherDie',
-      'bigDieOff',
-      'undo',
-      'take',
-      'pass',
-      'crawford',
-    ].forEach((c) => {
-      expect(cov.has(c), c).toBe(true);
-    });
-  }, 120_000);
-
-  test('a rotation of portes and backgammon, matches to 3', () => {
-    const cov = new Set<string>();
-    seeds(5001, 6).forEach((seed) => playMatch(seed, ['portes', 'backgammon'], 3, cov));
-    ['single', 'gammon', 'crawford'].forEach((c) => {
-      expect(cov.has(c), c).toBe(true);
-    });
-  }, 120_000);
+  test(
+    'a rotation of portes and backgammon, matches to 3',
+    () => {
+      const cov = new Set<string>();
+      seeds(5001, share(6)).forEach((seed) => playMatch(seed, ['portes', 'backgammon'], 3, cov));
+      ['single', 'gammon', 'crawford'].forEach((c) => {
+        expect(cov.has(c), c).toBe(true);
+      });
+    },
+    TIMEOUT_MS,
+  );
 });

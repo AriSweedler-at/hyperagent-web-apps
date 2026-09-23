@@ -18,9 +18,13 @@ import {
   sanitiseCode,
   validateCode,
   type Game,
+  BACKGAMMON_CODE_ALPHABET,
+  BACKGAMMON_CODE_LENGTH,
+  BACKGAMMON_CODE_LENGTH_ERROR,
+  BACKGAMMON_PEER_PREFIX,
 } from './roomCode.ts';
 
-const GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice'];
+const GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice', 'backgammon'];
 
 describe('frozen literals (byte for byte what the legacy pages hold)', () => {
   test('gin', () => {
@@ -49,6 +53,24 @@ describe('frozen literals (byte for byte what the legacy pages hold)', () => {
       peerCase: 'lower',
       lengthError: 'Codes are 5 characters',
     });
+  });
+
+  test("backgammon: gin's alphabet and length under its own broker prefix", () => {
+    expect(BACKGAMMON_PEER_PREFIX).toBe('sheshbesh-');
+    expect(BACKGAMMON_CODE_ALPHABET).toBe('ABCDEFGHJKLMNPQRSTUVWXYZ');
+    expect(BACKGAMMON_CODE_LENGTH).toBe(4);
+    expect(BACKGAMMON_CODE_LENGTH_ERROR).toBe('Enter the 4-letter room code.');
+    expect(ROOM_CODE.backgammon).toEqual({
+      alphabet: 'ABCDEFGHJKLMNPQRSTUVWXYZ',
+      length: 4,
+      peerPrefix: 'sheshbesh-',
+      peerCase: 'upper',
+      lengthError: 'Enter the 4-letter room code.',
+    });
+    expect(sanitiseCode('backgammon', 'ab1c-d io')).toBe('ABCD');
+    expect(validateCode('backgammon', 'abcd')).toEqual(ok('ABCD'));
+    expect(validateCode('backgammon', 'abc')).toEqual(err('Enter the 4-letter room code.'));
+    expect(peerIdFor('backgammon', 'KQZM')).toBe('sheshbesh-KQZM');
   });
 
   test('the alphabets leave out the look-alikes and have no repeats', () => {

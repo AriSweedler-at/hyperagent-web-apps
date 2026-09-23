@@ -29,6 +29,12 @@ type Driver = Readonly<{
 const DRIVERS: Readonly<Record<OnlineGame, Driver>> = {
   'gin-rummy': { hostRoom: ginHostRoom, readRoomCode: ginRoomCode, joinByCode: ginJoin },
   fidice: { hostRoom: fidiceHostLobby, readRoomCode: fidiceLobbyCode, joinByCode: fidiceJoin },
+  // Online play arrives with the backgammon online PR (PR-D); until then a spec that names it fails loudly.
+  backgammon: {
+    hostRoom: () => Promise.reject(new Error('backgammon online is not wired yet (PR-D)')),
+    readRoomCode: () => Promise.reject(new Error('backgammon online is not wired yet (PR-D)')),
+    joinByCode: () => Promise.reject(new Error('backgammon online is not wired yet (PR-D)')),
+  },
 };
 
 type Fixtures = { project: Project; player: Player; players: Players };

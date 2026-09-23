@@ -53,12 +53,19 @@ and tests that prove it land before the code they protect.
 │       │   └── src/             engine/ (types, cards, melds, melds.algorithms, layoff, game, view, index),
 │       │                        protocol.ts, storage.ts, net/{host,guest}.ts, ui/{state,render,cards,cues,fit,
 │       │                        local,home,rules}.ts, ui/hand/{HandView,meldGroups}.ts, scorer/{scores,voice,csv,format,main}.ts
-│       └── fidice/              index.html, main.ts, theme.css, src/ = the 38 modules at their // src/<path>.ts
-│                                marker paths (assets, domain (+probability.algorithms), bots, net, view, app)
+│       ├── fidice/              index.html, main.ts, theme.css, src/ = the 38 modules at their // src/<path>.ts
+│       │                        marker paths (assets, domain (+probability.algorithms), bots, net, view, app)
+│       └── backgammon/          Sheshbesh (docs/design/backgammon-{rules,board}.md): index.html (static screens,
+│           └── src/             24 points in one grid), main.ts, theme.css (formatted; redeclares the eleven tokens),
+│                                engine/ (types, variants, board, moves, notation, setup, score, apply, view, decode,
+│                                index; the seeded replay beside it), protocol.ts, storage.ts, fx.ts,
+│                                net/{peerjs,host,guest}.ts (gin's sessions, three edits), ui/{state,render,board,
+│                                home,local,rules,sound,page.fake}.ts, ui/board/{layout,fly,dragger}.ts
 ├── legacy/                      MIGRATION ONLY: verbatim pages + shared/ice.js, copied into dist by the plugin
-├── test/                        fixtures/legacy (sha256-pinned .cjs cores), goldens/ (JSON files < 100 KB each),
-│                                parity/ (describe.each([legacy, current])), dist/ (asset-urls, check-dist-paths,
-│                                class-contract)
+├── test/                        fixtures/legacy (sha256-pinned .cjs cores), fixtures/backgammon-wire (self-recorded
+│                                frames), fixtures/styles (computed-style goldens), parity/ (describe.each([legacy,
+│                                current])), dist/ (asset-urls, check-dist-paths, dist-parity, class-contract,
+│                                backgammon-grid)
 ├── e2e/                         Playwright specs + fixtures/two-players.ts
 ├── tools/                       serve-dist, proxy-dev, replay-goldens, legacy/{extract,debundle,record}-*
 └── infra/                       games-proxy/ (worker.ts: mapPath exported, UPSTREAM from env), turn-worker/ (plain JS, unchanged)
@@ -81,7 +88,7 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 | `web/shared/lib/sound/` | itself | The sound fonts (docs/design/sound-fonts.md): `cues.ts` the twenty generic cues every game maps its events onto; `sound.ts` `Sound` (`synth`, `sample`, `silence`), `Note`, `OscillatorType`; `fonts.ts` `SOUND_FONTS`, `fontByName`, `resolveSound` (partial fonts fall back to the total `default`), `isSoundFont`, `badSoundFontMsg(key, value)`; `fonts/<name>.ts` the fonts as data. |
 | `web/shared/edge/sound.ts` | shared/lib, `@shared/edge/fx` | `playSound(audio, sound, deps)`: a synth through `AudioCues.seq`, a sample fetched and decoded once per URL into the cues' context, silence nothing; every failure silent. A game's `fx.ts` plays its table's cue in the App's font through it. |
 | `web/shared/edge/peer.ts` | shared/lib, `@shared/edge/transport` | The peer plumbing every game's sessions share: `NetDeps`, `whenTransportReady`, `peerWatchdog`, `keepPeerAlive`, `announcePath`, `describePeerError`, the legacy timings and strings. Each game's `net/peerjs.ts` re-exports it (gin) or takes its types (fidice). |
-| `engine` / `domain` / `bots` | shared/lib, siblings | Pure. `applyAction(state, seat, action, rng): Result<State, RuleError>` (gin), `apply(s, actor, action, rng): Result` (fidice). Return new state; never mutate. `viewFor` / `redactFor` are the only redaction. |
+| `engine` / `domain` / `bots` | shared/lib, siblings | Pure. `applyAction(state, seat, action, rng): Result<State, RuleError>` (gin), `apply(s, actor, action, rng): Result` (fidice), `applyAction(state, seat, action, rng, now): Result<State, string>` (backgammon, with `createGame`/`nextGame` taking the same injected `rng` and `now`). Return new state; never mutate. `viewFor` / `redactFor` are the only redaction (backgammon hides nothing: its `View` adds the per-seat selectors `legal`, `plays`, `canDouble`, `pips`). |
 | `protocol.ts` | engine/domain types, shared/lib | Trust boundary. Every inbound frame passes a decoder returning `Result`; outbound frames are built here. Shapes frozen by wire goldens; a future change adds a version field here. |
 | `scorer/` (not `main.ts`) | engine types, shared/lib, siblings | Pure maths under the pure profile: the Score Counter's `computeRoundScores`, standings, voice parser, CSV text and `fmtDuration` (which `ui/cues.ts` re-exports). `scorer/main.ts` is its screen, an edge. |
 | `net/` | protocol, engine/domain, `@shared/edge/transport`, `@shared/edge/clock`, `@shared/edge/peer` | Never imports `peerjs`. `Transport`, `Clock`, `Rng`, `NewId` are injected so protocol tests run on `transport.fake.ts`. |
@@ -103,14 +110,21 @@ used to make by itself, which the drivers play a knock's layoff phase through, a
 page's own `ginRummy_soundFont` key so another game on the origin keeps its own choice:
 docs/design/sound-fonts.md),
 `window.__fidice`,
+`window.__backgammon` (`app` as a getter, `dispatch(intent)`, `act(action)` through the reducer,
+`legal()` the engine's legal actions for my view, `view()`, `render()`, `showScreen(id)`,
+`initHome()`, `fx`, `setup(state)`, which seats any decodable engine `State` at a pass-and-play
+table for e2e and stories (`sandbox/load`; refused with a toast in any other role), and
+`soundFont(name)` / `soundFontName()` under the page's own `backgammon_soundFont` key:
+docs/design/backgammon-board.md §4, §7),
 `window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
 `?ice=<url>` (ICE config override), `?ice-policy=relay` (port-only: `iceTransportPolicy: 'relay'`
 inside the Peer `config`, for the `@relay` specs' relay-forced games), `?join=<code>` (every
 game's invite convention, built by `web/shared/lib/invite.ts` and read by `web/shared/edge/invite.ts`; fidice keeps its `#join=` /
-`#watch=` fragments for now. Gin: the invite link `#shareCodeBtn` shares, the link alone with no
+`#watch=` fragments for now. Gin and backgammon: the invite link `#shareCodeBtn` shares, the link alone with no
 text beside it; `main.ts` dispatches `join/link` after `home/init`, so the code sits in the join
 form on the Play tab in online mode, then drops it from the address bar with
-`history.replaceState`, the other parameters kept), `?story=<id>` (gin only: `main.ts`
+`history.replaceState`, the other parameters kept; backgammon's boot does the same today even
+though its online mode is hidden until its online PR), `?story=<id>` (gin only: `main.ts`
 reads it before anything else and, when present, imports `src/stories/boot.ts` and returns, so the
 page paints one catalogued table state from `src/stories/catalogue.ts` with the real `paint` and
 constructs no store, network, ICE or timer; `?story=` alone lists the stories as links, `&nav` adds
@@ -306,15 +320,22 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
    ladder, `apply` phase gates, `redactFor`, `survivalFor` spot values, every strategy's `decide()`
    over seeded views), property tests via `legalActions` (300 seeded games: 52-card conservation,
    hand sizes 10/11, totals monotone, termination), pure UI helpers, scorer maths, `ice.ts` with a
-   fetch parameter. Coverage (`vitest.config.ts` thresholds, ratcheted in step 15 from the measured
+   fetch parameter; the backgammon engine's 42-position table of legal-move sets, its scenario rows
+   (openings, undo, the cube and Crawford sequence, a hit's log lines) and its seeded replay
+   (`replay.test.ts`: 91 matches per push, `BG_REPLAY_GAMES=1000` nightly, every invariant on
+   every step and the enumeration of maximal plays as the oracle of `legalMoves`), its board
+   builders and status strings as strings, its reducer over the shell and the table, its painters
+   on the page fake built from `index.html?raw`, its wire goldens under
+   `test/fixtures/backgammon-wire/` (self-recorded: no legacy page exists). Coverage (`vitest.config.ts` thresholds, ratcheted in step 15 from the measured
    numbers: lines, functions and statements 5 points under measured wherever that beat the former
    90% floor by 8 or more, branches 3 points under, nothing lowered): 100% on `web/shared/lib` and
    on both `*.algorithms.ts` (with direct tests of the 300k node cap and the 400-entry cache
    eviction; branches 84% on fidice's, 97% on gin's); lines/functions/statements 94-95% on the gin
    engine, the fidice domain and view, the gin ui/, net/ and scorer maths, the gin protocol, storage
    and fx, the shared edges and the games-proxy Worker; 92-93% on the fidice bots; 90% on the
-   fidice net/ sessions; branches 81-97% per group. The unit suites are seeded, so the figures are
-   deterministic.
+   fidice net/ sessions; branches 81-97% per group; the backgammon groups at measured minus
+   5/5/5/3 (engine 94/94/93/92, protocol, storage and fx 95/95/95/97, ui 94/95/93/88, net
+   95/95/93/91). The unit suites are seeded, so the figures are deterministic.
 2. Protocol: decoders reject malformed and hostile frames (wrong `t`, out-of-range rank/die,
    oversized names, prototype-pollution keys) with the strings fidice already echoes; wire goldens
    recorded from the legacy pages decode AND re-encode byte-for-byte after `ts` masking; host/guest
@@ -322,16 +343,23 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
    tests for prefixes, alphabets, storage keys and `t` tags.
 3. Parity (permanent): `describe.each([['legacy', gin-engine.cjs], ['current', engine]])` runs the
    same assertions on both; 400 seeded gin games (1000 nightly) and 12 seeded fidice bot games replay through both
-   with state and views deep-equal (known defects preserved and named); DOM-snapshot parity
+   with state and views deep-equal (known defects preserved and named; backgammon has no legacy
+   leg, its oracle is the replay above); DOM-snapshot parity
    (normalised innerHTML of `#hand`, `#actions`, `#statusBanner`, `#oppCards`, `#rrBody`, `#app` over
-   ~60 recorded views); computed-style goldens (~60 selectors at 390x844 and 1280x800) recorded
-   before any CSS moves; a seeded 3-bot fidice game log golden. `npm run replay`
+   ~60 recorded views); computed-style goldens (60-110 selectors per game at 390x844 and 1280x800;
+   gin's and fidice's recorded before any CSS moves, backgammon's with its page:
+   `driveBackgammon` plays through the hook, docs/design/backgammon-board.md §7); a seeded 3-bot
+   fidice game log golden; the backgammon board's two `grid-template-areas` strings parsed out of
+   the built CSS against `ui/board/layout.ts` (`test/dist/backgammon-grid.test.ts`). `npm run replay`
    (`node --experimental-strip-types tools/replay-goldens.ts`) runs the replays without npm.
 4. E2E (Playwright, two contexts, Chromium with `--disable-features=WebRtcHideLocalIpsWithMdns
    --no-first-run`, `window.__rng` seeded via `addInitScript`): gin online (join, deal, scripted
    turns, both DOMs agree, host reload -> resume, guest rejoin), gin local (curtain to a knock),
    gin scorer (CSV blob), fidice online (lobby, hello, seeded bots, redaction, spectator), fidice
-   bots to `over`; smoke on every page: zero uncaught exceptions, zero failed requests outside an
+   bots to `over`, backgammon pass-and-play (the curtain cue, a turn, the undo, the die-chip tray
+   through `__backgammon.setup`, a bear-off, the result sheet) and its board geometry (every point
+   inside the board, pairwise disjoint and equal, every target ≥ 44px at 390x844, one frame in
+   every phase, no scroll at the two viewports and a scroll at 375x667); smoke on every page: zero uncaught exceptions, zero failed requests outside an
    allowlist, and the Peer constructor received the `?ice=` config. Visual `toHaveScreenshot`
    baselines captured on the CI runner from the legacy pages. The `@relay` specs (gin and fidice
    with `?ice-policy=relay`) connect through the harness's coturn and read the selected candidate
@@ -370,9 +398,12 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
 ## Conventions for small diffs
 
 - New game: `web/games/<g>/{index.html, main.ts, theme.css, src/}` plus tests, a coverage entry,
-  `CONTRACT.md` rows and its name in the harness lists (`GAMES`, `PAGES`); nothing in `web/shared`
-  changes. Vite picks up the folder; the proxy needs no change; e2e gets one spec per mode. The
-  README's "Add a game" is the step-by-step version.
+  `CONTRACT.md` rows and its name in the registry (`Game` in `web/shared/lib/roomCode.ts` with its
+  room-code row, then `GAMES`, `PAGE_TITLES`, `HOOKS` in `tools/games.ts`; `eslint.config.js`
+  spells `GAMES` once more); nothing else in `web/shared` changes. Vite picks up the folder; the
+  proxy needs no change; the dist guards, the e2e page list and the computed-style tool enumerate
+  from the registry; e2e gets one spec per mode. Sheshbesh landed this way (docs/design/
+  backgammon-board.md §6). The README's "Add a game" is the step-by-step version.
 - New rule or action: add the variant to the `Action` union in `engine/types.ts`, the reducer branch
   in `game.ts` (exhaustiveness check fails until every switch handles it), the codec case in
   `protocol.ts`, a table test and a recorded golden. Wire-visible changes add a version field.
@@ -408,6 +439,21 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
   behind the existing wire goldens.
 
 ## Deviations (recorded as the steps land)
+
+- Sheshbesh (backgammon), the third game, follows gin's shape rather than fidice's: static screens
+  in `index.html`, a pure reducer with effects as data, painters over `web/shared/edge/dom.ts`,
+  copies of gin's `net/{host,guest}.ts` with three edits (`peerIdFor('backgammon', …)`, the
+  protocol imports, `matchLength`/`variant` in place of `target`), so the shared shell and sessions
+  can be lifted mechanically later (docs/design/backgammon-board.md §5). Its engine injects `now`
+  beside `rng` (`applyAction(state, seat, action, rng, now)`) because the log and the match record
+  carry timestamps. It has no legacy page, so the parity oracles do not apply: the seeded replay is
+  the oracle, the wire goldens are self-recorded, and `LEGACY_GAMES` in `tools/games.ts` names gin
+  and fidice explicitly instead of aliasing `GAMES`. Its `index.html` and `theme.css` are
+  Prettier-formatted (no `.prettierignore` entry: nothing to diff against). Its `theme.css`
+  redeclares the eleven shared tokens on its own palette for good, like fidice's until the restyle,
+  and `test/tokens.test.ts` pins it. Online play is hidden in its first page PR
+  (`ui/state.ts ONLINE_MODE_SHOWN`); the online PR flips it, adds hosting to the style driver and
+  re-records the two goldens.
 
 Step 1 (toolchain scaffold), against the versions on the registry at the time:
 

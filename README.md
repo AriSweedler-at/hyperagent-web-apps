@@ -1,6 +1,7 @@
 # hyperagent-web-apps
 
-Two browser games, Gin Rummy and Fidice (one-cup liar's dice), written in strict functional
+Three browser games, Gin Rummy, Fidice (one-cup liar's dice) and Sheshbesh (backgammon: portes
+or Western rules), written in strict functional
 TypeScript, built by Vite into static pages and served from two origins: GitHub Pages and a
 Cloudflare Worker in front of it. Online play is peer-to-peer over WebRTC (PeerJS brokers the
 handshake; a Cloudflare TURN relay carries the game when NAT blocks a direct path). Every push to
@@ -11,15 +12,21 @@ pages got here.
 
 ## Play
 
-| Game                         | GitHub Pages                                                          | games.sweedler.com                    | Source                 |
-| ---------------------------- | --------------------------------------------------------------------- | ------------------------------------- | ---------------------- |
-| Gin Rummy                    | https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/ | https://games.sweedler.com/gin-rummy/ | `web/games/gin-rummy/` |
-| Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/    | https://games.sweedler.com/fidice/    | `web/games/fidice/`    |
+| Game                         | GitHub Pages                                                           | games.sweedler.com                     | Source                  |
+| ---------------------------- | ---------------------------------------------------------------------- | -------------------------------------- | ----------------------- |
+| Gin Rummy                    | https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/  | https://games.sweedler.com/gin-rummy/  | `web/games/gin-rummy/`  |
+| Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/     | https://games.sweedler.com/fidice/     | `web/games/fidice/`     |
+| Sheshbesh (backgammon)       | https://arisweedler-at.github.io/hyperagent-web-apps/games/backgammon/ | https://games.sweedler.com/backgammon/ | `web/games/backgammon/` |
 
 Both origins serve the same `dist/`. `games.sweedler.com` is the Cloudflare Worker in
-`infra/games-proxy/`: `/gin-rummy/` and `/fidice/` are the short URLs, `/games/<name>/` redirects to
-them and `/shared/...` maps to the site's `shared/` directory. A host on one origin and a guest on
-the other still meet: peer ids carry no origin.
+`infra/games-proxy/`: `/gin-rummy/`, `/fidice/` and `/backgammon/` are the short URLs,
+`/games/<name>/` redirects to them and `/shared/...` maps to the site's `shared/` directory. A host
+on one origin and a guest on the other still meet: peer ids carry no origin.
+
+Sheshbesh plays portes (the Greek set's first game: no doubling cube, a gammon doubles) or Western
+backgammon (the cube, the triple game, the Crawford rule) as a match to 1, 3, 5 or 7 points, on one
+phone passed between two players (`docs/design/backgammon-rules.md`, `docs/design/backgammon-board.md`);
+its online mode ships in a following PR.
 
 Online play works on one network, or behind friendly NATs, with STUN alone. Two devices both behind
 NAT (a phone on cellular and a laptop on office Wi-Fi) need the TURN relay: the pages fetch
@@ -70,9 +77,9 @@ npm ci`) so CI installs are scanned, and restores the file; the integrity hashes
 way.
 
 Prettier leaves alone what must keep its bytes (`.prettierignore`): `legacy/**`, `web/index.html`
-(dist parity compares against it verbatim), both games' `index.html` and `theme.css` (the legacy
-layout, so a diff against `legacy/` reads as the hoist alone), the generated fixtures, `docs/` and
-`infra/turn-worker/`.
+(dist parity compares against it verbatim), the gin and fidice `index.html` and `theme.css` (the
+legacy layout, so a diff against `legacy/` reads as the hoist alone; backgammon's, with no legacy
+twin, are formatted), the generated fixtures, `docs/` and `infra/turn-worker/`.
 
 ## Tests
 
@@ -91,18 +98,23 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    12 seeded fidice bot games (`SEEDS` in `test/parity/fidice.legacy.test.ts`) replay through both
    legs with states deep-equal; recorded wire frames and localStorage captures decode and re-encode
    byte for byte. Known legacy defects the port fixes are named and pinned on the legacy leg only.
-   Test hooks on the pages: `window.__gin`, `window.__fidice`, and `window.__rng` as the rng when
-   installed before boot.
+   Test hooks on the pages: `window.__gin`, `window.__fidice`, `window.__backgammon`, and
+   `window.__rng` as the rng when installed before boot. The backgammon engine has no legacy twin:
+   its oracle is the seeded replay beside it (`web/games/backgammon/src/engine/replay.test.ts`, 91
+   matches per push and `BG_REPLAY_GAMES=1000` nightly) asserting every invariant on every step,
+   with the enumeration of maximal plays as the oracle of the legal-move list.
 3. **Dist guards** (`npm run build && npm run test:dist`, `test/dist/`): every URL in dist HTML and
-   CSS is relative and resolves on both origins through the Worker's real `mapPath()`; both game
-   pages are Vite module pages that preload one shared chunk and link the shared stylesheet;
-   `dist/index.html` is byte-identical to `web/index.html`. The **class contract**
+   CSS is relative and resolves on both origins through the Worker's real `mapPath()`; every game
+   page is a Vite module page that preloads the shared chunks (one common to all; the DOM edge is
+   a second one gin and backgammon share) and links the one shared stylesheet;
+   `dist/index.html` is byte-identical to `web/index.html`; the backgammon board's two
+   `grid-template-areas` strings agree with their pure twin (`backgammon-grid.test.ts`). The **class contract**
    (`class-contract.test.ts`): every class the game's TypeScript names has a rule in a stylesheet
    the page links and vice versa, with what the extraction cannot see tabled in
    `web/shared/styles/CONTRACT.md` (each row is checked against the tree, so it cannot go stale).
 4. **Computed-style goldens** (`e2e/computed-styles.spec.ts`, `pages` project):
    `tools/parity/computed-styles.ts` drives each page through its screens at 390x844 and 1280x800
-   and reads `getComputedStyle` for ~60 selectors; `test/fixtures/styles/<game>.<viewport>.json`
+   and reads `getComputedStyle` for 60-110 selectors; `test/fixtures/styles/<game>.<viewport>.json`
    are the goldens. A CSS move that changes a computed value fails with one line per
    screen/selector/property.
 5. **Transport integration** (`npm run test:integration`): the real PeerJS adapter through a local
@@ -113,7 +125,7 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    Worker over :4173), a PeerServer (:9000) and, when `turnserver` is on PATH, a coturn TURN relay
    (:3478, static credentials, loopback only), then runs every spec in `e2e/` on projects `pages`
    and `proxy`: smoke on every page (zero uncaught exceptions, zero failed requests outside an
-   allowlist), gin local and scorer, and the `@online` specs (gin join/deal/turns, host reload and
+   allowlist), gin local and scorer, backgammon pass-and-play and its board geometry, and the `@online` specs (gin join/deal/turns, host reload and
    guest rejoin, fidice lobby/start) in a host and a guest context that meet through `?peer=` and
    take a STUN-only ICE list through `?ice=`; fonts and CDNs are answered from local copies and
    `Math.random` is seeded. The `@relay` specs (`e2e/gin-relay.spec.ts`, `e2e/fidice-relay.spec.ts`)
@@ -167,7 +179,7 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
 
 **Moving a golden.** A PR that changes what a golden pins says so in its body and touches only that
 golden. Computed styles: `npm run build`, then
-`node --experimental-strip-types tools/parity/computed-styles.ts` rewrites the four files
+`node --experimental-strip-types tools/parity/computed-styles.ts` rewrites the six files
 (`--check` compares without writing; a `--token` the golden never recorded is a note, not a failure,
 until re-recorded). Legacy cuts: `npm run fixtures:legacy`, and the PR says why the oracle moved
 (`legacy/**` itself is never edited). Gin wire frames and storage captures:
@@ -320,6 +332,7 @@ web/shared/styles/           tokens.css (the shared palette, :root only), base.c
 web/shared/ui/               reserved for the roadmap's shared screen builders (README only)
 web/games/gin-rummy/         index.html, theme.css, main.ts, src/{engine,protocol.ts,storage.ts,net,ui,scorer}
 web/games/fidice/            index.html, theme.css, main.ts, MANIFEST.json, src/{assets,domain,bots,net,view,app}
+web/games/backgammon/        index.html, theme.css, main.ts, src/{engine,protocol.ts,storage.ts,fx.ts,net,ui,ui/board}
 legacy/                      the pre-migration pages and shared/ice.js, verbatim; never served, never edited (legacy/README.md)
 test/fixtures/legacy/        sha256-pinned cuts of the legacy cores, the gin wire frames and storage captures
 test/fixtures/styles/        computed-style goldens, <game>.<viewport>.json
@@ -331,7 +344,7 @@ e2e/                         Playwright specs; fixtures/ (site, player, two-play
 tools/                       serve-dist, proxy-dev, hooks-verify; legacy/ extractors and recorders; parity/ drivers
 infra/games-proxy/           Cloudflare Worker (TypeScript) serving the site at games.sweedler.com
 infra/turn-worker/           Cloudflare Worker (plain JS) minting TURN credentials at turn.sweedler.com
-docs/                        ARCHITECTURE.md (the layout and its rules), MIGRATION.md (the plan and its Deviations)
+docs/                        ARCHITECTURE.md (the layout and its rules), MIGRATION.md (the plan and its Deviations), design/ (per-feature designs)
 .github/workflows/           ci.yml (check, e2e, broker, deploy), nightly.yml (the deployed page through local servers)
 .github/actions/npm-ci/      the scanned install that rewrites the runner's lockfile copy (see "Develop")
 .githooks/                   pre-commit (chains the template hook), pre-push (npm run check)

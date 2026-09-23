@@ -2,8 +2,11 @@
 // "Tokens"). web/shared/styles/tokens.css declares gin's palette under the shared names, gin's
 // theme.css declares none of them (tokens.css is the single source of gin's values) and fidice's
 // theme.css, linked last, redeclares every one so the shared names resolve to its own palette until
-// the Fidice restyle drops the overrides. The computed-style goldens pin the resolved values; this
-// test pins where each name is declared, which the goldens cannot see.
+// the Fidice restyle drops the overrides. Backgammon's theme.css does the same on purpose (its
+// whitewash-and-aegean palette is not a restyle target; docs/design/backgammon-board.md §3): a
+// partial override would inherit gin's green felt for the names it forgot. The computed-style
+// goldens pin the resolved values; this test pins where each name is declared, which the goldens
+// cannot see.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -13,6 +16,7 @@ const WEB = resolve(import.meta.dirname, '..', 'web');
 const TOKENS = resolve(WEB, 'shared', 'styles', 'tokens.css');
 const GIN_THEME = resolve(WEB, 'games', 'gin-rummy', 'theme.css');
 const FIDICE_THEME = resolve(WEB, 'games', 'fidice', 'theme.css');
+const BACKGAMMON_THEME = resolve(WEB, 'games', 'backgammon', 'theme.css');
 
 /** The shared vocabulary: gin's palette names, in tokens.css order. */
 const SHARED: ReadonlyArray<string> = [
@@ -80,4 +84,9 @@ test('gin theme.css redeclares no shared name: tokens.css is the single source o
 test('fidice theme.css redeclares every shared name: its look holds until the restyle', () => {
   const fidice = new Set(rootNames(FIDICE_THEME));
   expect(SHARED.filter((name) => !fidice.has(name))).toEqual([]);
+});
+
+test('backgammon theme.css redeclares every shared name: its palette never inherits gin felt', () => {
+  const backgammon = new Set(rootNames(BACKGAMMON_THEME));
+  expect(SHARED.filter((name) => !backgammon.has(name))).toEqual([]);
 });

@@ -8,6 +8,7 @@ import { expect, test } from 'vitest';
 
 import {
   GAMES,
+  type Game,
   cssClasses,
   markupClasses,
   readContract,
@@ -19,6 +20,21 @@ import {
 import { describeDist } from './dist.ts';
 
 const names = (rows: ReadonlyArray<Row>): ReadonlyArray<string> => rows.flatMap((r) => r.names);
+/**
+ * How many class names each source must yield, per game, so an extraction that silently finds
+ * nothing (a moved file, a changed helper name) fails here rather than passing the two orphan
+ * tests vacuously. TypeScript: gin and fidice spell most names out; backgammon's board builders
+ * make theirs by template (`die-${face}`, `ck-${owner}`, the `conn-dot` attribute), which the
+ * extraction cannot see (42 seen; the rest are CONTRACT.md rows). Markup: fidice paints its whole
+ * page from TS into `#app`, gin's and backgammon's pages carry their screens.
+ */
+const TS_FLOOR: Readonly<Record<Game, number>> = { 'gin-rummy': 50, fidice: 50, backgammon: 35 };
+const MARKUP_FLOOR: Readonly<Record<Game, number>> = {
+  'gin-rummy': 40,
+  fidice: -1,
+  backgammon: 40,
+};
+const CSS_FLOOR = 100;
 /** Rows with a `Toggled by` and no `Styled in`: TS names the class, no rule is expected. */
 const behaviourOnly = (rows: ReadonlyArray<Row>): ReadonlyArray<Row> =>
   rows.filter((r) => r.toggledBy !== '' && r.styledIn === '');
@@ -53,10 +69,9 @@ describeDist('CSS <-> TS class contract', (root) => {
         expect.stringMatching(/^shared\/assets\/[\w-]+\.css$/) as string,
         expect.stringMatching(new RegExp(`^shared/assets/${game}-[\\w-]+\\.css$`)) as string,
       ]);
-      expect(tsNames.length).toBeGreaterThan(50);
-      expect(css.length).toBeGreaterThan(100);
-      // fidice paints its whole page from TS into `#app`; gin's markup carries its screens.
-      expect(markup.length).toBeGreaterThan(game === 'fidice' ? -1 : 40);
+      expect(tsNames.length).toBeGreaterThan(TS_FLOOR[game]);
+      expect(css.length).toBeGreaterThan(CSS_FLOOR);
+      expect(markup.length).toBeGreaterThan(MARKUP_FLOOR[game]);
     });
 
     test(`${game}: every class TS names has a rule in the built CSS or is a behaviour-only row`, () => {

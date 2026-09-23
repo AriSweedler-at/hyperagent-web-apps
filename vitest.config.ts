@@ -19,6 +19,11 @@ export default defineConfig({
         'web/games/fidice/src/view/**/*.ts',
         'web/games/gin-rummy/src/engine/**/*.ts',
         'web/games/backgammon/src/engine/**/*.ts',
+        'web/games/backgammon/src/protocol.ts',
+        'web/games/backgammon/src/storage.ts',
+        'web/games/backgammon/src/ui/**/*.ts',
+        'web/games/backgammon/src/net/**/*.ts',
+        'web/games/backgammon/src/fx.ts',
         'web/games/gin-rummy/src/protocol.ts',
         'web/games/gin-rummy/src/storage.ts',
         'web/games/gin-rummy/src/cardBack.ts',
@@ -102,6 +107,42 @@ export default defineConfig({
           functions: 100,
           statements: 100,
           branches: 92,
+        },
+        // The rest of the backgammon page (docs/design/backgammon-board.md §6), at measured minus
+        // 5/5/5/3 like gin's rows: the wire goldens and decoder tests (protocol), the Map-backed
+        // store tests (storage), the reducer, builder, painter and page-fake suites (ui/**), the
+        // session scenarios over transport.fake.ts (net/**) and the cue table (fx). Measured
+        // (lines/functions/statements/branches): protocol 100/100/100/100, storage
+        // 100/100/100/100, ui 99.6/100/98.7/91.6, net 100/100/98.9/94.4, fx 100/100/100/100.
+        'web/games/backgammon/src/protocol.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 97,
+        },
+        'web/games/backgammon/src/storage.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 97,
+        },
+        'web/games/backgammon/src/ui/**': {
+          lines: 94,
+          functions: 95,
+          statements: 93,
+          branches: 88,
+        },
+        'web/games/backgammon/src/net/**': {
+          lines: 95,
+          functions: 95,
+          statements: 93,
+          branches: 91,
+        },
+        'web/games/backgammon/src/fx.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 97,
         },
         'web/games/gin-rummy/src/protocol.ts': {
           lines: 95,

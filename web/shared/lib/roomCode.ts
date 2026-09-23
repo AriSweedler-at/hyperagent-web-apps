@@ -6,7 +6,7 @@
 import { err, ok, type Result } from './result.ts';
 import type { Rng } from './rng.ts';
 
-export type Game = 'gin-rummy' | 'fidice';
+export type Game = 'gin-rummy' | 'fidice' | 'backgammon';
 
 export type RoomCodeSpec = Readonly<{
   /** Characters a generated code is drawn from. */
@@ -31,6 +31,13 @@ export const FIDICE_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const FIDICE_CODE_LENGTH = 5;
 export const FIDICE_CODE_LENGTH_ERROR = 'Codes are 5 characters';
 
+// Backgammon (Sheshbesh, docs/design/backgammon-board.md): gin's alphabet and length, so the join
+// form's guard and the e2e typing are the same; its own prefix keeps the two games apart on the broker.
+export const BACKGAMMON_PEER_PREFIX = 'sheshbesh-';
+export const BACKGAMMON_CODE_ALPHABET = GIN_CODE_ALPHABET;
+export const BACKGAMMON_CODE_LENGTH = GIN_CODE_LENGTH;
+export const BACKGAMMON_CODE_LENGTH_ERROR = GIN_CODE_LENGTH_ERROR;
+
 export const ROOM_CODE: Readonly<Record<Game, RoomCodeSpec>> = {
   'gin-rummy': {
     alphabet: GIN_CODE_ALPHABET,
@@ -45,6 +52,13 @@ export const ROOM_CODE: Readonly<Record<Game, RoomCodeSpec>> = {
     peerPrefix: FIDICE_PEER_PREFIX,
     peerCase: 'lower',
     lengthError: FIDICE_CODE_LENGTH_ERROR,
+  },
+  backgammon: {
+    alphabet: BACKGAMMON_CODE_ALPHABET,
+    length: BACKGAMMON_CODE_LENGTH,
+    peerPrefix: BACKGAMMON_PEER_PREFIX,
+    peerCase: 'upper',
+    lengthError: BACKGAMMON_CODE_LENGTH_ERROR,
   },
 };
 
@@ -69,6 +83,11 @@ const TYPED_CODE: Readonly<Record<Game, (raw: string) => string>> = {
       .replace(/[^A-Z]/g, '')
       .slice(0, GIN_CODE_LENGTH),
   fidice: (raw) => raw.toUpperCase(),
+  backgammon: (raw) =>
+    raw
+      .toUpperCase()
+      .replace(/[^A-Z]/g, '')
+      .slice(0, BACKGAMMON_CODE_LENGTH),
 };
 
 export const sanitiseCode = (game: Game, raw: string): string => TYPED_CODE[game](raw);

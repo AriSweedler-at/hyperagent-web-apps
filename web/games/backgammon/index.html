@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta property="og:title" content="Sheshbesh" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image:width" content="1024" />
+    <meta property="og:image:height" content="1024" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Sheshbesh" />
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Sheshbesh — Sephardic backgammon</title>
+    <link rel="icon" href="../../shared/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="../../shared/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=GFS+Didot&family=Cardo:ital,wght@0,400;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../../shared/styles/tokens.css" />
+    <link rel="stylesheet" href="../../shared/styles/base.css" />
+    <link rel="stylesheet" href="./theme.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- HOME / LOBBY (design §4). The Online mode is hidden until the online PR: its panel and
+           ids stay, the switch shows Pass the phone alone, and the local panel is the default. -->
+      <div id="homeScreen">
+        <div class="masthead">
+          <h1>Sheshbesh</h1>
+          <div class="subtitle">Backgammon</div>
+        </div>
+
+        <div id="resumeBox" class="card-box resume hidden">
+          <label>Game in progress</label>
+          <button class="btn btn-primary btn-block" id="resumeBtn">Resume</button>
+        </div>
+
+        <div class="tabbar" id="topTabbar">
+          <div class="tab-wrap" id="tabPlayWrap">
+            <button type="button" class="tab-btn" id="tabPlayBtn" data-tab="play">Play</button>
+            <div class="tab-submenu" id="playSubmenu">
+              <button type="button" class="hidden" data-mode="online">Online</button>
+              <button type="button" data-mode="local">Pass the phone</button>
+            </div>
+          </div>
+          <button type="button" class="tab-btn" id="tabRulesBtn" data-tab="rules">Rules</button>
+          <button type="button" class="tab-btn" id="tabAboutBtn" data-tab="about">About</button>
+        </div>
+
+        <!-- PLAY TAB -->
+        <div id="playPanel" class="tab-panel">
+          <div class="mode-switch" id="playModeSwitch">
+            <button type="button" class="mode-btn hidden" data-mode="online">Online</button>
+            <button type="button" class="mode-btn active" data-mode="local">Pass the phone</button>
+          </div>
+
+          <div id="onlineModeContent" class="hidden">
+            <div class="card-box">
+              <label>Your name</label>
+              <input type="text" id="nameInput" value="Ari" maxlength="20" autocomplete="off" />
+            </div>
+            <div class="card-box">
+              <label>Open a table</label>
+              <div class="row">
+                <div class="field grow">
+                  <span class="field-label">Match to</span>
+                  <select id="matchLengthSel">
+                    <option value="1">1 point</option>
+                    <option value="3">3 points</option>
+                    <option value="5" selected>5 points</option>
+                    <option value="7">7 points</option>
+                  </select>
+                </div>
+                <div class="field grow">
+                  <span class="field-label">Rules</span>
+                  <select id="variantSel">
+                    <option value="portes" selected>Portes</option>
+                    <option value="backgammon">Western</option>
+                  </select>
+                </div>
+              </div>
+              <button class="btn btn-primary btn-block" id="hostBtn">Open a table</button>
+              <div class="empty-note left">You'll get a 4-letter room code to share.</div>
+            </div>
+            <div class="card-box">
+              <label>Sit down at a table</label>
+              <div class="row">
+                <input
+                  type="text"
+                  id="codeInput"
+                  class="code-input grow"
+                  placeholder="CODE"
+                  maxlength="4"
+                  autocapitalize="characters"
+                  autocomplete="off"
+                  autocorrect="off"
+                  spellcheck="false"
+                  inputmode="text"
+                  enterkeyhint="go"
+                  data-lpignore="true"
+                  name="room-code-no-ac"
+                />
+                <button class="btn btn-secondary" id="joinBtn">Sit down</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="localModeContent">
+            <div class="card-box">
+              <label>Players</label>
+              <div class="row">
+                <input
+                  type="text"
+                  id="p1NameInput"
+                  class="grow"
+                  placeholder="Player 1"
+                  maxlength="20"
+                  autocomplete="off"
+                />
+                <input
+                  type="text"
+                  id="p2NameInput"
+                  class="grow"
+                  placeholder="Player 2"
+                  maxlength="20"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+            <div class="card-box">
+              <div class="row">
+                <div class="field grow">
+                  <span class="field-label">Match to</span>
+                  <select id="localMatchLengthSel">
+                    <option value="1">1 point</option>
+                    <option value="3">3 points</option>
+                    <option value="5" selected>5 points</option>
+                    <option value="7">7 points</option>
+                  </select>
+                </div>
+                <div class="field grow">
+                  <span class="field-label">Rules</span>
+                  <select id="localVariantSel">
+                    <option value="portes" selected>Portes</option>
+                    <option value="backgammon">Western</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" id="localBtn">Start</button>
+            <div class="empty-note left">
+              One phone, no internet needed. The board stays in view; a curtain says whose turn it
+              is.
+            </div>
+          </div>
+        </div>
+
+        <!-- RULES TAB: rules.ts fills the list for the chosen variant. -->
+        <div id="rulesPanel" class="tab-panel hidden">
+          <ul class="rules-list" id="rulesList"></ul>
+        </div>
+
+        <!-- ABOUT TAB -->
+        <div id="aboutPanel" class="tab-panel hidden">
+          <div class="card-box prose">
+            <p>
+              Sheshbesh is what Sephardic Jews around the eastern Mediterranean called backgammon:
+              six and five, the roll that gives the game its name. It was played in the cafés of
+              Salonica, Izmir and Jerusalem on the same wooden boards their Greek and Turkish
+              neighbours used, and it travelled with the families who left.
+            </p>
+            <p>
+              This page plays two rulesets. Portes is the first game of the Greek set: no doubling
+              cube, a gammon counts double, and the winner of the opening roll rolls again. Western
+              backgammon adds the doubling cube, the triple for a backgammon and the Crawford rule
+              in a match. Pass one phone between you, or open a table and share the code.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- HOST WAITING -->
+      <div id="hostWaitScreen" class="hidden">
+        <h1>Your table</h1>
+        <div class="subtitle">Have your opponent open this same page and enter the code</div>
+        <div class="card-box centered">
+          <label>Room code</label>
+          <div class="room-code" id="roomCode">----</div>
+          <button class="btn btn-secondary btn-sm" id="shareCodeBtn">Share invite</button>
+        </div>
+        <div class="card-box centered">
+          <div id="hostWaitStatus" class="pulse muted">Opening the table…</div>
+          <div class="empty-note">
+            Keep this screen open while your opponent joins. If you switch apps, come straight back
+            and the table reconnects on its own.
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block hidden" id="startGameBtn">Start the match</button>
+        <button class="btn btn-ghost btn-block" id="cancelHostBtn">Cancel</button>
+      </div>
+
+      <!-- GUEST WAITING -->
+      <div id="guestWaitScreen" class="hidden">
+        <h1>Joining…</h1>
+        <div class="card-box centered">
+          <div id="guestWaitStatus" class="pulse muted">Connecting…</div>
+        </div>
+        <button class="btn btn-ghost btn-block" id="cancelGuestBtn">Back</button>
+      </div>
+
+      <!-- TABLE (design §2.2.1). The 24 points are direct children of #board in absolute order;
+           the seat perspective is data-own on each point and data-seat on the board, written by
+           paintSeat; the static markup ships seat 0's. -->
+      <div id="tableScreen" class="hidden">
+        <div class="topbar">
+          <div class="row tight">
+            <button class="icon-btn" id="menuBtn" title="Menu" aria-label="Menu">☰</button>
+            <button
+              class="icon-btn hidden"
+              id="handoffBtn"
+              title="Continue online"
+              aria-label="Continue online"
+            >
+              🌐
+            </button>
+          </div>
+          <div class="opp-strip">
+            <span class="name" id="oppName">Opponent</span>
+            <span class="conn-dot" id="oppDot"></span>
+            <span class="pips" id="pipsOpp">167</span>
+          </div>
+          <div class="badge dim" id="gameBadge">Game 1 · to 5</div>
+          <div class="row tight">
+            <button class="icon-btn desk-only" id="rulesBtnGame" title="Rules" aria-label="Rules">
+              ?
+            </button>
+            <button class="icon-btn desk-only" id="historyBtn" title="History" aria-label="History">
+              ≡
+            </button>
+            <button class="icon-btn" id="soundBtn" title="Sound &amp; vibration" aria-label="Sound">
+              🔊
+            </button>
+          </div>
+        </div>
+        <div class="status-line" id="statusLine" aria-live="polite">
+          <span id="statusText">—</span><span class="sr-only" id="statusDice"></span>
+        </div>
+
+        <div class="board" id="board" data-seat="0">
+          <div
+            class="point pt-a pt-near"
+            id="point-1"
+            data-abs="1"
+            data-own="1"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-b pt-near"
+            id="point-2"
+            data-abs="2"
+            data-own="2"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-a pt-near"
+            id="point-3"
+            data-abs="3"
+            data-own="3"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-b pt-near"
+            id="point-4"
+            data-abs="4"
+            data-own="4"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-a pt-near"
+            id="point-5"
+            data-abs="5"
+            data-own="5"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-b pt-near"
+            id="point-6"
+            data-abs="6"
+            data-own="6"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-a pt-near"
+            id="point-7"
+            data-abs="7"
+            data-own="7"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-b pt-near"
+            id="point-8"
+            data-abs="8"
+            data-own="8"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-a pt-near"
+            id="point-9"
+            data-abs="9"
+            data-own="9"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-b pt-near"
+            id="point-10"
+            data-abs="10"
+            data-own="10"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-a pt-near"
+            id="point-11"
+            data-abs="11"
+            data-own="11"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-b pt-near"
+            id="point-12"
+            data-abs="12"
+            data-own="12"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-a pt-far"
+            id="point-13"
+            data-abs="13"
+            data-own="13"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-b pt-far"
+            id="point-14"
+            data-abs="14"
+            data-own="14"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-a pt-far"
+            id="point-15"
+            data-abs="15"
+            data-own="15"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-b pt-far"
+            id="point-16"
+            data-abs="16"
+            data-own="16"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-a pt-far"
+            id="point-17"
+            data-abs="17"
+            data-own="17"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-b pt-far"
+            id="point-18"
+            data-abs="18"
+            data-own="18"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-a pt-far"
+            id="point-19"
+            data-abs="19"
+            data-own="19"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-b pt-far"
+            id="point-20"
+            data-abs="20"
+            data-own="20"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-a pt-far"
+            id="point-21"
+            data-abs="21"
+            data-own="21"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-b pt-far"
+            id="point-22"
+            data-abs="22"
+            data-own="22"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-a pt-far"
+            id="point-23"
+            data-abs="23"
+            data-own="23"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div
+            class="point pt-b pt-far"
+            id="point-24"
+            data-abs="24"
+            data-own="24"
+            role="button"
+            tabindex="0"
+          ></div>
+          <div class="bar far" id="barTop" role="button" tabindex="0"></div>
+          <div class="dice" id="dice" role="button" tabindex="0" aria-label="Roll"></div>
+          <div class="cube hidden" id="cube" data-owner="none">1</div>
+          <div class="bar near" id="barBottom" role="button" tabindex="0"></div>
+          <div class="off" id="offLight" data-owner="0" role="button" tabindex="0"></div>
+          <div class="off" id="offDark" data-owner="1" role="button" tabindex="0"></div>
+        </div>
+
+        <div class="controls" id="controls">
+          <div class="me-strip">
+            <span class="name" id="myName">You</span>
+            <span class="pips" id="pipsMe">167</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="undoBtn" disabled>Undo</button>
+          <button class="btn btn-secondary btn-sm hidden" id="doubleBtn">Double</button>
+          <!-- Reserved (design §1 "Turn end"): the turn ends by itself; hidden in every state. -->
+          <button class="btn btn-secondary btn-sm hidden" id="doneBtn">Done</button>
+          <div class="roll-slot">
+            <button class="btn btn-primary" id="rollBtn">Buen mazal! <small>roll</small></button>
+            <div class="dice-mini hidden" id="diceMini"></div>
+            <div class="wait-note hidden" id="waitNote">Waiting…</div>
+            <button class="btn btn-secondary btn-sm hidden" id="resultChipBtn">Result</button>
+          </div>
+          <div class="chips hidden" id="moveChips"></div>
+          <button class="icon-btn hidden" id="chipCancelBtn" aria-label="Cancel">✕</button>
+        </div>
+      </div>
+
+      <!-- ENDGAME: the match is over (design §2.4.11). -->
+      <div id="endgameScreen" class="hidden">
+        <h1>Match over</h1>
+        <div class="card-box centered">
+          <div class="sheet-title" id="resultTitle">Player takes the match</div>
+          <div class="sheet-sub" id="resultSub"></div>
+        </div>
+        <div class="card-box">
+          <label>Games</label>
+          <div class="score-list" id="matchScore"></div>
+        </div>
+        <div class="row">
+          <button class="btn btn-secondary grow" id="leaveBtn">Leave</button>
+          <button class="btn btn-primary grow" id="nextGameBtn">Rematch</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PASS-AND-PLAY CURTAIN (design §2.1.8): a translucent wash, the board readable beneath. -->
+    <div id="curtainOverlay" class="overlay curtain hidden">
+      <div class="sheet centered">
+        <div class="sheet-title" id="curtainTitle">Pass the phone</div>
+        <div class="sheet-sub" id="curtainSub">Your turn.</div>
+        <div id="curtainLast" class="empty-note"></div>
+        <button class="btn btn-primary btn-block" id="curtainBtn">Roll</button>
+        <button class="btn btn-ghost btn-block btn-sm" id="curtainHandoffBtn">
+          Continue online
+        </button>
+      </div>
+    </div>
+
+    <!-- GAME RESULT (design §2.1.7): the sheet over the dimmed board. -->
+    <div id="resultOverlay" class="overlay hidden">
+      <div class="sheet centered">
+        <div class="sheet-title" id="rsTitle">Game over</div>
+        <div class="sheet-sub" id="rsSub"></div>
+        <div class="score-line" id="rsScore"></div>
+        <button class="btn btn-primary btn-block" id="rsNextBtn">Next game</button>
+        <button class="btn btn-ghost btn-block btn-sm" id="rsPeekBtn">Look at the table</button>
+      </div>
+    </div>
+
+    <!-- DOUBLE OFFERED (Western only, design §2.4.8). -->
+    <div id="cubeOverlay" class="overlay hidden">
+      <div class="sheet centered">
+        <div class="sheet-title">The cube</div>
+        <div class="sheet-sub" id="cubeOfferText">Your opponent doubles. Take or pass?</div>
+        <div class="row">
+          <button class="btn btn-secondary grow" id="passBtn">Pass</button>
+          <button class="btn btn-primary grow" id="takeBtn">Take</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESIGN: reserved for v1.1 (design §2.2.2); present, hidden, no binder in v1. -->
+    <div id="resignOverlay" class="overlay hidden">
+      <div class="sheet centered">
+        <div class="sheet-title">Resign</div>
+        <div class="sheet-sub">Offer to concede this game.</div>
+        <div class="row" id="resignLevelBtns">
+          <button class="btn btn-secondary grow" data-level="1">Single</button>
+          <button class="btn btn-secondary grow" data-level="2">Gammon</button>
+          <button class="btn btn-secondary grow" data-level="3">Backgammon</button>
+        </div>
+        <button class="btn btn-ghost btn-block btn-sm" id="cancelResignBtn">Cancel</button>
+      </div>
+    </div>
+
+    <!-- RULES -->
+    <div id="rulesOverlay" class="overlay hidden">
+      <div class="sheet">
+        <div class="sheet-title">Rules</div>
+        <ul class="rules-list" id="rulesOverlayList"></ul>
+        <button class="btn btn-primary btn-block" id="closeRulesBtn">Got it</button>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div id="historyOverlay" class="overlay hidden">
+      <div class="sheet">
+        <div class="row between">
+          <div class="sheet-title">This game</div>
+          <button class="btn btn-ghost btn-sm" id="closeHistoryBtn">Close</button>
+        </div>
+        <div class="history" id="historyList"></div>
+      </div>
+    </div>
+
+    <!-- MENU (the phone's home for rules and history, design §2.2.2). -->
+    <div id="menuOverlay" class="overlay hidden">
+      <div class="sheet">
+        <div class="row between">
+          <div class="sheet-title">Menu</div>
+          <button class="btn btn-ghost btn-sm" id="closeMenuBtn">Close</button>
+        </div>
+        <div class="menu-list">
+          <button class="btn btn-secondary btn-block" id="menuRulesBtn">Rules</button>
+          <button class="btn btn-secondary btn-block" id="menuHistoryBtn">History</button>
+          <label class="toggle-row">
+            <input type="checkbox" id="menuCurtainToggle" checked />
+            <span>Curtain between turns</span>
+          </label>
+          <button class="btn btn-ghost btn-block" id="menuLeaveBtn">Leave the table</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEAVE CONFIRM -->
+    <div id="leaveConfirm" class="overlay hidden">
+      <div class="sheet centered">
+        <div class="sheet-title">Leave the table?</div>
+        <div class="sheet-sub" id="leaveConfirmText">The game will be lost.</div>
+        <div class="row">
+          <button class="btn btn-secondary grow" id="leaveCancelBtn">Stay</button>
+          <button class="btn btn-primary grow" id="leaveConfirmBtn">Leave</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" role="status"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

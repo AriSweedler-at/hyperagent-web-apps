@@ -29,3 +29,5 @@ docs/
 /web/games/fidice/theme.css
 /web/games/gin-rummy/index.html
 /web/games/gin-rummy/theme.css
+# web/games/backgammon/{index.html,theme.css} are new files with no legacy twin and stay formatted
+# (docs/design/backgammon-board.md §6).
