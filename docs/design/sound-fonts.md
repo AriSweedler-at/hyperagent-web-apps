@@ -66,8 +66,14 @@ export type Sound =
 - `sample` is the seam for real recorded fonts: a URL relative to the page
   (`../../shared/sound/<font>/<cue>.mp3`, the assets under `web/public/shared/sound/<font>/` beside
   the shared favicon, so both origins serve them), fetched and decoded once on first use, cached
-  per URL, and silent when the fetch or the decode fails. No sample font ships yet.
+  per URL, and silent when the fetch or the decode fails. No sample font ships yet. Corrected at
+  implementation (2026-09-23): a failure is cached like a success, so a bad or missing file is
+  asked for once per page, not once per cue.
 - `silence` lets a font mute a cue on purpose (a minimal font that only marks turns and results).
+- Added at implementation: the module also exports the constructors `note(freq, dur, gap?)` (no
+  `gap` key when none is given, so a font's literal reads as the legacy tables did),
+  `synth(voice, gain, notes)`, `sample(url, gain)`, the `SILENCE` constant and `MAX_GAIN` (0.3),
+  which the font validity test reads.
 
 ## 4. Fonts (`web/shared/lib/sound/fonts.ts` + `fonts/<name>.ts`)
 
@@ -96,7 +102,10 @@ export const resolveSound = (font: SoundFont, cue: SoundCue): Sound;
 | `felt` | Soft: sine and triangle voices, lower gains, shorter tails; a quiet table. | Suits the Sheshbesh restraint. |
 | `arcade` | Bright: square waves, crisp attacks, the 8-bit register. | |
 
-Fonts are pure data in `web/shared/lib/sound/fonts/<name>.ts`. Tests: `default` total over
+Fonts are pure data in `web/shared/lib/sound/fonts/<name>.ts`. The default's `sounds` is typed
+`Readonly<Record<SoundCue, Sound>>` and exported as `DEFAULT_SOUNDS` (added at implementation), so
+a missing cue is a compile error before it is a test failure; the font files import only
+`cues.ts`, `sound.ts` and the `SoundFont` type, so `fonts.ts` importing them is no cycle. Tests: `default` total over
 `SOUND_CUES`; every sound valid (gains in `(0, 0.3]`, durations and gaps `> 0`, sample URLs relative,
 no absolute or root-relative URL); names unique and equal to the file's `name`; `resolveSound`
 falls back to `default`; `isSoundFont`/`badSoundFontMsg`.
@@ -134,7 +143,10 @@ Fidice, when it gains sound: `roll`, `turn`, `good`, `bad`, `score`, `victory`, 
 Playing: the game's `fx.ts` resolves `CUES[event]`, plays `resolveSound(fontByName(current), cue)`
 through the shared edge player, and buzzes the table's pattern; nothing plays while the game's own
 sound toggle (`ginRummy_sound`, `backgammon_sound`) is off. The current font is the App's
-(section 6), passed to the effect runner with the cue.
+(section 6), passed to the effect runner with the cue. Corrected at implementation: gin's `Fx` is
+`play(event, font)`, `toggle(font)`, `enabled()` and `warm()`; the legacy object's eight per-event
+methods (`fx.gin()`, `fx.win()`, …) are gone, since a font parameter made them awkward and only
+their test called them. `toggle` taps in the font it is given when turning on.
 
 ## 6. Choosing a font: per game, no conflicts
 
@@ -190,7 +202,7 @@ that already exists.
 | `web/shared/lib/sound/sound.ts` | pure | `Sound`, `Note`, `OscillatorType` (moved here from `web/shared/edge/fx.ts`, which imports them) |
 | `web/shared/lib/sound/fonts.ts` | pure | `SOUND_FONTS`, `SoundFontName`, `DEFAULT_SOUND_FONT`, `isSoundFont`, `badSoundFontMsg`, `fontByName`, `resolveSound` |
 | `web/shared/lib/sound/fonts/{default,felt,arcade}.ts` | pure | the fonts as data |
-| `web/shared/edge/sound.ts` | edge | `playSound(audio, sound, deps)`: synth through `AudioCues.seq`; sample through injected `fetchBuffer` + the context's `decodeAudioData`/`createBufferSource` (typed structurally; the existing fakes need no change); `silence` does nothing; every failure silent |
+| `web/shared/edge/sound.ts` | edge | `playSound(audio, sound, deps)`: synth through `AudioCues.seq`; sample through `deps.fetchBuffer` and the context's `decodeAudioData`/`createBufferSource`, both optional on `AudioContextLike` so the oscillator fakes need no change; `silence` does nothing; every failure silent. Corrected at implementation: `deps` is `{ fetchBuffer, cache }`, the cache from `createSampleCache()` made once by main.ts, and the context comes from `AudioCues.context()`, an accessor added to `web/shared/edge/fx.ts` (its `ensure()`), so the `AudioCues` fakes gain one line |
 | `web/games/<game>/src/ui/sound.ts` | game ui | the event → `{cue, buzz}` table (section 5) |
 | `web/games/<game>/src/fx.ts` | game | plays a table entry through the edge with the App's font; the sound toggle |
 | `web/games/<game>/src/storage.ts` | game | the key, decoder, reader, writer |
@@ -198,8 +210,10 @@ that already exists.
 | `web/games/<game>/main.ts` | boot | the boot drop, `__<game>.soundFont(name)` and `soundFontName()` |
 
 Lint: `ui/` may import `web/shared/lib` (pure) and `web/shared/edge/dom.ts` only, so the table
-imports `SoundCue` from lib; the player is reached from `fx.ts`/`main.ts`, which are edges.
-`web/shared/lib/**` stays at 100% coverage; `web/shared/edge/**` at its ratchet.
+imports `SoundCue` from lib; the player is reached from `fx.ts` (no zone restricts it) and
+`main.ts` (an edge). `tsconfig.node.json` lists `web/shared/edge/sound.ts` beside `fx.ts`, since
+the node project compiles gin's `src/` (corrected at implementation). `web/shared/lib/**` stays
+at 100% coverage; `web/shared/edge/**` at its ratchet.
 
 ## 10. Tests
 
@@ -210,8 +224,10 @@ imports `SoundCue` from lib; the player is reached from `fx.ts`/`main.ts`, which
   (`web/games/gin-rummy/src/fx.test.ts`, against the frozen legacy numbers).
 - **edge**: `playSound` for each kind over fakes; a failing fetch and a failing decode are silent;
   the sample cache fetches once per URL.
-- **game**: storage round trip and the refusal of unknown names; `soundFont/set` writes and the
-  `fx` effect carries the font; `homeSnapshot()` drops a bad value; the e2e page-only spec
+- **game**: storage round trip and the refusal of unknown names (the legacy-capture parity suite,
+  test/parity/gin.storage.test.ts, lists the key as this page's own); `soundFont/set` writes and
+  the `fx` effect carries the font; `homeSnapshot()` drops a bad value (main.ts is boot, so the
+  e2e spec is its oracle); the e2e page-only spec
   (`e2e/gin-sound-font.spec.ts`, modelled on `gin-card-back.spec.ts`): a stored `arcade` shows after a
   reload through `__gin.soundFontName()`, `__gin.soundFont('felt')` applies and stores,
   `__gin.soundFont('plaid')` logs and refuses, a stored `tartan` is logged at boot and dropped.
