@@ -88,6 +88,7 @@ import {
 } from '../sandbox.ts';
 import { INITIAL_CUES, nextCue, oppDrawCue, selectionIn, type Cue, type CueState } from './cues.ts';
 import { drawSource, settleDraw, type DrawStage } from './hand/draw.ts';
+import type { DropTarget } from './hand/drag.ts';
 import { arrangedOf, declarable, toggleMeld, type HumanMelds } from './hand/arrange.ts';
 import { settlePicture, type Picture, moveLoose, samePicture } from './hand/picture.ts';
 
@@ -226,7 +227,7 @@ export type App = Readonly<{
    * laid off onto the knocker's melds (`from: 'table'`); `onto` is the meld the card is over and
    * fits, lit as its drop target. A tap is ignored until the drag ends. Session only.
    */
-  drag: Readonly<{ cardId: string; from: 'hand' | 'table'; onto: number | null }> | null;
+  drag: Readonly<{ cardId: string; from: 'hand' | 'table'; onto: DropTarget | null }> | null;
   /** How the hand is arranged (`ginRummy_sort`). */
   sort: SortMode;
   /** The card back drawn on every face-down card (`ginRummy_cardBack`, src/cardBack.ts). */
@@ -387,12 +388,12 @@ export type Intent =
   /** The pointer is over loose index `index`: the card moves there, the order is manual from now on. */
   | Readonly<{ type: 'card/dragOver'; index: number }>
   /** The pointer is over the knocker's meld `onto` (null: over none): lit when the card fits it. */
-  | Readonly<{ type: 'card/dragOnto'; onto: number | null }>
+  | Readonly<{ type: 'card/dragOnto'; onto: DropTarget | null }>
   /**
    * The drag ended with the pointer over meld `over` (null: over none): a hand card over a meld it
    * fits is laid off, a table card released off the melds is taken back, else the card shows again.
    */
-  | Readonly<{ type: 'card/dragEnd'; over?: number | null }>
+  | Readonly<{ type: 'card/dragEnd'; over?: DropTarget | null }>
   /** `__gin.cardBack(name)` (the console, for now): a valid preset is shown and remembered. */
   | Readonly<{ type: 'cardBack/set'; back: CardBack }>
   // ---- the sandbox (src/sandbox.ts), shown while the first player is named `sandbox` ----
@@ -1018,6 +1019,18 @@ const actionClick = (app: App, which: string, ctx: Context): Step => {
   }
 };
 
+/**
+ * Whether the hand card `cardId` may be dropped on the discard pile (§5d): my discard phase, no
+ * drawn card waiting in the ghost cell, and not the card just taken from the pile (the legacy's lock).
+ * The painter lights the pile and the Discard button with it while the card is dragged.
+ */
+export const canDropDiscard = (app: App, v: View, cardId: string): boolean =>
+  v.isMyTurn &&
+  v.phase === 'discard' &&
+  app.draw === null &&
+  v.drawnFromDiscard !== cardId &&
+  v.me.hand.some((c) => c.id === cardId);
+
 /** Whether the defender's card `cardId` fits the knocker's meld `onto` as extended so far (§7b). */
 const fitsMeld = (v: View, cardId: string, onto: number | null): boolean => {
   const lo = v.layoff;
@@ -1390,8 +1403,18 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       const d = app.drag;
       const v = app.view;
       if (d === null || v === null) return pure(app);
-      // Only a meld the card fits lights up; a laid-off card back over the melds lights none.
-      const onto = d.from === 'hand' && fitsMeld(v, d.cardId, intent.onto) ? intent.onto : null;
+      // Only a target the card may go to lights up: a meld it fits, or the discard pile when the
+      // card may be discarded; a laid-off card back over the melds lights none.
+      const onto: DropTarget | null =
+        d.from !== 'hand'
+          ? null
+          : intent.onto === 'discard'
+            ? canDropDiscard(app, v, d.cardId)
+              ? 'discard'
+              : null
+            : fitsMeld(v, d.cardId, intent.onto)
+              ? intent.onto
+              : null;
       return onto === d.onto ? pure(app) : pure({ ...app, drag: { ...d, onto } });
     }
     case 'card/dragEnd': {
@@ -1399,9 +1422,17 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       if (d === null) return pure(app);
       const cleared: App = { ...app, drag: null };
       const over = intent.over ?? null;
+      // Released on the discard pile, the card is discarded as the Discard button would (§5d).
       if (
         d.from === 'hand' &&
-        over !== null &&
+        over === 'discard' &&
+        app.view !== null &&
+        canDropDiscard(app, app.view, d.cardId)
+      )
+        return act({ ...cleared, selectedCard: null }, { type: 'discard', cardId: d.cardId }, ctx);
+      if (
+        d.from === 'hand' &&
+        typeof over === 'number' &&
         app.view !== null &&
         fitsMeld(app.view, d.cardId, over)
       )

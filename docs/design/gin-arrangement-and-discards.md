@@ -272,6 +272,19 @@ cards shouldn't immediately snap around, but they should move via transitions."
   e2e/gin-arrange.spec.ts (a drag over the live story: the ghost leans left on a fast pull left,
   the cell empties, the card lands first, Manual is active; both viewports).
 
+**Dropping on the discard pile (the owner, 2026-09-23).** "When you click and drag a card to reorder it,
+you should also be able to click and drag it to be over the discard pile": in the discard phase a hand
+card in the air makes the discard pile and the Discard button `drop-ready` (the pile glows amber, the
+button's text wiggles), and the one under the pointer `drop` (green), where a release discards the card
+exactly as the button would (`card/dragEnd` over `'discard'` runs the `discard` action; the card just
+taken from the pile stays locked, and nothing lights outside the discard phase). The pile's hitbox is
+its box grown by half in each direction ("you just have to be within 50% of the discard pile",
+dragger.ts `DROP_GROW`), the button's likewise; while a knock is answered the melds come first and the
+piles are hidden. The reducer decides (`canDropDiscard`); the dragger only names what is under the
+pointer (`DropTarget` in hand/drag.ts). Oracles: `dragger.test.ts` (the grown box, the button, the
+immediate end), `state.test.ts` (the discard, the locked card, the phase), `render.test.ts` (the
+classes) and `e2e/gin-drag-discard.spec.ts` (the lit targets, the near miss, the discard and the curtain).
+
 ## 6. Hand layout
 
 DOM (`SlotHandView.render`): each group is one grid item; loose cards and the ghost are bare cells:
