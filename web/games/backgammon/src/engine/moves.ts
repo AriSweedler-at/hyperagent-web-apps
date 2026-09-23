@@ -42,10 +42,10 @@ export const remainingDice = (state: State): ReadonlyArray<Die> =>
 const slot = (place: From | To): number => (place === 'bar' ? -1 : place === 'off' ? 24 : place);
 export const moveKey = (m: Move): string =>
   `${String(slot(m.from))}>${String(slot(m.to))}/${String(m.die)}`;
+export const compareMoves = (a: Move, b: Move): number =>
+  slot(a.from) - slot(b.from) || slot(a.to) - slot(b.to) || b.die - a.die;
 export const sortMoves = (moves: ReadonlyArray<Move>): ReadonlyArray<Move> =>
-  [...moves].sort(
-    (a, b) => slot(a.from) - slot(b.from) || slot(a.to) - slot(b.to) || b.die - a.die,
-  );
+  [...moves].sort(compareMoves);
 export const movesEqual = (a: Move, b: Move): boolean => moveKey(a) === moveKey(b);
 
 /**
