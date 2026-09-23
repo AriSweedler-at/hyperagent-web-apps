@@ -27,6 +27,7 @@ const fakeAudio = (
       state.enabled = value;
     },
     enabled: () => state.enabled,
+    context: () => null,
   };
   return { audio, calls, enabled: () => state.enabled };
 };
