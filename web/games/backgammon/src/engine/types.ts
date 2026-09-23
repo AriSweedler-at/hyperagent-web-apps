@@ -52,16 +52,18 @@ export type To = PointIndex | 'off';
 export type Move = Readonly<{ from: From; to: To; die: Die }>;
 /** A move as played: `hit` is read off the board before the move (the toast and the `*` use it). */
 export type PlayedMove = Readonly<{ from: From; to: To; die: Die; hit: boolean }>;
+/** One maximal play: the single-die moves of a turn, in order. */
+export type Play = ReadonlyArray<Move>;
 
 export type Variant = 'portes' | 'backgammon' | 'plakoto' | 'fevga';
 /** The two the engine plays; `createGame` is typed on this so an unimplemented variant cannot start. */
 export type ShippedVariant = 'portes' | 'backgammon';
 
 /**
- * `opening`: the opening roll is made (by `createGame`/`nextGame`) and the winner has not acted:
- * in Western play the winner moves those dice, in tavli the winner rolls. There is no `toDouble`
- * phase (a double is legal in `toRoll` when `canDouble`) and no `done` action (the turn ends by
- * itself when the play is complete, R13).
+ * `opening` is reserved and never emitted in v1: `createGame`/`nextGame` resolve the opening roll,
+ * so a game starts in `moving` (Western: the winner plays the opening pair) or `toRoll` (tavli: the
+ * winner rerolls). There is no `toDouble` phase (a double is legal in `toRoll` when `canDouble`)
+ * and no `done` action (the turn ends by itself when the play is complete, R13).
  */
 export type Phase = 'opening' | 'toRoll' | 'cubeOffered' | 'moving' | 'over';
 
@@ -143,6 +145,8 @@ export type State = Readonly<{
   dice: Dice | null;
   /** This turn's moves in order; `remainingDice` is the roll minus their dice. */
   played: ReadonlyArray<PlayedMove>;
+  /** The previous completed turn's `played` (the opponent's moves animate from it); [] at a game's start and after a forfeited roll. */
+  lastPlay: ReadonlyArray<PlayedMove>;
   /** The board when the dice were rolled (undo target); non-null iff the mover is moving. */
   turnStart: Board | null;
   cube: Cube;
@@ -158,6 +162,7 @@ export type State = Readonly<{
   endedAt: number | null;
 }>;
 
+export const ACTION_TYPES = ['roll', 'move', 'undo', 'double', 'take', 'pass', 'next'] as const;
 export type Action =
   | Readonly<{ type: 'roll' | 'undo' | 'double' | 'take' | 'pass' | 'next' }>
   | Readonly<{ type: 'move'; from: From; to: To; die: Die }>;
@@ -181,8 +186,13 @@ export type View = Readonly<{
   /** The dice still to play; [] when nobody is moving. */
   movesLeft: ReadonlyArray<Die>;
   played: ReadonlyArray<PlayedMove>;
+  lastPlay: ReadonlyArray<PlayedMove>;
   /** My legal next moves (sorted by `moveKey`) when I am moving; else []. */
   legal: ReadonlyArray<Move>;
+  /** The maximal plays consistent with `played`, canonical order, at most PLAYS_CAP; else []. */
+  plays: ReadonlyArray<Play>;
+  /** The true count: `plays.length < playsTotal` iff the list was truncated. */
+  playsTotal: number;
   canUndo: boolean;
   canDouble: boolean;
   canBearOff: Pair<boolean>;
@@ -190,7 +200,6 @@ export type View = Readonly<{
   cube: Cube;
   match: Match;
   matchOver: boolean;
-  matchWinner: Seat | null;
   result: GameResult | null;
   games: ReadonlyArray<GameRecord>;
   log: ReadonlyArray<LogEntry>;
@@ -246,6 +255,8 @@ export const BAR_PIPS = 25;
 export const HOME_SIZE = 6;
 /** R19 says no cap; 128 cannot matter in a match of 7 and would break the literal type. */
 export const CUBE_MAX: CubeValue = 64;
+/** A doubles position can reach tens of thousands of plays; a `state` frame carries this many. */
+export const PLAYS_CAP = 512;
 export const MATCH_LENGTHS: ReadonlyArray<number> = [1, 3, 5, 7];
 export const DEFAULT_MATCH_LENGTH = 5;
 export const DEFAULT_VARIANT: ShippedVariant = 'portes';

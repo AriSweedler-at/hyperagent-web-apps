@@ -2,8 +2,9 @@
 // the starting board from the variant's own-numbered `start`, the one die formula, the opening
 // roll (rerolled on a tie) and the `State` literal in types.ts's key order. `createGame` is
 // infallible: the option type only admits shipped variants, and the Crawford flags are evaluated
-// here as well as in `nextGame`. The winner of the opening roll acts first from `phase 'opening'`:
-// in Western play the opening dice are the first turn's roll, in tavli the winner rolls afresh.
+// here as well as in `nextGame`. The winner of the opening roll acts first: in Western play the
+// opening dice are the first turn's roll (`phase 'moving'`), in tavli the winner rolls afresh
+// (`phase 'toRoll'`); `phase 'opening'` is reserved and never emitted.
 import type { Rng } from '../../../../shared/lib/rng.ts';
 import { emptyBoard } from './board.ts';
 import { diceText } from './notation.ts';
@@ -114,12 +115,13 @@ const startGame = (
     options,
     variant,
     gameNo,
-    phase: 'opening',
+    phase: dice === null ? 'toRoll' : 'moving',
     turn: opening.winner,
     board,
     opening: opening.dice,
     dice,
     played: [],
+    lastPlay: [],
     turnStart: dice === null ? null : board,
     cube: { value: 1, owner: null },
     match: {
@@ -130,8 +132,18 @@ const startGame = (
     },
     result: null,
     games,
+    // Game 1 opens the match, so its log starts at the opening roll; later games announce themselves.
     log: [
-      { seat: null, kind: 'game', text: gameText(gameNo, crawford.isCrawfordGame), at: startedAt },
+      ...(gameNo === 1
+        ? []
+        : [
+            {
+              seat: null,
+              kind: 'game' as const,
+              text: gameText(gameNo, crawford.isCrawfordGame),
+              at: startedAt,
+            },
+          ]),
       ...opening.ties,
       openingEntry,
     ],
@@ -189,5 +201,6 @@ export const withPosition = (state: State, board: Board, turn: Seat, dice: Dice 
   board,
   dice,
   played: [],
+  lastPlay: [],
   turnStart: dice === null ? null : board,
 });

@@ -145,7 +145,8 @@ describe('bear-off and structure', () => {
     const a = pos('L: 8:1 | D: 20:1 | bar 0/0 | off 0/0');
     expect(boardKey(a)).toBe(boardKey(pos('L: 8:1 | D: 20:1 | bar 0/0 | off 0/0')));
     const pinned = afterMove(a, 0, { from: 7, to: 4, die: 3 }, VARIANTS.plakoto);
-    const reversed = { ...pinned, points: pinned.points.map((st, i) => (i === 4 ? [0, 1] : st)) };
+    const flipped: Stack = [0, 1];
+    const reversed = { ...pinned, points: pinned.points.map((st, i) => (i === 4 ? flipped : st)) };
     expect(boardKey(pinned)).not.toBe(boardKey(reversed));
     expect(boardKey(START)).toContain('|0/0|0/0');
   });
