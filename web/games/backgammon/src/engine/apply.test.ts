@@ -7,7 +7,7 @@ import type { Rng } from '../../../../shared/lib/rng.ts';
 import { actorOf, applyAction, canDouble, MESSAGES } from './apply.ts';
 import { legalMoves, remainingDice } from './moves.ts';
 import { moveLabel, parseMove, parsePosition } from './notation.ts';
-import { createGame, nextGame, withPosition } from './setup.ts';
+import { createGame, nextGame, OPENING_TIE_CAP, withPosition } from './setup.ts';
 import type { Action, Board, Dice, Move, Seat, ShippedVariant, State } from './types.ts';
 import { VARIANTS } from './variants.ts';
 
@@ -128,6 +128,18 @@ describe('openings (S1-S3)', () => {
     expect(rolled.lastAction?.text).toBe('Ari rolled 6-6');
     expect(rolled.lastAction?.kind).toBe('roll');
     expect(rolled.log).toHaveLength(2);
+  });
+
+  test('a source that ties forever cannot wedge createGame: Light starts at the tie cap', () => {
+    // Every die comes from the injected rng (R27); a stub or a stuck source ties on every draw.
+    const rng = counting(() => 0);
+    const s = createGame(PLAYERS, { rotation: ['backgammon'] }, rng, now);
+    const ties = s.log.filter((e) => e.kind === 'opening' && e.seat === null);
+    expect(ties).toHaveLength(OPENING_TIE_CAP);
+    expect(ties.every((e) => e.text === 'Both rolled 1 — again')).toBe(true);
+    expect(s).toMatchObject({ turn: 0, opening: [1, 1], dice: [1, 1], phase: 'moving' });
+    expect(s.lastAction?.text).toBe('Ari rolled 1, Jeff rolled 1 — Ari plays 1-1');
+    expect(rng.calls()).toBe(2 * (OPENING_TIE_CAP + 1));
   });
 
   test('defaults: portes, match to 5; an empty rotation falls back too', () => {

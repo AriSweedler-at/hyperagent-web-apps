@@ -3,7 +3,8 @@
 // guest are `unknown` until they pass one of these. Built from web/shared/lib/json combinators
 // with the fields in types.ts's order, so `JSON.stringify` of a decoded value reproduces the
 // engine's own text byte for byte. Structural checks plus the board invariants the engine leans
-// on (24 points, fifteen a side, stacks of one owner); play legality stays with `applyAction`.
+// on (24 points, fifteen a side, stacks of one owner) and the phase's agreement with the turn
+// fields, since a save that disagrees would wedge the game; play legality stays with `applyAction`.
 // Only the shipped variants decode: a save naming plakoto or fevga is refused until they ship.
 import {
   arrayOf,
@@ -173,67 +174,93 @@ const gameRecord: Decoder<GameRecord> = object({
   endedAt: timestamp,
 });
 
+/**
+ * The phase decides which turn fields are live: `moving` carries the dice and the turn's starting
+ * board, every other phase has nothing played, and `over` is the one phase with a result. The
+ * dice may outlive the turn (they show the last roll), so only their absence is checked. A save
+ * that disagrees, say `moving` without dice, leaves no action legal for either seat.
+ */
+const phaseAgrees = (
+  s: Pick<State, 'phase' | 'dice' | 'played' | 'result'> & Partial<Pick<State, 'turnStart'>>,
+): boolean => {
+  const moving = s.phase === 'moving';
+  return (
+    (!moving || s.dice !== null) &&
+    (moving || s.played.length === 0) &&
+    (s.turnStart === undefined || (s.turnStart !== null) === moving) &&
+    (s.result !== null) === (s.phase === 'over')
+  );
+};
+
 /** The host's full state, as the save holds it (setup.ts's key order). */
-export const decodeState: Decoder<State> = object({
-  players: pair(player),
-  options,
-  variant: shippedVariant,
-  gameNo: integer(1),
-  phase,
-  turn: decodeSeat,
-  board: decodeBoard,
-  opening: pair(decodeDie),
-  dice: nullable(dice),
-  played: arrayOf(playedMove),
-  lastPlay: arrayOf(playedMove),
-  turnStart: nullable(decodeBoard),
-  cube,
-  match,
-  result: nullable(gameResult),
-  games: arrayOf(gameRecord),
-  log: arrayOf(logEntry),
-  lastAction: nullable(logEntry),
-  startedAt: timestamp,
-  endedAt: nullable(timestamp),
-});
+export const decodeState: Decoder<State> = refine(
+  object({
+    players: pair(player),
+    options,
+    variant: shippedVariant,
+    gameNo: integer(1),
+    phase,
+    turn: decodeSeat,
+    board: decodeBoard,
+    opening: pair(decodeDie),
+    dice: nullable(dice),
+    played: arrayOf(playedMove),
+    lastPlay: arrayOf(playedMove),
+    turnStart: nullable(decodeBoard),
+    cube,
+    match,
+    result: nullable(gameResult),
+    games: arrayOf(gameRecord),
+    log: arrayOf(logEntry),
+    lastAction: nullable(logEntry),
+    startedAt: timestamp,
+    endedAt: nullable(timestamp),
+  }),
+  phaseAgrees,
+  'a phase that agrees with dice, played, turnStart and result',
+);
 
 const seatInfo = object({ idx: decodeSeat, id: string, name: string });
 
 /** A per-seat view, as a wire `state` frame carries it (view.ts's key order). */
-export const decodeView: Decoder<View> = object({
-  me: seatInfo,
-  opp: seatInfo,
-  players: pair(player),
-  options,
-  variant: shippedVariant,
-  gameNo: integer(1),
-  phase,
-  turn: decodeSeat,
-  actor: nullable(decodeSeat),
-  isMyTurn: boolean,
-  board: decodeBoard,
-  opening: pair(decodeDie),
-  dice: nullable(dice),
-  movesLeft: arrayOf(decodeDie),
-  played: arrayOf(playedMove),
-  lastPlay: arrayOf(playedMove),
-  legal: arrayOf(decodeMove),
-  plays: arrayOf(play),
-  playsTotal: count,
-  canUndo: boolean,
-  canDouble: boolean,
-  canBearOff: pair(boolean),
-  pips: pair(count),
-  cube,
-  match,
-  matchOver: boolean,
-  result: nullable(gameResult),
-  games: arrayOf(gameRecord),
-  log: arrayOf(logEntry),
-  lastAction: nullable(logEntry),
-  startedAt: timestamp,
-  endedAt: nullable(timestamp),
-});
+export const decodeView: Decoder<View> = refine(
+  object({
+    me: seatInfo,
+    opp: seatInfo,
+    players: pair(player),
+    options,
+    variant: shippedVariant,
+    gameNo: integer(1),
+    phase,
+    turn: decodeSeat,
+    actor: nullable(decodeSeat),
+    isMyTurn: boolean,
+    board: decodeBoard,
+    opening: pair(decodeDie),
+    dice: nullable(dice),
+    movesLeft: arrayOf(decodeDie),
+    played: arrayOf(playedMove),
+    lastPlay: arrayOf(playedMove),
+    legal: arrayOf(decodeMove),
+    plays: arrayOf(play),
+    playsTotal: count,
+    canUndo: boolean,
+    canDouble: boolean,
+    canBearOff: pair(boolean),
+    pips: pair(count),
+    cube,
+    match,
+    matchOver: boolean,
+    result: nullable(gameResult),
+    games: arrayOf(gameRecord),
+    log: arrayOf(logEntry),
+    lastAction: nullable(logEntry),
+    startedAt: timestamp,
+    endedAt: nullable(timestamp),
+  }),
+  phaseAgrees,
+  'a phase that agrees with dice, played and result',
+);
 
 const actionHead = object({ type: literal(...ACTION_TYPES) });
 const plainAction = object({ type: literal('roll', 'undo', 'double', 'take', 'pass', 'next') });

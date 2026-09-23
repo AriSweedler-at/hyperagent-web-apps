@@ -1,3 +1,6 @@
+// Scoring (understand.md §5 R17, R18, R21-R24; panel E1 §5 score.ts): pip counts with the
+// judge's corrections (T13, P20), the winner and the multiplier on the end-position table for
+// both variants, and the match arithmetic including the Crawford flags.
 import { describe, expect, test } from 'vitest';
 
 import { afterMove } from './board.ts';

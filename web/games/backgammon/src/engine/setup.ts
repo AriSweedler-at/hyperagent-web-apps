@@ -58,16 +58,22 @@ export type Opening = Readonly<{
   ties: ReadonlyArray<LogEntry>;
 }>;
 
+/**
+ * Ties past this many stand, and Light starts: every die comes from the injected rng (R27), so a
+ * stub or a stuck source ties on every draw, and `createGame` promises a State, not a Result.
+ */
+export const OPENING_TIE_CAP = 32;
+
 /** R5/R6: one die each, rerolled together while they tie; the higher die's seat starts. */
 export const openingRoll = (rng: Rng, now: Now, ties: ReadonlyArray<LogEntry> = []): Opening => {
   const light = rollDie(rng);
   const dark = rollDie(rng);
-  if (light === dark)
+  if (light === dark && ties.length < OPENING_TIE_CAP)
     return openingRoll(rng, now, [
       ...ties,
       { seat: null, kind: 'opening', text: `Both rolled ${String(light)} — again`, at: now() },
     ]);
-  return { dice: [light, dark], winner: light > dark ? 0 : 1, ties };
+  return { dice: [light, dark], winner: dark > light ? 1 : 0, ties };
 };
 
 const gameText = (gameNo: number, isCrawfordGame: boolean): string =>

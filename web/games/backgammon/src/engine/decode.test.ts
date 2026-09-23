@@ -124,6 +124,28 @@ describe('rejections', () => {
     );
   });
 
+  test('the phase must agree with the turn fields, or no action would ever be legal', () => {
+    // A Western game 1 is `moving` with dice; a save that lost them would wedge the game.
+    const wedged = '$: expected a phase that agrees with dice, played, turnStart and result';
+    expect(bad({ dice: null, turnStart: null })).toBe(wedged);
+    expect(bad({ turnStart: null })).toBe(wedged);
+    expect(bad({ phase: 'toRoll' })).toBe(wedged);
+    expect(bad({ phase: 'over' })).toBe(wedged);
+    expect(
+      bad({ phase: 'toRoll', turnStart: null, played: [{ from: 7, to: 4, die: 3, hit: false }] }),
+    ).toBe(wedged);
+    expect(
+      bad({ result: { winner: 0, multiplier: 1, cube: 1, points: 1, reason: 'passed' } }),
+    ).toBe(wedged);
+    expect(bad({ phase: 'toRoll', turnStart: null })).toBe('ok');
+    const view = viaJson(viewFor(s, 0)) as Record<string, unknown>;
+    expect(failureOf(decodeView({ ...view, dice: null }))).toBe(
+      '$: expected a phase that agrees with dice, played and result',
+    );
+    expect(failureOf(decodeView({ ...view, phase: 'over' }))).toContain('$: expected a phase');
+    expect(failureOf(decodeView({ ...view, phase: 'toRoll' }))).toBe('ok');
+  });
+
   test('actions: the type decides the keys; nothing else is accepted', () => {
     expect(decodeAction({ type: 'roll', extra: 1 })).toEqual({ ok: true, value: { type: 'roll' } });
     expect(decodeAction({ type: 'move', from: 'bar', to: 18, die: 6 })).toEqual({

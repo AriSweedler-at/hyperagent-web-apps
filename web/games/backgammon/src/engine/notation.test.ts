@@ -1,3 +1,6 @@
+// The notation (understand.md §5 R28; panel E1 §5 notation.ts): own-numbered point names, move
+// and play text with hit stars and `(n)` for a die that is not the distance, and the test-table
+// parsers (`parseMove`, `parsePosition` / `formatPosition`) with the refusals they owe a sandbox.
 import { describe, expect, test } from 'vitest';
 
 import {

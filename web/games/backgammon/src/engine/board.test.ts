@@ -1,3 +1,6 @@
+// The board primitives (understand.md §5 R2, R8, R10, R11, R15; panel E1 §5 board.ts): the
+// frame from own to absolute numbering, `isOpen` with the single-opponent hook, `afterMove` for
+// plain moves, hits, pins, bar entry and bearing off, and the shape checks the decoders lean on.
 import { describe, expect, test } from 'vitest';
 
 import {

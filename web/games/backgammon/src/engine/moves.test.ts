@@ -29,6 +29,7 @@ import {
   sortMoves,
 } from './moves.ts';
 import { moveLabel, parseMove, parsePosition } from './notation.ts';
+import { pipCount } from './score.ts';
 import { createGame, withPosition } from './setup.ts';
 import type { Board, Dice, Move, Seat } from './types.ts';
 import { VARIANTS } from './variants.ts';
@@ -214,12 +215,17 @@ describe('continuations pinned by the table notes', () => {
 
   test('P29: chained hits grow the bar by one each and add 20 and 16 pips', () => {
     const p29 = 'L: 24:2 13:5 8:3 6:5 | D: 24:3 13:5 9:1 8:3 6:2 5:1 | bar 0/0 | off 0/0';
+    // The judge's correction: dark's own 5 then own 9 go to the bar (25): 187 -> 207 -> 223.
+    expect(pipCount(pos(p29), 1, R)).toBe(187);
     const one = after(p29, 0, ['24/20*']);
     expect(one.bar).toEqual([0, 1]);
+    expect(pipCount(one, 1, R)).toBe(207);
     expect(labels(one, 0, movesFrom(legalFirstMoves(one, 0, [4, 4, 4], R), 19))).toEqual([
       '20/16*',
     ]);
-    expect(after(p29, 0, ['24/20*', '20/16*']).bar).toEqual([0, 2]);
+    const two = after(p29, 0, ['24/20*', '20/16*']);
+    expect(two.bar).toEqual([0, 2]);
+    expect(pipCount(two, 1, R)).toBe(223);
   });
 });
 

@@ -66,6 +66,7 @@ export { crawfordFor, matchOver, matchWinner, multiplierFor, pipCount, winnerOf 
 export {
   createGame,
   nextGame,
+  OPENING_TIE_CAP,
   openingRoll,
   rollDie,
   startingBoard,
