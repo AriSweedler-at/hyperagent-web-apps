@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import worker, { DEFAULT_UPSTREAM, type Env, mapPath, unmapPath } from './worker.ts';
+import { ALIASES as REGISTRY_ALIASES } from '../../tools/games.ts';
+import worker, { ALIASES, DEFAULT_UPSTREAM, type Env, mapPath, unmapPath } from './worker.ts';
 
 const ORIGIN = 'https://games.sweedler.com';
 const GH = 'https://arisweedler-at.github.io';
@@ -35,6 +36,13 @@ describe('mapPath: the mapping table in the file header', () => {
     ['/gin-rummy', '/hyperagent-web-apps/games/gin-rummy'],
     ['/gin-rummy/', '/hyperagent-web-apps/games/gin-rummy/'],
     ['/fidice/app-abc123.js', '/hyperagent-web-apps/games/fidice/app-abc123.js'],
+    // An alias is served in place: the page and its assets come from the game's folder.
+    ['/sheshbesh/', '/hyperagent-web-apps/games/backgammon/'],
+    ['/sheshbesh/app-abc123.js', '/hyperagent-web-apps/games/backgammon/app-abc123.js'],
+    ['/sheshbesh/deep/er/file.js', '/hyperagent-web-apps/games/backgammon/deep/er/file.js'],
+    // Only the whole first segment is an alias.
+    ['/sheshbeshx/', '/hyperagent-web-apps/games/sheshbeshx/'],
+    ['/shesh/', '/hyperagent-web-apps/games/shesh/'],
     ['/shared/ice.js', '/hyperagent-web-apps/shared/ice.js'],
     ['/shared/assets/chunk-1.js', '/hyperagent-web-apps/shared/assets/chunk-1.js'],
     ['/hyperagent-web-apps/', '/hyperagent-web-apps/'],
@@ -54,8 +62,19 @@ describe('mapPath: the mapping table in the file header', () => {
     ['/games/gin-rummy', '/gin-rummy'],
     ['/games/fidice/app.js', '/fidice/app.js'],
     ['/games/', '/'],
+    // /ALIAS without its slash is redirected here, not fetched: the upstream's slash redirect would
+    // come back as /hyperagent-web-apps/games/backgammon/ and unmapPath would send the player to
+    // /backgammon/. /games/ALIAS is a landing-style link like any other.
+    ['/sheshbesh', '/sheshbesh/'],
+    ['/games/sheshbesh/', '/sheshbesh/'],
+    ['/games/sheshbesh', '/sheshbesh'],
   ])('%s redirects to %s on this origin', (pathname, shortPath) => {
     expect(mapPath(pathname)).toEqual({ kind: 'redirect', path: shortPath });
+  });
+
+  test('ALIASES is the map tools/games.ts spells for the Pages origin', () => {
+    expect(ALIASES).toEqual(REGISTRY_ALIASES);
+    expect(ALIASES).toEqual({ sheshbesh: 'backgammon' });
   });
 });
 
@@ -83,6 +102,13 @@ describe('unmapPath: upstream pathname back to this origin', () => {
       expect(unmapPath(mapped.path)).toBe(pathname);
     },
   );
+
+  test('knows no alias: the game path an alias fetched comes back as the game, so an alias never round-trips', () => {
+    const mapped = mapPath('/sheshbesh/');
+    expect(mapped.kind).toBe('fetch');
+    expect(unmapPath(mapped.path)).toBe('/backgammon/');
+    expect(unmapPath('/hyperagent-web-apps/games/backgammon/')).toBe('/backgammon/');
+  });
 });
 
 describe('fetch handler', () => {
@@ -103,6 +129,30 @@ describe('fetch handler', () => {
       const res = await get('/games/gin-rummy/?v=1');
       expect(res.status).toBe(301);
       expect(res.headers.get('Location')).toBe(`${ORIGIN}/gin-rummy/?v=1`);
+    }));
+
+  test('/ALIAS/ serves the game page in place, query and all, and its assets from the game folder', () =>
+    withUpstream(upstreamEcho, async () => {
+      expect(await (await get('/sheshbesh/?join=ABCD')).text()).toBe(
+        `${GH}/hyperagent-web-apps/games/backgammon/?join=ABCD`,
+      );
+      expect(await (await get('/sheshbesh/app-abc.js')).text()).toBe(
+        `${GH}/hyperagent-web-apps/games/backgammon/app-abc.js`,
+      );
+    }));
+
+  test('/ALIAS without its slash redirects to /ALIAS/ on this origin, keeping the query, without calling upstream', () =>
+    withUpstream(noUpstream, async () => {
+      const res = await get('/sheshbesh?join=ABCD');
+      expect(res.status).toBe(301);
+      expect(res.headers.get('Location')).toBe(`${ORIGIN}/sheshbesh/?join=ABCD`);
+    }));
+
+  test('/games/ALIAS/ redirects to /ALIAS/ like every landing-style link', () =>
+    withUpstream(noUpstream, async () => {
+      const res = await get('/games/sheshbesh/');
+      expect(res.status).toBe(301);
+      expect(res.headers.get('Location')).toBe(`${ORIGIN}/sheshbesh/`);
     }));
 
   test('/shared/ice.js reaches the shared directory, not games/shared', () =>

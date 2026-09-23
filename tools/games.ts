@@ -33,3 +33,15 @@ export const HOOKS: Readonly<Record<Game, string>> = {
 
 /** The landing page's card links, relative to the site root, in GAMES order. */
 export const LANDING_HREFS: ReadonlyArray<string> = GAMES.map((game) => `games/${game}/`);
+
+/**
+ * A game's second URL name -> the game folder it stands for: `/sheshbesh/` is the backgammon page.
+ * An alias is not a game: no landing card, no room-code, title or hook row, and never a GAMES entry.
+ * On the Pages origin web/games/<alias>/index.html is a stub that forwards to `../<game>/`, query
+ * and hash intact; on games.sweedler.com the Worker serves `/<alias>/` from `games/<game>/` in place
+ * (infra/games-proxy/worker.ts keeps its own copy of this map, since wrangler deploys that file
+ * alone; its test pins the two equal). The dist guards check each stub, and only the game's own URL
+ * is linked from the landing page. The values are folder names rather than `Game`: backgammon's
+ * page and its `Game` row land separately from this alias.
+ */
+export const ALIASES: Readonly<Record<string, string>> = { sheshbesh: 'backgammon' };

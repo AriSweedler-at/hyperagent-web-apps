@@ -4,12 +4,15 @@
 // Nothing may be emitted to a root /assets/ either. Runs on dist/ after the build (test:dist).
 import { expect, test } from 'vitest';
 
+import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
 import { GAMES } from '../../tools/games.ts';
 import {
+  ALIAS_PAGES,
   allReferences,
   classify,
   describeDist,
   distFiles,
+  isAliasPage,
   readDist,
   referencedFiles,
   referencesIn,
@@ -23,7 +26,9 @@ describeDist('dist asset URLs', (root) => {
   });
 
   test('every reference is relative, shared-relative or https', () => {
-    const references = allReferences(root);
+    // An alias stub's one link is `../<game>/`, a parent path only a sibling of games/<game>/ may
+    // use; the alias test below checks it, and every other file's references are checked here.
+    const references = allReferences(root).filter(({ file }) => !isAliasPage(file));
     expect(references.length).toBeGreaterThan(0);
     const offenders = references
       .map((reference) => ({ ...reference, placement: classify(reference.value) }))
@@ -44,6 +49,28 @@ describeDist('dist asset URLs', (root) => {
 
   test('nothing is emitted under a root assets/ directory', () => {
     expect(distFiles(root).filter((file) => file.startsWith('assets/'))).toEqual([]);
+  });
+
+  ALIAS_PAGES.forEach(({ alias, game, page }) => {
+    test(`the ${alias} stub forwards to ../${game}/, links it once and requests nothing else`, () => {
+      const html = readDist(root, page);
+      // The one reference: the no-script link. Its inline script is code, not markup, so the
+      // forward itself is checked as text; both spell the same document-relative target, which the
+      // Pages origin resolves to games/<game>/ (on the proxy the Worker serves the alias in place
+      // and this file is never fetched).
+      expect(referencesIn(page, html)).toEqual([
+        { file: page, kind: 'href', value: `../${game}/` },
+      ]);
+      expect(html).toContain(`location.replace('../${game}/' + location.search + location.hash)`);
+      expect(html).not.toContain('<script type="module"');
+      expect(html).not.toContain(' src=');
+      // No `/`-rooted URL anywhere in the file, the script included: a quote, paren or `=`
+      // followed by `/`; and never the Pages mount point.
+      expect(html).not.toMatch(/["'(=]\//);
+      expect(html).not.toContain(PAGES_BASE_PATH);
+      expect(html).toContain('<meta name="robots" content="noindex" />');
+      expect(html).toMatch(/<title>[^<]+<\/title>/);
+    });
   });
 
   GAMES.forEach((game) => {

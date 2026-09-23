@@ -4,8 +4,16 @@
 // requests outside the allowlist (e2e/fixtures/offline.ts). The landing page's card links must
 // also resolve on the origin they are clicked from: on the proxy that means the Worker's
 // /games/XXX -> /XXX redirect.
-import { HOOKS, LANDING_HREFS } from '../tools/games.ts';
-import { EXPECTED_TITLES, PAGES, pagePath } from './fixtures/site.ts';
+import { ALIASES, HOOKS, LANDING_HREFS } from '../tools/games.ts';
+import { gameQuery } from './fixtures/player.ts';
+import {
+  EXPECTED_TITLES,
+  PAGES,
+  PAGES_BASE_PATH,
+  folderPath,
+  pagePath,
+  titleOf,
+} from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 PAGES.forEach((name) => {
@@ -46,4 +54,27 @@ test('landing: every card link resolves on this origin', async ({ player, projec
       expect(await response.text(), target).toContain('<title>');
     }),
   );
+});
+
+// An alias (tools/games.ts ALIASES) is a game's page under a second name. On the Pages origin the
+// stub web/games/<alias>/index.html forwards to ../<game>/ with the query intact, so the address
+// bar ends at the game's own path; on the proxy the Worker serves /<alias>/ from the game's folder
+// in place, so the address bar keeps the alias. Either way the page that loads is the game's: its
+// title, and a clean load. The page reads and strips ?join= itself (a room nobody hosts, on the
+// harness's broker), so the pathname is asserted and not the query.
+// Needs the game's page in dist: written while the backgammon page was landing in its own PR, so
+// on a checkout without web/games/backgammon/index.html this test fails until that PR is in.
+Object.entries(ALIASES).forEach(([alias, game]) => {
+  test(`${alias}: is the ${game} page under another name`, async ({ player, project }) => {
+    const { page, watched } = player;
+    // The join code beside the harness's `?peer=` and `?ice=` hooks, as an invite link opens.
+    const query = new URLSearchParams(gameQuery());
+    query.set('join', 'ABCD');
+    await page.goto(`${folderPath(project, alias)}?${query.toString()}`);
+    const expected = project === 'proxy' ? `/${alias}/` : `${PAGES_BASE_PATH}games/${game}/`;
+    await expect.poll(() => new URL(page.url()).pathname).toBe(expected);
+    await expect(page).toHaveTitle(titleOf(game));
+    await page.waitForLoadState('networkidle');
+    expect(watched.failures(), 'failed requests').toEqual([]);
+  });
 });
