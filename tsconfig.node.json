@@ -23,6 +23,12 @@
   // bundles it as is) with its table tests: tools/proxy-dev.ts runs its default export and the dist
   // guards import mapPath. It uses the WHATWG globals @types/node declares (Request, Response,
   // Headers, URL, fetch), the same interfaces Cloudflare provides.
+  // The backgammon src/ tree is listed as gin's is (docs/design/backgammon-board.md §6):
+  // test/dist/backgammon-grid.test.ts imports ui/board/layout.ts, which reaches the engine, and
+  // the e2e fixtures take the engine's types; its DOM modules (the painters, the page fake, the
+  // flight and drag helpers over web/shared/edge/dom.ts) are excluded below by name. Its
+  // protocol.test.ts reads the wire goldens through Vite's `?raw` import, so the one declaration
+  // tsconfig.web.json relies on (web/raw-imports.d.ts) is listed here too.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023"],
@@ -53,6 +59,8 @@
     "web/games/fidice/src/view/ui.ts",
     "web/games/fidice/src/view/scenarios.ts",
     "web/games/gin-rummy/src/**/*.ts",
+    "web/games/backgammon/src/**/*.ts",
+    "web/raw-imports.d.ts",
     "web/shared/edge/storage.ts",
     "web/shared/edge/fx.ts",
     "web/shared/edge/sound.ts",
@@ -71,6 +79,12 @@
     "web/games/gin-rummy/src/ui/hand/flip*.ts",
     "web/games/gin-rummy/src/scorer/main*.ts",
     "web/games/gin-rummy/src/stories/boot.ts",
-    "web/games/gin-rummy/src/stories/catalogue.test.ts"
+    "web/games/gin-rummy/src/stories/catalogue.test.ts",
+    "web/games/backgammon/src/ui/render*.ts",
+    "web/games/backgammon/src/ui/home*.ts",
+    "web/games/backgammon/src/ui/local*.ts",
+    "web/games/backgammon/src/ui/page.fake.ts",
+    "web/games/backgammon/src/ui/board/dragger*.ts",
+    "web/games/backgammon/src/ui/board/fly*.ts"
   ]
 }

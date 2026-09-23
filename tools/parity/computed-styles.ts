@@ -438,6 +438,124 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.rules .steps li::before',
     '.rules .ex',
   ],
+  // Sheshbesh (docs/design/backgammon-board.md §3, §5): the shell in its restyled shapes, then the
+  // table: the board frame and its meander, a point with its triangle and label (the phone's
+  // sideways triangles differ from the desktop's by design, so `.point*::before/::after` differ
+  // between the two goldens), the two checkers, the highlight states as the rules combine them,
+  // the dice faces and their state words, the trays, the controls row and the die-chip tray, the
+  // sheets. `#toast.show`/`.hit` are timed (2.6 s) and left out; `.flyer` is transient.
+  backgammon: [
+    ':root',
+    'body',
+    '#app',
+    'h1',
+    '.masthead .subtitle',
+    '.card-box',
+    '.card-box.prose p',
+    '.field-label',
+    '.btn',
+    '.btn-primary',
+    '.btn-secondary',
+    '.btn-ghost',
+    '.btn-sm',
+    '.btn-block',
+    '.btn:disabled',
+    '.btn small',
+    'input[type="text"]',
+    'select',
+    'label',
+    '.row',
+    '.icon-btn',
+    '.code-input',
+    '.room-code',
+    '.empty-note',
+    '.pulse',
+    '.tabbar',
+    '.tab-btn',
+    '.tab-btn.active',
+    '.tab-submenu',
+    '.mode-switch',
+    '.mode-btn',
+    '.mode-btn.active',
+    '.toggle-row',
+    '#tableScreen',
+    '.topbar',
+    '.badge',
+    '.badge.dim',
+    '.opp-strip',
+    '.opp-strip .name',
+    '.opp-strip .pips',
+    '.conn-dot',
+    '.conn-dot.on',
+    '.conn-dot.off',
+    '.status-line',
+    '#board',
+    '#board::before',
+    '#board.inert',
+    '.point',
+    '.point::before',
+    '.point::after',
+    '.point.pt-a::before',
+    '.point.pt-b::before',
+    '.point.pt-far::after',
+    '.point.pt-near::after',
+    '.point.can-move .checker.top',
+    '.point.selected .checker.top',
+    '.selected.auto .checker.top',
+    '.point.target',
+    '.point.target::before',
+    '.point.target::after',
+    '.point.target-2::after',
+    '.checker',
+    '.checker.top',
+    '.ck-light',
+    '.ck-dark',
+    '.checker.top[data-count]::after',
+    '.bar',
+    '.bar.far',
+    '.bar.near',
+    '#dice',
+    '#dice.rolling .die',
+    '.die',
+    '.die::before',
+    '.die::after',
+    '.die.blank::before',
+    '.die.used',
+    '.die.used::after',
+    '.die.dead',
+    '.die.theirs',
+    '.die.picked::before',
+    '#cube',
+    '.off',
+    '.off .slab',
+    '.off.target::after',
+    '.controls',
+    '.me-strip',
+    '.me-strip .name',
+    '.me-strip .pips',
+    '.roll-slot',
+    '.roll-slot .btn-primary',
+    '.dice-mini',
+    '.dice-mini .die',
+    '.wait-note',
+    '.chips',
+    '.chip',
+    '.chip .faces',
+    '.chip .via',
+    '.overlay',
+    '.overlay.curtain',
+    '.sheet',
+    '.sheet-title',
+    '.sheet-sub',
+    '.rules-list',
+    '.rules-list li',
+    '.rules-list li strong',
+    '.menu-list',
+    '.history-row',
+    '.history-row .who',
+    '.score-line',
+    '#toast',
+  ],
 };
 
 // ---- the golden --------------------------------------------------------------------------------------
@@ -487,7 +605,10 @@ const sha256 = (text: string): string => createHash('sha256').update(text, 'utf8
  * Platform spellings of one font-family, collapsed to the macOS form so goldens agree between
  * macOS and the Linux runners: Chromium on macOS resolves the `BlinkMacSystemFont` alias to
  * `system-ui` when it parses the stylesheet, and the UA's default serif (what `:root` shows before
- * any rule sets a font) is `Times` on macOS and `"Times New Roman"` on Linux.
+ * any rule sets a font) is `Times` on macOS and `"Times New Roman"` on Linux. The backgammon
+ * page's web fonts (GFS Didot, Cardo; docs/design/backgammon-board.md risk 13) need no alias:
+ * `font-family` is read as specified, and a quoted family name serialises the same everywhere
+ * (`"GFS Didot", Didot, "Bodoni MT", Georgia, serif`); the stylesheet itself is stubbed offline.
  */
 export const FONT_ALIASES: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bBlinkMacSystemFont\b/g, '"system-ui"'],
@@ -1012,9 +1133,207 @@ const driveFidice = async (page: Page, shot: Shot): Promise<void> => {
   await visible(page, '#screen-menu');
 };
 
+/**
+ * What the backgammon driver reads off the page between steps: the hook's view (design §2.6) and
+ * the classes the painter set, in one evaluate so a step never sees two paints.
+ */
+type BgSummary = Readonly<{
+  phase: string | null;
+  canMove: ReadonlyArray<string>;
+  selected: ReadonlyArray<string>;
+  /** `id:data-die` of every target, in DOM order. */
+  targets: ReadonlyArray<string>;
+  canUndo: boolean;
+}>;
+
+const readBg = (page: Page): Promise<BgSummary> =>
+  page.evaluate<BgSummary>(`(() => {
+    const v = window.__backgammon.app.shell.view;
+    const ids = (sel) => Array.from(document.querySelectorAll(sel)).map((e) => e.id);
+    return {
+      phase: v === null ? null : v.phase,
+      canMove: ids('#board .can-move'),
+      selected: ids('#board .selected'),
+      targets: Array.from(document.querySelectorAll('#board .target, #board .target-2')).map((e) => e.id + ':' + (e.dataset.die ?? '')),
+      canUndo: v !== null && v.canUndo,
+    };
+  })()`);
+
+/**
+ * Plays the seeded policy through the hook (`__backgammon.legal()` -> `__backgammon.act(a)`, the
+ * page's own seeded Math.random picking uniformly, never an undo) until `stop`, a JS predicate
+ * over the actor's view, holds; a game's end stops it too unless `nextGames` lets it play `next`
+ * on to the match end. In-page, so a whole game costs no round trips; the curtain then names the
+ * actor and the driver reveals it before a shot. A forfeited roll (R14) leaves the roller's view
+ * on show for 1.2 s with nothing legal in it; the driver ends that beat itself (`noMove/elapsed`,
+ * the timer's own intent) instead of waiting. Returns the phase it stopped in.
+ */
+const fastForward = (page: Page, stop: string, nextGames = false): Promise<string> =>
+  page.evaluate<string>(`(() => {
+    const bg = window.__backgammon;
+    const stop = (v) => (${stop});
+    let held = 0;
+    for (let n = 0; n < 20000 && held < 2; n += 1) {
+      const v = bg.view();
+      if (v === null || v.matchOver || stop(v)) break;
+      if (v.phase === 'over' && !${String(nextGames)}) break;
+      const acts = bg.legal().filter((a) => a.type !== 'undo');
+      if (acts.length === 0) {
+        held += 1;
+        bg.dispatch({ type: 'noMove/elapsed' });
+        continue;
+      }
+      held = 0;
+      bg.act(acts[Math.floor(Math.random() * acts.length)]);
+    }
+    const last = bg.view();
+    return last === null ? 'none' : last.phase;
+  })()`);
+
+/** Flights and the hit toast are timed; a shot waits them out so two runs read the same classes. */
+const settleBg = async (page: Page): Promise<void> => {
+  await page.waitForFunction(
+    `document.querySelectorAll('.flyer, .drag-ghost, .checker.arriving').length === 0 && !document.getElementById('toast').classList.contains('show')`,
+  );
+};
+
+/**
+ * Sheshbesh (docs/design/backgammon-board.md §7): the home tabs (pass the phone is the only mode
+ * while online is hidden), a 3-point portes match with its first turn played by hand (rolled, a
+ * source selected with its targets, a move, the undo, the turn over under the curtain), the menu,
+ * history and rules sheets, then the seeded policy through the hook to the states the CSS draws
+ * apart: a checker on the bar, a roll with a dead die, bearing off into the tray, the result sheet
+ * and the table behind it, the next game's curtain and the match end; last a Western match to the
+ * cube offer and the take. Hosting joins this driver with the online PR (PR-D), which re-records.
+ */
+const driveBackgammon = async (page: Page, shot: Shot): Promise<void> => {
+  const snap = async (name: string): Promise<void> => {
+    await settleBg(page);
+    await shot(name);
+  };
+  const reveal = async (): Promise<void> => {
+    if (await page.locator('#curtainOverlay').isVisible()) await click(page, '#curtainBtn');
+  };
+  await page.waitForFunction('typeof window.__backgammon === "object"');
+  await visible(page, '#homeScreen');
+  await snap('home: play tab, pass the phone');
+  await click(page, '#tabRulesBtn');
+  await snap('home: rules tab');
+  await click(page, '#tabAboutBtn');
+  await snap('home: about tab');
+  await click(page, '#tabPlayBtn');
+
+  // ---- a 3-point portes match: the first turn by hand ----
+  await fill(page, '#p1NameInput', 'Ann');
+  await fill(page, '#p2NameInput', 'Bob');
+  await page.locator('#localMatchLengthSel').selectOption('3');
+  await page.locator('#localVariantSel').selectOption('portes');
+  await click(page, '#localBtn');
+  await visible(page, '#curtainOverlay');
+  await snap('local: match started, curtain up');
+  await click(page, '#curtainBtn');
+  await snap('local: rolled');
+  // Tap a die to force it (design §2.4.4), then release it.
+  await click(page, '#dice .die[data-die]');
+  await snap('local: a die picked');
+  await click(page, '#dice .die.picked');
+  const rolled = await readBg(page);
+  const source = rolled.canMove[0];
+  if (source === undefined) throw new Error('no source can move after the opening roll');
+  if (rolled.selected.length === 0) await click(page, `#${source}`);
+  await snap('local: a source selected, targets shown');
+  const target = (await readBg(page)).targets[0]?.split(':')[0];
+  if (target === undefined) throw new Error(`no target from ${source}`);
+  await click(page, `#${target}`);
+  await snap('local: moved, one die used');
+  if ((await readBg(page)).canUndo) {
+    await click(page, '#undoBtn');
+    await snap('local: undone');
+  }
+  await fastForward(page, "v.phase !== 'moving'");
+  await snap('local: turn over, curtain for the other seat');
+
+  // ---- the sheets over the table ----
+  await reveal();
+  await click(page, '#menuBtn');
+  await snap('table: menu sheet');
+  await click(page, '#menuHistoryBtn');
+  await snap('table: history sheet');
+  await page.keyboard.press('Escape');
+  await click(page, '#menuBtn');
+  await click(page, '#menuRulesBtn');
+  await snap('table: rules sheet');
+  await page.keyboard.press('Escape');
+
+  // ---- the states the seeded policy reaches: on the bar, a dead die, bearing off ----
+  const states: ReadonlyArray<readonly [string, string]> = [
+    ['turn: a checker on the bar', "v.phase === 'moving' && v.board.bar[v.me.idx] > 0"],
+    [
+      'turn: only one die can be played',
+      "v.phase === 'moving' && v.played.length === 0 && v.dice !== null && v.dice[0] !== v.dice[1] && v.plays.every((p) => p.length === 1)",
+    ],
+    ['turn: bearing off', "v.phase === 'moving' && v.canBearOff[v.me.idx]"],
+  ];
+  // The first source whose targets include a tray (so the tray's die disc is on show), else the first.
+  const selectSource = async (sources: ReadonlyArray<string>): Promise<void> => {
+    const [from, ...rest] = sources;
+    if (from === undefined) return;
+    await click(page, `#${from}`);
+    const { targets } = await readBg(page);
+    if (rest.length === 0 || targets.some((t) => t.startsWith('off'))) return;
+    await click(page, `#${from}`);
+    await selectSource(rest);
+  };
+  await states.reduce(async (done, [name, stop]) => {
+    await done;
+    if ((await fastForward(page, stop)) !== 'moving') return;
+    await reveal();
+    const s = await readBg(page);
+    if (s.selected.length === 0) await selectSource(s.canMove);
+    await snap(name);
+  }, Promise.resolve());
+
+  // ---- the game over: the result sheet, the table behind it, the next game, the match end ----
+  await fastForward(page, 'false');
+  await visible(page, '#resultOverlay');
+  await snap('game over: result sheet');
+  await click(page, '#rsPeekBtn');
+  await snap('game over: table behind the sheet');
+  await click(page, '#resultChipBtn');
+  await click(page, '#rsNextBtn');
+  await visible(page, '#curtainOverlay');
+  await snap('game 2: curtain up, the badge counts');
+  await fastForward(page, 'false', true);
+  await visible(page, '#endgameScreen');
+  await snap('match over: endgame screen');
+  await click(page, '#leaveBtn');
+  await visible(page, '#homeScreen');
+
+  // ---- Western: the opening roll is the first move, the cube offer, the take ----
+  await page.locator('#localVariantSel').selectOption('backgammon');
+  await page.locator('#localMatchLengthSel').selectOption('5');
+  await click(page, '#localBtn');
+  await visible(page, '#curtainOverlay');
+  await click(page, '#curtainBtn');
+  await snap('western: the opening roll to play');
+  if ((await fastForward(page, "v.phase === 'cubeOffered'")) === 'cubeOffered') {
+    await reveal();
+    await visible(page, '#cubeOverlay');
+    await snap('western: double offered');
+    await click(page, '#takeBtn');
+    await reveal();
+    await snap('western: cube taken, the doubler rolls');
+  }
+  await click(page, '#menuBtn');
+  await click(page, '#menuLeaveBtn');
+  await visible(page, '#homeScreen');
+  await snap('home: after the matches');
+};
+
 const DRIVERS: Readonly<Record<Game, (page: Page, shot: Shot) => Promise<void>>> = {
   'gin-rummy': driveGin,
   fidice: driveFidice,
+  backgammon: driveBackgammon,
 };
 
 // ---- the harness -------------------------------------------------------------------------------------
@@ -1239,8 +1558,8 @@ export const diffGoldens = (expected: Golden, actual: Golden): GoldenDiff => {
 if (isMain(import.meta.url)) {
   const check = process.argv.includes('--check');
   const dist = resolve(REPO_ROOT, 'dist');
-  if (!existsSync(resolve(dist, 'games', 'fidice', 'index.html'))) {
-    console.error('dist/ has no game pages: run `npm run build` first');
+  if (!GAMES.every((game) => existsSync(resolve(dist, 'games', game, 'index.html')))) {
+    console.error('dist/ lacks a game page: run `npm run build` first');
     process.exit(1);
   }
   const harness = await startHarness(dist);

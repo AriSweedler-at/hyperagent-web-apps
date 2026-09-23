@@ -1,0 +1,10 @@
+[
+  {
+    "t": "toast",
+    "msg": "It's not your turn."
+  },
+  {
+    "t": "toast",
+    "msg": "That move isn't legal."
+  }
+]

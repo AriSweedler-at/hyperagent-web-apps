@@ -1,0 +1,65 @@
+[
+  {
+    "t": "action",
+    "action": {
+      "type": "roll"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "move",
+      "from": 7,
+      "to": 4,
+      "die": 3
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "move",
+      "from": "bar",
+      "to": 20,
+      "die": 4
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "move",
+      "from": 5,
+      "to": "off",
+      "die": 6
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "undo"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "double"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "take"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "pass"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "next"
+    }
+  }
+]

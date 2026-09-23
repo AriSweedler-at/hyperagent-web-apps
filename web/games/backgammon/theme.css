@@ -1,0 +1,1758 @@
+/* Sheshbesh's theme (scratchpad/bg/design.md §2.3, §4; the owner: "subtle but recognizable").
+   The page links web/shared/styles/tokens.css and base.css before this file, and :root below
+   redeclares every one of the eleven shared names (a partial override would inherit gin's green
+   felt: understand.md risk 11, test/tokens.test.ts). The palette is restrained: a whitewash page,
+   aegean blue as the one accent, an olive-wood board, gold only as a hairline. The board is one
+   DOM in two grid templates (§2.3.3): the phone stands it on end (twelve rows of two points, a
+   bar band, an off row), the desktop lays it flat from 900px (two rows of thirteen). Every place
+   is a grid area named by its own number, so a seat swap is 24 `data-own` attributes and the
+   `data-seat` on #board, never a second template. web/games/backgammon/src/ui/board/layout.ts is
+   the pure twin of the two templates; test/dist/backgammon-grid.test.ts parses them out of the
+   built CSS and holds the two together. Prettier formats this file (understand.md 2.19). */
+:root {
+  /* The eleven shared names, on this game's palette (design §2.3.1). */
+  --bg: #f4efe6;
+  --card: #efe8dc;
+  --card-2: #e4dac4;
+  --accent: #0b3c5d;
+  --accent-dark: #06253d;
+  --gold: #c9a227;
+  --text: #2a1a12;
+  --muted: #7a6a58;
+  --danger: #b7472a;
+  --radius: 12px;
+  --felt: linear-gradient(160deg, #a67c52 0%, #8e6740 55%, #6e4b2a 100%);
+  /* The game's own tokens: only the ones a rule below reads. */
+  --olivewood-dark: #6e4b2a;
+  --stone: #d9cbad;
+  --olive: #6b7f3b;
+  --olive-leaf: #9aa86b;
+  --nazar: #1e6fd9;
+  --nazar-pale: #8dc3f0;
+  --walnut: #4a2e1c;
+  --nacre-sheen: linear-gradient(135deg, #f7f2ea 0%, #e9e9ec 45%, #ede7d8 100%);
+  --serif-display: 'GFS Didot', 'Didot', 'Bodoni MT', Georgia, serif;
+  --serif-text: 'Cardo', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  /* Off the table the checker size the sheets and the history rows draw at; #tableScreen sets its own. */
+  --checker-d: 28px;
+  --die-s: 36px;
+}
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+html,
+body {
+  padding: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--serif-text);
+  overscroll-behavior-y: contain;
+}
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+}
+/* GFS Didot for the title and the room code only (design §1 Theme); Cardo everywhere else. */
+h1 {
+  font-family: var(--serif-display);
+  font-weight: 400;
+  font-size: 2rem;
+  line-height: 1.1;
+  margin: 10px 0 0;
+  text-align: center;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+.masthead {
+  margin: 4px 0 14px;
+}
+.subtitle {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  margin: 4px 0 14px;
+}
+/* Under the title only: "Backgammon" as a spaced small-caps line. */
+.masthead .subtitle {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.card-box {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 2px rgba(42, 26, 18, 0.06);
+}
+.card-box.centered,
+.centered {
+  text-align: center;
+}
+.card-box > label + *,
+.card-box > label + .row {
+  margin-top: 8px;
+}
+.card-box.prose p {
+  margin: 0 0 12px;
+  line-height: 1.5;
+  font-size: 0.98rem;
+}
+.card-box.prose p:last-child {
+  margin-bottom: 0;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 14px 18px;
+  min-height: 54px;
+  transition:
+    transform 0.08s ease,
+    filter 0.15s ease;
+  user-select: none;
+  color: var(--text);
+}
+.btn:active {
+  transform: scale(0.96);
+  filter: brightness(0.95);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-primary {
+  background: var(--accent);
+  color: var(--bg);
+  width: 100%;
+  font-size: 1.1rem;
+}
+.btn-primary:hover {
+  background: var(--accent-dark);
+}
+.btn-secondary {
+  background: var(--card-2);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid rgba(42, 26, 18, 0.18);
+}
+.btn-block {
+  width: 100%;
+}
+.btn-sm {
+  padding: 10px 12px;
+  min-height: 44px;
+  font-size: 0.9rem;
+}
+.btn small {
+  font-weight: 400;
+  font-style: italic;
+  opacity: 0.8;
+}
+.row .btn {
+  white-space: nowrap;
+}
+#localBtn,
+.card-box + .btn-block {
+  margin-bottom: 4px;
+}
+input[type='text'],
+input[type='number'],
+select,
+textarea {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 400;
+  outline: none;
+  border: 1px solid rgba(42, 26, 18, 0.14);
+  min-height: 48px;
+}
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 55%,
+    calc(100% - 13px) 55%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 34px;
+}
+input::placeholder {
+  color: var(--muted);
+  font-weight: 400;
+}
+label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.field-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding-left: 2px;
+}
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.row + .row,
+.row + .btn {
+  margin-top: 10px;
+}
+.row.tight {
+  gap: 6px;
+}
+.row.between {
+  justify-content: space-between;
+}
+.grow {
+  flex: 1;
+}
+.icon-btn {
+  background: var(--card-2);
+  border: none;
+  color: var(--text);
+  border-radius: var(--radius);
+  width: 44px;
+  height: 44px;
+  font-size: 1.1rem;
+  font-family: inherit;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.code-input {
+  text-align: center;
+  letter-spacing: 0.4em;
+  font-size: 1.5rem !important;
+  text-transform: uppercase;
+  font-family: var(--serif-display);
+}
+.room-code {
+  font-family: var(--serif-display);
+  font-size: 3rem;
+  letter-spacing: 0.3em;
+  text-align: center;
+  color: var(--accent);
+  font-weight: 400;
+  padding-left: 0.3em;
+  margin: 6px 0 10px;
+}
+.empty-note {
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: center;
+  padding: 8px 0 0;
+  line-height: 1.4;
+}
+.empty-note.left {
+  text-align: left;
+  padding: 8px 2px 0;
+}
+.muted {
+  color: var(--muted);
+}
+.pulse {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.badge {
+  background: var(--card-2);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 7px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.badge.dim {
+  color: var(--muted);
+}
+.conn-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #a89c8a;
+  flex-shrink: 0;
+}
+.conn-dot.on {
+  background: var(--olive);
+}
+.conn-dot.off {
+  background: var(--danger);
+}
+/* Visually hidden, read aloud: the dice in words beside the status line (design §2.5). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+:is(.point, .bar, .off, #dice, .btn, .icon-btn, .chip, .tab-btn, .mode-btn):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* ---------- top tabs and the mode switch (gin's shapes, restyled) ---------- */
+.tabbar {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 16px;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 4px;
+}
+.tab-wrap {
+  position: relative;
+  flex: 1.2;
+  display: flex;
+}
+.tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 11px 6px;
+  min-height: 44px;
+  border-radius: 9px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tab-btn.active {
+  background: var(--bg);
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.tab-wrap .tab-btn::after {
+  content: ' \25BE';
+  opacity: 0.55;
+  font-size: 0.8em;
+}
+.tab-panel.hidden {
+  display: none !important;
+}
+.tab-submenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  z-index: 30;
+  background: var(--card);
+  border: 1px solid rgba(42, 26, 18, 0.12);
+  border-radius: var(--radius);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 10px 26px rgba(42, 26, 18, 0.18);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.12s,
+    transform 0.12s;
+}
+.tab-submenu::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 8px;
+}
+.tab-submenu.force-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+@media (hover: hover) {
+  .tab-wrap:hover .tab-btn:not(.active) + .tab-submenu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+  .tab-submenu button:hover {
+    background: var(--card-2);
+    color: var(--text);
+  }
+}
+.tab-submenu button {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-family: inherit;
+  text-align: left;
+  padding: 11px 12px;
+  border-radius: 9px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tab-submenu button.active {
+  background: var(--bg);
+  color: var(--accent);
+}
+.tabbar:has(+ #playPanel:not(.hidden)) {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.mode-switch {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 4px;
+  background: var(--card);
+  border-top: 1px solid rgba(42, 26, 18, 0.08);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+.mode-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 700;
+  padding: 9px 6px;
+  min-height: 44px;
+  border-radius: 9px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mode-btn.active {
+  background: var(--bg);
+  color: var(--accent);
+}
+.rules-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rules-list li {
+  font-size: 0.92rem;
+  line-height: 1.45;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+#rulesOverlay .rules-list li {
+  background: var(--card-2);
+}
+.rules-list li strong {
+  color: var(--accent);
+}
+
+/* ---------- overlays and sheets ---------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(42, 26, 18, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+/* The curtain (design §2.4.9): aegean-deep at 78%, the position readable beneath. */
+.overlay.curtain {
+  background: rgba(6, 37, 61, 0.78);
+}
+.sheet {
+  background: var(--card);
+  border-radius: 20px;
+  padding: 22px 18px;
+  max-width: 420px;
+  width: 100%;
+  max-height: 88dvh;
+  overflow-y: auto;
+  box-shadow: 0 18px 48px rgba(6, 37, 61, 0.35);
+}
+.sheet-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-align: center;
+  margin: 4px 0 2px;
+}
+.row .sheet-title {
+  margin: 0;
+  text-align: left;
+}
+.sheet-sub {
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+.sheet .btn-block + .btn-block {
+  margin-top: 8px;
+}
+.sheet .rules-list + .btn,
+.sheet .row + .btn-block {
+  margin-top: 14px;
+}
+.score-line {
+  text-align: center;
+  font-weight: 700;
+  color: var(--accent);
+  margin: 0 0 14px;
+}
+.score-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.score-row,
+.history-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--card-2);
+  font-size: 0.92rem;
+}
+.history {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 60dvh;
+  overflow-y: auto;
+}
+.history-row {
+  background: transparent;
+  border-bottom: 1px solid rgba(42, 26, 18, 0.08);
+  border-radius: 0;
+  padding: 6px 2px;
+}
+.history-row .who {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: 0.95rem;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.toggle-row input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(20px);
+  background: var(--accent-dark);
+  color: var(--bg);
+  font-weight: 700;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(6, 37, 61, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s;
+  z-index: 100;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+/* The hit toast ("Kapará.") wears the one warm edge in the theme. */
+#toast.hit {
+  box-shadow:
+    inset 0 0 0 2px var(--danger),
+    0 8px 24px rgba(6, 37, 61, 0.35);
+}
+
+/* ---------- the table: geometry (design §2.3.1) ---------- */
+/* At the table the page never scrolls (gin's rule): the board's point width is a clamp() of the
+   viewport, every row above and below it has one height in every phase, and the fallback under
+   `@media (max-height: 805px)` at the end of this section lets a short viewport scroll instead of
+   clipping the controls. */
+body.fixed-screen,
+body.fixed-screen #app {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+#tableScreen {
+  /* Phone: the board stands on end. Everything that is not the board measures 172px: #app padding
+     24, topbar 44, status line 22, controls 56, three 8px gaps, and 2px of slack for rounding.
+     The board is twelve point rows, the bar band, the off row and 16px of frame, so at 390x844
+     --point-w is (844 - 172 - 48 - 44 - 16) / 12 = 47px (the judge's figure) and the board 672px.
+     Below the 44px floor (806px tall) the fallback scrolls. */
+  --chrome-h: 172px;
+  --bar-w: 48px;
+  --off-h: 44px;
+  --point-w: clamp(
+    44px,
+    calc((100dvh - var(--chrome-h) - var(--bar-w) - var(--off-h) - 16px) / 12),
+    64px
+  );
+  /* One column: (viewport - #app's 24px of gutters - the 16px frame) / 2, 175px at 390. */
+  --point-len: min(calc((100vw - 40px) / 2), 220px);
+  --checker-d: calc(var(--point-w) * 0.86);
+  /* Five coins fit along a point with the label corner spared: 27.6px at 390x844 (layout.ts stackStep). */
+  --stack-step: min(var(--checker-d), calc((var(--point-len) - var(--checker-d) - 20px) / 4));
+  --die-s: calc(var(--bar-w) - 4px);
+  --off-w: 0px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  gap: 8px;
+}
+@media (min-width: 900px) {
+  #tableScreen {
+    /* Desktop: the classic flat board. Fourteen columns and a half of gutters across, 11.4 point
+       widths tall (two 5.2 rows plus the chrome): 53px at 1280x800, the board 754 x 572. */
+    --chrome-h: 190px;
+    --bar-w: var(--point-w);
+    --off-h: 0px;
+    --point-w: clamp(
+      40px,
+      min(calc((100vw - 64px) / 14.5), calc((100dvh - var(--chrome-h)) / 11.4)),
+      72px
+    );
+    --point-len: calc(var(--point-w) * 5.2);
+    --checker-d: calc(var(--point-w) * 0.86);
+    --stack-step: var(--checker-d);
+    --die-s: clamp(32px, calc(var(--point-w) * 0.8), 44px);
+    --off-w: clamp(36px, calc(var(--point-w) * 0.8), 56px);
+  }
+  body.fixed-screen #app {
+    max-width: 1000px;
+  }
+}
+
+/* ---------- the table: vertical structure (design §2.3.2) ---------- */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.opp-strip,
+.me-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.95rem;
+}
+.opp-strip {
+  flex: 1;
+}
+.opp-strip .name,
+.me-strip .name {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.opp-strip .pips,
+.me-strip .pips {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+/* The opponent's name pulses while they are to move (design §2.1.4). */
+.opp-strip.to-move .name {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.status-line {
+  text-align: center;
+  height: 22px;
+  line-height: 22px;
+  min-height: 1.35em;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+  padding: 0 6px;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 56px;
+  flex-shrink: 0;
+}
+.controls .me-strip {
+  flex: 1;
+}
+.controls .btn {
+  white-space: nowrap;
+}
+/* The roll slot: the roll button, the mini dice, the wait note and the result chip share one box
+   so the row has one height in every phase. */
+.roll-slot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 168px;
+  min-height: 54px;
+}
+.roll-slot .btn-primary {
+  width: auto;
+  min-width: 168px;
+  padding: 12px 16px;
+}
+.wait-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: right;
+  font-style: italic;
+}
+.dice-mini {
+  --die-s: 22px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.desk-only {
+  display: none;
+}
+@media (min-width: 900px) {
+  .desk-only {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+/* The die-chip tray takes the controls row without changing its height (design §2.4.3). */
+.chips {
+  display: none;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+}
+#controls.choosing .me-strip,
+#controls.choosing #undoBtn,
+#controls.choosing #doubleBtn,
+#controls.choosing .roll-slot {
+  display: none;
+}
+#controls.choosing #moveChips {
+  display: flex;
+  animation: fadeIn 160ms ease-out both;
+}
+#controls.choosing #chipCancelBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 56px;
+  height: 48px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 10px;
+  background: var(--card-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip .faces {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.chip .via {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.72rem;
+}
+.chip.hits .via {
+  color: var(--danger);
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---------- the board: two grid templates, one DOM (design §2.3.3) ---------- */
+/* Phone: six columns so the bar band names three areas (the far bar, the dice, my bar); every
+   point spans three. Own numbers name the areas; the seat mapping is the `data-own` attribute on
+   each point and `data-seat` on the board (the 24 one-liners and the two tray rules below), so
+   the same two strings serve both seats. layout.ts is the twin of these strings and
+   test/dist/backgammon-grid.test.ts compares them (design risk 5). */
+#board {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: var(--felt);
+  /* The one gold hairline: the frame's inner edge. */
+  box-shadow:
+    inset 0 0 0 1px var(--gold),
+    0 2px 6px rgba(42, 26, 18, 0.18);
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(6, var(--point-w)) var(--bar-w) repeat(6, var(--point-w)) var(--off-h);
+  grid-template-areas:
+    'o13 o13 o13 o12 o12 o12'
+    'o14 o14 o14 o11 o11 o11'
+    'o15 o15 o15 o10 o10 o10'
+    'o16 o16 o16 o9 o9 o9'
+    'o17 o17 o17 o8 o8 o8'
+    'o18 o18 o18 o7 o7 o7'
+    'barTop barTop dice dice barBottom barBottom'
+    'o19 o19 o19 o6 o6 o6'
+    'o20 o20 o20 o5 o5 o5'
+    'o21 o21 o21 o4 o4 o4'
+    'o22 o22 o22 o3 o3 o3'
+    'o23 o23 o23 o2 o2 o2'
+    'o24 o24 o24 o1 o1 o1'
+    'offFar offFar offFar offNear offNear offNear';
+  user-select: none;
+}
+@media (min-width: 900px) {
+  #board {
+    grid-template-columns: repeat(6, var(--point-w)) var(--bar-w) repeat(6, var(--point-w)) var(
+        --off-w
+      );
+    grid-template-rows: var(--point-len) var(--point-len);
+    grid-template-areas:
+      'o13 o14 o15 o16 o17 o18 barTop o19 o20 o21 o22 o23 o24 offFar'
+      'o12 o11 o10 o9 o8 o7 barBottom o6 o5 o4 o3 o2 o1 offNear';
+    justify-self: center;
+    align-self: center;
+  }
+}
+/* The area names are own numbers; a point's own number is its attribute. */
+.point[data-own='1'] {
+  grid-area: o1;
+}
+.point[data-own='2'] {
+  grid-area: o2;
+}
+.point[data-own='3'] {
+  grid-area: o3;
+}
+.point[data-own='4'] {
+  grid-area: o4;
+}
+.point[data-own='5'] {
+  grid-area: o5;
+}
+.point[data-own='6'] {
+  grid-area: o6;
+}
+.point[data-own='7'] {
+  grid-area: o7;
+}
+.point[data-own='8'] {
+  grid-area: o8;
+}
+.point[data-own='9'] {
+  grid-area: o9;
+}
+.point[data-own='10'] {
+  grid-area: o10;
+}
+.point[data-own='11'] {
+  grid-area: o11;
+}
+.point[data-own='12'] {
+  grid-area: o12;
+}
+.point[data-own='13'] {
+  grid-area: o13;
+}
+.point[data-own='14'] {
+  grid-area: o14;
+}
+.point[data-own='15'] {
+  grid-area: o15;
+}
+.point[data-own='16'] {
+  grid-area: o16;
+}
+.point[data-own='17'] {
+  grid-area: o17;
+}
+.point[data-own='18'] {
+  grid-area: o18;
+}
+.point[data-own='19'] {
+  grid-area: o19;
+}
+.point[data-own='20'] {
+  grid-area: o20;
+}
+.point[data-own='21'] {
+  grid-area: o21;
+}
+.point[data-own='22'] {
+  grid-area: o22;
+}
+.point[data-own='23'] {
+  grid-area: o23;
+}
+.point[data-own='24'] {
+  grid-area: o24;
+}
+#barTop {
+  grid-area: barTop;
+}
+#barBottom {
+  grid-area: barBottom;
+}
+#dice {
+  grid-area: dice;
+}
+#cube {
+  grid-area: dice;
+}
+/* The trays are colour-fixed ids; the seat decides which is near. */
+#board[data-seat='0'] #offLight,
+#board[data-seat='1'] #offDark {
+  grid-area: offNear;
+}
+#board[data-seat='0'] #offDark,
+#board[data-seat='1'] #offLight {
+  grid-area: offFar;
+}
+
+/* ---------- the frame and its one motif (design §2.3.6) ---------- */
+/* A 3px Greek key along the frame's inner edge in low-contrast gold, drawn as two half-phase
+   repeating gradients masked to a band; nothing else on the frame, no pinstripes, no watermark. */
+#board::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: calc(var(--radius) - 3px);
+  pointer-events: none;
+  color: var(--gold);
+  opacity: 0.35;
+  background:
+    repeating-linear-gradient(90deg, currentColor 0 3px, transparent 3px 9px) 0 0 / auto 3px
+      repeat-x,
+    repeating-linear-gradient(90deg, transparent 0 4px, currentColor 4px 7px, transparent 7px 9px) 0
+      100% / auto 3px repeat-x,
+    repeating-linear-gradient(0deg, currentColor 0 3px, transparent 3px 9px) 0 0 / 3px auto repeat-y,
+    repeating-linear-gradient(0deg, transparent 0 4px, currentColor 4px 7px, transparent 7px 9px)
+      100% 0 / 3px auto repeat-y;
+}
+/* The centre seam between the phone's two columns: a hairline in the panel colour painted into the
+   board's background, so the bar band and the trays (grid items, painted above it) interrupt it. */
+#board {
+  background:
+    linear-gradient(rgba(239, 232, 220, 0.55), rgba(239, 232, 220, 0.55)) 50% 8px / 1px
+      calc(100% - 16px - var(--off-h)) no-repeat,
+    var(--felt);
+}
+@media (min-width: 900px) {
+  #board {
+    background: var(--felt);
+  }
+}
+.bar {
+  position: relative;
+  background: var(--walnut);
+}
+#barTop {
+  border-radius: 6px 0 0 6px;
+}
+#barBottom {
+  border-radius: 0 6px 6px 0;
+}
+#dice {
+  position: relative;
+  background: var(--walnut);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  padding-left: 2px;
+  cursor: pointer;
+  z-index: 2;
+}
+@media (min-width: 900px) {
+  #barTop {
+    border-radius: 6px 6px 0 0;
+  }
+  #barBottom {
+    border-radius: 0 0 6px 6px;
+  }
+  #dice {
+    grid-area: barTop / barTop / barBottom / barBottom;
+    place-self: center;
+    flex-direction: column;
+    background: transparent;
+    padding: 0;
+    gap: 8px;
+  }
+}
+
+/* ---------- a point: triangle, label, stacking axis (design §2.3.4) ---------- */
+/* A checker's place is a pure function of its index --i (0..4, set inline by checkersHtml), the
+   side (--sx/--sy) and --stack-step: the same markup lays out sideways on the phone and vertically
+   on the desktop. The whole cell is the tap target (47 x 175px on a phone), never the checker. */
+.point {
+  position: relative;
+  overflow: visible;
+  cursor: default;
+}
+.point::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  transition: filter 120ms;
+}
+/* Two triangle shades alternate by absolute parity (pt-a odd, pt-b even). */
+.point.pt-a::before {
+  background: var(--stone);
+}
+.point.pt-b::before {
+  background: var(--olive);
+}
+.point::after {
+  content: attr(data-own);
+  position: absolute;
+  font:
+    700 0.62rem var(--serif-text),
+    serif;
+  line-height: 1;
+  color: var(--muted);
+  opacity: 0.85;
+  pointer-events: none;
+}
+.point.pt-b::after {
+  color: var(--stone);
+}
+/* Phone: the far column points at the seam from the left, the near column from the right;
+   checkers stack along x from the base. */
+.point.pt-far::before {
+  clip-path: polygon(0 0, 0 100%, 100% 50%);
+}
+.point.pt-near::before {
+  clip-path: polygon(100% 0, 100% 100%, 0 50%);
+}
+.point.pt-far::after {
+  left: 4px;
+  bottom: 3px;
+}
+.point.pt-near::after {
+  right: 4px;
+  bottom: 3px;
+}
+.point.pt-far {
+  --sx: 1;
+  --sy: 0;
+  --ox: 14px;
+  --oy: calc((var(--point-w) - var(--checker-d)) / 2);
+}
+.point.pt-near {
+  --sx: -1;
+  --sy: 0;
+  --ox: calc(100% - var(--checker-d) - 14px);
+  --oy: calc((var(--point-w) - var(--checker-d)) / 2);
+}
+@media (min-width: 900px) {
+  /* Desktop: far points hang from the top edge, near points rise from the bottom; checkers stack along y. */
+  .point.pt-far::before {
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+  }
+  .point.pt-near::before {
+    clip-path: polygon(0 100%, 100% 100%, 50% 0);
+  }
+  .point.pt-far::after {
+    top: 3px;
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+  .point.pt-near::after {
+    bottom: 3px;
+    top: auto;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+  .point.pt-far {
+    --sx: 0;
+    --sy: 1;
+    --ox: calc((var(--point-w) - var(--checker-d)) / 2);
+    --oy: 15px;
+  }
+  .point.pt-near {
+    --sx: 0;
+    --sy: -1;
+    --ox: calc((var(--point-w) - var(--checker-d)) / 2);
+    --oy: calc(100% - var(--checker-d) - 15px);
+  }
+}
+/* The bars stack inward from the band's outer ends, tighter so five fit in a half. */
+.bar {
+  --stack-step: calc(var(--checker-d) * 0.45);
+  --oy: calc((var(--bar-w) - var(--checker-d)) / 2);
+}
+.bar.far {
+  --sx: 1;
+  --sy: 0;
+  --ox: 6px;
+}
+.bar.near {
+  --sx: -1;
+  --sy: 0;
+  --ox: calc(100% - var(--checker-d) - 6px);
+}
+@media (min-width: 900px) {
+  .bar {
+    --ox: calc((var(--bar-w) - var(--checker-d)) / 2);
+  }
+  .bar.far {
+    --sx: 0;
+    --sy: 1;
+    --oy: 6px;
+  }
+  .bar.near {
+    --sx: 0;
+    --sy: -1;
+    --oy: calc(100% - var(--checker-d) - 6px);
+  }
+}
+
+/* ---------- checkers as CSS (design §2.3.5) ---------- */
+.checker {
+  position: absolute;
+  left: var(--ox);
+  top: var(--oy);
+  width: var(--checker-d);
+  height: var(--checker-d);
+  border-radius: 50%;
+  transform: translate(
+    calc(var(--i, 0) * var(--stack-step) * var(--sx, 0)),
+    calc(var(--i, 0) * var(--stack-step) * var(--sy, 0))
+  );
+  transition:
+    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 120ms;
+  touch-action: none;
+}
+/* Five drawn; the sixth onward is the badge on the top visible checker (the point label stays). */
+.checker:nth-child(n + 6) {
+  display: none;
+}
+.checker.top[data-count]::after {
+  content: attr(data-count);
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--bg);
+  font:
+    700 0.66rem var(--serif-text),
+    serif;
+  padding: 0 4px;
+}
+/* Nacre: a pale disc with a soft sheen and a hairline gold ring. */
+.ck-light {
+  background: var(--nacre-sheen);
+  box-shadow:
+    inset 0 0 0 1px var(--gold),
+    inset 0 -2px 4px rgba(42, 26, 18, 0.12),
+    inset 0 1px 2px rgba(255, 255, 255, 0.6),
+    0 1px 2px rgba(0, 0, 0, 0.25);
+}
+/* Nazar: a plain deep-blue disc, a fine blue ring at the edge and a second hairline ring at 60%
+   of the diameter (the eye motif as a subtle inner ring, never a literal eye). */
+.ck-dark {
+  background: var(--accent-dark);
+  box-shadow:
+    inset 0 0 0 1px var(--nazar),
+    inset 0 0 0 calc(var(--checker-d) * 0.2) var(--accent-dark),
+    inset 0 0 0 calc(var(--checker-d) * 0.2 + 1px) var(--nazar-pale),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+/* Borne-off checkers as slabs: the face flattened, laid from the tray's outer edge. */
+.off {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  cursor: default;
+}
+.off .slab {
+  width: 7px;
+  height: 26px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+#offLight .slab {
+  background: var(--nacre-sheen);
+  box-shadow: inset 0 0 0 1px var(--gold);
+}
+#offDark .slab {
+  background: var(--accent-dark);
+  box-shadow: inset 0 0 0 1px var(--nazar);
+}
+/* Phone: the far tray fills from the left edge, the near tray from the right. */
+#board[data-seat='0'] #offDark,
+#board[data-seat='1'] #offLight {
+  justify-content: flex-start;
+}
+#board[data-seat='0'] #offLight,
+#board[data-seat='1'] #offDark {
+  justify-content: flex-end;
+}
+@media (min-width: 900px) {
+  .off {
+    flex-direction: column;
+    padding: 6px 0;
+  }
+  .off .slab {
+    width: 26px;
+    height: 7px;
+  }
+  #board[data-seat='0'] #offLight,
+  #board[data-seat='1'] #offDark {
+    justify-content: flex-end;
+  }
+}
+/* The doubling cube (Western only): a nacre face, Cardo numeral, on the owner's side of the bar. */
+#cube {
+  justify-self: end;
+  align-self: start;
+  width: 20px;
+  height: 20px;
+  margin: 3px 2px 0 0;
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.7rem;
+  line-height: 20px;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  z-index: 3;
+  pointer-events: none;
+}
+@media (min-width: 900px) {
+  #cube {
+    grid-area: barTop / barTop / barBottom / barBottom;
+    justify-self: center;
+    align-self: center;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    margin: 0;
+  }
+  #cube[data-owner='none'] {
+    margin-block: 0 calc(var(--die-s) * 2 + 46px);
+  }
+  #cube[data-owner='far'] {
+    align-self: start;
+    margin-block: calc(var(--checker-d) * 2.3) 0;
+  }
+  #cube[data-owner='near'] {
+    align-self: end;
+    margin-block: 0 calc(var(--checker-d) * 2.3);
+  }
+}
+
+/* ---------- dice as CSS (design §2.3.7, §2.5) ---------- */
+/* A die is a 44px hit box (`die/pick` is a tap target) whose face is `::before`, 2px inside, and
+   whose pips are `::after`: radial-gradient dots on the 3x3 grid of the face. No images. */
+.die {
+  --face: calc(var(--die-s) - 4px);
+  display: inline-block;
+  --dot: calc(var(--face) * 0.17);
+  --lo: 27%;
+  --hi: 73%;
+  --pip: var(--text) calc(var(--dot) / 2), transparent calc(var(--dot) / 2 + 0.5px);
+  position: relative;
+  width: var(--die-s);
+  height: var(--die-s);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.die::before,
+.die::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: calc(var(--face) * 0.2);
+}
+.die::before {
+  background: var(--card);
+  box-shadow:
+    inset 0 -2px 3px rgba(42, 26, 18, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.die-1::after {
+  background: radial-gradient(circle at 50% 50%, var(--pip));
+}
+.die-2::after {
+  background:
+    radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
+    radial-gradient(circle at var(--hi) var(--hi), var(--pip));
+}
+.die-3::after {
+  background:
+    radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
+    radial-gradient(circle at 50% 50%, var(--pip)),
+    radial-gradient(circle at var(--hi) var(--hi), var(--pip));
+}
+.die-4::after {
+  background:
+    radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
+    radial-gradient(circle at var(--hi) var(--lo), var(--pip)),
+    radial-gradient(circle at var(--lo) var(--hi), var(--pip)),
+    radial-gradient(circle at var(--hi) var(--hi), var(--pip));
+}
+.die-5::after {
+  background:
+    radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
+    radial-gradient(circle at var(--hi) var(--lo), var(--pip)),
+    radial-gradient(circle at 50% 50%, var(--pip)),
+    radial-gradient(circle at var(--lo) var(--hi), var(--pip)),
+    radial-gradient(circle at var(--hi) var(--hi), var(--pip));
+}
+.die-6::after {
+  background:
+    radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
+    radial-gradient(circle at var(--hi) var(--lo), var(--pip)),
+    radial-gradient(circle at var(--lo) 50%, var(--pip)),
+    radial-gradient(circle at var(--hi) 50%, var(--pip)),
+    radial-gradient(circle at var(--lo) var(--hi), var(--pip)),
+    radial-gradient(circle at var(--hi) var(--hi), var(--pip));
+}
+/* Before the roll: two blank nacre squares. */
+.die.blank::before {
+  background: rgba(239, 232, 220, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(239, 232, 220, 0.7);
+}
+/* A consumed die dims and wears a diagonal slash over its pips. */
+.die.used {
+  opacity: 0.4;
+}
+.die.used::after {
+  background-image: linear-gradient(
+    135deg,
+    transparent 46%,
+    var(--muted) 46%,
+    var(--muted) 54%,
+    transparent 54%
+  );
+  background-size: 100% 100%;
+}
+/* A die no maximal play uses: dimmed and struck through, `aria-disabled`. */
+.die.dead {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.die.dead::after {
+  background-image: linear-gradient(
+    0deg,
+    transparent 46%,
+    var(--danger) 46%,
+    var(--danger) 54%,
+    transparent 54%
+  );
+  background-size: 100% 100%;
+}
+.die.picked::before {
+  box-shadow:
+    0 0 0 2px var(--gold),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.die.theirs {
+  filter: saturate(0.7) brightness(0.85);
+}
+#dice.rolling .die {
+  animation: tumble 350ms ease-out;
+}
+@keyframes tumble {
+  0% {
+    transform: rotate(0) scale(0.8);
+  }
+  60% {
+    transform: rotate(200deg) scale(1.08);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+/* ---------- highlight states (design §2.3.7) ---------- */
+/* A source that can move: an olive ring on its top checker and a slow glow. */
+.can-move {
+  cursor: pointer;
+}
+.can-move .checker.top {
+  box-shadow:
+    0 0 0 3px var(--olive-leaf),
+    0 1px 2px rgba(0, 0, 0, 0.25);
+  animation: glow 1.6s ease-in-out infinite;
+}
+@keyframes glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px var(--olive-leaf),
+      0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(154, 168, 107, 0.45),
+      0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+}
+/* The chosen source: a gold ring and a 4px lift toward the tip; the derived sole source (`auto`)
+   keeps the ring without the lift. */
+.selected .checker.top {
+  animation: none;
+  box-shadow:
+    0 0 0 3px var(--gold),
+    0 6px 12px rgba(0, 0, 0, 0.35);
+  transform: translate(
+      calc(var(--i, 0) * var(--stack-step) * var(--sx, 0)),
+      calc(var(--i, 0) * var(--stack-step) * var(--sy, 0))
+    )
+    translate(calc(4px * var(--sx, 0)), calc(4px * var(--sy, 0)));
+  z-index: 2;
+}
+.selected.auto .checker.top {
+  transform: translate(
+    calc(var(--i, 0) * var(--stack-step) * var(--sx, 0)),
+    calc(var(--i, 0) * var(--stack-step) * var(--sy, 0))
+  );
+}
+/* A destination: a 22px nazar disc with the die at the tip end; a combined destination the same
+   disc with a dashed ring and a smaller numeral (`data-die="6+5"`, "?" when the tap opens the tray). */
+.point.target::before,
+.point.target-2::before {
+  filter: brightness(1.12);
+}
+.target,
+.target-2 {
+  cursor: pointer;
+}
+.point.target::after,
+.point.target-2::after,
+.off.target::after {
+  content: attr(data-die);
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--nazar);
+  color: var(--bg);
+  font:
+    700 0.8rem var(--serif-text),
+    serif;
+  line-height: 22px;
+  text-align: center;
+  opacity: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  z-index: 3;
+  left: auto;
+  right: auto;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+}
+.point.pt-far.target::after,
+.point.pt-far.target-2::after {
+  right: 6px;
+}
+.point.pt-near.target::after,
+.point.pt-near.target-2::after {
+  left: 6px;
+}
+.point.target-2::after {
+  width: auto;
+  min-width: 22px;
+  padding: 0 5px;
+  border-radius: 11px;
+  background: var(--bg);
+  color: var(--nazar);
+  outline: 2px dashed var(--nazar);
+  outline-offset: -2px;
+  font-size: 0.7rem;
+  letter-spacing: -0.02em;
+}
+.off.target::after {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.7rem;
+}
+@media (min-width: 900px) {
+  .point.target::after,
+  .point.target-2::after {
+    top: auto;
+    bottom: auto;
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .point.pt-far.target::after,
+  .point.pt-far.target-2::after {
+    bottom: 6px;
+  }
+  .point.pt-near.target::after,
+  .point.pt-near.target-2::after {
+    top: 6px;
+  }
+  .off.target::after {
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+/* The only destinations (one maximal play): a harder pulse. */
+.target.only::after,
+.target-2.only::after {
+  animation: pulse 0.9s ease-in-out infinite;
+}
+/* A destination under a dragged checker. */
+.drop::before {
+  filter: brightness(1.25);
+}
+.drop::after {
+  transform: translateY(-50%) scale(1.15);
+}
+/* A blot was just hit here: a warm wash on the triangle. */
+.hit::before {
+  animation: hitFlash 420ms ease-out;
+}
+@keyframes hitFlash {
+  0% {
+    filter: brightness(1);
+  }
+  25% {
+    filter: brightness(1.15) sepia(0.6) saturate(3) hue-rotate(-20deg);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+/* A tapped point that is neither source nor target. */
+.shake {
+  animation: shake 120ms ease-in-out;
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  33% {
+    transform: translateX(-3px);
+  }
+  66% {
+    transform: translateX(3px);
+  }
+}
+/* The just-landed checker during a flight. */
+.checker.arriving {
+  visibility: hidden;
+}
+/* Not my turn or not moving: nothing glows, nothing takes a tap. */
+#board.inert .point,
+#board.inert .bar,
+#board.inert .off {
+  pointer-events: none;
+  cursor: default;
+}
+#board.inert .can-move .checker.top {
+  animation: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* ---------- motion (design §2.3.8) ---------- */
+/* A flight (ui/board/fly.ts): a clone of the moving checker fixed over the page glides from the
+   source rect to the destination in FLY_MS; toward a tray it flattens into a slab. */
+.flyer {
+  position: fixed;
+  margin: 0;
+  z-index: 60;
+  pointer-events: none;
+  will-change: transform;
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: none;
+}
+.flyer.flyer-slab {
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-radius 260ms;
+}
+/* A checker dragged by hand (ui/board/dragger.ts): the ghost follows the pointer, then glides
+   into place or back. */
+.drag-ghost {
+  position: fixed;
+  margin: 0;
+  z-index: 60;
+  pointer-events: none;
+  will-change: transform;
+  box-shadow:
+    0 0 0 3px var(--gold),
+    0 14px 28px rgba(0, 0, 0, 0.45);
+  transition: none;
+  animation: none;
+}
+.drag-ghost.landing {
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  #dice.rolling .die,
+  .can-move .checker.top,
+  .hit::before,
+  .shake,
+  .target.only::after,
+  .target-2.only::after,
+  .opp-strip.to-move .name {
+    animation: none;
+  }
+  .flyer,
+  .flyer.flyer-slab,
+  .drag-ghost.landing,
+  .checker {
+    transition-duration: 1ms;
+  }
+}
+
+/* ---------- short viewports (design §2.3.1, A1's graft) ---------- */
+/* With --point-w floored at 44px the board is 636px and the screen needs 806px. Below that the
+   document scrolls instead of clipping the controls row; the board itself can be scrolled from
+   (touch-action: none is scoped to .checker). */
+@media (max-height: 805px) and (max-width: 899px) {
+  body.fixed-screen,
+  body.fixed-screen #app {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  body.fixed-screen #app {
+    min-height: 100dvh;
+  }
+  #tableScreen {
+    overflow: visible;
+  }
+}
+/* The desktop board floors at 40px points (11.4 x 40 + 190 = 646px); shorter windows scroll too. */
+@media (max-height: 645px) and (min-width: 900px) {
+  body.fixed-screen,
+  body.fixed-screen #app {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  body.fixed-screen #app {
+    min-height: 100dvh;
+  }
+  #tableScreen {
+    overflow: visible;
+  }
+}

@@ -2,10 +2,12 @@
 // byte-identical to web/index.html (Vite leaves it alone with cssMinify off; a future Vite that
 // reformats it will fail here and the owner decides). Step 7 cut fidice over and step 13 gin-rummy:
 // each games/<g>/index.html is Vite's module page (never the legacy bundle), its app-[hash].js sits
-// beside it, its CSS under shared/assets/, both pages preload the same shared chunk, and every
+// beside it, its CSS under shared/assets/, every page preloads the chunk they all share, and every
 // asset a page references exists; no shared/ice.js is emitted. legacy/** stays in the repo as the
 // frozen source of the oracle fixtures (legacy/README.md; test/fixtures/legacy/manifest.test.ts
-// pins it) and is never served. Runs after the build (test:dist).
+// pins it) and is never served. The backgammon page (docs/design/backgammon-board.md) has no
+// legacy twin: it is built and checked like the others, `LEGACY_GAMES` keeps the two that have
+// one. Runs after the build (test:dist).
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -116,22 +118,56 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     expect(gin).toContain('<title>Gin Rummy</title>');
   });
 
-  test('both module pages preload the same shared chunk(s) and link the same shared stylesheet under shared/assets/', () => {
-    const shared = (page: string, ext: string): ReadonlyArray<string> =>
-      referencesIn(page, readDist(root, page))
+  test('the backgammon page is gin-shaped: static screens, the 24 points and empty rules slots', () => {
+    const page = readDist(root, 'games/backgammon/index.html');
+    expect(page).toContain('<title>Sheshbesh — Sephardic backgammon</title>');
+    ['id="app"', 'id="homeScreen"', 'id="tableScreen"', 'id="board"', 'id="toast"'].forEach(
+      (id) => {
+        expect(page).toContain(id);
+      },
+    );
+    // Points are direct children of #board in absolute order (design §2.2.1); the seat mapping is
+    // an attribute, so the markup ships seat 0's `data-own` for every point.
+    Array.from({ length: 24 }, (_, i) => i + 1).forEach((abs) => {
+      expect(page).toContain(`id="point-${String(abs)}"`);
+    });
+    expect(page).toContain('id="rulesList"');
+    expect(page).toContain('id="rulesOverlayList"');
+    expect(page).not.toContain('<strong>Goal:</strong>');
+  });
+
+  test('every module page preloads the chunk all of them share and links the one shared stylesheet; a chunk under shared/assets/ is preloaded by two pages at least', () => {
+    // A game's own CSS is `<game>-[hash].css`; everything else under shared/assets/ is shared.
+    const own = GAMES.map((game) => `/${game}-`);
+    const shared = (game: string, ext: string): ReadonlyArray<string> =>
+      referencesIn(`games/${game}/index.html`, readDist(root, `games/${game}/index.html`))
         .map(({ value }) => value)
         .filter((value) => new RegExp(`^\\.\\./\\.\\./shared/assets/[\\w-]+\\.${ext}$`).test(value))
-        .filter((value) => !value.includes('/fidice-') && !value.includes('/gin-rummy-'));
-    const fidice = shared('games/fidice/index.html', 'js');
-    expect(fidice.length).toBeGreaterThanOrEqual(1);
-    expect(shared('games/gin-rummy/index.html', 'js')).toEqual(fidice);
-    // web/shared/styles/{tokens,base}.css, linked by both pages, are emitted once (step 14).
-    const sharedCss = shared('games/fidice/index.html', 'css');
+        .filter((value) => !own.some((prefix) => value.includes(prefix)));
+    const chunks = Object.fromEntries(GAMES.map((game) => [game, shared(game, 'js')]));
+    const preloadedBy = (chunk: string): ReadonlyArray<string> =>
+      GAMES.filter((game) => chunks[game]?.includes(chunk) === true);
+    // PeerJS and the shared edges every page imports (steps 9 and 12) are one chunk for all three.
+    const common = Object.values(chunks)
+      .flat()
+      .filter((chunk) => preloadedBy(chunk).length === GAMES.length);
+    expect(new Set(common).size).toBeGreaterThanOrEqual(1);
+    // Rolldown splits a module out of the bundles only when more than one page imports it (the DOM
+    // edge, web/shared/edge/dom.ts, became such a chunk when backgammon joined gin in painting
+    // through it; fidice has its own vdom), so a chunk preloaded by one page alone is a split gone
+    // wrong: that page's code has left its bundle.
+    [...new Set(Object.values(chunks).flat())].forEach((chunk) => {
+      expect(preloadedBy(chunk).length, chunk).toBeGreaterThanOrEqual(2);
+    });
+    // web/shared/styles/{tokens,base}.css, linked by every page, are emitted once (step 14).
+    const sharedCss = shared('fidice', 'css');
     expect(sharedCss).toHaveLength(1);
-    expect(shared('games/gin-rummy/index.html', 'css')).toEqual(sharedCss);
-    expect(readDist(root, 'games/fidice/index.html')).toContain(
-      '<link rel="modulepreload" crossorigin href="../../shared/assets/',
-    );
+    GAMES.forEach((game) => {
+      expect(shared(game, 'css'), game).toEqual(sharedCss);
+      expect(readDist(root, `games/${game}/index.html`), game).toContain(
+        '<link rel="modulepreload" crossorigin href="../../shared/assets/',
+      );
+    });
   });
 
   test('legacy/ is retained, unserved, as the frozen oracle source (legacy/README.md)', () => {
@@ -144,7 +180,7 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     expect(existsSync(resolve(REPO_ROOT, 'legacy', 'README.md'))).toBe(true);
   });
 
-  test('the tree holds the landing page, both game pages and nothing stray at the root', () => {
+  test('the tree holds the landing page, every game page and nothing stray at the root', () => {
     const files = distFiles(root);
     ['.nojekyll', 'index.html', ...GAMES.map((game) => `games/${game}/index.html`)].forEach(
       (file) => {

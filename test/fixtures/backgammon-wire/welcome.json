@@ -1,0 +1,14 @@
+[
+  {
+    "t": "welcome",
+    "hostName": "Ann",
+    "matchLength": 5,
+    "variant": "portes"
+  },
+  {
+    "t": "welcome",
+    "hostName": "Ann",
+    "matchLength": 3,
+    "variant": "backgammon"
+  }
+]

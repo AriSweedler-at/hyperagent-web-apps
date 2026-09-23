@@ -11,22 +11,24 @@ export type { Game };
 export type PageName = Game | 'landing';
 
 /** Every game the site builds, in the order the landing page lists them. */
-export const GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice'];
+export const GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice', 'backgammon'];
 
 /** The games with a frozen legacy page under legacy/<g>/index.html (the oracle source, never served). */
-export const LEGACY_GAMES: ReadonlyArray<Game> = GAMES;
+export const LEGACY_GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice'];
 
 /** `<title>` of each page, as e2e/smoke.spec.ts expects it. */
 export const PAGE_TITLES: Readonly<Record<PageName, string>> = {
   landing: "Ari's web apps",
   'gin-rummy': 'Gin Rummy',
   fidice: "Fidice — one-cup liar's dice",
+  backgammon: 'Sheshbesh — Sephardic backgammon',
 };
 
 /** The documented test hook each page exposes once its boot finished (docs/ARCHITECTURE.md "Documented test hooks"). */
 export const HOOKS: Readonly<Record<Game, string>> = {
   'gin-rummy': 'window.__gin',
   fidice: 'window.__fidice',
+  backgammon: 'window.__backgammon',
 };
 
 /** The landing page's card links, relative to the site root, in GAMES order. */

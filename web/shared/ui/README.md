@@ -2,6 +2,11 @@
 
 Reserved (docs/ARCHITECTURE.md "Seams reserved for the roadmap"). Nothing is implemented in
 step 5; the folder exists so the module boundaries and the class contract have a home to name.
+Three games now carry the shapes this folder is meant to hold: gin's shell (home tabs, mode
+switch, waiting rooms, curtain, result sheets) was copied into `web/games/backgammon/src/ui/`
+with the same field, intent and painter names on purpose (docs/design/backgammon-board.md §4), so
+the shared shell reducer and painters (P6/P7 in that design's PR plan) are a mechanical lift once
+both games are green; the two-seat host/guest sessions land first as `web/shared/net/` (P5).
 
 What lands here later, and where it comes from:
 
@@ -19,4 +24,6 @@ The generic CSS primitives this table once reserved as `base.css` landed in
 
 Rules that will apply: builders return `SafeHtml` or write through `@shared/edge/dom` only; no
 `peerjs`, no `localStorage`, no timers except through an injected `Clock`; every class they toggle
-is a row in `web/shared/styles/CONTRACT.md`.
+is a row in `web/shared/styles/CONTRACT.md`. The backgammon page already follows them: its board
+builders (`ui/board.ts`) return strings tested as strings, its painters write through
+`web/shared/edge/dom.ts`, and its template-built class names are `backgammon` rows in the contract.
