@@ -7,7 +7,10 @@
 // fixes (peer id, welcome and lobby bytes, its decoder's refusals). The wire corpus replay is
 // test/parity/gin.sessions.test.ts. The last group is the liveness the sessions added over the
 // legacy (liveness.ts): 5 s heartbeats below the codec, a 15 s silence as the peer gone, the seat
-// freed and a silent channel replaced by a join.
+// freed, a join held while the guest is quiet and then refused or seated, and a broker blip that
+// leaves a live channel alone. Two legacy scenarios changed their shape with it: a third peer is
+// told the room is full once the first guest is heard (not at once), and a guest's broker
+// reconnect opens no second channel beside a live one.
 import { describe, expect, test } from 'vitest';
 
 import {
@@ -401,7 +404,7 @@ describe('HostSession', () => {
     expect(PATH_DIRECT_MSG).toBe('Connected directly');
   });
 
-  test('a third peer is told the room is full and closed 300 ms later; the first channel stays', () => {
+  test('a third peer is told the room is full once the first guest is heard, and closed 300 ms later; the first channel stays', () => {
     const w = world();
     startHost(w, cell(hostCtx()));
     w.broker.flush();
@@ -411,6 +414,12 @@ describe('HostSession', () => {
     const c1 = connectFrom(first, ROOM);
     w.broker.flush();
     const c3 = connectFrom(third, ROOM);
+    w.broker.flush();
+    // Held (liveness.ts): the first guest has said nothing since its channel opened, so only its
+    // next frame proves it is there. The legacy answered `full` at once.
+    expect(third.received).toEqual([]);
+    expect(c3.open()).toBe(true);
+    c1.send({ t: 'join', name: 'Jeff' });
     w.broker.flush();
     expect(third.received).toEqual([{ t: 'full' }]);
     expect(c3.open()).toBe(true);
@@ -451,6 +460,11 @@ describe('HostSession', () => {
     hostConns[1]?.errors.forEach((fn) => {
       fn({ type: 'webrtc', message: '' });
     });
+    expect(w.since(mark)).toEqual([['guestGone', null]]);
+    expect(c2.open()).toBe(true);
+    // The channel is kept (PeerJS closes a failed one itself), but its silence watch stopped with
+    // the report: the same guest is not reported gone again at the grace.
+    pass(w, HB_GRACE_MS * 2);
     expect(w.since(mark)).toEqual([['guestGone', null]]);
     expect(c2.open()).toBe(true);
   });
@@ -739,15 +753,27 @@ describe('GuestSession', () => {
     w.broker.dropSocket(id);
     w.clock.advance(1500);
     expect(w.log.at(-1)).toEqual(['status', reconnectingMsg(2)]);
-    // Each reconnect's `open` runs tryJoin again (the legacy trait): two more channels beside the
-    // live one, which stops being current, so its closing later is not a loss.
+    // Each reconnect's `open` runs tryJoin, which joins nothing beside the live channel (the
+    // legacy opened a second one each time): the live channel stays current, so its closing
+    // later is the loss it is.
     w.broker.flush();
-    expect(host.conns).toHaveLength(3);
-    expect(w.log.filter((e) => e[0] === 'connected')).toHaveLength(3);
+    expect(host.conns).toHaveLength(1);
+    expect(w.log.filter((e) => e[0] === 'connected')).toHaveLength(1);
     const m3 = w.log.length;
     host.conns[0]?.close();
     w.broker.flush();
-    expect(w.since(m3)).toEqual([]);
+    expect(w.since(m3)).toEqual([['lost']]);
+    // The broker blinks again while the rejoin is pending: that `open` joins at once (no channel
+    // is open), and the rejoin timer then finds the new channel open and joins nothing more.
+    w.broker.dropSocket(id);
+    w.broker.flush();
+    w.clock.advance(RECONNECT_FIRST_MS);
+    w.broker.flush();
+    expect(host.conns).toHaveLength(2);
+    w.clock.advance(REJOIN_MS);
+    w.broker.flush();
+    expect(host.conns).toHaveLength(2);
+    expect(w.log.filter((e) => e[0] === 'connected')).toHaveLength(2);
   });
 });
 
@@ -835,7 +861,7 @@ describe('liveness across the sessions', () => {
     expect(seen).toHaveLength(1);
   });
 
-  test('host: a join while the guest is lively is a third peer; one after HB_MISSED_MS of silence takes the seat, the silent channel closed without a guestGone', () => {
+  test("host: a join while the guest is quiet is held; the guest's next frame makes it a third peer (full, closed 300 ms on); one after HB_MISSED_MS of silence takes the seat at once, the silent channel closed without a guestGone", () => {
     const w = world();
     startHost(w, cell(hostCtx()));
     w.broker.flush();
@@ -844,16 +870,25 @@ describe('liveness across the sessions', () => {
     const cA = connectFrom(first, ROOM);
     w.broker.flush();
     pass(w, HB_MISSED_MS - 1);
-    // Silent for 9 999 ms: within a heartbeat's slack, so the newcomer is a third peer.
+    // Silent for 9 999 ms: within a heartbeat's slack, so the newcomer waits for the answer.
     const second = party(w, undefined);
     w.broker.flush();
     const cB = connectFrom(second, ROOM);
     w.broker.flush();
+    expect(second.received).toEqual([]);
+    expect(cB.open()).toBe(true);
+    // The first guest beats: the newcomer was a third peer.
+    cA.send(HEARTBEAT);
+    w.broker.flush();
     expect(second.received).toEqual([{ t: 'full' }]);
-    pass(w, FULL_CLOSE_MS);
+    pass(w, FULL_CLOSE_MS - 1);
+    expect(cB.open()).toBe(true);
+    pass(w, 1);
     expect(cB.open()).toBe(false);
     expect(cA.open()).toBe(true);
-    // Silent for 10 299 ms: the seat is taken by the next join.
+    expect(w.log.filter((e) => e[0] === 'guestGone')).toEqual([]);
+    // Silent for 10 s since that beat: the seat is taken by the next join, with no wait.
+    pass(w, HB_MISSED_MS - FULL_CLOSE_MS);
     const third = party(w, undefined);
     w.broker.flush();
     const cC = connectFrom(third, ROOM);
@@ -871,6 +906,128 @@ describe('liveness across the sessions', () => {
     pass(w, 1);
     expect(w.log.filter((e) => e[0] === 'guestGone')).toEqual([['guestGone', null]]);
     expect(cC.open()).toBe(false);
+  });
+
+  test('host: the returning guest: back 2.3 s after its tab died, held with its join waiting, never told full; seated at HB_MISSED_MS of silence with the join replayed after the welcome', () => {
+    const w = world();
+    const hctx = cell(hostCtx());
+    startHost(w, hctx);
+    w.broker.flush();
+    const dead = party(w, undefined);
+    w.broker.flush();
+    const cA = connectFrom(dead, ROOM);
+    w.broker.flush();
+    cA.send({ t: 'join', name: 'Jeff' });
+    w.broker.flush();
+    hctx.value = hostCtx({ hasGame: true, oppName: 'Jeff', oppConnected: true });
+    // Its last beat, then the tab dies; the same player is back in a new tab 2.3 s later.
+    cA.send(HEARTBEAT);
+    w.broker.flush();
+    const mark = w.log.length;
+    pass(w, 2300);
+    const back = party(w, undefined);
+    w.broker.flush();
+    const cB = connectFrom(back, ROOM);
+    w.broker.flush();
+    cB.send({ t: 'join', name: 'Jeff' });
+    cB.send(HEARTBEAT);
+    w.broker.flush();
+    // Held: nothing to the newcomer, nothing to the app, the old channel still open.
+    pass(w, HB_MISSED_MS - 2300 - 1);
+    expect(back.received).toEqual([]);
+    expect(w.since(mark)).toEqual([]);
+    expect(cA.open()).toBe(true);
+    // 10 s of silence from the dead tab: the newcomer is seated, the welcome first and the join it
+    // sent while it waited right after (the heartbeat it sent was not kept); the dead channel
+    // closes with no guestGone, so the host's table never showed the seat empty.
+    pass(w, 1);
+    expect(back.received).toEqual([welcome('Ann', 100)]);
+    expect(w.since(mark)).toEqual([['frame', { t: 'join', name: 'Jeff' }]]);
+    expect(cA.open()).toBe(false);
+    expect(cB.open()).toBe(true);
+    // The new channel is beaten and watched; a frame on it is a frame, the old one says nothing more.
+    pass(w, HB_MS);
+    expect(back.received).toEqual([welcome('Ann', 100), HEARTBEAT]);
+    cB.send({ t: 'action', action: { type: 'draw' } });
+    w.broker.flush();
+    expect(w.log.at(-1)).toEqual(['frame', { t: 'action', action: { type: 'draw' } }]);
+    pass(w, HB_GRACE_MS * 2);
+    expect(w.log.filter((e) => e[0] === 'guestGone')).toEqual([['guestGone', null]]);
+  });
+
+  test('host: a second join while one is held is a third peer at once; the held one takes the seat the moment the current guest leaves on purpose', () => {
+    const w = world();
+    startHost(w, cell(hostCtx()));
+    w.broker.flush();
+    const first = party(w, undefined);
+    w.broker.flush();
+    const cA = connectFrom(first, ROOM);
+    w.broker.flush();
+    pass(w, 3000);
+    const knock = party(w, undefined);
+    w.broker.flush();
+    const cB = connectFrom(knock, ROOM);
+    w.broker.flush();
+    cB.send({ t: 'join', name: 'Kim' });
+    w.broker.flush();
+    expect(knock.received).toEqual([]);
+    // Another peer, before the hold is answered: full, as ever, and closed 300 ms on.
+    const extra = party(w, undefined);
+    w.broker.flush();
+    const cX = connectFrom(extra, ROOM);
+    w.broker.flush();
+    expect(extra.received).toEqual([{ t: 'full' }]);
+    expect(knock.received).toEqual([]);
+    pass(w, FULL_CLOSE_MS);
+    expect(cX.open()).toBe(false);
+    // The current guest leaves (Leave, a reload): the loss is reported, then the held join is
+    // seated without further wait, its frames replayed.
+    const mark = w.log.length;
+    cA.close();
+    w.broker.flush();
+    expect(w.since(mark)).toEqual([
+      ['guestGone', null],
+      ['frame', { t: 'join', name: 'Kim' }],
+    ]);
+    expect(knock.received).toEqual([welcome('Ann', 100)]);
+    expect(cB.open()).toBe(true);
+    // Nobody is held any more: the probe that waited on the old channel answers nothing at 10 s.
+    pass(w, HB_MISSED_MS);
+    expect(knock.received).toEqual([welcome('Ann', 100), HEARTBEAT, HEARTBEAT]);
+    expect(w.since(mark)).toHaveLength(2);
+  });
+
+  test('host: a held join that closes its channel wants no answer; the next join is held afresh', () => {
+    const w = world();
+    startHost(w, cell(hostCtx()));
+    w.broker.flush();
+    const first = party(w, undefined);
+    w.broker.flush();
+    const cA = connectFrom(first, ROOM);
+    w.broker.flush();
+    pass(w, 2000);
+    const knock = party(w, undefined);
+    w.broker.flush();
+    const cB = connectFrom(knock, ROOM);
+    w.broker.flush();
+    cB.close();
+    w.broker.flush();
+    // The first guest beats: nothing is sent anywhere (the knocker is gone, its channel closed).
+    cA.send(HEARTBEAT);
+    w.broker.flush();
+    expect(knock.received).toEqual([]);
+    expect(w.log.filter((e) => e[0] === 'guestGone')).toEqual([]);
+    // A new knock is held on its own, not refused as a second one.
+    pass(w, 1000);
+    const again = party(w, undefined);
+    w.broker.flush();
+    const cC = connectFrom(again, ROOM);
+    w.broker.flush();
+    expect(again.received).toEqual([]);
+    pass(w, HB_MISSED_MS - 1000);
+    expect(again.received).toEqual([welcome('Ann', 100)]);
+    expect(cC.open()).toBe(true);
+    expect(cA.open()).toBe(false);
   });
 
   test('guest: beats the host every 5 s; a host silent for 15 s is lost and the rejoin follows 1.5 s later on a fresh channel', () => {
@@ -937,7 +1094,7 @@ describe('liveness across the sessions', () => {
     expect(w.clock.pending()).toBe(0);
   });
 
-  test('the reconnect trait, bounded: a guest broker blip opens a second channel that is told full while the first still beats; once the first has been silent HB_MISSED_MS the rejoin takes the seat', () => {
+  test('a guest broker blip beside a live channel: the reconnect joins nothing, no lost, no full, no second channel; both keep beating', () => {
     const w = world();
     const hctx = cell(hostCtx());
     startHost(w, hctx);
@@ -949,34 +1106,19 @@ describe('liveness across the sessions', () => {
     gctx.value = guestCtx({ oppConnected: true });
     pass(w, HB_MS * 2);
     const guestId = w.spy.peers[1]?.peer.id() ?? '';
-    const mark = w.log.length;
     w.broker.dropSocket(guestId);
     w.broker.flush();
-    // 400 ms later the broker is back and `open` runs tryJoin again (the legacy trait): the first
-    // channel stops beating; the host, still hearing nothing amiss, tells the newcomer full.
+    // The drop itself is shown, as ever (the network error's status and toast); from here on,
+    // nothing. 400 ms later the broker is back and `open` runs tryJoin, which finds the channel
+    // open and connects nothing (the legacy opened a second channel here, which the host told full).
+    const mark = w.log.length;
     pass(w, RECONNECT_FIRST_MS);
-    const statuses = (): ReadonlyArray<unknown> =>
-      w.since(mark).filter((e) => e[0] === 'status' || e[0] === 'frame' || e[0] === 'lost');
-    expect(statuses().at(-1)).toEqual(['frame', { t: 'full' }]);
-    // Full, closed 300 ms on, lost, a rejoin 1.5 s on, full again... until the first channel
-    // has been silent for HB_MISSED_MS, when a rejoin is welcomed and the seat is the guest's.
-    pass(w, HB_MISSED_MS + FULL_CLOSE_MS + REJOIN_MS);
-    const kinds = w.since(mark).map((e) => e[0]);
-    expect(kinds.filter((k) => k === 'guestGone')).toEqual([]);
-    expect(kinds.filter((k) => k === 'lost').length).toBeGreaterThanOrEqual(2);
-    // Both sessions log here: the guest's welcome, then the host's join.
-    expect(
-      w
-        .since(mark)
-        .filter((e) => e[0] === 'frame')
-        .slice(-2),
-    ).toEqual([
-      ['frame', welcome('Ann', 100)],
-      ['frame', { t: 'join', name: 'Jeff' }],
-    ]);
-    // Settled: both beat again and nobody is reported gone for a long while.
-    const m2 = w.log.length;
+    expect(w.since(mark)).toEqual([]);
+    expect(w.spy.peers[1]?.conns).toHaveLength(1);
+    expect(w.spy.peers[0]?.conns).toHaveLength(1);
+    // Settled: both beat on the one channel and nobody is reported anything for a long while.
     pass(w, 60_000);
-    expect(w.since(m2)).toEqual([]);
+    expect(w.since(mark)).toEqual([]);
+    expect(w.spy.peers[1]?.conns).toHaveLength(1);
   });
 });

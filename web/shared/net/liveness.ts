@@ -11,6 +11,14 @@
 // only WIRE_TAGS and would refuse `hb`, no game frame changes a byte, and the parity traces
 // (test/parity/gin.sessions.test.ts) compare what the codecs handed the apps, which this never is.
 //
+// A heartbeat is not answered: the peer's own cadence is the only proof of life, so nothing can
+// tell a dead guest from a quiet one sooner than its next beat is due. That is why a join that
+// arrives while the current guest is quiet is held (host.ts `accept`, `probe` below) rather than
+// refused: the guest's next frame, at most HB_MS away, makes the newcomer a third peer, and
+// HB_MISSED_MS of silence makes it the guest's own return. Refusing at once, as the legacy did,
+// showed a guest whose tab had just died "That room already has two players" five times over
+// while it tried again every REJOIN_MS (the liveness review's L2-early).
+//
 // The RTCPeerConnection's ICE and connection states were not taken as the signal, even as a fast
 // path: Chromium sat in `disconnected` without reaching `failed` in the review, `failed` when it
 // comes follows Chromium's own consent timeout (about 30 s, slower than the grace), and neither
@@ -18,7 +26,10 @@
 // stays as it is and the fake needs no new lever. Everything here runs on the injected Clock,
 // which clock.fake.ts drives in the tests; the grace is judged from `clock.now()` at the moment a
 // timer fires, not from a count of fired timers, so a page whose timers were frozen in the
-// background reaches the right verdict the moment it wakes.
+// background reaches the right verdict the moment it wakes. That clock is `Date.now()`, so a wall
+// clock stepped forward by the grace or more (an NTP correction) reads as that much silence and
+// calls a lively peer gone once, on both sides; the rejoin that follows repairs it, and a
+// monotonic clock would cost the Clock type a second reading for a case no review reproduced.
 import type { Clock, Timer } from '../lib/clock.ts';
 import type { Connection } from '../edge/transport.ts';
 
@@ -29,7 +40,7 @@ export const HB_GRACE_MS = 15_000;
 /**
  * A join arriving while the current guest has been silent this long (one heartbeat missed, with a
  * whole period of slack for jitter) replaces the silent channel instead of being told the room is
- * full: a guest whose tab died and who is back in a new one need not wait out the grace.
+ * full; one arriving earlier waits for this moment, or for the guest's next frame (host.ts).
  */
 export const HB_MISSED_MS = 2 * HB_MS;
 
@@ -46,6 +57,13 @@ export type Liveness = Readonly<{
   heard: () => void;
   /** Milliseconds since the peer was last heard (since `start`, until a frame arrives). */
   silence: () => number;
+  /**
+   * Someone is waiting on this peer's next sign of life (host.ts holds a join this way): `alive`
+   * runs on the next frame heard, `silent` the moment the silence reaches `ms` (judged from the
+   * clock, as the verdict is), whichever comes first and only that one. `stop` cancels it without
+   * a call, as does the function returned; a second probe replaces the first.
+   */
+  probe: (ms: number, alive: () => void, silent: () => void) => () => void;
   /** The channel closed or stopped being the session's current one: no more beats, no verdict. */
   stop: () => void;
 }>;
@@ -60,12 +78,21 @@ export const liveness = (conn: Connection, clock: Clock, onGone: () => void): Li
   let running = false;
   let beatTimer: Timer | null = null;
   let checkTimer: Timer | null = null;
+  let probeTimer: Timer | null = null;
+  let probeAlive: (() => void) | null = null;
+  const silence = (): number => clock.now() - lastHeard;
+  const clearProbe = (): void => {
+    if (probeTimer !== null) clock.clearTimeout(probeTimer);
+    probeTimer = null;
+    probeAlive = null;
+  };
   const stop = (): void => {
     running = false;
     if (beatTimer !== null) clock.clearTimeout(beatTimer);
     if (checkTimer !== null) clock.clearTimeout(checkTimer);
     beatTimer = null;
     checkTimer = null;
+    clearProbe();
   };
   // Neither timer fires after `stop`, which clears both, so neither callback re-checks `running`.
   const beat = (): void => {
@@ -75,13 +102,13 @@ export const liveness = (conn: Connection, clock: Clock, onGone: () => void): Li
   // Judged from the clock, not re-armed on every frame: frames can be frequent, and a check that
   // fires early simply waits out what is left of the grace.
   const check = (): void => {
-    const silent = clock.now() - lastHeard;
-    if (silent >= HB_GRACE_MS) {
+    const gap = silence();
+    if (gap >= HB_GRACE_MS) {
       stop();
       onGone();
       return;
     }
-    checkTimer = clock.setTimeout(check, HB_GRACE_MS - silent);
+    checkTimer = clock.setTimeout(check, HB_GRACE_MS - gap);
   };
   return {
     start: () => {
@@ -93,8 +120,28 @@ export const liveness = (conn: Connection, clock: Clock, onGone: () => void): Li
     },
     heard: () => {
       lastHeard = clock.now();
+      const alive = probeAlive;
+      if (alive === null) return;
+      clearProbe();
+      alive();
     },
-    silence: () => clock.now() - lastHeard,
+    silence,
+    probe: (ms, alive, silent) => {
+      clearProbe();
+      probeAlive = alive;
+      // Armed for what is left of `ms`. A frame meanwhile resolves the probe through `heard` and
+      // clears this timer, so when it fires nothing was heard and the silence is at least `ms`
+      // (a timer never fires early); no re-check of the clock is needed, unlike `check`, whose
+      // grace is pushed back by frames without re-arming.
+      probeTimer = clock.setTimeout(
+        () => {
+          clearProbe();
+          silent();
+        },
+        Math.max(0, ms - silence()),
+      );
+      return clearProbe;
+    },
     stop,
   };
 };

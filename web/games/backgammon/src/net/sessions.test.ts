@@ -57,10 +57,14 @@ describe('backgammon HostSession', () => {
     session.send(state);
     w.broker.flush();
     expect(guest.received.at(-1)).toEqual(state);
-    // A third peer is told the room is full with this game's frame.
+    // A third peer is told the room is full with this game's frame, once the first guest is heard again
+    // (web/shared/net/host.ts `accept`: a join beside a quiet guest waits for its next frame).
     const third = party(w, undefined);
     w.broker.flush();
     connectFrom(third, ROOM);
+    w.broker.flush();
+    expect(third.received).toEqual([]);
+    conn.send({ t: 'action', action: { type: 'roll' } });
     w.broker.flush();
     expect(third.received).toEqual([{ t: 'full' }]);
   });

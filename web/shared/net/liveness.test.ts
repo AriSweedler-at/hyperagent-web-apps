@@ -1,8 +1,8 @@
 // The heartbeat and the silence watch for one channel (liveness.ts), over the fake broker and the
 // fake clock: the cadence, the verdict after HB_GRACE_MS of silence exactly once, a frame pushing
-// the verdict back, `stop` cancelling both, and nothing written to a channel that is not open.
-// How the two sessions use it (the seat freed, the rejoin, a join replacing a silent channel) is
-// pinned in sessions.test.ts.
+// the verdict back, `stop` cancelling both, nothing written to a channel that is not open, and the
+// probe (a frame or `ms` of silence, whichever first, once). How the two sessions use it (the seat
+// freed, the rejoin, a join held and then seated or refused) is pinned in sessions.test.ts.
 import { describe, expect, test } from 'vitest';
 
 import { fakeClock, type FakeClock } from '../edge/clock.fake.ts';
@@ -156,5 +156,98 @@ describe('liveness', () => {
     expect(q.localErrors).toEqual([]);
     pass(q, HB_GRACE_MS);
     expect(q.gone).toEqual([HB_GRACE_MS]);
+  });
+
+  test('probe: a frame heard first is `alive`, once; the silence reaching `ms` first is `silent`, once; judged from the clock', () => {
+    const p = pair();
+    p.live.start();
+    pass(p, 3000);
+    const calls: string[] = [];
+    p.live.probe(
+      HB_MISSED_MS,
+      () => calls.push(`alive@${String(p.clock.now())}`),
+      () => calls.push(`silent@${String(p.clock.now())}`),
+    );
+    // Silent for 3 s when armed: the answer is due 7 s on...
+    pass(p, HB_MISSED_MS - 3000 - 1);
+    expect(calls).toEqual([]);
+    // ...unless a frame comes first.
+    p.live.heard();
+    expect(calls).toEqual([`alive@${String(HB_MISSED_MS - 1)}`]);
+    // Resolved: neither a later frame nor the timer that was armed says anything more.
+    p.live.heard();
+    pass(p, HB_MISSED_MS * 2);
+    expect(calls).toHaveLength(1);
+    // A fresh probe on a peer that stays quiet: `silent` exactly when the silence reaches `ms`.
+    const q = pair();
+    q.live.start();
+    pass(q, 4000);
+    const answers: string[] = [];
+    q.live.probe(
+      HB_MISSED_MS,
+      () => answers.push('alive'),
+      () => answers.push(`silent@${String(q.live.silence())}`),
+    );
+    pass(q, HB_MISSED_MS - 4000 - 1);
+    expect(answers).toEqual([]);
+    pass(q, 1);
+    expect(answers).toEqual([`silent@${String(HB_MISSED_MS)}`]);
+    q.live.heard();
+    pass(q, HB_MISSED_MS);
+    expect(answers).toHaveLength(1);
+    // The verdict still comes on its own schedule: the probe took nothing from the watch.
+    expect(q.gone).toEqual([]);
+    pass(q, HB_GRACE_MS);
+    expect(q.gone).toHaveLength(1);
+  });
+
+  test('probe: `stop` and the returned cancel answer nothing; a second probe replaces the first', () => {
+    const p = pair();
+    p.live.start();
+    const calls: string[] = [];
+    const cancel = p.live.probe(
+      HB_MISSED_MS,
+      () => calls.push('alive-1'),
+      () => calls.push('silent-1'),
+    );
+    cancel();
+    p.live.heard();
+    pass(p, HB_MISSED_MS);
+    expect(calls).toEqual([]);
+    p.live.probe(
+      HB_MISSED_MS,
+      () => calls.push('alive-2'),
+      () => calls.push('silent-2'),
+    );
+    // Replaced before it could answer: only the third speaks, and only once.
+    p.live.probe(
+      HB_MISSED_MS,
+      () => calls.push('alive-3'),
+      () => calls.push('silent-3'),
+    );
+    p.live.heard();
+    expect(calls).toEqual(['alive-3']);
+    p.live.probe(
+      HB_MISSED_MS,
+      () => calls.push('alive-4'),
+      () => calls.push('silent-4'),
+    );
+    p.live.stop();
+    pass(p, HB_GRACE_MS * 2);
+    expect(calls).toEqual(['alive-3']);
+    expect(p.clock.pending()).toBe(0);
+    // Armed on a peer already silent past `ms`: answered on the next tick, not synchronously.
+    const q = pair();
+    q.live.start();
+    pass(q, HB_MISSED_MS + 1);
+    const late: string[] = [];
+    q.live.probe(
+      HB_MISSED_MS,
+      () => late.push('alive'),
+      () => late.push('silent'),
+    );
+    expect(late).toEqual([]);
+    q.clock.advance(0);
+    expect(late).toEqual(['silent']);
   });
 });
