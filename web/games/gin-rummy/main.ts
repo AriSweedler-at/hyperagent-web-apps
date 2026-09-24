@@ -227,7 +227,7 @@ const boot = (): void => {
       cancel: timers.cancel,
     },
     toggleSound: () => {
-      fx.toggle(app.soundFont);
+      fx.toggle(app.shell.soundFont);
     },
     share: (code) => {
       // The share sheet, else the clipboard with a toast, else the code itself (web/shared/edge/boot.ts).
@@ -274,7 +274,7 @@ const boot = (): void => {
     now,
     rng,
     fx: (cue) => {
-      fx.play(cue, app.soundFont);
+      fx.play(cue, app.shell.soundFont);
     },
     toast: (message) => {
       toast(message, null);
@@ -357,18 +357,21 @@ const boot = (): void => {
       dispatch({ type: 'mode/set', mode });
     },
     /** The engine's legal actions for my view. */
-    legal: (): ReadonlyArray<Action> => (app.view === null ? [] : legalActions(app.view)),
+    legal: (): ReadonlyArray<Action> =>
+      app.shell.view === null ? [] : legalActions(app.shell.view),
     /**
      * The layoffs the engine used to make by itself, then `finishLayoff` (§7b): what the drivers
      * (e2e/fixtures/gin-play.ts, tools/parity) play through a knock's layoff phase to land where
      * the automatic layoff landed. Host and pass-and-play only (the game is here).
      */
-    layoffs: (): ReadonlyArray<Action> => (app.game === null ? [] : bestLayoffActions(app.game)),
+    layoffs: (): ReadonlyArray<Action> =>
+      app.shell.game === null ? [] : bestLayoffActions(app.shell.game),
     // The sandbox from the console (src/sandbox.ts): deal a map; read the table back as one.
     sandbox: (map: string) => {
       dispatch({ type: 'sandbox/start', map });
     },
-    sandboxMap: (): string | null => (app.game === null ? null : formatMap(mapOf(app.game))),
+    sandboxMap: (): string | null =>
+      app.shell.game === null ? null : formatMap(mapOf(app.shell.game)),
     /** The card back, from the console for now: a preset is shown and remembered; anything else is logged and refused. */
     cardBack: (name: string): void => {
       if (!isCardBack(name)) {
@@ -385,7 +388,7 @@ const boot = (): void => {
       }
       dispatch({ type: 'soundFont/set', font: name });
     },
-    soundFontName: (): string => app.soundFont,
+    soundFontName: (): string => app.shell.soundFont,
     dispatch,
   };
 

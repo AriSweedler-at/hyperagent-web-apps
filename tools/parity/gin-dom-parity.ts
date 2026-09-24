@@ -225,8 +225,15 @@ export type HookView = Readonly<{
   forceStock: boolean;
 }>;
 
+/**
+ * The view the page holds. The legacy page's hook keeps the flat `app.view`; the port's has held
+ * `app.shell.view` since the App split in two (docs/design/shared-shell.md §5 C1), and this driver
+ * reads the legacy page for its choices while computed-styles.ts reads the port with the same call.
+ */
 export const readView = (page: Page): Promise<HookView | null> =>
-  page.evaluate<HookView | null>('window.__gin.app.view');
+  page.evaluate<HookView | null>(
+    '(() => { const app = window.__gin.app; return "shell" in app ? app.shell.view : app.view; })()',
+  );
 
 /**
  * Accept the drawn card when the page shows it in the ghost slot (docs/design/gin-draw-ghost-slot.md

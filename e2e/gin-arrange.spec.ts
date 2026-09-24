@@ -40,7 +40,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       test.skip(testInfo.project.name !== 'pages', 'runs once: the same bytes on both origins');
       const watched = watchPage(page, ALLOWED_FAILURES);
       const story = storyById('accepted-two-ways');
-      const options = story?.app.view?.meldOptions ?? [];
+      const options = story?.app.shell.view?.meldOptions ?? [];
       expect(options.length).toBeGreaterThanOrEqual(2);
       await openLive(page, 'accepted-two-ways');
       await expect(page.locator('#deadwoodInfo .alt-badge')).toHaveText(
@@ -55,7 +55,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         1,
       );
       // The option not in use: only that one carries the "Use this arrangement" button.
-      const active = story?.app.view?.activeMeldSig;
+      const active = story?.app.shell.view?.activeMeldSig;
       const pick = options.findIndex((o) => o.sig !== active);
       const chosen = options[pick];
       if (chosen === undefined) throw new Error('every option is in use');
@@ -87,7 +87,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await openLive(page, 'accepted-fresh');
       await expect(page.locator('#arrangeBtn')).toHaveClass(/due/);
       const story = storyById('sorted-by-rank');
-      const hand = story?.app.view?.me.hand ?? [];
+      const hand = story?.app.shell.view?.me.hand ?? [];
       const rankOf = new Map(hand.map((c) => [c.id, c.r]));
       const suitOf = new Map(hand.map((c) => [c.id, 'SHDC'.indexOf(c.s)]));
 
@@ -110,7 +110,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       // The melds never move: the same groups in the same order under every mode.
       const arranged = storyById('arranged-after-accept');
       expect(await page.evaluate<ReadonlyArray<Ids>>(GROUPS)).toEqual(
-        (arranged?.app.picture?.groups ?? []).map((g) => g.map((c) => c.id)),
+        (arranged?.app.table.picture?.groups ?? []).map((g) => g.map((c) => c.id)),
       );
       // Manual keeps the loose cards exactly where they are.
       const loose = await page.evaluate<Ids>(LOOSE);
@@ -213,9 +213,9 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#hand .card.selected')).toHaveCount(0);
 
       // A loose card that joins no meld: the toast, nothing marked.
-      const loose = story?.app.picture?.loose ?? [];
+      const loose = story?.app.table.picture?.loose ?? [];
       const alone = loose.find((c) => {
-        const held = story?.app.view?.me.hand ?? [];
+        const held = story?.app.shell.view?.me.hand ?? [];
         const sameRank = held.filter((o) => o.r === c.r).length;
         const neighbours = held.filter((o) => o.s === c.s && Math.abs(o.r - c.r) === 1).length;
         return sameRank < 3 && neighbours === 0;

@@ -94,7 +94,7 @@ describe('the captured saves through the reducer', () => {
       storage.setItem(c.key, c.raw);
       const rt = runtime(storage);
       rt.dispatch({ type: 'home/init', home: readHome(createStore(storage)) });
-      const offer = rt.app().resume;
+      const offer = rt.app().shell.resume;
       if (variant === 'host.lobby') {
         // A room with no hand dealt is not offered (the legacy needed `saved.game`).
         expect(offer).toBeNull();
@@ -158,13 +158,13 @@ describe('the captured saves through the reducer', () => {
     rt.dispatch({ type: 'home/init', home: readHome(createStore(storage)) });
     rt.dispatch({ type: 'resume/click' });
     const app = rt.app();
-    expect(app.role).toBe('host');
-    expect(app.screen).toBe('hostWaitScreen');
-    expect(app.game).not.toBeNull();
-    if (app.game === null) return;
-    expect(app.view).toEqual(viewFor(app.game, 0));
-    expect(app.oppName).toBe('Jeff');
-    expect(app.target).toBe(75);
+    expect(app.shell.role).toBe('host');
+    expect(app.shell.screen).toBe('hostWaitScreen');
+    expect(app.shell.game).not.toBeNull();
+    if (app.shell.game === null) return;
+    expect(app.shell.view).toEqual(viewFor(app.shell.game, 0));
+    expect(app.shell.oppName).toBe('Jeff');
+    expect(app.shell.target).toBe(75);
   });
 });
 

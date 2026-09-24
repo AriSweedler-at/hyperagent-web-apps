@@ -253,14 +253,14 @@ describe('the catalogue', () => {
       { act: 'discard', enabled: true },
       { act: 'knock', enabled: true },
     ]);
-    expect(must('accepted-two-ways').app.view?.meldOptions.length).toBeGreaterThanOrEqual(2);
+    expect(must('accepted-two-ways').app.shell.view?.meldOptions.length).toBeGreaterThanOrEqual(2);
   });
 
   test('only a draw from the discard pile offers the undo button (docs/design/gin-arrangement-and-discards.md §4)', () => {
     const undoable = STORIES.filter((s) => s.facts.actions.some((a) => a.act === 'undoDraw'));
     expect(undoable.map((s) => s.id)).toEqual(['drawn-discard-shown', 'taken-upcard-shown']);
-    expect(must('undo-back-to-draw').app.game?.discard.length).toBe(
-      must('draw-mine-open').app.game?.discard.length,
+    expect(must('undo-back-to-draw').app.shell.game?.discard.length).toBe(
+      must('draw-mine-open').app.shell.game?.discard.length,
     );
   });
 
@@ -282,7 +282,7 @@ describe('the catalogue', () => {
 
   test('the discards stories: every discard of the hand greyed, the top ringed, my hand only when included', () => {
     const open = must('discards-open');
-    const game = open.app.game;
+    const game = open.app.shell.game;
     if (game === null) throw new Error('no game');
     expect(open.facts.dc?.seen).toHaveLength(game.discard.length);
     expect(open.facts.dc?.seen.length).toBeGreaterThan(1);
@@ -315,8 +315,8 @@ describe('the catalogue', () => {
     expect(due).not.toContain('arranged-after-accept');
     expect(due).not.toContain('human-meld');
     STORIES.forEach((s) => {
-      const shown = s.app.draw !== null;
-      const over = s.app.view?.phase === 'roundOver';
+      const shown = s.app.table.draw !== null;
+      const over = s.app.shell.view?.phase === 'roundOver';
       if (shown || over) expect(s.facts.arrange, s.id).toBe('off');
     });
     expect(STORIES.filter((s) => s.facts.human.length > 0).map((s) => s.id)).toEqual([
@@ -330,18 +330,18 @@ describe('the catalogue', () => {
     const manual = STORIES.find((s) => s.id === 'manual-order');
     expect(manual?.facts.arrange).toBe('idle');
     const rank = STORIES.find((s) => s.id === 'sorted-by-rank');
-    expect(manual?.app.picture?.loose.map((c) => c.id)).not.toEqual(
-      rank?.app.picture?.loose.map((c) => c.id),
+    expect(manual?.app.table.picture?.loose.map((c) => c.id)).not.toEqual(
+      rank?.app.table.picture?.loose.map((c) => c.id),
     );
   });
 
   test('every story is a table screen with a view; the guest story has no game', () => {
     STORIES.forEach((s) => {
-      expect(s.app.screen, s.id).toBe('tableScreen');
-      expect(s.app.view, s.id).not.toBeNull();
-      expect(s.app.picture, s.id).not.toBeNull();
-      expect(s.app.role, s.id).toBe(s.id === 'drawn-pending-guest' ? 'guest' : 'local');
-      expect(s.app.game === null, s.id).toBe(s.id === 'drawn-pending-guest');
+      expect(s.app.shell.screen, s.id).toBe('tableScreen');
+      expect(s.app.shell.view, s.id).not.toBeNull();
+      expect(s.app.table.picture, s.id).not.toBeNull();
+      expect(s.app.shell.role, s.id).toBe(s.id === 'drawn-pending-guest' ? 'guest' : 'local');
+      expect(s.app.shell.game === null, s.id).toBe(s.id === 'drawn-pending-guest');
     });
   });
 });
@@ -354,7 +354,7 @@ describe('every story painted on the page fake', () => {
       expect(factsOnPage(p)).toEqual(story.facts);
       // Eleven cells, less one per card the defender (whose turn the layoff phase is) laid off (§7b).
       const laid =
-        story.facts.layoff !== undefined && story.app.view?.isMyTurn === true
+        story.facts.layoff !== undefined && story.app.shell.view?.isMyTurn === true
           ? story.facts.layoff.laid.length
           : 0;
       expect(story.facts.slots).toBe(11 - laid);
@@ -443,7 +443,7 @@ describe('every story painted on the page fake', () => {
   });
 
   test('the sort stories: the loose cards ascend by rank; by suit under the default; manual keeps them reversed', () => {
-    const view = must('sorted-by-rank').app.view;
+    const view = must('sorted-by-rank').app.shell.view;
     if (view === null) throw new Error('no view');
     const byId = new Map(view.me.hand.map((c) => [c.id, c]));
     const looseOf = (id: string): ReadonlyArray<string> =>
@@ -516,8 +516,8 @@ describe('every story painted on the page fake', () => {
       expect(laidOffOnPage(page)).toEqual(['4S', '5S']);
       expect(page.get('actions').text()).toContain('data-act="showResult"');
     });
-    expect(must('round-over-laid-off').app.view?.me.name).toBe('Ann');
-    expect(must('round-over-laid-off-defender').app.view?.me.name).toBe('Bob');
+    expect(must('round-over-laid-off').app.shell.view?.me.name).toBe('Ann');
+    expect(must('round-over-laid-off-defender').app.shell.view?.me.name).toBe('Bob');
   });
 
   test('round-over-table keeps the result sheet put away and offers Show results', () => {

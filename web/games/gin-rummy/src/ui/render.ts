@@ -113,14 +113,14 @@ const bindSheets = (doc: PageLike, dispatch: Dispatch): void => {
 
 /** `showScreen(id)`: every screen but `id` gets `hidden`; the table locks the body to the viewport. */
 export const paintScreen = (doc: PageLike, app: App): void => {
-  paintShellScreen(doc, SCREENS, app.screen, 'tableScreen');
+  paintShellScreen(doc, SCREENS, app.shell.screen, 'tableScreen');
   // The card back: theme.css draws every `.card.back` from `body[data-card-back]` (src/cardBack.ts).
-  setAttr(doc.body, 'data-card-back', app.cardBack);
+  setAttr(doc.body, 'data-card-back', app.table.cardBack);
 };
 
 /** `#roomCode`, `#hostWaitStatus` (+ its pulse), `#startGameBtn`, `#guestWaitStatus` (+ its pulse). */
 export const paintWaiting = (doc: DocumentLike, app: App): void => {
-  paintShellWaiting(doc, app);
+  paintShellWaiting(doc, app.shell);
 };
 
 /**
@@ -130,7 +130,7 @@ export const paintWaiting = (doc: DocumentLike, app: App): void => {
  * pass-and-play alone.
  */
 export const paintHandoff = (doc: DocumentLike, app: App): void => {
-  const game = app.role === 'local' ? app.game : null;
+  const game = app.shell.role === 'local' ? app.shell.game : null;
   paintShellHandoff(doc, game === null ? null : handoffLabel(game));
 };
 
@@ -143,7 +143,7 @@ export const oppCardsHtml = (cardCount: number): string =>
 
 /** `#connDot`'s whole class attribute; pass-and-play hides it. */
 export const connDotClass = (app: App): string =>
-  `conn-dot ${app.oppConnected ? 'on' : 'off'}${app.role === 'local' ? ' hidden' : ''}`;
+  `conn-dot ${app.shell.oppConnected ? 'on' : 'off'}${app.shell.role === 'local' ? ' hidden' : ''}`;
 
 const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
   setText(requireId(doc, 'oppName'), v.opp.name);
@@ -151,7 +151,7 @@ const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
   setHtml(requireId(doc, 'oppCards'), trustedHtml(oppCardsHtml(v.opp.cardCount)));
   const dot = requireId(doc, 'connDot');
   setAttr(dot, 'class', connDotClass(app));
-  setAttr(dot, 'title', app.oppConnected ? 'Connected' : 'Disconnected');
+  setAttr(dot, 'title', app.shell.oppConnected ? 'Connected' : 'Disconnected');
   setText(requireId(doc, 'roundBadge'), `Hand ${String(v.handNumber)}`);
   setText(requireId(doc, 'targetBadge'), `to ${String(v.target)}`);
 };
@@ -205,11 +205,11 @@ export const discardsSubText = (v: View, withHand: boolean): string =>
 const paintDiscards = (doc: DocumentLike, app: App, v: View): void => {
   // Without `discardIds` (a legacy host's frames) the sheet has nothing to show.
   setDisabled(requireId(doc, 'discardsBtn'), v.discardIds === undefined);
-  paintSheet(doc, 'discardsOverlay', app.discardsOpen);
-  if (!app.discardsOpen) return;
-  setHtml(requireId(doc, 'discardsGrid'), discardsHtml(v, app.discardsWithHand));
-  setText(requireId(doc, 'discardsSub'), discardsSubText(v, app.discardsWithHand));
-  setChecked(requireId(doc, 'discardsHandToggle'), app.discardsWithHand);
+  paintSheet(doc, 'discardsOverlay', app.table.discardsOpen);
+  if (!app.table.discardsOpen) return;
+  setHtml(requireId(doc, 'discardsGrid'), discardsHtml(v, app.table.discardsWithHand));
+  setText(requireId(doc, 'discardsSub'), discardsSubText(v, app.table.discardsWithHand));
+  setChecked(requireId(doc, 'discardsHandToggle'), app.table.discardsWithHand);
 };
 
 const paintPiles = (doc: DocumentLike, v: View): void => {
@@ -264,7 +264,7 @@ const paintTableMelds = (doc: DocumentLike, app: App, v: View): void => {
     );
   }
   const laid = new Set(lo.laidOff.map((e) => e.card.id));
-  const dragging = app.drag?.from === 'table' ? app.drag.cardId : null;
+  const dragging = app.table.drag?.from === 'table' ? app.table.drag.cardId : null;
   queryAllIn(melds, '.meld-group').forEach((group, i) => {
     const cards = lo.extended[i] ?? [];
     const key = `${idsOf(cards).join(' ')}:${dragging ?? ''}`;
@@ -284,12 +284,12 @@ const paintTableMelds = (doc: DocumentLike, app: App, v: View): void => {
         ),
       );
     }
-    toggleClass(group, 'drop', app.drag?.onto === i);
+    toggleClass(group, 'drop', app.table.drag?.onto === i);
   });
 };
 
 const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
-  const status = statusWith(v, app.selectedCard, app.draw);
+  const status = statusWith(v, app.table.selectedCard, app.table.draw);
   setText(requireId(doc, 'statusMain'), status.main);
   setText(requireId(doc, 'statusSub'), status.sub);
   toggleClass(requireId(doc, 'statusBanner'), 'mine', v.isMyTurn && v.phase !== 'roundOver');
@@ -351,18 +351,30 @@ const paintHand = (doc: DocumentLike, app: App, v: View, handView: HandView): vo
   setText(requireId(doc, 'myName'), `${v.me.name} · ${String(v.me.total)} pts`);
   const altCount = v.meldOptions.length;
   const dw = requireId(doc, 'deadwoodInfo');
-  setHtml(dw, deadwoodHtml(v, app.selectedCard));
+  setHtml(dw, deadwoodHtml(v, app.table.selectedCard));
   toggleClass(dw, 'tappable-dw', altCount > 1);
   setAttr(dw, 'title', altCount > 1 ? 'Tap to choose which melds you declare' : '');
   const hand = requireId(doc, 'hand');
-  const arranged = arrangedOf(v, app.draw, app.human, app.sort, app.picture);
-  const picture = app.picture ?? arranged;
+  const arranged = arrangedOf(
+    v,
+    app.table.draw,
+    app.table.human,
+    app.table.sort,
+    app.table.picture,
+  );
+  const picture = app.table.picture ?? arranged;
   // The cards glide to their new cells (flip.ts) rather than snap; the dragged card's cell is emptied.
   flipCards(hand, () => {
     setHtml(
       hand,
       trustedHtml(
-        handView.render(v, app.selectedCard, app.draw, picture, app.drag?.cardId ?? null),
+        handView.render(
+          v,
+          app.table.selectedCard,
+          app.table.draw,
+          picture,
+          app.table.drag?.cardId ?? null,
+        ),
       ),
     );
   });
@@ -373,10 +385,10 @@ const paintHand = (doc: DocumentLike, app: App, v: View, handView: HandView): vo
   // Arrange opens its sheet in play, never while the drawn card waits in the ghost cell; `due`
   // is the cue that the kept picture differs from the arrangement the player asked for.
   const arrange = requireId(doc, 'arrangeBtn');
-  const arrangeable = inPlay(v.phase) && app.draw === null;
+  const arrangeable = inPlay(v.phase) && app.table.draw === null;
   setDisabled(arrange, !arrangeable);
   toggleClass(arrange, 'due', arrangeable && !samePicture(picture, arranged));
-  setHtml(requireId(doc, 'actions'), actionsHtml(v, app.selectedCard));
+  setHtml(requireId(doc, 'actions'), actionsHtml(v, app.table.selectedCard));
   paintDropTargets(doc, app, v);
 };
 
@@ -386,7 +398,7 @@ const paintHand = (doc: DocumentLike, app: App, v: View, handView: HandView): vo
  * turns the one under the pointer green, where a release discards the card (dragger.ts).
  */
 const paintDropTargets = (doc: DocumentLike, app: App, v: View): void => {
-  const d = app.drag;
+  const d = app.table.drag;
   const ready = d !== null && d.from === 'hand' && canDropDiscard(app, v, d.cardId);
   const over = ready && d.onto === 'discard';
   const pile = requireId(doc, 'discardPile');
@@ -399,9 +411,9 @@ const paintDropTargets = (doc: DocumentLike, app: App, v: View): void => {
 };
 
 const paintArrange = (doc: DocumentLike, app: App): void => {
-  paintSheet(doc, 'arrangeOverlay', app.arrangeOpen);
+  paintSheet(doc, 'arrangeOverlay', app.table.arrangeOpen);
   queryAllIn(requireId(doc, 'arrangeModes'), 'button[data-sort]').forEach((b) => {
-    toggleClass(b, 'active', dataOf(b, 'sort') === app.sort);
+    toggleClass(b, 'active', dataOf(b, 'sort') === app.table.sort);
   });
 };
 
@@ -494,7 +506,7 @@ const paintRoundResult = (doc: DocumentLike, app: App, v: View): void => {
     // there only rrHideBtn wrote the class, so a Rematch (resultDismissed back to false) never
     // brings a put-away sheet back over the endgame.
     if (v.phase !== 'gameOver') toggleClass(overlay, 'hidden', true);
-    else if (app.resultDismissed) toggleClass(overlay, 'hidden', true);
+    else if (app.table.resultDismissed) toggleClass(overlay, 'hidden', true);
     return;
   }
   const text = roundResultText(v);
@@ -512,7 +524,7 @@ const paintRoundResult = (doc: DocumentLike, app: App, v: View): void => {
   const btn = requireId(doc, 'rrContinueBtn');
   setDisabled(btn, v.ready[v.me.idx]);
   setText(btn, continueLabel(v));
-  toggleClass(overlay, 'hidden', app.resultDismissed);
+  toggleClass(overlay, 'hidden', app.table.resultDismissed);
 };
 
 // ---- the meld chooser ----------------------------------------------------------------------------
@@ -542,8 +554,8 @@ export const meldChooserSub = (v: View): string =>
   `${String(v.meldOptions.length)} ways to meld for the same ${String(v.me.deadwoodValue)} deadwood. Your score is identical either way — but the melds you declare decide what ${v.opp.name} can lay off if you knock.`;
 
 const paintMeldChooser = (doc: DocumentLike, app: App, v: View): void => {
-  paintSheet(doc, 'meldOverlay', app.meldChooser);
-  if (!app.meldChooser) return;
+  paintSheet(doc, 'meldOverlay', app.table.meldChooser);
+  if (!app.table.meldChooser) return;
   setText(requireId(doc, 'meldSub'), meldChooserSub(v));
   setHtml(
     requireId(doc, 'meldOptionList'),
@@ -631,17 +643,18 @@ export const historyHtml = (v: View | null): SafeHtml => {
 };
 
 const paintOverlays = (doc: DocumentLike, app: App): void => {
-  paintSheet(doc, 'rulesOverlay', app.rulesOpen);
-  paintSheet(doc, 'sandboxHelpOverlay', app.sandbox.helpOpen);
-  paintSheet(doc, 'historyOverlay', app.history !== null);
-  if (app.history === 'game') setHtml(requireId(doc, 'historyList'), historyHtml(app.view));
+  paintSheet(doc, 'rulesOverlay', app.shell.rulesOpen);
+  paintSheet(doc, 'sandboxHelpOverlay', app.table.sandbox.helpOpen);
+  paintSheet(doc, 'historyOverlay', app.table.history !== null);
+  if (app.table.history === 'game')
+    setHtml(requireId(doc, 'historyList'), historyHtml(app.shell.view));
 };
 
 // ---- the whole paint -----------------------------------------------------------------------------
 
 /** The game screens from a view: the endgame at `gameOver`, else the table and its sheets. */
 const paintGame = (doc: DocumentLike, app: App, handView: HandView): void => {
-  const v = app.view;
+  const v = app.shell.view;
   if (v === null) {
     // `leaveGame()` hid the result sheet; nothing else of the table is touched without a view.
     paintSheet(doc, 'roundResultOverlay', false);

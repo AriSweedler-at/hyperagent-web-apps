@@ -40,7 +40,7 @@ import {
   settlePicture,
   type Picture,
 } from '../ui/hand/picture.ts';
-import { initialApp, type App } from '../ui/state.ts';
+import { initialApp, type App, type Shell, type Table } from '../ui/state.ts';
 
 /** The seed of the deal every story but the seed searches plays from. */
 export const SEED = 12;
@@ -368,17 +368,23 @@ const threeRows = play(dealtAround(cardsOfText(`${SEVEN_RUN} ${KINGS} 2C`), null
 
 // ---- apps and facts ---------------------------------------------------------------------------------
 
+/** A story's overrides on the two halves of the App (ui/state.ts `Shell`/`Table`). */
+type Over = Readonly<{ shell?: Partial<Shell>; table?: Partial<Table> }>;
+
 /** A pass-and-play table showing `seat`'s view, the phone revealed to that seat. */
-const tableApp = (game: State, seat: Seat, over: Partial<App> = {}): App => ({
+const tableApp = (game: State, seat: Seat, over: Over = {}): App => ({
   ...initialApp,
-  role: 'local',
-  oppConnected: true,
-  game,
-  view: viewFor(game, seat),
-  screen: 'tableScreen',
-  revealed: seat,
-  draw: null,
-  ...over,
+  shell: {
+    ...initialApp.shell,
+    role: 'local',
+    oppConnected: true,
+    game,
+    view: viewFor(game, seat),
+    screen: 'tableScreen',
+    revealed: seat,
+    ...over.shell,
+  },
+  table: { ...initialApp.table, draw: null, ...over.table },
 });
 
 /** The `shown` stage for a draw just made from `before`, and the picture from before the draw the ten slots keep. */
@@ -419,26 +425,23 @@ const actionsOf = (
 };
 
 /** The sheet the app's flags open over `state`: a chooser, the discards, or the result while not put away. */
-const sheetOf = (state: State, app: Partial<App>): SheetState =>
-  app.meldChooser === true
+const sheetOf = (state: State, app: Over): SheetState =>
+  app.table?.meldChooser === true
     ? 'meldOverlay'
-    : app.arrangeOpen === true
+    : app.table?.arrangeOpen === true
       ? 'arrangeOverlay'
-      : app.discardsOpen === true
+      : app.table?.discardsOpen === true
         ? 'discardsOverlay'
-        : state.phase === 'roundOver' && state.result !== null && app.resultDismissed !== true
+        : state.phase === 'roundOver' &&
+            state.result !== null &&
+            app.table?.resultDismissed !== true
           ? 'roundResultOverlay'
           : 'none';
 
 /** With the discarded-cards sheet open: the pile's ids in deck order, my hand when included, the top. */
-const dcOf = (
-  state: State,
-  seat: Seat,
-  sheet: SheetState,
-  app: Partial<App>,
-): Partial<StoryFacts> => {
+const dcOf = (state: State, seat: Seat, sheet: SheetState, app: Over): Partial<StoryFacts> => {
   if (sheet !== 'discardsOverlay') return {};
-  const withHand = app.discardsWithHand === true;
+  const withHand = app.table?.discardsWithHand === true;
   const deck = idsOf(makeDeck());
   const inDeckOrder = (ids: ReadonlyArray<string>): ReadonlyArray<string> =>
     deck.filter((id) => ids.includes(id));
@@ -473,7 +476,7 @@ const factsOf = (
   selected: string | null,
   arrangement: Arrangement,
   statusSub: string,
-  app: Partial<App>,
+  app: Over,
 ): StoryFacts => {
   const view = viewFor(state, seat);
   const sheet = sheetOf(state, app);
@@ -561,7 +564,7 @@ type Spec = Readonly<{
   human?: HumanMelds;
   sort?: SortMode;
   selected?: string;
-  app?: Partial<App>;
+  app?: Over;
   sameHandAs?: string;
   screenshot?: false;
 }>;
@@ -576,12 +579,8 @@ const story = (spec: Spec): Story => {
     id: spec.id,
     title: spec.title,
     app: tableApp(spec.state, spec.seat, {
-      draw: stage,
-      selectedCard: selected,
-      picture,
-      human,
-      sort,
       ...spec.app,
+      table: { draw: stage, selectedCard: selected, picture, human, sort, ...spec.app?.table },
     }),
     facts: factsOf(
       spec.state,
@@ -682,7 +681,7 @@ export const STORIES: ReadonlyArray<Story> = [
     seat: 0,
     stage: { kind: 'waiting', from: 'stock' },
     statusSub: 'Drawing…',
-    app: { role: 'guest', game: null, code: 'ABCD', oppName: PLAYERS[1].name },
+    app: { shell: { role: 'guest', game: null, code: 'ABCD', oppName: PLAYERS[1].name } },
   }),
   story({
     id: 'accepted-fresh',
@@ -742,7 +741,7 @@ export const STORIES: ReadonlyArray<Story> = [
     seat: 0,
     picture: twoWaysPicture,
     statusSub: ACCEPTED_SUB,
-    app: { meldChooser: true },
+    app: { table: { meldChooser: true } },
   }),
   story({
     id: 'human-meld',
@@ -778,7 +777,7 @@ export const STORIES: ReadonlyArray<Story> = [
     seat: 0,
     picture: acceptedPicture,
     statusSub: ACCEPTED_SUB,
-    app: { arrangeOpen: true },
+    app: { table: { arrangeOpen: true } },
   }),
   story({
     id: 'hand-three-rows',
@@ -820,7 +819,7 @@ export const STORIES: ReadonlyArray<Story> = [
     seat: knockSeat,
     picture: acceptedFrom(knockable.before, knockState, knockSeat),
     statusSub: ACCEPTED_SUB,
-    app: { discardsOpen: true },
+    app: { table: { discardsOpen: true } },
   }),
   story({
     id: 'discards-with-hand',
@@ -829,7 +828,7 @@ export const STORIES: ReadonlyArray<Story> = [
     seat: knockSeat,
     picture: acceptedFrom(knockable.before, knockState, knockSeat),
     statusSub: ACCEPTED_SUB,
-    app: { discardsOpen: true, discardsWithHand: true },
+    app: { table: { discardsOpen: true, discardsWithHand: true } },
   }),
   story({
     id: 'layoff-mine',
@@ -852,7 +851,7 @@ export const STORIES: ReadonlyArray<Story> = [
     state: knocked,
     seat: knockSeat,
     statusSub: 'See results',
-    app: { resultDismissed: true },
+    app: { table: { resultDismissed: true } },
   }),
   story({
     id: 'round-over-laid-off',
@@ -861,7 +860,7 @@ export const STORIES: ReadonlyArray<Story> = [
     state: laidOffKnocked,
     seat: 0,
     statusSub: 'See results',
-    app: { resultDismissed: false },
+    app: { table: { resultDismissed: false } },
   }),
   story({
     id: 'round-over-laid-off-defender',
@@ -869,7 +868,7 @@ export const STORIES: ReadonlyArray<Story> = [
     state: laidOffKnocked,
     seat: 1,
     statusSub: 'See results',
-    app: { resultDismissed: false },
+    app: { table: { resultDismissed: false } },
   }),
 ];
 
@@ -877,9 +876,10 @@ export const storyById = (id: string): Story | null => STORIES.find((s) => s.id 
 
 /** The card ids of the first ten slots as the picture orders them, which `sameHandAs` pairs share. */
 export const heldCards = (story: Story): ReadonlyArray<string> => {
-  const view = story.app.view;
+  const view = story.app.shell.view;
   if (view === null) return [];
   const picture =
-    story.app.picture ?? arrangedOf(view, story.app.draw, story.app.human, story.app.sort);
+    story.app.table.picture ??
+    arrangedOf(view, story.app.table.draw, story.app.table.human, story.app.table.sort);
   return idsOf(cardsOf(picture)).slice(0, HAND_SIZE);
 };

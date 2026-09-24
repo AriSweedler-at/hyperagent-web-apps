@@ -49,17 +49,25 @@ describe('curtainText', () => {
 describe('paintCurtain', () => {
   test('shows the curtain with its texts for the waiting seat; hides it, texts untouched, otherwise', () => {
     const page = ginPage(MARKUP);
-    paintCurtain(page.doc, { ...initialApp, role: 'local', game: passed, curtain: 1 });
+    paintCurtain(page.doc, {
+      ...initialApp,
+      shell: { ...initialApp.shell, role: 'local', game: passed },
+      table: { ...initialApp.table, curtain: 1 },
+    });
     expect(page.get('curtainOverlay').hidden()).toBe(false);
     expect(page.get('curtainTitle').text()).toBe('Pass the phone to Bob');
     expect(page.get('curtainSub').text()).toBe('Ann, look away 👀');
     expect(page.get('curtainLast').text()).toBe(passed.lastAction?.text);
     expect(page.get('curtainBtn').text()).toBe("I'm Bob — show my cards");
-    paintCurtain(page.doc, { ...initialApp, role: 'local', game: passed, curtain: null });
+    paintCurtain(page.doc, {
+      ...initialApp,
+      shell: { ...initialApp.shell, role: 'local', game: passed },
+      table: { ...initialApp.table, curtain: null },
+    });
     expect(page.get('curtainOverlay').hidden()).toBe(true);
     expect(page.get('curtainTitle').text()).toBe('Pass the phone to Bob');
     // A curtain without a game (unreachable) is not shown.
-    paintCurtain(page.doc, { ...initialApp, curtain: 0 });
+    paintCurtain(page.doc, { ...initialApp, table: { ...initialApp.table, curtain: 0 } });
     expect(page.get('curtainOverlay').hidden()).toBe(true);
   });
 });
