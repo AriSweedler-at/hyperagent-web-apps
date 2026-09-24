@@ -1,5 +1,5 @@
-// The per-seat view (understand.md §5 R13, R24, R26, R33; panel E1 §5 `view.ts` with E2's
-// `legalActions` graft). Nothing in backgammon is hidden, so `viewFor` is the state plus the
+// The per-seat view (rules R13, R24, R26, R33;
+// `legalActions`). Nothing in backgammon is hidden, so `viewFor` is the state plus the
 // selectors the UI needs, computed for the viewer: `legal` and `plays` are non-empty only for the
 // seat that is moving, `canDouble` only for the seat that may double, and both seats' views
 // carry the same board. The literal is built in types.ts's key order so a `state` frame

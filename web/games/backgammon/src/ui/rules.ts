@@ -1,7 +1,7 @@
-// The rules list (design §4 "Home": `#rulesPanel` from `rules.ts RULES_ITEMS[variant]`), the one
+// The rules list (design §5.1: `#rulesPanel` from `rules.ts RULES_ITEMS[variant]`), the one
 // source both slots render from (`#rulesList` on the home tab and `#rulesOverlayList` over the
 // table, render.ts `renderRules`), so the two copies cannot drift as gin's legacy page let them.
-// Plain English throughout (design Q11): the only non-English word on this page is the name.
+// Plain English throughout (design §1 Q11): the only non-English word on this page is the name.
 import type { ShippedVariant } from '../engine/index.ts';
 
 /** What every tavli-family game shares: the board, the direction, hits, the bar and bearing off. */
@@ -13,7 +13,7 @@ const COMMON: ReadonlyArray<string> = [
   '<strong>Bearing off:</strong> Once all your checkers are home you may bear them off with an exact die, or from your highest point with a larger die.',
 ];
 
-/** Portes (design Q1): the first game of the Greek set, cube-less, a gammon doubles, no triple. */
+/** Portes (rules §1 Q1): the first game of the Greek set, cube-less, a gammon doubles, no triple. */
 const PORTES: ReadonlyArray<string> = [
   ...COMMON,
   '<strong>Opening:</strong> Each player rolls one die; the higher roll starts and rolls both dice again for the first turn (a tie is rolled again).',

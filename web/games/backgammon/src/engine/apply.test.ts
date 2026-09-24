@@ -1,4 +1,4 @@
-// The reducer's action x phase matrix (panel E1 §4 scenarios S1-S15, every MESSAGES entry
+// The reducer's action x phase matrix (the action x phase scenarios S1-S15, every MESSAGES entry
 // reachable), the turn flows of the table rows that end turns and games through `applyAction`
 // (auto-end, forfeited roll, hits, bear-off finishes), the cube, Crawford and the match.
 import { describe, expect, test } from 'vitest';

@@ -1,4 +1,4 @@
-// The backgammon engine as one module (understand.md §4 step 4; panel E1 §5): the UI, protocol
+// The backgammon engine as one module (docs/design/backgammon-rules.md): the UI, protocol
 // and storage import only from here. Pure: no DOM, no clock, no randomness of its own; `rng` and
 // `now` are injected into `createGame`, `nextGame` and `applyAction` (docs/ARCHITECTURE.md
 // "Module boundaries").

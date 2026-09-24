@@ -1,4 +1,4 @@
-// The reducer alone (scratchpad/bg/design.md §2.4, §4; gin's state.test.ts shape): every intent
+// The reducer alone (docs/design/backgammon-board.md §4, §5; gin's state.test.ts shape): every intent
 // once, the flows that matter (a pass-and-play match driven through taps with a seeded rng, a
 // hosted match against a fake guest frame stream, the resume snapshot, the die-chip tray and the
 // R14 beat), the effects as data, and `runEffect` against recorded adapters.
@@ -581,7 +581,7 @@ describe('hosting', () => {
     expect(done.app.shell.screen).toBe('tableScreen');
     expect(cues(done.effects)).toContain('roll');
     expect(cues(done.effects)).toContain('bearOff');
-    // Next game: applied for the host and broadcast; the guest's `next` would race it (design §7 risk 9).
+    // Next game: applied for the host and broadcast; the guest's `next` would race it (design §10 risk 9).
     const nextGame = run(done.app, { type: 'next/click' });
     expect(game(nextGame.app).gameNo).toBe(2);
     expect(kinds(nextGame.effects)).toContain('send');
@@ -833,10 +833,10 @@ describe('pass and play', () => {
   });
 });
 
-// Positions in the engine's notation, each side in its own numbering (design §3.5).
-/** Light to play 6-3 from 13: two orders reach 4, one hitting the blot on 7 (design §2.1.3). */
+// Positions in the engine's notation, each side in its own numbering (the engine's notation, moves.test.ts).
+/** Light to play 6-3 from 13: two orders reach 4, one hitting the blot on 7 (design §4.3). */
 const TWO_ORDERS = 'L: 24:2 13:5 8:3 6:5 | D: 18:1 2:14 | bar 0/0 | off 0/0';
-/** Light bears off: both dice take the 4 (design §2.4.4 "6·5"). */
+/** Light bears off: both dice take the 4 (design §4.4 "6·5"). */
 const BOTH_SUFFICE = 'L: 4:1 2:1 | D: 24:2 1:13 | bar 0/0 | off 13/0';
 /** Light on the bar against a closed board: any roll forfeits (R14). */
 const SHUT_OUT = 'L: 13:14 | D: 1:2 2:2 3:2 4:2 5:2 6:2 7:3 | bar 1/0 | off 0/0';
@@ -922,11 +922,15 @@ describe('the table', () => {
     expect(g).toMatchObject({ turn: 1, phase: 'toRoll' });
     expect(chosen.app.table).toMatchObject({ pending: null, selected: null, curtain: 1 });
     expect(cues(chosen.effects)).toEqual(['yourTurn', 'place', 'place']);
-    // The hitting order toasts the hit player once the phone changes hands.
+    // The hitting order: the curtain rises for Bob with no toast yet (Ann still holds the phone);
+    // Bob's reveal toasts him the hit in his own numbering (Ann's 7 is his 18).
     const hit = run(opened.app, { type: 'chip/tap', index: 0 });
     expect(game(hit.app).lastPlay.map((m) => m.hit)).toEqual([true, false]);
-    expect(toasts(hit.effects)).toEqual([[hitMsg('Ann', 18), null]]);
+    expect(toasts(hit.effects)).toEqual([]);
     expect(cues(hit.effects)).toEqual(['yourTurn', 'hit', 'place']);
+    expect(toasts(run(hit.app, { type: 'curtain/reveal' }).effects)).toEqual([
+      [hitMsg('Ann', [18]), null],
+    ]);
     // Cancel, a board tap, and a missing chip.
     expect(run(opened.app, { type: 'chip/cancel' }).app.table.pending).toBeNull();
     expect(run(opened.app, { type: 'point/tap', point: 12 }).app.table.pending).toBeNull();
@@ -937,8 +941,60 @@ describe('the table', () => {
   });
 });
 
+describe('the hit toast in pass-and-play', () => {
+  /** A Dark blot on Light's 5-point (Dark's 20); Light rolls 3-1 and hits with the 3 from the 8. */
+  const BLOT_ON_5 = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:4 20:1 | bar 0/0 | off 0/0';
+  /** Light hits 8/5* with the 3, then covers 6/5 with the 1: the turn flips to Dark. */
+  const hitTurn = (start: App): Step => {
+    const first = run(start, { type: 'point/tap', point: 7 }, { type: 'point/tap', point: 4 });
+    expect(game(first.app).played).toEqual([{ from: 7, to: 4, die: 3, hit: true }]);
+    const second = run(first.app, { type: 'point/tap', point: 5 }, { type: 'point/tap', point: 4 });
+    expect(game(second.app)).toMatchObject({ turn: 1, phase: 'toRoll' });
+    return second;
+  };
+
+  test('a hit on the first of two taps: nothing at the flip, the toast on the reveal, once', () => {
+    const flipped = hitTurn(at(BLOT_ON_5, 0, [3, 1]));
+    expect(flipped.app.table.curtain).toBe(1);
+    expect(toasts(flipped.effects)).toEqual([]);
+    const lifted = run(flipped.app, { type: 'curtain/reveal' });
+    expect(toasts(lifted.effects)).toEqual([[hitMsg('Ann', [20]), null]]);
+    expect(lifted.app.table.curtain).toBeNull();
+    // Bob rolls and plays on: no second toast, and none for Ann when the phone comes back.
+    const rolled = run(lifted.app, { type: 'roll/click' });
+    expect(toasts(rolled.effects)).toEqual([]);
+    const back = playTurn(rolled);
+    expect(toasts(back.effects)).toEqual([]);
+    if (back.app.table.curtain !== null)
+      expect(toasts(run(back.app, { type: 'curtain/reveal' }).effects)).toEqual([]);
+  });
+
+  test('with the curtain off the toast comes at the flip; turning it off while it is up is a reveal', () => {
+    const off = run(at(BLOT_ON_5, 0, [3, 1]), { type: 'curtain/mode', mode: 'never' }).app;
+    const flipped = hitTurn(off);
+    expect(flipped.app.table.curtain).toBeNull();
+    expect(toasts(flipped.effects)).toEqual([[hitMsg('Ann', [20]), null]]);
+    const up = hitTurn(at(BLOT_ON_5, 0, [3, 1]));
+    const dropped = run(up.app, { type: 'curtain/mode', mode: 'never' });
+    expect(dropped.app.table.curtain).toBeNull();
+    expect(toasts(dropped.effects)).toEqual([[hitMsg('Ann', [20]), null]]);
+    // Turning it off with nothing behind it toasts nothing.
+    expect(
+      toasts(run(at(BLOT_ON_5, 0, [3, 1]), { type: 'curtain/mode', mode: 'never' }).effects),
+    ).toEqual([]);
+  });
+
+  test('hitMsg: one point, or several in one breath', () => {
+    expect(hitMsg('Ann', [20])).toBe('Kapará. Ann hit you on your 20-point.');
+    expect(hitMsg('Ann', [20, 5])).toBe('Kapará. Ann hit you on your 20-point and your 5-point.');
+    expect(hitMsg('Ann', [22, 20, 5])).toBe(
+      'Kapará. Ann hit you on your 22-point, your 20-point and your 5-point.',
+    );
+  });
+});
+
 describe('the dice, the bar, the tray and a drag', () => {
-  test('bear-off with either die opens two chips; the chosen die is the one spent (design §2.4.4)', () => {
+  test('bear-off with either die opens two chips; the chosen die is the one spent (design §4.4)', () => {
     const app = at(BOTH_SUFFICE, 0, [6, 5]);
     const v = view(app);
     // The sole source is derived: nothing is stored, the tray tap acts on it.

@@ -1,4 +1,4 @@
-// The variant rows (understand.md §4 R29-R31; panel E1 §5 variants.ts): the flags and caps of
+// The variant rows (rules R29-R31): the flags and caps of
 // portes and backgammon, the reserved plakoto and fevga, fifteen checkers a side in every start,
 // and the frames (`ownOf` / `absOf`) as inverses for every variant, seat and point.
 import { describe, expect, test } from 'vitest';

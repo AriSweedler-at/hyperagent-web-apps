@@ -1,5 +1,5 @@
-// Board primitives every other engine module shares (understand.md §5 R2, R8, R10, R11, R15;
-// panel E1 §2.1): the frame helpers routed through the variant's `ownOf`/`absOf`, open/blocked
+// Board primitives every other engine module shares (rules R2, R8, R10, R11,
+// R15): the frame helpers routed through the variant's `ownOf`/`absOf`, open/blocked
 // with the single-opponent hook (hit, pin, illegal), the one function that moves a checker, and
 // the structural checks the decoder and the replay lean on. All O(24), all pure.
 import {

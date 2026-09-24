@@ -29,19 +29,50 @@ const entry = (kind: LogEntry['kind'], seat: 0 | 1, text: string): LogEntry => (
 });
 
 describe('lastTurnText', () => {
-  test('the last move or forfeited roll, with its hit lines; nothing before a turn is played', () => {
-    expect(lastTurnText({ ...bob, log: [] })).toBe('');
-    expect(lastTurnText({ ...bob, log: [entry('roll', 0, 'Ann rolled 3-1')] })).toBe('');
-    const log = [
-      entry('roll', 0, 'Ann rolled 3-1'),
-      entry('move', 0, 'Ann moved 8/5* 6/5'),
-      entry('hit', 0, 'Ann hit Bob on the 5-point'),
-      entry('roll', 1, 'Bob rolled 6-6'),
-    ];
-    expect(lastTurnText({ ...bob, log })).toBe('Ann moved 8/5* 6/5 · Ann hit Bob on the 5-point');
+  const log = [
+    entry('roll', 0, 'Ann rolled 3-1'),
+    entry('move', 0, 'Ann moved 8/5* 6/5'),
+    entry('hit', 0, 'Ann hit Bob on the 5-point'),
+    entry('roll', 1, 'Bob rolled 6-6'),
+  ];
+  /** Ann's 8/5* 6/5 in the storage frame: abs 7 -> 4 (Bob's own 20) hitting, then abs 5 -> 4. */
+  const lastPlay = [
+    { from: 7, to: 4, die: 3, hit: true },
+    { from: 5, to: 4, die: 1, hit: false },
+  ] as const;
+  test('the last move with its hits in the incoming player`s numbering; a forfeited roll as logged', () => {
+    // Bob takes the phone: the point he was hit on is his 20, as the board under the curtain draws it.
+    expect(lastTurnText({ ...bob, log, lastPlay }, 1)).toBe(
+      'Ann moved 8/5* 6/5 · Ann hit you on your 20-point',
+    );
+    // Ann takes it back (a double offered after her turn): her own hits keep the log's line.
+    expect(lastTurnText({ ...bob, log, lastPlay }, 0)).toBe(
+      'Ann moved 8/5* 6/5 · Ann hit Bob on the 5-point',
+    );
     expect(
-      lastTurnText({ ...bob, log: [...log, entry('noMove', 1, 'Bob rolled 6-6 and cannot move')] }),
+      lastTurnText(
+        {
+          ...bob,
+          log: [...log, entry('noMove', 1, 'Bob rolled 6-6 and cannot move')],
+          lastPlay: [],
+        },
+        0,
+      ),
     ).toBe('Bob rolled 6-6 and cannot move');
+  });
+  test('before any turn: the opening roll that decided who starts, ties left out', () => {
+    expect(lastTurnText({ ...bob, log: [] }, 1)).toBe('');
+    expect(lastTurnText({ ...bob, log: [entry('roll', 0, 'Ann rolled 3-1')] }, 1)).toBe('');
+    const opening = [
+      { seat: null, kind: 'opening' as const, text: 'Both rolled 4 — again', at: NOW },
+      entry('opening', 0, 'Ann rolled 4, Bob rolled 2 — Ann starts'),
+    ];
+    expect(lastTurnText({ ...bob, log: opening }, 0)).toBe(
+      'Ann rolled 4, Bob rolled 2 — Ann starts',
+    );
+    // The real game's first curtain reads the engine's own line.
+    expect(lastTurnText(bob, game.turn)).toBe(game.log.at(-1)?.text);
+    expect(lastTurnText(bob, game.turn)).toMatch(/^Ann rolled \d, Bob rolled \d — \w+ starts$/);
   });
 });
 
@@ -101,7 +132,8 @@ describe('paintCurtain', () => {
     expect(p.get('curtainOverlay').hidden()).toBe(false);
     expect(p.get('curtainTitle').text()).toBe(`Pass the phone to ${name}`);
     expect(p.get('curtainSub').text()).toBe('Your turn.');
-    expect(p.get('curtainLast').text()).toBe('');
+    // The first curtain of a game carries the opening roll.
+    expect(p.get('curtainLast').text()).toBe(started.shell.game?.log.at(-1)?.text);
     expect(p.get('curtainBtn').text()).toBe(`${name} — roll`);
     expect(p.get('curtainBtn').attr('data-rolls')).toBe('1');
     // Online play (and with it the handoff) is hidden in this PR.

@@ -164,8 +164,8 @@ describe("the shell painters (gin's names)", () => {
 
   test('showToast/hideToast: the text, `show`, and `hit` for the Kapará toast alone', () => {
     const p = page();
-    showToast(p.doc, `${HIT_TOAST_PREFIX} Bob hit you on the 5-point.`);
-    expect(p.get('toast').text()).toBe('Kapará. Bob hit you on the 5-point.');
+    showToast(p.doc, `${HIT_TOAST_PREFIX} Bob hit you on your 5-point.`);
+    expect(p.get('toast').text()).toBe('Kapará. Bob hit you on your 5-point.');
     expect(p.get('toast').hasClass('show')).toBe(true);
     expect(p.get('toast').hasClass('hit')).toBe(true);
     showToast(p.doc, 'Invite copied to clipboard');
@@ -175,13 +175,15 @@ describe("the shell painters (gin's names)", () => {
     expect(p.get('toast').text()).toBe('Invite copied to clipboard');
   });
 
-  test('paintSound: the glyph and the tooltip', () => {
+  test('paintSound: the glyph, the tooltip and the pressed state', () => {
     const p = page();
     paintSound(p.doc, false);
     expect(p.get('soundBtn').text()).toBe('🔇');
     expect(p.get('soundBtn').attr('title')).toBe('Sound & vibration off');
+    expect(p.get('soundBtn').attr('aria-pressed')).toBe('false');
     paintSound(p.doc, true);
     expect(p.get('soundBtn').text()).toBe('🔊');
+    expect(p.get('soundBtn').attr('aria-pressed')).toBe('true');
   });
 
   test('connDotClass: on/off, hidden in pass-and-play', () => {

@@ -1,5 +1,5 @@
-// Seeded random play to the end of the match (understand.md §5 R33; panel E1 §6 with E2's
-// coverage grafts): a policy over `legalActions` drives `applyAction`, and after every step the
+// Seeded random play to the end of the match (rules R33): a
+// policy over `legalActions` drives `applyAction`, and after every step the
 // invariants hold: thirty checkers, stacks of one owner, `off` never decreasing within a game,
 // the mover's pips falling by the die (or the point, bearing off) and the opponent's rising by
 // exactly a hit, the wrong seat refused, every single step not offered refused, both seats'

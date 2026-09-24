@@ -1,4 +1,4 @@
-// The engine's text (understand.md §5 R28; panel E1 §3 "Log and lastAction" and §4's notation):
+// The engine's text (rules R28):
 // moves in the mover's own numbering (`8/5*`, `bar/20`, `6/off`), a turn's moves with adjacent
 // repeats collapsed (`13/7(2)`), and the position notation the test table and a sandbox share:
 // `L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0`, each side in its own numbering.

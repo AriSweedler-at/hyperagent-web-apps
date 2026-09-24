@@ -1,4 +1,4 @@
-// Scoring selectors (understand.md §5 R17, R18, R21, R22, R24; panel E1 §5 `score.ts`): the pip
+// Scoring selectors (rules R17, R18, R21, R22, R24): the pip
 // count, who has borne everything off, the single/gammon/backgammon multiplier capped per variant,
 // and the match arithmetic. The match winner is derived from the score (R24's spirit), never
 // stored; the Crawford flags are computed here and evaluated by `createGame` as well as

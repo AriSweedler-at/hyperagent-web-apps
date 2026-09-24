@@ -1,5 +1,5 @@
-// Shapes of the backgammon engine (scratchpad/bg/understand.md §5 R1, R29, R32; panel E1 §1 with
-// the judge's grafts). The board is 24 ordered stacks of seat ids in an absolute 0..23 frame plus
+// Shapes of the backgammon engine (docs/design/backgammon-rules.md §2; rules R1,
+// R29, R32). The board is 24 ordered stacks of seat ids in an absolute 0..23 frame plus
 // bar/off pairs: homogeneous in portes and Western backgammon, ordered so plakoto's pinning fits
 // without a second representation. Every rule speaks the mover's own 1..24 numbering through the
 // variant's `ownOf`/`absOf`. Key order here is the wire/save order: setup.ts builds every literal

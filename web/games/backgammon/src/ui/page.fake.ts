@@ -1,5 +1,5 @@
 // The Sheshbesh page as a page fake for the tests beside ui/{render,home,local}.ts (gin's
-// ui/page.fake.ts shape, design §2.6 "Painter tests over `backgammonPage(markup)`"): one fake
+// ui/page.fake.ts shape, design §7 "Painter tests over `backgammonPage(markup)`"): one fake
 // element per `id="…"` in the page's markup (web/games/backgammon/index.html, which the test reads
 // through `?raw` and passes in), with the classes, attributes and the input value as the markup
 // has them, so the fixture cannot drift from the page. The 24 points, the bars, the dice and the
@@ -53,12 +53,12 @@ const optionsFromMarkup = (markup: string): ReadonlyMap<string, FakeElOptions> =
     }),
   );
 
-/** The two play modes, in the markup's order (design §4: Online · Pass the phone). */
+/** The two play modes, in the markup's order (design §2.4: Online · Pass the phone). */
 export const MODES = ['online', 'local'] as const;
 
 export type BackgammonPage = FakePage &
   Readonly<{
-    /** The switch's mode buttons: online, then local (the online one ships hidden, design §6 PR-C). */
+    /** The switch's mode buttons: online, then local (the online one ships hidden, design §5.3). */
     modeButtons: ReadonlyArray<FakeEl>;
     /** The Play tab submenu's mode buttons, same order. */
     submenuButtons: ReadonlyArray<FakeEl>;

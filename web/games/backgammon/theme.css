@@ -1,16 +1,16 @@
-/* Sheshbesh's theme (scratchpad/bg/design.md §2.3, §4; the owner: "subtle but recognizable").
+/* Sheshbesh's theme (docs/design/backgammon-board.md §3, §5; the owner: "subtle but recognizable").
    The page links web/shared/styles/tokens.css and base.css before this file, and :root below
    redeclares every one of the eleven shared names (a partial override would inherit gin's green
-   felt: understand.md risk 11, test/tokens.test.ts). The palette is restrained: a whitewash page,
+   felt; test/tokens.test.ts holds it). The palette is restrained: a whitewash page,
    aegean blue as the one accent, an olive-wood board, gold only as a hairline. The board is one
-   DOM in two grid templates (§2.3.3): the phone stands it on end (twelve rows of two points, a
+   DOM in two grid templates (§3.3): the phone stands it on end (twelve rows of two points, a
    bar band, an off row), the desktop lays it flat from 900px (two rows of thirteen). Every place
    is a grid area named by its own number, so a seat swap is 24 `data-own` attributes and the
    `data-seat` on #board, never a second template. web/games/backgammon/src/ui/board/layout.ts is
    the pure twin of the two templates; test/dist/backgammon-grid.test.ts parses them out of the
-   built CSS and holds the two together. Prettier formats this file (understand.md 2.19). */
+   built CSS and holds the two together. Prettier formats this file. */
 :root {
-  /* The eleven shared names, on this game's palette (design §2.3.1). */
+  /* The eleven shared names, on this game's palette (design §3.1). */
   --bg: #f4efe6;
   --card: #efe8dc;
   --card-2: #e4dac4;
@@ -25,7 +25,7 @@
   /* The game's own tokens: only the ones a rule below reads. */
   --olivewood-dark: #6e4b2a;
   --stone: #d9cbad;
-  --olive: #6b7f3b;
+  --olive: #5f7133;
   --olive-leaf: #9aa86b;
   --nazar: #1e6fd9;
   --nazar-pale: #8dc3f0;
@@ -56,6 +56,30 @@ body {
   padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
+}
+/* The trim (the owner: "green style trim in the background at the border of the window"): a quiet
+   olive band along the viewport's edge with a gold hairline on its inner side, fixed and inert.
+   It paints at z-index 0, under every positioned thing (overlays 50, flyers 60, the toast 100) and
+   away from every control: #app's 12px gutters keep the board and the buttons clear of the band
+   (6px on a phone, 10px from 900px). No pattern: the meander stays the board frame's alone. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border: 6px solid var(--olive);
+  box-shadow: inset 0 0 0 1px var(--gold);
+}
+@media (min-width: 900px) {
+  body::before {
+    border-width: 10px;
+  }
+  /* Wider gutters keep the topbar and the controls 6px off the wider band; the desktop's
+     --chrome-h budget (190px) already has the room. */
+  #app {
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  }
 }
 /* GFS Didot for the title and the room code only (design §1 Theme); Cardo everywhere else. */
 h1 {
@@ -324,7 +348,7 @@ label {
 .conn-dot.off {
   background: var(--danger);
 }
-/* Visually hidden, read aloud: the dice in words beside the status line (design §2.5). */
+/* Visually hidden, read aloud: the dice in words beside the status line (design §6). */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -516,7 +540,7 @@ label {
   z-index: 50;
   padding: 16px;
 }
-/* The curtain (design §2.4.9): aegean-deep at 78%, the position readable beneath. */
+/* The curtain (design §4.9): aegean-deep at 78%, the position readable beneath. */
 .overlay.curtain {
   background: rgba(6, 37, 61, 0.78);
 }
@@ -646,7 +670,7 @@ label {
     0 8px 24px rgba(6, 37, 61, 0.35);
 }
 
-/* ---------- the table: geometry (design §2.3.1) ---------- */
+/* ---------- the table: geometry (design §3.1) ---------- */
 /* At the table the page never scrolls (gin's rule): the board's point width is a clamp() of the
    viewport, every row above and below it has one height in every phase, and the fallback under
    `@media (max-height: 805px)` at the end of this section lets a short viewport scroll instead of
@@ -662,7 +686,7 @@ body.fixed-screen #app {
   /* Phone: the board stands on end. Everything that is not the board measures 172px: #app padding
      24, topbar 44, status line 22, controls 56, three 8px gaps, and 2px of slack for rounding.
      The board is twelve point rows, the bar band, the off row and 16px of frame, so at 390x844
-     --point-w is (844 - 172 - 48 - 44 - 16) / 12 = 47px (the judge's figure) and the board 672px.
+     --point-w is (844 - 172 - 48 - 44 - 16) / 12 = 47px and the board 672px.
      Below the 44px floor (806px tall) the fallback scrolls. */
   --chrome-h: 172px;
   --bar-w: 48px;
@@ -709,7 +733,7 @@ body.fixed-screen #app {
   }
 }
 
-/* ---------- the table: vertical structure (design §2.3.2) ---------- */
+/* ---------- the table: vertical structure (design §3.2) ---------- */
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -742,7 +766,7 @@ body.fixed-screen #app {
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
-/* The opponent's name pulses while they are to move (design §2.1.4). */
+/* The opponent's name pulses while they are to move (design §2.1). */
 .opp-strip.to-move .name {
   animation: pulse 1.6s ease-in-out infinite;
 }
@@ -807,7 +831,7 @@ body.fixed-screen #app {
     justify-content: center;
   }
 }
-/* The die-chip tray takes the controls row without changing its height (design §2.4.3). */
+/* The die-chip tray takes the controls row without changing its height (design §4.3). */
 .chips {
   display: none;
   gap: 8px;
@@ -870,12 +894,12 @@ body.fixed-screen #app {
   }
 }
 
-/* ---------- the board: two grid templates, one DOM (design §2.3.3) ---------- */
+/* ---------- the board: two grid templates, one DOM (design §3.3) ---------- */
 /* Phone: six columns so the bar band names three areas (the far bar, the dice, my bar); every
    point spans three. Own numbers name the areas; the seat mapping is the `data-own` attribute on
    each point and `data-seat` on the board (the 24 one-liners and the two tray rules below), so
    the same two strings serve both seats. layout.ts is the twin of these strings and
-   test/dist/backgammon-grid.test.ts compares them (design risk 5). */
+   test/dist/backgammon-grid.test.ts compares them (design §10 risk 5). */
 #board {
   position: relative;
   display: grid;
@@ -1014,7 +1038,7 @@ body.fixed-screen #app {
   grid-area: offFar;
 }
 
-/* ---------- the frame and its one motif (design §2.3.6) ---------- */
+/* ---------- the frame and its one motif (design §3.6) ---------- */
 /* A 3px Greek key along the frame's inner edge in low-contrast gold, drawn as two half-phase
    repeating gradients masked to a band; nothing else on the frame, no pinstripes, no watermark. */
 #board::before {
@@ -1064,7 +1088,6 @@ body.fixed-screen #app {
   align-items: center;
   justify-content: flex-start;
   gap: 2px;
-  padding-left: 2px;
   cursor: pointer;
   z-index: 2;
 }
@@ -1085,7 +1108,7 @@ body.fixed-screen #app {
   }
 }
 
-/* ---------- a point: triangle, label, stacking axis (design §2.3.4) ---------- */
+/* ---------- a point: triangle, label, stacking axis (design §3.4) ---------- */
 /* A checker's place is a pure function of its index --i (0..4, set inline by checkersHtml), the
    side (--sx/--sy) and --stack-step: the same markup lays out sideways on the phone and vertically
    on the desktop. The whole cell is the tap target (47 x 175px on a phone), never the checker. */
@@ -1111,15 +1134,16 @@ body.fixed-screen #app {
   content: attr(data-own);
   position: absolute;
   font:
-    700 0.62rem var(--serif-text),
+    700 0.7rem var(--serif-text),
     serif;
   line-height: 1;
-  color: var(--muted);
-  opacity: 0.85;
+  color: var(--text);
+  opacity: 0.8;
   pointer-events: none;
 }
 .point.pt-b::after {
-  color: var(--stone);
+  color: var(--bg);
+  opacity: 1;
 }
 /* Phone: the far column points at the seam from the left, the near column from the right;
    checkers stack along x from the base. */
@@ -1215,7 +1239,7 @@ body.fixed-screen #app {
   }
 }
 
-/* ---------- checkers as CSS (design §2.3.5) ---------- */
+/* ---------- checkers as CSS (design §3.5) ---------- */
 .checker {
   position: absolute;
   left: var(--ox);
@@ -1229,7 +1253,7 @@ body.fixed-screen #app {
   );
   transition:
     transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 120ms;
+    outline-color 120ms;
   touch-action: none;
 }
 /* Five drawn; the sixth onward is the badge on the top visible checker (the point label stays). */
@@ -1273,14 +1297,46 @@ body.fixed-screen #app {
     inset 0 -2px 4px rgba(0, 0, 0, 0.3),
     0 1px 2px rgba(0, 0, 0, 0.3);
 }
-/* Borne-off checkers as slabs: the face flattened, laid from the tray's outer edge. */
+/* On the walnut band the deep-blue disc has no edge (1.3:1): a pale nazar ring outside it reads
+   at 6.6:1 against the band and keeps the disc's own rings. */
+.bar .ck-dark {
+  box-shadow:
+    inset 0 0 0 1px var(--nazar),
+    inset 0 0 0 calc(var(--checker-d) * 0.2) var(--accent-dark),
+    inset 0 0 0 calc(var(--checker-d) * 0.2 + 1px) var(--nazar-pale),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+    0 0 0 1.5px var(--nazar-pale),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+/* Borne-off checkers as slabs: the face flattened, laid from the tray's outer edge. A tray with
+   nothing in it says so: a faint slot outline and the word `off`, which the die disc replaces
+   while the tray is a target. */
 .off {
   position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 0 6px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(239, 232, 220, 0.22);
   cursor: default;
+}
+.off:empty::before {
+  content: 'off';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font:
+    700 0.7rem var(--serif-text),
+    serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(239, 232, 220, 0.5);
+  pointer-events: none;
+}
+.off.target:empty::before {
+  content: none;
 }
 .off .slab {
   width: 7px;
@@ -1319,23 +1375,37 @@ body.fixed-screen #app {
     justify-content: flex-end;
   }
 }
-/* The doubling cube (Western only): a nacre face, Cardo numeral, on the owner's side of the bar. */
+/* The doubling cube (Western only): a nacre face, Cardo numeral, on the owner's side of the bar.
+   Phone: centred it sits at the dice area's inner end (two 44px dice and the cube fill the 116px
+   area, so the dice start flush); owned, it moves into the owner's bar half. */
 #cube {
   justify-self: end;
-  align-self: start;
-  width: 20px;
-  height: 20px;
-  margin: 3px 2px 0 0;
-  border-radius: 4px;
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  border-radius: 5px;
   background: var(--card);
   color: var(--text);
   font-weight: 700;
-  font-size: 0.7rem;
-  line-height: 20px;
+  font-size: 0.8rem;
+  line-height: 26px;
   text-align: center;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   z-index: 3;
   pointer-events: none;
+}
+@media (max-width: 899px) {
+  #cube[data-owner='far'] {
+    grid-area: barTop;
+    justify-self: end;
+    margin-right: 4px;
+  }
+  #cube[data-owner='near'] {
+    grid-area: barBottom;
+    justify-self: start;
+    margin-left: 4px;
+  }
 }
 @media (min-width: 900px) {
   #cube {
@@ -1345,7 +1415,6 @@ body.fixed-screen #app {
     width: 30px;
     height: 30px;
     line-height: 30px;
-    margin: 0;
   }
   #cube[data-owner='none'] {
     margin-block: 0 calc(var(--die-s) * 2 + 46px);
@@ -1360,7 +1429,7 @@ body.fixed-screen #app {
   }
 }
 
-/* ---------- dice as CSS (design §2.3.7, §2.5) ---------- */
+/* ---------- dice as CSS (design §3.7, §6) ---------- */
 /* A die is a 44px hit box (`die/pick` is a tap target) whose face is `::before`, 2px inside, and
    whose pips are `::after`: radial-gradient dots on the 3x3 grid of the face. No images. */
 .die {
@@ -1484,37 +1553,34 @@ body.fixed-screen #app {
   }
 }
 
-/* ---------- highlight states (design §2.3.7) ---------- */
-/* A source that can move: an olive ring on its top checker and a slow glow. */
+/* ---------- highlight states (design §3.7) ---------- */
+/* A source that can move: an olive ring round its top checker and a slow glow. The cue rings are
+   outlines (they follow the disc's radius), never box-shadows, so the nazar and nacre hairlines
+   that tell the two checkers apart stay under them. */
 .can-move {
   cursor: pointer;
 }
 .can-move .checker.top {
-  box-shadow:
-    0 0 0 3px var(--olive-leaf),
-    0 1px 2px rgba(0, 0, 0, 0.25);
+  outline: 3px solid var(--olive-leaf);
+  outline-offset: 0;
   animation: glow 1.6s ease-in-out infinite;
 }
 @keyframes glow {
   0%,
   100% {
-    box-shadow:
-      0 0 0 3px var(--olive-leaf),
-      0 1px 2px rgba(0, 0, 0, 0.25);
+    outline-color: var(--olive-leaf);
   }
   50% {
-    box-shadow:
-      0 0 0 3px rgba(154, 168, 107, 0.45),
-      0 1px 2px rgba(0, 0, 0, 0.25);
+    outline-color: rgba(154, 168, 107, 0.45);
   }
 }
-/* The chosen source: a gold ring and a 4px lift toward the tip; the derived sole source (`auto`)
-   keeps the ring without the lift. */
+/* The chosen source: a gold ring, a 4px lift toward the tip and the lift's shadow (a filter, so
+   the disc's own shadows stay); the derived sole source (`auto`) keeps the ring without the lift. */
 .selected .checker.top {
   animation: none;
-  box-shadow:
-    0 0 0 3px var(--gold),
-    0 6px 12px rgba(0, 0, 0, 0.35);
+  outline: 3px solid var(--gold);
+  outline-offset: 0;
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.35));
   transform: translate(
       calc(var(--i, 0) * var(--stack-step) * var(--sx, 0)),
       calc(var(--i, 0) * var(--stack-step) * var(--sy, 0))
@@ -1523,6 +1589,7 @@ body.fixed-screen #app {
   z-index: 2;
 }
 .selected.auto .checker.top {
+  filter: none;
   transform: translate(
     calc(var(--i, 0) * var(--stack-step) * var(--sx, 0)),
     calc(var(--i, 0) * var(--stack-step) * var(--sy, 0))
@@ -1668,10 +1735,10 @@ body.fixed-screen #app {
 }
 #board.inert .can-move .checker.top {
   animation: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  outline: none;
 }
 
-/* ---------- motion (design §2.3.8) ---------- */
+/* ---------- motion (design §3.8) ---------- */
 /* A flight (ui/board/fly.ts): a clone of the moving checker fixed over the page glides from the
    source rect to the destination in FLY_MS; toward a tray it flattens into a slab. */
 .flyer {
@@ -1696,9 +1763,9 @@ body.fixed-screen #app {
   z-index: 60;
   pointer-events: none;
   will-change: transform;
-  box-shadow:
-    0 0 0 3px var(--gold),
-    0 14px 28px rgba(0, 0, 0, 0.45);
+  outline: 3px solid var(--gold);
+  outline-offset: 0;
+  filter: drop-shadow(0 14px 14px rgba(0, 0, 0, 0.45));
   transition: none;
   animation: none;
 }
@@ -1723,7 +1790,7 @@ body.fixed-screen #app {
   }
 }
 
-/* ---------- short viewports (design §2.3.1, A1's graft) ---------- */
+/* ---------- short viewports (design §3.10) ---------- */
 /* With --point-w floored at 44px the board is 636px and the screen needs 806px. Below that the
    document scrolls instead of clipping the controls row; the board itself can be scrolled from
    (touch-action: none is scoped to .checker). */

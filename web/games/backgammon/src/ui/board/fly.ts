@@ -1,4 +1,4 @@
-// A checker's flight between two containers (design §2.3.9 "ui/board/fly.ts", §2.3.8 "Motion"):
+// A checker's flight between two containers (design §3.9 "Flights", §3.8 "Motion"):
 // gin's ghost joined to a FLIP. A move changes the key of two containers (three with a hit), so
 // the painter rebuilds them and the moved checker would simply appear at its destination. Before
 // the repaint the top checker (or newest slab) of every departure container is measured; after it

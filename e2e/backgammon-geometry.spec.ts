@@ -1,4 +1,4 @@
-// The board's geometry as a real-click test (scratchpad/bg/design.md §2.6 "Geometry oracle"):
+// The board's geometry as a real-click test (docs/design/backgammon-board.md §7 "Geometry oracle"):
 // pass-and-play on one page at a phone, a laptop and a short phone. At every state of a turn
 // (under the curtain, to roll, rolled, after a move, with the die-chip tray open, under the next
 // curtain, at the game over) the 24 points tile the board without overlap in the order
@@ -43,7 +43,7 @@ const VIEWPORTS: Readonly<Record<string, Case>> = {
 
 /** Light's 6-point holds seven (the count badge, five drawn); a legal 6-5 for either seat. */
 const STACKS = 'L: 24:2 13:5 8:1 6:7 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';
-/** Light bears off with 6-5 from own 4: both dice suffice, so the tap opens the tray (design §2.4.3); then 2/off ends the game. */
+/** Light bears off with 6-5 from own 4: both dice suffice, so the tap opens the tray (design §4.3); then 2/off ends the game. */
 const BOTH_SUFFICE = 'L: 4:1 2:1 | D: 24:2 1:13 | bar 0/0 | off 13/0';
 
 /** The seat whose view the page shows. */
@@ -76,7 +76,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         return g.frame;
       };
 
-      // The curtain's tap reveals and rolls (design §2.1.8): the board comes up mid-roll.
+      // The curtain's tap reveals and rolls (design §4.9): the board comes up mid-roll.
       await bgReveal(page);
       const v = await requireBoard(page);
       expect(v.phase).toBe('moving');

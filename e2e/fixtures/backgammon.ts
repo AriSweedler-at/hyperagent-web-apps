@@ -1,4 +1,4 @@
-// Drives the Sheshbesh page through its DOM (scratchpad/bg/design.md §2.6 "Testability"): the
+// Drives the Sheshbesh page through its DOM (docs/design/backgammon-board.md §7 "Testability"): the
 // home form, the pass-and-play curtain, the roll button, the points, bars and trays a player
 // taps. The one thing read from the documented hook (`window.__backgammon`, docs/ARCHITECTURE.md)
 // is the engine's `View` (`readBoard`), which the specs use as the oracle for what the DOM must
@@ -62,7 +62,7 @@ export const myOffId = (view: View): string => (view.me.idx === 0 ? 'offLight' :
 export const theirOffId = (view: View): string => (view.me.idx === 0 ? 'offDark' : 'offLight');
 
 /**
- * What the curtain says (design §2.1.8): the incoming player's name in the title, the last turn
+ * What the curtain says (design §4.9): the incoming player's name in the title, the last turn
  * beneath, and whether one tap also rolls (`data-rolls`, painted by ui/local.ts).
  */
 export type Curtain = Readonly<{
@@ -125,7 +125,7 @@ export const bgRoll = async (page: Page): Promise<View> => {
   await roll.click();
   await expect.poll(async () => (await readBoard(page))?.phase).toBe('moving');
   const view = await requireBoard(page);
-  // A double shows four faces (design §2.2.3 `#dice`).
+  // A double shows four faces (design §2.2 `#dice`).
   await expect(page.locator('#dice .die:not(.blank)')).toHaveCount(
     view.dice?.[0] === view.dice?.[1] ? 4 : 2,
   );
@@ -140,7 +140,7 @@ const placeId = (view: View, place: Place): string =>
 export const ownPlace = (view: View, place: From | To): Place =>
   place === 'bar' || place === 'off' ? place : rulesOf(view.variant).ownOf(view.me.idx, place);
 
-/** Tap a place on the board (the whole point, bar half or tray is the target, design §2.5). */
+/** Tap a place on the board (the whole point, bar half or tray is the target, design §6). */
 export const bgTap = async (page: Page, place: Place): Promise<void> => {
   const view = await requireBoard(page);
   await page.locator(`#${placeId(view, place)}`).click();
@@ -156,7 +156,7 @@ export const bgMove = async (page: Page, from: Place, to: Place): Promise<View> 
   const before = await requireBoard(page);
   const played = before.played.length;
   const source = page.locator(`#${placeId(before, from)}`);
-  // A tap on the selected source deselects it (design §2.4.2 rule 2): tap only what is not lit.
+  // A tap on the selected source deselects it (design §4.2 rule 2): tap only what is not lit.
   const lit = await page.evaluate<boolean>(
     `document.getElementById(${JSON.stringify(placeId(before, from))}).classList.contains('selected')`,
   );
@@ -166,7 +166,7 @@ export const bgMove = async (page: Page, from: Place, to: Place): Promise<View> 
   await expect(dest).toHaveClass(/\btarget(-2)?\b/);
   await dest.click();
   // Two ways to the same point, or both dice bearing the checker off: the die-chip tray asks
-  // which (design §2.4.3); the first chip (the higher die first) is this helper's answer.
+  // which (design §4.3); the first chip (the higher die first) is this helper's answer.
   const choosing = await page.evaluate<boolean>(
     "document.getElementById('controls').classList.contains('choosing')",
   );

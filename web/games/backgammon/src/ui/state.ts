@@ -1,7 +1,7 @@
-// The Sheshbesh app as a reducer over intents (scratchpad/bg/design.md §2.4 "The interaction
-// model", §4 "The shell"; docs/ARCHITECTURE.md "Module boundaries": imported only by main.ts, the
+// The Sheshbesh app as a reducer over intents (docs/design/backgammon-board.md §4 "The interaction
+// model", §5 "The shell"; docs/ARCHITECTURE.md "Module boundaries": imported only by main.ts, the
 // painters and tests). `App` is gin's shape split in two so the shell can be lifted into a shared
-// reducer later (design §6 PR-E/P6): `shell` is the home screen, the waiting rooms, the session
+// reducer later (design §5.3): `shell` is the home screen, the waiting rooms, the session
 // (role, code, names, the engine `State` for the host and pass-and-play, my `View` for every role)
 // and the resume offer, field for field as gin names them; `table` is the board's interaction
 // memory (the tapped source, the forced die, the die-chip tray, a drag, the overlays, the curtain
@@ -16,7 +16,7 @@
 // `State` here with no Peer. Online play is hidden in this PR (design §6 PR-C): `mode/set 'online'`
 // is accepted, the home painter hides the option and the default mode is `local` until PR-D.
 //
-// Tap-to-move (design §2.4.2): a tap names a source or a destination; the sole legal source is
+// Tap-to-move (design §4.2): a tap names a source or a destination; the sole legal source is
 // derived, never stored (`effectiveSelection`); a destination reached by chains that differ in
 // consequence opens the die-chip tray (`pending`) instead of committing. The helpers that decide
 // this (`sourcesOf`, `effectiveSelection`, `targetsOf`) live in ui/board.ts, so the discs on the
@@ -100,6 +100,7 @@ import {
 import {
   deadDice,
   effectiveSelection,
+  hitsAgainst,
   sourcesOf,
   targetsOf,
   type Chain,
@@ -216,7 +217,7 @@ export type Shell = Readonly<{
   soundFont: SoundFontName;
 }>;
 
-/** The board's interaction memory (design §2.4.1 `Table`). Session only: never saved, never on the wire. */
+/** The board's interaction memory (design §4.1 `Table`). Session only: never saved, never on the wire. */
 export type Table = Readonly<{
   /** A tapped source only; the sole legal source is derived, never stored (`effectiveSelection`). */
   selected: Place | null;
@@ -308,9 +309,9 @@ export const initialApp: App = { shell: initialShell, table: initialTable };
 
 /** The Play tab opens its submenu after this long a press. */
 export const LONG_PRESS_MS = 450;
-/** A tapped point that is neither source nor target shakes for this long (design §2.4.2 rule 1). */
+/** A tapped point that is neither source nor target shakes for this long (design §4.2 rule 1). */
 export const SHAKE_MS = 120;
-/** R14: a forfeited roll stays on the table this long before the curtain rises (design §2.4.5). */
+/** R14: a forfeited roll stays on the table this long before the curtain rises (design §4.5). */
 export const NO_MOVE_MS = 1200;
 /** `shareCodeBtn`'s fallback toast lasts this long. */
 export const SHARE_FALLBACK_MS = 4000;
@@ -333,9 +334,19 @@ export const hostRoomMsg = (hostName: string): string =>
   `Connected — waiting for ${hostName} to start`;
 export const guestGoneMsg = (oppName: string | null, code: string | null): string =>
   `${oppName ?? 'Opponent'} disconnected — they can rejoin with code ${String(code)}.`;
-/** Design §4 "Hit toast": fired on the hit player's device from the new hit moves, never from log text. */
-export const hitMsg = (byName: string, ownPoint: number): string =>
-  `Kapará. ${byName} hit you on the ${String(ownPoint)}-point.`;
+/**
+ * The hit toast, for the player hit, in their own numbering, from the moves and never from log
+ * text: `Kapará. Ari hit you on your 20-point.`; two hits in one turn share the toast (there is
+ * one `#toast`, its timer restarts): `… on your 20-point and your 5-point.`
+ */
+export const hitMsg = (byName: string, ownPoints: ReadonlyArray<number>): string => {
+  const named = ownPoints.map((p) => `your ${String(p)}-point`);
+  const where =
+    named.length <= 1
+      ? (named[0] ?? '')
+      : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1] ?? ''}`;
+  return `Kapará. ${byName} hit you on ${where}.`;
+};
 
 // ---- intents -----------------------------------------------------------------------------------
 
@@ -423,7 +434,7 @@ export type Intent =
   | Readonly<{ type: 'guest/connected' }>
   | Readonly<{ type: 'guest/frame'; frame: HostFrame }>
   | Readonly<{ type: 'guest/lost' }>
-  // ---- the table (design §2.4.1) ----
+  // ---- the table (design §4.1) ----
   /** `act(action)`: every role (the hook, and the buttons below resolve to it). */
   | Readonly<{ type: 'act'; action: Action }>
   /** A `.point` tapped: its absolute index. */
@@ -638,7 +649,7 @@ const samePlay = (a: ReadonlyArray<PlayedMove>, b: ReadonlyArray<PlayedMove>): b
   a.length === b.length && a.every((m, i) => sameMove(m, b[i]));
 
 /**
- * The moves `next` shows that `prev` did not (design §2.3.9 `flightsBetween`'s rule): this turn's
+ * The moves `next` shows that `prev` did not (design §3.9 `flightsBetween`'s rule): this turn's
  * new moves, or, once the turn flipped or the game ended, the finished turn's tail beyond what
  * `prev` saw. The mover is `prev.turn` either way. Nothing across games or after an undo.
  */
@@ -684,16 +695,27 @@ export const cuesBetween = (prev: View, next: View, role: Role | null): Readonly
   ];
 };
 
-/** Design §2.4.10: "Kapará." on the hit player's device, from the opponent's new hit moves, in my numbering. */
+/** Online: "Kapará." on the hit player's device as the opponent's hit moves arrive, in my numbering. */
 const hitToastsBetween = (prev: View, next: View): ReadonlyArray<Effect> => {
   const mover = prev.turn;
   if (mover === next.me.idx) return [];
   const rules = rulesOf(next.variant);
-  return newMovesBetween(prev, next)
-    .filter((m) => m.hit && m.to !== 'off')
-    .map((m) =>
-      toast(hitMsg(next.players[mover].name, m.to === 'off' ? 0 : rules.ownOf(next.me.idx, m.to))),
-    );
+  const points = newMovesBetween(prev, next).flatMap((m) =>
+    m.hit && m.to !== 'off' ? [rules.ownOf(next.me.idx, m.to)] : [],
+  );
+  return points.length === 0 ? [] : [toast(hitMsg(next.players[mover].name, points))];
+};
+
+/**
+ * Pass-and-play: the same toast for the seat now taking the phone, from the turn just finished
+ * against them. At the turn's end the hitter still holds the phone, so the flip is the wrong
+ * moment (and the hitter's own view had already shown the moves, so a diff finds none): the
+ * reveal fires it, or the flip itself when the curtain is off.
+ */
+const handedHits = (game: State, seat: Seat): ReadonlyArray<Effect> => {
+  const v = viewFor(game, seat);
+  const points = hitsAgainst(v, seat);
+  return points.length === 0 ? [] : [toast(hitMsg(v.players[otherSeat(seat)].name, points))];
 };
 
 /** The view a cue memory keys on: the same game position paints the same for either seat. */
@@ -737,7 +759,8 @@ const rendered = (app: App, prev: View | null, now: number): Step => {
   const key = viewKey(view);
   const fresh = key !== app.shell.cues.key && prev !== null;
   const cues = fresh ? cuesBetween(prev, view, app.shell.role) : [];
-  const hitToasts = fresh ? hitToastsBetween(prev, view) : [];
+  // Pass-and-play toasts the player hit when the phone reaches them (`handedHits`), not here.
+  const hitToasts = fresh && app.shell.role !== 'local' ? hitToastsBetween(prev, view) : [];
   const beat = key !== app.shell.cues.key && freshNoMove(prev, view);
   const screen: ScreenId = view.matchOver ? 'endgameScreen' : 'tableScreen';
   const resultOpen = view.phase === 'over' ? prev?.phase !== 'over' || app.table.resultOpen : false;
@@ -798,7 +821,7 @@ const hostDispatch = (app: App, seat: Seat, action: Action, ctx: Context): Step 
 };
 
 /**
- * `localBroadcast(initial)` (design §2.4.9): the actor's view (the mover, or the seat answering a
+ * `localBroadcast(initial)` (design §4.9): the actor's view (the mover, or the seat answering a
  * double) while the game is on, the revealed seat's (or seat 0's) once it is over; the curtain
  * comes up when the phone must change hands, chiming unless this is the start or a reveal. R14:
  * a forfeited roll keeps the roller's view and the curtain down until `noMove/elapsed`.
@@ -817,6 +840,10 @@ const localBroadcast = (app: App, initial: boolean, now: number): Step => {
     app.shell.revealed !== viewIdx
       ? viewIdx
       : null;
+  // With the curtain off the phone changes hands unannounced: the seat now looking is told of
+  // the hits against them here; with it on, `curtain/reveal` tells them once they have it.
+  const handed =
+    curtain === null && prev !== null && prev.me.idx !== viewIdx ? handedHits(game, viewIdx) : [];
   return then(
     step(
       withTable(withShell(app, { view: viewFor(game, viewIdx) }), {
@@ -827,6 +854,7 @@ const localBroadcast = (app: App, initial: boolean, now: number): Step => {
       }),
       { type: 'persist' },
       ...(curtain !== null && !initial ? [{ type: 'fx', cue: 'yourTurn' } as const] : []),
+      ...handed,
     ),
     (a) => rendered(a, prev, now),
   );
@@ -860,7 +888,7 @@ const localAct = (app: App, actions: ReadonlyArray<Action>, ctx: Context): Step 
 };
 
 /**
- * `act(action)` by role (design §2.4.2 "Commit"): pass-and-play and the host apply the actions in
+ * `act(action)` by role (design §4.2 "Commit"): pass-and-play and the host apply the actions in
  * order and broadcast once; the guest sends one `action` frame per action, in order (the host
  * applies them one by one and broadcasts after each).
  */
@@ -1208,7 +1236,7 @@ const cancelFinish = (app: App): Step =>
     { type: 'initHome' },
   );
 
-// ---- the table: taps, the tray, the dice, a drag (design §2.4.2-§2.4.4) -----------------------
+// ---- the table: taps, the tray, the dice, a drag (design §4.2-§4.4) -----------------------
 
 /** My view while I may act and the board is live; null under the curtain or on the other seat's turn. */
 const liveView = (app: App): View | null => {
@@ -1233,13 +1261,13 @@ const tapTarget = (app: App, v: View, sel: Place, to: To, ctx: Context): Step | 
     : commit(app, target.chains[0]?.moves ?? [], ctx);
 };
 
-/** Design §2.4.2 rules 1-5 for a `.point`. */
+/** Design §4.2 rules 1-5 for a `.point`. */
 const pointTap = (app: App, point: PointIndex, ctx: Context): Step => {
   // The click a drag's release fires reaches a point: a drag selects nothing.
   if (app.table.drag !== null) return pure(app);
   const v = movingView(app);
   if (v === null) return pure(app);
-  // A tap anywhere on the board closes the tray (design §2.4.3).
+  // A tap anywhere on the board closes the tray (design §4.3).
   if (app.table.pending !== null) return pure(withTable(app, { pending: null }));
   const sel = effectiveSelection(app.table.selected, v);
   const committed = sel === null ? null : tapTarget(app, v, sel, point, ctx);
@@ -1281,7 +1309,7 @@ const diePick = (app: App, die: Die): Step => {
   );
 };
 
-/** Design §2.4.12: a press past the threshold on a source lights its targets; the drop commits the default chain. */
+/** Design §4.12: a press past the threshold on a source lights its targets; the drop commits the default chain. */
 const dragStart = (app: App, from: Place): Step => {
   const v = movingView(app);
   if (v === null || !sourcesOf(v).includes(from)) return pure(app);
@@ -1584,21 +1612,27 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
       return pure(withTable(app, { historyOpen: !t.historyOpen }));
     case 'rules/toggle':
       return pure(withShell(app, { rulesOpen: !app.shell.rulesOpen }));
-    case 'curtain/mode':
+    case 'curtain/mode': {
+      // Turning the curtain off while it is up is a reveal: the seat behind it is told of its hits.
+      const dropped = intent.mode === 'never' ? t.curtain : null;
       return step(
         withTable(app, {
           curtainMode: intent.mode,
           curtain: intent.mode === 'never' ? null : t.curtain,
         }),
         { type: 'writeCurtainMode', mode: intent.mode },
+        ...(dropped !== null && app.shell.game !== null ? handedHits(app.shell.game, dropped) : []),
       );
+    }
     case 'curtain/reveal': {
       const game = app.shell.game;
       if (game === null) return pure(app);
+      const seat = actorOf(game) ?? game.turn;
       return then(
         step(
-          withTable(withShell(app, { revealed: actorOf(game) ?? game.turn }), { curtain: null }),
+          withTable(withShell(app, { revealed: seat }), { curtain: null }),
           tap,
+          ...handedHits(game, seat),
         ),
         (a) => localBroadcast(a, true, ctx.now()),
       );

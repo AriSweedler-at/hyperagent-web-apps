@@ -1,5 +1,5 @@
-// The four tavli-family rule rows (understand.md §5 R29-R31; panel E1 §5 `variants.ts`, with the
-// judge's graft of `ownOf`/`absOf` on the rules). Portes and Western backgammon are implemented;
+// The four tavli-family rule rows (rules R29-R31; `ownOf`/`absOf`
+// on the rules). Portes and Western backgammon are implemented;
 // plakoto and fevga are typed and framed so the engine's hooks (pinning in `isOpen`/`afterMove`,
 // fevga's rotated frame) are exercised by tests without shipping the variants. `rulesOf` is typed
 // on `ShippedVariant`, so no game can start under an `implemented: false` row.

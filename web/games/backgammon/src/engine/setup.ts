@@ -1,4 +1,4 @@
-// Starting a game (understand.md §5 R3, R5, R6, R21-R23, R27; panel E1 §3 "Opening" and "Match"):
+// Starting a game (rules R3, R5, R6, R21-R23, R27):
 // the starting board from the variant's own-numbered `start`, the one die formula, the opening
 // roll (rerolled on a tie) and the `State` literal in types.ts's key order. `createGame` is
 // infallible: the option type only admits shipped variants, and the Crawford flags are evaluated
