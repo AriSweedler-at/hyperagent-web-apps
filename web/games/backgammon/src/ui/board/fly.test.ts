@@ -39,6 +39,12 @@ type Options = Readonly<{
   slab?: boolean;
   cloneable?: boolean;
   empty?: boolean;
+  /** The destination's top coin is there before the repaint too (a stack already five tall). */
+  persisted?: boolean;
+  /** That coin already wore a count badge before the repaint (six or more). */
+  badged?: boolean;
+  /** The repaint puts a count badge on the top coin (five became six). */
+  badgeOnLanding?: boolean;
 }>;
 
 /**
@@ -59,6 +65,7 @@ const table = (o: Options = {}) => {
     o.toAt ?? rect(300, 600),
     null,
   );
+  if (o.badged === true) landed.el.setAttribute('data-count', '6');
   const shown = { painted: false };
   const from = fakeEl('point-8', {
     queries: {
@@ -68,13 +75,16 @@ const table = (o: Options = {}) => {
   });
   const to = fakeEl(o.slab === true ? 'offLight' : 'point-5', {
     queries: {
-      '.checker.top': () => (shown.painted && o.slab !== true ? [landed] : []),
+      '.checker.top': () =>
+        (shown.painted || o.persisted === true) && o.slab !== true ? [landed] : [],
       '.slab': () => (shown.painted && o.slab === true ? [landed] : []),
     },
   });
   const page = fakePage([from, to]);
   const repaint = vi.fn(() => {
     shown.painted = true;
+    if (o.badgeOnLanding === true)
+      landed.el.setAttribute('data-count', o.badged === true ? '7' : '6');
   });
   const flight: Flight =
     o.slab === true
@@ -109,6 +119,24 @@ describe('flyMoves', () => {
     t.clone.fire('transitionend');
     expect(t.clone.removed()).toBe(true);
     expect(t.landed.hasClass('arriving')).toBe(false);
+  });
+
+  test('a stack already five tall keeps its top coin: it is not hidden, and a badge the landing brings waits under `landing`', () => {
+    // Five became six: the fifth coin stayed through the repaint and gained the badge.
+    const grown = table({ persisted: true, badgeOnLanding: true });
+    flyMoves(grown.page.doc, [grown.flight], grown.repaint);
+    expect(grown.landed.hasClass('arriving')).toBe(false);
+    expect(grown.landed.hasClass('landing')).toBe(true);
+    expect(grown.clone.style('transform')).toBe('translate(200px, 400px) scale(1, 1)');
+    grown.clone.fire('transitionend');
+    expect(grown.landed.hasClass('landing')).toBe(false);
+    expect(grown.clone.removed()).toBe(true);
+    // Six became seven: the badge was there and only its number changed; nothing hides.
+    const taller = table({ persisted: true, badged: true, badgeOnLanding: true });
+    flyMoves(taller.page.doc, [taller.flight], taller.repaint);
+    expect(taller.landed.hasClass('arriving')).toBe(false);
+    expect(taller.landed.hasClass('landing')).toBe(false);
+    expect(taller.clone.hasClass('flyer')).toBe(true);
   });
 
   test('a bear-off lands on the newest slab, scaled to its shape', () => {

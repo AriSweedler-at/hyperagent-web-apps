@@ -56,7 +56,13 @@ pulses (`.opp-strip.to-move`) while they are to move.
 Static vs. rebuilt: each place has a `data-key` (`L5`, `D2`, `-0` for the points and bars; the
 count for the trays; dice `6-5:dl:-:0`, faces plus used/dead/picked/roller) and its children are
 rebuilt only when the key changes (`checkersHtml`, `slabsHtml`, `diceHtml`, `chipsHtml` in
-`ui/board.ts`, string-tested). Highlights (`can-move selected auto target target-2 only hit shake
+`ui/board.ts`, string-tested). A point's or a bar's checkers are reconciled rather than rebuilt
+when only the count changes (`ensureStack` in `ui/render.ts`): the elements already there stay,
+one per index, extra ones go from the end, new ones are appended, and `top` and `data-count` move
+onto the top visible one; an owner change or an emptied place rebuilds from the template. So the
+five drawn coins of a stack survive its sixth (the owner, 2026-09-24: "there is a flash whenever
+you place a new one on"): the fifth keeps its element and gains the badge, the sixth is appended
+under it, and the flight (§3.9) lands on the coin that stayed instead of hiding it. Highlights (`can-move selected auto target target-2 only hit shake
 drop`), `data-die` and the `aria-label`s are toggled outside the key, so a selection never rebuilds
 a stack and the `.selected` lift transitions. A move changes the key of exactly two containers
 (three with a hit). `#dice` pulses `rolling` for the one paint that brings new faces. Flights are
@@ -205,6 +211,7 @@ keep the board and every control clear of it. No pattern: the meander stays the 
 | `hit` | the point where a blot was just hit | `animation: hitFlash 420ms` (a warm wash on `::before`) |
 | `shake` | a tapped point that is neither source nor target | `animation: shake 120ms` |
 | `arriving` | the just-landed checker during a flight | `visibility: hidden` |
+| `landing` | the top coin of a stack already five tall while the sixth flies in | `::after { visibility: hidden }`: the count badge waits for the landing; the coin itself stays |
 | `inert` on `#board` | not my turn / not moving | `pointer-events: none` on `.point,.bar,.off`; no outlines, no glow |
 | `theirs` on `.die` | the opponent's roll | `filter: saturate(.7) brightness(.85)` |
 | `used` on `.die` | a consumed die | `opacity: .4` and a diagonal slash over the pips |
@@ -234,7 +241,9 @@ delay.
 `flyMoves(doc, flights, repaint)` with `Flight = { fromContainer, toContainer, slab?, hit? }` over
 `PlaceId = 'point-N' | 'barTop' | 'barBottom' | 'offLight' | 'offDark'`: before the repaint it
 measures the top checker in `fromContainer`; it repaints; it finds the top checker (or newest slab)
-in `toContainer`, marks it `arriving`, clones the source into `doc.body` as a fixed `.flyer`
+in `toContainer`, marks it `arriving` (unless it is the coin that was already on top of a stack of five or more, which stays
+visible; a count badge the landing brings hides under `landing` until the clone lands), clones the
+source into `doc.body` as a fixed `.flyer`
 (`--checker-d` set to the rect's width, as gin's ghost sets `--card-w`), forces a layout read, sets
 the translate (`scale(.35, 1)` toward a slab, class `flyer-slab`) and on `afterTransition(flyer,
 …, FLY_MS + 60)` removes the flyer and `arriving`. Zero rects (the page fake): repaint and return.

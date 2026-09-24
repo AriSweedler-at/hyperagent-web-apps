@@ -16,14 +16,18 @@
 // delegated click on `#board`, design §4.2; Enter/Space on a focused place is the same tap,
 // design §6); the input wiring of the home screen and the curtain is beside their paints.
 import {
+  appendHtml,
   closestFrom,
   dataOf,
+  hasClass,
   isDisabled,
   keyOf,
   listen,
   listenId,
   preventDefault,
+  queryAllIn,
   queryIn,
+  removeElement,
   requireId,
   safeHtml,
   setAttr,
@@ -51,9 +55,11 @@ import {
   type View,
 } from '../engine/index.ts';
 import {
+  VISIBLE_MAX,
   absOfId,
-  barHtml,
   barsOf,
+  checkerHtml,
+  checkersHtml,
   chipsFor,
   chipsHtml,
   chipsKey,
@@ -68,9 +74,9 @@ import {
   offHtml,
   offIdFor,
   ownPoint,
+  ownerOf,
   pipHtml,
   placeAria,
-  pointHtml,
   pointId,
   resultText,
   sideOf,
@@ -243,17 +249,58 @@ const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
 export const barKey = (seat: Seat, count: number): string =>
   count === 0 ? '-0' : `${seat === 0 ? 'L' : 'D'}${String(count)}`;
 
+const checkerClass = (seat: Seat): string => (seat === 0 ? 'ck-light' : 'ck-dark');
+
+/**
+ * A stack's checkers reconciled in place (design §2.2 "Keys", §3.4): the container's `data-key`
+ * still names what it shows (`L6`), but while the owner is the same the checker elements already
+ * there are kept, one per index: the extra ones go from the end, new ones are appended, and `top`
+ * and the count badge move onto the top visible one. So a stack growing from five to six (or
+ * back) never rebuilds its five drawn coins: the fifth keeps its element and gains or loses the
+ * badge, and the sixth is the arriving checker, hidden by `nth-child(n + 6)`. An owner change (a
+ * blot hit) or an empty container rebuilds from the template as before. The owner (2026-09-24):
+ * "When there are more than '5' on the stack, there is a flash whenever you place a new one on."
+ */
+export const ensureStack = (el: Element, key: string, seat: Seat | null, count: number): void => {
+  if (dataOf(el, 'key') === key) return;
+  setAttr(el, 'data-key', key);
+  const present = queryAllIn(el, '.checker');
+  const first = present[0];
+  if (seat === null || first === undefined || !hasClass(first, checkerClass(seat))) {
+    setHtml(el, trustedHtml(checkersHtml(seat, count)));
+    return;
+  }
+  present.slice(count).forEach(removeElement);
+  const top = Math.min(count, VISIBLE_MAX) - 1;
+  present.slice(0, count).forEach((checker, i) => {
+    toggleClass(checker, 'top', i === top);
+    setAttr(checker, 'data-count', i === top && count > VISIBLE_MAX ? String(count) : null);
+  });
+  if (count > present.length)
+    appendHtml(
+      el,
+      trustedHtml(
+        Array.from({ length: count - present.length }, (_, i) =>
+          checkerHtml(seat, present.length + i, count),
+        ).join(''),
+      ),
+    );
+};
+
 const paintPlaces = (doc: DocumentLike, v: View): void => {
   POINT_INDICES.forEach((abs) => {
     const stack = v.board.points[abs] ?? [];
-    ensureKeyed(requireId(doc, pointId(abs)), stackKey(stack), () => pointHtml(stack));
+    ensureStack(requireId(doc, pointId(abs)), stackKey(stack), ownerOf(stack), stack.length);
   });
   const bars = barsOf(v);
-  ensureKeyed(requireId(doc, 'barTop'), barKey(bars.top.seat, bars.top.count), () =>
-    barHtml(bars.top.seat, bars.top.count),
-  );
-  ensureKeyed(requireId(doc, 'barBottom'), barKey(bars.bottom.seat, bars.bottom.count), () =>
-    barHtml(bars.bottom.seat, bars.bottom.count),
+  const top = bars.top.count === 0 ? null : bars.top.seat;
+  ensureStack(requireId(doc, 'barTop'), barKey(bars.top.seat, bars.top.count), top, bars.top.count);
+  const bottom = bars.bottom.count === 0 ? null : bars.bottom.seat;
+  ensureStack(
+    requireId(doc, 'barBottom'),
+    barKey(bars.bottom.seat, bars.bottom.count),
+    bottom,
+    bars.bottom.count,
   );
   ([0, 1] as const).forEach((seat) => {
     const off = v.board.off[seat];

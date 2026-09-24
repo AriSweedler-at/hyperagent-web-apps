@@ -5,7 +5,10 @@
 // the arrival (the destination's top checker or newest slab) is hidden under `arriving`, a clone
 // of the departed checker is fixed over where it stood, laid out, then sent to the arrival's rect
 // by one transform (translate plus the scale that turns a checker into a slab, whichever way the
-// tray lies), and the clone goes when its transition ends or the fallback timer fires. A hit blot
+// tray lies), and the clone goes when its transition ends or the fallback timer fires. A stack
+// already five tall keeps its top coin through the repaint (render.ts `ensureStack`: the sixth
+// is hidden under it and only the count badge changes), so that coin is not hidden: the clone
+// lands on it, and a badge the landing brings waits under `landing` until it does. A hit blot
 // waits `HIT_DELAY_MS` before it leaves for the bar, so the mover lands on it first. The
 // transition itself is `.flyer`'s in theme.css, so `prefers-reduced-motion` can shorten it; only
 // the delay is written inline. Nothing measurable (the page fake) means the repaint alone. The
@@ -14,6 +17,7 @@ import {
   addClass,
   afterTransition,
   cloneInto,
+  dataOf,
   queryAllIn,
   queryIn,
   rectOf,
@@ -46,24 +50,43 @@ const departure = (container: Element): Element | null =>
 const arrival = (container: Element, slab: boolean): Element | null =>
   slab ? (queryAllIn(container, '.slab').at(-1) ?? null) : queryIn(container, '.checker.top');
 
-type Departed = Readonly<{ flight: Flight; source: Element; from: Rect }>;
+type Departed = Readonly<{
+  flight: Flight;
+  source: Element;
+  from: Rect;
+  /** The destination's top coin before the repaint, and whether it already wore a count badge. */
+  before: Element | null;
+  badged: boolean;
+}>;
 
 const measure = (doc: PageLike, flight: Flight): Departed | null => {
   const source = departure(requireId(doc, flight.fromContainer));
   if (source === null) return null;
   const from = rectOf(source);
-  return measurable(from) ? { flight, source, from } : null;
+  if (!measurable(from)) return null;
+  const before = arrival(requireId(doc, flight.toContainer), flight.slab === true);
+  return {
+    flight,
+    source,
+    from,
+    before,
+    badged: before !== null && dataOf(before, 'count') !== null,
+  };
 };
 
-/** After the repaint: hide the arrival, fix the clone where the checker stood, send it over. */
-const launch = (doc: PageLike, { flight, source, from }: Departed): void => {
+/**
+ * After the repaint: hide the arrival (unless it is the coin that was already on top: then only
+ * a badge the landing brings hides), fix the clone where the checker stood, send it over.
+ */
+const launch = (doc: PageLike, { flight, source, from, before, badged }: Departed): void => {
   const target = arrival(requireId(doc, flight.toContainer), flight.slab === true);
   if (target === null) return;
   const to = rectOf(target);
   if (!measurable(to)) return;
   const flyer = cloneInto(doc.body, source);
   if (flyer === null) return;
-  addClass(target, 'arriving');
+  if (target !== before) addClass(target, 'arriving');
+  else if (!badged && dataOf(target, 'count') !== null) addClass(target, 'landing');
   addClass(flyer, 'flyer');
   if (flight.slab === true) addClass(flyer, 'flyer-slab');
   removeClass(flyer, 'top', 'arriving');
@@ -88,7 +111,7 @@ const launch = (doc: PageLike, { flight, source, from }: Departed): void => {
     flyer,
     () => {
       removeElement(flyer);
-      removeClass(target, 'arriving');
+      removeClass(target, 'arriving', 'landing');
     },
     FLY_MS + delay + FALLBACK_SLACK_MS,
   );

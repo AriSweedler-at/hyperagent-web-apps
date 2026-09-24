@@ -18,6 +18,7 @@ import {
   boardIntentOf,
   connDotClass,
   cubeOfferText,
+  ensureStack,
   gameBadgeText,
   hideToast,
   historyHtml,
@@ -445,6 +446,50 @@ describe('the table', () => {
       '<div class="score-row"><span>Game 1</span><span class="who">Ann</span><span>single</span><span>1</span></div>',
     );
     expect(p.get('nextGameBtn').text()).toBe('Rematch');
+  });
+
+  test('a stack past five grows and shrinks in place: the drawn coins keep their elements and the top one takes the badge', () => {
+    // Five coins of Light, as the fake elements the container's query returns.
+    const coins = Array.from({ length: 5 }, (_, i) =>
+      fakeEl(`c${String(i)}`, { classes: ['checker', 'ck-light', ...(i === 4 ? ['top'] : [])] }),
+    );
+    const point = fakeEl('pt', { queries: { '.checker': coins } });
+    ensureStack(point.el, 'L6', 0, 6);
+    expect(coins.map((c) => c.hasClass('top'))).toEqual([false, false, false, false, true]);
+    expect(coins[4]?.attr('data-count')).toBe('6');
+    expect(coins.every((c) => !c.removed())).toBe(true);
+    // The sixth is appended (the stylesheet hides it under the fifth), nothing is rebuilt.
+    expect(point.text()).toBe('<div class="checker ck-light" style="--i:5"></div>');
+    expect(point.attr('data-key')).toBe('L6');
+    ensureStack(point.el, 'L6', 0, 6);
+    expect(point.text()).toBe('<div class="checker ck-light" style="--i:5"></div>');
+    // Back to four: the fifth goes, the fourth is the top, no badge anywhere.
+    ensureStack(point.el, 'L4', 0, 4);
+    expect(coins[4]?.removed()).toBe(true);
+    expect(coins.slice(0, 4).map((c) => c.hasClass('top'))).toEqual([false, false, false, true]);
+    expect(coins.slice(0, 4).map((c) => c.attr('data-count'))).toEqual([null, null, null, null]);
+    // Another owner (a blot hit) and an emptied place: the template, as before.
+    ensureStack(point.el, 'D1', 1, 1);
+    expect(point.text()).toBe('<div class="checker ck-dark top" style="--i:0"></div>');
+    ensureStack(point.el, '-0', null, 0);
+    expect(point.text()).toBe('');
+
+    // Through the paint: 8/6 with the 2 puts a sixth coin on the 6-point (`#point-6`).
+    const six = Array.from({ length: 5 }, (_, i) =>
+      fakeEl(`six${String(i)}`, { classes: ['checker', 'ck-light', ...(i === 4 ? ['top'] : [])] }),
+    );
+    const p = backgammonPage(MARKUP, { 'point-6': { queries: { '.checker': six } } });
+    const rolled = at('L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0', 0, [2, 1]);
+    paint(p.doc, rolled);
+    expect(p.get(pt(6)).attr('data-key')).toBe('L5');
+    expect(six[4]?.attr('data-count')).toBeNull();
+    const moved = run(rolled, { type: 'point/tap', point: 7 }, { type: 'point/tap', point: 5 }).app;
+    paint(p.doc, moved);
+    expect(p.get(pt(6)).attr('data-key')).toBe('L6');
+    expect(six[4]?.attr('data-count')).toBe('6');
+    expect(six[4]?.hasClass('top')).toBe(true);
+    expect(six.every((c) => !c.removed())).toBe(true);
+    expect(p.get(pt(6)).text()).toBe('<div class="checker ck-light" style="--i:5"></div>');
   });
 
   test('the sheets: history rows, the menu with the curtain toggle, the rules keyed to the game', () => {

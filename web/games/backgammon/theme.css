@@ -1848,8 +1848,12 @@ body.fixed-screen #app {
     transform: translateX(3px);
   }
 }
-/* The just-landed checker during a flight. */
+/* The just-landed checker during a flight; on a stack already five tall the top coin stays and
+   only the badge the landing brings waits for it (render.ts ensureStack, fly.ts). */
 .checker.arriving {
+  visibility: hidden;
+}
+.checker.landing::after {
   visibility: hidden;
 }
 /* Not my turn or not moving: nothing glows, nothing takes a tap. */
