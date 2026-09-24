@@ -51,12 +51,14 @@ export default defineConfig({
       // them; the gin net/ sessions the scenario tests beside them and the wire-corpus replay;
       // the games.sweedler.com Worker (infra/games-proxy/worker.ts) its table tests over a stubbed
       // global fetch. Measured at the ratchet (lines/functions/statements/branches):
-      // shared/lib 100/100/100/100, shared/edge 99.5/99.1/98.9/93.4, fidice domain
+      // shared/lib 100/100/100/100, shared/edge 99.4/98.8/98.9/94.1 (re-measured with
+      // cuePlayer.ts and netDeps.ts, shared-shell plan A4, both at 100/100/100/100), fidice domain
       // 100/100/99.1/92.6, bots 98.9/97.9/98.4/89.9, net/protocol 100/100/100/96.7, net
       // 95.9/93.2/92.2/84.4, app 99.7/98.5/99.1/97.2, view 100/100/99.3/94.3, domain algorithms
       // 100/100/100/87.5; gin engine 99.8/99.3/98.7/95.8, engine algorithms 100/100/100/100,
       // protocol 100/100/100/100, storage 100/100/100/100, ui 99.8/99.5/99.1/93.7, scorer
-      // 100/100/97.9/88.5, net 100/100/99.2/96.2, fx 100/100/100/100; games-proxy
+      // 100/100/97.9/88.5, net 100/100/99.2/96.2, fx 100/100/100/100 (since A4 the ~8-line wrapper
+      // over web/shared/edge/cuePlayer.ts, no branches; its wiring test keeps the row); games-proxy
       // 100/100/100/96.7 (docs/ARCHITECTURE.md "Testing pyramid"). Since the shared-shell PR A2 both
       // games' protocol.ts are wrappers over web/shared/lib/protocol.ts that measure two lines each
       // (its own test holds the skeleton at 100/100/100/100 inside the shared/lib row); they still
@@ -121,7 +123,8 @@ export default defineConfig({
         // The rest of the backgammon page (docs/design/backgammon-board.md §6), at measured minus
         // 5/5/5/3 like gin's rows: the wire goldens and decoder tests (protocol), the Map-backed
         // store tests (storage), the reducer, builder, painter and page-fake suites (ui/**), the
-        // session scenarios over transport.fake.ts (net/**) and the cue table (fx). Measured
+        // session scenarios over transport.fake.ts (net/**) and the cue table with the wrapper over
+        // the shared player (fx, as gin's). Measured
         // (lines/functions/statements/branches): protocol 100/100/100/100, storage
         // 100/100/100/100, ui 99.6/100/98.7/91.6, net 100/100/98.9/94.4, fx 100/100/100/100.
         // Re-measured when the shared-shell extraction (docs/design/shared-shell.md §5 A3) moved
