@@ -2,37 +2,36 @@
 // ui/ reaches the document only through @shared/edge/dom). The legacy page (legacy/gin-rummy/
 // index.html) wrote the home screen from `initHome`, `setHomeTab`, `renderPlayMode` and the
 // handlers registered at DOMContentLoaded; here `paintHome` reads the App (ui/state.ts) and
-// `bindHome` turns each control into an intent. The three input writes that are not a paint (the
-// saved names at `initHome`, the sanitised room code as it is typed) are effects the reducer
-// raises and main.ts runs through `fillNameInputs` / `fillP2NameInput` / `setCodeInput`, so the
-// paint never overwrites what the player is typing.
-//
-// One legacy trait kept: `renderPlayMode` ran only when the Play tab was shown or the mode was
-// set, so the mode buttons' `active` marks (the submenu's are visible on every tab) are painted
-// only while the Play tab is the current one and are otherwise left as they were.
+// `bindHome` turns each control into an intent. The shell every game's home screen shares (the
+// tabs, the mode switch and its submenu, the code field, the resume box, the start, join, share
+// and cancel buttons) is web/shared/ui/home.ts since docs/design/shared-shell.md §5 B2; this file
+// composes it with what is gin's alone: the sandbox editor and the Score Counter's name inputs.
+// The three input writes that are not a paint (the saved names at `initHome`, the sanitised room
+// code as it is typed) are effects the reducer raises and main.ts runs through `fillNameInputs` /
+// `fillP2NameInput` / `setCodeInput`, so the paint never overwrites what the player is typing.
 import {
-  dataOf,
   escapeHtml,
-  inputDataOf,
-  inputTypeOf,
-  isWithin,
-  keyOf,
   listen,
   listenId,
-  preventDefault,
   queryAllIn,
   readValue,
   requireId,
   setHtml,
   setText,
   setValue,
-  stopPropagation,
   targetValueOf,
   toggleClass,
   trustedHtml,
   type DocumentLike,
   type PageLike,
 } from '../../../../shared/edge/dom.ts';
+import {
+  bindHomeShell,
+  fillInputs,
+  paintHomeShell,
+  type HomeView,
+  type ShellIntentBuilders,
+} from '../../../../shared/ui/home.ts';
 import { PRESETS } from '../sandbox.ts';
 import {
   HOME_TABS,
@@ -41,6 +40,7 @@ import {
   type App,
   type HomeTab,
   type Intent,
+  type PlayMode,
 } from './state.ts';
 
 /**
@@ -49,22 +49,16 @@ import {
  * input being typed in alone, so the fill after a keystroke moves only the other inputs.
  */
 export const fillNameInputs = (doc: DocumentLike, name: string): void => {
-  ['nameInput', 'p1NameInput', 'scP1NameInput'].forEach((id) => {
-    setValue(requireId(doc, id), name);
-  });
+  fillInputs(doc, ['nameInput', 'p1NameInput', 'scP1NameInput'], name);
 };
 
 /** The second player's name into pass-and-play's second seat and the Score Counter's second player. */
 export const fillP2NameInput = (doc: DocumentLike, name: string): void => {
-  ['p2NameInput', 'scP2NameInput'].forEach((id) => {
-    setValue(requireId(doc, id), name);
-  });
+  fillInputs(doc, ['p2NameInput', 'scP2NameInput'], name);
 };
 
-/** `#codeInput` after the reducer sanitised what was typed. */
-export const setCodeInput = (doc: DocumentLike, value: string): void => {
-  setValue(requireId(doc, 'codeInput'), value);
-};
+/** The shell's helpers, kept under their gin names for main.ts and the tests. */
+export { blocksCodeInput, setCodeInput, tabButtonId } from '../../../../shared/ui/home.ts';
 
 /**
  * The invite `#shareCodeBtn` shares: the page (`pageUrl` is its origin and path) with the code to
@@ -74,17 +68,8 @@ export const setCodeInput = (doc: DocumentLike, value: string): void => {
  */
 export { inviteUrl } from '../../../../shared/lib/invite.ts';
 
-/** `tabPlayBtn`, `tabRulesBtn`, `tabScoreBtn`, `tabAboutBtn`. */
-export const tabButtonId = (tab: HomeTab): string =>
-  `tab${tab.charAt(0).toUpperCase()}${tab.slice(1)}Btn`;
-
-/**
- * The code input's `beforeinput` guard: keyboard suggestions arrive as replacement text or as a
- * multi-character insert, and are refused so the field keeps exactly what was typed.
- */
-export const blocksCodeInput = (inputType: string, data: string | null): boolean =>
-  inputType === 'insertReplacementText' ||
-  (inputType === 'insertText' && data !== null && data.length > 1);
+/** The three mode panels the page carries (`${mode}ModeContent`): the stored two and the sandbox. */
+const PLAY_MODES: ReadonlyArray<PlayMode> = ['online', 'local', 'sandbox'];
 
 /** `#sbPreset`'s options, once at boot: every preset by its title, then a random deal. */
 export const renderSandbox = (doc: DocumentLike): void => {
@@ -114,43 +99,47 @@ const paintSandbox = (doc: DocumentLike, app: App): void => {
   setText(requireId(doc, 'sbError'), app.sandbox.error ?? '');
 };
 
-/** `renderPlayMode()`: the three mode panels and the `active` marks on both sets of mode buttons. */
-const paintPlayMode = (doc: DocumentLike, app: App): void => {
-  toggleClass(requireId(doc, 'onlineModeContent'), 'hidden', app.playMode !== 'online');
-  toggleClass(requireId(doc, 'localModeContent'), 'hidden', app.playMode !== 'local');
-  toggleClass(requireId(doc, 'sandboxModeContent'), 'hidden', app.playMode !== 'sandbox');
-  [
-    ...queryAllIn(requireId(doc, 'playModeSwitch'), '.mode-btn'),
-    ...queryAllIn(requireId(doc, 'playSubmenu'), 'button'),
-  ].forEach((b) => {
-    toggleClass(b, 'active', dataOf(b, 'mode') === app.playMode);
-  });
-};
+/** What the shared shell paints, read off the App. */
+const homeView = (app: App): HomeView<HomeTab> => ({
+  homeTab: app.homeTab,
+  playMode: app.playMode,
+  submenuOpen: app.submenuOpen,
+  resumeLabel: app.resume === null ? null : resumeLabel(app.resume),
+});
 
-/** The tabs and panels, the play mode, the submenu's `force-open`, and the resume box. */
+/** The tabs and panels, the play mode, the submenu's `force-open`, and the resume box; then the sandbox. */
 export const paintHome = (doc: DocumentLike, app: App): void => {
-  HOME_TABS.forEach((t) => {
-    toggleClass(requireId(doc, tabButtonId(t)), 'active', t === app.homeTab);
-    toggleClass(requireId(doc, `${t}Panel`), 'hidden', t !== app.homeTab);
-  });
-  if (app.homeTab === 'play') paintPlayMode(doc, app);
+  paintHomeShell(doc, homeView(app), { tabs: HOME_TABS, modes: PLAY_MODES });
   paintSandbox(doc, app);
-  toggleClass(requireId(doc, 'playSubmenu'), 'force-open', app.submenuOpen);
-  toggleClass(requireId(doc, 'resumeBox'), 'hidden', app.resume === null);
-  if (app.resume !== null) setText(requireId(doc, 'resumeBtn'), resumeLabel(app.resume));
 };
 
-/** Every control of the home screen and the two waiting screens, as the legacy registered them. */
-export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
-  const nameInput = requireId(doc, 'nameInput');
-  listen(nameInput, 'input', () => {
-    dispatch({ type: 'name/typed', value: readValue(nameInput) });
-  });
-  const p1NameInput = requireId(doc, 'p1NameInput');
-  listen(p1NameInput, 'input', () => {
-    dispatch({ type: 'p1name/typed', value: readValue(p1NameInput) });
-  });
-  // The Score Counter's two players are the pass-and-play players: the same intents, the same keys.
+/** What the two start buttons read beside the names: the target score of their panel. */
+type StartOptions = Readonly<{ target: string }>;
+
+/** The shell's intents as gin spells them (the shared binder never imports this file's Intent). */
+const SHELL_INTENTS: ShellIntentBuilders<Intent, HomeTab, StartOptions> = {
+  nameTyped: (value) => ({ type: 'name/typed', value }),
+  p1NameTyped: (value) => ({ type: 'p1name/typed', value }),
+  p2NameTyped: (value) => ({ type: 'p2name/typed', value }),
+  hostClick: (name, options) => ({ type: 'host/click', name, ...options }),
+  joinClick: (name, code) => ({ type: 'join/click', name, code }),
+  codeTyped: (value, inputType) => ({ type: 'code/typed', value, inputType }),
+  hostDeal: { type: 'host/deal' },
+  localClick: (p1, p2, options) => ({ type: 'local/click', p1, p2, ...options }),
+  tabSet: (tab) => ({ type: 'tab/set', tab }),
+  modeSet: (mode) => ({ type: 'mode/set', mode }),
+  submenuPress: { type: 'submenu/press' },
+  submenuRelease: { type: 'submenu/release' },
+  tabPlayClick: { type: 'tab/playClick' },
+  submenuPick: (mode) => ({ type: 'submenu/pick', mode }),
+  submenuDismiss: { type: 'submenu/dismiss' },
+  resumeClick: { type: 'resume/click' },
+  shareClick: { type: 'share/click' },
+  cancel: { type: 'cancel' },
+};
+
+/** The Score Counter's two players are the pass-and-play players: the same intents, the same keys. */
+const bindScorerNames = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
   const scP1NameInput = requireId(doc, 'scP1NameInput');
   listen(scP1NameInput, 'input', () => {
     dispatch({ type: 'p1name/typed', value: readValue(scP1NameInput) });
@@ -159,43 +148,12 @@ export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): voi
   listen(scP2NameInput, 'input', () => {
     dispatch({ type: 'p2name/typed', value: readValue(scP2NameInput) });
   });
+};
+
+/** The sandbox's controls; the names come from the pass-and-play inputs, as its game does. */
+const bindSandbox = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
+  const p1NameInput = requireId(doc, 'p1NameInput');
   const p2NameInput = requireId(doc, 'p2NameInput');
-  listen(p2NameInput, 'input', () => {
-    dispatch({ type: 'p2name/typed', value: readValue(p2NameInput) });
-  });
-  listenId(doc, 'hostBtn', 'click', () => {
-    dispatch({
-      type: 'host/click',
-      name: readValue(nameInput),
-      target: readValue(requireId(doc, 'targetInput')),
-    });
-  });
-  const codeInput = requireId(doc, 'codeInput');
-  const join = (): void => {
-    dispatch({ type: 'join/click', name: readValue(nameInput), code: readValue(codeInput) });
-  };
-  listenId(doc, 'joinBtn', 'click', join);
-  listen(codeInput, 'beforeinput', (e) => {
-    if (blocksCodeInput(inputTypeOf(e), inputDataOf(e))) preventDefault(e);
-  });
-  listen(codeInput, 'input', (e) => {
-    dispatch({ type: 'code/typed', value: targetValueOf(e), inputType: inputTypeOf(e) });
-  });
-  listen(codeInput, 'keydown', (e) => {
-    if (keyOf(e) === 'Enter') join();
-  });
-  listenId(doc, 'startGameBtn', 'click', () => {
-    dispatch({ type: 'host/deal' });
-  });
-  listenId(doc, 'localBtn', 'click', () => {
-    dispatch({
-      type: 'local/click',
-      p1: readValue(p1NameInput),
-      p2: readValue(p2NameInput),
-      target: readValue(requireId(doc, 'localTargetInput')),
-    });
-  });
-  // The sandbox's controls; the names come from the pass-and-play inputs, as its game does.
   const sbMap = requireId(doc, 'sbMap');
   listenId(doc, 'sbPreset', 'change', (e) => {
     const id = targetValueOf(e);
@@ -221,52 +179,18 @@ export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): voi
       p2: readValue(p2NameInput),
     });
   });
-  listenId(doc, 'tabRulesBtn', 'click', () => {
-    dispatch({ type: 'tab/set', tab: 'rules' });
+};
+
+/** Every control of the home screen and the two waiting screens, as the legacy registered them. */
+export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
+  bindHomeShell(doc, dispatch, {
+    tabs: HOME_TABS,
+    startOptions: {
+      host: (d) => ({ target: readValue(requireId(d, 'targetInput')) }),
+      local: (d) => ({ target: readValue(requireId(d, 'localTargetInput')) }),
+    },
+    intents: SHELL_INTENTS,
   });
-  listenId(doc, 'tabScoreBtn', 'click', () => {
-    dispatch({ type: 'tab/set', tab: 'score' });
-  });
-  listenId(doc, 'tabAboutBtn', 'click', () => {
-    dispatch({ type: 'tab/set', tab: 'about' });
-  });
-  queryAllIn(requireId(doc, 'playModeSwitch'), '.mode-btn').forEach((b) => {
-    listen(b, 'click', () => {
-      dispatch({ type: 'mode/set', mode: dataOf(b, 'mode') ?? '' });
-    });
-  });
-  // The Play tab: tap, hover (desktop, CSS) and long press (touch) open its submenu.
-  const tabPlayBtn = requireId(doc, 'tabPlayBtn');
-  listen(tabPlayBtn, 'pointerdown', () => {
-    dispatch({ type: 'submenu/press' });
-  });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => {
-    listen(tabPlayBtn, ev, () => {
-      dispatch({ type: 'submenu/release' });
-    });
-  });
-  listen(tabPlayBtn, 'click', () => {
-    dispatch({ type: 'tab/playClick' });
-  });
-  queryAllIn(requireId(doc, 'playSubmenu'), 'button[data-mode]').forEach((b) => {
-    listen(b, 'click', (e) => {
-      stopPropagation(e);
-      dispatch({ type: 'submenu/pick', mode: dataOf(b, 'mode') ?? '' });
-    });
-  });
-  const tabPlayWrap = requireId(doc, 'tabPlayWrap');
-  listen(doc, 'click', (e) => {
-    if (!isWithin(tabPlayWrap, e)) dispatch({ type: 'submenu/dismiss' });
-  });
-  listenId(doc, 'resumeBtn', 'click', () => {
-    dispatch({ type: 'resume/click' });
-  });
-  listenId(doc, 'shareCodeBtn', 'click', () => {
-    dispatch({ type: 'share/click' });
-  });
-  ['cancelHostBtn', 'cancelGuestBtn'].forEach((id) => {
-    listenId(doc, id, 'click', () => {
-      dispatch({ type: 'cancel' });
-    });
-  });
+  bindScorerNames(doc, dispatch);
+  bindSandbox(doc, dispatch);
 };
