@@ -25,6 +25,7 @@ import {
   OPPONENT_LEFT_MSG,
   ROOM_FULL_MSG,
   SCREENS,
+  SHELL_INTENT_TYPES,
   WAITING_FOR_GUEST_MSG,
   guestContextOf,
   guestGoneMsg,
@@ -162,6 +163,14 @@ describe('the initial app', () => {
       'scGameScreen',
       'scEndScreen',
     ]);
+  });
+
+  test('the shell`s intents are listed once, for the shared shell reducer to come', () => {
+    expect(SHELL_INTENT_TYPES).toContain('home/init');
+    expect(SHELL_INTENT_TYPES).toContain('guest/lost');
+    expect(SHELL_INTENT_TYPES).not.toContain('card/tap');
+    expect(SHELL_INTENT_TYPES).toHaveLength(36);
+    expect(new Set(SHELL_INTENT_TYPES).size).toBe(SHELL_INTENT_TYPES.length);
   });
 });
 
