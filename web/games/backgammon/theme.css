@@ -555,8 +555,9 @@ label {
   background: var(--nacre);
   color: var(--accent);
 }
-/* With the Play panel open the tab bar flows into the mode switch: no bottom hairline, no bottom radii. */
-.tabbar:has(+ #playPanel:not(.hidden)) {
+/* With the Play panel open and its mode switch shown the tab bar flows into the switch: no bottom
+   hairline, no bottom radii. Gated on the switch so a hidden one leaves the bar its own bottom edge. */
+.tabbar:has(+ #playPanel:not(.hidden) > .mode-switch:not(.hidden)) {
   margin-bottom: 0;
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;

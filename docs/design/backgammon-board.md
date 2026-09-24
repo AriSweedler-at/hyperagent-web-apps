@@ -31,8 +31,8 @@ the rules by rule (`rules R13`).
 | Turn end | No `done` action: the turn ends by itself when no maximal play extends what was played (rules R13); `#doneBtn` is reserved and hidden in every state. |
 | Hit toast | "Kapará. {name} hit you on your {n}-point." for the player hit, in their own numbering, from the moves (`played[i].hit`, `lastPlay`), never from log text. Online it fires as the opponent's hit moves arrive; in pass-and-play when the phone reaches the player hit (§4.9). |
 | Accessibility | Every tap target ≥ 44px on the phone (the geometry e2e asserts it), a painted `aria-label` per place, Enter/Space on a focused place is its tap, Escape closes the sheet or the tray. |
+| Theme | "Subtle but recognizable": a parchment page (a CC0 photo of real medieval parchment, mirror-tiled, under a cream multiply; §3.11), the home shell in a rich aegean blue with nacre text and a gold hairline, olive-wood board, gold elsewhere only as a hairline, one low-contrast meander line on the frame, an olive trim along the window's edge. The dark checker a deep-blue disc with a fine blue ring (the eye motif as a subtle inner ring, never a literal eye); the light one a pale disc with a soft sheen. Checkers, dice and frame are CSS only, no images. GFS Didot for the title and the room code, Cardo for everything else, both from Google Fonts. |
 | Online | Gin's flow, the default mode: the Online panel (name, match length, rules, "Open a table" / "Sit down" by code), `#hostWaitScreen` with the 4-letter code, "Share invite" and "Start the match", `#guestWaitScreen`; the host applies both seats' actions (`hostDispatch`) and broadcasts the guest's `View`, a refusal is a `toast` frame, the guest's Roll is an `action` frame the host rolls; the table's 🌐 and the curtain's "Continue online" hand a pass-and-play game to a fresh room (`handoff/click`); saves per role drive "Resume hosting room X" / "Rejoin room X". |
-| Online | Hidden in the page PR (`ui/state.ts ONLINE_MODE_SHOWN = false`: the mode switch, the Online panel and the curtain's "Continue online" are hidden and pass-and-play is the default); the sessions, protocol and storage shapes are in place for the online PR (§5.3). |
 
 ## 2. The one DOM
 
@@ -530,10 +530,12 @@ and four"); `#toast` is `role="status"`; `#soundBtn` is a toggle with `aria-pres
 by shape (the inner ring only on the dark one), targets carry numerals, the selected checker has a
 ring and a lift, a hit has the flash and the toast: colour is never the only cue.
 `prefers-reduced-motion` per §3.8. Contrast (WCAG, the page measured against the parchment's
-rendered mean): `--text` on `--bg` 11.8:1, `--muted` on `--bg` 4.9:1, `--accent` (the title) on
+rendered mean): `--text` on `--bg` 11.8:1, `--muted` on `--bg` 4.9:1 (4.5:1 against the tile's
+darkest percentile, the creases and specks), `--accent` (the title) on
 `--bg` 8.2:1; on the panel (§3.11) nacre 9.0–11.9:1 and `--nacre-dim` 5.5–6.9:1 across the
 gradient, `--accent` on nacre 9.8:1 (the open tab), `--text` on nacre 14.2:1 (inputs, secondary
-buttons), nacre on the primary button 6.3–8.0:1, the gold hairline 4.8:1 on the panel; on the board
+buttons), nacre on the primary button 6.3–8.0:1, the gold hairline (`--hair`, 62% over the panel)
+2.7:1, decorative: the panel is told from the page by its blue, not by the line; on the board
 the labels 6.5:1 on stone and nacre 4.6:1 on olive, nacre on `--accent` 9.8:1 (the count badge),
 nacre on `--nazar` 4.1:1 (the target disc's numeral, as it was with `--bg`: the one pair under
 4.5:1, a board token this change leaves alone), the bar ring 6.6:1 on walnut.
