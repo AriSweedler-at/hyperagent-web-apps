@@ -57,9 +57,10 @@ export default defineConfig({
       // protocol 100/100/100/100, storage 100/100/100/100, ui 99.8/99.5/99.1/93.7, scorer
       // 100/100/97.9/88.5, net 100/100/99.2/96.2, fx 100/100/100/100; games-proxy
       // 100/100/100/96.7 (docs/ARCHITECTURE.md "Testing pyramid"). Since the shared-shell PR A2 both
-      // games' protocol.ts are two-line wrappers over web/shared/lib/protocol.ts (its own test holds
-      // the skeleton at 100/100/100/100 inside the shared/lib row); they still measure 100/100/100/100
-      // through the wire-corpus, golden and session suites, so their rows stand as ratcheted.
+      // games' protocol.ts are wrappers over web/shared/lib/protocol.ts that measure two lines each
+      // (its own test holds the skeleton at 100/100/100/100 inside the shared/lib row); they still
+      // measure 100/100/100/100 through the wire-corpus, golden and session suites, so their rows
+      // stand as ratcheted.
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
