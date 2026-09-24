@@ -495,7 +495,9 @@ describe('hosting', () => {
       startGameVisible: true,
       hostStatus: { text: joinedMsg('Ann 2'), pulse: true },
     });
-    expect(effects).toEqual([{ type: 'send', frame: lobby('Ann', 3, 'portes') }]);
+    expect(effects).toEqual([
+      { type: 'send', frame: lobby('Ann', { matchLength: 3, variant: 'portes' }) },
+    ]);
   });
 
   test('host/deal needs a guest; then the match starts and the guest`s view goes on the wire', () => {

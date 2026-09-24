@@ -145,8 +145,14 @@ const GOLDENS: Readonly<Record<WireTag, ReadonlyArray<Frame>>> = {
     action({ type: 'pass' }),
     action({ type: 'next' }),
   ],
-  welcome: [welcome('Ann', 5, 'portes'), welcome('Ann', 3, 'backgammon')],
-  lobby: [lobby('Ann', 5, 'portes'), lobby('Ann', 1, 'backgammon')],
+  welcome: [
+    welcome('Ann', { matchLength: 5, variant: 'portes' }),
+    welcome('Ann', { matchLength: 3, variant: 'backgammon' }),
+  ],
+  lobby: [
+    lobby('Ann', { matchLength: 5, variant: 'portes' }),
+    lobby('Ann', { matchLength: 1, variant: 'backgammon' }),
+  ],
   full: [full()],
   toast: [toast("It's not your turn."), toast("That move isn't legal.")],
   // Portes before the first roll; Dark (the guest) rolled and moving, `legal` and `plays` filled;
@@ -202,12 +208,12 @@ describe('builders produce the golden literals, key for key', () => {
     ['roll', action({ type: 'roll' }), '{"t":"action","action":{"type":"roll"}}'],
     [
       'welcome',
-      welcome('Ann', 5, 'portes'),
+      welcome('Ann', { matchLength: 5, variant: 'portes' }),
       '{"t":"welcome","hostName":"Ann","matchLength":5,"variant":"portes"}',
     ],
     [
       'lobby',
-      lobby('Ann', 3, 'backgammon'),
+      lobby('Ann', { matchLength: 3, variant: 'backgammon' }),
       '{"t":"lobby","hostName":"Ann","matchLength":3,"variant":"backgammon"}',
     ],
     ['full', full(), '{"t":"full"}'],
@@ -389,8 +395,8 @@ describe('decodeGuestFrame / decodeHostFrame keep each side to its own frames', 
 
   test('the guest accepts the five host frames and refuses join and action', () => {
     [
-      welcome('Ann', 5, 'portes'),
-      lobby('Ann', 5, 'portes'),
+      welcome('Ann', { matchLength: 5, variant: 'portes' }),
+      lobby('Ann', { matchLength: 5, variant: 'portes' }),
       full(),
       toast('t'),
       state(guestView(portesRolled)),
