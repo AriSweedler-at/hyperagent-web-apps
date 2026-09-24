@@ -1,4 +1,4 @@
-// The player over fakes (scratchpad/bg/shared-shell.md §5 A4: gin's and backgammon's four createFx
+// The player over fakes (docs/design/shared-shell.md §5 A4: gin's and backgammon's four createFx
 // tests, moved here once): a row of the injected table is one sequence from the font and the row's
 // buzz, another font re-voices the same event while the buzz stays the table's, a disabled player
 // buzzes nothing and warms nothing, and `toggle` persists through the injected callback, warming

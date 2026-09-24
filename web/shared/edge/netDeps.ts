@@ -1,4 +1,4 @@
-// The browser NetDeps an online page hands its sessions (scratchpad/bg/shared-shell.md §5 A4),
+// The browser NetDeps an online page hands its sessions (docs/design/shared-shell.md §5 A4),
 // moved verbatim from the three main.ts files: a Transport factory over `realTransport` (the one
 // importer of peerjs; it reads the `?peer=` and `?ice-policy=` hooks from `search` itself) at the
 // page's PeerJS log level, the ICE loader over the browser's fetch, the real clock, and `onWake`,

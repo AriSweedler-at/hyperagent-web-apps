@@ -1,5 +1,5 @@
 // The game's sound and haptics (docs/design/backgammon-board.md §5.1 "Sound"; docs/design/sound-fonts.md
-// §5, §9) are the shared cue player (web/shared/edge/cuePlayer.ts, scratchpad/bg/shared-shell.md §5 A4)
+// §5, §9) are the shared cue player (web/shared/edge/cuePlayer.ts, docs/design/shared-shell.md §5 A4)
 // over this game's table (ui/sound.ts) and its `backgammon_sound` preference (storage.ts). main.ts
 // constructs the real deps; fx.test.ts pins the table and this wiring.
 import {

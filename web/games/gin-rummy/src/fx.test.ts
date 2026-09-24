@@ -2,7 +2,7 @@
 // is the legacy `fx` object's notes, voice and gain number for number, and its buzz is unchanged.
 // LEGACY below is a frozen copy of the numbers (legacy/gin-rummy/index.html, then ui/sound.ts
 // before the fonts), not a read of the file it checks. The player itself is the shared one
-// (web/shared/edge/cuePlayer.test.ts, scratchpad/bg/shared-shell.md §5 A4); the one createFx test
+// (web/shared/edge/cuePlayer.test.ts, docs/design/shared-shell.md §5 A4); the one createFx test
 // here pins what gin injects: this table and the `ginRummy_sound` key.
 import { describe, expect, test } from 'vitest';
 

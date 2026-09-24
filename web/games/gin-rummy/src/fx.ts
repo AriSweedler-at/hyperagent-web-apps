@@ -1,5 +1,5 @@
 // The legacy `fx` object (legacy/gin-rummy/index.html: sound + haptics; docs/MIGRATION.md step 12)
-// is the shared cue player (web/shared/edge/cuePlayer.ts, scratchpad/bg/shared-shell.md §5 A4)
+// is the shared cue player (web/shared/edge/cuePlayer.ts, docs/design/shared-shell.md §5 A4)
 // over gin's table (ui/sound.ts) and its `ginRummy_sound` preference (storage.ts). main.ts
 // constructs the real deps; fx.test.ts pins the table and this wiring.
 import {

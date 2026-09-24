@@ -1,4 +1,4 @@
-// The cue player every game's fx.ts wraps (scratchpad/bg/shared-shell.md §5 A4): gin's legacy `fx`
+// The cue player every game's fx.ts wraps (docs/design/shared-shell.md §5 A4): gin's legacy `fx`
 // object (legacy/gin-rummy/index.html: sound + haptics, docs/MIGRATION.md step 12) moved here
 // verbatim from web/games/gin-rummy/src/fx.ts, with the two things a game owns injected: its cue
 // table (ui/sound.ts, event -> generic cue + buzz) and the persist of its sound preference

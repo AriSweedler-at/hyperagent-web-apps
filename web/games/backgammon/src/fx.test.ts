@@ -1,6 +1,6 @@
 // The table (ui/sound.ts; docs/design/sound-fonts.md §5) and the wiring over fakes: every event
 // names a generic cue the default font voices, no two events share a cue, and `createFx` is the
-// shared player (web/shared/edge/cuePlayer.test.ts, scratchpad/bg/shared-shell.md §5 A4) over this
+// shared player (web/shared/edge/cuePlayer.test.ts, docs/design/shared-shell.md §5 A4) over this
 // table and the `backgammon_sound` key.
 import { describe, expect, test } from 'vitest';
 
