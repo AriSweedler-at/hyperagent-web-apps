@@ -148,6 +148,8 @@ describe('every test file belongs to exactly one suite', () => {
  */
 const ROWS_BEFORE: ReadonlyArray<readonly [string, Suite, Thresholds]> = [
   ['web/shared/lib/**', 'shared', { lines: 100, functions: 100, branches: 100, statements: 100 }],
+  // Added after the partition (docs/design/glossary-links.md §3): held at 100 like shared/lib.
+  ['web/shared/ui/**', 'shared', { lines: 100, functions: 100, branches: 100, statements: 100 }],
   ['web/shared/edge/**', 'shared', { lines: 94, functions: 94, statements: 93, branches: 90 }],
   ['web/shared/net/**', 'shared', { lines: 95, functions: 95, statements: 95, branches: 94 }],
   [
@@ -281,6 +283,8 @@ const INCLUDE_BEFORE: ReadonlyArray<string> = [
   'web/shared/lib/**/*.ts',
   'web/shared/edge/**/*.ts',
   'web/shared/net/**/*.ts',
+  // Added after the partition (docs/design/glossary-links.md §3): the shared shell's pure helpers.
+  'web/shared/ui/**/*.ts',
   'web/games/fidice/src/domain/**/*.ts',
   'web/games/fidice/src/bots/**/*.ts',
   'web/games/fidice/src/net/**/*.ts',

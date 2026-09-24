@@ -54,10 +54,11 @@ describe('pure helpers', () => {
   });
 
   test('tabButtonId capitalises the tab', () => {
-    expect(['play', 'rules', 'score'].map((t) => tabButtonId(t as 'play'))).toEqual([
+    expect(['play', 'rules', 'score', 'about'].map((t) => tabButtonId(t as 'play'))).toEqual([
       'tabPlayBtn',
       'tabRulesBtn',
       'tabScoreBtn',
+      'tabAboutBtn',
     ]);
   });
 
@@ -198,6 +199,7 @@ describe('bindHome', () => {
     p.get('localBtn').fire('click');
     p.get('tabRulesBtn').fire('click');
     p.get('tabScoreBtn').fire('click');
+    p.get('tabAboutBtn').fire('click');
     p.modeButtons[1]?.fire('click');
     p.modeButtons[2]?.fire('click');
     p.get('resumeBtn').fire('click');
@@ -217,6 +219,7 @@ describe('bindHome', () => {
       { type: 'local/click', p1: 'Zoë', p2: 'Bob', target: '50' },
       { type: 'tab/set', tab: 'rules' },
       { type: 'tab/set', tab: 'score' },
+      { type: 'tab/set', tab: 'about' },
       { type: 'mode/set', mode: 'local' },
       { type: 'mode/set', mode: 'sandbox' },
       { type: 'resume/click' },

@@ -58,18 +58,14 @@ import { phoneRows, samePicture } from './hand/picture.ts';
 import { SORT_MODES, type SortMode } from '../sort.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
-import { RULES_ITEMS } from './rules.ts';
+import { aboutHtml } from './about.ts';
+import { RULES_SLOT_IDS, rulesItemsHtml } from './rules.ts';
 import { canDropDiscard, handoffLabel, SCREENS, type App, type Intent } from './state.ts';
 
 export type { PageLike };
 export type Dispatch = (intent: Intent) => void;
 
-/** The ids of the two `<ul class="rules-list">` slots: the home tab's and the in-game overlay's. */
-export const RULES_SLOT_IDS = ['rulesList', 'rulesOverlayList'] as const;
-
-/** The eleven `<li>`s, one per line as the legacy page had them between its tags. */
-export const rulesItemsHtml = (): string =>
-  RULES_ITEMS.map((item) => `<li>${item}</li>`).join('\n');
+export { RULES_SLOT_IDS, rulesItemsHtml } from './rules.ts';
 
 /** Fill both rules slots from ui/rules.ts (once, at boot). */
 export const renderRules = (doc: DocumentLike): void => {
@@ -77,6 +73,11 @@ export const renderRules = (doc: DocumentLike): void => {
   RULES_SLOT_IDS.forEach((id) => {
     setHtml(requireId(doc, id), markup);
   });
+};
+
+/** Fill `#aboutCopy` from ui/about.ts (once, at boot), its jargon linked to the rules. */
+export const renderAbout = (doc: DocumentLike): void => {
+  setHtml(requireId(doc, 'aboutCopy'), trustedHtml(aboutHtml()));
 };
 
 /** `showScreen(id)`: every screen but `id` gets `hidden`; the table locks the body to the viewport. */

@@ -251,12 +251,24 @@ describe('rules', () => {
       .map((l) => l.trim())
       .filter((l) => l !== '');
 
+  /**
+   * What the glossary added since (docs/design/glossary-links.md): the anchor id on each `<li>` and
+   * the jargon links inside the bodies. Stripped, the words must still be the legacy's.
+   */
+  const withoutGlossary = (html: string): string =>
+    html.replace(/ id="rule-[a-z-]+"/g, '').replace(/<a class="jargon"[^>]*>([^<]*)<\/a>/g, '$1');
+
   test('RULES_LIST_HTML is both legacy copies, line for line, without the page indentation', () => {
     const blocks = legacyRulesBlocks();
     expect(blocks).toHaveLength(2);
     blocks.forEach((block) => {
-      expect(RULES_LIST_HTML.split('\n')).toEqual(trimmed(block));
+      expect(withoutGlossary(RULES_LIST_HTML).split('\n')).toEqual(trimmed(block));
     });
     expect(RULES_ITEMS).toHaveLength(11);
+    // The stripping is not a no-op: the ids and at least one link are really there.
+    expect(RULES_LIST_HTML).toContain('<li id="rule-knock">');
+    expect(RULES_LIST_HTML).toContain(
+      '<a class="jargon" href="#rule-deadwood" data-rule="deadwood">',
+    );
   });
 });

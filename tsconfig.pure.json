@@ -8,6 +8,7 @@
   },
   "include": [
     "web/shared/lib/**/*.ts",
+    "web/shared/ui/**/*.ts",
     "web/games/*/src/engine/**/*.ts",
     "web/games/*/src/domain/**/*.ts",
     "web/games/*/src/bots/**/*.ts",

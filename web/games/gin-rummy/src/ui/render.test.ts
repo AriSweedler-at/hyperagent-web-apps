@@ -39,6 +39,7 @@ import {
   paintScreen,
   paintSound,
   paintWaiting,
+  renderAbout,
   renderRules,
   roundResultText,
   rulesItemsHtml,
@@ -49,6 +50,7 @@ import {
   discardsSubText,
 } from './render.ts';
 import { state as stateFrame } from '../protocol.ts';
+import { aboutHtml } from './about.ts';
 import { RULES_ITEMS, RULES_LIST_HTML } from './rules.ts';
 import { SCREENS, initialApp, reduce, type App, type Intent } from './state.ts';
 
@@ -134,6 +136,16 @@ const local = (game: State, seat: Seat, over: Partial<App> = {}): App => ({
 });
 
 const shown = (p: GinPage): ReadonlyArray<string> => SCREENS.filter((id) => !p.get(id).hidden());
+
+describe('renderAbout', () => {
+  test('fills #aboutCopy with the two paragraphs, their jargon linked to the rules', () => {
+    const p = page();
+    renderAbout(p.doc);
+    expect(p.get('aboutCopy').text()).toBe(aboutHtml());
+    expect(p.get('aboutCopy').text().match(/<p>/g)).toHaveLength(2);
+    expect(p.get('aboutCopy').text()).toContain('data-rule="knock">knocks</a>');
+  });
+});
 
 describe('renderRules', () => {
   test('fills both slots with the eleven items, one per line, as ui/rules.ts has them', () => {

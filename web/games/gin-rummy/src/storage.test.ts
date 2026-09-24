@@ -80,7 +80,7 @@ describe('frozen constants', () => {
       'ginRummy_soundFont',
       'ginRummyScorerState_v2',
     ]);
-    expect(HOME_TABS).toEqual(['play', 'rules', 'score']);
+    expect(HOME_TABS).toEqual(['play', 'rules', 'score', 'about']);
     expect(DEFAULT_HOME_TAB).toBe('play');
     expect(PLAY_MODES).toEqual(['online', 'local']);
     expect(DEFAULT_PLAY_MODE).toBe('online');

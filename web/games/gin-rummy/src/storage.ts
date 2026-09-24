@@ -100,7 +100,8 @@ export const STORAGE_KEYS = {
 } as const;
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
-export const HOME_TABS = ['play', 'rules', 'score'] as const;
+/** Play, Rules, the Score Counter and, since the glossary links, About (docs/design/glossary-links.md). */
+export const HOME_TABS = ['play', 'rules', 'score', 'about'] as const;
 export type HomeTab = (typeof HOME_TABS)[number];
 export const DEFAULT_HOME_TAB: HomeTab = 'play';
 export const DEFAULT_PLAY_MODE: PlayMode = 'online';

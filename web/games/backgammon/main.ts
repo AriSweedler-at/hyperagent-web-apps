@@ -1,6 +1,6 @@
 // Boot (docs/ARCHITECTURE.md "Module boundaries": main.ts constructs the adapters and injects
 // them; no logic). Gin's main.ts line for line where the games agree (design §5.3 "main.ts boot",
-// understand.md §4 step 7): the real Transport (web/shared/edge/transport.ts, which bundles PeerJS
+// docs/design/backgammon-board.md §5.2): the real Transport (web/shared/edge/transport.ts, which bundles PeerJS
 // and honours `?peer=`), the ICE loader, localStorage, the clock, `Math.random` (or the harness's
 // `window.__rng`, read before anything draws so a seeded opening roll is the seeded one, R27),
 // Web Audio, vibration and the wake lock are built here and handed to the reducer (src/ui/state.ts)
@@ -17,10 +17,12 @@ import {
 import { joinCodeFrom, withoutJoin } from '../../shared/edge/invite.ts';
 import { browserNetDeps } from '../../shared/edge/netDeps.ts';
 import { shareText } from '../../shared/edge/share.ts';
+import { bindJargon, revealRule } from '../../shared/edge/glossary.ts';
 import { createSampleCache } from '../../shared/edge/sound.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
 import type { Timer } from '../../shared/lib/clock.ts';
 import type { Rng } from '../../shared/lib/rng.ts';
+import { ruleFromHash } from '../../shared/ui/glossary.ts';
 import { badSoundFontMsg, isSoundFont } from '../../shared/lib/sound/fonts.ts';
 import { legalActions, type Action, type View } from './src/engine/index.ts';
 import { createFx } from './src/fx.ts';
@@ -258,6 +260,9 @@ const boot = (): void => {
         },
       );
     },
+    revealRule: (slot, rule) => {
+      revealRule(document, slot, rule);
+    },
     page: {
       fillName: (name) => {
         fillNameInputs(document, name);
@@ -275,6 +280,10 @@ const boot = (): void => {
   };
 
   bindAll(document, dispatch);
+  // A tap on jargon in the About copy or in a rule (docs/design/glossary-links.md) shows that rule.
+  bindJargon(document, (rule) => {
+    dispatch({ type: 'rules/show', rule });
+  });
   paintSound(document, fx.enabled());
   // Browsers only let audio start after a user gesture: warm the context on the first tap.
   ['pointerdown', 'touchstart', 'keydown'].forEach((event) => {
@@ -344,6 +353,10 @@ const boot = (): void => {
       `${location.pathname}${query === '' ? '' : `?${query}`}${location.hash}`,
     );
   }
+  // A rule deep link (`#rule-<id>`, docs/design/glossary-links.md §1): the Rules tab, scrolled to
+  // that rule. The hash stays, so the link can be copied from the address bar.
+  const rule = ruleFromHash(location.hash);
+  if (rule !== null) dispatch({ type: 'rules/show', rule });
 };
 
 boot();

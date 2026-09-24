@@ -464,7 +464,11 @@ Play/Rules/About (`HOME_TABS`, `backgammon_homeTab`), the mode switch (`PLAY_MOD
 default 5) and the ruleset (portes/Western), the room-code form with gin's `beforeinput` guard, the
 resume box from `resumeFor(save)`, the rules panel from `ui/rules.ts RULES_ITEMS[variant]` (plain
 English, one source for `#rulesList` and `#rulesOverlayList`), an About panel of two short
-paragraphs. Waiting rooms: gin's, fed by the sessions' status strings; `#shareCodeBtn` →
+paragraphs (`ui/about.ts`, written into `#aboutCopy` per ruleset). Both carry glossary links
+(docs/design/glossary-links.md): each rule item has an id, `ui/glossary.ts` names the words that
+mean each rule per ruleset, and a tap on jargon is `rules/show { rule }` (the Rules tab on the home
+screen, the rules overlay anywhere else) followed by the `revealRule { slot, rule }` effect; a
+`#rule-<id>` deep link at boot does the same. Waiting rooms: gin's, fed by the sessions' status strings; `#shareCodeBtn` →
 `share/click` → `shareText(navigator, { title: 'Sheshbesh', url })` with gin's `INVITE_COPIED_MSG`
 fallback; `#startGameBtn` when the guest is connected → `createGame`. Sound: `src/fx.ts` plays the
 table's cues (`roll place hit bearOff yourTurn win lose double tap` in `ui/sound.ts`) in the App's
@@ -533,7 +537,8 @@ ring and a lift, a hit has the flash and the toast: colour is never the only cue
 rendered mean): `--text` on `--bg` 11.8:1, `--muted` on `--bg` 4.9:1 (4.5:1 against the tile's
 darkest percentile, the creases and specks), `--accent` (the title) on
 `--bg` 8.2:1; on the panel (§3.11) nacre 9.0–11.9:1 and `--nacre-dim` 5.5–6.9:1 across the
-gradient, `--accent` on nacre 9.8:1 (the open tab), `--text` on nacre 14.2:1 (inputs, secondary
+gradient (the About copy's glossary links are nacre too, `.card-box .jargon`: the accent they wear
+on the cream rules list would be 1.0:1 there), `--accent` on nacre 9.8:1 (the open tab), `--text` on nacre 14.2:1 (inputs, secondary
 buttons), nacre on the primary button 6.3–8.0:1, the gold hairline (`--hair`, 62% over the panel)
 2.7:1, decorative: the panel is told from the page by its blue, not by the line; on the board
 the labels 6.5:1 on stone and nacre 4.6:1 on olive, nacre on `--accent` 9.8:1 (the count badge),

@@ -1,4 +1,4 @@
-// The backgammon page's localStorage (design.md §5.2; understand.md §4 step 1 "Storage keys"):
+// The backgammon page's localStorage (docs/design/backgammon-board.md §5.2, the keys):
 // gin's storage.ts key for key under this game's own names, so two games on one origin never
 // read each other's saves or preferences (docs/ARCHITECTURE.md "Module boundaries": only this
 // module names the keys). Every read goes through a decoder built on the engine's `decodeState`
@@ -88,7 +88,7 @@ export const STORAGE_KEYS = {
   variant: 'backgammon_variant',
   /** The match length the home screen last chose (bare string naming one of MATCH_LENGTHS). */
   matchLength: 'backgammon_matchLength',
-  /** The pass-and-play curtain: `always` or `never` (bare string; design.md Q4). */
+  /** The pass-and-play curtain: `always` or `never` (bare string; backgammon-board.md §4.9). */
   curtain: 'backgammon_curtain',
 } as const;
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];

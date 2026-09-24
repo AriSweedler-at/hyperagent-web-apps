@@ -30,6 +30,7 @@ import {
   paintSound,
   paintWaiting,
   recordKind,
+  renderAbout,
   renderRules,
   rollLabel,
   scoreHtml,
@@ -37,6 +38,7 @@ import {
   viewKey,
   waitNoteText,
 } from './render.ts';
+import { aboutHtml } from './about.ts';
 import { rulesItemsHtml } from './rules.ts';
 import {
   SCREENS,
@@ -116,6 +118,23 @@ const shown = (p: BackgammonPage): ReadonlyArray<string> =>
 const withView = (app: App, v: View): App => ({ ...app, shell: { ...app.shell, view: v } });
 
 describe("the shell painters (gin's names)", () => {
+  test('renderAbout fills #aboutCopy for the variant, keyed, with the links that ruleset has', () => {
+    const p = page();
+    renderAbout(p.doc, 'portes');
+    expect(p.get('aboutCopy').text()).toBe(aboutHtml('portes'));
+    expect(p.get('aboutCopy').attr('data-key')).toBe('portes');
+    // Portes has no cube rule: "doubling cube" lands on its scoring rule, "Crawford rule" is plain.
+    expect(p.get('aboutCopy').text()).toContain('data-rule="scoring">doubling cube</a>');
+    expect(p.get('aboutCopy').text()).not.toContain('data-rule="crawford"');
+    renderAbout(p.doc, 'backgammon');
+    expect(p.get('aboutCopy').text()).toContain('data-rule="cube">doubling cube</a>');
+    expect(p.get('aboutCopy').text()).toContain('data-rule="crawford">Crawford rule</a>');
+    // The paint follows the game in play's ruleset, else the home screen's choice.
+    paint(p.doc, { ...initialApp, shell: { ...initialApp.shell, variant: 'portes' } });
+    expect(p.get('aboutCopy').attr('data-key')).toBe('portes');
+    expect(p.get('rulesList').attr('data-key')).toBe('portes');
+  });
+
   test('renderRules fills both slots for the variant, keyed, and switches with it', () => {
     const p = page();
     renderRules(p.doc, 'portes');

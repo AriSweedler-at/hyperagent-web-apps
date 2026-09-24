@@ -45,11 +45,15 @@ describe('rules', () => {
   test('eleven items, each headed in bold, wrapped once in the legacy list', () => {
     expect(RULES_ITEMS).toHaveLength(11);
     RULES_ITEMS.forEach((item) => {
-      expect(item).toMatch(/^<strong>[^<]+:<\/strong> /);
+      expect(item.id).toMatch(/^[a-z][a-z-]*$/);
+      expect(item.heading).not.toBe('');
+      expect(item.body).not.toBe('');
     });
-    expect(RULES_LIST_HTML.startsWith('<ul class="rules-list">\n<li>')).toBe(true);
+    expect(
+      RULES_LIST_HTML.startsWith('<ul class="rules-list">\n<li id="rule-melds"><strong>'),
+    ).toBe(true);
     expect(RULES_LIST_HTML.endsWith('</li>\n</ul>')).toBe(true);
-    expect(RULES_LIST_HTML.match(/<li>/g)).toHaveLength(11);
+    expect(RULES_LIST_HTML.match(/<li id="rule-[a-z-]+">/g)).toHaveLength(11);
     expect(RULES_TITLE).toBe('Gin Rummy — Quick Rules');
   });
 });

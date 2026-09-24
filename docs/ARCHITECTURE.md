@@ -90,6 +90,8 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 | `web/shared/lib` | itself | Leaf modules. `Result<T,E>` (`ok/err/map/andThen`), `Rng = () => number`, `mulberry32`, JSON decoders, `roomCode` constants (`'ginrummy-ari-'`, `'fidice-'`, alphabets). |
 | `web/shared/lib/invite.ts` | itself | The invite link: `inviteUrl(code, pageUrl)` is `<pageUrl>?join=<code>` (pure). |
 | `web/shared/edge/invite.ts` | itself | `joinCodeFrom(search)` and `withoutJoin(search)`: a boot reads the code and drops it from the address bar through the platform's `URLSearchParams`. |
+| `web/shared/ui` | shared/lib, `@shared/edge/dom` (and its fakes) | The shared shell's pure helpers, lint-pure like shared/lib and held at 100%. `glossary.ts` (docs/design/glossary-links.md): `RuleItem`, `Glossary`, `ruleAnchor(id)`, `linkJargon(html, glossary, { except })`, `rulesListHtml(items, glossary)`, `ruleFromHash(hash)`. |
+| `web/shared/edge/glossary.ts` | shared/lib, shared/ui, `@shared/edge/dom` | `bindJargon(doc, onRule)` (one delegated click on `a.jargon`) and `revealRule(doc, slotId, ruleId)` (scroll into view inside the named rules slot a frame after the paint, `.rule-flash` for 1.2 s); each game's `main.ts` wires both. |
 | `web/shared/lib/sound/` | itself | The sound fonts (docs/design/sound-fonts.md): `cues.ts` the twenty generic cues every game maps its events onto; `sound.ts` `Sound` (`synth`, `sample`, `silence`), `Note`, `OscillatorType`; `fonts.ts` `SOUND_FONTS`, `fontByName`, `resolveSound` (partial fonts fall back to the total `default`), `isSoundFont`, `badSoundFontMsg(key, value)`; `fonts/<name>.ts` the fonts as data. |
 | `web/shared/edge/sound.ts` | shared/lib, `@shared/edge/fx` | `playSound(audio, sound, deps)`: a synth through `AudioCues.seq`, a sample fetched and decoded once per URL into the cues' context, silence nothing; every failure silent. A game's `fx.ts` plays its table's cue in the App's font through it. |
 | `web/shared/edge/cuePlayer.ts` | shared/lib, `@shared/edge/fx`, `@shared/edge/sound` | `createCuePlayer<E>({ audio, sound, vibrate, cues, persist, onToggle })`: gin's legacy `fx` object once for every game, with the game's cue table (`ui/sound.ts`, event -> generic cue + buzz) and the persist of its sound preference injected. `play(event, font)` resolves the row's cue in the App's font and buzzes when enabled; `toggle(font)` flips, persists, warms and taps when turning on; `warm()`. Each game's `src/fx.ts` is an ~8-line wrapper (shared-shell plan, A4). |
@@ -125,7 +127,9 @@ docs/design/sound-fonts.md),
 table for e2e and stories (`sandbox/load`; refused with a toast in any other role), and
 `soundFont(name)` / `soundFontName()` under the page's own `backgammon_soundFont` key:
 docs/design/backgammon-board.md §4, §7),
-`window.__rng` (a seeded rng installed before boot), `?peer=host:port` (PeerServer override),
+`window.__rng` (a seeded rng installed before boot), `#rule-<id>` (gin and backgammon: a rule deep
+link, docs/design/glossary-links.md; `main.ts` dispatches `rules/show` after `home/init`, so the
+page opens on the Rules tab scrolled to that rule, and the hash stays), `?peer=host:port` (PeerServer override),
 `?ice=<url>` (ICE config override), `?ice-policy=relay` (port-only: `iceTransportPolicy: 'relay'`
 inside the Peer `config`, for the `@relay` specs' relay-forced games), `?join=<code>` (every
 game's invite convention, built by `web/shared/lib/invite.ts` and read by `web/shared/edge/invite.ts`; fidice keeps its `#join=` /
@@ -487,10 +491,10 @@ docs run only `check`. The levels below say which suite holds them.
 
 - Shared design tokens / UI kit: `web/shared/styles/tokens.css` (linked by both pages since step 14;
   it declares gin's palette under the eleven shared names, fidice's `theme.css` overrides every one
-  onto its own palette; `CONTRACT.md` "Tokens" tables both) and `web/shared/ui/` (README only). The
-  Fidice restyle drops those overrides, points fidice's rules at the shared names and re-records the
-  goldens, then moves screen builders into `shared/ui`; computed-style goldens and the class
-  contract gate it.
+  onto its own palette; `CONTRACT.md` "Tokens" tables both) and `web/shared/ui/` (the glossary
+  helpers so far, docs/design/glossary-links.md). The Fidice restyle drops those overrides, points
+  fidice's rules at the shared names and re-records the goldens, then moves screen builders into
+  `shared/ui`; computed-style goldens and the class contract gate it.
 - Swappable hand display: `ui/hand/HandView.ts` is the interface `render.ts` consumes; a new view is
   a second module and a `main.ts` choice. Landed: `ui/hand/SlotHandView.ts`, the eleven fixed
   cells with the ghost draw slot (docs/design/gin-draw-ghost-slot.md, PR A), is what `main.ts`

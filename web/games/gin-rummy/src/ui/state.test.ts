@@ -204,6 +204,25 @@ describe('home', () => {
     expect(run(initialApp, { type: 'tab/set', tab: 'score', persist: false }).effects).toEqual([]);
   });
 
+  test('rules/show: the Rules tab (persisted) and the home list on the home screen; the overlay and its list anywhere else', () => {
+    const fromHome = run(initialApp, { type: 'rules/show', rule: 'knock' });
+    expect(fromHome.app).toMatchObject({ homeTab: 'rules', rulesOpen: false });
+    expect(fromHome.effects).toEqual([
+      { type: 'writeHomeTab', tab: 'rules' },
+      { type: 'revealRule', slot: 'rulesList', rule: 'knock' },
+    ]);
+    const table: App = { ...initialApp, screen: 'tableScreen' };
+    const fromTable = run(table, { type: 'rules/show', rule: 'gin' });
+    expect(fromTable.app).toMatchObject({ homeTab: 'play', rulesOpen: true });
+    expect(fromTable.effects).toEqual([
+      { type: 'revealRule', slot: 'rulesOverlayList', rule: 'gin' },
+    ]);
+    const scorer: App = { ...initialApp, screen: 'scGameScreen' };
+    expect(run(scorer, { type: 'rules/show', rule: 'undercut' }).effects).toEqual([
+      { type: 'revealRule', slot: 'rulesOverlayList', rule: 'undercut' },
+    ]);
+  });
+
   test('mode/set: local or online, persisted', () => {
     expect(run(initialApp, { type: 'mode/set', mode: 'local' })).toEqual({
       app: { ...initialApp, playMode: 'local' },
@@ -1394,6 +1413,7 @@ describe('runEffect', () => {
       toggleSound: note('toggleSound'),
       share: note('share'),
       copy: note('copy'),
+      revealRule: note('revealRule'),
       page: {
         fillName: note('page.fillName'),
         fillP2Name: note('page.fillP2Name'),
@@ -1469,6 +1489,7 @@ describe('runEffect', () => {
       { type: 'fillP2Name', name: 'Bob' },
       { type: 'setCode', value: 'AB' },
       { type: 'copy', text: 'x' },
+      { type: 'revealRule', slot: 'rulesList', rule: 'knock' },
       { type: 'initHome' },
     ];
     effects.forEach((e) => {
@@ -1495,6 +1516,7 @@ describe('runEffect', () => {
       ['page.fillP2Name', 'Bob'],
       ['page.setCode', 'AB'],
       ['copy', 'x'],
+      ['revealRule', 'rulesList', 'knock'],
       ['dispatch', { type: 'home/init', home }],
     ]);
     answer.yes = false;

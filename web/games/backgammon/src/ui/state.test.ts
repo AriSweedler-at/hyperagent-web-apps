@@ -347,6 +347,25 @@ describe('home', () => {
     expect(run(initialApp, { type: 'tab/set', tab: 'score' }).app.shell.homeTab).toBe('play');
   });
 
+  test('rules/show: the Rules tab (persisted) and the home list on the home screen; the overlay and its list anywhere else', () => {
+    const fromHome = run(initialApp, { type: 'rules/show', rule: 'scoring' });
+    expect(fromHome.app.shell).toMatchObject({ homeTab: 'rules', rulesOpen: false });
+    expect(fromHome.effects).toEqual([
+      { type: 'writeHomeTab', tab: 'rules' },
+      { type: 'revealRule', slot: 'rulesList', rule: 'scoring' },
+    ]);
+    const table = local();
+    const fromTable = run(table, { type: 'rules/show', rule: 'cube' });
+    expect(fromTable.app.shell).toMatchObject({ homeTab: table.shell.homeTab, rulesOpen: true });
+    expect(fromTable.effects).toEqual([
+      { type: 'revealRule', slot: 'rulesOverlayList', rule: 'cube' },
+    ]);
+    const waiting = run(initialApp, { type: 'screen/show', screen: 'hostWaitScreen' }).app;
+    expect(run(waiting, { type: 'rules/show', rule: 'online' }).effects).toEqual([
+      { type: 'revealRule', slot: 'rulesOverlayList', rule: 'online' },
+    ]);
+  });
+
   test('mode/set stores local or online; variant/set and matchLength/set keep only shipped values', () => {
     const online = run(initialApp, { type: 'mode/set', mode: 'online' });
     const back = run(online.app, { type: 'mode/set', mode: 'local' });
@@ -1313,6 +1332,7 @@ const deps = (
       timers: { start: note('timers.start'), cancel: note('timers.cancel') },
       toggleSound: note('toggleSound'),
       share: note('share'),
+      revealRule: note('revealRule'),
       page: {
         fillName: note('page.fillName'),
         fillP2Name: note('page.fillP2Name'),
@@ -1627,6 +1647,7 @@ describe('runEffect', () => {
     runEffect(app, { type: 'cancelTimer', id: 'longPress' }, d);
     runEffect(app, { type: 'toggleSound' }, d);
     runEffect(app, { type: 'share', code: 'ABCD' }, d);
+    runEffect(app, { type: 'revealRule', slot: 'rulesList', rule: 'blocks' }, d);
     runEffect(app, { type: 'fillName', name: 'Ann' }, d);
     runEffect(app, { type: 'fillP2Name', name: 'Bob' }, d);
     runEffect(app, { type: 'setCode', value: 'ABC' }, d);
@@ -1646,6 +1667,7 @@ describe('runEffect', () => {
       ['timers.cancel', 'longPress'],
       ['toggleSound'],
       ['share', 'ABCD'],
+      ['revealRule', 'rulesList', 'blocks'],
       ['page.fillName', 'Ann'],
       ['page.fillP2Name', 'Bob'],
       ['page.setCode', 'ABC'],

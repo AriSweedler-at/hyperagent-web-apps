@@ -1,7 +1,7 @@
 // Sheshbesh's sessions are the shared ones (web/shared/net, docs/design/shared-shell.md A1) with
 // this game's codec and game fixed by the wrappers beside this file. The scenarios (statuses,
 // toasts, timers, the ticket) run once in web/shared/net/sessions.test.ts; this suite pins what
-// the wrappers fix (design.md §5.3): the `sheshbesh-` peer id, the welcome and lobby bytes
+// the wrappers fix (docs/design/backgammon-board.md §5.2): the `sheshbesh-` peer id, the welcome and lobby bytes
 // carrying `matchLength` and `variant` in place of gin's `target`, a guest frame this game's
 // decoder refuses and one it accepts.
 import { describe, expect, test } from 'vitest';
@@ -21,7 +21,7 @@ import type { GuestFrame, HostFrame } from '../protocol.ts';
 import { CONNECTED_MSG, GuestSession } from './guest.ts';
 import { HostSession, WAITING_MSG, type Room } from './host.ts';
 
-/** understand.md §4 step 1: prefix `sheshbesh-`, the code upper case. */
+/** backgammon-board.md §5.2: prefix `sheshbesh-`, the code upper case. */
 const ROOM = peerIdFor('backgammon', CODE);
 const hostCtx = hostCtxFor<Room>({ matchLength: 5, variant: 'portes' });
 
