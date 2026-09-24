@@ -464,7 +464,11 @@ Play/Rules/About (`HOME_TABS`, `backgammon_homeTab`), the mode switch (`PLAY_MOD
 default 5) and the ruleset (portes/Western), the room-code form with gin's `beforeinput` guard, the
 resume box from `resumeFor(save)`, the rules panel from `ui/rules.ts RULES_ITEMS[variant]` (plain
 English, one source for `#rulesList` and `#rulesOverlayList`), an About panel of two short
-paragraphs. Waiting rooms: gin's, fed by the sessions' status strings; `#shareCodeBtn` →
+paragraphs (`ui/about.ts`, written into `#aboutCopy` per ruleset). Both carry glossary links
+(docs/design/glossary-links.md): each rule item has an id, `ui/glossary.ts` names the words that
+mean each rule per ruleset, and a tap on jargon is `rules/show { rule }` (the Rules tab on the home
+screen, the rules overlay anywhere else) followed by the `revealRule { slot, rule }` effect; a
+`#rule-<id>` deep link at boot does the same. Waiting rooms: gin's, fed by the sessions' status strings; `#shareCodeBtn` →
 `share/click` → `shareText(navigator, { title: 'Sheshbesh', url })` with gin's `INVITE_COPIED_MSG`
 fallback; `#startGameBtn` when the guest is connected → `createGame`. Sound: `src/fx.ts` plays the
 table's cues (`roll place hit bearOff yourTurn win lose double tap` in `ui/sound.ts`) in the App's
