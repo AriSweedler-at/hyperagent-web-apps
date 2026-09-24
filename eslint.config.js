@@ -25,10 +25,13 @@ const ALGORITHMS = ['**/*.algorithms.ts'];
 const EDGES = [
   'web/**/main.ts',
   'web/**/app/**/*.ts',
-  // fidice's peerjs.ts is the PeerJS adapter itself: it holds the deferred Peer (step 9).
+  // fidice's peerjs.ts is the PeerJS adapter itself: it holds the deferred Peer (step 9); gin's
+  // and backgammon's host.ts/guest.ts are the wrappers over web/shared/net's sessions.
   'web/games/*/src/net/{host,guest,client,session,peerjs}.ts',
   'web/**/view/vdom.ts',
   'web/shared/edge/**/*.ts',
+  // The two-seat sessions (classes over the Peer) and the harness beside them (docs/design/shared-shell.md §4.5).
+  'web/shared/net/**/*.ts',
 ];
 // The page boots only: gin's scorer/main.ts is an edge (EDGES) but takes its rng injected.
 const RNG_ALLOWED = ['web/games/*/main.ts', 'web/shared/edge/**/*.ts'];
@@ -233,7 +236,25 @@ const zones = [
       `${GAME_SRC}/storage.ts`,
     ],
     // The two fakes are for the session tests beside the modules (docs/MIGRATION.md step 12);
-    // peer.ts is the peer plumbing every game's sessions share (watchdog, keep-alive, path toast).
+    // peer.ts is the peer plumbing every game's sessions share (watchdog, keep-alive, path toast);
+    // web/shared/net holds the two-seat sessions a game's host.ts/guest.ts wrap and the harness its
+    // sessions.test.ts drives them with (docs/design/shared-shell.md §4.5).
+    except: [
+      '**/web/shared/edge/transport.ts',
+      '**/web/shared/edge/transport.fake.ts',
+      '**/web/shared/edge/clock.ts',
+      '**/web/shared/edge/clock.fake.ts',
+      '**/web/shared/edge/peer.ts',
+      '**/web/shared/net/**',
+    ],
+    message: 'net/ imports protocol, engine/domain and only the transport, clock and peer edges.',
+  },
+  {
+    // The shared two-seat sessions (docs/design/shared-shell.md §4.5): the same reach as a game's
+    // net/ zone above, with the game itself injected (the codec and `game`), never imported (the
+    // './web/shared' zone refuses that).
+    target: ['./web/shared/net/**'],
+    from: ['./web/shared/edge/**', './web/shared/ui/**', './web/shared/styles/**'],
     except: [
       '**/web/shared/edge/transport.ts',
       '**/web/shared/edge/transport.fake.ts',
@@ -241,7 +262,7 @@ const zones = [
       '**/web/shared/edge/clock.fake.ts',
       '**/web/shared/edge/peer.ts',
     ],
-    message: 'net/ imports protocol, engine/domain and only the transport, clock and peer edges.',
+    message: 'web/shared/net imports web/shared/lib and only the transport, clock and peer edges.',
   },
   {
     // Every ui/ module except ui/state.ts, which the reducer zone below owns, and the tests beside

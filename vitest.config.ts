@@ -12,6 +12,7 @@ export default defineConfig({
       include: [
         'web/shared/lib/**/*.ts',
         'web/shared/edge/**/*.ts',
+        'web/shared/net/**/*.ts',
         'web/games/fidice/src/domain/**/*.ts',
         'web/games/fidice/src/bots/**/*.ts',
         'web/games/fidice/src/net/**/*.ts',
@@ -64,6 +65,11 @@ export default defineConfig({
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
+        // The two-seat sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios
+        // once over a fake codec (sessions.test.ts beside them, with sessions.harness.ts), the two
+        // games' byte-pinning suites through their wrappers and the gin wire-corpus replay. Measured
+        // at the move (lines/functions/statements/branches): 100/100/100/97.8.
+        'web/shared/net/**': { lines: 95, functions: 95, statements: 95, branches: 94 },
         'web/games/fidice/src/domain/**': {
           lines: 95,
           functions: 95,
@@ -122,6 +128,8 @@ export default defineConfig({
         // the readers and writers both storage.ts spelled into web/shared/edge/prefs.ts: both
         // storage.ts still 100/100/100/100 (backgammon's has no branch left), prefs.ts
         // 100/100/100/100 under prefs.test.ts, shared/edge 99.4/98.8/98.9/94.3; no row moves.
+        // Since docs/design/shared-shell.md A1 its net/ is the two wrappers over web/shared/net
+        // (100 on every metric): the row is a small file's, like protocol's.
         'web/games/backgammon/src/protocol.ts': {
           lines: 95,
           functions: 95,
@@ -143,8 +151,8 @@ export default defineConfig({
         'web/games/backgammon/src/net/**': {
           lines: 95,
           functions: 95,
-          statements: 93,
-          branches: 91,
+          statements: 95,
+          branches: 97,
         },
         'web/games/backgammon/src/fx.ts': {
           lines: 95,
@@ -185,11 +193,14 @@ export default defineConfig({
           statements: 92,
           branches: 85,
         },
+        // Since docs/design/shared-shell.md A1 gin's net/ is the two wrappers over web/shared/net,
+        // where its sessions and their measured 100/100/99.2/96.2 went (the row above); the
+        // wrappers measure 100 on every metric, so the row is a small file's, like protocol's.
         'web/games/gin-rummy/src/net/**': {
           lines: 95,
           functions: 95,
-          statements: 94,
-          branches: 93,
+          statements: 95,
+          branches: 97,
         },
         'web/games/gin-rummy/src/fx.ts': { lines: 95, functions: 95, statements: 95, branches: 97 },
         'infra/games-proxy/worker.ts': { lines: 95, functions: 95, statements: 95, branches: 93 },

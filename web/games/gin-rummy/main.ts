@@ -28,7 +28,7 @@ import type { Action } from './src/engine/types.ts';
 import { createFx } from './src/fx.ts';
 import { GuestSession, type GuestEvents } from './src/net/guest.ts';
 import { HostSession, type HostEvents } from './src/net/host.ts';
-import type { NetDeps } from './src/net/peerjs.ts';
+import type { NetDeps } from '../../shared/edge/peer.ts';
 import { isGuestFrame } from './src/protocol.ts';
 import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
 import { STORAGE_KEYS, soundEnabled } from './src/storage.ts';

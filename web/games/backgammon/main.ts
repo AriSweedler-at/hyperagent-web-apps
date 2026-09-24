@@ -27,7 +27,7 @@ import { legalActions, type Action, type View } from './src/engine/index.ts';
 import { createFx } from './src/fx.ts';
 import { GuestSession, type GuestEvents } from './src/net/guest.ts';
 import { HostSession, type HostEvents } from './src/net/host.ts';
-import type { NetDeps } from './src/net/peerjs.ts';
+import type { NetDeps } from '../../shared/edge/peer.ts';
 import { isGuestFrame } from './src/protocol.ts';
 import { STORAGE_KEYS, soundEnabled } from './src/storage.ts';
 import { fillNameInputs, fillP2NameInput, inviteUrl, setCodeInput } from './src/ui/home.ts';
