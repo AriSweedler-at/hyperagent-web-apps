@@ -1,7 +1,9 @@
 // The legacy pin (docs/design/sound-fonts.md §10): every gin event, played in the `default` font,
 // is the legacy `fx` object's notes, voice and gain number for number, and its buzz is unchanged.
 // LEGACY below is a frozen copy of the numbers (legacy/gin-rummy/index.html, then ui/sound.ts
-// before the fonts), not a read of the file it checks.
+// before the fonts), not a read of the file it checks. The player itself is the shared one
+// (web/shared/edge/cuePlayer.test.ts, scratchpad/bg/shared-shell.md §5 A4); the one createFx test
+// here pins what gin injects: this table and the `ginRummy_sound` key.
 import { describe, expect, test } from 'vitest';
 
 import type { AudioCues, Note, OscillatorType } from '../../../shared/edge/fx.ts';
@@ -90,7 +92,7 @@ describe('the table on the default font', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// createFx over fakes
+// createFx over fakes: the wiring
 // ---------------------------------------------------------------------------------------------
 type Call = ReadonlyArray<unknown>;
 
@@ -157,61 +159,15 @@ const world = (
 };
 
 describe('createFx', () => {
-  test('play: every event is one sequence from the font and its buzz', () => {
-    const { fx, calls, buzzes } = world();
-    EVENTS.forEach((event) => {
-      fx.play(event, 'default');
-    });
-    expect(calls).toEqual(
-      EVENTS.map((event) => {
-        const legacy = LEGACY[event];
-        return ['seq', legacy.notes, legacy.type, legacy.gain];
-      }),
-    );
-    expect(buzzes).toEqual(EVENTS.map((event) => LEGACY[event].buzz));
-  });
-
-  test("another font re-voices the same event; the buzz is the table's, not the font's", () => {
-    const { fx, calls, buzzes } = world();
-    fx.play('gin', 'arcade');
-    const arcade = resolveSound(fontByName('arcade'), 'great');
-    expect(arcade.kind).toBe('synth');
-    if (arcade.kind !== 'synth') return;
-    expect(calls).toEqual([['seq', arcade.notes, 'square', arcade.gain]]);
-    expect(calls[0]?.[1]).not.toEqual(LEGACY.gin.notes);
-    expect(buzzes).toEqual([LEGACY.gin.buzz]);
-  });
-
-  test('disabled: the audio edge stays silent on its own and no buzz is sent', () => {
-    const { fx, buzzes, calls } = world(false);
-    fx.play('gin', 'default');
-    expect(buzzes).toEqual([]);
-    // The sequence is still handed to the audio cues, which drop it themselves while disabled.
-    expect(calls).toHaveLength(1);
-    expect(fx.enabled()).toBe(false);
-    fx.warm();
-    expect(calls).toHaveLength(1);
-  });
-
-  test('toggle flips and persists the preference; turning on warms the context and taps in the font', () => {
+  test('wires the shared player to the table and the ginRummy_sound key', () => {
     const { fx, calls, buzzes, toggles, storage } = world();
-    fx.toggle('felt');
+    fx.play('gin', 'default');
+    expect(calls).toEqual([['seq', LEGACY.gin.notes, LEGACY.gin.type, LEGACY.gin.gain]]);
+    expect(buzzes).toEqual([LEGACY.gin.buzz]);
+    fx.toggle('default');
     expect(fx.enabled()).toBe(false);
     expect(storage.map.get(STORAGE_KEYS.sound)).toBe('off');
     expect(storage.map.has(STORAGE_KEYS.soundFont)).toBe(false);
     expect(toggles).toEqual([false]);
-    expect(calls).toEqual([]);
-    fx.toggle('felt');
-    expect(fx.enabled()).toBe(true);
-    expect(storage.map.get(STORAGE_KEYS.sound)).toBe('on');
-    expect(storage.map.has(STORAGE_KEYS.soundFont)).toBe(false);
-    expect(toggles).toEqual([false, true]);
-    const felt = resolveSound(fontByName('felt'), 'tap');
-    expect(felt.kind).toBe('synth');
-    if (felt.kind !== 'synth') return;
-    expect(calls).toEqual([['warm'], ['seq', felt.notes, felt.voice, felt.gain]]);
-    expect(buzzes).toEqual([12]);
-    fx.warm();
-    expect(calls.at(-1)).toEqual(['warm']);
   });
 });

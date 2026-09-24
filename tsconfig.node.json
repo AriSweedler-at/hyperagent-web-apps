@@ -20,9 +20,10 @@
   // (docs/design/shared-shell.md §5 A3), web/shared/edge/prefs.ts, which both games' storage.ts
   // build their readers and writers from, for the codec, storage and string-golden parity suites;
   // since step 12 web/shared/edge/fx.ts is listed too (the gin fx.ts wraps it, all structural
-  // types) and the DOM modules (ui/render.ts, ui/home.ts, ui/local.ts, the hand's dragger.ts and
-  // flip.ts) are excluded below, by globs over web/games/*/src/ui where both games name a module
-  // the same way (docs/design/shared-shell.md §5 A5).
+  // types), with sound.ts and cuePlayer.ts beside it (the shared player both games' fx.ts wrap,
+  // docs/design/shared-shell.md §5 A4), and the DOM modules (ui/render.ts, ui/home.ts, ui/local.ts,
+  // the hand's dragger.ts and flip.ts) are excluded below, by globs over web/games/*/src/ui where
+  // both games name a module the same way (docs/design/shared-shell.md §5 A5).
   // infra/games-proxy/**/*.ts is the games.sweedler.com Worker (TypeScript since step 15; wrangler
   // bundles it as is) with its table tests: tools/proxy-dev.ts runs its default export and the dist
   // guards import mapPath. It uses the WHATWG globals @types/node declares (Request, Response,
@@ -70,6 +71,7 @@
     "web/shared/edge/prefs.ts",
     "web/shared/edge/fx.ts",
     "web/shared/edge/sound.ts",
+    "web/shared/edge/cuePlayer.ts",
     "infra/games-proxy/**/*.ts"
   ],
   // The paint and wiring of both games (ui/{render,home,local}.ts, the page fake, the drag helper
