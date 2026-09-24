@@ -46,11 +46,11 @@ jobs:
       # The full legacy-replay corpus: every push plays 400 seeded games (test/parity/gin.replay.ts),
       # the nightly all 1000, so a rare seed still gets its comparison.
       - name: Gin engine parity over the full 1000-game replay
-        run: GIN_REPLAY_GAMES=1000 npm test -- test/parity/gin.replay
+        run: GIN_REPLAY_GAMES=1000 npm run test:gin -- test/parity/gin.replay
       # The backgammon engine's seeded replay (web/games/backgammon/src/engine/replay.test.ts): every
       # push plays 91 matches, the nightly 1000, so a rare dice stream still meets every invariant.
       - name: Backgammon engine invariants over 1000 seeded matches
-        run: BG_REPLAY_GAMES=1000 npm test -- web/games/backgammon/src/engine/replay
+        run: BG_REPLAY_GAMES=1000 npm run test:backgammon -- web/games/backgammon/src/engine/replay
       - name: Online and relay-forced specs against the deployed page
         run: npm run test:deployed
       - name: Upload Playwright report

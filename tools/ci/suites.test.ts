@@ -549,3 +549,36 @@ describe('the affected scripts the hook runs', () => {
     expect(SCRIPTS['affected']).toBe('node --experimental-strip-types tools/ci/affected.ts');
   });
 });
+
+/** ci.yml as the graph pin needs it: text, since no YAML parser is a dependency here. */
+const CI_YML = readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8');
+
+describe('ci.yml carries the graph the table describes', () => {
+  test.each(JOBS)('%s is a job gated on its changes output, and ci-ok needs it', (job) => {
+    expect(CI_YML).toContain(
+      `\n  ${job}:\n    needs: changes\n    if: needs.changes.outputs.${job} == 'true'\n`,
+    );
+    expect(CI_YML).toContain(`      ${job}: \${{ steps.affected.outputs.${job} }}\n`);
+    const ciOk = CI_YML.slice(CI_YML.indexOf('\n  ci-ok:'), CI_YML.indexOf('\n  deploy:'));
+    expect(ciOk, 'ci-ok needs').toContain(`\n      - ${job}\n`);
+  });
+
+  test('check is always on, ci-ok is always(), deploy needs ci-ok alone and only on main', () => {
+    const check = CI_YML.slice(CI_YML.indexOf('\n  check:'), CI_YML.indexOf('\n  shared:'));
+    expect(check).not.toContain('needs:');
+    expect(check).not.toContain('\n    if:');
+    const ciOk = CI_YML.slice(CI_YML.indexOf('\n  ci-ok:'), CI_YML.indexOf('\n  deploy:'));
+    expect(ciOk).toContain('\n      - check\n');
+    expect(ciOk).toContain('\n    if: always()\n');
+    expect(ciOk).not.toContain('- broker');
+    const deploy = CI_YML.slice(CI_YML.indexOf('\n  deploy:'));
+    expect(deploy).toContain('\n    needs: [ci-ok]\n');
+    expect(deploy).toContain("github.ref == 'refs/heads/main' && needs.ci-ok.result == 'success'");
+  });
+
+  test('the changes job selects everything off a pull request and diffs against the base on one', () => {
+    expect(CI_YML).toContain('--base "origin/$BASE" --github | tee -a "$GITHUB_OUTPUT"');
+    expect(CI_YML).toContain('--all --github | tee -a "$GITHUB_OUTPUT"');
+    expect(CI_YML).toContain('fetch-depth: 0');
+  });
+});
