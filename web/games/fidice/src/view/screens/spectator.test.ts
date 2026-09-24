@@ -16,7 +16,7 @@ describe('spectatorScreen', () => {
     requireId(root, 'screen-spec');
     const bar = requireId(root, 'specHostBar');
     expect(bar.textContent).toContain(`4/6 seated \xB7 code ${CODE}`);
-    const [add, start] = byClass(bar, 'btn-secondary').concat(byClass(bar, 'btn-primary'));
+    const [add, start] = byClass(bar, 'btn-secondary').concat(byClass(bar, 'btn-go'));
     expect(add?.disabled).toBe(false);
     expect(start?.disabled).toBe(false);
     expect(requireId(root, 'btnLeaveSpec').textContent).toBe('Close table');

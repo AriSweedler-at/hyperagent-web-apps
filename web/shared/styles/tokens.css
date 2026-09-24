@@ -24,6 +24,12 @@
   --text: #f2fdf6;
   --muted: #9cc9ac;
   --danger: #f87171;
+  /* The call to action (docs/ARCHITECTURE.md "Calls to action"): the fill and the label of every
+     button that opens, joins or starts a game (.btn-go, styled in each theme). A light olive-lime,
+     apart from the accent green so the start button reads apart from Take and Discard; fidice and
+     backgammon redeclare both onto their palettes. */
+  --go: #c2d06d;
+  --go-text: #10281a;
   --radius: 18px;
   --felt: radial-gradient(ellipse at 50% 30%, #1f5a3a 0%, #123a26 55%, #0b2418 100%);
 }

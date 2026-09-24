@@ -360,7 +360,7 @@ const nameScreen = (ui: Ui, dispatch: Dispatch): VNode => {
       h(
         'button',
         {
-          class: 'btn-primary btn-big',
+          class: 'btn-go btn-big',
           id: 'btnNameGo',
           on: {
             click: () => {

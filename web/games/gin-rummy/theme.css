@@ -33,6 +33,14 @@
   .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
   .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #08260f; width: 100%; font-size: 1.1rem; }
   .btn-gold { background: linear-gradient(135deg, #fde68a, var(--gold)); color: #3a2a00; }
+  /* The call to action (docs/ARCHITECTURE.md "Calls to action"; the owner: "all the 'start game'
+     buttons should be green and should stand out well"): Host, Join, Start pass & play, Deal the
+     first hand, Next hand and Rematch in the shared --go, a light olive-lime apart from the accent
+     green of Take and Discard, at .btn-primary's type size; the width comes from .btn-block or the
+     row. The hover lifts a shade, the press keeps .btn:active's dim, the ring sits off the button. */
+  .btn-go { background: var(--go); color: var(--go-text); font-size: 1.1rem; }
+  .btn-go:hover:not(:active):not(:disabled) { filter: brightness(1.06); }
+  .btn-go:focus-visible { outline: 3px solid var(--go); outline-offset: 3px; }
   .btn-secondary { background: var(--card-2); }
   .btn-ghost { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.15); }
   .btn-block { width: 100%; }
