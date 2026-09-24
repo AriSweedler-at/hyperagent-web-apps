@@ -6,7 +6,7 @@
 // (`dist/shared/assets/backgammon-<hash>.css`) and asserts that every name forms exactly one
 // rectangle and that the cells and the visual row order are the ones
 // web/games/backgammon/src/ui/board/layout.ts reports, which the geometry e2e and the painter
-// tests take as their oracle. Runs on dist/ after the build (test:dist).
+// tests take as their oracle. Runs on dist/ after the build (npm run test:site).
 import { expect, test } from 'vitest';
 
 import {

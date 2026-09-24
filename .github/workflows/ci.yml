@@ -1,42 +1,81 @@
-# Runs on every push to main and every pull request. Four jobs start at once and the deploy waits
-# for three of them, so a push reaches GitHub Pages in about the time of the slowest job rather
-# than their sum. Job "check" is the local pre-push gate (typecheck, lint, unit tests, build, dist
-# guards, the hook shims) and uploads dist/ as the artifact "deploy" publishes. Job "coverage" runs
-# the unit tests again under v8 coverage against vitest.config.ts's ratchets; it is a gate too, in
-# parallel, because instrumentation roughly doubles the suite's time. Job "e2e" plays every browser
-# spec against a fresh build of dist/: the pure-UI specs on the `pages` origin only and the specs
-# about origins, signalling and the relay on both emulated origins (playwright.config.ts
-# `testIgnore`), the two-peer games through a local PeerServer (the merge gate for online play,
-# docs/MIGRATION.md step 3), the relay-forced games through a coturn the harness starts (installed
-# by .github/actions/coturn; e2e/gin-relay.spec.ts, e2e/fidice-relay.spec.ts,
-# e2e/backgammon-relay.spec.ts), the stories spec
-# (e2e/gin-stories.spec.ts) against the committed per-platform screenshot baselines under
-# e2e/__screenshots__, whose -linux.png files the workflow_dispatch job stories-baselines.yml records
-# on the branch for the PR author to commit before this job can pass, and the transport integration
-# test (the real PeerJS through a local PeerServer in Chromium), which lives here because this job
-# already has the browser. Chromium is restored from actions/cache by Playwright version, so only a
-# version bump downloads it. Job "broker" repeats the online specs through the real 0.peerjs.com
-# and is advisory (continue-on-error), so a third-party outage never blocks a merge but a signalling
-# regression is visible at review. Job "deploy" (docs/MIGRATION.md step 4) publishes the checked
-# dist/ to GitHub Pages on a push to main once check, coverage and e2e are green; Settings > Pages
-# > Source must be "GitHub Actions" for it to take effect (see README "Deploy"). Dependency
-# installs go through .github/actions/npm-ci: the lockfile names Airtable's Socket Firewall
-# registry, which runners cannot reach, so npm substitutes the public registry at install time and
-# Socket Firewall Free scans what it downloads. nightly.yml is the other workflow: it plays the
-# same online and relay-forced specs every night with the deployed GitHub Pages page as the subject
-# and every server local (no Cloudflare service is in any test, issue #19), and reports on a pinned
-# issue.
+# Runs on every push to main, every pull request and by hand. The graph (docs/design/test-partition.md
+# §6; docs/ARCHITECTURE.md "GitHub Actions"): job "changes" diffs the PR against its base through
+# tools/ci/affected.ts and emits one boolean per job; on a push to main or a workflow_dispatch it
+# selects everything, since main must prove everything before it deploys. Job "check" (typecheck,
+# lint, the hook shims) always runs, beside "changes", so the diff's fifteen seconds hide behind it.
+# Every other job needs "changes" and carries `if: needs.changes.outputs.<job> == 'true'`: one job
+# per vitest suite of tools/ci/suites.ts, each run once and under v8 coverage against its own
+# threshold rows (`npm run test:<suite> -- --coverage`; "harness" has no rows, "shared-integration"
+# is the transport contract in Chromium), "site" building dist/ first and uploading it as the
+# artifact "deploy" publishes, and one Playwright job per suite with specs (`npm run
+# test:e2e:<suite>`: both emulated origins, the two-peer games through a local PeerServer, the
+# relay-forced games through the coturn .github/actions/coturn installs, the stories spec against
+# the committed linux baselines under e2e/__screenshots__ that stories-baselines.yml records). Which
+# change runs what is the table in tools/ci/suites.ts: a game's folder runs that game, the site and
+# the harness; web/shared/** and anything that configures, builds or drives the tests runs
+# everything; docs run only "check". Job "broker" repeats the online specs through the real
+# 0.peerjs.com and is advisory (continue-on-error, outside ci-ok). Job "ci-ok" is the one gate a
+# human or a branch rule watches: `if: always()`, green when every needed job succeeded or was
+# skipped, red on a failure or a cancellation, "changes" itself among the needed so a crash in the
+# selector cannot pass as a run with no suites (GitHub skips a job whose `needs` were skipped unless
+# it says always(), so "deploy" cannot need the suite jobs directly). Job "deploy" publishes the
+# checked dist/ to GitHub Pages on a push to main once ci-ok is green; Settings > Pages > Source
+# must be "GitHub Actions" (README "Deploy"). Chromium is restored from actions/cache by Playwright
+# version (.github/actions/playwright-chromium); dependency installs go through
+# .github/actions/npm-ci, which points the runner's copy of the lockfile at the public registry
+# (the committed one names Airtable's Socket Firewall) and scans the install. nightly.yml plays the
+# online and relay-forced specs against the deployed page every night and reports on a pinned issue.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  # Which jobs this change selects (tools/ci/affected.ts over tools/ci/suites.ts). Node builtins
+  # only, so no npm ci; fetch-depth 0 so the PR's base is there to diff against.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      shared: ${{ steps.affected.outputs.shared }}
+      shared-integration: ${{ steps.affected.outputs.shared-integration }}
+      gin: ${{ steps.affected.outputs.gin }}
+      fidice: ${{ steps.affected.outputs.fidice }}
+      backgammon: ${{ steps.affected.outputs.backgammon }}
+      site: ${{ steps.affected.outputs.site }}
+      harness: ${{ steps.affected.outputs.harness }}
+      e2e-gin: ${{ steps.affected.outputs.e2e-gin }}
+      e2e-fidice: ${{ steps.affected.outputs.e2e-fidice }}
+      e2e-backgammon: ${{ steps.affected.outputs.e2e-backgammon }}
+      e2e-site: ${{ steps.affected.outputs.e2e-site }}
+      everything: ${{ steps.affected.outputs.everything }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Select the jobs the diff touches (everything on a push to main or by hand)
+        id: affected
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            node --experimental-strip-types tools/ci/affected.ts --base "origin/$BASE"
+            node --experimental-strip-types tools/ci/affected.ts --base "origin/$BASE" --github | tee -a "$GITHUB_OUTPUT"
+          else
+            node --experimental-strip-types tools/ci/affected.ts --all --github | tee -a "$GITHUB_OUTPUT"
+          fi
+
+  # Always: the static gate, and the hook shims parse.
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -52,27 +91,13 @@ jobs:
         run: npm run typecheck
       - name: Lint and format check
         run: npm run lint
-      - name: Unit tests
-        run: npm test
-      - name: Build dist
-        run: npm run build
-      - name: Dist guards (relative asset URLs, paths on both origins, module pages and the landing page's parity with web/)
-        run: npm run test:dist
       - name: Verify git hook wiring
         run: npm run hooks:verify
-      - name: Upload dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist
-          # .nojekyll is a dotfile; upload-artifact v4 drops hidden files unless told otherwise.
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 7
 
-  # The same suite as "check" runs, under v8 coverage against the ratchets in vitest.config.ts;
-  # its own job so the instrumentation's minute is spent beside "e2e", not before it.
-  coverage:
+  # ---- one job per vitest suite, each under coverage against its own rows ----------------------
+  shared:
+    needs: changes
+    if: needs.changes.outputs.shared == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -83,10 +108,131 @@ jobs:
           cache: npm
       - name: Install dependencies
         uses: ./.github/actions/npm-ci
-      - name: Unit tests with coverage
-        run: npm test -- --coverage
+      - name: web/shared unit tests and the two legacy oracles, with coverage
+        run: npm run test:shared -- --coverage
 
-  e2e:
+  # The real Transport (PeerJS) needs a browser: a PeerServer, a Vite dev server and Chromium are
+  # started by the test itself (docs/MIGRATION.md step 5). It skips where loopback WebRTC is
+  # blocked; the runner has none of that, so here it runs for real.
+  shared-integration:
+    needs: changes
+    if: needs.changes.outputs.shared-integration == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Install Chromium
+        uses: ./.github/actions/playwright-chromium
+      - name: Transport integration (real PeerJS through a local PeerServer)
+        run: npm run test:shared-integration
+
+  gin:
+    needs: changes
+    if: needs.changes.outputs.gin == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Gin unit tests, parity oracles and fixture pins, with coverage
+        run: npm run test:gin -- --coverage
+
+  fidice:
+    needs: changes
+    if: needs.changes.outputs.fidice == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Fidice unit tests, parity oracles and the debundle pin, with coverage
+        run: npm run test:fidice -- --coverage
+
+  backgammon:
+    needs: changes
+    if: needs.changes.outputs.backgammon == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Backgammon unit tests and the seeded replay, with coverage
+        run: npm run test:backgammon -- --coverage
+
+  # Builds dist/, then the guards over it (relative asset URLs, paths on both origins, module
+  # pages, the landing page's parity with web/, the class contract), the token and ratchet pins and
+  # the Worker's table tests with coverage; uploads dist/ for "deploy".
+  site:
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Build dist and run the site guards, with coverage
+        run: npm run test:site -- --coverage
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          # .nojekyll is a dotfile; upload-artifact v4 drops hidden files unless told otherwise.
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  harness:
+    needs: changes
+    if: needs.changes.outputs.harness == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: The harness testing itself (the two origins, the legacy pins, the registry, the suite table)
+        run: npm run test:harness
+
+  # ---- one Playwright job per suite with specs ---------------------------------------------------
+  # `npm run test:e2e:<suite>` builds dist/ first (deterministic, under a second), then plays that
+  # suite's specs on both emulated origins with four workers. The @relay specs (gin, fidice,
+  # backgammon) play through a TURN relay of the harness's own: playwright.config.ts starts
+  # `turnserver` on :3478 once the coturn action has stopped the system one. The site suite has no
+  # relay spec, so it runs with E2E_TURN=off and installs no coturn.
+  e2e-gin:
+    needs: changes
+    if: needs.changes.outputs.e2e-gin == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -99,31 +245,105 @@ jobs:
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
         uses: ./.github/actions/playwright-chromium
-      # The real Transport (PeerJS) needs a browser: a PeerServer, a Vite dev server and Chromium
-      # are started by the test itself (docs/MIGRATION.md step 5). It skips where loopback WebRTC
-      # is blocked; the runner has none of that, so here it runs for real.
-      - name: Transport integration (real PeerJS through a local PeerServer)
-        run: npm run test:integration
-      # The @relay specs play through a TURN relay of the harness's own (the action's header says
-      # how): playwright.config.ts starts `turnserver` on :3478 once the system one is stopped.
       - name: Install coturn for the relay-forced games
         uses: ./.github/actions/coturn
-      # `npm run test:e2e` builds dist/ first (deterministic, under a second), so the specs run
-      # against the same output "check" uploaded. Projects: pages and proxy; gin-online, gin-resume
-      # and fidice-online on both are the proof that the served module pages play real two-peer
-      # games on both origins, gin-relay and fidice-relay that they do so through a TURN relay when
-      # forced to, and gin-dom-parity that the gin page paints what the legacy page did.
-      - name: Browser specs on both origins against dist (local PeerServer and TURN)
-        run: npm run test:e2e
+      - name: Gin specs on both origins against dist (local PeerServer and TURN; the stories baselines)
+        run: npm run test:e2e:gin
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-gin
           path: playwright-report
           retention-days: 7
 
+  e2e-fidice:
+    needs: changes
+    if: needs.changes.outputs.e2e-fidice == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Install Chromium
+        uses: ./.github/actions/playwright-chromium
+      - name: Install coturn for the relay-forced games
+        uses: ./.github/actions/coturn
+      - name: Fidice specs on both origins against dist (local PeerServer and TURN)
+        run: npm run test:e2e:fidice
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-fidice
+          path: playwright-report
+          retention-days: 7
+
+  e2e-backgammon:
+    needs: changes
+    if: needs.changes.outputs.e2e-backgammon == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Install Chromium
+        uses: ./.github/actions/playwright-chromium
+      - name: Install coturn for the relay-forced games
+        uses: ./.github/actions/coturn
+      - name: Backgammon specs on both origins against dist (local PeerServer and TURN)
+        run: npm run test:e2e:backgammon
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-backgammon
+          path: playwright-report
+          retention-days: 7
+
+  e2e-site:
+    needs: changes
+    if: needs.changes.outputs.e2e-site == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      E2E_TURN: 'off'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Install Chromium
+        uses: ./.github/actions/playwright-chromium
+      - name: Smoke every page on both origins and the six computed-style goldens
+        run: npm run test:e2e:site
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-site
+          path: playwright-report
+          retention-days: 7
+
+  # Advisory: the online and relay-forced specs of every game through the real 0.peerjs.com (the
+  # TURN relay stays the local coturn), so a signalling regression is visible at review without a
+  # third party blocking a merge. Not in ci-ok's list.
   broker:
+    needs: changes
+    if: needs.changes.outputs.e2e-gin == 'true' || needs.changes.outputs.e2e-fidice == 'true' || needs.changes.outputs.e2e-backgammon == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: true
@@ -139,7 +359,6 @@ jobs:
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
         uses: ./.github/actions/playwright-chromium
-      # The broker is the real one here; the TURN relay stays the local coturn (see job e2e).
       - name: Install coturn for the relay-forced games
         uses: ./.github/actions/coturn
       - name: Online and relay-forced specs through 0.peerjs.com (advisory)
@@ -152,11 +371,42 @@ jobs:
           path: playwright-report
           retention-days: 7
 
-  # Publishes the dist/ that "check" built and tested. Nothing is installed here: the artifact is
-  # the whole input. Requires Settings > Pages > Source = GitHub Actions (one-time; README "Deploy").
+  # The one gate: "changes" ran and every needed job succeeded or was skipped by it. A failure or a
+  # cancellation anywhere turns it red; always() is what lets it run beside skipped jobs. "changes"
+  # is in the list on purpose: without it a crash in the selector skips every gated job, and
+  # skipped is green here, so a PR that broke tools/ci/suites.ts would pass with no suite run.
+  ci-ok:
+    needs:
+      - changes
+      - check
+      - shared
+      - shared-integration
+      - gin
+      - fidice
+      - backgammon
+      - site
+      - harness
+      - e2e-gin
+      - e2e-fidice
+      - e2e-backgammon
+      - e2e-site
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every needed job succeeded or was skipped
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          printf '%s\n' "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          printf '%s\n' "$NEEDS" | jq -e 'to_entries | map(select(.value.result != "success" and .value.result != "skipped")) | length == 0' > /dev/null
+
+  # Publishes the dist/ that "site" built and tested (on main every job runs, so it is there).
+  # Nothing is installed here: the artifact is the whole input. Requires Settings > Pages > Source
+  # = GitHub Actions (one-time; README "Deploy").
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [check, coverage, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-ok.result == 'success'
+    needs: [ci-ok]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

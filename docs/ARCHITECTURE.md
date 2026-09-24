@@ -26,12 +26,13 @@ and tests that prove it land before the code they protect.
 ```
 .
 ├── package.json / .nvmrc        scripts: build, preview, serve, proxy:dev, typecheck, lint, lint:fix, format,
-│                                test, test:watch, test:dist, test:integration, test:e2e, test:deployed,
-│                                check (= typecheck+lint+test+build+test:dist), fixtures:*, debundle:fidice,
-│                                hooks, hooks:verify (README "Develop" has the table)
+│                                test, test:watch, test:<suite> (shared, shared-integration, gin, fidice,
+│                                backgammon, site, harness), test:e2e, test:e2e:<suite>, test:deployed,
+│                                check (= typecheck+lint+test+test:site), check:affected, affected,
+│                                fixtures:*, debundle:fidice, hooks, hooks:verify (README "Develop" has the table)
 ├── tsconfig.json                solution -> tsconfig.{base,web,pure,node}.json
 ├── vite.config.ts               root web/, base './', input = glob web/**/index.html, legacyPassthrough plugin
-├── vitest.config.ts             node env; jsdom only for *.dom.test.ts; v8 coverage thresholds
+├── vitest.config.ts             one project per suite of tools/ci/suites.ts; the v8 coverage block computed from VITEST_SUITE
 ├── playwright.config.ts         projects: pages, proxy (hermetic); E2E_BROKER=cloud (real 0.peerjs.com, advisory);
 │                                E2E_TARGET=deployed (the deployed page, pages only; nightly)
 ├── eslint.config.js             flat config (below)
@@ -294,35 +295,55 @@ exit 0
 ```
 
 `exec` with `/dev/tty` on stdin because the template hook uses `read -n 1` prompts.
-`.githooks/pre-push` runs `npm run check` (typecheck, lint, unit; same commands as CI job `check`)
-and prints `npm ci` if `node_modules` is missing. `npm run hooks:verify` fails if `core.hooksPath`
-is not `.githooks` or `.git/hooks/pre-commit` is missing, and runs in CI as a repo-local sanity check
-of the shim script itself (`sh -n`).
+`.githooks/pre-push` runs `npm run check:affected` (typecheck, lint, then only the vitest suites
+`tools/ci/affected.ts` selects from the diff against `origin/main`, one after another through their
+`test:<suite>` scripts; the browser suite and the e2e specs stay CI's, as `npm run check` never ran
+them either), prints `npm ci` if `node_modules` is missing, and runs the whole `npm run check`
+under `PRE_PUSH=full` or when there is no `origin/main` to diff against. `npm run hooks:verify`
+fails if `core.hooksPath` is not `.githooks`, `.git/hooks/pre-commit` is missing or the scripts the
+shim execs are gone from package.json, and runs in CI as a repo-local sanity check of the shim
+scripts themselves (`sh -n`).
 
 ### GitHub Actions
 
-`ci.yml` on `push` and `pull_request`. Job `check`: checkout, `setup-node@v4 {node-version-file:
-.nvmrc, cache: npm}`, `npm ci`, `npm run typecheck` (`tsc -b`), `npm run lint` (eslint + prettier
---check), `npm test`, `npm run build`, dist tests, upload `dist`. Job `coverage` (parallel):
-`npm test -- --coverage` against the ratchets. Job `e2e` (parallel, its own build): Chromium from
-`.github/actions/playwright-chromium` (actions/cache by Playwright version; the OS packages every
-run, the download only on a miss), coturn from `.github/actions/coturn` (apt; the system service it
-starts is stopped), `npm run
-test:integration`, `npm run test:e2e` (four workers under CI; projects pages + proxy, the page-only
-specs on pages alone: `PAGE_ONLY_SPECS`;
-PeerServer from the `peer` package on :9000; coturn on :3478 started by `playwright.config.ts`
-with one static long-term credential, loopback only, no TLS, its relay ports right above (`e2e/fixtures/site.ts`
-`turnServerCommand`), reached through an ICE list the config writes under `e2e/fixtures/.generated/`;
-retries 1; trace on first retry; report uploaded). The `@relay` specs (`e2e/gin-relay.spec.ts`,
-`e2e/fidice-relay.spec.ts`) play both games with `?ice-policy=relay` through that relay and read the
-selected candidate pair off every `RTCPeerConnection` the page built (`e2e/browser/record-pc.js`
-keeps them; `selected-pairs.js` reads `getStats()` as `ice.ts` `describe()` does); without
-`turnserver` on PATH they skip with the install line, and under `CI` the config refuses to start
-instead, so a broken install cannot pass as a skip. Job `broker` (needs check, `continue-on-error:
-true`): the two-peer and relay-forced specs without `?peer=` through 0.peerjs.com (the relay stays
-local), so signalling regressions surface at review without blocking on a third party. Job `deploy`
-as above. Branch protection on `main` requires `check` and
-`e2e`. Installs in every job use the composite action `.github/actions/npm-ci`. The owner's npm registry is
+`ci.yml` on `push` to main, `pull_request` and `workflow_dispatch` is the job graph of
+`docs/design/test-partition.md`. Job `changes` (fetch-depth 0, no `npm ci`) runs
+`tools/ci/affected.ts` over the PR's diff against its base through the change -> jobs table in
+`tools/ci/suites.ts` and emits one boolean output per job; a push to main or a dispatch selects
+everything. Job `check` always runs beside it: `setup-node@v4 {node-version-file: .nvmrc, cache:
+npm}`, `npm ci`, `npm run typecheck` (`tsc -b`), `npm run lint` (eslint + prettier --check),
+`npm run hooks:verify`. Every other job `needs: changes` and carries `if:
+needs.changes.outputs.<job> == 'true'`: one job per vitest suite, run once under v8 coverage
+against that suite's own threshold rows (`npm run test:<suite> -- --coverage`; `harness` has no
+rows; `shared-integration` is the transport contract, so it installs Chromium first), `site`
+building `dist/` and uploading it after its guards, and one Playwright job per suite with specs
+(`npm run test:e2e:<suite>`, its own build: Chromium from `.github/actions/playwright-chromium`
+(actions/cache by Playwright version; the OS packages every run, the download only on a miss),
+coturn from `.github/actions/coturn` for the three game jobs (apt; the system service it starts is
+stopped; `e2e-site` has no relay spec and runs with `E2E_TURN=off`); four workers under CI;
+projects pages + proxy, the page-only specs on pages alone: `PAGE_ONLY_SPECS`; PeerServer from the
+`peer` package on :9000; coturn on :3478 started by `playwright.config.ts` with one static
+long-term credential, loopback only, no TLS, its relay ports right above (`e2e/fixtures/site.ts`
+`turnServerCommand`), reached through an ICE list the config writes under
+`e2e/fixtures/.generated/`; retries 1; trace on first retry; report uploaded per job). The
+`@relay` specs (`e2e/gin-relay.spec.ts`, `e2e/fidice-relay.spec.ts`, `e2e/backgammon-relay.spec.ts`)
+play the games with `?ice-policy=relay` through that relay and read the selected candidate pair
+off every `RTCPeerConnection` the page built (`e2e/browser/record-pc.js` keeps them;
+`selected-pairs.js` reads `getStats()` as `ice.ts` `describe()` does); without `turnserver` on
+PATH they skip with the install line, and under `CI` the config refuses to start instead, so a
+broken install cannot pass as a skip. Job `broker` (gated on any game's e2e job,
+`continue-on-error: true`): the two-peer and relay-forced specs without `?peer=` through
+0.peerjs.com (the relay stays local), so signalling regressions surface at review without blocking
+on a third party. Job `ci-ok` needs `changes` and every gate (not `broker`) with `if: always()` and is green
+when each needed job succeeded or was skipped by `changes`, red on a failure or a cancellation
+(`changes` is needed so a crash in the selector is a failed need, not eleven green skips): GitHub
+skips a job whose `needs` were skipped unless it says `always()`, so `deploy` needs `ci-ok` alone
+and runs on a push to main (as above). `ci-ok` is the one check a branch rule or a human watches.
+Which change runs what: a game's folder runs that game's unit and e2e jobs, `site`, `e2e-site` and
+`harness`; `web/shared/**`, `tools/**`, `e2e/fixtures/**`, `legacy/**`, `.github/**` and the
+build, lint and test configs run everything; docs run only `check` (the table in
+`tools/ci/suites.ts`, pinned by `tools/ci/suites.test.ts` together with `ci.yml`'s job list).
+Installs in every job use the composite action `.github/actions/npm-ci`. The owner's npm registry is
 Airtable's Socket Firewall in registry mode, so `package-lock.json` records that host in every
 `resolved` URL and is committed exactly as written; it is never rewritten. Runners cannot
 authenticate to the firewall, so the action rewrites the runner's checked-out copy of the lockfile
@@ -346,7 +367,23 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
 
 ## Testing pyramid
 
-1. Unit (vitest, colocated `*.test.ts`): engine/domain table tests (the 22-deadwood two-arrangement
+Suites first (`docs/design/test-partition.md`). Every test belongs to exactly one of seven suites,
+decided by path alone in `tools/ci/suites.ts`: `shared` (`web/shared/**` unit tests and the two
+legacy oracles that read only shared code), `shared-integration` (the transport contract in
+Chromium; the fake two-seat game joins it with the shared shell), `gin`, `fidice`, `backgammon`
+(each game's colocated tests, its `test/parity/<g>.*` oracles and its fixture pins), `site` (the
+guards over the built site or over every page at once: `test/dist/**`, tokens, ratchet, the
+Worker) and `harness` (the harness testing itself: the two origins, the legacy pins, the registry,
+the suite table). `npm run test:<suite>` runs one (`VITEST_SUITE=<suite> vitest run --project
+<suite>`; `-- --coverage` measures that suite's threshold rows alone), `npm run
+test:e2e:<gin|fidice|backgammon|site>` its Playwright half (`E2E_SUITE`), and `npm test` every
+project as one run. `tools/ci/suites.test.ts` fails on a test file no suite claims. CI gates one
+job per suite on `tools/ci/affected.ts` (below, "GitHub Actions"): `web/shared/**` runs every
+game, since every game imports shared; a game's folder runs that game, the site and the harness;
+docs run only `check`. The levels below say which suite holds them.
+
+1. Unit (vitest, colocated `*.test.ts`; suites `shared`, `gin`, `fidice`, `backgammon`, with the
+   Worker's table tests in `site`): engine/domain table tests (the 22-deadwood two-arrangement
    hand, chained 6S/10S/QS layoff, every `applyAction` branch, tie-at-target -> seat 0; the 252-row
    ladder, `apply` phase gates, `redactFor`, `survivalFor` spot values, every strategy's `decide()`
    over seeded views), property tests via `legalActions` (300 seeded games: 52-card conservation,
@@ -357,7 +394,7 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
    every step and the enumeration of maximal plays as the oracle of `legalMoves`), its board
    builders and status strings as strings, its reducer over the shell and the table, its painters
    on the page fake built from `index.html?raw`, its wire goldens under
-   `test/fixtures/backgammon-wire/` (self-recorded: no legacy page exists). Coverage (`vitest.config.ts` thresholds, ratcheted in step 15 from the measured
+   `test/fixtures/backgammon-wire/` (self-recorded: no legacy page exists). Coverage (the threshold rows of `tools/ci/suites.ts`, one block per suite and each measured by its suite alone, ratcheted in step 15 from the measured
    numbers: lines, functions and statements 5 points under measured wherever that beat the former
    90% floor by 8 or more, branches 3 points under, nothing lowered): 100% on `web/shared/lib` and
    on both `*.algorithms.ts` (with direct tests of the 300k node cap and the 400-entry cache
@@ -604,13 +641,14 @@ Step 4 (Vite build in passthrough mode; Pages deployed by Actions):
   outside `public/` (node 22's `fs.globSync` prints an experimental warning on every build).
 - `legacyPassthrough` copies `legacy/shared/ice.js` only while `LEGACY_PAGES` is non-empty; the
   loader exists for the legacy pages alone.
-- `npm run test:e2e` builds first (`npm run build && playwright test`), so jobs `e2e` and `broker`
-  rebuild dist rather than download it; the build is deterministic. `deploy` downloads the `dist`
-  artifact `check` uploaded (with `include-hidden-files: true`, or `.nojekyll` would be dropped) and
-  installs nothing.
-- `test/dist/**` is excluded from `vitest.config.ts` and run by `vitest.dist.config.ts` via
-  `npm run test:dist`, which `npm run check` runs after `npm run build`; a missing dist/ skips with a
-  note. `.gitignore` anchors `/dist/` so `test/dist/` is tracked.
+- `npm run test:e2e` builds first (`npm run build && playwright test`), so the four `e2e-<suite>`
+  jobs and `broker` rebuild dist rather than download it; the build is deterministic. `deploy`
+  downloads the `dist` artifact `site` uploaded (with `include-hidden-files: true`, or `.nojekyll`
+  would be dropped) and installs nothing.
+- `test/dist/**` is excluded from a plain `npm test` and run after `npm run build`; a missing dist/
+  skips with a note. (Since the test partition it is the `site` suite's standalone half, run by
+  `npm run test:site`, which builds first; `vitest.dist.config.ts` is gone and `test:dist` is its alias
+  for one release.) `.gitignore` anchors `/dist/` so `test/dist/` is tracked.
 - `tools/serve-dist.ts` defaults `--root` to `dist` and resolves `--alias` targets against the
   working directory (route kind `alias`), since the e2e ICE fixture is not in dist. Its node tests and
   the proxy's mount a temp directory staged from `legacy/` and `web/index.html`
@@ -635,10 +673,11 @@ Step 5 (shared TypeScript modules with tests first):
   peerConnection()). `transport.fake.ts` is an in-memory broker with one FIFO queue (auto or manual
   delivery, structured-cloned frames). `transport.contract.ts` is one scripted scenario whose log
   (`transport.contract.log.ts`) the fake test and the browser integration test both must reproduce.
-- The integration test lives in `test/integration/` and runs from `npm run test:integration`
-  (`vitest.integration.config.ts`): PeerServer, Vite dev server and Chromium are started
+- The integration test lives in `test/integration/` and runs from `npm run test:shared-integration`
+  (the `shared-integration` suite, `browser: true` in `tools/ci/suites.ts`; `test:integration` is its
+  alias for one release; it had `vitest.integration.config.ts` before the partition): PeerServer, Vite dev server and Chromium are started
   programmatically on free ports; it skips with a note where loopback WebRTC is blocked and runs for
-  real in the CI `check` job, which now installs Chromium.
+  real in the CI `shared-integration` job, which installs Chromium first.
 - `dom.ts` takes `Readonly<HTMLElement>` and mutates through methods only, so the edge profile's
   readonly-parameter rule needs no exception; the escaping template tag is `safeHtml` (Prettier
   reformats `html`-tagged templates). Its tests use a structural fake: jsdom is not installed.

@@ -1,6 +1,6 @@
 // No jsdom in this repo (docs/ARCHITECTURE.md lists it for *.dom.test.ts only when installed), so
 // these run against a structural fake of the members dom.ts touches. Nothing here needs layout.
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import {
   addClass,
@@ -39,6 +39,16 @@ import {
   targetValueOf,
   toggleClass,
   trustedHtml,
+  afterTransition,
+  capturePointer,
+  cloneInto,
+  closestIn,
+  nextFrame,
+  pointerOf,
+  rectOf,
+  releasePointer,
+  setChecked,
+  setStyle,
   type DocumentLike,
 } from './dom.ts';
 import { fakeEl, fakePage, fakeTarget } from './page.fake.ts';
@@ -295,5 +305,159 @@ describe('events (over page.fake.ts)', () => {
     expect(keyOf(bare)).toBe('');
     expect(inputTypeOf(bare)).toBe('');
     expect(inputDataOf(bare)).toBeNull();
+  });
+});
+
+// The hand's drag and FLIP helpers (ui/hand/dragger.ts, flip.ts) and the checkbox setter were
+// measured through the games' painter tests alone; the shared suite runs on its own now
+// (docs/design/test-partition.md "Coverage"), so their contract is pinned here too.
+describe('geometry, styles, clones, frames and pointers (over page.fake.ts and bare objects)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  test('setChecked writes the property, not the attribute', () => {
+    const box = fakeEl('soundToggle');
+    setChecked(box.el, true);
+    expect(box.checked()).toBe(true);
+    expect(box.attr('checked')).toBeNull();
+    setChecked(box.el, false);
+    expect(box.checked()).toBe(false);
+  });
+
+  test('rectOf reads getBoundingClientRect and is all zeros where the element cannot be measured', () => {
+    const measured = {
+      getBoundingClientRect: () => ({ left: 1, top: 2, width: 3, height: 4, right: 4, bottom: 6 }),
+    } as unknown as HTMLElement;
+    expect(rectOf(measured)).toEqual({ left: 1, top: 2, width: 3, height: 4 });
+    expect(rectOf(fakeEl('hand').el)).toEqual({ left: 0, top: 0, width: 0, height: 0 });
+  });
+
+  test('setStyle sets the inline property where there is a style, nothing on a bare object', () => {
+    const card = fakeEl('card');
+    setStyle(card.el, '--lift', '3px');
+    expect(card.style('--lift')).toBe('3px');
+    setStyle({} as unknown as HTMLElement, '--lift', '3px');
+  });
+
+  test('cloneInto appends a deep clone, or returns null where the element cannot be cloned', () => {
+    const appended: unknown[] = [];
+    const copy = { id: 'copy' };
+    const source = { cloneNode: (deep: boolean) => (deep ? copy : null) } as unknown as HTMLElement;
+    const parent = {
+      appendChild: (node: unknown) => {
+        appended.push(node);
+      },
+    } as unknown as HTMLElement;
+    expect(cloneInto(parent, source)).toBe(copy);
+    expect(appended).toEqual([copy]);
+    // A parent that cannot append (a fake) still hands the copy back.
+    expect(cloneInto({} as unknown as HTMLElement, source)).toBe(copy);
+    expect(cloneInto(parent, fakeEl('x').el)).toBeNull();
+  });
+
+  test('closestIn asks the element itself', () => {
+    expect(closestIn(fakeEl('x').el, '.card')).toBeNull();
+    const found = { id: 'y' };
+    const el = {
+      closest: (selector: string) => (selector === '.card' ? found : null),
+    } as unknown as HTMLElement;
+    expect(closestIn(el, '.card')).toBe(found);
+    expect(closestIn(el, '.pile')).toBeNull();
+  });
+
+  test('nextFrame goes through requestAnimationFrame where there is one and is a no-op without', () => {
+    const ran: string[] = [];
+    // node has no requestAnimationFrame: the callback never runs.
+    nextFrame(() => {
+      ran.push('no raf');
+    });
+    expect(ran).toEqual([]);
+    vi.stubGlobal('requestAnimationFrame', (cb: () => void) => {
+      cb();
+      return 1;
+    });
+    nextFrame(() => {
+      ran.push('raf');
+    });
+    expect(ran).toEqual(['raf']);
+  });
+
+  test('afterTransition runs once: on transitionend, or after the fallback, never both', () => {
+    vi.useFakeTimers();
+    const ran: string[] = [];
+    const a = fakeEl('a');
+    afterTransition(
+      a.el,
+      () => {
+        ran.push('a');
+      },
+      300,
+    );
+    a.fire('transitionend');
+    a.fire('transitionend');
+    vi.advanceTimersByTime(300);
+    expect(ran).toEqual(['a']);
+    const b = fakeEl('b');
+    afterTransition(
+      b.el,
+      () => {
+        ran.push('b');
+      },
+      300,
+    );
+    vi.advanceTimersByTime(299);
+    expect(ran).toEqual(['a']);
+    vi.advanceTimersByTime(1);
+    b.fire('transitionend');
+    expect(ran).toEqual(['a', 'b']);
+  });
+
+  test('pointerOf reads the pointer fields, zeros where absent', () => {
+    const el = fakeEl('p');
+    expect(pointerOf(el.fire('pointerdown', { clientX: 10, clientY: 20, pointerId: 7 }))).toEqual({
+      x: 10,
+      y: 20,
+      id: 7,
+    });
+    expect(pointerOf({} as unknown as Event)).toEqual({ x: 0, y: 0, id: 0 });
+  });
+
+  test('capturePointer and releasePointer call through, tolerate a fake and swallow the DOM errors', () => {
+    const calls: string[] = [];
+    const el = {
+      setPointerCapture: (id: number) => {
+        calls.push(`set:${String(id)}`);
+      },
+      releasePointerCapture: (id: number) => {
+        calls.push(`release:${String(id)}`);
+      },
+    } as unknown as HTMLElement;
+    capturePointer(el, 3);
+    releasePointer(el, 3);
+    expect(calls).toEqual(['set:3', 'release:3']);
+    capturePointer(fakeEl('x').el, 1);
+    releasePointer(fakeEl('x').el, 1);
+    const gone = {
+      setPointerCapture: () => {
+        throw new Error('InvalidStateError');
+      },
+      releasePointerCapture: () => {
+        throw new Error('InvalidStateError');
+      },
+    } as unknown as HTMLElement;
+    capturePointer(gone, 1);
+    releasePointer(gone, 1);
+  });
+
+  test('the event readers on an event with none of the optional fields', () => {
+    const bare = {} as unknown as Event;
+    expect(inputTypeOf(bare)).toBe('');
+    expect(keyOf(bare)).toBe('');
+    expect(inputDataOf(bare)).toBeNull();
+    expect(targetIdOf(bare)).toBe('');
+    expect(targetValueOf(bare)).toBe('');
+    expect(closestFrom(bare, '.card')).toBeNull();
   });
 });

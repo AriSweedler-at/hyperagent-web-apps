@@ -3,7 +3,9 @@
 #   1. core.hooksPath points at .githooks (set by `npm run hooks`, which is also the `prepare`
 #      script, so `npm ci` installs it);
 #   2. both shims are executable and parse (`sh -n`);
-#   3. the owner's template hook .git/hooks/pre-commit exists, so the pre-commit shim has
+#   3. the scripts the pre-push shim runs (check, check:affected, test:affected) exist in
+#      package.json;
+#   4. the owner's template hook .git/hooks/pre-commit exists, so the pre-commit shim has
 #      something to chain to. CI checkouts have no template hook, so under CI=… that is reported
 #      rather than failed.
 # Exits non-zero on the first failure.
@@ -21,6 +23,11 @@ path="$(git config --get core.hooksPath || true)"
 for hook in .githooks/pre-commit .githooks/pre-push; do
   [ -x "$hook" ] || fail "$hook is missing or not executable"
   sh -n "$hook" || fail "$hook does not parse"
+done
+
+# The pre-push shim execs these by name; a renamed script would fail every push at its end, not here.
+for script in check check:affected test:affected; do
+  grep -q "\"$script\":" package.json || fail "package.json has no $script script; .githooks/pre-push runs it"
 done
 
 # --git-common-dir: in a linked worktree --git-dir is .git/worktrees/<name>, which has no hooks/.

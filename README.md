@@ -42,35 +42,43 @@ Node 22 (`.nvmrc`). TypeScript, ESLint (typescript-eslint strict, eslint-plugin-
 boundaries), Prettier, vitest and Playwright, all pinned exactly in `package.json`.
 
 ```
-npm ci            # install; the `prepare` script also installs the git hooks
-npm run check     # typecheck + lint + unit tests + build + dist guards: what CI and pre-push run
+npm ci                  # install; the `prepare` script also installs the git hooks
+npm run check           # typecheck + lint + every unit suite + build + the site guards: the full gate
+npm run check:affected  # typecheck + lint + only the suites your commits touch: what pre-push runs
+npm run test:gin        # one suite (shared, shared-integration, gin, fidice, backgammon, site, harness)
 ```
 
-| Script                                               | What it does                                                                                                   |
-| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `npm run check`                                      | `typecheck`, `lint`, `test`, `build`, `test:dist`, in that order; CI job `check` and the pre-push hook         |
-| `npm run typecheck`                                  | `tsc -b` over the web, pure and node projects                                                                  |
-| `npm run lint`                                       | `eslint . --max-warnings 0`, then `prettier --check .`                                                         |
-| `npm run lint:fix` / `npm run format`                | `eslint --fix` / `prettier --write` on everything they check                                                   |
-| `npm test`                                           | vitest over `web/`, `test/`, `infra/` `*.test.ts` bar `test/dist/`, `test/integration/`; `-- --coverage` gates |
-| `npm run test:watch`                                 | vitest, watching                                                                                               |
-| `npm run build`                                      | `vite build` -> `dist/` (`web/` is the root; every `web/**/index.html` is an entry)                            |
-| `npm run test:dist`                                  | the guards on `dist/` (see "Tests"); needs a build first                                                       |
-| `npm run test:integration`                           | the real PeerJS transport through a local PeerServer in Chromium; skips where loopback WebRTC is blocked       |
-| `npm run test:e2e`                                   | build, then Playwright: every spec in `e2e/` on both emulated origins                                          |
-| `npm run test:deployed`                              | the `@online` and `@relay` specs with the deployed Pages page as the subject, every server local; nightly      |
-| `npm run serve`                                      | GitHub Pages emulation: `dist/` at http://127.0.0.1:4173/hyperagent-web-apps/                                  |
-| `npm run preview`                                    | build, then serve                                                                                              |
-| `npm run proxy:dev`                                  | games.sweedler.com emulation: the real Worker at http://127.0.0.1:8787/ over :4173                             |
-| `npm run fixtures:legacy`                            | re-cut `test/fixtures/legacy/*.cjs` from the frozen pages and re-pin `MANIFEST.json`                           |
-| `npm run fixtures:gin-wire` / `fixtures:gin-storage` | re-record the gin wire frames / localStorage captures from the legacy page                                     |
-| `npm run debundle:fidice`                            | re-split the legacy fidice bundle into `web/games/fidice/src/**` and re-pin its `MANIFEST.json`                |
-| `npm run hooks` / `npm run hooks:verify`             | `git config core.hooksPath .githooks` / confirm the wiring                                                     |
+| Script                                               | What it does                                                                                                                                                                                |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run check`                                      | `typecheck`, `lint`, `test`, `test:site`, in that order: the full gate (what main proves)                                                                                                   |
+| `npm run check:affected`                             | `typecheck`, `lint`, then only the suites `tools/ci/affected.ts` selects from the diff against `origin/main`; the pre-push hook (`PRE_PUSH=full` for the whole gate)                        |
+| `npm run affected`                                   | print that selection, per path and why; `-- --github`, `-- --json`, `-- --all`, `-- --base <ref>`                                                                                           |
+| `npm run typecheck`                                  | `tsc -b` over the web, pure and node projects                                                                                                                                               |
+| `npm run lint`                                       | `eslint . --max-warnings 0`, then `prettier --check .`                                                                                                                                      |
+| `npm run lint:fix` / `npm run format`                | `eslint --fix` / `prettier --write` on everything they check                                                                                                                                |
+| `npm test`                                           | vitest, every suite as one run (the `*.test.ts` under `web/`, `test/`, `infra/`, `tools/` bar the dist guards and the browser contract); `-- --coverage` gates the union of the rows        |
+| `npm run test:<suite>`                               | one suite: `shared`, `shared-integration` (Chromium), `gin`, `fidice`, `backgammon`, `site` (builds first), `harness`; `-- --coverage` gates that suite's rows alone (`tools/ci/suites.ts`) |
+| `npm run test:watch`                                 | vitest, watching                                                                                                                                                                            |
+| `npm run build`                                      | `vite build` -> `dist/` (`web/` is the root; every `web/**/index.html` is an entry)                                                                                                         |
+| `npm run test:site`                                  | build, then the guards on `dist/` (see "Tests"), the token and ratchet pins and the Worker's tests; `test:dist` is its alias for one release                                                |
+| `npm run test:shared-integration`                    | the real PeerJS transport through a local PeerServer in Chromium; skips where loopback WebRTC is blocked; `test:integration` is its alias for one release                                   |
+| `npm run test:e2e`                                   | build, then Playwright: every spec in `e2e/` on both emulated origins                                                                                                                       |
+| `npm run test:e2e:<suite>`                           | one suite's specs (`gin`, `fidice`, `backgammon`, `site`), both origins; extra arguments pass through                                                                                       |
+| `npm run test:deployed`                              | the `@online` and `@relay` specs with the deployed Pages page as the subject, every server local; nightly                                                                                   |
+| `npm run serve`                                      | GitHub Pages emulation: `dist/` at http://127.0.0.1:4173/hyperagent-web-apps/                                                                                                               |
+| `npm run preview`                                    | build, then serve                                                                                                                                                                           |
+| `npm run proxy:dev`                                  | games.sweedler.com emulation: the real Worker at http://127.0.0.1:8787/ over :4173                                                                                                          |
+| `npm run fixtures:legacy`                            | re-cut `test/fixtures/legacy/*.cjs` from the frozen pages and re-pin `MANIFEST.json`                                                                                                        |
+| `npm run fixtures:gin-wire` / `fixtures:gin-storage` | re-record the gin wire frames / localStorage captures from the legacy page                                                                                                                  |
+| `npm run debundle:fidice`                            | re-split the legacy fidice bundle into `web/games/fidice/src/**` and re-pin its `MANIFEST.json`                                                                                             |
+| `npm run hooks` / `npm run hooks:verify`             | `git config core.hooksPath .githooks` / confirm the wiring                                                                                                                                  |
 
 Git hooks are plain files in `.githooks/`: `pre-commit` chains to the owner's template hook in
 `.git/hooks/pre-commit` (big-file and trailing-whitespace prompts; it resolves the hook through
-`--git-common-dir`, so linked worktrees reach it too) and `pre-push` runs `npm run check`. `npm ci`
-installs them through `prepare`; run `npm run hooks` again if `core.hooksPath` was changed.
+`--git-common-dir`, so linked worktrees reach it too) and `pre-push` runs `npm run check:affected`
+(typecheck, lint, then the suites the pushed commits touch; `PRE_PUSH=full git push` runs the whole
+`npm run check`, as does a checkout with no `origin/main`). `npm ci` installs them through
+`prepare`; run `npm run hooks` again if `core.hooksPath` was changed.
 
 `package-lock.json` is written behind Airtable's Socket Firewall registry and is committed exactly
 as npm produces it; never rewrite it. CI installs through `.github/actions/npm-ci`, which points the
@@ -105,7 +113,7 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    its oracle is the seeded replay beside it (`web/games/backgammon/src/engine/replay.test.ts`, 91
    matches per push and `BG_REPLAY_GAMES=1000` nightly) asserting every invariant on every step,
    with the enumeration of maximal plays as the oracle of the legal-move list.
-3. **Dist guards** (`npm run build && npm run test:dist`, `test/dist/`): every URL in dist HTML and
+3. **Dist guards** (`npm run test:site`, which builds first; `test/dist/`, the `site` suite): every URL in dist HTML and
    CSS is relative and resolves on both origins through the Worker's real `mapPath()`; every game
    page is a Vite module page that preloads the shared chunks (one common to all; the DOM edge is
    a second one gin and backgammon share) and links the one shared stylesheet;
@@ -119,7 +127,7 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    and reads `getComputedStyle` for 60-110 selectors; `test/fixtures/styles/<game>.<viewport>.json`
    are the goldens. A CSS move that changes a computed value fails with one line per
    screen/selector/property.
-5. **Transport integration** (`npm run test:integration`): the real PeerJS adapter through a local
+5. **Transport integration** (`npm run test:shared-integration`, the `shared-integration` suite; never part of `npm test`): the real PeerJS adapter through a local
    PeerServer in Chromium runs the same contract scenario as `transport.fake.ts` and must produce
    the same log.
 6. **Hermetic two-peer e2e** (`npm run test:e2e`; first time `npx playwright install chromium`):
@@ -219,8 +227,14 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    `Math.random` is banned outside `main.ts` and `web/shared/edge`; the pure layers (`engine/`,
    `domain/`, `bots/`, `protocol.ts`, the scorer maths, `*.algorithms.ts`) also ban `Date.now`:
    inject a clock.
-5. Tests beside each module. Add the new folders to `coverage.include` and one `thresholds` entry
-   per group in `vitest.config.ts` (measured minus a margin; nothing existing goes down).
+5. Tests beside each module, and a suite row for the game in `tools/ci/suites.ts`: its `unit`
+   globs (`web/games/<g>/**/*.test.ts` and any `test/parity/<g>.*` oracles), its `coverage.include`
+   folders with one threshold row per group (measured minus a margin; nothing existing goes down),
+   its e2e glob (`**/<g>-*.spec.ts`) and a `gameRules('<g>')` entry so a change under
+   `web/games/<g>/**` runs `<g>`, `e2e-<g>`, `site`, `e2e-site` and `harness`. `tools/ci/suites.test.ts`
+   fails until every new test file is claimed by exactly one suite; `npm run test:<g>` is then the
+   game's own loop and CI gains the `<g>` and `e2e-<g>` jobs (add both to `.github/workflows/ci.yml`,
+   which the same test pins against the table).
 6. A class TypeScript builds in a way the extraction cannot see, a hook with no rule, or dead CSS
    gets a row in `web/shared/styles/CONTRACT.md`; otherwise `class-contract.test.ts` fails after the
    build.
@@ -233,8 +247,8 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    card to `web/index.html`.
 8. One e2e spec per mode: `e2e/<g>-local.spec.ts` and `e2e/<g>-online.spec.ts` tagged `@online`
    (host and guest through `e2e/fixtures/two-players.ts`; `expectPeerOptions` on the recorded
-   `new Peer` call). Both run on both projects, and the online one against the deployed page in
-   nightly, for free.
+   `new Peer` call). Both run on both projects (`npm run test:e2e:<g>` runs the game's specs alone),
+   and the online one against the deployed page in nightly, for free.
 9. The proxy needs nothing: the Worker's catch-all maps `games.sweedler.com/<g>/` to
    `/hyperagent-web-apps/games/<g>/`.
 
@@ -348,19 +362,20 @@ legacy/                      the pre-migration pages and shared/ice.js, verbatim
 test/fixtures/legacy/        sha256-pinned cuts of the legacy cores, the gin wire frames and storage captures
 test/fixtures/styles/        computed-style goldens, <game>.<viewport>.json
 test/parity/                 describe.each([legacy, current]) suites and the seeded replays
-test/dist/                   the dist guards and the class contract (npm run test:dist)
-test/integration/            the real transport through a local PeerServer in Chromium
+test/dist/                   the dist guards and the class contract (the site suite: npm run test:site)
+test/integration/            the real transport through a local PeerServer in Chromium (npm run test:shared-integration)
 test/tools/                  tests of the tools below
 e2e/                         Playwright specs; fixtures/ (site, player, two-players, offline, seed); browser/ init scripts
-tools/                       serve-dist, proxy-dev, hooks-verify; legacy/ extractors and recorders; parity/ drivers
+tools/                       serve-dist, proxy-dev, hooks-verify; legacy/ extractors and recorders; parity/ drivers;
+tools/ci/                    suites.ts (the one table: suite -> tests, coverage rows, specs, and change -> jobs), affected.ts, run-affected.ts
 infra/games-proxy/           Cloudflare Worker (TypeScript) serving the site at games.sweedler.com
 infra/turn-worker/           Cloudflare Worker (plain JS) minting TURN credentials at turn.sweedler.com
 docs/                        ARCHITECTURE.md (the layout and its rules), MIGRATION.md (the plan and its Deviations), design/ (per-feature designs)
-.github/workflows/           ci.yml (check, e2e, broker, deploy), nightly.yml (the deployed page through local servers)
+.github/workflows/           ci.yml (changes -> check + one job per suite -> ci-ok -> deploy), nightly.yml (the deployed page through local servers)
 .github/actions/npm-ci/      the scanned install that rewrites the runner's lockfile copy (see "Develop")
-.githooks/                   pre-commit (chains the template hook), pre-push (npm run check)
+.githooks/                   pre-commit (chains the template hook), pre-push (npm run check:affected)
 vite.config.ts               root web/, base './', input = every web/**/index.html
-vitest.config.ts             unit config and coverage thresholds; vitest.dist / vitest.integration configs beside it
+vitest.config.ts             one project per suite of tools/ci/suites.ts; the coverage block computed from VITEST_SUITE
 playwright.config.ts         projects pages and proxy; E2E_BROKER=cloud, E2E_TARGET=deployed, E2E_PORT_OFFSET, E2E_TURN
 dist/                        build output (gitignored): what both origins serve
 ```

@@ -41,8 +41,6 @@
   },
   "include": [
     "vitest.config.ts",
-    "vitest.dist.config.ts",
-    "vitest.integration.config.ts",
     "vite.config.ts",
     "playwright.config.ts",
     "tools/**/*.ts",

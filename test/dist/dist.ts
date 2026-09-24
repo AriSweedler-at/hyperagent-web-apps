@@ -1,9 +1,9 @@
 // Shared plumbing for the dist guards (docs/ARCHITECTURE.md "Two origins"): whether the build
 // tree exists, how to list it, and how to pull every URL reference out of the HTML and CSS Vite
 // wrote. One tree is guarded, dist/ (`npm run build`): since docs/MIGRATION.md step 13 every page
-// is Vite's and the dark dist-next/ build is gone. These suites run from `npm run test:dist` after
-// the build (vitest.dist.config.ts); an absent tree is recorded as one skipped test with a note, so
-// a checkout without a build is never mistaken for a broken site.
+// is Vite's and the dark dist-next/ build is gone. These suites are the `site` suite's standalone half
+// (tools/ci/suites.ts): `npm run test:site` builds and runs them, `npm test` never does; an absent tree
+// is recorded as one skipped test with a note, so a checkout without a build is never mistaken for a broken site.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
@@ -35,7 +35,7 @@ export const DIST_ROOT: DistRoot = {
 export const distPresent = (root: DistRoot): boolean => existsSync(resolve(root.dir, 'index.html'));
 
 export const skipNote = (root: DistRoot): string =>
-  `${root.name}/ is absent: run \`${root.build}\` first (CI runs \`npm run test:dist\` after the build)`;
+  `${root.name}/ is absent: run \`${root.build}\` first (CI runs \`npm run test:site\`, which builds first)`;
 
 /**
  * `describe` over the build tree: runs `body(root)` when dist/ exists and records one skipped test

@@ -1,0 +1,131 @@
+// affected.ts diffs, parses and formats; the rules it applies are tools/ci/suites.ts's and are
+// tested beside them. Here: the flags, the three output shapes over a table of diffs, and the git
+// call against a base that is always present (HEAD itself: no paths).
+import { describe, expect, test } from 'vitest';
+
+import {
+  DEFAULT_BASE,
+  changedPaths,
+  format,
+  formatGithub,
+  formatHuman,
+  formatJson,
+  parseArgs,
+  reportFor,
+} from './affected.ts';
+import { JOBS } from './suites.ts';
+
+describe('parseArgs', () => {
+  test('defaults: origin/main, a diff, the human format', () => {
+    expect(parseArgs([])).toEqual({ base: 'origin/main', all: false, format: 'human' });
+    expect(DEFAULT_BASE).toBe('origin/main');
+  });
+
+  test('every flag, in any order', () => {
+    expect(parseArgs(['--all'])).toMatchObject({ all: true });
+    expect(parseArgs(['--github'])).toMatchObject({ format: 'github' });
+    expect(parseArgs(['--json'])).toMatchObject({ format: 'json' });
+    expect(parseArgs(['--base', 'origin/release'])).toMatchObject({ base: 'origin/release' });
+    expect(parseArgs(['--json', '--base', 'main', '--all'])).toEqual({
+      base: 'main',
+      all: true,
+      format: 'json',
+    });
+    // The last format wins, as with any repeated flag.
+    expect(parseArgs(['--github', '--json'])).toMatchObject({ format: 'json' });
+  });
+
+  test('an unknown flag or a bare --base is an error that prints the usage', () => {
+    expect(() => parseArgs(['--verbose'])).toThrow(/unknown argument --verbose\nusage:/);
+    expect(() => parseArgs(['--base'])).toThrow(/--base needs a ref/);
+    expect(() => parseArgs(['--base', '--all'])).toThrow(/--base needs a ref/);
+  });
+});
+
+describe('the three formats over a table of diffs', () => {
+  const ginOnly = reportFor(['web/games/gin-rummy/src/fx.ts']);
+  const docsOnly = reportFor(['README.md']);
+  const everything = reportFor(null);
+  const nothing = reportFor([]);
+
+  test('--github: one line per job in graph order, then everything=', () => {
+    expect(formatGithub(ginOnly).split('\n')).toEqual([
+      'shared=false',
+      'shared-integration=false',
+      'gin=true',
+      'fidice=false',
+      'backgammon=false',
+      'site=true',
+      'harness=true',
+      'e2e-gin=true',
+      'e2e-fidice=false',
+      'e2e-backgammon=false',
+      'e2e-site=true',
+      'everything=false',
+    ]);
+    expect(formatGithub(everything).split('\n')).toEqual([
+      ...JOBS.map((job) => `${job}=true`),
+      'everything=true',
+    ]);
+    expect(formatGithub(docsOnly).split('\n')).toEqual([
+      ...JOBS.map((job) => `${job}=false`),
+      'everything=false',
+    ]);
+    // Every line is a name GitHub accepts as an output: letters, digits, - and _.
+    formatGithub(everything)
+      .split('\n')
+      .forEach((line) => {
+        expect(line).toMatch(/^[A-Za-z][A-Za-z0-9_-]*=(true|false)$/);
+      });
+  });
+
+  test('--json: the paths, every job as a boolean, and everything', () => {
+    expect(JSON.parse(formatJson(ginOnly))).toEqual({
+      paths: ['web/games/gin-rummy/src/fx.ts'],
+      jobs: {
+        shared: false,
+        'shared-integration': false,
+        gin: true,
+        fidice: false,
+        backgammon: false,
+        site: true,
+        harness: true,
+        'e2e-gin': true,
+        'e2e-fidice': false,
+        'e2e-backgammon': false,
+        'e2e-site': true,
+      },
+      everything: false,
+    });
+    expect(JSON.parse(formatJson(everything))).toMatchObject({ paths: null, everything: true });
+    expect(JSON.parse(formatJson(nothing))).toMatchObject({ paths: [], everything: false });
+  });
+
+  test('human: each path with the row that claimed it, then the jobs', () => {
+    expect(formatHuman(ginOnly)).toBe(
+      [
+        'web/games/gin-rummy/src/fx.ts',
+        "    -> gin, e2e-gin, site, e2e-site, harness (the page is built into dist and smoked, tokens/ratchet/the class contract read every game, and tools/games.test.ts pins the registry against the games' storage keys)",
+        '',
+        'jobs: gin, site, harness, e2e-gin, e2e-site',
+      ].join('\n'),
+    );
+    expect(formatHuman(docsOnly)).toContain('-> nothing (');
+    expect(formatHuman(docsOnly)).toContain('jobs: none (check only)');
+    expect(formatHuman(reportFor(['tools/games.ts']))).toContain('-> everything (');
+    expect(formatHuman(everything)).toBe(`--all: every job\n\njobs: ${JOBS.join(', ')}`);
+    expect(formatHuman(nothing)).toBe('no changed paths\n\njobs: none (check only)');
+  });
+
+  test('format dispatches on the kind', () => {
+    expect(format(ginOnly, 'github')).toBe(formatGithub(ginOnly));
+    expect(format(ginOnly, 'json')).toBe(formatJson(ginOnly));
+    expect(format(ginOnly, 'human')).toBe(formatHuman(ginOnly));
+  });
+});
+
+describe('changedPaths', () => {
+  test('HEAD against itself changes nothing (the git call and its parsing, on any checkout)', () => {
+    expect(changedPaths('HEAD')).toEqual([]);
+  });
+});
