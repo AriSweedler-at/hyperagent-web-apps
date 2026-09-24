@@ -41,8 +41,8 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expectRevealed(page, 'rulesList', 'scoring');
       // The address bar is untouched by a tap (only a deep link carries the hash).
       expect(new URL(page.url()).hash).toBe('');
-      // Inside a rule: Goal names bearing off.
-      await page.locator('#rulesList #rule-goal a.jargon[data-rule="bearing-off"]').click();
+      // Inside a rule: Goal names bearing off twice ("bear them off", "bear off"); tap the first.
+      await page.locator('#rulesList #rule-goal a.jargon[data-rule="bearing-off"]').first().click();
       await expectRevealed(page, 'rulesList', 'bearing-off');
       // The tab choice is remembered like a tap on the tab itself.
       await page.reload();
