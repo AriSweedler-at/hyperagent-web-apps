@@ -57,8 +57,8 @@ describe('builders produce the legacy literals, key for key', () => {
       action({ type: 'discard', cardId: 'AS' }),
       '{"t":"action","action":{"type":"discard","cardId":"AS"}}',
     ],
-    ['welcome', welcome('Ann', 100), '{"t":"welcome","hostName":"Ann","target":100}'],
-    ['lobby', lobby('Ann', 50), '{"t":"lobby","hostName":"Ann","target":50}'],
+    ['welcome', welcome('Ann', { target: 100 }), '{"t":"welcome","hostName":"Ann","target":100}'],
+    ['lobby', lobby('Ann', { target: 50 }), '{"t":"lobby","hostName":"Ann","target":50}'],
     ['full', full(), '{"t":"full"}'],
     ['toast', toast("It's not your turn."), '{"t":"toast","msg":"It\'s not your turn."}'],
   ])('%s', (_tag, frame, json) => {
@@ -75,8 +75,8 @@ describe('decodeFrame', () => {
     const frames = [
       join('Jeff'),
       action({ type: 'setMelds', melds: [['AS', 'AH', 'AD']] }),
-      welcome('Ann', 100),
-      lobby('Ann', 100),
+      welcome('Ann', { target: 100 }),
+      lobby('Ann', { target: 100 }),
       full(),
       toast('x'),
       state(view),
@@ -189,7 +189,13 @@ describe('decodeGuestFrame / decodeHostFrame keep each side to its own frames', 
   });
 
   test('the guest accepts the five host frames and refuses join and action', () => {
-    [welcome('Ann', 100), lobby('Ann', 100), full(), toast('t'), state(view)].forEach((frame) => {
+    [
+      welcome('Ann', { target: 100 }),
+      lobby('Ann', { target: 100 }),
+      full(),
+      toast('t'),
+      state(view),
+    ].forEach((frame) => {
       expect(decodeHostFrame(viaJson(frame))).toEqual({ ok: true, value: frame });
     });
     expect(decodeHostFrame({ t: 'join', name: 'Jeff' })).toEqual({

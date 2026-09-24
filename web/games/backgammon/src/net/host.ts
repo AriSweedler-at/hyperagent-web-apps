@@ -195,7 +195,7 @@ export class HostSession {
     this.conn = conn;
     conn.onOpen(() => {
       const ctx = deps.read();
-      conn.send(welcome(ctx.myName, ctx.matchLength, ctx.variant));
+      conn.send(welcome(ctx.myName, { matchLength: ctx.matchLength, variant: ctx.variant }));
       announcePath(
         conn,
         () => this.conn === conn,

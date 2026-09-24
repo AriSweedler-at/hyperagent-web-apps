@@ -190,7 +190,7 @@ export class HostSession {
     this.conn = conn;
     conn.onOpen(() => {
       const ctx = deps.read();
-      conn.send(welcome(ctx.myName, ctx.target));
+      conn.send(welcome(ctx.myName, { target: ctx.target }));
       announcePath(
         conn,
         () => this.conn === conn,

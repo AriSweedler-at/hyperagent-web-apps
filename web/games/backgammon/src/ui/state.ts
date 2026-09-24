@@ -1017,7 +1017,10 @@ const hostFrame = (app: App, frame: GuestFrame, ctx: Context): Step => {
         withShell(withHostStatus(connected, joinedMsg(name)), { startGameVisible: true }),
         {
           type: 'send',
-          frame: lobbyFrame(app.shell.myName, app.shell.matchLength, app.shell.variant),
+          frame: lobbyFrame(app.shell.myName, {
+            matchLength: app.shell.matchLength,
+            variant: app.shell.variant,
+          }),
         },
       );
     }

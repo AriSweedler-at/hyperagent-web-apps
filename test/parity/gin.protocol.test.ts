@@ -34,9 +34,9 @@ const rebuild = (frame: Frame): Frame => {
     case 'action':
       return action(frame.action);
     case 'welcome':
-      return welcome(frame.hostName, frame.target);
+      return welcome(frame.hostName, { target: frame.target });
     case 'lobby':
-      return lobby(frame.hostName, frame.target);
+      return lobby(frame.hostName, { target: frame.target });
     case 'full':
       return full();
     case 'toast':
