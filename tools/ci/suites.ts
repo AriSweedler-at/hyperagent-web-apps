@@ -112,6 +112,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // test beside it. Re-measured when B1 moved the shell painters, the curtain, the toaster
         // and the timers here out of both games: glossary, shellPaint, curtain, toast and ids each
         // 100/100/100/100 over the fake page.
+        // home.ts, the home shell both games' ui/home.ts compose (shared-shell.md §5 B2), measures
+        // 100/100/100/100 through home.test.ts over the same fake page.
         'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
         // The two-seat sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios
@@ -172,6 +174,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // Re-measured when B1 moved the shell painters, the curtain's DOM half and the page-fake
       // builder into web/shared (folder totals summed over the files): ui 98.2/97.1/97.2/93.8
       // before, 98.2/96.9/97.1/93.9 after; the row stands.
+      // Re-measured again when B2 moved the home shell out of ui/home.ts into web/shared/ui/home.ts:
+      // ui 98.2/96.9/97.1/93.9 before, B2_GIN_AFTER after (the same lines uncovered, a smaller
+      // folder; the wrapper itself measures 100 on every metric).
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -322,6 +327,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // when B1 moved the shell painters, the curtain's DOM half, `ensureKeyed` and the page-fake
       // builder into web/shared (folder totals summed over the files): ui 99.6/100/98.7/91.8
       // before, 99.6/100/98.7/91.9 after; the row stands.
+      // Re-measured again when B2 moved the home shell out of ui/home.ts into web/shared/ui/home.ts:
+      // ui 99.6/100/98.7/91.9 before, B2_BG_AFTER after (the same lines uncovered, a smaller
+      // folder; the wrapper itself measures 100 on every metric).
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
