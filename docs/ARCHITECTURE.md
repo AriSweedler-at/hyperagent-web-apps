@@ -98,7 +98,7 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 | `ui/state.ts` / `app/controller.ts` | everything below | Reducer over intents; imported only by `main.ts` and tests. |
 | `main.ts` | everything | Constructs adapters (PeerJS, Web Audio, storage, clock, `Math.random`). No logic. Module scripts are deferred, so it boots directly. |
 | `*.algorithms.ts` | shared/lib | The only files where loops, `let` and local mutation are allowed. Pure, functions only, 100% line coverage, and each export carries a comment saying why the functional form is unfit (hot DP, node-capped DFS, cartesian enumeration). |
-| `tools/games.ts` | shared/lib (types) | The harness's registry of the games: `GAMES`, `LEGACY_GAMES`, `PAGE_TITLES`, `HOOKS`, `LANDING_HREFS` over `roomCode.ts`'s `Game` union. The e2e fixtures, the dist guards and the computed-style oracle enumerate from it; `eslint.config.js` spells its own `GAMES` (plain JS) for the pairwise zones. |
+| `tools/games.ts` | shared/lib (types) | The harness's registry of the games: one `REGISTRY` row per game (title, hook, storage keys, PeerJS debug level, page shape, class-contract floors) over `roomCode.ts`'s `Game` union, with `GAMES`, `PAGE_TITLES`, `HOOKS` and `LANDING_HREFS` read off the rows and `LEGACY_GAMES` beside them. The e2e fixtures, the dist guards and the computed-style oracle enumerate from it; `eslint.config.js` spells its own `GAMES` (plain JS) for the pairwise zones. |
 
 Games never import each other. `infra/` shares only the pure `mapPath()` with tests.
 
@@ -422,8 +422,8 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
 
 - New game: `web/games/<g>/{index.html, main.ts, theme.css, src/}` plus tests, a coverage entry,
   `CONTRACT.md` rows and its name in the registry (`Game` in `web/shared/lib/roomCode.ts` with its
-  room-code row, then `GAMES`, `PAGE_TITLES`, `HOOKS` in `tools/games.ts`; `eslint.config.js`
-  spells `GAMES` once more); nothing else in `web/shared` changes. Vite picks up the folder; the
+  room-code row, then a `REGISTRY` row in `tools/games.ts`; `eslint.config.js` spells `GAMES` once
+  more); nothing else in `web/shared` changes. Vite picks up the folder; the
   proxy needs no change; the dist guards, the e2e page list and the computed-style tool enumerate
   from the registry; e2e gets one spec per mode. Sheshbesh landed this way (docs/design/
   backgammon-board.md §6). The README's "Add a game" is the step-by-step version.

@@ -3,15 +3,86 @@ import { resolve } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
-import { ALIASES, GAMES, HOOKS, LANDING_HREFS, LEGACY_GAMES, PAGE_TITLES } from './games.ts';
+import { STORAGE_KEYS as BACKGAMMON_KEYS } from '../web/games/backgammon/src/storage.ts';
+import { STORAGE_KEYS as GIN_KEYS } from '../web/games/gin-rummy/src/storage.ts';
+import {
+  ALIASES,
+  GAMES,
+  HOOKS,
+  LANDING_HREFS,
+  LEGACY_GAMES,
+  PAGE_TITLES,
+  REGISTRY,
+} from './games.ts';
 
 describe('the games registry', () => {
-  test('lists the three built games; the two migrated ones have a legacy page', () => {
+  test('lists the three built games in landing order; the two migrated ones have a legacy page', () => {
     expect(GAMES).toEqual(['gin-rummy', 'fidice', 'backgammon']);
+    expect(Object.keys(REGISTRY)).toEqual(GAMES);
     expect(LEGACY_GAMES).toEqual(['gin-rummy', 'fidice']);
   });
 
-  test('pins every page title', () => {
+  test('pins every row', () => {
+    expect(REGISTRY).toEqual({
+      'gin-rummy': {
+        title: 'Gin Rummy',
+        hook: 'window.__gin',
+        storage: { saveKey: 'ginRummyMP_v1', prefix: 'ginRummy_' },
+        debug: 0,
+        pageShape: {
+          ids: ['app', 'homeScreen', 'tableScreen', 'scResOverlay', 'toast'],
+          rulesSlots: true,
+        },
+        contractFloors: { ts: 50, markup: 40 },
+      },
+      fidice: {
+        title: "Fidice — one-cup liar's dice",
+        hook: 'window.__fidice',
+        debug: 1,
+        pageShape: { ids: ['app'], rulesSlots: false },
+        contractFloors: { ts: 50, markup: -1 },
+      },
+      backgammon: {
+        title: 'Sheshbesh — backgammon',
+        hook: 'window.__backgammon',
+        storage: { saveKey: 'backgammonMP_v1', prefix: 'backgammon_' },
+        debug: 0,
+        pageShape: {
+          ids: [
+            'app',
+            'homeScreen',
+            'tableScreen',
+            'board',
+            'toast',
+            ...Array.from({ length: 24 }, (_, i) => `point-${String(i + 1)}`),
+          ],
+          rulesSlots: true,
+        },
+        contractFloors: { ts: 35, markup: 40 },
+      },
+    });
+  });
+
+  test("the storage rows are the games' own STORAGE_KEYS: the save key, and the prefix of the shell's preference keys", () => {
+    // The shell's preferences (docs/design/shared-shell.md §5 A3): `<prefix><name>` in both games.
+    // A game's other keys (gin's Score Counter save `ginRummyScorerState_v2`, backgammon's variant
+    // and match length) are its own and need not carry the prefix.
+    const SHELL_PREFS = ['name', 'p2Name', 'homeTab', 'playMode', 'sound', 'soundFont'];
+    const pin = (
+      storage: Readonly<{ saveKey: string; prefix: string }> | undefined,
+      keys: Readonly<Record<string, string>>,
+    ): void => {
+      expect(storage?.saveKey).toBe(keys['save']);
+      SHELL_PREFS.forEach((name) => {
+        expect(keys[name], name).toBe(`${storage?.prefix ?? ''}${name}`);
+      });
+    };
+    pin(REGISTRY['gin-rummy'].storage, GIN_KEYS);
+    pin(REGISTRY.backgammon.storage, BACKGAMMON_KEYS);
+    expect(REGISTRY.fidice.storage).toBeUndefined();
+  });
+
+  test('pins every page title, read off the rows', () => {
     expect(PAGE_TITLES).toEqual({
       landing: "Ari's web apps",
       'gin-rummy': 'Gin Rummy',
@@ -20,7 +91,7 @@ describe('the games registry', () => {
     });
   });
 
-  test('pins every page hook', () => {
+  test('pins every page hook, read off the rows', () => {
     expect(HOOKS).toEqual({
       'gin-rummy': 'window.__gin',
       fidice: 'window.__fidice',
