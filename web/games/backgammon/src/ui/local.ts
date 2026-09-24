@@ -103,7 +103,7 @@ export const paintCurtain = (doc: PageLike, app: App): void => {
 
 /** `#curtainBtn`: the incoming seat reveals, and rolls when the button said so; `#curtainHandoffBtn` hands off. */
 export const bindLocal = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
-  bindCurtain(doc, dispatch, (btn) =>
+  bindCurtain(doc, dispatch, (btn): ReadonlyArray<Intent> =>
     dataOf(btn, 'rolls') === '1'
       ? [{ type: 'curtain/reveal' }, { type: 'roll/click' }]
       : [{ type: 'curtain/reveal' }],

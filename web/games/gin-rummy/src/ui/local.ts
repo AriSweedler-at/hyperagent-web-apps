@@ -38,5 +38,5 @@ export const paintCurtain = (doc: PageLike, app: App): void => {
 
 /** `#curtainBtn`: the seat whose turn it is reveals its cards. */
 export const bindLocal = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
-  bindCurtain(doc, dispatch, () => [{ type: 'curtain/reveal' }]);
+  bindCurtain(doc, dispatch, (): ReadonlyArray<Intent> => [{ type: 'curtain/reveal' }]);
 };
