@@ -356,14 +356,14 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const curtain = await bgCurtain(page);
       expect(curtain.title).toBe('Pass the phone to Bob');
       // The hit line in Bob's numbering (the board beneath is his): Ann's 5-point is his 20.
-      expect(curtain.last).toBe('Ann moved 8/7 8/5* · Ann hit you on the 20-point');
+      expect(curtain.last).toBe('Ann moved 8/7 8/5* · Ann hit you on your 20-point');
       // Nothing is toasted while Ann still holds the phone; Bob's reveal brings the "Kapará."
       // toast, in his own numbering (docs/design/backgammon-board.md §4.9).
       const toast = page.locator('#toast');
       await expect(toast).not.toHaveClass(/\bshow\b/);
       await bgReveal(page);
       await expect(toast).toBeVisible();
-      await expect(toast).toHaveText('Kapará. Ann hit you on the 20-point.');
+      await expect(toast).toHaveText('Kapará. Ann hit you on your 20-point.');
       await expect(toast).toHaveClass(/\bhit\b/);
     });
 

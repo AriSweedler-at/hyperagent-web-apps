@@ -336,11 +336,11 @@ export const guestGoneMsg = (oppName: string | null, code: string | null): strin
   `${oppName ?? 'Opponent'} disconnected — they can rejoin with code ${String(code)}.`;
 /**
  * The hit toast, for the player hit, in their own numbering, from the moves and never from log
- * text: `Kapará. Ari hit you on the 20-point.`; two hits in one turn share the toast (there is
- * one `#toast`, its timer restarts): `… on the 20-point and the 5-point.`
+ * text: `Kapará. Ari hit you on your 20-point.`; two hits in one turn share the toast (there is
+ * one `#toast`, its timer restarts): `… on your 20-point and your 5-point.`
  */
 export const hitMsg = (byName: string, ownPoints: ReadonlyArray<number>): string => {
-  const named = ownPoints.map((p) => `the ${String(p)}-point`);
+  const named = ownPoints.map((p) => `your ${String(p)}-point`);
   const where =
     named.length <= 1
       ? (named[0] ?? '')

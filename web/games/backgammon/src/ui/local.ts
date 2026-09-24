@@ -31,7 +31,7 @@ export type CurtainText = Readonly<{
 /**
  * `#curtainLast` for the seat taking the phone: the turn just finished as one line, its hits in
  * the incoming player's own numbering because the board beneath is drawn in it (`Ari moved 8/5*
- * 6/5 · Ari hit you on the 20-point`; the notation stays the mover's, as notation does). A
+ * 6/5 · Ari hit you on your 20-point`; the notation stays the mover's, as notation does). A
  * forfeited roll reads as logged; the incoming player's own hits (a double offered after their
  * turn) keep the log's lines, already in their numbering. Before any turn, the opening roll
  * (`Ari rolled 4, Jeff rolled 2 — Ari starts`, or `— Ari plays 4-2` in Western).
@@ -44,7 +44,7 @@ export const lastTurnText = (v: View, incoming: Seat): string => {
   const against = hitsAgainst(v, incoming);
   if (against.length > 0) {
     const by = v.players[mover].name;
-    return [last.text, ...against.map((p) => `${by} hit you on the ${String(p)}-point`)].join(
+    return [last.text, ...against.map((p) => `${by} hit you on your ${String(p)}-point`)].join(
       ' · ',
     );
   }

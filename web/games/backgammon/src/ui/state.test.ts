@@ -985,10 +985,10 @@ describe('the hit toast in pass-and-play', () => {
   });
 
   test('hitMsg: one point, or several in one breath', () => {
-    expect(hitMsg('Ann', [20])).toBe('Kapará. Ann hit you on the 20-point.');
-    expect(hitMsg('Ann', [20, 5])).toBe('Kapará. Ann hit you on the 20-point and the 5-point.');
+    expect(hitMsg('Ann', [20])).toBe('Kapará. Ann hit you on your 20-point.');
+    expect(hitMsg('Ann', [20, 5])).toBe('Kapará. Ann hit you on your 20-point and your 5-point.');
     expect(hitMsg('Ann', [22, 20, 5])).toBe(
-      'Kapará. Ann hit you on the 22-point, the 20-point and the 5-point.',
+      'Kapará. Ann hit you on your 22-point, your 20-point and your 5-point.',
     );
   });
 });
