@@ -44,7 +44,8 @@ and tests that prove it land before the code they protect.
 │   │   ├── lib/                 PURE: result, rng, json (decoders), roomCode (alphabets, prefixes, sanitiser),
 │   │   │                        algorithms (the loop escape hatch), clock (types)
 │   │   ├── edge/                EFFECTS: ice, transport (only importer of 'peerjs'; ?peer= override),
-│   │   │                        transport.fake, clock, storage, dom, fx
+│   │   │                        transport.fake, clock, storage, prefs (the shell's readers/writers over a
+│   │   │                        Store: name, play mode, sound, sound font, shellSave), dom, fx
 │   │   ├── ui/                  RESERVED (README only): HandView slot, toast/name-entry/lobby builders
 │   │   └── styles/              tokens.css (:root tokens only), base.css (shared primitives), CONTRACT.md
 │   │                            (CSS<->TS class contract + the two palettes' token table); both pages link them
@@ -94,7 +95,7 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 | `scorer/` (not `main.ts`) | engine types, shared/lib, siblings | Pure maths under the pure profile: the Score Counter's `computeRoundScores`, standings, voice parser, CSV text and `fmtDuration` (which `ui/cues.ts` re-exports). `scorer/main.ts` is its screen, an edge. |
 | `net/` | protocol, engine/domain, `@shared/edge/transport`, `@shared/edge/clock`, `@shared/edge/peer` | Never imports `peerjs`. `Transport`, `Clock`, `Rng`, `NewId` are injected so protocol tests run on `transport.fake.ts`. |
 | `ui/` / `view/` | engine/domain types, shared/lib, `@shared/edge/dom` | Render a view to strings/VNodes; DOM writes only in `render.ts` / `vdom.ts`. `HandView { render(model, selection): string }` is the only way a hand is drawn. |
-| `storage.ts` / `app/effects.ts` | shared/lib, `@shared/edge/storage` | Only modules that touch localStorage; every read goes through a decoder. |
+| `storage.ts` / `app/effects.ts` | shared/lib, `@shared/edge/storage`, `@shared/edge/prefs` | Only modules that touch localStorage; every read goes through a decoder. A game's `storage.ts` names its keys and builds its readers and writers from `prefs.ts` (`textPref`, `namePref`, `soundPref`, `shellSave<S, X>` over the engine decoder and the host save's own fields), so the shared literals are spelled once (docs/design/shared-shell.md §5 A3). |
 | `ui/state.ts` / `app/controller.ts` | everything below | Reducer over intents; imported only by `main.ts` and tests. |
 | `main.ts` | everything | Constructs adapters (PeerJS, Web Audio, storage, clock, `Math.random`). No logic. Module scripts are deferred, so it boots directly. |
 | `*.algorithms.ts` | shared/lib | The only files where loops, `let` and local mutation are allowed. Pure, functions only, 100% line coverage, and each export carries a comment saying why the functional form is unfit (hot DP, node-capped DFS, cartesian enumeration). |
