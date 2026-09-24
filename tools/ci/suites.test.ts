@@ -421,6 +421,7 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   ['a gin spec', ['e2e/gin-online.spec.ts'], ['e2e-gin']],
   ['a backgammon spec', ['e2e/backgammon-relay.spec.ts'], ['e2e-backgammon']],
   ['the smoke and style specs', ['e2e/smoke.spec.ts', 'e2e/computed-styles.spec.ts'], ['e2e-site']],
+  ["the shared shell's liveness spec", ['e2e/shell-liveness.spec.ts'], ['e2e-site']],
   ['the landing page', ['web/index.html'], ['site', 'e2e-site']],
   ['the alias stub', ['web/games/sheshbesh/index.html'], ['site', 'e2e-site']],
   ['the Worker', ['infra/games-proxy/worker.ts'], ['site', 'e2e-site', 'harness']],

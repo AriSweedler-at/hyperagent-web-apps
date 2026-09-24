@@ -96,7 +96,7 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 | `web/shared/edge/sound.ts` | shared/lib, `@shared/edge/fx` | `playSound(audio, sound, deps)`: a synth through `AudioCues.seq`, a sample fetched and decoded once per URL into the cues' context, silence nothing; every failure silent. A game's `fx.ts` plays its table's cue in the App's font through it. |
 | `web/shared/edge/cuePlayer.ts` | shared/lib, `@shared/edge/fx`, `@shared/edge/sound` | `createCuePlayer<E>({ audio, sound, vibrate, cues, persist, onToggle })`: gin's legacy `fx` object once for every game, with the game's cue table (`ui/sound.ts`, event -> generic cue + buzz) and the persist of its sound preference injected. `play(event, font)` resolves the row's cue in the App's font and buzzes when enabled; `toggle(font)` flips, persists, warms and taps when turning on; `warm()`. Each game's `src/fx.ts` is an ~8-line wrapper (shared-shell plan, A4). |
 | `web/shared/edge/peer.ts` | shared/lib, `@shared/edge/transport` | The peer plumbing every game's sessions share: `NetDeps`, `whenTransportReady`, `peerWatchdog`, `keepPeerAlive`, `announcePath`, `describePeerError`, the legacy timings and strings. `web/shared/net` imports it directly; fidice's `net/peerjs.ts` takes its types. |
-| `web/shared/net` | shared/lib, `@shared/edge/transport`, `@shared/edge/clock`, `@shared/edge/peer` | The two-seat sessions (docs/design/shared-shell.md §4.5): `HostSession<G, H, X>` and `GuestSession<G, H>` are gin's classes with the game injected, a `HostCodec`/`GuestCodec` built from the game's `protocol.ts` (decode, welcome, full; decode, join) and `game` for `peerIdFor`. Never names a game. `sessions.harness.ts` is the world the three session suites share. |
+| `web/shared/net` | shared/lib, `@shared/edge/transport`, `@shared/edge/clock`, `@shared/edge/peer` | The two-seat sessions (docs/design/shared-shell.md §4.5): `HostSession<G, H, X>` and `GuestSession<G, H>` are gin's classes with the game injected, a `HostCodec`/`GuestCodec` built from the game's `protocol.ts` (decode, welcome, full; decode, join) and `game` for `peerIdFor`. Never names a game. `liveness.ts` is the peer-loss detection both sessions run below the codec: a `{t: 'hb'}` frame every `HB_MS` (5 s) on an open channel, intercepted before the game's decoder, and `HB_GRACE_MS` (15 s) with no inbound frame is the peer gone (`guestGone(null)` on the host, the channel closed and the seat freed; `lost` and the rejoin on the guest); a join arriving while the current guest has been silent `HB_MISSED_MS` (10 s) replaces the silent channel instead of being told the room is full, and one arriving sooner is held until the guest's next frame (a third peer: `full`) or that silence (the guest's own return: seated, its waiting frames replayed). The guest's `tryJoin` connects nothing while a channel is open, so a broker reconnect under a live game opens no second channel. PeerJS fires `close` only for a deliberate departure, so without this a killed tab or a dropped phone kept its seat for good. `sessions.harness.ts` is the world the three session suites share. |
 | `web/shared/edge/netDeps.ts` | `@shared/edge/{transport,ice,clock,peer}` | `browserNetDeps({ search, debug, onWake? })`: the `NetDeps` a page hands its sessions, once for the three pages: `realTransport` at the page's PeerJS log level (gin 0, fidice 1, backgammon 0; e2e `expectPeerOptions` pins each), the browser ICE loader, the real clock and the legacy `keepPeerAlive` wake listeners (`document` visibilitychange, `window` online). Constructed in `main.ts` only. |
 | `engine` / `domain` / `bots` | shared/lib, siblings | Pure. `applyAction(state, seat, action, rng): Result<State, RuleError>` (gin), `apply(s, actor, action, rng): Result` (fidice), `applyAction(state, seat, action, rng, now): Result<State, string>` (backgammon, with `createGame`/`nextGame` taking the same injected `rng` and `now`). Return new state; never mutate. `viewFor` / `redactFor` are the only redaction (backgammon hides nothing: its `View` adds the per-seat selectors `legal`, `plays`, `canDouble`, `pips`). |
 | `web/shared/lib/protocol.ts` | itself | The two-seat wire skeleton gin and backgammon share (the shared-shell design §4.5): `twoSeatProtocol({ decodeAction, decodeView, room })` returns the seven frame builders and the three decoders in the legacy key order (`welcome`/`lobby` spread the game's room after `hostName`), with `isGuestFrame`, `guestNameFor` and the `WIRE_TAGS`/`NAME_MAX`/`TOAST_MAX`/`DEFAULT_GUEST_NAME` literals. |
@@ -434,7 +434,13 @@ docs run only `check`. The levels below say which suite holds them.
    every phase, no scroll at the two viewports and a scroll at 375x667), backgammon online (join by
    code, the seeded opening on both boards, the guest's roll rolled by the host, a move propagating,
    `sheshbesh-<code>` on the host's Peer; host reload -> resume, guest rejoin, pass-and-play resume;
-   the 🌐 handoff and its `?join=` link); smoke on every page: zero uncaught exceptions, zero failed requests outside an
+   the 🌐 handoff and its `?join=` link); shell liveness for both games (`e2e/shell-liveness.spec.ts`,
+   `pages` only: the guest's browser context closed mid-game, the host's dot off and the rejoin
+   toast within `LIVENESS_TIMEOUT`, then the same name in a new tab seated with the current view;
+   the same return two seconds after the death, held and seated with no "room full" and no toast on
+   the host; the guest's broker socket closed under a live game, no second channel and no "lost";
+   statuses and toasts collected by a MutationObserver, so a flash between polls is not missed);
+   smoke on every page: zero uncaught exceptions, zero failed requests outside an
    allowlist, and the Peer constructor received the `?ice=` config. Visual `toHaveScreenshot`
    baselines captured on the CI runner from the legacy pages. The `@relay` specs (gin, fidice and
    backgammon with `?ice-policy=relay`) connect through the harness's coturn and read the selected candidate
@@ -1059,3 +1065,41 @@ Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage r
   `sheshbesh-ABCD`), welcome and lobby bytes, and one refused and one accepted frame through the
   real wrappers. `web/shared/net` has its own zone (shared/lib and the transport, clock and peer
   edges), coverage row and `tsconfig.node.json` entry.
+- Liveness in the shared sessions (`web/shared/net/liveness.ts`; the decision's reasons in its
+  header): the two-browser review of the online PRs found that a guest whose tab or phone died
+  was never reported to the host (PeerJS fires a DataConnection's `close` only for a deliberate
+  departure; the RTCPeerConnection sat in `disconnected` without `failed`), so the opponent dot
+  stayed green and the same guest back in a new tab was told the room was full for as long as the
+  host page lived. Both sessions now heartbeat below the codec (`{t: 'hb'}` every `HB_MS` = 5 s on
+  an open channel, intercepted by the session before the game's decoder, so no game frame changed
+  a byte and the wire-corpus traces compare exactly what they did) and take `HB_GRACE_MS` = 15 s
+  with no inbound frame as the peer gone: the host closes the channel and raises `guestGone(null)`
+  once, the reducers' existing copy ("they can rejoin with code X") and the freed seat follow; the
+  guest raises `lost` and rejoins `REJOIN_MS` later as after a close. A join arriving while the
+  current guest has been silent `HB_MISSED_MS` = 10 s replaces the silent channel (closed with no
+  `guestGone`) rather than being told the room is full; one arriving sooner is held (`accept`):
+  a heartbeat is not answered, so nothing tells a dead guest from a quiet one before its next
+  beat is due, and the legacy's `full` at once was what a guest got, every `REJOIN_MS`, when it
+  came back within seconds of its tab dying (the liveness review's L2-early: five "room full"
+  flashes). Held, the join's frames wait; the guest's next frame makes it a third peer (`full`,
+  closed `FULL_CLOSE_MS` on, so a genuine third peer waits at most `HB_MS`), `HB_MISSED_MS` of
+  silence makes it the guest's return (seated, the welcome then its waiting `join`), a second
+  join while one is held is `full` at once, and a held join is seated the moment the guest leaves
+  on purpose. The guest's `tryJoin` connects nothing while a channel is open: the legacy joined
+  on every Peer `open`, so a broker socket blink mid-game opened a second channel the host told
+  `full`, and the guest showed "room full", "lost" and a dot flicker for ~10 s over a game that was
+  fine (the review's B4); a data channel does not depend on the broker once open. A channel that
+  raised `error` keeps its report but its watch stops, so the silence that follows does not report
+  the same guest twice. The ICE states were not adopted as a fast path (Chromium's `failed`, when
+  it comes, follows its ~30 s consent timeout; neither transition is drivable in the transport
+  contract's bounded run), so the `Connection` type, the fake and the contract are unchanged. The
+  grace is judged from `clock.now()` when a timer fires, so a page frozen in the background gives
+  its verdict on waking; that clock is `Date.now()`, and a wall clock stepped forward by the grace
+  reads as silence once (documented in `liveness.ts`, not repaired: the rejoin repairs it).
+  `liveness.test.ts` pins the mechanism and the probe, `sessions.test.ts` nine scenarios over both
+  sessions (the seat freed, the hold refused and seated, the returning guest, a second knock, a
+  knocker leaving, a heartbeat never surfacing, the two sessions keeping each other alive, the
+  broker blink joining nothing), `e2e/shell-liveness.spec.ts` the page for each game. Two legacy
+  scenarios changed shape with it (a third peer is `full` once the first guest is heard, not at
+  once; a guest's reconnect opens no second channel), as did both games' third-peer pins; the gin
+  wire traces are untouched (they replay `full` through `send`, whose bytes did not change).

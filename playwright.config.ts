@@ -76,6 +76,8 @@ const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/gin-scorer.spec.ts',
   '**/gin-sound-font.spec.ts',
   '**/gin-stories.spec.ts',
+  // The sessions' silence watch is a timer, the same on either origin.
+  '**/shell-liveness.spec.ts',
 ];
 /** The suite `E2E_SUITE` names, or none; a name with no e2e half is an error, never a full run. */
 const e2eSuiteFromEnv = (value: string | undefined): Suite | undefined => {

@@ -12,9 +12,21 @@
 // the broker itself does not answer. Everything it did to the page goes through `GuestEvents` and
 // everything it read off `app` comes back through `read()`, so sessions.test.ts drives it over
 // transport.fake.ts and clock.fake.ts. Inbound frames pass the game's decoder; a refused frame is
-// dropped (the legacy ignored non-objects and unknown tags). Two legacy traits are kept on purpose:
-// `tryJoin` runs on every Peer `open`, so a broker reconnect opens a second channel beside a live
-// one, and a channel that stopped being current still reports its frames.
+// dropped (the legacy ignored non-objects and unknown tags). One legacy trait is kept on purpose: a
+// channel that stopped being current still reports its frames. Another was dropped with the
+// liveness below: the legacy ran `tryJoin` on every Peer `open`, so a broker reconnect mid-game
+// (keepPeerAlive, after the PeerServer socket blinked) opened a second channel beside a live one,
+// which the host told `full`; the guest then showed "room full", "lost the host" and a rejoin loop
+// for as long as it took the first channel to fall silent, while the game on that channel went on
+// unharmed (the liveness review's B4). A data channel does not depend on the broker once it is
+// open, so `tryJoin` connects nothing while a channel is open; beside a closed or never-opened
+// channel it joins as before (the first `open`, the retries, and a broker that came back after the
+// host was lost).
+//
+// Liveness (liveness.ts; host.ts has the host's half): the guest heartbeats the host every HB_MS
+// on its open channel and, after HB_GRACE_MS without any frame from it, closes the dead channel
+// and takes the path a closed channel takes: `lost`, then a rejoin REJOIN_MS later. A channel that
+// stopped being current (a rejoin's predecessor) stops beating.
 import {
   ICE_FAILED_MSG,
   WATCHDOG_MS,
@@ -31,6 +43,9 @@ import {
 import type { Connection, PeerHandle } from '../edge/transport.ts';
 import type { Result } from '../lib/result.ts';
 import { peerIdFor, type Game } from '../lib/roomCode.ts';
+import { isHeartbeat, liveness, type Liveness } from './liveness.ts';
+
+export { HB_GRACE_MS, HB_MS } from './liveness.ts';
 
 /** `peer-unavailable` (the host's phone is asleep): connect again after this long... */
 export const JOIN_RETRY_MS = 3000;
@@ -80,7 +95,10 @@ export type GuestEvents<H> = Readonly<{
   connected: () => void;
   /** A host frame arrived and passed the decoder. */
   frame: (frame: H) => void;
-  /** The current channel closed; the session connects again REJOIN_MS later. */
+  /**
+   * The current channel closed, or fell silent for HB_GRACE_MS (liveness.ts); the session
+   * connects again REJOIN_MS later.
+   */
   lost: () => void;
 }>;
 
@@ -115,6 +133,8 @@ export class GuestSession<G, H> {
   private readonly opts: GuestOptions;
   private peer: PeerHandle | null = null;
   private conn: Connection | null = null;
+  /** The current channel's heartbeat and silence watch; stopped with the channel. */
+  private live: Liveness | null = null;
   private joinTries = 0;
 
   constructor(deps: GuestDeps<H>, codec: GuestCodec<G, H>, opts: GuestOptions) {
@@ -136,6 +156,7 @@ export class GuestSession<G, H> {
 
   /** Leave: close the channel and destroy the Peer (cancel destroyed the Peer, which closes both). */
   close(): void {
+    this.live?.stop();
     this.conn?.close();
     this.peer?.destroy();
   }
@@ -177,6 +198,9 @@ export class GuestSession<G, H> {
     const { deps, codec, opts } = this;
     const { events } = deps;
     if (peer.destroyed() || peer.disconnected()) return;
+    // A channel to the host is open: nothing to join again (the header). This is the broker coming
+    // back under a live game, or a rejoin timer firing after a broker `open` already rejoined.
+    if (this.conn?.open() === true) return;
     this.joinTries += 1;
     events.status(
       this.joinTries === 1
@@ -184,7 +208,19 @@ export class GuestSession<G, H> {
         : retryingMsg(opts.code, this.joinTries),
     );
     const conn = peer.connect(peerIdFor(opts.game, opts.code));
+    // The channel this one replaces (a rejoin's predecessor, closed or given up on) stops beating.
+    this.live?.stop();
     this.conn = conn;
+    const live = liveness(conn, deps.clock, () => {
+      // HB_GRACE_MS without a frame from the host: its page is dead or frozen (a watch is stopped
+      // whenever its channel stops being current, so this is about `this.conn`). Dropped first, so
+      // the close (PeerJS emits it at once) is not a second loss; then the closed channel's path.
+      this.conn = null;
+      this.live = null;
+      conn.close();
+      this.lost(peer, ice);
+    });
+    this.live = live;
     let opened = false;
     let failed = false;
     deps.clock.setTimeout(() => {
@@ -198,6 +234,7 @@ export class GuestSession<G, H> {
       conn.send(codec.join(deps.read().myName));
       events.status(CONNECTED_MSG);
       events.persist();
+      live.start();
       announcePath(
         conn,
         () => this.conn === conn,
@@ -208,16 +245,17 @@ export class GuestSession<G, H> {
       );
     });
     // As the legacy `conn.on('data', onHostMsg)`: every channel that was once current keeps reporting.
+    // A heartbeat is life and nothing more: it stops here, before the codec.
     conn.onMessage((raw) => {
+      live.heard();
+      if (isHeartbeat(raw)) return;
       const decoded = codec.decode(raw);
       if (decoded.ok) events.frame(decoded.value);
     });
     conn.onClose(() => {
       if (this.conn !== conn) return;
-      events.lost();
-      deps.clock.setTimeout(() => {
-        this.tryJoin(peer, ice);
-      }, REJOIN_MS);
+      live.stop();
+      this.lost(peer, ice);
     });
     // PeerJS closes the RTCPeerConnection before it relays the ICE state, so this error is the
     // only reliable signal that negotiation failed before the channel opened (no 'close' follows).
@@ -228,5 +266,13 @@ export class GuestSession<G, H> {
       }
       events.toast(describePeerError(e), ERROR_TOAST_MS);
     });
+  }
+
+  /** The current channel is gone (closed, or silent past the grace): report it, rejoin REJOIN_MS later. */
+  private lost(peer: PeerHandle, ice: IceResult | null): void {
+    this.deps.events.lost();
+    this.deps.clock.setTimeout(() => {
+      this.tryJoin(peer, ice);
+    }, REJOIN_MS);
   }
 }

@@ -25,7 +25,7 @@ a fourth game learns it must register.
 | `gin` | `web/games/gin-rummy/**/*.test.ts`, `test/parity/gin.*`, `test/fixtures/legacy/gin-wire.test.ts`, `test/card-backs.test.ts` | | the 10 gin rows | `**/gin-*.spec.ts` |
 | `fidice` | `web/games/fidice/**/*.test.ts`, `test/parity/fidice.*`, `test/tools/debundle-fidice.test.ts` | | the 7 fidice rows | `**/fidice-*.spec.ts` |
 | `backgammon` | `web/games/backgammon/**/*.test.ts` | | the 7 backgammon rows | `**/backgammon-*.spec.ts` |
-| `site` | `test/tokens.test.ts`, `test/ratchet.test.ts`, `infra/games-proxy/worker.test.ts` | `test/dist/**` (`needsBuild: true`) | `infra/games-proxy/worker.ts` | `**/smoke.spec.ts`, `**/computed-styles.spec.ts` |
+| `site` | `test/tokens.test.ts`, `test/ratchet.test.ts`, `infra/games-proxy/worker.test.ts` | `test/dist/**` (`needsBuild: true`) | `infra/games-proxy/worker.ts` | `**/smoke.spec.ts`, `**/computed-styles.spec.ts`, `**/shell-liveness.spec.ts` (the shared shell across both games: a cross-game spec until §5.2's tags split such files) |
 | `harness` | `test/tools/{serve-dist,proxy-dev,computed-styles}.test.ts`, `test/fixtures/legacy/{frozen,manifest}.test.ts`, `tools/**/*.test.ts` | | | |
 
 Counts on this branch: 30 + 1 + 44 + 17 + 21 + 8 + 9 = 130 test files (the harness row holds the
@@ -77,7 +77,7 @@ paths and `everything` anywhere selects every job. `check` (typecheck, lint, hoo
 | `test/integration/**` | `shared-integration` |
 | `web/index.html`, `web/games/sheshbesh/**` | `site`, `e2e-site` |
 | `test/dist/**`, `test/tokens.test.ts`, `test/ratchet.test.ts` | `site` |
-| `e2e/smoke.spec.ts`, `e2e/computed-styles.spec.ts` | `e2e-site` |
+| `e2e/smoke.spec.ts`, `e2e/computed-styles.spec.ts`, `e2e/shell-liveness.spec.ts` | `e2e-site` |
 | `infra/games-proxy/**` | `site`, `e2e-site`, `harness` |
 | `test/tools/**`, `test/fixtures/legacy/**` | `harness` |
 | anything else | everything (a new folder earns its row) |
