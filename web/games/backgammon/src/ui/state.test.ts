@@ -18,7 +18,12 @@ import {
 import type { Board, Dice, Seat, State, View } from '../engine/index.ts';
 import { connectingMsg } from '../net/guest.ts';
 import { OPENING_MSG, handoffMsg } from '../net/host.ts';
-import { lobby, state as stateFrame, toast as toastFrame } from '../protocol.ts';
+import {
+  action as actionFrame,
+  lobby,
+  state as stateFrame,
+  toast as toastFrame,
+} from '../protocol.ts';
 import { STORAGE_KEYS } from '../storage.ts';
 import { effectiveSelection, sourcesOf, targetsOf } from './board.ts';
 import { CUES } from './sound.ts';
@@ -39,6 +44,7 @@ import {
   SCREENS,
   SHAKE_MS,
   SHELL_INTENT_TYPES,
+  TUMBLE_MS,
   WAITING_FOR_GUEST_MSG,
   badPositionMsg,
   cuesBetween,
@@ -57,6 +63,7 @@ import {
   reduce,
   resumeFor,
   resumeLabel,
+  rollModalOpen,
   runEffect,
   saveFor,
   type App,
@@ -177,6 +184,8 @@ const hosting = (): App => run(lobbyApp(), { type: 'host/deal' }).app;
 const nextTap = (app: App): Intent | null => {
   if (app.table.curtain !== null) return { type: 'curtain/reveal' };
   if (app.table.pending !== null) return { type: 'chip/tap', index: 0 };
+  // The dice tumble after every roll (TUMBLE_MS); the policy lets the timer fire, as main.ts would.
+  if (app.table.rolling) return { type: 'tumble/elapsed' };
   if (app.table.noMoveUntil !== null) return { type: 'noMove/elapsed' };
   const v = view(app);
   if (v.phase === 'over') return null;
@@ -242,6 +251,7 @@ describe('the initial app', () => {
       picked: null,
       pending: null,
       drag: null,
+      rolling: false,
       shake: null,
       resultOpen: false,
       menuOpen: false,
@@ -555,7 +565,9 @@ describe('hosting', () => {
     });
     const mine = run(start, { type: 'roll/click' });
     if (guestFirst) {
-      expect(kinds(wrong.effects)).toEqual(['send', 'persist', 'fx', 'scrollTop']);
+      // The guest's roll: broadcast, the roll cue, the tumble on the host's board too.
+      expect(kinds(wrong.effects)).toEqual(['send', 'persist', 'fx', 'startTimer', 'scrollTop']);
+      expect(wrong.app.table.rolling).toBe(true);
       expect(game(wrong.app).phase).toBe('moving');
       expect(sends(wrong.effects)).toEqual([stateFrame(viewFor(game(wrong.app), 1))]);
       // The host's own roll is dropped by the reducer (not my turn), not by the engine.
@@ -1174,6 +1186,107 @@ describe('the dice, the bar, the tray and a drag', () => {
   });
 });
 
+describe('the roll modal and the tumble (design §4.7)', () => {
+  const START = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';
+  const tumble = {
+    type: 'startTimer',
+    id: 'tumble',
+    ms: TUMBLE_MS,
+    then: { type: 'tumble/elapsed' },
+  };
+
+  test('pass-and-play: the modal is up for the revealed seat to roll, not under the curtain; the click tumbles, holds every tap, then settles', () => {
+    const covered = local();
+    expect(game(covered).phase).toBe('toRoll');
+    expect(rollModalOpen(covered)).toBe(false);
+    const open = revealed(covered);
+    expect(rollModalOpen(open)).toBe(true);
+    expect(open.table.rolling).toBe(false);
+    // The click: the engine rolls at once; the tumble timer is armed at the click and again as the
+    // roll arrives; the modal stays through the tumble.
+    const rolled = run(open, { type: 'roll/click' });
+    expect(game(rolled.app).phase).toBe('moving');
+    expect(rolled.app.table.rolling).toBe(true);
+    expect(rollModalOpen(rolled.app)).toBe(true);
+    expect(rolled.effects).toEqual([
+      tumble,
+      { type: 'persist' },
+      { type: 'fx', cue: 'roll' },
+      tumble,
+      { type: 'scrollTop' },
+    ]);
+    // Nothing answers while the dice tumble: a tap on a source, a second roll, an undo.
+    const [source] = sourcesOf(view(rolled.app));
+    if (source === undefined || source === 'bar') throw new Error('no point source');
+    expect(run(rolled.app, { type: 'point/tap', point: source })).toEqual({
+      app: rolled.app,
+      effects: [],
+    });
+    expect(run(rolled.app, { type: 'roll/click' })).toEqual({ app: rolled.app, effects: [] });
+    expect(run(rolled.app, { type: 'undo/click' })).toEqual({ app: rolled.app, effects: [] });
+    // The timer: the dice settle, the modal goes, the board answers.
+    const settledDice = run(rolled.app, { type: 'tumble/elapsed' });
+    expect(settledDice.app.table.rolling).toBe(false);
+    expect(settledDice.effects).toEqual([]);
+    expect(rollModalOpen(settledDice.app)).toBe(false);
+    expect(run(settledDice.app, { type: 'point/tap', point: source }).app.table.selected).toBe(
+      source,
+    );
+    // A stray timer changes nothing.
+    expect(run(settledDice.app, { type: 'tumble/elapsed' })).toEqual({
+      app: settledDice.app,
+      effects: [],
+    });
+    // Once the match is over there is no roll to ask for.
+    const done = playOut({ app: local('1'), effects: [] }, 4000).app;
+    expect(view(done).matchOver).toBe(true);
+    expect(rollModalOpen(done)).toBe(false);
+  });
+
+  test('the guest: the click sends the roll and holds the modal; the host`s frame brings the faces and restarts the tumble; a refusal drops it; the host`s own roll tumbles without the modal', () => {
+    const seated = withPosition(game(local()), pos(START), 1, null);
+    const welcome = { t: 'welcome', hostName: 'Ann', matchLength: 5, variant: 'portes' } as const;
+    const guest = run(
+      initialApp,
+      { type: 'join/click', name: 'Bo', code: 'ABCD' },
+      { type: 'guest/frame', frame: welcome },
+      { type: 'guest/connected' },
+      { type: 'guest/frame', frame: stateFrame(viewFor(seated, 1)) },
+    ).app;
+    expect(guest.shell.view?.isMyTurn).toBe(true);
+    expect(rollModalOpen(guest)).toBe(true);
+    const asked = run(guest, { type: 'roll/click' });
+    expect(asked.app.table.rolling).toBe(true);
+    expect(rollModalOpen(asked.app)).toBe(true);
+    expect(asked.effects).toEqual([tumble, { type: 'send', frame: actionFrame({ type: 'roll' }) }]);
+    // The host rolled: the frame's fresh roll cues and restarts the tumble; the modal stays.
+    const rolledState = applyAction(seated, 1, { type: 'roll' }, ctx.rng, ctx.now);
+    if (!rolledState.ok) throw new Error(rolledState.error);
+    const arrived = run(asked.app, {
+      type: 'guest/frame',
+      frame: stateFrame(viewFor(rolledState.value, 1)),
+    });
+    expect(arrived.app.table.rolling).toBe(true);
+    expect(rollModalOpen(arrived.app)).toBe(true);
+    expect(arrived.effects).toEqual([{ type: 'fx', cue: 'roll' }, tumble, { type: 'scrollTop' }]);
+    expect(rollModalOpen(run(arrived.app, { type: 'tumble/elapsed' }).app)).toBe(false);
+    // The host refused (not my turn after all): the toast frame drops the tumble with the taps.
+    const refused = run(asked.app, { type: 'guest/frame', frame: toastFrame('No.') });
+    expect(refused.app.table.rolling).toBe(false);
+    // The other seat's roll: the dice tumble on my board, no modal of mine.
+    const hostToRoll = withPosition(game(local()), pos(START), 0, null);
+    const hostRolled = applyAction(hostToRoll, 0, { type: 'roll' }, ctx.rng, ctx.now);
+    if (!hostRolled.ok) throw new Error(hostRolled.error);
+    const watching = run(
+      run(guest, { type: 'guest/frame', frame: stateFrame(viewFor(hostToRoll, 1)) }).app,
+      { type: 'guest/frame', frame: stateFrame(viewFor(hostRolled.value, 1)) },
+    );
+    expect(watching.app.table.rolling).toBe(true);
+    expect(rollModalOpen(watching.app)).toBe(false);
+    expect(kinds(watching.effects)).toEqual(['fx', 'startTimer', 'scrollTop']);
+  });
+});
+
 describe('the R14 beat and the Western cube', () => {
   test('a roll with no move keeps the roller`s table for NO_MOVE_MS, then the curtain rises for the other seat', () => {
     const app = at(SHUT_OUT, 0, null);
@@ -1183,16 +1296,34 @@ describe('the R14 beat and the Western cube', () => {
     expect(g.lastAction?.kind).toBe('noMove');
     // The forfeited roll stays in view: Light's view, dice shown, no curtain yet, the timer armed.
     expect(rolled.app.shell.view).toEqual(viewFor(g, 0));
-    expect(rolled.app.table).toMatchObject({ curtain: null, noMoveUntil: NOW + NO_MOVE_MS });
+    expect(rolled.app.table).toMatchObject({
+      curtain: null,
+      noMoveUntil: NOW + NO_MOVE_MS,
+      rolling: true,
+    });
+    // The tumble timer is armed at the click and again as the roll arrives (design §4.7).
+    const tumble = {
+      type: 'startTimer',
+      id: 'tumble',
+      ms: TUMBLE_MS,
+      then: { type: 'tumble/elapsed' },
+    };
     expect(rolled.effects).toEqual([
+      tumble,
       { type: 'persist' },
       { type: 'fx', cue: 'roll' },
+      tumble,
       { type: 'startTimer', id: 'noMove', ms: NO_MOVE_MS, then: { type: 'noMove/elapsed' } },
       { type: 'scrollTop' },
     ]);
+    // The forfeited roll's modal stays through the tumble (the roller's own), then goes; the beat holds on.
+    expect(rollModalOpen(rolled.app)).toBe(true);
+    const settledDice = run(rolled.app, { type: 'tumble/elapsed' }).app;
+    expect(settledDice.table).toMatchObject({ rolling: false, noMoveUntil: NOW + NO_MOVE_MS });
+    expect(rollModalOpen(settledDice)).toBe(false);
     // Taps and rolls during the beat are dropped (not Light's turn any more).
-    expect(run(rolled.app, { type: 'roll/click' })).toEqual({ app: rolled.app, effects: [] });
-    const seen = run(rolled.app, { type: 'noMove/elapsed' });
+    expect(run(settledDice, { type: 'roll/click' })).toEqual({ app: settledDice, effects: [] });
+    const seen = run(settledDice, { type: 'noMove/elapsed' });
     expect(seen.app.table).toMatchObject({ noMoveUntil: null, curtain: 1 });
     expect(seen.app.shell.view).toEqual(viewFor(g, 1));
     expect(kinds(seen.effects)).toEqual(['persist', 'fx', 'scrollTop']);

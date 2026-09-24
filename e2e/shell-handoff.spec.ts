@@ -89,7 +89,7 @@ const handOff = async (
 
 /**
  * Cancel the room and resume pass and play: the table as it stands, read beneath the curtain that
- * names the mover again (its button would roll for a backgammon seat still to roll, so it is left up).
+ * names the mover again (its reveal would bring backgammon's roll modal for a seat still to roll, so it is left up).
  */
 const cancelAndResume = async (page: Page, driver: ShellDriver): Promise<string> => {
   await page.locator('#cancelHostBtn').click();

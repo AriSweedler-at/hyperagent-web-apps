@@ -938,11 +938,6 @@ body.fixed-screen #app {
   min-width: 168px;
   min-height: 54px;
 }
-.roll-slot .btn-primary {
-  width: auto;
-  min-width: 168px;
-  padding: 12px 16px;
-}
 .wait-note {
   color: var(--muted);
   font-size: 0.9rem;
@@ -1592,43 +1587,52 @@ body.fixed-screen #app {
     inset 0 -2px 3px rgba(42, 26, 18, 0.15),
     0 1px 2px rgba(0, 0, 0, 0.35);
 }
-.die-1::after {
-  background: radial-gradient(circle at 50% 50%, var(--pip));
-}
-.die-2::after {
-  background:
+.die {
+  /* The six faces as pip lists, so the tumble's keyframes can name them too. */
+  --pips-1: radial-gradient(circle at 50% 50%, var(--pip));
+  --pips-2:
     radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
     radial-gradient(circle at var(--hi) var(--hi), var(--pip));
-}
-.die-3::after {
-  background:
+  --pips-3:
     radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
     radial-gradient(circle at 50% 50%, var(--pip)),
     radial-gradient(circle at var(--hi) var(--hi), var(--pip));
-}
-.die-4::after {
-  background:
+  --pips-4:
     radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
     radial-gradient(circle at var(--hi) var(--lo), var(--pip)),
     radial-gradient(circle at var(--lo) var(--hi), var(--pip)),
     radial-gradient(circle at var(--hi) var(--hi), var(--pip));
-}
-.die-5::after {
-  background:
+  --pips-5:
     radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
     radial-gradient(circle at var(--hi) var(--lo), var(--pip)),
     radial-gradient(circle at 50% 50%, var(--pip)),
     radial-gradient(circle at var(--lo) var(--hi), var(--pip)),
     radial-gradient(circle at var(--hi) var(--hi), var(--pip));
-}
-.die-6::after {
-  background:
+  --pips-6:
     radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
     radial-gradient(circle at var(--hi) var(--lo), var(--pip)),
     radial-gradient(circle at var(--lo) 50%, var(--pip)),
     radial-gradient(circle at var(--hi) 50%, var(--pip)),
     radial-gradient(circle at var(--lo) var(--hi), var(--pip)),
     radial-gradient(circle at var(--hi) var(--hi), var(--pip));
+}
+.die-1::after {
+  background: var(--pips-1);
+}
+.die-2::after {
+  background: var(--pips-2);
+}
+.die-3::after {
+  background: var(--pips-3);
+}
+.die-4::after {
+  background: var(--pips-4);
+}
+.die-5::after {
+  background: var(--pips-5);
+}
+.die-6::after {
+  background: var(--pips-6);
 }
 /* Before the roll: two blank nacre squares. */
 .die.blank::before {
@@ -1672,8 +1676,20 @@ body.fixed-screen #app {
 .die.theirs {
   filter: saturate(0.7) brightness(0.85);
 }
-#dice.rolling .die {
-  animation: tumble 350ms ease-out;
+/* The tumble (design §4.7; the owner: "a little die rolling animation. Which for now is just the
+   dice scrolling randomly through their numbers"): while `rolling` (ui/state.ts `table.rolling`,
+   TUMBLE_MS 700) each die turns once and its pips run through a fixed pseudo-random list of
+   faces, one every 70ms for 560ms (`steps(1, end)`: each face holds), then the real faces show for
+   the rest of the beat. Odd and even dice run different lists, so two dice never agree mid-air.
+   A cosmetic run over a roll the engine has already made: no randomness here. */
+.rolling .die {
+  animation: tumble 560ms ease-out;
+}
+.rolling .die::after {
+  animation: tumble-faces-a 560ms steps(1, end);
+}
+.rolling .die:nth-child(even)::after {
+  animation-name: tumble-faces-b;
 }
 @keyframes tumble {
   0% {
@@ -1685,6 +1701,91 @@ body.fixed-screen #app {
   100% {
     transform: rotate(360deg) scale(1);
   }
+}
+@keyframes tumble-faces-a {
+  0% {
+    background: var(--pips-3);
+  }
+  12.5% {
+    background: var(--pips-6);
+  }
+  25% {
+    background: var(--pips-1);
+  }
+  37.5% {
+    background: var(--pips-4);
+  }
+  50% {
+    background: var(--pips-2);
+  }
+  62.5% {
+    background: var(--pips-5);
+  }
+  75% {
+    background: var(--pips-1);
+  }
+  87.5%,
+  100% {
+    background: var(--pips-3);
+  }
+}
+@keyframes tumble-faces-b {
+  0% {
+    background: var(--pips-5);
+  }
+  12.5% {
+    background: var(--pips-2);
+  }
+  25% {
+    background: var(--pips-4);
+  }
+  37.5% {
+    background: var(--pips-6);
+  }
+  50% {
+    background: var(--pips-1);
+  }
+  62.5% {
+    background: var(--pips-3);
+  }
+  75% {
+    background: var(--pips-6);
+  }
+  87.5%,
+  100% {
+    background: var(--pips-2);
+  }
+}
+
+/* ---------- the roll modal (design §4.7) ---------- */
+/* The start-of-turn call to action, over the board alone (a child of #board: the topbar and its
+   menu stay in reach): a dim wash and a sheet with the two dice, the button and, in Western, the
+   Double. It has no close, no backdrop tap and no Escape: it goes when the dice have settled. */
+.roll-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: rgba(42, 26, 18, 0.45);
+}
+.roll-sheet {
+  max-width: 340px;
+  padding: 18px 16px 16px;
+}
+.roll-dice {
+  --die-s: 56px;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin: 4px 0 16px;
+}
+.roll-cta {
+  font-size: 1.2rem;
+  min-height: 60px;
 }
 
 /* ---------- highlight states (design §3.7) ---------- */
@@ -1918,7 +2019,8 @@ body.fixed-screen #app {
   transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @media (prefers-reduced-motion: reduce) {
-  #dice.rolling .die,
+  .rolling .die,
+  .rolling .die::after,
   .can-move .checker.top,
   .hit::before,
   .shake,

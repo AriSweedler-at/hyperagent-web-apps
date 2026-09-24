@@ -1,5 +1,5 @@
 // Drives the Sheshbesh board through its DOM (docs/design/backgammon-board.md §7 "Testability"): the
-// roll button, the points, bars and trays a player taps, and the curtain's game words. The shell
+// roll modal, the points, bars and trays a player taps, and the curtain's game words. The shell
 // around it (the room, the join, the curtain's reveal, the pass-and-play start) is
 // e2e/fixtures/shell.ts, driven once for both shell games; `bgReveal` and `bgStartLocal` stay
 // exported here so the backgammon specs keep their names. The one
@@ -95,24 +95,21 @@ export const theirOffId = (view: View): string => (view.me.idx === 0 ? 'offDark'
 
 /**
  * What the curtain says (design §4.9): the incoming player's name in the title, the last turn
- * beneath, and whether one tap also rolls (`data-rolls`, painted by ui/local.ts).
+ * beneath, and the button that reveals (the roll is the modal's, design §4.7).
  */
 export type Curtain = Readonly<{
   title: string;
   sub: string;
   last: string;
   button: string;
-  rolls: boolean;
 }>;
 export const bgCurtain = async (page: Page): Promise<Curtain> => {
   await expect(page.locator('#curtainOverlay')).toBeVisible();
-  const btn = page.locator('#curtainBtn');
   return {
     title: await page.locator('#curtainTitle').innerText(),
     sub: await page.locator('#curtainSub').innerText(),
     last: await page.locator('#curtainLast').innerText(),
-    button: await btn.innerText(),
-    rolls: (await btn.getAttribute('data-rolls')) === '1',
+    button: await page.locator('#curtainBtn').innerText(),
   };
 };
 
@@ -138,11 +135,17 @@ export const bgStartLocal = (
       await p.locator('#localMatchLengthSel').selectOption(String(options.matchLength));
   });
 
-/** Roll from a live board (`#rollBtn` shown): the phase turns `moving` and the dice show faces. */
+/**
+ * Roll from the roll modal (design §4.7, `#rollOverlay` up for the seat to roll): the button
+ * rolls, the dice tumble (`#board[data-rolling]`) and settle (`#board[data-rolled]`), the modal
+ * goes, the phase is `moving` and the dice show faces.
+ */
 export const bgRoll = async (page: Page): Promise<View> => {
-  const roll = page.locator('#rollBtn');
-  await expect(roll).toBeVisible();
-  await roll.click();
+  const modal = page.locator('#rollOverlay');
+  await expect(modal).toBeVisible();
+  await page.locator('#rollModalBtn').click();
+  await expect(page.locator('#board')).toHaveAttribute('data-rolled', '1');
+  await expect(modal).toBeHidden();
   await expect.poll(async () => (await readBoard(page))?.phase).toBe('moving');
   const view = await requireBoard(page);
   // A double shows four faces (design §2.2 `#dice`).

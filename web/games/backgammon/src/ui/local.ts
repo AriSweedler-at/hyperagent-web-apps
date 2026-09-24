@@ -3,11 +3,11 @@
 // turn flow itself is the reducer's (ui/state.ts `localBroadcast`: whose view is shown, when the
 // curtain comes up, who has revealed); this is its DOM half, written only while the curtain is up
 // (gin's rule: the texts are left as they were when it hides), and the curtain button's wiring.
-// One tap on the button reveals and, when the button promised a roll, rolls: the promise is
-// painted onto the button as `data-rolls`, so the binder needs no App of its own. The DOM half is
-// the shared shell's since docs/design/shared-shell.md §5 B1 (web/shared/ui/curtain.ts); the copy
-// and the roll promise stay here.
-import { dataOf, listenId, type PageLike } from '../../../../shared/edge/dom.ts';
+// One tap on the button reveals; the roll is the roll modal's, which comes up for the revealed
+// seat (design §4.7; until 2026-09-24 the button rolled too, `data-rolls`). The DOM half is the
+// shared shell's since docs/design/shared-shell.md §5 B1 (web/shared/ui/curtain.ts); the copy
+// stays here.
+import { listenId, type PageLike } from '../../../../shared/edge/dom.ts';
 import {
   bindCurtain,
   paintCurtain as paintShellCurtain,
@@ -23,8 +23,6 @@ export type CurtainText = Readonly<{
   /** The last `move`/`noMove` log line with its hits, or the opening roll before any turn. */
   last: string;
   button: string;
-  /** The button rolls as well as reveals (portes `toRoll` without a double to consider). */
-  rolls: boolean;
 }>;
 
 /**
@@ -52,62 +50,65 @@ export const lastTurnText = (v: View, incoming: Seat): string => {
   return [last, ...own].map((e) => e.text).join(' · ');
 };
 
-/** The button's copy by phase (design §4.9) and whether one tap also rolls. */
-const buttonFor = (v: View, name: string): Readonly<{ button: string; rolls: boolean }> => {
+/** The button's copy by phase (design §4.9): one tap reveals; what the seat then does is named. */
+const buttonFor = (v: View, name: string): string => {
+  switch (v.phase) {
+    case 'toRoll':
+      return `${name} — your turn`;
+    case 'moving':
+      return `${name} — play ${v.dice === null ? '' : diceText(v.dice)}`;
+    case 'cubeOffered':
+      return `${name} — answer`;
+    case 'over':
+    case 'opening':
+      return `${name} — look`;
+  }
+};
+
+/** The sub line by phase: what waits behind the curtain (the roll modal, the opening dice, the cube). */
+const subFor = (v: View, other: string): string => {
   switch (v.phase) {
     case 'toRoll':
       return v.canDouble
-        ? { button: `${name} — your turn`, rolls: false }
-        : { button: `${name} — roll`, rolls: true };
-    case 'moving':
-      return { button: `${name} — play ${v.dice === null ? '' : diceText(v.dice)}`, rolls: false };
+        ? 'Your turn. Double, or roll.'
+        : 'Your turn. Roll when you have the phone.';
     case 'cubeOffered':
-      return { button: `${name} — answer`, rolls: false };
+      return `${other} doubles to ${String(v.cube.value * 2)}`;
+    case 'moving':
     case 'over':
     case 'opening':
-      return { button: `${name} — look`, rolls: false };
+      return 'Your turn.';
   }
 };
 
 /**
  * The curtain for the seat the phone is handed to (design §2.4 "The copy", the curtain row), read
- * from that seat's own view (`localBroadcast` shows the incoming actor's): `toRoll` rolls at once
- * unless a double is on offer, the Western opening plays the dice already rolled, a cube offer
+ * from that seat's own view (`localBroadcast` shows the incoming actor's): `toRoll` hands over to
+ * the roll modal (design §4.7), the Western opening plays the dice already rolled, a cube offer
  * is answered.
  */
 export const curtainText = (v: View, incoming: Seat): CurtainText => {
   const name = v.players[incoming].name;
   const other = v.players[incoming === 0 ? 1 : 0].name;
-  const sub =
-    v.phase === 'cubeOffered' ? `${other} doubles to ${String(v.cube.value * 2)}` : 'Your turn.';
   return {
     title: `Pass the phone to ${name}`,
-    sub,
+    sub: subFor(v, other),
     last: lastTurnText(v, incoming),
-    ...buttonFor(v, name),
+    button: buttonFor(v, name),
   };
 };
-
-/** The shared curtain's text, the roll promise painted onto the button as `data-rolls`. */
-const withRolls = ({ rolls, ...text }: CurtainText): ShellCurtainText => ({
-  ...text,
-  attrs: { 'data-rolls': rolls ? '1' : null },
-});
 
 /** `#curtainOverlay` and its texts from the App; hidden (texts untouched) when no seat is waiting. */
 export const paintCurtain = (doc: PageLike, app: App): void => {
   const seat = app.table.curtain;
   const v = app.shell.view;
-  paintShellCurtain(doc, seat === null || v === null ? null : withRolls(curtainText(v, seat)));
+  const text: ShellCurtainText | null = seat === null || v === null ? null : curtainText(v, seat);
+  paintShellCurtain(doc, text);
 };
 
-/** `#curtainBtn`: the incoming seat reveals, and rolls when the button said so; `#curtainHandoffBtn` hands off. */
+/** `#curtainBtn`: the incoming seat reveals (the roll modal then asks for the roll); `#curtainHandoffBtn` hands off. */
 export const bindLocal = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
-  bindCurtain(doc, dispatch, (btn): ReadonlyArray<Intent> =>
-    dataOf(btn, 'rolls') === '1'
-      ? [{ type: 'curtain/reveal' }, { type: 'roll/click' }]
-      : [{ type: 'curtain/reveal' }],
-  );
+  bindCurtain(doc, dispatch, (): ReadonlyArray<Intent> => [{ type: 'curtain/reveal' }]);
   listenId(doc, 'curtainHandoffBtn', 'click', () => {
     dispatch({ type: 'handoff/click' });
   });

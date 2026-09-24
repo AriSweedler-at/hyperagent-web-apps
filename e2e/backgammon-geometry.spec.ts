@@ -1,7 +1,7 @@
 // The board's geometry as a real-click test (docs/design/backgammon-board.md §7 "Geometry oracle"):
 // pass-and-play on one page at a phone, a laptop and a short phone. At every state of a turn
-// (under the curtain, to roll, rolled, after a move, with the die-chip tray open, under the next
-// curtain, at the game over) the 24 points tile the board without overlap in the order
+// (under the curtain, to roll with the modal up, rolled, after a move, with the die-chip tray
+// open, under the next curtain, at the game over) the 24 points tile the board without overlap in the order
 // ui/board/layout.ts `rowOrder` states for the layout and the seat, every stack shows at most five
 // coins inside its place, every tap target is at least 44px on a phone, nothing scrolls where the
 // viewport fits, and the frame around the board (topbar, status line, board, controls) keeps the
@@ -78,9 +78,12 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         return g.frame;
       };
 
-      // The curtain's tap reveals and rolls (design §4.9): the board comes up mid-roll.
+      // The curtain's tap reveals (design §4.9); the roll modal is up over the board, and its
+      // button rolls (design §4.7): the frame holds through both.
       await bgReveal(page);
-      const v = await requireBoard(page);
+      await expect(page.locator('#rollOverlay')).toBeVisible();
+      await check('modal up');
+      const v = await bgRoll(page);
       expect(v.phase).toBe('moving');
       await check('rolled');
       const [first] = v.legal;
@@ -94,7 +97,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       // To roll (a position seated before its roll: the button and the blank dice), the die-chip
       // tray, then the game over: the sheet is over the board and the frame holds throughout.
       await bgSetup(page, bgPosition({ text: BOTH_SUFFICE, turn: 0 }));
-      await expect(page.locator('#rollBtn')).toBeVisible();
+      await expect(page.locator('#rollOverlay')).toBeVisible();
       await check('to roll', 0);
       await bgRoll(page);
       await bgSetup(page, bgPosition({ text: BOTH_SUFFICE, turn: 0, dice: [6, 5] }));

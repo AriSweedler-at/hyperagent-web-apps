@@ -14,11 +14,11 @@ the rules by rule (`rules R13`).
 
 | # | Question | Decision |
 |---|---|---|
-| Q4 | Pass-and-play cover | Gin's `'local'` role, no Peer. A one-tap turn cue on a translucent curtain (`#curtainOverlay`, the position readable beneath) whose button also rolls; a setting `curtainMode: 'always' \| 'never'` under `backgammon_curtain` (nothing is hidden in backgammon, so the curtain is a courtesy). Western opening: the starter already holds the opening dice, so the button reads "{name} — play 6-3" and only reveals. |
+| Q4 | Pass-and-play cover | Gin's `'local'` role, no Peer. A one-tap turn cue on a translucent curtain (`#curtainOverlay`, the position readable beneath) whose button reveals; the roll is then the roll modal's (§4.7; until 2026-09-24 the button rolled too); a setting `curtainMode: 'always' \| 'never'` under `backgammon_curtain` (nothing is hidden in backgammon, so the curtain is a courtesy). Western opening: the starter already holds the opening dice, so the button reads "{name} — play 6-3" and no modal follows. |
 | Q5 | Names | Display name `Sheshbesh`; `<title>` `Sheshbesh — backgammon` (`tools/games.ts PAGE_TITLES`); folder and `Game` literal `backgammon`; hook `window.__backgammon`; room codes 4 letters from gin's alphabet with `peerPrefix 'sheshbesh-'` and gin's length error. |
 | Q6 | Rejoin | Gin's name-based rejoin. |
 | Q7 | Invite | `?join=<code>` through `web/shared/lib/invite.ts` and `web/shared/edge/invite.ts`. |
-| Q11 | Copy | Plain English, with exactly three non-English strings anywhere: the name `Sheshbesh`, `Buen mazal!` on the roll button, `Kapará.` opening the hit toast. |
+| Q11 | Copy | Plain English, with exactly three non-English strings anywhere: the name `Sheshbesh`, `Buen mazal!` on the roll modal's button, `Kapará.` opening the hit toast. |
 | Q12 | Toast | Gin's: `TOAST_MS 2600`, one restarting timer, `#toast` last in the body. |
 | Board | One DOM: 24 direct children `#point-1..#point-24` of `#board` in absolute order plus `#barTop #dice #cube #barBottom #offLight #offDark`; placement by two `grid-template-areas` strings (phone, desktop) whose area names are own numbers; the seat perspective is `data-own` on each point and `data-seat` on `#board`. |
 | Chirality | Home bottom-right on the phone (own checkers run clockwise there, counter-clockwise on the desktop). The alternative is one grid string and two selectors. |
@@ -40,10 +40,11 @@ the rules by rule (`rules R13`).
 
 `#tableScreen`: `.topbar` (`#menuBtn`, the opponent strip `#oppName #oppDot #pipsOpp`,
 `#gameBadge` "Game 3 · 2–1 · to 5", `#rulesBtnGame #historyBtn` on the desktop, `#soundBtn` with
-`aria-pressed`), `#statusLine` (`#statusText`, `#statusDice.sr-only`), `#board`, `.controls`
-(`#myName #pipsMe`, `#undoBtn` disabled rather than hidden, `#doubleBtn`, the reserved hidden
-`#doneBtn`, the roll slot holding `#rollBtn` "Buen mazal! roll" / `#diceMini` / `#waitNote` /
-`#resultChipBtn`, then `#moveChips` and `#chipCancelBtn`). Points carry `data-abs` (static),
+`aria-pressed`), `#statusLine` (`#statusText`, `#statusDice.sr-only`), `#board` (its places, and
+last the roll modal `#rollOverlay.roll-modal`: `#rollModalTitle #rollModalSub #rollModalDice
+#rollModalBtn` "Buen mazal! roll" and `#doubleBtn`, §4.7), `.controls` (`#myName #pipsMe`,
+`#undoBtn` disabled rather than hidden, the reserved hidden `#doneBtn`, the roll slot holding
+`#diceMini` / `#waitNote` / `#resultChipBtn`, then `#moveChips` and `#chipCancelBtn`). Points carry `data-abs` (static),
 `data-own`, `pt-a`/`pt-b` (absolute parity, the two triangle shades) and `pt-near`/`pt-far` (own
 1..12 near). `#barTop` is always the far player's bar and `#barBottom` mine; `#offLight`/`#offDark`
 are colour-fixed and CSS places them near or far by `#board[data-seat]`. `paintSeat` rewrites
@@ -93,11 +94,11 @@ Plain English except the three strings (Q11).
 | Host / Join / Local buttons | Open a table · Sit down · Start |
 | Host waiting (`#hostWaitStatus`) | Waiting for your opponent to join · code **ABCD**; `#startGameBtn` "Start the match" |
 | Guest waiting | Joining ABCD… / Connected — waiting for Ari to start |
-| Roll button | Buen mazal! `<small>roll</small>`; with the curtain off, "{incoming} — Buen mazal! roll" |
+| Roll modal | title "Your turn" (pass-and-play: "{name} — your turn", the cue that the phone changed hands, the only one with the curtain off), sub "Roll to start your turn" / "Double, or roll to start your turn" (Western, the cube on offer), the button Buen mazal! `<small>roll</small>`, `#doubleBtn` "Double" beside it |
 | Status line | §1 "Status line"; the tray open: "13 · 6+3 reaches 4 two ways", "4 · either die bears off"; a die picked: "6-4 · playing the 6"; a forfeited roll: "6-6 · no move — turn passes", "4-2 · no entry — turn passes" |
 | Target discs | one die: `3`; a combined move: `6+3`, `3+3`, three or four of a double `3×3`, `3×4`; `?` when the tap opens the tray; both dice bearing off: `6·5` |
 | Die chips | line one the dice as digits `6·3`, line two the landing `→ 4 via 7, hits` / `→ 4 via 10` / `→ off`; the whole as the chip's `aria-label` |
-| Curtain | title "Pass the phone to {name}", sub "Your turn." / "{doubler} doubles to {v}"; `#curtainLast` the turn just finished ("Ari moved 8/5* 6/5 · Ari hit you on your 20-point": the hits in the incoming player's own numbering, the notation the mover's), a forfeited roll as logged, or before any turn the opening roll ("Ari rolled 6, Jeff rolled 4 — Ari starts"; "— Ari plays 6-4" in Western); button by phase: `toRoll` and not `canDouble` → "{name} — roll" (reveals and rolls), `toRoll` and `canDouble` → "{name} — your turn", `moving` (the Western opening) → "{name} — play 6-3", `cubeOffered` → "{name} — answer", `over` → "{name} — look"; handoff "Continue online" |
+| Curtain | title "Pass the phone to {name}", sub by phase: `toRoll` "Your turn. Roll when you have the phone." / with `canDouble` "Your turn. Double, or roll." / `cubeOffered` "{doubler} doubles to {v}" / else "Your turn."; `#curtainLast` the turn just finished ("Ari moved 8/5* 6/5 · Ari hit you on your 20-point": the hits in the incoming player's own numbering, the notation the mover's), a forfeited roll as logged, or before any turn the opening roll ("Ari rolled 6, Jeff rolled 4 — Ari starts"; "— Ari plays 6-4" in Western); button by phase, and it only reveals: `toRoll` → "{name} — your turn" (the roll modal follows), `moving` (the Western opening) → "{name} — play 6-3", `cubeOffered` → "{name} — answer", `over` → "{name} — look"; handoff "Continue online" |
 | Hit toast | Kapará. {name} hit you on your {n}-point. · two hits in one turn: "… on your 20-point and your 5-point." |
 | Double offered | {name} doubles to {v}. Take or pass? · Take · Pass ({name} wins {p}); the doubler's roll slot: "{name} is thinking about the cube" |
 | Game over | {name} wins 1 point / {name} wins 2 points · gammon / {name} wins 3 points · backgammon / {name} wins 4 points · gammon, cube 2 / {name} passed · {name} wins {p}; sub "{loser} had N checkers left · P pips" or "{loser} passed the double"; "Ari 2 – 0 Jeff · match to 5"; Next game · Look at the table |
@@ -139,8 +140,8 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
 `body.fixed-screen` and `#app` are the viewport's height with `overflow: hidden`; `#tableScreen` a
 column flex with 8px gaps; `.topbar` 44px; `.status-line` 22px with `min-height: 1.35em` so it
 never collapses; `#board { flex: 0 0 auto }`; `.controls` 56px with `.roll-slot { min-width:
-168px; min-height: 54px }` so the roll button, the mini dice, the wait note and the result chip
-share one box (one height in every phase, gin's rule). `.desk-only` hides below 900px (rules and
+168px; min-height: 54px }` so the mini dice, the wait note and the result chip share one box (one
+height in every phase, gin's rule; the roll itself is the modal's, §4.7). `.desk-only` hides below 900px (rules and
 history live in `#menuOverlay` on the phone). `#controls.choosing` hides the me-strip, Undo,
 Double and the roll slot and shows `#moveChips` and `#chipCancelBtn`: the tray takes the row
 without changing its height.
@@ -218,7 +219,7 @@ keep the board and every control clear of it. No pattern: the meander stays the 
 | `dead` on `.die` | no maximal play uses it | `opacity: .4`, a `--danger` strike, `aria-disabled` |
 | `picked` on `.die` | the die the player tapped to force | a 2px `--gold` ring on the face |
 | `blank` on `.die` | before the roll | a translucent nacre square |
-| `rolling` on `#dice` | new dice arrived | `animation: tumble 350ms` |
+| `rolling` on `#dice`, `#diceMini`, `#rollModalDice` | the dice tumble (`table.rolling`, from a roll until the `tumble` timer, §4.7) | `.rolling .die { animation: tumble 560ms }` and `.rolling .die::after { animation: tumble-faces-a\|b 560ms steps(1, end) }`: the pips run through a fixed pseudo-random list of faces (`--pips-1..6` on `.die`), one every 70ms, odd and even dice on different lists, then the real faces show for the rest of the beat; `#board[data-rolling]` through it, `#board[data-rolled]` once faces are shown and still (what the specs wait for) |
 | `die-1..die-6` | the pips | `radial-gradient` dots on the 3x3 grid of `::after`; no images |
 | `choosing` on `#controls` | the die-chip tray is open | §3.2 |
 | `data-owner` on `#cube` | `near\|far\|none` | §3.3 |
@@ -235,8 +236,9 @@ lift on the way (`fly-lift`, 200ms: the clone rises 6px and its shadow deepens a
 the individual `translate` and `filter` so the glide's transform and its `transitionend` are
 untouched); the movers of one play leave 60ms apart (`STAGGER_MS`, `flightDelays`) and a hit's
 flight to the bar 80ms after the mover that landed on it (`HIT_DELAY_MS`); the chip tray fades in
-over 160ms; `tumble` 350ms once per new roll key; `hitFlash` 420ms; `glow` 1.6s loop. `@media
-(prefers-reduced-motion: reduce)` disables `tumble`, `glow`, `hitFlash`, `shake` and the pulses and
+over 160ms; the tumble 560ms of face cycling inside `TUMBLE_MS` 700 (§4.7); `hitFlash` 420ms; `glow`
+1.6s loop. `@media (prefers-reduced-motion: reduce)` disables `tumble` and `tumble-faces` (the
+real faces show at once: the tumble is one frame, the beat stays), `glow`, `hitFlash`, `shake` and the pulses and
 sets the flyer's and the checker's `transition-duration` to 1ms (and `fly-lift` off) so the
 fallback timer is the only delay.
 
@@ -302,11 +304,11 @@ like, so the waiting rooms and the match-over screen follow without a hook.
 ### 4.1 The reducer slice and the pure helpers
 
 `Table = { selected, picked, pending, drag, shake, resultOpen, menuOpen, historyOpen, curtain,
-curtainMode, noMoveUntil, lastPainted }`: a tapped source only (the sole legal source is derived,
-never stored), a die forced by tapping it (cleared after a move), the die-chip tray `{ from, to,
-chains }`, a drag `{ from, over }`, the overlays, the seat the phone is handed to, the persisted
-curtain setting, the R14 beat's deadline and the view the previous paint showed (for
-`flightsBetween`). Pure helpers in `ui/board.ts` (string- and table-tested; they import the
+curtainMode, noMoveUntil, lastPainted, rolling }`: a tapped source only (the sole legal source is
+derived, never stored), a die forced by tapping it (cleared after a move), the die-chip tray `{
+from, to, chains }`, a drag `{ from, over }`, the overlays, the seat the phone is handed to, the
+persisted curtain setting, the R14 beat's deadline, the view the previous paint showed (for
+`flightsBetween`) and whether the dice are tumbling (§4.7). Pure helpers in `ui/board.ts` (string- and table-tested; they import the
 engine and never `ui/state.ts`): `sideOf`, `sourcesOf(v)` (distinct `from` over `v.legal`),
 `effectiveSelection(selected, v)` = the tapped source, else the sole source, `chainsFrom(v, from,
 picked)`, `targetsOf(v, from, picked)`, `deadDice(v)`, `statusText(v, opts)`, `barsOf`,
@@ -343,7 +345,8 @@ effectiveSelection(table.selected, v)` and `T = targetsOf(v, sel, picked)`:
    chains.
 8. `die/pick d`: `picked = picked === d ? null : d` when `d` is in `movesLeft` and not dead;
    targets recompute for that die alone (no combined targets); the pick clears after the commit.
-9. A tap while `#board.inert` is dropped by CSS (`pointer-events: none`) and by the reducer.
+9. A tap while `#board.inert` is dropped by CSS (`pointer-events: none`) and by the reducer; the
+   board is inert under the curtain, on the other seat's turn and while the dice tumble (§4.7).
 
 Commit = `applyAction(game, seat, move, rng, now)` locally / on the host, or one `{t:'action'}`
 frame per move from the guest, in order; the host applies sequentially and broadcasts after each;
@@ -392,14 +395,43 @@ hidden (the controls row keeps its shape). `undo/click` → `applyAction(undo)` 
 `turnStart`, `played = []`; host-applied online. `flightsBetween` yields the reversed flights. The
 last die of a turn cannot be undone; the status line said so before the tap.
 
-### 4.7 The roll button and the roll slot
+### 4.7 The roll modal, the tumble and the roll slot
 
-`#rollBtn` "Buen mazal! (roll)": shown when it is my turn and `phase === 'toRoll'`; dispatches
-`roll/click` → `applyAction(roll)`; online the guest sends `{type:'roll'}` and the host rolls.
-Tapping `#dice` is the same intent. Hidden while `moving` (the slot shows `#diceMini`), during the
-opponent's turn (`#waitNote` "Waiting for Jeff…"), under the curtain, and while `phase === 'over'`
-(`#resultChipBtn` when the sheet is closed). In pass-and-play with `curtainMode: 'never'` the
-button carries the incoming player's name, the only cue that the phone changed hands.
+The owner (2026-09-24): "There should be a button to roll instead of giving it to you with a roll.
+The roll button should be a call to action and it should be a modal that cannot be dismissed and
+when you click it there should be a little die rolling animation. Which for now is just the dice
+scrolling randomly through their numbers."
+
+`#rollOverlay.roll-modal` is the last child of `#board` (absolute, `inset: 0`, over the board
+alone so the topbar and its menu stay in reach): a dim wash and a `.sheet.roll-sheet` with
+`#rollModalTitle` ("Your turn"; pass-and-play "{name} — your turn", the cue that the phone changed
+hands and the only one with the curtain off), `#rollModalSub` ("Roll to start your turn"; Western
+with the cube on offer "Double, or roll to start your turn"), `#rollModalDice` (two dice, blank
+until the click), the call to action `#rollModalBtn` "Buen mazal! roll" (`.btn-primary.roll-cta`,
+the strong primary at 1.2rem and 60px; the CTA-colour work gives it its colour class when it
+lands) and `#doubleBtn` "Double" when `v.canDouble` (§4.8). It has no close button, no backdrop
+tap and no Escape (it is not in `SHEETS`): `rollModalOpen(app)` (ui/state.ts) alone shows it, when
+`phase === 'toRoll'` and it is my turn and the curtain is down, and keeps it up through my own
+roll's tumble (`table.rolling` with `lastAction` a `roll` or `noMove` of my seat); the Western
+opening starter, already `moving`, never sees it.
+
+`#rollModalBtn` → `roll/click`: the engine rolls at once (`applyAction(roll)` locally and on the
+host; the guest sends `{type:'roll'}` and the host rolls, so the state and the wire are as they
+were) and `table.rolling` is set with a `startTimer` effect `tumble` of `TUMBLE_MS` 700 ms. A
+roll that arrives in a view (`rolledBetween(prev, next)` in `rendered`: mine, or the other
+seat's) sets `rolling` and arms the same timer again, so the guest's tumble, started at the click,
+restarts when the host's faces arrive; `tumble/elapsed` clears it. While `rolling`: `liveView` is
+null (no tap, roll, undo or double answers; `#board.inert`), the modal's button is disabled, and
+the painter puts `rolling` on `#dice`, `#diceMini` and `#rollModalDice` (§3.7: the faces run
+through a fixed pseudo-random list every 70 ms for 560 ms, then the real faces show for the last
+140 ms), with `#board[data-rolling]` for the specs to wait on and `#board[data-rolled]` once the
+faces stand still. The roll cue plays at the click as before (`cuesBetween`); a refusal (`refuse`)
+drops `rolling` with the taps. Tapping `#dice` is still `roll/click`. Under reduced motion the
+cycling is off (one frame) and the 700 ms beat stays.
+
+The roll slot in the controls row keeps its box (§3.2) for `#diceMini` while `moving`, `#waitNote`
+"Waiting for Jeff…" during the opponent's turn, and `#resultChipBtn` while `phase === 'over'` with
+the sheet closed.
 
 ### 4.8 Double / Take / Pass (Western only)
 
@@ -421,8 +453,9 @@ last revealed, and `paintCurtain` raises `#curtainOverlay` (`rgba(6,37,61,.78)`,
 readable beneath) with §2.4's curtain copy from `curtainText(view, incoming)` (`ui/local.ts`, pure
 and table-tested): `#curtainLast` is `lastTurnText(view, incoming)`, the turn just finished with
 its hits in the incoming player's numbering through `hitsAgainst`, or the opening roll before any
-turn. One tap dispatches `curtain/reveal` and then `roll/click` only when the button promised a
-roll (`data-rolls`). `#curtainHandoffBtn` "Continue online" is gin's handoff (`handoff/click`).
+turn. One tap dispatches `curtain/reveal`; the roll modal (§4.7) then asks the revealed seat for the roll
+(until 2026-09-24 the button rolled too, promised as `data-rolls`; the shared curtain still takes
+`attrs`, and no game passes one). `#curtainHandoffBtn` "Continue online" is gin's handoff (`handoff/click`).
 `curtainMode: 'never'` (the menu toggle, persisted) skips the overlay; nothing is hidden either way
 (Q4). A forfeited roll (R14) keeps the roller's dice on show for `NO_MOVE_MS` before the curtain
 rises.
@@ -539,7 +572,7 @@ first, refactor later).
 | `.off` trays | 44 x 175px | `--off-h: 44px` |
 | `#dice` | 48 x 117px | the band's centre third, `role="button"` "Roll"; each `.die` a 44px hit box round a 40px face |
 | `.chip` | ≥ 56 x 48px | intrinsic |
-| `#rollBtn` | 54px min-height | gin's `.btn-primary` |
+| `#rollModalBtn` | 60px min-height | `.btn-primary.roll-cta`, in the modal over the board |
 | `#undoBtn`, `#doubleBtn`, `#chipCancelBtn`, `.icon-btn` | 44 x 44px | gin's `.btn-sm` / `.icon-btn` rules |
 | overlay buttons, `#curtainBtn` | 54 / 44px | `.btn`, `.btn-sm` |
 
@@ -573,8 +606,9 @@ swap); `#board[data-seat]`; `#point-N .checker.top[data-count="7"]` with exactly
 checkers; `.point.can-move` set equals `sourcesOf(view)`; `.point.selected`, `.selected.auto`;
 `.point.target[data-die="3"]` and `.target-2[data-die="3+1"]` equal `targetsOf`; `#barBottom
 .checker` after a hit; `#offLight .slab` count; `#dice .die.die-3.used`, `.die.dead`,
-`.die.picked`; `#moveChips .chip` count and `data-*`; `#rollBtn` visible/hidden per phase;
-`#statusText` (pinned strings from `statusText`); `#curtainBtn` text and `data-rolls`;
+`.die.picked`; `#moveChips .chip` count and `data-*`; `#rollOverlay` visible per `rollModalOpen`,
+`#rollModalBtn` disabled while `#board[data-rolling]`, `#board[data-rolled]` once the dice stand
+(the specs' wait after a roll); `#statusText` (pinned strings from `statusText`); `#curtainBtn` text;
 `#curtainLast`; `#rsTitle`; `#gameBadge`; the toast "Kapará…" after the reveal. Painter tests over
 `backgammonPage(markup)` (from `index.html?raw`, gin's `optionsFromMarkup`) assert the keyed
 rebuild: two paints with the same board and a changed selection leave the checker elements
@@ -619,8 +653,8 @@ specs. `main` is unprotected: watch CI, then merge.
 
 ## 9. The computed-style driver
 
-`driveBackgammon` (in `tools/parity/computed-styles.ts`) shoots 24 screens per viewport: the three
-home tabs; a 3-point portes match with its first turn by hand (the curtain, rolled, a die picked, a
+`driveBackgammon` (in `tools/parity/computed-styles.ts`) shoots 25 screens per viewport: the three
+home tabs; a 3-point portes match with its first turn by hand (the curtain, the roll modal, rolled, a die picked, a
 source selected with its targets, a move, the undo, the turn over); the menu, history and rules
 sheets; then the seeded policy through the hook (`__backgammon.legal()` → `__backgammon.act(a)`,
 in-page so a whole game costs no round trips) stopped at a checker on the bar, a roll with one dead

@@ -1,8 +1,9 @@
 // Sheshbesh's pass-and-play on one page (docs/design/backgammon-board.md §4, §5, §7), at a phone
 // and a laptop, the game's half: the home screen's own fields (the shell's half of the home screen
 // and of the pass-and-play start is e2e/shell-home.spec.ts and e2e/shell-local.spec.ts, for both
-// shell games). The table: a game starts under the curtain naming the opening winner, whose button
-// rolls (portes) or plays the opening dice (Western); tap-to-move plays a turn with the legal sources and targets lit as the engine's view
+// shell games). The table: a game starts under the curtain naming the opening winner, whose reveal
+// brings the roll modal (portes; it cannot be dismissed, its button rolls and the dice tumble) or
+// the opening dice to play (Western); tap-to-move plays a turn with the legal sources and targets lit as the engine's view
 // has them and the status line naming what is left; undo rewinds; the die-chip tray opens where
 // both dice bear the same checker off; a hit raises the Kapará toast for the player hit; a
 // bear-off ends the game with the gammon named on the result sheet; a match end reaches the end
@@ -80,7 +81,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#rulesList li')).toHaveCount(9);
     });
 
-    test('pass and play: the curtain names the opening winner, its button rolls, the roll shows on the dice', async ({
+    test('pass and play: the curtain names the opening winner; the reveal brings the roll modal, which nothing dismisses; its button rolls, the dice tumble and settle', async ({
       player,
       project,
     }) => {
@@ -91,22 +92,46 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const first = view.players[view.turn].name;
       const other = view.players[view.turn === 0 ? 1 : 0].name;
       // The curtain covers a live board (the position is readable beneath) and hands it to the
-      // opening winner: one tap reveals and rolls (design §4.9).
+      // opening winner: one tap reveals; the roll waits in the modal (design §4.9, §4.7).
       const curtain = await bgCurtain(page);
       // The first curtain carries the opening roll from the engine's log.
       const opening = view.log.filter((e) => e.kind === 'opening').at(-1)?.text ?? '';
       expect(opening).toMatch(/ starts$/);
       expect(curtain).toEqual({
         title: `Pass the phone to ${first}`,
-        sub: 'Your turn.',
+        sub: 'Your turn. Roll when you have the phone.',
         last: opening,
-        button: `${first} — roll`,
-        rolls: true,
+        button: `${first} — your turn`,
       });
       await expect(page.locator('#dice .die.blank')).toHaveCount(2);
+      await expect(page.locator('#rollOverlay')).toBeHidden();
       await page.locator('#curtainBtn').click();
       await expect(page.locator('#curtainOverlay')).toBeHidden();
-      await expect.poll(async () => (await requireBoard(page)).phase).toBe('moving');
+      // The modal: the seat's name, two blank dice, the call to action; still `toRoll` beneath.
+      const modal = page.locator('#rollOverlay');
+      await expect(modal).toBeVisible();
+      await expect(page.locator('#rollModalTitle')).toHaveText(`${first} — your turn`);
+      await expect(page.locator('#rollModalDice .die.blank')).toHaveCount(2);
+      await expect(page.locator('#rollModalBtn')).toContainText('Buen mazal!');
+      await expect(page.locator('#rollModalBtn small')).toHaveText('roll');
+      expect((await requireBoard(page)).phase).toBe('toRoll');
+      // Nothing dismisses it: a tap on its backdrop, Escape.
+      await modal.click({ position: { x: 4, y: 4 } });
+      await page.keyboard.press('Escape');
+      await expect(modal).toBeVisible();
+      expect((await requireBoard(page)).phase).toBe('toRoll');
+      // The button rolls: the engine has rolled at once, the dice tumble (`data-rolling`) with the
+      // button held and the board inert, then settle (`data-rolled`) and the modal goes.
+      await page.locator('#rollModalBtn').click();
+      await expect(page.locator('#board')).toHaveAttribute('data-rolling', '1');
+      expect((await requireBoard(page)).phase).toBe('moving');
+      await expect(page.locator('#rollModalBtn')).toBeDisabled();
+      await expect(page.locator('#board')).toHaveClass(/\binert\b/);
+      await expect(page.locator('#dice')).toHaveClass(/\brolling\b/);
+      await expect(page.locator('#board')).toHaveAttribute('data-rolled', '1');
+      await expect(page.locator('#board')).not.toHaveAttribute('data-rolling', '1');
+      await expect(modal).toBeHidden();
+      await expect(page.locator('#board')).not.toHaveClass(/\binert\b/);
       const rolled = await requireBoard(page);
       const dice = rolled.dice;
       if (dice === null) throw new Error('no dice after the roll');
@@ -122,7 +147,6 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         `${diceText(dice)} · play ${faces.length === 4 ? 'all four' : 'both dice'}`,
       );
       await expect(page.locator('#gameBadge')).toHaveText('Game 1 · 0–0 · to 5');
-      await expect(page.locator('#rollBtn')).toBeHidden();
       await expect(page.locator('#diceMini')).toBeVisible();
     });
 
@@ -133,11 +157,11 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
       await bgReveal(page);
-      // Before a roll: the button in the roll slot, blank dice; the roll fills them (design §4.7).
+      // Before a roll: the modal over the board, blank dice; the roll fills them (design §4.7).
       await bgSetup(page, bgPosition({ text: START, turn: 0 }));
-      await expect(page.locator('#rollBtn')).toBeVisible();
-      await expect(page.locator('#rollBtn')).toContainText('Buen mazal!');
-      await expect(page.locator('#rollBtn small')).toHaveText('roll');
+      await expect(page.locator('#rollOverlay')).toBeVisible();
+      await expect(page.locator('#rollModalBtn')).toContainText('Buen mazal!');
+      await expect(page.locator('#rollModalBtn small')).toHaveText('roll');
       await expect(page.locator('#dice .die.blank')).toHaveCount(2);
       await expect(page.locator('#statusText')).toHaveText('Your turn. Buen mazal!');
       const v = await bgRoll(page);
@@ -327,12 +351,12 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const first = view.players[view.turn].name;
       const dice = view.dice;
       if (dice === null) throw new Error('the Western opening carries no dice');
-      // The starter already holds the opening pair: the button reveals and does not roll (Q4).
+      // The starter already holds the opening pair: the button reveals and no roll modal comes (Q4).
       const curtain = await bgCurtain(page);
       expect(curtain.button).toBe(`${first} — play ${diceText(dice)}`);
-      expect(curtain.rolls).toBe(false);
       await bgReveal(page);
       expect((await requireBoard(page)).phase).toBe('moving');
+      await expect(page.locator('#rollOverlay')).toBeHidden();
       await expect(page.locator('#dice .die:not(.blank)')).toHaveCount(2);
       await expect(page.locator('#cube')).toBeVisible();
       await expect(page.locator('#cube')).toHaveText('1');
@@ -340,9 +364,10 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#doubleBtn')).toBeHidden();
       await expect(page.locator('#rulesList li, #rulesOverlayList li')).toHaveCount(22);
 
-      // Before a roll the cube is on offer: Double beside Roll (design §4.8).
+      // Before a roll the cube is on offer: Double beside Roll, in the modal (design §4.8).
       await bgSetup(page, bgPosition({ text: START, turn: 0, variant: 'backgammon' }));
-      await expect(page.locator('#rollBtn')).toBeVisible();
+      await expect(page.locator('#rollOverlay')).toBeVisible();
+      await expect(page.locator('#rollModalSub')).toHaveText('Double, or roll to start your turn');
       await expect(page.locator('#doubleBtn')).toBeVisible();
       await expect(page.locator('#statusText')).toHaveText('Your turn. Double or roll');
       await page.locator('#doubleBtn').click();
@@ -352,7 +377,6 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         title: 'Pass the phone to Bob',
         sub: 'Ann doubles to 2',
         button: 'Bob — answer',
-        rolls: false,
       });
       await bgReveal(page);
       await expect(page.locator('#cubeOverlay')).toBeVisible();
@@ -360,13 +384,16 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#passBtn')).toHaveText('Pass (Ann wins 1)');
       await page.locator('#takeBtn').click();
       await expect(page.locator('#cubeOverlay')).toBeHidden();
-      // Bob owns the cube at 2 and Ann rolls: her curtain offers the roll alone.
+      // Bob owns the cube at 2 and Ann rolls: her curtain hands her to the roll alone.
       const back = await bgCurtain(page);
       expect(back).toMatchObject({
         title: 'Pass the phone to Ann',
-        button: 'Ann — roll',
-        rolls: true,
+        sub: 'Your turn. Roll when you have the phone.',
+        button: 'Ann — your turn',
       });
+      await bgReveal(page);
+      await expect(page.locator('#rollOverlay')).toBeVisible();
+      await expect(page.locator('#doubleBtn')).toBeHidden();
       await expect(page.locator('#cube')).toHaveText('2');
       expect((await requireBoard(page)).cube).toEqual({ value: 2, owner: 1 });
     });
