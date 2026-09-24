@@ -1,4 +1,4 @@
-# coturn for the relay-forced games (e2e/gin-relay.spec.ts, e2e/fidice-relay.spec.ts): the @relay
+# coturn for the relay-forced games (e2e/shell-relay.spec.ts, e2e/fidice-relay.spec.ts): the @relay
 # specs play through a TURN relay of the harness's own, `turnserver` started by playwright.config.ts
 # on :3478 with static credentials (e2e/fixtures/site.ts turnServerCommand). The Debian package also
 # starts a system turnserver on :3478, which is stopped so the harness can bind its own; under CI the

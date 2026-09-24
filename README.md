@@ -135,11 +135,13 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    Worker over :4173), a PeerServer (:9000) and, when `turnserver` is on PATH, a coturn TURN relay
    (:3478, static credentials, loopback only), then runs every spec in `e2e/` on projects `pages`
    and `proxy`: smoke on every page (zero uncaught exceptions, zero failed requests outside an
-   allowlist), gin local and scorer, backgammon pass-and-play and its board geometry, and the `@online` specs (gin join/deal/turns, host reload and
-   guest rejoin, fidice lobby/start, backgammon join/roll/move, resume and the handoff) in a host and a guest context that meet through `?peer=` and
+   allowlist), gin local and scorer, backgammon pass-and-play and its board geometry, the shared
+   shell once for both (`e2e/shell-*.spec.ts`: the home screen, the pass-and-play start, the room,
+   host reload and guest rejoin, the handoff; `docs/design/shared-shell.md` D1), and the `@online`
+   specs (gin's deal and turns, fidice lobby/start, backgammon roll/move) in a host and a guest context that meet through `?peer=` and
    take a STUN-only ICE list through `?ice=`; fonts and CDNs are answered from local copies and
-   `Math.random` is seeded. The `@relay` specs (`e2e/gin-relay.spec.ts`, `e2e/fidice-relay.spec.ts`,
-   `e2e/backgammon-relay.spec.ts`)
+   `Math.random` is seeded. The `@relay` specs (`e2e/shell-relay.spec.ts` for gin and backgammon,
+   `e2e/fidice-relay.spec.ts`)
    open both pages with `?ice-policy=relay` and an ICE list naming that relay (written per run under
    `e2e/fixtures/.generated/`, since its port follows the offset), so every candidate must cross it:
    both games still join and play, "Connected via relay" shows, and the selected candidate pair read
@@ -248,7 +250,10 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
 8. One e2e spec per mode: `e2e/<g>-local.spec.ts` and `e2e/<g>-online.spec.ts` tagged `@online`
    (host and guest through `e2e/fixtures/two-players.ts`; `expectPeerOptions` on the recorded
    `new Peer` call). Both run on both projects (`npm run test:e2e:<g>` runs the game's specs alone),
-   and the online one against the deployed page in nightly, for free.
+   and the online one against the deployed page in nightly, for free. A game built on the shared
+   shell (the home screen, the waiting rooms, the curtain: `docs/design/shared-shell.md` §3.1) joins
+   `SHELL_GAMES` and `SHELL` in `tools/games.ts` and gets a row in `e2e/fixtures/shell-games.ts`
+   instead: `e2e/shell-*.spec.ts` then drive its shell, and its suite row lists them with the tag.
 9. The proxy needs nothing: the Worker's catch-all maps `games.sweedler.com/<g>/` to
    `/hyperagent-web-apps/games/<g>/`.
 

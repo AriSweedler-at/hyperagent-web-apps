@@ -7,10 +7,12 @@
 // two-seat game of the design's §4 joins it), one per game (its colocated tests, its parity
 // oracles, its fixture pins), `site` (guards over the built site or over every page at once) and
 // `harness` (the harness testing itself). tools/ci/suites.test.ts is the accounting: every
-// *.test.ts and every e2e spec is claimed by exactly one suite, every threshold row sits under a
-// coverage.include glob of its own suite (vitest passes an empty glob's row silently: an empty
-// coverage map summarises to 100%), and the change -> jobs table below holds. Node builtins only,
-// so `node --experimental-strip-types tools/ci/affected.ts` runs before `npm ci` in CI.
+// *.test.ts is claimed by exactly one suite and every e2e spec by exactly one, or by the suites of
+// the games a shared spec drives (the shell specs: one tagged describe per game, each game's job
+// playing its own), every threshold row sits under a coverage.include glob of its own suite (vitest
+// passes an empty glob's row silently: an empty coverage map summarises to 100%), and the
+// change -> jobs table below holds. Node builtins only, so `node --experimental-strip-types
+// tools/ci/affected.ts` runs before `npm ci` in CI.
 import { matchesAny } from './glob.ts';
 
 export type Suite =
@@ -24,8 +26,27 @@ export type Thresholds = Readonly<{
   statements: number;
 }>;
 
-/** A suite's Playwright half: its spec files, and the tags of the other games' describes to leave out of a shared spec file (the design's §5.2; none today). */
-export type E2eSpec = Readonly<{ files: ReadonlyArray<string>; otherTags: ReadonlyArray<string> }>;
+/**
+ * A suite's Playwright half: its spec files and, for a spec file two suites share (the shell specs,
+ * e2e/shell-*.spec.ts: one describe per shell game tagged `@<game>`, docs/design/shared-shell.md
+ * §6.3), the suite's own tag and the other suites' tags, which playwright.config.ts puts in
+ * `grepInvert` so each job plays its game's describes alone; a CLI --grep composes with that.
+ */
+export type E2eSpec = Readonly<{
+  files: ReadonlyArray<string>;
+  /** The tag this suite's describes carry inside a shared spec file; absent when it shares none. */
+  tag?: string;
+  /** The tags of the other suites sharing a spec file with this one: left out of this suite's run. */
+  otherTags: ReadonlyArray<string>;
+}>;
+
+/**
+ * The shared shell specs (docs/design/shared-shell.md D1): the home screen, the pass-and-play start,
+ * the room, the relay-forced game, resume, the handoff and the sessions' liveness, written once
+ * over tools/games.ts SHELL_GAMES. Both shell games' suites claim them; the tags decide which
+ * describes each job plays.
+ */
+const SHELL_SPECS: ReadonlyArray<string> = ['**/shell-*.spec.ts'];
 
 export type SuiteSpec = Readonly<{
   /** vitest include globs `npm test` runs, and `npm run test:<suite>` with them. */
@@ -209,7 +230,12 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         'web/games/gin-rummy/src/fx.ts': { lines: 95, functions: 95, statements: 95, branches: 97 },
       },
     },
-    e2e: { files: ['**/gin-*.spec.ts'], otherTags: [] },
+    // Gin's own specs and its describes of the shell specs (`@gin-rummy`; backgammon's left out).
+    e2e: {
+      files: ['**/gin-*.spec.ts', ...SHELL_SPECS],
+      tag: '@gin-rummy',
+      otherTags: ['@backgammon'],
+    },
   },
   fidice: {
     unit: [
@@ -341,7 +367,12 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         },
       },
     },
-    e2e: { files: ['**/backgammon-*.spec.ts'], otherTags: [] },
+    // Backgammon's own specs and its describes of the shell specs (`@backgammon`; gin's left out).
+    e2e: {
+      files: ['**/backgammon-*.spec.ts', ...SHELL_SPECS],
+      tag: '@backgammon',
+      otherTags: ['@gin-rummy'],
+    },
   },
   site: {
     unit: [
@@ -364,14 +395,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         'infra/games-proxy/worker.ts': { lines: 95, functions: 95, statements: 95, branches: 93 },
       },
     },
-    // Every page on both origins, the six computed-style goldens (two viewports per game), and the
-    // shared shell's liveness across the two games that play it (web/shared/net, one spec file
-    // with a test per game: a cross-game spec, like the smoke, until the design's §5.2 tags split
-    // such files per game).
-    e2e: {
-      files: ['**/smoke.spec.ts', '**/computed-styles.spec.ts', '**/shell-liveness.spec.ts'],
-      otherTags: [],
-    },
+    // Every page on both origins, and the six computed-style goldens (two viewports per game).
+    e2e: { files: ['**/smoke.spec.ts', '**/computed-styles.spec.ts'], otherTags: [] },
   },
   harness: {
     unit: [
@@ -500,6 +525,15 @@ export const RULES: ReadonlyArray<Rule> = [
     runs: 'everything',
     why: 'the harness, the build and lint configuration, the frozen oracles and the shared code every game imports',
   },
+  {
+    // One describe per shell game, each played by that game's e2e job through its tag (the gin and
+    // backgammon rows claim the files, each inverting the other's tag): a spec change runs both
+    // jobs, a change under web/games/<g>/** runs e2e-<g> with its describes (gameRules), and
+    // web/shared/** runs everything (above). Neither game-e2e job runs the other game's describes.
+    globs: ['e2e/shell-*.spec.ts'],
+    runs: [e2eJob('gin'), e2eJob('backgammon')],
+    why: "the shared shell specs: a describe per shell game, each run by that game's e2e job through its tag",
+  },
   ...gameRules('gin'),
   {
     globs: ['test/fixtures/legacy/gin-*', 'test/fixtures/legacy/gin-*/**'],
@@ -546,7 +580,7 @@ export const RULES: ReadonlyArray<Rule> = [
     why: 'the site guards themselves',
   },
   {
-    globs: ['e2e/smoke.spec.ts', 'e2e/computed-styles.spec.ts', 'e2e/shell-liveness.spec.ts'],
+    globs: ['e2e/smoke.spec.ts', 'e2e/computed-styles.spec.ts'],
     runs: ['e2e-site'],
     why: 'the site specs themselves',
   },

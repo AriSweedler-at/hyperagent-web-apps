@@ -5,11 +5,10 @@
 // Teardown asserts zero uncaught exceptions on every page a spec opened.
 import { test as base, expect, type Page } from '@playwright/test';
 
-import type { Game } from '../../tools/games.ts';
-import { bgHostRoom, bgJoin, bgRoomCode } from './backgammon.ts';
+import type { Game, ShellGame } from '../../tools/games.ts';
 import { fidiceHostLobby, fidiceJoin, fidiceLobbyCode } from './fidice.ts';
-import { ginHostRoom, ginJoin, ginRoomCode } from './gin.ts';
 import { newPlayer, type Player } from './player.ts';
+import { hostRoom as shellHostRoom, join as shellJoin, roomCode } from './shell.ts';
 import { asProject, type Project } from './site.ts';
 
 export type Players = Readonly<{ host: Player; guest: Player }>;
@@ -26,11 +25,18 @@ type Driver = Readonly<{
   joinByCode: (page: Page, name: string, code: string) => Promise<void>;
 }>;
 
+/** The shared shell's room (e2e/fixtures/shell.ts), told the game for its code shape and its words. */
+const shellDriver = (game: ShellGame): Driver => ({
+  hostRoom: (page, name) => shellHostRoom(page, game, name),
+  readRoomCode: (page) => roomCode(page, game),
+  joinByCode: (page, name, code) => shellJoin(page, game, name, code),
+});
+
 /** One driver per game: a game the registry knows without a driver is a type error here. */
 const DRIVERS: Readonly<Record<OnlineGame, Driver>> = {
-  'gin-rummy': { hostRoom: ginHostRoom, readRoomCode: ginRoomCode, joinByCode: ginJoin },
+  'gin-rummy': shellDriver('gin-rummy'),
   fidice: { hostRoom: fidiceHostLobby, readRoomCode: fidiceLobbyCode, joinByCode: fidiceJoin },
-  backgammon: { hostRoom: bgHostRoom, readRoomCode: bgRoomCode, joinByCode: bgJoin },
+  backgammon: shellDriver('backgammon'),
 };
 
 type Fixtures = { project: Project; player: Player; players: Players };

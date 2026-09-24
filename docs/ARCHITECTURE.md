@@ -330,7 +330,7 @@ projects pages + proxy, the page-only specs on pages alone: `PAGE_ONLY_SPECS`; P
 long-term credential, loopback only, no TLS, its relay ports right above (`e2e/fixtures/site.ts`
 `turnServerCommand`), reached through an ICE list the config writes under
 `e2e/fixtures/.generated/`; retries 1; trace on first retry; report uploaded per job). The
-`@relay` specs (`e2e/gin-relay.spec.ts`, `e2e/fidice-relay.spec.ts`, `e2e/backgammon-relay.spec.ts`)
+`@relay` specs (`e2e/shell-relay.spec.ts` for gin and backgammon, `e2e/fidice-relay.spec.ts`)
 play the games with `?ice-policy=relay` through that relay and read the selected candidate pair
 off every `RTCPeerConnection` the page built (`e2e/browser/record-pc.js` keeps them;
 `selected-pairs.js` reads `getStats()` as `ice.ts` `describe()` does); without `turnserver` on
@@ -543,7 +543,8 @@ docs run only `check`. The levels below say which suite holds them.
   frame the host rolls; peer ids are `sheshbesh-<code>`; the saves (`backgammonMP_v1`, per role)
   drive the three resume labels, and the table's 🌐 (or the curtain's "Continue online") turns a
   pass-and-play game into a hosted room under a fresh code, the invite joining as the second seat
-  (`e2e/backgammon-{online,relay,resume,handoff}.spec.ts`).
+  (`e2e/backgammon-online.spec.ts` for the play over the wire; the room, the relay, resume and the
+  handoff are the shared shell's `e2e/shell-*.spec.ts`, one describe per shell game).
 
 Step 1 (toolchain scaffold), against the versions on the registry at the time:
 

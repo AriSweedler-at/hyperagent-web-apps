@@ -247,7 +247,7 @@ jobs:
         uses: ./.github/actions/playwright-chromium
       - name: Install coturn for the relay-forced games
         uses: ./.github/actions/coturn
-      - name: Gin specs on both origins against dist (local PeerServer and TURN; the stories baselines)
+      - name: Gin specs and its describes of the shell specs on both origins against dist (local PeerServer and TURN; the stories baselines)
         run: npm run test:e2e:gin
       - name: Upload Playwright report
         if: failure()
@@ -301,7 +301,7 @@ jobs:
         uses: ./.github/actions/playwright-chromium
       - name: Install coturn for the relay-forced games
         uses: ./.github/actions/coturn
-      - name: Backgammon specs on both origins against dist (local PeerServer and TURN)
+      - name: Backgammon specs and its describes of the shell specs on both origins against dist (local PeerServer and TURN)
         run: npm run test:e2e:backgammon
       - name: Upload Playwright report
         if: failure()
@@ -328,7 +328,7 @@ jobs:
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
         uses: ./.github/actions/playwright-chromium
-      - name: Smoke every page on both origins, the six computed-style goldens and the shell's liveness in both games
+      - name: Smoke every page on both origins and the six computed-style goldens
         run: npm run test:e2e:site
       - name: Upload Playwright report
         if: failure()

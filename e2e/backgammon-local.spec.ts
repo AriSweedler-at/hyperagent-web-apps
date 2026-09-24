@@ -1,8 +1,8 @@
-// Sheshbesh's shell and pass-and-play on one page (docs/design/backgammon-board.md §4, §5, §7), at a
-// phone and a laptop. The home screen: the title, the tab bar, the Play submenu, Online the
-// default mode with Pass the phone beside it (the online specs play online). The table: a game starts under
-// the curtain naming the opening winner, whose button rolls (portes) or plays the opening dice
-// (Western); tap-to-move plays a turn with the legal sources and targets lit as the engine's view
+// Sheshbesh's pass-and-play on one page (docs/design/backgammon-board.md §4, §5, §7), at a phone
+// and a laptop, the game's half: the home screen's own fields (the shell's half of the home screen
+// and of the pass-and-play start is e2e/shell-home.spec.ts and e2e/shell-local.spec.ts, for both
+// shell games). The table: a game starts under the curtain naming the opening winner, whose button
+// rolls (portes) or plays the opening dice (Western); tap-to-move plays a turn with the legal sources and targets lit as the engine's view
 // has them and the status line naming what is left; undo rewinds; the die-chip tray opens where
 // both dice bear the same checker off; a hit raises the Kapará toast for the player hit; a
 // bear-off ends the game with the gammon named on the result sheet; a match end reaches the end
@@ -61,84 +61,23 @@ const sourcePoints = (view: View): ReadonlyArray<number> =>
     .filter((p): p is number => typeof p === 'number')
     .sort((a, b) => a - b);
 
-/** Hold the pointer on the Play tab past the long-press timer: the submenu opens (design §5.1). */
-const longPressPlay = async (page: Page): Promise<void> => {
-  const tab = page.locator('#tabPlayBtn');
-  const box = await tab.boundingBox();
-  if (box === null) throw new Error('the Play tab has no box');
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.waitForTimeout(650);
-  await page.mouse.up();
-};
-
 Object.entries(VIEWPORTS).forEach(([name, vp]) => {
   test.describe(name, () => {
-    test('home: the title, the tab bar, Rules and About; Online the default, Pass the phone beside it', async ({
+    test("home: the table's own fields: the online panel's variant and match length, the second seat's placeholder, nine rules", async ({
       player,
       project,
     }) => {
       const { page } = player;
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await page.goto(pagePath(project, 'backgammon'));
-      await expect(page).toHaveTitle('Sheshbesh — backgammon');
-      await expect(page.locator('#homeScreen h1')).toHaveText('Sheshbesh');
-      await expect(page.locator('#topTabbar .tab-btn')).toHaveText(['Play', 'Rules', 'About']);
-      await expect(page.locator('#tabPlayBtn')).toHaveClass(/\bactive\b/);
-      // Online is the default mode (storage.ts DEFAULT_PLAY_MODE, as gin's): its panel is up with
-      // the name, the two selects and the code form; the switch flips to Pass the phone.
-      await expect(page.locator('#playModeSwitch')).toBeVisible();
-      await expect(page.locator('#playModeSwitch .mode-btn')).toHaveText([
-        'Online',
-        'Pass the phone',
-      ]);
-      await expect(page.locator('#playModeSwitch .mode-btn[data-mode="online"]')).toHaveClass(
-        /\bactive\b/,
-      );
-      await expect(page.locator('#onlineModeContent')).toBeVisible();
-      await expect(page.locator('#localModeContent')).toBeHidden();
-      await expect(page.locator('#nameInput')).toHaveValue('Ari');
+      // The online panel carries the two selects beside the name and the code form.
       await expect(page.locator('#variantSel')).toHaveValue('portes');
       await expect(page.locator('#matchLengthSel')).toHaveValue('5');
       await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
-      await expect(page.locator('#localModeContent')).toBeVisible();
-      await expect(page.locator('#onlineModeContent')).toBeHidden();
-      await expect(page.locator('#playModeSwitch .mode-btn[data-mode="local"]')).toHaveClass(
-        /\bactive\b/,
-      );
       // Gin's convention: the second seat is a placeholder, and an empty name plays as "Jeff".
-      await expect(page.locator('#p2NameInput')).toHaveValue('');
       await expect(page.locator('#p2NameInput')).toHaveAttribute('placeholder', 'Player 2');
-      await expect(page.locator('#localVariantSel')).toHaveValue('portes');
-      await expect(page.locator('#localMatchLengthSel')).toHaveValue('5');
       await page.locator('#tabRulesBtn').click();
-      await expect(page.locator('#rulesPanel')).toBeVisible();
       await expect(page.locator('#rulesList li')).toHaveCount(9);
-      await page.locator('#tabAboutBtn').click();
-      await expect(page.locator('#aboutPanel')).toBeVisible();
-      await expect(page.locator('#playPanel')).toBeHidden();
-    });
-
-    test('home: a long press on Play opens the submenu; its options are Online and Pass the phone; a pick lands on the Play tab', async ({
-      player,
-      project,
-    }) => {
-      const { page } = player;
-      await page.setViewportSize({ width: vp.width, height: vp.height });
-      await page.goto(pagePath(project, 'backgammon'));
-      await page.locator('#tabRulesBtn').click();
-      await expect(page.locator('#rulesPanel')).toBeVisible();
-      const submenu = page.locator('#playSubmenu');
-      await longPressPlay(page);
-      await expect(submenu).toHaveClass(/\bforce-open\b/);
-      await expect(submenu.locator('button')).toHaveText(['Online', 'Pass the phone']);
-      await expect(submenu.locator('button[data-mode="online"]')).toBeVisible();
-      await expect(submenu.locator('button[data-mode="local"]')).toBeVisible();
-      await submenu.locator('button[data-mode="local"]').click();
-      await expect(submenu).not.toHaveClass(/\bforce-open\b/);
-      await expect(page.locator('#playPanel')).toBeVisible();
-      await expect(page.locator('#localModeContent')).toBeVisible();
-      await expect(page.locator('#tabPlayBtn')).toHaveClass(/\bactive\b/);
     });
 
     test('pass and play: the curtain names the opening winner, its button rolls, the roll shows on the dice', async ({
@@ -185,10 +124,6 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#gameBadge')).toHaveText('Game 1 · 0–0 · to 5');
       await expect(page.locator('#rollBtn')).toBeHidden();
       await expect(page.locator('#diceMini')).toBeVisible();
-      // The game is saved for "Resume pass & play".
-      const raw = await page.evaluate<string | null>("localStorage.getItem('backgammonMP_v1')");
-      const saved: unknown = JSON.parse(raw ?? 'null');
-      expect(saved).toMatchObject({ role: 'local', game: { gameNo: 1, phase: 'moving' } });
     });
 
     test('tap to move: the legal sources light, a source lights its targets, the status names what is left, undo rewinds', async ({

@@ -1,4 +1,4 @@
-// The relay-forced Fidice table, the twin of e2e/gin-relay.spec.ts: host and guest open fidice with
+// The relay-forced Fidice table, twin of e2e/shell-relay.spec.ts: host and guest open fidice with
 // `?ice-policy=relay` and the ICE list naming the harness's TURN relay, the guest joins by code,
 // both lobbies show the two seats, the guest toasts "Connected via relay", the selected candidate
 // pair on both sides is a relay one, the host starts and both see the same round. Only the guest

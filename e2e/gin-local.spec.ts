@@ -1,12 +1,16 @@
-// Pass-and-play on one page: start, the curtain hands the phone to the first player, one full turn
-// (take the upcard, discard), and the curtain comes back for the other player naming the move.
-// Then, through the `window.__gin` driver of e2e/fixtures/gin-play.ts, rounds to their end until
-// one is scored: at every round over the result sheet shows exactly the cards the engine laid off
-// onto the knocker's melds (docs/design/gin-arrangement-and-discards.md §7).
+// Pass-and-play on one page, gin's half: the curtain covers the hand until the first player takes
+// the phone, one full turn (take the upcard, discard), and the curtain comes back for the other
+// player naming the move. The shell's half (the switch, the names, the curtain's words, the reveal,
+// the names on the table, the save) is e2e/shell-local.spec.ts, for both shell games. Then, through
+// the `window.__gin` driver of e2e/fixtures/gin-play.ts, rounds to their end until one is scored: at
+// every round over the result sheet shows exactly the cards the engine laid off onto the knocker's
+// melds (docs/design/gin-arrangement-and-discards.md §7).
 import type { Page } from '@playwright/test';
 
-import { ginAcceptDraw, ginDiscardFirstFree, ginTakeUpcard } from './fixtures/gin.ts';
+import { DESKTOP } from './fixtures/geometry.ts';
+import { ginAcceptDraw, ginDiscardFirstFree, ginReveal, ginTakeUpcard } from './fixtures/gin.ts';
 import { playToRoundOver, readView } from './fixtures/gin-play.ts';
+import { DEFAULT_NAMES, curtainTitle, startLocal } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -29,21 +33,18 @@ const expectLaidOffSheet = async (page: Page): Promise<boolean> => {
   return result?.void === false;
 };
 
-test('pass and play: start, curtain handoff, one full turn', async ({ player, project }) => {
+test('pass and play: the curtain covers the hand; one full turn (take the upcard, discard); the curtain comes back naming the move', async ({
+  player,
+  project,
+}) => {
   const { page } = player;
-  await page.goto(pagePath(project, 'gin-rummy'));
-  await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
-  await expect(page.locator('#localModeContent')).toBeVisible();
-  await page.locator('#p1NameInput').fill('Ann');
-  await page.locator('#p2NameInput').fill('Bob');
-  await page.locator('#localBtn').click();
+  await startLocal(page, pagePath(project, 'gin-rummy'), DESKTOP);
 
-  // The curtain hides the first player's cards until they take the phone.
+  // The curtain hides the first player's cards until they take the phone, and it must cover them:
+  // the topmost element at every hand card's centre is the curtain (or something inside it), so a
+  // CSS regression to .overlay's inset or z-index fails here.
   const curtain = page.locator('#curtainOverlay');
   const title = page.locator('#curtainTitle');
-  await expect(curtain).toBeVisible();
-  // ...and it must cover them: the topmost element at every hand card's centre is the curtain (or
-  // something inside it), so a CSS regression to .overlay's inset or z-index fails here.
   await expect(page.locator('#hand .card')).toHaveCount(10);
   const exposed = await page.evaluate<number>(
     `Array.from(document.querySelectorAll('#hand .card')).filter((card) => {
@@ -53,15 +54,10 @@ test('pass and play: start, curtain handoff, one full turn', async ({ player, pr
     }).length`,
   );
   expect(exposed, 'hand cards not covered by the curtain').toBe(0);
-  await expect(title).toHaveText(/^Pass the phone to (Ann|Bob)$/);
+  await expect(title).toHaveText(curtainTitle(DEFAULT_NAMES));
   const first = (await title.innerText()).replace('Pass the phone to ', '');
-  const other = first === 'Ann' ? 'Bob' : 'Ann';
-  await expect(page.locator('#curtainSub')).toContainText(`${other}, look away`);
-  await page.locator('#curtainBtn').click();
-  await expect(curtain).toBeHidden();
-  await expect(page.locator('#tableScreen')).toBeVisible();
-  await expect(page.locator('#myName')).toContainText(first);
-  await expect(page.locator('#oppName')).toHaveText(other);
+  const other = first === DEFAULT_NAMES[0] ? DEFAULT_NAMES[1] : DEFAULT_NAMES[0];
+  await ginReveal(page);
   await expect(page.locator('#hand .card')).toHaveCount(10);
   await expect(page.locator('#statusBanner')).toHaveClass(/mine/);
   await expect(page.locator('#statusSub')).toHaveText('Take the upcard or pass');
@@ -88,11 +84,6 @@ test('pass and play: start, curtain handoff, one full turn', async ({ player, pr
   await expect(title).toHaveText(`Pass the phone to ${other}`);
   await expect(page.locator('#curtainLast')).toContainText(`${first} discarded the`);
   await expect(page.locator('#discardPile .card')).toHaveAttribute('data-card', discarded);
-
-  // The game is saved for "Resume pass & play".
-  const raw = await page.evaluate<string | null>("localStorage.getItem('ginRummyMP_v1')");
-  const saved: unknown = JSON.parse(raw ?? 'null');
-  expect(saved).toMatchObject({ role: 'local', game: { handNumber: 1 } });
 });
 
 test('pass and play: at every round over the sheet shows the cards laid off, as the engine has them', async ({
