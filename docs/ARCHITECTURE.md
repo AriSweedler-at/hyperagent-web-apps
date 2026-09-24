@@ -299,8 +299,9 @@ of the shim script itself (`sh -n`).
 .nvmrc, cache: npm}`, `npm ci`, `npm run typecheck` (`tsc -b`), `npm run lint` (eslint + prettier
 --check), `npm test`, `npm run build`, dist tests, upload `dist`. Job `coverage` (parallel):
 `npm test -- --coverage` against the ratchets. Job `e2e` (parallel, its own build): Chromium from
-`.github/actions/playwright-chromium` (actions/cache by Playwright version; `--with-deps` only on a
-miss), `apt-get install coturn` (the system service it starts is stopped), `npm run
+`.github/actions/playwright-chromium` (actions/cache by Playwright version; the OS packages every
+run, the download only on a miss), coturn from `.github/actions/coturn` (apt; the system service it
+starts is stopped), `npm run
 test:integration`, `npm run test:e2e` (four workers under CI; projects pages + proxy, the page-only
 specs on pages alone: `PAGE_ONLY_SPECS`;
 PeerServer from the `peer` package on :9000; coturn on :3478 started by `playwright.config.ts`
@@ -323,7 +324,8 @@ to the public registry (host and the firewall's `/npm/` path prefix; npm's `repl
 swaps only the hostname), installs through Socket Firewall Free (`sfw npm ci`) so CI installs are
 scanned too, and restores the pristine lockfile afterwards. The lockfile's integrity hashes are
 verified against what is downloaded either way. `nightly.yml` (`cron 23 9 * * *` and
-`workflow_dispatch`; by hand `gh workflow run nightly.yml`) installs coturn like `e2e` and runs
+`workflow_dispatch`; by hand `gh workflow run nightly.yml`) installs Chromium and coturn through
+the same two composite actions as `e2e` (so does `stories-baselines.yml`, Chromium alone) and runs
 `npm run test:deployed` (`E2E_TARGET=deployed npm run test:e2e -- --grep "@online|@relay"`): the
 `pages` project's baseURL is the deployed origin `https://arisweedler-at.github.io` (`e2e/fixtures/site.ts`
 `DEPLOYED_PAGES_ORIGIN`, `baseUrl()`), there is no `proxy` project (`PROJECTS`), proxy-dev is not
