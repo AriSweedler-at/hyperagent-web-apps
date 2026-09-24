@@ -19,8 +19,8 @@ same three excluded from tsconfig.pure.json and tsconfig.node.json, so tsconfig.
 compiles them). The whole folder is held at 100% coverage (tools/ci/suites.ts, the `shared`
 suite: every module has its test beside it, the painters' over `web/shared/edge/page.fake.ts`);
 the edge that scrolls and flashes a rule is `web/shared/edge/glossary.ts`. Its import zone is a
-game's `ui/` zone: `web/shared/lib` and the DOM edge (`dom.ts` and its fakes), plus the clock edge
-and its fake for `toast.ts`'s test. Gin's shell (home tabs, mode switch, waiting rooms, curtain,
+game's `ui/` zone: `web/shared/lib` and the DOM edge (`dom.ts` and its fakes), plus the clock fake
+for `toast.ts`'s test. Gin's shell (home tabs, mode switch, waiting rooms, curtain,
 result sheets) was copied into `web/games/backgammon/src/ui/` with the same field, intent and
 painter names on purpose (docs/design/backgammon-board.md §4), which is what makes each move here
 mechanical: a game's `ui/render.ts`, `ui/local.ts` and `main.ts` compose the shared module under

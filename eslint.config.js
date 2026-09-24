@@ -191,18 +191,17 @@ const zones = [
   {
     // The shared shell's ui/ (docs/design/glossary-links.md §3, shared-shell.md §4.1): the reach of
     // a game's ui/ zone below, web/shared/lib and the DOM edge with its fakes, nothing else. The
-    // clock edge and its fake are for toast.ts's test alone (§4.4: the toaster and the timers take
-    // their Clock injected, so the modules import only the type from web/shared/lib/clock.ts).
+    // clock fake is for toast.ts's test alone (§4.4: the toaster and the timers take their Clock
+    // injected, so the module imports only the type from web/shared/lib/clock.ts).
     target: './web/shared/ui',
     from: ['./web/shared/edge/**', './web/shared/net/**', './web/shared/styles/**'],
     except: [
       '**/web/shared/edge/dom.ts',
       '**/web/shared/edge/dom.fake.ts',
       '**/web/shared/edge/page.fake.ts',
-      '**/web/shared/edge/clock.ts',
       '**/web/shared/edge/clock.fake.ts',
     ],
-    message: 'web/shared/ui imports web/shared/lib and the DOM and clock edges only.',
+    message: 'web/shared/ui imports web/shared/lib, the DOM edge and the clock fake only.',
   },
   ...gamePairZones,
   {
