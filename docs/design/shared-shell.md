@@ -162,7 +162,7 @@ web/games/<g>/src/
   main.ts                     bootShell(config) + the game's hook extras (bg ~60-70, gin ~150-170)
 ```
 
-`boot.ts` is listed under `ui/` as the task names it; the lint rule `RNG_ALLOWED = ['web/games/*/main.ts', 'web/shared/edge/**']` means it must not call `Math.random`/`Date.now` itself. Either `main.ts` passes `rng`/`now`/`clock` in (shown below) or the file lives at `web/shared/edge/boot.ts`. Decide in the PR that creates it; the API is the same.
+`boot.ts` is listed under `ui/` as the task names it; the lint rule `RNG_ALLOWED = ['web/games/*/main.ts', 'web/shared/edge/**']` means it must not call `Math.random`/`Date.now` itself. Either `main.ts` passes `rng`/`now`/`clock` in (shown below) or the file lives at `web/shared/edge/boot.ts`. Decide in the PR that creates it; the API is the same. B3 decided `web/shared/edge/boot.ts`: the three helpers import `edge/invite.ts`, `edge/share.ts`, `edge/fx.ts`'s `WakeLock` and the sessions' event types from `web/shared/net`, all outside the ui zone's contract (`web/shared/lib`, the DOM edge and the clock fake), so the ui folder would have needed four `except` rows and a carve-out from the pure profile for one file; `INVITE_COPIED_MSG`, `roomCodeMsg` and `SHARE_FALLBACK_MS` moved there with the share chain (they were main.ts's alone), and `bootShell` (C3) lands beside them.
 
 ### 4.2 The shell reducer (`web/shared/ui/shell.ts`)
 

@@ -30,11 +30,11 @@ the old names, so their tests run unchanged. The two-seat host/guest sessions la
 
 What lands here later, and where it comes from (docs/design/shared-shell.md §5):
 
-| Module        | Contract                                                                                                                 | Source                              |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
-| `boot.ts`     | `applyInviteLink`, `shareInvite`, `sessionEvents` (B3), then `bootShell(cfg)` (C3)                                       | both `main.ts`                      |
-| `shell.ts`    | `reduceShell`, `runShellEffect`, `hostContextOf`, `guestContextOf`, `saveFor`, `readHome` over a game's `shellConfig.ts` | both `ui/state.ts` (C2)             |
-| `HandView.ts` | `HandView { render(model, selection): string }`, the only way a hand is drawn                                            | gin `ui/hand/HandView.ts` (step 11) |
+| Module        | Contract                                                                                                                                                                                                                                                                      | Source                              |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `boot.ts`     | Landed as `web/shared/edge/boot.ts` instead (B3: `applyInviteLink`, `shareInvite` with the invite copy, `sessionEvents`; it reaches `edge/invite.ts`, `edge/share.ts`, `edge/fx.ts` and `web/shared/net`, outside this folder's zone), where `bootShell(cfg)` (C3) joins them | both `main.ts`                      |
+| `shell.ts`    | `reduceShell`, `runShellEffect`, `hostContextOf`, `guestContextOf`, `saveFor`, `readHome` over a game's `shellConfig.ts`                                                                                                                                                      | both `ui/state.ts` (C2)             |
+| `HandView.ts` | `HandView { render(model, selection): string }`, the only way a hand is drawn                                                                                                                                                                                                 | gin `ui/hand/HandView.ts` (step 11) |
 
 The generic CSS primitives this table once reserved as `base.css` landed in
 `web/shared/styles/base.css` instead (docs/MIGRATION.md step 14: the box-sizing reset,

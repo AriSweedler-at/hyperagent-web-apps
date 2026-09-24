@@ -306,10 +306,6 @@ export const SANDBOX_COPIED_MSG = 'Copied for the console';
 export const consoleCall = (map: string): string => `__gin.sandbox(\`${map}\`)`;
 /** The sandbox mode shows while the first player is named `sandbox`. */
 export const sandboxUnlocked = (app: App): boolean => unlocksSandbox(app.p1Name);
-export const INVITE_COPIED_MSG = 'Invite copied to clipboard';
-export const roomCodeMsg = (code: string): string => `Room code: ${code}`;
-/** `shareCodeBtn`'s fallback toast lasts this long. */
-export const SHARE_FALLBACK_MS = 4000;
 
 // ---- the strings the app (not the sessions) wrote --------------------------------------------
 

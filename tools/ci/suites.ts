@@ -104,7 +104,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // (docs/ARCHITECTURE.md "*.algorithms.ts"). Measured at the ratchet
       // (lines/functions/statements/branches): shared/lib 100/100/100/100, shared/edge
       // 99.4/98.8/98.9/94.4 (re-measured with prefs.ts (A3), cuePlayer.ts and netDeps.ts (A4), the
-      // three at 100/100/100/100).
+      // three at 100/100/100/100; again with boot.ts (shared-shell.md §5 B3: the invite link, the
+      // share chain and the session adapters out of both main.ts, 100/100/100/100 over boot.test.ts),
+      // the folder at 99.72/99.36/99.75/96.6).
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The shared shell's helpers and painters (docs/design/glossary-links.md §3;
