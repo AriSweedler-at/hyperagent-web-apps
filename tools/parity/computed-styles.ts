@@ -35,6 +35,7 @@ import { resolve } from 'node:path';
 import { chromium, type Browser, type Page } from '@playwright/test';
 import { PeerServer } from 'peer';
 
+import { DESKTOP, PHONE, type Viewport } from '../../e2e/fixtures/geometry.ts';
 import { routeOffline } from '../../e2e/fixtures/offline.ts';
 import { seedScript } from '../../e2e/fixtures/seed.ts';
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
@@ -50,14 +51,10 @@ import {
   readView,
 } from './gin-dom-parity.ts';
 
-export { GAMES, type Game };
+export { GAMES, type Game, type Viewport };
 
-export type Viewport = Readonly<{ width: number; height: number }>;
-/** A phone (iPhone 12-class) and a laptop window. */
-export const VIEWPORTS: ReadonlyArray<Viewport> = [
-  { width: 390, height: 844 },
-  { width: 1280, height: 800 },
-];
+/** A phone (iPhone 12-class) and a laptop window: the geometry specs' two (e2e/fixtures/geometry.ts). */
+export const VIEWPORTS: ReadonlyArray<Viewport> = [PHONE, DESKTOP];
 export const viewportName = (v: Viewport): string => `${String(v.width)}x${String(v.height)}`;
 
 export const GOLDEN_DIR = 'test/fixtures/styles';

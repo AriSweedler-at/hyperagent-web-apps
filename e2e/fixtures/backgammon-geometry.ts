@@ -5,7 +5,9 @@
 // 24 pairwise disjoint and one size, in the visual order `rowOrder` (ui/board/layout.ts, the CSS's
 // pure twin) states for the layout and the seat, every stack's visible coins inside its place and
 // no more than five, every tap target at least 44px on its short side on a phone, and no scroll
-// where the viewport fits (the document scrolls only under the fallback, design §3.1).
+// where the viewport fits (the document scrolls only under the fallback, design §3.1). The frame
+// and the overflow reads are the shared oracle's (e2e/fixtures/geometry.ts `frameScript`,
+// `fitsScript`, `expectSameFrame`; docs/design/shared-shell.md §5 A5), spliced into the one script.
 import { expect, type Page } from '@playwright/test';
 
 import {
@@ -15,6 +17,7 @@ import {
   type Layout,
 } from '../../web/games/backgammon/src/ui/board/layout.ts';
 import type { Box } from './boxes.ts';
+import { TOL, fitsScript, frameScript, type Frame } from './geometry.ts';
 
 export type Rect = Box;
 export type Stack = Readonly<{ rect: Rect; count: number; visible: ReadonlyArray<Rect> }>;
@@ -25,7 +28,6 @@ export type Fits = Readonly<{
   tableScreen: boolean;
   controlsReachable: boolean;
 }>;
-export type Frame = Readonly<Record<string, Rect | null>>;
 export type BoardGeometry = Readonly<{
   width: number;
   height: number;
@@ -79,11 +81,6 @@ const GEOMETRY = `(async () => {
     const coins = Array.from(el.querySelectorAll('.checker, .slab'));
     return { rect: rect(el), count: coins.length, visible: coins.filter(shown).map(rect) };
   };
-  const fits = (id) => { const el = document.getElementById(id); return el.scrollHeight <= el.clientHeight + 1; };
-  const before = window.scrollY;
-  window.scrollTo(0, document.documentElement.scrollHeight);
-  const controls = document.getElementById('controls').getBoundingClientRect();
-  window.scrollTo(0, before);
   const board = document.getElementById('board');
   return {
     width: window.innerWidth, height: window.innerHeight,
@@ -96,22 +93,14 @@ const GEOMETRY = `(async () => {
       const name = el.id !== '' ? '#' + el.id : el.tagName.toLowerCase() + '.' + Array.from(el.classList).join('.');
       return { sel: name, w: r.w, h: r.h };
     }),
-    fits: {
-      document: document.documentElement.scrollHeight <= window.innerHeight + 1,
-      app: fits('app'), tableScreen: fits('tableScreen'),
-      controlsReachable: controls.bottom <= window.innerHeight + 0.5,
-    },
-    frame: Object.fromEntries(${JSON.stringify(FRAME_SELECTORS)}.map((sel) => {
-      const el = document.querySelector(sel);
-      return [sel, el === null ? null : rect(el)];
-    })),
+    fits: ${fitsScript(['app', 'tableScreen'], 'controls')},
+    frame: ${frameScript(FRAME_SELECTORS)},
   };
 })()`;
 
 export const boardGeometry = (page: Page): Promise<BoardGeometry> =>
   page.evaluate<BoardGeometry>(GEOMETRY);
 
-const TOL = 0.5;
 const inside = (inner: Rect, outer: Rect): boolean =>
   inner.x >= outer.x - TOL &&
   inner.y >= outer.y - TOL &&
@@ -213,23 +202,6 @@ export const expectFits = (g: BoardGeometry, scrolls: boolean, when: string): vo
     app: true,
     tableScreen: true,
     controlsReachable: true,
-  });
-};
-
-/** Every box of the frame is where it was, to half a pixel. */
-export const expectSameFrame = (now: Frame, start: Frame, when: string): void => {
-  FRAME_SELECTORS.forEach((sel) => {
-    const a = now[sel];
-    const b = start[sel];
-    expect(a, `${sel} missing at ${when}`).not.toBeNull();
-    expect(b, `${sel} missing at the start`).not.toBeNull();
-    if (a === null || b === null || a === undefined || b === undefined) return;
-    (['x', 'y', 'w', 'h'] as const).forEach((side) => {
-      expect(
-        Math.abs(a[side] - b[side]),
-        `${sel} changed (${side}) at ${when}`,
-      ).toBeLessThanOrEqual(TOL);
-    });
   });
 };
 
