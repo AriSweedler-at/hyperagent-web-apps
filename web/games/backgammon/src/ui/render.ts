@@ -638,8 +638,8 @@ const absOfPoint = (el: Element): PointIndex | null => {
 /**
  * The intent a tap (or Enter/Space) on `#board` raises, from the element it landed on: a die while
  * moving forces that die, the dice otherwise roll, a point, a bar or a tray names itself; the
- * board's own surface closes the die-chip tray. No seat or viewport logic here: the reducer knows
- * which bar and tray are mine.
+ * board's own surface (the felt) closes the die-chip tray and lets the tapped source go (design
+ * §4.2). No seat or viewport logic here: the reducer knows which bar and tray are mine.
  */
 export const boardIntentOf = (e: Readonly<Event>): Intent | null => {
   const die = closestFrom(e, '.die');
@@ -655,7 +655,7 @@ export const boardIntentOf = (e: Readonly<Event>): Intent | null => {
   }
   if (closestFrom(e, '.bar') !== null) return { type: 'bar/tap' };
   if (closestFrom(e, '.off') !== null) return { type: 'off/tap' };
-  return targetIdOf(e) === 'board' ? { type: 'chip/cancel' } : null;
+  return targetIdOf(e) === 'board' ? { type: 'board/tap' } : null;
 };
 
 /** The sheets' close buttons and backdrops; Escape closes the open sheet, else the die-chip tray (design §6). */

@@ -447,8 +447,10 @@ export type Intent =
   | Readonly<{ type: 'die/pick'; die: Die }>
   /** A `.chip` in the die-chip tray: commit that chain. */
   | Readonly<{ type: 'chip/tap'; index: number }>
-  /** `#chipCancelBtn`, a tap on the board, or a source tap: the tray closes. */
+  /** `#chipCancelBtn`, Escape, or a source tap: the tray closes. */
   | Readonly<{ type: 'chip/cancel' }>
+  /** A tap on the board's own surface (the felt between the places): the tray closes and the tapped source is let go (design §4.2 rule 2b). */
+  | Readonly<{ type: 'board/tap' }>
   /** `#rollBtn`, `#dice` before the roll, and the curtain button when it promised a roll. */
   | Readonly<{ type: 'roll/click' }>
   | Readonly<{ type: 'undo/click' }>
@@ -1606,6 +1608,10 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
     }
     case 'chip/cancel':
       return pure(withTable(app, { pending: null }));
+    case 'board/tap':
+      return t.pending === null && t.selected === null
+        ? pure(app)
+        : pure(withTable(app, { pending: null, selected: null }));
     case 'roll/click':
       // The curtain button dispatches `curtain/reveal` first, so the roll lands on a live board.
       return v?.phase === 'toRoll' ? act(app, [{ type: 'roll' }], ctx) : pure(app);

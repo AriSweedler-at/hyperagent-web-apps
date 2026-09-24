@@ -902,6 +902,13 @@ describe('the table', () => {
     expect(picked.effects).toEqual([{ type: 'fx', cue: 'tap' }]);
     expect(run(picked.app, { type: 'point/tap', point: 12 }).app.table.selected).toBeNull();
     expect(run(picked.app, { type: 'point/tap', point: 7 }).app.table.selected).toBe(7);
+    // The felt: a tap on the board's own surface lets the source go too (design §4.2 rule 2b).
+    const felt = run(picked.app, { type: 'board/tap' });
+    expect(felt.app.table).toMatchObject({ selected: null, pending: null });
+    expect(felt.effects).toEqual([]);
+    expect(run(felt.app, { type: 'board/tap' })).toEqual({ app: felt.app, effects: [] });
+    // Deselected, the targets are gone: the board paints from the same helpers the reducer taps with.
+    expect(targetsOf(v, effectiveSelection(felt.app.table.selected, v), null)).toEqual([]);
     const stray = run(app, { type: 'point/tap', point: 10 });
     expect(stray.app.table.shake).toBe(10);
     expect(stray.effects).toEqual([
@@ -963,6 +970,10 @@ describe('the table', () => {
     ]);
     // Cancel, a board tap, and a missing chip.
     expect(run(opened.app, { type: 'chip/cancel' }).app.table.pending).toBeNull();
+    expect(run(opened.app, { type: 'board/tap' }).app.table).toMatchObject({
+      pending: null,
+      selected: null,
+    });
     expect(run(opened.app, { type: 'point/tap', point: 12 }).app.table.pending).toBeNull();
     expect(run(opened.app, { type: 'chip/tap', index: 5 })).toEqual({
       app: opened.app,

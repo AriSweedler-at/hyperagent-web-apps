@@ -315,7 +315,10 @@ effectiveSelection(table.selected, v)` and `T = targetsOf(v, sel, picked)`:
 
 1. `point/tap p`, `sel === null`: `p ∈ sourcesOf(v)` → `selected = p`; otherwise `shake` on `p`
    (a 120ms class via a `startTimer` effect, no toast).
-2. `point/tap p`, `p === sel` → `selected = null` (the derived sole source keeps its `auto` ring).
+2. `point/tap p`, `p === sel` → `selected = null` and the targets go with it (the owner, 2026-09-24:
+   "clicking a selected piece should deselect it"; the derived sole source keeps its `auto` ring,
+   since its targets are the only moves there are). 2b. A tap on the felt (`#board` itself, no
+   place under the finger) is `board/tap`: the tray closes and `selected = null`.
 3. `point/tap p`, `p ∈ T` reached by one chain → commit the chain's moves in order (one `move`
    action each); `selected = null; picked = null`.
 4. `point/tap p`, `p ∈ T` reached by chains that differ in consequence → `pending = { from: sel,
@@ -341,7 +344,8 @@ numbering, ordered by the higher first die, then fewer hits. `chipsHtml` writes
 digits (`6·3`; die glyphs drew as empty boxes at chip size on phones) and `.via` the landing (`→ 4
 via 7, hits`, warm when the chain `hits`), the whole as its `aria-label`. `chip/tap {index}`
 commits that chain's moves in order and clears `pending`, `selected`, `picked`. `chip/cancel` (the
-`✕`, a tap on the board, a source tap, Escape) clears `pending` only. The tray is the only way to
+`✕`, a source tap, Escape) clears `pending` only; a tap on the felt is `board/tap` (rule 2b) and
+clears the selection too. The tray is the only way to
 choose the order of a two-order combined move whose intermediates differ; it also decides which
 die a double-sufficing bear-off spends. The board discs stay primary: the tray never appears for an
 unambiguous destination.

@@ -577,7 +577,7 @@ describe('bindAll', () => {
     });
     expect(boardIntentOf(target({ '.bar': p.get('barBottom') }))).toEqual({ type: 'bar/tap' });
     expect(boardIntentOf(target({ '.off': p.get('offLight') }))).toEqual({ type: 'off/tap' });
-    expect(boardIntentOf(target({}, 'board'))).toEqual({ type: 'chip/cancel' });
+    expect(boardIntentOf(target({}, 'board'))).toEqual({ type: 'board/tap' });
     expect(boardIntentOf(target({}, 'checker'))).toBeNull();
   });
 
