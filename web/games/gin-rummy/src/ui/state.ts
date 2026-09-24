@@ -3,9 +3,14 @@
 // (legacy/gin-rummy/index.html) kept one mutable `app` object, wrote the DOM from a hundred
 // places and called the network from its handlers. Here `App` is that object as an immutable
 // record, plus what the legacy kept in the DOM or in closures (the screen shown, the two waiting
-// statuses, the netAttempt ticket, the curtain, the cue machine's memory), `Intent` is every
-// handler and every network event, and `reduce` returns the next App with a list of `Effect`s:
-// what to persist, toast, send, play or open, as data. main.ts runs the effects through the real
+// statuses, the netAttempt ticket, the curtain, the cue machine's memory), split in two as
+// backgammon splits it (docs/design/shared-shell.md §4.1, C1): `shell` is the home screen, the
+// waiting rooms and the session, field for field as backgammon names them, the record C2 lifts
+// into the shared shell reducer; `table` is the hand's own state (the tapped card, the ghost
+// slot, the picture, a drag, the sheets, the curtain, the sandbox editor), which stays gin's.
+// `Intent` is every handler and every network event, partitioned the same way
+// (`SHELL_INTENT_TYPES`), and `reduce` returns the next App with a list of `Effect`s: what to
+// persist, toast, send, play or open, as data. main.ts runs the effects through the real
 // adapters (`runEffect`) and paints the App (ui/render.ts); the tests run the reducer alone.
 // `persist`/`saveFor` and `readHome` are the legacy `persist()`/`loadSaved()`/`initHome` reads,
 // through storage.ts, producing the same `ginRummyMP_v1` bytes as the captured fixtures
@@ -147,7 +152,16 @@ export type Resume =
     }>
   | Readonly<{ kind: 'guest'; code: string; myName: string }>;
 
-export type App = Readonly<{
+/**
+ * Everything but the table's own state, split from the legacy `app` object as backgammon splits
+ * it (docs/design/shared-shell.md §4.1, C1): the home screen, the waiting rooms and the session
+ * (role, code, names, the engine `State` for the host and pass-and-play, my `View` for every
+ * role), the resume offer, the rules sheet and the Play tab's submenu, under backgammon's field
+ * names, with `target` where backgammon has `matchLength` and `variant`. `game` and `view` sit
+ * here too: the shell owns the session (who plays, from which device), the table only remembers
+ * taps and sheets. This is the record C2 lifts into the shared shell reducer.
+ */
+export type Shell = Readonly<{
   // ---- the legacy `app` object, field for field ----
   role: Role | null;
   code: string | null;
@@ -159,9 +173,6 @@ export type App = Readonly<{
   view: View | null;
   oppName: string | null;
   oppConnected: boolean;
-  selectedCard: string | null;
-  /** Set by the legacy, never read; kept so the hook's `app` has the same members. */
-  hostSeated: boolean;
   nameTouched: boolean;
   /** Pass-and-play: the seat that tapped "show my cards" this turn. */
   revealed: Seat | null;
@@ -172,9 +183,6 @@ export type App = Readonly<{
    * the sandbox mode shows while it is `sandbox` (src/sandbox.ts `unlocksSandbox`).
    */
   p1Name: string;
-  sandbox: Sandbox;
-  /** The round-result sheet was put away with "Look at the table". */
-  resultDismissed: boolean;
   // ---- what the legacy kept in the DOM or in closures ----
   screen: ScreenId;
   /** The `netAttempt` ticket: bumped by every start, cancel and leave. */
@@ -183,33 +191,6 @@ export type App = Readonly<{
   guestStatus: WaitStatus;
   /** `#startGameBtn` shown (a guest is in the lobby). */
   startGameVisible: boolean;
-  /** `#curtainOverlay`: the seat the phone is handed to, or null when hidden. */
-  curtain: Seat | null;
-  /** `#meldOverlay` open. */
-  meldChooser: boolean;
-  /** `playCuesFor`'s memory. */
-  cues: CueState;
-  /** `ginRummy_name`, as `initHome` put it in the inputs. */
-  savedName: string | null;
-  resume: Resume | null;
-  /** `#rulesOverlay` open. */
-  rulesOpen: boolean;
-  /**
-   * `#historyOverlay` open, and whose list it shows: the game's (painted from the view) or the
-   * Score Counter's (scorer/main.ts writes the list itself).
-   */
-  history: 'game' | 'scorer' | null;
-  /** `#playSubmenu` held open by a long press on the Play tab (`force-open`). */
-  submenuOpen: boolean;
-  /** A long press just opened the submenu, so the click that follows must not switch tabs. */
-  longPressed: boolean;
-  /** `#codeInput` as last sanitised (the legacy `lastGoodCode`). */
-  codeDraft: string;
-  /**
-   * The ghost draw slot (docs/design/gin-draw-ghost-slot.md §3): whether the drawn card is
-   * awaited or shown. Not saved, not on the wire.
-   */
-  draw: DrawStage | null;
   /**
    * The hosted game came from pass-and-play (`#handoffBtn`, the 🌐 in the table's top bar) and its remote
    * seat has not joined yet: the wait screen tells the player to send the invite, a guest that
@@ -218,6 +199,50 @@ export type App = Readonly<{
    * resumes the offer. Cleared by the guest's join and by every leave and cancel.
    */
   handoff: boolean;
+  /** `ginRummy_name`, as `initHome` put it in the inputs. */
+  savedName: string | null;
+  resume: Resume | null;
+  /** `#rulesOverlay` open. */
+  rulesOpen: boolean;
+  /** `playCuesFor`'s memory. */
+  cues: CueState;
+  /** `#playSubmenu` held open by a long press on the Play tab (`force-open`). */
+  submenuOpen: boolean;
+  /** A long press just opened the submenu, so the click that follows must not switch tabs. */
+  longPressed: boolean;
+  /** `#codeInput` as last sanitised (the legacy `lastGoodCode`). */
+  codeDraft: string;
+  /** The font every cue plays in (`ginRummy_soundFont`, docs/design/sound-fonts.md §6). */
+  soundFont: SoundFontName;
+}>;
+
+/**
+ * The table's own state (backgammon's `Table`, docs/design/shared-shell.md §4.1): the tapped
+ * card, the ghost draw slot, the kept picture, the melds made by hand, a drag, the sheets, the
+ * pass-and-play curtain, the sandbox editor and gin's two table preferences (`sort`, `cardBack`).
+ * Never saved but for those two, never on the wire; gin's alone when C2 lifts the shell. The
+ * legacy's `hostSeated` (set, never read) is gone: it stayed only so the hook's `app` kept the
+ * legacy's members, and this split changes that shape anyway.
+ */
+export type Table = Readonly<{
+  selectedCard: string | null;
+  sandbox: Sandbox;
+  /** The round-result sheet was put away with "Look at the table". */
+  resultDismissed: boolean;
+  /** `#curtainOverlay`: the seat the phone is handed to, or null when hidden. */
+  curtain: Seat | null;
+  /** `#meldOverlay` open. */
+  meldChooser: boolean;
+  /**
+   * `#historyOverlay` open, and whose list it shows: the game's (painted from the view) or the
+   * Score Counter's (scorer/main.ts writes the list itself).
+   */
+  history: 'game' | 'scorer' | null;
+  /**
+   * The ghost draw slot (docs/design/gin-draw-ghost-slot.md §3): whether the drawn card is
+   * awaited or shown. Not saved, not on the wire.
+   */
+  draw: DrawStage | null;
   /**
    * The hand as the cells show it (docs/design/gin-arrangement-and-discards.md §5): kept through
    * a selection, a draw, an accept and a discard, re-melded at the start of my turn, on Arrange
@@ -237,14 +262,14 @@ export type App = Readonly<{
   sort: SortMode;
   /** The card back drawn on every face-down card (`ginRummy_cardBack`, src/cardBack.ts). */
   cardBack: CardBack;
-  /** The font every cue plays in (`ginRummy_soundFont`, docs/design/sound-fonts.md §6). */
-  soundFont: SoundFontName;
   /** `#arrangeOverlay` open. */
   arrangeOpen: boolean;
   /** `#discardsOverlay` open, and whether it greys the cards in my hand too. Session only. */
   discardsOpen: boolean;
   discardsWithHand: boolean;
 }>;
+
+export type App = Readonly<{ shell: Shell; table: Table }>;
 
 // What a table leaves behind when a hand is dealt, left or lost: the ghost cell's stage, the kept
 // picture and the melds made by hand all belong to the hand that just ended.
@@ -253,7 +278,7 @@ const HAND_CLEARED = { draw: null, picture: null, human: null, drag: null } as c
 export const DEFAULT_NAME = 'Ari';
 export const DEFAULT_TARGET = 100;
 
-export const initialApp: App = {
+export const initialShell: Shell = {
   role: null,
   code: null,
   myName: DEFAULT_NAME,
@@ -262,42 +287,46 @@ export const initialApp: App = {
   view: null,
   oppName: null,
   oppConnected: false,
-  selectedCard: null,
-  hostSeated: false,
   nameTouched: false,
   revealed: null,
   homeTab: DEFAULT_HOME_TAB,
   playMode: DEFAULT_PLAY_MODE,
   p1Name: '',
-  sandbox: { preset: DEFAULT_PRESET.id, map: DEFAULT_PRESET.map, error: null, helpOpen: false },
-  resultDismissed: false,
   screen: 'homeScreen',
   netAttempt: 0,
   hostStatus: { text: OPENING_MSG, pulse: true },
   guestStatus: { text: 'Connecting…', pulse: true },
   startGameVisible: false,
-  curtain: null,
-  meldChooser: false,
-  cues: INITIAL_CUES,
+  handoff: false,
   savedName: null,
   resume: null,
   rulesOpen: false,
-  history: null,
+  cues: INITIAL_CUES,
   submenuOpen: false,
   longPressed: false,
   codeDraft: '',
+  soundFont: DEFAULT_SOUND_FONT,
+};
+
+export const initialTable: Table = {
+  selectedCard: null,
+  sandbox: { preset: DEFAULT_PRESET.id, map: DEFAULT_PRESET.map, error: null, helpOpen: false },
+  resultDismissed: false,
+  curtain: null,
+  meldChooser: false,
+  history: null,
   draw: null,
-  handoff: false,
   picture: null,
   human: null,
   drag: null,
   sort: DEFAULT_SORT,
   cardBack: DEFAULT_CARD_BACK,
-  soundFont: DEFAULT_SOUND_FONT,
   arrangeOpen: false,
   discardsOpen: false,
   discardsWithHand: false,
 };
+
+export const initialApp: App = { shell: initialShell, table: initialTable };
 
 /** The Play tab opens its submenu after this long a press. */
 export const LONG_PRESS_MS = 450;
@@ -305,7 +334,7 @@ export const SANDBOX_COPIED_MSG = 'Copied for the console';
 /** The console call that deals `map`: what `#sbCopyBtn` copies. */
 export const consoleCall = (map: string): string => `__gin.sandbox(\`${map}\`)`;
 /** The sandbox mode shows while the first player is named `sandbox`. */
-export const sandboxUnlocked = (app: App): boolean => unlocksSandbox(app.p1Name);
+export const sandboxUnlocked = (app: App): boolean => unlocksSandbox(app.shell.p1Name);
 
 // ---- the strings the app (not the sessions) wrote --------------------------------------------
 
@@ -489,6 +518,55 @@ export type Intent =
   /** A session asked the app to persist. */
   | Readonly<{ type: 'persist' }>;
 
+/**
+ * The shell's half of `Intent`, backgammon's list under gin's names (docs/design/shared-shell.md
+ * §4.2; C1): what the shared shell reducer owns once C2 lands. Everything else is the table's,
+ * including gin's own `cardBack/set`, the sandbox editor and the rules and history sheets, and,
+ * as in backgammon's partition, the leave flow, the curtain, `visible`, `render` and `persist`.
+ */
+export const SHELL_INTENT_TYPES = [
+  'home/init',
+  'name/typed',
+  'p1name/typed',
+  'p2name/typed',
+  'tab/set',
+  'rules/show',
+  'mode/set',
+  'host/click',
+  'join/click',
+  'local/click',
+  'resume/click',
+  'handoff/click',
+  'cancel',
+  'cancel/finish',
+  'screen/show',
+  'submenu/press',
+  'submenu/release',
+  'submenu/longPress',
+  'tab/playClick',
+  'submenu/pick',
+  'submenu/dismiss',
+  'code/typed',
+  'join/link',
+  'sound/toggle',
+  'soundFont/set',
+  'share/click',
+  'host/start',
+  'host/status',
+  'host/frame',
+  'host/guestGone',
+  'host/deal',
+  'guest/start',
+  'guest/status',
+  'guest/connected',
+  'guest/frame',
+  'guest/lost',
+] as const satisfies ReadonlyArray<Intent['type']>;
+export type ShellIntent = Extract<Intent, { type: (typeof SHELL_INTENT_TYPES)[number] }>;
+export type TableIntent = Exclude<Intent, ShellIntent>;
+const isShellIntent = (intent: Intent): intent is ShellIntent =>
+  (SHELL_INTENT_TYPES as ReadonlyArray<string>).includes(intent.type);
+
 // ---- effects -----------------------------------------------------------------------------------
 
 export type Effect =
@@ -559,6 +637,14 @@ const toast = (message: string, ms: number | null = null): Effect => ({
   message,
   ms,
 });
+const withShell = (app: App, over: Partial<Shell>): App => ({
+  ...app,
+  shell: { ...app.shell, ...over },
+});
+const withTable = (app: App, over: Partial<Table>): App => ({
+  ...app,
+  table: { ...app.table, ...over },
+});
 /**
  * A refused move: the toast, and a draw that was awaited never leaves the ghost slot pending. A
  * `shown` stage is kept: only `__gin.act` can send a move the engine refuses while the drawn card
@@ -566,7 +652,7 @@ const toast = (message: string, ms: number | null = null): Effect => ({
  * hand over a toast (docs/design/gin-arrangement-and-discards.md §4).
  */
 const refuse = (app: App, message: string): Step =>
-  step(app.draw?.kind === 'waiting' ? { ...app, draw: null } : app, toast(message));
+  step(app.table.draw?.kind === 'waiting' ? withTable(app, { draw: null }) : app, toast(message));
 
 // ---- helpers, as the legacy had them ------------------------------------------------------------
 
@@ -582,20 +668,19 @@ const nameOr = (raw: string, fallback: string): string => {
   return (trimmed === '' ? fallback : trimmed).slice(0, NAME_MAX);
 };
 
-const withSandbox = (app: App, over: Partial<Sandbox>): App => ({
-  ...app,
-  sandbox: { ...app.sandbox, ...over },
-});
+const withSandbox = (app: App, over: Partial<Sandbox>): App =>
+  withTable(app, { sandbox: { ...app.table.sandbox, ...over } });
 
 /** The first name as typed; a sandbox that the name no longer unlocks falls back to pass-and-play. */
-const withP1Name = (app: App, value: string): App => ({
-  ...app,
-  p1Name: value,
-  playMode: app.playMode === 'sandbox' && !unlocksSandbox(value) ? 'local' : app.playMode,
-});
+const withP1Name = (app: App, value: string): App =>
+  withShell(app, {
+    p1Name: value,
+    playMode:
+      app.shell.playMode === 'sandbox' && !unlocksSandbox(value) ? 'local' : app.shell.playMode,
+  });
 
 const showScreen = (app: App, screen: ScreenId): Step =>
-  step({ ...app, screen }, { type: 'scrollTop' });
+  step(withShell(app, { screen }), { type: 'scrollTop' });
 
 /**
  * The state side of the legacy `render()`: nothing without a view; else the cue machine steps
@@ -606,32 +691,30 @@ const showScreen = (app: App, screen: ScreenId): Step =>
  * after every intent.
  */
 const rendered = (app: App, prev: View | null = null): Step => {
-  const view = app.view;
+  const view = app.shell.view;
   if (view === null) return pure(app);
-  const cued = nextCue(app.cues, view, app.role === 'local' ? 'local' : 'online');
-  const drew = app.role === 'local' ? null : oppDrawCue(prev, view);
-  const selectedCard = selectionIn(view, app.selectedCard);
+  const cued = nextCue(app.shell.cues, view, app.shell.role === 'local' ? 'local' : 'online');
+  const drew = app.shell.role === 'local' ? null : oppDrawCue(prev, view);
+  const selectedCard = selectionIn(view, app.table.selectedCard);
   const screen: ScreenId = view.phase === 'gameOver' ? 'endgameScreen' : 'tableScreen';
-  const draw = settleDraw(app.draw, view);
-  const picture = settlePicture(app.picture, view, draw, () =>
-    arrangedOf(view, draw, app.human, app.sort, app.picture),
+  const draw = settleDraw(app.table.draw, view);
+  const picture = settlePicture(app.table.picture, view, draw, () =>
+    arrangedOf(view, draw, app.table.human, app.table.sort, app.table.picture),
   );
   return step(
-    { ...app, cues: cued.state, selectedCard, screen, draw, picture },
+    withTable(withShell(app, { cues: cued.state, screen }), { selectedCard, draw, picture }),
     ...(cued.cue === null ? [] : [{ type: 'fx', cue: cued.cue } as const]),
     ...(drew === null ? [] : [{ type: 'fx', cue: drew } as const]),
     { type: 'scrollTop' },
   );
 };
 
-const withHostStatus = (app: App, text: string, stopPulse = false): App => ({
-  ...app,
-  hostStatus: { text, pulse: stopPulse ? false : app.hostStatus.pulse },
-});
-const withGuestStatus = (app: App, text: string, stopPulse = false): App => ({
-  ...app,
-  guestStatus: { text, pulse: stopPulse ? false : app.guestStatus.pulse },
-});
+const withHostStatus = (app: App, text: string, stopPulse = false): App =>
+  withShell(app, { hostStatus: { text, pulse: stopPulse ? false : app.shell.hostStatus.pulse } });
+const withGuestStatus = (app: App, text: string, stopPulse = false): App =>
+  withShell(app, {
+    guestStatus: { text, pulse: stopPulse ? false : app.shell.guestStatus.pulse },
+  });
 
 /** `app.game.players[1].name = name` on a rejoin. */
 const renameGuest = (game: State, name: string): State => ({
@@ -643,28 +726,28 @@ const renameGuest = (game: State, name: string): State => ({
 
 /** `broadcast()`: my view, the guest's view on the wire, selection cleared, saved, rendered. */
 const broadcast = (app: App): Step => {
-  const game = app.game;
+  const game = app.shell.game;
   if (game === null) return pure(app);
   return then(
     step(
-      { ...app, view: viewFor(game, 0), selectedCard: null },
+      withTable(withShell(app, { view: viewFor(game, 0) }), { selectedCard: null }),
       { type: 'send', frame: stateFrame(viewFor(game, 1)) },
       { type: 'persist' },
     ),
-    (a) => rendered(a, app.view),
+    (a) => rendered(a, app.shell.view),
   );
 };
 
 /** `dispatch(pIdx, action)`, host only: apply, or refuse to the mover; then broadcast. */
 const hostDispatch = (app: App, seat: Seat, action: Action, ctx: Context): Step => {
-  if (app.game === null) return pure(app);
-  const res = applyAction(app.game, seat, action, ctx.rng, ctx.now);
+  if (app.shell.game === null) return pure(app);
+  const res = applyAction(app.shell.game, seat, action, ctx.rng, ctx.now);
   if (!res.ok) {
     return seat === 0
       ? refuse(app, res.error)
       : step(app, { type: 'send', frame: toastFrame(res.error) });
   }
-  return broadcast({ ...app, game: res.value, resultDismissed: false });
+  return broadcast(withTable(withShell(app, { game: res.value }), { resultDismissed: false }));
 };
 
 /**
@@ -673,14 +756,14 @@ const hostDispatch = (app: App, seat: Seat, action: Action, ctx: Context): Step 
  * is the start or a reveal.
  */
 const localBroadcast = (app: App, initial: boolean): Step => {
-  const game = app.game;
+  const game = app.shell.game;
   if (game === null) return pure(app);
   const playing = inPlay(game.phase);
-  const viewIdx: Seat = playing ? game.turn : (app.revealed ?? 0);
-  const curtain = playing && app.revealed !== game.turn ? game.turn : null;
+  const viewIdx: Seat = playing ? game.turn : (app.shell.revealed ?? 0);
+  const curtain = playing && app.shell.revealed !== game.turn ? game.turn : null;
   return then(
     step(
-      { ...app, view: viewFor(game, viewIdx), selectedCard: null, curtain },
+      withTable(withShell(app, { view: viewFor(game, viewIdx) }), { selectedCard: null, curtain }),
       { type: 'persist' },
       ...(curtain !== null && !initial ? [{ type: 'fx', cue: 'yourTurn' } as const] : []),
     ),
@@ -690,35 +773,34 @@ const localBroadcast = (app: App, initial: boolean): Step => {
 
 /** `localAct(action)`: `ready` is applied for both seats; anything else for the mover. */
 const localAct = (app: App, action: Action, ctx: Context): Step => {
-  const game = app.game;
+  const game = app.shell.game;
   if (game === null) return pure(app);
   if (action.type === 'ready') {
     const r1 = applyAction(game, 0, action, ctx.rng, ctx.now);
     const g1 = r1.ok ? r1.value : game;
     const r2 = applyAction(g1, 1, action, ctx.rng, ctx.now);
     if (!r1.ok && !r2.ok) return refuse(app, r1.error);
-    return localBroadcast({ ...app, game: r2.ok ? r2.value : g1, resultDismissed: false }, false);
+    return localBroadcast(
+      withTable(withShell(app, { game: r2.ok ? r2.value : g1 }), { resultDismissed: false }),
+      false,
+    );
   }
   const res = applyAction(game, game.turn, action, ctx.rng, ctx.now);
   if (!res.ok) return refuse(app, res.error);
-  return localBroadcast({ ...app, game: res.value, resultDismissed: false }, false);
+  return localBroadcast(
+    withTable(withShell(app, { game: res.value }), { resultDismissed: false }),
+    false,
+  );
 };
 
 /** `startLocal(p1, p2, target, savedGame)` with the game already made; `human` is the sandbox's hand-made melds. */
 const startLocal = (app: App, game: State, human: HumanMelds | null = null): Step =>
   then(
     step(
-      {
-        ...app,
-        role: 'local',
-        code: null,
-        oppConnected: true,
-        game,
-        revealed: null,
-        resultDismissed: false,
-        ...HAND_CLEARED,
-        human,
-      },
+      withTable(
+        withShell(app, { role: 'local', code: null, oppConnected: true, game, revealed: null }),
+        { resultDismissed: false, ...HAND_CLEARED, human },
+      ),
       { type: 'wakeLock', hold: true },
     ),
     (a) => localBroadcast(a, true),
@@ -727,11 +809,11 @@ const startLocal = (app: App, game: State, human: HumanMelds | null = null): Ste
 /** `startHost(resumeCode)` up to the network: the session is the `startHost` effect. */
 const startHost = (app: App, resumeCode: string | null, ctx: Context): Step => {
   const code = resumeCode ?? randomCode('gin-rummy', ctx.rng);
-  const attempt = app.netAttempt + 1;
+  const attempt = app.shell.netAttempt + 1;
   return then(
     showScreen(
       withHostStatus(
-        { ...app, role: 'host', code, netAttempt: attempt, startGameVisible: false },
+        withShell(app, { role: 'host', code, netAttempt: attempt, startGameVisible: false }),
         OPENING_MSG,
       ),
       'hostWaitScreen',
@@ -742,10 +824,13 @@ const startHost = (app: App, resumeCode: string | null, ctx: Context): Step => {
 
 /** `startGuest(code)` up to the network: the session is the `startGuest` effect. */
 const startGuest = (app: App, code: string): Step => {
-  const attempt = app.netAttempt + 1;
+  const attempt = app.shell.netAttempt + 1;
   return then(
     showScreen(
-      withGuestStatus({ ...app, role: 'guest', code, netAttempt: attempt }, connectingMsg(code)),
+      withGuestStatus(
+        withShell(app, { role: 'guest', code, netAttempt: attempt }),
+        connectingMsg(code),
+      ),
       'guestWaitScreen',
     ),
     (a) => step(a, { type: 'startGuest', code, attempt }),
@@ -763,11 +848,13 @@ const startGuest = (app: App, code: string): Step => {
  */
 const act = (app: App, action: Action, ctx: Context): Step => {
   const from = drawSource(action);
-  if (from !== null && app.draw?.kind === 'waiting') return pure(app);
+  if (from !== null && app.table.draw?.kind === 'waiting') return pure(app);
   const held: App =
-    from !== null && app.view !== null ? { ...app, draw: { kind: 'waiting', from } } : app;
+    from !== null && app.shell.view !== null
+      ? withTable(app, { draw: { kind: 'waiting', from } })
+      : app;
   return then(step(held, { type: 'fx', cue: 'tap' }), (a) => {
-    switch (a.role) {
+    switch (a.shell.role) {
       case 'local':
         return localAct(a, action, ctx);
       case 'host':
@@ -776,7 +863,7 @@ const act = (app: App, action: Action, ctx: Context): Step => {
       case null:
         // The legacy tested `app.conn && app.conn.open`; a guest's channel is open exactly while
         // the host counts as connected (set on open, cleared on close), and no role has no channel.
-        return a.role === 'guest' && a.oppConnected
+        return a.shell.role === 'guest' && a.shell.oppConnected
           ? step(a, { type: 'send', frame: actionFrame(action) })
           : refuse(a, NOT_CONNECTED_MSG);
     }
@@ -789,13 +876,14 @@ const act = (app: App, action: Action, ctx: Context): Step => {
  * or failed before its join leaves the wait screen saying to send the invite, with no toast.
  */
 const guestGone = (app: App): Step => {
-  if (app.handoff) return pure(withHostStatus(app, handoffMsg(app.code ?? '', app.oppName)));
-  if (app.game !== null && app.view !== null && app.view.phase !== 'gameOver')
+  if (app.shell.handoff)
+    return pure(withHostStatus(app, handoffMsg(app.shell.code ?? '', app.shell.oppName)));
+  if (app.shell.game !== null && app.shell.view !== null && app.shell.view.phase !== 'gameOver')
     return then(rendered(app), (a) =>
-      step(a, toast(guestGoneMsg(a.oppName, a.code), GONE_TOAST_MS)),
+      step(a, toast(guestGoneMsg(a.shell.oppName, a.shell.code), GONE_TOAST_MS)),
     );
-  if (app.game === null)
-    return pure({ ...withHostStatus(app, OPPONENT_LEFT_MSG), startGameVisible: false });
+  if (app.shell.game === null)
+    return pure(withShell(withHostStatus(app, OPPONENT_LEFT_MSG), { startGameVisible: false }));
   return pure(app);
 };
 
@@ -803,19 +891,19 @@ const guestGone = (app: App): Step => {
 const hostFrame = (app: App, frame: GuestFrame, ctx: Context): Step => {
   switch (frame.t) {
     case 'join': {
-      const name = guestNameFor(frame.name, app.myName);
-      const connected = { ...app, oppConnected: true, oppName: name, handoff: false };
-      if (app.game !== null) {
+      const name = guestNameFor(frame.name, app.shell.myName);
+      const connected = withShell(app, { oppConnected: true, oppName: name, handoff: false });
+      if (app.shell.game !== null) {
         // Rejoin: keep the seat, refresh the name.
-        return broadcast({ ...connected, game: renameGuest(app.game, name) });
+        return broadcast(withShell(connected, { game: renameGuest(app.shell.game, name) }));
       }
       return step(
-        { ...withHostStatus(connected, joinedMsg(name)), startGameVisible: true },
-        { type: 'send', frame: lobbyFrame(app.myName, { target: app.target }) },
+        withShell(withHostStatus(connected, joinedMsg(name)), { startGameVisible: true }),
+        { type: 'send', frame: lobbyFrame(app.shell.myName, { target: app.shell.target }) },
       );
     }
     case 'action':
-      return app.game === null ? pure(app) : hostDispatch(app, 1, frame.action, ctx);
+      return app.shell.game === null ? pure(app) : hostDispatch(app, 1, frame.action, ctx);
   }
 };
 
@@ -826,7 +914,7 @@ const guestFrame = (app: App, frame: HostFrame): Step => {
     case 'lobby':
       return pure(
         withGuestStatus(
-          { ...app, oppName: frame.hostName, target: frame.target },
+          withShell(app, { oppName: frame.hostName, target: frame.target }),
           hostRoomMsg(frame.hostName, frame.target),
         ),
       );
@@ -837,14 +925,11 @@ const guestFrame = (app: App, frame: HostFrame): Step => {
       return refuse(app, frame.msg);
     case 'state':
       return rendered(
-        {
-          ...app,
-          view: frame.view,
-          oppConnected: true,
+        withTable(withShell(app, { view: frame.view, oppConnected: true }), {
           selectedCard: null,
           resultDismissed: false,
-        },
-        app.view,
+        }),
+        app.shell.view,
       );
   }
 };
@@ -895,7 +980,7 @@ export const handoffLabel = (game: State): string =>
 const setHomeTab = (app: App, tab: string, persist: boolean): Step => {
   const known = HOME_TABS.find((t) => t === tab) ?? DEFAULT_HOME_TAB;
   return step(
-    { ...app, homeTab: known },
+    withShell(app, { homeTab: known }),
     ...(persist ? [{ type: 'writeHomeTab', tab: known } as const] : []),
   );
 };
@@ -906,23 +991,23 @@ const initHome = (app: App, home: HomeSnapshot): Step =>
     then(
       then(
         step(
-          {
-            ...a,
-            savedName: home.name,
-            p1Name: home.name ?? '',
-            nameTouched: home.name !== null ? true : a.nameTouched,
-            homeTab: home.homeTab,
-            playMode: home.playMode,
-            sort: home.sort,
-            cardBack: home.cardBack,
-            soundFont: home.soundFont,
-          },
+          withTable(
+            withShell(a, {
+              savedName: home.name,
+              p1Name: home.name ?? '',
+              nameTouched: home.name !== null ? true : a.shell.nameTouched,
+              homeTab: home.homeTab,
+              playMode: home.playMode,
+              soundFont: home.soundFont,
+            }),
+            { sort: home.sort, cardBack: home.cardBack },
+          ),
           ...(home.name === null ? [] : [{ type: 'fillName', name: home.name } as const]),
           ...(home.p2Name === null ? [] : [{ type: 'fillP2Name', name: home.p2Name } as const]),
         ),
         (b) => setHomeTab(b, home.homeTab, false),
       ),
-      (b) => pure({ ...b, resume: resumeFor(home.save, home.scorer) }),
+      (b) => pure(withShell(b, { resume: resumeFor(home.save, home.scorer) })),
     ),
   );
 
@@ -935,8 +1020,7 @@ const resume = (app: App, offer: Resume, ctx: Context): Step => {
       return startLocal(app, offer.game);
     case 'host':
       return startHost(
-        {
-          ...app,
+        withShell(app, {
           myName: offer.myName,
           target: offer.target,
           game: offer.game,
@@ -944,12 +1028,12 @@ const resume = (app: App, offer: Resume, ctx: Context): Step => {
           view: viewFor(offer.game, 0),
           // A handoff nobody joined resumes as one, under the code the invite already carries.
           handoff: offer.handoff,
-        },
+        }),
         offer.code,
         ctx,
       );
     case 'guest':
-      return startGuest({ ...app, myName: offer.myName }, offer.code);
+      return startGuest(withShell(app, { myName: offer.myName }), offer.code);
   }
 };
 
@@ -962,21 +1046,19 @@ const resume = (app: App, offer: Resume, ctx: Context): Step => {
  */
 const handoff = (app: App, game: State, ctx: Context): Step =>
   startHost(
-    {
-      ...app,
-      myName: game.players[0].name,
-      target: game.target,
-      game,
-      oppName: game.players[1].name,
-      oppConnected: false,
-      view: viewFor(game, 0),
-      selectedCard: null,
-      revealed: null,
-      curtain: null,
-      meldChooser: false,
-      draw: null,
-      handoff: true,
-    },
+    withTable(
+      withShell(app, {
+        myName: game.players[0].name,
+        target: game.target,
+        game,
+        oppName: game.players[1].name,
+        oppConnected: false,
+        view: viewFor(game, 0),
+        revealed: null,
+        handoff: true,
+      }),
+      { selectedCard: null, curtain: null, meldChooser: false, draw: null },
+    ),
     null,
     ctx,
   );
@@ -984,20 +1066,19 @@ const handoff = (app: App, game: State, ctx: Context): Step =>
 /** `leaveGame()` after the confirm and the network close: the reset, then home. */
 const leaveFinish = (app: App): Step =>
   step(
-    {
-      ...app,
-      netAttempt: app.netAttempt + 1,
-      role: null,
-      game: null,
-      view: null,
-      oppConnected: false,
-      code: null,
-      revealed: null,
-      curtain: null,
-      meldChooser: false,
-      handoff: false,
-      ...HAND_CLEARED,
-    },
+    withTable(
+      withShell(app, {
+        netAttempt: app.shell.netAttempt + 1,
+        role: null,
+        game: null,
+        view: null,
+        oppConnected: false,
+        code: null,
+        revealed: null,
+        handoff: false,
+      }),
+      { curtain: null, meldChooser: false, ...HAND_CLEARED },
+    ),
     { type: 'clearSave' },
     { type: 'initHome' },
   );
@@ -1008,9 +1089,9 @@ const leaveFinish = (app: App): Step =>
  */
 const cancelFinish = (app: App): Step =>
   step(
-    { ...app, role: null, netAttempt: app.netAttempt + 1, handoff: false },
-    app.handoff && app.game !== null
-      ? { type: 'saveLocal', game: app.game }
+    withShell(app, { role: null, netAttempt: app.shell.netAttempt + 1, handoff: false }),
+    app.shell.handoff && app.shell.game !== null
+      ? { type: 'saveLocal', game: app.shell.game }
       : { type: 'clearSave' },
     { type: 'initHome' },
   );
@@ -1024,11 +1105,11 @@ const actionClick = (app: App, which: string, ctx: Context): Step => {
       return act(app, { type: which }, ctx);
     case 'discard':
     case 'knock':
-      return app.selectedCard === null
+      return app.table.selectedCard === null
         ? pure(app)
-        : act(app, { type: which, cardId: app.selectedCard }, ctx);
+        : act(app, { type: which, cardId: app.table.selectedCard }, ctx);
     case 'showResult':
-      return pure({ ...app, resultDismissed: false });
+      return pure(withTable(app, { resultDismissed: false }));
     case 'finishLayoff':
       return act(app, { type: 'finishLayoff' }, ctx);
     default:
@@ -1044,7 +1125,7 @@ const actionClick = (app: App, which: string, ctx: Context): Step => {
 export const canDropDiscard = (app: App, v: View, cardId: string): boolean =>
   v.isMyTurn &&
   v.phase === 'discard' &&
-  app.draw === null &&
+  app.table.draw === null &&
   v.drawnFromDiscard !== cardId &&
   v.me.hand.some((c) => c.id === cardId);
 
@@ -1058,7 +1139,7 @@ const fitsMeld = (v: View, cardId: string, onto: number | null): boolean => {
 
 // ---- the reducer -------------------------------------------------------------------------------
 
-export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
+const shellIntent = (app: App, intent: ShellIntent, ctx: Context): Step => {
   switch (intent.type) {
     // ---- home ----
     case 'home/init':
@@ -1068,7 +1149,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     // names); the fill writes only inputs whose value differs, so the one being typed in is left alone.
     case 'name/typed':
       return step(
-        withP1Name({ ...app, nameTouched: true }, intent.value),
+        withP1Name(withShell(app, { nameTouched: true }), intent.value),
         { type: 'rememberName', name: intent.value.trim() },
         { type: 'fillName', name: intent.value },
       );
@@ -1089,8 +1170,10 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'rules/show': {
       // On the home screen the Rules tab is the rules; anywhere else (the table, a waiting room,
       // the scorer) the overlay is, and its own copy of the list is the one to scroll.
-      const home = app.screen === 'homeScreen';
-      const shown = home ? setHomeTab(app, 'rules', true) : pure({ ...app, rulesOpen: true });
+      const home = app.shell.screen === 'homeScreen';
+      const shown = home
+        ? setHomeTab(app, 'rules', true)
+        : pure(withShell(app, { rulesOpen: true }));
       return then(shown, (a) =>
         step(a, {
           type: 'revealRule',
@@ -1102,20 +1185,19 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'mode/set': {
       // The sandbox is shown, never stored: a reload lands on the stored mode.
       if (intent.mode === 'sandbox')
-        return pure(sandboxUnlocked(app) ? { ...app, playMode: 'sandbox' } : app);
+        return pure(sandboxUnlocked(app) ? withShell(app, { playMode: 'sandbox' }) : app);
       const mode: StoredPlayMode = intent.mode === 'local' ? 'local' : 'online';
-      return step({ ...app, playMode: mode }, { type: 'writePlayMode', mode });
+      return step(withShell(app, { playMode: mode }), { type: 'writePlayMode', mode });
     }
     case 'host/click':
       return startHost(
-        {
-          ...app,
+        withShell(app, {
           myName: nameOr(intent.name, DEFAULT_NAME),
           target: parseTarget(intent.target),
           game: null,
           oppName: null,
           oppConnected: false,
-        },
+        }),
         null,
         ctx,
       );
@@ -1124,9 +1206,11 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       if (!code.ok) return step(app, toast(code.error));
       const typed = intent.name.trim();
       const myName = (
-        typed !== '' && (app.nameTouched || typed !== DEFAULT_NAME) ? typed : DEFAULT_GUEST_NAME
+        typed !== '' && (app.shell.nameTouched || typed !== DEFAULT_NAME)
+          ? typed
+          : DEFAULT_GUEST_NAME
       ).slice(0, NAME_MAX);
-      return startGuest({ ...app, myName }, code.value);
+      return startGuest(withShell(app, { myName }), code.value);
     }
     case 'local/click': {
       const p1 = nameOr(intent.p1, 'Player 1');
@@ -1146,11 +1230,14 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       return startLocal(app, game);
     }
     case 'resume/click':
-      return app.resume === null ? pure(app) : resume(app, app.resume, ctx);
+      return app.shell.resume === null ? pure(app) : resume(app, app.shell.resume, ctx);
     case 'handoff/click':
       // The home screen's offer, or the game in play on the pass-and-play curtain.
-      if (app.role === 'local' && app.game !== null) return handoff(app, app.game, ctx);
-      return app.resume?.kind === 'local' ? handoff(app, app.resume.game, ctx) : pure(app);
+      if (app.shell.role === 'local' && app.shell.game !== null)
+        return handoff(app, app.shell.game, ctx);
+      return app.shell.resume?.kind === 'local'
+        ? handoff(app, app.shell.resume.game, ctx)
+        : pure(app);
     case 'cancel':
       return step(app, { type: 'closeNet' }, { type: 'then', intent: { type: 'cancel/finish' } });
     case 'cancel/finish':
@@ -1158,37 +1245,113 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'screen/show':
       return showScreen(app, intent.screen);
     case 'submenu/press':
-      return step(
-        { ...app, longPressed: false },
-        {
-          type: 'startTimer',
-          id: 'longPress',
-          ms: LONG_PRESS_MS,
-          then: { type: 'submenu/longPress' },
-        },
-      );
+      return step(withShell(app, { longPressed: false }), {
+        type: 'startTimer',
+        id: 'longPress',
+        ms: LONG_PRESS_MS,
+        then: { type: 'submenu/longPress' },
+      });
     case 'submenu/release':
       return step(app, { type: 'cancelTimer', id: 'longPress' });
     case 'submenu/longPress':
-      return step({ ...app, longPressed: true, submenuOpen: true }, { type: 'fx', cue: 'tap' });
+      return step(withShell(app, { longPressed: true, submenuOpen: true }), {
+        type: 'fx',
+        cue: 'tap',
+      });
     case 'tab/playClick':
       // The long press already opened the submenu; the click that follows must not switch tabs.
-      return app.longPressed
-        ? pure({ ...app, longPressed: false })
-        : setHomeTab({ ...app, submenuOpen: false }, 'play', true);
+      return app.shell.longPressed
+        ? pure(withShell(app, { longPressed: false }))
+        : setHomeTab(withShell(app, { submenuOpen: false }), 'play', true);
     case 'submenu/pick':
       return then(reduce(app, { type: 'mode/set', mode: intent.mode }, ctx), (a) =>
-        setHomeTab({ ...a, submenuOpen: false }, 'play', true),
+        setHomeTab(withShell(a, { submenuOpen: false }), 'play', true),
       );
     case 'submenu/dismiss':
-      return pure({ ...app, submenuOpen: false });
-    case 'cardBack/set':
-      return step({ ...app, cardBack: intent.back }, { type: 'writeCardBack', back: intent.back });
+      return pure(withShell(app, { submenuOpen: false }));
     case 'soundFont/set':
-      return step(
-        { ...app, soundFont: intent.font },
-        { type: 'writeSoundFont', font: intent.font },
+      return step(withShell(app, { soundFont: intent.font }), {
+        type: 'writeSoundFont',
+        font: intent.font,
+      });
+    case 'code/typed': {
+      // A keyboard suggestion that swapped earlier letters arrives as a replacement: keep the last good code.
+      const value =
+        intent.inputType === 'insertReplacementText'
+          ? app.shell.codeDraft
+          : sanitiseCode('gin-rummy', intent.value);
+      return step(withShell(app, { codeDraft: value }), { type: 'setCode', value });
+    }
+    case 'join/link': {
+      // The invite link: the code is in the form; the mode is shown, not stored.
+      const code = sanitiseCode('gin-rummy', intent.code);
+      return then(
+        setHomeTab(withShell(app, { playMode: 'online', codeDraft: code }), 'play', false),
+        (a) => step(a, { type: 'setCode', value: code }),
       );
+    }
+    case 'sound/toggle':
+      return step(app, { type: 'toggleSound' });
+    case 'share/click':
+      return app.shell.code === null
+        ? pure(app)
+        : step(app, { type: 'share', code: app.shell.code });
+    // ---- net: host ----
+    case 'host/start':
+      return startHost(app, intent.code, ctx);
+    case 'host/status':
+      return pure(withHostStatus(app, intent.text, intent.stopPulse));
+    case 'host/frame':
+      return hostFrame(app, intent.frame, ctx);
+    case 'host/guestGone': {
+      const gone = withShell(app, { oppConnected: false });
+      return intent.iceFailed === null
+        ? guestGone(gone)
+        : pure(withHostStatus(gone, intent.iceFailed));
+    }
+    case 'host/deal': {
+      if (!app.shell.oppConnected) return step(app, toast(WAITING_FOR_GUEST_MSG));
+      const game = createGame(
+        {
+          players: [
+            { id: 'host', name: app.shell.myName },
+            // A connected opponent has a name; the fallback only satisfies the type.
+            { id: 'guest', name: app.shell.oppName ?? DEFAULT_GUEST_NAME },
+          ],
+          target: app.shell.target,
+        },
+        ctx.rng,
+        ctx.now,
+      );
+      return broadcast(
+        withTable(withShell(app, { game }), { resultDismissed: false, ...HAND_CLEARED }),
+      );
+    }
+    // ---- net: guest ----
+    case 'guest/start':
+      return startGuest(app, intent.code);
+    case 'guest/status':
+      return pure(withGuestStatus(app, intent.text, intent.stopPulse));
+    case 'guest/connected':
+      return pure(withShell(app, { oppConnected: true }));
+    case 'guest/frame':
+      return guestFrame(app, intent.frame);
+    case 'guest/lost': {
+      const lost = withTable(withShell(app, { oppConnected: false }), { ...HAND_CLEARED });
+      if (lost.shell.view !== null && lost.shell.view.phase !== 'gameOver')
+        return then(rendered(lost), (a) => step(a, toast(LOST_HOST_MSG, GONE_TOAST_MS)));
+      return showScreen(withGuestStatus(lost, DISCONNECTED_MSG), 'guestWaitScreen');
+    }
+  }
+};
+
+const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
+  switch (intent.type) {
+    case 'cardBack/set':
+      return step(withTable(app, { cardBack: intent.back }), {
+        type: 'writeCardBack',
+        back: intent.back,
+      });
     // ---- the sandbox ----
     case 'sandbox/preset': {
       const preset = presetById(intent.id);
@@ -1207,7 +1370,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'sandbox/copy':
       return step(
         app,
-        { type: 'copy', text: consoleCall(app.sandbox.map) },
+        { type: 'copy', text: consoleCall(app.table.sandbox.map) },
         toast(SANDBOX_COPIED_MSG),
       );
     case 'sandbox/start': {
@@ -1230,111 +1393,43 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
           : { hand: game.handNumber, groups: parsed.value.melds.map(idsOf) };
       return startLocal(withSandbox(app, { map: intent.map, error: null }), game, human);
     }
-    case 'code/typed': {
-      // A keyboard suggestion that swapped earlier letters arrives as a replacement: keep the last good code.
-      const value =
-        intent.inputType === 'insertReplacementText'
-          ? app.codeDraft
-          : sanitiseCode('gin-rummy', intent.value);
-      return step({ ...app, codeDraft: value }, { type: 'setCode', value });
-    }
-    case 'join/link': {
-      // The invite link: the code is in the form; the mode is shown, not stored.
-      const code = sanitiseCode('gin-rummy', intent.code);
-      return then(setHomeTab({ ...app, playMode: 'online', codeDraft: code }, 'play', false), (a) =>
-        step(a, { type: 'setCode', value: code }),
-      );
-    }
-    case 'sound/toggle':
-      return step(app, { type: 'toggleSound' });
-    case 'share/click':
-      return app.code === null ? pure(app) : step(app, { type: 'share', code: app.code });
     case 'rules/open':
-      return pure({ ...app, rulesOpen: true });
+      return pure(withShell(app, { rulesOpen: true }));
     case 'rules/close':
-      return pure({ ...app, rulesOpen: false });
+      return pure(withShell(app, { rulesOpen: false }));
     case 'history/open':
-      return pure({ ...app, history: intent.who });
+      return pure(withTable(app, { history: intent.who }));
     case 'history/close':
-      return pure({ ...app, history: null });
-    // ---- net: host ----
-    case 'host/start':
-      return startHost(app, intent.code, ctx);
-    case 'host/status':
-      return pure(withHostStatus(app, intent.text, intent.stopPulse));
-    case 'host/frame':
-      return hostFrame(app, intent.frame, ctx);
-    case 'host/guestGone': {
-      const gone = { ...app, oppConnected: false };
-      return intent.iceFailed === null
-        ? guestGone(gone)
-        : pure(withHostStatus(gone, intent.iceFailed));
-    }
-    case 'host/deal': {
-      if (!app.oppConnected) return step(app, toast(WAITING_FOR_GUEST_MSG));
-      const game = createGame(
-        {
-          players: [
-            { id: 'host', name: app.myName },
-            // A connected opponent has a name; the fallback only satisfies the type.
-            { id: 'guest', name: app.oppName ?? DEFAULT_GUEST_NAME },
-          ],
-          target: app.target,
-        },
-        ctx.rng,
-        ctx.now,
-      );
-      return broadcast({
-        ...app,
-        game,
-        resultDismissed: false,
-        ...HAND_CLEARED,
-      });
-    }
-    // ---- net: guest ----
-    case 'guest/start':
-      return startGuest(app, intent.code);
-    case 'guest/status':
-      return pure(withGuestStatus(app, intent.text, intent.stopPulse));
-    case 'guest/connected':
-      return pure({ ...app, oppConnected: true });
-    case 'guest/frame':
-      return guestFrame(app, intent.frame);
-    case 'guest/lost': {
-      const lost = { ...app, oppConnected: false, ...HAND_CLEARED };
-      if (lost.view !== null && lost.view.phase !== 'gameOver')
-        return then(rendered(lost), (a) => step(a, toast(LOST_HOST_MSG, GONE_TOAST_MS)));
-      return showScreen(withGuestStatus(lost, DISCONNECTED_MSG), 'guestWaitScreen');
-    }
+      return pure(withTable(app, { history: null }));
     // ---- the table ----
     case 'act':
       return act(app, intent.action, ctx);
     case 'card/tap': {
-      const v = app.view;
+      const v = app.shell.view;
       // The click a drag's release fires reaches a card: a drag selects nothing.
-      if (app.drag !== null) return pure(app);
+      if (app.table.drag !== null) return pure(app);
       if (v === null || !v.isMyTurn || v.phase !== 'discard') return pure(app);
-      if (app.draw?.kind === 'shown') {
+      if (app.table.draw?.kind === 'shown') {
         // A tap on the ghost card accepts it; a tap on a held card accepts and selects that card
         // in one go (a tap on a held card is an action by the owner's rule: cards may move now).
         const accepted: App =
-          app.draw.cardId === intent.cardId
-            ? { ...app, draw: null }
-            : { ...app, draw: null, selectedCard: intent.cardId };
+          app.table.draw.cardId === intent.cardId
+            ? withTable(app, { draw: null })
+            : withTable(app, { draw: null, selectedCard: intent.cardId });
         return then(step(accepted, { type: 'fx', cue: 'tap' }), rendered);
       }
       if (v.drawnFromDiscard === intent.cardId) return step(app, toast(LOCKED_CARD_MSG));
-      const selectedCard = app.selectedCard === intent.cardId ? null : intent.cardId;
-      return then(step({ ...app, selectedCard }, { type: 'fx', cue: 'tap' }), rendered);
+      const selectedCard = app.table.selectedCard === intent.cardId ? null : intent.cardId;
+      return then(step(withTable(app, { selectedCard }), { type: 'fx', cue: 'tap' }), rendered);
     }
     case 'stock/tap': {
-      const v = app.view;
+      const v = app.shell.view;
       return v !== null && v.isMyTurn && v.phase === 'draw'
         ? act(app, { type: 'drawStock' }, ctx)
         : pure(app);
     }
     case 'discard/tap': {
-      const v = app.view;
+      const v = app.shell.view;
       if (v?.isMyTurn !== true) return pure(app);
       if (v.phase === 'upcard') return act(app, { type: 'takeUpcard' }, ctx);
       if (v.phase !== 'draw') return pure(app);
@@ -1345,16 +1440,16 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'action/click':
       return actionClick(app, intent.act, ctx);
     case 'result/hide':
-      return pure({ ...app, resultDismissed: true });
+      return pure(withTable(app, { resultDismissed: true }));
     case 'meld/open': {
-      const v = app.view;
+      const v = app.shell.view;
       if (v === null || v.meldOptions.length < 2) return pure(app);
-      return step({ ...app, meldChooser: true }, { type: 'fx', cue: 'tap' });
+      return step(withTable(app, { meldChooser: true }), { type: 'fx', cue: 'tap' });
     }
     case 'meld/close':
-      return pure({ ...app, meldChooser: false });
+      return pure(withTable(app, { meldChooser: false }));
     case 'meld/choose': {
-      const v = app.view;
+      const v = app.shell.view;
       const option = v?.meldOptions[intent.index];
       if (v === null || option === undefined) return pure(app);
       // The pick becomes hand-made, so it outlives the engine's declaration (arrange.ts), and the
@@ -1362,7 +1457,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       const groups = option.melds.map(idsOf);
       const human: HumanMelds = { hand: v.handNumber, groups };
       return act(
-        { ...app, meldChooser: false, picture: null, human },
+        withTable(app, { meldChooser: false, picture: null, human }),
         { type: 'setMelds', melds: groups },
         ctx,
       );
@@ -1370,29 +1465,32 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'arrange/open': {
       // Never while the drawn card waits in the ghost cell: the ten on the table have no melding
       // of their own then. Either player's turn otherwise (UI only).
-      const v = app.view;
-      return v === null || !inPlay(v.phase) || app.draw !== null
+      const v = app.shell.view;
+      return v === null || !inPlay(v.phase) || app.table.draw !== null
         ? pure(app)
-        : step({ ...app, arrangeOpen: true }, { type: 'fx', cue: 'tap' });
+        : step(withTable(app, { arrangeOpen: true }), { type: 'fx', cue: 'tap' });
     }
     case 'arrange/close':
-      return pure({ ...app, arrangeOpen: false });
+      return pure(withTable(app, { arrangeOpen: false }));
     case 'discards/open':
-      return app.view?.discardIds === undefined
+      return app.shell.view?.discardIds === undefined
         ? pure(app)
-        : step({ ...app, discardsOpen: true }, { type: 'fx', cue: 'tap' });
+        : step(withTable(app, { discardsOpen: true }), { type: 'fx', cue: 'tap' });
     case 'discards/close':
-      return pure({ ...app, discardsOpen: false });
+      return pure(withTable(app, { discardsOpen: false }));
     case 'discards/toggleHand':
-      return pure({ ...app, discardsWithHand: !app.discardsWithHand });
+      return pure(withTable(app, { discardsWithHand: !app.table.discardsWithHand }));
     case 'hand/arrange': {
-      const v = app.view;
-      const chosen: App = { ...app, sort: intent.mode, arrangeOpen: false };
+      const v = app.shell.view;
+      const chosen: App = withTable(app, { sort: intent.mode, arrangeOpen: false });
       const remembered: Effect = { type: 'writeSort', sort: intent.mode };
-      if (v === null || !inPlay(v.phase) || app.draw !== null) return step(chosen, remembered);
+      if (v === null || !inPlay(v.phase) || app.table.draw !== null)
+        return step(chosen, remembered);
       return then(
         step(
-          { ...chosen, picture: arrangedOf(v, null, app.human, intent.mode, app.picture) },
+          withTable(chosen, {
+            picture: arrangedOf(v, null, app.table.human, intent.mode, app.table.picture),
+          }),
           remembered,
           {
             type: 'fx',
@@ -1403,8 +1501,8 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       );
     }
     case 'card/dragStart': {
-      const v = app.view;
-      if (v === null || !inPlay(v.phase) || app.draw !== null) return pure(app);
+      const v = app.shell.view;
+      if (v === null || !inPlay(v.phase) || app.table.draw !== null) return pure(app);
       const from = intent.from ?? 'hand';
       if (from === 'table') {
         // A laid-off card comes back only while the defender answers and its meld stays a meld.
@@ -1412,31 +1510,31 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
         const free =
           lo !== undefined && v.isMyTurn && canTakeBack(lo.melds, lo.laidOff, intent.cardId);
         return free
-          ? pure({ ...app, drag: { cardId: intent.cardId, from, onto: null } })
+          ? pure(withTable(app, { drag: { cardId: intent.cardId, from, onto: null } }))
           : pure(app);
       }
       // A loose card: its cell empties and the long press is off.
-      const loose = app.picture?.loose.some((c) => c.id === intent.cardId) === true;
+      const loose = app.table.picture?.loose.some((c) => c.id === intent.cardId) === true;
       if (!loose) return pure(app);
-      return step(
-        { ...app, drag: { cardId: intent.cardId, from, onto: null } },
-        { type: 'cancelTimer', id: 'cardPress' },
-      );
+      return step(withTable(app, { drag: { cardId: intent.cardId, from, onto: null } }), {
+        type: 'cancelTimer',
+        id: 'cardPress',
+      });
     }
     case 'card/dragOver': {
-      const d = app.drag;
-      if (d?.from !== 'hand' || d.onto !== null || app.picture === null) return pure(app);
-      const moved = moveLoose(app.picture, d.cardId, intent.index);
-      if (samePicture(moved, app.picture)) return pure(app);
+      const d = app.table.drag;
+      if (d?.from !== 'hand' || d.onto !== null || app.table.picture === null) return pure(app);
+      const moved = moveLoose(app.table.picture, d.cardId, intent.index);
+      if (samePicture(moved, app.table.picture)) return pure(app);
       // A card moved by hand makes the order manual, remembered once.
       return step(
-        { ...app, picture: moved, sort: 'manual' },
-        ...(app.sort === 'manual' ? [] : [{ type: 'writeSort', sort: 'manual' } as const]),
+        withTable(app, { picture: moved, sort: 'manual' }),
+        ...(app.table.sort === 'manual' ? [] : [{ type: 'writeSort', sort: 'manual' } as const]),
       );
     }
     case 'card/dragOnto': {
-      const d = app.drag;
-      const v = app.view;
+      const d = app.table.drag;
+      const v = app.shell.view;
       if (d === null || v === null) return pure(app);
       // Only a target the card may go to lights up: a meld it fits, or the discard pile when the
       // card may be discarded; a laid-off card back over the melds lights none.
@@ -1450,26 +1548,30 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
             : fitsMeld(v, d.cardId, intent.onto)
               ? intent.onto
               : null;
-      return onto === d.onto ? pure(app) : pure({ ...app, drag: { ...d, onto } });
+      return onto === d.onto ? pure(app) : pure(withTable(app, { drag: { ...d, onto } }));
     }
     case 'card/dragEnd': {
-      const d = app.drag;
+      const d = app.table.drag;
       if (d === null) return pure(app);
-      const cleared: App = { ...app, drag: null };
+      const cleared: App = withTable(app, { drag: null });
       const over = intent.over ?? null;
       // Released on the discard pile, the card is discarded as the Discard button would (§5d).
       if (
         d.from === 'hand' &&
         over === 'discard' &&
-        app.view !== null &&
-        canDropDiscard(app, app.view, d.cardId)
+        app.shell.view !== null &&
+        canDropDiscard(app, app.shell.view, d.cardId)
       )
-        return act({ ...cleared, selectedCard: null }, { type: 'discard', cardId: d.cardId }, ctx);
+        return act(
+          withTable(cleared, { selectedCard: null }),
+          { type: 'discard', cardId: d.cardId },
+          ctx,
+        );
       if (
         d.from === 'hand' &&
         typeof over === 'number' &&
-        app.view !== null &&
-        fitsMeld(app.view, d.cardId, over)
+        app.shell.view !== null &&
+        fitsMeld(app.shell.view, d.cardId, over)
       )
         return act(cleared, { type: 'layOff', cardId: d.cardId, onto: over }, ctx);
       if (d.from === 'table' && over === null)
@@ -1479,8 +1581,8 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'card/press': {
       // The App is returned as is: main.ts skips the paint, so the pressed element survives to
       // receive its click (a plain tap) or the timer below (a long press).
-      const v = app.view;
-      if (v === null || !inPlay(v.phase) || app.draw !== null) return pure(app);
+      const v = app.shell.view;
+      if (v === null || !inPlay(v.phase) || app.table.draw !== null) return pure(app);
       return step(app, {
         type: 'startTimer',
         id: 'cardPress',
@@ -1491,14 +1593,14 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'card/release':
       return step(app, { type: 'cancelTimer', id: 'cardPress' });
     case 'hand/mark': {
-      const v = app.view;
-      if (v === null || !inPlay(v.phase) || app.draw !== null) return pure(app);
-      const human = toggleMeld(app.human, v.handNumber, v.me.hand, intent.cardId);
+      const v = app.shell.view;
+      if (v === null || !inPlay(v.phase) || app.table.draw !== null) return pure(app);
+      const human = toggleMeld(app.table.human, v.handNumber, v.me.hand, intent.cardId);
       if (human === null) return step(app, toast(NO_MELD_MSG));
       // The repaint replaces the pressed card's element, so the click that ends the press never
       // reaches a card: a long press selects nothing.
-      const picture = arrangedOf(v, null, human, app.sort, app.picture);
-      const marked: App = { ...app, human, picture, selectedCard: null };
+      const picture = arrangedOf(v, null, human, app.table.sort, app.table.picture);
+      const marked: App = withTable(app, { human, picture, selectedCard: null });
       // Declared to the engine too when it scores as well as the solver, so a knock lays off
       // against these melds; a worse arrangement stays a picture and the knock counts the best.
       const groups = declarable(v.me.hand, picture);
@@ -1507,16 +1609,19 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
         : act(marked, { type: 'setMelds', melds: groups }, ctx);
     }
     case 'curtain/reveal': {
-      if (app.game === null) return pure(app);
+      if (app.shell.game === null) return pure(app);
       return then(
-        step({ ...app, revealed: app.game.turn, curtain: null }, { type: 'fx', cue: 'tap' }),
+        step(withTable(withShell(app, { revealed: app.shell.game.turn }), { curtain: null }), {
+          type: 'fx',
+          cue: 'tap',
+        }),
         (a) => localBroadcast(a, true),
       );
     }
     case 'leave/request':
       return step(app, {
         type: 'confirm',
-        message: app.role === 'local' ? LEAVE_LOCAL_MSG : LEAVE_ONLINE_MSG,
+        message: app.shell.role === 'local' ? LEAVE_LOCAL_MSG : LEAVE_ONLINE_MSG,
         then: { type: 'leave/confirmed' },
       });
     case 'leave/confirmed':
@@ -1530,7 +1635,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     case 'leave/finish':
       return leaveFinish(app);
     case 'visible':
-      return app.role === null ? pure(app) : step(app, { type: 'wakeLock', hold: true });
+      return app.shell.role === null ? pure(app) : step(app, { type: 'wakeLock', hold: true });
     case 'render':
       return rendered(app);
     case 'persist':
@@ -1538,25 +1643,28 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
   }
 };
 
+export const reduce = (app: App, intent: Intent, ctx: Context): Step =>
+  isShellIntent(intent) ? shellIntent(app, intent, ctx) : tableIntent(app, intent, ctx);
+
 // ---- storage: persist and resume -------------------------------------------------------------
 
 /** `persist()`: the save for the current role, or null when there is nothing to save. */
 export const saveFor = (app: App): Save | null => {
-  switch (app.role) {
+  switch (app.shell.role) {
     case 'local':
-      return app.game === null ? null : { role: 'local', game: app.game };
+      return app.shell.game === null ? null : { role: 'local', game: app.shell.game };
     case 'host':
       return {
         role: 'host',
-        code: app.code ?? '',
-        myName: app.myName,
-        target: app.target,
-        game: app.game,
-        oppName: app.oppName,
-        ...(app.handoff ? { handoff: true } : {}),
+        code: app.shell.code ?? '',
+        myName: app.shell.myName,
+        target: app.shell.target,
+        game: app.shell.game,
+        oppName: app.shell.oppName,
+        ...(app.shell.handoff ? { handoff: true } : {}),
       };
     case 'guest':
-      return { role: 'guest', code: app.code ?? '', myName: app.myName };
+      return { role: 'guest', code: app.shell.code ?? '', myName: app.shell.myName };
     case null:
       return null;
   }
@@ -1589,23 +1697,23 @@ export const readHome = (store: Store): HomeSnapshot => {
 // ---- what the sessions read back ---------------------------------------------------------------
 
 export const hostContextOf = (app: App): HostContext => ({
-  attempt: app.netAttempt,
-  role: app.role,
-  code: app.code,
-  myName: app.myName,
-  target: app.target,
-  hasGame: app.game !== null,
-  handoff: app.handoff,
-  oppName: app.oppName,
-  oppConnected: app.oppConnected,
+  attempt: app.shell.netAttempt,
+  role: app.shell.role,
+  code: app.shell.code,
+  myName: app.shell.myName,
+  target: app.shell.target,
+  hasGame: app.shell.game !== null,
+  handoff: app.shell.handoff,
+  oppName: app.shell.oppName,
+  oppConnected: app.shell.oppConnected,
 });
 
 export const guestContextOf = (app: App): GuestContext => ({
-  attempt: app.netAttempt,
-  role: app.role,
-  code: app.code,
-  myName: app.myName,
-  oppConnected: app.oppConnected,
+  attempt: app.shell.netAttempt,
+  role: app.shell.role,
+  code: app.shell.code,
+  myName: app.shell.myName,
+  oppConnected: app.shell.oppConnected,
 });
 
 // ---- running the effects -----------------------------------------------------------------------
@@ -1688,7 +1796,7 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       deps.net.send(effect.frame);
       return;
     case 'fx':
-      deps.fx(effect.cue, app.soundFont);
+      deps.fx(effect.cue, app.shell.soundFont);
       return;
     case 'wakeLock':
       deps.wakeLock(effect.hold);

@@ -123,34 +123,35 @@ const lobby = (): App =>
 /** A host mid-hand: dealt, both passed the upcard, the host drew from the stock. */
 const hosting = (): App => ({
   ...lobby(),
-  game: drawn,
-  view: viewFor(drawn, 0),
-  screen: 'tableScreen',
+  shell: { ...lobby().shell, game: drawn, view: viewFor(drawn, 0), screen: 'tableScreen' },
 });
 
 describe('the initial app', () => {
   test('is the legacy `app` literal plus the DOM state, on the home screen', () => {
     expect(initialApp).toMatchObject({
-      role: null,
-      code: null,
-      myName: 'Ari',
-      target: 100,
-      game: null,
-      view: null,
-      oppName: null,
-      oppConnected: false,
-      selectedCard: null,
-      hostSeated: false,
-      nameTouched: false,
-      revealed: null,
-      homeTab: 'play',
-      playMode: 'online',
-      p1Name: '',
-      sandbox: { preset: 'no-melds', map: DEFAULT_PRESET.map, error: null, helpOpen: false },
-      screen: 'homeScreen',
-      netAttempt: 0,
-      hostStatus: { text: 'Opening room…', pulse: true },
-      guestStatus: { text: 'Connecting…', pulse: true },
+      shell: {
+        role: null,
+        code: null,
+        myName: 'Ari',
+        target: 100,
+        game: null,
+        view: null,
+        oppName: null,
+        oppConnected: false,
+        nameTouched: false,
+        revealed: null,
+        homeTab: 'play',
+        playMode: 'online',
+        p1Name: '',
+        screen: 'homeScreen',
+        netAttempt: 0,
+        hostStatus: { text: 'Opening room…', pulse: true },
+        guestStatus: { text: 'Connecting…', pulse: true },
+      },
+      table: {
+        selectedCard: null,
+        sandbox: { preset: 'no-melds', map: DEFAULT_PRESET.map, error: null, helpOpen: false },
+      },
     });
     expect(SCREENS).toEqual([
       'homeScreen',
@@ -167,19 +168,21 @@ describe('the initial app', () => {
 describe('home', () => {
   test('home/init shows the home screen, applies the saved name, tab and mode, and offers a resume', () => {
     const { app, effects } = run(
-      { ...initialApp, screen: 'tableScreen' },
+      { ...initialApp, shell: { ...initialApp.shell, screen: 'tableScreen' } },
       {
         type: 'home/init',
         home: { ...home, name: 'Ann', p2Name: 'Bob', homeTab: 'score', playMode: 'local' },
       },
     );
     expect(app).toMatchObject({
-      screen: 'homeScreen',
-      savedName: 'Ann',
-      nameTouched: true,
-      homeTab: 'score',
-      playMode: 'local',
-      resume: null,
+      shell: {
+        screen: 'homeScreen',
+        savedName: 'Ann',
+        nameTouched: true,
+        homeTab: 'score',
+        playMode: 'local',
+        resume: null,
+      },
     });
     // The saved names go into the inputs; the tab is applied without persisting
     // (`{ persist: false }`); the score tab wakes the scorer.
@@ -189,13 +192,13 @@ describe('home', () => {
       { type: 'fillP2Name', name: 'Bob' },
     ]);
     const plain = run(initialApp, { type: 'home/init', home });
-    expect(plain.app.nameTouched).toBe(false);
+    expect(plain.app.shell.nameTouched).toBe(false);
     expect(plain.effects).toEqual([{ type: 'scrollTop' }]);
   });
 
   test('tab/set persists a known tab, maps an unknown one to play, wakes the scorer on score', () => {
     expect(run(initialApp, { type: 'tab/set', tab: 'rules' })).toEqual({
-      app: { ...initialApp, homeTab: 'rules' },
+      app: { ...initialApp, shell: { ...initialApp.shell, homeTab: 'rules' } },
       effects: [{ type: 'writeHomeTab', tab: 'rules' }],
     });
     expect(run(initialApp, { type: 'tab/set', tab: 'settings' }).effects).toEqual([
@@ -206,18 +209,18 @@ describe('home', () => {
 
   test('rules/show: the Rules tab (persisted) and the home list on the home screen; the overlay and its list anywhere else', () => {
     const fromHome = run(initialApp, { type: 'rules/show', rule: 'knock' });
-    expect(fromHome.app).toMatchObject({ homeTab: 'rules', rulesOpen: false });
+    expect(fromHome.app).toMatchObject({ shell: { homeTab: 'rules', rulesOpen: false } });
     expect(fromHome.effects).toEqual([
       { type: 'writeHomeTab', tab: 'rules' },
       { type: 'revealRule', slot: 'rulesList', rule: 'knock' },
     ]);
-    const table: App = { ...initialApp, screen: 'tableScreen' };
+    const table: App = { ...initialApp, shell: { ...initialApp.shell, screen: 'tableScreen' } };
     const fromTable = run(table, { type: 'rules/show', rule: 'gin' });
-    expect(fromTable.app).toMatchObject({ homeTab: 'play', rulesOpen: true });
+    expect(fromTable.app).toMatchObject({ shell: { homeTab: 'play', rulesOpen: true } });
     expect(fromTable.effects).toEqual([
       { type: 'revealRule', slot: 'rulesOverlayList', rule: 'gin' },
     ]);
-    const scorer: App = { ...initialApp, screen: 'scGameScreen' };
+    const scorer: App = { ...initialApp, shell: { ...initialApp.shell, screen: 'scGameScreen' } };
     expect(run(scorer, { type: 'rules/show', rule: 'undercut' }).effects).toEqual([
       { type: 'revealRule', slot: 'rulesOverlayList', rule: 'undercut' },
     ]);
@@ -225,15 +228,15 @@ describe('home', () => {
 
   test('mode/set: local or online, persisted', () => {
     expect(run(initialApp, { type: 'mode/set', mode: 'local' })).toEqual({
-      app: { ...initialApp, playMode: 'local' },
+      app: { ...initialApp, shell: { ...initialApp.shell, playMode: 'local' } },
       effects: [{ type: 'writePlayMode', mode: 'local' }],
     });
-    expect(run(initialApp, { type: 'mode/set', mode: 'bots' }).app.playMode).toBe('online');
+    expect(run(initialApp, { type: 'mode/set', mode: 'bots' }).app.shell.playMode).toBe('online');
   });
 
   test('typing a name remembers it trimmed, shows it as typed in the other inputs, and marks the online one touched', () => {
     expect(run(initialApp, { type: 'name/typed', value: '  Zoë ' })).toEqual({
-      app: { ...initialApp, nameTouched: true, p1Name: '  Zoë ' },
+      app: { ...initialApp, shell: { ...initialApp.shell, nameTouched: true, p1Name: '  Zoë ' } },
       effects: [
         { type: 'rememberName', name: 'Zoë' },
         { type: 'fillName', name: '  Zoë ' },
@@ -265,7 +268,7 @@ describe('home', () => {
     });
     // A saved second name alone fills its input and nothing else.
     expect(run(initialApp, { type: 'home/init', home: { ...home, p2Name: 'Bob' } })).toMatchObject({
-      app: { nameTouched: false, savedName: null },
+      app: { shell: { nameTouched: false, savedName: null } },
       effects: [{ type: 'scrollTop' }, { type: 'fillP2Name', name: 'Bob' }],
     });
   });
@@ -278,14 +281,17 @@ describe('home', () => {
 
   test('screen/show flips the screen and scrolls to the top', () => {
     expect(run(initialApp, { type: 'screen/show', screen: 'scGameScreen' })).toEqual({
-      app: { ...initialApp, screen: 'scGameScreen' },
+      app: { ...initialApp, shell: { ...initialApp.shell, screen: 'scGameScreen' } },
       effects: [{ type: 'scrollTop' }],
     });
   });
 
   test('the Play tab: a tap switches tabs; a long press opens the submenu and swallows the click that follows', () => {
-    const pressed = run({ ...initialApp, homeTab: 'rules' }, { type: 'submenu/press' });
-    expect(pressed.app.longPressed).toBe(false);
+    const pressed = run(
+      { ...initialApp, shell: { ...initialApp.shell, homeTab: 'rules' } },
+      { type: 'submenu/press' },
+    );
+    expect(pressed.app.shell.longPressed).toBe(false);
     expect(pressed.effects).toEqual([
       {
         type: 'startTimer',
@@ -296,44 +302,48 @@ describe('home', () => {
     ]);
     // Released in time: the timer is cancelled and the click switches to the Play tab.
     const tapped = run(pressed.app, { type: 'submenu/release' }, { type: 'tab/playClick' });
-    expect(tapped.app).toMatchObject({ homeTab: 'play', submenuOpen: false, longPressed: false });
+    expect(tapped.app).toMatchObject({
+      shell: { homeTab: 'play', submenuOpen: false, longPressed: false },
+    });
     expect(tapped.effects).toEqual([
       { type: 'cancelTimer', id: 'longPress' },
       { type: 'writeHomeTab', tab: 'play' },
     ]);
     // Held: the submenu opens with a tap sound; the click that follows only clears the flag.
     const held = run(pressed.app, { type: 'submenu/longPress' });
-    expect(held.app).toMatchObject({ submenuOpen: true, longPressed: true, homeTab: 'rules' });
+    expect(held.app).toMatchObject({
+      shell: { submenuOpen: true, longPressed: true, homeTab: 'rules' },
+    });
     expect(held.effects).toEqual([{ type: 'fx', cue: 'tap' }]);
     const swallowed = run(held.app, { type: 'tab/playClick' });
     expect(swallowed.app).toMatchObject({
-      submenuOpen: true,
-      longPressed: false,
-      homeTab: 'rules',
+      shell: { submenuOpen: true, longPressed: false, homeTab: 'rules' },
     });
     expect(swallowed.effects).toEqual([]);
     // A submenu pick sets the mode, shows the Play tab and closes the submenu; a click elsewhere just closes it.
     const picked = run(held.app, { type: 'submenu/pick', mode: 'local' });
-    expect(picked.app).toMatchObject({ playMode: 'local', homeTab: 'play', submenuOpen: false });
+    expect(picked.app).toMatchObject({
+      shell: { playMode: 'local', homeTab: 'play', submenuOpen: false },
+    });
     expect(picked.effects).toEqual([
       { type: 'writePlayMode', mode: 'local' },
       { type: 'writeHomeTab', tab: 'play' },
     ]);
-    expect(run(held.app, { type: 'submenu/dismiss' }).app.submenuOpen).toBe(false);
+    expect(run(held.app, { type: 'submenu/dismiss' }).app.shell.submenuOpen).toBe(false);
   });
 
   test('the code input keeps upper-case letters only, four at most, and reverts a keyboard replacement', () => {
     const typed = run(initialApp, { type: 'code/typed', value: 'ab1c', inputType: 'insertText' });
-    expect(typed.app.codeDraft).toBe('ABC');
+    expect(typed.app.shell.codeDraft).toBe('ABC');
     expect(typed.effects).toEqual([{ type: 'setCode', value: 'ABC' }]);
     const more = run(typed.app, { type: 'code/typed', value: 'abcde', inputType: 'insertText' });
-    expect(more.app.codeDraft).toBe('ABCD');
+    expect(more.app.shell.codeDraft).toBe('ABCD');
     const swapped = run(more.app, {
       type: 'code/typed',
       value: 'XYZW',
       inputType: 'insertReplacementText',
     });
-    expect(swapped.app.codeDraft).toBe('ABCD');
+    expect(swapped.app.shell.codeDraft).toBe('ABCD');
     expect(swapped.effects).toEqual([{ type: 'setCode', value: 'ABCD' }]);
   });
 
@@ -343,17 +353,18 @@ describe('home', () => {
       effects: [{ type: 'toggleSound' }],
     });
     expect(run(initialApp, { type: 'share/click' }).effects).toEqual([]);
-    expect(run({ ...initialApp, code: 'ABCD' }, { type: 'share/click' }).effects).toEqual([
-      { type: 'share', code: 'ABCD' },
-    ]);
+    expect(
+      run({ ...initialApp, shell: { ...initialApp.shell, code: 'ABCD' } }, { type: 'share/click' })
+        .effects,
+    ).toEqual([{ type: 'share', code: 'ABCD' }]);
     const opened = run(initialApp, { type: 'rules/open' }, { type: 'history/open', who: 'game' });
-    expect(opened.app).toMatchObject({ rulesOpen: true, history: 'game' });
+    expect(opened.app).toMatchObject({ shell: { rulesOpen: true }, table: { history: 'game' } });
     expect(opened.effects).toEqual([]);
     const scorer = run(opened.app, { type: 'history/open', who: 'scorer' });
-    expect(scorer.app.history).toBe('scorer');
+    expect(scorer.app.table.history).toBe('scorer');
     expect(run(opened.app, { type: 'rules/close' }, { type: 'history/close' }).app).toMatchObject({
-      rulesOpen: false,
-      history: null,
+      shell: { rulesOpen: false },
+      table: { history: null },
     });
   });
 });
@@ -366,53 +377,58 @@ describe('hosting', () => {
       target: '75',
     });
     expect(app).toMatchObject({
-      role: 'host',
-      myName: 'Ann',
-      target: 75,
-      game: null,
-      oppName: null,
-      oppConnected: false,
-      netAttempt: 1,
-      screen: 'hostWaitScreen',
-      hostStatus: { text: OPENING_MSG, pulse: true },
-      startGameVisible: false,
+      shell: {
+        role: 'host',
+        myName: 'Ann',
+        target: 75,
+        game: null,
+        oppName: null,
+        oppConnected: false,
+        netAttempt: 1,
+        screen: 'hostWaitScreen',
+        hostStatus: { text: OPENING_MSG, pulse: true },
+        startGameVisible: false,
+      },
     });
-    expect(app.code).toMatch(/^[ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$/);
+    expect(app.shell.code).toMatch(/^[ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$/);
     expect(effects).toEqual([
       { type: 'scrollTop' },
-      { type: 'startHost', code: app.code, attempt: 1, resume: false },
+      { type: 'startHost', code: app.shell.code, attempt: 1, resume: false },
     ]);
     // An empty name is Ari, a long one is cut to 20; a bad target is 100.
     const defaults = run(initialApp, { type: 'host/click', name: '', target: 'x' }).app;
-    expect(defaults).toMatchObject({ myName: 'Ari', target: 100 });
+    expect(defaults).toMatchObject({ shell: { myName: 'Ari', target: 100 } });
     expect(
-      run(initialApp, { type: 'host/click', name: 'A'.repeat(25), target: '1' }).app.myName,
+      run(initialApp, { type: 'host/click', name: 'A'.repeat(25), target: '1' }).app.shell.myName,
     ).toBe('A'.repeat(20));
   });
 
   test('host/start with a code keeps it (a resume or a busy retry); null draws another', () => {
-    const resumed = run({ ...initialApp, netAttempt: 4 }, { type: 'host/start', code: 'LRZL' });
-    expect(resumed.app).toMatchObject({ role: 'host', code: 'LRZL', netAttempt: 5 });
+    const resumed = run(
+      { ...initialApp, shell: { ...initialApp.shell, netAttempt: 4 } },
+      { type: 'host/start', code: 'LRZL' },
+    );
+    expect(resumed.app).toMatchObject({ shell: { role: 'host', code: 'LRZL', netAttempt: 5 } });
     expect(resumed.effects).toEqual([
       { type: 'scrollTop' },
       { type: 'startHost', code: 'LRZL', attempt: 5, resume: true },
     ]);
     const fresh = run(resumed.app, { type: 'host/start', code: null });
-    expect(fresh.app.code).not.toBe('LRZL');
+    expect(fresh.app.shell.code).not.toBe('LRZL');
     expect(fresh.effects.at(-1)).toMatchObject({ type: 'startHost', attempt: 6, resume: false });
   });
 
   test('host/status writes the wait status; stopPulse sticks', () => {
     const a = run(initialApp, { type: 'host/status', text: WAITING_MSG, stopPulse: false }).app;
-    expect(a.hostStatus).toEqual({ text: WAITING_MSG, pulse: true });
+    expect(a.shell.hostStatus).toEqual({ text: WAITING_MSG, pulse: true });
     const b = run(a, { type: 'host/status', text: 'boom', stopPulse: true }).app;
-    expect(b.hostStatus).toEqual({ text: 'boom', pulse: false });
-    expect(run(b, { type: 'host/status', text: 'again', stopPulse: false }).app.hostStatus).toEqual(
-      {
-        text: 'again',
-        pulse: false,
-      },
-    );
+    expect(b.shell.hostStatus).toEqual({ text: 'boom', pulse: false });
+    expect(
+      run(b, { type: 'host/status', text: 'again', stopPulse: false }).app.shell.hostStatus,
+    ).toEqual({
+      text: 'again',
+      pulse: false,
+    });
   });
 
   test('a join in the lobby: the guest is named (normalised against the host), the lobby frame goes out', () => {
@@ -422,15 +438,17 @@ describe('hosting', () => {
       frame: { t: 'join', name: ' ann ' },
     });
     expect(app).toMatchObject({
-      oppConnected: true,
-      oppName: 'ann 2',
-      startGameVisible: true,
-      hostStatus: { text: joinedMsg('ann 2'), pulse: true },
+      shell: {
+        oppConnected: true,
+        oppName: 'ann 2',
+        startGameVisible: true,
+        hostStatus: { text: joinedMsg('ann 2'), pulse: true },
+      },
     });
     expect(effects).toEqual([{ type: 'send', frame: { t: 'lobby', hostName: 'Ann', target: 50 } }]);
-    expect(run(started, { type: 'host/frame', frame: { t: 'join', name: '' } }).app.oppName).toBe(
-      'Jeff',
-    );
+    expect(
+      run(started, { type: 'host/frame', frame: { t: 'join', name: '' } }).app.shell.oppName,
+    ).toBe('Jeff');
   });
 
   test('an action frame before the deal is ignored', () => {
@@ -447,18 +465,17 @@ describe('hosting', () => {
       effects: [{ type: 'toast', message: WAITING_FOR_GUEST_MSG, ms: null }],
     });
     const { app, effects } = run(lobby(), { type: 'host/deal' });
-    const game = app.game;
+    const game = app.shell.game;
     if (game === null) throw new Error('no game');
     expect(game.players).toEqual([
       { id: 'host', name: 'Ann', total: 0 },
       { id: 'guest', name: 'Jeff', total: 0 },
     ]);
     expect(game.startedAt).toBe(NOW);
-    expect(app.view).toEqual(viewFor(game, 0));
+    expect(app.shell.view).toEqual(viewFor(game, 0));
     expect(app).toMatchObject({
-      screen: 'tableScreen',
-      selectedCard: null,
-      resultDismissed: false,
+      shell: { screen: 'tableScreen' },
+      table: { selectedCard: null, resultDismissed: false },
     });
     // The first render chimes "your turn" when the host moves first.
     expect(kinds(effects)).toEqual(
@@ -483,25 +500,25 @@ describe('hosting', () => {
     const card = drawn.hands[0][0]?.id ?? '';
     const afterHost = run(app, { type: 'act', action: { type: 'discard', cardId: card } });
     expect(kinds(afterHost.effects)).toEqual(['fx', 'send', 'persist', 'scrollTop']);
-    expect(afterHost.app.game?.turn).toBe(1);
+    expect(afterHost.app.shell.game?.turn).toBe(1);
     const afterGuest = run(afterHost.app, {
       type: 'host/frame',
       frame: { t: 'action', action: { type: 'drawStock' } },
     });
-    expect(afterGuest.app.game?.phase).toBe('discard');
+    expect(afterGuest.app.shell.game?.phase).toBe('discard');
     expect(afterGuest.effects[0]).toEqual({
       type: 'send',
-      frame: { t: 'state', view: viewFor(afterGuest.app.game ?? drawn, 1) },
+      frame: { t: 'state', view: viewFor(afterGuest.app.shell.game ?? drawn, 1) },
     });
     // The guest drew from the stock: the host hears the pickup.
     expect(kinds(afterGuest.effects)).toEqual(['send', 'persist', 'fx', 'scrollTop']);
     expect(afterGuest.effects[2]).toEqual({ type: 'fx', cue: 'oppStock' });
-    expect(afterGuest.app.view).toEqual(viewFor(afterGuest.app.game ?? drawn, 0));
+    expect(afterGuest.app.shell.view).toEqual(viewFor(afterGuest.app.shell.game ?? drawn, 0));
   });
 
   test("the host's own refused move is toasted", () => {
     const { app, effects } = run(hosting(), { type: 'act', action: { type: 'drawStock' } });
-    expect(app.game).toBe(drawn);
+    expect(app.shell.game).toBe(drawn);
     expect(effects).toEqual([
       { type: 'fx', cue: 'tap' },
       { type: 'toast', message: 'Discard a card, knock, or undo your draw.', ms: null },
@@ -509,40 +526,45 @@ describe('hosting', () => {
   });
 
   test('a rejoin mid-hand renames seat 1 and broadcasts', () => {
-    const gone = { ...hosting(), oppConnected: false };
+    const gone = { ...hosting(), shell: { ...hosting().shell, oppConnected: false } };
     const { app, effects } = run(gone, {
       type: 'host/frame',
       frame: { t: 'join', name: 'Jeffrey' },
     });
-    expect(app.oppConnected).toBe(true);
-    expect(app.oppName).toBe('Jeffrey');
-    expect(app.game?.players[1]).toEqual({ id: 'guest', name: 'Jeffrey', total: 0 });
+    expect(app.shell.oppConnected).toBe(true);
+    expect(app.shell.oppName).toBe('Jeffrey');
+    expect(app.shell.game?.players[1]).toEqual({ id: 'guest', name: 'Jeffrey', total: 0 });
     expect(kinds(effects)).toEqual(['send', 'persist', 'scrollTop']);
   });
 
   test('the guest going: mid-hand a toast with the code; in the lobby the status and no deal button', () => {
     const midHand = run(hosting(), { type: 'host/guestGone', iceFailed: null });
-    expect(midHand.app.oppConnected).toBe(false);
+    expect(midHand.app.shell.oppConnected).toBe(false);
     expect(toasts(midHand.effects)).toEqual([
-      [guestGoneMsg('Jeff', midHand.app.code), GONE_TOAST_MS],
+      [guestGoneMsg('Jeff', midHand.app.shell.code), GONE_TOAST_MS],
     ]);
     expect(guestGoneMsg(null, 'ABCD')).toBe(
       'Opponent disconnected — they can rejoin with code ABCD.',
     );
     const inLobby = run(lobby(), { type: 'host/guestGone', iceFailed: null });
     expect(inLobby.app).toMatchObject({
-      oppConnected: false,
-      startGameVisible: false,
-      hostStatus: { text: OPPONENT_LEFT_MSG },
+      shell: {
+        oppConnected: false,
+        startGameVisible: false,
+        hostStatus: { text: OPPONENT_LEFT_MSG },
+      },
     });
     expect(inLobby.effects).toEqual([]);
     // Game over: nothing said.
-    const over = { ...hosting(), view: { ...viewFor(drawn, 0), phase: 'gameOver' as const } };
+    const over = {
+      ...hosting(),
+      shell: { ...hosting().shell, view: { ...viewFor(drawn, 0), phase: 'gameOver' as const } },
+    };
     expect(run(over, { type: 'host/guestGone', iceFailed: null }).effects).toEqual([]);
     // ICE failed before anyone joined: the status carries the explanation.
     const ice = run(lobby(), { type: 'host/guestGone', iceFailed: 'no route' });
-    expect(ice.app.hostStatus.text).toBe('no route');
-    expect(ice.app.startGameVisible).toBe(true);
+    expect(ice.app.shell.hostStatus.text).toBe('no route');
+    expect(ice.app.shell.startGameVisible).toBe(true);
   });
 });
 
@@ -553,26 +575,30 @@ describe('joining', () => {
     expect(toasts(bad.effects)).toEqual([['Enter the 4-letter room code.', null]]);
     const { app, effects } = run(initialApp, { type: 'join/click', name: 'Zoë', code: ' kqzm ' });
     expect(app).toMatchObject({
-      role: 'guest',
-      code: 'KQZM',
-      myName: 'Zoë',
-      netAttempt: 1,
-      screen: 'guestWaitScreen',
-      guestStatus: { text: connectingMsg('KQZM'), pulse: true },
+      shell: {
+        role: 'guest',
+        code: 'KQZM',
+        myName: 'Zoë',
+        netAttempt: 1,
+        screen: 'guestWaitScreen',
+        guestStatus: { text: connectingMsg('KQZM'), pulse: true },
+      },
     });
     expect(effects).toEqual([
       { type: 'scrollTop' },
       { type: 'startGuest', code: 'KQZM', attempt: 1 },
     ]);
     // The untouched default "Ari" joins as Jeff; a touched "Ari" keeps it; empty is Jeff.
-    expect(run(initialApp, { type: 'join/click', name: 'Ari', code: 'KQZM' }).app.myName).toBe(
-      'Jeff',
-    );
     expect(
-      run({ ...initialApp, nameTouched: true }, { type: 'join/click', name: 'Ari', code: 'KQZM' })
-        .app.myName,
+      run(initialApp, { type: 'join/click', name: 'Ari', code: 'KQZM' }).app.shell.myName,
+    ).toBe('Jeff');
+    expect(
+      run(
+        { ...initialApp, shell: { ...initialApp.shell, nameTouched: true } },
+        { type: 'join/click', name: 'Ari', code: 'KQZM' },
+      ).app.shell.myName,
     ).toBe('Ari');
-    expect(run(initialApp, { type: 'join/click', name: '  ', code: 'KQZM' }).app.myName).toBe(
+    expect(run(initialApp, { type: 'join/click', name: '  ', code: 'KQZM' }).app.shell.myName).toBe(
       'Jeff',
     );
   });
@@ -587,22 +613,24 @@ describe('joining', () => {
 
   test('the host frames: welcome/lobby name the room, full says so, toast toasts, state renders the table', () => {
     const app = joined();
-    expect(app.oppConnected).toBe(true);
+    expect(app.shell.oppConnected).toBe(true);
     const welcomed = run(app, {
       type: 'guest/frame',
       frame: { t: 'welcome', hostName: 'Ann', target: 75 },
     });
     expect(welcomed.app).toMatchObject({
-      oppName: 'Ann',
-      target: 75,
-      guestStatus: { text: hostRoomMsg('Ann', 75), pulse: true },
+      shell: {
+        oppName: 'Ann',
+        target: 75,
+        guestStatus: { text: hostRoomMsg('Ann', 75), pulse: true },
+      },
     });
     expect(welcomed.effects).toEqual([]);
     expect(
-      run(app, { type: 'guest/frame', frame: { t: 'lobby', hostName: 'Bo', target: 5 } }).app
+      run(app, { type: 'guest/frame', frame: { t: 'lobby', hostName: 'Bo', target: 5 } }).app.shell
         .guestStatus.text,
     ).toBe("Connected to Bo's room (playing to 5). Waiting for the host to start…");
-    expect(run(app, { type: 'guest/frame', frame: { t: 'full' } }).app.guestStatus.text).toBe(
+    expect(run(app, { type: 'guest/frame', frame: { t: 'full' } }).app.shell.guestStatus.text).toBe(
       ROOM_FULL_MSG,
     );
     expect(run(app, { type: 'guest/frame', frame: { t: 'toast', msg: 'x' } }).effects).toEqual([
@@ -610,15 +638,16 @@ describe('joining', () => {
     ]);
     const view = viewFor(drawn, 1);
     const shown = run(
-      { ...app, oppConnected: false, selectedCard: 'AS', resultDismissed: true },
+      {
+        ...app,
+        shell: { ...app.shell, oppConnected: false },
+        table: { ...app.table, selectedCard: 'AS', resultDismissed: true },
+      },
       { type: 'guest/frame', frame: { t: 'state', view } },
     );
     expect(shown.app).toMatchObject({
-      view,
-      oppConnected: true,
-      selectedCard: null,
-      resultDismissed: false,
-      screen: 'tableScreen',
+      shell: { view, oppConnected: true, screen: 'tableScreen' },
+      table: { selectedCard: null, resultDismissed: false },
     });
     expect(shown.effects).toEqual([{ type: 'scrollTop' }]);
   });
@@ -629,27 +658,30 @@ describe('joining', () => {
       [1, { type: 'passUpcard' }],
     ]);
     const stock = run(
-      { ...joined(), view: viewFor(bothPassed, 1) },
+      { ...joined(), shell: { ...joined().shell, view: viewFor(bothPassed, 1) } },
       { type: 'guest/frame', frame: { t: 'state', view: viewFor(drawn, 1) } },
     );
     expect(stock.effects).toEqual([{ type: 'fx', cue: 'oppStock' }, { type: 'scrollTop' }]);
     const tookUpcard = play(dealt, [[0, { type: 'takeUpcard' }]]);
     const discard = run(
-      { ...joined(), view: viewFor(dealt, 1) },
+      { ...joined(), shell: { ...joined().shell, view: viewFor(dealt, 1) } },
       { type: 'guest/frame', frame: { t: 'state', view: viewFor(tookUpcard, 1) } },
     );
     expect(discard.effects).toEqual([{ type: 'fx', cue: 'oppDiscard' }, { type: 'scrollTop' }]);
   });
 
   test('acting sends the action frame while connected, else the not-connected toast', () => {
-    const app = { ...joined(), view: viewFor(drawn, 1) };
+    const app = { ...joined(), shell: { ...joined().shell, view: viewFor(drawn, 1) } };
     expect(run(app, { type: 'act', action: { type: 'ready' } }).effects).toEqual([
       { type: 'fx', cue: 'tap' },
       { type: 'send', frame: { t: 'action', action: { type: 'ready' } } },
     ]);
     expect(
       toasts(
-        run({ ...app, oppConnected: false }, { type: 'act', action: { type: 'ready' } }).effects,
+        run(
+          { ...app, shell: { ...app.shell, oppConnected: false } },
+          { type: 'act', action: { type: 'ready' } },
+        ).effects,
       ),
     ).toEqual([[NOT_CONNECTED_MSG, null]]);
     // No role at all (the hook's act on the home screen): the same toast.
@@ -660,29 +692,34 @@ describe('joining', () => {
 
   test('losing the host: mid-game a re-render and a toast; otherwise the wait screen says so', () => {
     const inGame = run(
-      { ...joined(), view: viewFor(drawn, 1), screen: 'tableScreen' },
+      { ...joined(), shell: { ...joined().shell, view: viewFor(drawn, 1), screen: 'tableScreen' } },
       { type: 'guest/lost' },
     );
-    expect(inGame.app.oppConnected).toBe(false);
-    expect(inGame.app.screen).toBe('tableScreen');
+    expect(inGame.app.shell.oppConnected).toBe(false);
+    expect(inGame.app.shell.screen).toBe('tableScreen');
     expect(inGame.effects).toEqual([
       { type: 'scrollTop' },
       { type: 'toast', message: LOST_HOST_MSG, ms: GONE_TOAST_MS },
     ]);
     const waiting = run(joined(), { type: 'guest/lost' });
     expect(waiting.app).toMatchObject({
-      oppConnected: false,
-      screen: 'guestWaitScreen',
-      guestStatus: { text: DISCONNECTED_MSG },
+      shell: {
+        oppConnected: false,
+        screen: 'guestWaitScreen',
+        guestStatus: { text: DISCONNECTED_MSG },
+      },
     });
     expect(waiting.effects).toEqual([{ type: 'scrollTop' }]);
-    const over = { ...joined(), view: { ...viewFor(drawn, 1), phase: 'gameOver' as const } };
-    expect(run(over, { type: 'guest/lost' }).app.screen).toBe('guestWaitScreen');
+    const over = {
+      ...joined(),
+      shell: { ...joined().shell, view: { ...viewFor(drawn, 1), phase: 'gameOver' as const } },
+    };
+    expect(run(over, { type: 'guest/lost' }).app.shell.screen).toBe('guestWaitScreen');
   });
 
   test('guest/status writes the wait status', () => {
     const app = run(joined(), { type: 'guest/status', text: 'x', stopPulse: true }).app;
-    expect(app.guestStatus).toEqual({ text: 'x', pulse: false });
+    expect(app.shell.guestStatus).toEqual({ text: 'x', pulse: false });
   });
 });
 
@@ -694,27 +731,27 @@ describe('pass and play', () => {
       p2: 'ANN',
       target: '20',
     });
-    const game = app.game;
+    const game = app.shell.game;
     if (game === null) throw new Error('no game');
     expect(game.players.map((p) => p.name)).toEqual(['ann', 'ANN 2']);
     expect(game.target).toBe(20);
     expect(app).toMatchObject({
-      role: 'local',
-      code: null,
-      oppConnected: true,
-      revealed: null,
-      resultDismissed: false,
-      curtain: game.turn,
-      selectedCard: null,
-      screen: 'tableScreen',
+      shell: {
+        role: 'local',
+        code: null,
+        oppConnected: true,
+        revealed: null,
+        screen: 'tableScreen',
+      },
+      table: { resultDismissed: false, curtain: game.turn, selectedCard: null },
     });
-    expect(app.view).toEqual(viewFor(game, game.turn));
+    expect(app.shell.view).toEqual(viewFor(game, game.turn));
     // Initial: no "your turn" chime with the first curtain (one phone: the render never chimes turns).
     expect(kinds(effects)).toEqual(['wakeLock', 'persist', 'scrollTop']);
     expect(effects[0]).toEqual({ type: 'wakeLock', hold: true });
     const defaults = run(initialApp, { type: 'local/click', p1: '', p2: '', target: '' }).app;
-    expect(defaults.game?.players.map((p) => p.name)).toEqual(['Player 1', 'Player 2']);
-    expect(defaults.game?.target).toBe(100);
+    expect(defaults.shell.game?.players.map((p) => p.name)).toEqual(['Player 1', 'Player 2']);
+    expect(defaults.shell.game?.target).toBe(100);
   });
 
   const local = (): App =>
@@ -723,15 +760,18 @@ describe('pass and play', () => {
   test('the curtain reveal shows the mover and hides the curtain; a move hands the phone over', () => {
     const start = local();
     const revealed = run(start, { type: 'curtain/reveal' });
-    expect(revealed.app).toMatchObject({ revealed: start.game?.turn, curtain: null });
+    expect(revealed.app).toMatchObject({
+      shell: { revealed: start.shell.game?.turn },
+      table: { curtain: null },
+    });
     expect(kinds(revealed.effects)).toEqual(['fx', 'persist', 'scrollTop']);
     const passed = run(revealed.app, { type: 'act', action: { type: 'passUpcard' } });
-    const game = passed.app.game;
+    const game = passed.app.shell.game;
     if (game === null) throw new Error('no game');
-    expect(game.turn).not.toBe(start.game?.turn);
+    expect(game.turn).not.toBe(start.shell.game?.turn);
     // The phone must change hands: the curtain is up for the new mover and chimes.
-    expect(passed.app.curtain).toBe(game.turn);
-    expect(passed.app.view).toEqual(viewFor(game, game.turn));
+    expect(passed.app.table.curtain).toBe(game.turn);
+    expect(passed.app.shell.view).toEqual(viewFor(game, game.turn));
     expect(kinds(passed.effects)).toEqual(['fx', 'persist', 'fx', 'scrollTop']);
     expect(passed.effects[2]).toEqual({ type: 'fx', cue: 'yourTurn' });
     // A refused move is toasted and changes nothing (a refused draw passes through the ghost
@@ -748,31 +788,48 @@ describe('pass and play', () => {
     const notOver = run(start, { type: 'act', action: { type: 'ready' } });
     expect(notOver.app).toBe(start);
     // Both seats are refused; seat 0's refusal is the one toasted (`r1.error`).
-    const r1 = applyAction(start.game ?? dealt, 0, { type: 'ready' }, mulberry32(0), () => NOW);
+    const r1 = applyAction(
+      start.shell.game ?? dealt,
+      0,
+      { type: 'ready' },
+      mulberry32(0),
+      () => NOW,
+    );
     expect(r1.ok).toBe(false);
     expect(toasts(notOver.effects)).toEqual([[r1.ok ? '' : r1.error, null]]);
   });
 });
 
 describe('the table', () => {
-  const myTurn = (): App => ({
-    ...run(initialApp, { type: 'host/click', name: 'Ann', target: '100' }).app,
-    game: drawn,
-    view: viewFor(drawn, 0),
-    oppConnected: true,
-    oppName: 'Jeff',
-  });
+  const myTurn = (): App => {
+    const hosted = run(initialApp, { type: 'host/click', name: 'Ann', target: '100' }).app;
+    return {
+      ...hosted,
+      shell: {
+        ...hosted.shell,
+        game: drawn,
+        view: viewFor(drawn, 0),
+        oppConnected: true,
+        oppName: 'Jeff',
+      },
+    };
+  };
 
   test('card/tap selects and deselects during my discard, refuses the locked card, ignores otherwise', () => {
     const app = myTurn();
     const card = drawn.hands[0][1]?.id ?? '';
     const selected = run(app, { type: 'card/tap', cardId: card });
-    expect(selected.app.selectedCard).toBe(card);
+    expect(selected.app.table.selectedCard).toBe(card);
     expect(selected.effects).toEqual([{ type: 'fx', cue: 'tap' }, { type: 'scrollTop' }]);
-    expect(run(selected.app, { type: 'card/tap', cardId: card }).app.selectedCard).toBeNull();
+    expect(run(selected.app, { type: 'card/tap', cardId: card }).app.table.selectedCard).toBeNull();
     // Not my turn / not discarding: nothing.
-    expect(run({ ...app, view: viewFor(drawn, 1) }, { type: 'card/tap', cardId: card })).toEqual({
-      app: { ...app, view: viewFor(drawn, 1) },
+    expect(
+      run(
+        { ...app, shell: { ...app.shell, view: viewFor(drawn, 1) } },
+        { type: 'card/tap', cardId: card },
+      ),
+    ).toEqual({
+      app: { ...app, shell: { ...app.shell, view: viewFor(drawn, 1) } },
       effects: [],
     });
     expect(run(initialApp, { type: 'card/tap', cardId: card }).effects).toEqual([]);
@@ -780,7 +837,7 @@ describe('the table', () => {
     const took = play(dealt, [[0, { type: 'takeUpcard' }]]);
     const locked = took.drawnFromDiscard ?? '';
     const refused = run(
-      { ...app, game: took, view: viewFor(took, 0) },
+      { ...app, shell: { ...app.shell, game: took, view: viewFor(took, 0) } },
       { type: 'card/tap', cardId: locked },
     );
     expect(toasts(refused.effects)).toEqual([[LOCKED_CARD_MSG, null]]);
@@ -793,7 +850,7 @@ describe('the table', () => {
       [0, { type: 'passUpcard' }],
       [1, { type: 'passUpcard' }],
     ]);
-    const drawing = { ...app, game: draw, view: viewFor(draw, 0) };
+    const drawing = { ...app, shell: { ...app.shell, game: draw, view: viewFor(draw, 0) } };
     expect(kinds(run(drawing, { type: 'stock/tap' }).effects)).toEqual([
       'fx',
       'send',
@@ -804,17 +861,20 @@ describe('the table', () => {
     expect(toasts(run(drawing, { type: 'discard/tap' }).effects)).toEqual([
       [FORCE_STOCK_MSG, null],
     ]);
-    const upcard = { ...app, game: dealt, view: viewFor(dealt, 0) };
+    const upcard = { ...app, shell: { ...app.shell, game: dealt, view: viewFor(dealt, 0) } };
     const took = run(upcard, { type: 'discard/tap' });
-    expect(took.app.game?.drawnFromDiscard).not.toBeNull();
-    const notMine = { ...app, view: viewFor(drawn, 1) };
+    expect(took.app.shell.game?.drawnFromDiscard).not.toBeNull();
+    const notMine = { ...app, shell: { ...app.shell, view: viewFor(drawn, 1) } };
     expect(run(notMine, { type: 'discard/tap' }).effects).toEqual([]);
     expect(run(app, { type: 'discard/tap' }).effects).toEqual([]); // discard phase
     const oneDraw = play(dealt, [
       [0, { type: 'takeUpcard' }],
       [0, { type: 'discard', cardId: dealt.hands[0][0]?.id ?? '' }],
     ]);
-    const canDrawDiscard = { ...app, game: oneDraw, view: viewFor(oneDraw, 0) };
+    const canDrawDiscard = {
+      ...app,
+      shell: { ...app.shell, game: oneDraw, view: viewFor(oneDraw, 0) },
+    };
     // Seat 1's turn now: no.
     expect(run(canDrawDiscard, { type: 'discard/tap' }).effects).toEqual([]);
   });
@@ -823,26 +883,32 @@ describe('the table', () => {
     const app = myTurn();
     expect(run(app, { type: 'action/click', act: 'discard' }).effects).toEqual([]);
     const card = drawn.hands[0][0]?.id ?? '';
-    const discarded = run({ ...app, selectedCard: card }, { type: 'action/click', act: 'discard' });
-    expect(discarded.app.game?.turn).toBe(1);
-    const knocked = run({ ...app, selectedCard: card }, { type: 'action/click', act: 'knock' });
+    const discarded = run(
+      { ...app, table: { ...app.table, selectedCard: card } },
+      { type: 'action/click', act: 'discard' },
+    );
+    expect(discarded.app.shell.game?.turn).toBe(1);
+    const knocked = run(
+      { ...app, table: { ...app.table, selectedCard: card } },
+      { type: 'action/click', act: 'knock' },
+    );
     const option = viewFor(drawn, 0).discardOptions?.[card];
     const canKnock = option !== undefined && !('locked' in option) && option.canKnock;
     expect(kinds(knocked.effects)).toEqual(
       canKnock ? ['fx', 'send', 'persist', 'fx', 'scrollTop'] : ['fx', 'toast'],
     );
-    const upcard = { ...app, game: dealt, view: viewFor(dealt, 0) };
-    expect(run(upcard, { type: 'action/click', act: 'passUpcard' }).app.game?.upcardStage).toBe(
-      'dealer',
-    );
-    expect(run(upcard, { type: 'action/click', act: 'takeUpcard' }).app.game?.phase).toBe(
+    const upcard = { ...app, shell: { ...app.shell, game: dealt, view: viewFor(dealt, 0) } };
+    expect(
+      run(upcard, { type: 'action/click', act: 'passUpcard' }).app.shell.game?.upcardStage,
+    ).toBe('dealer');
+    expect(run(upcard, { type: 'action/click', act: 'takeUpcard' }).app.shell.game?.phase).toBe(
       'discard',
     );
-    const dismissed = { ...app, resultDismissed: true };
-    expect(run(dismissed, { type: 'action/click', act: 'showResult' }).app.resultDismissed).toBe(
-      false,
-    );
-    expect(run(app, { type: 'result/hide' }).app.resultDismissed).toBe(true);
+    const dismissed = { ...app, table: { ...app.table, resultDismissed: true } };
+    expect(
+      run(dismissed, { type: 'action/click', act: 'showResult' }).app.table.resultDismissed,
+    ).toBe(false);
+    expect(run(app, { type: 'result/hide' }).app.table.resultDismissed).toBe(true);
     expect(run(app, { type: 'action/click', act: 'bogus' })).toEqual({ app, effects: [] });
   });
 
@@ -852,25 +918,28 @@ describe('the table', () => {
     expect(run(app, { type: 'meld/open' })).toEqual({ app, effects: [] });
     const two = {
       ...app,
-      view: {
-        ...viewFor(drawn, 0),
-        meldOptions: [
-          {
-            melds: [[drawn.hands[0][0] ?? { id: 'AS', r: 1, s: 'S' }]],
-            deadwood: [],
-            value: 0,
-            sig: 'a',
-          },
-          { melds: [], deadwood: [], value: 0, sig: 'b' },
-        ],
+      shell: {
+        ...app.shell,
+        view: {
+          ...viewFor(drawn, 0),
+          meldOptions: [
+            {
+              melds: [[drawn.hands[0][0] ?? { id: 'AS', r: 1, s: 'S' }]],
+              deadwood: [],
+              value: 0,
+              sig: 'a',
+            },
+            { melds: [], deadwood: [], value: 0, sig: 'b' },
+          ],
+        },
       },
     };
     const opened = run(two, { type: 'meld/open' });
-    expect(opened.app.meldChooser).toBe(true);
+    expect(opened.app.table.meldChooser).toBe(true);
     expect(opened.effects).toEqual([{ type: 'fx', cue: 'tap' }]);
-    expect(run(opened.app, { type: 'meld/close' }).app.meldChooser).toBe(false);
+    expect(run(opened.app, { type: 'meld/close' }).app.table.meldChooser).toBe(false);
     const chosen = run(opened.app, { type: 'meld/choose', index: 0 });
-    expect(chosen.app.meldChooser).toBe(false);
+    expect(chosen.app.table.meldChooser).toBe(false);
     // The arrangement is a setMelds action through the host's dispatch (refused here: unfit).
     expect(chosen.effects[0]).toEqual({ type: 'fx', cue: 'tap' });
     expect(kinds(chosen.effects)).toEqual(['fx', 'toast']);
@@ -881,17 +950,24 @@ describe('the table', () => {
   });
 
   test('render re-runs the render step: the table, the cue machine, a stale selection dropped', () => {
-    const app = { ...myTurn(), screen: 'homeScreen' as const, selectedCard: 'ZZ' };
+    const app = {
+      ...myTurn(),
+      shell: { ...myTurn().shell, screen: 'homeScreen' as const },
+      table: { ...myTurn().table, selectedCard: 'ZZ' },
+    };
     const { app: after, effects } = run(app, { type: 'render' });
-    expect(after.screen).toBe('tableScreen');
-    expect(after.selectedCard).toBeNull();
+    expect(after.shell.screen).toBe('tableScreen');
+    expect(after.table.selectedCard).toBeNull();
     expect(kinds(effects)).toEqual(['scrollTop']);
     expect(run(initialApp, { type: 'render' })).toEqual({ app: initialApp, effects: [] });
     const over = {
       ...app,
-      view: { ...viewFor(drawn, 0), phase: 'gameOver' as const, winner: 0 as const },
+      shell: {
+        ...app.shell,
+        view: { ...viewFor(drawn, 0), phase: 'gameOver' as const, winner: 0 as const },
+      },
     };
-    expect(run(over, { type: 'render' }).app.screen).toBe('endgameScreen');
+    expect(run(over, { type: 'render' }).app.shell.screen).toBe('endgameScreen');
   });
 });
 
@@ -899,12 +975,15 @@ describe('the ghost draw slot', () => {
   /** Pass-and-play, seat 0 revealed and moving. */
   const local = (game: State): App => ({
     ...initialApp,
-    role: 'local',
-    oppConnected: true,
-    game,
-    view: viewFor(game, 0),
-    screen: 'tableScreen',
-    revealed: 0,
+    shell: {
+      ...initialApp.shell,
+      role: 'local',
+      oppConnected: true,
+      game,
+      view: viewFor(game, 0),
+      screen: 'tableScreen',
+      revealed: 0,
+    },
   });
   const passed = play(dealt, [
     [0, { type: 'passUpcard' }],
@@ -921,27 +1000,27 @@ describe('the ghost draw slot', () => {
 
   test('a stock draw shows the drawn card over the ten cards held as they were before the draw', () => {
     const { app, effects } = run(local(passed), { type: 'stock/tap' });
-    const view = app.view;
+    const view = app.shell.view;
     expect(view?.phase).toBe('discard');
-    expect(app.draw).toEqual({ kind: 'shown', from: 'stock', cardId: view?.lastDrawnId });
+    expect(app.table.draw).toEqual({ kind: 'shown', from: 'stock', cardId: view?.lastDrawnId });
     // The picture is the one before the draw, not the re-melded eleven (picture.ts rule b).
-    expect(app.picture).toEqual(preDraw);
+    expect(app.table.picture).toEqual(preDraw);
     if (view === null) throw new Error('no view');
-    expect(app.picture).not.toEqual(engineOf(view, null));
-    expect(app.selectedCard).toBeNull();
+    expect(app.table.picture).not.toEqual(engineOf(view, null));
+    expect(app.table.selectedCard).toBeNull();
     expect(kinds(effects)).toEqual(['fx', 'persist', 'scrollTop']);
   });
 
   test('taking the upcard shows it from the discard pile (the locked card)', () => {
     const tapped = run(local(dealt), { type: 'discard/tap' }).app;
-    expect(tapped.draw).toEqual({
+    expect(tapped.table.draw).toEqual({
       kind: 'shown',
       from: 'discard',
-      cardId: tapped.game?.drawnFromDiscard,
+      cardId: tapped.shell.game?.drawnFromDiscard,
     });
-    expect(tapped.picture).toEqual(engineOf(viewFor(dealt, 0), null));
+    expect(tapped.table.picture).toEqual(engineOf(viewFor(dealt, 0), null));
     const button = run(local(dealt), { type: 'action/click', act: 'takeUpcard' }).app;
-    expect(button.draw).toEqual(tapped.draw);
+    expect(button.table.draw).toEqual(tapped.table.draw);
     const drawPile = run(
       local(
         play(dealt, [
@@ -952,131 +1031,137 @@ describe('the ghost draw slot', () => {
       { type: 'render' },
     ).app;
     // Seat 1 draws now; a view for seat 0 is not its turn, so no stage is set.
-    expect(run(drawPile, { type: 'discard/tap' }).app.draw).toBeNull();
+    expect(run(drawPile, { type: 'discard/tap' }).app.table.draw).toBeNull();
   });
 
   test('tapping the ghost card accepts it; tapping a held card accepts and selects that card', () => {
     const shown = run(local(passed), { type: 'stock/tap' }).app;
-    const ghostId = shown.draw?.kind === 'shown' ? shown.draw.cardId : '';
+    const ghostId = shown.table.draw?.kind === 'shown' ? shown.table.draw.cardId : '';
     const accepted = run(shown, { type: 'card/tap', cardId: ghostId });
-    expect(accepted.app.draw).toBeNull();
-    expect(accepted.app.selectedCard).toBeNull();
-    expect(accepted.app.view).toBe(shown.view);
+    expect(accepted.app.table.draw).toBeNull();
+    expect(accepted.app.table.selectedCard).toBeNull();
+    expect(accepted.app.shell.view).toBe(shown.shell.view);
     expect(accepted.effects).toEqual([{ type: 'fx', cue: 'tap' }, { type: 'scrollTop' }]);
-    const held = shown.view?.me.hand.find((c) => c.id !== ghostId)?.id ?? '';
+    const held = shown.shell.view?.me.hand.find((c) => c.id !== ghostId)?.id ?? '';
     const selected = run(shown, { type: 'card/tap', cardId: held });
-    expect(selected.app.draw).toBeNull();
-    expect(selected.app.selectedCard).toBe(held);
+    expect(selected.app.table.draw).toBeNull();
+    expect(selected.app.table.selectedCard).toBe(held);
     expect(selected.effects).toEqual([{ type: 'fx', cue: 'tap' }, { type: 'scrollTop' }]);
     // Accepted: today's toggle, no stage comes back.
     const toggled = run(selected.app, { type: 'card/tap', cardId: held });
-    expect(toggled.app.selectedCard).toBeNull();
-    expect(toggled.app.draw).toBeNull();
+    expect(toggled.app.table.selectedCard).toBeNull();
+    expect(toggled.app.table.draw).toBeNull();
   });
 
   test('a re-render while shown keeps the stage (the meld chooser re-broadcasts the same view)', () => {
     const shown = run(local(passed), { type: 'stock/tap' }).app;
-    expect(run(shown, { type: 'render' }).app.draw).toBe(shown.draw);
-    expect(run(shown, { type: 'visible' }).app.draw).toBe(shown.draw);
-    expect(run(shown, { type: 'meld/open' }).app.draw).toBe(shown.draw);
+    expect(run(shown, { type: 'render' }).app.table.draw).toBe(shown.table.draw);
+    expect(run(shown, { type: 'visible' }).app.table.draw).toBe(shown.table.draw);
+    expect(run(shown, { type: 'meld/open' }).app.table.draw).toBe(shown.table.draw);
   });
 
   test('a stock draw is final: no ↩, and `undoDraw` through act toasts with the shown stage kept', () => {
     const shown = run(local(passed), { type: 'stock/tap' }).app;
-    expect(shown.view?.canUndo).toBe(false);
-    expect(shown.draw?.kind).toBe('shown');
+    expect(shown.shell.view?.canUndo).toBe(false);
+    expect(shown.table.draw?.kind).toBe('shown');
     const refused = run(shown, { type: 'action/click', act: 'undoDraw' });
-    expect(refused.app.draw).toBe(shown.draw);
-    expect(refused.app.view).toBe(shown.view);
-    expect(refused.app.game).toBe(shown.game);
+    expect(refused.app.table.draw).toBe(shown.table.draw);
+    expect(refused.app.shell.view).toBe(shown.shell.view);
+    expect(refused.app.shell.game).toBe(shown.shell.game);
     expect(kinds(refused.effects)).toEqual(['fx', 'toast']);
     expect(toasts(refused.effects)).toEqual([[STOCK_DRAW_FINAL_MSG, null]]);
   });
 
   test('the undo button undoes a discard-pile draw through act: the view is back in the draw phase, no stage', () => {
     const shown = run(local(openDraw), { type: 'discard/tap' }).app;
-    expect(shown.draw).toMatchObject({ kind: 'shown', from: 'discard' });
-    expect(shown.view?.canUndo).toBe(true);
+    expect(shown.table.draw).toMatchObject({ kind: 'shown', from: 'discard' });
+    expect(shown.shell.view?.canUndo).toBe(true);
     const undone = run(shown, { type: 'action/click', act: 'undoDraw' });
-    expect(undone.app.view?.phase).toBe('draw');
-    expect(undone.app.view?.canUndo).toBe(false);
-    expect(undone.app.draw).toBeNull();
+    expect(undone.app.shell.view?.phase).toBe('draw');
+    expect(undone.app.shell.view?.canUndo).toBe(false);
+    expect(undone.app.table.draw).toBeNull();
     expect(kinds(undone.effects)).toEqual(['fx', 'persist', 'scrollTop']);
     // The upcard path undoes back to the upcard decision.
     const took = run(local(dealt), { type: 'discard/tap' }).app;
     const back = run(took, { type: 'action/click', act: 'undoDraw' }).app;
-    expect(back.view?.phase).toBe('upcard');
-    expect(back.draw).toBeNull();
+    expect(back.shell.view?.phase).toBe('upcard');
+    expect(back.table.draw).toBeNull();
   });
 
   test('a refused draw clears the stage and toasts: pass-and-play, the host, a disconnected guest', () => {
     // Both passed: the engine refuses the discard pile (the reducer's own guard is bypassed by act).
     const refused = run(local(passed), { type: 'act', action: { type: 'drawDiscard' } });
-    expect(refused.app.draw).toBeNull();
+    expect(refused.app.table.draw).toBeNull();
     expect(kinds(refused.effects)).toEqual(['fx', 'toast']);
-    const host = { ...hosting(), game: passed, view: viewFor(passed, 0) };
+    const host = {
+      ...hosting(),
+      shell: { ...hosting().shell, game: passed, view: viewFor(passed, 0) },
+    };
     const hostRefused = run(host, { type: 'act', action: { type: 'drawDiscard' } });
-    expect(hostRefused.app.draw).toBeNull();
+    expect(hostRefused.app.table.draw).toBeNull();
     expect(kinds(hostRefused.effects)).toEqual(['fx', 'toast']);
+    const joinedApp = run(initialApp, { type: 'join/click', name: 'Jeff', code: 'KQZM' }).app;
     const guest: App = {
-      ...run(initialApp, { type: 'join/click', name: 'Jeff', code: 'KQZM' }).app,
-      view: viewFor(passed, 0),
+      ...joinedApp,
+      shell: { ...joinedApp.shell, view: viewFor(passed, 0) },
     };
     const offline = run(guest, { type: 'stock/tap' });
-    expect(offline.app.draw).toBeNull();
+    expect(offline.app.table.draw).toBeNull();
     expect(toasts(offline.effects)).toEqual([[NOT_CONNECTED_MSG, null]]);
     // A refusal that is not a draw (ready for both seats) clears nothing that was not there.
-    expect(run(local(passed), { type: 'act', action: { type: 'ready' } }).app.draw).toBeNull();
+    expect(
+      run(local(passed), { type: 'act', action: { type: 'ready' } }).app.table.draw,
+    ).toBeNull();
   });
 
   test('a guest waits for the state frame: pending through a re-render, shown on the frame, cleared by a toast', () => {
+    const connectedApp = run(
+      initialApp,
+      { type: 'join/click', name: 'Jeff', code: 'KQZM' },
+      { type: 'guest/connected' },
+    ).app;
     const guest: App = {
-      ...run(
-        initialApp,
-        { type: 'join/click', name: 'Jeff', code: 'KQZM' },
-        { type: 'guest/connected' },
-      ).app,
-      view: viewFor(passed, 0),
-      screen: 'tableScreen',
+      ...connectedApp,
+      shell: { ...connectedApp.shell, view: viewFor(passed, 0), screen: 'tableScreen' },
     };
     const waiting = run(guest, { type: 'stock/tap' });
-    expect(waiting.app.draw).toEqual({ kind: 'waiting', from: 'stock' });
+    expect(waiting.app.table.draw).toEqual({ kind: 'waiting', from: 'stock' });
     expect(waiting.effects).toEqual([
       { type: 'fx', cue: 'tap' },
       { type: 'send', frame: { t: 'action', action: { type: 'drawStock' } } },
     ]);
     const rerendered = run(waiting.app, { type: 'render' }, { type: 'visible' }).app;
-    expect(rerendered.draw).toEqual(waiting.app.draw);
+    expect(rerendered.table.draw).toEqual(waiting.app.table.draw);
     const view = viewFor(drawn, 0);
     const shown = run(rerendered, { type: 'guest/frame', frame: { t: 'state', view } }).app;
-    expect(shown.draw).toEqual({ kind: 'shown', from: 'stock', cardId: view.lastDrawnId });
+    expect(shown.table.draw).toEqual({ kind: 'shown', from: 'stock', cardId: view.lastDrawnId });
     // The guest's picture is the one it painted before the draw, kept through the state frame.
-    expect(shown.picture).toEqual(preDraw);
+    expect(shown.table.picture).toEqual(preDraw);
     const refused = run(waiting.app, { type: 'guest/frame', frame: { t: 'toast', msg: 'no' } });
-    expect(refused.app.draw).toBeNull();
+    expect(refused.app.table.draw).toBeNull();
     expect(toasts(refused.effects)).toEqual([['no', null]]);
     // The host's own view never carries the guest's stage: a state frame for the other seat clears it.
     const theirs = run(waiting.app, {
       type: 'guest/frame',
       frame: { t: 'state', view: viewFor(drawn, 1) },
     }).app;
-    expect(theirs.draw).toBeNull();
+    expect(theirs.table.draw).toBeNull();
     // Losing the host mid-wait clears the stage.
-    expect(run(waiting.app, { type: 'guest/lost' }).app.draw).toBeNull();
+    expect(run(waiting.app, { type: 'guest/lost' }).app.table.draw).toBeNull();
   });
 
   test('a guest tapping again mid-wait sends nothing: one draw on the wire, the stage kept, no refusal', () => {
+    const connectedApp = run(
+      initialApp,
+      { type: 'join/click', name: 'Jeff', code: 'KQZM' },
+      { type: 'guest/connected' },
+    ).app;
     const guest: App = {
-      ...run(
-        initialApp,
-        { type: 'join/click', name: 'Jeff', code: 'KQZM' },
-        { type: 'guest/connected' },
-      ).app,
-      view: viewFor(passed, 0),
-      screen: 'tableScreen',
+      ...connectedApp,
+      shell: { ...connectedApp.shell, view: viewFor(passed, 0), screen: 'tableScreen' },
     };
     const twice = run(guest, { type: 'stock/tap' }, { type: 'stock/tap' });
-    expect(twice.app.draw).toEqual({ kind: 'waiting', from: 'stock' });
+    expect(twice.app.table.draw).toEqual({ kind: 'waiting', from: 'stock' });
     expect(twice.effects).toEqual([
       { type: 'fx', cue: 'tap' },
       { type: 'send', frame: { t: 'action', action: { type: 'drawStock' } } },
@@ -1093,14 +1178,14 @@ describe('the ghost draw slot', () => {
       expect(again.app).toBe(twice.app);
       expect(again.effects).toEqual([]);
     });
-    expect(run(twice.app, { type: 'discard/tap' }).app.draw).toEqual(twice.app.draw);
+    expect(run(twice.app, { type: 'discard/tap' }).app.table.draw).toEqual(twice.app.table.draw);
     // The upcard path: two pile taps, one `takeUpcard` on the wire.
     const upcardTwice = run(
-      { ...guest, view: viewFor(dealt, 0) },
+      { ...guest, shell: { ...guest.shell, view: viewFor(dealt, 0) } },
       { type: 'discard/tap' },
       { type: 'discard/tap' },
     );
-    expect(upcardTwice.app.draw?.kind).toBe('waiting');
+    expect(upcardTwice.app.table.draw?.kind).toBe('waiting');
     expect(upcardTwice.effects.filter((e) => e.type === 'send')).toEqual([
       { type: 'send', frame: { t: 'action', action: { type: 'takeUpcard' } } },
     ]);
@@ -1108,7 +1193,7 @@ describe('the ghost draw slot', () => {
     // refusal toast follows to clear it.
     const view = viewFor(drawn, 0);
     const shown = run(twice.app, { type: 'guest/frame', frame: { t: 'state', view } }).app;
-    expect(shown.draw).toEqual({ kind: 'shown', from: 'stock', cardId: view.lastDrawnId });
+    expect(shown.table.draw).toEqual({ kind: 'shown', from: 'stock', cardId: view.lastDrawnId });
     // Undo is not a draw: it is never swallowed by the wait (the upcard path, which undoes).
     expect(
       kinds(run(upcardTwice.app, { type: 'action/click', act: 'undoDraw' }).effects),
@@ -1117,13 +1202,17 @@ describe('the ghost draw slot', () => {
 
   test('a new game, a new deal and leaving clear the stage; the save never carries it', () => {
     const shown = run(local(passed), { type: 'stock/tap' }).app;
-    expect(run(shown, { type: 'local/click', p1: 'A', p2: 'B', target: '1' }).app.draw).toBeNull();
-    expect(run(shown, { type: 'leave/finish' }).app.draw).toBeNull();
-    const host = { ...lobby(), draw: shown.draw };
-    expect(run(host, { type: 'host/deal' }).app.draw).toBeNull();
-    expect(saveFor(shown)).toEqual({ role: 'local', game: shown.game });
+    expect(
+      run(shown, { type: 'local/click', p1: 'A', p2: 'B', target: '1' }).app.table.draw,
+    ).toBeNull();
+    expect(run(shown, { type: 'leave/finish' }).app.table.draw).toBeNull();
+    const host = { ...lobby(), table: { ...lobby().table, draw: shown.table.draw } };
+    expect(run(host, { type: 'host/deal' }).app.table.draw).toBeNull();
+    expect(saveFor(shown)).toEqual({ role: 'local', game: shown.shell.game });
     expect(saveFor(shown)).not.toHaveProperty('draw');
-    expect(saveFor({ ...hosting(), draw: shown.draw })).not.toHaveProperty('draw');
+    expect(
+      saveFor({ ...hosting(), table: { ...hosting().table, draw: shown.table.draw } }),
+    ).not.toHaveProperty('draw');
   });
 });
 
@@ -1147,14 +1236,16 @@ describe('leaving and cancelling', () => {
     ]);
     const finished = run(hosting(), { type: 'leave/finish' });
     expect(finished.app).toMatchObject({
-      role: null,
-      game: null,
-      view: null,
-      oppConnected: false,
-      code: null,
-      revealed: null,
-      curtain: null,
-      netAttempt: hosting().netAttempt + 1,
+      shell: {
+        role: null,
+        game: null,
+        view: null,
+        oppConnected: false,
+        code: null,
+        revealed: null,
+        netAttempt: hosting().shell.netAttempt + 1,
+      },
+      table: { curtain: null },
     });
     expect(finished.effects).toEqual([{ type: 'clearSave' }, { type: 'initHome' }]);
   });
@@ -1168,7 +1259,9 @@ describe('leaving and cancelling', () => {
       { type: 'then', intent: { type: 'cancel/finish' } },
     ]);
     const finished = run(waiting, { type: 'cancel/finish' });
-    expect(finished.app).toMatchObject({ role: null, netAttempt: 2, code: waiting.code });
+    expect(finished.app).toMatchObject({
+      shell: { role: null, netAttempt: 2, code: waiting.shell.code },
+    });
     expect(finished.effects).toEqual([{ type: 'clearSave' }, { type: 'initHome' }]);
   });
 
@@ -1246,21 +1339,25 @@ describe('resume', () => {
       { type: 'home/init', home: { ...home, save: { role: 'local', game: drawn } } },
       { type: 'resume/click' },
     );
-    expect(local.app).toMatchObject({ role: 'local', game: drawn, screen: 'tableScreen' });
+    expect(local.app).toMatchObject({
+      shell: { role: 'local', game: drawn, screen: 'tableScreen' },
+    });
     const host = run(
       initialApp,
       { type: 'home/init', home: { ...home, save: hostSave } },
       { type: 'resume/click' },
     );
     expect(host.app).toMatchObject({
-      role: 'host',
-      code: 'LRZL',
-      myName: 'Ann',
-      target: 75,
-      game: drawn,
-      oppName: 'Jeff',
-      view: viewFor(drawn, 0),
-      screen: 'hostWaitScreen',
+      shell: {
+        role: 'host',
+        code: 'LRZL',
+        myName: 'Ann',
+        target: 75,
+        game: drawn,
+        oppName: 'Jeff',
+        view: viewFor(drawn, 0),
+        screen: 'hostWaitScreen',
+      },
     });
     expect(host.effects.at(-1)).toEqual({
       type: 'startHost',
@@ -1273,7 +1370,7 @@ describe('resume', () => {
       { type: 'home/init', home: { ...home, save: { role: 'guest', code: 'KQZM', myName: 'Jo' } } },
       { type: 'resume/click' },
     );
-    expect(guest.app).toMatchObject({ role: 'guest', code: 'KQZM', myName: 'Jo' });
+    expect(guest.app).toMatchObject({ shell: { role: 'guest', code: 'KQZM', myName: 'Jo' } });
     expect(guest.effects.at(-1)).toEqual({ type: 'startGuest', code: 'KQZM', attempt: 1 });
   });
 });
@@ -1284,7 +1381,7 @@ describe('storage', () => {
     const midHand = hosting();
     expect(saveFor(midHand)).toEqual({
       role: 'host',
-      code: midHand.code,
+      code: midHand.shell.code,
       myName: 'Ann',
       target: 100,
       game: drawn,
@@ -1293,8 +1390,8 @@ describe('storage', () => {
     const guest = run(initialApp, { type: 'join/click', name: 'Jeff', code: 'KQZM' }).app;
     expect(saveFor(guest)).toEqual({ role: 'guest', code: 'KQZM', myName: 'Jeff' });
     const local = run(initialApp, { type: 'local/click', p1: 'A', p2: 'B', target: '1' }).app;
-    expect(saveFor(local)).toEqual({ role: 'local', game: local.game });
-    expect(saveFor({ ...local, game: null })).toBeNull();
+    expect(saveFor(local)).toEqual({ role: 'local', game: local.shell.game });
+    expect(saveFor({ ...local, shell: { ...local.shell, game: null } })).toBeNull();
   });
 
   test('readHome: the defaults when nothing is stored, the values when they are', () => {
@@ -1359,7 +1456,7 @@ describe('the sessions read back', () => {
     expect(hostContextOf(app)).toEqual({
       attempt: 1,
       role: 'host',
-      code: app.code,
+      code: app.shell.code,
       myName: 'Ann',
       target: 100,
       hasGame: true,
@@ -1370,7 +1467,7 @@ describe('the sessions read back', () => {
     expect(guestContextOf(app)).toEqual({
       attempt: 1,
       role: 'host',
-      code: app.code,
+      code: app.shell.code,
       myName: 'Ann',
       oppConnected: true,
     });
@@ -1459,7 +1556,11 @@ describe('runEffect', () => {
 
   test("the fx effect carries the App's font to the player, so the reducer is the source of truth", () => {
     const { deps, log } = recorded();
-    runEffect({ ...initialApp, soundFont: 'felt' }, { type: 'fx', cue: 'tap' }, deps);
+    runEffect(
+      { ...initialApp, shell: { ...initialApp.shell, soundFont: 'felt' } },
+      { type: 'fx', cue: 'tap' },
+      deps,
+    );
     runEffect(initialApp, { type: 'fx', cue: 'win' }, deps);
     expect(log).toEqual([
       ['fx', 'tap', 'felt'],
@@ -1561,20 +1662,22 @@ describe('the remote handoff of a pass-and-play game', () => {
   test('handoff/click: seat 0 hosts the game as it stands under a fresh code; seat 1 is awaited', () => {
     const handed = run(offered(), { type: 'handoff/click' });
     expect(handed.app).toMatchObject({
-      role: 'host',
-      myName: 'Ann',
-      target: 100,
-      game: drawn,
-      oppName: 'Jeff',
-      oppConnected: false,
-      view: viewFor(drawn, 0),
-      handoff: true,
-      screen: 'hostWaitScreen',
+      shell: {
+        role: 'host',
+        myName: 'Ann',
+        target: 100,
+        game: drawn,
+        oppName: 'Jeff',
+        oppConnected: false,
+        view: viewFor(drawn, 0),
+        handoff: true,
+        screen: 'hostWaitScreen',
+      },
     });
-    expect(handed.app.code).toMatch(/^[A-Z]{4}$/);
+    expect(handed.app.shell.code).toMatch(/^[A-Z]{4}$/);
     expect(handed.effects.at(-1)).toEqual({
       type: 'startHost',
-      code: handed.app.code,
+      code: handed.app.shell.code,
       attempt: 1,
       resume: false,
     });
@@ -1585,7 +1688,7 @@ describe('the remote handoff of a pass-and-play game', () => {
     });
     expect(saveFor(handed.app)).toEqual({
       role: 'host',
-      code: handed.app.code,
+      code: handed.app.shell.code,
       myName: 'Ann',
       target: 100,
       game: drawn,
@@ -1599,30 +1702,27 @@ describe('the remote handoff of a pass-and-play game', () => {
     const save = saveFor(handed);
     // Back on the home screen after a reload: the offer reads as the handoff, not a room to host.
     const reloaded = run(initialApp, { type: 'home/init', home: { ...home, save } });
-    expect(reloaded.app.resume).toEqual({
+    expect(reloaded.app.shell.resume).toEqual({
       kind: 'host',
-      code: handed.code,
+      code: handed.shell.code,
       myName: 'Ann',
       target: 100,
       game: drawn,
       oppName: 'Jeff',
       handoff: true,
     });
-    if (reloaded.app.resume === null) throw new Error('no offer');
-    expect(resumeLabel(reloaded.app.resume)).toBe(
+    if (reloaded.app.shell.resume === null) throw new Error('no offer');
+    expect(resumeLabel(reloaded.app.shell.resume)).toBe(
       'Continue online: Ann hosts, Jeff joins by invite',
     );
     // Resuming reopens the room under the code the invite already carries, still as a handoff.
     const resumed = run(reloaded.app, { type: 'resume/click' });
     expect(resumed.app).toMatchObject({
-      role: 'host',
-      code: handed.code,
-      handoff: true,
-      screen: 'hostWaitScreen',
+      shell: { role: 'host', code: handed.shell.code, handoff: true, screen: 'hostWaitScreen' },
     });
     expect(resumed.effects.at(-1)).toEqual({
       type: 'startHost',
-      code: handed.code,
+      code: handed.shell.code,
       attempt: 1,
       resume: true,
     });
@@ -1647,53 +1747,54 @@ describe('the remote handoff of a pass-and-play game', () => {
         },
       },
     });
-    expect(plain.app.resume).toMatchObject({ kind: 'host', handoff: false });
-    if (plain.app.resume === null) throw new Error('no offer');
-    expect(resumeLabel(plain.app.resume)).toBe('Resume hosting room LRZL');
-    expect(run(plain.app, { type: 'resume/click' }).app.handoff).toBe(false);
+    expect(plain.app.shell.resume).toMatchObject({ kind: 'host', handoff: false });
+    if (plain.app.shell.resume === null) throw new Error('no offer');
+    expect(resumeLabel(plain.app.shell.resume)).toBe('Resume hosting room LRZL');
+    expect(run(plain.app, { type: 'resume/click' }).app.shell.handoff).toBe(false);
   });
 
   test('a guest that drops before its join leaves the handoff waiting for the invite: no table, no toast', () => {
     const handed = run(offered(), { type: 'handoff/click' }).app;
-    const code = handed.code ?? '';
+    const code = handed.shell.code ?? '';
     const gone = run(handed, { type: 'host/guestGone', iceFailed: null });
     expect(gone.app).toMatchObject({
-      screen: 'hostWaitScreen',
-      handoff: true,
-      oppConnected: false,
-      hostStatus: { text: handoffMsg(code, 'Jeff') },
+      shell: {
+        screen: 'hostWaitScreen',
+        handoff: true,
+        oppConnected: false,
+        hostStatus: { text: handoffMsg(code, 'Jeff') },
+      },
     });
     expect(gone.effects).toEqual([]);
     // ICE failed before the channel opened: the session's text, still on the wait screen.
     const failed = run(handed, { type: 'host/guestGone', iceFailed: 'ICE failed' });
-    expect(failed.app).toMatchObject({ screen: 'hostWaitScreen', handoff: true });
-    expect(failed.app.hostStatus.text).toBe('ICE failed');
+    expect(failed.app).toMatchObject({ shell: { screen: 'hostWaitScreen', handoff: true } });
+    expect(failed.app.shell.hostStatus.text).toBe('ICE failed');
   });
 
   test('handoff/click from the pass-and-play table: the game in play goes online, its curtain and draw marks cleared', () => {
     const playing = run(offered(), { type: 'resume/click' }).app;
-    expect(playing).toMatchObject({ role: 'local', game: drawn, screen: 'tableScreen' });
-    expect(playing.curtain).not.toBeNull();
+    expect(playing).toMatchObject({ shell: { role: 'local', game: drawn, screen: 'tableScreen' } });
+    expect(playing.table.curtain).not.toBeNull();
     const handed = run(
-      { ...playing, selectedCard: drawn.hands[0][0]?.id ?? null },
+      { ...playing, table: { ...playing.table, selectedCard: drawn.hands[0][0]?.id ?? null } },
       { type: 'handoff/click' },
     );
     expect(handed.app).toMatchObject({
-      role: 'host',
-      myName: 'Ann',
-      oppName: 'Jeff',
-      oppConnected: false,
-      game: drawn,
-      view: viewFor(drawn, 0),
-      handoff: true,
-      screen: 'hostWaitScreen',
-      curtain: null,
-      revealed: null,
-      draw: null,
-      selectedCard: null,
-      meldChooser: false,
+      shell: {
+        role: 'host',
+        myName: 'Ann',
+        oppName: 'Jeff',
+        oppConnected: false,
+        game: drawn,
+        view: viewFor(drawn, 0),
+        handoff: true,
+        screen: 'hostWaitScreen',
+        revealed: null,
+      },
+      table: { curtain: null, draw: null, selectedCard: null, meldChooser: false },
     });
-    expect(handed.app.code).toMatch(/^[A-Z]{4}$/);
+    expect(handed.app.shell.code).toMatch(/^[A-Z]{4}$/);
     expect(kinds(handed.effects)).toContain('startHost');
     // Not from an online table.
     const online = hosting();
@@ -1704,13 +1805,10 @@ describe('the remote handoff of a pass-and-play game', () => {
     const handed = run(offered(), { type: 'handoff/click' }).app;
     const joined = run(handed, { type: 'host/frame', frame: { t: 'join', name: 'Bobby' } });
     expect(joined.app).toMatchObject({
-      handoff: false,
-      oppName: 'Bobby',
-      oppConnected: true,
-      screen: 'tableScreen',
+      shell: { handoff: false, oppName: 'Bobby', oppConnected: true, screen: 'tableScreen' },
     });
-    expect(joined.app.game?.players[1].name).toBe('Bobby');
-    expect(joined.app.game?.hands).toEqual(drawn.hands);
+    expect(joined.app.shell.game?.players[1].name).toBe('Bobby');
+    expect(joined.app.shell.game?.hands).toEqual(drawn.hands);
     expect(kinds(joined.effects)).toEqual(expect.arrayContaining(['send', 'persist']));
     expect(hostContextOf(joined.app).handoff).toBe(false);
   });
@@ -1718,7 +1816,7 @@ describe('the remote handoff of a pass-and-play game', () => {
   test('cancelling the room before anyone joined gives the game back to pass-and-play', () => {
     const handed = run(offered(), { type: 'handoff/click' }).app;
     const finished = run(handed, { type: 'cancel/finish' });
-    expect(finished.app).toMatchObject({ role: null, handoff: false, netAttempt: 2 });
+    expect(finished.app).toMatchObject({ shell: { role: null, handoff: false, netAttempt: 2 } });
     expect(finished.effects).toEqual([{ type: 'saveLocal', game: drawn }, { type: 'initHome' }]);
     // A room opened from the home screen is cleared with its save, as before.
     const fresh = run(initialApp, { type: 'host/click', name: 'Ann', target: '100' }).app;
@@ -1730,14 +1828,11 @@ describe('the remote handoff of a pass-and-play game', () => {
 
   test('join/link: the invite code into the join form, the Play tab and online mode; nothing stored', () => {
     const linked = run(
-      { ...initialApp, homeTab: 'rules', playMode: 'local' },
+      { ...initialApp, shell: { ...initialApp.shell, homeTab: 'rules', playMode: 'local' } },
       { type: 'join/link', code: 'kqzm9' },
     );
     expect(linked.app).toMatchObject({
-      codeDraft: 'KQZM',
-      homeTab: 'play',
-      playMode: 'online',
-      nameTouched: false,
+      shell: { codeDraft: 'KQZM', homeTab: 'play', playMode: 'online', nameTouched: false },
     });
     expect(linked.effects).toEqual([{ type: 'setCode', value: 'KQZM' }]);
   });
@@ -1746,12 +1841,15 @@ describe('the remote handoff of a pass-and-play game', () => {
 describe('the arrangement: the sheet, the sort modes and the long press', () => {
   const local = (game: State, seat: Seat = 0): App => ({
     ...initialApp,
-    role: 'local',
-    oppConnected: true,
-    game,
-    view: viewFor(game, seat),
-    screen: 'tableScreen',
-    revealed: seat,
+    shell: {
+      ...initialApp.shell,
+      role: 'local',
+      oppConnected: true,
+      game,
+      view: viewFor(game, seat),
+      screen: 'tableScreen',
+      revealed: seat,
+    },
   });
   const passed = play(dealt, [
     [0, { type: 'passUpcard' }],
@@ -1770,40 +1868,45 @@ describe('the arrangement: the sheet, the sort modes and the long press', () => 
   ).find((g) => viewFor(g, 0).me.melds.length > 0);
   if (meldy === undefined) throw new Error('no seed under forty deals a meld');
   const accepted = run(local(meldy), { type: 'render' }).app;
-  const v = accepted.view;
+  const v = accepted.shell.view;
   if (v === null) throw new Error('no view');
 
   test('the sheet opens in play without a draw stage and closes; never while the drawn card waits', () => {
     const open = run(accepted, { type: 'arrange/open' });
-    expect(open.app.arrangeOpen).toBe(true);
+    expect(open.app.table.arrangeOpen).toBe(true);
     expect(kinds(open.effects)).toEqual(['fx']);
-    expect(run(open.app, { type: 'arrange/close' }).app.arrangeOpen).toBe(false);
+    expect(run(open.app, { type: 'arrange/close' }).app.table.arrangeOpen).toBe(false);
     const shown = run(local(passed), { type: 'stock/tap' }).app;
-    expect(shown.draw?.kind).toBe('shown');
+    expect(shown.table.draw?.kind).toBe('shown');
     expect(run(shown, { type: 'arrange/open' }).app).toBe(shown);
   });
 
   test('a sort mode is remembered, closes the sheet and re-arranges the picture at once', () => {
     const open = run(accepted, { type: 'arrange/open' }).app;
     const sorted = run(open, { type: 'hand/arrange', mode: 'suit' });
-    expect(sorted.app.sort).toBe('suit');
-    expect(sorted.app.arrangeOpen).toBe(false);
+    expect(sorted.app.table.sort).toBe('suit');
+    expect(sorted.app.table.arrangeOpen).toBe(false);
     expect(sorted.effects).toEqual(
       expect.arrayContaining([
         { type: 'writeSort', sort: 'suit' },
         { type: 'fx', cue: 'tap' },
       ]),
     );
-    expect(sorted.app.picture).toEqual(arrangedOf(v, null, null, 'suit', accepted.picture));
+    expect(sorted.app.table.picture).toEqual(
+      arrangedOf(v, null, null, 'suit', accepted.table.picture),
+    );
     // Manual keeps the loose cards where they are: the picture only re-melds.
     const manual = run(sorted.app, { type: 'hand/arrange', mode: 'manual' });
-    expect(manual.app.sort).toBe('manual');
-    expect(manual.app.picture?.loose).toEqual(sorted.app.picture?.loose);
+    expect(manual.app.table.sort).toBe('manual');
+    expect(manual.app.table.picture?.loose).toEqual(sorted.app.table.picture?.loose);
     // Out of play the mode is still remembered, the picture untouched.
-    const over = { ...accepted, view: { ...v, phase: 'roundOver' as const } };
+    const over = {
+      ...accepted,
+      shell: { ...accepted.shell, view: { ...v, phase: 'roundOver' as const } },
+    };
     const later = run(over, { type: 'hand/arrange', mode: 'rank' });
-    expect(later.app.sort).toBe('rank');
-    expect(later.app.picture).toBe(over.picture);
+    expect(later.app.table.sort).toBe('rank');
+    expect(later.app.table.picture).toBe(over.table.picture);
     expect(kinds(later.effects)).toEqual(['writeSort']);
   });
 
@@ -1831,16 +1934,16 @@ describe('the arrangement: the sheet, the sort modes and the long press', () => 
     if (meld === undefined) throw new Error('meldy melds nothing');
     const id = meld[0]?.id ?? '';
     const marked = run(accepted, { type: 'hand/mark', cardId: id });
-    expect(marked.app.human?.groups).toEqual([meld.map((c) => c.id)]);
-    expect(marked.app.picture?.human).toEqual(meld.map((c) => c.id));
-    expect(marked.app.picture?.groups[0]).toEqual(meld);
-    expect(marked.app.selectedCard).toBeNull();
+    expect(marked.app.table.human?.groups).toEqual([meld.map((c) => c.id)]);
+    expect(marked.app.table.picture?.human).toEqual(meld.map((c) => c.id));
+    expect(marked.app.table.picture?.groups[0]).toEqual(meld);
+    expect(marked.app.table.selectedCard).toBeNull();
     // The engine's own meld scores as the solver: declared, so the game's meldPref names it.
-    expect(marked.app.game?.meldPref[0]?.[0]).toEqual(meld.map((c) => c.id));
+    expect(marked.app.shell.game?.meldPref[0]?.[0]).toEqual(meld.map((c) => c.id));
     expect(kinds(marked.effects)).toContain('persist');
     const dissolved = run(marked.app, { type: 'hand/mark', cardId: id });
-    expect(dissolved.app.human).toEqual({ hand: meldy.handNumber, groups: [] });
-    expect(dissolved.app.picture?.human).toEqual([]);
+    expect(dissolved.app.table.human).toEqual({ hand: meldy.handNumber, groups: [] });
+    expect(dissolved.app.table.picture?.human).toEqual([]);
   });
 
   test('a long press on a card that melds nothing toasts and changes nothing else', () => {
@@ -1852,8 +1955,8 @@ describe('the arrangement: the sheet, the sort modes and the long press', () => 
     );
     if (lone === undefined) return;
     const pressed = run(accepted, { type: 'hand/mark', cardId: lone.id });
-    expect(pressed.app.human).toBeNull();
-    expect(pressed.app.picture).toBe(accepted.picture);
+    expect(pressed.app.table.human).toBeNull();
+    expect(pressed.app.table.picture).toBe(accepted.table.picture);
     expect(toasts(pressed.effects)).toEqual([[NO_MELD_MSG, null]]);
   });
 
@@ -1861,18 +1964,20 @@ describe('the arrangement: the sheet, the sort modes and the long press', () => 
     const options = v.meldOptions;
     if (options.length < 2) return;
     const picked = run(accepted, { type: 'meld/choose', index: 1 });
-    expect(picked.app.human?.groups).toEqual(options[1]?.melds.map((m) => m.map((c) => c.id)));
-    expect(picked.app.meldChooser).toBe(false);
+    expect(picked.app.table.human?.groups).toEqual(
+      options[1]?.melds.map((m) => m.map((c) => c.id)),
+    );
+    expect(picked.app.table.meldChooser).toBe(false);
   });
 
   test('a new deal and leaving drop the hand-made melds; the save never carries them', () => {
     const meld = v.me.melds[0];
     if (meld === undefined) throw new Error('meldy melds nothing');
     const marked = run(accepted, { type: 'hand/mark', cardId: meld[0]?.id ?? '' }).app;
-    expect(marked.human).not.toBeNull();
-    expect(run(marked, { type: 'leave/finish' }).app.human).toBeNull();
+    expect(marked.table.human).not.toBeNull();
+    expect(run(marked, { type: 'leave/finish' }).app.table.human).toBeNull();
     expect(
-      run(marked, { type: 'local/click', p1: 'A', p2: 'B', target: '1' }).app.human,
+      run(marked, { type: 'local/click', p1: 'A', p2: 'B', target: '1' }).app.table.human,
     ).toBeNull();
     expect(saveFor(marked)).not.toHaveProperty('human');
     expect(saveFor(marked)).not.toHaveProperty('picture');
@@ -1882,32 +1987,38 @@ describe('the arrangement: the sheet, the sort modes and the long press', () => 
 describe('the discarded-cards sheet', () => {
   const table: App = {
     ...initialApp,
-    role: 'local',
-    oppConnected: true,
-    game: drawn,
-    view: viewFor(drawn, 0),
-    screen: 'tableScreen',
-    revealed: 0,
+    shell: {
+      ...initialApp.shell,
+      role: 'local',
+      oppConnected: true,
+      game: drawn,
+      view: viewFor(drawn, 0),
+      screen: 'tableScreen',
+      revealed: 0,
+    },
   };
 
   test('opens with a tap cue when the view lists the discards, toggles the hand, closes', () => {
     const open = run(table, { type: 'discards/open' });
-    expect(open.app.discardsOpen).toBe(true);
+    expect(open.app.table.discardsOpen).toBe(true);
     expect(kinds(open.effects)).toEqual(['fx']);
     const toggled = run(open.app, { type: 'discards/toggleHand' }).app;
-    expect(toggled.discardsWithHand).toBe(true);
-    expect(run(toggled, { type: 'discards/toggleHand' }).app.discardsWithHand).toBe(false);
+    expect(toggled.table.discardsWithHand).toBe(true);
+    expect(run(toggled, { type: 'discards/toggleHand' }).app.table.discardsWithHand).toBe(false);
     const closed = run(toggled, { type: 'discards/close' }).app;
-    expect(closed.discardsOpen).toBe(false);
+    expect(closed.table.discardsOpen).toBe(false);
     // The toggle is remembered for the next opening within the session.
-    expect(closed.discardsWithHand).toBe(true);
+    expect(closed.table.discardsWithHand).toBe(true);
   });
 
   test("a legacy host's view without discardIds keeps the sheet shut", () => {
     const legacy = Object.fromEntries(
       Object.entries(viewFor(drawn, 0)).filter(([k]) => k !== 'discardIds'),
     ) as View;
-    const guest: App = { ...table, role: 'guest', game: null, view: legacy };
+    const guest: App = {
+      ...table,
+      shell: { ...table.shell, role: 'guest', game: null, view: legacy },
+    };
     expect(run(guest, { type: 'discards/open' }).app).toBe(guest);
   });
 });
@@ -1933,18 +2044,20 @@ describe('the sandbox', () => {
       effects: [],
     });
     const inSandbox = run(unlocked, { type: 'mode/set', mode: 'sandbox' });
-    expect(inSandbox.app.playMode).toBe('sandbox');
+    expect(inSandbox.app.shell.playMode).toBe('sandbox');
     expect(inSandbox.effects).toEqual([]);
     // The name changing away while in the sandbox falls back to pass-and-play.
-    expect(run(inSandbox.app, { type: 'p1name/typed', value: 'Ann' }).app.playMode).toBe('local');
-    expect(run(inSandbox.app, { type: 'p1name/typed', value: 'SANDBOX' }).app.playMode).toBe(
+    expect(run(inSandbox.app, { type: 'p1name/typed', value: 'Ann' }).app.shell.playMode).toBe(
+      'local',
+    );
+    expect(run(inSandbox.app, { type: 'p1name/typed', value: 'SANDBOX' }).app.shell.playMode).toBe(
       'sandbox',
     );
   });
 
   test('the editor: a preset, typing, a random deal, help, and copy as a console call', () => {
     const preset = run(initialApp, { type: 'sandbox/preset', id: 'two-ways-tie' });
-    expect(preset.app.sandbox).toEqual({
+    expect(preset.app.table.sandbox).toEqual({
       preset: 'two-ways-tie',
       map: twoWays,
       error: null,
@@ -1952,11 +2065,13 @@ describe('the sandbox', () => {
     });
     expect(run(initialApp, { type: 'sandbox/preset', id: 'nope' }).app).toBe(initialApp);
     const typed = run(preset.app, { type: 'sandbox/typed', value: 'p1: AS' });
-    expect(typed.app.sandbox).toMatchObject({ preset: '', map: 'p1: AS', error: null });
+    expect(typed.app.table.sandbox).toMatchObject({ preset: '', map: 'p1: AS', error: null });
     const random = run(typed.app, { type: 'sandbox/random' });
-    expect(random.app.sandbox.preset).toBe('random');
-    expect(random.app.sandbox.map).toMatch(/^p1: (\S+ ){9}\S+\np2: /);
-    expect(run(random.app, { type: 'sandbox/help', open: true }).app.sandbox.helpOpen).toBe(true);
+    expect(random.app.table.sandbox.preset).toBe('random');
+    expect(random.app.table.sandbox.map).toMatch(/^p1: (\S+ ){9}\S+\np2: /);
+    expect(run(random.app, { type: 'sandbox/help', open: true }).app.table.sandbox.helpOpen).toBe(
+      true,
+    );
     expect(run(typed.app, { type: 'sandbox/copy' }).effects).toEqual([
       { type: 'copy', text: '__gin.sandbox(`p1: AS`)' },
       { type: 'toast', message: SANDBOX_COPIED_MSG, ms: null },
@@ -1966,29 +2081,33 @@ describe('the sandbox', () => {
   test('dealing a map starts a pass-and-play game exactly as written, with its hand-made melds; a bad map shows its error', () => {
     const dealt = run(unlocked, { type: 'sandbox/start', map: twoWays, p1: 'sandbox', p2: 'Bob' });
     expect(dealt.app).toMatchObject({
-      role: 'local',
-      screen: 'tableScreen',
-      sandbox: { error: null },
+      shell: { role: 'local', screen: 'tableScreen' },
+      table: { sandbox: { error: null } },
     });
-    expect(dealt.app.game?.players.map((p) => p.name)).toEqual(['sandbox', 'Bob']);
-    expect(dealt.app.game?.hands[0].map((c) => c.id)).toEqual(
+    expect(dealt.app.shell.game?.players.map((p) => p.name)).toEqual(['sandbox', 'Bob']);
+    expect(dealt.app.shell.game?.hands[0].map((c) => c.id)).toEqual(
       '6S 7S 8S 7H 7D 2C 9H JD QC KH'.split(' '),
     );
-    expect(dealt.app.game?.discard.map((c) => c.id)).toEqual(['5S']);
-    expect(dealt.app.game).toMatchObject({ turn: 0, phase: 'draw', handNumber: 1 });
-    expect(dealt.app.human).toBeNull();
+    expect(dealt.app.shell.game?.discard.map((c) => c.id)).toEqual(['5S']);
+    expect(dealt.app.shell.game).toMatchObject({ turn: 0, phase: 'draw', handNumber: 1 });
+    expect(dealt.app.table.human).toBeNull();
     expect(kinds(dealt.effects)).toEqual(['wakeLock', 'persist', 'scrollTop']);
     // The console deals with default names; a hand-made meld in the map is the player's.
     const made = run(initialApp, {
       type: 'sandbox/start',
       map: presetById('hand-made-set')?.map ?? '',
     });
-    expect(made.app.game?.players.map((p) => p.name)).toEqual(['Player 1', 'Player 2']);
-    expect(made.app.human).toEqual({ hand: 1, groups: [['7S', '7H', '7D']] });
-    expect(made.app.picture?.groups.map((g) => g.map((c) => c.id))).toEqual([['7S', '7H', '7D']]);
+    expect(made.app.shell.game?.players.map((p) => p.name)).toEqual(['Player 1', 'Player 2']);
+    expect(made.app.table.human).toEqual({ hand: 1, groups: [['7S', '7H', '7D']] });
+    expect(made.app.table.picture?.groups.map((g) => g.map((c) => c.id))).toEqual([
+      ['7S', '7H', '7D'],
+    ]);
     const bad = run(unlocked, { type: 'sandbox/start', map: 'p1: AS' });
-    expect(bad.app.game).toBeNull();
-    expect(bad.app.sandbox).toMatchObject({ map: 'p1: AS', error: 'p1 needs 10 cards, has 1' });
+    expect(bad.app.shell.game).toBeNull();
+    expect(bad.app.table.sandbox).toMatchObject({
+      map: 'p1: AS',
+      error: 'p1 needs 10 cards, has 1',
+    });
     expect(bad.effects).toEqual([]);
   });
 });
@@ -1996,47 +2115,56 @@ describe('the sandbox', () => {
 describe('a loose card dragged by hand', () => {
   const local = (game: State): App => ({
     ...initialApp,
-    role: 'local',
-    oppConnected: true,
-    game,
-    view: viewFor(game, 0),
-    screen: 'tableScreen',
-    revealed: 0,
+    shell: {
+      ...initialApp.shell,
+      role: 'local',
+      oppConnected: true,
+      game,
+      view: viewFor(game, 0),
+      screen: 'tableScreen',
+      revealed: 0,
+    },
   });
   const accepted = run(local(drawn), { type: 'render' }).app;
-  const loose = accepted.picture?.loose ?? [];
+  const loose = accepted.table.picture?.loose ?? [];
   if (loose.length < 2) throw new Error('the drawn hand needs two loose cards');
   const last = loose[loose.length - 1]?.id ?? '';
-  const meldCard = accepted.picture?.groups[0]?.[0]?.id ?? null;
+  const meldCard = accepted.table.picture?.groups[0]?.[0]?.id ?? null;
 
   test('the drag begins on a loose card in play, cancelling the long press; never on a meld, out of play or while a card waits', () => {
     const started = run(accepted, { type: 'card/dragStart', cardId: last });
-    expect(started.app.drag).toEqual({ cardId: last, from: 'hand', onto: null });
+    expect(started.app.table.drag).toEqual({ cardId: last, from: 'hand', onto: null });
     expect(started.effects).toEqual([{ type: 'cancelTimer', id: 'cardPress' }]);
     if (meldCard !== null)
       expect(run(accepted, { type: 'card/dragStart', cardId: meldCard }).app).toBe(accepted);
-    const over = { ...accepted, view: { ...viewFor(drawn, 0), phase: 'roundOver' as const } };
+    const over = {
+      ...accepted,
+      shell: { ...accepted.shell, view: { ...viewFor(drawn, 0), phase: 'roundOver' as const } },
+    };
     expect(run(over, { type: 'card/dragStart', cardId: last }).app).toBe(over);
-    const waiting = { ...accepted, draw: { kind: 'waiting' as const, from: 'stock' as const } };
+    const waiting = {
+      ...accepted,
+      table: { ...accepted.table, draw: { kind: 'waiting' as const, from: 'stock' as const } },
+    };
     expect(run(waiting, { type: 'card/dragStart', cardId: last }).app).toBe(waiting);
   });
 
   test('over another loose index the card moves there and the order turns manual, written once; the same place changes nothing', () => {
     const started = run(accepted, { type: 'card/dragStart', cardId: last }).app;
     const moved = run(started, { type: 'card/dragOver', index: 0 });
-    expect(moved.app.picture?.loose.map((c) => c.id)).toEqual([
+    expect(moved.app.table.picture?.loose.map((c) => c.id)).toEqual([
       last,
       ...loose.slice(0, -1).map((c) => c.id),
     ]);
-    expect(moved.app.picture?.groups).toEqual(accepted.picture?.groups);
-    expect(moved.app.sort).toBe('manual');
+    expect(moved.app.table.picture?.groups).toEqual(accepted.table.picture?.groups);
+    expect(moved.app.table.sort).toBe('manual');
     expect(moved.effects).toEqual([{ type: 'writeSort', sort: 'manual' }]);
     expect(run(moved.app, { type: 'card/dragOver', index: 0 })).toEqual({
       app: moved.app,
       effects: [],
     });
     const again = run(moved.app, { type: 'card/dragOver', index: 1 });
-    expect(again.app.picture?.loose[1]?.id).toBe(last);
+    expect(again.app.table.picture?.loose[1]?.id).toBe(last);
     expect(again.effects).toEqual([]);
     // Nothing moves without a drag.
     expect(run(accepted, { type: 'card/dragOver', index: 0 })).toEqual({
@@ -2049,33 +2177,41 @@ describe('a loose card dragged by hand', () => {
     const started = run(accepted, { type: 'card/dragStart', cardId: last }).app;
     expect(run(started, { type: 'card/tap', cardId: last })).toEqual({ app: started, effects: [] });
     const ended = run(started, { type: 'card/dragEnd' });
-    expect(ended.app.drag).toBeNull();
+    expect(ended.app.table.drag).toBeNull();
     expect(ended.effects).toEqual([]);
     expect(run(accepted, { type: 'card/dragEnd' }).app).toBe(accepted);
-    expect(run(ended.app, { type: 'card/tap', cardId: last }).app.selectedCard).toBe(last);
+    expect(run(ended.app, { type: 'card/tap', cardId: last }).app.table.selectedCard).toBe(last);
   });
 
   test('over the discard pile the drag lights it for a card that may be discarded; released there the card is discarded, as the button would', () => {
     const started = run(accepted, { type: 'card/dragStart', cardId: last }).app;
     const lit = run(started, { type: 'card/dragOnto', onto: 'discard' });
-    expect(lit.app.drag).toEqual({ cardId: last, from: 'hand', onto: 'discard' });
+    expect(lit.app.table.drag).toEqual({ cardId: last, from: 'hand', onto: 'discard' });
     expect(lit.effects).toEqual([]);
     expect(run(lit.app, { type: 'card/dragOnto', onto: 'discard' }).app).toBe(lit.app);
     const dropped = run(lit.app, { type: 'card/dragEnd', over: 'discard' });
-    expect(dropped.app.drag).toBeNull();
-    expect(dropped.app.selectedCard).toBeNull();
-    expect(dropped.app.game?.discard.some((c) => c.id === last)).toBe(true);
-    expect(dropped.app.game?.hands[0]).toHaveLength(10);
-    expect(dropped.app.game?.turn).toBe(1);
+    expect(dropped.app.table.drag).toBeNull();
+    expect(dropped.app.table.selectedCard).toBeNull();
+    expect(dropped.app.shell.game?.discard.some((c) => c.id === last)).toBe(true);
+    expect(dropped.app.shell.game?.hands[0]).toHaveLength(10);
+    expect(dropped.app.shell.game?.turn).toBe(1);
     // The card just taken from the pile may not go back: the pile stays dark and a release there does nothing.
-    const locked = { ...started, view: { ...viewFor(drawn, 0), drawnFromDiscard: last } };
-    expect(run(locked, { type: 'card/dragOnto', onto: 'discard' }).app.drag?.onto).toBeNull();
+    const locked = {
+      ...started,
+      shell: { ...started.shell, view: { ...viewFor(drawn, 0), drawnFromDiscard: last } },
+    };
+    expect(run(locked, { type: 'card/dragOnto', onto: 'discard' }).app.table.drag?.onto).toBeNull();
     const kept = run(locked, { type: 'card/dragEnd', over: 'discard' });
-    expect(kept.app.drag).toBeNull();
-    expect(kept.app.game).toBe(locked.game);
+    expect(kept.app.table.drag).toBeNull();
+    expect(kept.app.shell.game).toBe(locked.shell.game);
     // Out of the discard phase nothing lights either.
-    const drawing = { ...started, view: { ...viewFor(drawn, 0), phase: 'draw' as const } };
-    expect(run(drawing, { type: 'card/dragOnto', onto: 'discard' }).app.drag?.onto).toBeNull();
+    const drawing = {
+      ...started,
+      shell: { ...started.shell, view: { ...viewFor(drawn, 0), phase: 'draw' as const } },
+    };
+    expect(
+      run(drawing, { type: 'card/dragOnto', onto: 'discard' }).app.table.drag?.onto,
+    ).toBeNull();
   });
 });
 
@@ -2093,12 +2229,15 @@ describe('laying off by hand (§7b)', () => {
     run(
       {
         ...initialApp,
-        role: 'local',
-        oppConnected: true,
-        game,
-        view: viewFor(game, 1),
-        screen: 'tableScreen',
-        revealed: 1,
+        shell: {
+          ...initialApp.shell,
+          role: 'local',
+          oppConnected: true,
+          game,
+          view: viewFor(game, 1),
+          screen: 'tableScreen',
+          revealed: 1,
+        },
       },
       { type: 'render' },
     ).app;
@@ -2106,52 +2245,56 @@ describe('laying off by hand (§7b)', () => {
   const laidOne = bob(play(knocked, [[1, { type: 'layOff', cardId: '4S', onto: spades }]]));
 
   test('the view and the picture: the melds on the table, the laid card off the hand, Done the one action', () => {
-    expect(answering.view?.phase).toBe('layoff');
-    expect(answering.view?.layoff?.extended.map((m) => m.map((c) => c.id).join(' '))).toContain(
-      'AS 2S 3S',
-    );
-    expect(answering.picture?.loose.map((c) => c.id)).toContain('4S');
-    expect(laidOne.view?.layoff?.laidOff.map((e) => e.card.id)).toEqual(['4S']);
+    expect(answering.shell.view?.phase).toBe('layoff');
+    expect(
+      answering.shell.view?.layoff?.extended.map((m) => m.map((c) => c.id).join(' ')),
+    ).toContain('AS 2S 3S');
+    expect(answering.table.picture?.loose.map((c) => c.id)).toContain('4S');
+    expect(laidOne.shell.view?.layoff?.laidOff.map((e) => e.card.id)).toEqual(['4S']);
     // The laid card leaves its cell in place; the other nine stay.
-    expect(laidOne.picture?.loose.map((c) => c.id)).not.toContain('4S');
-    expect(laidOne.picture?.loose.length).toBe((answering.picture?.loose.length ?? 0) - 1);
-    expect(run(answering, { type: 'action/click', act: 'finishLayoff' }).app.game?.phase).toBe(
-      'roundOver',
+    expect(laidOne.table.picture?.loose.map((c) => c.id)).not.toContain('4S');
+    expect(laidOne.table.picture?.loose.length).toBe(
+      (answering.table.picture?.loose.length ?? 0) - 1,
     );
+    expect(
+      run(answering, { type: 'action/click', act: 'finishLayoff' }).app.shell.game?.phase,
+    ).toBe('roundOver');
   });
 
   test('a hand card over the meld it fits lights it and lays off on release; over another it lights nothing', () => {
     const started = run(laidOne, { type: 'card/dragStart', cardId: '5S' }).app;
-    expect(started.drag).toEqual({ cardId: '5S', from: 'hand', onto: null });
+    expect(started.table.drag).toEqual({ cardId: '5S', from: 'hand', onto: null });
     const lit = run(started, { type: 'card/dragOnto', onto: spades });
-    expect(lit.app.drag?.onto).toBe(spades);
+    expect(lit.app.table.drag?.onto).toBe(spades);
     const other = (spades + 1) % 3;
-    expect(run(started, { type: 'card/dragOnto', onto: other }).app.drag?.onto).toBeNull();
-    expect(run(lit.app, { type: 'card/dragOnto', onto: null }).app.drag?.onto).toBeNull();
+    expect(run(started, { type: 'card/dragOnto', onto: other }).app.table.drag?.onto).toBeNull();
+    expect(run(lit.app, { type: 'card/dragOnto', onto: null }).app.table.drag?.onto).toBeNull();
     // Released over the spades: laid off through the engine, the drag over, the tap sound.
     const laid = run(lit.app, { type: 'card/dragEnd', over: spades });
-    expect(laid.app.drag).toBeNull();
-    expect(laid.app.game?.knock?.laidOff.map((e) => e.cardId)).toEqual(['4S', '5S']);
-    expect(laid.app.view?.me.deadwoodValue).toBe(20);
+    expect(laid.app.table.drag).toBeNull();
+    expect(laid.app.shell.game?.knock?.laidOff.map((e) => e.cardId)).toEqual(['4S', '5S']);
+    expect(laid.app.shell.view?.me.deadwoodValue).toBe(20);
     expect(kinds(laid.effects)).toContain('fx');
     // Released over a meld it does not fit, or over none: nothing laid, the card back in its cell.
-    expect(run(started, { type: 'card/dragEnd', over: other }).app.game?.knock?.laidOff).toEqual([
-      { cardId: '4S', onto: spades },
-    ]);
-    expect(run(started, { type: 'card/dragEnd', over: null }).app.drag).toBeNull();
+    expect(
+      run(started, { type: 'card/dragEnd', over: other }).app.shell.game?.knock?.laidOff,
+    ).toEqual([{ cardId: '4S', onto: spades }]);
+    expect(run(started, { type: 'card/dragEnd', over: null }).app.table.drag).toBeNull();
   });
 
   test("a laid card drags back off the melds while its meld stays a meld; the knocker's cards never drag", () => {
     const fromTable = run(laidOne, { type: 'card/dragStart', cardId: '4S', from: 'table' });
-    expect(fromTable.app.drag).toEqual({ cardId: '4S', from: 'table', onto: null });
+    expect(fromTable.app.table.drag).toEqual({ cardId: '4S', from: 'table', onto: null });
     // Over the melds it lights nothing; released off them it comes back.
-    expect(run(fromTable.app, { type: 'card/dragOnto', onto: spades }).app.drag?.onto).toBeNull();
+    expect(
+      run(fromTable.app, { type: 'card/dragOnto', onto: spades }).app.table.drag?.onto,
+    ).toBeNull();
     const back = run(fromTable.app, { type: 'card/dragEnd', over: null });
-    expect(back.app.game?.knock?.laidOff).toEqual([]);
-    expect(back.app.picture?.loose.map((c) => c.id)).toContain('4S');
+    expect(back.app.shell.game?.knock?.laidOff).toEqual([]);
+    expect(back.app.table.picture?.loose.map((c) => c.id)).toContain('4S');
     // Released over a meld: nothing happens.
     expect(
-      run(fromTable.app, { type: 'card/dragEnd', over: spades }).app.game?.knock?.laidOff,
+      run(fromTable.app, { type: 'card/dragEnd', over: spades }).app.shell.game?.knock?.laidOff,
     ).toEqual([{ cardId: '4S', onto: spades }]);
     // A pinned card (the knocker's) starts no drag; a held 5S holds the 4S on.
     expect(run(laidOne, { type: 'card/dragStart', cardId: 'AS', from: 'table' }).app).toBe(laidOne);
@@ -2162,20 +2305,20 @@ describe('laying off by hand (§7b)', () => {
       ]),
     );
     expect(run(both, { type: 'card/dragStart', cardId: '4S', from: 'table' }).app).toBe(both);
-    expect(run(both, { type: 'card/dragStart', cardId: '5S', from: 'table' }).app.drag?.from).toBe(
-      'table',
-    );
+    expect(
+      run(both, { type: 'card/dragStart', cardId: '5S', from: 'table' }).app.table.drag?.from,
+    ).toBe('table');
   });
 });
 
 describe('the card back', () => {
   test("home/init reads it; the console hook's intent shows a preset and remembers it", () => {
     expect(
-      run(initialApp, { type: 'home/init', home: { ...home, cardBack: 'blue-stripe' } }).app
+      run(initialApp, { type: 'home/init', home: { ...home, cardBack: 'blue-stripe' } }).app.table
         .cardBack,
     ).toBe('blue-stripe');
     const set = run(initialApp, { type: 'cardBack/set', back: 'yu-gi-oh' });
-    expect(set.app.cardBack).toBe('yu-gi-oh');
+    expect(set.app.table.cardBack).toBe('yu-gi-oh');
     expect(set.effects).toEqual([{ type: 'writeCardBack', back: 'yu-gi-oh' }]);
   });
 });
@@ -2183,10 +2326,11 @@ describe('the card back', () => {
 describe('the sound font', () => {
   test("home/init reads it; the console hook's intent plays it from now on and remembers it", () => {
     expect(
-      run(initialApp, { type: 'home/init', home: { ...home, soundFont: 'arcade' } }).app.soundFont,
+      run(initialApp, { type: 'home/init', home: { ...home, soundFont: 'arcade' } }).app.shell
+        .soundFont,
     ).toBe('arcade');
     const set = run(initialApp, { type: 'soundFont/set', font: 'felt' });
-    expect(set.app.soundFont).toBe('felt');
+    expect(set.app.shell.soundFont).toBe('felt');
     expect(set.effects).toEqual([{ type: 'writeSoundFont', font: 'felt' }]);
   });
 });

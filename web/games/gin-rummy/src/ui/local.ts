@@ -32,7 +32,9 @@ export const curtainText = (game: State, turn: 0 | 1): CurtainText => {
 export const paintCurtain = (doc: PageLike, app: App): void => {
   paintShellCurtain(
     doc,
-    app.curtain === null || app.game === null ? null : curtainText(app.game, app.curtain),
+    app.table.curtain === null || app.shell.game === null
+      ? null
+      : curtainText(app.shell.game, app.table.curtain),
   );
 };
 

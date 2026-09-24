@@ -89,9 +89,12 @@ describe('paintHome', () => {
 
     paintHome(p.doc, {
       ...initialApp,
-      playMode: 'local',
-      submenuOpen: true,
-      resume: { kind: 'guest', code: 'KQZM', myName: 'Jo' },
+      shell: {
+        ...initialApp.shell,
+        playMode: 'local',
+        submenuOpen: true,
+        resume: { kind: 'guest', code: 'KQZM', myName: 'Jo' },
+      },
     });
     expect(p.get('onlineModeContent').hidden()).toBe(true);
     expect(p.get('localModeContent').hidden()).toBe(false);
@@ -113,20 +116,26 @@ describe('paintHome', () => {
       mulberry32(1),
       () => 1,
     );
-    paintHome(p.doc, { ...initialApp, resume: { kind: 'local', game } });
+    paintHome(p.doc, {
+      ...initialApp,
+      shell: { ...initialApp.shell, resume: { kind: 'local', game } },
+    });
     expect(p.get('resumeBtn').text()).toBe('Resume pass & play: Ann vs Bob');
   });
 
   test('renderPlayMode ran only on the Play tab: another tab leaves the mode marks as they were', () => {
     const p = page();
-    paintHome(p.doc, { ...initialApp, homeTab: 'rules', playMode: 'local' });
+    paintHome(p.doc, {
+      ...initialApp,
+      shell: { ...initialApp.shell, homeTab: 'rules', playMode: 'local' },
+    });
     expect(p.get('tabRulesBtn').hasClass('active')).toBe(true);
     expect(p.get('rulesPanel').hidden()).toBe(false);
     expect(p.get('playPanel').hidden()).toBe(true);
     expect(p.get('localModeContent').hidden()).toBe(true);
     expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([false, false, false]);
     expect(p.submenuButtons.map((b) => b.hasClass('active'))).toEqual([false, false, false]);
-    paintHome(p.doc, { ...initialApp, homeTab: 'score' });
+    paintHome(p.doc, { ...initialApp, shell: { ...initialApp.shell, homeTab: 'score' } });
     expect(p.get('scorePanel').hidden()).toBe(false);
   });
 
@@ -136,14 +145,16 @@ describe('paintHome', () => {
     expect(p.modeButtons[2]?.hidden()).toBe(true);
     expect(p.submenuButtons[2]?.hidden()).toBe(true);
     expect(p.get('sandboxModeContent').hidden()).toBe(true);
-    expect(p.get('sbMap').value()).toBe(initialApp.sandbox.map);
+    expect(p.get('sbMap').value()).toBe(initialApp.table.sandbox.map);
     expect(p.get('sbPreset').value()).toBe('no-melds');
     expect(p.get('sbError').text()).toBe('');
     paintHome(p.doc, {
       ...initialApp,
-      p1Name: 'Sandbox',
-      playMode: 'sandbox',
-      sandbox: { preset: '', map: 'p1: AS', error: 'p1 needs 10 cards, has 1', helpOpen: false },
+      shell: { ...initialApp.shell, p1Name: 'Sandbox', playMode: 'sandbox' },
+      table: {
+        ...initialApp.table,
+        sandbox: { preset: '', map: 'p1: AS', error: 'p1 needs 10 cards, has 1', helpOpen: false },
+      },
     });
     expect(p.modeButtons[2]?.hidden()).toBe(false);
     expect(p.submenuButtons[2]?.hidden()).toBe(false);

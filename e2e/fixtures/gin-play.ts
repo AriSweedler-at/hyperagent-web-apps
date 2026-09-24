@@ -18,9 +18,9 @@ export type HookView = Readonly<{
   }> | null;
 }>;
 
-/** The view the page holds, as `window.__gin.app.view` exposes it. */
+/** The view the page holds, as `window.__gin.app.shell.view` exposes it. */
 export const readView = (page: Page): Promise<HookView | null> =>
-  page.evaluate<HookView | null>('window.__gin.app.view');
+  page.evaluate<HookView | null>('window.__gin.app.shell.view');
 
 /** The discard that leaves the least deadwood, or the one that lets the player knock. */
 export const chooseDiscard = async (

@@ -94,17 +94,17 @@ const paintSandbox = (doc: DocumentLike, app: App): void => {
   ].forEach((b) => {
     toggleClass(b, 'hidden', !unlocked);
   });
-  setValue(requireId(doc, 'sbPreset'), app.sandbox.preset);
-  setValue(requireId(doc, 'sbMap'), app.sandbox.map);
-  setText(requireId(doc, 'sbError'), app.sandbox.error ?? '');
+  setValue(requireId(doc, 'sbPreset'), app.table.sandbox.preset);
+  setValue(requireId(doc, 'sbMap'), app.table.sandbox.map);
+  setText(requireId(doc, 'sbError'), app.table.sandbox.error ?? '');
 };
 
 /** What the shared shell paints, read off the App. */
 const homeView = (app: App): HomeView<HomeTab> => ({
-  homeTab: app.homeTab,
-  playMode: app.playMode,
-  submenuOpen: app.submenuOpen,
-  resumeLabel: app.resume === null ? null : resumeLabel(app.resume),
+  homeTab: app.shell.homeTab,
+  playMode: app.shell.playMode,
+  submenuOpen: app.shell.submenuOpen,
+  resumeLabel: app.shell.resume === null ? null : resumeLabel(app.shell.resume),
 });
 
 /** The tabs and panels, the play mode, the submenu's `force-open`, and the resume box; then the sandbox. */

@@ -52,7 +52,15 @@ import {
 import { state as stateFrame } from '../protocol.ts';
 import { aboutHtml } from './about.ts';
 import { RULES_ITEMS, RULES_LIST_HTML } from './rules.ts';
-import { SCREENS, initialApp, reduce, type App, type Intent } from './state.ts';
+import {
+  SCREENS,
+  initialApp,
+  reduce,
+  type App,
+  type Intent,
+  type Shell,
+  type Table,
+} from './state.ts';
 
 import MARKUP from '../../index.html?raw';
 
@@ -125,14 +133,20 @@ const knocked = playUntil(dealt, (s) => s.phase === 'roundOver' && s.result?.voi
 const short = createGame({ players: PLAYERS, target: 1, dealer: 0 }, rng, () => NOW);
 const over = playUntil(short, (s) => s.phase === 'gameOver');
 
-const local = (game: State, seat: Seat, over: Partial<App> = {}): App => ({
+/** Per-case overrides on the two halves of the App (state.ts `Shell`/`Table`). */
+type Over = Readonly<{ shell?: Partial<Shell>; table?: Partial<Table> }>;
+const local = (game: State, seat: Seat, over: Over = {}): App => ({
   ...initialApp,
-  role: 'local',
-  oppConnected: true,
-  game,
-  view: viewFor(game, seat),
-  screen: 'tableScreen',
-  ...over,
+  shell: {
+    ...initialApp.shell,
+    role: 'local',
+    oppConnected: true,
+    game,
+    view: viewFor(game, seat),
+    screen: 'tableScreen',
+    ...over.shell,
+  },
+  table: { ...initialApp.table, ...over.table },
 });
 
 const shown = (p: GinPage): ReadonlyArray<string> => SCREENS.filter((id) => !p.get(id).hidden());
@@ -163,10 +177,10 @@ describe('screens, waiting statuses, toast and sound', () => {
   test('paintScreen shows exactly the app screen and locks the body for the table', () => {
     const p = page();
     expect(shown(p)).toEqual(['homeScreen']);
-    paintScreen(p.doc, { ...initialApp, screen: 'tableScreen' });
+    paintScreen(p.doc, { ...initialApp, shell: { ...initialApp.shell, screen: 'tableScreen' } });
     expect(shown(p)).toEqual(['tableScreen']);
     expect(p.body.hasClass('fixed-screen')).toBe(true);
-    paintScreen(p.doc, { ...initialApp, screen: 'scEndScreen' });
+    paintScreen(p.doc, { ...initialApp, shell: { ...initialApp.shell, screen: 'scEndScreen' } });
     expect(shown(p)).toEqual(['scEndScreen']);
     expect(p.body.hasClass('fixed-screen')).toBe(false);
   });
@@ -180,10 +194,13 @@ describe('screens, waiting statuses, toast and sound', () => {
     expect(p.get('startGameBtn').hidden()).toBe(true);
     paintWaiting(p.doc, {
       ...initialApp,
-      code: 'ABCD',
-      hostStatus: { text: 'Jeff joined! Ready when you are.', pulse: true },
-      guestStatus: { text: 'boom', pulse: false },
-      startGameVisible: true,
+      shell: {
+        ...initialApp.shell,
+        code: 'ABCD',
+        hostStatus: { text: 'Jeff joined! Ready when you are.', pulse: true },
+        guestStatus: { text: 'boom', pulse: false },
+        startGameVisible: true,
+      },
     });
     expect(p.get('roomCode').text()).toBe('ABCD');
     expect(p.get('hostWaitStatus').text()).toBe('Jeff joined! Ready when you are.');
@@ -220,9 +237,9 @@ describe('screens, waiting statuses, toast and sound', () => {
     expect(p.get('handoffBtn').attr('title')).toBe(
       `Continue online: ${PLAYERS[0].name} hosts, ${PLAYERS[1].name} joins by invite`,
     );
-    paintHandoff(p.doc, local(dealt, 0, { role: 'host' }));
+    paintHandoff(p.doc, local(dealt, 0, { shell: { role: 'host' } }));
     expect(p.get('handoffBtn').hidden()).toBe(true);
-    paintHandoff(p.doc, { ...initialApp, role: 'local' });
+    paintHandoff(p.doc, { ...initialApp, shell: { ...initialApp.shell, role: 'local' } });
     expect(p.get('handoffBtn').hidden()).toBe(true);
   });
 
@@ -259,7 +276,12 @@ describe('the table', () => {
       `${'<div class="card back tiny"></div>'.repeat(11)}<span class="opp-count">12</span>`,
     );
     expect(p.get('connDot').attr('class')).toBe('conn-dot on hidden');
-    expect(connDotClass({ ...initialApp, role: 'host', oppConnected: false })).toBe('conn-dot off');
+    expect(
+      connDotClass({
+        ...initialApp,
+        shell: { ...initialApp.shell, role: 'host', oppConnected: false },
+      }),
+    ).toBe('conn-dot off');
     expect(p.get('connDot').attr('title')).toBe('Connected');
     expect(p.get('roundBadge').text()).toBe('Hand 1');
     expect(p.get('targetBadge').text()).toBe('to 100');
@@ -306,7 +328,7 @@ describe('the table', () => {
     expect(p.get('meldOverlay').hidden()).toBe(true);
     // A selection: the status, the readout, the buttons.
     const selected = v.me.hand.find((c) => v.discardOptions?.[c.id] !== undefined)?.id ?? null;
-    paintAll(p.doc, { ...app, selectedCard: selected });
+    paintAll(p.doc, { ...app, table: { ...app.table, selectedCard: selected } });
     expect(p.get('statusSub').text()).toBe('Discard it, or knock if you can');
     expect(p.get('deadwoodInfo').text()).toMatch(/^Deadwood after discard: \d+/);
     expect(p.get('actions').text()).toContain('data-act="discard" >Discard</button>');
@@ -333,16 +355,22 @@ describe('the table', () => {
     const p = page();
     const v = viewFor(drawn, 0);
     const cardId = v.me.hand[0]?.id ?? '';
-    paintAll(p.doc, local(drawn, 0, { drag: { cardId, from: 'hand', onto: null } }));
+    paintAll(p.doc, local(drawn, 0, { table: { drag: { cardId, from: 'hand', onto: null } } }));
     expect(p.get('discardPile').hasClass('drop-ready')).toBe(true);
     expect(p.get('discardPile').hasClass('drop')).toBe(false);
-    paintAll(p.doc, local(drawn, 0, { drag: { cardId, from: 'hand', onto: 'discard' } }));
+    paintAll(
+      p.doc,
+      local(drawn, 0, { table: { drag: { cardId, from: 'hand', onto: 'discard' } } }),
+    );
     expect(p.get('discardPile').hasClass('drop')).toBe(true);
     // The card just taken from the pile lights nothing; nor does a hand with no card in the air.
     const lockedView = { ...v, drawnFromDiscard: cardId };
     paintAll(
       p.doc,
-      local(drawn, 0, { view: lockedView, drag: { cardId, from: 'hand', onto: 'discard' } }),
+      local(drawn, 0, {
+        shell: { view: lockedView },
+        table: { drag: { cardId, from: 'hand', onto: 'discard' } },
+      }),
     );
     expect(p.get('discardPile').hasClass('drop-ready')).toBe(false);
     expect(p.get('discardPile').hasClass('drop')).toBe(false);
@@ -354,12 +382,12 @@ describe('the table', () => {
     const p = page();
     const before = viewFor(passed, 0);
     const shownApp = reduce(local(passed, 0), { type: 'stock/tap' }, { rng, now: () => NOW }).app;
-    const v = shownApp.view;
-    if (v === null || shownApp.draw === null) throw new Error('the draw did not show');
+    const v = shownApp.shell.view;
+    if (v === null || shownApp.table.draw === null) throw new Error('the draw did not show');
     paintAll(p.doc, shownApp);
     expect(p.get('statusSub').text()).toBe('Tap the new card to keep it, or pick a discard');
     expect(p.get('hand').text()).toBe(
-      slotHandView.render(v, null, shownApp.draw, shownApp.picture),
+      slotHandView.render(v, null, shownApp.table.draw, shownApp.table.picture),
     );
     // The ten held cards paint as they were before the draw; the eleventh sits in the ghost cell.
     expect(
@@ -383,10 +411,7 @@ describe('the table', () => {
     expect(p.get('actions').text()).not.toContain('data-act="undoDraw"');
     expect(p.get('actions').text()).toContain('data-act="discard" disabled');
     // A guest awaiting the host's state frame: the pending cell and "Drawing…".
-    const pending = {
-      ...local(passed, 0),
-      draw: { kind: 'waiting', from: 'stock' } as const,
-    };
+    const pending = local(passed, 0, { table: { draw: { kind: 'waiting', from: 'stock' } } });
     paintAll(p.doc, pending);
     expect(p.get('statusSub').text()).toBe('Drawing…');
     expect(p.get('hand').text()).toContain('<div class="slot ghost pending"></div>');
@@ -405,7 +430,10 @@ describe('the table', () => {
     );
     expect(p.get('hand').text()).toBe(slotHandView.render(v, null));
     expect(p.get('hand').text().endsWith('<div class="slot ghost open"></div>')).toBe(true);
-    paintAll(p.doc, { ...local(dealt, 1), role: 'host', oppName: 'Ann' });
+    paintAll(p.doc, {
+      ...local(dealt, 1),
+      shell: { ...local(dealt, 1).shell, role: 'host', oppName: 'Ann' },
+    });
     expect(p.get('hand').text().endsWith('<div class="slot ghost"></div>')).toBe(true);
     expect(p.get('statusMain').text()).toBe("Ann's turn");
     expect(p.get('statusSub').text()).toBe('Deciding on the upcard…');
@@ -504,7 +532,7 @@ describe('the table', () => {
     expect(p.get('rrContinueBtn').disabled()).toBe(false);
     expect(continueLabel({ ...v, ready: [true, false] })).toBe('Waiting for Bob…');
     expect(continueLabel({ ...v, target: 1 })).toBe('See final result');
-    paintAll(p.doc, local(knocked, 0, { resultDismissed: true }));
+    paintAll(p.doc, local(knocked, 0, { table: { resultDismissed: true } }));
     expect(p.get('roundResultOverlay').hidden()).toBe(true);
     // A void hand has its own texts; a view without a result writes nothing.
     const voided = roundResultText({
@@ -543,7 +571,7 @@ describe('the table', () => {
     };
     const optB = { melds: [v.me.hand.slice(1, 4)], deadwood: [], value: 0, sig: 'b' };
     const twoWays: View = { ...v, meldOptions: [optA, optB], activeMeldSig: 'a' };
-    paintAll(p.doc, local(drawn, 0, { view: twoWays, meldChooser: true }));
+    paintAll(p.doc, local(drawn, 0, { shell: { view: twoWays }, table: { meldChooser: true } }));
     expect(p.get('meldOverlay').hidden()).toBe(false);
     expect(p.get('meldSub').text()).toBe(meldChooserSub(twoWays));
     expect(p.get('meldSub').text()).toMatch(
@@ -587,14 +615,14 @@ describe('the table', () => {
     expect(gameDurationText({ ...v, rounds: [] })).toBe('—');
     expect(p.get('rematchBtn').text()).toBe('Rematch');
     expect(p.get('rematchBtn').disabled()).toBe(false);
-    paintAll(p.doc, local(over, 0, { view: { ...v, ready: [true, false] } }));
+    paintAll(p.doc, local(over, 0, { shell: { view: { ...v, ready: [true, false] } } }));
     expect(p.get('rematchBtn').text()).toBe('Waiting for Bob…');
     expect(p.get('rematchBtn').disabled()).toBe(true);
     // The sheet stays up over the endgame until "Look at the table".
     p.get('roundResultOverlay').el.classList.remove('hidden');
     paintAll(p.doc, local(over, 0));
     expect(p.get('roundResultOverlay').hidden()).toBe(false);
-    paintAll(p.doc, local(over, 0, { resultDismissed: true }));
+    paintAll(p.doc, local(over, 0, { table: { resultDismissed: true } }));
     expect(p.get('roundResultOverlay').hidden()).toBe(true);
     // The table itself was not repainted.
     expect(p.get('hand').text()).toBe('');
@@ -606,41 +634,47 @@ describe('the table', () => {
     // and the reducer clears resultDismissed, as the legacy act(ready) did; the legacy render()
     // returned at gameOver before its overlay write, so the sheet stayed hidden.
     const p = page();
-    const host: App = { ...local(over, 0), role: 'host', code: 'ABCD' };
+    const host: App = {
+      ...local(over, 0),
+      shell: { ...local(over, 0).shell, role: 'host', code: 'ABCD' },
+    };
     const hidden = reduce(host, { type: 'result/hide' }, ctx).app;
     paintAll(p.doc, hidden);
     expect(p.get('roundResultOverlay').hidden()).toBe(true);
     const readied = reduce(hidden, { type: 'act', action: { type: 'ready' } }, ctx).app;
-    expect(readied.view?.phase).toBe('gameOver');
-    expect(readied.view?.ready).toEqual([true, false]);
-    expect(readied.resultDismissed).toBe(false);
+    expect(readied.shell.view?.phase).toBe('gameOver');
+    expect(readied.shell.view?.ready).toEqual([true, false]);
+    expect(readied.table.resultDismissed).toBe(false);
     paintAll(p.doc, readied);
     expect(p.get('roundResultOverlay').hidden()).toBe(true);
     // Guest: the host's state frame after its Rematch arrives while the sheet is put away.
     const q = page();
     const guest: App = {
       ...initialApp,
-      role: 'guest',
-      code: 'ABCD',
-      oppConnected: true,
-      view: viewFor(over, 1),
-      screen: 'endgameScreen',
+      shell: {
+        ...initialApp.shell,
+        role: 'guest',
+        code: 'ABCD',
+        oppConnected: true,
+        view: viewFor(over, 1),
+        screen: 'endgameScreen',
+      },
     };
     const gHidden = reduce(guest, { type: 'result/hide' }, ctx).app;
     paintAll(q.doc, gHidden);
     expect(q.get('roundResultOverlay').hidden()).toBe(true);
-    if (readied.game === null) throw new Error('the host lost its game');
-    const frame = stateFrame(viewFor(readied.game, 1));
+    if (readied.shell.game === null) throw new Error('the host lost its game');
+    const frame = stateFrame(viewFor(readied.shell.game, 1));
     const received = reduce(gHidden, { type: 'guest/frame', frame }, ctx).app;
-    expect(received.view?.ready).toEqual([true, false]);
-    expect(received.resultDismissed).toBe(false);
+    expect(received.shell.view?.ready).toEqual([true, false]);
+    expect(received.table.resultDismissed).toBe(false);
     paintAll(q.doc, received);
     expect(q.get('roundResultOverlay').hidden()).toBe(true);
   });
 
   test('the rules and history overlays follow the App; the game history lists every hand', () => {
     const p = page();
-    paintAll(p.doc, local(knocked, 0, { rulesOpen: true, history: 'game' }));
+    paintAll(p.doc, local(knocked, 0, { shell: { rulesOpen: true }, table: { history: 'game' } }));
     expect(p.get('rulesOverlay').hidden()).toBe(false);
     expect(p.get('historyOverlay').hidden()).toBe(false);
     const v = viewFor(knocked, 0);
@@ -689,7 +723,7 @@ describe('the table', () => {
     expect(undercut).toContain('<div class="history-scores">Ann: 0 · Bob: +28</div>');
     expect(undercut).toContain('<strong>H2</strong> — Bob went Gin</div>');
     // The Score Counter writes its own list: the paint leaves it alone.
-    paintAll(p.doc, local(knocked, 0, { history: 'scorer' }));
+    paintAll(p.doc, local(knocked, 0, { table: { history: 'scorer' } }));
     expect(p.get('historyOverlay').hidden()).toBe(false);
     expect(p.get('historyList').text()).toBe(historyHtml(v).markup);
     paintAll(p.doc, local(knocked, 0));

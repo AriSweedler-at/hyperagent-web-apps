@@ -870,7 +870,7 @@ const visible = async (page: Page, selector: string): Promise<void> => {
 
 /**
  * Gin: the home tabs, hosting on the broker, a pass-and-play hand to a knock (the driver reads the
- * legacy hook `window.__gin.app.view` for its choices as gin-dom-parity does, a one-point target so
+ * legacy hook `window.__gin.app.shell.view` for its choices as gin-dom-parity does, a one-point target so
  * the first scored hand ends the game), the overlays, the endgame and a Score Counter session. A
  * draw is shot twice: the drawn card in the ghost slot, then accepted into the hand
  * (docs/design/gin-draw-ghost-slot.md §9).

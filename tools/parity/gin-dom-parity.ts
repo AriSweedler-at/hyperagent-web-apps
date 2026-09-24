@@ -206,7 +206,7 @@ export type HookView = Readonly<{
 }>;
 
 export const readView = (page: Page): Promise<HookView | null> =>
-  page.evaluate<HookView | null>('window.__gin.app.view');
+  page.evaluate<HookView | null>('window.__gin.app.shell.view');
 
 /**
  * Accept the drawn card when the page shows it in the ghost slot (docs/design/gin-draw-ghost-slot.md
