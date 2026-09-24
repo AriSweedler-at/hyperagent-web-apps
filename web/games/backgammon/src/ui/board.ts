@@ -331,6 +331,15 @@ const firstDie = (c: Chain): number => c.moves[0]?.die ?? 0;
 export const compareChains = (a: Chain, b: Chain): number =>
   firstDie(b) - firstDie(a) || a.hits.length - b.hits.length;
 
+/**
+ * The dice a combined target spends, `6+3`; three or four of a double as `3×3`, `3×4` (`3+3+3+3?`
+ * overflowed a 53px desktop point into its neighbours).
+ */
+const diceLabel = (dice: ReadonlyArray<Die>): string =>
+  dice.length > 2 && dice.every((d) => d === dice[0])
+    ? `${String(dice[0])}×${String(dice.length)}`
+    : dice.join('+');
+
 const targetAt = (to: To, chains: ReadonlyArray<Chain>): Target => {
   const sorted = [...chains].sort(compareChains);
   const singles = sorted.filter((c) => c.moves.length === 1);
@@ -345,7 +354,7 @@ const targetAt = (to: To, chains: ReadonlyArray<Chain>): Target => {
       chains: singles,
     };
   const opens = new Set(sorted.map((c) => c.hits.join(','))).size > 1;
-  const dice = sorted[0]?.moves.map((m) => String(m.die)).join('+') ?? '';
+  const dice = diceLabel(sorted[0]?.moves.map((m) => m.die) ?? []);
   return { to, kind: 'target-2', die: `${dice}${opens ? '?' : ''}`, opens, chains: sorted };
 };
 
@@ -389,26 +398,30 @@ export const chipsFor = (v: View, chains: ReadonlyArray<Chain>): ReadonlyArray<C
     hits: c.hits.map((p) => ownPoint(v, p)),
   }));
 
-const DIE_GLYPHS: ReadonlyArray<string> = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-export const dieGlyph = (die: Die): string => DIE_GLYPHS[die - 1] ?? '';
-
-/** `⚅⚂ →4 via 7 hits`, `⚂⚅ →4 via 10`, `⚅ →off` (design §2.1.3). */
-export const chipLabel = (chip: Chip): string => {
+/** The chain's dice as digits, `6·3`: the ⚅ glyphs drew as empty boxes at chip size on phones. */
+export const chipFaces = (chip: Chip): string => chip.dice.map(String).join('·');
+/** Where the chain lands and what it passes: `→ 4 via 7, hits`, `→ 4 via 10`, `→ off`. */
+export const chipNote = (chip: Chip): string => {
   const via = chip.via.length === 0 ? '' : ` via ${chip.via.map(String).join(', ')}`;
-  return `${chip.dice.map(dieGlyph).join('')} →${String(chip.to)}${via}${chip.hits.length === 0 ? '' : ' hits'}`;
+  return `→ ${String(chip.to)}${via}${chip.hits.length === 0 ? '' : ', hits'}`;
 };
+/** The chip in one breath, `6·3 → 4 via 7, hits`: its `aria-label`, and the two lines joined. */
+export const chipLabel = (chip: Chip): string => `${chipFaces(chip)} ${chipNote(chip)}`;
 
 export const chipKey = (chip: Chip): string =>
   `${chip.dice.join('+')}>${String(chip.to)}/${chip.via.join('.')}/${chip.hits.join('.')}`;
 /** `#moveChips` is rebuilt when this changes (design §2.2.3). */
 export const chipsKey = (chips: ReadonlyArray<Chip>): string => chips.map(chipKey).join('|');
 
-/** `.chip[data-index][data-dice][data-to][data-via][data-hit]`; `data-index` is the chain's index. */
+/**
+ * `.chip[data-index][data-dice][data-to][data-via][data-hit]` with the dice on one line (`.faces`)
+ * and the landing on the next (`.via`, warm when the chain `hits`); `data-index` is the chain's index.
+ */
 export const chipsHtml = (chips: ReadonlyArray<Chip>): string =>
   chips
     .map(
       (chip, i) =>
-        `<button type="button" class="chip" data-index="${String(i)}" data-dice="${chip.dice.join('+')}" data-to="${String(chip.to)}" data-via="${chip.via.join('+')}" data-hit="${chip.hits.join('+')}">${chipLabel(chip)}</button>`,
+        `<button type="button" class="chip${chip.hits.length === 0 ? '' : ' hits'}" data-index="${String(i)}" data-dice="${chip.dice.join('+')}" data-to="${String(chip.to)}" data-via="${chip.via.join('+')}" data-hit="${chip.hits.join('+')}" aria-label="${chipLabel(chip)}"><span class="faces">${chipFaces(chip)}</span><span class="via">${chipNote(chip)}</span></button>`,
     )
     .join('');
 
@@ -420,6 +433,8 @@ export type StatusOpts = Readonly<{
   pending: Pending | null;
   /** The painter is holding the R14 beat: the forfeited roll stays on the line (design §2.4.5). */
   noMoveShown: boolean;
+  /** The die the player tapped to force (`die/pick`): the line confirms it. */
+  picked?: Die | null;
 }>;
 export const PLAIN_STATUS: StatusOpts = { pending: null, noMoveShown: false };
 
@@ -452,9 +467,10 @@ const deadStatus = (v: View, dead: ReadonlyArray<Die>, playable: number): string
     ? `only ${COUNT_WORDS[playable] ?? String(playable)} of the four can be played`
     : `the ${String(dead[0])} cannot be played`;
 
-const movingStatus = (v: View, pending: Pending | null): string => {
+const movingStatus = (v: View, pending: Pending | null, picked: Die | null): string => {
   if (pending !== null) return pendingStatus(v, pending);
   const roll = rollOf(v);
+  if (picked !== null) return `${roll} · playing the ${String(picked)}`;
   const dead = deadDice(v);
   const playable = v.plays[0]?.length ?? 0;
   if (v.board.bar[v.me.idx] > 0) return `${roll} · enter from the bar`;
@@ -495,7 +511,7 @@ export const statusText = (v: View, opts: StatusOpts = PLAIN_STATUS): string => 
     case 'toRoll':
       return v.canDouble ? 'Your turn. Double or roll' : 'Your turn. Buen mazal!';
     case 'moving':
-      return movingStatus(v, opts.pending);
+      return movingStatus(v, opts.pending, opts.picked ?? null);
     case 'cubeOffered':
       return `${opp} doubles to ${String(v.cube.value * 2)}. Take or pass?`;
     case 'opening':
@@ -564,11 +580,16 @@ export type Highlight = Readonly<{ canMove: boolean; selected: boolean; die: str
 export const NO_HIGHLIGHT: Highlight = { canMove: false, selected: false, die: null };
 
 const plural = (n: number, noun: string): string => `${String(n)} ${noun}${n === 1 ? '' : 's'}`;
+/** `3×3` spoken as `three 3s`; the tray's `?` is not read. */
+const spokenDie = (die: string): string =>
+  die
+    .replace(/(\d)×(\d)/, (_m, d: string, n: string) => `${COUNT_WORDS[Number(n)] ?? n} ${d}s`)
+    .replace('?', '');
 const highlightSuffix = (hl: Highlight): string =>
   hl.selected
     ? ', selected'
     : hl.die !== null
-      ? `, target with the ${hl.die}`
+      ? `, target with the ${spokenDie(hl.die)}`
       : hl.canMove
         ? ', can move'
         : '';

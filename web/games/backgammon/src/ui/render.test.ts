@@ -175,13 +175,15 @@ describe("the shell painters (gin's names)", () => {
     expect(p.get('toast').text()).toBe('Invite copied to clipboard');
   });
 
-  test('paintSound: the glyph and the tooltip', () => {
+  test('paintSound: the glyph, the tooltip and the pressed state', () => {
     const p = page();
     paintSound(p.doc, false);
     expect(p.get('soundBtn').text()).toBe('🔇');
     expect(p.get('soundBtn').attr('title')).toBe('Sound & vibration off');
+    expect(p.get('soundBtn').attr('aria-pressed')).toBe('false');
     paintSound(p.doc, true);
     expect(p.get('soundBtn').text()).toBe('🔊');
+    expect(p.get('soundBtn').attr('aria-pressed')).toBe('true');
   });
 
   test('connDotClass: on/off, hidden in pass-and-play', () => {

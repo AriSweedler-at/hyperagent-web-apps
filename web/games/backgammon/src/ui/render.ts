@@ -149,11 +149,12 @@ export const hideToast = (doc: DocumentLike): void => {
   toggleClass(requireId(doc, 'toast'), 'show', false);
 };
 
-/** `fx.renderToggle()`: `#soundBtn`'s glyph and tooltip. */
+/** `fx.renderToggle()`: `#soundBtn`'s glyph, tooltip and pressed state (it is a toggle). */
 export const paintSound = (doc: DocumentLike, enabled: boolean): void => {
   const btn = requireId(doc, 'soundBtn');
   setText(btn, enabled ? '🔊' : '🔇');
   setAttr(btn, 'title', enabled ? 'Sound & vibration on' : 'Sound & vibration off');
+  setAttr(btn, 'aria-pressed', enabled ? 'true' : 'false');
 };
 
 /**
@@ -228,7 +229,10 @@ const holdingNoMove = (app: App): boolean => app.table.noMoveUntil !== null;
 
 const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
   const noMoveShown = holdingNoMove(app);
-  setText(requireId(doc, 'statusText'), statusText(v, { pending: app.table.pending, noMoveShown }));
+  setText(
+    requireId(doc, 'statusText'),
+    statusText(v, { pending: app.table.pending, noMoveShown, picked: app.table.picked }),
+  );
   // The dice in words for screen readers (design §2.5), exactly while faces are shown.
   const shown = diceFor(v, app.table.picked, noMoveShown).faces.length > 0;
   setText(requireId(doc, 'statusDice'), shown ? diceWords(v.dice) : '');

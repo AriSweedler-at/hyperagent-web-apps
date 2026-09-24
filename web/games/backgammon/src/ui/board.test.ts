@@ -56,6 +56,7 @@ import {
   slabsHtml,
   sourcesOf,
   stackKey,
+  PLAIN_STATUS,
   statusText,
   targetsOf,
   type Chain,
@@ -306,6 +307,19 @@ describe('selection', () => {
     ]);
     expect(targetsOf(viewAt(START, 0, [3, 1]), null, null)).toEqual([]);
     expect(targetsOf(viewAt(START, 0, [3, 1]), 7, 1).map((x) => x.die)).toEqual(['1']);
+    // Doubles: three or four of a kind as `3×3`, `3×4`, so the pill fits a desktop point.
+    expect(targetsOf(viewAt(START, 0, [3, 3]), 12, null).map((x) => [x.to, x.die])).toEqual([
+      [3, '3×3'],
+      [6, '3+3'],
+      [9, '3'],
+    ]);
+    const open = 'L: 24:2 13:5 8:3 6:5 | D: 1:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';
+    expect(targetsOf(viewAt(open, 0, [3, 3]), 12, null).map((x) => x.die)).toEqual([
+      '3×4',
+      '3×3',
+      '3+3',
+      '3',
+    ]);
   });
 
   test('a hit on one path opens the tray (T13 and design §2.1.3); either die bearing off reads 6·5 (T12)', () => {
@@ -337,15 +351,16 @@ describe('selection', () => {
       { dice: [6, 3], to: 4, via: [7], hits: [7] },
       { dice: [3, 6], to: 4, via: [10], hits: [] },
     ]);
-    expect(chips.map(chipLabel)).toEqual(['⚅⚂ →4 via 7 hits', '⚂⚅ →4 via 10']);
+    // Digits, not die glyphs (⚅ drew as a box at chip size); the landing on its own line.
+    expect(chips.map(chipLabel)).toEqual(['6·3 → 4 via 7, hits', '3·6 → 4 via 10']);
     expect(chipsHtml(chips)).toBe(
-      '<button type="button" class="chip" data-index="0" data-dice="6+3" data-to="4" data-via="7" data-hit="7">⚅⚂ →4 via 7 hits</button>' +
-        '<button type="button" class="chip" data-index="1" data-dice="3+6" data-to="4" data-via="10" data-hit="">⚂⚅ →4 via 10</button>',
+      '<button type="button" class="chip hits" data-index="0" data-dice="6+3" data-to="4" data-via="7" data-hit="7" aria-label="6·3 → 4 via 7, hits"><span class="faces">6·3</span><span class="via">→ 4 via 7, hits</span></button>' +
+        '<button type="button" class="chip" data-index="1" data-dice="3+6" data-to="4" data-via="10" data-hit="" aria-label="3·6 → 4 via 10"><span class="faces">3·6</span><span class="via">→ 4 via 10</span></button>',
     );
     expect(chipsKey(chips)).toBe('6+3>4/7/7|3+6>4/10/');
     const off = viewAt(T12, 0, [6, 5]);
     const offChips = chipsFor(off, targetsOf(off, 3, null)[0]?.chains ?? []);
-    expect(offChips.map(chipLabel)).toEqual(['⚅ →off', '⚄ →off']);
+    expect(offChips.map(chipLabel)).toEqual(['6 → off', '5 → off']);
   });
 });
 
@@ -357,6 +372,13 @@ describe('statusText', () => {
     expect(statusText(viewAt(START, 0, null))).toBe('Your turn. Buen mazal!');
     expect(statusText(western(0, null))).toBe('Your turn. Double or roll');
     expect(statusText(viewAt(START, 0, [3, 1]))).toBe('3-1 · play both dice');
+    // A forced die is confirmed on the line (the tray, when open, comes first).
+    expect(statusText(viewAt(START, 0, [6, 4]), { ...PLAIN_STATUS, picked: 6 })).toBe(
+      '6-4 · playing the 6',
+    );
+    expect(statusText(viewAt(T5, 0, [6, 1]), { ...PLAIN_STATUS, picked: 1 })).toBe(
+      '6-1 · playing the 1',
+    );
     expect(statusText(viewAt(START, 0, [6, 6]))).toBe('6-6 · play all four');
     expect(statusText(viewAt(T5, 0, [6, 1]))).toBe('6-1 · enter from the bar');
     expect(statusText(viewAt(T15, 0, [6, 5]))).toBe('6-5 · the 6 cannot be played');
@@ -487,6 +509,10 @@ describe('resultText and placeAria', () => {
     expect(placeAria(v, 'point-12')).toBe("Jeff's 12-point, 5 checkers");
     expect(placeAria(v, 'point-5', { canMove: false, selected: false, die: '3' })).toBe(
       'Point 5, empty, target with the 3',
+    );
+    // A doubles pill is spoken in words, the tray's "?" left out.
+    expect(placeAria(v, 'point-5', { canMove: false, selected: false, die: '3×3?' })).toBe(
+      'Point 5, empty, target with the three 3s',
     );
     expect(placeAria(v, 'barBottom', { canMove: true, selected: true, die: null })).toBe(
       'Your bar, 1 checker, selected',
