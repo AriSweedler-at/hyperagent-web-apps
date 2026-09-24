@@ -19,11 +19,11 @@ import { shareText, type ShareNavigatorLike } from '../../shared/edge/share.ts';
 import { bindJargon, revealRule } from '../../shared/edge/glossary.ts';
 import { createSampleCache } from '../../shared/edge/sound.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
-import type { Timer } from '../../shared/lib/clock.ts';
 import { joinCodeFrom, withoutJoin } from '../../shared/edge/invite.ts';
 import { browserNetDeps } from '../../shared/edge/netDeps.ts';
 import type { Rng } from '../../shared/lib/rng.ts';
 import { ruleFromHash } from '../../shared/ui/glossary.ts';
+import { createTimers, createToaster } from '../../shared/ui/toast.ts';
 import { bestLayoffActions, legalActions } from './src/engine/index.ts';
 import type { Action } from './src/engine/types.ts';
 import { createFx } from './src/fx.ts';
@@ -44,16 +44,7 @@ import {
   renderSandbox,
   setCodeInput,
 } from './src/ui/home.ts';
-import {
-  bindAll,
-  fmtTime,
-  hideToast,
-  paint,
-  paintSound,
-  renderAbout,
-  renderRules,
-  showToast,
-} from './src/ui/render.ts';
+import { bindAll, fmtTime, paint, paintSound, renderAbout, renderRules } from './src/ui/render.ts';
 import {
   INVITE_COPIED_MSG,
   SHARE_FALLBACK_MS,
@@ -71,9 +62,6 @@ import {
   type ScreenId,
   type TimerId,
 } from './src/ui/state.ts';
-
-/** The legacy `toast(msg, ms)` default. */
-const TOAST_MS = 2600;
 
 type Scorer = Readonly<{ resume: () => void }>;
 
@@ -143,22 +131,10 @@ const boot = (): void => {
 
   let app: App = initialApp;
   let session: HostSession | GuestSession | null = null;
-  let toastTimer: Timer | null = null;
   /** The reducer's named timers (the Play tab's long press); arming one again restarts it. */
-  const timers = new Map<TimerId, Timer>();
-  const cancelTimer = (id: TimerId): void => {
-    const armed = timers.get(id);
-    if (armed !== undefined) realClock.clearTimeout(armed);
-    timers.delete(id);
-  };
-
-  const toast = (message: string, ms: number | null): void => {
-    showToast(document, message);
-    if (toastTimer !== null) realClock.clearTimeout(toastTimer);
-    toastTimer = realClock.setTimeout(() => {
-      hideToast(document);
-    }, ms ?? TOAST_MS);
-  };
+  const timers = createTimers<TimerId>(realClock);
+  /** The legacy `toast(msg, ms)` with its 2.6 s default; a new toast restarts the one hide timer. */
+  const toast = createToaster(document, realClock);
 
   const fx = createFx({
     audio,
@@ -294,16 +270,11 @@ const boot = (): void => {
     },
     timers: {
       start: (id, ms, then) => {
-        cancelTimer(id);
-        timers.set(
-          id,
-          realClock.setTimeout(() => {
-            timers.delete(id);
-            dispatch(then);
-          }, ms),
-        );
+        timers.start(id, ms, () => {
+          dispatch(then);
+        });
       },
-      cancel: cancelTimer,
+      cancel: timers.cancel,
     },
     toggleSound: () => {
       fx.toggle(app.soundFont);

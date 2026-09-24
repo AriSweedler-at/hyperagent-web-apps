@@ -13,8 +13,10 @@ import tseslint from 'typescript-eslint';
 const PURE = [
   'web/shared/lib/**/*.ts',
   // The shared shell's pure helpers (web/shared/ui/glossary.ts first, docs/design/glossary-links.md
-  // §3); a painter that lands here later carves itself out the way scorer/main.ts does below.
-  'web/shared/ui/**/*.ts',
+  // §3; ids.ts). Its painters and binders (shellPaint.ts, curtain.ts, toast.ts: they write the
+  // document, docs/design/shared-shell.md §4.4) are carved out the way scorer/main.ts is below;
+  // tsconfig.pure.json excludes the same three.
+  'web/shared/ui/!(shellPaint|curtain|toast).ts',
   'web/games/*/src/engine/**/*.ts',
   'web/games/*/src/domain/**/*.ts',
   'web/games/*/src/bots/**/*.ts',
@@ -35,6 +37,9 @@ const EDGES = [
   'web/shared/edge/**/*.ts',
   // The two-seat sessions (classes over the Peer) and the harness beside them (docs/design/shared-shell.md §4.5).
   'web/shared/net/**/*.ts',
+  // The shell's toaster and named timers (docs/design/shared-shell.md §4.4): the one shared/ui
+  // module that holds state between calls (the Map of armed timers), over an injected Clock.
+  'web/shared/ui/toast.ts',
 ];
 // The page boots only: gin's scorer/main.ts is an edge (EDGES) but takes its rng injected.
 const RNG_ALLOWED = ['web/games/*/main.ts', 'web/shared/edge/**/*.ts'];
@@ -185,15 +190,18 @@ const zones = [
   },
   {
     // The shared shell's ui/ (docs/design/glossary-links.md §3, shared-shell.md §4.1): the reach of
-    // a game's ui/ zone below, web/shared/lib and the DOM edge with its fakes, nothing else.
+    // a game's ui/ zone below, web/shared/lib and the DOM edge with its fakes, nothing else. The
+    // clock fake is for toast.ts's test alone (§4.4: the toaster and the timers take their Clock
+    // injected, so the module imports only the type from web/shared/lib/clock.ts).
     target: './web/shared/ui',
     from: ['./web/shared/edge/**', './web/shared/net/**', './web/shared/styles/**'],
     except: [
       '**/web/shared/edge/dom.ts',
       '**/web/shared/edge/dom.fake.ts',
       '**/web/shared/edge/page.fake.ts',
+      '**/web/shared/edge/clock.fake.ts',
     ],
-    message: 'web/shared/ui imports web/shared/lib and the DOM edge only.',
+    message: 'web/shared/ui imports web/shared/lib, the DOM edge and the clock fake only.',
   },
   ...gamePairZones,
   {

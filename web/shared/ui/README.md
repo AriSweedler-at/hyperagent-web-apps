@@ -4,29 +4,37 @@ The shared shell's UI code (docs/ARCHITECTURE.md "Seams reserved for the roadmap
 since step 5 so the module boundaries and the class contract had a home to name; the first module
 landed with the glossary links (docs/design/glossary-links.md):
 
-| Module        | Holds                                                                                                                                                                                                                                                                                      |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `glossary.ts` | `RuleItem`, `Glossary`; `ruleAnchor(id)` (`rule-<id>`), `linkJargon(html, glossary, { except })` (the first whole-word term per rule wrapped as `<a class="jargon" data-rule>`, longest terms first, never inside a tag or a link), `rulesListHtml(items, glossary)`, `ruleFromHash(hash)` |
+| Module          | Holds                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `glossary.ts`   | `RuleItem`, `Glossary`; `ruleAnchor(id)` (`rule-<id>`), `linkJargon(html, glossary, { except })` (the first whole-word term per rule wrapped as `<a class="jargon" data-rule>`, longest terms first, never inside a tag or a link), `rulesListHtml(items, glossary)`, `ruleFromHash(hash)`                                                                                                                                            |
+| `shellPaint.ts` | The shell painters and binders both games carried under one name (docs/design/shared-shell.md §4.4, moved in B1), each over the view it reads rather than an App: `paintScreen(doc, screens, current, fixedOn)`, `paintWaiting(doc, WaitingView)`, `showToast(doc, msg, marks?)`/`hideToast`, `paintSound`, `paintHandoff(doc, label or null)`, `paintSheet`, `bindSheets(doc, sheets, dispatch, { escapeFallback }?)`, `ensureKeyed` |
+| `curtain.ts`    | `CurtainText` (+ optional `attrs` on the button: backgammon's `data-rolls`), `paintCurtain(doc, text or null)` (null hides, texts untouched), `bindCurtain(doc, dispatch, onReveal)`; each game keeps its `curtainText`                                                                                                                                                                                                               |
+| `toast.ts`      | `TOAST_MS`, `createTimers<Id>(clock)` (the named-timer Map both `main.ts` files kept: arming restarts, a fired timer forgets itself) and `createToaster(doc, clock, defaultMs?, marks?)` (gin's single restarting hide timer); an edge in eslint.config.js `EDGES` because the timers are state                                                                                                                                       |
+| `ids.ts`        | `SHELL_GAMES` and `SHELL_IDS`, the ids every shell page carries; `test/dist/shell-ids.test.ts` asserts them on the built pages                                                                                                                                                                                                                                                                                                        |
 
-The folder is lint-pure like `web/shared/lib` (eslint.config.js `PURE`, tsconfig.pure.json) and
-held at 100% coverage (vitest.config.ts); the edge that scrolls and flashes a rule is
-`web/shared/edge/glossary.ts`. Its import zone is a game's `ui/` zone: `web/shared/lib` and the
-DOM edge (`dom.ts` and its fakes). A painter that lands here later carves itself out of the pure
-profile the way `scorer/main.ts` does.
-Three games now carry the shapes this folder is meant to hold: gin's shell (home tabs, mode
-switch, waiting rooms, curtain, result sheets) was copied into `web/games/backgammon/src/ui/`
-with the same field, intent and painter names on purpose (docs/design/backgammon-board.md §4), so
-the shared shell reducer and painters (P6/P7 in that design's PR plan) are a mechanical lift once
-both games are green; the two-seat host/guest sessions land first as `web/shared/net/` (P5).
+The helpers (`glossary.ts`, `ids.ts`) are lint-pure like `web/shared/lib` (eslint.config.js
+`PURE`, tsconfig.pure.json); the painters and binders write the document and are carved out of the
+pure profile the way `scorer/main.ts` is (`web/shared/ui/!(shellPaint|curtain|toast).ts`, the
+same three excluded from tsconfig.pure.json and tsconfig.node.json, so tsconfig.web.json alone
+compiles them). The whole folder is held at 100% coverage (tools/ci/suites.ts, the `shared`
+suite: every module has its test beside it, the painters' over `web/shared/edge/page.fake.ts`);
+the edge that scrolls and flashes a rule is `web/shared/edge/glossary.ts`. Its import zone is a
+game's `ui/` zone: `web/shared/lib` and the DOM edge (`dom.ts` and its fakes), plus the clock fake
+for `toast.ts`'s test. Gin's shell (home tabs, mode switch, waiting rooms, curtain,
+result sheets) was copied into `web/games/backgammon/src/ui/` with the same field, intent and
+painter names on purpose (docs/design/backgammon-board.md §4), which is what makes each move here
+mechanical: a game's `ui/render.ts`, `ui/local.ts` and `main.ts` compose the shared module under
+the old names, so their tests run unchanged. The two-seat host/guest sessions landed first as
+`web/shared/net/` (shared-shell.md A1).
 
-What lands here later, and where it comes from:
+What lands here later, and where it comes from (docs/design/shared-shell.md §5):
 
-| Module         | Contract                                                                      | Source                                            |
-| -------------- | ----------------------------------------------------------------------------- | ------------------------------------------------- |
-| `HandView.ts`  | `HandView { render(model, selection): string }`, the only way a hand is drawn | gin `ui/hand/HandView.ts` (step 11)               |
-| `toast.ts`     | `toast(root, text, ms)` builder over `@shared/edge/dom` and a `Clock`         | gin `toast()` / fidice toast view (after step 13) |
-| `nameEntry.ts` | name form builder (`Ari` / `Jeff` defaults preserved per game)                | both pages' home screens (after step 13)          |
-| `lobby.ts`     | room-code display and join form over `@shared/lib/roomCode`                   | both pages (after step 13)                        |
+| Module        | Contract                                                                                                                                                                        | Source                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `home.ts`     | `paintTabs`, `paintPlayMode`, `paintSubmenu`, `paintResume`, `paintHomeShell`, `bindHomeShell`, `bindLongPress`, `fillInputs`, `setCodeInput`, `blocksCodeInput`, `tabButtonId` | both `ui/home.ts` (B2)              |
+| `boot.ts`     | `applyInviteLink`, `shareInvite`, `sessionEvents` (B3), then `bootShell(cfg)` (C3)                                                                                              | both `main.ts`                      |
+| `shell.ts`    | `reduceShell`, `runShellEffect`, `hostContextOf`, `guestContextOf`, `saveFor`, `readHome` over a game's `shellConfig.ts`                                                        | both `ui/state.ts` (C2)             |
+| `HandView.ts` | `HandView { render(model, selection): string }`, the only way a hand is drawn                                                                                                   | gin `ui/hand/HandView.ts` (step 11) |
 
 The generic CSS primitives this table once reserved as `base.css` landed in
 `web/shared/styles/base.css` instead (docs/MIGRATION.md step 14: the box-sizing reset,

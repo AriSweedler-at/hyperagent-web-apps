@@ -18,7 +18,6 @@
 import {
   closestFrom,
   dataOf,
-  hasClass,
   isDisabled,
   keyOf,
   listen,
@@ -86,6 +85,18 @@ import {
 } from './board.ts';
 import { bindDrag } from './board/dragger.ts';
 import { flyMoves } from './board/fly.ts';
+import {
+  bindSheets as bindShellSheets,
+  ensureKeyed,
+  paintHandoff as paintShellHandoff,
+  paintScreen as paintShellScreen,
+  paintSheet,
+  paintSound as paintShellSound,
+  paintWaiting as paintShellWaiting,
+  showToast as showShellToast,
+  type Sheet,
+  type ToastMarks,
+} from '../../../../shared/ui/shellPaint.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { aboutHtml } from './about.ts';
@@ -95,16 +106,14 @@ import { SCREENS, handoffLabel, type App, type Intent } from './state.ts';
 export type { PageLike };
 export type Dispatch = (intent: Intent) => void;
 
-// ---- the shell (gin's painters under gin's names) -------------------------------------------------
+// ---- the shell (web/shared/ui/shellPaint.ts, each over the App's shell slice) ---------------------
 
 export { RULES_SLOT_IDS } from './rules.ts';
+export { hideToast } from '../../../../shared/ui/shellPaint.ts';
 
 /** Write `markup` into `#id` unless the slot already shows `key`, so a repaint rewrites nothing. */
 const renderKeyed = (doc: DocumentLike, id: string, key: string, markup: () => string): void => {
-  const slot = requireId(doc, id);
-  if (dataOf(slot, 'key') === key) return;
-  setAttr(slot, 'data-key', key);
-  setHtml(slot, trustedHtml(markup()));
+  ensureKeyed(requireId(doc, id), key, markup);
 };
 
 /** Fill both rules slots for `variant` (ui/rules.ts); keyed, so a repaint rewrites nothing. */
@@ -128,45 +137,31 @@ const paintRules = (doc: DocumentLike, app: App): void => {
 
 /** `showScreen(id)`: every screen but `id` gets `hidden`; the table locks the body to the viewport. */
 export const paintScreen = (doc: PageLike, app: App): void => {
-  SCREENS.forEach((id) => {
-    toggleClass(requireId(doc, id), 'hidden', id !== app.shell.screen);
-  });
-  toggleClass(doc.body, 'fixed-screen', app.shell.screen === 'tableScreen');
+  paintShellScreen(doc, SCREENS, app.shell.screen, 'tableScreen');
 };
 
 /** `#roomCode`, `#hostWaitStatus` (+ its pulse), `#startGameBtn`, `#guestWaitStatus` (+ its pulse). */
 export const paintWaiting = (doc: DocumentLike, app: App): void => {
-  setText(requireId(doc, 'roomCode'), app.shell.code ?? '----');
-  const hostStatus = requireId(doc, 'hostWaitStatus');
-  setText(hostStatus, app.shell.hostStatus.text);
-  toggleClass(hostStatus, 'pulse', app.shell.hostStatus.pulse);
-  toggleClass(requireId(doc, 'startGameBtn'), 'hidden', !app.shell.startGameVisible);
-  const guestStatus = requireId(doc, 'guestWaitStatus');
-  setText(guestStatus, app.shell.guestStatus.text);
-  toggleClass(guestStatus, 'pulse', app.shell.guestStatus.pulse);
+  paintShellWaiting(doc, app.shell);
 };
 
 /** The hit toast (design §4.9) wears the one warm edge (`#toast.hit`). */
 export const HIT_TOAST_PREFIX = 'Kapará.';
 
-/** `toast(msg)`'s DOM half: the text and the `show` class; main.ts keeps the hide timer. */
-export const showToast = (doc: DocumentLike, message: string): void => {
-  const el = requireId(doc, 'toast');
-  setText(el, message);
-  toggleClass(el, 'hit', message.startsWith(HIT_TOAST_PREFIX));
-  toggleClass(el, 'show', true);
-};
+/** The one mark this page's toast wears: `hit` for the Kapará toast, off for every other message. */
+export const toastMarks = (message: string): ToastMarks => ({
+  hit: message.startsWith(HIT_TOAST_PREFIX),
+});
 
-export const hideToast = (doc: DocumentLike): void => {
-  toggleClass(requireId(doc, 'toast'), 'show', false);
+/** `toast(msg)`'s DOM half: the text, the `hit` mark and the `show` class; main.ts keeps the hide timer. */
+export const showToast = (doc: DocumentLike, message: string): void => {
+  showShellToast(doc, message, toastMarks(message));
 };
 
 /** `fx.renderToggle()`: `#soundBtn`'s glyph, tooltip and pressed state (it is a toggle). */
 export const paintSound = (doc: DocumentLike, enabled: boolean): void => {
-  const btn = requireId(doc, 'soundBtn');
-  setText(btn, enabled ? '🔊' : '🔇');
-  setAttr(btn, 'title', enabled ? 'Sound & vibration on' : 'Sound & vibration off');
-  setAttr(btn, 'aria-pressed', enabled ? 'true' : 'false');
+  paintShellSound(doc, enabled);
+  setAttr(requireId(doc, 'soundBtn'), 'aria-pressed', enabled ? 'true' : 'false');
 };
 
 /**
@@ -174,25 +169,18 @@ export const paintSound = (doc: DocumentLike, enabled: boolean): void => {
  * (ui/state.ts `handoff`); the tooltip names who hosts and who joins. Pass-and-play alone shows it.
  */
 export const paintHandoff = (doc: DocumentLike, app: App): void => {
-  const btn = requireId(doc, 'handoffBtn');
   const game = app.shell.role === 'local' ? app.shell.game : null;
-  toggleClass(btn, 'hidden', game === null);
-  if (game !== null) setAttr(btn, 'title', handoffLabel(game));
+  paintShellHandoff(doc, game === null ? null : handoffLabel(game));
 };
 
 // A sheet is an overlay a flag shows; the same flag's intent answers its close button, a tap on
-// its backdrop (the overlay element itself, never its children) and Escape.
-type Sheet = Readonly<{ overlay: string; close: string; intent: Intent }>;
-const SHEETS: ReadonlyArray<Sheet> = [
+// its backdrop (the overlay element itself, never its children) and Escape. The list is this game's.
+const SHEETS: ReadonlyArray<Sheet<Intent>> = [
   { overlay: 'rulesOverlay', close: 'closeRulesBtn', intent: { type: 'rules/toggle' } },
   { overlay: 'historyOverlay', close: 'closeHistoryBtn', intent: { type: 'history/toggle' } },
   { overlay: 'menuOverlay', close: 'closeMenuBtn', intent: { type: 'menu/toggle' } },
   { overlay: 'resultOverlay', close: 'rsPeekBtn', intent: { type: 'result/peek' } },
 ];
-
-const paintSheet = (doc: DocumentLike, overlay: string, open: boolean): void => {
-  toggleClass(requireId(doc, overlay), 'hidden', !open);
-};
 
 // ---- the table: frame, strips, status (design §2.1) --------------------------------------------
 
@@ -250,13 +238,6 @@ const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
 };
 
 // ---- the keyed places (design §2.2) -------------------------------------------------------------
-
-/** Rebuild `el` from `markup` only when `key` differs from its `data-key`, so its children survive a paint. */
-const ensureKeyed = (el: Element, key: string, markup: () => string): void => {
-  if (dataOf(el, 'key') === key) return;
-  setAttr(el, 'data-key', key);
-  setHtml(el, trustedHtml(markup()));
-};
 
 /** A bar half's key: `${owner}${count}` as `stackKey` spells a point's (`-0` when empty). */
 export const barKey = (seat: Seat, count: number): string =>
@@ -677,21 +658,9 @@ export const boardIntentOf = (e: Readonly<Event>): Intent | null => {
   return targetIdOf(e) === 'board' ? { type: 'chip/cancel' } : null;
 };
 
+/** The sheets' close buttons and backdrops; Escape closes the open sheet, else the die-chip tray (design §6). */
 const bindSheets = (doc: PageLike, dispatch: Dispatch): void => {
-  SHEETS.forEach(({ overlay, close, intent }) => {
-    listenId(doc, close, 'click', () => {
-      dispatch(intent);
-    });
-    listenId(doc, overlay, 'click', (e) => {
-      if (targetIdOf(e) === overlay) dispatch(intent);
-    });
-  });
-  // Escape closes the open sheet, else the die-chip tray (design §6).
-  listen(doc, 'keydown', (e) => {
-    if (keyOf(e) !== 'Escape') return;
-    const open = SHEETS.find((s) => !hasClass(requireId(doc, s.overlay), 'hidden'));
-    dispatch(open === undefined ? { type: 'chip/cancel' } : open.intent);
-  });
+  bindShellSheets(doc, SHEETS, dispatch, { escapeFallback: { type: 'chip/cancel' } });
 };
 
 /** A button's click as one intent, skipped while it is disabled. */

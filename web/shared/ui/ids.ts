@@ -1,0 +1,75 @@
+// The ids the shell's markup carries in every shell page (docs/design/shared-shell.md §4.1
+// `ids.ts`; §5 B1): what the shared painters and binders (shellPaint.ts, curtain.ts, and the home
+// binder B2 brings) reach by id, and what the shell reducer's screens and waiting rooms are. Both
+// pages (web/games/gin-rummy/index.html, web/games/backgammon/index.html) carry every one of them,
+// under these exact ids; test/dist/shell-ids.test.ts asserts it on the built pages, so a page that
+// renames one fails the site suite before a painter fails at boot. Ids a game alone has (gin's
+// scorer, backgammon's board, the menu sheet) are not here. Pure: a list, importable from node.
+import type { Game } from '../lib/roomCode.ts';
+
+/** The games whose page is the shell's markup today; fidice joins with its restyle (design §4.6). */
+export const SHELL_GAMES: ReadonlyArray<Game> = ['gin-rummy', 'backgammon'];
+
+export const SHELL_IDS: ReadonlyArray<string> = [
+  // The page root and the screens (`SCREENS` in each game's ui/state.ts names these five).
+  'app',
+  'homeScreen',
+  'hostWaitScreen',
+  'guestWaitScreen',
+  'tableScreen',
+  'endgameScreen',
+  // The home screen: the tab bar and its three panels, the play-mode switch and its submenu, the
+  // online and pass-and-play fields, the resume box (ui/home.ts, B2).
+  'topTabbar',
+  'tabPlayWrap',
+  'tabPlayBtn',
+  'tabRulesBtn',
+  'tabAboutBtn',
+  'playPanel',
+  'rulesPanel',
+  'aboutPanel',
+  'playModeSwitch',
+  'playSubmenu',
+  'onlineModeContent',
+  'localModeContent',
+  'nameInput',
+  'codeInput',
+  'hostBtn',
+  'joinBtn',
+  'p1NameInput',
+  'p2NameInput',
+  'localBtn',
+  'resumeBox',
+  'resumeBtn',
+  'rulesList',
+  'aboutCopy',
+  // The waiting rooms (shellPaint.ts `paintWaiting`; the buttons ui/home.ts binds).
+  'roomCode',
+  'hostWaitStatus',
+  'startGameBtn',
+  'shareCodeBtn',
+  'cancelHostBtn',
+  'guestWaitStatus',
+  'cancelGuestBtn',
+  // The table's shell controls (shellPaint.ts `paintSound`, `paintHandoff`; ui/render.ts binds).
+  'soundBtn',
+  'handoffBtn',
+  'leaveBtn',
+  'rulesBtnGame',
+  'historyBtn',
+  // The sheets both games open from the table (shellPaint.ts `paintSheet`, `bindSheets`).
+  'rulesOverlay',
+  'rulesOverlayList',
+  'closeRulesBtn',
+  'historyOverlay',
+  'historyList',
+  'closeHistoryBtn',
+  // The pass-and-play curtain (curtain.ts).
+  'curtainOverlay',
+  'curtainTitle',
+  'curtainSub',
+  'curtainLast',
+  'curtainBtn',
+  // The toast (shellPaint.ts `showToast`, toast.ts).
+  'toast',
+];

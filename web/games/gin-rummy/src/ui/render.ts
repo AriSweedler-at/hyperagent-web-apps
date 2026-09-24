@@ -32,7 +32,6 @@ import {
   setDisabled,
   setHtml,
   setText,
-  targetIdOf,
   toggleClass,
   trustedHtml,
   type DocumentLike,
@@ -56,6 +55,14 @@ import { bindDrag } from './hand/dragger.ts';
 import { flipCards } from './hand/flip.ts';
 import { phoneRows, samePicture } from './hand/picture.ts';
 import { SORT_MODES, type SortMode } from '../sort.ts';
+import {
+  bindSheets as bindShellSheets,
+  paintHandoff as paintShellHandoff,
+  paintScreen as paintShellScreen,
+  paintSheet,
+  paintWaiting as paintShellWaiting,
+  type Sheet,
+} from '../../../../shared/ui/shellPaint.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { aboutHtml } from './about.ts';
@@ -66,6 +73,9 @@ export type { PageLike };
 export type Dispatch = (intent: Intent) => void;
 
 export { RULES_SLOT_IDS, rulesItemsHtml } from './rules.ts';
+// The shell painters both games share (docs/design/shared-shell.md §4.4, moved in B1) under the
+// names main.ts, stories/boot.ts and the tests always imported them by.
+export { hideToast, paintSound, showToast } from '../../../../shared/ui/shellPaint.ts';
 
 /** Fill both rules slots from ui/rules.ts (once, at boot). */
 export const renderRules = (doc: DocumentLike): void => {
@@ -80,11 +90,11 @@ export const renderAbout = (doc: DocumentLike): void => {
   setHtml(requireId(doc, 'aboutCopy'), trustedHtml(aboutHtml()));
 };
 
-/** `showScreen(id)`: every screen but `id` gets `hidden`; the table locks the body to the viewport. */
+// ---- the shell (web/shared/ui/shellPaint.ts, each over the App's slice it reads) ------------------
+
 // A sheet is an overlay a flag shows; the same flag's close intent answers its button and a tap
-// on its backdrop (the overlay element itself, never its children).
-type Sheet = Readonly<{ overlay: string; close: string; intent: Intent }>;
-const SHEETS: ReadonlyArray<Sheet> = [
+// on its backdrop (the overlay element itself, never its children). The list is this game's.
+const SHEETS: ReadonlyArray<Sheet<Intent>> = [
   { overlay: 'rulesOverlay', close: 'closeRulesBtn', intent: { type: 'rules/close' } },
   { overlay: 'historyOverlay', close: 'closeHistoryBtn', intent: { type: 'history/close' } },
   { overlay: 'meldOverlay', close: 'closeMeldBtn', intent: { type: 'meld/close' } },
@@ -97,58 +107,20 @@ const SHEETS: ReadonlyArray<Sheet> = [
   },
 ];
 
-const paintSheet = (doc: DocumentLike, overlay: string, open: boolean): void => {
-  toggleClass(requireId(doc, overlay), 'hidden', !open);
-};
-
 const bindSheets = (doc: PageLike, dispatch: Dispatch): void => {
-  SHEETS.forEach(({ overlay, close, intent }) => {
-    listenId(doc, close, 'click', () => {
-      dispatch(intent);
-    });
-    listenId(doc, overlay, 'click', (e) => {
-      if (targetIdOf(e) === overlay) dispatch(intent);
-    });
-  });
+  bindShellSheets(doc, SHEETS, dispatch);
 };
 
+/** `showScreen(id)`: every screen but `id` gets `hidden`; the table locks the body to the viewport. */
 export const paintScreen = (doc: PageLike, app: App): void => {
-  SCREENS.forEach((id) => {
-    toggleClass(requireId(doc, id), 'hidden', id !== app.screen);
-  });
-  toggleClass(doc.body, 'fixed-screen', app.screen === 'tableScreen');
+  paintShellScreen(doc, SCREENS, app.screen, 'tableScreen');
   // The card back: theme.css draws every `.card.back` from `body[data-card-back]` (src/cardBack.ts).
   setAttr(doc.body, 'data-card-back', app.cardBack);
 };
 
 /** `#roomCode`, `#hostWaitStatus` (+ its pulse), `#startGameBtn`, `#guestWaitStatus` (+ its pulse). */
 export const paintWaiting = (doc: DocumentLike, app: App): void => {
-  setText(requireId(doc, 'roomCode'), app.code ?? '----');
-  const hostStatus = requireId(doc, 'hostWaitStatus');
-  setText(hostStatus, app.hostStatus.text);
-  toggleClass(hostStatus, 'pulse', app.hostStatus.pulse);
-  toggleClass(requireId(doc, 'startGameBtn'), 'hidden', !app.startGameVisible);
-  const guestStatus = requireId(doc, 'guestWaitStatus');
-  setText(guestStatus, app.guestStatus.text);
-  toggleClass(guestStatus, 'pulse', app.guestStatus.pulse);
-};
-
-/** `toast(msg)`'s DOM half: the text and the `show` class; main.ts keeps the hide timer. */
-export const showToast = (doc: DocumentLike, message: string): void => {
-  const el = requireId(doc, 'toast');
-  setText(el, message);
-  toggleClass(el, 'show', true);
-};
-
-export const hideToast = (doc: DocumentLike): void => {
-  toggleClass(requireId(doc, 'toast'), 'show', false);
-};
-
-/** `fx.renderToggle()`: `#soundBtn`'s glyph and tooltip. */
-export const paintSound = (doc: DocumentLike, enabled: boolean): void => {
-  const btn = requireId(doc, 'soundBtn');
-  setText(btn, enabled ? '🔊' : '🔇');
-  setAttr(btn, 'title', enabled ? 'Sound & vibration on' : 'Sound & vibration off');
+  paintShellWaiting(doc, app);
 };
 
 /**
@@ -158,10 +130,8 @@ export const paintSound = (doc: DocumentLike, enabled: boolean): void => {
  * pass-and-play alone.
  */
 export const paintHandoff = (doc: DocumentLike, app: App): void => {
-  const btn = requireId(doc, 'handoffBtn');
   const game = app.role === 'local' ? app.game : null;
-  toggleClass(btn, 'hidden', game === null);
-  if (game !== null) setAttr(btn, 'title', handoffLabel(game));
+  paintShellHandoff(doc, game === null ? null : handoffLabel(game));
 };
 
 // ---- the table -----------------------------------------------------------------------------------
