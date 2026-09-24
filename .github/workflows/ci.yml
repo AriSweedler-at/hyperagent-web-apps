@@ -328,7 +328,7 @@ jobs:
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
         uses: ./.github/actions/playwright-chromium
-      - name: Smoke every page on both origins and the six computed-style goldens
+      - name: Smoke every page on both origins, the six computed-style goldens and the shell's liveness in both games
         run: npm run test:e2e:site
       - name: Upload Playwright report
         if: failure()
