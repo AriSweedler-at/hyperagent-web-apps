@@ -807,7 +807,7 @@ const hostFrame = (app: App, frame: GuestFrame, ctx: Context): Step => {
       }
       return step(
         { ...withHostStatus(connected, joinedMsg(name)), startGameVisible: true },
-        { type: 'send', frame: lobbyFrame(app.myName, app.target) },
+        { type: 'send', frame: lobbyFrame(app.myName, { target: app.target }) },
       );
     }
     case 'action':
