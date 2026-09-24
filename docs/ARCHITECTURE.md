@@ -46,13 +46,15 @@ and tests that prove it land before the code they protect.
 │   │   ├── edge/                EFFECTS: ice, transport (only importer of 'peerjs'; ?peer= override),
 │   │   │                        transport.fake, clock, storage, prefs (the shell's readers/writers over a
 │   │   │                        Store: name, play mode, sound, sound font, shellSave), dom, fx
+│   │   ├── net/                 the two-seat sessions (host, guest) gin's and backgammon's net/ wrap, codec and
+│   │   │                        game injected (docs/design/shared-shell.md §4.5); sessions.harness for their suites
 │   │   ├── ui/                  RESERVED (README only): HandView slot, toast/name-entry/lobby builders
 │   │   └── styles/              tokens.css (:root tokens only), base.css (shared primitives), CONTRACT.md
 │   │                            (CSS<->TS class contract + the two palettes' token table); both pages link them
 │   └── games/
 │       ├── gin-rummy/           index.html (legacy markup + module script), main.ts, theme.css (legacy CSS), src/
 │       │   └── src/             engine/ (types, cards, melds, melds.algorithms, layoff, game, view, index),
-│       │                        protocol.ts, storage.ts, net/{host,guest}.ts, ui/{state,render,cards,cues,fit,
+│       │                        protocol.ts, storage.ts, net/{host,guest}.ts (wrappers over shared/net), ui/{state,render,cards,cues,fit,
 │       │                        local,home,rules}.ts, ui/hand/{HandView,meldGroups}.ts, scorer/{scores,voice,csv,format,main}.ts
 │       ├── fidice/              index.html, main.ts, theme.css, src/ = the 38 modules at their // src/<path>.ts
 │       │                        marker paths (assets, domain (+probability.algorithms), bots, net, view, app)
@@ -60,7 +62,7 @@ and tests that prove it land before the code they protect.
 │       │   └── src/             24 points in one grid), main.ts, theme.css (formatted; redeclares the eleven tokens),
 │       │                        engine/ (types, variants, board, moves, notation, setup, score, apply, view, decode,
 │       │                        index; the seeded replay beside it), protocol.ts, storage.ts, fx.ts,
-│       │                        net/{peerjs,host,guest}.ts (gin's sessions, three edits), ui/{state,render,board,
+│       │                        net/{host,guest}.ts (wrappers over shared/net), ui/{state,render,board,
 │       │                        home,local,rules,sound,page.fake}.ts, ui/board/{layout,fly,dragger}.ts
 │       └── sheshbesh/           index.html only: the alias stub forwarding to ../backgammon/ ("Two origins", Aliases)
 ├── legacy/                      MIGRATION ONLY: verbatim pages + shared/ice.js, copied into dist by the plugin
@@ -89,12 +91,13 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 | `web/shared/edge/invite.ts` | itself | `joinCodeFrom(search)` and `withoutJoin(search)`: a boot reads the code and drops it from the address bar through the platform's `URLSearchParams`. |
 | `web/shared/lib/sound/` | itself | The sound fonts (docs/design/sound-fonts.md): `cues.ts` the twenty generic cues every game maps its events onto; `sound.ts` `Sound` (`synth`, `sample`, `silence`), `Note`, `OscillatorType`; `fonts.ts` `SOUND_FONTS`, `fontByName`, `resolveSound` (partial fonts fall back to the total `default`), `isSoundFont`, `badSoundFontMsg(key, value)`; `fonts/<name>.ts` the fonts as data. |
 | `web/shared/edge/sound.ts` | shared/lib, `@shared/edge/fx` | `playSound(audio, sound, deps)`: a synth through `AudioCues.seq`, a sample fetched and decoded once per URL into the cues' context, silence nothing; every failure silent. A game's `fx.ts` plays its table's cue in the App's font through it. |
-| `web/shared/edge/peer.ts` | shared/lib, `@shared/edge/transport` | The peer plumbing every game's sessions share: `NetDeps`, `whenTransportReady`, `peerWatchdog`, `keepPeerAlive`, `announcePath`, `describePeerError`, the legacy timings and strings. Each game's `net/peerjs.ts` re-exports it (gin) or takes its types (fidice). |
+| `web/shared/edge/peer.ts` | shared/lib, `@shared/edge/transport` | The peer plumbing every game's sessions share: `NetDeps`, `whenTransportReady`, `peerWatchdog`, `keepPeerAlive`, `announcePath`, `describePeerError`, the legacy timings and strings. `web/shared/net` imports it directly; fidice's `net/peerjs.ts` takes its types. |
+| `web/shared/net` | shared/lib, `@shared/edge/transport`, `@shared/edge/clock`, `@shared/edge/peer` | The two-seat sessions (docs/design/shared-shell.md §4.5): `HostSession<G, H, X>` and `GuestSession<G, H>` are gin's classes with the game injected, a `HostCodec`/`GuestCodec` built from the game's `protocol.ts` (decode, welcome, full; decode, join) and `game` for `peerIdFor`. Never names a game. `sessions.harness.ts` is the world the three session suites share. |
 | `engine` / `domain` / `bots` | shared/lib, siblings | Pure. `applyAction(state, seat, action, rng): Result<State, RuleError>` (gin), `apply(s, actor, action, rng): Result` (fidice), `applyAction(state, seat, action, rng, now): Result<State, string>` (backgammon, with `createGame`/`nextGame` taking the same injected `rng` and `now`). Return new state; never mutate. `viewFor` / `redactFor` are the only redaction (backgammon hides nothing: its `View` adds the per-seat selectors `legal`, `plays`, `canDouble`, `pips`). |
 | `web/shared/lib/protocol.ts` | itself | The two-seat wire skeleton gin and backgammon share (the shared-shell design §4.5): `twoSeatProtocol({ decodeAction, decodeView, room })` returns the seven frame builders and the three decoders in the legacy key order (`welcome`/`lobby` spread the game's room after `hostName`), with `isGuestFrame`, `guestNameFor` and the `WIRE_TAGS`/`NAME_MAX`/`TOAST_MAX`/`DEFAULT_GUEST_NAME` literals. |
 | `protocol.ts` | engine/domain types, shared/lib | Trust boundary. Every inbound frame passes a decoder returning `Result`; outbound frames are built here (gin and backgammon through the shared skeleton, each keeping only its room: `{ target }`, `{ matchLength, variant }`). Shapes frozen by wire goldens; a future change adds a version field here. |
 | `scorer/` (not `main.ts`) | engine types, shared/lib, siblings | Pure maths under the pure profile: the Score Counter's `computeRoundScores`, standings, voice parser, CSV text and `fmtDuration` (which `ui/cues.ts` re-exports). `scorer/main.ts` is its screen, an edge. |
-| `net/` | protocol, engine/domain, `@shared/edge/transport`, `@shared/edge/clock`, `@shared/edge/peer` | Never imports `peerjs`. `Transport`, `Clock`, `Rng`, `NewId` are injected so protocol tests run on `transport.fake.ts`. |
+| `net/` | protocol, engine/domain, `@shared/edge/transport`, `@shared/edge/clock`, `@shared/edge/peer`, `@shared/net` | Never imports `peerjs`. `Transport`, `Clock`, `Rng`, `NewId` are injected so protocol tests run on `transport.fake.ts`. Gin's and backgammon's `net/{host,guest}.ts` are wrappers over `@shared/net` that fix the codec and the game and re-export every constant and message, so `ui/state.ts` and `main.ts` import nothing from `web/shared/net`. |
 | `ui/` / `view/` | engine/domain types, shared/lib, `@shared/edge/dom` | Render a view to strings/VNodes; DOM writes only in `render.ts` / `vdom.ts`. `HandView { render(model, selection): string }` is the only way a hand is drawn. |
 | `storage.ts` / `app/effects.ts` | shared/lib, `@shared/edge/storage`, `@shared/edge/prefs` | Only modules that touch localStorage; every read goes through a decoder. A game's `storage.ts` names its keys and builds its readers and writers from `prefs.ts` (`textPref`, `namePref`, `soundPref`, `shellSave<S, X>` over the engine decoder and the host save's own fields), so the shared literals are spelled once (docs/design/shared-shell.md §5 A3). |
 | `ui/state.ts` / `app/controller.ts` | everything below | Reducer over intents; imported only by `main.ts` and tests. |
@@ -461,9 +464,14 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
   phase, so nothing is measured after a paint; the legacy `fitTable()` loop, `ui/fit.ts` and
   `--tscale` are retired, and `e2e/gin-geometry.spec.ts` asserts the result at 390x844, 1280x800
   and 375x667.
-- Generic host/client session and code-entry/toast/lobby builders: extracted from fidice's
-  `HostSession`/`ClientSession` into `web/shared` only after both games are typed and parity-locked,
-  behind the existing wire goldens.
+- The shared shell (docs/design/shared-shell.md): the audit and the ordered plan for hoisting
+  everything a player touches that is not the game (sessions, protocol skeleton, storage helpers,
+  cue player, painters, home binder, boot, the shell reducer) out of gin and backgammon into
+  `web/shared`, each PR behind the suites that already pin both games. Landed: A1, the two-seat
+  sessions (`web/shared/net/{host,guest}.ts`, gin's classes with the codec and the game injected;
+  both games' `net/{host,guest}.ts` are wrappers). Fidice's N-seat `HostSession`/`ClientSession`
+  stay its own (§4.6): moving its client onto the shared pipe would change pinned behaviour (its
+  12 s single timeout against gin's 40 x 3 s retries), a product decision, not a DRY pass.
 
 ## Deviations (recorded as the steps land)
 
@@ -988,3 +996,14 @@ Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage r
   and drops the queue (not the toast showing) when a table is torn down; `controller.test.ts` pins
   each and now names only `ladder.showBid` as a legacy defect. The dead `.ha-img-placeholder` block
   is gone from both themes and from `CONTRACT.md`; the computed-style goldens did not move.
+- docs/design/shared-shell.md A1 (the shared shell's first PR): gin's `net/{host,guest}.ts`
+  moved to `web/shared/net/{host,guest}.ts` as `HostSession<G, H, X>` / `GuestSession<G, H>` with
+  a codec (`decode`, `welcome(ctx)`, `full`; `decode`, `join`) and `game` injected; gin's and
+  backgammon's `net/{host,guest}.ts` are wrappers that fix them and re-export every constant and
+  message, so wire bytes, peer ids and the suites above net/ are untouched. The two `net/peerjs.ts`
+  re-exports are gone (shared/net imports `edge/peer.ts`; `main.ts` takes `NetDeps` from there).
+  Gin's 21 session scenarios run once in `web/shared/net/sessions.test.ts` over a fake codec and
+  `sessions.harness.ts`; each game's `sessions.test.ts` pins its peer id (`ginrummy-ari-ABCD`,
+  `sheshbesh-ABCD`), welcome and lobby bytes, and one refused and one accepted frame through the
+  real wrappers. `web/shared/net` has its own zone (shared/lib and the transport, clock and peer
+  edges), coverage row and `tsconfig.node.json` entry.

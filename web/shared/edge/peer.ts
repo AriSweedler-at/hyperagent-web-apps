@@ -8,8 +8,9 @@
 // hook) and the ICE loader (or null: the page without shared/ice.js, which still connects
 // same-network devices on PeerJS's STUN). Every timer runs on the injected Clock, so the session
 // tests beside each game's net/ drive the schedules by hand. The legacy `whenPeerReady` poll and its
-// "library didn't load" branch have no counterpart: PeerJS arrives with the bundle. A game's
-// src/net/peerjs.ts re-exports this module, so its sessions keep importing `./peerjs.ts`.
+// "library didn't load" branch have no counterpart: PeerJS arrives with the bundle. The shared
+// two-seat sessions (web/shared/net, docs/design/shared-shell.md A1) import this module directly;
+// fidice's src/net/peerjs.ts takes its types for its own N-seat session.
 import type { Clock, Timer } from '../lib/clock.ts';
 import type {
   Connection,
