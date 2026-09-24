@@ -494,7 +494,7 @@ const revealCard = (ui: Ui, g: PublicState, dispatch: Dispatch): VNode | null =>
       h(
         'button',
         {
-          class: 'btn-primary btn-big',
+          class: 'btn-go btn-big',
           id: 'btnNext',
           on: {
             click: () => {

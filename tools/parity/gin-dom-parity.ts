@@ -105,15 +105,22 @@ export const normalise = (html: string): string =>
     )
     // The calls to action (docs/ARCHITECTURE.md "Calls to action"; the owner, 2026-09-24: "all the
     // 'start game' buttons should be green and should stand out well"): Host, Join, Start pass &
-    // play, Deal the first hand, Next hand and Rematch wear `btn-go` where the legacy had
-    // `btn-primary` (Join: `btn-secondary`), and the two that leaned on `.btn-primary`'s width carry
-    // `btn-block`. The button variants are dropped from those six class attributes on both pages.
+    // play, Deal the first hand, Next hand, Rematch, Start scoring and New game wear `btn-go` where
+    // the legacy had `btn-primary` (Join: `btn-secondary`), and the three that leaned on
+    // `.btn-primary`'s width carry `btn-block`. Each `btn-go` is read as the legacy's variant and
+    // the three widths are dropped, so a start button that lost the class, or any other button that
+    // gained it, still fails.
     .replace(
-      /(<button class=")([^"]*)(" id="(?:hostBtn|joinBtn|localBtn|startGameBtn|rrContinueBtn|rematchBtn)")/g,
-      (_match, open: string, classes: string, close: string) =>
+      /(<button class=")([^"]*)(" id="(hostBtn|joinBtn|localBtn|startGameBtn|rrContinueBtn|rematchBtn|scStartBtn|scEndNewBtn)")/g,
+      (_match, open: string, classes: string, close: string, id: string) =>
         `${open}${classes
           .split(' ')
-          .filter((name) => !/^btn-(?:primary|secondary|go|block)$/.test(name))
+          .filter(
+            (name) => name !== 'btn-block' || !/^(?:localBtn|startGameBtn|scStartBtn)$/.test(id),
+          )
+          .map((name) =>
+            name === 'btn-go' ? (id === 'joinBtn' ? 'btn-secondary' : 'btn-primary') : name,
+          )
           .join(' ')}${close}`,
     )
     .replace(/>\s+</g, '><')

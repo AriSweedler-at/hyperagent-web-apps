@@ -492,9 +492,10 @@ docs run only `check`. The levels below say which suite holds them.
   `protocol.ts`, a table test and a recorded golden. Wire-visible changes add a version field.
 - New screen or CSS class: add it to `CONTRACT.md`; `class-contract.test.ts` fails when a class
   toggled in TS has no CSS rule or vice versa.
-- Calls to action: every button whose press opens, joins or starts a game (Host, Join, Open a
-  table, Sit down, Start, Start pass & play, Deal the first hand, Start the match, Next hand, Next
-  game, Rematch, Let's go, Start game) wears `.btn-go`, the shared `--go`/`--go-text` of
+- Calls to action: every button whose press opens, joins or starts a game, hand or round (Host,
+  Join, Open a table, Sit down, Start, Start pass & play, Deal the first hand, Start the match, Next
+  hand, Next game, Next round, Rematch, Let's go, Start game, and the Score Counter's Start scoring
+  and New game and the sandbox's Deal the map) wears `.btn-go`, the shared `--go`/`--go-text` of
   `web/shared/styles/tokens.css`, which each theme redeclares on its palette and styles. The owner,
   2026-09-24: "the 'open a table' and 'sit down' call-to-action buttons should be a standout
   color. Perhaps a light olive green. As a design principle all the 'start game' buttons should
