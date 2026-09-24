@@ -74,7 +74,7 @@ export const setCodeInput = (doc: DocumentLike, value: string): void => {
  */
 export { inviteUrl } from '../../../../shared/lib/invite.ts';
 
-/** `tabPlayBtn`, `tabRulesBtn`, `tabScoreBtn`. */
+/** `tabPlayBtn`, `tabRulesBtn`, `tabScoreBtn`, `tabAboutBtn`. */
 export const tabButtonId = (tab: HomeTab): string =>
   `tab${tab.charAt(0).toUpperCase()}${tab.slice(1)}Btn`;
 
@@ -226,6 +226,9 @@ export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): voi
   });
   listenId(doc, 'tabScoreBtn', 'click', () => {
     dispatch({ type: 'tab/set', tab: 'score' });
+  });
+  listenId(doc, 'tabAboutBtn', 'click', () => {
+    dispatch({ type: 'tab/set', tab: 'about' });
   });
   queryAllIn(requireId(doc, 'playModeSwitch'), '.mode-btn').forEach((b) => {
     listen(b, 'click', () => {

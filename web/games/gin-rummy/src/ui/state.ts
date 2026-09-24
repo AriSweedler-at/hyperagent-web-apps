@@ -95,6 +95,7 @@ import { drawSource, settleDraw, type DrawStage } from './hand/draw.ts';
 import type { DropTarget } from './hand/drag.ts';
 import { arrangedOf, declarable, toggleMeld, type HumanMelds } from './hand/arrange.ts';
 import { settlePicture, type Picture, moveLoose, samePicture } from './hand/picture.ts';
+import type { RulesSlot } from './rules.ts';
 
 // ---- the state ---------------------------------------------------------------------------------
 
@@ -359,6 +360,11 @@ export type Intent =
   | Readonly<{ type: 'p2name/typed'; value: string }>
   /** `setHomeTab(tab, { persist })`: an unknown tab is `play`. */
   | Readonly<{ type: 'tab/set'; tab: string; persist?: boolean }>
+  /**
+   * A glossary link (docs/design/glossary-links.md) or a `#rule-<id>` deep link at boot: the Rules
+   * tab on the home screen, the rules overlay anywhere else, then the rule scrolled to and flashed.
+   */
+  | Readonly<{ type: 'rules/show'; rule: string }>
   /** `setPlayMode(mode)`: `sandbox` while unlocked, `local`, else `online`. */
   | Readonly<{ type: 'mode/set'; mode: string }>
   /** `#hostBtn`: the raw input values. */
@@ -501,6 +507,8 @@ export type Effect =
   | Readonly<{ type: 'writeSort'; sort: SortMode }>
   | Readonly<{ type: 'writeCardBack'; back: CardBack }>
   | Readonly<{ type: 'writeSoundFont'; font: SoundFontName }>
+  /** Scroll `rule` into view inside the rules `slot` that is on screen and flash it (web/shared/edge/glossary.ts). */
+  | Readonly<{ type: 'revealRule'; slot: RulesSlot; rule: string }>
   /** `ms` null is the default duration. */
   | Readonly<{ type: 'toast'; message: string; ms: number | null }>
   /** To the current session's channel, if open. */
@@ -1082,6 +1090,19 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
       );
     case 'tab/set':
       return setHomeTab(app, intent.tab, intent.persist !== false);
+    case 'rules/show': {
+      // On the home screen the Rules tab is the rules; anywhere else (the table, a waiting room,
+      // the scorer) the overlay is, and its own copy of the list is the one to scroll.
+      const home = app.screen === 'homeScreen';
+      const shown = home ? setHomeTab(app, 'rules', true) : pure({ ...app, rulesOpen: true });
+      return then(shown, (a) =>
+        step(a, {
+          type: 'revealRule',
+          slot: home ? 'rulesList' : 'rulesOverlayList',
+          rule: intent.rule,
+        }),
+      );
+    }
     case 'mode/set': {
       // The sandbox is shown, never stored: a reload lands on the stored mode.
       if (intent.mode === 'sandbox')
@@ -1618,6 +1639,8 @@ export type EffectDeps = Readonly<{
   share: (code: string) => void;
   /** `text` to the clipboard, silently (the reducer toasts). */
   copy: (text: string) => void;
+  /** `revealRule(document, slot, rule)` (web/shared/edge/glossary.ts): scroll to the rule and flash it. */
+  revealRule: (slot: RulesSlot, rule: string) => void;
   /** The three input writes the paint does not own (they would fight the player's typing). */
   page: Readonly<{
     fillName: (name: string) => void;
@@ -1721,6 +1744,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'copy':
       deps.copy(effect.text);
+      return;
+    case 'revealRule':
+      deps.revealRule(effect.slot, effect.rule);
       return;
   }
 };

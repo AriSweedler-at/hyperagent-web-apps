@@ -49,6 +49,7 @@ const depsOver = (store: EffectDeps['store'], dispatch: (i: Intent) => void): Ef
   scrollTop: quiet,
   scorer: { resume: quiet },
   copy: quiet,
+  revealRule: quiet,
   timers: { start: quiet, cancel: quiet },
   toggleSound: quiet,
   share: quiet,

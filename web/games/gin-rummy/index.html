@@ -40,7 +40,8 @@
         </div>
       </div>
       <button type="button" class="tab-btn" id="tabRulesBtn" data-tab="rules">Rules</button>
-      <button type="button" class="tab-btn" id="tabScoreBtn" data-tab="score">Score Counter</button>
+      <button type="button" class="tab-btn" id="tabScoreBtn" data-tab="score">Score</button>
+      <button type="button" class="tab-btn" id="tabAboutBtn" data-tab="about">About</button>
     </div>
 
     <!-- PLAY TAB -->
@@ -128,6 +129,11 @@
       </div>
       <button class="btn btn-primary" id="scStartBtn">Start scoring</button>
     </div>
+
+    <!-- ABOUT TAB: about.ts fills the copy, its jargon linked to the rules (docs/design/glossary-links.md). -->
+    <div id="aboutPanel" class="tab-panel hidden">
+      <div class="card-box prose" id="aboutCopy"></div>
+    </div><!-- /about -->
   </div>
 
   <!-- SCORER: GAME -->

@@ -10,8 +10,9 @@
 // table opens (the sheets, the overlays, the toast) still compares at every checkpoint. Only
 // whitespace, the two rules slots' ids, the `#handoffBtn` button and the row that holds it, the
 // sandbox (its two mode buttons and `#sandboxModeContent`; the new page's markup additions), the
-// result body's key and the hidden curtain's stale text (the knock's layoff phase, §7b, shows a
-// curtain the legacy never did) are normalised.
+// result body's key, the hidden curtain's stale text (the knock's layoff phase, §7b, shows a
+// curtain the legacy never did) and the glossary (docs/design/glossary-links.md: the About tab and
+// its panel, the rule ids and the jargon links, the shorter Score tab label) are normalised.
 // What is read from the pages is compared; what is decided (which card
 // to discard) is read from the legacy page's `window.__gin` hook and applied to both, so the two
 // never diverge on a choice; after a draw the new page's ghost card is accepted (`acceptIfShown`)
@@ -82,6 +83,15 @@ export const normalise = (html: string): string =>
     .replace(/<button[^>]*\bdata-mode="sandbox"[^>]*>[^<]*<\/button>/g, '')
     .replace(/<!-- The sandbox[^>]*-->/g, '')
     .replace(/<div id="sandboxModeContent"[\s\S]*?<!-- \/sandbox -->/g, '')
+    // The glossary links (docs/design/glossary-links.md): the About tab and its panel are new, each
+    // rule carries its anchor id and the jargon inside a rule is a link, and the Score tab's label
+    // shortened so four tabs fit a phone. The words underneath are the legacy's.
+    .replace(/<button[^>]*\bid="tabAboutBtn"[^>]*>[^<]*<\/button>/g, '')
+    .replace(/<!-- ABOUT TAB[^>]*-->/g, '')
+    .replace(/<div id="aboutPanel"[\s\S]*?<!-- \/about -->/g, '')
+    .replace(/ id="rule-[a-z-]+"/g, '')
+    .replace(/<a class="jargon"[^>]*>([^<]*)<\/a>/g, '$1')
+    .replace(/(\bid="tabScoreBtn"[^>]*>)Score Counter</g, '$1Score<')
     // The Score Counter's players: the legacy grew rows and an "+ Add player" button, the page has
     // two fixed inputs sharing pass-and-play's names; everything up to the Start button is blanked.
     .replace(
