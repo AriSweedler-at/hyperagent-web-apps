@@ -86,8 +86,11 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // three at 100/100/100/100).
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
-        // The shared shell's pure helpers (docs/design/glossary-links.md §3): lint-pure like
-        // shared/lib and held at 100 like it; glossary.test.ts beside the first module.
+        // The shared shell's helpers and painters (docs/design/glossary-links.md §3;
+        // docs/design/shared-shell.md §4.4): held at 100 like shared/lib, every module with its
+        // test beside it. Re-measured when B1 moved the shell painters, the curtain, the toaster
+        // and the timers here out of both games: glossary, shellPaint, curtain, toast and ids each
+        // 100/100/100/100 over the fake page.
         'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
         // The two-seat sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios
@@ -145,6 +148,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // shared-shell PR A2 protocol.ts is a wrapper over web/shared/lib/protocol.ts that measures
       // two lines (the skeleton's own test holds it at 100/100/100/100 inside the shared/lib row);
       // it still measures 100/100/100/100 through the wire-corpus, golden and session suites.
+      // Re-measured when B1 moved the shell painters, the curtain's DOM half and the page-fake
+      // builder into web/shared (folder totals summed over the files): ui 98.2/97.1/97.2/93.8
+      // before, 98.2/96.9/97.1/93.9 after; the row stands.
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -286,7 +292,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // 100/100/98.9/94.4, fx 100/100/100/100. Re-measured when the shared-shell extraction (A3)
       // moved the readers and writers both storage.ts spelled into web/shared/edge/prefs.ts: storage
       // still 100/100/100/100 (no branch left). Since A1 its net/ is the two wrappers over
-      // web/shared/net (100 on every metric): the row is a small file's, like protocol's.
+      // web/shared/net (100 on every metric): the row is a small file's, like protocol's. Re-measured
+      // when B1 moved the shell painters, the curtain's DOM half, `ensureKeyed` and the page-fake
+      // builder into web/shared (folder totals summed over the files): ui 99.6/100/98.7/91.8
+      // before, 99.6/100/98.7/91.9 after; the row stands.
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
