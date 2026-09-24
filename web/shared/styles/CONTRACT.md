@@ -2,7 +2,7 @@
 
 Every class a game's TypeScript names has a rule in the stylesheet its page links, and every class
 that stylesheet styles is named by TypeScript or carried by the page markup.
-`test/dist/class-contract.test.ts` (docs/MIGRATION.md step 14; from `npm run test:dist`, after the
+`test/dist/class-contract.test.ts` (docs/MIGRATION.md step 14; from `npm run test:site`, after the
 build) enforces both directions on dist/ for each game, reading three sources through
 `test/dist/classes.ts`:
 
