@@ -533,8 +533,15 @@ export const RULES: ReadonlyArray<Rule> = [
   },
 ];
 
-const selectionFor = (path: string): Selection =>
-  RULES.find((rule) => matchesAny(path, rule.globs))?.runs ?? 'everything';
+/** The first row that matches `path`; the last row (`**`) always does. */
+export const ruleFor = (path: string): Rule =>
+  RULES.find((rule) => matchesAny(path, rule.globs)) ?? {
+    globs: ['**'],
+    runs: 'everything',
+    why: 'fallback',
+  };
+
+const selectionFor = (path: string): Selection => ruleFor(path).runs;
 
 /** The jobs a diff selects (its paths repo-relative, as `git diff --name-only` prints them). */
 export const jobsFor = (paths: ReadonlyArray<string>): ReadonlySet<Job> => {

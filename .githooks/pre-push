@@ -1,10 +1,15 @@
 #!/bin/sh
-# Run the same checks as the CI job "check" (typecheck, lint, unit tests, build, dist guards)
-# before anything leaves this machine. Installed by `npm run hooks`; see docs/ARCHITECTURE.md
-# "Git hooks".
+# Gate a push on what its commits touch (docs/design/test-partition.md §7): typecheck and lint
+# always, then only the suites tools/ci/affected.ts selects from the diff against origin/main
+# (`npm run check:affected`; the browser suite and the e2e specs stay CI's, as they always were).
+# PRE_PUSH=full runs the whole gate (`npm run check`) instead, as does a checkout with no
+# origin/main to diff against. Installed by `npm run hooks`; see docs/ARCHITECTURE.md "Git hooks".
 cd "$(git rev-parse --show-toplevel)" || exit 1
 if [ ! -d node_modules ]; then
   echo "pre-push: node_modules is missing; run: npm ci" >&2
   exit 1
 fi
-exec npm run check
+if [ "${PRE_PUSH:-}" = full ] || ! git rev-parse --verify -q origin/main >/dev/null; then
+  exec npm run check
+fi
+exec npm run check:affected

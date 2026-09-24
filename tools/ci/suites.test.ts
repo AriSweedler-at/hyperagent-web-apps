@@ -537,3 +537,15 @@ describe('the e2e scripts agree with the table', () => {
     expect(SCRIPTS['test:e2e']).toBe('npm run build && playwright test');
   });
 });
+
+describe('the affected scripts the hook runs', () => {
+  test('check:affected is the gate minus the unaffected suites; affected prints the selection', () => {
+    expect(SCRIPTS['check:affected']).toBe(
+      'npm run typecheck && npm run lint && npm run test:affected',
+    );
+    expect(SCRIPTS['test:affected']).toBe(
+      'node --experimental-strip-types tools/ci/run-affected.ts',
+    );
+    expect(SCRIPTS['affected']).toBe('node --experimental-strip-types tools/ci/affected.ts');
+  });
+});
