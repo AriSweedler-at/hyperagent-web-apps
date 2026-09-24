@@ -1,20 +1,20 @@
-// Where the Sheshbesh page's DOM writes for the game screens live (design §2.2 "The DOM plan",
-// §2.4 "The interaction model"; docs/ARCHITECTURE.md "Module boundaries": ui/ reaches the
+// Where the Sheshbesh page's DOM writes for the game screens live (docs/design/backgammon-board.md §2 "The one DOM",
+// §4 "The interaction model"; docs/ARCHITECTURE.md "Module boundaries": ui/ reaches the
 // document only through the shared DOM edge). `paint(doc, app)` is idempotent and runs after
 // every intent: the screen switch and the waiting statuses, the home screen (ui/home.ts), the
 // curtain (ui/local.ts), the table, the result sheet, the endgame and the overlays, each written
 // from the App (ui/state.ts) alone, so the same App always paints the same DOM. Gin's
-// ui/render.ts is the shape (so the shell extraction, design §6 PR-E/P6, stays mechanical); the
+// ui/render.ts is the shape (so a shared shell, design §5.3, stays mechanical); the
 // table is this game's.
 //
-// The board is keyed (design §2.2.3): every container of `#board` carries `data-key` and is
+// The board is keyed (design §2.2): every container of `#board` carries `data-key` and is
 // rebuilt from ui/board.ts's templates only when its key changes, so a selection change never
 // recreates checkers and the `.selected` lift transitions; highlights, `data-die` and the aria
 // labels are refreshed outside the key on every paint. A move changes the key of exactly two
 // containers (three with a hit), and `flightsBetween` + ui/board/fly.ts fly the checkers between
 // the two paints. `bindAll` turns the table's and the overlays' controls into intents (one
-// delegated click on `#board`, design §2.4.2; Enter/Space on a focused place is the same tap,
-// design §2.5); the input wiring of the home screen and the curtain is beside their paints.
+// delegated click on `#board`, design §4.2; Enter/Space on a focused place is the same tap,
+// design §6); the input wiring of the home screen and the curtain is beside their paints.
 import {
   closestFrom,
   dataOf,
@@ -134,7 +134,7 @@ export const paintWaiting = (doc: DocumentLike, app: App): void => {
   toggleClass(guestStatus, 'pulse', app.shell.guestStatus.pulse);
 };
 
-/** The hit toast (design §4 "Hit toast") wears the one warm edge (`#toast.hit`). */
+/** The hit toast (design §4.9) wears the one warm edge (`#toast.hit`). */
 export const HIT_TOAST_PREFIX = 'Kapará.';
 
 /** `toast(msg)`'s DOM half: the text and the `show` class; main.ts keeps the hide timer. */
@@ -160,7 +160,7 @@ export const paintSound = (doc: DocumentLike, enabled: boolean): void => {
 /**
  * `#handoffBtn` (the 🌐 beside the menu button): a pass-and-play game can go on as a hosted room
  * (ui/state.ts `handoff`); the tooltip names who hosts and who joins. Hidden with the rest of
- * online play until PR-D (`ONLINE_MODE_SHOWN`).
+ * online play until the online PR (`ONLINE_MODE_SHOWN`, design §5.3).
  */
 export const paintHandoff = (doc: DocumentLike, app: App): void => {
   const btn = requireId(doc, 'handoffBtn');
@@ -183,10 +183,10 @@ const paintSheet = (doc: DocumentLike, overlay: string, open: boolean): void => 
   toggleClass(requireId(doc, overlay), 'hidden', !open);
 };
 
-// ---- the table: frame, strips, status (design §2.2.1) --------------------------------------------
+// ---- the table: frame, strips, status (design §2.1) --------------------------------------------
 
 /**
- * `paintSeat` (design §2.2.1): `#board[data-seat]`, each point's `data-own` and its `pt-near`/
+ * `paintSeat` (design §2.1): `#board[data-seat]`, each point's `data-own` and its `pt-near`/
  * `pt-far` side, written only when the seat differs from what the board shows (once per game, and
  * on a seat swap); the static markup ships seat 0's.
  */
@@ -208,7 +208,7 @@ export const paintSeat = (doc: DocumentLike, v: View): void => {
 export const connDotClass = (app: App): string =>
   `conn-dot ${app.shell.oppConnected ? 'on' : 'off'}${app.shell.role === 'local' ? ' hidden' : ''}`;
 
-/** `#gameBadge`: `Game 3 · 2–1 · to 5` (design §2.4.11), seats in order. */
+/** `#gameBadge`: `Game 3 · 2–1 · to 5` (design §4.11), seats in order. */
 export const gameBadgeText = (v: View): string =>
   `Game ${String(v.gameNo)} · ${String(v.match.score[0])}–${String(v.match.score[1])} · to ${String(v.match.length)}`;
 
@@ -218,13 +218,13 @@ const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
   setAttr(dot, 'class', connDotClass(app));
   setAttr(dot, 'title', app.shell.oppConnected ? 'Connected' : 'Disconnected');
   setHtml(requireId(doc, 'pipsOpp'), trustedHtml(pipHtml(v.pips[v.opp.idx])));
-  // The strip has no id of its own (design §2.2.1): the opponent's name pulses while they are to move.
+  // The strip has no id of its own (design §2.1): the opponent's name pulses while they are to move.
   const strip = queryIn(requireId(doc, 'tableScreen'), '.opp-strip');
   if (strip !== null) toggleClass(strip, 'to-move', !v.isMyTurn && v.phase !== 'over');
   setText(requireId(doc, 'gameBadge'), gameBadgeText(v));
 };
 
-/** The R14 beat is on: the forfeited roll stays on the table and the status line (design §2.4.5). */
+/** The R14 beat is on: the forfeited roll stays on the table and the status line (design §4.5). */
 const holdingNoMove = (app: App): boolean => app.table.noMoveUntil !== null;
 
 const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
@@ -233,12 +233,12 @@ const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
     requireId(doc, 'statusText'),
     statusText(v, { pending: app.table.pending, noMoveShown, picked: app.table.picked }),
   );
-  // The dice in words for screen readers (design §2.5), exactly while faces are shown.
+  // The dice in words for screen readers (design §6), exactly while faces are shown.
   const shown = diceFor(v, app.table.picked, noMoveShown).faces.length > 0;
   setText(requireId(doc, 'statusDice'), shown ? diceWords(v.dice) : '');
 };
 
-// ---- the keyed places (design §2.2.3) -------------------------------------------------------------
+// ---- the keyed places (design §2.2) -------------------------------------------------------------
 
 /** Rebuild `el` from `markup` only when `key` differs from its `data-key`, so its children survive a paint. */
 const ensureKeyed = (el: Element, key: string, markup: () => string): void => {
@@ -269,7 +269,7 @@ const paintPlaces = (doc: DocumentLike, v: View): void => {
   });
 };
 
-// ---- highlights, outside the key (design §2.3.7, §2.4.2, §2.4.5, §2.4.12) -------------------------
+// ---- highlights, outside the key (design §3.7, §4.2, §4.5, §4.12) -------------------------
 
 /** What a place wears this paint, resolved once per place from the App and the view. */
 type Marks = Readonly<{
@@ -297,7 +297,7 @@ const NO_MARKS: Marks = {
   hit: false,
 };
 
-/** The board is live for me: my turn, moving, no curtain up (design §2.4.2 rule 9). */
+/** The board is live for me: my turn, moving, no curtain up (design §4.2 rule 9). */
 export const isLive = (app: App, v: View): boolean =>
   v.isMyTurn && v.phase === 'moving' && app.table.curtain === null;
 
@@ -338,7 +338,7 @@ const applyMarks = (el: Element, v: View, id: PlaceId, m: Marks): void => {
   );
 };
 
-/** Every place's classes, `data-die` and aria label (`paintHighlights` + `paintDrag` of design §2.7). */
+/** Every place's classes, `data-die` and aria label (`paintHighlights` + `paintDrag` in web/shared/styles/CONTRACT.md). */
 const paintHighlights = (
   doc: DocumentLike,
   app: App,
@@ -380,13 +380,13 @@ const paintHighlights = (
   applyMarks(requireId(doc, theirs), v, theirs, NO_MARKS);
 };
 
-// ---- dice, cube, controls (design §2.2.3 `#dice`, §2.4.7, §2.4.3) --------------------------------
+// ---- dice, cube, controls (design §2.2 `#dice`, §4.7, §4.3) --------------------------------
 
 const paintDice = (doc: DocumentLike, app: App, v: View): void => {
   const model = diceFor(v, app.table.picked, holdingNoMove(app));
   const dice = requireId(doc, 'dice');
   // `rolling` pulses once when the faces change (a fresh roll): it is on for the paint that brings
-  // them and off again on the next one; the tumble runs its 350ms in between (design §2.2.3).
+  // them and off again on the next one; the tumble runs its 350ms in between (design §2.2).
   const roll = model.faces.map((f) => String(f.die)).join('');
   toggleClass(dice, 'rolling', roll !== '' && dataOf(dice, 'roll') !== roll);
   setAttr(dice, 'data-roll', roll === '' ? null : roll);
@@ -400,7 +400,7 @@ const paintDice = (doc: DocumentLike, app: App, v: View): void => {
 };
 
 /**
- * `#rollBtn`'s copy (design §2.4.7): "Buen mazal! (roll)", or the incoming player's name before
+ * `#rollBtn`'s copy (design §4.7): "Buen mazal! (roll)", or the incoming player's name before
  * it in pass-and-play without the curtain, where the button is the only cue that the phone
  * changed hands.
  */
@@ -409,7 +409,7 @@ export const rollLabel = (app: App, v: View): SafeHtml =>
     ? safeHtml`${v.me.name} — Buen mazal! <small>roll</small>`
     : trustedHtml('Buen mazal! <small>roll</small>');
 
-/** `#waitNote` (design §2.4.8, §2.4.10): `Waiting for Jeff…`, or the cube after my double. */
+/** `#waitNote` (design §4.8, §4.10): `Waiting for Jeff…`, or the cube after my double. */
 export const waitNoteText = (v: View): string =>
   v.phase === 'cubeOffered'
     ? `${v.opp.name} is thinking about the cube`
@@ -420,7 +420,7 @@ const paintControls = (doc: DocumentLike, app: App, v: View): void => {
   setHtml(requireId(doc, 'pipsMe'), trustedHtml(pipHtml(v.pips[v.me.idx])));
   const mine = v.isMyTurn && app.table.curtain === null;
   const over = v.phase === 'over';
-  // Disabled, not hidden: the controls row keeps its shape (design §2.4.6).
+  // Disabled, not hidden: the controls row keeps its shape (design §4.6).
   setDisabled(requireId(doc, 'undoBtn'), !(mine && v.canUndo));
   toggleClass(
     requireId(doc, 'doubleBtn'),
@@ -437,7 +437,7 @@ const paintControls = (doc: DocumentLike, app: App, v: View): void => {
   toggleClass(wait, 'hidden', over || v.isMyTurn || app.table.curtain !== null);
   setText(wait, waitNoteText(v));
   toggleClass(requireId(doc, 'resultChipBtn'), 'hidden', !(over && !app.table.resultOpen));
-  // The die-chip tray takes the row while a choice is pending (design §2.4.3).
+  // The die-chip tray takes the row while a choice is pending (design §4.3).
   const pending = app.table.pending;
   const chips = pending === null ? [] : chipsFor(v, pending.chains);
   toggleClass(requireId(doc, 'controls'), 'choosing', pending !== null);
@@ -447,7 +447,7 @@ const paintControls = (doc: DocumentLike, app: App, v: View): void => {
   toggleClass(requireId(doc, 'chipCancelBtn'), 'hidden', pending === null);
 };
 
-// ---- the result sheet, the endgame, the cube offer (design §2.4.8, §2.4.11) ------------------------
+// ---- the result sheet, the endgame, the cube offer (design §4.8, §4.11) ------------------------
 
 /** `#rsNextBtn` / `#nextGameBtn`: the host or pass-and-play starts the next game; the guest waits. */
 export const nextLabel = (app: App, v: View): string =>
@@ -490,7 +490,7 @@ export const recordKind = (g: GameRecord): string =>
         ? 'backgammon'
         : 'single';
 
-/** `#matchScore`: one row per finished game, `Game 3 · Ari · gammon · 2` (design §2.4.11). */
+/** `#matchScore`: one row per finished game, `Game 3 · Ari · gammon · 2` (design §4.11). */
 export const scoreHtml = (v: View): SafeHtml =>
   safeHtml`${v.games.map(
     (g) =>
@@ -511,7 +511,7 @@ const paintEndgame = (doc: DocumentLike, app: App, v: View): void => {
   setDisabled(next, app.shell.role === 'guest');
 };
 
-/** `#cubeOfferText` and `#passBtn` (design §2.4.8): `Ari doubles to 2. Take or pass?` · `Pass (Ari wins 1)`. */
+/** `#cubeOfferText` and `#passBtn` (design §4.8): `Ari doubles to 2. Take or pass?` · `Pass (Ari wins 1)`. */
 export const cubeOfferText = (v: View): Readonly<{ offer: string; pass: string }> => ({
   offer: `${v.opp.name} doubles to ${String(v.cube.value * 2)}. Take or pass?`,
   pass: `Pass (${v.opp.name} wins ${String(v.cube.value)})`,
@@ -562,7 +562,7 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
 
 // ---- the whole paint ------------------------------------------------------------------------------
 
-/** The position a paint is keyed on: a change flies the checkers `flightsBetween` names (design §2.3.9). */
+/** The position a paint is keyed on: a change flies the checkers `flightsBetween` names (design §3.9). */
 export const viewKey = (v: View): string =>
   `${String(v.gameNo)}:${String(v.startedAt)}:${String(v.turn)}:${v.phase}:${String(v.played.length)}:${String(v.log.length)}`;
 
@@ -629,7 +629,7 @@ export const paint = (doc: PageLike, app: App): void => {
   paintOverlays(doc, app);
 };
 
-// ---- input wiring (design §2.4.2, §2.5) ------------------------------------------------------------
+// ---- input wiring (design §4.2, §6) ------------------------------------------------------------
 
 const DICE: ReadonlyArray<Die> = [1, 2, 3, 4, 5, 6];
 const dieOf = (el: Element): Die | null => {
@@ -674,7 +674,7 @@ const bindSheets = (doc: PageLike, dispatch: Dispatch): void => {
       if (targetIdOf(e) === overlay) dispatch(intent);
     });
   });
-  // Escape closes the open sheet, else the die-chip tray (design §2.5).
+  // Escape closes the open sheet, else the die-chip tray (design §6).
   listen(doc, 'keydown', (e) => {
     if (keyOf(e) !== 'Escape') return;
     const open = SHEETS.find((s) => !hasClass(requireId(doc, s.overlay), 'hidden'));
@@ -696,7 +696,7 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
     const intent = boardIntentOf(e);
     if (intent !== null) dispatch(intent);
   });
-  // Enter/Space on a focused place is its tap (design §2.5); the page must not scroll on Space.
+  // Enter/Space on a focused place is its tap (design §6); the page must not scroll on Space.
   listenId(doc, 'board', 'keydown', (e) => {
     const k = keyOf(e);
     if (k !== 'Enter' && k !== ' ') return;

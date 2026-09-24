@@ -1,5 +1,5 @@
-// The table's builders as strings and tables (design §2.6 "pinned strings from statusText",
-// §2.4.1's helpers over the engine's test positions): the keyed markup, the ids of the viewer's
+// The table's builders as strings and tables (design §7 "pinned strings from statusText",
+// §4.1's helpers over the engine's test positions): the keyed markup, the ids of the viewer's
 // frame, which dice are dead, what a selected source reaches and with which dice, the chip tray,
 // the status and result copy, the aria labels and the flights between two paints.
 import { describe, expect, test } from 'vitest';
@@ -111,7 +111,7 @@ const move = (state: State, text: string): State =>
 const START = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';
 /** T13: a Dark blot on Light's 5-point. */
 const BLOT_ON_5 = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:4 20:1 | bar 0/0 | off 0/0';
-/** Design §2.1.3: a Dark blot on Light's 7-point, so 13 reaches 4 two ways with 6-3. */
+/** Design §4.3: a Dark blot on Light's 7-point, so 13 reaches 4 two ways with 6-3. */
 const BLOT_ON_7 = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:4 18:1 | bar 0/0 | off 0/0';
 const T5 = 'L: 24:1 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 1/0 | off 0/0';
 const T9 = 'L: 24:1 10:1 9:1 8:1 | D: 5:2 23:2 24:2 13:9 | bar 0/0 | off 11/0';
@@ -293,7 +293,7 @@ describe('selection', () => {
     expect(chainsFrom(viewAt(START, 0, null), 7, null)).toEqual([]);
   });
 
-  test('targetsOf: one-step targets name their die, a two-order point is target-2 (design §2.1.2)', () => {
+  test('targetsOf: one-step targets name their die, a two-order point is target-2 (design §4.2)', () => {
     const t = targetsOf(viewAt(START, 0, [3, 1]), 7, null);
     expect(t.map(({ to, kind, die, opens }) => ({ to, kind, die, opens }))).toEqual([
       { to: 3, kind: 'target-2', die: '3+1', opens: false },
@@ -322,7 +322,7 @@ describe('selection', () => {
     ]);
   });
 
-  test('a hit on one path opens the tray (T13 and design §2.1.3); either die bearing off reads 6·5 (T12)', () => {
+  test('a hit on one path opens the tray (T13 and design §4.3); either die bearing off reads 6·5 (T12)', () => {
     const t13 = targetsOf(viewAt(BLOT_ON_5, 0, [3, 1]), 7, null);
     expect(t13.map((x) => [x.to, x.die, x.opens])).toEqual([
       [3, '3+1?', true],

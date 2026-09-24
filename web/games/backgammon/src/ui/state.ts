@@ -1,7 +1,7 @@
-// The Sheshbesh app as a reducer over intents (scratchpad/bg/design.md §2.4 "The interaction
-// model", §4 "The shell"; docs/ARCHITECTURE.md "Module boundaries": imported only by main.ts, the
+// The Sheshbesh app as a reducer over intents (docs/design/backgammon-board.md §4 "The interaction
+// model", §5 "The shell"; docs/ARCHITECTURE.md "Module boundaries": imported only by main.ts, the
 // painters and tests). `App` is gin's shape split in two so the shell can be lifted into a shared
-// reducer later (design §6 PR-E/P6): `shell` is the home screen, the waiting rooms, the session
+// reducer later (design §5.3): `shell` is the home screen, the waiting rooms, the session
 // (role, code, names, the engine `State` for the host and pass-and-play, my `View` for every role)
 // and the resume offer, field for field as gin names them; `table` is the board's interaction
 // memory (the tapped source, the forced die, the die-chip tray, a drag, the overlays, the curtain
@@ -16,7 +16,7 @@
 // `State` here with no Peer. Online play is hidden in this PR (design §6 PR-C): `mode/set 'online'`
 // is accepted, the home painter hides the option and the default mode is `local` until PR-D.
 //
-// Tap-to-move (design §2.4.2): a tap names a source or a destination; the sole legal source is
+// Tap-to-move (design §4.2): a tap names a source or a destination; the sole legal source is
 // derived, never stored (`effectiveSelection`); a destination reached by chains that differ in
 // consequence opens the die-chip tray (`pending`) instead of committing. The helpers that decide
 // this (`sourcesOf`, `effectiveSelection`, `targetsOf`) live in ui/board.ts, so the discs on the
@@ -217,7 +217,7 @@ export type Shell = Readonly<{
   soundFont: SoundFontName;
 }>;
 
-/** The board's interaction memory (design §2.4.1 `Table`). Session only: never saved, never on the wire. */
+/** The board's interaction memory (design §4.1 `Table`). Session only: never saved, never on the wire. */
 export type Table = Readonly<{
   /** A tapped source only; the sole legal source is derived, never stored (`effectiveSelection`). */
   selected: Place | null;
@@ -309,9 +309,9 @@ export const initialApp: App = { shell: initialShell, table: initialTable };
 
 /** The Play tab opens its submenu after this long a press. */
 export const LONG_PRESS_MS = 450;
-/** A tapped point that is neither source nor target shakes for this long (design §2.4.2 rule 1). */
+/** A tapped point that is neither source nor target shakes for this long (design §4.2 rule 1). */
 export const SHAKE_MS = 120;
-/** R14: a forfeited roll stays on the table this long before the curtain rises (design §2.4.5). */
+/** R14: a forfeited roll stays on the table this long before the curtain rises (design §4.5). */
 export const NO_MOVE_MS = 1200;
 /** `shareCodeBtn`'s fallback toast lasts this long. */
 export const SHARE_FALLBACK_MS = 4000;
@@ -434,7 +434,7 @@ export type Intent =
   | Readonly<{ type: 'guest/connected' }>
   | Readonly<{ type: 'guest/frame'; frame: HostFrame }>
   | Readonly<{ type: 'guest/lost' }>
-  // ---- the table (design §2.4.1) ----
+  // ---- the table (design §4.1) ----
   /** `act(action)`: every role (the hook, and the buttons below resolve to it). */
   | Readonly<{ type: 'act'; action: Action }>
   /** A `.point` tapped: its absolute index. */
@@ -649,7 +649,7 @@ const samePlay = (a: ReadonlyArray<PlayedMove>, b: ReadonlyArray<PlayedMove>): b
   a.length === b.length && a.every((m, i) => sameMove(m, b[i]));
 
 /**
- * The moves `next` shows that `prev` did not (design §2.3.9 `flightsBetween`'s rule): this turn's
+ * The moves `next` shows that `prev` did not (design §3.9 `flightsBetween`'s rule): this turn's
  * new moves, or, once the turn flipped or the game ended, the finished turn's tail beyond what
  * `prev` saw. The mover is `prev.turn` either way. Nothing across games or after an undo.
  */
@@ -821,7 +821,7 @@ const hostDispatch = (app: App, seat: Seat, action: Action, ctx: Context): Step 
 };
 
 /**
- * `localBroadcast(initial)` (design §2.4.9): the actor's view (the mover, or the seat answering a
+ * `localBroadcast(initial)` (design §4.9): the actor's view (the mover, or the seat answering a
  * double) while the game is on, the revealed seat's (or seat 0's) once it is over; the curtain
  * comes up when the phone must change hands, chiming unless this is the start or a reveal. R14:
  * a forfeited roll keeps the roller's view and the curtain down until `noMove/elapsed`.
@@ -888,7 +888,7 @@ const localAct = (app: App, actions: ReadonlyArray<Action>, ctx: Context): Step 
 };
 
 /**
- * `act(action)` by role (design §2.4.2 "Commit"): pass-and-play and the host apply the actions in
+ * `act(action)` by role (design §4.2 "Commit"): pass-and-play and the host apply the actions in
  * order and broadcast once; the guest sends one `action` frame per action, in order (the host
  * applies them one by one and broadcasts after each).
  */
@@ -1236,7 +1236,7 @@ const cancelFinish = (app: App): Step =>
     { type: 'initHome' },
   );
 
-// ---- the table: taps, the tray, the dice, a drag (design §2.4.2-§2.4.4) -----------------------
+// ---- the table: taps, the tray, the dice, a drag (design §4.2-§4.4) -----------------------
 
 /** My view while I may act and the board is live; null under the curtain or on the other seat's turn. */
 const liveView = (app: App): View | null => {
@@ -1261,13 +1261,13 @@ const tapTarget = (app: App, v: View, sel: Place, to: To, ctx: Context): Step | 
     : commit(app, target.chains[0]?.moves ?? [], ctx);
 };
 
-/** Design §2.4.2 rules 1-5 for a `.point`. */
+/** Design §4.2 rules 1-5 for a `.point`. */
 const pointTap = (app: App, point: PointIndex, ctx: Context): Step => {
   // The click a drag's release fires reaches a point: a drag selects nothing.
   if (app.table.drag !== null) return pure(app);
   const v = movingView(app);
   if (v === null) return pure(app);
-  // A tap anywhere on the board closes the tray (design §2.4.3).
+  // A tap anywhere on the board closes the tray (design §4.3).
   if (app.table.pending !== null) return pure(withTable(app, { pending: null }));
   const sel = effectiveSelection(app.table.selected, v);
   const committed = sel === null ? null : tapTarget(app, v, sel, point, ctx);
@@ -1309,7 +1309,7 @@ const diePick = (app: App, die: Die): Step => {
   );
 };
 
-/** Design §2.4.12: a press past the threshold on a source lights its targets; the drop commits the default chain. */
+/** Design §4.12: a press past the threshold on a source lights its targets; the drop commits the default chain. */
 const dragStart = (app: App, from: Place): Step => {
   const v = movingView(app);
   if (v === null || !sourcesOf(v).includes(from)) return pure(app);

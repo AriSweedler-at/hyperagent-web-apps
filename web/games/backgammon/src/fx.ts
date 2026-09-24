@@ -1,7 +1,7 @@
-// The game's sound and haptics (design.md §4 "Sound"; docs/design/sound-fonts.md §5, §9) over the
+// The game's sound and haptics (docs/design/backgammon-board.md §5.1 "Sound"; docs/design/sound-fonts.md §5, §9) over the
 // shared audio, sound and vibration edges (web/shared/edge/{fx,sound}.ts), with the event table
 // from ui/sound.ts and the `backgammon_sound` preference through storage.ts: gin's fx.ts under
-// this game's table, so the shared-shell extraction (design.md §6 PR-E) can lift both at once.
+// this game's table, so a shared shell (backgammon-board.md §5.3) can lift both at once.
 // An event names a cue, not notes: `play` resolves the cue in the font the caller passes (the
 // App's `soundFont`, so the reducer stays the source of truth) and hands the sound to the edge
 // player. `enabled` lives in the audio cues; a buzz is skipped when disabled. `toggle` flips and

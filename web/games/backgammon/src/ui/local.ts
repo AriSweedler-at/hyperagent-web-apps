@@ -1,4 +1,4 @@
-// Pass-and-play on one phone (design §2.4.9 "The curtain cue", §2.1.8, §4 "Curtain"): the
+// Pass-and-play on one phone (design §4.9 "The curtain and the hit toast", §2.4 "The copy"): the
 // translucent curtain that names whose turn it is while the phone changes hands. The two-seat
 // turn flow itself is the reducer's (ui/state.ts `localBroadcast`: whose view is shown, when the
 // curtain comes up, who has revealed); this is its DOM half, written only while the curtain is up
@@ -53,7 +53,7 @@ export const lastTurnText = (v: View, incoming: Seat): string => {
   return [last, ...own].map((e) => e.text).join(' · ');
 };
 
-/** The button's copy by phase (design §2.1.8) and whether one tap also rolls. */
+/** The button's copy by phase (design §4.9) and whether one tap also rolls. */
 const buttonFor = (v: View, name: string): Readonly<{ button: string; rolls: boolean }> => {
   switch (v.phase) {
     case 'toRoll':
@@ -71,7 +71,7 @@ const buttonFor = (v: View, name: string): Readonly<{ button: string; rolls: boo
 };
 
 /**
- * The curtain for the seat the phone is handed to (design §2.1.8 "Button copy by phase"), read
+ * The curtain for the seat the phone is handed to (design §2.4 "The copy", the curtain row), read
  * from that seat's own view (`localBroadcast` shows the incoming actor's): `toRoll` rolls at once
  * unless a double is on offer, the Western opening plays the dice already rolled, a cube offer
  * is answered.
@@ -96,7 +96,7 @@ export const paintCurtain = (doc: PageLike, app: App): void => {
   const v = app.shell.view;
   const up = seat !== null && v !== null;
   toggleClass(overlay, 'hidden', !up);
-  // The handoff to an online room ships with online play (design §6 PR-D).
+  // The handoff to an online room ships with online play (design §5.3).
   toggleClass(requireId(doc, 'curtainHandoffBtn'), 'hidden', !ONLINE_MODE_SHOWN);
   if (seat === null || v === null) return;
   const text = curtainText(v, seat);

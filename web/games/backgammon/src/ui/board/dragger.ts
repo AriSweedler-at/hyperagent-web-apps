@@ -1,4 +1,4 @@
-// A checker dragged by hand (design §2.4.12 "Drag (optional, gin's dragger)"): gin's
+// A checker dragged by hand (design §4.12 "Drag"): gin's
 // ui/hand/dragger.ts reshaped for a disc. Tap-to-move is the primary input; this is the second
 // one, bound once to `#board`. A press on the top checker of a container that can move starts a
 // session; once the pointer has moved DRAG_THRESHOLD the drag begins: `checker/dragStart {from}`

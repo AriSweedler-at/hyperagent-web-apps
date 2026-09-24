@@ -1,4 +1,4 @@
-// The reducer alone (scratchpad/bg/design.md §2.4, §4; gin's state.test.ts shape): every intent
+// The reducer alone (docs/design/backgammon-board.md §4, §5; gin's state.test.ts shape): every intent
 // once, the flows that matter (a pass-and-play match driven through taps with a seeded rng, a
 // hosted match against a fake guest frame stream, the resume snapshot, the die-chip tray and the
 // R14 beat), the effects as data, and `runEffect` against recorded adapters.
@@ -581,7 +581,7 @@ describe('hosting', () => {
     expect(done.app.shell.screen).toBe('tableScreen');
     expect(cues(done.effects)).toContain('roll');
     expect(cues(done.effects)).toContain('bearOff');
-    // Next game: applied for the host and broadcast; the guest's `next` would race it (design §7 risk 9).
+    // Next game: applied for the host and broadcast; the guest's `next` would race it (design §10 risk 9).
     const nextGame = run(done.app, { type: 'next/click' });
     expect(game(nextGame.app).gameNo).toBe(2);
     expect(kinds(nextGame.effects)).toContain('send');
@@ -833,10 +833,10 @@ describe('pass and play', () => {
   });
 });
 
-// Positions in the engine's notation, each side in its own numbering (design §3.5).
-/** Light to play 6-3 from 13: two orders reach 4, one hitting the blot on 7 (design §2.1.3). */
+// Positions in the engine's notation, each side in its own numbering (the engine's notation, moves.test.ts).
+/** Light to play 6-3 from 13: two orders reach 4, one hitting the blot on 7 (design §4.3). */
 const TWO_ORDERS = 'L: 24:2 13:5 8:3 6:5 | D: 18:1 2:14 | bar 0/0 | off 0/0';
-/** Light bears off: both dice take the 4 (design §2.4.4 "6·5"). */
+/** Light bears off: both dice take the 4 (design §4.4 "6·5"). */
 const BOTH_SUFFICE = 'L: 4:1 2:1 | D: 24:2 1:13 | bar 0/0 | off 13/0';
 /** Light on the bar against a closed board: any roll forfeits (R14). */
 const SHUT_OUT = 'L: 13:14 | D: 1:2 2:2 3:2 4:2 5:2 6:2 7:3 | bar 1/0 | off 0/0';
@@ -994,7 +994,7 @@ describe('the hit toast in pass-and-play', () => {
 });
 
 describe('the dice, the bar, the tray and a drag', () => {
-  test('bear-off with either die opens two chips; the chosen die is the one spent (design §2.4.4)', () => {
+  test('bear-off with either die opens two chips; the chosen die is the one spent (design §4.4)', () => {
     const app = at(BOTH_SUFFICE, 0, [6, 5]);
     const v = view(app);
     // The sole source is derived: nothing is stored, the tray tap acts on it.

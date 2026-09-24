@@ -1,5 +1,5 @@
-// The board's two `grid-template-areas` strings against their pure twin (scratchpad/bg/design.md
-// §2.6, risk 5). web/games/backgammon/theme.css places every point, bar half, the dice and the
+// The board's two `grid-template-areas` strings against their pure twin (docs/design/backgammon-board.md
+// §7, §10 risk 5). web/games/backgammon/theme.css places every point, bar half, the dice and the
 // trays by area name in two templates (the phone's fourteen rows, the desktop's two inside
 // `@media (min-width: 900px)`); a misspelt or misplaced name there collapses the grid with no
 // error, and no unit test sees a stylesheet. This suite parses both strings out of the built CSS

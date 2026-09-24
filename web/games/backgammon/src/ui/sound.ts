@@ -1,4 +1,4 @@
-// Sheshbesh's one sound table (scratchpad/bg/design.md §4 "Sound"; docs/design/sound-fonts.md §5):
+// Sheshbesh's one sound table (docs/design/backgammon-board.md §5.1 "Sound"; docs/design/sound-fonts.md §5):
 // each event the reducer raises (ui/state.ts `cuesBetween`, plus the tap) named as a generic cue
 // every font composes for, beside its vibration pattern. No notes live here: the shipped fonts
 // (web/shared/lib/sound/fonts/*.ts) voice each cue, and src/fx.ts plays a row through the shared
@@ -6,7 +6,7 @@
 // "Haptics"). Nothing else in the game names a sound.
 import type { SoundCue } from '../../../../shared/lib/sound/cues.ts';
 
-/** The events of the table (design §4): the reducer derives them from the change between two views. */
+/** The events of the table (design §5.1): the reducer derives them from the change between two views. */
 export type Cue = 'roll' | 'place' | 'hit' | 'bearOff' | 'yourTurn' | 'win' | 'lose' | 'double';
 
 /** What one event plays: the cue the font voices, and a vibration pattern. */

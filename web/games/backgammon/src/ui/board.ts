@@ -1,5 +1,5 @@
-// The table's pure builders (scratchpad/bg/design.md §2.2.3 "Static vs painter-rebuilt", §2.4.1
-// "Pure helpers in ui/board.ts", §2.7 the class list): the markup strings a painter writes into
+// The table's pure builders (docs/design/backgammon-board.md §2.2 "Keys, highlights and flights", §4.1
+// "The reducer slice and the pure helpers"; the class list is web/shared/styles/CONTRACT.md): the markup strings a painter writes into
 // the keyed containers of `#board` and `#controls`, the keys that say when a container must be
 // rebuilt, the selection helpers the reducer and the painter share (which places can move, what a
 // tapped source reaches and with which dice), the status and result copy, the painted aria labels,
@@ -39,13 +39,13 @@ import {
 const distinct = <T>(xs: ReadonlyArray<T>): ReadonlyArray<T> =>
   xs.filter((x, i) => xs.indexOf(x) === i);
 
-/** A source the player may tap: a point or the bar (design §2.4.1 `Place`). */
+/** A source the player may tap: a point or the bar (design §4.1 `Place`). */
 export type Place = From;
 /** The id of a keyed container of `#board`: `point-N` is 1-based absolute (`data-abs`). */
 export type PlaceId = `point-${number}` | 'barTop' | 'barBottom' | 'offLight' | 'offDark';
 export type Side = 'near' | 'far';
 
-/** Design §2.3.3: own 1..12 is the near half of the board, 13..24 the far half. */
+/** Design §3.3: own 1..12 is the near half of the board, 13..24 the far half. */
 export const sideOf = (own: number): Side => (own <= 12 ? 'near' : 'far');
 
 /** The viewer's own number of an absolute point (the label `data-own` shows). */
@@ -54,7 +54,7 @@ export const ownPoint = (v: View, abs: PointIndex): number =>
 
 /** `point-1`..`point-24`; `String()` widens the template to `point-${string}`, hence the cast. */
 export const pointId = (abs: PointIndex): PlaceId => `point-${String(abs + 1)}` as PlaceId;
-/** `#barTop` is always the far player's bar and `#barBottom` mine (design §2.2.1). */
+/** `#barTop` is always the far player's bar and `#barBottom` mine (design §2.1). */
 export const barIdFor = (v: View, seat: Seat): PlaceId =>
   seat === v.me.idx ? 'barBottom' : 'barTop';
 /** The trays are colour-fixed: Light's slabs are always in `#offLight`. */
@@ -63,7 +63,7 @@ export const offIdFor = (seat: Seat): PlaceId => (seat === 0 ? 'offLight' : 'off
 export const placeIdOf = (v: View, seat: Seat, place: From | To): PlaceId =>
   place === 'bar' ? barIdFor(v, seat) : place === 'off' ? offIdFor(seat) : pointId(place);
 
-/** `barsOf(view)` (design §2.2.1): which seat's bar each half of the band shows, and how many. */
+/** `barsOf(view)` (design §2.1): which seat's bar each half of the band shows, and how many. */
 export const barsOf = (
   v: View,
 ): Readonly<{
@@ -74,9 +74,9 @@ export const barsOf = (
   bottom: { seat: v.me.idx, count: v.board.bar[v.me.idx] },
 });
 
-// ---- checkers and slabs (design §2.2.3: keyed markup) ----------------------------------------------
+// ---- checkers and slabs (design §2.2: keyed markup) ----------------------------------------------
 
-/** Five checkers are drawn; the sixth onward is the count badge on the fifth (design §2.3.4). */
+/** Five checkers are drawn; the sixth onward is the count badge on the fifth (design §3.4). */
 export const VISIBLE_MAX = 5;
 
 const ownerLetter = (seat: Seat | null): string => (seat === null ? '-' : seat === 0 ? 'L' : 'D');
@@ -111,7 +111,7 @@ export const pointHtml = (stack: Stack): string => checkersHtml(ownerOf(stack), 
 export const barHtml = (seat: Seat, count: number): string =>
   checkersHtml(count === 0 ? null : seat, count);
 
-/** A borne-off checker, flattened (design §2.3.4). */
+/** A borne-off checker, flattened (design §3.4). */
 export const slabsHtml = (count: number): string =>
   Array.from({ length: count }, () => '<div class="slab"></div>').join('');
 /** A tray's content. */
@@ -121,7 +121,7 @@ export const offHtml = (count: number): string => slabsHtml(count);
 export const pipHtml = (pips: number): string =>
   `${String(pips)}<span class="sr-only"> pips</span>`;
 
-// ---- dice (design §2.2.3 `#dice`, §2.3.7 `used dead picked theirs blank`, §2.4.4 "Which die") -----
+// ---- dice (design §2.2 `#dice`, §3.7 `used dead picked theirs blank`, §4.4 "Which die") -----
 
 export type DieState = 'live' | 'used' | 'dead';
 export type DieFace = Readonly<{ die: Die; state: DieState; picked: boolean }>;
@@ -136,7 +136,7 @@ const withoutOne = (dice: ReadonlyArray<Die>, die: Die): ReadonlyArray<Die> => {
 };
 
 /**
- * Design §2.4.4: a die is dead when no maximal play uses it. Per face value, the copies in
+ * Design §4.4: a die is dead when no maximal play uses it. Per face value, the copies in
  * `movesLeft` beyond the most any play spends are dead: for a non-double the die no play
  * contains, for a double the last `movesLeft.length − plays[0].length` faces. Nothing is dead
  * for a viewer who is not moving (`plays` is empty for them).
@@ -182,9 +182,9 @@ const faceStates = (
 const BLANK: DiceModel = { faces: [], theirs: false, key: 'blank' };
 
 /**
- * The dice to show: blank before a roll (design §2.1.1), the roll while someone moves (`theirs`
+ * The dice to show: blank before a roll (design §3.7 `blank`), the roll while someone moves (`theirs`
  * when it is not mine), the final roll once the game is over, and a forfeited roll (every face
- * dead) while the painter holds the R14 beat (`noMoveShown`, design §2.4.5). `picked` rings the
+ * dead) while the painter holds the R14 beat (`noMoveShown`, design §4.5). `picked` rings the
  * first live face of that value (`die/pick`).
  */
 export const diceFor = (v: View, picked: Die | null = null, noMoveShown = false): DiceModel => {
@@ -242,11 +242,11 @@ export const diceHtml = (model: DiceModel): string =>
 
 const DIE_WORDS: ReadonlyArray<string> = ['one', 'two', 'three', 'four', 'five', 'six'];
 
-/** `#statusDice` (design §2.5): the roll in words for screen readers, '' before a roll. */
+/** `#statusDice` (design §6): the roll in words for screen readers, '' before a roll. */
 export const diceWords = (dice: Dice | null): string =>
   dice === null ? '' : dice.map((d) => DIE_WORDS[d - 1] ?? '').join(' and ');
 
-// ---- the cube (design §2.2.3 `#cube`: text = value, `data-owner` = none | near | far) -------------
+// ---- the cube (design §2.2 `#cube`: text = value, `data-owner` = none | near | far) -------------
 
 export type CubeSide = 'none' | 'near' | 'far';
 
@@ -255,9 +255,9 @@ export const cubeText = (cube: Cube): string => String(cube.value);
 export const cubeOwner = (cube: Cube, me: Seat): CubeSide =>
   cube.owner === null ? 'none' : cube.owner === me ? 'near' : 'far';
 
-// ---- selection (design §2.4.1 chainsFrom/targetsOf, §2.4.3 the die-chip tray, §2.4.5 the sole source)
+// ---- selection (design §4.1 chainsFrom/targetsOf, §4.3 the die-chip tray, §4.5 the sole source)
 
-/** A same-checker chain a maximal play allows (design §2.4.1 `Chain`), in absolute points. */
+/** A same-checker chain a maximal play allows (design §4.1 `Chain`), in absolute points. */
 export type Chain = Readonly<{
   moves: ReadonlyArray<Move>;
   to: To;
@@ -267,13 +267,13 @@ export type Chain = Readonly<{
   hits: ReadonlyArray<PointIndex>;
 }>;
 export type TargetKind = 'target' | 'target-2';
-/** A destination of the selected source: its class and its `data-die` text (design §2.3.7). */
+/** A destination of the selected source: its class and its `data-die` text (design §3.7). */
 export type Target = Readonly<{
   to: To;
   kind: TargetKind;
   /** `"3"`; `"6·5"` when either die bears off; `"3+1"`; `"6+3?"` when the tap opens the tray. */
   die: string;
-  /** The tap opens the die-chip tray instead of committing (design §2.4.3). */
+  /** The tap opens the die-chip tray instead of committing (design §4.3). */
   opens: boolean;
   /** In chip order: the higher first die, then fewer hits; `chip/tap {index}` indexes this list. */
   chains: ReadonlyArray<Chain>;
@@ -283,7 +283,7 @@ export type Target = Readonly<{
 export const sourcesOf = (v: View): ReadonlyArray<Place> => distinct(v.legal.map((m) => m.from));
 
 /**
- * Design §2.4.5: the tapped source while it can still move, else the sole source (the derived
+ * Design §4.5: the tapped source while it can still move, else the sole source (the derived
  * `.selected.auto`), else nothing. A stale tap (its checker has moved) is not shown as selected.
  */
 export const effectiveSelection = (selected: Place | null, v: View): Place | null => {
@@ -315,7 +315,7 @@ const toChain = (v: View, moves: ReadonlyArray<Move>): Chain => {
 };
 
 /**
- * The same-checker chains from `from` that a maximal play allows (design §2.4.1), exact by the
+ * The same-checker chains from `from` that a maximal play allows (design §4.1), exact by the
  * engine's hereditary lemma; a picked die keeps only its single steps (no combined targets).
  * Empty unless the viewer is the one moving.
  */
@@ -327,7 +327,7 @@ export const chainsFrom = (v: View, from: Place, picked: Die | null): ReadonlyAr
         .map((play) => toChain(v, play));
 
 const firstDie = (c: Chain): number => c.moves[0]?.die ?? 0;
-/** Chip order (design §2.4.3): the higher first die, then fewer hits. */
+/** Chip order (design §4.3): the higher first die, then fewer hits. */
 export const compareChains = (a: Chain, b: Chain): number =>
   firstDie(b) - firstDie(a) || a.hits.length - b.hits.length;
 
@@ -343,7 +343,7 @@ const diceLabel = (dice: ReadonlyArray<Die>): string =>
 const targetAt = (to: To, chains: ReadonlyArray<Chain>): Target => {
   const sorted = [...chains].sort(compareChains);
   const singles = sorted.filter((c) => c.moves.length === 1);
-  // One step reaches a point with exactly one die; only a bear-off can take either (design §2.4.4
+  // One step reaches a point with exactly one die; only a bear-off can take either (design §4.4
   // "6·5"), and then the tap opens the tray so the player picks the die that dims.
   if (singles.length > 0)
     return {
@@ -360,7 +360,7 @@ const targetAt = (to: To, chains: ReadonlyArray<Chain>): Target => {
 
 const toSlot = (to: To): number => (to === 'off' ? 24 : to);
 
-/** The destinations of `from` grouped by end point, in board order (design §2.4.1 `targetsOf`). */
+/** The destinations of `from` grouped by end point, in board order (design §4.1 `targetsOf`). */
 export const targetsOf = (
   v: View,
   from: Place | null,
@@ -379,7 +379,7 @@ export const targetsOf = (
   ].sort((a, b) => toSlot(a.to) - toSlot(b.to));
 };
 
-// ---- the die-chip tray (design §2.1.3, §2.4.3) ---------------------------------------------------
+// ---- the die-chip tray (design §4.3) ---------------------------------------------------
 
 /** A chip in the player's own numbering. */
 export type Chip = Readonly<{
@@ -410,7 +410,7 @@ export const chipLabel = (chip: Chip): string => `${chipFaces(chip)} ${chipNote(
 
 export const chipKey = (chip: Chip): string =>
   `${chip.dice.join('+')}>${String(chip.to)}/${chip.via.join('.')}/${chip.hits.join('.')}`;
-/** `#moveChips` is rebuilt when this changes (design §2.2.3). */
+/** `#moveChips` is rebuilt when this changes (design §2.2). */
 export const chipsKey = (chips: ReadonlyArray<Chip>): string => chips.map(chipKey).join('|');
 
 /**
@@ -425,13 +425,13 @@ export const chipsHtml = (chips: ReadonlyArray<Chip>): string =>
     )
     .join('');
 
-// ---- the status line (design §1 "Status line", §2.1 mockups, §2.4.5, §2.4.10) ---------------------
+// ---- the status line (design §1 "Status line", §2.4 "The copy", §4.5, §4.10) ---------------------
 
-/** The die-chip tray as the reducer holds it (design §2.4.1 `Table.pending`). */
+/** The die-chip tray as the reducer holds it (design §4.1 `Table.pending`). */
 export type Pending = Readonly<{ from: Place; to: To; chains: ReadonlyArray<Chain> }>;
 export type StatusOpts = Readonly<{
   pending: Pending | null;
-  /** The painter is holding the R14 beat: the forfeited roll stays on the line (design §2.4.5). */
+  /** The painter is holding the R14 beat: the forfeited roll stays on the line (design §4.5). */
   noMoveShown: boolean;
   /** The die the player tapped to force (`die/pick`): the line confirms it. */
   picked?: Die | null;
@@ -453,7 +453,7 @@ const mayDouble = (v: View, seat: Seat): boolean =>
 const placeName = (v: View, place: From | To): string =>
   place === 'bar' ? 'bar' : place === 'off' ? 'off' : String(ownPoint(v, place));
 
-/** `13 · 6+3 reaches 4 two ways` (design §2.1.3); `4 · either die bears off` (§2.1.6). */
+/** `13 · 6+3 reaches 4 two ways` (design §2.4); `4 · either die bears off` (§4.4). */
 const pendingStatus = (v: View, pending: Pending): string => {
   const from = placeName(v, pending.from);
   if (pending.chains.every((c) => c.moves.length === 1)) return `${from} · either die bears off`;
@@ -489,7 +489,7 @@ const noMoveStatus = (v: View): string => {
   return `${rollOf(v)} · ${entering ? 'no entry' : 'no move'} — turn passes`;
 };
 
-/** `#statusText`: what is left to do, pinned strings (design §2.6). */
+/** `#statusText`: what is left to do, pinned strings (design §7). */
 export const statusText = (v: View, opts: StatusOpts = PLAIN_STATUS): string => {
   const opp = v.opp.name;
   if (v.phase === 'over') return resultText(v).title;
@@ -538,7 +538,7 @@ export const hitsAgainst = (v: View, seat: Seat): ReadonlyArray<number> => {
   return v.lastPlay.flatMap((m) => (m.hit && m.to !== 'off' ? [rules.ownOf(seat, m.to)] : []));
 };
 
-// ---- the result sheet (design §2.4.11) -----------------------------------------------------------
+// ---- the result sheet (design §4.11) -----------------------------------------------------------
 
 export type ResultCopy = Readonly<{ title: string; sub: string; score: string }>;
 
@@ -573,7 +573,7 @@ export const resultText = (v: View): ResultCopy => {
       };
 };
 
-// ---- painted aria labels (design §2.2.3 `placeAria`, §2.5) ------------------------------------------
+// ---- painted aria labels (design §2.2 `placeAria`, §6) ------------------------------------------
 
 /** The highlight a place wears this paint; only one word of it is spoken. */
 export type Highlight = Readonly<{ canMove: boolean; selected: boolean; die: string | null }>;
@@ -623,7 +623,7 @@ export const placeAria = (v: View, id: PlaceId, hl: Highlight = NO_HIGHLIGHT): s
     : `${whose(owner)} ${own}-point, ${plural(stack.length, 'checker')}${highlightSuffix(hl)}`;
 };
 
-// ---- flights (design §2.3.9 `flightsBetween`) -------------------------------------------------------
+// ---- flights (design §3.9 `flightsBetween`) -------------------------------------------------------
 
 /** A checker's trip between two containers; `slab` when it lands as a slab, `hit` for a blot sent to the bar. */
 export type Flight = Readonly<{
@@ -632,7 +632,7 @@ export type Flight = Readonly<{
   slab?: true;
   hit?: true;
 }>;
-/** More than this many flights in one repaint and the board repaints cold (design §2.3.9). */
+/** More than this many flights in one repaint and the board repaints cold (design §3.9). */
 export const MAX_FLIGHTS = 4;
 
 const sameMove = (a: PlayedMove, b: PlayedMove): boolean =>

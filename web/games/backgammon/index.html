@@ -27,7 +27,7 @@
   </head>
   <body>
     <div id="app">
-      <!-- HOME / LOBBY (design §4). The Online mode is hidden until the online PR: its panel and
+      <!-- HOME / LOBBY (docs/design/backgammon-board.md §5.1; "design §N" below is that document). The Online mode is hidden until the online PR: its panel and
            ids stay, the switch shows Pass the phone alone, and the local panel is the default. -->
       <div id="homeScreen">
         <div class="masthead">
@@ -213,7 +213,7 @@
         <button class="btn btn-ghost btn-block" id="cancelGuestBtn">Back</button>
       </div>
 
-      <!-- TABLE (design §2.2.1). The 24 points are direct children of #board in absolute order;
+      <!-- TABLE (design §2.1). The 24 points are direct children of #board in absolute order;
            the seat perspective is data-own on each point and data-seat on the board, written by
            paintSeat; the static markup ships seat 0's. -->
       <div id="tableScreen" class="hidden">
@@ -472,7 +472,7 @@
         </div>
       </div>
 
-      <!-- ENDGAME: the match is over (design §2.4.11). -->
+      <!-- ENDGAME: the match is over (design §4.11). -->
       <div id="endgameScreen" class="hidden">
         <h1>Match over</h1>
         <div class="card-box centered">
@@ -490,7 +490,7 @@
       </div>
     </div>
 
-    <!-- PASS-AND-PLAY CURTAIN (design §2.1.8): a translucent wash, the board readable beneath. -->
+    <!-- PASS-AND-PLAY CURTAIN (design §4.9): a translucent wash, the board readable beneath. -->
     <div id="curtainOverlay" class="overlay curtain hidden">
       <div class="sheet centered">
         <div class="sheet-title" id="curtainTitle">Pass the phone</div>
@@ -503,7 +503,7 @@
       </div>
     </div>
 
-    <!-- GAME RESULT (design §2.1.7): the sheet over the dimmed board. -->
+    <!-- GAME RESULT (design §4.11): the sheet over the dimmed board. -->
     <div id="resultOverlay" class="overlay hidden">
       <div class="sheet centered">
         <div class="sheet-title" id="rsTitle">Game over</div>
@@ -514,7 +514,7 @@
       </div>
     </div>
 
-    <!-- DOUBLE OFFERED (Western only, design §2.4.8). -->
+    <!-- DOUBLE OFFERED (Western only, design §4.8). -->
     <div id="cubeOverlay" class="overlay hidden">
       <div class="sheet centered">
         <div class="sheet-title">The cube</div>
@@ -526,7 +526,7 @@
       </div>
     </div>
 
-    <!-- RESIGN: reserved for v1.1 (design §2.2.2); present, hidden, no binder in v1. -->
+    <!-- RESIGN: reserved for v1.1 (design §2.3); present, hidden, no binder in v1. -->
     <div id="resignOverlay" class="overlay hidden">
       <div class="sheet centered">
         <div class="sheet-title">Resign</div>
@@ -560,7 +560,7 @@
       </div>
     </div>
 
-    <!-- MENU (the phone's home for rules and history, design §2.2.2). -->
+    <!-- MENU (the phone's home for rules and history, design §2.3). -->
     <div id="menuOverlay" class="overlay hidden">
       <div class="sheet">
         <div class="row between">

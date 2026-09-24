@@ -4,7 +4,8 @@ The settled rules of `web/games/backgammon/src/engine/` (PR #53), distilled from
 section 3. Two rulesets ship: **portes** (the first game of the Greek tavli set, the default) and
 Western **backgammon**. Plakoto and fevga exist as `Variant` literals with `implemented: false`
 rows in `VARIANTS`; `ShippedVariant` excludes them, `createGame` is typed on it and every decoder
-refuses them. `docs/design/backgammon-board.md` is the table screen that plays these rules.
+refuses them. `docs/design/backgammon-board.md` is the table screen that plays these rules. The
+code's comments cite this document by rule (`rules R13`, the rows of §3) and by section (`rules §2`).
 
 Numbering: every rule and every test row is written in the mover's **own** numbering, 1..24 from
 the mover's bearing-off edge; absolute indices 0..23 are the storage frame. Seat 0 (Light, the

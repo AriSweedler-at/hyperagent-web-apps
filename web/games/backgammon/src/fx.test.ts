@@ -15,7 +15,7 @@ import { CUES, type Cue } from './ui/sound.ts';
 const EVENTS = Object.keys(CUES) as ReadonlyArray<Cue | 'tap'>;
 
 describe('the table', () => {
-  test('pins the design\'s mapping (design.md §4 "Sound"; sound-fonts.md §5)', () => {
+  test('pins the design\'s mapping (backgammon-board.md §5.1 "Sound"; sound-fonts.md §5)', () => {
     const mapping: Readonly<Record<Cue | 'tap', SoundCue>> = {
       tap: 'tap',
       roll: 'roll',

@@ -1,6 +1,6 @@
-// Sheshbesh's shell and pass-and-play on one page (scratchpad/bg/design.md §2.4, §4, PR-C's e2e
-// row), at a phone and a laptop. The home screen: the title, the tab bar, the Play submenu, the
-// Online mode hidden until PR-D with Pass the phone the default. The table: a game starts under
+// Sheshbesh's shell and pass-and-play on one page (docs/design/backgammon-board.md §4, §5, §7), at a
+// phone and a laptop. The home screen: the title, the tab bar, the Play submenu, the
+// Online mode hidden until the online PR (design §5.3) with Pass the phone the default. The table: a game starts under
 // the curtain naming the opening winner, whose button rolls (portes) or plays the opening dice
 // (Western); tap-to-move plays a turn with the legal sources and targets lit as the engine's view
 // has them and the status line naming what is left; undo rewinds; the die-chip tray opens where
@@ -38,7 +38,7 @@ const VIEWPORTS: Readonly<Record<string, Viewport>> = {
   desktop: { width: 1280, height: 800 },
 };
 
-/** Light to play 6-3 from the start against a Dark blot on Light's 7: 13/4 reaches it two ways (design §2.1.3). */
+/** Light to play 6-3 from the start against a Dark blot on Light's 7: 13/4 reaches it two ways (design §4.3). */
 const TWO_ORDERS = 'L: 24:2 13:5 8:3 6:5 | D: 18:1 2:14 | bar 0/0 | off 0/0';
 /** Light bears off with 6-5 from own 4: both dice suffice (the tray), then 2/off wins a gammon. */
 const BOTH_SUFFICE = 'L: 4:1 2:1 | D: 24:2 1:13 | bar 0/0 | off 13/0';
@@ -61,7 +61,7 @@ const sourcePoints = (view: View): ReadonlyArray<number> =>
     .filter((p): p is number => typeof p === 'number')
     .sort((a, b) => a - b);
 
-/** Hold the pointer on the Play tab past the long-press timer: the submenu opens (design §4). */
+/** Hold the pointer on the Play tab past the long-press timer: the submenu opens (design §5.1). */
 const longPressPlay = async (page: Page): Promise<void> => {
   const tab = page.locator('#tabPlayBtn');
   const box = await tab.boundingBox();
@@ -85,7 +85,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#homeScreen h1')).toHaveText('Sheshbesh');
       await expect(page.locator('#topTabbar .tab-btn')).toHaveText(['Play', 'Rules', 'About']);
       await expect(page.locator('#tabPlayBtn')).toHaveClass(/\bactive\b/);
-      // Online play ships with PR-D: its switch, its option and its panel are hidden; the local
+      // Online play ships with the online PR (design §5.3): its switch, its option and its panel are hidden; the local
       // panel is up with Pass the phone active (ui/state.ts ONLINE_MODE_SHOWN, DEFAULT_PLAY_MODE).
       await expect(page.locator('#playModeSwitch')).toBeHidden();
       await expect(page.locator('#playModeSwitch .mode-btn[data-mode="online"]')).toBeHidden();
@@ -140,7 +140,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const first = view.players[view.turn].name;
       const other = view.players[view.turn === 0 ? 1 : 0].name;
       // The curtain covers a live board (the position is readable beneath) and hands it to the
-      // opening winner: one tap reveals and rolls (design §2.1.8).
+      // opening winner: one tap reveals and rolls (design §4.9).
       const curtain = await bgCurtain(page);
       // The first curtain carries the opening roll from the engine's log.
       const opening = view.log.filter((e) => e.kind === 'opening').at(-1)?.text ?? '';
@@ -186,7 +186,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
       await bgReveal(page);
-      // Before a roll: the button in the roll slot, blank dice; the roll fills them (design §2.4.7).
+      // Before a roll: the button in the roll slot, blank dice; the roll fills them (design §4.7).
       await bgSetup(page, bgPosition({ text: START, turn: 0 }));
       await expect(page.locator('#rollBtn')).toBeVisible();
       await expect(page.locator('#rollBtn')).toContainText('Buen mazal!');
@@ -195,7 +195,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#statusText')).toHaveText('Your turn. Buen mazal!');
       const v = await bgRoll(page);
       await expect(page.locator('#dice .die.blank')).toHaveCount(0);
-      // Every point the engine lets move wears `can-move`, and nothing else does (design §2.6).
+      // Every point the engine lets move wears `can-move`, and nothing else does (design §7).
       expect(await litPoints(page, 'can-move', v)).toEqual(sourcePoints(v));
       expect(await litPoints(page, 'selected', v)).toEqual(
         sourcePoints(v).length === 1 ? sourcePoints(v) : [],
@@ -244,7 +244,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const v = await bgSetup(page, bgPosition({ text: TWO_ORDERS, turn: 0, dice: [6, 3] }));
       await bgTap(page, 13);
       // 13/7* with the 6 and 13/10 with the 3 are single steps; 13/4 needs both and the paths
-      // differ (7 is a hit), so the disc asks (design §2.4.1 `targetsOf`).
+      // differ (7 is a hit), so the disc asks (design §4.1 `targetsOf`).
       await expect(page.locator(`#${ownPointId(v, 7)}`)).toHaveAttribute('data-die', '6');
       await expect(page.locator(`#${ownPointId(v, 10)}`)).toHaveAttribute('data-die', '3');
       const four = page.locator(`#${ownPointId(v, 4)}`);
@@ -278,7 +278,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await bgReveal(page);
       const v = await bgSetup(page, bgPosition({ text: BOTH_SUFFICE, turn: 0, dice: [6, 5] }));
       expect(v.me.idx).toBe(0);
-      // The tray disc names both dice; the tap opens two chips, the higher die first (design §2.4.4).
+      // The tray disc names both dice; the tap opens two chips, the higher die first (design §4.4).
       await expect(page.locator('#offLight')).toHaveClass(/\btarget\b/);
       await expect(page.locator('#offLight')).toHaveAttribute('data-die', '6·5');
       await bgTap(page, 'off');
@@ -393,7 +393,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#doubleBtn')).toBeHidden();
       await expect(page.locator('#rulesList li, #rulesOverlayList li')).toHaveCount(22);
 
-      // Before a roll the cube is on offer: Double beside Roll (design §2.4.8).
+      // Before a roll the cube is on offer: Double beside Roll (design §4.8).
       await bgSetup(page, bgPosition({ text: START, turn: 0, variant: 'backgammon' }));
       await expect(page.locator('#rollBtn')).toBeVisible();
       await expect(page.locator('#doubleBtn')).toBeVisible();

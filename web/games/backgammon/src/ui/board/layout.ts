@@ -1,11 +1,11 @@
-// The pure twin of the board's CSS (scratchpad/bg/design.md §2.3.3, §2.6; A3's graft). theme.css
+// The pure twin of the board's CSS (docs/design/backgammon-board.md §3.3, §7). theme.css
 // places the 24 points, the two bar halves, the dice and the two trays with two
 // `grid-template-areas` strings (the phone stands the board on end, the desktop lays it flat from
 // 900px) whose area names are own numbers, and the seat perspective is `data-own` on each point.
 // This module holds the same two templates as data and the same seat mapping, so the geometry
 // e2e (`boardGeometry`) and the painter tests have an oracle for where every place must be, and
 // test/dist/backgammon-grid.test.ts parses the strings out of the built CSS and compares them with
-// `boardLayout`/`rowOrder` (design risk 5: a typo in either string collapses the grid silently).
+// `boardLayout`/`rowOrder` (design §10 risk 5: a typo in either string collapses the grid silently).
 // Pure: imports the engine's frame and nothing else; no DOM.
 import { err, ok, type Result } from '../../../../../shared/lib/result.ts';
 import { rulesOf, type PointIndex, type Seat } from '../../engine/index.ts';
@@ -24,7 +24,7 @@ export const DESKTOP_MIN_WIDTH = 900;
 export const layoutFor = (width: number): Layout =>
   width >= DESKTOP_MIN_WIDTH ? 'desktop' : 'phone';
 
-/** Five checkers are drawn; the sixth onward is the count badge on the top one (design §2.3.4). */
+/** Five checkers are drawn; the sixth onward is the count badge on the top one (design §3.4). */
 export const MAX_DRAWN = 5;
 export const visibleOf = (count: number): number => Math.max(0, Math.min(count, MAX_DRAWN));
 /** The corner the point label keeps, in px, which the coin run along a phone point spares. */
@@ -40,7 +40,7 @@ export const stackStep = (pointLen: number, checkerD: number): number =>
 export const stackExtent = (count: number, checkerD: number, step: number): number =>
   count <= 0 ? 0 : checkerD + (visibleOf(count) - 1) * step;
 
-/** theme.css's `--point-w` clamps, by layout (design §2.3.1 "Honest numbers"). */
+/** theme.css's `--point-w` clamps, by layout (design §3.1). */
 export const PHONE_GEOMETRY = {
   chromeH: 172,
   barW: 48,

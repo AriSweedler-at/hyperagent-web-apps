@@ -1,11 +1,11 @@
-// The board's geometry as a player's finger meets it (scratchpad/bg/design.md §2.6 "Geometry
+// The board's geometry as a player's finger meets it (docs/design/backgammon-board.md §7 "Geometry
 // oracle"; gin's e2e/fixtures/gin.ts `expectHandRows` and e2e/gin-geometry.spec.ts shape). One
 // `page.evaluate` reads every rect in document coordinates (so a scrolled page compares with an
 // unscrolled one); the assertions are pure over that record: every point inside the board, the
 // 24 pairwise disjoint and one size, in the visual order `rowOrder` (ui/board/layout.ts, the CSS's
 // pure twin) states for the layout and the seat, every stack's visible coins inside its place and
 // no more than five, every tap target at least 44px on its short side on a phone, and no scroll
-// where the viewport fits (the document scrolls only under the fallback, design §2.3.1).
+// where the viewport fits (the document scrolls only under the fallback, design §3.1).
 import { expect, type Page } from '@playwright/test';
 
 import {
@@ -41,7 +41,7 @@ export type BoardGeometry = Readonly<{
   frame: Frame;
 }>;
 
-/** The frame around the board: one box each, in every phase (design §2.6 `expectSameFrame`). */
+/** The frame around the board: one box each, in every phase (design §7 `expectSameFrame`). */
 export const FRAME_SELECTORS: ReadonlyArray<string> = [
   '#tableScreen .topbar',
   '#statusLine',
@@ -55,7 +55,7 @@ const PLACE_IDS: ReadonlyArray<string> = [
   'offLight',
   'offDark',
 ];
-/** What a finger may land on at the table; `#diceMini`'s faces are display-only and excluded (design §2.5). */
+/** What a finger may land on at the table; `#diceMini`'s faces are display-only and excluded (design §6). */
 const TARGET_SELECTOR =
   '#tableScreen .point, #tableScreen .bar, #tableScreen .off, #dice .die, #tableScreen .btn, #tableScreen .icon-btn, #tableScreen .chip, #curtainOverlay .btn, #resultOverlay .btn';
 
@@ -155,7 +155,7 @@ export const expectPointsTiled = (g: BoardGeometry, when: string): void => {
 };
 
 /**
- * The visual order is `rowOrder`'s for this layout and seat (design §2.6): within a row the
+ * The visual order is `rowOrder`'s for this layout and seat (design §7): within a row the
  * places run left to right in the order given; every place of a row sits below every place of
  * the row before. The phone's fourteen rows include the bar band (barTop, dice, barBottom) and the
  * tray row; the desktop's two rows hold the bars and trays at their ends.
@@ -199,7 +199,7 @@ export const expectStacks = (g: BoardGeometry, when: string): void => {
   });
 };
 
-/** On a phone every visible tap target is at least 44px on its short side (design §2.5). */
+/** On a phone every visible tap target is at least 44px on its short side (design §6). */
 export const expectTargets = (g: BoardGeometry, when: string): void => {
   if (layoutFor(g.width) !== 'phone') return;
   const small = g.targets.filter((t) => Math.min(t.w, t.h) < 44 - TOL);
