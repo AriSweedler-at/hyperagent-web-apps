@@ -130,6 +130,16 @@ const fireOne = (
   };
 };
 
+/**
+ * The one deliberate deviation from the legacy tree (docs/ARCHITECTURE.md "Calls to action"; the
+ * owner, 2026-09-24: "all the 'start game' buttons should be green and should stand out well"):
+ * the name form's Let's go, the lobby's Start game and the spectator bar's Start game wear
+ * `btn-go` where the legacy had `btn-primary`. The typed leg's `btn-go` reads as the legacy's
+ * variant, so a start button that lost the class, or any other button that gained it, still fails.
+ */
+const normalise = (tree: string): string =>
+  tree.replace(/<button class="btn-go( btn-big)?"/g, '<button class="btn-primary$1"');
+
 /** Render `ui` through a leg into a fresh fake document, then exercise every listener. */
 const render = (leg: Leg, ui: Ui): Rendered => {
   const doc = fakeDocument();
@@ -142,7 +152,7 @@ const render = (leg: Leg, ui: Ui): Rendered => {
       intents.push(intent);
     }),
   );
-  const tree = root.childNodes.map(serialize).join('');
+  const tree = normalise(root.childNodes.map(serialize).join(''));
   const fired = all(root)
     .map((el, element) => ({ el, element }))
     .filter(({ el }) => el.listenerTypes().length > 0)
@@ -208,7 +218,7 @@ describe('the typed view against the legacy view sections', () => {
           root,
           leg.appView(ui, () => undefined),
         );
-        return root.childNodes.map(serialize).join('');
+        return normalise(root.childNodes.map(serialize).join(''));
       });
     };
     const expected = walk(legacy);

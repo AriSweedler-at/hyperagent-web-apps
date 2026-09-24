@@ -103,6 +103,19 @@ export const normalise = (html: string): string =>
       /(<div class="setup-players" id="scPlayers">)[\s\S]*?(<button[^>]*\bid="scStartBtn")/g,
       '$1</div></div>$2',
     )
+    // The calls to action (docs/ARCHITECTURE.md "Calls to action"; the owner, 2026-09-24: "all the
+    // 'start game' buttons should be green and should stand out well"): Host, Join, Start pass &
+    // play, Deal the first hand, Next hand and Rematch wear `btn-go` where the legacy had
+    // `btn-primary` (Join: `btn-secondary`), and the two that leaned on `.btn-primary`'s width carry
+    // `btn-block`. The button variants are dropped from those six class attributes on both pages.
+    .replace(
+      /(<button class=")([^"]*)(" id="(?:hostBtn|joinBtn|localBtn|startGameBtn|rrContinueBtn|rematchBtn)")/g,
+      (_match, open: string, classes: string, close: string) =>
+        `${open}${classes
+          .split(' ')
+          .filter((name) => !/^btn-(?:primary|secondary|go|block)$/.test(name))
+          .join(' ')}${close}`,
+    )
     .replace(/>\s+</g, '><')
     .replace(/\s+/g, ' ')
     .trim();
