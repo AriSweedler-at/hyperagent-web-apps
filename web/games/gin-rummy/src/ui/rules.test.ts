@@ -55,12 +55,18 @@ describe('the rules items', () => {
     });
   });
 
-  test('a rule that names another rule links it (Knock -> drawing, deadwood; Gin -> knock, lay-offs)', () => {
+  test('a rule that names another rule links it (Knock -> drawing, deadwood; Gin -> knock, lay-offs; Lay off -> knock, melds, deadwood)', () => {
     const lines = rulesItemsHtml().split('\n');
     expect(lines[5]).toContain('data-rule="draw">drawing</a>');
     expect(lines[5]).toContain('data-rule="deadwood">deadwood</a>');
     expect(lines[6]).toContain('data-rule="knock">Knock</a>');
     expect(lines[6]).toContain('data-rule="layoff">lay-offs</a>');
+    // The manual layoff (docs/design/gin-arrangement-and-discards.md §7b), in the app's own words.
+    expect(lines[7]).toContain('data-rule="knock">knock</a>');
+    expect(lines[7]).toContain('data-rule="melds">melds</a>');
+    expect(lines[7]).toContain('data-rule="deadwood">deadwood</a>');
+    expect(lines[7]).toContain('Done laying off');
+    expect(lines[7]).not.toContain('data-rule="layoff"');
     // Its own name stays plain: "gin" in the Gin rule, "deadwood" in Deadwood.
     expect(lines[6]).not.toContain('data-rule="gin"');
     expect(lines[1]).not.toContain('data-rule="deadwood"');

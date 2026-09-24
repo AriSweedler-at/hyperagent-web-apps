@@ -11,8 +11,9 @@
 // whitespace, the two rules slots' ids, the `#handoffBtn` button and the row that holds it, the
 // sandbox (its two mode buttons and `#sandboxModeContent`; the new page's markup additions), the
 // result body's key, the hidden curtain's stale text (the knock's layoff phase, §7b, shows a
-// curtain the legacy never did) and the glossary (docs/design/glossary-links.md: the About tab and
-// its panel, the rule ids and the jargon links, the shorter Score tab label) are normalised.
+// curtain the legacy never did), the glossary (docs/design/glossary-links.md: the About tab and
+// its panel, the rule ids and the jargon links, the shorter Score tab label) and the Lay off
+// rule's body (§7b: laying off is by hand and the rule says so) are normalised.
 // What is read from the pages is compared; what is decided (which card
 // to discard) is read from the legacy page's `window.__gin` hook and applied to both, so the two
 // never diverge on a choice; after a draw the new page's ghost card is accepted (`acceptIfShown`)
@@ -91,6 +92,10 @@ export const normalise = (html: string): string =>
     .replace(/<div id="aboutPanel"[\s\S]*?<!-- \/about -->/g, '')
     .replace(/ id="rule-[a-z-]+"/g, '')
     .replace(/<a class="jargon"[^>]*>([^<]*)<\/a>/g, '$1')
+    // The Lay off rule's body (docs/design/gin-arrangement-and-discards.md §7b, PR #45; the copy,
+    // PR #70): laying off is by hand and the rule says so, where the legacy's said the fitting
+    // cards were laid off automatically. The heading is compared, the body blanked on both pages.
+    .replace(/(<li><strong>Lay off:<\/strong>)[^<]*(<\/li>)/g, '$1$2')
     .replace(/(\bid="tabScoreBtn"[^>]*>)Score Counter</g, '$1Score<')
     // The Score Counter's players: the legacy grew rows and an "+ Add player" button, the page has
     // two fixed inputs sharing pass-and-play's names; everything up to the Start button is blanked.
