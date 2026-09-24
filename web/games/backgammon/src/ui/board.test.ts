@@ -42,6 +42,7 @@ import {
   diceHtml,
   diceWords,
   effectiveSelection,
+  MAX_FLIGHTS,
   flightsBetween,
   offHtml,
   offIdFor,
@@ -596,18 +597,26 @@ describe('flightsBetween', () => {
     expect(flightsBetween(viewFor(over, 0), viewFor(step(over, 0, { type: 'next' }), 0))).toEqual(
       [],
     );
-    // Four moves and a hit: five flights is more than fly.ts animates.
+    // A double's four moves, every one a hit: eight flights, the most one play can make, all fly
+    // (MAX_FLIGHTS; the owner asked for every move to be seen), staggered by fly.ts.
     const crowd: PlayedMove[] = [
       { from: 12, to: 6, die: 6, hit: true },
-      { from: 12, to: 6, die: 6, hit: false },
-      { from: 7, to: 1, die: 6, hit: false },
-      { from: 7, to: 1, die: 6, hit: false },
+      { from: 12, to: 6, die: 6, hit: true },
+      { from: 7, to: 1, die: 6, hit: true },
+      { from: 7, to: 1, die: 6, hit: true },
     ];
     const prev = viewFor({ ...t1, dice: [6, 6] }, 0);
     const next = viewFor({ ...t1, dice: [6, 6], played: crowd }, 0);
-    expect(flightsBetween(prev, next)).toEqual([]);
+    expect(MAX_FLIGHTS).toBe(8);
+    expect(flightsBetween(prev, next)).toHaveLength(8);
     expect(
       flightsBetween(prev, viewFor({ ...t1, dice: [6, 6], played: crowd.slice(1) }, 0)),
-    ).toHaveLength(3);
+    ).toHaveLength(6);
+    // Beyond the cap (nothing a play produces): cold.
+    const nine = [
+      ...flightsBetween(prev, next),
+      { fromContainer: 'point-1', toContainer: 'point-2' },
+    ];
+    expect(nine.length > MAX_FLIGHTS).toBe(true);
   });
 });

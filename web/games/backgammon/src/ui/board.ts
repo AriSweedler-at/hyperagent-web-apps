@@ -632,8 +632,8 @@ export type Flight = Readonly<{
   slab?: true;
   hit?: true;
 }>;
-/** More than this many flights in one repaint and the board repaints cold (design §3.9). */
-export const MAX_FLIGHTS = 4;
+/** More than this many flights in one repaint and the board repaints cold (design §3.9): a double's four moves with every one a hit. */
+export const MAX_FLIGHTS = 8;
 
 const sameMove = (a: PlayedMove, b: PlayedMove): boolean =>
   a.from === b.from && a.to === b.to && a.die === b.die && a.hit === b.hit;

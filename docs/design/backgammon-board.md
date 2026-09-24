@@ -211,7 +211,7 @@ keep the board and every control clear of it. No pattern: the meander stays the 
 | `hit` | the point where a blot was just hit | `animation: hitFlash 420ms` (a warm wash on `::before`) |
 | `shake` | a tapped point that is neither source nor target | `animation: shake 120ms` |
 | `arriving` | the just-landed checker during a flight | `visibility: hidden` |
-| `landing` | the top coin of a stack already five tall while the sixth flies in | `::after { visibility: hidden }`: the count badge waits for the landing; the coin itself stays |
+| `settling` | the top coin of a stack already five tall while the sixth flies in | `::after { visibility: hidden }`: the count badge waits for the landing; the coin itself stays |
 | `inert` on `#board` | not my turn / not moving | `pointer-events: none` on `.point,.bar,.off`; no outlines, no glow |
 | `theirs` on `.die` | the opponent's roll | `filter: saturate(.7) brightness(.85)` |
 | `used` on `.die` | a consumed die | `opacity: .4` and a diagonal slash over the pips |
@@ -229,12 +229,16 @@ Focus: `:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px }
 
 ### 3.8 Motion
 
-`transform` transitions 160ms on `.checker`; flights 260ms (`FLY_MS`), ease `cubic-bezier(.2,.8,
-.2,1)`; a hit's flight to the bar starts 80ms after the mover lands; the chip tray fades in over
-160ms; `tumble` 350ms once per new roll key; `hitFlash` 420ms; `glow` 1.6s loop. `@media
+`transform` transitions 160ms on `.checker`; flights 200ms (`FLY_MS`; the owner, 2026-09-24: "a
+zippy animation moving the chips from start to finish"), ease `cubic-bezier(.2,.8,.2,1)`, with a
+lift on the way (`fly-lift`, 200ms: the clone rises 6px and its shadow deepens at mid-flight, on
+the individual `translate` and `filter` so the glide's transform and its `transitionend` are
+untouched); the movers of one play leave 60ms apart (`STAGGER_MS`, `flightDelays`) and a hit's
+flight to the bar 80ms after the mover that landed on it (`HIT_DELAY_MS`); the chip tray fades in
+over 160ms; `tumble` 350ms once per new roll key; `hitFlash` 420ms; `glow` 1.6s loop. `@media
 (prefers-reduced-motion: reduce)` disables `tumble`, `glow`, `hitFlash`, `shake` and the pulses and
-sets the flyer's and the checker's `transition-duration` to 1ms so the fallback timer is the only
-delay.
+sets the flyer's and the checker's `transition-duration` to 1ms (and `fly-lift` off) so the
+fallback timer is the only delay.
 
 ### 3.9 Flights (`ui/board/fly.ts`)
 
@@ -242,14 +246,15 @@ delay.
 `PlaceId = 'point-N' | 'barTop' | 'barBottom' | 'offLight' | 'offDark'`: before the repaint it
 measures the top checker in `fromContainer`; it repaints; it finds the top checker (or newest slab)
 in `toContainer`, marks it `arriving` (unless it is the coin that was already on top of a stack of five or more, which stays
-visible; a count badge the landing brings hides under `landing` until the clone lands), clones the
+visible; a count badge the landing brings hides under `settling` until the clone lands), clones the
 source into `doc.body` as a fixed `.flyer`
 (`--checker-d` set to the rect's width, as gin's ghost sets `--card-w`), forces a layout read, sets
 the translate (`scale(.35, 1)` toward a slab, class `flyer-slab`) and on `afterTransition(flyer,
 …, FLY_MS + 60)` removes the flyer and `arriving`. Zero rects (the page fake): repaint and return.
 Flights come from the pure `flightsBetween(prev, next)` (`ui/board.ts`): the new `played` moves
 (plus hit → the opponent's bar), an undo reversed, a finished turn's `lastPlay` beyond what was
-already shown; more than four flights (`MAX_FLIGHTS`) or a new roll repaint cold. `fly.ts` may not
+already shown; more than eight flights (`MAX_FLIGHTS`: a double's four moves, each a hit) or a
+new roll repaint cold. `fly.ts` may not
 import `ui/state.ts`; it takes rects and ids only. The points a hit flight lifts from flash `hit`.
 
 ### 3.10 Short viewports

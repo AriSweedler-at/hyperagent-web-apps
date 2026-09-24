@@ -5,10 +5,13 @@
 // the arrival (the destination's top checker or newest slab) is hidden under `arriving`, a clone
 // of the departed checker is fixed over where it stood, laid out, then sent to the arrival's rect
 // by one transform (translate plus the scale that turns a checker into a slab, whichever way the
-// tray lies), and the clone goes when its transition ends or the fallback timer fires. A stack
+// tray lies) over FLY_MS with a small lift on the way (`fly-lift`: a rise of a few pixels and a
+// deeper shadow at mid-flight, a keyframe animation beside the transition, so the glide's own
+// end event still ends the flight), and the clone goes when its transition ends or the fallback
+// timer fires. Several flights in one repaint leave STAGGER_MS apart (`flightDelays`). A stack
 // already five tall keeps its top coin through the repaint (render.ts `ensureStack`: the sixth
 // is hidden under it and only the count badge changes), so that coin is not hidden: the clone
-// lands on it, and a badge the landing brings waits under `landing` until it does. A hit blot
+// lands on it, and a badge the landing brings waits under `settling` until it does. A hit blot
 // waits `HIT_DELAY_MS` before it leaves for the bar, so the mover lands on it first. The
 // transition itself is `.flyer`'s in theme.css, so `prefers-reduced-motion` can shorten it; only
 // the delay is written inline. Nothing measurable (the page fake) means the repaint alone. The
@@ -31,10 +34,12 @@ import {
 } from '../../../../../shared/edge/dom.ts';
 import type { Flight } from '../board.ts';
 
-/** The flight's duration (theme.css `.flyer { transition: transform 260ms … }`). */
-export const FLY_MS = 260;
+/** The flight's duration (theme.css `.flyer { transition: transform 200ms … }` and its `fly-lift`). */
+export const FLY_MS = 200;
 /** A hit blot leaves for the bar this long after the mover lands on it. */
 export const HIT_DELAY_MS = 80;
+/** The movers of one play leave this far apart, in order (design §3.8: "zippy", staggered). */
+export const STAGGER_MS = 60;
 /** Slack past the transition before the fallback timer clears a flight that never ended. */
 const FALLBACK_SLACK_MS = 60;
 
@@ -57,9 +62,31 @@ type Departed = Readonly<{
   /** The destination's top coin before the repaint, and whether it already wore a count badge. */
   before: Element | null;
   badged: boolean;
+  /** How long after the repaint this flight leaves (`flightDelays`). */
+  delay: number;
 }>;
 
-const measure = (doc: PageLike, flight: Flight): Departed | null => {
+type DelayFold = Readonly<{ out: ReadonlyArray<number>; movers: number; last: number }>;
+
+/**
+ * When each flight leaves, in ms after the repaint: the movers `STAGGER_MS` apart in order (one
+ * tap commits one move, so this is the opponent's play or a combined move arriving whole); a hit
+ * blot `HIT_DELAY_MS` after the mover that landed on it, so it is seen to be hit.
+ */
+export const flightDelays = (flights: ReadonlyArray<Flight>): ReadonlyArray<number> =>
+  flights.reduce<DelayFold>(
+    (acc, f) =>
+      f.hit === true
+        ? { ...acc, out: [...acc.out, acc.last + HIT_DELAY_MS] }
+        : {
+            out: [...acc.out, acc.movers * STAGGER_MS],
+            movers: acc.movers + 1,
+            last: acc.movers * STAGGER_MS,
+          },
+    { out: [], movers: 0, last: 0 },
+  ).out;
+
+const measure = (doc: PageLike, flight: Flight, delay: number): Departed | null => {
   const source = departure(requireId(doc, flight.fromContainer));
   if (source === null) return null;
   const from = rectOf(source);
@@ -71,14 +98,15 @@ const measure = (doc: PageLike, flight: Flight): Departed | null => {
     from,
     before,
     badged: before !== null && dataOf(before, 'count') !== null,
+    delay,
   };
 };
 
 /**
  * After the repaint: hide the arrival (unless it is the coin that was already on top: then only
- * a badge the landing brings hides), fix the clone where the checker stood, send it over.
+ * a badge the landing brings hides, under `settling`), fix the clone where the checker stood, send it over.
  */
-const launch = (doc: PageLike, { flight, source, from, before, badged }: Departed): void => {
+const launch = (doc: PageLike, { flight, source, from, before, badged, delay }: Departed): void => {
   const target = arrival(requireId(doc, flight.toContainer), flight.slab === true);
   if (target === null) return;
   const to = rectOf(target);
@@ -86,7 +114,7 @@ const launch = (doc: PageLike, { flight, source, from, before, badged }: Departe
   const flyer = cloneInto(doc.body, source);
   if (flyer === null) return;
   if (target !== before) addClass(target, 'arriving');
-  else if (!badged && dataOf(target, 'count') !== null) addClass(target, 'landing');
+  else if (!badged && dataOf(target, 'count') !== null) addClass(target, 'settling');
   addClass(flyer, 'flyer');
   if (flight.slab === true) addClass(flyer, 'flyer-slab');
   removeClass(flyer, 'top', 'arriving');
@@ -98,7 +126,12 @@ const launch = (doc: PageLike, { flight, source, from, before, badged }: Departe
   setStyle(flyer, 'width', px(from.width));
   setStyle(flyer, 'height', px(from.height));
   setStyle(flyer, 'transform', 'none');
-  if (flight.hit === true) setStyle(flyer, 'transition-delay', `${String(HIT_DELAY_MS)}ms`);
+  // The glide and its lift (theme.css `fly-lift`, a keyframe animation beside the transition)
+  // wait the same delay, so a staggered flight neither moves nor rises before its turn.
+  if (delay > 0) {
+    setStyle(flyer, 'transition-delay', `${String(delay)}ms`);
+    setStyle(flyer, 'animation-delay', `${String(delay)}ms`);
+  }
   // A layout read: the clone is laid out at its start before the transform below transitions.
   rectOf(flyer);
   setStyle(
@@ -106,12 +139,11 @@ const launch = (doc: PageLike, { flight, source, from, before, badged }: Departe
     'transform',
     `translate(${px(to.left - from.left)}, ${px(to.top - from.top)}) scale(${ratio(to.width, from.width)}, ${ratio(to.height, from.height)})`,
   );
-  const delay = flight.hit === true ? HIT_DELAY_MS : 0;
   afterTransition(
     flyer,
     () => {
       removeElement(flyer);
-      removeClass(target, 'arriving', 'landing');
+      removeClass(target, 'arriving', 'settling');
     },
     FLY_MS + delay + FALLBACK_SLACK_MS,
   );
@@ -127,8 +159,9 @@ export const flyMoves = (
   flights: ReadonlyArray<Flight>,
   repaint: () => void,
 ): void => {
-  const departed = flights.flatMap((flight) => {
-    const d = measure(doc, flight);
+  const delays = flightDelays(flights);
+  const departed = flights.flatMap((flight, i) => {
+    const d = measure(doc, flight, delays[i] ?? 0);
     return d === null ? [] : [d];
   });
   repaint();
