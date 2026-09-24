@@ -465,12 +465,13 @@ only, `sandbox/load`).
 
 ### 5.3 Online, hidden then shown
 
-The page PR shipped with `ONLINE_MODE_SHOWN = false`: `mode/set 'online'` is accepted but the home
-painter hides the option, the Online panel and the curtain's handoff button, and the default mode
-is pass-and-play; the reducer, the sessions, the protocol and the storage are complete. The online
-PR flips the constant, adds the online e2e specs and re-records the goldens with hosting in the
-driver (§9). A shared shell reducer for both games is the step after (working first, refactor
-later).
+The page PR shipped with the Online mode hidden (a constant in ui/state.ts: `mode/set 'online'`
+was accepted but the home painter hid the option, the Online panel and the curtain's handoff
+button, and pass-and-play was the default) while the reducer, the sessions, the protocol and the
+storage were complete. The online PR removed the constant, made Online the default
+(storage.ts `DEFAULT_PLAY_MODE`, as gin's), added the online e2e specs and re-recorded the goldens
+with hosting in the driver (§9). A shared shell reducer for both games is the step after (working
+first, refactor later).
 
 ## 6. Accessibility
 

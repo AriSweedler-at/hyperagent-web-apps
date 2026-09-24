@@ -30,6 +30,7 @@ import {
   LEAVE_ONLINE_MSG,
   LONG_PRESS_MS,
   LOST_HOST_MSG,
+  hostLeftMsg,
   NOT_CONNECTED_MSG,
   NO_MOVE_MS,
   OPPONENT_LEFT_MSG,
@@ -717,6 +718,13 @@ describe('joining', () => {
     const lost = run(seated, { type: 'guest/lost' });
     expect(lost.app.shell).toMatchObject({ oppConnected: false, screen: 'tableScreen' });
     expect(toasts(lost.effects)).toEqual([[LOST_HOST_MSG, GONE_TOAST_MS]]);
+    // The match over: the result stays up, the session closes and the save goes (nothing to rejoin).
+    const over = { ...viewFor(g, 1), phase: 'over' as const, matchOver: true };
+    const done = run(seated, { type: 'guest/frame', frame: { t: 'state', view: over } }).app;
+    const gone = run(done, { type: 'guest/lost' });
+    expect(gone.app.shell).toMatchObject({ oppConnected: false, screen: 'endgameScreen' });
+    expect(kinds(gone.effects)).toEqual(expect.arrayContaining(['closeNet', 'clearSave']));
+    expect(toasts(gone.effects)).toEqual([[hostLeftMsg('Ann'), GONE_TOAST_MS]]);
     const early = run(run(guest(), { type: 'guest/connected' }).app, { type: 'guest/lost' });
     expect(early.app.shell).toMatchObject({
       screen: 'guestWaitScreen',

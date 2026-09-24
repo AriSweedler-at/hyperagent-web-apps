@@ -448,9 +448,14 @@ const paintControls = (doc: DocumentLike, app: App, v: View): void => {
 
 // ---- the result sheet, the endgame, the cube offer (design §4.8, §4.11) ------------------------
 
-/** `#rsNextBtn` / `#nextGameBtn`: the host or pass-and-play starts the next game; the guest waits (short: it shares a row with Leave on a phone). */
+/**
+ * `#rsNextBtn` / `#nextGameBtn`: either seat starts the next game (the engine takes `next` from
+ * both, and so does `next/click`); a rematch is the host's, so the guest's button waits for them
+ * (short: it shares a row with Leave on a phone).
+ */
+export const nextWaits = (app: App, v: View): boolean => app.shell.role === 'guest' && v.matchOver;
 export const nextLabel = (app: App, v: View): string =>
-  app.shell.role === 'guest' ? `Waiting for ${v.opp.name}…` : v.matchOver ? 'Rematch' : 'Next game';
+  nextWaits(app, v) ? `Waiting for ${v.opp.name}…` : v.matchOver ? 'Rematch' : 'Next game';
 
 const paintResult = (doc: DocumentLike, app: App, v: View): void => {
   paintSheet(doc, 'resultOverlay', v.phase === 'over' && !v.matchOver && app.table.resultOpen);
@@ -461,7 +466,7 @@ const paintResult = (doc: DocumentLike, app: App, v: View): void => {
   setText(requireId(doc, 'rsScore'), text.score);
   const next = requireId(doc, 'rsNextBtn');
   setText(next, nextLabel(app, v));
-  setDisabled(next, app.shell.role === 'guest');
+  setDisabled(next, nextWaits(app, v));
 };
 
 /** `#resultTitle`: `Ari takes the match 5–2`. */
@@ -503,7 +508,7 @@ const paintEndgame = (doc: DocumentLike, app: App, v: View): void => {
   }
   const next = requireId(doc, 'nextGameBtn');
   setText(next, nextLabel(app, v));
-  setDisabled(next, app.shell.role === 'guest');
+  setDisabled(next, nextWaits(app, v));
 };
 
 /** `#cubeOfferText` and `#passBtn` (design §4.8): `Ari doubles to 2. Take or pass?` · `Pass (Ari wins 1)`. */

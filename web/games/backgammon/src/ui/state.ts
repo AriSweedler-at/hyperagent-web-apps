@@ -327,6 +327,8 @@ export const badPositionMsg = (error: string): string => `That position is not v
 export const joinedMsg = (name: string): string => `${name} joined! Ready when you are.`;
 export const hostRoomMsg = (hostName: string): string =>
   `Connected — waiting for ${hostName} to start`;
+/** `guest/lost` once the match is over: the host closed the room, there is nothing to rejoin. */
+export const hostLeftMsg = (hostName: string): string => `${hostName} left the table.`;
 export const guestGoneMsg = (oppName: string | null, code: string | null): string =>
   `${oppName ?? 'Opponent'} disconnected — they can rejoin with code ${String(code)}.`;
 /**
@@ -1543,11 +1545,22 @@ const shellIntent = (app: App, intent: ShellIntent, ctx: Context): Step => {
       return guestFrame(app, intent.frame, ctx.now());
     case 'guest/lost': {
       const lost = { shell: { ...s, oppConnected: false }, table: tableCleared(app.table) };
-      if (lost.shell.view !== null && !lost.shell.view.matchOver)
-        return then(rendered(lost, lost.shell.view, ctx.now()), (a) =>
-          step(a, toast(LOST_HOST_MSG, GONE_TOAST_MS)),
+      const v = lost.shell.view;
+      if (v === null) return showScreen(withGuestStatus(lost, DISCONNECTED_MSG), 'guestWaitScreen');
+      // Over: the result stays up; the session's rejoin finds a destroyed Peer and the save would
+      // only offer a dead room. Mid-match the session reconnects by itself.
+      if (v.matchOver)
+        return then(rendered(lost, v, ctx.now()), (a) =>
+          step(
+            a,
+            { type: 'closeNet' },
+            { type: 'clearSave' },
+            toast(hostLeftMsg(v.opp.name), GONE_TOAST_MS),
+          ),
         );
-      return showScreen(withGuestStatus(lost, DISCONNECTED_MSG), 'guestWaitScreen');
+      return then(rendered(lost, v, ctx.now()), (a) =>
+        step(a, toast(LOST_HOST_MSG, GONE_TOAST_MS)),
+      );
     }
   }
 };
