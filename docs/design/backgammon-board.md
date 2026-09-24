@@ -31,8 +31,8 @@ the rules by rule (`rules R13`).
 | Turn end | No `done` action: the turn ends by itself when no maximal play extends what was played (rules R13); `#doneBtn` is reserved and hidden in every state. |
 | Hit toast | "Kapará. {name} hit you on your {n}-point." for the player hit, in their own numbering, from the moves (`played[i].hit`, `lastPlay`), never from log text. Online it fires as the opponent's hit moves arrive; in pass-and-play when the phone reaches the player hit (§4.9). |
 | Accessibility | Every tap target ≥ 44px on the phone (the geometry e2e asserts it), a painted `aria-label` per place, Enter/Space on a focused place is its tap, Escape closes the sheet or the tray. |
-| Theme | "Subtle but recognizable": whitewash page, aegean blue the one accent, olive-wood board, gold only as a hairline, one low-contrast meander line on the frame, an olive trim along the window's edge. The dark checker a deep-blue disc with a fine blue ring (the eye motif as a subtle inner ring, never a literal eye); the light one a pale disc with a soft sheen. Checkers, dice and frame are CSS only, no images. GFS Didot for the title and the room code, Cardo for everything else, both from Google Fonts. |
 | Online | Gin's flow, the default mode: the Online panel (name, match length, rules, "Open a table" / "Sit down" by code), `#hostWaitScreen` with the 4-letter code, "Share invite" and "Start the match", `#guestWaitScreen`; the host applies both seats' actions (`hostDispatch`) and broadcasts the guest's `View`, a refusal is a `toast` frame, the guest's Roll is an `action` frame the host rolls; the table's 🌐 and the curtain's "Continue online" hand a pass-and-play game to a fresh room (`handoff/click`); saves per role drive "Resume hosting room X" / "Rejoin room X". |
+| Online | Hidden in the page PR (`ui/state.ts ONLINE_MODE_SHOWN = false`: the mode switch, the Online panel and the curtain's "Continue online" are hidden and pass-and-play is the default); the sessions, protocol and storage shapes are in place for the online PR (§5.3). |
 
 ## 2. The one DOM
 
@@ -106,13 +106,15 @@ Plain English except the three strings (Q11).
 ### 3.1 Tokens and geometry
 
 The eleven shared names are redeclared on this palette (a partial override would inherit gin's
-green felt; `test/tokens.test.ts` and `CONTRACT.md` "Tokens" hold it): `--bg #f4efe6`
-(whitewash), `--card #efe8dc`, `--card-2 #e4dac4`, `--accent #0b3c5d` (aegean, the one accent),
-`--accent-dark #06253d` (the dark checker, the curtain wash), `--gold #c9a227` (hairlines only),
-`--text #2a1a12`, `--muted #7a6a58`, `--danger #b7472a`, `--radius 12px`, `--felt` the olive-wood
-gradient. Game tokens, only the ones a rule reads: `--olivewood-dark --stone --olive (#5f7133, the
-dark triangles and the trim) --olive-leaf --nazar --nazar-pale --walnut --nacre-sheen
---serif-display --serif-text`. Geometry lives on `#tableScreen` like gin's `--card-w`:
+green felt; `test/tokens.test.ts` and `CONTRACT.md` "Tokens" hold it): `--bg #e7d7be` (the
+parchment tile's rendered mean, §3.11), `--card #efe8dc`, `--card-2 #e4dac4`, `--accent #0b3c5d`
+(aegean, the one accent), `--accent-dark #06253d` (the dark checker, the curtain wash), `--gold
+#c9a227` (hairlines only), `--text #2a1a12`, `--muted #685745` (a step darker than the first
+cut's `#7a6a58`, which fell to 3.7:1 on the parchment), `--danger #b7472a`, `--radius 12px`,
+`--felt` the olive-wood gradient. Game tokens, only the ones a rule reads: `--olivewood-dark
+--stone --olive (#5f7133, the dark triangles and the trim) --olive-leaf --nazar --nazar-pale
+--walnut --nacre-sheen --serif-display --serif-text`, and the shell's (§3.11) `--panel --nacre
+--nacre-dim --hair --parchment-cream`. Geometry lives on `#tableScreen` like gin's `--card-w`:
 
 - phone: `--chrome-h 172px` (#app padding 24, topbar 44, status 22, controls 56, three 8px gaps,
   2px slack), `--bar-w 48px`, `--off-h 44px`, `--point-w clamp(44px, (100dvh - chrome - bar - off
@@ -247,6 +249,38 @@ With `--point-w` floored at 44px the phone board is 636px and the screen needs 8
 controls, gin's rule with the threshold derived for this board; the desktop's floor is 646px
 (`max-height: 645px`). The board itself can be scrolled from: `touch-action: none` is scoped to
 `.checker`.
+
+### 3.11 Background and panel
+
+The owner, from the comparison page of eight backgrounds under a mock of the home panel: "That
+parchment background looks great. I much prefer the rich blue", then "Pergament.2 flesh". The
+background is that candidate: a CC0 photograph of the smooth flesh side of a medieval parchment
+(Wikimedia Commons [File:Pergament.2.jpg](https://commons.wikimedia.org/wiki/File:Pergament.2.jpg),
+Membeth, 2012, CC0 1.0; 1024² at 600 dpi), mirror-tiled 2×2 so every edge meets its own reflection
+(`assets/parchment-flesh.jpg`, 2048², 299 KB, JPEG quality 0.86), painted on `html` and `body`
+at its native 2048px so the grain is the same at every width, under a cream multiply
+(`--parchment-cream #eee0c8` as a gradient layer with `background-blend-mode: multiply`) that
+gives the nearly white photo its tone; `background-color: var(--bg)` beneath is the tile's
+rendered mean `#e7d7be`, the page's tone before the JPEG arrives. The attachment is the default
+(`fixed` breaks on iOS). The trim (§3.6) stays over it. Vite emits the tile beside the page's CSS
+under `shared/assets/` with a document-relative `url()`, which the dist guards accept.
+
+The panel is the mock's "rich blue" mode: `.tabbar`, `.mode-switch`, `.tab-submenu` and every
+`.card-box` (the Play panel's cards, `#resumeBox`, the waiting rooms, the match-over screen) in
+`--panel`, a `#0d4266 → --accent (#0b3c5d) → #082e49` gradient, with the gold hairline `--hair
+rgba(201,162,39,.62)` inset and a `0 8px 22px` blue-black shadow; text on it `--nacre #f3ecdf`;
+labels, field labels, notes and the muted status `--nacre-dim` (nacre at 72%); the open tab and
+mode nacre with `--accent` text, the tab with a 2px `--gold` underline; inputs and selects nacre
+with a gold-tinted edge and the accent for the chevron; the primary button (`.btn-primary`,
+everywhere) a step lighter than the panel (`#155a86 → #0f4a70`) with the same hairline and nacre
+text; secondary buttons, the icon buttons, the badge and the die chips nacre (the old `--card-2`
+is 1.02:1 against the parchment); in a `.sheet` the secondary buttons keep `--card-2`. The
+sheets, the curtain wash and the board keep their look; where the board and the toast wrote `--bg`
+as light ink (the olive labels, the count badge, the target disc, the hit toast) they write
+`--nacre`. `--muted` steps to `#685745` so the secondary text keeps 4.5:1 on the darker page
+(§6 has the pairs). The keyboard focus ring is `--gold` on the panel, where the accent ring would
+vanish. No class is added: the panel is what `.card-box`, `.tabbar` and `.mode-switch` now look
+like, so the waiting rooms and the match-over screen follow without a hook.
 
 ## 4. The interaction model (`ui/state.ts`, `App = { shell, table }`)
 
@@ -495,9 +529,14 @@ and four"); `#toast` is `role="status"`; `#soundBtn` is a toggle with `aria-pres
 "three 3s"), "Your bar, 1 checker, selected", "Your tray, 3 off, target with the 6". Checkers differ
 by shape (the inner ring only on the dark one), targets carry numerals, the selected checker has a
 ring and a lift, a hit has the flash and the toast: colour is never the only cue.
-`prefers-reduced-motion` per §3.8. Contrast: `--text` on `--bg` 12.9:1, the labels 6.5:1 on stone
-and 4.7:1 on olive, `--bg` on `--nazar` 4.7:1, `--bg` on `--accent` 11:1, the bar ring 6.6:1 on
-walnut.
+`prefers-reduced-motion` per §3.8. Contrast (WCAG, the page measured against the parchment's
+rendered mean): `--text` on `--bg` 11.8:1, `--muted` on `--bg` 4.9:1, `--accent` (the title) on
+`--bg` 8.2:1; on the panel (§3.11) nacre 9.0–11.9:1 and `--nacre-dim` 5.5–6.9:1 across the
+gradient, `--accent` on nacre 9.8:1 (the open tab), `--text` on nacre 14.2:1 (inputs, secondary
+buttons), nacre on the primary button 6.3–8.0:1, the gold hairline 4.8:1 on the panel; on the board
+the labels 6.5:1 on stone and nacre 4.6:1 on olive, nacre on `--accent` 9.8:1 (the count badge),
+nacre on `--nazar` 4.1:1 (the target disc's numeral, as it was with `--bg`: the one pair under
+4.5:1, a board token this change leaves alone), the bar ring 6.6:1 on walnut.
 
 ## 7. Testability
 
