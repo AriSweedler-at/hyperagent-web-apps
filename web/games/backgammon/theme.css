@@ -2,8 +2,9 @@
    The page links web/shared/styles/tokens.css and base.css before this file, and :root below
    redeclares every one of the eleven shared names (a partial override would inherit gin's green
    felt; test/tokens.test.ts holds it). The palette is restrained: a parchment page
-   (§3.11: a CC0 photo of real medieval parchment, mirror-tiled, under a cream multiply), aegean
-   blue as the one accent, an olive-wood board, gold only as a hairline. The board is one
+   (§3.11: a CC0 photo of real medieval parchment, mirror-tiled, under a cream multiply), the home
+   shell in a rich aegean blue with nacre text and fills and a gold hairline round it, an olive-wood
+   board, gold elsewhere only as a hairline. The board is one
    DOM in two grid templates (§3.3): the phone stands it on end (twelve rows of two points, a
    bar band, an off row), the desktop lays it flat from 900px (two rows of thirteen). Every place
    is a grid area named by its own number, so a seat swap is 24 `data-own` attributes and the
@@ -32,9 +33,12 @@
   --nazar-pale: #8dc3f0;
   --walnut: #4a2e1c;
   --nacre-sheen: linear-gradient(135deg, #f7f2ea 0%, #e9e9ec 45%, #ede7d8 100%);
-  /* Nacre: the light ink and the light fills now that the page itself is parchment (§3.11); the
-     cream the parchment photo is multiplied with. */
+  /* The home shell (§3.11): the rich-blue panel, nacre for text and fills on it, a gold hairline
+     round it; the cream the parchment photo is multiplied with. */
+  --panel: linear-gradient(180deg, #0d4266 0%, var(--accent) 60%, #082e49 100%);
   --nacre: #f3ecdf;
+  --nacre-dim: rgba(243, 236, 223, 0.72);
+  --hair: rgba(201, 162, 39, 0.62);
   --parchment-cream: #eee0c8;
   --serif-display: 'GFS Didot', 'Didot', 'Bodoni MT', Georgia, serif;
   --serif-text: 'Cardo', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
@@ -127,12 +131,50 @@ h1 {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+/* The panel (§3.11; the owner: "I much prefer the rich blue"): every box of the shell (the Play
+   panel's cards, the resume box, the waiting rooms, the match-over screen) in the rich-blue
+   gradient with a gold hairline inset and nacre text; the tab bar and the mode switch below wear
+   the same. */
 .card-box {
-  background: var(--card);
+  background: var(--panel);
+  color: var(--nacre);
   border-radius: var(--radius);
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 1px 2px rgba(42, 26, 18, 0.06);
+  box-shadow:
+    inset 0 0 0 1px var(--hair),
+    0 8px 22px rgba(6, 37, 61, 0.28);
+}
+/* On the panel: labels and notes in a dimmed nacre, the room code in nacre, fills nacre with a
+   gold-tinted edge and the accent for the chevron, the score rows nacre with the page's ink. */
+.card-box label,
+.card-box .field-label,
+.card-box .empty-note,
+.card-box .sheet-sub,
+.card-box .muted {
+  color: var(--nacre-dim);
+}
+.card-box .room-code {
+  color: var(--nacre);
+}
+.card-box input[type='text'],
+.card-box input[type='number'],
+.card-box select,
+.card-box textarea {
+  border-color: rgba(201, 162, 39, 0.4);
+}
+.card-box select {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--accent) 50%),
+    linear-gradient(135deg, var(--accent) 50%, transparent 50%);
+}
+.card-box .score-row {
+  background: var(--nacre);
+  color: var(--text);
+}
+/* Keyboard focus on the panel: the accent ring would vanish into it, so the ring is gold there. */
+#app :is(.tabbar, .mode-switch, .card-box) :is(.btn, .tab-btn, .mode-btn, button):focus-visible {
+  outline-color: var(--gold);
 }
 .card-box.centered,
 .centered {
@@ -178,17 +220,22 @@ h1 {
   cursor: not-allowed;
   transform: none;
 }
+/* The primary button a step lighter than the panel, with the same hairline; on hover a shade
+   lighter still (the press keeps .btn:active's dim). */
 .btn-primary {
-  background: var(--accent);
+  background: linear-gradient(180deg, #155a86 0%, #0f4a70 100%);
   color: var(--nacre);
   width: 100%;
   font-size: 1.1rem;
+  box-shadow:
+    inset 0 0 0 1px var(--hair),
+    0 6px 16px rgba(6, 37, 61, 0.28);
 }
-.btn-primary:hover {
-  background: var(--accent-dark);
+.btn-primary:hover:not(:active) {
+  filter: brightness(1.08);
 }
-/* Secondary buttons are nacre: a step lighter than the parchment (the old card tone is 1.02:1
-   against it). In a sheet (already the card colour) they keep the darker card tone they had. */
+/* Secondary buttons are nacre: a step lighter than the parchment, a fill on the panel. In a sheet
+   (already the card colour) they keep the darker card tone they had. */
 .btn-secondary {
   background: var(--nacre);
 }
@@ -394,14 +441,18 @@ label {
   height: 0;
 }
 
-/* ---------- top tabs and the mode switch (gin's shapes, restyled) ---------- */
+/* ---------- top tabs and the mode switch (gin's shapes, restyled; the panel look of §3.11) ---------- */
 .tabbar {
   display: flex;
   gap: 6px;
   margin: 4px 0 16px;
-  background: var(--card);
+  background: var(--panel);
+  color: var(--nacre);
   border-radius: var(--radius);
   padding: 4px;
+  box-shadow:
+    inset 0 0 0 1px var(--hair),
+    0 8px 22px rgba(6, 37, 61, 0.28);
 }
 .tab-wrap {
   position: relative;
@@ -412,7 +463,7 @@ label {
   flex: 1;
   background: transparent;
   border: none;
-  color: var(--muted);
+  color: var(--nacre-dim);
   font-family: inherit;
   font-weight: 700;
   font-size: 0.95rem;
@@ -422,10 +473,11 @@ label {
   white-space: nowrap;
   cursor: pointer;
 }
+/* The open tab: nacre with the gold underline. */
 .tab-btn.active {
-  background: var(--bg);
+  background: var(--nacre);
   color: var(--accent);
-  box-shadow: inset 0 -2px 0 var(--accent);
+  box-shadow: inset 0 -2px 0 var(--gold);
 }
 .tab-wrap .tab-btn::after {
   content: ' \25BE';
@@ -441,14 +493,17 @@ label {
   left: 0;
   min-width: 180px;
   z-index: 30;
-  background: var(--card);
-  border: 1px solid rgba(42, 26, 18, 0.12);
+  background: var(--panel);
+  color: var(--nacre);
+  border: none;
   border-radius: var(--radius);
   padding: 4px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  box-shadow: 0 10px 26px rgba(42, 26, 18, 0.18);
+  box-shadow:
+    inset 0 0 0 1px var(--hair),
+    0 10px 26px rgba(6, 37, 61, 0.35);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -479,14 +534,14 @@ label {
     transform: translateY(0);
   }
   .tab-submenu button:hover {
-    background: var(--card-2);
-    color: var(--text);
+    background: rgba(243, 236, 223, 0.12);
+    color: var(--nacre);
   }
 }
 .tab-submenu button {
   background: transparent;
   border: none;
-  color: var(--muted);
+  color: var(--nacre-dim);
   font-family: inherit;
   text-align: left;
   padding: 11px 12px;
@@ -497,28 +552,37 @@ label {
   cursor: pointer;
 }
 .tab-submenu button.active {
-  background: var(--bg);
+  background: var(--nacre);
   color: var(--accent);
 }
+/* With the Play panel open the tab bar flows into the mode switch: no bottom hairline, no bottom radii. */
 .tabbar:has(+ #playPanel:not(.hidden)) {
   margin-bottom: 0;
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
+  box-shadow:
+    inset 1px 1px 0 var(--hair),
+    inset -1px 0 0 var(--hair),
+    0 8px 22px rgba(6, 37, 61, 0.28);
 }
 .mode-switch {
   display: flex;
   gap: 6px;
   margin: 0 0 16px;
   padding: 4px;
-  background: var(--card);
-  border-top: 1px solid rgba(42, 26, 18, 0.08);
+  background: var(--panel);
+  color: var(--nacre);
+  border-top: 1px solid rgba(201, 162, 39, 0.35);
   border-radius: 0 0 var(--radius) var(--radius);
+  box-shadow:
+    inset 0 0 0 1px var(--hair),
+    0 8px 22px rgba(6, 37, 61, 0.28);
 }
 .mode-btn {
   flex: 1;
   background: transparent;
   border: none;
-  color: var(--muted);
+  color: var(--nacre-dim);
   font-family: inherit;
   font-weight: 700;
   padding: 9px 6px;
@@ -529,7 +593,7 @@ label {
   cursor: pointer;
 }
 .mode-btn.active {
-  background: var(--bg);
+  background: var(--nacre);
   color: var(--accent);
 }
 .rules-list {
