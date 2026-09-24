@@ -628,6 +628,12 @@ label {
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
 }
+/* On the panel (§3.11, the About copy) the accent is the panel's own blue and a link in it vanishes,
+   so there a link is nacre like the prose round it, its hairline gold (9.0:1 at the lightest stop). */
+.card-box .jargon {
+  color: var(--nacre);
+  text-decoration-color: var(--gold);
+}
 .rule-flash {
   animation: rule-flash 1.2s ease-out;
 }

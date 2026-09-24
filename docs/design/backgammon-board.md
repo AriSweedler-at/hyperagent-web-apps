@@ -537,7 +537,8 @@ ring and a lift, a hit has the flash and the toast: colour is never the only cue
 rendered mean): `--text` on `--bg` 11.8:1, `--muted` on `--bg` 4.9:1 (4.5:1 against the tile's
 darkest percentile, the creases and specks), `--accent` (the title) on
 `--bg` 8.2:1; on the panel (§3.11) nacre 9.0–11.9:1 and `--nacre-dim` 5.5–6.9:1 across the
-gradient, `--accent` on nacre 9.8:1 (the open tab), `--text` on nacre 14.2:1 (inputs, secondary
+gradient (the About copy's glossary links are nacre too, `.card-box .jargon`: the accent they wear
+on the cream rules list would be 1.0:1 there), `--accent` on nacre 9.8:1 (the open tab), `--text` on nacre 14.2:1 (inputs, secondary
 buttons), nacre on the primary button 6.3–8.0:1, the gold hairline (`--hair`, 62% over the panel)
 2.7:1, decorative: the panel is told from the page by its blue, not by the line; on the board
 the labels 6.5:1 on stone and nacre 4.6:1 on olive, nacre on `--accent` 9.8:1 (the count badge),

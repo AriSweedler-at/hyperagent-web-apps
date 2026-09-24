@@ -87,17 +87,17 @@ describe('the About copy', () => {
     expect(ABOUT_PARAGRAPHS[0]).toContain('Sephardic');
     const western = aboutHtml('backgammon');
     expect(western.split('\n')).toHaveLength(2);
-    ['Portes', 'gammon', 'doubling cube', 'Crawford rule', 'Bear off', 'opening roll'].forEach(
-      (word) => {
-        expect(western).toMatch(
-          new RegExp(`<a class="jargon" href="#rule-[\\w-]+" data-rule="[\\w-]+">${word}</a>`),
-        );
-      },
-    );
+    ['gammon', 'doubling cube', 'Crawford rule', 'Bear off', 'opening roll'].forEach((word) => {
+      expect(western).toMatch(
+        new RegExp(`<a class="jargon" href="#rule-[\\w-]+" data-rule="[\\w-]+">${word}</a>`),
+      );
+    });
     // "counts double" and "backgammon" the game keep their everyday sense: no link.
     expect(western).not.toMatch(/data-rule="[^"]+">double</);
     expect(western).not.toMatch(/data-rule="[^"]+">backgammon</);
-    expect(western).toContain('data-rule="scoring">Portes</a>');
+    // "Portes" links only where a rule names it: Portes's Scoring does, no Western rule does.
+    expect(western).not.toMatch(/data-rule="[^"]+">Portes</);
+    expect(aboutHtml('portes')).toContain('data-rule="scoring">Portes</a>');
     expect(aboutHtml('portes')).toContain('data-rule="scoring">doubling cube</a>');
   });
 });

@@ -20,6 +20,15 @@ export const ruleAnchor = (id: string): string => `${ANCHOR_PREFIX}${id}`;
 /** The class every jargon link carries (styled by each theme; the edge delegates clicks on it). */
 export const JARGON_CLASS = 'jargon';
 
+/**
+ * The ids of the two rules-list `<ul>` slots every game renders from one list: the home tab's and
+ * the in-game overlay's. Both hold the same `<li id="rule-<id>">`s, so `revealRule` takes the slot
+ * the reducer says is on screen rather than searching the document. (No class attribute is spelt
+ * here: test/dist/class-contract.test.ts reads `class="…"` out of source, comments included.)
+ */
+export const RULES_SLOT_IDS = ['rulesList', 'rulesOverlayList'] as const;
+export type RulesSlot = (typeof RULES_SLOT_IDS)[number];
+
 /** A term and the rule it means, one row per term. */
 type Term = Readonly<{ term: string; rule: string }>;
 /** A term with its place in the glossary, for a stable sort. */

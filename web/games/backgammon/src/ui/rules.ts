@@ -9,9 +9,8 @@ import { rulesListHtml, type RuleItem } from '../../../../shared/ui/glossary.ts'
 import type { ShippedVariant } from '../engine/index.ts';
 import { GLOSSARY } from './glossary.ts';
 
-/** The ids of the two `<ul class="rules-list">` slots: the home tab's and the in-game overlay's. */
-export const RULES_SLOT_IDS = ['rulesList', 'rulesOverlayList'] as const;
-export type RulesSlot = (typeof RULES_SLOT_IDS)[number];
+/** The two slots this list is rendered into, named once for every game beside the anchor. */
+export { RULES_SLOT_IDS, type RulesSlot } from '../../../../shared/ui/glossary.ts';
 
 /** What every tavli-family game shares: the board, the direction, hits, the bar and bearing off. */
 const COMMON: ReadonlyArray<RuleItem> = [
@@ -65,7 +64,7 @@ const PORTES: ReadonlyArray<RuleItem> = [
   {
     id: 'scoring',
     heading: 'Scoring',
-    body: 'A win counts 1 point; 2 if the loser has borne off nothing yet (a gammon, "diplo"). There is no doubling cube and no triple game.',
+    body: 'In Portes a win counts 1 point; 2 if the loser has borne off nothing yet (a gammon, "diplo"). There is no doubling cube and no triple game.',
   },
   MATCH,
   ONLINE,

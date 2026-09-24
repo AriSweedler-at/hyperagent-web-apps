@@ -8,9 +8,8 @@
 import { rulesListHtml, type RuleItem } from '../../../../shared/ui/glossary.ts';
 import { GLOSSARY } from './glossary.ts';
 
-/** The ids of the two `<ul class="rules-list">` slots: the home tab's and the in-game overlay's. */
-export const RULES_SLOT_IDS = ['rulesList', 'rulesOverlayList'] as const;
-export type RulesSlot = (typeof RULES_SLOT_IDS)[number];
+/** The two slots this list is rendered into, named once for every game beside the anchor. */
+export { RULES_SLOT_IDS, type RulesSlot } from '../../../../shared/ui/glossary.ts';
 
 /** The eleven items, in the legacy order; heading and body as the legacy `<li>` had them. */
 export const RULES_ITEMS: ReadonlyArray<RuleItem> = [

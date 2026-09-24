@@ -36,10 +36,14 @@ Backgammon (`src/ui/rules.ts`, per variant): `goal`, `direction` (point, home bo
 (doubles), `blocks` (blot, hit, bar, closed point), `bearing-off` (bear off), `opening`, `scoring`
 (gammon, diplo, backgammon), `match`, `cube` (double, take, pass, own the cube), `crawford`, `online`.
 The About panel keeps the Sephardic paragraph (the title no longer says it) with `portes`, `gammon`,
-`doubling cube`, `Crawford rule`, `bear off` linked.
+`doubling cube`, `Crawford rule`, `bear off` linked. A link lands only on a rule that says the word:
+`portes` links under the Portes ruleset (its Scoring rule opens "In Portes …") and stays plain under
+Western, as `Crawford rule` stays plain under Portes.
 
-Fidice (`src/view/screens/rules.ts` items get ids; the menu gets an About blurb): `bid`, `dudo`
-(call), `calza` (spot on), `palifico`, `wild ones`, `losing a die`.
+Fidice: deferred to a follow-up (§5). Its rules screen is prose panels (Setup / Your turn / Calling
+liar / The ladder), not items, and it plays one-cup liar's dice with poker hands, so its vocabulary
+is `bid`, `raise`, `call liar`, `pull out`, `cup`: not the dudo/calza/palifico set of Perudo. The
+follow-up rewrites the copy into `RuleItem`s and adds About to the menu screen first.
 
 ## 3. Shared code
 
@@ -49,7 +53,8 @@ Fidice (`src/view/screens/rules.ts` items get ids; the menu gets an About blurb)
   boundaries, longest terms first, skipping text inside tags and inside existing `<a>`; `except`
   suppresses self-links inside a rule); `rulesListHtml(items, glossary)` renders
   `<li id="rule-<id>"><strong>Heading:</strong> body</li>` with the body's jargon linked;
-  `ruleFromHash(hash): string | null` reads `#rule-<id>`.
+  `ruleFromHash(hash): string | null` reads `#rule-<id>`; `RULES_SLOT_IDS` / `RulesSlot` name the
+  two slots (`rulesList`, `rulesOverlayList`) once for every game.
 - `web/shared/edge/glossary.ts`: `bindJargon(doc, onRule: (id) => void)` (one delegated click
   listener on `a.jargon` through dom.ts, `preventDefault`), `revealRule(doc, slotId, id, timing?)`
   (`scrollIntoView` on `#rule-<id>` inside the rules slot the reducer names, a frame after the
@@ -61,8 +66,9 @@ Fidice (`src/view/screens/rules.ts` items get ids; the menu gets an About blurb)
   (persisted like `tab/set`), on any other screen `rulesOpen: true`; effect
   `revealRule { slot, rule }` (`slot` the rules list that is on screen) run by main.ts through the
   edge. Boot: `ruleFromHash(location.hash)` dispatches `rules/show`.
-- Fidice: the same pure helpers produce the links; the vdom rules screen renders `id="rule-<id>"`;
-  the controller handles the click (`ui.screen = 'rules'`) and calls `revealRule` after render.
+- Fidice (the follow-up): the same pure helpers produce the links; the vdom rules screen renders
+  `id="rule-<id>"`; the controller handles the click (`ui.screen = 'rules'`) and calls `revealRule`
+  after render.
 - CSS (each theme): `.jargon` is an underlined link in the accent colour (dotted underline, no
   colour shout: the restraint rule); `.rule-flash` a brief background fade. Rows in CONTRACT.md.
 
@@ -73,12 +79,13 @@ Fidice (`src/view/screens/rules.ts` items get ids; the menu gets an About blurb)
 - Reducer: `rules/show` sets the tab (and the overlay in game), emits the effect; the hash boot.
 - Painter (page fake): the delegated click dispatches; `revealRule` toggles the class.
 - E2E (page-only, both viewports, per game): About → tap "knock" (gin) / "gammon" (backgammon) /
-  "dudo" (fidice) → the Rules tab is active, `#rule-<id>` is inside the viewport and flashed;
+  "call liar" (fidice, the follow-up) → the Rules tab is active, `#rule-<id>` is inside the viewport and flashed;
   `?…#rule-<id>` at boot opens Rules at the rule. Story baselines only where a screenshot changes.
 
 ## 5. Sequencing
 
 After the polish PR (`bg-polish`, edits rules.ts/About) and the online PR (`bg-online`, edits
 home.ts/index.html) land: one PR for the shared helpers + gin + backgammon; fidice in the same PR
-if small, else a follow-up. The shared-shell extraction (P6/P7) then absorbs `rules/show`,
+if small, else a follow-up. It was not small (§2: an architecture change to its rules screen), so
+fidice is the follow-up. The shared-shell extraction (P6/P7) then absorbs `rules/show`,
 `bindJargon` and the About/Rules panels into the shared shell.

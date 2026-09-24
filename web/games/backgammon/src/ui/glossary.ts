@@ -22,7 +22,8 @@ const COMMON: Glossary = [
 
 /**
  * Portes has no cube and no Crawford game: "doubling cube" points at its scoring rule, which says
- * so, and "Crawford rule" stays plain text; "Portes" itself lands on the scoring that defines it.
+ * so, and "Crawford rule" stays plain text; "Portes" itself lands on that scoring rule, the one
+ * rule that names it. Under Western no rule says Portes, so the word stays plain there.
  */
 const PORTES: Glossary = [
   ...COMMON,
@@ -31,7 +32,7 @@ const PORTES: Glossary = [
 
 const WESTERN: Glossary = [
   ...COMMON,
-  { rule: 'scoring', terms: ['gammon', 'gammons', 'diplo', 'portes', 'triple'] },
+  { rule: 'scoring', terms: ['gammon', 'gammons', 'diplo', 'triple'] },
   { rule: 'cube', terms: ['doubling cube', 'own the cube', 'doubling', 'cube'] },
   { rule: 'crawford', terms: ['crawford rule', 'crawford'] },
 ];
