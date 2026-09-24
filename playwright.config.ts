@@ -27,8 +27,9 @@
 // lists them, both projects as ever; unset, every spec runs as before. The suite is a `testMatch`
 // rather than a positional file filter so the rule is spelled once, in the table, and composes
 // with a CLI `--grep` (the broker job's `"@online|@relay"`, `test:deployed`); a spec file shared
-// by two games would carry a tag per game and the other games' tags go into `grepInvert`, which
-// a CLI `--grep` also composes with (none today: docs/design/test-partition.md §5.2).
+// by two games (the shell specs, e2e/shell-*.spec.ts: one describe per shell game tagged `@<game>`,
+// docs/design/shared-shell.md §6.3) is claimed by both games' suites and the other game's tag goes
+// into `grepInvert` (`e2e.otherTags`), which a CLI `--grep` also composes with.
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 import { defineConfig } from '@playwright/test';
@@ -69,15 +70,16 @@ const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/gin-draw.spec.ts',
   '**/gin-geometry.spec.ts',
   '**/gin-glossary.spec.ts',
-  '**/gin-home.spec.ts',
   '**/gin-layoff.spec.ts',
   '**/gin-local.spec.ts',
   '**/gin-sandbox.spec.ts',
   '**/gin-scorer.spec.ts',
   '**/gin-sound-font.spec.ts',
   '**/gin-stories.spec.ts',
+  '**/shell-home.spec.ts',
   // The sessions' silence watch is a timer, the same on either origin.
   '**/shell-liveness.spec.ts',
+  '**/shell-local.spec.ts',
 ];
 /** The suite `E2E_SUITE` names, or none; a name with no e2e half is an error, never a full run. */
 const e2eSuiteFromEnv = (value: string | undefined): Suite | undefined => {

@@ -1,11 +1,11 @@
-// Two-peer Sheshbesh through the local PeerServer (docs/design/backgammon-board.md "Online";
-// gin's e2e/gin-online.spec.ts, step for step): the host opens a table, the guest sits down by
-// the code read off the host's screen, the host starts the match, both boards show the same
-// seeded opening (the same position, turn and dice), a roll out of turn is refused with a toast,
-// the guest's Roll is rolled by the host (its `roll` is an `action` frame; the dice come back in
-// the next `state` frame) and both see the same dice, one move by taps propagates to the other
-// board, and the recorded Peer constructions prove the ?peer= broker override and the ?ice=
-// configuration reached PeerJS under the `sheshbesh-` peer id.
+// Two-peer Sheshbesh through the local PeerServer (docs/design/backgammon-board.md "Online"),
+// backgammon's half: once the shell has connected the two pages and the host has started the
+// match, a roll out of turn is refused with a toast, the guest's Roll is rolled by the host (its
+// `roll` is an `action` frame; the dice come back in the next `state` frame) and both see the same
+// dice, and one move by taps propagates to the other board. The shell's half (the table, the join,
+// the seeded opening on both boards with the seats and the names, the recorded Peer constructions
+// with the ?peer= and ?ice= hooks under the `sheshbesh-` peer id) is e2e/shell-online.spec.ts, for
+// both shell games.
 import type { Page } from '@playwright/test';
 
 import { MESSAGES, type Action } from '../web/games/backgammon/src/engine/index.ts';
@@ -19,8 +19,8 @@ import {
   readBoard,
   requireBoard,
 } from './fixtures/backgammon.ts';
-import { expectPeerOptions, openGame } from './fixtures/player.ts';
-import { expect, hostRoom, joinByCode, test } from './fixtures/two-players.ts';
+import { connect } from './fixtures/shell-games.ts';
+import { expect, test } from './fixtures/two-players.ts';
 
 /** An action through the documented hook, as the sandbox and the style driver play (docs/ARCHITECTURE.md). */
 const act = (page: Page, action: Action): Promise<void> =>
@@ -50,27 +50,14 @@ const hostPlaysUntilGuestRolls = async (host: Page, guest: Page): Promise<void> 
 };
 
 test(
-  'host opens a table, guest joins by code, both see the seeded opening, the host rolls for the guest, a move propagates',
+  'after the start a roll out of turn is refused, the host rolls for the guest, a move propagates',
   { tag: '@online' },
   async ({ players, project }) => {
     const { host, guest } = players;
-    await openGame(host, project, 'backgammon');
-    await openGame(guest, project, 'backgammon');
-
-    const code = await hostRoom(host, 'backgammon', 'Host');
-    await joinByCode(guest, 'backgammon', code, 'Guest');
-    await expect(host.page.locator('#hostWaitStatus')).toContainText('Guest joined!');
+    await connect(players, project, 'backgammon');
     await bgHostStarts(host.page, guest.page);
-
-    // Both boards agree on the opening: the host is seat 0 and the guest seat 1, the opening roll
-    // resolved and the winner to roll; the names cross over.
+    // The opening both boards agree on; whose turn it is decides which seat is refused below.
     const opening = await bgBoardsAgree(host.page, guest.page);
-    expect(opening).toMatchObject({ gameNo: 1, phase: 'toRoll', me: { idx: 0 } });
-    expect(await requireBoard(guest.page)).toMatchObject({ me: { idx: 1 }, turn: opening.turn });
-    await expect(host.page.locator('#oppName')).toHaveText('Guest');
-    await expect(guest.page.locator('#oppName')).toHaveText('Host');
-    await expect(host.page.locator('#gameBadge')).toHaveText('Game 1 · 0–0 · to 5');
-    await expect(guest.page.locator('#gameBadge')).toHaveText('Game 1 · 0–0 · to 5');
 
     // Out of turn: the waiting seat's roll is refused with the engine's message (for the guest it
     // comes back as a toast frame from the host).
@@ -94,13 +81,5 @@ test(
     expect(moved.board).not.toEqual(rolled.board);
     await expect(host.page.locator('#curtainOverlay')).toBeHidden();
     await expect(guest.page.locator('#curtainOverlay')).toBeHidden();
-
-    // PeerJS was constructed with the harness's broker and ICE configuration on both sides.
-    const hostCall = (await host.peerCalls()).at(-1);
-    const guestCall = (await guest.peerCalls()).at(-1);
-    expect(hostCall?.id).toBe(`sheshbesh-${code}`);
-    expectPeerOptions(hostCall, 0);
-    expect(guestCall?.id).toBeNull();
-    expectPeerOptions(guestCall, 0);
   },
 );
