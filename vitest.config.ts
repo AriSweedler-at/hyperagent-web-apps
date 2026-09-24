@@ -118,6 +118,10 @@ export default defineConfig({
         // session scenarios over transport.fake.ts (net/**) and the cue table (fx). Measured
         // (lines/functions/statements/branches): protocol 100/100/100/100, storage
         // 100/100/100/100, ui 99.6/100/98.7/91.6, net 100/100/98.9/94.4, fx 100/100/100/100.
+        // Re-measured when the shared-shell extraction (docs/design/shared-shell.md §5 A3) moved
+        // the readers and writers both storage.ts spelled into web/shared/edge/prefs.ts: both
+        // storage.ts still 100/100/100/100 (backgammon's has no branch left), prefs.ts
+        // 100/100/100/100 under prefs.test.ts, shared/edge 99.4/98.8/98.9/94.3; no row moves.
         'web/games/backgammon/src/protocol.ts': {
           lines: 95,
           functions: 95,

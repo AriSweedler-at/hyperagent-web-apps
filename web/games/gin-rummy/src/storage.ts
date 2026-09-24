@@ -10,30 +10,59 @@
 // (`ginRummy_name`, `ginRummy_homeTab`, `ginRummy_playMode`, `ginRummy_sound`), as the legacy
 // `safeSet` wrote them. One key is this page's own: `ginRummy_p2Name`, the pass-and-play second
 // name, remembered under `rememberName`'s rule; the legacy read `#p2NameInput` only at the Start
-// button and never stored it, so no capture exists for it.
+// button and never stored it, so no capture exists for it. The readers and writers every shell
+// shares (the name rule, the bare-string preferences, the save's three roles) are built by
+// web/shared/edge/prefs.ts (docs/design/shared-shell.md §5 A3) over the keys, the engine decoder
+// and the host save's own field spelled here; the keys and the literals did not move.
 import { CARD_BACKS, type CardBack } from './cardBack.ts';
-import { SOUND_FONTS, type SoundFontName } from '../../../shared/lib/sound/fonts.ts';
 import { SORT_MODES, type SortMode } from './sort.ts';
 import type { Store, StorageError } from '../../../shared/edge/storage.ts';
+import {
+  NAME_MAX,
+  PLAY_MODES,
+  SOUND_STATES,
+  decodeName,
+  decodePlayMode,
+  decodeSoundFont,
+  decodeSoundState,
+  namePref,
+  shellSave,
+  soundPref,
+  textPref,
+  type GuestSave as ShellGuestSave,
+  type HostSave as ShellHostSave,
+  type LocalSave as ShellLocalSave,
+  type PlayMode,
+  type Save as ShellSave,
+  type SoundState,
+} from '../../../shared/edge/prefs.ts';
 
 // ui/state.ts names the Store through this module (docs/MIGRATION.md step 12): the reducer may
 // import everything below it but never an edge (docs/ARCHITECTURE.md "Module boundaries").
 export type { Store, StorageError };
+// The shell's shared literals, named through this module too, so the page has one storage import.
+export {
+  NAME_MAX,
+  PLAY_MODES,
+  SOUND_STATES,
+  decodeName,
+  decodePlayMode,
+  decodeSoundFont,
+  decodeSoundState,
+  type PlayMode,
+  type SoundState,
+};
 import {
   arrayOf,
-  formatError,
   integer,
   literal,
-  nullable,
   object,
-  optional,
   record,
   refine,
   string,
   type Decoder,
 } from '../../../shared/lib/json.ts';
-import { err, type Result } from '../../../shared/lib/result.ts';
-import { isWellFormedCode } from '../../../shared/lib/roomCode.ts';
+import type { Result } from '../../../shared/lib/result.ts';
 import { decodeState } from './engine/decode.ts';
 import type { State } from './engine/types.ts';
 import type { ScorerState } from './scorer/scores.ts';
@@ -74,11 +103,7 @@ export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 export const HOME_TABS = ['play', 'rules', 'score'] as const;
 export type HomeTab = (typeof HOME_TABS)[number];
 export const DEFAULT_HOME_TAB: HomeTab = 'play';
-export const PLAY_MODES = ['online', 'local'] as const;
-export type PlayMode = (typeof PLAY_MODES)[number];
 export const DEFAULT_PLAY_MODE: PlayMode = 'online';
-export const SOUND_STATES = ['on', 'off'] as const;
-export type SoundState = (typeof SOUND_STATES)[number];
 export { DEFAULT_SORT, SORT_MODES, type SortMode } from './sort.ts';
 export { CARD_BACKS, DEFAULT_CARD_BACK, type CardBack } from './cardBack.ts';
 export {
@@ -86,72 +111,20 @@ export {
   SOUND_FONTS,
   type SoundFontName,
 } from '../../../shared/lib/sound/fonts.ts';
-/** `rememberName` sliced what it stored to this many characters. */
-export const NAME_MAX = 20;
 
 /** `persist()` writes one of three shapes by role; the keys are in the legacy literals' order. */
-export type LocalSave = Readonly<{ role: 'local'; game: State }>;
-export type HostSave = Readonly<{
-  role: 'host';
-  code: string;
-  myName: string;
-  target: number;
-  /** null while the room waits for its first guest. */
-  game: State | null;
-  oppName: string | null;
-  /**
-   * The game came from pass-and-play (ui/state.ts `handoff`) and its remote seat has not joined:
-   * a reload resumes the offer, and cancelling gives the game back to pass-and-play. Written only
-   * when true, so every other host save keeps the legacy literal byte for byte.
-   */
-  handoff?: true;
-}>;
-export type GuestSave = Readonly<{ role: 'guest'; code: string; myName: string }>;
-export type Save = LocalSave | HostSave | GuestSave;
+export type LocalSave = ShellLocalSave<State>;
+/** The host save's own field, between `myName` and `game` in the legacy literal: the target score. */
+export type HostExtra = Readonly<{ target: number }>;
+export type HostSave = ShellHostSave<State, HostExtra>;
+export type GuestSave = ShellGuestSave;
+export type Save = ShellSave<State, HostExtra>;
 
-const roomCode = refine(
-  string,
-  (code) => isWellFormedCode('gin-rummy', code),
-  'a 4-letter room code',
-);
-const saveHead = object({ role: literal('local', 'host', 'guest') });
-const localSave: Decoder<LocalSave> = object({ role: literal('local'), game: decodeState });
-const hostSave: Decoder<HostSave> = object({
-  role: literal('host'),
-  code: roomCode,
-  myName: string,
-  target: integer(1),
-  game: nullable(decodeState),
-  oppName: nullable(string),
-  handoff: optional(literal(true)),
-});
-const guestSave: Decoder<GuestSave> = object({
-  role: literal('guest'),
-  code: roomCode,
-  myName: string,
-});
+const hostExtra: Decoder<HostExtra> = object({ target: integer(1) });
 
-export const decodeSave: Decoder<Save> = (input) => {
-  const head = saveHead(input);
-  if (!head.ok) return head;
-  switch (head.value.role) {
-    case 'local':
-      return localSave(input);
-    case 'host':
-      return hostSave(input);
-    case 'guest':
-      return guestSave(input);
-  }
-};
-
-/** `if (savedName)`: the legacy treated an empty string as no name. */
-export const decodeName: Decoder<string> = refine(string, (s) => s !== '', 'a non-empty name');
 export const decodeHomeTab: Decoder<HomeTab> = literal(...HOME_TABS);
-export const decodePlayMode: Decoder<PlayMode> = literal(...PLAY_MODES);
-export const decodeSoundState: Decoder<SoundState> = literal(...SOUND_STATES);
 export const decodeSort: Decoder<SortMode> = literal(...SORT_MODES);
 export const decodeCardBack: Decoder<CardBack> = literal(...CARD_BACKS);
-export const decodeSoundFont: Decoder<SoundFontName> = literal(...SOUND_FONTS);
 
 const scorerPlayer = object({ id: string, name: string });
 const scorerRound = object({
@@ -169,113 +142,42 @@ export const decodeScorerState: Decoder<ScorerState> = object({
   startedAt: integer(0),
 });
 
-const invalid = (key: string, error: Parameters<typeof formatError>[0]): StorageError => ({
-  kind: 'invalid',
-  key,
-  reason: formatError(error),
-});
-
-/** A bare-string key through its decoder. */
-const readTextWith = <T>(
-  store: Store,
-  key: string,
-  decoder: Decoder<T>,
-): Result<T, StorageError> => {
-  const text = store.readText(key);
-  if (!text.ok) return text;
-  const decoded = decoder(text.value);
-  return decoded.ok ? decoded : err(invalid(key, decoded.error));
-};
-
 // ---- the game save ---------------------------------------------------------------------------
 
-export const readSave = (store: Store): Result<Save, StorageError> =>
-  store.readJson(STORAGE_KEYS.save, decodeSave);
-
-/** The `persist()` literal for a save, key for key, whatever order the caller's object had. */
-const saveLiteral = (save: Save): Save => {
-  switch (save.role) {
-    case 'local':
-      return { role: 'local', game: save.game };
-    case 'host':
-      return {
-        role: 'host',
-        code: save.code,
-        myName: save.myName,
-        target: save.target,
-        game: save.game,
-        oppName: save.oppName,
-        ...(save.handoff === true ? { handoff: true } : {}),
-      };
-    case 'guest':
-      return { role: 'guest', code: save.code, myName: save.myName };
-  }
-};
-
-export const writeSave = (store: Store, save: Save): Result<null, StorageError> =>
-  store.writeJson(STORAGE_KEYS.save, saveLiteral(save));
-
-export const clearSave = (store: Store): Result<null, StorageError> =>
-  store.remove(STORAGE_KEYS.save);
+export const { decodeSave, readSave, writeSave, clearSave } = shellSave<State, HostExtra>({
+  key: STORAGE_KEYS.save,
+  game: 'gin-rummy',
+  decodeGame: decodeState,
+  hostExtra: { decode: hostExtra, literal: (save) => ({ target: save.target }) },
+});
 
 // ---- the bare-string preferences -----------------------------------------------------------
 
-export const readName = (store: Store): Result<string, StorageError> =>
-  readTextWith(store, STORAGE_KEYS.name, decodeName);
-
-/** `rememberName`: an empty name removes the key, anything else is stored cut to NAME_MAX. */
-const writeNameUnder = (store: Store, key: StorageKey, name: string): Result<null, StorageError> =>
-  name === '' ? store.remove(key) : store.writeText(key, name.slice(0, NAME_MAX));
-
-export const writeName = (store: Store, name: string): Result<null, StorageError> =>
-  writeNameUnder(store, STORAGE_KEYS.name, name);
-
+export const { read: readName, write: writeName } = namePref(STORAGE_KEYS.name);
 /** The pass-and-play second name, under `rememberName`'s rule; the legacy never stored it. */
-export const readP2Name = (store: Store): Result<string, StorageError> =>
-  readTextWith(store, STORAGE_KEYS.p2Name, decodeName);
-
-export const writeP2Name = (store: Store, name: string): Result<null, StorageError> =>
-  writeNameUnder(store, STORAGE_KEYS.p2Name, name);
-
-export const readHomeTab = (store: Store): Result<HomeTab, StorageError> =>
-  readTextWith(store, STORAGE_KEYS.homeTab, decodeHomeTab);
-
-export const writeHomeTab = (store: Store, tab: HomeTab): Result<null, StorageError> =>
-  store.writeText(STORAGE_KEYS.homeTab, tab);
-
-export const readPlayMode = (store: Store): Result<PlayMode, StorageError> =>
-  readTextWith(store, STORAGE_KEYS.playMode, decodePlayMode);
-
-export const writePlayMode = (store: Store, mode: PlayMode): Result<null, StorageError> =>
-  store.writeText(STORAGE_KEYS.playMode, mode);
-
-export const readSoundState = (store: Store): Result<SoundState, StorageError> =>
-  readTextWith(store, STORAGE_KEYS.sound, decodeSoundState);
-
-export const readSort = (store: Store): Result<SortMode, StorageError> =>
-  readTextWith(store, STORAGE_KEYS.sort, decodeSort);
-
-export const writeSort = (store: Store, sort: SortMode): Result<null, StorageError> =>
-  store.writeText(STORAGE_KEYS.sort, sort);
-
-export const readCardBack = (store: Store): Result<CardBack, StorageError> =>
-  readTextWith(store, STORAGE_KEYS.cardBack, decodeCardBack);
-export const writeCardBack = (store: Store, back: CardBack): Result<null, StorageError> =>
-  store.writeText(STORAGE_KEYS.cardBack, back);
-
-export const readSoundFont = (store: Store): Result<SoundFontName, StorageError> =>
-  readTextWith(store, STORAGE_KEYS.soundFont, decodeSoundFont);
-export const writeSoundFont = (store: Store, font: SoundFontName): Result<null, StorageError> =>
-  store.writeText(STORAGE_KEYS.soundFont, font);
-
-/** `safeGet(FX_KEY) !== 'off'`: on unless the key says off (missing or unreadable counts as on). */
-export const soundEnabled = (store: Store): boolean => {
-  const state = readSoundState(store);
-  return !(state.ok && state.value === 'off');
-};
-
-export const writeSoundState = (store: Store, sound: SoundState): Result<null, StorageError> =>
-  store.writeText(STORAGE_KEYS.sound, sound);
+export const { read: readP2Name, write: writeP2Name } = namePref(STORAGE_KEYS.p2Name);
+export const { read: readHomeTab, write: writeHomeTab } = textPref(
+  STORAGE_KEYS.homeTab,
+  decodeHomeTab,
+);
+export const { read: readPlayMode, write: writePlayMode } = textPref(
+  STORAGE_KEYS.playMode,
+  decodePlayMode,
+);
+export const {
+  read: readSoundState,
+  write: writeSoundState,
+  enabled: soundEnabled,
+} = soundPref(STORAGE_KEYS.sound);
+export const { read: readSort, write: writeSort } = textPref(STORAGE_KEYS.sort, decodeSort);
+export const { read: readCardBack, write: writeCardBack } = textPref(
+  STORAGE_KEYS.cardBack,
+  decodeCardBack,
+);
+export const { read: readSoundFont, write: writeSoundFont } = textPref(
+  STORAGE_KEYS.soundFont,
+  decodeSoundFont,
+);
 
 // ---- the Score Counter -----------------------------------------------------------------------
 
