@@ -51,8 +51,8 @@ export default defineConfig({
       // them; the gin net/ sessions the scenario tests beside them and the wire-corpus replay;
       // the games.sweedler.com Worker (infra/games-proxy/worker.ts) its table tests over a stubbed
       // global fetch. Measured at the ratchet (lines/functions/statements/branches):
-      // shared/lib 100/100/100/100, shared/edge 99.4/98.8/98.9/94.1 (re-measured with
-      // cuePlayer.ts and netDeps.ts, shared-shell plan A4, both at 100/100/100/100), fidice domain
+      // shared/lib 100/100/100/100, shared/edge 99.4/98.8/98.9/94.4 (re-measured with
+      // prefs.ts (A3), cuePlayer.ts and netDeps.ts (A4), the three at 100/100/100/100), fidice domain
       // 100/100/99.1/92.6, bots 98.9/97.9/98.4/89.9, net/protocol 100/100/100/96.7, net
       // 95.9/93.2/92.2/84.4, app 99.7/98.5/99.1/97.2, view 100/100/99.3/94.3, domain algorithms
       // 100/100/100/87.5; gin engine 99.8/99.3/98.7/95.8, engine algorithms 100/100/100/100,
