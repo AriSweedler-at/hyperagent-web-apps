@@ -31,6 +31,24 @@ export const STUN_ONLY: IceResult = {
 /** Let the scripted ICE promise resolve (one macrotask). */
 export const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
+/**
+ * Let `ms` pass in `step`s, delivering the broker's queue after each, so a frame a timer sends
+ * (a heartbeat, liveness.ts) crosses the wire when it is sent rather than at the end: a silence
+ * watch that fired before an undelivered heartbeat would call a lively peer gone.
+ */
+export const pass = (w: World, ms: number, step = 1000): void => {
+  const whole = Math.floor(ms / step);
+  Array.from({ length: whole }).forEach(() => {
+    w.clock.advance(step);
+    w.broker.flush();
+  });
+  const rest = ms - whole * step;
+  if (rest > 0) {
+    w.clock.advance(rest);
+    w.broker.flush();
+  }
+};
+
 // ---------------------------------------------------------------------------------------------
 // A spy Transport: the fake broker, plus a way to fire the errors it has no reason to emit
 // (`negotiation-failed`, an unknown type) on a Peer or a channel, and a log of what was sent.

@@ -17,6 +17,17 @@
 // an inbound frame the decoder refuses is dropped (the legacy ignored non-objects and unknown
 // tags; a malformed `action` it would have handed to the engine, whose refusal it toasted back).
 //
+// Liveness (liveness.ts, the decision and its reasons in that header): the legacy learnt of a
+// guest only from the channel's `close`, which PeerJS fires for a deliberate departure alone, so a
+// guest whose tab died kept its seat for good. Both sessions now heartbeat below the codec: the
+// host sends `{t: 'hb'}` every HB_MS on the open channel, counts every inbound frame as life, and
+// after HB_GRACE_MS of silence closes the channel and raises `guestGone(null)` once, exactly as a
+// closed channel is reported, so the reducers' existing "they can rejoin with code X" copy and the
+// freed seat follow with no game change. A join that arrives while the current guest has been
+// silent for HB_MISSED_MS replaces the silent channel (the old one closed, no `guestGone`, the
+// join re-seats) instead of being told the room is full; a join while the guest is lively is a
+// third peer, as before. The transport's ICE states were not adopted (liveness.ts says why).
+//
 // The netAttempt ticket: `whenTransportReady` waits on a network fetch, so its callback can land
 // after the player has cancelled and started over, possibly with the same role and code. Each
 // attempt takes a ticket (`HostOptions.attempt`, the app's `netAttempt` at the time); cancel and
@@ -37,6 +48,9 @@ import {
 import type { Connection, PeerHandle } from '../edge/transport.ts';
 import type { Result } from '../lib/result.ts';
 import { peerIdFor, type Game } from '../lib/roomCode.ts';
+import { HB_MISSED_MS, isHeartbeat, liveness, type Liveness } from './liveness.ts';
+
+export { HB_GRACE_MS, HB_MISSED_MS, HB_MS } from './liveness.ts';
 
 /** `unavailable-id` on a resumed code: retry after this long. */
 export const BUSY_RETRY_MS = 1500;
@@ -99,9 +113,9 @@ export type HostEvents<G> = Readonly<{
   /** A guest frame arrived on the current channel and passed the decoder. */
   frame: (frame: G) => void;
   /**
-   * The guest's channel closed or failed. `iceFailed` is the status text to show when negotiation
-   * failed before the channel ever opened and no hand was dealt (nobody joined, so "Opponent left"
-   * would be wrong); null otherwise.
+   * The guest's channel closed, failed, or fell silent for HB_GRACE_MS (liveness.ts). `iceFailed`
+   * is the status text to show when negotiation failed before the channel ever opened and no hand
+   * was dealt (nobody joined, so "Opponent left" would be wrong); null otherwise.
    */
   guestGone: (iceFailed: string | null) => void;
 }>;
@@ -141,6 +155,8 @@ export class HostSession<G, H, X> {
   private readonly opts: HostOptions;
   private peer: PeerHandle | null = null;
   private conn: Connection | null = null;
+  /** The current channel's heartbeat and silence watch; stopped with the channel. */
+  private live: Liveness | null = null;
 
   constructor(deps: HostDeps<G, X>, codec: HostCodec<G, H, X>, opts: HostOptions) {
     this.deps = deps;
@@ -161,6 +177,7 @@ export class HostSession<G, H, X> {
 
   /** Leave: close the channel and destroy the Peer (cancel destroyed the Peer, which closes both). */
   close(): void {
+    this.live?.stop();
     this.conn?.close();
     this.peer?.destroy();
   }
@@ -207,7 +224,14 @@ export class HostSession<G, H, X> {
   private accept(conn: Connection, ice: IceResult | null): void {
     const { deps, codec } = this;
     const { events } = deps;
-    if (this.conn?.open() === true) {
+    const current = this.conn;
+    // A current guest that has missed a heartbeat: its page is dead or frozen, and this join is
+    // its return in a new tab, or another player's. Either way the seat is free.
+    const silent =
+      current !== null && current.open() && this.live !== null
+        ? this.live.silence() >= HB_MISSED_MS
+        : false;
+    if (current?.open() === true && !silent) {
       // A third peer: the room is full.
       conn.onOpen(() => {
         conn.send(codec.full());
@@ -217,10 +241,19 @@ export class HostSession<G, H, X> {
       });
       return;
     }
+    this.live?.stop();
     this.conn = conn;
+    const live = liveness(conn, deps.clock, () => {
+      this.gone(conn);
+    });
+    this.live = live;
+    // The silent channel closes now that it is no longer current, so its `close` is not a loss:
+    // no `guestGone`, the join that follows re-seats the opponent.
+    if (silent) current?.close();
     conn.onOpen(() => {
       const ctx = deps.read();
       conn.send(codec.welcome(ctx));
+      live.start();
       announcePath(
         conn,
         () => this.conn === conn,
@@ -231,12 +264,17 @@ export class HostSession<G, H, X> {
       );
     });
     // As the legacy `conn.on('data', ...)`: every channel that was once current keeps reporting.
+    // A heartbeat is life and nothing more: it stops here, before the codec.
     conn.onMessage((raw) => {
+      live.heard();
+      if (isHeartbeat(raw)) return;
       const decoded = codec.decode(raw);
       if (decoded.ok) events.frame(decoded.value);
     });
     conn.onClose(() => {
-      if (this.conn === conn) events.guestGone(null);
+      if (this.conn !== conn) return;
+      live.stop();
+      events.guestGone(null);
     });
     conn.onError((e) => {
       if (this.conn !== conn) return;
@@ -249,5 +287,18 @@ export class HostSession<G, H, X> {
       }
       events.guestGone(null);
     });
+  }
+
+  /**
+   * HB_GRACE_MS without a frame from the current guest (a watch is stopped whenever its channel
+   * stops being current, so the verdict is always about `this.conn`): the channel is dropped
+   * first, so that its `close` (PeerJS emits it at once) is not a second report, then the loss is
+   * reported the way a closed channel is, and the seat is free for the next join.
+   */
+  private gone(conn: Connection): void {
+    this.conn = null;
+    this.live = null;
+    conn.close();
+    this.deps.events.guestGone(null);
   }
 }

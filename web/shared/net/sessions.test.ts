@@ -5,7 +5,9 @@
 // scenarios, run once here over a fake codec since the sessions are generic
 // (docs/design/shared-shell.md A1); each game's net/sessions.test.ts pins only what its wrapper
 // fixes (peer id, welcome and lobby bytes, its decoder's refusals). The wire corpus replay is
-// test/parity/gin.sessions.test.ts.
+// test/parity/gin.sessions.test.ts. The last group is the liveness the sessions added over the
+// legacy (liveness.ts): 5 s heartbeats below the codec, a 15 s silence as the peer gone, the seat
+// freed and a silent channel replaced by a join.
 import { describe, expect, test } from 'vitest';
 
 import {
@@ -42,6 +44,9 @@ import {
   CODE_BUSY_MSG,
   ERROR_TOAST_MS,
   FULL_CLOSE_MS,
+  HB_GRACE_MS,
+  HB_MISSED_MS,
+  HB_MS,
   HOST_WATCHDOG_MSG,
   HostSession,
   OPENING_MSG,
@@ -53,6 +58,7 @@ import {
   type HostContext,
   type HostOptions,
 } from './host.ts';
+import { HEARTBEAT, isHeartbeat } from './liveness.ts';
 import {
   CODE,
   STUN_ONLY,
@@ -62,6 +68,7 @@ import {
   hostCtxFor,
   hostParty,
   party,
+  pass,
   settle,
   world,
   type World,
@@ -741,5 +748,235 @@ describe('GuestSession', () => {
     host.conns[0]?.close();
     w.broker.flush();
     expect(w.since(m3)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Liveness (liveness.ts): what the legacy never had. A party here stands for a peer whose page
+// died or froze: its channel stays open and it sends nothing.
+// ---------------------------------------------------------------------------------------------
+
+describe('liveness across the sessions', () => {
+  test('host: beats the guest every 5 s once the channel is open; 15 s of silence closes it and reports guestGone once; the seat is free again', () => {
+    const w = world();
+    startHost(w, cell(hostCtx()));
+    w.broker.flush();
+    const guest = party(w, undefined);
+    w.broker.flush();
+    const c1 = connectFrom(guest, ROOM);
+    w.broker.flush();
+    expect(guest.received).toEqual([welcome('Ann', 100)]);
+    pass(w, HB_MS - 1);
+    expect(guest.received).toHaveLength(1);
+    pass(w, 1);
+    expect(guest.received).toEqual([welcome('Ann', 100), HEARTBEAT]);
+    pass(w, HB_MS);
+    expect(guest.received.filter(isHeartbeat)).toHaveLength(2);
+    const mark = w.log.length;
+    pass(w, HB_GRACE_MS - 2 * HB_MS - 1);
+    expect(w.since(mark)).toEqual([]);
+    expect(c1.open()).toBe(true);
+    pass(w, 1);
+    expect(w.since(mark)).toEqual([['guestGone', null]]);
+    expect(c1.open()).toBe(false);
+    // Nothing more from the dead channel: no third beat, no second verdict.
+    pass(w, HB_GRACE_MS * 2);
+    expect(w.since(mark)).toEqual([['guestGone', null]]);
+    expect(guest.received.filter(isHeartbeat)).toHaveLength(2);
+    // The seat is free: the same guest in a new tab is welcomed, not told the room is full.
+    const c2 = connectFrom(guest, ROOM);
+    w.broker.flush();
+    expect(guest.received.at(-1)).toEqual(welcome('Ann', 100));
+    expect(c2.open()).toBe(true);
+    c2.send({ t: 'join', name: 'Jeff' });
+    w.broker.flush();
+    expect(w.log.at(-1)).toEqual(['frame', { t: 'join', name: 'Jeff' }]);
+  });
+
+  test('host: any inbound frame is life, and a heartbeat never reaches the codec or the app', () => {
+    const w = world();
+    const seen: unknown[] = [];
+    const spying: HostCodec<GuestFrame, HostFrame, Room> = {
+      ...hostCodec,
+      decode: (raw) => {
+        seen.push(raw);
+        return hostCodec.decode(raw);
+      },
+    };
+    new HostSession({ ...w.deps, read: cell(hostCtx()).read, events: w.hostEvents }, spying, {
+      game: GAME,
+      code: CODE,
+      attempt: 1,
+      resume: false,
+    });
+    w.broker.flush();
+    const guest = party(w, undefined);
+    w.broker.flush();
+    const conn = connectFrom(guest, ROOM);
+    w.broker.flush();
+    const mark = w.log.length;
+    pass(w, 12_000);
+    conn.send(HEARTBEAT);
+    w.broker.flush();
+    expect(seen).toEqual([]);
+    expect(w.since(mark)).toEqual([]);
+    // The grace runs from that heartbeat: 15 s more, not 3.
+    pass(w, HB_GRACE_MS - 1);
+    expect(w.since(mark)).toEqual([]);
+    // A game frame is life too (and reaches the codec and the app as ever).
+    conn.send({ t: 'join', name: 'Jeff' });
+    w.broker.flush();
+    expect(seen).toEqual([{ t: 'join', name: 'Jeff' }]);
+    expect(w.since(mark)).toEqual([['frame', { t: 'join', name: 'Jeff' }]]);
+    pass(w, HB_GRACE_MS - 1);
+    expect(w.log.at(-1)).toEqual(['frame', { t: 'join', name: 'Jeff' }]);
+    pass(w, 1);
+    expect(w.log.at(-1)).toEqual(['guestGone', null]);
+    expect(seen).toHaveLength(1);
+  });
+
+  test('host: a join while the guest is lively is a third peer; one after HB_MISSED_MS of silence takes the seat, the silent channel closed without a guestGone', () => {
+    const w = world();
+    startHost(w, cell(hostCtx()));
+    w.broker.flush();
+    const first = party(w, undefined);
+    w.broker.flush();
+    const cA = connectFrom(first, ROOM);
+    w.broker.flush();
+    pass(w, HB_MISSED_MS - 1);
+    // Silent for 9 999 ms: within a heartbeat's slack, so the newcomer is a third peer.
+    const second = party(w, undefined);
+    w.broker.flush();
+    const cB = connectFrom(second, ROOM);
+    w.broker.flush();
+    expect(second.received).toEqual([{ t: 'full' }]);
+    pass(w, FULL_CLOSE_MS);
+    expect(cB.open()).toBe(false);
+    expect(cA.open()).toBe(true);
+    // Silent for 10 299 ms: the seat is taken by the next join.
+    const third = party(w, undefined);
+    w.broker.flush();
+    const cC = connectFrom(third, ROOM);
+    w.broker.flush();
+    expect(third.received).toEqual([welcome('Ann', 100)]);
+    expect(cC.open()).toBe(true);
+    expect(cA.open()).toBe(false);
+    expect(w.log.filter((e) => e[0] === 'guestGone')).toEqual([]);
+    cC.send({ t: 'join', name: 'Cal' });
+    w.broker.flush();
+    expect(w.log.at(-1)).toEqual(['frame', { t: 'join', name: 'Cal' }]);
+    // The watch is the new channel's alone: its grace, counted from its open, is the one verdict.
+    pass(w, HB_GRACE_MS - 1);
+    expect(w.log.filter((e) => e[0] === 'guestGone')).toEqual([]);
+    pass(w, 1);
+    expect(w.log.filter((e) => e[0] === 'guestGone')).toEqual([['guestGone', null]]);
+    expect(cC.open()).toBe(false);
+  });
+
+  test('guest: beats the host every 5 s; a host silent for 15 s is lost and the rejoin follows 1.5 s later on a fresh channel', () => {
+    const w = world();
+    const host = hostAnswering(w);
+    w.broker.flush();
+    startGuest(w, cell(guestCtx()));
+    w.broker.flush();
+    expect(host.received).toEqual([{ t: 'join', name: 'Jeff' }]);
+    pass(w, HB_MS);
+    expect(host.received).toEqual([{ t: 'join', name: 'Jeff' }, HEARTBEAT]);
+    const mark = w.log.length;
+    pass(w, HB_GRACE_MS - HB_MS - 1);
+    expect(w.since(mark)).toEqual([]);
+    expect(host.conns[0]?.open()).toBe(true);
+    pass(w, 1);
+    expect(w.since(mark)).toEqual([['lost']]);
+    expect(host.conns[0]?.open()).toBe(false);
+    pass(w, REJOIN_MS - 1);
+    expect(w.since(mark)).toEqual([['lost']]);
+    pass(w, 1);
+    expect(w.since(mark).map((e) => e[0])).toEqual([
+      'lost',
+      'status',
+      'connected',
+      'status',
+      'persist',
+      'frame',
+      'frame',
+    ]);
+    expect(host.conns).toHaveLength(2);
+    // The dead channel's beats stopped with the verdict (two went out); the new channel's begin.
+    expect(host.received.filter(isHeartbeat)).toHaveLength(2);
+    pass(w, HB_MS);
+    expect(host.received.filter(isHeartbeat)).toHaveLength(3);
+    expect(host.received.at(-1)).toEqual(HEARTBEAT);
+  });
+
+  test('host and guest sessions keep each other alive: a minute passes with no loss on either side and no frame surfacing', () => {
+    const w = world();
+    const hostS = startHost(w, cell(hostCtx()));
+    w.broker.flush();
+    const guestS = startGuest(w, cell(guestCtx()));
+    w.broker.flush();
+    const mark = w.log.length;
+    pass(w, 60_000);
+    expect(w.since(mark)).toEqual([]);
+    // The game frames still flow both ways, and only they reach the apps.
+    hostS.send({ t: 'toast', msg: 'still here' });
+    guestS.send({ t: 'action', action: { type: 'draw' } });
+    w.broker.flush();
+    expect(w.since(mark)).toEqual([
+      ['frame', { t: 'toast', msg: 'still here' }],
+      ['frame', { t: 'action', action: { type: 'draw' } }],
+    ]);
+    // Leaving stops both watches: no verdict ever follows a Leave.
+    guestS.close();
+    w.broker.flush();
+    expect(w.log.at(-1)).toEqual(['guestGone', null]);
+    const m2 = w.log.length;
+    hostS.close();
+    pass(w, HB_GRACE_MS * 2);
+    expect(w.since(m2)).toEqual([]);
+    expect(w.clock.pending()).toBe(0);
+  });
+
+  test('the reconnect trait, bounded: a guest broker blip opens a second channel that is told full while the first still beats; once the first has been silent HB_MISSED_MS the rejoin takes the seat', () => {
+    const w = world();
+    const hctx = cell(hostCtx());
+    startHost(w, hctx);
+    w.broker.flush();
+    const gctx = cell(guestCtx());
+    startGuest(w, gctx);
+    w.broker.flush();
+    hctx.value = hostCtx({ oppConnected: true, oppName: 'Jeff' });
+    gctx.value = guestCtx({ oppConnected: true });
+    pass(w, HB_MS * 2);
+    const guestId = w.spy.peers[1]?.peer.id() ?? '';
+    const mark = w.log.length;
+    w.broker.dropSocket(guestId);
+    w.broker.flush();
+    // 400 ms later the broker is back and `open` runs tryJoin again (the legacy trait): the first
+    // channel stops beating; the host, still hearing nothing amiss, tells the newcomer full.
+    pass(w, RECONNECT_FIRST_MS);
+    const statuses = (): ReadonlyArray<unknown> =>
+      w.since(mark).filter((e) => e[0] === 'status' || e[0] === 'frame' || e[0] === 'lost');
+    expect(statuses().at(-1)).toEqual(['frame', { t: 'full' }]);
+    // Full, closed 300 ms on, lost, a rejoin 1.5 s on, full again... until the first channel
+    // has been silent for HB_MISSED_MS, when a rejoin is welcomed and the seat is the guest's.
+    pass(w, HB_MISSED_MS + FULL_CLOSE_MS + REJOIN_MS);
+    const kinds = w.since(mark).map((e) => e[0]);
+    expect(kinds.filter((k) => k === 'guestGone')).toEqual([]);
+    expect(kinds.filter((k) => k === 'lost').length).toBeGreaterThanOrEqual(2);
+    // Both sessions log here: the guest's welcome, then the host's join.
+    expect(
+      w
+        .since(mark)
+        .filter((e) => e[0] === 'frame')
+        .slice(-2),
+    ).toEqual([
+      ['frame', welcome('Ann', 100)],
+      ['frame', { t: 'join', name: 'Jeff' }],
+    ]);
+    // Settled: both beat again and nobody is reported gone for a long while.
+    const m2 = w.log.length;
+    pass(w, 60_000);
+    expect(w.since(m2)).toEqual([]);
   });
 });
