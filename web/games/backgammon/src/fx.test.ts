@@ -1,6 +1,7 @@
-// The table (ui/sound.ts; docs/design/sound-fonts.md §5) and the player over fakes: every event
-// names a generic cue the default font voices, no two events share a cue, and `createFx` plays a
-// row through the audio edge with the table's buzz in whichever font it is handed.
+// The table (ui/sound.ts; docs/design/sound-fonts.md §5) and the wiring over fakes: every event
+// names a generic cue the default font voices, no two events share a cue, and `createFx` is the
+// shared player (web/shared/edge/cuePlayer.test.ts, docs/design/shared-shell.md §5 A4) over this
+// table and the `backgammon_sound` key.
 import { describe, expect, test } from 'vitest';
 
 import type { AudioCues, Note, OscillatorType } from '../../../shared/edge/fx.ts';
@@ -47,7 +48,7 @@ describe('the table', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// createFx over fakes
+// createFx over fakes: the wiring
 // ---------------------------------------------------------------------------------------------
 type Call = ReadonlyArray<unknown>;
 
@@ -120,51 +121,15 @@ const seqOf = (font: SoundFontName, cue: SoundCue): Call => {
 };
 
 describe('createFx', () => {
-  test('play: every event is one sequence from the font and its buzz', () => {
-    const { fx, calls, buzzes } = world();
-    EVENTS.forEach((event) => {
-      fx.play(event, 'default');
-    });
-    expect(calls).toEqual(EVENTS.map((event) => seqOf('default', CUES[event].cue)));
-    expect(buzzes).toEqual(EVENTS.map((event) => CUES[event].buzz));
-  });
-
-  test("another font re-voices the same event; the buzz is the table's, not the font's", () => {
-    const { fx, calls, buzzes } = world();
-    fx.play('win', 'arcade');
-    expect(calls).toEqual([seqOf('arcade', 'victory')]);
-    expect(calls[0]?.[2]).toBe('square');
-    expect(calls[0]?.[1]).not.toEqual(seqOf('default', 'victory')[1]);
-    expect(buzzes).toEqual([CUES.win.buzz]);
-  });
-
-  test('disabled: the audio edge stays silent on its own and no buzz is sent', () => {
-    const { fx, buzzes, calls } = world(false);
-    fx.play('win', 'default');
-    expect(buzzes).toEqual([]);
-    // The sequence is still handed to the audio cues, which drop it themselves while disabled.
-    expect(calls).toHaveLength(1);
-    expect(fx.enabled()).toBe(false);
-    fx.warm();
-    expect(calls).toHaveLength(1);
-  });
-
-  test('toggle flips and persists backgammon_sound; turning on warms the context and taps in the font', () => {
+  test('wires the shared player to the table and the backgammon_sound key', () => {
     const { fx, calls, buzzes, toggles, storage } = world();
-    fx.toggle('felt');
+    fx.play('hit', 'default');
+    expect(calls).toEqual([seqOf('default', 'capture')]);
+    expect(buzzes).toEqual([CUES.hit.buzz]);
+    fx.toggle('default');
     expect(fx.enabled()).toBe(false);
     expect(storage.map.get(STORAGE_KEYS.sound)).toBe('off');
     expect(storage.map.has(STORAGE_KEYS.soundFont)).toBe(false);
     expect(toggles).toEqual([false]);
-    expect(calls).toEqual([]);
-    fx.toggle('felt');
-    expect(fx.enabled()).toBe(true);
-    expect(storage.map.get(STORAGE_KEYS.sound)).toBe('on');
-    expect(storage.map.has(STORAGE_KEYS.soundFont)).toBe(false);
-    expect(toggles).toEqual([false, true]);
-    expect(calls).toEqual([['warm'], seqOf('felt', 'tap')]);
-    expect(buzzes).toEqual([CUES.tap.buzz]);
-    fx.warm();
-    expect(calls.at(-1)).toEqual(['warm']);
   });
 });
