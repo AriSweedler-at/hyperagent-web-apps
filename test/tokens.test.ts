@@ -29,6 +29,8 @@ const SHARED: ReadonlyArray<string> = [
   '--text',
   '--muted',
   '--danger',
+  '--go',
+  '--go-text',
   '--radius',
   '--felt',
 ];

@@ -60,7 +60,7 @@ and tests that prove it land before the code they protect.
 │       ├── fidice/              index.html, main.ts, theme.css, src/ = the 38 modules at their // src/<path>.ts
 │       │                        marker paths (assets, domain (+probability.algorithms), bots, net, view, app)
 │       ├── backgammon/          Sheshbesh (docs/design/backgammon-{rules,board}.md): index.html (static screens,
-│       │   └── src/             24 points in one grid), main.ts, theme.css (formatted; redeclares the eleven tokens),
+│       │   └── src/             24 points in one grid), main.ts, theme.css (formatted; redeclares the thirteen tokens),
 │       │                        engine/ (types, variants, board, moves, notation, setup, score, apply, view, decode,
 │       │                        index; the seeded replay beside it), protocol.ts, storage.ts, fx.ts,
 │       │                        net/{host,guest}.ts (wrappers over shared/net), ui/{state,render,board,
@@ -492,13 +492,25 @@ docs run only `check`. The levels below say which suite holds them.
   `protocol.ts`, a table test and a recorded golden. Wire-visible changes add a version field.
 - New screen or CSS class: add it to `CONTRACT.md`; `class-contract.test.ts` fails when a class
   toggled in TS has no CSS rule or vice versa.
+- Calls to action: every button whose press opens, joins or starts a game, hand or round (Host,
+  Join, Open a table, Sit down, Start, Start pass & play, Deal the first hand, Start the match, Next
+  hand, Next game, Next round, Rematch, Let's go, Start game, and the Score Counter's Start scoring
+  and New game and the sandbox's Deal the map) wears `.btn-go`, the shared `--go`/`--go-text` of
+  `web/shared/styles/tokens.css`, which each theme redeclares on its palette and styles. The owner,
+  2026-09-24: "the 'open a table' and 'sit down' call-to-action buttons should be a standout
+  color. Perhaps a light olive green. As a design principle all the 'start game' buttons should
+  be green and should stand out well." So the start button is the one green, the brightest thing
+  on its screen, and apart from the accent the in-game actions keep (Roll, Knock, Discard, Take,
+  Done, Undo, Double, Pass, Leave, Cancel, Back, Resume stay `btn-primary`/`btn-secondary`/
+  `btn-ghost`); a new start button takes `.btn-go`, never `btn-primary`. `CONTRACT.md` "Tokens"
+  tables the three fills and their measured contrasts.
 - Behaviour change: a PR that flips a golden says so in its body and touches only that golden.
 - Anything needing a loop goes into the game's `*.algorithms.ts` with a reason comment and a test.
 
 ## Seams reserved for the roadmap (not implemented now)
 
 - Shared design tokens / UI kit: `web/shared/styles/tokens.css` (linked by both pages since step 14;
-  it declares gin's palette under the eleven shared names, fidice's `theme.css` overrides every one
+  it declares gin's palette under the thirteen shared names, fidice's `theme.css` overrides every one
   onto its own palette; `CONTRACT.md` "Tokens" tables both) and `web/shared/ui/` (the glossary
   helpers so far, docs/design/glossary-links.md). The Fidice restyle drops those overrides, points
   fidice's rules at the shared names and re-records the goldens, then moves screen builders into
@@ -538,7 +550,7 @@ docs run only `check`. The levels below say which suite holds them.
   the oracle, the wire goldens are self-recorded, and `LEGACY_GAMES` in `tools/games.ts` names gin
   and fidice explicitly instead of aliasing `GAMES`. Its `index.html` and `theme.css` are
   Prettier-formatted (no `.prettierignore` entry: nothing to diff against). Its `theme.css`
-  redeclares the eleven shared tokens on its own palette for good, like fidice's until the restyle,
+  redeclares the thirteen shared tokens on its own palette for good, like fidice's until the restyle,
   and `test/tokens.test.ts` pins it. Online play is gin's, host-authoritative: the reducer's
   `hostDispatch` applies `applyAction` for both seats and broadcasts `viewFor(game, 1)` as a
   `state` frame, a refusal to the guest is a `toast` frame, and the guest's `roll` is an `action`

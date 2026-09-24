@@ -1,6 +1,6 @@
 /* Sheshbesh's theme (docs/design/backgammon-board.md §3, §5; the owner: "subtle but recognizable").
    The page links web/shared/styles/tokens.css and base.css before this file, and :root below
-   redeclares every one of the eleven shared names (a partial override would inherit gin's green
+   redeclares every one of the thirteen shared names (a partial override would inherit gin's green
    felt; test/tokens.test.ts holds it). The palette is restrained: a parchment page
    (§3.11: a CC0 photo of real medieval parchment, mirror-tiled, under a cream multiply), the home
    shell in a rich aegean blue with nacre text and fills and a gold hairline round it, an olive-wood
@@ -12,7 +12,8 @@
    the pure twin of the two templates; test/dist/backgammon-grid.test.ts parses them out of the
    built CSS and holds the two together. Prettier formats this file. */
 :root {
-  /* The eleven shared names, on this game's palette (design §3.1). */
+  /* The thirteen shared names, on this game's palette (design §3.1; --go and --go-text: the call to
+     action, docs/ARCHITECTURE.md "Calls to action"). */
   --bg: #e7d7be;
   --card: #efe8dc;
   --card-2: #e4dac4;
@@ -22,6 +23,8 @@
   --text: #2a1a12;
   --muted: #685745;
   --danger: #b7472a;
+  --go: #a3b070;
+  --go-text: #1f2a12;
   --radius: 12px;
   --felt: linear-gradient(160deg, #a67c52 0%, #8e6740 55%, #6e4b2a 100%);
   /* The game's own tokens: only the ones a rule below reads. */
@@ -233,6 +236,23 @@ h1 {
 }
 .btn-primary:hover:not(:active) {
   filter: brightness(1.08);
+}
+/* The call to action (docs/ARCHITECTURE.md "Calls to action"; the owner: "all the 'start game'
+   buttons should be green and should stand out well"): Open a table, Sit down, Start, Start the
+   match, Next game and Rematch in the shared --go, a light olive a step up from the move cue's
+   olive leaf, the page's ink for the label. On the panel it is the one green thing; on the
+   parchment and the sheet an olive hairline and the primary's shadow give it its edge. The focus
+   ring is .btn's (gold on the panel). */
+.btn-go {
+  background: var(--go);
+  color: var(--go-text);
+  font-size: 1.1rem;
+  box-shadow:
+    inset 0 0 0 1px rgba(95, 113, 51, 0.6),
+    0 6px 16px rgba(6, 37, 61, 0.28);
+}
+.btn-go:hover:not(:active) {
+  filter: brightness(1.06);
 }
 /* Secondary buttons are nacre: a step lighter than the parchment, a fill on the panel. In a sheet
    (already the card colour) they keep the darker card tone they had. */

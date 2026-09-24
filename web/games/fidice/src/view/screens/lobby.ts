@@ -122,7 +122,7 @@ const lobbyScreen = (ui: Ui, game: PublicState, dispatch: Dispatch): VNode => {
           h(
             'button',
             {
-              class: 'btn-primary btn-big',
+              class: 'btn-go btn-big',
               id: 'btnStart',
               tip: 'Needs at least 2 players. Late arrivals watch as spectators.',
               props: { disabled: game.players.length < 2 },

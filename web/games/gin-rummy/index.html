@@ -61,7 +61,7 @@
           <label>Host a game</label>
           <div class="row" style="margin-top:8px;">
             <div class="grow"><input type="number" id="targetInput" value="100" inputmode="numeric" placeholder="Play to…"></div>
-            <button class="btn btn-primary grow" id="hostBtn" style="width:auto;">Host</button>
+            <button class="btn btn-go grow" id="hostBtn" style="width:auto;">Host</button>
           </div>
           <div class="empty-note" style="text-align:left; padding:8px 2px 0;">You'll get a 4-letter room code to share.</div>
         </div>
@@ -69,7 +69,7 @@
           <label>Join a game</label>
           <div class="row" style="margin-top:8px;">
             <input type="text" id="codeInput" class="code-input grow" placeholder="CODE" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="go" data-lpignore="true" name="room-code-no-ac">
-            <button class="btn btn-secondary" id="joinBtn" style="min-width:96px;">Join</button>
+            <button class="btn btn-go" id="joinBtn" style="min-width:96px;">Join</button>
           </div>
         </div>
       </div>
@@ -87,7 +87,7 @@
           <label>Play to</label>
           <input type="number" id="localTargetInput" value="100" inputmode="numeric" style="margin-top:8px;">
         </div>
-        <button class="btn btn-primary" id="localBtn">Start pass &amp; play</button>
+        <button class="btn btn-go btn-block" id="localBtn">Start pass &amp; play</button>
         <div class="empty-note" style="text-align:left; padding:8px 2px 0;">One phone, no internet needed — it hides each player's cards until they tap "Show my cards" on their turn.</div>
       </div>
 
@@ -104,7 +104,7 @@
           </div>
           <div class="empty-note" id="sbError" style="text-align:left; padding:8px 2px 0; color: var(--danger);"></div>
         </div>
-        <button class="btn btn-primary" id="sbStartBtn">Deal the map</button>
+        <button class="btn btn-go btn-block" id="sbStartBtn">Deal the map</button>
         <div class="empty-note" style="text-align:left; padding:8px 2px 0;">A pass-and-play game dealt exactly as written above: both hands, the discard pile, the stock. From the console: <code>__gin.sandbox(map)</code>.</div>
       </div><!-- /sandbox -->
     </div>
@@ -127,7 +127,7 @@
           <div class="player-input-row"><input type="text" id="scP2NameInput" placeholder="Player 2 name" maxlength="20"></div>
         </div>
       </div>
-      <button class="btn btn-primary" id="scStartBtn">Start scoring</button>
+      <button class="btn btn-go btn-block" id="scStartBtn">Start scoring</button>
     </div>
 
     <!-- ABOUT TAB: about.ts fills the copy, its jargon linked to the rules (docs/design/glossary-links.md). -->
@@ -166,7 +166,7 @@
       <button class="btn btn-secondary" id="scEndHistoryBtn" style="min-width:52px;">📜</button>
       <button class="btn btn-secondary" id="scEndExportBtn" style="min-width:52px;">📤</button>
       <button class="btn btn-secondary grow" id="scEndKeepBtn">Keep playing</button>
-      <button class="btn btn-primary grow" id="scEndNewBtn">New game</button>
+      <button class="btn btn-go grow" id="scEndNewBtn">New game</button>
     </div>
   </div>
 
@@ -183,7 +183,7 @@
       <div id="hostWaitStatus" class="pulse" style="color:var(--muted);">Opening room…</div>
       <div class="empty-note" style="padding-top:10px;">Keep this screen open while your opponent joins — if you switch apps, come straight back and the room reconnects on its own.</div>
     </div>
-    <button class="btn btn-primary hidden" id="startGameBtn">Deal the first hand</button>
+    <button class="btn btn-go btn-block hidden" id="startGameBtn">Deal the first hand</button>
     <button class="btn btn-ghost btn-block" id="cancelHostBtn" style="margin-top:10px;">Cancel</button>
   </div>
 
@@ -253,7 +253,7 @@
     <div class="row">
       <button class="btn btn-secondary" id="historyBtnEnd" style="min-width:60px;">📜</button>
       <button class="btn btn-secondary grow" id="leaveBtnEnd">Leave</button>
-      <button class="btn btn-primary grow" id="rematchBtn">Rematch</button>
+      <button class="btn btn-go grow" id="rematchBtn">Rematch</button>
     </div>
   </div>
 
@@ -349,7 +349,7 @@ target: 100</pre>
     <div class="sheet-title" id="rrTitle">Hand over</div>
     <div class="sheet-sub" id="rrSub"></div>
     <div id="rrBody"></div>
-    <button class="btn btn-primary btn-block" id="rrContinueBtn" style="margin-top:10px;">Next hand</button>
+    <button class="btn btn-go btn-block" id="rrContinueBtn" style="margin-top:10px;">Next hand</button>
     <button class="btn btn-ghost btn-block btn-sm" id="rrHideBtn" style="margin-top:8px;">Look at the table</button>
   </div>
 </div>

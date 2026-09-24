@@ -210,7 +210,7 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    and `<script type="module" src="./main.ts">`. Vite's input glob (`web/**/index.html`) picks the
    folder up and builds `dist/games/<g>/index.html` with `app-[hash].js` beside it; the shared chunk
    and every CSS file land under `dist/shared/assets/`. Never a `/`-rooted URL: guard 1 fails.
-2. `web/games/<g>/theme.css`: the game's rules over the eleven tokens `tokens.css` declares (to use
+2. `web/games/<g>/theme.css`: the game's rules over the thirteen tokens `tokens.css` declares (to use
    another palette, override them on `:root` as fidice does; `CONTRACT.md` "Tokens").
 3. `web/games/<g>/main.ts`: the boot and no logic. Construct the adapters (`realTransport`,
    `createIce(browserIceDeps())`, `browserStore`, `realClock`, `Math.random` or `window.__rng`) and

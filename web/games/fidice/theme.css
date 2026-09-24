@@ -18,6 +18,8 @@
      these four alias fidice's role equivalents: --bg is --mist, the top stop of the sky gradient
      body paints (the shoreline artwork in body::before covers only its bottom 32vh). */
   --bg:var(--mist); --card-2:var(--cream-2); --text:var(--ink); --danger:var(--red);
+  /* The call to action (docs/ARCHITECTURE.md "Calls to action"): a light olive on this palette, the pine's ink for its label. */
+  --go:#a6b85c; --go-text:#14210c;
 }
 html,body{height:100%}
 body{font-family:'Nunito',system-ui,sans-serif;color:var(--ink);min-height:100%;display:flex;flex-direction:column;position:relative;
@@ -31,6 +33,11 @@ button:active{transform:translateY(1px)}
 button:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .btn-primary{background:linear-gradient(180deg,#e2863d 0,var(--accent) 100%);color:#fff;box-shadow:0 3px 0 var(--accent-dark)}
 .btn-primary:hover:not(:disabled){background:linear-gradient(180deg,#ee9550 0,#de8038 100%)}
+/* The call to action (docs/ARCHITECTURE.md "Calls to action"; the owner: "all the 'start game' buttons should be green
+   and should stand out well"): the name form's Let's go and the lobby's Start game in the shared --go, with the buttons' hard shadow in a darker olive. */
+.btn-go{background:var(--go);color:var(--go-text);box-shadow:0 3px 0 #6f7d3a}
+.btn-go:hover:not(:disabled){background:#b4c56a}
+.btn-go:focus-visible{outline:3px solid var(--pine);outline-offset:2px}
 .btn-secondary{background:var(--cream-2);color:var(--timber);border:1.5px solid #cdbc9c;box-shadow:0 2px 0 #cdbc9c}
 .btn-secondary:hover:not(:disabled){background:#e6d8bd}
 .btn-danger{background:var(--red);color:#fff;box-shadow:0 3px 0 #9d332b}

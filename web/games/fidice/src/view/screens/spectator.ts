@@ -214,7 +214,7 @@ const spectatorScreen = (ui: Ui, g: PublicState, dispatch: Dispatch): VNode => {
           h(
             'button',
             {
-              class: 'btn-primary',
+              class: 'btn-go',
               props: { disabled: g.players.length < 2 },
               on: {
                 click: () => {
