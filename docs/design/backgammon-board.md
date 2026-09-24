@@ -95,7 +95,7 @@ Plain English except the three strings (Q11).
 | Host waiting (`#hostWaitStatus`) | Waiting for your opponent to join · code **ABCD**; `#startGameBtn` "Start the match" |
 | Guest waiting | Joining ABCD… / Connected — waiting for Ari to start |
 | Roll modal | title "Your turn" (pass-and-play: "{name} — your turn", the cue that the phone changed hands, the only one with the curtain off), sub "Roll to start your turn" / "Double, or roll to start your turn" (Western, the cube on offer), the button Buen mazal! `<small>roll</small>`, `#doubleBtn` "Double" beside it |
-| Status line | §1 "Status line"; the tray open: "13 · 6+3 reaches 4 two ways", "4 · either die bears off"; a die picked: "6-4 · playing the 6"; a forfeited roll: "6-6 · no move — turn passes", "4-2 · no entry — turn passes" |
+| Status line | §1 "Status line"; while the dice tumble: "Rolling…" (`ROLLING_STATUS`, the roll is not named before the faces settle, §4.7); the tray open: "13 · 6+3 reaches 4 two ways", "4 · either die bears off"; a die picked: "6-4 · playing the 6"; a forfeited roll: "6-6 · no move — turn passes", "4-2 · no entry — turn passes" |
 | Target discs | one die: `3`; a combined move: `6+3`, `3+3`, three or four of a double `3×3`, `3×4`; `?` when the tap opens the tray; both dice bearing off: `6·5` |
 | Die chips | line one the dice as digits `6·3`, line two the landing `→ 4 via 7, hits` / `→ 4 via 10` / `→ off`; the whole as the chip's `aria-label` |
 | Curtain | title "Pass the phone to {name}", sub by phase: `toRoll` "Your turn. Roll when you have the phone." / with `canDouble` "Your turn. Double, or roll." / `cubeOffered` "{doubler} doubles to {v}" / else "Your turn."; `#curtainLast` the turn just finished ("Ari moved 8/5* 6/5 · Ari hit you on your 20-point": the hits in the incoming player's own numbering, the notation the mover's), a forfeited roll as logged, or before any turn the opening roll ("Ari rolled 6, Jeff rolled 4 — Ari starts"; "— Ari plays 6-4" in Western); button by phase, and it only reveals: `toRoll` → "{name} — your turn" (the roll modal follows), `moving` (the Western opening) → "{name} — play 6-3", `cubeOffered` → "{name} — answer", `over` → "{name} — look"; handoff "Continue online" |
@@ -170,7 +170,9 @@ right; the desktop's far points hang from the top edge and the near ones rise fr
 `--bg` on olive (4.7:1), in the base corner. A checker's place is a pure function of its index
 `--i` (0..4, set inline by `checkersHtml`), the side (`--sx/--sy`) and `--stack-step`, so the same
 markup lays out sideways on the phone and vertically on the desktop; the sixth checker on is
-`display: none` and the count badge sits on the top visible one. The bars stack inward from the
+`display: none` (`.point > .checker:nth-child(n + 6)`, `.bar > …`: scoped to the places, since a
+flight clone or a drag ghost is a `.checker` on the body, where an unscoped rule hid every one of
+them until 2026-09-24) and the count badge sits on the top visible one. The bars stack inward from the
 band's outer ends with `--stack-step: 0.45 checker-d` so five fit in a half. The whole cell is the
 tap target, never the checker.
 
@@ -422,7 +424,9 @@ roll that arrives in a view (`rolledBetween(prev, next)` in `rendered`: mine, or
 seat's) sets `rolling` and arms the same timer again, so the guest's tumble, started at the click,
 restarts when the host's faces arrive; `tumble/elapsed` clears it. While `rolling`: `liveView` is
 null (no tap, roll, undo or double answers; `#board.inert`), the modal's button is disabled, and
-the painter puts `rolling` on `#dice`, `#diceMini` and `#rollModalDice` (§3.7: the faces run
+the status line reads "Rolling…" (`ROLLING_STATUS`; the dice in words wait too, so nothing names
+the roll before the faces settle), and the painter puts `rolling` on `#dice`, `#diceMini` and
+`#rollModalDice` (§3.7: the faces run
 through a fixed pseudo-random list every 70 ms for 560 ms, then the real faces show for the last
 140 ms), with `#board[data-rolling]` for the specs to wait on and `#board[data-rolled]` once the
 faces stand still. The roll cue plays at the click as before (`cuesBetween`); when the settled

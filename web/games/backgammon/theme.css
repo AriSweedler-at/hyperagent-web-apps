@@ -1385,8 +1385,12 @@ body.fixed-screen #app {
     outline-color 120ms;
   touch-action: none;
 }
-/* Five drawn; the sixth onward is the badge on the top visible checker (the point label stays). */
-.checker:nth-child(n + 6) {
+/* Five drawn; the sixth onward is the badge on the top visible checker (the point label stays).
+   Scoped to the places: a flight clone or a drag ghost is a .checker appended to the body, where
+   an unscoped nth-child(n + 6) hid every one of them (the body has more than five children), so
+   no flight was ever seen until 2026-09-24. */
+.point > .checker:nth-child(n + 6),
+.bar > .checker:nth-child(n + 6) {
   display: none;
 }
 .checker.top[data-count]::after {
