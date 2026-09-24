@@ -105,13 +105,14 @@ Plain English except the three strings (Q11).
 
 ### 3.1 Tokens and geometry
 
-The eleven shared names are redeclared on this palette (a partial override would inherit gin's
+The thirteen shared names are redeclared on this palette (a partial override would inherit gin's
 green felt; `test/tokens.test.ts` and `CONTRACT.md` "Tokens" hold it): `--bg #e7d7be` (the
 parchment tile's rendered mean, §3.11), `--card #efe8dc`, `--card-2 #e4dac4`, `--accent #0b3c5d`
 (aegean, the one accent), `--accent-dark #06253d` (the dark checker, the curtain wash), `--gold
 #c9a227` (hairlines only), `--text #2a1a12`, `--muted #685745` (a step darker than the first
 cut's `#7a6a58`, which fell to 3.7:1 on the parchment), `--danger #b7472a`, `--radius 12px`,
-`--felt` the olive-wood gradient. Game tokens, only the ones a rule reads: `--olivewood-dark
+`--felt` the olive-wood gradient, `--go #a3b070` and `--go-text #1f2a12` (the call to action, the
+shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, only the ones a rule reads: `--olivewood-dark
 --stone --olive (#5f7133, the dark triangles and the trim) --olive-leaf --nazar --nazar-pale
 --walnut --nacre-sheen --serif-display --serif-text`, and the shell's (§3.11) `--panel --nacre
 --nacre-dim --hair --parchment-cream`. Geometry lives on `#tableScreen` like gin's `--card-w`:
