@@ -198,10 +198,10 @@ keep the board and every control clear of it. No pattern: the meander stays the 
 | `can-move` | a `.point`/`.bar` that has a legal move from it | `.can-move .checker.top { outline: 3px solid var(--olive-leaf) }` plus a 1.6 s `glow` pulse of `outline-color`. Outlines, never box-shadows: the checker's own rings stay under the cue |
 | `selected` | the chosen source | a 3px `--gold` outline, a 4px lift toward the tip (`transform`) and the lift's shadow as `filter: drop-shadow` |
 | `selected auto` | the derived sole source | the ring, no lift, no shadow |
-| `target` + `data-die="n"` | a destination `.point`/`.off` | `::after { content: attr(data-die) }`, a 22px `--nazar` disc with the numeral in `--bg` at the tip end; `.target::before { filter: brightness(1.12) }` |
-| `target-2` + `data-die="6+3"` | a combined destination | the same disc as a `--bg` pill with a dashed `--nazar` outline and a smaller numeral; `3×3` for three of a double; `?` when the tap opens the tray |
-| `only` | the only destinations (one maximal play) | a harder `pulse` on the disc |
-| `drop` | a destination under a dragged checker | brighter triangle, the disc scaled 1.15 |
+| `target` + `data-die="n"` | a destination `.point`/`.off` | the whole cell lights (the owner, 2026-09-24: "not just the triangle, but the whole rectangle"): a translucent nazar wash over the cell with a pale nazar ring and a soft outer glow, on either triangle shade and on the tray; the triangle breathes (`target-glow`, 1.4 s, brightness 1.1 ↔ 1.3; static at 1.15 under reduced motion); `::after { content: attr(data-die) }` is a 24px badge centred in the cell (`left/top: 50%`, `translate(-50%, -50%)`, over the stack) on both viewports: `--accent` under `--nacre` digits (9.8:1) with a 1.5px `--nazar-pale` ring |
+| `target-2` + `data-die="6+3"` | a combined destination | the same lit cell; the badge a `--nacre` pill with `--accent` digits (9.8:1), a dashed `--nazar` outline and a smaller numeral; `3×3` for three of a double; `?` when the tap opens the tray |
+| `only` | the only destinations (one maximal play) | a harder `pulse` on the badge |
+| `drop` | a destination under a dragged checker | brighter triangle, the badge scaled 1.15 |
 | `hit` | the point where a blot was just hit | `animation: hitFlash 420ms` (a warm wash on `::before`) |
 | `shake` | a tapped point that is neither source nor target | `animation: shake 120ms` |
 | `arriving` | the just-landed checker during a flight | `visibility: hidden` |
@@ -543,8 +543,9 @@ on the cream rules list would be 1.0:1 there), `--accent` on nacre 9.8:1 (the op
 buttons), nacre on the primary button 6.3–8.0:1, the gold hairline (`--hair`, 62% over the panel)
 2.7:1, decorative: the panel is told from the page by its blue, not by the line; on the board
 the labels 6.5:1 on stone and nacre 4.6:1 on olive, nacre on `--accent` 9.8:1 (the count badge),
-nacre on `--nazar` 4.1:1 (the target disc's numeral, as it was with `--bg`: the one pair under
-4.5:1, a board token this change leaves alone), the bar ring 6.6:1 on walnut.
+nacre on `--accent` 9.8:1 again for the target badge's digits (the nazar disc it replaced read
+4.1:1, the one pair that was under 4.5:1; the badge keeps its blue as a `--nazar-pale` ring), the
+bar ring 6.6:1 on walnut.
 
 ## 7. Testability
 
