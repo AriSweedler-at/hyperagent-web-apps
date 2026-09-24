@@ -5,9 +5,9 @@
 // the PeerJS debug level) is written once; GAMES, PAGE_TITLES and HOOKS are read off the rows.
 // `Game` itself is web/shared/lib/roomCode.ts's closed union, so a game the harness names must
 // have a room-code row, and a game the union gains shows up here as a type error until it has a
-// row. tools/games.test.ts pins every value. The `shell` block of §6.1 (the tabs, the guest-answered
-// status, the curtain copy, the connection dot, the local fields) joins with D1's shared shell
-// fixtures, once bg-online has given backgammon a guest-answered string to assert.
+// row. tools/games.test.ts pins every value. The `shell` block of §6.1 (the heading, the tabs, the
+// guest-answered status, the connection dot, the local fields) is SHELL below, one row per shell
+// game, spread into the game's REGISTRY row; e2e/shell-*.spec.ts drive both shell games by it.
 import type { Game } from '../web/shared/lib/roomCode.ts';
 
 export type { Game };
@@ -46,7 +46,81 @@ export type GameSpec = Readonly<{
    * page from TS into `#app` (-1: any count passes), gin's and backgammon's pages carry their screens.
    */
   contractFloors: Readonly<{ ts: number; markup: number }>;
+  /** The shared shell's row (SHELL), present for the shell games alone. */
+  shell?: ShellSpec;
 }>;
+
+/**
+ * What the shared shell specs (e2e/shell-*.spec.ts, docs/design/shared-shell.md §6.1-6.3) ask a game
+ * by name: what the two pages spell differently while their ids agree. Data only (strings, lists,
+ * one RegExp), so tools/games.test.ts pins every row with toEqual and a node script reads the
+ * registry without Playwright; what needs a Page or a seat's name (the curtain's sub line, the
+ * table half once the shell has connected) is the game's row in e2e/fixtures/shell-games.ts.
+ */
+export type ShellSpec = Readonly<{
+  /** `#homeScreen h1`. */
+  heading: string;
+  /** The `title` of the payload `#shareCodeBtn` hands the share sheet (main.ts shareInvite). */
+  shareTitle: string;
+  /** `#topTabbar .tab-btn`, in order. */
+  tabs: ReadonlyArray<string>;
+  /**
+   * `#playModeSwitch .mode-btn` and `#playSubmenu button`, in order, gin's hidden Sandbox entry
+   * included: a locator counts hidden buttons too.
+   */
+  modes: ReadonlyArray<string>;
+  /**
+   * `#guestWaitStatus` once the host has answered the join. The guest itself writes 'Connected.
+   * Waiting for the host to start…' when the channel opens, before its join is sent; only the
+   * host's reply carries a name (gin's a target too).
+   */
+  hostAnswered: RegExp;
+  /** The table's connection dot, `on` while the peer is connected. */
+  connDot: string;
+  /** The pass-and-play panel's fields beyond the two names, each with the value it starts at. */
+  localFields: ReadonlyArray<readonly [id: string, value: string]>;
+  /**
+   * The `.btn`s the curtain carries: the reveal, and backgammon's "Continue online" (the handoff
+   * offered under the curtain, where the phone is about to change hands; gin's table alone offers it).
+   */
+  curtainButtons: number;
+}>;
+
+/**
+ * The games with the shared shell (the home screen, the waiting rooms, the curtain, the toast:
+ * docs/design/shared-shell.md §3.1); fidice joins with its restyle (§4.6). A game here without a
+ * SHELL row, or a row in e2e/fixtures/shell-games.ts, is a type error.
+ */
+export type ShellGame = 'gin-rummy' | 'backgammon';
+export const SHELL_GAMES: ReadonlyArray<ShellGame> = ['gin-rummy', 'backgammon'];
+
+/** One shell row per shell game; REGISTRY carries each as its `shell`. */
+export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
+  'gin-rummy': {
+    heading: '♠ Gin Rummy',
+    shareTitle: 'Gin Rummy',
+    tabs: ['Play', 'Rules', 'Score', 'About'],
+    modes: ['🌐 Online', '📱 Pass & Play', '🧪 Sandbox'],
+    hostAnswered: /^Connected to .+'s room \(playing to \d+\)\. Waiting for the host to start/,
+    connDot: '#connDot',
+    localFields: [['localTargetInput', '100']],
+    curtainButtons: 1,
+  },
+  backgammon: {
+    heading: 'Sheshbesh',
+    shareTitle: 'Sheshbesh',
+    tabs: ['Play', 'Rules', 'About'],
+    modes: ['Online', 'Pass the phone'],
+    // ui/state.ts `hostRoomMsg`: only the host's `lobby` reply carries the host's name.
+    hostAnswered: /^Connected — waiting for .+ to start$/,
+    connDot: '#oppDot',
+    localFields: [
+      ['localVariantSel', 'portes'],
+      ['localMatchLengthSel', '5'],
+    ],
+    curtainButtons: 2,
+  },
+};
 
 /** The 24 points, direct children of #board in absolute order (docs/design/backgammon-board.md §2.2.1). */
 const POINT_IDS: ReadonlyArray<string> = Array.from(
@@ -67,6 +141,7 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
       rulesSlots: true,
     },
     contractFloors: { ts: 50, markup: 40 },
+    shell: SHELL['gin-rummy'],
   },
   fidice: {
     title: "Fidice — one-cup liar's dice",
@@ -87,6 +162,7 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
       rulesSlots: true,
     },
     contractFloors: { ts: 35, markup: 40 },
+    shell: SHELL.backgammon,
   },
 };
 

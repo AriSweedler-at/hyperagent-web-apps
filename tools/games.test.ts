@@ -13,6 +13,8 @@ import {
   LEGACY_GAMES,
   PAGE_TITLES,
   REGISTRY,
+  SHELL,
+  SHELL_GAMES,
 } from './games.ts';
 
 describe('the games registry', () => {
@@ -34,6 +36,17 @@ describe('the games registry', () => {
           rulesSlots: true,
         },
         contractFloors: { ts: 50, markup: 40 },
+        shell: {
+          heading: '♠ Gin Rummy',
+          shareTitle: 'Gin Rummy',
+          tabs: ['Play', 'Rules', 'Score', 'About'],
+          modes: ['🌐 Online', '📱 Pass & Play', '🧪 Sandbox'],
+          hostAnswered:
+            /^Connected to .+'s room \(playing to \d+\)\. Waiting for the host to start/,
+          connDot: '#connDot',
+          localFields: [['localTargetInput', '100']],
+          curtainButtons: 1,
+        },
       },
       fidice: {
         title: "Fidice — one-cup liar's dice",
@@ -59,8 +72,33 @@ describe('the games registry', () => {
           rulesSlots: true,
         },
         contractFloors: { ts: 35, markup: 40 },
+        shell: {
+          heading: 'Sheshbesh',
+          shareTitle: 'Sheshbesh',
+          tabs: ['Play', 'Rules', 'About'],
+          modes: ['Online', 'Pass the phone'],
+          hostAnswered: /^Connected — waiting for .+ to start$/,
+          connDot: '#oppDot',
+          localFields: [
+            ['localVariantSel', 'portes'],
+            ['localMatchLengthSel', '5'],
+          ],
+          curtainButtons: 2,
+        },
       },
     });
+  });
+
+  test('the shell games are the rows with a shell, each carrying its SHELL row and a storage row', () => {
+    // The shell specs (e2e/shell-*.spec.ts) iterate SHELL_GAMES and read the save and the
+    // preference keys through the storage row, so a shell game must have both.
+    expect(SHELL_GAMES).toEqual(GAMES.filter((game) => REGISTRY[game].shell !== undefined));
+    expect(SHELL_GAMES).toEqual(['gin-rummy', 'backgammon']);
+    SHELL_GAMES.forEach((game) => {
+      expect(REGISTRY[game].shell).toBe(SHELL[game]);
+      expect(REGISTRY[game].storage, game).toBeDefined();
+    });
+    expect(Object.keys(SHELL)).toEqual(SHELL_GAMES);
   });
 
   test("the storage rows are the games' own STORAGE_KEYS: the save key, and the prefix of the shell's preference keys", () => {
