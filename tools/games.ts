@@ -21,7 +21,7 @@ export const PAGE_TITLES: Readonly<Record<PageName, string>> = {
   landing: "Ari's web apps",
   'gin-rummy': 'Gin Rummy',
   fidice: "Fidice — one-cup liar's dice",
-  backgammon: 'Sheshbesh — Sephardic backgammon',
+  backgammon: 'Sheshbesh — backgammon',
 };
 
 /** The documented test hook each page exposes once its boot finished (docs/ARCHITECTURE.md "Documented test hooks"). */

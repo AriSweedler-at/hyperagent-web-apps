@@ -128,7 +128,7 @@ describeDist('dist parity with legacy/ and web/', (root) => {
 
   test('the backgammon page is gin-shaped: static screens, the 24 points and empty rules slots', () => {
     const page = readDist(root, 'games/backgammon/index.html');
-    expect(page).toContain('<title>Sheshbesh — Sephardic backgammon</title>');
+    expect(page).toContain('<title>Sheshbesh — backgammon</title>');
     ['id="app"', 'id="homeScreen"', 'id="tableScreen"', 'id="board"', 'id="toast"'].forEach(
       (id) => {
         expect(page).toContain(id);

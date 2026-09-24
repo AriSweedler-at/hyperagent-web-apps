@@ -13,7 +13,7 @@ scroll. Seat 0 = Light (host), seat 1 = Dark (guest); "own N" is the viewer's ow
 | # | Question | Decision |
 |---|---|---|
 | Q4 | Pass-and-play cover | Gin's `'local'` role, no Peer. A one-tap turn cue on a translucent curtain (`#curtainOverlay`, the position readable beneath) whose button also rolls; a setting `curtainMode: 'always' \| 'never'` under `backgammon_curtain` (nothing is hidden in backgammon, so the curtain is a courtesy). Western opening: the starter already holds the opening dice, so the button reads "{name} — play 6-3" and only reveals. |
-| Q5 | Names | Display name `Sheshbesh`; `<title>` `Sheshbesh — Sephardic backgammon` (`tools/games.ts PAGE_TITLES`); folder and `Game` literal `backgammon`; hook `window.__backgammon`; room codes 4 letters from gin's alphabet with `peerPrefix 'sheshbesh-'` and gin's length error. |
+| Q5 | Names | Display name `Sheshbesh`; `<title>` `Sheshbesh — backgammon` (`tools/games.ts PAGE_TITLES`); folder and `Game` literal `backgammon`; hook `window.__backgammon`; room codes 4 letters from gin's alphabet with `peerPrefix 'sheshbesh-'` and gin's length error. |
 | Q6 | Rejoin | Gin's name-based rejoin. |
 | Q7 | Invite | `?join=<code>` through `web/shared/lib/invite.ts` and `web/shared/edge/invite.ts`. |
 | Q11 | Copy | Plain English, with exactly three non-English strings anywhere: the name `Sheshbesh`, `Buen mazal!` on the roll button, `Kapará.` opening the hit toast. |

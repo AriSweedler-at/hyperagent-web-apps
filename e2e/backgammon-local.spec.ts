@@ -81,7 +81,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const { page } = player;
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await page.goto(pagePath(project, 'backgammon'));
-      await expect(page).toHaveTitle('Sheshbesh — Sephardic backgammon');
+      await expect(page).toHaveTitle('Sheshbesh — backgammon');
       await expect(page.locator('#homeScreen h1')).toHaveText('Sheshbesh');
       await expect(page.locator('#topTabbar .tab-btn')).toHaveText(['Play', 'Rules', 'About']);
       await expect(page.locator('#tabPlayBtn')).toHaveClass(/\bactive\b/);

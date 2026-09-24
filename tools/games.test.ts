@@ -16,7 +16,7 @@ describe('the games registry', () => {
       landing: "Ari's web apps",
       'gin-rummy': 'Gin Rummy',
       fidice: "Fidice — one-cup liar's dice",
-      backgammon: 'Sheshbesh — Sephardic backgammon',
+      backgammon: 'Sheshbesh — backgammon',
     });
   });
 
