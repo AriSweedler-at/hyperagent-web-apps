@@ -15,8 +15,9 @@
   // The gin engine is listed since docs/MIGRATION.md step 10: test/parity runs it beside the
   // legacy fixture as the `current` leg (tsconfig.pure.json remains its guard); since step 11 the
   // whole gin src/ tree is (protocol, storage, the string-producing ui/ and scorer/ helpers, all
-  // DOM-free by design) with web/shared/edge/storage.ts, for the codec, storage and string-golden
-  // parity suites; since step 12 web/shared/edge/fx.ts is listed too (the gin fx.ts wraps it, all
+  // DOM-free by design) with web/shared/edge/storage.ts and, since the shared-shell extraction
+  // (docs/design/shared-shell.md §5 A3), web/shared/edge/prefs.ts, which both games' storage.ts
+  // build their readers and writers from, for the codec, storage and string-golden parity suites; since step 12 web/shared/edge/fx.ts is listed too (the gin fx.ts wraps it, all
   // structural types) and the DOM modules (ui/render.ts, ui/home.ts, ui/local.ts, the hand's
   // dragger.ts and flip.ts) are excluded below, by globs over web/games/*/src/ui where both games
   // name a module the same way (docs/design/shared-shell.md §5 A5).
@@ -63,6 +64,7 @@
     "web/games/backgammon/src/**/*.ts",
     "web/raw-imports.d.ts",
     "web/shared/edge/storage.ts",
+    "web/shared/edge/prefs.ts",
     "web/shared/edge/fx.ts",
     "web/shared/edge/sound.ts",
     "infra/games-proxy/**/*.ts"

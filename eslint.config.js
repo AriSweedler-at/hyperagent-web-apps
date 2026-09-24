@@ -290,8 +290,11 @@ const zones = [
       `${GAME_SRC}/ui/**`,
       `${GAME_SRC}/view/**`,
     ],
-    except: ['**/web/shared/edge/storage.ts'],
-    message: 'storage modules import only web/shared/lib and @shared/edge/storage.',
+    // prefs.ts is the shell's shared readers and writers over a Store (docs/design/shared-shell.md
+    // §5 A3): a game's storage.ts builds its own from them over the keys it alone names.
+    except: ['**/web/shared/edge/storage.ts', '**/web/shared/edge/prefs.ts'],
+    message:
+      'storage modules import only web/shared/lib, @shared/edge/storage and @shared/edge/prefs.',
   },
 ];
 
