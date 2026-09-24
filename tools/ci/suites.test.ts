@@ -111,6 +111,7 @@ describe('every test file belongs to exactly one suite', () => {
     expect(shellSpecs).toEqual([
       'e2e/shell-handoff.spec.ts',
       'e2e/shell-home.spec.ts',
+      'e2e/shell-liveness.spec.ts',
       'e2e/shell-local.spec.ts',
       'e2e/shell-online.spec.ts',
       'e2e/shell-relay.spec.ts',
@@ -477,7 +478,11 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
     ['e2e-gin', 'backgammon', 'e2e-backgammon', 'site', 'e2e-site', 'harness'],
   ],
   ['the smoke and style specs', ['e2e/smoke.spec.ts', 'e2e/computed-styles.spec.ts'], ['e2e-site']],
-  ["the shared shell's liveness spec", ['e2e/shell-liveness.spec.ts'], ['e2e-site']],
+  [
+    "the shared shell's liveness spec",
+    ['e2e/shell-liveness.spec.ts'],
+    ['e2e-gin', 'e2e-backgammon'],
+  ],
   ['the landing page', ['web/index.html'], ['site', 'e2e-site']],
   ['the alias stub', ['web/games/sheshbesh/index.html'], ['site', 'e2e-site']],
   ['the Worker', ['infra/games-proxy/worker.ts'], ['site', 'e2e-site', 'harness']],

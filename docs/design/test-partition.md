@@ -33,14 +33,15 @@ Counts on this branch: 30 + 1 + 44 + 17 + 21 + 8 + 9 = 130 test files (the harne
 three new `tools/ci` tests, shared the new `dom.fake.test.ts`); 210 Playwright tests in 28 files =
 gin 142/18 + fidice 4/2 + backgammon 46/6 + site 18/2.
 
-The shell specs (`e2e/shell-{home,local,online,relay,resume,handoff}.spec.ts`,
+The shell specs (`e2e/shell-{home,local,online,relay,resume,handoff,liveness}.spec.ts`,
 `docs/design/shared-shell.md` D1) drive both shell games from one file each: a `SHELL_GAMES.forEach`
 over `tools/games.ts`, one `test.describe(game, { tag: '@<game>' })` per game. Both game suites
 list the files (`e2e.files`) with their own tag (`e2e.tag`) and the other's in `e2e.otherTags`,
 which `playwright.config.ts` turns into `grepInvert`, so `e2e-gin` plays gin's describes and
 `e2e-backgammon` backgammon's, each once, and a CLI `--grep` (`@online|@relay`, `@gin-rummy`)
 composes with it. The accounting allows a spec file several claimants only when every claimant
-carries a tag and inverts exactly the others', and pins the six files and the idiom. Why not a
+carries a tag and inverts exactly the others', and pins the seven files and the idiom (the liveness
+spec was `site`'s cross-game file until the tags could split it). Why not a
 suite of their own: an `e2e-shell` job would need its own coturn (four of the six relay through
 it), its own ci.yml entry and script, and would run for a fidice-only change too; under `site` the
 relay spec would have to install coturn there. The game jobs already run for a change to their game
@@ -92,7 +93,7 @@ paths and `everything` anywhere selects every job. `check` (typecheck, lint, hoo
 | `test/integration/**` | `shared-integration` |
 | `web/index.html`, `web/games/sheshbesh/**` | `site`, `e2e-site` |
 | `test/dist/**`, `test/tokens.test.ts`, `test/ratchet.test.ts` | `site` |
-| `e2e/smoke.spec.ts`, `e2e/computed-styles.spec.ts`, `e2e/shell-liveness.spec.ts` | `e2e-site` |
+| `e2e/smoke.spec.ts`, `e2e/computed-styles.spec.ts` | `e2e-site` |
 | `infra/games-proxy/**` | `site`, `e2e-site`, `harness` |
 | `test/tools/**`, `test/fixtures/legacy/**` | `harness` |
 | anything else | everything (a new folder earns its row) |

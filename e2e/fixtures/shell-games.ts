@@ -29,6 +29,8 @@ export type ShellDriver = Readonly<{
   hostSave: Readonly<Record<string, unknown>>;
   /** What the pass-and-play save carries beyond `role: 'local'` once the first seat has revealed. */
   localSave: Readonly<Record<string, unknown>>;
+  /** Something of the game itself a seated page shows: the hand's cards, the board (e2e/shell-liveness.spec.ts). */
+  table: string;
   /** The handoff offered while a curtain is up (e2e/shell-handoff.spec.ts, the case under the curtain). */
   curtainOffer: Readonly<{
     /** The case, as its test is titled. */
@@ -69,6 +71,7 @@ const gin: ShellDriver = {
   },
   hostSave: { game: { handNumber: 1 } },
   localSave: { game: { handNumber: 1 } },
+  table: '#hand .card',
   curtainOffer: {
     title:
       "the offer is the table's alone: the curtain carries none; after a pass the next seat reveals and takes it, the curtain marks cleared",
@@ -103,6 +106,7 @@ const backgammon: ShellDriver = {
   hostSave: { matchLength: 5, variant: 'portes', game: { gameNo: 1 } },
   // The reveal rolls for the opening winner, so the saved game is mid-turn.
   localSave: { game: { gameNo: 1, phase: 'moving' } },
+  table: '#board',
   curtainOffer: {
     title:
       "the curtain's Continue online takes the offer too, with the phone about to change hands",

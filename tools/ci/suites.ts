@@ -42,8 +42,9 @@ export type E2eSpec = Readonly<{
 
 /**
  * The shared shell specs (docs/design/shared-shell.md D1): the home screen, the pass-and-play start,
- * the room, the relay-forced game, resume and the handoff, written once over tools/games.ts
- * SHELL_GAMES. Both shell games' suites claim them; the tags decide which describes each job plays.
+ * the room, the relay-forced game, resume, the handoff and the sessions' liveness, written once
+ * over tools/games.ts SHELL_GAMES. Both shell games' suites claim them; the tags decide which
+ * describes each job plays.
  */
 const SHELL_SPECS: ReadonlyArray<string> = ['**/shell-*.spec.ts'];
 
@@ -385,14 +386,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         'infra/games-proxy/worker.ts': { lines: 95, functions: 95, statements: 95, branches: 93 },
       },
     },
-    // Every page on both origins, the six computed-style goldens (two viewports per game), and the
-    // shared shell's liveness across the two games that play it (web/shared/net, one spec file
-    // with a test per game: a cross-game spec, like the smoke, until the design's §5.2 tags split
-    // such files per game).
-    e2e: {
-      files: ['**/smoke.spec.ts', '**/computed-styles.spec.ts', '**/shell-liveness.spec.ts'],
-      otherTags: [],
-    },
+    // Every page on both origins, and the six computed-style goldens (two viewports per game).
+    e2e: { files: ['**/smoke.spec.ts', '**/computed-styles.spec.ts'], otherTags: [] },
   },
   harness: {
     unit: [
@@ -576,7 +571,7 @@ export const RULES: ReadonlyArray<Rule> = [
     why: 'the site guards themselves',
   },
   {
-    globs: ['e2e/smoke.spec.ts', 'e2e/computed-styles.spec.ts', 'e2e/shell-liveness.spec.ts'],
+    globs: ['e2e/smoke.spec.ts', 'e2e/computed-styles.spec.ts'],
     runs: ['e2e-site'],
     why: 'the site specs themselves',
   },
