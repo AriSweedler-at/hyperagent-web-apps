@@ -362,6 +362,8 @@ export const createToaster = (doc: Document, clock: Clock, defaultMs = 2600, cla
 export const createTimers = <Id extends string>(clock: Clock): Readonly<{ start: (id: Id, ms: number, fire: () => void) => void; cancel: (id: Id) => void }>;   // the named-timer Map from both main.ts files
 ```
 
+As landed (B2, `web/shared/ui/home.ts`): three signatures differ from the sketch above, each forced by the two games. `startOptions` is a `{host, local}` pair of readers, not one, because the two start buttons read different inputs in both games (gin `targetInput` and `localTargetInput`; backgammon `matchLengthSel`/`variantSel` and their `local*` twins); `hostClick(name, options)` and `localClick(p1, p2, options)` take what the reader returned as `Start` and each game spreads it after the names, so every intent keeps its literal key order. `ShellIntentBuilders<I, Tab, Start>` is generic over the tab and start types too, and an intent with no payload (`hostDeal`, `submenuPress`, `cancel`, ...) is supplied as the value itself, a builder only where the control carries a value. `bindHomeShell`'s `tabs` is the game's `HOME_TABS` array, not `{tab, id}` pairs: the binder derives each button's id with `tabButtonId` and skips `play`, whose button is the long-press one. `HomeView.playMode` is a `string` (no shared `PlayMode` exists before C2) and the tab list each `storage.ts` decodes stays the game's, passed in. The B2 row's "shared cases move once" gave way to §5's stronger rule (both suites unchanged): gin's 12 and backgammon's 9 `home.test.ts` cases stay, so the shell's paint and bind cases run three times until C2 unifies the reducer.
+
 ### 4.5 Boot (`boot.ts`) and the sessions (`web/shared/net/{host,guest}.ts`)
 
 ```ts
