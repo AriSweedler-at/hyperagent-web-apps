@@ -15,11 +15,11 @@ import {
   type AudioContextLike,
   type NavigatorLike,
 } from '../../shared/edge/fx.ts';
-import { shareText, type ShareNavigatorLike } from '../../shared/edge/share.ts';
+import type { ShareNavigatorLike } from '../../shared/edge/share.ts';
 import { bindJargon, revealRule } from '../../shared/edge/glossary.ts';
 import { createSampleCache } from '../../shared/edge/sound.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
-import { joinCodeFrom, withoutJoin } from '../../shared/edge/invite.ts';
+import { applyInviteLink, sessionEvents, shareInvite } from '../../shared/edge/boot.ts';
 import { browserNetDeps } from '../../shared/edge/netDeps.ts';
 import type { Rng } from '../../shared/lib/rng.ts';
 import { ruleFromHash } from '../../shared/ui/glossary.ts';
@@ -27,34 +27,25 @@ import { createTimers, createToaster } from '../../shared/ui/toast.ts';
 import { bestLayoffActions, legalActions } from './src/engine/index.ts';
 import type { Action } from './src/engine/types.ts';
 import { createFx } from './src/fx.ts';
-import { GuestSession, type GuestEvents } from './src/net/guest.ts';
-import { HostSession, type HostEvents } from './src/net/host.ts';
+import { GuestSession } from './src/net/guest.ts';
+import { HostSession } from './src/net/host.ts';
 import type { NetDeps } from '../../shared/edge/peer.ts';
-import { isGuestFrame } from './src/protocol.ts';
+import { isGuestFrame, type GuestFrame, type HostFrame } from './src/protocol.ts';
 import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
 import { STORAGE_KEYS, soundEnabled } from './src/storage.ts';
 import { badCardBackMsg, isCardBack } from './src/cardBack.ts';
 import { badSoundFontMsg, isSoundFont } from '../../shared/lib/sound/fonts.ts';
 import { formatMap, mapOf } from './src/sandbox.ts';
 import { slotHandView } from './src/ui/hand/SlotHandView.ts';
-import {
-  fillNameInputs,
-  fillP2NameInput,
-  inviteUrl,
-  renderSandbox,
-  setCodeInput,
-} from './src/ui/home.ts';
+import { fillNameInputs, fillP2NameInput, renderSandbox, setCodeInput } from './src/ui/home.ts';
 import { bindAll, fmtTime, paint, paintSound, renderAbout, renderRules } from './src/ui/render.ts';
 import {
-  INVITE_COPIED_MSG,
-  SHARE_FALLBACK_MS,
   guestContextOf,
   hostContextOf,
   initialApp,
   readHome,
   type HomeSnapshot,
   reduce,
-  roomCodeMsg,
   runEffect,
   type App,
   type EffectDeps,
@@ -180,53 +171,12 @@ const boot = (): void => {
     if (changed) repaint();
   };
 
-  const hostEvents: HostEvents = {
-    status: (text, stopPulse = false) => {
-      dispatch({ type: 'host/status', text, stopPulse });
-    },
-    toast: (message, ms) => {
-      toast(message, ms ?? null);
-    },
-    holdWakeLock: () => {
-      void wakeLock.hold();
-    },
-    persist: () => {
-      dispatch({ type: 'persist' });
-    },
-    restart: (code) => {
-      dispatch({ type: 'host/start', code });
-    },
-    frame: (frame) => {
-      dispatch({ type: 'host/frame', frame });
-    },
-    guestGone: (iceFailed) => {
-      dispatch({ type: 'host/guestGone', iceFailed });
-    },
-  };
-
-  const guestEvents: GuestEvents = {
-    status: (text, stopPulse = false) => {
-      dispatch({ type: 'guest/status', text, stopPulse });
-    },
-    toast: (message, ms) => {
-      toast(message, ms ?? null);
-    },
-    holdWakeLock: () => {
-      void wakeLock.hold();
-    },
-    persist: () => {
-      dispatch({ type: 'persist' });
-    },
-    connected: () => {
-      dispatch({ type: 'guest/connected' });
-    },
-    frame: (frame) => {
-      dispatch({ type: 'guest/frame', frame });
-    },
-    lost: () => {
-      dispatch({ type: 'guest/lost' });
-    },
-  };
+  // The sessions' events as intents, toasts and the wake lock (web/shared/edge/boot.ts).
+  const { host: hostEvents, guest: guestEvents } = sessionEvents<GuestFrame, HostFrame>({
+    dispatch,
+    toast,
+    wakeLock,
+  });
 
   const deps: EffectDeps = {
     store,
@@ -280,16 +230,13 @@ const boot = (): void => {
       fx.toggle(app.soundFont);
     },
     share: (code) => {
-      // The legacy handler's chain: the share sheet (a phone's OS menu), else the clipboard with a
-      // toast (desktop), else the code itself. The invite is the link alone (`?join=<code>` on the
-      // page's origin and path, so a fragment on this page never lands in it): no text beside it.
-      const pageUrl = `${location.origin}${location.pathname}`;
-      void shareText(navigator, { title: 'Gin Rummy', url: inviteUrl(code, pageUrl) }).then(
-        (outcome) => {
-          if (outcome === 'copied') toast(INVITE_COPIED_MSG, null);
-          else if (outcome === 'failed') toast(roomCodeMsg(code), SHARE_FALLBACK_MS);
-        },
-      );
+      // The share sheet, else the clipboard with a toast, else the code itself (web/shared/edge/boot.ts).
+      void shareInvite(navigator, {
+        title: 'Gin Rummy',
+        code,
+        pageUrl: `${location.origin}${location.pathname}`,
+        toast,
+      });
     },
     copy: (text) => {
       // The clipboard alone, no share sheet: a console call is for the keyboard, not a friend.
@@ -443,20 +390,11 @@ const boot = (): void => {
   };
 
   dispatch({ type: 'home/init', home: homeSnapshot() });
-  // An invite link (`?join=<code>`, docs/ARCHITECTURE.md "Documented test hooks"): the code goes
-  // into the join form once the home screen is up and leaves the address bar, so a reload or a
-  // bookmark of this page lands on the ordinary home screen (the other hooks, `?peer=` and
-  // `?ice=`, stay).
-  const join = joinCodeFrom(location.search);
-  if (join !== null) {
-    dispatch({ type: 'join/link', code: join });
-    const query = withoutJoin(location.search);
-    history.replaceState(
-      null,
-      '',
-      `${location.pathname}${query === '' ? '' : `?${query}`}${location.hash}`,
-    );
-  }
+  // An invite link (`?join=<code>`): into the join form now that the home screen is up, and out of
+  // the address bar (web/shared/edge/boot.ts).
+  applyInviteLink(window, (code) => {
+    dispatch({ type: 'join/link', code });
+  });
   // A rule deep link (`#rule-<id>`, docs/design/glossary-links.md §1): the Rules tab, scrolled to
   // that rule. The hash stays, so the link can be copied from the address bar.
   const rule = ruleFromHash(location.hash);

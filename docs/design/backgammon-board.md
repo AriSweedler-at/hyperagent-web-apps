@@ -469,8 +469,8 @@ paragraphs (`ui/about.ts`, written into `#aboutCopy` per ruleset). Both carry gl
 mean each rule per ruleset, and a tap on jargon is `rules/show { rule }` (the Rules tab on the home
 screen, the rules overlay anywhere else) followed by the `revealRule { slot, rule }` effect; a
 `#rule-<id>` deep link at boot does the same. Waiting rooms: gin's, fed by the sessions' status strings; `#shareCodeBtn` →
-`share/click` → `shareText(navigator, { title: 'Sheshbesh', url })` with gin's `INVITE_COPIED_MSG`
-fallback; `#startGameBtn` when the guest is connected → `createGame`. Sound: `src/fx.ts` plays the
+`share/click` → `shareInvite(navigator, { title: 'Sheshbesh', code, pageUrl, toast })` (web/shared/edge/boot.ts:
+gin's chain and its `INVITE_COPIED_MSG` / `Room code:` fallbacks); `#startGameBtn` when the guest is connected → `createGame`. Sound: `src/fx.ts` plays the
 table's cues (`roll place hit bearOff yourTurn win lose double tap` in `ui/sound.ts`) in the App's
 sound font through `web/shared/edge/sound.ts`; `#soundBtn` toggles `backgammon_sound` (and its
 `aria-pressed`); `__backgammon.soundFont(name)` picks a font from the console; the wake lock is

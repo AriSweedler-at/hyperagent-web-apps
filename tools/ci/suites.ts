@@ -104,7 +104,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // (docs/ARCHITECTURE.md "*.algorithms.ts"). Measured at the ratchet
       // (lines/functions/statements/branches): shared/lib 100/100/100/100, shared/edge
       // 99.4/98.8/98.9/94.4 (re-measured with prefs.ts (A3), cuePlayer.ts and netDeps.ts (A4), the
-      // three at 100/100/100/100).
+      // three at 100/100/100/100; again with boot.ts (shared-shell.md §5 B3: the invite link, the
+      // share chain and the session adapters out of both main.ts, 100/100/100/100 over boot.test.ts),
+      // the folder at 99.72/99.36/99.75/96.6).
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The shared shell's helpers and painters (docs/design/glossary-links.md §3;
@@ -177,6 +179,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // Re-measured again when B2 moved the home shell out of ui/home.ts into web/shared/ui/home.ts:
       // ui 98.2/96.9/97.1/93.9 before, 98.1/96.8/97.0/94.0 after (the same lines uncovered, a smaller
       // folder; the wrapper itself measures 100 on every metric).
+      // Re-measured when B3 moved roomCodeMsg, INVITE_COPIED_MSG and SHARE_FALLBACK_MS out of
+      // ui/state.ts into web/shared/edge/boot.ts: ui 98.1/97.1/97.0/94.0 (roomCodeMsg was the one
+      // function this suite never called, so functions rose; nothing went down and the row stands).
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -330,6 +335,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // Re-measured again when B2 moved the home shell out of ui/home.ts into web/shared/ui/home.ts:
       // ui 99.6/100/98.7/91.9 before, 99.6/100/98.6/92.0 after (the same lines uncovered, a smaller
       // folder; the wrapper itself measures 100 on every metric).
+      // Re-measured when B3 moved INVITE_COPIED_MSG and SHARE_FALLBACK_MS (two constants, no
+      // function) out of ui/state.ts into web/shared/edge/boot.ts: still ui 99.6/100/98.6/92.0.
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,

@@ -309,11 +309,8 @@ export const LONG_PRESS_MS = 450;
 export const SHAKE_MS = 120;
 /** R14: a forfeited roll stays on the table this long before the curtain rises (design §4.5). */
 export const NO_MOVE_MS = 1200;
-/** `shareCodeBtn`'s fallback toast lasts this long. */
-export const SHARE_FALLBACK_MS = 4000;
 /** `onGuestGone`'s toast lasts this long, as does `LOST_HOST_MSG`. */
 export const GONE_TOAST_MS = 4000;
-export const INVITE_COPIED_MSG = 'Invite copied to clipboard';
 export const NOT_CONNECTED_MSG = 'Not connected to the host.';
 export const WAITING_FOR_GUEST_MSG = 'Waiting for your opponent to join.';
 export const OPPONENT_LEFT_MSG = 'Opponent left. Waiting for someone to join…';
