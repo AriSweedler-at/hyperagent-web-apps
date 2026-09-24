@@ -110,6 +110,7 @@ import {
   type Target,
 } from './board.ts';
 import type { Cue } from './sound.ts';
+import type { RulesSlot } from './rules.ts';
 
 // ---- the state ---------------------------------------------------------------------------------
 
@@ -369,6 +370,11 @@ export type Intent =
   | Readonly<{ type: 'p2name/typed'; value: string }>
   /** `setHomeTab(tab, { persist })`: an unknown tab is `play`. */
   | Readonly<{ type: 'tab/set'; tab: string; persist?: boolean }>
+  /**
+   * A glossary link (docs/design/glossary-links.md) or a `#rule-<id>` deep link at boot: the Rules
+   * tab on the home screen, the rules overlay anywhere else, then the rule scrolled to and flashed.
+   */
+  | Readonly<{ type: 'rules/show'; rule: string }>
   /** `setPlayMode(mode)`: `local`, else `online`. */
   | Readonly<{ type: 'mode/set'; mode: string }>
   /** `#variantSel` / `#localVariantSel`: a shipped variant is remembered; anything else is ignored. */
@@ -498,6 +504,7 @@ export const SHELL_INTENT_TYPES = [
   'p1name/typed',
   'p2name/typed',
   'tab/set',
+  'rules/show',
   'mode/set',
   'variant/set',
   'matchLength/set',
@@ -553,6 +560,8 @@ export type Effect =
   | Readonly<{ type: 'writeMatchLength'; length: number }>
   | Readonly<{ type: 'writeCurtainMode'; mode: CurtainMode }>
   | Readonly<{ type: 'writeSoundFont'; font: SoundFontName }>
+  /** Scroll `rule` into view inside the rules `slot` that is on screen and flash it (web/shared/edge/glossary.ts). */
+  | Readonly<{ type: 'revealRule'; slot: RulesSlot; rule: string }>
   /** `ms` null is the default duration. */
   | Readonly<{ type: 'toast'; message: string; ms: number | null }>
   /** To the current session's channel, if open. */
@@ -1397,6 +1406,21 @@ const shellIntent = (app: App, intent: ShellIntent, ctx: Context): Step => {
       );
     case 'tab/set':
       return setHomeTab(app, intent.tab, intent.persist !== false);
+    case 'rules/show': {
+      // On the home screen the Rules tab is the rules; anywhere else (the table, a waiting room,
+      // the end screen) the overlay is, and its own copy of the list is the one to scroll.
+      const home = app.shell.screen === 'homeScreen';
+      const shown = home
+        ? setHomeTab(app, 'rules', true)
+        : pure(withShell(app, { rulesOpen: true }));
+      return then(shown, (a) =>
+        step(a, {
+          type: 'revealRule',
+          slot: home ? 'rulesList' : 'rulesOverlayList',
+          rule: intent.rule,
+        }),
+      );
+    }
     case 'mode/set': {
       const mode: PlayMode = intent.mode === 'local' ? 'local' : 'online';
       return step(withShell(app, { playMode: mode }), { type: 'writePlayMode', mode });
@@ -1782,6 +1806,8 @@ export type EffectDeps = Readonly<{
   toggleSound: () => void;
   /** The invite for the room `code`: its link, through the share sheet or the clipboard. */
   share: (code: string) => void;
+  /** `revealRule(document, slot, rule)` (web/shared/edge/glossary.ts): scroll to the rule and flash it. */
+  revealRule: (slot: RulesSlot, rule: string) => void;
   /** The three input writes the paint does not own (they would fight the player's typing). */
   page: Readonly<{
     fillName: (name: string) => void;
@@ -1873,6 +1899,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'share':
       deps.share(effect.code);
+      return;
+    case 'revealRule':
+      deps.revealRule(effect.slot, effect.rule);
       return;
     case 'fillName':
       deps.page.fillName(effect.name);

@@ -618,6 +618,24 @@ label {
 .rules-list li strong {
   color: var(--accent);
 }
+/* Glossary links (docs/design/glossary-links.md; web/shared/ui/glossary.ts writes them): jargon in
+   the About copy and in a rule that names another rule is a link to that rule, a dotted hairline
+   in the accent and nothing louder. The rule it lands on flashes once: its background fades from a
+   wash of the accent back to its own (web/shared/edge/glossary.ts holds the class for 1.2 s). */
+.jargon {
+  color: var(--accent);
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.rule-flash {
+  animation: rule-flash 1.2s ease-out;
+}
+@keyframes rule-flash {
+  from {
+    background-color: rgba(11, 60, 93, 0.18);
+  }
+}
 
 /* ---------- overlays and sheets ---------- */
 .overlay {

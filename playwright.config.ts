@@ -58,6 +58,7 @@ const CI = process.env['CI'] !== undefined && process.env['CI'] !== '';
 /** Specs about the page alone, not its origin: they run on `pages` only. */
 const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/backgammon-geometry.spec.ts',
+  '**/backgammon-glossary.spec.ts',
   '**/backgammon-local.spec.ts',
   '**/computed-styles.spec.ts',
   '**/gin-drag-discard.spec.ts',
@@ -67,6 +68,7 @@ const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/gin-dom-parity.spec.ts',
   '**/gin-draw.spec.ts',
   '**/gin-geometry.spec.ts',
+  '**/gin-glossary.spec.ts',
   '**/gin-home.spec.ts',
   '**/gin-layoff.spec.ts',
   '**/gin-local.spec.ts',

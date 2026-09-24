@@ -88,7 +88,8 @@ import { bindDrag } from './board/dragger.ts';
 import { flyMoves } from './board/fly.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
-import { rulesItemsHtml } from './rules.ts';
+import { aboutHtml } from './about.ts';
+import { RULES_SLOT_IDS, rulesItemsHtml } from './rules.ts';
 import { SCREENS, handoffLabel, type App, type Intent } from './state.ts';
 
 export type { PageLike };
@@ -96,22 +97,33 @@ export type Dispatch = (intent: Intent) => void;
 
 // ---- the shell (gin's painters under gin's names) -------------------------------------------------
 
-/** The ids of the two `<ul class="rules-list">` slots: the home tab's and the in-game overlay's. */
-export const RULES_SLOT_IDS = ['rulesList', 'rulesOverlayList'] as const;
+export { RULES_SLOT_IDS } from './rules.ts';
+
+/** Write `markup` into `#id` unless the slot already shows `key`, so a repaint rewrites nothing. */
+const renderKeyed = (doc: DocumentLike, id: string, key: string, markup: () => string): void => {
+  const slot = requireId(doc, id);
+  if (dataOf(slot, 'key') === key) return;
+  setAttr(slot, 'data-key', key);
+  setHtml(slot, trustedHtml(markup()));
+};
 
 /** Fill both rules slots for `variant` (ui/rules.ts); keyed, so a repaint rewrites nothing. */
 export const renderRules = (doc: DocumentLike, variant: ShippedVariant): void => {
   RULES_SLOT_IDS.forEach((id) => {
-    const slot = requireId(doc, id);
-    if (dataOf(slot, 'key') === variant) return;
-    setAttr(slot, 'data-key', variant);
-    setHtml(slot, trustedHtml(rulesItemsHtml(variant)));
+    renderKeyed(doc, id, variant, () => rulesItemsHtml(variant));
   });
 };
 
-/** The rules the player is looking at: the game in play's, else the home screen's choice. */
+/** `#aboutCopy` for `variant` (ui/about.ts): the same words, linked to that ruleset's rules. */
+export const renderAbout = (doc: DocumentLike, variant: ShippedVariant): void => {
+  renderKeyed(doc, 'aboutCopy', variant, () => aboutHtml(variant));
+};
+
+/** The rules the player is looking at: the game in play's, else the home screen's choice; the About copy follows. */
 const paintRules = (doc: DocumentLike, app: App): void => {
-  renderRules(doc, app.shell.view?.variant ?? app.shell.variant);
+  const variant = app.shell.view?.variant ?? app.shell.variant;
+  renderRules(doc, variant);
+  renderAbout(doc, variant);
 };
 
 /** `showScreen(id)`: every screen but `id` gets `hidden`; the table locks the body to the viewport. */
@@ -748,7 +760,10 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   });
 };
 
-/** Every control of the page (home, curtain, table, sheets), once, at boot. */
+/**
+ * Every control of the page (home, curtain, table, sheets), once, at boot. The glossary links are
+ * bound by main.ts through web/shared/edge/glossary.ts (an edge, out of ui/'s reach).
+ */
 export const bindAll = (doc: PageLike, dispatch: Dispatch): void => {
   bindHome(doc, dispatch);
   bindLocal(doc, dispatch);

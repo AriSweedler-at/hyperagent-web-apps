@@ -47,6 +47,7 @@
     "test/**/*.ts",
     "e2e/**/*.ts",
     "web/shared/lib/**/*.ts",
+    "web/shared/ui/**/*.ts",
     "web/shared/edge/clock.ts",
     "web/shared/edge/clock.fake.ts",
     "web/shared/edge/ice.ts",
