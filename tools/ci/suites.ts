@@ -423,6 +423,17 @@ const gameRules = (game: 'gin' | 'fidice' | 'backgammon'): ReadonlyArray<Rule> =
  * side is the fallback: a path no row names runs everything, so a new folder must earn its row.
  */
 export const RULES: ReadonlyArray<Rule> = [
+  // Two .md files a test reads, above the prose row that would otherwise claim them for `check`.
+  {
+    globs: ['web/shared/styles/CONTRACT.md'],
+    runs: ['site'],
+    why: 'class-contract.test.ts checks every row of it against dist',
+  },
+  {
+    globs: ['legacy/README.md'],
+    runs: ['harness', 'site'],
+    why: 'frozen.test.ts lists it beside the frozen pages and dist-parity.test.ts asserts it exists',
+  },
   {
     globs: [
       'docs/**',

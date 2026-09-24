@@ -431,6 +431,9 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   ['a harness test', ['test/tools/serve-dist.test.ts'], ['harness']],
   ['the fidice debundle pin', ['test/tools/debundle-fidice.test.ts'], ['fidice']],
   ['docs only', ['docs/ARCHITECTURE.md', 'README.md', 'docs/design/test-partition.md'], []],
+  // Two .md files tests read: they sit above the prose row, or a PR editing one would merge unrun.
+  ['the class contract', ['web/shared/styles/CONTRACT.md'], ['site']],
+  ['the legacy README', ['legacy/README.md'], ['harness', 'site']],
   ['the hooks', ['.githooks/pre-push', 'tools/hooks-verify.sh'], []],
   ['a Claude settings file', ['.claude/settings.json'], []],
   ['shared code', ['web/shared/lib/rng.ts'], EVERYTHING],
@@ -563,12 +566,14 @@ describe('ci.yml carries the graph the table describes', () => {
     expect(ciOk, 'ci-ok needs').toContain(`\n      - ${job}\n`);
   });
 
-  test('check is always on, ci-ok is always(), deploy needs ci-ok alone and only on main', () => {
+  test('check is always on, ci-ok needs changes and is always(), deploy needs ci-ok alone and only on main', () => {
     const check = CI_YML.slice(CI_YML.indexOf('\n  check:'), CI_YML.indexOf('\n  shared:'));
     expect(check).not.toContain('needs:');
     expect(check).not.toContain('\n    if:');
     const ciOk = CI_YML.slice(CI_YML.indexOf('\n  ci-ok:'), CI_YML.indexOf('\n  deploy:'));
     expect(ciOk).toContain('\n      - check\n');
+    // Skipped is green in ci-ok, so a failed `changes` must be a failed need, not eleven skips.
+    expect(ciOk).toContain('\n      - changes\n');
     expect(ciOk).toContain('\n    if: always()\n');
     expect(ciOk).not.toContain('- broker');
     const deploy = CI_YML.slice(CI_YML.indexOf('\n  deploy:'));

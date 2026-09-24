@@ -28,9 +28,9 @@ a fourth game learns it must register.
 | `site` | `test/tokens.test.ts`, `test/ratchet.test.ts`, `infra/games-proxy/worker.test.ts` | `test/dist/**` (`needsBuild: true`) | `infra/games-proxy/worker.ts` | `**/smoke.spec.ts`, `**/computed-styles.spec.ts` |
 | `harness` | `test/tools/{serve-dist,proxy-dev,computed-styles}.test.ts`, `test/fixtures/legacy/{frozen,manifest}.test.ts`, `tools/**/*.test.ts` | | | |
 
-Counts at the cut (main 21b085e): 29 + 1 + 44 + 17 + 21 + 8 + 9 = 129 test files (the harness
-row holds the four new `tools/ci` tests); 210 Playwright tests in 28 files = gin 142/18 + fidice
-4/2 + backgammon 46/6 + site 18/2.
+Counts on this branch: 30 + 1 + 44 + 17 + 21 + 8 + 9 = 130 test files (the harness row holds the
+three new `tools/ci` tests, shared the new `dom.fake.test.ts`); 210 Playwright tests in 28 files =
+gin 142/18 + fidice 4/2 + backgammon 46/6 + site 18/2.
 
 ## Running one suite
 
@@ -62,6 +62,8 @@ paths and `everything` anywhere selects every job. `check` (typecheck, lint, hoo
 
 | Changed path | Jobs |
 |---|---|
+| `web/shared/styles/CONTRACT.md` | `site` (class-contract.test.ts checks every row) |
+| `legacy/README.md` | `harness`, `site` (frozen.test.ts and dist-parity.test.ts pin it) |
 | `docs/**`, `**/*.md`, `.claude/**`, `.githooks/**`, `tools/hooks-verify.sh`, `infra/turn-worker/**` | none (check only) |
 | `tools/**`, `e2e/fixtures/**`, `e2e/browser/**`, `legacy/**`, `.github/**`, `package*.json`, `.nvmrc`, `tsconfig*.json`, `eslint.config.js`, `.prettierrc*`, `.prettierignore`, `vite.config.ts`, `vitest.config.ts`, `playwright.config.ts`, `web/raw-imports.d.ts`, `web/shared/**` | everything |
 | `web/games/<g>/**` | `<g>`, `e2e-<g>`, `site`, `e2e-site`, `harness` |
@@ -94,8 +96,8 @@ changes ──┬── shared ────────────────�
  jobs)    ├── fidice ────────────────┤
           ├── backgammon ────────────┤
           ├── site (build, dist ↑) ──┼── ci-ok ── deploy (push to main)
-          ├── harness ───────────────┤   always(); green on success or skipped,
-          ├── e2e-gin ───────────────┤   red on failure or cancelled
+          ├── harness ───────────────┤   always(); needs changes too; green on
+          ├── e2e-gin ───────────────┤   success or skipped, red on failure or cancelled
           ├── e2e-fidice ────────────┤
           ├── e2e-backgammon ────────┤
           └── e2e-site ──────────────┤
@@ -107,7 +109,8 @@ run once, instrumented, against their own rows. `site` builds and uploads `dist/
 downloads. The three game e2e jobs install Chromium and coturn (every game has a relay spec);
 `e2e-site` runs with `E2E_TURN=off`. A push to main or a `workflow_dispatch` selects everything.
 GitHub skips a job whose `needs` were skipped unless it says `always()`, so `deploy` needs `ci-ok`
-alone. `nightly.yml` and `stories-baselines.yml` do not use `changes`: the nightly's two 1000-game
+alone. `ci-ok` needs `changes` as well: skipped is green there, so a crash in the selector must
+show as a failed need, not as eleven skips. `nightly.yml` and `stories-baselines.yml` do not use `changes`: the nightly's two 1000-game
 replays go through `npm run test:gin -- test/parity/gin.replay` and `npm run test:backgammon --
 web/games/backgammon/src/engine/replay` (the file filter applies inside a project); the baselines
 job keeps `npm run test:e2e -- e2e/gin-stories.spec.ts --project pages --update-snapshots=all`.

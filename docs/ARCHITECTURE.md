@@ -334,8 +334,9 @@ PATH they skip with the install line, and under `CI` the config refuses to start
 broken install cannot pass as a skip. Job `broker` (gated on any game's e2e job,
 `continue-on-error: true`): the two-peer and relay-forced specs without `?peer=` through
 0.peerjs.com (the relay stays local), so signalling regressions surface at review without blocking
-on a third party. Job `ci-ok` needs every gate (not `broker`) with `if: always()` and is green when
-each needed job succeeded or was skipped by `changes`, red on a failure or a cancellation: GitHub
+on a third party. Job `ci-ok` needs `changes` and every gate (not `broker`) with `if: always()` and is green
+when each needed job succeeded or was skipped by `changes`, red on a failure or a cancellation
+(`changes` is needed so a crash in the selector is a failed need, not eleven green skips): GitHub
 skips a job whose `needs` were skipped unless it says `always()`, so `deploy` needs `ci-ok` alone
 and runs on a push to main (as above). `ci-ok` is the one check a branch rule or a human watches.
 Which change runs what: a game's folder runs that game's unit and e2e jobs, `site`, `e2e-site` and
@@ -640,10 +641,10 @@ Step 4 (Vite build in passthrough mode; Pages deployed by Actions):
   outside `public/` (node 22's `fs.globSync` prints an experimental warning on every build).
 - `legacyPassthrough` copies `legacy/shared/ice.js` only while `LEGACY_PAGES` is non-empty; the
   loader exists for the legacy pages alone.
-- `npm run test:e2e` builds first (`npm run build && playwright test`), so jobs `e2e` and `broker`
-  rebuild dist rather than download it; the build is deterministic. `deploy` downloads the `dist`
-  artifact `check` uploaded (with `include-hidden-files: true`, or `.nojekyll` would be dropped) and
-  installs nothing.
+- `npm run test:e2e` builds first (`npm run build && playwright test`), so the four `e2e-<suite>`
+  jobs and `broker` rebuild dist rather than download it; the build is deterministic. `deploy`
+  downloads the `dist` artifact `site` uploaded (with `include-hidden-files: true`, or `.nojekyll`
+  would be dropped) and installs nothing.
 - `test/dist/**` is excluded from a plain `npm test` and run after `npm run build`; a missing dist/
   skips with a note. (Since the test partition it is the `site` suite's standalone half, run by
   `npm run test:site`, which builds first; `vitest.dist.config.ts` is gone and `test:dist` is its alias
@@ -676,7 +677,7 @@ Step 5 (shared TypeScript modules with tests first):
   (the `shared-integration` suite, `browser: true` in `tools/ci/suites.ts`; `test:integration` is its
   alias for one release; it had `vitest.integration.config.ts` before the partition): PeerServer, Vite dev server and Chromium are started
   programmatically on free ports; it skips with a note where loopback WebRTC is blocked and runs for
-  real in the CI `check` job, which now installs Chromium.
+  real in the CI `shared-integration` job, which installs Chromium first.
 - `dom.ts` takes `Readonly<HTMLElement>` and mutates through methods only, so the edge profile's
   readonly-parameter rule needs no exception; the escaping template tag is `safeHtml` (Prettier
   reformats `html`-tagged templates). Its tests use a structural fake: jsdom is not installed.

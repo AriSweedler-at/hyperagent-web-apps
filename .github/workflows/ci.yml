@@ -16,7 +16,8 @@
 # everything; docs run only "check". Job "broker" repeats the online specs through the real
 # 0.peerjs.com and is advisory (continue-on-error, outside ci-ok). Job "ci-ok" is the one gate a
 # human or a branch rule watches: `if: always()`, green when every needed job succeeded or was
-# skipped, red on a failure or a cancellation (GitHub skips a job whose `needs` were skipped unless
+# skipped, red on a failure or a cancellation, "changes" itself among the needed so a crash in the
+# selector cannot pass as a run with no suites (GitHub skips a job whose `needs` were skipped unless
 # it says always(), so "deploy" cannot need the suite jobs directly). Job "deploy" publishes the
 # checked dist/ to GitHub Pages on a push to main once ci-ok is green; Settings > Pages > Source
 # must be "GitHub Actions" (README "Deploy"). Chromium is restored from actions/cache by Playwright
@@ -370,10 +371,13 @@ jobs:
           path: playwright-report
           retention-days: 7
 
-  # The one gate: every needed job succeeded or was skipped by "changes". A failure or a
-  # cancellation anywhere turns it red; always() is what lets it run beside skipped jobs.
+  # The one gate: "changes" ran and every needed job succeeded or was skipped by it. A failure or a
+  # cancellation anywhere turns it red; always() is what lets it run beside skipped jobs. "changes"
+  # is in the list on purpose: without it a crash in the selector skips every gated job, and
+  # skipped is green here, so a PR that broke tools/ci/suites.ts would pass with no suite run.
   ci-ok:
     needs:
+      - changes
       - check
       - shared
       - shared-integration
