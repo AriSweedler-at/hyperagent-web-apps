@@ -277,6 +277,12 @@ export const cloneInto = (parent: Element, el: Element): Element | null => {
 /** `el.closest(selector)` from the element itself. */
 export const closestIn = (el: Element, selector: string): Element | null => el.closest(selector);
 
+/** `el.scrollIntoView(options)` where the element has it (a rule a glossary link names); nothing on a fake. */
+export const scrollIntoView = (el: Element, options: Readonly<ScrollIntoViewOptions>): void => {
+  const scrollable = el as Partial<Pick<HTMLElement, 'scrollIntoView'>>;
+  scrollable.scrollIntoView?.call(el, options);
+};
+
 /** `requestAnimationFrame(fn)` where there is one; nothing on a fake. */
 export const nextFrame = (fn: () => void): void => {
   const frames = globalThis as Partial<Pick<typeof globalThis, 'requestAnimationFrame'>>;

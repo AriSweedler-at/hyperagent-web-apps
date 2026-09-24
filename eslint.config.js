@@ -12,6 +12,9 @@ import tseslint from 'typescript-eslint';
 // ---------------------------------------------------------------------------------------------
 const PURE = [
   'web/shared/lib/**/*.ts',
+  // The shared shell's pure helpers (web/shared/ui/glossary.ts first, docs/design/glossary-links.md
+  // §3); a painter that lands here later carves itself out the way scorer/main.ts does below.
+  'web/shared/ui/**/*.ts',
   'web/games/*/src/engine/**/*.ts',
   'web/games/*/src/domain/**/*.ts',
   'web/games/*/src/bots/**/*.ts',
@@ -179,6 +182,18 @@ const zones = [
     target: './web/shared',
     from: './web/games',
     message: 'shared code never imports a game.',
+  },
+  {
+    // The shared shell's ui/ (docs/design/glossary-links.md §3, shared-shell.md §4.1): the reach of
+    // a game's ui/ zone below, web/shared/lib and the DOM edge with its fakes, nothing else.
+    target: './web/shared/ui',
+    from: ['./web/shared/edge/**', './web/shared/net/**', './web/shared/styles/**'],
+    except: [
+      '**/web/shared/edge/dom.ts',
+      '**/web/shared/edge/dom.fake.ts',
+      '**/web/shared/edge/page.fake.ts',
+    ],
+    message: 'web/shared/ui imports web/shared/lib and the DOM edge only.',
   },
   ...gamePairZones,
   {

@@ -1,7 +1,18 @@
 # web/shared/ui
 
-Reserved (docs/ARCHITECTURE.md "Seams reserved for the roadmap"). Nothing is implemented in
-step 5; the folder exists so the module boundaries and the class contract have a home to name.
+The shared shell's UI code (docs/ARCHITECTURE.md "Seams reserved for the roadmap"). Reserved
+since step 5 so the module boundaries and the class contract had a home to name; the first module
+landed with the glossary links (docs/design/glossary-links.md):
+
+| Module        | Holds                                                                                                                                                                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `glossary.ts` | `RuleItem`, `Glossary`; `ruleAnchor(id)` (`rule-<id>`), `linkJargon(html, glossary, { except })` (the first whole-word term per rule wrapped as `<a class="jargon" data-rule>`, longest terms first, never inside a tag or a link), `rulesListHtml(items, glossary)`, `ruleFromHash(hash)` |
+
+The folder is lint-pure like `web/shared/lib` (eslint.config.js `PURE`, tsconfig.pure.json) and
+held at 100% coverage (vitest.config.ts); the edge that scrolls and flashes a rule is
+`web/shared/edge/glossary.ts`. Its import zone is a game's `ui/` zone: `web/shared/lib` and the
+DOM edge (`dom.ts` and its fakes). A painter that lands here later carves itself out of the pure
+profile the way `scorer/main.ts` does.
 Three games now carry the shapes this folder is meant to hold: gin's shell (home tabs, mode
 switch, waiting rooms, curtain, result sheets) was copied into `web/games/backgammon/src/ui/`
 with the same field, intent and painter names on purpose (docs/design/backgammon-board.md §4), so

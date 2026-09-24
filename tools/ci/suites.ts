@@ -73,7 +73,12 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
     browser: false,
     needsBuild: false,
     coverage: {
-      include: ['web/shared/lib/**/*.ts', 'web/shared/edge/**/*.ts', 'web/shared/net/**/*.ts'],
+      include: [
+        'web/shared/lib/**/*.ts',
+        'web/shared/edge/**/*.ts',
+        'web/shared/net/**/*.ts',
+        'web/shared/ui/**/*.ts',
+      ],
       // The shared pure library stays at 100% lines, functions and statements
       // (docs/ARCHITECTURE.md "*.algorithms.ts"). Measured at the ratchet
       // (lines/functions/statements/branches): shared/lib 100/100/100/100, shared/edge
@@ -81,6 +86,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // three at 100/100/100/100).
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        // The shared shell's pure helpers (docs/design/glossary-links.md §3): lint-pure like
+        // shared/lib and held at 100 like it; glossary.test.ts beside the first module.
+        'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
         // The two-seat sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios
         // once over a fake codec (sessions.test.ts beside them, with sessions.harness.ts), the two
