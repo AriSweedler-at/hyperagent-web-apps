@@ -3,7 +3,7 @@
 // theme.css declares none of them (tokens.css is the single source of gin's values) and fidice's
 // theme.css, linked last, redeclares every one so the shared names resolve to its own palette until
 // the Fidice restyle drops the overrides. Backgammon's theme.css does the same on purpose (its
-// whitewash-and-aegean palette is not a restyle target; docs/design/backgammon-board.md §3): a
+// parchment-and-aegean palette is not a restyle target; docs/design/backgammon-board.md §3): a
 // partial override would inherit gin's green felt for the names it forgot. The computed-style
 // goldens pin the resolved values; this test pins where each name is declared, which the goldens
 // cannot see.
