@@ -1,8 +1,9 @@
 /* Sheshbesh's theme (docs/design/backgammon-board.md §3, §5; the owner: "subtle but recognizable").
    The page links web/shared/styles/tokens.css and base.css before this file, and :root below
    redeclares every one of the eleven shared names (a partial override would inherit gin's green
-   felt; test/tokens.test.ts holds it). The palette is restrained: a whitewash page,
-   aegean blue as the one accent, an olive-wood board, gold only as a hairline. The board is one
+   felt; test/tokens.test.ts holds it). The palette is restrained: a parchment page
+   (§3.11: a CC0 photo of real medieval parchment, mirror-tiled, under a cream multiply), aegean
+   blue as the one accent, an olive-wood board, gold only as a hairline. The board is one
    DOM in two grid templates (§3.3): the phone stands it on end (twelve rows of two points, a
    bar band, an off row), the desktop lays it flat from 900px (two rows of thirteen). Every place
    is a grid area named by its own number, so a seat swap is 24 `data-own` attributes and the
@@ -11,14 +12,14 @@
    built CSS and holds the two together. Prettier formats this file. */
 :root {
   /* The eleven shared names, on this game's palette (design §3.1). */
-  --bg: #f4efe6;
+  --bg: #e7d7be;
   --card: #efe8dc;
   --card-2: #e4dac4;
   --accent: #0b3c5d;
   --accent-dark: #06253d;
   --gold: #c9a227;
   --text: #2a1a12;
-  --muted: #7a6a58;
+  --muted: #685745;
   --danger: #b7472a;
   --radius: 12px;
   --felt: linear-gradient(160deg, #a67c52 0%, #8e6740 55%, #6e4b2a 100%);
@@ -31,6 +32,10 @@
   --nazar-pale: #8dc3f0;
   --walnut: #4a2e1c;
   --nacre-sheen: linear-gradient(135deg, #f7f2ea 0%, #e9e9ec 45%, #ede7d8 100%);
+  /* Nacre: the light ink and the light fills now that the page itself is parchment (§3.11); the
+     cream the parchment photo is multiplied with. */
+  --nacre: #f3ecdf;
+  --parchment-cream: #eee0c8;
   --serif-display: 'GFS Didot', 'Didot', 'Bodoni MT', Georgia, serif;
   --serif-text: 'Cardo', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   /* Off the table the checker size the sheets and the history rows draw at; #tableScreen sets its own. */
@@ -44,7 +49,22 @@ html,
 body {
   padding: 0;
   min-height: 100%;
-  background: var(--bg);
+  /* The parchment (§3.11; the owner: "Pergament.2 flesh"): a CC0 photo of the smooth flesh side
+     of a medieval parchment (Wikimedia Commons File:Pergament.2.jpg, Membeth 2012, CC0 1.0),
+     mirror-tiled 2x2 into one 2048px tile so every edge meets its own reflection, repeated at
+     its native size so the grain is the same at every width, under a cream multiply that gives
+     it its tone (the photo is nearly white). The colour beneath is the tile's rendered mean, so
+     the page has its tone before the JPEG arrives; the attachment is the default, never fixed
+     (iOS). */
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--parchment-cream), var(--parchment-cream)),
+    url(./assets/parchment-flesh.jpg);
+  background-size:
+    auto,
+    2048px 2048px;
+  background-repeat: repeat;
+  background-blend-mode: multiply, normal;
   color: var(--text);
   font-family: var(--serif-text);
   overscroll-behavior-y: contain;
@@ -160,14 +180,19 @@ h1 {
 }
 .btn-primary {
   background: var(--accent);
-  color: var(--bg);
+  color: var(--nacre);
   width: 100%;
   font-size: 1.1rem;
 }
 .btn-primary:hover {
   background: var(--accent-dark);
 }
+/* Secondary buttons are nacre: a step lighter than the parchment (the old card tone is 1.02:1
+   against it). In a sheet (already the card colour) they keep the darker card tone they had. */
 .btn-secondary {
+  background: var(--nacre);
+}
+.sheet .btn-secondary {
   background: var(--card-2);
 }
 .btn-ghost {
@@ -202,7 +227,7 @@ textarea {
   width: 100%;
   padding: 13px 14px;
   border-radius: var(--radius);
-  background: var(--bg);
+  background: var(--nacre);
   color: var(--text);
   font-family: inherit;
   font-size: 1.05rem;
@@ -268,7 +293,7 @@ label {
   flex: 1;
 }
 .icon-btn {
-  background: var(--card-2);
+  background: var(--nacre);
   border: none;
   color: var(--text);
   border-radius: var(--radius);
@@ -323,7 +348,7 @@ label {
   }
 }
 .badge {
-  background: var(--card-2);
+  background: var(--nacre);
   color: var(--accent);
   font-weight: 700;
   font-size: 0.8rem;
@@ -647,7 +672,7 @@ label {
   bottom: calc(24px + env(safe-area-inset-bottom));
   transform: translateX(-50%) translateY(20px);
   background: var(--accent-dark);
-  color: var(--bg);
+  color: var(--nacre);
   font-weight: 700;
   padding: 12px 16px;
   border-radius: var(--radius);
@@ -865,7 +890,7 @@ body.fixed-screen #app {
   padding: 0 10px;
   border: none;
   border-radius: 10px;
-  background: var(--card-2);
+  background: var(--nacre);
   color: var(--text);
   font-family: inherit;
   font-size: 0.8rem;
@@ -1142,7 +1167,7 @@ body.fixed-screen #app {
   pointer-events: none;
 }
 .point.pt-b::after {
-  color: var(--bg);
+  color: var(--nacre);
   opacity: 1;
 }
 /* Phone: the far column points at the seam from the left, the near column from the right;
@@ -1271,7 +1296,7 @@ body.fixed-screen #app {
   text-align: center;
   border-radius: 8px;
   background: var(--accent);
-  color: var(--bg);
+  color: var(--nacre);
   font:
     700 0.66rem var(--serif-text),
     serif;
@@ -1614,7 +1639,7 @@ body.fixed-screen #app {
   height: 22px;
   border-radius: 50%;
   background: var(--nazar);
-  color: var(--bg);
+  color: var(--nacre);
   font:
     700 0.8rem var(--serif-text),
     serif;
@@ -1643,7 +1668,7 @@ body.fixed-screen #app {
   min-width: 22px;
   padding: 0 5px;
   border-radius: 11px;
-  background: var(--bg);
+  background: var(--nacre);
   color: var(--nazar);
   outline: 2px dashed var(--nazar);
   outline-offset: -2px;

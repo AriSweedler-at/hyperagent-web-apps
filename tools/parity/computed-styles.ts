@@ -615,11 +615,22 @@ export const FONT_ALIASES: ReadonlyArray<readonly [RegExp, string]> = [
 export const normaliseFont = (value: string): string =>
   FONT_ALIASES.reduce((v, [from, to]) => v.replace(from, to), value);
 
+/**
+ * A `url()` in a computed value (the parchment tile behind the backgammon page) is absolute and
+ * carries the origin the page was served from, which is a free port here and PORTS.pages in the
+ * e2e replay: the origin is folded to `<pages>` so the golden pins the file, not the run.
+ */
+const PAGES_URL = new RegExp(
+  `url\\("https?://[^/"]+${PAGES_BASE_PATH.replaceAll('/', '\\/')}`,
+  'g',
+);
+export const normaliseUrl = (value: string): string => value.replace(PAGES_URL, 'url("<pages>/');
+
 /** A data: URL or other very long value keeps its length and hash, which still pins it. */
 export const compactValue = (value: string): string =>
   value.length > LONG_VALUE
     ? `<${String(value.length)} chars sha256:${sha256(value).slice(0, 16)}>`
-    : value;
+    : normaliseUrl(value);
 
 export const hashRecord = (record: StyleRecord): string =>
   sha256(JSON.stringify({ v: record.v, vars: sortKeys(record.vars) })).slice(0, 12);
