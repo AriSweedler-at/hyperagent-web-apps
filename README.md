@@ -27,8 +27,8 @@ page. A host on one origin and a guest on the other still meet: peer ids carry n
 
 Sheshbesh plays portes (the Greek set's first game: no doubling cube, a gammon doubles) or Western
 backgammon (the cube, the triple game, the Crawford rule) as a match to 1, 3, 5 or 7 points, on one
-phone passed between two players (`docs/design/backgammon-rules.md`, `docs/design/backgammon-board.md`);
-its online mode ships in a following PR.
+phone passed between two players or online, host-authoritative over the same peer sessions as gin
+(`docs/design/backgammon-rules.md`, `docs/design/backgammon-board.md`).
 
 Online play works on one network, or behind friendly NATs, with STUN alone. Two devices both behind
 NAT (a phone on cellular and a laptop on office Wi-Fi) need the TURN relay: the pages fetch
@@ -128,9 +128,10 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    (:3478, static credentials, loopback only), then runs every spec in `e2e/` on projects `pages`
    and `proxy`: smoke on every page (zero uncaught exceptions, zero failed requests outside an
    allowlist), gin local and scorer, backgammon pass-and-play and its board geometry, and the `@online` specs (gin join/deal/turns, host reload and
-   guest rejoin, fidice lobby/start) in a host and a guest context that meet through `?peer=` and
+   guest rejoin, fidice lobby/start, backgammon join/roll/move, resume and the handoff) in a host and a guest context that meet through `?peer=` and
    take a STUN-only ICE list through `?ice=`; fonts and CDNs are answered from local copies and
-   `Math.random` is seeded. The `@relay` specs (`e2e/gin-relay.spec.ts`, `e2e/fidice-relay.spec.ts`)
+   `Math.random` is seeded. The `@relay` specs (`e2e/gin-relay.spec.ts`, `e2e/fidice-relay.spec.ts`,
+   `e2e/backgammon-relay.spec.ts`)
    open both pages with `?ice-policy=relay` and an ICE list naming that relay (written per run under
    `e2e/fixtures/.generated/`, since its port follows the offset), so every candidate must cross it:
    both games still join and play, "Connected via relay" shows, and the selected candidate pair read

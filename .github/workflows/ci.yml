@@ -8,7 +8,8 @@
 # about origins, signalling and the relay on both emulated origins (playwright.config.ts
 # `testIgnore`), the two-peer games through a local PeerServer (the merge gate for online play,
 # docs/MIGRATION.md step 3), the relay-forced games through a coturn the harness starts (installed
-# by .github/actions/coturn; e2e/gin-relay.spec.ts, e2e/fidice-relay.spec.ts), the stories spec
+# by .github/actions/coturn; e2e/gin-relay.spec.ts, e2e/fidice-relay.spec.ts,
+# e2e/backgammon-relay.spec.ts), the stories spec
 # (e2e/gin-stories.spec.ts) against the committed per-platform screenshot baselines under
 # e2e/__screenshots__, whose -linux.png files the workflow_dispatch job stories-baselines.yml records
 # on the branch for the PR author to commit before this job can pass, and the transport integration

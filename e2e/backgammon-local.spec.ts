@@ -1,6 +1,6 @@
 // Sheshbesh's shell and pass-and-play on one page (docs/design/backgammon-board.md §4, §5, §7), at a
-// phone and a laptop. The home screen: the title, the tab bar, the Play submenu, the
-// Online mode hidden until the online PR (design §5.3) with Pass the phone the default. The table: a game starts under
+// phone and a laptop. The home screen: the title, the tab bar, the Play submenu, Online the
+// default mode with Pass the phone beside it (the online specs play online). The table: a game starts under
 // the curtain naming the opening winner, whose button rolls (portes) or plays the opening dice
 // (Western); tap-to-move plays a turn with the legal sources and targets lit as the engine's view
 // has them and the status line naming what is left; undo rewinds; the die-chip tray opens where
@@ -74,7 +74,7 @@ const longPressPlay = async (page: Page): Promise<void> => {
 
 Object.entries(VIEWPORTS).forEach(([name, vp]) => {
   test.describe(name, () => {
-    test('home: the title, the tab bar, Rules and About; Online hidden, Pass the phone the default', async ({
+    test('home: the title, the tab bar, Rules and About; Online the default, Pass the phone beside it', async ({
       player,
       project,
     }) => {
@@ -85,13 +85,24 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#homeScreen h1')).toHaveText('Sheshbesh');
       await expect(page.locator('#topTabbar .tab-btn')).toHaveText(['Play', 'Rules', 'About']);
       await expect(page.locator('#tabPlayBtn')).toHaveClass(/\bactive\b/);
-      // Online play ships with the online PR (design §5.3): its switch, its option and its panel are hidden; the local
-      // panel is up with Pass the phone active (ui/state.ts ONLINE_MODE_SHOWN, DEFAULT_PLAY_MODE).
-      await expect(page.locator('#playModeSwitch')).toBeHidden();
-      await expect(page.locator('#playModeSwitch .mode-btn[data-mode="online"]')).toBeHidden();
-      await expect(page.locator('#playSubmenu button[data-mode="online"]')).toBeHidden();
-      await expect(page.locator('#onlineModeContent')).toBeHidden();
+      // Online is the default mode (storage.ts DEFAULT_PLAY_MODE, as gin's): its panel is up with
+      // the name, the two selects and the code form; the switch flips to Pass the phone.
+      await expect(page.locator('#playModeSwitch')).toBeVisible();
+      await expect(page.locator('#playModeSwitch .mode-btn')).toHaveText([
+        'Online',
+        'Pass the phone',
+      ]);
+      await expect(page.locator('#playModeSwitch .mode-btn[data-mode="online"]')).toHaveClass(
+        /\bactive\b/,
+      );
+      await expect(page.locator('#onlineModeContent')).toBeVisible();
+      await expect(page.locator('#localModeContent')).toBeHidden();
+      await expect(page.locator('#nameInput')).toHaveValue('Ari');
+      await expect(page.locator('#variantSel')).toHaveValue('portes');
+      await expect(page.locator('#matchLengthSel')).toHaveValue('5');
+      await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
       await expect(page.locator('#localModeContent')).toBeVisible();
+      await expect(page.locator('#onlineModeContent')).toBeHidden();
       await expect(page.locator('#playModeSwitch .mode-btn[data-mode="local"]')).toHaveClass(
         /\bactive\b/,
       );
@@ -108,7 +119,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#playPanel')).toBeHidden();
     });
 
-    test('home: a long press on Play opens the submenu; Pass the phone is its one shown option and lands on the Play tab', async ({
+    test('home: a long press on Play opens the submenu; its options are Online and Pass the phone; a pick lands on the Play tab', async ({
       player,
       project,
     }) => {
@@ -120,8 +131,9 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const submenu = page.locator('#playSubmenu');
       await longPressPlay(page);
       await expect(submenu).toHaveClass(/\bforce-open\b/);
+      await expect(submenu.locator('button')).toHaveText(['Online', 'Pass the phone']);
+      await expect(submenu.locator('button[data-mode="online"]')).toBeVisible();
       await expect(submenu.locator('button[data-mode="local"]')).toBeVisible();
-      await expect(submenu.locator('button[data-mode="online"]')).toBeHidden();
       await submenu.locator('button[data-mode="local"]').click();
       await expect(submenu).not.toHaveClass(/\bforce-open\b/);
       await expect(page.locator('#playPanel')).toBeVisible();

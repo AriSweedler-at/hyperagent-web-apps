@@ -89,7 +89,7 @@ import { flyMoves } from './board/fly.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { rulesItemsHtml } from './rules.ts';
-import { ONLINE_MODE_SHOWN, SCREENS, handoffLabel, type App, type Intent } from './state.ts';
+import { SCREENS, handoffLabel, type App, type Intent } from './state.ts';
 
 export type { PageLike };
 export type Dispatch = (intent: Intent) => void;
@@ -159,13 +159,12 @@ export const paintSound = (doc: DocumentLike, enabled: boolean): void => {
 
 /**
  * `#handoffBtn` (the 🌐 beside the menu button): a pass-and-play game can go on as a hosted room
- * (ui/state.ts `handoff`); the tooltip names who hosts and who joins. Hidden with the rest of
- * online play until the online PR (`ONLINE_MODE_SHOWN`, design §5.3).
+ * (ui/state.ts `handoff`); the tooltip names who hosts and who joins. Pass-and-play alone shows it.
  */
 export const paintHandoff = (doc: DocumentLike, app: App): void => {
   const btn = requireId(doc, 'handoffBtn');
   const game = app.shell.role === 'local' ? app.shell.game : null;
-  toggleClass(btn, 'hidden', game === null || !ONLINE_MODE_SHOWN);
+  toggleClass(btn, 'hidden', game === null);
   if (game !== null) setAttr(btn, 'title', handoffLabel(game));
 };
 
@@ -449,13 +448,14 @@ const paintControls = (doc: DocumentLike, app: App, v: View): void => {
 
 // ---- the result sheet, the endgame, the cube offer (design §4.8, §4.11) ------------------------
 
-/** `#rsNextBtn` / `#nextGameBtn`: the host or pass-and-play starts the next game; the guest waits. */
+/**
+ * `#rsNextBtn` / `#nextGameBtn`: either seat starts the next game (the engine takes `next` from
+ * both, and so does `next/click`); a rematch is the host's, so the guest's button waits for them
+ * (short: it shares a row with Leave on a phone).
+ */
+export const nextWaits = (app: App, v: View): boolean => app.shell.role === 'guest' && v.matchOver;
 export const nextLabel = (app: App, v: View): string =>
-  app.shell.role === 'guest'
-    ? `Waiting for ${v.opp.name} to start the next game`
-    : v.matchOver
-      ? 'Rematch'
-      : 'Next game';
+  nextWaits(app, v) ? `Waiting for ${v.opp.name}…` : v.matchOver ? 'Rematch' : 'Next game';
 
 const paintResult = (doc: DocumentLike, app: App, v: View): void => {
   paintSheet(doc, 'resultOverlay', v.phase === 'over' && !v.matchOver && app.table.resultOpen);
@@ -466,7 +466,7 @@ const paintResult = (doc: DocumentLike, app: App, v: View): void => {
   setText(requireId(doc, 'rsScore'), text.score);
   const next = requireId(doc, 'rsNextBtn');
   setText(next, nextLabel(app, v));
-  setDisabled(next, app.shell.role === 'guest');
+  setDisabled(next, nextWaits(app, v));
 };
 
 /** `#resultTitle`: `Ari takes the match 5–2`. */
@@ -508,7 +508,7 @@ const paintEndgame = (doc: DocumentLike, app: App, v: View): void => {
   }
   const next = requireId(doc, 'nextGameBtn');
   setText(next, nextLabel(app, v));
-  setDisabled(next, app.shell.role === 'guest');
+  setDisabled(next, nextWaits(app, v));
 };
 
 /** `#cubeOfferText` and `#passBtn` (design §4.8): `Ari doubles to 2. Take or pass?` · `Pass (Ari wins 1)`. */

@@ -1,7 +1,8 @@
 # Plays the deployed page every night (docs/MIGRATION.md step 15, docs/ARCHITECTURE.md "CI").
 # ci.yml proves the code on emulated origins; this proves the bytes GitHub Pages actually serves at
 # https://arisweedler-at.github.io/hyperagent-web-apps/ still play: the @online specs (gin
-# join/deal/turn, gin resume/rejoin, fidice lobby/start) and the @relay specs (both games with
+# join/deal/turn, gin resume/rejoin, fidice lobby/start, backgammon join/roll/move, resume and the
+# pass-and-play handoff) and the @relay specs (all three games with
 # ?ice-policy=relay, every candidate through the relay) open the deployed pages with the same hooks
 # the PR harness uses, ?peer= naming a PeerServer on this runner, ?ice= naming an ICE list served
 # from this runner and the coturn started on it. Nothing Cloudflare is in the loop: not

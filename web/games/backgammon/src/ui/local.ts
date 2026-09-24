@@ -16,7 +16,7 @@ import {
 } from '../../../../shared/edge/dom.ts';
 import { diceText, type Seat, type View } from '../engine/index.ts';
 import { hitsAgainst, lastTurnEntry } from './board.ts';
-import { ONLINE_MODE_SHOWN, type App, type Intent } from './state.ts';
+import type { App, Intent } from './state.ts';
 
 export type CurtainText = Readonly<{
   title: string;
@@ -96,8 +96,6 @@ export const paintCurtain = (doc: PageLike, app: App): void => {
   const v = app.shell.view;
   const up = seat !== null && v !== null;
   toggleClass(overlay, 'hidden', !up);
-  // The handoff to an online room ships with online play (design §5.3).
-  toggleClass(requireId(doc, 'curtainHandoffBtn'), 'hidden', !ONLINE_MODE_SHOWN);
   if (seat === null || v === null) return;
   const text = curtainText(v, seat);
   setText(requireId(doc, 'curtainTitle'), text.title);

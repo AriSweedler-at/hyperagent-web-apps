@@ -30,9 +30,9 @@ import {
   LEAVE_ONLINE_MSG,
   LONG_PRESS_MS,
   LOST_HOST_MSG,
+  hostLeftMsg,
   NOT_CONNECTED_MSG,
   NO_MOVE_MS,
-  ONLINE_MODE_SHOWN,
   OPPONENT_LEFT_MSG,
   ROOM_FULL_MSG,
   SANDBOX_LOCAL_ONLY_MSG,
@@ -215,7 +215,7 @@ const playTurn = (start: Step): Step => {
 };
 
 describe('the initial app', () => {
-  test('is gin`s shell split from the table, on the home screen, pass-and-play by default', () => {
+  test('is gin`s shell split from the table, on the home screen, online by default', () => {
     expect(initialApp.shell).toMatchObject({
       role: null,
       code: null,
@@ -228,7 +228,7 @@ describe('the initial app', () => {
       oppConnected: false,
       revealed: null,
       homeTab: 'play',
-      playMode: 'local',
+      playMode: 'online',
       screen: 'homeScreen',
       netAttempt: 0,
       hostStatus: { text: OPENING_MSG, pulse: true },
@@ -260,12 +260,14 @@ describe('the initial app', () => {
     ]);
   });
 
-  test('online play is hidden in this PR: the default mode is local, the option is not shown, and the reducer still accepts it', () => {
-    expect(DEFAULT_PLAY_MODE).toBe('local');
-    expect(ONLINE_MODE_SHOWN).toBe(false);
-    const { app, effects } = run(initialApp, { type: 'mode/set', mode: 'online' });
-    expect(app.shell.playMode).toBe('online');
-    expect(effects).toEqual([{ type: 'writePlayMode', mode: 'online' }]);
+  test("online is the default mode (storage.ts's, as gin's); mode/set switches and remembers it", () => {
+    expect(DEFAULT_PLAY_MODE).toBe('online');
+    expect(initialApp.shell.playMode).toBe('online');
+    const { app, effects } = run(initialApp, { type: 'mode/set', mode: 'local' });
+    expect(app.shell.playMode).toBe('local');
+    expect(effects).toEqual([{ type: 'writePlayMode', mode: 'local' }]);
+    // Anything but `local` is online (gin's `setPlayMode`).
+    expect(run(app, { type: 'mode/set', mode: 'sandbox' }).app.shell.playMode).toBe('online');
   });
 
   test('the shell`s intents are listed once, for the shared shell reducer to come', () => {
@@ -716,6 +718,13 @@ describe('joining', () => {
     const lost = run(seated, { type: 'guest/lost' });
     expect(lost.app.shell).toMatchObject({ oppConnected: false, screen: 'tableScreen' });
     expect(toasts(lost.effects)).toEqual([[LOST_HOST_MSG, GONE_TOAST_MS]]);
+    // The match over: the result stays up, the session closes and the save goes (nothing to rejoin).
+    const over = { ...viewFor(g, 1), phase: 'over' as const, matchOver: true };
+    const done = run(seated, { type: 'guest/frame', frame: { t: 'state', view: over } }).app;
+    const gone = run(done, { type: 'guest/lost' });
+    expect(gone.app.shell).toMatchObject({ oppConnected: false, screen: 'endgameScreen' });
+    expect(kinds(gone.effects)).toEqual(expect.arrayContaining(['closeNet', 'clearSave']));
+    expect(toasts(gone.effects)).toEqual([[hostLeftMsg('Ann'), GONE_TOAST_MS]]);
     const early = run(run(guest(), { type: 'guest/connected' }).app, { type: 'guest/lost' });
     expect(early.app.shell).toMatchObject({
       screen: 'guestWaitScreen',
@@ -1454,7 +1463,7 @@ describe('storage', () => {
   test('readHome: the defaults when the store is empty, the values when it is not', () => {
     const storage = fakeStorage();
     const store = createStore(storage);
-    expect(readHome(store)).toEqual({ ...home, playMode: 'local' });
+    expect(readHome(store)).toEqual({ ...home, playMode: 'online' });
     storage.map.set(STORAGE_KEYS.name, 'Ann');
     storage.map.set(STORAGE_KEYS.p2Name, 'Bob');
     storage.map.set(STORAGE_KEYS.homeTab, 'about');

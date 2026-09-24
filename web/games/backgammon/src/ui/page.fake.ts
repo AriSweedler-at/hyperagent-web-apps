@@ -58,7 +58,7 @@ export const MODES = ['online', 'local'] as const;
 
 export type BackgammonPage = FakePage &
   Readonly<{
-    /** The switch's mode buttons: online, then local (the online one ships hidden, design §5.3). */
+    /** The switch's mode buttons: online (the markup's `active`), then local. */
     modeButtons: ReadonlyArray<FakeEl>;
     /** The Play tab submenu's mode buttons, same order. */
     submenuButtons: ReadonlyArray<FakeEl>;
@@ -76,34 +76,19 @@ export const backgammonPage = (
   const fromMarkup = optionsFromMarkup(markup);
   const modeButtons = MODES.map((mode) =>
     fakeEl(`modeSwitch-${mode}`, {
-      classes: ['mode-btn', ...(mode === 'online' ? ['hidden'] : ['active'])],
+      classes: ['mode-btn', ...(mode === 'online' ? ['active'] : [])],
       attrs: { 'data-mode': mode },
     }),
   );
   const submenuButtons = MODES.map((mode) =>
-    fakeEl(`submenu-${mode}`, {
-      classes: mode === 'online' ? ['hidden'] : [],
-      attrs: { 'data-mode': mode },
-    }),
+    fakeEl(`submenu-${mode}`, { attrs: { 'data-mode': mode } }),
   );
-  const onlineOnly = (buttons: ReadonlyArray<FakeEl>): ReadonlyArray<FakeEl> => buttons.slice(0, 1);
   // The opponent's strip has no id (render.ts toggles `to-move` on it through `#tableScreen`).
   const oppStrip = fakeEl('oppStrip', { classes: ['opp-strip'] });
   const declared: Readonly<Record<string, FakeElOptions>> = {
     tableScreen: { queries: { '.opp-strip': [oppStrip] } },
-    playModeSwitch: {
-      queries: {
-        '.mode-btn': modeButtons,
-        '.mode-btn[data-mode="online"]': onlineOnly(modeButtons),
-      },
-    },
-    playSubmenu: {
-      queries: {
-        button: submenuButtons,
-        'button[data-mode]': submenuButtons,
-        'button[data-mode="online"]': onlineOnly(submenuButtons),
-      },
-    },
+    playModeSwitch: { queries: { '.mode-btn': modeButtons } },
+    playSubmenu: { queries: { button: submenuButtons, 'button[data-mode]': submenuButtons } },
   };
   // Elements other ids declare as children are created first so the parents can reference them.
   const plain = [...fromMarkup.keys()].filter((id) => !(id in declared) && !(id in extra));

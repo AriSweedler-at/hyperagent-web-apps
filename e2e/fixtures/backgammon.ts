@@ -1,6 +1,7 @@
 // Drives the Sheshbesh page through its DOM (docs/design/backgammon-board.md §7 "Testability"): the
-// home form, the pass-and-play curtain, the roll button, the points, bars and trays a player
-// taps. The one thing read from the documented hook (`window.__backgammon`, docs/ARCHITECTURE.md)
+// home form (a room hosted or joined by code, gin's twins for e2e/fixtures/two-players.ts), the
+// pass-and-play curtain, the roll button, the points, bars and trays a player taps. The one
+// thing read from the documented hook (`window.__backgammon`, docs/ARCHITECTURE.md)
 // is the engine's `View` (`readBoard`), which the specs use as the oracle for what the DOM must
 // show (which points may move, where a tap lands); positions are seated through its `setup`, built
 // here in node from the same engine the page runs (`bgPosition`). Own numbering (1..24 from the
@@ -25,8 +26,10 @@ import {
   type View,
 } from '../../web/games/backgammon/src/engine/index.ts';
 import { mulberry32 } from '../../web/shared/lib/rng.ts';
+import { BROKER_TIMEOUT, WEBRTC_TIMEOUT } from './timeouts.ts';
 
 export type Viewport = Readonly<{ width: number; height: number }>;
+
 export type Names = Readonly<[string, string]>;
 export const DEFAULT_NAMES: Names = ['Ann', 'Bob'];
 
@@ -43,6 +46,75 @@ export const requireBoard = async (page: Page): Promise<View> => {
   if (view === null) throw new Error('the page holds no game view');
   return view;
 };
+
+// ---- online: the room (gin's fixtures, ids for ids) ------------------------------------------
+
+/** The 4-letter code `#roomCode` shows. */
+export const bgRoomCode = async (page: Page): Promise<string> => {
+  const code = page.locator('#roomCode');
+  await expect(code).toHaveText(/^[A-Z]{4}$/);
+  return code.innerText();
+};
+
+/** Open a table as `name`; resolves with the code once the broker has confirmed the room. */
+export const bgHostRoom = async (page: Page, name: string): Promise<string> => {
+  await expect(page.locator('#onlineModeContent')).toBeVisible();
+  await page.locator('#nameInput').fill(name);
+  await page.locator('#hostBtn').click();
+  await expect(page.locator('#hostWaitScreen')).toBeVisible();
+  // The page re-rolls the code (and rewrites #roomCode) when the broker reports the id taken, so
+  // the code is read only after the broker has confirmed the room.
+  await expect(page.locator('#hostWaitStatus')).toContainText('Waiting for your opponent to join', {
+    timeout: BROKER_TIMEOUT,
+  });
+  return bgRoomCode(page);
+};
+
+/**
+ * The guest's status once the host has answered its join (ui/state.ts `hostRoomMsg`). The guest
+ * itself writes 'Connected. Waiting for the host to start…' when the channel opens, before its
+ * join is sent; only the host's `lobby` reply carries the host's name.
+ */
+export const BG_HOST_ANSWERED = /^Connected — waiting for .+ to start$/;
+
+/** Sit down at a table by code; resolves once the channel is open and the host has answered the join. */
+export const bgJoin = async (page: Page, name: string, code: string): Promise<void> => {
+  await expect(page.locator('#onlineModeContent')).toBeVisible();
+  await page.locator('#nameInput').fill(name);
+  // The code field refuses multi-character inserts (it defeats keyboard autocorrect), so type it.
+  await page.locator('#codeInput').pressSequentially(code);
+  await expect(page.locator('#codeInput')).toHaveValue(code);
+  await page.locator('#joinBtn').click();
+  await expect(page.locator('#guestWaitScreen')).toBeVisible();
+  await expect(page.locator('#guestWaitStatus')).toHaveText(BG_HOST_ANSWERED, {
+    timeout: WEBRTC_TIMEOUT,
+  });
+};
+
+/** The host starts the match; both tables appear (online shows no curtain). */
+export const bgHostStarts = async (host: Page, guest: Page): Promise<void> => {
+  await expect(host.locator('#startGameBtn')).toBeVisible({ timeout: WEBRTC_TIMEOUT });
+  await host.locator('#startGameBtn').click();
+  await expect(host.locator('#tableScreen')).toBeVisible();
+  await expect(guest.locator('#tableScreen')).toBeVisible();
+  await expect(host.locator('#curtainOverlay')).toBeHidden();
+  await expect(guest.locator('#curtainOverlay')).toBeHidden();
+};
+
+/** What both boards must agree on: the position, whose turn, the phase, the dice and the log so far. */
+export const boardKey = (v: View | null): string =>
+  v === null
+    ? 'none'
+    : JSON.stringify([v.gameNo, v.phase, v.turn, v.dice, v.board, v.log.length, v.played.length]);
+
+/** The guest's board shows what the host's does (its frame arrives a beat later); resolves with the host's view. */
+export const bgBoardsAgree = async (host: Page, guest: Page): Promise<View> => {
+  const view = await requireBoard(host);
+  await expect.poll(async () => boardKey(await readBoard(guest))).toBe(boardKey(view));
+  return view;
+};
+
+// ---- the table -------------------------------------------------------------------------------
 
 /** `#point-N` of the viewer's own point `own` (1..24), through the view's seat and variant frame. */
 export const ownPointId = (view: View, own: number): string =>
@@ -106,6 +178,8 @@ export const bgStartLocal = async (
 ): Promise<void> => {
   await page.setViewportSize({ width: viewport.width, height: viewport.height });
   await page.goto(url);
+  // Online is the default mode: the switch flips to pass and play first (gin's driver does the same).
+  await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
   await expect(page.locator('#localModeContent')).toBeVisible();
   await page.locator('#p1NameInput').fill(names[0]);
   await page.locator('#p2NameInput').fill(names[1]);
