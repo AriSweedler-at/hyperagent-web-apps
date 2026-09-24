@@ -1237,6 +1237,14 @@ describe('the roll modal and the tumble (design §4.7)', () => {
       app: settledDice.app,
       effects: [],
     });
+    // A double (a constant rng throws 4-4) earns its cue as the dice settle, after the roll's,
+    // never before; a plain roll earns none.
+    const doubled = reduce(open, { type: 'roll/click' }, { rng: () => 0.5, now: () => NOW });
+    expect(game(doubled.app).dice).toEqual([4, 4]);
+    expect(cues(doubled.effects)).toEqual(['roll']);
+    expect(cues(reduce(doubled.app, { type: 'tumble/elapsed' }, ctx).effects)).toEqual(['doubles']);
+    expect(game(rolled.app).dice?.[0]).not.toBe(game(rolled.app).dice?.[1]);
+    expect(cues(settledDice.effects)).toEqual([]);
     // Once the match is over there is no roll to ask for.
     const done = playOut({ app: local('1'), effects: [] }, 4000).app;
     expect(view(done).matchOver).toBe(true);
@@ -1863,7 +1871,18 @@ describe('the rest of the shell', () => {
   });
 
   test('every cue the reducer raises has a sound row', () => {
-    const raised = ['roll', 'place', 'hit', 'bearOff', 'yourTurn', 'win', 'lose', 'double', 'tap'];
+    const raised = [
+      'roll',
+      'doubles',
+      'place',
+      'hit',
+      'bearOff',
+      'yourTurn',
+      'win',
+      'lose',
+      'double',
+      'tap',
+    ];
     expect(Object.keys(CUES).sort()).toEqual([...raised].sort());
     expect(CUES.hit.cue).toBe('capture');
     expect(CUES.bearOff.cue).toBe('score');

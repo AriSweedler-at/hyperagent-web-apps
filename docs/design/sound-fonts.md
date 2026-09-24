@@ -137,7 +137,10 @@ Backgammon's table (its `src/ui/sound.ts`, written with the page): `select → t
 per seat, since a table holds one cue per event; the reducer decides which seat hears what),
 `bearOff → score`, `undo → undo`, `opening → start`, `yourTurn → turn`,
 `double → challenge`, `take → good`, `pass → neutral`, `gammon → great`, `win → victory`,
-`lose → loss`, `guestJoined → connection`, `guestGone → disconnect`, `shared → invite`.
+`lose → loss`, `guestJoined → connection`, `guestGone → disconnect`, `shared → invite`. As shipped
+(backgammon-board.md §5.1) the table is smaller (`roll place hit bearOff yourTurn win lose double
+tap`) plus `doubles → good`, the small excited notice as the dice settle on a double (§4.7 there),
+which both seats hear as both hear the roll.
 
 Fidice, when it gains sound: `roll`, `turn`, `good`, `bad`, `score`, `victory`, `loss`.
 

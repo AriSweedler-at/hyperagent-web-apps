@@ -20,6 +20,7 @@ describe('the table', () => {
     const mapping: Readonly<Record<Cue | 'tap', SoundCue>> = {
       tap: 'tap',
       roll: 'roll',
+      doubles: 'good',
       place: 'move',
       hit: 'capture',
       bearOff: 'score',

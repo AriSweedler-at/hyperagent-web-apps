@@ -1739,8 +1739,23 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
     }
     case 'shake/elapsed':
       return pure(withTable(app, { shake: null }));
-    case 'tumble/elapsed':
-      return t.rolling ? pure(withTable(app, { rolling: false })) : pure(app);
+    case 'tumble/elapsed': {
+      if (!t.rolling) return pure(app);
+      // The dice have settled: a double earns its cue now, after the roll's (design §4.7, §5.1),
+      // on both seats' tables alike (each runs the tumble the roll started).
+      const view = app.shell.view;
+      const last = view?.lastAction ?? null;
+      const doubles =
+        view?.dice !== null &&
+        view?.dice !== undefined &&
+        view.dice[0] === view.dice[1] &&
+        last !== null &&
+        (last.kind === 'roll' || last.kind === 'noMove');
+      return step(
+        withTable(app, { rolling: false }),
+        ...(doubles ? [{ type: 'fx', cue: 'doubles' } as const] : []),
+      );
+    }
     case 'sandbox/load':
       return sandboxLoad(app, intent.state, ctx);
     case 'leave/request':

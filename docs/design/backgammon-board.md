@@ -425,8 +425,9 @@ null (no tap, roll, undo or double answers; `#board.inert`), the modal's button 
 the painter puts `rolling` on `#dice`, `#diceMini` and `#rollModalDice` (§3.7: the faces run
 through a fixed pseudo-random list every 70 ms for 560 ms, then the real faces show for the last
 140 ms), with `#board[data-rolling]` for the specs to wait on and `#board[data-rolled]` once the
-faces stand still. The roll cue plays at the click as before (`cuesBetween`); a refusal (`refuse`)
-drops `rolling` with the taps. Tapping `#dice` is still `roll/click`. Under reduced motion the
+faces stand still. The roll cue plays at the click as before (`cuesBetween`); when the settled
+roll is a double, `tumble/elapsed` raises `doubles` (§5.1) after it, for whichever seat is
+watching; a refusal (`refuse`) drops `rolling` with the taps. Tapping `#dice` is still `roll/click`. Under reduced motion the
 cycling is off (one frame) and the 700 ms beat stays.
 
 The roll slot in the controls row keeps its box (§3.2) for `#diceMini` while `moving`, `#waitNote`
@@ -523,7 +524,10 @@ screen, the rules overlay anywhere else) followed by the `revealRule { slot, rul
 `#rule-<id>` deep link at boot does the same. Waiting rooms: gin's, fed by the sessions' status strings; `#shareCodeBtn` →
 `share/click` → `shareInvite(navigator, { title: 'Sheshbesh', code, pageUrl, toast })` (web/shared/edge/boot.ts:
 gin's chain and its `INVITE_COPIED_MSG` / `Room code:` fallbacks); `#startGameBtn` when the guest is connected → `createGame`. Sound: `src/fx.ts` plays the
-table's cues (`roll place hit bearOff yourTurn win lose double tap` in `ui/sound.ts`) in the App's
+table's cues (`roll doubles place hit bearOff yourTurn win lose double tap` in `ui/sound.ts`; `doubles`
+→ the shared `good` with a light buzz, the owner's "small excited sound played when you roll
+doubles", raised by `tumble/elapsed` as the dice settle on a double, §4.7, on both seats' tables
+since both run the tumble the roll started) in the App's
 sound font through `web/shared/edge/sound.ts`; `#soundBtn` toggles `backgammon_sound` (and its
 `aria-pressed`); `__backgammon.soundFont(name)` picks a font from the console; the wake lock is
 held while hosting or in a local game.
