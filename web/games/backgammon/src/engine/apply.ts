@@ -1,5 +1,5 @@
-// The reducer (understand.md §5 R7, R12-R14, R19, R21, R22, R26-R28; panel E1 §3 "Turn flow",
-// "Cube and Crawford", "Undo", "Actor and refusal order"): `applyAction(state, seat, action, rng,
+// The reducer (rules R7, R12-R14, R19, R21, R22, R26-R28; the turn
+// flow, the cube and Crawford, undo, the actor and refusal order): `applyAction(state, seat, action, rng,
 // now)` returns a new State or a refusal worded for the player, never mutates, never throws, and
 // is the single entry the local reducer and the online host share. A move is legal iff
 // `legalMoves` offers it; the turn ends by itself when nothing extends `played` (no `done`

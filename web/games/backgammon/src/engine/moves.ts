@@ -1,8 +1,8 @@
-// Legal play (understand.md §5 R4, R7-R9, R11-R14, R16; panel E1 §2.2-2.4): every rule about one
+// Legal play (rules R4, R7-R9, R11-R14, R16): every rule about one
 // die lives in `singleSteps`; the obligation to play as many dice as possible and the higher-die
 // rule are a level-by-level enumeration of the boards reachable with the remaining dice,
 // deduplicated by resulting board at every level (two orderings of independent moves meet there),
-// tried in both die orders for a non-double. Maximality is hereditary (E1 §2.4, brute-forced over
+// tried in both die orders for a non-double. Maximality is hereditary (brute-forced over
 // 3000 positions): after any offered move, the legal continuations from the new board with the
 // remaining multiset are exactly the completions of the maximal plays, so `legalMoves` is a
 // function of (board, dice, played) alone, the same function decides UI offers, action legality

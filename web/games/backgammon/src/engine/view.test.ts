@@ -1,4 +1,4 @@
-// The per-seat view (panel E1 §5 view.ts): the wire key order, what belongs to the mover only
+// The per-seat view (rules §2 `View`): the wire key order, what belongs to the mover only
 // (legal, plays, canUndo), the PLAYS_CAP with the true count beside it, canDouble and the finished
 // game, and `legalActions` per phase for the actor, which the replay policy draws from.
 import { describe, expect, test } from 'vitest';

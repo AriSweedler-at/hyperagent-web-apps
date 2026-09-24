@@ -1,5 +1,5 @@
-// Scoring (understand.md §5 R17, R18, R21-R24; panel E1 §5 score.ts): pip counts with the
-// judge's corrections (T13, P20), the winner and the multiplier on the end-position table for
+// Scoring (rules R17, R18, R21-R24): pip counts with the
+// corrected rows (T13, P20), the winner and the multiplier on the end-position table for
 // both variants, and the match arithmetic including the Crawford flags.
 import { describe, expect, test } from 'vitest';
 
@@ -30,12 +30,12 @@ describe('pipCount (R24)', () => {
     );
     expect(pipCount(t14, 0, P)).toBe(103);
     expect(pipCount(t14, 1, P)).toBe(93);
-    // T13 (judge's correction): dark is 181 before 8/5* and 186 after (own 20 -> the bar, 25).
+    // T13 (corrected): dark is 181 before 8/5* and 186 after (own 20 -> the bar, 25).
     const t13 = pos('L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:4 20:1 | bar 0/0 | off 0/0');
     expect(pipCount(t13, 1, P)).toBe(181);
     const hit = parseMove(0, '8/5*', P);
     expect(hit.ok && pipCount(afterMove(t13, 0, hit.value, P), 1, P)).toBe(186);
-    // P20 (judge's correction): 163 -> 168.
+    // P20 (corrected): 163 -> 168.
     const p20 = pos('L: 24:2 13:5 8:3 6:5 | D: 24:1 20:1 13:5 8:3 6:5 | bar 0/0 | off 0/0');
     expect(pipCount(p20, 1, P)).toBe(163);
     expect(hit.ok && pipCount(afterMove(p20, 0, hit.value, P), 1, P)).toBe(168);

@@ -1,4 +1,4 @@
-// Decoders for the engine's shapes (understand.md §5 R32; panel E1 §5 `decode.ts`): a `View`
+// Decoders for the engine's shapes (rules R32): a `View`
 // arriving in a wire `state` frame, a `State` read back from the save and an `Action` from a
 // guest are `unknown` until they pass one of these. Built from web/shared/lib/json combinators
 // with the fields in types.ts's order, so `JSON.stringify` of a decoded value reproduces the

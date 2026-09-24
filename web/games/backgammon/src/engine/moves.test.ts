@@ -1,5 +1,5 @@
-// The test-position table (panel E1 §4 T1-T30 and E2 §4's rows converted to own numbering,
-// deduplicated, with the judge's pip corrections), one row per tricky rule: bar entry, the
+// The test-position table (T1-T30 and the coverage rows, in own numbering,
+// deduplicated, with corrected pip counts), one row per tricky rule: bar entry, the
 // higher-die rule, a low die that would kill the high die, doubles with fewer than four playable,
 // exact / higher-die / highest-point bear-off, hits, blocked primes. Every row is checked three
 // ways: the legal first moves equal the pinned set, they equal the first moves of `maximalPlays`
@@ -215,7 +215,7 @@ describe('continuations pinned by the table notes', () => {
 
   test('P29: chained hits grow the bar by one each and add 20 and 16 pips', () => {
     const p29 = 'L: 24:2 13:5 8:3 6:5 | D: 24:3 13:5 9:1 8:3 6:2 5:1 | bar 0/0 | off 0/0';
-    // The judge's correction: dark's own 5 then own 9 go to the bar (25): 187 -> 207 -> 223.
+    // The corrected count: dark's own 5 then own 9 go to the bar (25): 187 -> 207 -> 223.
     expect(pipCount(pos(p29), 1, R)).toBe(187);
     const one = after(p29, 0, ['24/20*']);
     expect(one.bar).toEqual([0, 1]);
@@ -230,7 +230,7 @@ describe('continuations pinned by the table notes', () => {
 });
 
 describe('the worst cases: fifteen singletons under doubles', () => {
-  // E1's position (consecutive singletons, nothing blocked) and E2's P27 (the 1-point blocked).
+  // Consecutive singletons with nothing blocked, then the same with the 1-point blocked (P27).
   const e1 = pos(
     'L: 21:1 20:1 19:1 18:1 17:1 16:1 15:1 14:1 13:1 12:1 11:1 10:1 9:1 8:1 7:1 | D: 1:15 | bar 0/0 | off 0/0',
   );
