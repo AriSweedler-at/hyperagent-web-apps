@@ -12,6 +12,7 @@ export default defineConfig({
       include: [
         'web/shared/lib/**/*.ts',
         'web/shared/edge/**/*.ts',
+        'web/shared/net/**/*.ts',
         'web/games/fidice/src/domain/**/*.ts',
         'web/games/fidice/src/bots/**/*.ts',
         'web/games/fidice/src/net/**/*.ts',
@@ -64,6 +65,11 @@ export default defineConfig({
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
+        // The two-seat sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios
+        // once over a fake codec (sessions.test.ts beside them), the two games' byte-pinning suites
+        // through their wrappers and the gin wire-corpus replay. Measured at the move
+        // (lines/functions/statements/branches): 100/100/99.2/96.2, the row gin's net/ had.
+        'web/shared/net/**': { lines: 95, functions: 95, statements: 94, branches: 93 },
         'web/games/fidice/src/domain/**': {
           lines: 95,
           functions: 95,

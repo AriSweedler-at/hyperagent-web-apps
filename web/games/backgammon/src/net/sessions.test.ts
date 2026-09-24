@@ -62,7 +62,7 @@ import {
   type IceLoader,
   type IceResult,
   type NetDeps,
-} from './peerjs.ts';
+} from '../../../../shared/edge/peer.ts';
 
 const CODE = 'ABCD';
 /** understand.md §4 step 1: prefix `sheshbesh-`, the code upper case. */

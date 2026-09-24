@@ -60,7 +60,7 @@ import {
   type IceLoader,
   type IceResult,
   type NetDeps,
-} from './peerjs.ts';
+} from '../../../../shared/edge/peer.ts';
 
 const CODE = 'ABCD';
 const ROOM = `${GIN_PEER_PREFIX}${CODE}`;

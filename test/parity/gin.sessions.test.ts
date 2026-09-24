@@ -11,7 +11,7 @@ import { describe, expect, test } from 'vitest';
 import type { GuestFrame, HostFrame } from '../../web/games/gin-rummy/src/protocol.ts';
 import { GuestSession, type GuestEvents } from '../../web/games/gin-rummy/src/net/guest.ts';
 import { HostSession, type HostEvents } from '../../web/games/gin-rummy/src/net/host.ts';
-import type { NetDeps } from '../../web/games/gin-rummy/src/net/peerjs.ts';
+import type { NetDeps } from '../../web/shared/edge/peer.ts';
 import { fakeClock } from '../../web/shared/edge/clock.fake.ts';
 import { fakeBroker } from '../../web/shared/edge/transport.fake.ts';
 import { GIN_PEER_PREFIX } from '../../web/shared/lib/roomCode.ts';

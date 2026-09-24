@@ -5,7 +5,8 @@
   // tsconfig.pure.json remains the guard for that directory, as in tsconfig.web.json. The three edge
   // modules listed are written against structural types (no DOM lib) because test/parity runs the
   // ICE loader beside the legacy IIFE in node; tsconfig.web.json still owns web/shared/edge. The
-  // transport edge and the fidice pure core plus net/ are listed for the same reason since
+  // transport edge, web/shared/net (the two-seat sessions both games' net/ wrap,
+  // docs/design/shared-shell.md A1) and the fidice pure core plus net/ are listed for the same reason since
   // docs/MIGRATION.md step 9: test/parity/fidice.sessions.test.ts drives the typed sessions over
   // transport.fake.ts beside the legacy classes (tsconfig.web.json still owns those files too).
   // dom.fake.ts and the DOM-free view modules (types, ui, scenarios) are listed for
@@ -53,6 +54,7 @@
     "web/shared/edge/transport.ts",
     "web/shared/edge/transport.fake.ts",
     "web/shared/edge/peer.ts",
+    "web/shared/net/**/*.ts",
     "web/shared/edge/transport.contract.log.ts",
     "web/shared/edge/dom.fake.ts",
     "web/games/fidice/src/domain/**/*.ts",
