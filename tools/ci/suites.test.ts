@@ -521,3 +521,19 @@ describe('the scripts agree with the table', () => {
     );
   });
 });
+
+describe('the e2e scripts agree with the table', () => {
+  test.each(E2E_SUITES)(
+    'test:e2e:%s sets E2E_SUITE and defers to test:e2e (build, then Playwright)',
+    (suite) => {
+      expect(SCRIPTS[`test:e2e:${suite}`]).toBe(`E2E_SUITE=${suite} npm run test:e2e`);
+    },
+  );
+
+  test('a suite with no e2e half has no e2e script, and test:e2e itself is unchanged', () => {
+    SUITE_NAMES.filter((s) => SUITES[s].e2e === undefined).forEach((s) => {
+      expect(SCRIPTS[`test:e2e:${s}`], s).toBeUndefined();
+    });
+    expect(SCRIPTS['test:e2e']).toBe('npm run build && playwright test');
+  });
+});

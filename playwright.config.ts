@@ -22,11 +22,18 @@
 // fidice with `?ice-policy=relay`) relay through a coturn of the harness's own on :3478
 // (`turnserver` on PATH, else they skip with the install line; `E2E_TURN=off` leaves it out),
 // reached through an ICE list this file writes under e2e/fixtures/.generated/ because the relay's
-// port follows the offset.
+// port follows the offset. `E2E_SUITE=<gin|fidice|backgammon|site>` (the `test:e2e:<suite>`
+// scripts; CI's one job per suite) narrows the run to that suite's spec files as tools/ci/suites.ts
+// lists them, both projects as ever; unset, every spec runs as before. The suite is a `testMatch`
+// rather than a positional file filter so the rule is spelled once, in the table, and composes
+// with a CLI `--grep` (the broker job's `"@online|@relay"`, `test:deployed`); a spec file shared
+// by two games would carry a tag per game and the other games' tags go into `grepInvert`, which
+// a CLI `--grep` also composes with (none today: docs/design/test-partition.md §5.2).
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 import { defineConfig } from '@playwright/test';
 
+import { SUITES, E2E_SUITES, isSuite, type Suite } from './tools/ci/suites.ts';
 import {
   GENERATED_DIR,
   ICE_TURN_FILE,
@@ -68,6 +75,16 @@ const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/gin-sound-font.spec.ts',
   '**/gin-stories.spec.ts',
 ];
+/** The suite `E2E_SUITE` names, or none; a name with no e2e half is an error, never a full run. */
+const e2eSuiteFromEnv = (value: string | undefined): Suite | undefined => {
+  if (value === undefined || value === '') return undefined;
+  if (isSuite(value) && SUITES[value].e2e !== undefined) return value;
+  throw new Error(`E2E_SUITE=${value} names no e2e suite; one of: ${E2E_SUITES.join(', ')}`);
+};
+const e2e = (() => {
+  const suite = e2eSuiteFromEnv(process.env['E2E_SUITE']);
+  return suite === undefined ? undefined : SUITES[suite].e2e;
+})();
 const deployed = isDeployed();
 const cloudBroker = process.env['E2E_BROKER'] === 'cloud';
 // The local TURN relay: coturn when installed, unless asked off. CI installs coturn, so a missing
@@ -91,6 +108,11 @@ const pagesAliases = aliasArgs({
 
 export default defineConfig({
   testDir: 'e2e',
+  // One suite's specs when E2E_SUITE names it (see the header); every spec otherwise.
+  ...(e2e === undefined ? {} : { testMatch: [...e2e.files] }),
+  ...(e2e === undefined || e2e.otherTags.length === 0
+    ? {}
+    : { grepInvert: new RegExp(e2e.otherTags.join('|')) }),
   // WebRTC between two contexts has real network latency even on one machine; the fixtures bound
   // each step (e2e/fixtures/timeouts.ts) and this is the whole-test ceiling.
   timeout: 90_000,
