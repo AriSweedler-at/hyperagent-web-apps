@@ -258,12 +258,29 @@ describe('rules', () => {
   const withoutGlossary = (html: string): string =>
     html.replace(/ id="rule-[a-z-]+"/g, '').replace(/<a class="jargon"[^>]*>([^<]*)<\/a>/g, '$1');
 
-  test('RULES_LIST_HTML is both legacy copies, line for line, without the page indentation', () => {
+  /**
+   * RULE CHANGE (docs/design/gin-arrangement-and-discards.md §7b, PR #45; the copy, PR #70):
+   * laying off is by hand since, and the Lay off rule says so, where the legacy's said the fitting
+   * cards were laid off automatically. Its heading is still the legacy's; its body is the one
+   * item whose words are the app's own, so both sides compare with that body blanked.
+   */
+  const LAYOFF_LINE = /^(<li><strong>Lay off:<\/strong>) .+(<\/li>)$/;
+  const withoutLayoffBody = (lines: ReadonlyArray<string>): ReadonlyArray<string> =>
+    lines.map((line) => line.replace(LAYOFF_LINE, '$1$2'));
+  const layoffLine = (lines: ReadonlyArray<string>): string =>
+    lines.find((line) => LAYOFF_LINE.test(line)) ?? '';
+
+  test('RULES_LIST_HTML is both legacy copies, line for line, without the page indentation, but for the Lay off body', () => {
     const blocks = legacyRulesBlocks();
     expect(blocks).toHaveLength(2);
+    const ours = withoutGlossary(RULES_LIST_HTML).split('\n');
     blocks.forEach((block) => {
-      expect(withoutGlossary(RULES_LIST_HTML).split('\n')).toEqual(trimmed(block));
+      expect(withoutLayoffBody(ours)).toEqual(withoutLayoffBody(trimmed(block)));
+      // The blanking is not a no-op: the legacy's Lay off body is the automatic one, ours is not.
+      expect(layoffLine(trimmed(block))).toContain('laid off automatically');
     });
+    expect(layoffLine(ours)).toContain('drag');
+    expect(RULES_LIST_HTML).not.toContain('laid off automatically');
     expect(RULES_ITEMS).toHaveLength(11);
     // The stripping is not a no-op: the ids and at least one link are really there.
     expect(RULES_LIST_HTML).toContain('<li id="rule-knock">');

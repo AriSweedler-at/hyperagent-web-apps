@@ -2,9 +2,11 @@
 // (`#rulesPanel` on the home tab and `#rulesOverlay` over the table: the named "duplicated rules
 // markup" defect), so this is the deduplicated source; step 12 renders both places from it.
 // test/parity/gin.ui.test.ts checks `RULES_LIST_HTML` against both legacy copies (pinned in
-// test/fixtures/legacy/gin-ui.cjs) item for item, ignoring only the page's indentation and what
+// test/fixtures/legacy/gin-ui.cjs) item for item, ignoring only the page's indentation, what
 // the glossary added (docs/design/glossary-links.md): each item carries an id, the anchor a jargon
-// link lands on, and the jargon inside a body is linked to the rule it names (ui/glossary.ts).
+// link lands on, and the jargon inside a body is linked to the rule it names (ui/glossary.ts), and
+// the one body the words of which are this page's own: Lay off, which describes the manual layoff
+// of docs/design/gin-arrangement-and-discards.md §7b where the legacy's laid off automatically.
 import { rulesListHtml, type RuleItem } from '../../../../shared/ui/glossary.ts';
 import { GLOSSARY } from './glossary.ts';
 
@@ -51,7 +53,7 @@ export const RULES_ITEMS: ReadonlyArray<RuleItem> = [
   {
     id: 'layoff',
     heading: 'Lay off',
-    body: "Against a normal knock, the opponent's deadwood cards that fit your melds are laid off automatically.",
+    body: "Against a normal knock, the opponent's melds are laid out on the table and it's your turn to lay off: drag any of your deadwood cards that fit (a fourth to a set, the next rank at either end of a run) onto them, or drag one back to keep it. Tap Done laying off to finish; only then does the hand score.",
   },
   {
     id: 'undercut',
