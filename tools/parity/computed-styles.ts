@@ -1195,13 +1195,14 @@ const settleBg = async (page: Page): Promise<void> => {
 };
 
 /**
- * Sheshbesh (docs/design/backgammon-board.md §7): the home tabs (pass the phone is the only mode
- * while online is hidden), a 3-point portes match with its first turn played by hand (rolled, a
+ * Sheshbesh (docs/design/backgammon-board.md §7): the home tabs, a room opened on the local broker
+ * (the wait screen with its code, gin's step), then pass the phone: a 3-point portes match with its
+ * first turn played by hand (rolled, a
  * source selected with its targets, a move, the undo, the turn over under the curtain), the menu,
  * history and rules sheets, then the seeded policy through the hook to the states the CSS draws
  * apart: a checker on the bar, a roll with a dead die, bearing off into the tray, the result sheet
  * and the table behind it, the next game's curtain and the match end; last a Western match to the
- * cube offer and the take. Hosting joins this driver with the online PR (PR-D), which re-records.
+ * cube offer and the take.
  */
 const driveBackgammon = async (page: Page, shot: Shot): Promise<void> => {
   const snap = async (name: string): Promise<void> => {
@@ -1213,14 +1214,28 @@ const driveBackgammon = async (page: Page, shot: Shot): Promise<void> => {
   };
   await page.waitForFunction('typeof window.__backgammon === "object"');
   await visible(page, '#homeScreen');
-  await snap('home: play tab, pass the phone');
+  await snap('home: play tab, online');
   await click(page, '#tabRulesBtn');
   await snap('home: rules tab');
   await click(page, '#tabAboutBtn');
   await snap('home: about tab');
   await click(page, '#tabPlayBtn');
 
+  // ---- hosting: the room opens on the local broker ----
+  await fill(page, '#nameInput', 'Ann');
+  await click(page, '#hostBtn');
+  await visible(page, '#hostWaitScreen');
+  await page
+    .locator('#hostWaitStatus')
+    .filter({ hasText: 'Waiting for your opponent to join' })
+    .waitFor();
+  await snap('host: waiting for the opponent');
+  await click(page, '#cancelHostBtn');
+  await visible(page, '#homeScreen');
+
   // ---- a 3-point portes match: the first turn by hand ----
+  await click(page, '#playModeSwitch .mode-btn[data-mode="local"]');
+  await snap('home: play tab, pass the phone');
   await fill(page, '#p1NameInput', 'Ann');
   await fill(page, '#p2NameInput', 'Bob');
   await page.locator('#localMatchLengthSel').selectOption('3');

@@ -106,6 +106,8 @@ export const bgStartLocal = async (
 ): Promise<void> => {
   await page.setViewportSize({ width: viewport.width, height: viewport.height });
   await page.goto(url);
+  // Online is the default mode: the switch flips to pass and play first (gin's driver does the same).
+  await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
   await expect(page.locator('#localModeContent')).toBeVisible();
   await page.locator('#p1NameInput').fill(names[0]);
   await page.locator('#p2NameInput').fill(names[1]);

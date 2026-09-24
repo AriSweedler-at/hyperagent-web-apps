@@ -129,8 +129,7 @@ game's invite convention, built by `web/shared/lib/invite.ts` and read by `web/s
 `#watch=` fragments for now. Gin and backgammon: the invite link `#shareCodeBtn` shares, the link alone with no
 text beside it; `main.ts` dispatches `join/link` after `home/init`, so the code sits in the join
 form on the Play tab in online mode, then drops it from the address bar with
-`history.replaceState`, the other parameters kept; backgammon's boot does the same today even
-though its online mode is hidden until its online PR), `?story=<id>` (gin only: `main.ts`
+`history.replaceState`, the other parameters kept), `?story=<id>` (gin only: `main.ts`
 reads it before anything else and, when present, imports `src/stories/boot.ts` and returns, so the
 page paints one catalogued table state from `src/stories/catalogue.ts` with the real `paint` and
 constructs no store, network, ICE or timer; `?story=` alone lists the stories as links, `&nav` adds
@@ -389,10 +388,13 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
    bots to `over`, backgammon pass-and-play (the curtain cue, a turn, the undo, the die-chip tray
    through `__backgammon.setup`, a bear-off, the result sheet) and its board geometry (every point
    inside the board, pairwise disjoint and equal, every target ≥ 44px at 390x844, one frame in
-   every phase, no scroll at the two viewports and a scroll at 375x667); smoke on every page: zero uncaught exceptions, zero failed requests outside an
+   every phase, no scroll at the two viewports and a scroll at 375x667), backgammon online (join by
+   code, the seeded opening on both boards, the guest's roll rolled by the host, a move propagating,
+   `sheshbesh-<code>` on the host's Peer; host reload -> resume, guest rejoin, pass-and-play resume;
+   the 🌐 handoff and its `?join=` link); smoke on every page: zero uncaught exceptions, zero failed requests outside an
    allowlist, and the Peer constructor received the `?ice=` config. Visual `toHaveScreenshot`
-   baselines captured on the CI runner from the legacy pages. The `@relay` specs (gin and fidice
-   with `?ice-policy=relay`) connect through the harness's coturn and read the selected candidate
+   baselines captured on the CI runner from the legacy pages. The `@relay` specs (gin, fidice and
+   backgammon with `?ice-policy=relay`) connect through the harness's coturn and read the selected candidate
    pair off every `RTCPeerConnection`: relay on both ends. `E2E_TARGET=deployed` (nightly) runs the
    `@online` and `@relay` specs with the deployed Pages page in place of the emulated one and the
    same local servers behind the hooks; the emulated-only specs (DOM parity, computed styles) skip
@@ -486,9 +488,13 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
   and fidice explicitly instead of aliasing `GAMES`. Its `index.html` and `theme.css` are
   Prettier-formatted (no `.prettierignore` entry: nothing to diff against). Its `theme.css`
   redeclares the eleven shared tokens on its own palette for good, like fidice's until the restyle,
-  and `test/tokens.test.ts` pins it. Online play is hidden in its first page PR
-  (`ui/state.ts ONLINE_MODE_SHOWN`); the online PR flips it, adds hosting to the style driver and
-  re-records the two goldens.
+  and `test/tokens.test.ts` pins it. Online play is gin's, host-authoritative: the reducer's
+  `hostDispatch` applies `applyAction` for both seats and broadcasts `viewFor(game, 1)` as a
+  `state` frame, a refusal to the guest is a `toast` frame, and the guest's `roll` is an `action`
+  frame the host rolls; peer ids are `sheshbesh-<code>`; the saves (`backgammonMP_v1`, per role)
+  drive the three resume labels, and the table's 🌐 (or the curtain's "Continue online") turns a
+  pass-and-play game into a hosted room under a fresh code, the invite joining as the second seat
+  (`e2e/backgammon-{online,relay,resume,handoff}.spec.ts`).
 
 Step 1 (toolchain scaffold), against the versions on the registry at the time:
 

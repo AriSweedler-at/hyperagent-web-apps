@@ -27,8 +27,8 @@
   </head>
   <body>
     <div id="app">
-      <!-- HOME / LOBBY (docs/design/backgammon-board.md §5.1; "design §N" below is that document). The Online mode is hidden until the online PR: its panel and
-           ids stay, the switch shows Pass the phone alone, and the local panel is the default. -->
+      <!-- HOME / LOBBY (docs/design/backgammon-board.md §5.1; "design §N" below is that document):
+           Online (the default, as gin's) or Pass the phone. -->
       <div id="homeScreen">
         <div class="masthead">
           <h1>Sheshbesh</h1>
@@ -44,7 +44,7 @@
           <div class="tab-wrap" id="tabPlayWrap">
             <button type="button" class="tab-btn" id="tabPlayBtn" data-tab="play">Play</button>
             <div class="tab-submenu" id="playSubmenu">
-              <button type="button" class="hidden" data-mode="online">Online</button>
+              <button type="button" data-mode="online">Online</button>
               <button type="button" data-mode="local">Pass the phone</button>
             </div>
           </div>
@@ -55,11 +55,11 @@
         <!-- PLAY TAB -->
         <div id="playPanel" class="tab-panel">
           <div class="mode-switch" id="playModeSwitch">
-            <button type="button" class="mode-btn hidden" data-mode="online">Online</button>
-            <button type="button" class="mode-btn active" data-mode="local">Pass the phone</button>
+            <button type="button" class="mode-btn active" data-mode="online">Online</button>
+            <button type="button" class="mode-btn" data-mode="local">Pass the phone</button>
           </div>
 
-          <div id="onlineModeContent" class="hidden">
+          <div id="onlineModeContent">
             <div class="card-box">
               <label>Your name</label>
               <input type="text" id="nameInput" value="Ari" maxlength="20" autocomplete="off" />
@@ -110,7 +110,7 @@
             </div>
           </div>
 
-          <div id="localModeContent">
+          <div id="localModeContent" class="hidden">
             <div class="card-box">
               <label>Players</label>
               <div class="row">

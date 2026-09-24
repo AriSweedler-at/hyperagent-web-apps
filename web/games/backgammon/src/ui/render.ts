@@ -89,7 +89,7 @@ import { flyMoves } from './board/fly.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { rulesItemsHtml } from './rules.ts';
-import { ONLINE_MODE_SHOWN, SCREENS, handoffLabel, type App, type Intent } from './state.ts';
+import { SCREENS, handoffLabel, type App, type Intent } from './state.ts';
 
 export type { PageLike };
 export type Dispatch = (intent: Intent) => void;
@@ -159,13 +159,12 @@ export const paintSound = (doc: DocumentLike, enabled: boolean): void => {
 
 /**
  * `#handoffBtn` (the 🌐 beside the menu button): a pass-and-play game can go on as a hosted room
- * (ui/state.ts `handoff`); the tooltip names who hosts and who joins. Hidden with the rest of
- * online play until the online PR (`ONLINE_MODE_SHOWN`, design §5.3).
+ * (ui/state.ts `handoff`); the tooltip names who hosts and who joins. Pass-and-play alone shows it.
  */
 export const paintHandoff = (doc: DocumentLike, app: App): void => {
   const btn = requireId(doc, 'handoffBtn');
   const game = app.shell.role === 'local' ? app.shell.game : null;
-  toggleClass(btn, 'hidden', game === null || !ONLINE_MODE_SHOWN);
+  toggleClass(btn, 'hidden', game === null);
   if (game !== null) setAttr(btn, 'title', handoffLabel(game));
 };
 

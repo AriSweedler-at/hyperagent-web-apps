@@ -6,10 +6,8 @@
 // typed) are effects the reducer raises and main.ts runs through `fillNameInputs` /
 // `fillP2NameInput` / `setCodeInput`, so the paint never overwrites what the player is typing.
 //
-// Online play is hidden in this PR (design §6 PR-C, ui/state.ts `ONLINE_MODE_SHOWN`): the Online
-// buttons of the switch and the submenu wear `hidden` while it is false; the ids and the panel
-// stay, so PR-D flips one constant. One gin trait kept: the mode buttons' `active` marks are
-// painted only while the Play tab is the current one and are otherwise left as they were.
+// One gin trait kept: the mode buttons' `active` marks are painted only while the Play tab is the
+// current one and are otherwise left as they were.
 import {
   dataOf,
   inputDataOf,
@@ -30,14 +28,7 @@ import {
   type DocumentLike,
   type PageLike,
 } from '../../../../shared/edge/dom.ts';
-import {
-  HOME_TABS,
-  ONLINE_MODE_SHOWN,
-  resumeLabel,
-  type App,
-  type HomeTab,
-  type Intent,
-} from './state.ts';
+import { HOME_TABS, resumeLabel, type App, type HomeTab, type Intent } from './state.ts';
 
 /**
  * The first player's name into every input that shows it: the online name and pass-and-play's
@@ -105,20 +96,6 @@ const paintPlayMode = (doc: DocumentLike, app: App): void => {
   });
 };
 
-/**
- * The Online option of the switch and the submenu: shown once online play ships (PR-D). With one
- * mode left the switch itself is a lone pill under the tabs, so it goes too until then.
- */
-const paintOnlineOption = (doc: DocumentLike): void => {
-  toggleClass(requireId(doc, 'playModeSwitch'), 'hidden', !ONLINE_MODE_SHOWN);
-  [
-    ...queryAllIn(requireId(doc, 'playModeSwitch'), '.mode-btn[data-mode="online"]'),
-    ...queryAllIn(requireId(doc, 'playSubmenu'), 'button[data-mode="online"]'),
-  ].forEach((b) => {
-    toggleClass(b, 'hidden', !ONLINE_MODE_SHOWN);
-  });
-};
-
 /** The tabs and panels, the play mode, the selects, the submenu's `force-open`, and the resume box. */
 export const paintHome = (doc: DocumentLike, app: App): void => {
   HOME_TABS.forEach((t) => {
@@ -126,7 +103,6 @@ export const paintHome = (doc: DocumentLike, app: App): void => {
     toggleClass(requireId(doc, `${t}Panel`), 'hidden', t !== app.shell.homeTab);
   });
   if (app.shell.homeTab === 'play') paintPlayMode(doc, app);
-  paintOnlineOption(doc);
   paintOptions(doc, app);
   toggleClass(requireId(doc, 'playSubmenu'), 'force-open', app.shell.submenuOpen);
   toggleClass(requireId(doc, 'resumeBox'), 'hidden', app.shell.resume === null);

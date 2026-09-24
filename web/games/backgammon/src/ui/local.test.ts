@@ -136,8 +136,8 @@ describe('paintCurtain', () => {
     expect(p.get('curtainLast').text()).toBe(started.shell.game?.log.at(-1)?.text);
     expect(p.get('curtainBtn').text()).toBe(`${name} — roll`);
     expect(p.get('curtainBtn').attr('data-rolls')).toBe('1');
-    // Online play (and with it the handoff) is hidden in this PR.
-    expect(p.get('curtainHandoffBtn').hidden()).toBe(true);
+    // The curtain offers the handoff to an online room (ui/state.ts `handoff/click`).
+    expect(p.get('curtainHandoffBtn').hidden()).toBe(false);
     const revealed = reduce(started, { type: 'curtain/reveal' }, ctx).app;
     paintCurtain(p.doc, revealed);
     expect(p.get('curtainOverlay').hidden()).toBe(true);

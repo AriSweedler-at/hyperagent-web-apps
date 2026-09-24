@@ -13,8 +13,8 @@
 // Turn authority is gin's (design §5.3): the host applies `applyAction` for both seats and
 // broadcasts `viewFor(game, 1)` as a `state` frame, a refusal to the guest is a `toast` frame; the
 // guest sends `action` frames (its `roll` asks the host to roll, Q9); pass-and-play keeps the
-// `State` here with no Peer. Online play is hidden in this PR (design §6 PR-C): `mode/set 'online'`
-// is accepted, the home painter hides the option and the default mode is `local` until PR-D.
+// `State` here with no Peer. Online is the default mode (storage.ts `DEFAULT_PLAY_MODE`, as gin's);
+// an invite link (`join/link`) shows the online panel with the code filled in.
 //
 // Tap-to-move (design §4.2): a tap names a source or a destination; the sole legal source is
 // derived, never stored (`effectiveSelection`); a destination reached by chains that differ in
@@ -71,6 +71,7 @@ import {
   type HostFrame,
 } from '../protocol.ts';
 import {
+  DEFAULT_PLAY_MODE,
   HOME_TABS,
   clearSave,
   readCurtainMode,
@@ -113,7 +114,7 @@ import type { Cue } from './sound.ts';
 // ---- the state ---------------------------------------------------------------------------------
 
 // ui/home.ts paints the tabs and modes from the lists storage.ts decodes; ui/ may not import storage.ts.
-export { HOME_TABS, type CurtainMode, type HomeTab, type PlayMode };
+export { DEFAULT_PLAY_MODE, HOME_TABS, type CurtainMode, type HomeTab, type PlayMode };
 // The reducer resolves taps with the same helpers the board paints from (ui/board.ts); re-exported for main.ts.
 export {
   sourcesOf,
@@ -247,12 +248,6 @@ export type App = Readonly<{ shell: Shell; table: Table }>;
 export const DEFAULT_NAME = 'Ari';
 export const DEFAULT_GUEST_NAME = 'Jeff';
 export const DEFAULT_HOME_TAB: HomeTab = 'play';
-/**
- * Online play is hidden until PR-D (design §6 PR-C): the default mode is pass-and-play and the
- * home painter hides the Online option while this is false. The reducer accepts `online` anyway.
- */
-export const ONLINE_MODE_SHOWN = false;
-export const DEFAULT_PLAY_MODE: PlayMode = 'local';
 export const DEFAULT_CURTAIN_MODE: CurtainMode = 'always';
 export const NAME_MAX = 20;
 
@@ -372,7 +367,7 @@ export type Intent =
   | Readonly<{ type: 'p2name/typed'; value: string }>
   /** `setHomeTab(tab, { persist })`: an unknown tab is `play`. */
   | Readonly<{ type: 'tab/set'; tab: string; persist?: boolean }>
-  /** `setPlayMode(mode)`: `local`, else `online` (accepted while hidden; the painter decides what shows). */
+  /** `setPlayMode(mode)`: `local`, else `online`. */
   | Readonly<{ type: 'mode/set'; mode: string }>
   /** `#variantSel` / `#localVariantSel`: a shipped variant is remembered; anything else is ignored. */
   | Readonly<{ type: 'variant/set'; variant: string }>
@@ -420,7 +415,7 @@ export type Intent =
   | Readonly<{ type: 'soundFont/set'; font: SoundFontName }>
   /** `#shareCodeBtn`. */
   | Readonly<{ type: 'share/click' }>
-  // ---- net: host (wired in PR-D; the reducer is complete) ----
+  // ---- net: host ----
   /** `startHost(resumeCode)`: null draws a fresh code. */
   | Readonly<{ type: 'host/start'; code: string | null }>
   | Readonly<{ type: 'host/status'; text: string; stopPulse: boolean }>

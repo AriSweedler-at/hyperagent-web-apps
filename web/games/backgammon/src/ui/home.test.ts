@@ -14,7 +14,7 @@ import {
   tabButtonId,
 } from './home.ts';
 import { backgammonPage, type BackgammonPage } from './page.fake.ts';
-import { ONLINE_MODE_SHOWN, initialApp, type App, type Intent } from './state.ts';
+import { initialApp, type App, type Intent } from './state.ts';
 
 import MARKUP from '../../index.html?raw';
 const page = (): BackgammonPage => backgammonPage(MARKUP);
@@ -77,15 +77,14 @@ describe('paintHome', () => {
     expect(p.get('playPanel').hidden()).toBe(false);
     expect(p.get('rulesPanel').hidden()).toBe(true);
     expect(p.get('aboutPanel').hidden()).toBe(true);
-    // Pass-and-play is the default while online play is hidden (ui/state.ts ONLINE_MODE_SHOWN).
-    expect(ONLINE_MODE_SHOWN).toBe(false);
-    expect(p.get('onlineModeContent').hidden()).toBe(true);
-    expect(p.get('localModeContent').hidden()).toBe(false);
-    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([false, true]);
-    expect(p.modeButtons.map((b) => b.hidden())).toEqual([true, false]);
-    expect(p.get('playModeSwitch').hidden()).toBe(true);
-    expect(p.submenuButtons.map((b) => b.hasClass('active'))).toEqual([false, true]);
-    expect(p.submenuButtons.map((b) => b.hidden())).toEqual([true, false]);
+    // Online is the default mode (storage.ts DEFAULT_PLAY_MODE, as gin's); both options show.
+    expect(p.get('onlineModeContent').hidden()).toBe(false);
+    expect(p.get('localModeContent').hidden()).toBe(true);
+    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([true, false]);
+    expect(p.modeButtons.map((b) => b.hidden())).toEqual([false, false]);
+    expect(p.get('playModeSwitch').hidden()).toBe(false);
+    expect(p.submenuButtons.map((b) => b.hasClass('active'))).toEqual([true, false]);
+    expect(p.submenuButtons.map((b) => b.hidden())).toEqual([false, false]);
     expect(p.get('matchLengthSel').value()).toBe('5');
     expect(p.get('localMatchLengthSel').value()).toBe('5');
     expect(p.get('variantSel').value()).toBe('portes');
@@ -96,16 +95,16 @@ describe('paintHome', () => {
     paintHome(
       p.doc,
       shell({
-        playMode: 'online',
+        playMode: 'local',
         submenuOpen: true,
         matchLength: 3,
         variant: 'backgammon',
         resume: { kind: 'guest', code: 'KQZM', myName: 'Jo' },
       }),
     );
-    expect(p.get('onlineModeContent').hidden()).toBe(false);
-    expect(p.get('localModeContent').hidden()).toBe(true);
-    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([true, false]);
+    expect(p.get('onlineModeContent').hidden()).toBe(true);
+    expect(p.get('localModeContent').hidden()).toBe(false);
+    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([false, true]);
     expect(p.get('matchLengthSel').value()).toBe('3');
     expect(p.get('localVariantSel').value()).toBe('backgammon');
     expect(p.get('playSubmenu').hasClass('force-open')).toBe(true);
@@ -115,12 +114,13 @@ describe('paintHome', () => {
 
   test("another tab leaves the mode marks as they were (gin's renderPlayMode trait)", () => {
     const p = page();
-    paintHome(p.doc, shell({ homeTab: 'rules', playMode: 'online' }));
+    paintHome(p.doc, shell({ homeTab: 'rules', playMode: 'local' }));
     expect(p.get('tabRulesBtn').hasClass('active')).toBe(true);
     expect(p.get('rulesPanel').hidden()).toBe(false);
     expect(p.get('playPanel').hidden()).toBe(true);
-    expect(p.get('onlineModeContent').hidden()).toBe(true);
-    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([false, true]);
+    // The markup's marks (Online active, the local panel hidden) stand until the Play tab paints.
+    expect(p.get('localModeContent').hidden()).toBe(true);
+    expect(p.modeButtons.map((b) => b.hasClass('active'))).toEqual([true, false]);
     paintHome(p.doc, shell({ homeTab: 'about' }));
     expect(p.get('aboutPanel').hidden()).toBe(false);
   });
