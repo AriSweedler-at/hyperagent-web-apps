@@ -6,6 +6,7 @@
 import { test as base, expect, type Page } from '@playwright/test';
 
 import type { Game } from '../../tools/games.ts';
+import { bgHostRoom, bgJoin, bgRoomCode } from './backgammon.ts';
 import { fidiceHostLobby, fidiceJoin, fidiceLobbyCode } from './fidice.ts';
 import { ginHostRoom, ginJoin, ginRoomCode } from './gin.ts';
 import { newPlayer, type Player } from './player.ts';
@@ -29,12 +30,7 @@ type Driver = Readonly<{
 const DRIVERS: Readonly<Record<OnlineGame, Driver>> = {
   'gin-rummy': { hostRoom: ginHostRoom, readRoomCode: ginRoomCode, joinByCode: ginJoin },
   fidice: { hostRoom: fidiceHostLobby, readRoomCode: fidiceLobbyCode, joinByCode: fidiceJoin },
-  // Online play arrives with the backgammon online PR (PR-D); until then a spec that names it fails loudly.
-  backgammon: {
-    hostRoom: () => Promise.reject(new Error('backgammon online is not wired yet (PR-D)')),
-    readRoomCode: () => Promise.reject(new Error('backgammon online is not wired yet (PR-D)')),
-    joinByCode: () => Promise.reject(new Error('backgammon online is not wired yet (PR-D)')),
-  },
+  backgammon: { hostRoom: bgHostRoom, readRoomCode: bgRoomCode, joinByCode: bgJoin },
 };
 
 type Fixtures = { project: Project; player: Player; players: Players };

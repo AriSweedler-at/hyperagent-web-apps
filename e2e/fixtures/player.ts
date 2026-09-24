@@ -88,13 +88,21 @@ export const newPlayer = async (
   testInfo: TestInfo,
 ): Promise<Player> => {
   const seed = seedFor([...RUN_SALT, testInfo.project.name, ...testInfo.titlePath, role]);
-  // What a deployed page needs before it may reach the harness: Chromium (Local Network Access,
-  // since 142) asks the user before a public site fetches from or opens a socket to a loopback
-  // address, and the `?ice=` list and the `?peer=` broker are both on 127.0.0.1. Emulated pages
-  // are loopback themselves and need nothing.
-  const context = await browser.newContext(
-    isDeployed() ? { permissions: ['local-network-access'] } : {},
-  );
+  // Two permissions the pages never ask for. Camera and microphone: Chromium gathers ICE host
+  // candidates on every interface only for an origin that holds a media permission; otherwise it
+  // keeps to the default route's interface, and on a machine where a VPN owns that route (WARP,
+  // Tailscale) the two contexts see only the tunnel's address and never pair. The runner has one
+  // interface and is unaffected. Local Network Access (Chromium 142+): what a deployed page needs
+  // before it may reach the harness, since it asks the user before a public site fetches from or
+  // opens a socket to a loopback address, and the `?ice=` list and the `?peer=` broker are both on
+  // 127.0.0.1; emulated pages are loopback themselves and need nothing more.
+  const context = await browser.newContext({
+    permissions: [
+      'camera',
+      'microphone',
+      ...(isDeployed() ? (['local-network-access'] as const) : []),
+    ],
+  });
   await context.addInitScript({ content: seedScript(seed) });
   await context.addInitScript({ path: RECORD_PEER_SCRIPT });
   await context.addInitScript({ path: RECORD_PC_SCRIPT });

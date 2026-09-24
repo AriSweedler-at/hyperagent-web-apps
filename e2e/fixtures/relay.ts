@@ -1,4 +1,5 @@
-// What the two relay-forced specs share (e2e/gin-relay.spec.ts, e2e/fidice-relay.spec.ts): the
+// What the relay-forced specs share (e2e/gin-relay.spec.ts, e2e/fidice-relay.spec.ts,
+// e2e/backgammon-relay.spec.ts): the
 // skip when no TURN relay is at hand, the toast a page writes once its channel runs through one
 // (gin's PATH_RELAY_MSG in web/games/gin-rummy/src/net/peerjs.ts, fidice's describePath in
 // web/games/fidice/src/net/peerjs.ts), and the proof from the connection itself that the selected
