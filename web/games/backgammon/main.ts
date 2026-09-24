@@ -20,9 +20,9 @@ import { shareText } from '../../shared/edge/share.ts';
 import { bindJargon, revealRule } from '../../shared/edge/glossary.ts';
 import { createSampleCache } from '../../shared/edge/sound.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
-import type { Timer } from '../../shared/lib/clock.ts';
 import type { Rng } from '../../shared/lib/rng.ts';
 import { ruleFromHash } from '../../shared/ui/glossary.ts';
+import { createTimers, createToaster } from '../../shared/ui/toast.ts';
 import { badSoundFontMsg, isSoundFont } from '../../shared/lib/sound/fonts.ts';
 import { legalActions, type Action, type View } from './src/engine/index.ts';
 import { createFx } from './src/fx.ts';
@@ -32,7 +32,7 @@ import type { NetDeps } from '../../shared/edge/peer.ts';
 import { isGuestFrame } from './src/protocol.ts';
 import { STORAGE_KEYS, soundEnabled } from './src/storage.ts';
 import { fillNameInputs, fillP2NameInput, inviteUrl, setCodeInput } from './src/ui/home.ts';
-import { bindAll, hideToast, paint, paintSound, showToast } from './src/ui/render.ts';
+import { bindAll, paint, paintSound, toastMarks } from './src/ui/render.ts';
 import {
   INVITE_COPIED_MSG,
   SHARE_FALLBACK_MS,
@@ -49,9 +49,6 @@ import {
   type ScreenId,
   type TimerId,
 } from './src/ui/state.ts';
-
-/** Gin's `toast(msg, ms)` default (design Q12). */
-const TOAST_MS = 2600;
 
 /** `shareText`'s last resort: the code itself, for the player to read out. */
 const roomCodeMsg = (code: string): string => `Room code: ${code}`;
@@ -89,22 +86,10 @@ const boot = (): void => {
 
   let app: App = initialApp;
   let session: HostSession | GuestSession | null = null;
-  let toastTimer: Timer | null = null;
   /** The reducer's named timers (the long press, the shake, the R14 beat); arming one again restarts it. */
-  const timers = new Map<TimerId, Timer>();
-  const cancelTimer = (id: TimerId): void => {
-    const armed = timers.get(id);
-    if (armed !== undefined) realClock.clearTimeout(armed);
-    timers.delete(id);
-  };
-
-  const toast = (message: string, ms: number | null): void => {
-    showToast(document, message);
-    if (toastTimer !== null) realClock.clearTimeout(toastTimer);
-    toastTimer = realClock.setTimeout(() => {
-      hideToast(document);
-    }, ms ?? TOAST_MS);
-  };
+  const timers = createTimers<TimerId>(realClock);
+  /** Gin's `toast(msg, ms)` with its 2.6 s default (design Q12); the Kapará toast wears `hit`. */
+  const toast = createToaster(document, realClock, undefined, toastMarks);
 
   const fx = createFx({
     audio,
@@ -234,16 +219,11 @@ const boot = (): void => {
     },
     timers: {
       start: (id, ms, then) => {
-        cancelTimer(id);
-        timers.set(
-          id,
-          realClock.setTimeout(() => {
-            timers.delete(id);
-            dispatch(then);
-          }, ms),
-        );
+        timers.start(id, ms, () => {
+          dispatch(then);
+        });
       },
-      cancel: cancelTimer,
+      cancel: timers.cancel,
     },
     toggleSound: () => {
       fx.toggle(app.shell.soundFont);

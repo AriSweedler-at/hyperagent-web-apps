@@ -4,16 +4,15 @@
 // curtain comes up, who has revealed); this is its DOM half, written only while the curtain is up
 // (gin's rule: the texts are left as they were when it hides), and the curtain button's wiring.
 // One tap on the button reveals and, when the button promised a roll, rolls: the promise is
-// painted onto the button as `data-rolls`, so the binder needs no App of its own.
+// painted onto the button as `data-rolls`, so the binder needs no App of its own. The DOM half is
+// the shared shell's since docs/design/shared-shell.md §5 B1 (web/shared/ui/curtain.ts); the copy
+// and the roll promise stay here.
+import { dataOf, listenId, type PageLike } from '../../../../shared/edge/dom.ts';
 import {
-  dataOf,
-  listenId,
-  requireId,
-  setAttr,
-  setText,
-  toggleClass,
-  type PageLike,
-} from '../../../../shared/edge/dom.ts';
+  bindCurtain,
+  paintCurtain as paintShellCurtain,
+  type CurtainText as ShellCurtainText,
+} from '../../../../shared/ui/curtain.ts';
 import { diceText, type Seat, type View } from '../engine/index.ts';
 import { hitsAgainst, lastTurnEntry } from './board.ts';
 import type { App, Intent } from './state.ts';
@@ -89,31 +88,26 @@ export const curtainText = (v: View, incoming: Seat): CurtainText => {
   };
 };
 
+/** The shared curtain's text, the roll promise painted onto the button as `data-rolls`. */
+const withRolls = ({ rolls, ...text }: CurtainText): ShellCurtainText => ({
+  ...text,
+  attrs: { 'data-rolls': rolls ? '1' : null },
+});
+
 /** `#curtainOverlay` and its texts from the App; hidden (texts untouched) when no seat is waiting. */
 export const paintCurtain = (doc: PageLike, app: App): void => {
-  const overlay = requireId(doc, 'curtainOverlay');
   const seat = app.table.curtain;
   const v = app.shell.view;
-  const up = seat !== null && v !== null;
-  toggleClass(overlay, 'hidden', !up);
-  if (seat === null || v === null) return;
-  const text = curtainText(v, seat);
-  setText(requireId(doc, 'curtainTitle'), text.title);
-  setText(requireId(doc, 'curtainSub'), text.sub);
-  setText(requireId(doc, 'curtainLast'), text.last);
-  const btn = requireId(doc, 'curtainBtn');
-  setText(btn, text.button);
-  setAttr(btn, 'data-rolls', text.rolls ? '1' : null);
+  paintShellCurtain(doc, seat === null || v === null ? null : withRolls(curtainText(v, seat)));
 };
 
 /** `#curtainBtn`: the incoming seat reveals, and rolls when the button said so; `#curtainHandoffBtn` hands off. */
 export const bindLocal = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
-  const btn = requireId(doc, 'curtainBtn');
-  listenId(doc, 'curtainBtn', 'click', () => {
-    const rolls = dataOf(btn, 'rolls') === '1';
-    dispatch({ type: 'curtain/reveal' });
-    if (rolls) dispatch({ type: 'roll/click' });
-  });
+  bindCurtain(doc, dispatch, (btn) =>
+    dataOf(btn, 'rolls') === '1'
+      ? [{ type: 'curtain/reveal' }, { type: 'roll/click' }]
+      : [{ type: 'curtain/reveal' }],
+  );
   listenId(doc, 'curtainHandoffBtn', 'click', () => {
     dispatch({ type: 'handoff/click' });
   });
