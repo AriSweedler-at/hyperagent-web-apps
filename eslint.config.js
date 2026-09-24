@@ -13,10 +13,10 @@ import tseslint from 'typescript-eslint';
 const PURE = [
   'web/shared/lib/**/*.ts',
   // The shared shell's pure helpers (web/shared/ui/glossary.ts first, docs/design/glossary-links.md
-  // §3; ids.ts). Its painters and binders (shellPaint.ts, curtain.ts, toast.ts: they write the
-  // document, docs/design/shared-shell.md §4.4) are carved out the way scorer/main.ts is below;
-  // tsconfig.pure.json excludes the same three.
-  'web/shared/ui/!(shellPaint|curtain|toast).ts',
+  // §3; ids.ts). Its painters and binders (shellPaint.ts, curtain.ts, toast.ts, home.ts: they write
+  // the document, docs/design/shared-shell.md §4.4) are carved out the way scorer/main.ts is below;
+  // tsconfig.pure.json excludes the same four.
+  'web/shared/ui/!(shellPaint|curtain|toast|home).ts',
   'web/games/*/src/engine/**/*.ts',
   'web/games/*/src/domain/**/*.ts',
   'web/games/*/src/bots/**/*.ts',

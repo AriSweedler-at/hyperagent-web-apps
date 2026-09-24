@@ -11,11 +11,12 @@ landed with the glossary links (docs/design/glossary-links.md):
 | `curtain.ts`    | `CurtainText` (+ optional `attrs` on the button: backgammon's `data-rolls`), `paintCurtain(doc, text or null)` (null hides, texts untouched), `bindCurtain(doc, dispatch, onReveal)`; each game keeps its `curtainText`                                                                                                                                                                                                               |
 | `toast.ts`      | `TOAST_MS`, `createTimers<Id>(clock)` (the named-timer Map both `main.ts` files kept: arming restarts, a fired timer forgets itself) and `createToaster(doc, clock, defaultMs?, marks?)` (gin's single restarting hide timer); an edge in eslint.config.js `EDGES` because the timers are state                                                                                                                                       |
 | `ids.ts`        | `SHELL_GAMES` and `SHELL_IDS`, the ids every shell page carries; `test/dist/shell-ids.test.ts` asserts them on the built pages                                                                                                                                                                                                                                                                                                        |
+| `home.ts`       | The home shell both games' `ui/home.ts` compose (docs/design/shared-shell.md §4.4, moved in §5 B2): `HomeView`, `fillInputs`, `setCodeInput`, `tabButtonId`, `blocksCodeInput`, `paintTabs`, `paintPlayMode`, `paintSubmenu`, `paintResume`, `paintHomeShell(doc, view, { tabs, modes })`, `bindHomeShell(doc, dispatch, { tabs, startOptions, intents })` over the game's `ShellIntentBuilders`, `bindLongPress`                     |
 
 The helpers (`glossary.ts`, `ids.ts`) are lint-pure like `web/shared/lib` (eslint.config.js
 `PURE`, tsconfig.pure.json); the painters and binders write the document and are carved out of the
-pure profile the way `scorer/main.ts` is (`web/shared/ui/!(shellPaint|curtain|toast).ts`, the
-same three excluded from tsconfig.pure.json and tsconfig.node.json, so tsconfig.web.json alone
+pure profile the way `scorer/main.ts` is (`web/shared/ui/!(shellPaint|curtain|toast|home).ts`, the
+same four excluded from tsconfig.pure.json and tsconfig.node.json, so tsconfig.web.json alone
 compiles them). The whole folder is held at 100% coverage (tools/ci/suites.ts, the `shared`
 suite: every module has its test beside it, the painters' over `web/shared/edge/page.fake.ts`);
 the edge that scrolls and flashes a rule is `web/shared/edge/glossary.ts`. Its import zone is a
@@ -29,12 +30,11 @@ the old names, so their tests run unchanged. The two-seat host/guest sessions la
 
 What lands here later, and where it comes from (docs/design/shared-shell.md §5):
 
-| Module        | Contract                                                                                                                                                                        | Source                              |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `home.ts`     | `paintTabs`, `paintPlayMode`, `paintSubmenu`, `paintResume`, `paintHomeShell`, `bindHomeShell`, `bindLongPress`, `fillInputs`, `setCodeInput`, `blocksCodeInput`, `tabButtonId` | both `ui/home.ts` (B2)              |
-| `boot.ts`     | `applyInviteLink`, `shareInvite`, `sessionEvents` (B3), then `bootShell(cfg)` (C3)                                                                                              | both `main.ts`                      |
-| `shell.ts`    | `reduceShell`, `runShellEffect`, `hostContextOf`, `guestContextOf`, `saveFor`, `readHome` over a game's `shellConfig.ts`                                                        | both `ui/state.ts` (C2)             |
-| `HandView.ts` | `HandView { render(model, selection): string }`, the only way a hand is drawn                                                                                                   | gin `ui/hand/HandView.ts` (step 11) |
+| Module        | Contract                                                                                                                 | Source                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
+| `boot.ts`     | `applyInviteLink`, `shareInvite`, `sessionEvents` (B3), then `bootShell(cfg)` (C3)                                       | both `main.ts`                      |
+| `shell.ts`    | `reduceShell`, `runShellEffect`, `hostContextOf`, `guestContextOf`, `saveFor`, `readHome` over a game's `shellConfig.ts` | both `ui/state.ts` (C2)             |
+| `HandView.ts` | `HandView { render(model, selection): string }`, the only way a hand is drawn                                            | gin `ui/hand/HandView.ts` (step 11) |
 
 The generic CSS primitives this table once reserved as `base.css` landed in
 `web/shared/styles/base.css` instead (docs/MIGRATION.md step 14: the box-sizing reset,
