@@ -175,7 +175,7 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // builder into web/shared (folder totals summed over the files): ui 98.2/97.1/97.2/93.8
       // before, 98.2/96.9/97.1/93.9 after; the row stands.
       // Re-measured again when B2 moved the home shell out of ui/home.ts into web/shared/ui/home.ts:
-      // ui 98.2/96.9/97.1/93.9 before, B2_GIN_AFTER after (the same lines uncovered, a smaller
+      // ui 98.2/96.9/97.1/93.9 before, 98.1/96.8/97.0/94.0 after (the same lines uncovered, a smaller
       // folder; the wrapper itself measures 100 on every metric).
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
@@ -328,7 +328,7 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // builder into web/shared (folder totals summed over the files): ui 99.6/100/98.7/91.8
       // before, 99.6/100/98.7/91.9 after; the row stands.
       // Re-measured again when B2 moved the home shell out of ui/home.ts into web/shared/ui/home.ts:
-      // ui 99.6/100/98.7/91.9 before, B2_BG_AFTER after (the same lines uncovered, a smaller
+      // ui 99.6/100/98.7/91.9 before, 99.6/100/98.6/92.0 after (the same lines uncovered, a smaller
       // folder; the wrapper itself measures 100 on every metric).
       thresholds: {
         'web/games/backgammon/src/engine/**': {
