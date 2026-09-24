@@ -233,14 +233,20 @@ const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
 /** The R14 beat is on: the forfeited roll stays on the table and the status line (design §4.5). */
 const holdingNoMove = (app: App): boolean => app.table.noMoveUntil !== null;
 
+/** `#statusText` while the dice tumble (design §4.7): the roll is not named before the faces settle. */
+export const ROLLING_STATUS = 'Rolling…';
+
 const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
   const noMoveShown = holdingNoMove(app);
+  const rolling = app.table.rolling;
   setText(
     requireId(doc, 'statusText'),
-    statusText(v, { pending: app.table.pending, noMoveShown, picked: app.table.picked }),
+    rolling
+      ? ROLLING_STATUS
+      : statusText(v, { pending: app.table.pending, noMoveShown, picked: app.table.picked }),
   );
-  // The dice in words for screen readers (design §6), exactly while faces are shown.
-  const shown = diceFor(v, app.table.picked, noMoveShown).faces.length > 0;
+  // The dice in words for screen readers (design §6), exactly while settled faces are shown.
+  const shown = !rolling && diceFor(v, app.table.picked, noMoveShown).faces.length > 0;
   setText(requireId(doc, 'statusDice'), shown ? diceWords(v.dice) : '');
 };
 

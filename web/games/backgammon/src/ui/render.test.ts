@@ -12,6 +12,7 @@ import type { Board, Dice, Seat, State, View } from '../engine/index.ts';
 import { backgammonPage, type BackgammonPage } from './page.fake.ts';
 import {
   HIT_TOAST_PREFIX,
+  ROLLING_STATUS,
   RULES_SLOT_IDS,
   barKey,
   bindAll,
@@ -300,6 +301,9 @@ describe('the table', () => {
     expect(p.get('board').attr('data-rolling')).toBe('1');
     expect(p.get('board').attr('data-rolled')).toBeNull();
     expect(p.get('board').hasClass('inert')).toBe(true);
+    // The status line does not name the roll before the faces settle.
+    expect(p.get('statusText').text()).toBe(ROLLING_STATUS);
+    expect(p.get('statusDice').text()).toBe('');
     // The tumble ends: the modal goes, the faces stand, the board is live.
     const rolled = run(tumbling, { type: 'tumble/elapsed' }).app;
     paint(p.doc, rolled);
