@@ -15,13 +15,12 @@ import {
   type AudioContextLike,
   type NavigatorLike,
 } from '../../shared/edge/fx.ts';
-import { browserIceDeps, createIce } from '../../shared/edge/ice.ts';
 import { shareText, type ShareNavigatorLike } from '../../shared/edge/share.ts';
 import { createSampleCache } from '../../shared/edge/sound.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
-import { realTransport } from '../../shared/edge/transport.ts';
 import type { Timer } from '../../shared/lib/clock.ts';
 import { joinCodeFrom, withoutJoin } from '../../shared/edge/invite.ts';
+import { browserNetDeps } from '../../shared/edge/netDeps.ts';
 import type { Rng } from '../../shared/lib/rng.ts';
 import { bestLayoffActions, legalActions } from './src/engine/index.ts';
 import type { Action } from './src/engine/types.ts';
@@ -178,18 +177,9 @@ const boot = (): void => {
     },
   });
 
-  const netDeps: NetDeps = {
-    // PeerJS log level 0 as on the legacy page; realTransport reads the ?peer= hook itself.
-    transportFor: (ice) => realTransport({ ice, search: location.search, debug: 0 }),
-    ice: createIce(browserIceDeps()),
-    clock: realClock,
-    onWake: (fn) => {
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') fn();
-      });
-      window.addEventListener('online', fn);
-    },
-  };
+  // PeerJS log level 0 as on the legacy page (e2e expectPeerOptions pins it); the shared deps
+  // (web/shared/edge/netDeps.ts) read the ?peer= hook and wake the sessions on visibility/online.
+  const netDeps: NetDeps = browserNetDeps({ search: location.search, debug: 0 });
 
   // The hand is drawn by the slot view with the ghost draw slot (docs/ARCHITECTURE.md "Seams
   // reserved": the view is another module and this choice; docs/design/gin-draw-ghost-slot.md).

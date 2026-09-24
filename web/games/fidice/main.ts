@@ -6,8 +6,7 @@
 // `window.HyperIce`. Both libraries now arrive with this module instead of before it; the ICE
 // fetch itself still starts when a table is created or joined, as it did.
 import { realClock } from '../../shared/edge/clock.ts';
-import { browserIceDeps, createIce } from '../../shared/edge/ice.ts';
-import { realTransport } from '../../shared/edge/transport.ts';
+import { browserNetDeps } from '../../shared/edge/netDeps.ts';
 import type { Rng } from '../../shared/lib/rng.ts';
 import { Controller } from './src/app/controller.ts';
 import { browserEffects } from './src/app/effects.ts';
@@ -39,12 +38,10 @@ const boot = (): void => {
   };
   // Only the host rolls dice; guests still get Math.random for nothing in particular, as before.
   const rng: Rng = page.__rng ?? Math.random;
-  const peerDeps: PeerDeps = {
-    // PeerJS log level 1 as on the legacy page; realTransport reads the ?peer= hook itself.
-    transportFor: (ice) => realTransport({ ice, search: location.search, debug: 1 }),
-    ice: createIce(browserIceDeps()),
-    clock: realClock,
-  };
+  // PeerJS log level 1 as on the legacy page (e2e expectPeerOptions pins it); the shared deps
+  // (web/shared/edge/netDeps.ts) read the ?peer= hook. This adapter has no keep-alive, so their
+  // `onWake` is never subscribed here.
+  const peerDeps: PeerDeps = browserNetDeps({ search: location.search, debug: 1 });
   const controller = new Controller(
     {
       effects,

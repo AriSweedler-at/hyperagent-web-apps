@@ -14,12 +14,11 @@ import {
   type AudioContextLike,
   type NavigatorLike,
 } from '../../shared/edge/fx.ts';
-import { browserIceDeps, createIce } from '../../shared/edge/ice.ts';
 import { joinCodeFrom, withoutJoin } from '../../shared/edge/invite.ts';
+import { browserNetDeps } from '../../shared/edge/netDeps.ts';
 import { shareText } from '../../shared/edge/share.ts';
 import { createSampleCache } from '../../shared/edge/sound.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
-import { realTransport } from '../../shared/edge/transport.ts';
 import type { Timer } from '../../shared/lib/clock.ts';
 import type { Rng } from '../../shared/lib/rng.ts';
 import { badSoundFontMsg, isSoundFont } from '../../shared/lib/sound/fonts.ts';
@@ -125,18 +124,9 @@ const boot = (): void => {
     },
   });
 
-  const netDeps: NetDeps = {
-    // PeerJS log level 0 as gin's page; realTransport reads the ?peer= hook itself.
-    transportFor: (ice) => realTransport({ ice, search: location.search, debug: 0 }),
-    ice: createIce(browserIceDeps()),
-    clock: realClock,
-    onWake: (fn) => {
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') fn();
-      });
-      window.addEventListener('online', fn);
-    },
-  };
+  // PeerJS log level 0 as gin's page (e2e expectPeerOptions pins it); the shared deps
+  // (web/shared/edge/netDeps.ts) read the ?peer= hook and wake the sessions on visibility/online.
+  const netDeps: NetDeps = browserNetDeps({ search: location.search, debug: 0 });
 
   const repaint = (): void => {
     paint(document, app);
