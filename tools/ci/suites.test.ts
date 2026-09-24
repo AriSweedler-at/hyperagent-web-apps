@@ -2,7 +2,7 @@
 // every test in the repo, every coverage row must be measurable by its own suite, and the
 // change -> jobs table must hold. A new test file no rule claims fails here, which is how a
 // fourth game learns it must register a row in tools/ci/suites.ts.
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
@@ -488,5 +488,36 @@ describe('which change runs what', () => {
         expect(JOBS, `${rule.why}: ${job}`).toContain(job);
       });
     });
+  });
+});
+
+/** package.json as the scripts pin needs it. */
+const SCRIPTS = (
+  JSON.parse(readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')) as Readonly<{
+    scripts: Readonly<Record<string, string>>;
+  }>
+).scripts;
+
+describe('the scripts agree with the table', () => {
+  test.each(SUITE_NAMES)('test:%s names its suite twice: VITEST_SUITE and --project', (suite) => {
+    // The env var computes the coverage block and the project list; --project is the label that
+    // can only agree (vitest refuses a project the list does not hold). Both spell the same name.
+    const script = SCRIPTS[`test:${suite}`];
+    expect(script, `no test:${suite} script`).toBeDefined();
+    expect(script).toContain(`VITEST_SUITE=${suite} vitest run --project ${suite}`);
+    // A suite that needs the build builds first; the others never do.
+    expect(script?.startsWith('npm run build && ')).toBe(SUITES[suite].needsBuild);
+  });
+
+  test('the two aliases of the folded configs point at their suites (one release, then gone)', () => {
+    expect(SCRIPTS['test:dist']).toBe('npm run test:site');
+    expect(SCRIPTS['test:integration']).toBe('npm run test:shared-integration');
+  });
+
+  test('npm test and the full gate keep their meaning', () => {
+    expect(SCRIPTS['test']).toBe('vitest run');
+    expect(SCRIPTS['check']).toBe(
+      'npm run typecheck && npm run lint && npm test && npm run test:site',
+    );
   });
 });

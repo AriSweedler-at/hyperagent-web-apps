@@ -3,7 +3,7 @@
 // and every class that stylesheet styles is named by TypeScript or carried by the page markup. What
 // the extraction in test/dist/classes.ts cannot see (names a helper builds), what is a hook with no
 // rule, and what is dead CSS awaiting step 15 is a row in web/shared/styles/CONTRACT.md, and each
-// row is checked against the tree so it cannot go stale. Runs on dist/ after the build (test:dist).
+// row is checked against the tree so it cannot go stale. Runs on dist/ after the build (npm run test:site).
 import { expect, test } from 'vitest';
 
 import { REGISTRY } from '../../tools/games.ts';

@@ -651,3 +651,32 @@ describe('browserIceDeps', () => {
     expect(d.search()).toBe('?ice=https://alt.example');
   });
 });
+
+// Two branches the games' suites used to reach for the shared row (docs/design/test-partition.md
+// "Coverage"): the shared suite is measured alone now, so they are pinned here.
+describe('an empty error and a pair with one candidate id', () => {
+  test('a rejection that stringifies to nothing is a fallback with no error text', async () => {
+    const ice = createIce(
+      deps(
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the point is an empty reason
+        stub(() => Promise.reject('')),
+        fakeClock(),
+      ),
+    );
+    await expect(ice.load()).resolves.toMatchObject({ source: 'fallback', error: null });
+  });
+
+  test('a pair naming no local candidate reads as unknown on that side and relay on the other', async () => {
+    const ice = createIce(deps(jsonResponse([TURN]), fakeClock()));
+    const pc = pcWith([
+      { id: 'T1', type: 'transport', selectedCandidatePairId: 'P1' },
+      { id: 'P1', type: 'candidate-pair', remoteCandidateId: 'R' },
+      cand('R', 'relay'),
+    ]);
+    await expect(ice.describe(pc)).resolves.toEqual({
+      path: 'relay',
+      local: null,
+      remote: 'relay',
+    });
+  });
+});

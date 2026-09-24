@@ -55,3 +55,90 @@ describe('page.fake', () => {
     expect(fakeTarget({ id: 'i', value: 'w' })).toMatchObject({ id: 'i', value: 'w' });
   });
 });
+
+describe('page.fake, the members the painters and the drag helpers reach', () => {
+  test('checked, inline styles, toggled attributes, queries (static or per call), children, containment, select and remove', () => {
+    const a = fakeEl('a');
+    const b = fakeEl('b');
+    let round = 0;
+    const box = fakeEl('box', {
+      children: [a],
+      queries: {
+        '.static': [b],
+        '.fresh': () => {
+          round += 1;
+          return [fakeEl(`fresh-${String(round)}`)];
+        },
+      },
+    });
+    expect(box.checked()).toBe(false);
+    (box.el as HTMLInputElement).checked = true;
+    expect(box.checked()).toBe(true);
+    box.el.style.setProperty('--x', '1');
+    expect(box.style('--x')).toBe('1');
+    expect(box.el.toggleAttribute('hidden', true)).toBe(true);
+    expect(box.el.hasAttribute('hidden')).toBe(true);
+    expect(box.el.toggleAttribute('hidden', false)).toBe(false);
+    expect(box.el.hasAttribute('hidden')).toBe(false);
+    expect(box.el.querySelector('.static')).toBe(b.el);
+    expect(box.el.querySelectorAll('.static')).toEqual([b.el]);
+    expect(box.el.querySelector('.fresh')?.id).toBe('fresh-1');
+    expect(box.el.querySelector('.fresh')?.id).toBe('fresh-2');
+    expect([...box.el.children]).toEqual([a.el]);
+    expect(box.el.contains(a.el)).toBe(true);
+    expect(box.el.contains(b.el)).toBe(true);
+    expect(box.el.contains(fakeEl('stranger').el)).toBe(false);
+    const inner = fakeEl('inner');
+    const nested = fakeEl('nested', { children: [inner] });
+    const outer = fakeEl('outer', { children: [nested] });
+    expect(outer.el.contains(inner.el)).toBe(true);
+    expect(box.el.scrollHeight).toBe(0);
+    (box.el as HTMLInputElement).select();
+    expect(box.removed()).toBe(false);
+    box.el.remove();
+    expect(box.removed()).toBe(true);
+  });
+
+  test('a fired event carries what the test hands it, with the browser defaults otherwise; a delegated target answers closest', () => {
+    const el = fakeEl('k');
+    const full = el.fire('keydown', {
+      key: 'a',
+      inputType: 'insertText',
+      data: 'a',
+      clientX: 1,
+      clientY: 2,
+      pointerId: 3,
+    });
+    expect(full).toMatchObject({
+      type: 'keydown',
+      key: 'a',
+      inputType: 'insertText',
+      data: 'a',
+      clientX: 1,
+      clientY: 2,
+      pointerId: 3,
+    });
+    expect(full.target).toBe(el.el);
+    const bare = el.fire('click');
+    expect(bare).toMatchObject({ key: '', inputType: '', data: null, clientX: 0, clientY: 0 });
+    expect(bare.wasPrevented()).toBe(false);
+    bare.preventDefault();
+    expect(bare.wasPrevented()).toBe(true);
+    expect(bare.wasStopped()).toBe(false);
+    bare.stopPropagation();
+    expect(bare.wasStopped()).toBe(true);
+    expect(el.listenerTypes()).toEqual([]);
+    const row = fakeEl('row');
+    const target = fakeTarget({ closest: { '.row': row } }) as Readonly<{
+      closest: (selector: string) => unknown;
+      id: string;
+      value: string;
+    }>;
+    expect(target.closest('.row')).toBe(row.el);
+    expect(target.closest('.nope')).toBeNull();
+    expect(target.id).toBe('');
+    expect(target.value).toBe('');
+    const empty = fakeTarget({}) as Readonly<{ closest: (selector: string) => unknown }>;
+    expect(empty.closest('.row')).toBeNull();
+  });
+});

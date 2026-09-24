@@ -7,7 +7,7 @@
 // frozen source of the oracle fixtures (legacy/README.md; test/fixtures/legacy/manifest.test.ts
 // pins it) and is never served. The backgammon page (docs/design/backgammon-board.md) has no
 // legacy twin: it is built and checked like the others, `LEGACY_GAMES` keeps the two that have
-// one. Runs after the build (test:dist).
+// one. Runs after the build (npm run test:site).
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
