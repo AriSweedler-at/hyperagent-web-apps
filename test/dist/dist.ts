@@ -9,7 +9,7 @@ import { resolve, sep } from 'node:path';
 
 import { describe, test } from 'vitest';
 
-import { ALIASES } from '../../tools/games.ts';
+import { ALIASES, GAMES } from '../../tools/games.ts';
 
 export const REPO_ROOT = resolve(import.meta.dirname, '..', '..');
 
@@ -38,12 +38,34 @@ export const skipNote = (root: DistRoot): string =>
   `${root.name}/ is absent: run \`${root.build}\` first (CI runs \`npm run test:site\`, which builds first)`;
 
 /**
+ * The game pages a build must carry; a tree that has some but not all is a STALE build (a checkout
+ * pulled past a new game without rebuilding), and the guards would otherwise fail seventeen ways
+ * that all mean "rebuild". The alias stubs are not required: they are guarded separately.
+ */
+export const missingPages = (root: DistRoot): ReadonlyArray<string> =>
+  GAMES.map((game) => `games/${game}/index.html`).filter(
+    (page) => !existsSync(resolve(root.dir, page)),
+  );
+
+export const staleNote = (root: DistRoot, missing: ReadonlyArray<string>): string =>
+  `${root.name}/ is stale (missing ${missing.join(', ')}): run \`${root.build}\` again (or \`npm run test:site\`, which builds first)`;
+
+/**
  * `describe` over the build tree: runs `body(root)` when dist/ exists and records one skipped test
  * with the build command when it does not.
  */
 export const describeDist = (name: string, body: (root: DistRoot) => void): void => {
   const root = DIST_ROOT;
   if (distPresent(root)) {
+    const missing = missingPages(root);
+    if (missing.length > 0) {
+      describe(`${name} [${root.name}]`, () => {
+        test(`stale ${root.name}/`, () => {
+          throw new Error(staleNote(root, missing));
+        });
+      });
+      return;
+    }
     describe(`${name} [${root.name}]`, () => {
       body(root);
     });
