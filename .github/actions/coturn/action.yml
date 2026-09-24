@@ -1,0 +1,18 @@
+# coturn for the relay-forced games (e2e/gin-relay.spec.ts, e2e/fidice-relay.spec.ts): the @relay
+# specs play through a TURN relay of the harness's own, `turnserver` started by playwright.config.ts
+# on :3478 with static credentials (e2e/fixtures/site.ts turnServerCommand). The Debian package also
+# starts a system turnserver on :3478, which is stopped so the harness can bind its own; under CI the
+# config refuses to run with the binary missing rather than skip, so a broken install cannot pass as
+# a skip. ci.yml's e2e and broker jobs and nightly.yml install it this way (one spelling, docs/design/
+# shared-shell.md §5 A5); stories-baselines.yml plays no relay-forced game and sets E2E_TURN=off.
+name: coturn
+description: Install coturn from apt for the relay-forced games and stop the system turnserver it starts
+runs:
+  using: composite
+  steps:
+    - name: Install coturn and stop the system service
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y coturn
+        sudo systemctl disable --now coturn || true

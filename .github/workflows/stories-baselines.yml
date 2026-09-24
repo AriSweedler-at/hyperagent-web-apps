@@ -40,7 +40,7 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-chromium
       # Builds dist/ first (test:e2e), starts the pages server, records or rewrites every baseline.
       - name: Record the linux baselines of every story at both screenshot viewports
         run: npm run test:e2e -- e2e/gin-stories.spec.ts --project pages --update-snapshots=all

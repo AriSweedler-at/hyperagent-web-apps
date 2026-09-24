@@ -35,14 +35,10 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/npm-ci
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-      # The relay the deployed page is forced through (as in ci.yml's e2e job): the Debian package
-      # starts a system turnserver on :3478, stopped so the harness can bind its own.
+        uses: ./.github/actions/playwright-chromium
+      # The relay the deployed page is forced through, installed as ci.yml's e2e job installs it.
       - name: Install coturn for the relay-forced games
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y coturn
-          sudo systemctl disable --now coturn || true
+        uses: ./.github/actions/coturn
       # `npm run test:deployed` is `E2E_TARGET=deployed npm run test:e2e -- --grep "@online|@relay"`:
       # the build only feeds the local serve-dist that hosts the ICE lists; the pages under test are
       # the deployed ones, on the `pages` project alone.

@@ -6,9 +6,9 @@
 // row is checked against the tree so it cannot go stale. Runs on dist/ after the build (test:dist).
 import { expect, test } from 'vitest';
 
+import { REGISTRY } from '../../tools/games.ts';
 import {
   GAMES,
-  type Game,
   cssClasses,
   markupClasses,
   readContract,
@@ -21,19 +21,10 @@ import { describeDist } from './dist.ts';
 
 const names = (rows: ReadonlyArray<Row>): ReadonlyArray<string> => rows.flatMap((r) => r.names);
 /**
- * How many class names each source must yield, per game, so an extraction that silently finds
- * nothing (a moved file, a changed helper name) fails here rather than passing the two orphan
- * tests vacuously. TypeScript: gin and fidice spell most names out; backgammon's board builders
- * make theirs by template (`die-${face}`, `ck-${owner}`, the `conn-dot` attribute), which the
- * extraction cannot see (42 seen; the rest are CONTRACT.md rows). Markup: fidice paints its whole
- * page from TS into `#app`, gin's and backgammon's pages carry their screens.
+ * How many class names the built CSS must yield; the per-game TypeScript and markup floors are
+ * each game's `contractFloors` row in tools/games.ts (why a floor: so an extraction that silently
+ * finds nothing fails here rather than passing the two orphan tests vacuously).
  */
-const TS_FLOOR: Readonly<Record<Game, number>> = { 'gin-rummy': 50, fidice: 50, backgammon: 35 };
-const MARKUP_FLOOR: Readonly<Record<Game, number>> = {
-  'gin-rummy': 40,
-  fidice: -1,
-  backgammon: 40,
-};
 const CSS_FLOOR = 100;
 /** Rows with a `Toggled by` and no `Styled in`: TS names the class, no rule is expected. */
 const behaviourOnly = (rows: ReadonlyArray<Row>): ReadonlyArray<Row> =>
@@ -59,6 +50,7 @@ describeDist('CSS <-> TS class contract', (root) => {
 
   GAMES.forEach((game) => {
     const rows = rowsFor(contract, game);
+    const floors = REGISTRY[game].contractFloors;
     const ts = tsClasses(game);
     const tsNames = ts.map(({ name }) => name);
     const markup = markupClasses(root, game);
@@ -69,9 +61,9 @@ describeDist('CSS <-> TS class contract', (root) => {
         expect.stringMatching(/^shared\/assets\/[\w-]+\.css$/) as string,
         expect.stringMatching(new RegExp(`^shared/assets/${game}-[\\w-]+\\.css$`)) as string,
       ]);
-      expect(tsNames.length).toBeGreaterThan(TS_FLOOR[game]);
+      expect(tsNames.length).toBeGreaterThan(floors.ts);
       expect(css.length).toBeGreaterThan(CSS_FLOOR);
-      expect(markup.length).toBeGreaterThan(MARKUP_FLOOR[game]);
+      expect(markup.length).toBeGreaterThan(floors.markup);
     });
 
     test(`${game}: every class TS names has a rule in the built CSS or is a behaviour-only row`, () => {

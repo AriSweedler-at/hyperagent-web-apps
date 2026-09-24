@@ -224,10 +224,12 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    gets a row in `web/shared/styles/CONTRACT.md`; otherwise `class-contract.test.ts` fails after the
    build.
 7. Join the registry the harness enumerates: add the game to the `Game` union in
-   `web/shared/lib/roomCode.ts` (with its room-code row), then to `GAMES`, `PAGE_TITLES` and `HOOKS`
-   in `tools/games.ts` (`LEGACY_GAMES` only if it has a frozen `legacy/<g>/index.html`); the e2e
-   fixtures, the dist guards and `tools/parity/computed-styles.ts` read those lists (then record the
-   game's two goldens). Add a card to `web/index.html`.
+   `web/shared/lib/roomCode.ts` (with its room-code row), then a row to `REGISTRY` in
+   `tools/games.ts` (title, hook, storage keys, PeerJS debug level, page shape, class-contract
+   floors; `LEGACY_GAMES` only if it has a frozen `legacy/<g>/index.html`); `GAMES`, `PAGE_TITLES`
+   and `HOOKS` are read off the rows, and the e2e fixtures, the dist guards and
+   `tools/parity/computed-styles.ts` enumerate from them (then record the game's two goldens). Add a
+   card to `web/index.html`.
 8. One e2e spec per mode: `e2e/<g>-local.spec.ts` and `e2e/<g>-online.spec.ts` tagged `@online`
    (host and guest through `e2e/fixtures/two-players.ts`; `expectPeerOptions` on the recorded
    `new Peer` call). Both run on both projects, and the online one against the deployed page in

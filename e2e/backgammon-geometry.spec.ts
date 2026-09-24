@@ -22,23 +22,25 @@ import {
   bgTap,
   ownPlace,
   requireBoard,
-  type Viewport,
 } from './fixtures/backgammon.ts';
+import { boardGeometry, expectBoardGeometry } from './fixtures/backgammon-geometry.ts';
 import {
-  boardGeometry,
-  expectBoardGeometry,
+  DESKTOP,
+  PHONE,
+  PHONE_SHORT,
   expectSameFrame,
   type Frame,
-} from './fixtures/backgammon-geometry.ts';
+  type Viewport,
+} from './fixtures/geometry.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 type Case = Viewport & Readonly<{ scrolls: boolean }>;
 const VIEWPORTS: Readonly<Record<string, Case>> = {
-  phone: { width: 390, height: 844, scrolls: false },
-  desktop: { width: 1280, height: 800, scrolls: false },
+  phone: { ...PHONE, scrolls: false },
+  desktop: { ...DESKTOP, scrolls: false },
   // An iPhone SE: the 44px point floor needs 806px, so the document scrolls instead of clipping.
-  'phone-short': { width: 375, height: 667, scrolls: true },
+  'phone-short': { ...PHONE_SHORT, scrolls: true },
 };
 
 /** Light's 6-point holds seven (the count badge, five drawn); a legal 6-5 for either seat. */

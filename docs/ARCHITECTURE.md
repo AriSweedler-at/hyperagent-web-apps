@@ -98,7 +98,7 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 | `ui/state.ts` / `app/controller.ts` | everything below | Reducer over intents; imported only by `main.ts` and tests. |
 | `main.ts` | everything | Constructs adapters (PeerJS, Web Audio, storage, clock, `Math.random`). No logic. Module scripts are deferred, so it boots directly. |
 | `*.algorithms.ts` | shared/lib | The only files where loops, `let` and local mutation are allowed. Pure, functions only, 100% line coverage, and each export carries a comment saying why the functional form is unfit (hot DP, node-capped DFS, cartesian enumeration). |
-| `tools/games.ts` | shared/lib (types) | The harness's registry of the games: `GAMES`, `LEGACY_GAMES`, `PAGE_TITLES`, `HOOKS`, `LANDING_HREFS` over `roomCode.ts`'s `Game` union. The e2e fixtures, the dist guards and the computed-style oracle enumerate from it; `eslint.config.js` spells its own `GAMES` (plain JS) for the pairwise zones. |
+| `tools/games.ts` | shared/lib (types) | The harness's registry of the games: one `REGISTRY` row per game (title, hook, storage keys, PeerJS debug level, page shape, class-contract floors) over `roomCode.ts`'s `Game` union, with `GAMES`, `PAGE_TITLES`, `HOOKS` and `LANDING_HREFS` read off the rows and `LEGACY_GAMES` beside them. The e2e fixtures, the dist guards and the computed-style oracle enumerate from it; `eslint.config.js` spells its own `GAMES` (plain JS) for the pairwise zones. |
 
 Games never import each other. `infra/` shares only the pure `mapPath()` with tests.
 
@@ -299,8 +299,9 @@ of the shim script itself (`sh -n`).
 .nvmrc, cache: npm}`, `npm ci`, `npm run typecheck` (`tsc -b`), `npm run lint` (eslint + prettier
 --check), `npm test`, `npm run build`, dist tests, upload `dist`. Job `coverage` (parallel):
 `npm test -- --coverage` against the ratchets. Job `e2e` (parallel, its own build): Chromium from
-`.github/actions/playwright-chromium` (actions/cache by Playwright version; `--with-deps` only on a
-miss), `apt-get install coturn` (the system service it starts is stopped), `npm run
+`.github/actions/playwright-chromium` (actions/cache by Playwright version; the OS packages every
+run, the download only on a miss), coturn from `.github/actions/coturn` (apt; the system service it
+starts is stopped), `npm run
 test:integration`, `npm run test:e2e` (four workers under CI; projects pages + proxy, the page-only
 specs on pages alone: `PAGE_ONLY_SPECS`;
 PeerServer from the `peer` package on :9000; coturn on :3478 started by `playwright.config.ts`
@@ -323,7 +324,8 @@ to the public registry (host and the firewall's `/npm/` path prefix; npm's `repl
 swaps only the hostname), installs through Socket Firewall Free (`sfw npm ci`) so CI installs are
 scanned too, and restores the pristine lockfile afterwards. The lockfile's integrity hashes are
 verified against what is downloaded either way. `nightly.yml` (`cron 23 9 * * *` and
-`workflow_dispatch`; by hand `gh workflow run nightly.yml`) installs coturn like `e2e` and runs
+`workflow_dispatch`; by hand `gh workflow run nightly.yml`) installs Chromium and coturn through
+the same two composite actions as `e2e` (so does `stories-baselines.yml`, Chromium alone) and runs
 `npm run test:deployed` (`E2E_TARGET=deployed npm run test:e2e -- --grep "@online|@relay"`): the
 `pages` project's baseURL is the deployed origin `https://arisweedler-at.github.io` (`e2e/fixtures/site.ts`
 `DEPLOYED_PAGES_ORIGIN`, `baseUrl()`), there is no `proxy` project (`PROJECTS`), proxy-dev is not
@@ -422,8 +424,8 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
 
 - New game: `web/games/<g>/{index.html, main.ts, theme.css, src/}` plus tests, a coverage entry,
   `CONTRACT.md` rows and its name in the registry (`Game` in `web/shared/lib/roomCode.ts` with its
-  room-code row, then `GAMES`, `PAGE_TITLES`, `HOOKS` in `tools/games.ts`; `eslint.config.js`
-  spells `GAMES` once more); nothing else in `web/shared` changes. Vite picks up the folder; the
+  room-code row, then a `REGISTRY` row in `tools/games.ts`; `eslint.config.js` spells `GAMES` once
+  more); nothing else in `web/shared` changes. Vite picks up the folder; the
   proxy needs no change; the dist guards, the e2e page list and the computed-style tool enumerate
   from the registry; e2e gets one spec per mode. Sheshbesh landed this way (docs/design/
   backgammon-board.md §6). The README's "Add a game" is the step-by-step version.

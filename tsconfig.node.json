@@ -18,7 +18,8 @@
   // DOM-free by design) with web/shared/edge/storage.ts, for the codec, storage and string-golden
   // parity suites; since step 12 web/shared/edge/fx.ts is listed too (the gin fx.ts wraps it, all
   // structural types) and the DOM modules (ui/render.ts, ui/home.ts, ui/local.ts, the hand's
-  // dragger.ts and flip.ts) are excluded below.
+  // dragger.ts and flip.ts) are excluded below, by globs over web/games/*/src/ui where both games
+  // name a module the same way (docs/design/shared-shell.md §5 A5).
   // infra/games-proxy/**/*.ts is the games.sweedler.com Worker (TypeScript since step 15; wrangler
   // bundles it as is) with its table tests: tools/proxy-dev.ts runs its default export and the dist
   // guards import mapPath. It uses the WHATWG globals @types/node declares (Request, Response,
@@ -26,7 +27,7 @@
   // The backgammon src/ tree is listed as gin's is (docs/design/backgammon-board.md §6):
   // test/dist/backgammon-grid.test.ts imports ui/board/layout.ts, which reaches the engine, and
   // the e2e fixtures take the engine's types; its DOM modules (the painters, the page fake, the
-  // flight and drag helpers over web/shared/edge/dom.ts) are excluded below by name. Its
+  // flight and drag helpers over web/shared/edge/dom.ts) are excluded below by the same globs. Its
   // protocol.test.ts reads the wire goldens through Vite's `?raw` import, so the one declaration
   // tsconfig.web.json relies on (web/raw-imports.d.ts) is listed here too.
   "extends": "./tsconfig.base.json",
@@ -66,25 +67,23 @@
     "web/shared/edge/sound.ts",
     "infra/games-proxy/**/*.ts"
   ],
-  // The gin paint and wiring (ui/{render,home,local}.ts and scorer/main.ts, step 12) are written
-  // against the DOM edge and stay out with their tests, as does the stories page (stories/boot.ts
-  // paints; its catalogue is DOM-free and stays in, e2e/gin-stories.spec.ts imports it).
+  // The paint and wiring of both games (ui/{render,home,local}.ts, the page fake, the drag helper
+  // under ui/hand or ui/board; step 12, backgammon-board.md §6) are written against the DOM edge
+  // and stay out with their tests, as do gin's scorer/main.ts, the hand's flip, the board's flight
+  // and the stories page (stories/boot.ts paints; its catalogue is DOM-free and stays in,
+  // e2e/gin-stories.spec.ts imports it). One glob per module name the games share: fidice has no
+  // src/ui, so the globs reach only the two.
   "exclude": [
     "test/fixtures/legacy/*.cjs",
-    "web/games/gin-rummy/src/ui/render*.ts",
-    "web/games/gin-rummy/src/ui/home*.ts",
-    "web/games/gin-rummy/src/ui/local*.ts",
-    "web/games/gin-rummy/src/ui/page.fake.ts",
-    "web/games/gin-rummy/src/ui/hand/dragger*.ts",
+    "web/games/*/src/ui/render*.ts",
+    "web/games/*/src/ui/home*.ts",
+    "web/games/*/src/ui/local*.ts",
+    "web/games/*/src/ui/page.fake.ts",
+    "web/games/*/src/ui/*/dragger*.ts",
     "web/games/gin-rummy/src/ui/hand/flip*.ts",
     "web/games/gin-rummy/src/scorer/main*.ts",
     "web/games/gin-rummy/src/stories/boot.ts",
     "web/games/gin-rummy/src/stories/catalogue.test.ts",
-    "web/games/backgammon/src/ui/render*.ts",
-    "web/games/backgammon/src/ui/home*.ts",
-    "web/games/backgammon/src/ui/local*.ts",
-    "web/games/backgammon/src/ui/page.fake.ts",
-    "web/games/backgammon/src/ui/board/dragger*.ts",
     "web/games/backgammon/src/ui/board/fly*.ts"
   ]
 }

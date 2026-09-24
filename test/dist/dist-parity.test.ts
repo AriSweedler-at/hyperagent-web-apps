@@ -14,7 +14,7 @@ import { resolve } from 'node:path';
 
 import { expect, test } from 'vitest';
 
-import { ALIASES, GAMES, LEGACY_GAMES } from '../../tools/games.ts';
+import { ALIASES, GAMES, LEGACY_GAMES, REGISTRY } from '../../tools/games.ts';
 import {
   ALIAS_PAGES,
   REPO_ROOT,
@@ -111,37 +111,23 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     });
   });
 
-  test('the fidice page is a vdom mount point; the gin page keeps the legacy markup with empty rules slots', () => {
-    expect(readDist(root, 'games/fidice/index.html')).toContain('<div id="app"></div>');
-    const gin = readDist(root, 'games/gin-rummy/index.html');
-    // The legacy ids intact, with the two rules slots empty (filled from ui/rules.ts at boot).
-    ['id="app"', 'id="homeScreen"', 'id="tableScreen"', 'id="scResOverlay"', 'id="toast"'].forEach(
-      (id) => {
-        expect(gin).toContain(id);
-      },
-    );
-    expect(gin).toContain('<ul class="rules-list" id="rulesList"></ul>');
-    expect(gin).toContain('<ul class="rules-list" id="rulesOverlayList"></ul>');
-    expect(gin).not.toContain('<strong>Goal:</strong>');
-    expect(gin).toContain('<title>Gin Rummy</title>');
-  });
-
-  test('the backgammon page is gin-shaped: static screens, the 24 points and empty rules slots', () => {
-    const page = readDist(root, 'games/backgammon/index.html');
-    expect(page).toContain('<title>Sheshbesh — backgammon</title>');
-    ['id="app"', 'id="homeScreen"', 'id="tableScreen"', 'id="board"', 'id="toast"'].forEach(
-      (id) => {
-        expect(page).toContain(id);
-      },
-    );
-    // Points are direct children of #board in absolute order (design §2.2.1); the seat mapping is
-    // an attribute, so the markup ships seat 0's `data-own` for every point.
-    Array.from({ length: 24 }, (_, i) => i + 1).forEach((abs) => {
-      expect(page).toContain(`id="point-${String(abs)}"`);
+  // The shape of each page as tools/games.ts REGISTRY spells it: the title, the ids of its static
+  // screens (fidice ships one mount point, `#app`, and paints the rest; gin keeps the legacy ids;
+  // backgammon is gin-shaped with the 24 points), and, where the row says so, the two rules lists
+  // empty (filled from ui/rules.ts at boot) with no rules prose baked into the markup.
+  GAMES.forEach((game) => {
+    const { title, pageShape } = REGISTRY[game];
+    test(`the ${game} page carries its title and its ids${pageShape.rulesSlots ? ', with empty rules slots' : ''}`, () => {
+      const page = readDist(root, `games/${game}/index.html`);
+      expect(page).toContain(`<title>${title}</title>`);
+      pageShape.ids.forEach((id) => {
+        expect(page).toContain(`id="${id}"`);
+      });
+      if (!pageShape.rulesSlots) return;
+      expect(page).toContain('<ul class="rules-list" id="rulesList"></ul>');
+      expect(page).toContain('<ul class="rules-list" id="rulesOverlayList"></ul>');
+      expect(page).not.toContain('<strong>Goal:</strong>');
     });
-    expect(page).toContain('id="rulesList"');
-    expect(page).toContain('id="rulesOverlayList"');
-    expect(page).not.toContain('<strong>Goal:</strong>');
   });
 
   test('every module page preloads the chunk all of them share and links the one shared stylesheet; a chunk under shared/assets/ is preloaded by two pages at least', () => {
