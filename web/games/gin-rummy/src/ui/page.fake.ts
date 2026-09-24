@@ -1,40 +1,21 @@
 // The gin page as a page fake for the tests beside ui/{render,home,local}.ts and scorer/main.ts:
 // one fake element per `id="…"` in the page's markup (web/games/gin-rummy/index.html, which the
-// test reads and passes in), with the classes and the input value as the markup has them, so the
-// fixture cannot drift from the page. The buttons without ids that the paint reaches through
+// test reads and passes in), with the classes, attributes and the input value as the markup has
+// them, so the fixture cannot drift from the page (web/shared/edge/page.fake.ts `pageFromMarkup`,
+// docs/design/shared-shell.md §5 B1). The buttons without ids that the paint reaches through
 // queries (`#playModeSwitch .mode-btn`, `#playSubmenu button`) and the pile labels the paint
 // writes into are declared here; a test may add its own queries and children for an id.
 import {
   fakeEl,
-  fakePage,
+  modeButtons,
+  pageFromMarkup,
   type FakeEl,
   type FakeElOptions,
   type FakePage,
 } from '../../../../shared/edge/page.fake.ts';
 
-const TAG = /<(\w+)([^>]*?)\bid="([^"]+)"([^>]*)>/g;
-
-const attrOf = (attrs: string, name: string): string | undefined =>
-  new RegExp(`\\b${name}="([^"]*)"`).exec(attrs)?.[1];
-
-/** `id -> options` from the markup: classes and value as written. */
-const optionsFromMarkup = (markup: string): ReadonlyMap<string, FakeElOptions> =>
-  new Map(
-    [...markup.matchAll(TAG)].map((m: Readonly<RegExpExecArray>) => {
-      const attrs = `${m[2] ?? ''} ${m[4] ?? ''}`;
-      const classes = attrOf(attrs, 'class');
-      const value = attrOf(attrs, 'value');
-      const title = attrOf(attrs, 'title');
-      return [
-        m[3] ?? '',
-        {
-          classes: classes === undefined ? [] : classes.split(/\s+/).filter((c) => c !== ''),
-          ...(value === undefined ? {} : { value }),
-          ...(title === undefined ? {} : { attrs: { title } }),
-        },
-      ];
-    }),
-  );
+/** The three play modes, in the switch's order; `sandbox` ships hidden (docs/design/gin-sandbox.md). */
+const MODES = ['online', 'local', 'sandbox'] as const;
 
 export type GinPage = FakePage &
   Readonly<{
@@ -54,18 +35,12 @@ export const ginPage = (
   extra: Readonly<Record<string, FakeElOptions>> = {},
   more: ReadonlyArray<FakeEl> = [],
 ): GinPage => {
-  const fromMarkup = optionsFromMarkup(markup);
-  const modeButtons = ['online', 'local', 'sandbox'].map((mode) =>
-    fakeEl(`modeSwitch-${mode}`, {
-      classes: ['mode-btn', ...(mode === 'sandbox' ? ['hidden'] : [])],
-      attrs: { 'data-mode': mode },
-    }),
-  );
-  const submenuButtons = ['online', 'local', 'sandbox'].map((mode) =>
-    fakeEl(`submenu-${mode}`, {
-      classes: mode === 'sandbox' ? ['hidden'] : [],
-      attrs: { 'data-mode': mode },
-    }),
+  const switchButtons = modeButtons('modeSwitch', MODES, (mode) => [
+    'mode-btn',
+    ...(mode === 'sandbox' ? ['hidden'] : []),
+  ]);
+  const submenuButtons = modeButtons('submenu', MODES, (mode) =>
+    mode === 'sandbox' ? ['hidden'] : [],
   );
   const sandboxOnly = (buttons: ReadonlyArray<FakeEl>): ReadonlyArray<FakeEl> =>
     buttons.slice(2, 3);
@@ -74,8 +49,8 @@ export const ginPage = (
   const declared: Readonly<Record<string, FakeElOptions>> = {
     playModeSwitch: {
       queries: {
-        '.mode-btn': modeButtons,
-        '.mode-btn[data-mode="sandbox"]': sandboxOnly(modeButtons),
+        '.mode-btn': switchButtons,
+        '.mode-btn[data-mode="sandbox"]': sandboxOnly(switchButtons),
       },
     },
     playSubmenu: {
@@ -88,22 +63,12 @@ export const ginPage = (
     stockPile: { queries: { '.pile-label': [stockLabel] } },
     discardPile: { queries: { '.pile-label': [discardLabel] } },
   };
-  // Elements other ids declare as children are created first so the parents can reference them.
-  const plain = [...fromMarkup.keys()].filter((id) => !(id in declared) && !(id in extra));
-  const plainEls = new Map(plain.map((id) => [id, fakeEl(id, fromMarkup.get(id))]));
-  const withChildren = (id: string, options: FakeElOptions): FakeEl =>
-    fakeEl(id, { ...fromMarkup.get(id), ...options });
-  const composed = [...fromMarkup.keys()]
-    .filter((id) => id in declared || id in extra)
-    .map((id) => withChildren(id, { ...declared[id], ...extra[id] }));
-  const page = fakePage([
-    ...plainEls.values(),
-    ...composed,
-    ...modeButtons,
+  const page = pageFromMarkup(markup, declared, extra, [
+    ...switchButtons,
     ...submenuButtons,
     stockLabel,
     discardLabel,
     ...more,
   ]);
-  return { ...page, modeButtons, submenuButtons, stockLabel, discardLabel };
+  return { ...page, modeButtons: switchButtons, submenuButtons, stockLabel, discardLabel };
 };
