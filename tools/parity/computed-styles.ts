@@ -1180,7 +1180,10 @@ const readBg = (page: Page): Promise<BgSummary> =>
  * on to the match end. In-page, so a whole game costs no round trips; the curtain then names the
  * actor and the driver reveals it before a shot. A forfeited roll (R14) leaves the roller's view
  * on show for 1.2 s with nothing legal in it; the driver ends that beat itself (`noMove/elapsed`,
- * the timer's own intent) instead of waiting. Returns the phase it stopped in.
+ * the timer's own intent) instead of waiting. Every act in the loop launches a flight whose clone
+ * only a timer removes, and no timer fires inside one task: the loop sweeps the clones and the
+ * marks they left before it returns (fly.ts culls a burst past MAX_LIVE_FLYERS on its own, but a
+ * whole match is thousands). Returns the phase it stopped in.
  */
 const fastForward = (page: Page, stop: string, nextGames = false): Promise<string> =>
   page.evaluate<string>(`(() => {
@@ -1200,6 +1203,8 @@ const fastForward = (page: Page, stop: string, nextGames = false): Promise<strin
       held = 0;
       bg.act(acts[Math.floor(Math.random() * acts.length)]);
     }
+    document.querySelectorAll('.flyer').forEach((f) => f.remove());
+    document.querySelectorAll('.checker.arriving, .checker.settling').forEach((c) => c.classList.remove('arriving', 'settling'));
     const last = bg.view();
     return last === null ? 'none' : last.phase;
   })()`);

@@ -428,6 +428,18 @@ const paintHighlights = (
 
 // ---- dice, cube, controls (design §2.2 `#dice`, §4.7, §4.3) --------------------------------
 
+/**
+ * `#board[data-rolling]` through a tumble and `#board[data-rolled]` once faces are shown and still
+ * (design §4.7): what the specs and the parity driver wait on. Written by every paint of the table
+ * and cleared when the match is over (the table is not painted then, and the last tumble's timer
+ * must not leave a stale mark on the hidden board).
+ */
+const paintRollMarks = (doc: DocumentLike, rolling: boolean, rolled: boolean): void => {
+  const board = requireId(doc, 'board');
+  setAttr(board, 'data-rolling', rolling ? '1' : null);
+  setAttr(board, 'data-rolled', rolled ? '1' : null);
+};
+
 const paintDice = (doc: DocumentLike, app: App, v: View): void => {
   const model = diceFor(v, app.table.picked, holdingNoMove(app));
   const dice = requireId(doc, 'dice');
@@ -442,9 +454,7 @@ const paintDice = (doc: DocumentLike, app: App, v: View): void => {
   const mini = requireId(doc, 'diceMini');
   ensureKeyed(mini, model.key, () => diceHtml(model));
   toggleClass(mini, 'rolling', rolling);
-  const board = requireId(doc, 'board');
-  setAttr(board, 'data-rolling', rolling ? '1' : null);
-  setAttr(board, 'data-rolled', shown && !rolling ? '1' : null);
+  paintRollMarks(doc, rolling, shown && !rolling);
   const cube = requireId(doc, 'cube');
   toggleClass(cube, 'hidden', !rulesOf(v.variant).cube);
   setText(cube, cubeText(v.cube));
@@ -680,6 +690,8 @@ const paintGame = (doc: PageLike, app: App): void => {
     paintEndgame(doc, app, v);
     paintSheet(doc, 'resultOverlay', false);
     paintSheet(doc, 'cubeOverlay', false);
+    paintSheet(doc, 'rollOverlay', false);
+    paintRollMarks(doc, false, false);
     return;
   }
   const board = requireId(doc, 'board');

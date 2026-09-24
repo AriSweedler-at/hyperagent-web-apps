@@ -473,6 +473,12 @@ describe('the table', () => {
     paint(p.doc, won);
     expect(view(won).matchOver).toBe(true);
     expect(shown(p)).toEqual(['endgameScreen']);
+    // The last roll's tumble may still be running as the match ends: no stale mark on the board.
+    paint(p.doc, { ...won, table: { ...won.table, rolling: true } });
+    expect(shown(p)).toEqual(['endgameScreen']);
+    expect(p.get('board').attr('data-rolling')).toBeNull();
+    expect(p.get('board').attr('data-rolled')).toBeNull();
+    expect(p.get('rollOverlay').hidden()).toBe(true);
     expect(p.get('resultOverlay').hidden()).toBe(true);
     expect(p.get('resultTitle').text()).toBe('Ann takes the match 1–0');
     expect(p.get('resultSub').text()).toBe('1 game');

@@ -42,6 +42,12 @@ export const HIT_DELAY_MS = 80;
 export const STAGGER_MS = 60;
 /** Slack past the transition before the fallback timer clears a flight that never ended. */
 const FALLBACK_SLACK_MS = 60;
+/**
+ * More clones than this in the air is a scripted burst (a policy through the hook playing a game
+ * in one task, a reconnect replaying frames), not play: they are culled before new ones launch,
+ * or thousands of composited layers pile up before any timer can remove them.
+ */
+export const MAX_LIVE_FLYERS = 12;
 
 const measurable = (r: Rect): boolean => r.width > 0 || r.height > 0;
 const px = (n: number): string => `${String(Math.round(n * 100) / 100)}px`;
@@ -165,6 +171,10 @@ export const flyMoves = (
     return d === null ? [] : [d];
   });
   repaint();
+  if (departed.length > 0) {
+    const live = queryAllIn(doc.body, '.flyer');
+    if (live.length > MAX_LIVE_FLYERS) live.forEach(removeElement);
+  }
   departed.forEach((d) => {
     launch(doc, d);
   });

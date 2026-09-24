@@ -260,6 +260,10 @@ Flights come from the pure `flightsBetween(prev, next)` (`ui/board.ts`): the new
 already shown; more than eight flights (`MAX_FLIGHTS`: a double's four moves, each a hit) or a
 new roll repaint cold. `fly.ts` may not
 import `ui/state.ts`; it takes rects and ids only. The points a hit flight lifts from flash `hit`.
+More than `MAX_LIVE_FLYERS` (12) clones in the air is a scripted burst (a policy through the hook
+playing a game in one task; a whole match is thousands of clones no timer can remove before the
+task ends), not play: they are culled before the next launch, and the parity driver's
+`fastForward` sweeps its own.
 
 ### 3.10 Short viewports
 
@@ -661,7 +665,7 @@ specs. `main` is unprotected: watch CI, then merge.
 
 ## 9. The computed-style driver
 
-`driveBackgammon` (in `tools/parity/computed-styles.ts`) shoots 25 screens per viewport: the three
+`driveBackgammon` (in `tools/parity/computed-styles.ts`) shoots 27 screens per viewport: the three
 home tabs; a 3-point portes match with its first turn by hand (the curtain, the roll modal, rolled, a die picked, a
 source selected with its targets, a move, the undo, the turn over); the menu, history and rules
 sheets; then the seeded policy through the hook (`__backgammon.legal()` → `__backgammon.act(a)`,

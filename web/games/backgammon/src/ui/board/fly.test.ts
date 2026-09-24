@@ -8,7 +8,14 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { Rect } from '../../../../../shared/edge/dom.ts';
 import { fakeEl, fakePage, type FakeEl } from '../../../../../shared/edge/page.fake.ts';
 import type { Flight } from '../board.ts';
-import { FLY_MS, HIT_DELAY_MS, STAGGER_MS, flightDelays, flyMoves } from './fly.ts';
+import {
+  FLY_MS,
+  HIT_DELAY_MS,
+  MAX_LIVE_FLYERS,
+  STAGGER_MS,
+  flightDelays,
+  flyMoves,
+} from './fly.ts';
 
 const rect = (left: number, top: number, width = 40, height = 40): Rect => ({
   left,
@@ -153,6 +160,26 @@ describe('flyMoves', () => {
     flyMoves(t.page.doc, [t.flight, t.flight], t.repaint);
     expect(t.clone.style('transition-delay')).toBe(`${String(STAGGER_MS)}ms`);
     expect(t.clone.style('animation-delay')).toBe(`${String(STAGGER_MS)}ms`);
+  });
+
+  test('a burst: more clones in the air than MAX_LIVE_FLYERS are culled before the next launch', () => {
+    const stale = Array.from({ length: MAX_LIVE_FLYERS + 1 }, (_, i) =>
+      fakeEl(`stale${String(i)}`, { classes: ['checker', 'flyer'] }),
+    );
+    const t = table();
+    // The body reports the stale clones: they go, the new flight launches as usual.
+    Object.assign(t.page.body.el, { querySelectorAll: () => stale.map((s) => s.el) });
+    flyMoves(t.page.doc, [t.flight], t.repaint);
+    expect(stale.every((s) => s.removed())).toBe(true);
+    expect(t.clone.hasClass('flyer')).toBe(true);
+    // At the cap nothing is culled.
+    const few = table();
+    const some = Array.from({ length: MAX_LIVE_FLYERS }, (_, i) =>
+      fakeEl(`live${String(i)}`, { classes: ['checker', 'flyer'] }),
+    );
+    Object.assign(few.page.body.el, { querySelectorAll: () => some.map((s) => s.el) });
+    flyMoves(few.page.doc, [few.flight], few.repaint);
+    expect(some.some((s) => s.removed())).toBe(false);
   });
 
   test('a bear-off lands on the newest slab, scaled to its shape', () => {
