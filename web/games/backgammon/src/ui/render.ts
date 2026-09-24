@@ -448,13 +448,9 @@ const paintControls = (doc: DocumentLike, app: App, v: View): void => {
 
 // ---- the result sheet, the endgame, the cube offer (design §4.8, §4.11) ------------------------
 
-/** `#rsNextBtn` / `#nextGameBtn`: the host or pass-and-play starts the next game; the guest waits. */
+/** `#rsNextBtn` / `#nextGameBtn`: the host or pass-and-play starts the next game; the guest waits (short: it shares a row with Leave on a phone). */
 export const nextLabel = (app: App, v: View): string =>
-  app.shell.role === 'guest'
-    ? `Waiting for ${v.opp.name} to start the next game`
-    : v.matchOver
-      ? 'Rematch'
-      : 'Next game';
+  app.shell.role === 'guest' ? `Waiting for ${v.opp.name}…` : v.matchOver ? 'Rematch' : 'Next game';
 
 const paintResult = (doc: DocumentLike, app: App, v: View): void => {
   paintSheet(doc, 'resultOverlay', v.phase === 'over' && !v.matchOver && app.table.resultOpen);

@@ -481,7 +481,7 @@ describe('the table', () => {
     expect(nextLabel(app, v)).toBe('Next game');
     expect(nextLabel(app, { ...v, matchOver: true })).toBe('Rematch');
     const guest: App = { ...app, shell: { ...app.shell, role: 'guest' } };
-    expect(nextLabel(guest, v)).toBe(`Waiting for ${v.opp.name} to start the next game`);
+    expect(nextLabel(guest, v)).toBe(`Waiting for ${v.opp.name}…`);
     expect(matchTitle({ ...v, match: { ...v.match, score: [5, 2] } })).toBe(
       'Ann takes the match 5–2',
     );
