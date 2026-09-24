@@ -14,7 +14,12 @@ import type { NetDeps } from './peer.ts';
 import { realTransport } from './transport.ts';
 
 export type BrowserNetDepsOptions = Readonly<{
-  /** The page's `location.search`: `realTransport` reads the `?peer=` hook from it. */
+  /**
+   * The page's `location.search` at boot: `realTransport` reads the `?peer=` and `?ice-policy=`
+   * hooks from it. The hand-written blocks read `location.search` inside `transportFor`, at each
+   * connection; the one rewrite a page makes (`withoutJoin`, dropping `?join=`) keeps every hook,
+   * so the options a Peer gets are the same either way.
+   */
   search: string;
   /** The PeerJS log level the page's legacy set: 0 on gin's and backgammon's, 1 on fidice's. */
   debug: number;
