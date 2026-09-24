@@ -2,7 +2,7 @@
 // moved there by docs/design/shared-shell.md A1; this file was its copy with three edits) with this
 // game's protocol.ts as its codec and 'backgammon' as the room's game, so the peer id is
 // `sheshbesh-<CODE>` and the welcome carries `matchLength` and `variant` in place of gin's `target`
-// (design.md §5.3; sessions.test.ts pins both). Every constant and message ui/state.ts, main.ts and
+// (docs/design/backgammon-board.md §5.2; sessions.test.ts pins both). Every constant and message ui/state.ts, main.ts and
 // the tests import is re-exported.
 import {
   HostSession as SharedHostSession,

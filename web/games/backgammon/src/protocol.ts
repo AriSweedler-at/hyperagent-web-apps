@@ -1,4 +1,4 @@
-// The backgammon wire codecs (design.md §5.1; understand.md §4 step 5): the seven frames a host
+// The backgammon wire codecs (docs/design/backgammon-board.md §5.2): the seven frames a host
 // and its guest exchange over the PeerJS data channel, gin's frame for frame with one change:
 // `welcome` and `lobby` carry `matchLength` and `variant` instead of gin's `target`, since the
 // guest must know which ruleset the host deals under. Since the shared-shell design (§4.5

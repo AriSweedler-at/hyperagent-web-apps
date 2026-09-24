@@ -496,7 +496,7 @@ export type Intent =
 
 /**
  * The shell's half of `Intent` (design §4): what a shared shell reducer would own once both games
- * are green (design §6 PR-E/P6). Everything else is the table's.
+ * are green (design §5.3). Everything else is the table's.
  */
 export const SHELL_INTENT_TYPES = [
   'home/init',

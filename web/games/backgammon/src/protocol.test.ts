@@ -1,10 +1,10 @@
-// The wire codecs and their goldens (design.md §5.1): no legacy corpus exists for this game, so
+// The wire codecs and their goldens (docs/design/backgammon-board.md §5.2): no legacy corpus exists for this game, so
 // this test is the recorder. Every frame below is built from a seeded engine with the clock
 // pinned; one JSON file per tag under test/fixtures/backgammon-wire/ holds what the builders
 // emitted, and the test asserts the files still equal the builders' output (values and key
 // order, whitespace aside), that every recorded frame decodes back to itself and re-encodes byte
 // for byte (R32), and that a `state` frame stays under the size cap even at the end of a match
-// (design.md §7 risk 2). The web project has no node types (tsconfig.web.json `types: []`), so
+// (backgammon-board.md §10 risk 2). The web project has no node types (tsconfig.web.json `types: []`), so
 // the files are read through the repo's `?raw` imports (web/raw-imports.d.ts) and written by
 // vitest's file snapshots. To re-record after a deliberate wire change (a new tag first needs an
 // empty `[]` file, since a `?raw` import must resolve):
@@ -248,7 +248,7 @@ describe('the wire goldens under test/fixtures/backgammon-wire', () => {
     });
   });
 
-  test('a state frame at the end of a match stays under the size cap (design.md §7 risk 2)', () => {
+  test('a state frame at the end of a match stays under the size cap (backgammon-board.md §10 risk 2)', () => {
     const sizes = GOLDENS.state.map((f) => JSON.stringify(f).length);
     sizes.forEach((n) => {
       expect(n).toBeLessThan(STATE_FRAME_LIMIT);

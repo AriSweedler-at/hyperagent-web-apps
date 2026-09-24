@@ -1,7 +1,7 @@
 // Sheshbesh's guest session: the shared two-seat session (web/shared/net/guest.ts, gin's session
 // moved there by docs/design/shared-shell.md A1; this file was its copy with one edit) with this
 // game's protocol.ts as its codec and 'backgammon' as the room's game, so it connects to
-// `sheshbesh-<CODE>` (design.md §5.3; sessions.test.ts pins it). Every constant and message
+// `sheshbesh-<CODE>` (docs/design/backgammon-board.md §5.2; sessions.test.ts pins it). Every constant and message
 // ui/state.ts, main.ts and the tests import is re-exported.
 import {
   GuestSession as SharedGuestSession,

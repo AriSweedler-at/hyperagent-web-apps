@@ -1,6 +1,6 @@
 // Boot (docs/ARCHITECTURE.md "Module boundaries": main.ts constructs the adapters and injects
 // them; no logic). Gin's main.ts line for line where the games agree (design §5.3 "main.ts boot",
-// understand.md §4 step 7): the real Transport (web/shared/edge/transport.ts, which bundles PeerJS
+// docs/design/backgammon-board.md §5.2): the real Transport (web/shared/edge/transport.ts, which bundles PeerJS
 // and honours `?peer=`), the ICE loader, localStorage, the clock, `Math.random` (or the harness's
 // `window.__rng`, read before anything draws so a seeded opening roll is the seeded one, R27),
 // Web Audio, vibration and the wake lock are built here and handed to the reducer (src/ui/state.ts)
