@@ -11,8 +11,9 @@ design with its measurements is the session document it came from (2026-09-24).
 
 `tools/ci/suites.ts` is the one place a path is assigned to a suite. `vitest.config.ts`,
 `playwright.config.ts`, `tools/ci/affected.ts` and the pre-push hook read it; nothing else spells
-a path list. `tools/ci/suites.test.ts` is the accounting: every `*.test.ts` and every `e2e/*.spec.ts`
-is claimed by exactly one suite, every glob names a file, every coverage row sits under its own
+a path list. `tools/ci/suites.test.ts` is the accounting: every `*.test.ts` is claimed by exactly
+one suite and every `e2e/*.spec.ts` by exactly one, or by the suites of the games a shared spec
+drives (the shell specs, below), every glob names a file, every coverage row sits under its own
 suite's `coverage.include` (vitest passes an empty row silently), the 28 rows of the former flat
 config are present at or above their figures, the scripts spell the same names as the table, and
 `ci.yml` carries one gated job per entry. A new test file no row claims fails there, which is how
@@ -22,15 +23,28 @@ a fourth game learns it must register.
 |---|---|---|---|---|
 | `shared` | `web/shared/**/*.test.ts`, `test/parity/{ice,roomCode}.legacy.test.ts` | | `web/shared/{lib,edge,net}/**` | |
 | `shared-integration` | (the fake two-seat game, when it lands) | `test/integration/**` (Chromium; `browser: true`) | | |
-| `gin` | `web/games/gin-rummy/**/*.test.ts`, `test/parity/gin.*`, `test/fixtures/legacy/gin-wire.test.ts`, `test/card-backs.test.ts` | | the 10 gin rows | `**/gin-*.spec.ts` |
+| `gin` | `web/games/gin-rummy/**/*.test.ts`, `test/parity/gin.*`, `test/fixtures/legacy/gin-wire.test.ts`, `test/card-backs.test.ts` | | the 10 gin rows | `**/gin-*.spec.ts`; `**/shell-*.spec.ts` tagged `@gin-rummy` (`@backgammon` inverted) |
 | `fidice` | `web/games/fidice/**/*.test.ts`, `test/parity/fidice.*`, `test/tools/debundle-fidice.test.ts` | | the 7 fidice rows | `**/fidice-*.spec.ts` |
-| `backgammon` | `web/games/backgammon/**/*.test.ts` | | the 7 backgammon rows | `**/backgammon-*.spec.ts` |
-| `site` | `test/tokens.test.ts`, `test/ratchet.test.ts`, `infra/games-proxy/worker.test.ts` | `test/dist/**` (`needsBuild: true`) | `infra/games-proxy/worker.ts` | `**/smoke.spec.ts`, `**/computed-styles.spec.ts`, `**/shell-liveness.spec.ts` (the shared shell across both games: a cross-game spec until §5.2's tags split such files) |
+| `backgammon` | `web/games/backgammon/**/*.test.ts` | | the 7 backgammon rows | `**/backgammon-*.spec.ts`; `**/shell-*.spec.ts` tagged `@backgammon` (`@gin-rummy` inverted) |
+| `site` | `test/tokens.test.ts`, `test/ratchet.test.ts`, `infra/games-proxy/worker.test.ts` | `test/dist/**` (`needsBuild: true`) | `infra/games-proxy/worker.ts` | `**/smoke.spec.ts`, `**/computed-styles.spec.ts` |
 | `harness` | `test/tools/{serve-dist,proxy-dev,computed-styles}.test.ts`, `test/fixtures/legacy/{frozen,manifest}.test.ts`, `tools/**/*.test.ts` | | | |
 
 Counts on this branch: 30 + 1 + 44 + 17 + 21 + 8 + 9 = 130 test files (the harness row holds the
 three new `tools/ci` tests, shared the new `dom.fake.test.ts`); 210 Playwright tests in 28 files =
 gin 142/18 + fidice 4/2 + backgammon 46/6 + site 18/2.
+
+The shell specs (`e2e/shell-{home,local,online,relay,resume,handoff}.spec.ts`,
+`docs/design/shared-shell.md` D1) drive both shell games from one file each: a `SHELL_GAMES.forEach`
+over `tools/games.ts`, one `test.describe(game, { tag: '@<game>' })` per game. Both game suites
+list the files (`e2e.files`) with their own tag (`e2e.tag`) and the other's in `e2e.otherTags`,
+which `playwright.config.ts` turns into `grepInvert`, so `e2e-gin` plays gin's describes and
+`e2e-backgammon` backgammon's, each once, and a CLI `--grep` (`@online|@relay`, `@gin-rummy`)
+composes with it. The accounting allows a spec file several claimants only when every claimant
+carries a tag and inverts exactly the others', and pins the six files and the idiom. Why not a
+suite of their own: an `e2e-shell` job would need its own coturn (four of the six relay through
+it), its own ci.yml entry and script, and would run for a fidice-only change too; under `site` the
+relay spec would have to install coturn there. The game jobs already run for a change to their game
+or to shared, and a shell describe is that game's flow.
 
 ## Running one suite
 
@@ -69,6 +83,7 @@ paths and `everything` anywhere selects every job. `check` (typecheck, lint, hoo
 | `web/games/<g>/**` | `<g>`, `e2e-<g>`, `site`, `e2e-site`, `harness` |
 | `test/parity/<g>.*` | `<g>` |
 | `e2e/<g>-*.spec.ts` (and `e2e/__screenshots__/**` for gin) | `e2e-<g>` |
+| `e2e/shell-*.spec.ts` | `e2e-gin`, `e2e-backgammon` (each plays its game's describes) |
 | `test/fixtures/styles/<g>.*` | `e2e-site` |
 | `test/fixtures/legacy/gin-*`, `test/fixtures/legacy/fidice-*` | `<g>`, `harness` |
 | `test/card-backs.test.ts` | `gin` |
@@ -145,7 +160,4 @@ scripts, stopping at the first failure and listing what CI adds (the browser sui
 - The fake two-seat game (`web/shared/example/coin`) and its integration tests join
   `shared-integration.unit` with the shared shell (the design's §4 and P3); `test:shared` then runs
   both projects so shared's rows see a real consumer.
-- A spec file shared by two games (the shell specs of Wave D) carries a Playwright tag per game's
-  describe; its suite lists the file and the other games' tags go into `grepInvert` (`e2e.otherTags`,
-  wired, empty today).
 - `test:dist` and `test:integration` go after one release.
