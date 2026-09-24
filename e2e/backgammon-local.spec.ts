@@ -142,10 +142,13 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       // The curtain covers a live board (the position is readable beneath) and hands it to the
       // opening winner: one tap reveals and rolls (design §2.1.8).
       const curtain = await bgCurtain(page);
+      // The first curtain carries the opening roll from the engine's log.
+      const opening = view.log.filter((e) => e.kind === 'opening').at(-1)?.text ?? '';
+      expect(opening).toMatch(/ starts$/);
       expect(curtain).toEqual({
         title: `Pass the phone to ${first}`,
         sub: 'Your turn.',
-        last: '',
+        last: opening,
         button: `${first} — roll`,
         rolls: true,
       });
@@ -352,10 +355,13 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#barBottom .checker.ck-dark')).toHaveCount(1);
       const curtain = await bgCurtain(page);
       expect(curtain.title).toBe('Pass the phone to Bob');
-      expect(curtain.last).toContain('Ann moved 8/7 8/5*');
-      expect(curtain.last).toContain('hit');
-      // Design §2.4.10: "Kapará." on the device of the player hit, in his own numbering.
+      // The hit line in Bob's numbering (the board beneath is his): Ann's 5-point is his 20.
+      expect(curtain.last).toBe('Ann moved 8/7 8/5* · Ann hit you on the 20-point');
+      // Nothing is toasted while Ann still holds the phone; Bob's reveal brings the "Kapará."
+      // toast, in his own numbering (docs/design/backgammon-board.md §4.9).
       const toast = page.locator('#toast');
+      await expect(toast).not.toHaveClass(/\bshow\b/);
+      await bgReveal(page);
       await expect(toast).toBeVisible();
       await expect(toast).toHaveText('Kapará. Ann hit you on the 20-point.');
       await expect(toast).toHaveClass(/\bhit\b/);

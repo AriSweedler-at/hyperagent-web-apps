@@ -100,6 +100,7 @@ import {
 import {
   deadDice,
   effectiveSelection,
+  hitsAgainst,
   sourcesOf,
   targetsOf,
   type Chain,
@@ -333,9 +334,19 @@ export const hostRoomMsg = (hostName: string): string =>
   `Connected — waiting for ${hostName} to start`;
 export const guestGoneMsg = (oppName: string | null, code: string | null): string =>
   `${oppName ?? 'Opponent'} disconnected — they can rejoin with code ${String(code)}.`;
-/** Design §4 "Hit toast": fired on the hit player's device from the new hit moves, never from log text. */
-export const hitMsg = (byName: string, ownPoint: number): string =>
-  `Kapará. ${byName} hit you on the ${String(ownPoint)}-point.`;
+/**
+ * The hit toast, for the player hit, in their own numbering, from the moves and never from log
+ * text: `Kapará. Ari hit you on the 20-point.`; two hits in one turn share the toast (there is
+ * one `#toast`, its timer restarts): `… on the 20-point and the 5-point.`
+ */
+export const hitMsg = (byName: string, ownPoints: ReadonlyArray<number>): string => {
+  const named = ownPoints.map((p) => `the ${String(p)}-point`);
+  const where =
+    named.length <= 1
+      ? (named[0] ?? '')
+      : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1] ?? ''}`;
+  return `Kapará. ${byName} hit you on ${where}.`;
+};
 
 // ---- intents -----------------------------------------------------------------------------------
 
@@ -684,16 +695,27 @@ export const cuesBetween = (prev: View, next: View, role: Role | null): Readonly
   ];
 };
 
-/** Design §2.4.10: "Kapará." on the hit player's device, from the opponent's new hit moves, in my numbering. */
+/** Online: "Kapará." on the hit player's device as the opponent's hit moves arrive, in my numbering. */
 const hitToastsBetween = (prev: View, next: View): ReadonlyArray<Effect> => {
   const mover = prev.turn;
   if (mover === next.me.idx) return [];
   const rules = rulesOf(next.variant);
-  return newMovesBetween(prev, next)
-    .filter((m) => m.hit && m.to !== 'off')
-    .map((m) =>
-      toast(hitMsg(next.players[mover].name, m.to === 'off' ? 0 : rules.ownOf(next.me.idx, m.to))),
-    );
+  const points = newMovesBetween(prev, next).flatMap((m) =>
+    m.hit && m.to !== 'off' ? [rules.ownOf(next.me.idx, m.to)] : [],
+  );
+  return points.length === 0 ? [] : [toast(hitMsg(next.players[mover].name, points))];
+};
+
+/**
+ * Pass-and-play: the same toast for the seat now taking the phone, from the turn just finished
+ * against them. At the turn's end the hitter still holds the phone, so the flip is the wrong
+ * moment (and the hitter's own view had already shown the moves, so a diff finds none): the
+ * reveal fires it, or the flip itself when the curtain is off.
+ */
+const handedHits = (game: State, seat: Seat): ReadonlyArray<Effect> => {
+  const v = viewFor(game, seat);
+  const points = hitsAgainst(v, seat);
+  return points.length === 0 ? [] : [toast(hitMsg(v.players[otherSeat(seat)].name, points))];
 };
 
 /** The view a cue memory keys on: the same game position paints the same for either seat. */
@@ -737,7 +759,8 @@ const rendered = (app: App, prev: View | null, now: number): Step => {
   const key = viewKey(view);
   const fresh = key !== app.shell.cues.key && prev !== null;
   const cues = fresh ? cuesBetween(prev, view, app.shell.role) : [];
-  const hitToasts = fresh ? hitToastsBetween(prev, view) : [];
+  // Pass-and-play toasts the player hit when the phone reaches them (`handedHits`), not here.
+  const hitToasts = fresh && app.shell.role !== 'local' ? hitToastsBetween(prev, view) : [];
   const beat = key !== app.shell.cues.key && freshNoMove(prev, view);
   const screen: ScreenId = view.matchOver ? 'endgameScreen' : 'tableScreen';
   const resultOpen = view.phase === 'over' ? prev?.phase !== 'over' || app.table.resultOpen : false;
@@ -817,6 +840,10 @@ const localBroadcast = (app: App, initial: boolean, now: number): Step => {
     app.shell.revealed !== viewIdx
       ? viewIdx
       : null;
+  // With the curtain off the phone changes hands unannounced: the seat now looking is told of
+  // the hits against them here; with it on, `curtain/reveal` tells them once they have it.
+  const handed =
+    curtain === null && prev !== null && prev.me.idx !== viewIdx ? handedHits(game, viewIdx) : [];
   return then(
     step(
       withTable(withShell(app, { view: viewFor(game, viewIdx) }), {
@@ -827,6 +854,7 @@ const localBroadcast = (app: App, initial: boolean, now: number): Step => {
       }),
       { type: 'persist' },
       ...(curtain !== null && !initial ? [{ type: 'fx', cue: 'yourTurn' } as const] : []),
+      ...handed,
     ),
     (a) => rendered(a, prev, now),
   );
@@ -1584,21 +1612,27 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
       return pure(withTable(app, { historyOpen: !t.historyOpen }));
     case 'rules/toggle':
       return pure(withShell(app, { rulesOpen: !app.shell.rulesOpen }));
-    case 'curtain/mode':
+    case 'curtain/mode': {
+      // Turning the curtain off while it is up is a reveal: the seat behind it is told of its hits.
+      const dropped = intent.mode === 'never' ? t.curtain : null;
       return step(
         withTable(app, {
           curtainMode: intent.mode,
           curtain: intent.mode === 'never' ? null : t.curtain,
         }),
         { type: 'writeCurtainMode', mode: intent.mode },
+        ...(dropped !== null && app.shell.game !== null ? handedHits(app.shell.game, dropped) : []),
       );
+    }
     case 'curtain/reveal': {
       const game = app.shell.game;
       if (game === null) return pure(app);
+      const seat = actorOf(game) ?? game.turn;
       return then(
         step(
-          withTable(withShell(app, { revealed: actorOf(game) ?? game.turn }), { curtain: null }),
+          withTable(withShell(app, { revealed: seat }), { curtain: null }),
           tap,
+          ...handedHits(game, seat),
         ),
         (a) => localBroadcast(a, true, ctx.now()),
       );

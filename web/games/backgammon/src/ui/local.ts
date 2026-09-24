@@ -15,25 +15,42 @@ import {
   type PageLike,
 } from '../../../../shared/edge/dom.ts';
 import { diceText, type Seat, type View } from '../engine/index.ts';
+import { hitsAgainst, lastTurnEntry } from './board.ts';
 import { ONLINE_MODE_SHOWN, type App, type Intent } from './state.ts';
 
 export type CurtainText = Readonly<{
   title: string;
   sub: string;
-  /** The last `move`/`noMove` log line, with the hit lines after it; '' at a game's start. */
+  /** The last `move`/`noMove` log line with its hits, or the opening roll before any turn. */
   last: string;
   button: string;
   /** The button rolls as well as reveals (portes `toRoll` without a double to consider). */
   rolls: boolean;
 }>;
 
-/** The log's last completed turn as one line: `Ari moved 8/5* 6/5 · Ari hit Jeff on the 5-point`. */
-export const lastTurnText = (v: View): string => {
-  const last = [...v.log].reverse().find((e) => e.kind === 'move' || e.kind === 'noMove');
-  if (last === undefined) return '';
+/**
+ * `#curtainLast` for the seat taking the phone: the turn just finished as one line, its hits in
+ * the incoming player's own numbering because the board beneath is drawn in it (`Ari moved 8/5*
+ * 6/5 · Ari hit you on the 20-point`; the notation stays the mover's, as notation does). A
+ * forfeited roll reads as logged; the incoming player's own hits (a double offered after their
+ * turn) keep the log's lines, already in their numbering. Before any turn, the opening roll
+ * (`Ari rolled 4, Jeff rolled 2 — Ari starts`, or `— Ari plays 4-2` in Western).
+ */
+export const lastTurnText = (v: View, incoming: Seat): string => {
+  const last = lastTurnEntry(v);
+  if (last === null) return [...v.log].reverse().find((e) => e.kind === 'opening')?.text ?? '';
+  const mover = last.seat;
+  if (mover === null) return last.text;
+  const against = hitsAgainst(v, incoming);
+  if (against.length > 0) {
+    const by = v.players[mover].name;
+    return [last.text, ...against.map((p) => `${by} hit you on the ${String(p)}-point`)].join(
+      ' · ',
+    );
+  }
   const at = v.log.lastIndexOf(last);
-  const hits = v.log.slice(at + 1).filter((e) => e.kind === 'hit' && e.seat === last.seat);
-  return [last, ...hits].map((e) => e.text).join(' · ');
+  const own = v.log.slice(at + 1).filter((e) => e.kind === 'hit' && e.seat === mover);
+  return [last, ...own].map((e) => e.text).join(' · ');
 };
 
 /** The button's copy by phase (design §2.1.8) and whether one tap also rolls. */
@@ -64,7 +81,12 @@ export const curtainText = (v: View, incoming: Seat): CurtainText => {
   const other = v.players[incoming === 0 ? 1 : 0].name;
   const sub =
     v.phase === 'cubeOffered' ? `${other} doubles to ${String(v.cube.value * 2)}` : 'Your turn.';
-  return { title: `Pass the phone to ${name}`, sub, last: lastTurnText(v), ...buttonFor(v, name) };
+  return {
+    title: `Pass the phone to ${name}`,
+    sub,
+    last: lastTurnText(v, incoming),
+    ...buttonFor(v, name),
+  };
 };
 
 /** `#curtainOverlay` and its texts from the App; hidden (texts untouched) when no seat is waiting. */

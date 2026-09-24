@@ -23,6 +23,7 @@ import {
   type Dice,
   type Die,
   type From,
+  type LogEntry,
   type Move,
   type PlayedMove,
   type PointIndex,
@@ -500,6 +501,25 @@ export const statusText = (v: View, opts: StatusOpts = PLAIN_STATUS): string => 
     case 'opening':
       return '';
   }
+};
+
+// ---- the turn just finished: the curtain's line and the hit toast -----------------------------------
+
+/** The turn just finished as the log names it (a `move` or `noMove` line), or null before the first. */
+export const lastTurnEntry = (v: View): LogEntry | null =>
+  [...v.log].reverse().find((e) => e.kind === 'move' || e.kind === 'noMove') ?? null;
+
+/**
+ * The points where `seat` was hit in the turn just finished, in `seat`'s own numbering. The log's
+ * hit lines are written in the mover's numbering (rules R28), so the points come from the moves
+ * instead: `lastPlay` is that turn's play whenever the last turn line is a `move` (a forfeited
+ * roll leaves `lastPlay` empty). Nothing when the last turn was `seat`'s own, or before any turn.
+ */
+export const hitsAgainst = (v: View, seat: Seat): ReadonlyArray<number> => {
+  const last = lastTurnEntry(v);
+  if (last?.kind !== 'move' || last.seat === seat) return [];
+  const rules = rulesOf(v.variant);
+  return v.lastPlay.flatMap((m) => (m.hit && m.to !== 'off' ? [rules.ownOf(seat, m.to)] : []));
 };
 
 // ---- the result sheet (design §2.4.11) -----------------------------------------------------------

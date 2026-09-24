@@ -922,11 +922,15 @@ describe('the table', () => {
     expect(g).toMatchObject({ turn: 1, phase: 'toRoll' });
     expect(chosen.app.table).toMatchObject({ pending: null, selected: null, curtain: 1 });
     expect(cues(chosen.effects)).toEqual(['yourTurn', 'place', 'place']);
-    // The hitting order toasts the hit player once the phone changes hands.
+    // The hitting order: the curtain rises for Bob with no toast yet (Ann still holds the phone);
+    // Bob's reveal toasts him the hit in his own numbering (Ann's 7 is his 18).
     const hit = run(opened.app, { type: 'chip/tap', index: 0 });
     expect(game(hit.app).lastPlay.map((m) => m.hit)).toEqual([true, false]);
-    expect(toasts(hit.effects)).toEqual([[hitMsg('Ann', 18), null]]);
+    expect(toasts(hit.effects)).toEqual([]);
     expect(cues(hit.effects)).toEqual(['yourTurn', 'hit', 'place']);
+    expect(toasts(run(hit.app, { type: 'curtain/reveal' }).effects)).toEqual([
+      [hitMsg('Ann', [18]), null],
+    ]);
     // Cancel, a board tap, and a missing chip.
     expect(run(opened.app, { type: 'chip/cancel' }).app.table.pending).toBeNull();
     expect(run(opened.app, { type: 'point/tap', point: 12 }).app.table.pending).toBeNull();
@@ -934,6 +938,58 @@ describe('the table', () => {
       app: opened.app,
       effects: [],
     });
+  });
+});
+
+describe('the hit toast in pass-and-play', () => {
+  /** A Dark blot on Light's 5-point (Dark's 20); Light rolls 3-1 and hits with the 3 from the 8. */
+  const BLOT_ON_5 = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:4 20:1 | bar 0/0 | off 0/0';
+  /** Light hits 8/5* with the 3, then covers 6/5 with the 1: the turn flips to Dark. */
+  const hitTurn = (start: App): Step => {
+    const first = run(start, { type: 'point/tap', point: 7 }, { type: 'point/tap', point: 4 });
+    expect(game(first.app).played).toEqual([{ from: 7, to: 4, die: 3, hit: true }]);
+    const second = run(first.app, { type: 'point/tap', point: 5 }, { type: 'point/tap', point: 4 });
+    expect(game(second.app)).toMatchObject({ turn: 1, phase: 'toRoll' });
+    return second;
+  };
+
+  test('a hit on the first of two taps: nothing at the flip, the toast on the reveal, once', () => {
+    const flipped = hitTurn(at(BLOT_ON_5, 0, [3, 1]));
+    expect(flipped.app.table.curtain).toBe(1);
+    expect(toasts(flipped.effects)).toEqual([]);
+    const lifted = run(flipped.app, { type: 'curtain/reveal' });
+    expect(toasts(lifted.effects)).toEqual([[hitMsg('Ann', [20]), null]]);
+    expect(lifted.app.table.curtain).toBeNull();
+    // Bob rolls and plays on: no second toast, and none for Ann when the phone comes back.
+    const rolled = run(lifted.app, { type: 'roll/click' });
+    expect(toasts(rolled.effects)).toEqual([]);
+    const back = playTurn(rolled);
+    expect(toasts(back.effects)).toEqual([]);
+    if (back.app.table.curtain !== null)
+      expect(toasts(run(back.app, { type: 'curtain/reveal' }).effects)).toEqual([]);
+  });
+
+  test('with the curtain off the toast comes at the flip; turning it off while it is up is a reveal', () => {
+    const off = run(at(BLOT_ON_5, 0, [3, 1]), { type: 'curtain/mode', mode: 'never' }).app;
+    const flipped = hitTurn(off);
+    expect(flipped.app.table.curtain).toBeNull();
+    expect(toasts(flipped.effects)).toEqual([[hitMsg('Ann', [20]), null]]);
+    const up = hitTurn(at(BLOT_ON_5, 0, [3, 1]));
+    const dropped = run(up.app, { type: 'curtain/mode', mode: 'never' });
+    expect(dropped.app.table.curtain).toBeNull();
+    expect(toasts(dropped.effects)).toEqual([[hitMsg('Ann', [20]), null]]);
+    // Turning it off with nothing behind it toasts nothing.
+    expect(
+      toasts(run(at(BLOT_ON_5, 0, [3, 1]), { type: 'curtain/mode', mode: 'never' }).effects),
+    ).toEqual([]);
+  });
+
+  test('hitMsg: one point, or several in one breath', () => {
+    expect(hitMsg('Ann', [20])).toBe('Kapará. Ann hit you on the 20-point.');
+    expect(hitMsg('Ann', [20, 5])).toBe('Kapará. Ann hit you on the 20-point and the 5-point.');
+    expect(hitMsg('Ann', [22, 20, 5])).toBe(
+      'Kapará. Ann hit you on the 22-point, the 20-point and the 5-point.',
+    );
   });
 });
 

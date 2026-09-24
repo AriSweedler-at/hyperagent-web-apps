@@ -31,6 +31,7 @@ import {
   checkerHtml,
   checkersHtml,
   chipLabel,
+  hitsAgainst,
   chipsFor,
   chipsHtml,
   chipsKey,
@@ -415,6 +416,28 @@ describe('statusText', () => {
     expect(statusText(viewFor(move(stateAt(T25, 0, [1, 4]), '1/off(4)'), 1))).toBe(
       'Ari wins 2 points · gammon',
     );
+  });
+});
+
+describe('hitsAgainst', () => {
+  test('the points a seat was hit on in the turn just finished, in their own numbering', () => {
+    // Ari's 8/5* 6/5 against the blot on his 5-point: Jeff's own 20.
+    const turn = move(move(stateAt(BLOT_ON_5, 0, [3, 1]), '8/5'), '6/5');
+    expect(turn).toMatchObject({ turn: 1, phase: 'toRoll' });
+    expect(hitsAgainst(viewFor(turn, 1), 1)).toEqual([20]);
+    // The hitter has nothing against him; nobody before a turn is played.
+    expect(hitsAgainst(viewFor(turn, 0), 0)).toEqual([]);
+    expect(hitsAgainst(viewAt(START, 0, null), 1)).toEqual([]);
+    // A forfeited roll after the hit: the last turn line is a noMove, so nothing is stale.
+    const forfeited: View = {
+      ...viewFor(turn, 0),
+      lastPlay: [],
+      log: [
+        ...turn.log,
+        { seat: 1, kind: 'noMove', text: 'Jeff rolled 6-6 and cannot move', at: NOW },
+      ],
+    };
+    expect(hitsAgainst(forfeited, 0)).toEqual([]);
   });
 });
 
