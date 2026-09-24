@@ -1,8 +1,8 @@
 // What the relay-forced specs share (e2e/shell-relay.spec.ts for gin and backgammon,
-// e2e/fidice-relay.spec.ts): the skip when no TURN relay is at hand, the toast a page writes once its channel runs through one
-// (PATH_RELAY_MSG in web/shared/edge/peer.ts, shared by gin and backgammon; fidice's describePath in
-// web/games/fidice/src/net/peerjs.ts), and the proof from the connection itself that the selected
-// candidate pair goes through the relay.
+// e2e/fidice-relay.spec.ts): the skip when no TURN relay is at hand, the toast a page writes once
+// its channel runs through one (PATH_RELAY_MSG in web/shared/edge/peer.ts, shared by gin and
+// backgammon; fidice's describePath in web/games/fidice/src/net/peerjs.ts), and the proof from the
+// connection itself that the selected candidate pair goes through the relay.
 import { expect, type Page } from '@playwright/test';
 
 import { selectedPairs } from './peer-connections.ts';

@@ -30,8 +30,9 @@ a fourth game learns it must register.
 | `harness` | `test/tools/{serve-dist,proxy-dev,computed-styles}.test.ts`, `test/fixtures/legacy/{frozen,manifest}.test.ts`, `tools/**/*.test.ts` | | | |
 
 Counts on this branch: 30 + 1 + 44 + 17 + 21 + 8 + 9 = 130 test files (the harness row holds the
-three new `tools/ci` tests, shared the new `dom.fake.test.ts`); 210 Playwright tests in 28 files =
-gin 142/18 + fidice 4/2 + backgammon 46/6 + site 18/2.
+three new `tools/ci` tests, shared the new `dom.fake.test.ts`); 245 Playwright tests in 30 files =
+gin 161/22 + fidice 4/2 + backgammon 62/11 + site 18/2, the seven shell files counted in both
+game suites (`E2E_SUITE=<suite> playwright test --list` is the source).
 
 The shell specs (`e2e/shell-{home,local,online,relay,resume,handoff,liveness}.spec.ts`,
 `docs/design/shared-shell.md` D1) drive both shell games from one file each: a `SHELL_GAMES.forEach`
