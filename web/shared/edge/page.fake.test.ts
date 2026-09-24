@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vitest';
 
-import { fakeEl, fakePage, fakeTarget } from './page.fake.ts';
+import {
+  fakeEl,
+  fakePage,
+  fakeTarget,
+  modeButtons,
+  optionsFromMarkup,
+  pageFromMarkup,
+} from './page.fake.ts';
 
 describe('page.fake', () => {
   test('an element records classes, attributes, content, value and styles', () => {
@@ -140,5 +147,86 @@ describe('page.fake, the members the painters and the drag helpers reach', () =>
     expect(target.value).toBe('');
     const empty = fakeTarget({}) as Readonly<{ closest: (selector: string) => unknown }>;
     expect(empty.closest('.row')).toBeNull();
+  });
+});
+
+describe('pageFromMarkup', () => {
+  const MARKUP = `
+<div id="app" class="app fixed">
+  <button id="undoBtn" class="btn" disabled title="Undo">Undo</button>
+  <input id="menuCurtainToggle" type="checkbox" checked data-next="never">
+  <div id="point-8" class="point pt-near" data-abs="8" data-own="8"></div>
+  <input id="nameInput" value="Ari">
+  <div id="playModeSwitch"></div>
+  <div id="toast"></div>
+</div>`;
+
+  test('optionsFromMarkup reads classes, value, title, data attributes and the boolean flags as written', () => {
+    const options = optionsFromMarkup(MARKUP);
+    expect([...options.keys()]).toEqual([
+      'app',
+      'undoBtn',
+      'menuCurtainToggle',
+      'point-8',
+      'nameInput',
+      'playModeSwitch',
+      'toast',
+    ]);
+    expect(options.get('app')).toEqual({ classes: ['app', 'fixed'], attrs: {} });
+    expect(options.get('undoBtn')).toEqual({
+      classes: ['btn'],
+      attrs: { disabled: '', title: 'Undo' },
+    });
+    expect(options.get('menuCurtainToggle')).toEqual({
+      classes: [],
+      attrs: { checked: '', 'data-next': 'never' },
+    });
+    expect(options.get('point-8')).toEqual({
+      classes: ['point', 'pt-near'],
+      attrs: { 'data-abs': '8', 'data-own': '8' },
+    });
+    expect(options.get('nameInput')).toEqual({ classes: [], value: 'Ari', attrs: {} });
+  });
+
+  test('modeButtons: one fake per mode, named by prefix, wearing data-mode and the classes given', () => {
+    const plain = modeButtons('submenu', ['online', 'local']);
+    expect(plain.map((b) => b.id)).toEqual(['submenu-online', 'submenu-local']);
+    expect(plain.map((b) => b.classes())).toEqual([[], []]);
+    expect(plain.map((b) => b.attr('data-mode'))).toEqual(['online', 'local']);
+    const switchButtons = modeButtons('modeSwitch', ['online', 'local', 'sandbox'], (mode) => [
+      'mode-btn',
+      ...(mode === 'sandbox' ? ['hidden'] : []),
+    ]);
+    expect(switchButtons.map((b) => b.classes())).toEqual([
+      ['mode-btn'],
+      ['mode-btn'],
+      ['mode-btn', 'hidden'],
+    ]);
+    expect(switchButtons[2]?.hidden()).toBe(true);
+  });
+
+  test('every id of the markup becomes an element; declared and extra add queries to an id, more adds the rest', () => {
+    const buttons = modeButtons('modeSwitch', ['online', 'local']);
+    const child = fakeEl('child');
+    const page = pageFromMarkup(
+      MARKUP,
+      { playModeSwitch: { queries: { '.mode-btn': buttons } } },
+      { toast: { children: [child] } },
+      [...buttons, child],
+    );
+    expect(page.get('undoBtn').disabled()).toBe(true);
+    expect(page.get('undoBtn').attr('title')).toBe('Undo');
+    expect(page.get('nameInput').value()).toBe('Ari');
+    expect(page.get('point-8').attr('data-abs')).toBe('8');
+    // Declared queries and the markup's classes both hold on the composed element.
+    expect(page.get('app').hasClass('fixed')).toBe(true);
+    expect(page.get('playModeSwitch').el.querySelectorAll('.mode-btn')).toHaveLength(2);
+    expect(page.get('toast').el.contains(child.el)).toBe(true);
+    expect(page.get('modeSwitch-local').attr('data-mode')).toBe('local');
+    expect(() => page.get('nope')).toThrow('fake page has no #nope');
+    // Defaults: no extra, no more.
+    const bare = pageFromMarkup(MARKUP, {});
+    expect(bare.get('toast').el.contains(child.el)).toBe(false);
+    expect(() => bare.get('modeSwitch-local')).toThrow();
   });
 });

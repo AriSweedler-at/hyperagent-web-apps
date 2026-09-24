@@ -78,9 +78,14 @@
   // and stay out with their tests, as do gin's scorer/main.ts, the hand's flip, the board's flight
   // and the stories page (stories/boot.ts paints; its catalogue is DOM-free and stays in,
   // e2e/gin-stories.spec.ts imports it). One glob per module name the games share: fidice has no
-  // src/ui, so the globs reach only the two.
+  // src/ui, so the globs reach only the two. The shared shell's painters and binders
+  // (web/shared/ui/{shellPaint,curtain,toast}.ts, docs/design/shared-shell.md §4.4) are DOM
+  // modules too and stay out with their tests; ids.ts (a list) stays in for test/dist/shell-ids.test.ts.
   "exclude": [
     "test/fixtures/legacy/*.cjs",
+    "web/shared/ui/shellPaint*.ts",
+    "web/shared/ui/curtain*.ts",
+    "web/shared/ui/toast*.ts",
     "web/games/*/src/ui/render*.ts",
     "web/games/*/src/ui/home*.ts",
     "web/games/*/src/ui/local*.ts",

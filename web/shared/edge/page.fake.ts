@@ -274,3 +274,88 @@ export const fakePage = (elements: ReadonlyArray<FakeEl>): FakePage => {
     },
   };
 };
+
+// ---- a page from its markup -----------------------------------------------------------------------
+// The two shell pages' fixtures (web/games/<g>/src/ui/page.fake.ts) built the same page from the
+// same regular expressions (docs/design/shared-shell.md §5 B1): one fake element per `id="…"` in
+// the page's markup, with the classes, attributes and the input value as the markup has them, so a
+// fixture cannot drift from its page. This is backgammon's richer version (data attributes and the
+// boolean `disabled`/`checked` the controls ship with); each game's fixture now declares only the
+// children the paint reaches through queries and the mode buttons its switch carries.
+
+const TAG = /<(\w+)([^>]*?)\bid="([^"]+)"([^>]*)>/g;
+
+const attrOf = (attrs: string, name: string): string | undefined =>
+  new RegExp(`\\b${name}="([^"]*)"`).exec(attrs)?.[1];
+
+/**
+ * The `data-*` attributes of a tag, as written (`data-abs`, `data-own`, `data-seat`, `data-owner`),
+ * and the boolean `disabled`/`checked` the controls ship with (`#undoBtn`, `#menuCurtainToggle`).
+ */
+const markupAttrsOf = (attrs: string): Readonly<Record<string, string>> => ({
+  ...Object.fromEntries(
+    [...attrs.matchAll(/\b(data-[\w-]+)="([^"]*)"/g)].map((m: Readonly<RegExpExecArray>) => [
+      m[1] ?? '',
+      m[2] ?? '',
+    ]),
+  ),
+  ...(/\bdisabled\b/.test(attrs) ? { disabled: '' } : {}),
+  ...(/\bchecked\b/.test(attrs) ? { checked: '' } : {}),
+});
+
+/** `id -> options` from the markup: classes, value, title and data attributes as written. */
+export const optionsFromMarkup = (markup: string): ReadonlyMap<string, FakeElOptions> =>
+  new Map(
+    [...markup.matchAll(TAG)].map((m: Readonly<RegExpExecArray>) => {
+      const attrs = `${m[2] ?? ''} ${m[4] ?? ''}`;
+      const classes = attrOf(attrs, 'class');
+      const value = attrOf(attrs, 'value');
+      const title = attrOf(attrs, 'title');
+      return [
+        m[3] ?? '',
+        {
+          classes: classes === undefined ? [] : classes.split(/\s+/).filter((c) => c !== ''),
+          ...(value === undefined ? {} : { value }),
+          attrs: { ...markupAttrsOf(attrs), ...(title === undefined ? {} : { title }) },
+        },
+      ];
+    }),
+  );
+
+/**
+ * The mode buttons the home paint reaches through `#playModeSwitch .mode-btn` and
+ * `#playSubmenu button[data-mode]`, which carry no ids in either page: one fake per mode named
+ * `<prefix>-<mode>` with `data-mode`, wearing the classes `classesFor` gives it (gin hides its
+ * `sandbox` mode; backgammon's switch ships `online` as `active`).
+ */
+export const modeButtons = (
+  prefix: string,
+  modes: ReadonlyArray<string>,
+  classesFor: (mode: string) => ReadonlyArray<string> = () => [],
+): ReadonlyArray<FakeEl> =>
+  modes.map((mode) =>
+    fakeEl(`${prefix}-${mode}`, { classes: [...classesFor(mode)], attrs: { 'data-mode': mode } }),
+  );
+
+/**
+ * Every element of a page, from its markup: `declared` adds queries or children to an id the
+ * fixture always needs (its classes and value still come from the markup), `extra` the same for one
+ * test, and `more` adds elements the markup has no id for (the mode buttons, a strip found by class).
+ */
+export const pageFromMarkup = (
+  markup: string,
+  declared: Readonly<Record<string, FakeElOptions>>,
+  extra: Readonly<Record<string, FakeElOptions>> = {},
+  more: ReadonlyArray<FakeEl> = [],
+): FakePage => {
+  const fromMarkup = optionsFromMarkup(markup);
+  // Elements other ids declare as children are created first so the parents can reference them.
+  const plain = [...fromMarkup.keys()].filter((id) => !(id in declared) && !(id in extra));
+  const plainEls = new Map(plain.map((id) => [id, fakeEl(id, fromMarkup.get(id))]));
+  const withChildren = (id: string, options: FakeElOptions): FakeEl =>
+    fakeEl(id, { ...fromMarkup.get(id), ...options });
+  const composed = [...fromMarkup.keys()]
+    .filter((id) => id in declared || id in extra)
+    .map((id) => withChildren(id, { ...declared[id], ...extra[id] }));
+  return fakePage([...plainEls.values(), ...composed, ...more]);
+};
