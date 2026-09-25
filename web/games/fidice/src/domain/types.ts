@@ -1,8 +1,9 @@
 // Shapes the fidice domain shares (docs/MIGRATION.md step 8), recovered from how the de-bundled
 // modules and the protocol decoders use them. The values live in the modules that build them
 // (hands.ts owns the ladder tables, game.ts the reducers); this file holds the types, plus the two
-// counts the index types are derived from, so a later phase can type bots, net and view against
-// the same names.
+// counts the index types are derived from and the name rule the forms, the seats and the wire
+// share, so a later phase can type bots, net and view against the same names.
+import type { NameRule } from '../../../../shared/lib/name.ts';
 
 /** The integers 0 .. N-1 as a union of literals: `Below<3>` is `0 | 1 | 2`. */
 type Below<N extends number, Acc extends ReadonlyArray<number> = []> = Acc['length'] extends N
@@ -13,6 +14,11 @@ type Below<N extends number, Acc extends ReadonlyArray<number> = []> = Acc['leng
 export const HAND_COUNT = 252;
 /** Chairs at the table (game.ts, lobby.ts). */
 export const MAX_SEATS = 6;
+/**
+ * A player's name: at most 16 characters, 'Player' when nothing is typed (the legacy literals the
+ * name form, lobby.ts's seats and the hello frame's cut all spelled; docs/design/dry-round-2.md H4).
+ */
+export const NAME_RULE: NameRule = { max: 16, fallback: 'Player' };
 
 /** A row of the ladder, 0 (weakest) .. 251 (strongest); `isRank`/`asRank` in hands.ts check one. */
 export type Rank = Below<typeof HAND_COUNT>;

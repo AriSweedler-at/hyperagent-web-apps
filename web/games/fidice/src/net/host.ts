@@ -32,7 +32,14 @@ import {
 } from '../domain/lobby.ts';
 import { redactFor } from '../domain/publicState.ts';
 import { expect } from '../domain/result.ts';
-import type { Action, Actor, Seat, State, Viewer } from '../domain/types.ts';
+import {
+  NAME_RULE,
+  type Action,
+  type Actor,
+  type Seat,
+  type State,
+  type Viewer,
+} from '../domain/types.ts';
 import { decodeClientMessage, type Role, type ServerMessage } from './protocol.ts';
 import type { Connection, HostEvents, HostTransport, Me } from './session.ts';
 
@@ -289,7 +296,10 @@ export class HostSession {
     }
     if (role === 'player') {
       const id = this.newId();
-      const seated = seatPlayer(this.state, makeHuman(id, name ?? 'Player', this.state.lives));
+      const seated = seatPlayer(
+        this.state,
+        makeHuman(id, name ?? NAME_RULE.fallback, this.state.lives),
+      );
       if (seated.ok) {
         const fresh = this.newId();
         this.tokens.set(fresh, id);

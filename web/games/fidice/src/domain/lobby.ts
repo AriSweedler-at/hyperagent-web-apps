@@ -2,9 +2,17 @@
 // section "// src/domain/lobby.ts"); behaviour and log lines are unchanged,
 // test/parity/fidice.legacy.test.ts is the oracle. Everything here is lobby-phase bookkeeping over
 // `State.players`; the helpers that cannot fail return the State unchanged when nothing applies.
+import { normaliseName } from '../../../../shared/lib/name.ts';
 import { MAX_SEATS, seat, withLog } from './game.ts';
 import { err, ok, type Result } from './result.ts';
-import type { BotProfile, Player, RuleError, Seat, State } from './types.ts';
+import {
+  NAME_RULE,
+  type BotProfile,
+  type Player,
+  type RuleError,
+  type Seat,
+  type State,
+} from './types.ts';
 
 const BOT_NAMES: ReadonlyArray<string> = [
   'Loon',
@@ -83,7 +91,9 @@ const makeBot = (s: State, id: string, profile: BotProfile): Player => ({
   bot: profile,
 });
 
-const cleanName = (name: string): string => name.trim().slice(0, 16);
+/** The name cut as every name is, without the fallback: the callers pick theirs (or filter). */
+const cleanName = (name: string): string =>
+  normaliseName(name, { max: NAME_RULE.max, fallback: '' });
 
 const renameBot = (s: State, id: string, name: string): State => {
   const at = seatOf(s, id);
@@ -110,7 +120,7 @@ const setBotProfile = (s: State, id: string, profile: BotProfile, label: string)
 
 const makeHuman = (id: string, name: string, lives: number): Player => ({
   id,
-  name: name.trim().slice(0, 16) || 'Player',
+  name: normaliseName(name, NAME_RULE),
   lives,
   losses: 0,
   connected: true,
