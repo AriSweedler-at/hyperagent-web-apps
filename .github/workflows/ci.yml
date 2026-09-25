@@ -1,16 +1,23 @@
 # Runs on every push to main, every pull request and by hand. The graph (docs/design/test-partition.md
 # §6; docs/ARCHITECTURE.md "GitHub Actions"): job "changes" diffs the PR against its base through
-# tools/ci/affected.ts and emits one boolean per job; on a push to main or a workflow_dispatch it
-# selects everything, since main must prove everything before it deploys. Job "check" (typecheck,
-# lint, the hook shims) always runs, beside "changes", so the diff's fifteen seconds hide behind it.
-# Every other job needs "changes" and carries `if: needs.changes.outputs.<job> == 'true'`: one job
-# per vitest suite of tools/ci/suites.ts, each run once and under v8 coverage against its own
-# threshold rows (`npm run test:<suite> -- --coverage`; "harness" has no rows, "shared-integration"
-# is the transport contract in Chromium), "site" building dist/ first and uploading it as the
-# artifact "deploy" publishes, and one Playwright job per suite with specs (`npm run
-# test:e2e:<suite>`: both emulated origins, the two-peer games through a local PeerServer, the
-# relay-forced games through the coturn .github/actions/coturn installs, the stories spec against
-# the committed linux baselines under e2e/__screenshots__ that stories-baselines.yml records). Which
+# tools/ci/affected.ts and emits one boolean per job plus the two JSON lists of game suites the
+# matrix jobs expand; on a push to main or a workflow_dispatch it selects everything, since main
+# must prove everything before it deploys. Job "check" (typecheck, lint, the hook shims) always
+# runs, beside "changes", so the diff's fifteen seconds hide behind it. Every other job needs
+# "changes" and is gated on its output: one job per shared, site and harness vitest suite of
+# tools/ci/suites.ts (`if: needs.changes.outputs.<job> == 'true'`), and the game suites as ONE
+# matrix job "game" over `fromJSON(needs.changes.outputs.games)` (a fourth game edits this file
+# nowhere: dry-round-2.md I1), each run once and under v8 coverage against its own threshold rows
+# (`npm run test:<suite> -- --coverage`; "harness" has no rows, "shared-integration" is the
+# transport contract in Chromium), "site" building dist/ first and uploading it as the artifact
+# "deploy" publishes, and the Playwright runs: the matrix job "e2e-game" over `e2e-games` plus
+# "e2e-site" (`npm run test:e2e:<suite>`: both emulated origins, the two-peer games through a
+# local PeerServer, the relay-forced games through the coturn .github/actions/coturn installs, the
+# stories spec against the committed linux baselines under e2e/__screenshots__ that
+# stories-baselines.yml records). A matrix job is skipped whole when its list is `[]` (GitHub
+# refuses an empty matrix), and `fail-fast: false` keeps one game's failure from cancelling the
+# others, as separate jobs never did. The checks read "game (gin)" and "e2e-game (gin)": no `name:`
+# override, since a job skipped before its matrix expands would show the raw expression. Which
 # change runs what is the table in tools/ci/suites.ts: a game's folder runs that game, the site and
 # the harness; web/shared/** and anything that configures, builds or drives the tests runs
 # everything; docs run only "check". Job "broker" repeats the online specs through the real
@@ -45,15 +52,12 @@ jobs:
     outputs:
       shared: ${{ steps.affected.outputs.shared }}
       shared-integration: ${{ steps.affected.outputs.shared-integration }}
-      gin: ${{ steps.affected.outputs.gin }}
-      fidice: ${{ steps.affected.outputs.fidice }}
-      backgammon: ${{ steps.affected.outputs.backgammon }}
       site: ${{ steps.affected.outputs.site }}
       harness: ${{ steps.affected.outputs.harness }}
-      e2e-gin: ${{ steps.affected.outputs.e2e-gin }}
-      e2e-fidice: ${{ steps.affected.outputs.e2e-fidice }}
-      e2e-backgammon: ${{ steps.affected.outputs.e2e-backgammon }}
       e2e-site: ${{ steps.affected.outputs.e2e-site }}
+      # The game suites selected, unit side and e2e side, as JSON lists for the two matrix jobs.
+      games: ${{ steps.affected.outputs.games }}
+      e2e-games: ${{ steps.affected.outputs.e2e-games }}
       everything: ${{ steps.affected.outputs.everything }}
     steps:
       - uses: actions/checkout@v4
@@ -132,9 +136,15 @@ jobs:
       - name: Transport integration (real PeerJS through a local PeerServer)
         run: npm run test:shared-integration
 
-  gin:
+  # The game suites (tools/ci/suites.ts GAME_SUITES), one matrix entry each: its unit tests,
+  # parity oracles, fixture pins and seeded replays, with coverage.
+  game:
     needs: changes
-    if: needs.changes.outputs.gin == 'true'
+    if: needs.changes.outputs.games != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.changes.outputs.games) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -145,40 +155,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         uses: ./.github/actions/npm-ci
-      - name: Gin unit tests, parity oracles and fixture pins, with coverage
-        run: npm run test:gin -- --coverage
-
-  fidice:
-    needs: changes
-    if: needs.changes.outputs.fidice == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
-      - name: Fidice unit tests, parity oracles and the debundle pin, with coverage
-        run: npm run test:fidice -- --coverage
-
-  backgammon:
-    needs: changes
-    if: needs.changes.outputs.backgammon == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
-      - name: Backgammon unit tests and the seeded replay, with coverage
-        run: npm run test:backgammon -- --coverage
+      - name: Unit tests, parity oracles and fixture pins of the suite, with coverage
+        run: npm run test:${{ matrix.suite }} -- --coverage
 
   # Builds dist/, then the guards over it (relative asset URLs, paths on both origins, module
   # pages, the landing page's parity with web/, the class contract), the token and ratchet pins and
@@ -224,15 +202,19 @@ jobs:
       - name: The harness testing itself (the two origins, the legacy pins, the registry, the suite table)
         run: npm run test:harness
 
-  # ---- one Playwright job per suite with specs ---------------------------------------------------
+  # ---- the Playwright runs: one matrix job over the game suites, one job for the site ------------
   # `npm run test:e2e:<suite>` builds dist/ first (deterministic, under a second), then plays that
-  # suite's specs on both emulated origins with four workers. The @relay specs (gin, fidice,
-  # backgammon) play through a TURN relay of the harness's own: playwright.config.ts starts
+  # suite's specs on both emulated origins with four workers. The @relay specs (every game has
+  # one) play through a TURN relay of the harness's own: playwright.config.ts starts
   # `turnserver` on :3478 once the coturn action has stopped the system one. The site suite has no
   # relay spec, so it runs with E2E_TURN=off and installs no coturn.
-  e2e-gin:
+  e2e-game:
     needs: changes
-    if: needs.changes.outputs.e2e-gin == 'true'
+    if: needs.changes.outputs.e2e-games != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.changes.outputs.e2e-games) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -247,67 +229,13 @@ jobs:
         uses: ./.github/actions/playwright-chromium
       - name: Install coturn for the relay-forced games
         uses: ./.github/actions/coturn
-      - name: Gin specs and its describes of the shell specs on both origins against dist (local PeerServer and TURN; the stories baselines)
-        run: npm run test:e2e:gin
+      - name: The suite's specs and its describes of the shell specs on both origins against dist (local PeerServer and TURN; gin's stories baselines)
+        run: npm run test:e2e:${{ matrix.suite }}
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-gin
-          path: playwright-report
-          retention-days: 7
-
-  e2e-fidice:
-    needs: changes
-    if: needs.changes.outputs.e2e-fidice == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
-      - name: Install Chromium
-        uses: ./.github/actions/playwright-chromium
-      - name: Install coturn for the relay-forced games
-        uses: ./.github/actions/coturn
-      - name: Fidice specs on both origins against dist (local PeerServer and TURN)
-        run: npm run test:e2e:fidice
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-fidice
-          path: playwright-report
-          retention-days: 7
-
-  e2e-backgammon:
-    needs: changes
-    if: needs.changes.outputs.e2e-backgammon == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
-      - name: Install Chromium
-        uses: ./.github/actions/playwright-chromium
-      - name: Install coturn for the relay-forced games
-        uses: ./.github/actions/coturn
-      - name: Backgammon specs and its describes of the shell specs on both origins against dist (local PeerServer and TURN)
-        run: npm run test:e2e:backgammon
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-backgammon
+          name: playwright-report-${{ matrix.suite }}
           path: playwright-report
           retention-days: 7
 
@@ -343,7 +271,7 @@ jobs:
   # third party blocking a merge. Not in ci-ok's list.
   broker:
     needs: changes
-    if: needs.changes.outputs.e2e-gin == 'true' || needs.changes.outputs.e2e-fidice == 'true' || needs.changes.outputs.e2e-backgammon == 'true'
+    if: needs.changes.outputs.e2e-games != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: true
@@ -374,21 +302,19 @@ jobs:
   # The one gate: "changes" ran and every needed job succeeded or was skipped by it. A failure or a
   # cancellation anywhere turns it red; always() is what lets it run beside skipped jobs. "changes"
   # is in the list on purpose: without it a crash in the selector skips every gated job, and
-  # skipped is green here, so a PR that broke tools/ci/suites.ts would pass with no suite run.
+  # skipped is green here, so a PR that broke tools/ci/suites.ts would pass with no suite run. A
+  # matrix job reports one result for all its entries (skipped when its list was `[]`, failure or
+  # cancelled when any entry was), so "game" and "e2e-game" stand for the six jobs they replaced.
   ci-ok:
     needs:
       - changes
       - check
       - shared
       - shared-integration
-      - gin
-      - fidice
-      - backgammon
+      - game
       - site
       - harness
-      - e2e-gin
-      - e2e-fidice
-      - e2e-backgammon
+      - e2e-game
       - e2e-site
     if: always()
     runs-on: ubuntu-latest

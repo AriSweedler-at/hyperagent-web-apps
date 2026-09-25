@@ -460,14 +460,28 @@ export type Selection = ReadonlyArray<Job> | 'everything' | 'nothing';
 
 export type Rule = Readonly<{ globs: ReadonlyArray<string>; runs: Selection; why: string }>;
 
-const GAME_FOLDERS: Readonly<Record<'gin' | 'fidice' | 'backgammon', string>> = {
+/**
+ * A game suite: the suites whose CI jobs share one shape, so ci.yml runs them as two matrix jobs
+ * (`game`: `npm run test:<suite> -- --coverage`; `e2e-game`: `npm run test:e2e:<suite>` under
+ * Chromium and coturn) over the lists the `changes` job emits (dry-round-2.md I1). A fourth game
+ * joins GAME_FOLDERS and its SUITES row; ci.yml is not edited.
+ */
+export type GameSuite = 'gin' | 'fidice' | 'backgammon';
+
+const GAME_FOLDERS: Readonly<Record<GameSuite, string>> = {
   gin: 'gin-rummy',
   fidice: 'fidice',
   backgammon: 'backgammon',
 };
 
+export const isGameSuite = (suite: Suite): suite is GameSuite =>
+  (Object.keys(GAME_FOLDERS) as ReadonlyArray<string>).includes(suite);
+
+/** The game suites in job order: the values of the two matrix jobs' `strategy.matrix.suite`. */
+export const GAME_SUITES: ReadonlyArray<GameSuite> = SUITE_NAMES.filter(isGameSuite);
+
 /** The rows every game gets: its folder, its parity oracles, its specs and its style goldens. */
-const gameRules = (game: 'gin' | 'fidice' | 'backgammon'): ReadonlyArray<Rule> => {
+const gameRules = (game: GameSuite): ReadonlyArray<Rule> => {
   const folder = GAME_FOLDERS[game];
   return [
     {
