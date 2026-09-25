@@ -487,7 +487,7 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       include: ['web/games/briscola/src/engine/**/*.ts'],
       // The engine (docs/design/briscola-rules.md §2): the 63 table positions, the view and decoder
       // suites and the seeded replay beside it. Measured at the PR (lines/functions/statements/
-      // branches) 100/100/100/96.4 over 124 tests; the row is measured minus 5/5/5/3, above gin's
+      // branches) 100/100/100/96.6 over 127 tests; the row is measured minus 5/5/5/3, above gin's
       // engine floor of 94/94/93/92 that the design set as the least it may be. The *.algorithms.ts
       // row is a forward row: no such file yet (every rule fits map/filter/reduce), it binds the
       // first one to 100% lines.

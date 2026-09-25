@@ -161,8 +161,8 @@ geometry/frames/pointers block of `dom.test.ts`, the page fake's remaining membe
 branches, and reads 99.6/97.0/99.3/99.7 there now. The forward rows are backgammon's and
 briscola's `engine/*.algorithms.ts` (no such file yet in either; each binds the first one to 100% and
 vitest passes it vacuously until then; `suites.test.ts` lists them as such). The `briscola` suite
-joined with its engine (`docs/design/briscola-rules.md` §5): 124 tests over six files, the engine
-row measured 100/100/100/96.4 and set at 95/95/95/93; the row `web/games/briscola/**` runs
+joined with its engine (`docs/design/briscola-rules.md` §5): 127 tests over six files, the engine
+row measured 100/100/100/96.6 and set at 95/95/95/93; the row `web/games/briscola/**` runs
 `briscola`, `site` (the ratchet over web/) and `harness` (the accounting) until the page earns
 `gameRules('briscola')`.
 

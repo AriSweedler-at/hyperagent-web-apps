@@ -131,7 +131,7 @@ E15/E16, `legal` for the actor alone, `others` in play order); log growth per ac
 accounting (E19); byte stability every 25th step; termination after `deckSize / n` tricks with
 `Σ totals === 120`, the match decided and `next` refused. Coverage asserted per suite: a draw, a
 win by each side, `trumpTaken` by each seat, an exchange chain, a 0-point trick, a trick won by an
-off-suit trump, partner-peek hands present. 124 tests, under a second.
+off-suit trump, partner-peek hands present. 127 tests, under a second.
 
 ## 6. Corrected at implementation
 
@@ -147,6 +147,13 @@ off-suit trump, partner-peek hands present. 124 tests, under a second.
   `Pair`, `SEATS`, `otherSeat` and `setAt` are not used: this engine's `Seat` is four wide and its
   seat arithmetic is `seats.ts`.
 
+- **The shared replay driver landed after this replay was written** (`test/shared/replay.ts`,
+  DRY round 2 F3, with the engine-test scaffolding of F4). Its `ReplayEngine` is a `Pick` of the
+  two-seat contract: `actorOf` returns the contract's `Seat | null` (0..1) and each `Step.actor` is
+  that `Seat`, so an engine whose actor may be seat 2 or 3 cannot pass as it is. `replay.test.ts`
+  keeps its own driver in backgammon's shape until the driver widens with the contract (the plan's
+  risk 4, PR-3), when it adopts `driveGame`, `replayScale`, `roundTrips` and the F4 helpers and
+  `test/shared/**` gains briscola in its change → jobs row.
 - **`seatCount` is not an input.** The design's `CreateGameOptions = Partial<GameOptions>` carried
   `seatCount` beside `players`; with `players.length === seatCount` required, one of the two is
   redundant, so `createGame` takes a `Players` tuple union (2, 3 or 4) and reads the seat count off

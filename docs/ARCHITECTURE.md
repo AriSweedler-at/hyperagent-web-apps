@@ -386,7 +386,7 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
 
 ## Testing pyramid
 
-Suites first (`docs/design/test-partition.md`). Every test belongs to exactly one of seven suites,
+Suites first (`docs/design/test-partition.md`). Every test belongs to exactly one of eight suites,
 decided by path alone in `tools/ci/suites.ts`: `shared` (`web/shared/**` unit tests, the two
 legacy oracles that read only shared code and the coin game under `web/shared/example/coin`, the
 `TwoSeatEngine` the shared replay driver is proved on), `shared-integration` (the transport
