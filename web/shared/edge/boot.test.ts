@@ -47,6 +47,8 @@ import { HostSession, WAITING_MSG, type HostCodec } from '../net/host.ts';
 import { CODE, cell, guestCtx, hostCtxFor, settle, world } from '../net/sessions.harness.ts';
 import { WATCHDOG_MS } from './peer.ts';
 import type { Ctx, Effect, GuestFrameOf, HomeSnapshot, HostFrameOf, Intent } from '../ui/shell.ts';
+import { SHELL_CUES } from '../lib/sound/cues.ts';
+import type { Phrase } from '../lib/sound/phrase.ts';
 import type { ShellEffectDeps } from '../ui/shellEffects.ts';
 import { TOAST_MS, createToaster, type Toast } from '../ui/toast.ts';
 
@@ -490,12 +492,13 @@ type Log = Readonly<{
   replaced: string[];
   copied: string[];
   buzzes: (number | ReadonlyArray<number>)[];
-  plays: (readonly [string, SoundFontName])[];
+  /** `play(event, font)` as `[event, font]`; `playPhrases(phrases, font)` as `[phrases, font]`. */
+  plays: (readonly [string | ReadonlyArray<Phrase>, SoundFontName])[];
   toggles: SoundFontName[];
   own: string[];
   hosts: FakeHost[];
   guests: FakeGuest[];
-  warms: { count: number };
+  warms: { count: number; fonts: (SoundFontName | undefined)[] };
 }>;
 
 /** One booted page: what the boot was given, and everything it touched, recorded. */
@@ -536,7 +539,7 @@ const bootPage = (options: Options = {}) => {
     own: [],
     hosts: [],
     guests: [],
-    warms: { count: 0 },
+    warms: { count: 0, fonts: [] },
   };
   const pending = { effects: [] as ReadonlyArray<FakeEffect> };
   const win: BootWindowLike & Record<string, unknown> = {
@@ -616,6 +619,7 @@ const bootPage = (options: Options = {}) => {
     else if (effect.type === 'toggleSound') deps.toggleSound();
     else if (effect.type === 'share') deps.share(effect.code);
     else if (effect.type === 'fx') deps.fx(effect.cue, app.shell.soundFont);
+    else if (effect.type === 'phrases') deps.fx(effect.phrases, app.shell.soundFont);
     else if (effect.type === 'wakeLock') deps.wakeLock(effect.hold);
     else if (effect.type === 'startHost')
       deps.net.startHost(effect.code, effect.attempt, effect.resume);
@@ -636,14 +640,18 @@ const bootPage = (options: Options = {}) => {
       play: (event, font) => {
         log.plays.push([event, font]);
       },
+      playPhrases: (phrases, font) => {
+        log.plays.push([phrases, font]);
+      },
       toggle: (font) => {
         on.value = !on.value;
         log.toggles.push(font);
         deps.onToggle(on.value);
       },
       enabled: () => on.value,
-      warm: () => {
+      warm: (font) => {
         log.warms.count += 1;
+        log.warms.fonts.push(font);
       },
     };
   };
@@ -949,6 +957,12 @@ describe('bootShell', () => {
     (b.hook()['soundFont'] as (n: string) => void)('felt');
     b.run([{ type: 'fx', cue: 'ding' }, { type: 'toggleSound' }]);
     expect(b.log.plays).toEqual([['ding', 'felt']]);
+    // The one `fx` dep routes a cue to `play` and chosen phrases to `playPhrases`, both in the App's font.
+    b.run([{ type: 'phrases', phrases: [SHELL_CUES.win, SHELL_CUES.lose] }]);
+    expect(b.log.plays).toEqual([
+      ['ding', 'felt'],
+      [[SHELL_CUES.win, SHELL_CUES.lose], 'felt'],
+    ]);
     expect(b.log.toggles).toEqual(['default', 'felt']);
     b.fxDeps.value?.vibrate([10, 20]);
     expect(b.log.buzzes).toEqual([[10, 20]]);
@@ -973,6 +987,8 @@ describe('bootShell', () => {
     b.p.fire('touchstart');
     b.p.fire('keydown');
     expect(b.log.warms.count).toBe(3);
+    // Each gesture warms in the App's font, so the table's samples are fetched with the context.
+    expect(b.log.warms.fonts).toEqual(['default', 'default', 'default']);
     b.fxDeps.value?.audio.warm();
     b.fxDeps.value?.audio.warm();
     expect(FakeAudioContext.made).toBe(1);

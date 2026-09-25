@@ -14,6 +14,7 @@ import { describe, expect, test } from 'vitest';
 import { boolean, literal, number, object, pair, string } from '../lib/json.ts';
 import { err, ok, type Result } from '../lib/result.ts';
 import { mulberry32 } from '../lib/rng.ts';
+import { SHELL_CUES } from '../lib/sound/cues.ts';
 import { SOUND_FONTS } from '../lib/sound/fonts.ts';
 import {
   CONNECTING_MSG,
@@ -382,14 +383,15 @@ describe('the initial shell and the partitions', () => {
     });
   });
 
-  test('the 44 shell intents and 27 shell effects are listed once; the guards partition a game`s unions', () => {
+  test('the 44 shell intents and 28 shell effects are listed once; the guards partition a game`s unions', () => {
     expect(SHELL_INTENT_TYPES).toHaveLength(44);
     expect(new Set(SHELL_INTENT_TYPES).size).toBe(44);
     expect(SHELL_INTENT_TYPES).toContain('curtain/reveal');
     expect(SHELL_INTENT_TYPES).toContain('position/load');
     expect(SHELL_INTENT_TYPES).toContain('persist');
-    expect(SHELL_EFFECT_TYPES).toHaveLength(27);
-    expect(new Set(SHELL_EFFECT_TYPES).size).toBe(27);
+    expect(SHELL_EFFECT_TYPES).toHaveLength(28);
+    expect(new Set(SHELL_EFFECT_TYPES).size).toBe(28);
+    expect(SHELL_EFFECT_TYPES).toContain('phrases');
     expect(isShellIntent<Fake>({ type: 'home/init', home })).toBe(true);
     expect(isShellIntent<Fake>({ type: 'own' })).toBe(false);
     expect(isShellEffect<Fake>({ type: 'persist' })).toBe(true);
@@ -1430,6 +1432,7 @@ describe('runShellEffect', () => {
       { type: 'toast', message: 'hi', ms: 4000 },
       { type: 'send', frame: { t: 'full' } },
       { type: 'fx', cue: 'ding' },
+      { type: 'phrases', phrases: [SHELL_CUES.win, { steps: [{ cue: 'good.trick' }], buzz: 9 }] },
       { type: 'wakeLock', hold: true },
       { type: 'startHost', code: 'ABCD', attempt: 2, resume: false },
       { type: 'startGuest', code: 'ABCD', attempt: 3 },
@@ -1455,6 +1458,7 @@ describe('runShellEffect', () => {
       ['toast', 'hi', 4000],
       ['send', { t: 'full' }],
       ['fx', 'ding', 'felt'],
+      ['fx', [SHELL_CUES.win, { steps: [{ cue: 'good.trick' }], buzz: 9 }], 'felt'],
       ['wakeLock', true],
       ['startHost', 'ABCD', 2, false],
       ['startGuest', 'ABCD', 3],

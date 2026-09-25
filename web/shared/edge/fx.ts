@@ -102,8 +102,8 @@ export type AudioContextLike = Readonly<{
 export type AudioCues = Readonly<{
   /** Play one tone `start` seconds from now; silent when disabled or the context is not running. */
   tone: (freq: number, start: number, dur: number, type?: OscillatorType, gain?: number) => void;
-  /** Play notes back to back. */
-  seq: (notes: ReadonlyArray<Note>, type?: OscillatorType, gain?: number) => void;
+  /** Play notes back to back, the first `start` seconds from now (0: at once, as every table row plays). */
+  seq: (notes: ReadonlyArray<Note>, type?: OscillatorType, gain?: number, start?: number) => void;
   /** Create and resume the context without playing (the legacy `ensure()` on the first gesture). */
   warm: () => void;
   setEnabled: (enabled: boolean) => void;
@@ -161,11 +161,13 @@ export const createAudioCues = (options: AudioCueOptions): AudioCues => {
     }
   };
 
-  const seq: AudioCues['seq'] = (notes, type, gain) => {
+  // `start` lets a phrase (web/shared/edge/sound.ts `playSlot`) book a later step ahead of time:
+  // Web Audio schedules by absolute time, so the notes queue now and sound then.
+  const seq: AudioCues['seq'] = (notes, type, gain, start = 0) => {
     notes.reduce((t, note) => {
       tone(note.freq, t, note.dur, type, gain);
       return t + (note.gap ?? note.dur);
-    }, 0);
+    }, start);
   };
 
   return {

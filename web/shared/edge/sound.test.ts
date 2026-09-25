@@ -1,9 +1,23 @@
 // The sound player over fakes (docs/design/sound-fonts.md §10 "edge"): each kind of Sound, a
 // failing fetch and a failing decode both silent, and the sample cache fetching once per URL.
+// Since the phrases (§2.2): a slot books its sound `atMs` ahead on the context's clock, a sample
+// whose slot passed while it decoded is skipped (never late), warming fetches without playing,
+// and a two-step phrase queues in one tick.
 import { describe, expect, test } from 'vitest';
 
+import type { SoundFont } from '../lib/sound/fonts.ts';
+import { note } from '../lib/sound/sound.ts';
 import type { AudioBufferLike, AudioContextLike, AudioCues, AudioNodeLike } from './fx.ts';
-import { createSampleCache, playSound, type SoundDeps } from './sound.ts';
+import {
+  SAMPLE_LATE_MS,
+  createSampleCache,
+  playPhrase,
+  playSlot,
+  playSlots,
+  playSound,
+  warmSamples,
+  type SoundDeps,
+} from './sound.ts';
 
 type Call = ReadonlyArray<unknown>;
 
@@ -14,6 +28,8 @@ type World = Readonly<{
   deps: SoundDeps;
   /** Settle every promise the player chained. */
   flush: () => Promise<void>;
+  /** Move the context's clock (seconds): what the audio thread does while a sample decodes. */
+  tick: (seconds: number) => void;
 }>;
 
 type Options = Readonly<{
@@ -30,9 +46,12 @@ const world = (options: Options = {}): World => {
   const calls: Call[] = [];
   const fetched: string[] = [];
   const destination: AudioNodeLike = { connect: (t) => t };
+  const clock = { now: 10 };
   const ctx: AudioContextLike = {
     state: options.state ?? 'running',
-    currentTime: 10,
+    get currentTime() {
+      return clock.now;
+    },
     destination,
     resume: () => Promise.resolve(),
     createOscillator: () => {
@@ -80,8 +99,8 @@ const world = (options: Options = {}): World => {
   };
   const audio: AudioCues = {
     tone: () => undefined,
-    seq: (notes, type, gain) => {
-      calls.push(['seq', notes, type, gain]);
+    seq: (notes, type, gain, start) => {
+      calls.push(['seq', notes, type, gain, start]);
     },
     warm: () => undefined,
     setEnabled: () => undefined,
@@ -103,7 +122,10 @@ const world = (options: Options = {}): World => {
     await Promise.resolve();
     await Promise.resolve();
   };
-  return { audio, calls, fetched, deps, flush };
+  const tick = (seconds: number): void => {
+    clock.now += seconds;
+  };
+  return { audio, calls, fetched, deps, flush, tick };
 };
 
 const SAMPLE = { kind: 'sample', url: '../../shared/sound/x/tap.mp3', gain: 0.2 } as const;
@@ -114,7 +136,7 @@ describe('playSound', () => {
     const notes = [{ freq: 660, dur: 0.05 }];
     playSound(w.audio, { kind: 'synth', notes, voice: 'triangle', gain: 0.08 }, w.deps);
     playSound(w.audio, { kind: 'silence' }, w.deps);
-    expect(w.calls).toEqual([['seq', notes, 'triangle', 0.08]]);
+    expect(w.calls).toEqual([['seq', notes, 'triangle', 0.08, 0]]);
     expect(w.fetched).toEqual([]);
   });
 
@@ -191,5 +213,92 @@ describe('playSound', () => {
     }).not.toThrow();
     await throwing.flush();
     expect(throwing.calls).toEqual([['decode', 8]]);
+  });
+});
+
+const STING = { kind: 'sample', url: '../../shared/sound/x/sting.mp3', gain: 0.2 } as const;
+const A = { kind: 'synth', notes: [note(880, 0.1)], voice: 'square', gain: 0.1 } as const;
+const FONT: SoundFont = {
+  name: 'arcade',
+  label: 'Test',
+  sounds: { 'good.trick': A, victory: STING },
+  durationsMs: { victory: 250 },
+};
+
+describe('slots and phrases', () => {
+  test('a slot books its sound atMs ahead: a synth through seq with a start, a sample at currentTime + atMs', async () => {
+    const w = world();
+    playSlot(w.audio, { sound: A, atMs: 400, ms: 100 }, w.deps);
+    playSlot(w.audio, { sound: STING, atMs: 250, ms: 250 }, w.deps);
+    await w.flush();
+    expect(w.calls).toEqual([
+      ['seq', A.notes, 'square', 0.1, 0.4],
+      ['decode', 8],
+      ['createBufferSource'],
+      ['createGain'],
+      ['gain.set', 0.2, 10.25],
+      ['source.connect', 'node'],
+      ['gain.connect', 'destination'],
+      ['source.start', 10.25],
+    ]);
+  });
+
+  test('a sample decoded after its slot is skipped, never late; one still within the grace starts', async () => {
+    const late = world();
+    playSlot(late.audio, { sound: STING, atMs: 100, ms: 250 }, late.deps);
+    late.tick(0.1 + SAMPLE_LATE_MS / 1000 + 0.001);
+    await late.flush();
+    expect(late.calls).toEqual([['decode', 8]]);
+
+    const grace = world();
+    playSlot(grace.audio, { sound: STING, atMs: 100, ms: 250 }, grace.deps);
+    grace.tick(0.1 + SAMPLE_LATE_MS / 1000 - 0.01);
+    await grace.flush();
+    expect(grace.calls.filter(([n]) => n === 'source.start')).toEqual([['source.start', 10.1]]);
+    expect(SAMPLE_LATE_MS).toBe(30);
+  });
+
+  test('warmSamples fetches and decodes every sample once, plays nothing, and needs a context but not a running one', async () => {
+    const w = world({ state: 'suspended' });
+    const slots = [
+      { sound: STING, atMs: 0, ms: 250 },
+      { sound: A, atMs: 250, ms: 100 },
+      { sound: STING, atMs: 350, ms: 250 },
+    ];
+    warmSamples(w.audio, slots, w.deps);
+    warmSamples(w.audio, slots, w.deps);
+    await w.flush();
+    expect(w.fetched).toEqual([STING.url]);
+    expect(w.calls).toEqual([['decode', 8]]);
+    expect(w.deps.cache.size()).toBe(1);
+
+    const off = world({ context: false });
+    warmSamples(off.audio, slots, off.deps);
+    await off.flush();
+    expect(off.fetched).toEqual([]);
+  });
+
+  test('a two-step phrase queues in one tick from the font`s declared lengths, samples warmed first', async () => {
+    const w = world();
+    playPhrase(
+      w.audio,
+      FONT,
+      { steps: [{ cue: 'good.trick.steal' }, { cue: 'victory', gapMs: 50 }], buzz: 12 },
+      w.deps,
+    );
+    // The sample's fetch is under way before any step is booked.
+    expect(w.fetched).toEqual([STING.url]);
+    expect(w.calls).toEqual([['seq', A.notes, 'square', 0.1, 0]]);
+    await w.flush();
+    expect(w.calls.filter(([n]) => n === 'source.start')).toEqual([['source.start', 10.15]]);
+    expect(w.calls.filter(([n]) => n === 'decode')).toHaveLength(1);
+  });
+
+  test('playSlots over an empty schedule touches nothing', async () => {
+    const w = world();
+    playSlots(w.audio, [], w.deps);
+    await w.flush();
+    expect(w.calls).toEqual([]);
+    expect(w.fetched).toEqual([]);
   });
 });

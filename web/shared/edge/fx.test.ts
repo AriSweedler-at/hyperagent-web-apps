@@ -303,6 +303,24 @@ describe('createAudioCues', () => {
     ]);
   });
 
+  test('seq with a start books the first note that many seconds ahead (a later step of a phrase)', () => {
+    const f = fakeContext();
+    const cues = createAudioCues({ makeContext: () => f.ctx });
+    cues.seq(
+      [
+        { freq: 523, dur: 0.12, gap: 0.13 },
+        { freq: 784, dur: 0.22 },
+      ],
+      'sine',
+      0.2,
+      0.4,
+    );
+    expect(f.calls.filter(([name]) => name === 'osc.start')).toEqual([
+      ['osc.start', 10.4],
+      ['osc.start', 10.53],
+    ]);
+  });
+
   test('a suspended context is resumed and nothing is queued until it runs', () => {
     const f = fakeContext('suspended');
     const cues = createAudioCues({ makeContext: () => f.ctx });

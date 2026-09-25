@@ -5,6 +5,9 @@
 // every game at once and a game never names a sound. Adding a cue is a shared change: the
 // `default` font must gain a sound for it (fonts.test.ts pins that it is total). Pure: a cue is a
 // name.
+import { string, type Decoder } from '../json.ts';
+import { err, ok } from '../result.ts';
+
 export const SOUND_CUES = [
   /** A touch acknowledged: a card or checker selected, a menu opened, a toggle flipped. */
   'tap',
@@ -49,8 +52,61 @@ export const SOUND_CUES = [
 ] as const;
 export type SoundCue = (typeof SOUND_CUES)[number];
 
-/** What one event plays: the cue the font voices, and a vibration pattern. */
-export type CueSpec = Readonly<{ cue: SoundCue; buzz: number | ReadonlyArray<number> }>;
+// ---- qualified cues (docs/design/sound-fonts.md §2.1; briscola-sound-history.md §3.1) ----------
+// A game may say more than the base: `good.trick.steal` is still a `good`, told apart from the
+// plain one by the segments after the dot, which are the GAME's words (briscola says `trick`,
+// `steal`; gin may say `knock`). Nothing shared interprets them: a font voices any prefix it likes
+// and `resolveSound` (fonts.ts) walks the `ladder` up to the base, so a font that voices only the
+// twenty base cues covers every qualified cue a game ever spells, and the vocabulary above never
+// grows a game noun. Voices (`voice.*`) are the announcer namespace over the same ladder; the
+// default font leaves it silent.
+
+/** A base cue, or one qualified by the game's own dotted words: `good`, `good.trick`, `good.trick.steal`. */
+export type CueId = SoundCue | `${SoundCue}.${string}`;
+/** An announcer line laid over a phrase's steps; a font voices any prefix of it or none. */
+export type VoiceId = 'voice' | `voice.${string}`;
+/** A vibration pattern: one duration, or the on/off alternation `navigator.vibrate` takes. */
+export type Buzz = number | ReadonlyArray<number>;
+
+/**
+ * What one event plays: the cue the font voices, and a vibration pattern. Since the phrases
+ * (phrase.ts) a row is also the one-step phrase `spec(cue, buzz)`, so a table of rows is a table of
+ * phrases with no edit; `cue` may be qualified.
+ */
+export type CueSpec = Readonly<{ cue: CueId; buzz: Buzz }>;
+
+/** The base cue a qualified id is a kind of: `good.trick.steal` is a `good`. */
+export const baseOf = (id: CueId): SoundCue =>
+  // The base is the text before the first dot; the type says it is one of the twenty, and
+  // `decodeCueId` is where an unknown string is refused before it becomes a `CueId`.
+  id.replace(/\..*$/, '') as SoundCue;
+
+/**
+ * Every prefix of an id, most specific first: `good.trick.steal` -> `good.trick.steal`,
+ * `good.trick`, `good`. A font is looked up along it; the last rung is the base.
+ */
+export const ladder = <Id extends string>(id: Id): ReadonlyArray<Id> => {
+  const parts = id.split('.');
+  // A prefix of a dotted `Id` is the same template type by construction; TS cannot see that
+  // through `join`, hence the assertion.
+  return parts.map((_, i) => parts.slice(0, parts.length - i).join('.') as Id);
+};
+
+export const isSoundCue = (value: string): value is SoundCue => SOUND_CUES.some((c) => c === value);
+
+/** `[a-z]+(\.[a-z0-9-]+)*`: the file-name-safe spelling the asset tool (§7) reads back as an id. */
+const CUE_ID_RE = /^[a-z]+(\.[a-z0-9-]+)*$/;
+const CUE_ID_EXPECTED = 'a cue id: a base cue, then dotted segments of [a-z0-9-]';
+
+export const isCueId = (value: string): value is CueId =>
+  CUE_ID_RE.test(value) && isSoundCue(value.replace(/\..*$/, ''));
+
+/** A stored or wire string as a cue id: refused unless it is well formed AND its base is a known cue. */
+export const decodeCueId: Decoder<CueId> = (input) => {
+  const text = string(input);
+  if (!text.ok) return text;
+  return isCueId(text.value) ? ok(text.value) : err({ path: [], expected: CUE_ID_EXPECTED });
+};
 
 // The four rows every game's table carries (docs/design/shared-shell.md §5 `cues`: the shell taps
 // on a touch, chimes the turn, plays the win and the loss), spelt once so a table spreads them
