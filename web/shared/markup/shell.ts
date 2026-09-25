@@ -96,22 +96,22 @@ export type ShellLook = Readonly<{
   pt10: string;
   /** Gin's ` style="margin:0;"` on the history sheet's title beside its close button. */
   m0: string;
-  /** Attribute list: an `empty-note` aligned left (`class="empty-note left"`; gin pads it inline too). */
+  /** Attribute list: an `empty-note` aligned left (backgammon's `left`; gin pads it inline too). */
   noteLeft: string;
-  /** Attribute list: a centred `card-box` (`class="card-box centered"`). */
+  /** Attribute list: a centred `card-box` (backgammon's `centered`). */
   centeredBox: string;
-  /** Attribute list: the waiting rooms' muted `pulse` status (`class="pulse muted"`). */
+  /** Attribute list: the waiting rooms' muted `pulse` status (backgammon's `muted`). */
   pulseMuted: string;
   /** `#joinBtn`: gin's ` style="min-width:96px;"`. */
   joinBtnWidth: string;
   /** `#curtainOverlay`: a class after `overlay` (` curtain`, the translucent wash) and a style after `hidden` (gin's felt). */
   curtainClass: string;
   curtainStyle: string;
-  /** Attribute list: the curtain's sheet (`class="sheet centered"`; gin centres it inline and colours its border). */
+  /** Attribute list: the curtain's `sheet` (backgammon's `centered`; gin centres it inline and colours its border). */
   curtainSheet: string;
-  /** Attribute list: the history sheet's title row (`class="row between"`). */
+  /** Attribute list: the history sheet's title `row` (backgammon's `between`). */
   betweenRow: string;
-  /** `#historyList`'s class attribute (` class="history"`), before its id. */
+  /** `#historyList`'s class attribute (backgammon's `history`), before its id. */
   historyClass: string;
   /** `#toast`'s attributes after its id (backgammon's ` role="status"`). */
   toastAttrs: string;

@@ -215,6 +215,25 @@ const zones = [
     ],
     message: 'web/shared/ui imports web/shared/lib, the DOM edge and the clock fake only.',
   },
+  {
+    // The shell markup renderer (dry-round-2.md G2): strings in, a Result out; it reads no file
+    // (tools/shell-markup.ts does) and no document.
+    target: './web/shared/markup',
+    from: [
+      './web/shared/edge/**',
+      './web/shared/net/**',
+      './web/shared/ui/**',
+      './web/shared/styles/**',
+    ],
+    message: 'web/shared/markup imports web/shared/lib only.',
+  },
+  {
+    // A shell game's page.ts is data for tools/shell-markup.ts: its slot values and the residue
+    // blocks of its index.html, typed by web/shared/markup/shell.ts and importing nothing else.
+    target: './web/games/*/page.ts',
+    from: ['./web/shared/edge/**', './web/shared/net/**', './web/shared/ui/**', `${GAME_SRC}/**`],
+    message: 'page.ts imports only the ShellPage types from web/shared/markup.',
+  },
   ...gamePairZones,
   {
     target: [`${GAME_SRC}/engine/**`, `${GAME_SRC}/domain/**`, `${GAME_SRC}/bots/**`],
