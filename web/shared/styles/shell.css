@@ -294,18 +294,18 @@ details.history-row[data-value='huge'] > summary {
 details.history-row[data-value='huge'] > summary {
   font-weight: 700;
 }
-.history-detail {
+details.history-row > .history-detail {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 4px 12px;
   margin: 0 0 10px 22px;
   font-size: 0.85rem;
 }
-.history-detail dt {
+details.history-row > .history-detail dt {
   color: var(--muted);
   font-weight: 700;
 }
-.history-detail dd {
+details.history-row > .history-detail dd {
   margin: 0;
 }
 /* The About tab's prose (each game's about.ts). */
