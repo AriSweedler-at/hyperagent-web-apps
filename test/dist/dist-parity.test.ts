@@ -56,7 +56,12 @@ describeDist('dist parity with legacy/ and web/', (root) => {
       expect(
         files.filter((file) => new RegExp(`^shared/assets/${game}-[\\w-]+\\.css$`).test(file)),
       ).toHaveLength(1);
-      expect(files.filter((file) => file.startsWith(`games/${game}/`))).toHaveLength(3);
+      // The page, its bundle and the map, and for a shell game the link-preview splash Vite copies
+      // from web/public/games/<g>/ (docs/design/link-previews.md §2); nothing else.
+      const splash = isShellGame(game) ? [`games/${game}/splash.png`] : [];
+      expect(files.filter((file) => file.startsWith(`games/${game}/`)).sort()).toEqual(
+        [`games/${game}/index.html`, bundles[0] ?? '', `${bundles[0] ?? ''}.map`, ...splash].sort(),
+      );
     });
 
     test(`the ${game} page is the built module page, not the legacy bundle`, () => {

@@ -12,6 +12,8 @@
 //   /hyperagent-web-apps/… passes through unchanged.
 // Only the slash-terminated prefixes are special: /games, /shared and /hyperagent-web-apps without
 // a trailing slash fall into the /XXX rule. worker.test.ts pins every row of this table.
+// A page fetched with `?join=CODE` (an invite link) has its Open Graph head rewritten to name the
+// code: "Link previews" below, docs/design/link-previews.md.
 // The upstream origin is env.UPSTREAM (default https://arisweedler-at.github.io) so the same
 // handler can front a local dist server in tests (tools/proxy-dev.ts).
 // Deploy with `npx wrangler deploy` from this directory (wrangler bundles TypeScript natively).
@@ -99,6 +101,74 @@ const rewriteLocation = (
   return headers;
 };
 
+// ---- Link previews (docs/design/link-previews.md §3) ----------------------------------------
+// An invite link (`/<game>/?join=CODE`) texted to a friend is unfurled by iMessage from the page's
+// Open Graph head. The Pages origin serves one static head per game; this origin can vary it by
+// query, so a GET for a page that carries a code gets its head rewritten: the title and the
+// descriptions say the code, og:url is the invite itself, the splash og:image stays the game's.
+// A string rewrite over the buffered page rather than HTMLRewriter: the handler also runs in node
+// (worker.test.ts, tools/proxy-dev.ts behind the Playwright `proxy` project), which has no
+// HTMLRewriter, and the pages are this repo's own composed markup (tools/shell-markup.ts), whose
+// meta tags spell `property`/`name` before `content` on one line each.
+
+/** The query parameter an invite link carries (web/shared/lib/invite.ts JOIN_PARAM; the test pins the two). */
+export const JOIN_PARAM = 'join';
+
+/**
+ * The shape of a room code (web/shared/lib/roomCode.ts ROOM_CODE: four letters for the shell games,
+ * five letters or digits for fidice; the test pins every game's alphabet and length inside it). Not
+ * imported from there: wrangler deploys this file alone. Anything else in `?join=` is not previewed.
+ */
+const JOIN_CODE = /^[A-Za-z0-9]{4,5}$/;
+
+/** The code the URL's `?join=` carries when it has a room code's shape, else undefined. */
+export const joinCode = (url: Readonly<URL>): string | undefined => {
+  const code = url.searchParams.get(JOIN_PARAM);
+  return code !== null && JOIN_CODE.test(code) ? code : undefined;
+};
+
+/** `<meta property="key" content="…">` or `<meta name="key" content="…">`: the opening, the content, the closing quote. */
+const metaTag = (key: string): RegExp =>
+  new RegExp(`(<meta\\s+(?:property|name)="${key}"\\s+content=")([^"]*)(")`);
+
+const escapeAttribute = (value: string): string =>
+  value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** The `content` of the page's first `<meta>` for `key` (an og: property or a twitter: name), if any. */
+export const metaContent = (html: string, key: string): string | undefined =>
+  metaTag(key).exec(html)?.[2];
+
+const setMeta = (html: string, key: string, value: string): string =>
+  html.replace(
+    metaTag(key),
+    (_tag: string, open: string, _old: string, close: string) =>
+      `${open}${escapeAttribute(value)}${close}`,
+  );
+
+/**
+ * The page with the invite's code in its preview: og:title and twitter:title name the game (read off
+ * the page's own og:title) and the code, both descriptions say the code again, og:url is the invite.
+ * A tag the page lacks is left out (nothing is inserted); a page without an og:title (a stub, an
+ * error page) comes back untouched. `<title>` is not touched: the tab's name is the page's.
+ */
+export const joinPreview = (html: string, code: string, inviteUrl: string): string => {
+  const game = metaContent(html, 'og:title');
+  if (game === undefined) return html;
+  const title = `Join ${game}: code ${code}`;
+  const description = `You're invited to ${game}. Open the link to sit down; the room code is ${code}.`;
+  const tags: ReadonlyArray<readonly [string, string]> = [
+    ['og:title', title],
+    ['twitter:title', title],
+    ['og:description', description],
+    ['twitter:description', description],
+    ['og:url', inviteUrl],
+  ];
+  return tags.reduce((page, [key, value]) => setMeta(page, key, value), html);
+};
+
+const isHtml = (headers: Headers): boolean =>
+  (headers.get('content-type') ?? '').startsWith('text/html');
+
 /** The module-Worker shape Cloudflare calls; tools/proxy-dev.ts calls the same `fetch`. */
 export type Handler = Readonly<{
   fetch: (request: Request, env?: Env) => Promise<Response>;
@@ -127,11 +197,27 @@ const handler: Handler = {
     });
 
     const response = await fetch(proxyReq);
+    const headers = rewriteLocation(response.headers, target, url.origin);
+
+    // A GET for a page under an invite code: the head is rewritten (link previews above). The body
+    // changes, so the upstream's length and encoding no longer describe it. HEAD has no body to
+    // rewrite and passes through as it is.
+    const code = request.method === 'GET' ? joinCode(url) : undefined;
+    if (code !== undefined && response.status === 200 && isHtml(response.headers)) {
+      headers.delete('content-length');
+      headers.delete('content-encoding');
+      const invite = `${url.origin}${url.pathname}?${JOIN_PARAM}=${code}`;
+      return new Response(joinPreview(await response.text(), code, invite), {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
 
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: rewriteLocation(response.headers, target, url.origin),
+      headers,
     });
   },
 };
