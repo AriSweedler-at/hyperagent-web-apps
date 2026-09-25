@@ -37,6 +37,7 @@ const DRIVERS: Readonly<Record<OnlineGame, Driver>> = {
   'gin-rummy': shellDriver('gin-rummy'),
   fidice: { hostRoom: fidiceHostLobby, readRoomCode: fidiceLobbyCode, joinByCode: fidiceJoin },
   backgammon: shellDriver('backgammon'),
+  briscola: shellDriver('briscola'),
 };
 
 type Fixtures = { project: Project; player: Player; players: Players };
