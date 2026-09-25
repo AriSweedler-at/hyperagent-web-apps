@@ -10,13 +10,14 @@
 // turning on, then tells the page to repaint `#soundBtn` (`onToggle`, a paint). A game's main.ts
 // constructs the real deps through its fx.ts; cuePlayer.test.ts records fakes over a table of its
 // own, and each game's fx.test.ts pins its table and the wiring.
-import type { SoundCue } from '../lib/sound/cues.ts';
+import type { CueSpec } from '../lib/sound/cues.ts';
 import { fontByName, resolveSound, type SoundFontName } from '../lib/sound/fonts.ts';
 import type { AudioCues } from './fx.ts';
 import { playSound, type SoundDeps } from './sound.ts';
 
-/** What one event plays: the cue the font voices, and a vibration pattern (a game's `CueSpec`). */
-export type CueSpec = Readonly<{ cue: SoundCue; buzz: number | ReadonlyArray<number> }>;
+// `CueSpec` (one row of a game's table) lives in web/shared/lib/sound/cues.ts since DRY round 2
+// (dry-round-2.md E9); re-exported so this module's import path holds.
+export type { CueSpec } from '../lib/sound/cues.ts';
 
 /** The sound preference as every game's storage.ts spells it (`SOUND_STATES`). */
 export type SoundState = 'on' | 'off';
