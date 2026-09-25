@@ -383,9 +383,11 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
 ## Testing pyramid
 
 Suites first (`docs/design/test-partition.md`). Every test belongs to exactly one of seven suites,
-decided by path alone in `tools/ci/suites.ts`: `shared` (`web/shared/**` unit tests and the two
-legacy oracles that read only shared code), `shared-integration` (the transport contract in
-Chromium; the fake two-seat game joins it with the shared shell), `gin`, `fidice`, `backgammon`
+decided by path alone in `tools/ci/suites.ts`: `shared` (`web/shared/**` unit tests, the two
+legacy oracles that read only shared code and the coin game under `web/shared/example/coin`, the
+two-seat engine the shared replay driver is proved on), `shared-integration` (the transport
+contract in Chromium; the coin game's integration tests through the shared shell join it), `gin`,
+`fidice`, `backgammon`
 (each game's colocated tests, its `test/parity/<g>.*` oracles and its fixture pins), `site` (the
 guards over the built site or over every page at once: `test/dist/**`, tokens, ratchet, the
 Worker) and `harness` (the harness testing itself: the two origins, the legacy pins, the registry,
@@ -918,7 +920,14 @@ Step 10 (gin engine): `web/games/gin-rummy/src/engine/**`:
   `melds.algorithms.ts` at 100%. The replay (400 games on every push, 1000 in the nightly) runs as four shards
   (`test/parity/gin.replay.{1..4}.test.ts`, one line each over `gin.replay.ts`) so vitest spreads
   it across workers: ~15 s wall on a 16-core laptop instead of ~55 s in one worker;
-  `GIN_REPLAY_GAMES=<n>` shortens a local run.
+  `GIN_REPLAY_GAMES=<n>` shortens a local run. Since the second DRY round (F3, F4) the seeded
+  driver every replay and codec trace spelled (dice from `mulberry32(seed)`, picks from
+  `mulberry32(seed * 7919)`, the policy once per step before `apply`, the shards, the env knob,
+  byte-stable round trips) is `test/shared/replay.ts`, and the scaffolding the engine tests
+  redeclared (`PLAYERS`, `now`, `viaJson`, `failureOf`, `must`, `countingRng`, `runIntents`) is
+  `test/shared/engine-helpers.ts`; backgammon's own (`scripted`, `pos`, `mv`, `START`) sits beside
+  its engine in `engine/test-helpers.ts`, a name eslint and the coverage exclude treat as test
+  code. `gin.replay.ts` keeps its two-leg compare, `replay.test.ts` its invariants.
 
 Step 11 (gin protocol, storage and pure UI/scorer helpers): `web/games/gin-rummy/src/`:
 

@@ -367,6 +367,7 @@ web/shared/lib/              shared pure TypeScript: result, rng, json decoders,
 web/shared/edge/             shared effects: ice, transport (the only importer of peerjs) + fake, clock, storage, dom, fx, share
 web/shared/styles/           tokens.css (the shared palette, :root only), base.css (shared primitives), CONTRACT.md
 web/shared/ui/               reserved for the roadmap's shared screen builders (README only)
+web/shared/example/coin/     the coin game: the two-seat engine the shared replay driver is proved on (100% row; the shell's future fake)
 web/games/gin-rummy/         index.html, theme.css, main.ts, src/{engine,protocol.ts,storage.ts,net,ui,scorer}
 web/games/fidice/            index.html, theme.css, main.ts, MANIFEST.json, src/{assets,domain,bots,net,view,app}
 web/games/backgammon/        index.html, theme.css, main.ts, src/{engine,protocol.ts,storage.ts,fx.ts,net,ui,ui/board}
@@ -374,6 +375,7 @@ legacy/                      the pre-migration pages and shared/ice.js, verbatim
 test/fixtures/legacy/        sha256-pinned cuts of the legacy cores, the gin wire frames and storage captures
 test/fixtures/styles/        computed-style goldens, <game>.<viewport>.json
 test/parity/                 describe.each([legacy, current]) suites and the seeded replays
+test/shared/                 replay.ts (the seeded driver: dice, picks, shards, the env knob, round trips) and engine-helpers.ts (PLAYERS, now, viaJson, must, countingRng, runIntents)
 test/dist/                   the dist guards and the class contract (the site suite: npm run test:site)
 test/integration/            the real transport through a local PeerServer in Chromium (npm run test:shared-integration)
 test/tools/                  tests of the tools below
