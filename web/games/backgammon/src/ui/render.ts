@@ -96,6 +96,9 @@ import { flyMoves } from './board/fly.ts';
 import {
   bindButtons,
   bindSheets as bindShellSheets,
+  connDotClass as shellConnDotClass,
+  connDotView,
+  paintConnDot,
   paintHandoff as paintShellHandoff,
   paintScreen as paintShellScreen,
   paintSheet,
@@ -212,9 +215,8 @@ export const paintSeat = (doc: DocumentLike, v: View): void => {
   });
 };
 
-/** `#oppDot`'s whole class attribute; pass-and-play hides it. */
-export const connDotClass = (app: App): string =>
-  `conn-dot ${app.shell.oppConnected ? 'on' : 'off'}${app.shell.role === 'local' ? ' hidden' : ''}`;
+/** `#oppDot`'s whole class attribute; pass-and-play hides it (the shell's, dry-round-2.md E6, over the App's shell slice). */
+export const connDotClass = (app: App): string => shellConnDotClass(connDotView(app.shell));
 
 /** `#gameBadge`: `Game 3 · 2–1 · to 5` (design §4.11), seats in order. */
 export const gameBadgeText = (v: View): string =>
@@ -222,9 +224,7 @@ export const gameBadgeText = (v: View): string =>
 
 const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
   setText(requireId(doc, 'oppName'), v.opp.name);
-  const dot = requireId(doc, 'oppDot');
-  setAttr(dot, 'class', connDotClass(app));
-  setAttr(dot, 'title', app.shell.oppConnected ? 'Connected' : 'Disconnected');
+  paintConnDot(doc, 'oppDot', connDotView(app.shell));
   setHtml(requireId(doc, 'pipsOpp'), trustedHtml(pipHtml(v.pips[v.opp.idx])));
   // The strip has no id of its own (design §2.1): the opponent's name pulses while they are to move.
   const strip = queryIn(requireId(doc, 'tableScreen'), '.opp-strip');

@@ -59,6 +59,9 @@ import {
   bindButtons,
   bindLongPress,
   bindSheets as bindShellSheets,
+  connDotClass as shellConnDotClass,
+  connDotView,
+  paintConnDot,
   paintHandoff as paintShellHandoff,
   paintScreen as paintShellScreen,
   paintSheet,
@@ -144,17 +147,14 @@ export const oppCardsHtml = (cardCount: number): string =>
   Array.from({ length: Math.min(cardCount, 11) }, () => backHtml('tiny')).join('') +
   `<span class="opp-count">${String(cardCount)}</span>`;
 
-/** `#connDot`'s whole class attribute; pass-and-play hides it. */
-export const connDotClass = (app: App): string =>
-  `conn-dot ${app.shell.oppConnected ? 'on' : 'off'}${app.shell.role === 'local' ? ' hidden' : ''}`;
+/** `#connDot`'s whole class attribute; pass-and-play hides it (the shell's, dry-round-2.md E6, over the App's shell slice). */
+export const connDotClass = (app: App): string => shellConnDotClass(connDotView(app.shell));
 
 const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
   setText(requireId(doc, 'oppName'), v.opp.name);
   setText(requireId(doc, 'oppScore'), `${String(v.opp.total)} pts`);
   setHtml(requireId(doc, 'oppCards'), trustedHtml(oppCardsHtml(v.opp.cardCount)));
-  const dot = requireId(doc, 'connDot');
-  setAttr(dot, 'class', connDotClass(app));
-  setAttr(dot, 'title', app.shell.oppConnected ? 'Connected' : 'Disconnected');
+  paintConnDot(doc, 'connDot', connDotView(app.shell));
   setText(requireId(doc, 'roundBadge'), `Hand ${String(v.handNumber)}`);
   setText(requireId(doc, 'targetBadge'), `to ${String(v.target)}`);
 };
