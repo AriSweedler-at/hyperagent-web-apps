@@ -155,6 +155,33 @@ describe('paintHistory', () => {
     paintHistory(p.doc, HISTORY_IDS.list, STREAM, COPY, CTX, 'match-2');
     expect(list.attr('data-key')).toBe('match-2:2');
     expect(rowsIn(list.text())).toHaveLength(3);
+    // A stream that no longer carries the id the key names (the ids ran on without it): rebuilt
+    // whole; so is a list painted empty (`-` is no id) once the stream has events.
+    const gap = fakePage([
+      fakeEl(HISTORY_IDS.list, {
+        queries: {
+          'details.history-row:last-of-type': [fakeEl('y', { attrs: { 'data-id': '2' } })],
+        },
+      }),
+    ]);
+    paintHistory(gap.doc, HISTORY_IDS.list, STREAM, COPY, CTX, 'g');
+    gap.get(HISTORY_IDS.list).el.insertAdjacentHTML('beforeend', '<!--open-->');
+    paintHistory(
+      gap.doc,
+      HISTORY_IDS.list,
+      [ev(3, 'trick', 0, 4), ev(4, 'result', null)],
+      COPY,
+      CTX,
+      'g',
+    );
+    expect(gap.get(HISTORY_IDS.list).text()).not.toContain('<!--open-->');
+    expect(rowsIn(gap.get(HISTORY_IDS.list).text())).toHaveLength(2);
+    const fromEmpty = page();
+    paintHistory(fromEmpty.doc, HISTORY_IDS.list, [], COPY, CTX, 'g');
+    expect(fromEmpty.get(HISTORY_IDS.list).attr('data-key')).toBe('g:-');
+    paintHistory(fromEmpty.doc, HISTORY_IDS.list, STREAM, COPY, CTX, 'g');
+    expect(fromEmpty.get(HISTORY_IDS.list).attr('data-key')).toBe('g:2');
+    expect(rowsIn(fromEmpty.get(HISTORY_IDS.list).text())).toHaveLength(3);
     // The last row is not the one the key names (something else rewrote the list): rebuilt whole.
     const foreign = fakePage([
       fakeEl(HISTORY_IDS.list, {
