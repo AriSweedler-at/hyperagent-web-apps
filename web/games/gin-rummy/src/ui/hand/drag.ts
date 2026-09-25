@@ -1,25 +1,28 @@
 // A card dragged by hand (docs/design/gin-arrangement-and-discards.md §5d): the numbers of the
-// gesture and of the ghost's motion, pure, so ui/hand/dragger.ts (the pointer events, the ghost
-// element, the frames) only applies them. A press becomes a drag once the pointer has moved
-// DRAG_THRESHOLD; the ghost closes FOLLOW of the gap to the pointer every frame, so it trails
-// with a little momentum, and it tilts with its horizontal speed (pull it left fast and it leans
-// left), never past MAX_TILT. `dropIndex` says where among the loose cells the pointer would put
-// the card: the cells are read row by row, left to right, as the dense grid lays them.
-export type Point = Readonly<{ x: number; y: number }>;
-export type Rect = Readonly<{ left: number; top: number; width: number; height: number }>;
+// ghost's motion, pure, plugged into the shared pointer-drag kernel (web/shared/edge/drag.ts
+// `motion`, docs/design/dry-round-2.md E1; the gesture's threshold, `Point` and `Rect` are
+// web/shared/lib/drag.ts's now, re-exported here for the callers that named them; this module
+// stays DOM-free because ui/state.ts imports it). The ghost closes FOLLOW of
+// the gap to the pointer every frame, so it trails with a little momentum, and it tilts with its
+// horizontal speed (pull it left fast and it leans left), never past MAX_TILT. `dropIndex` says
+// where among the loose cells the pointer would put the card: the cells are read row by row, left
+// to right, as the dense grid lays them.
+import {
+  DRAG_THRESHOLD,
+  startedDrag,
+  type Point,
+  type Rect,
+} from '../../../../../shared/lib/drag.ts';
+
+export { DRAG_THRESHOLD, startedDrag, type Point, type Rect };
 /** The ghost's place and its speed per frame. */
 export type Motion = Readonly<{ x: number; y: number; vx: number; vy: number }>;
 
-/** Pixels the pointer moves before a press is a drag (a tap or a long press moves less). */
-export const DRAG_THRESHOLD = 8;
 /** The share of the gap to the pointer the ghost closes each frame. */
 export const FOLLOW = 0.35;
 /** Degrees of tilt per pixel of horizontal speed per frame, and the most it tilts. */
 export const TILT_PER_PX = 1.2;
 export const MAX_TILT = 14;
-
-export const startedDrag = (from: Point, to: Point): boolean =>
-  Math.hypot(to.x - from.x, to.y - from.y) >= DRAG_THRESHOLD;
 
 export const at = (x: number, y: number): Motion => ({ x, y, vx: 0, vy: 0 });
 
