@@ -52,7 +52,7 @@ type Shell = Readonly<{
   table: string;
 }>;
 
-/** A shell game's row here, off its registry row (tools/games.ts SHELL) and its driver (e2./fixtures/online-games.ts). */
+/** A shell game's row here, off its registry row (tools/games.ts SHELL) and its driver (e2e/fixtures/online-games.ts). */
 const shellOf = (game: ShellGame): Shell => ({
   game,
   start: SHELL_DRIVERS[game].start,

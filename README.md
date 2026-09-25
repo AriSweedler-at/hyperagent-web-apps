@@ -142,9 +142,9 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    take a STUN-only ICE list through `?ice=`; fonts and CDNs are answered from local copies and
    `Math.random` is seeded. The `@relay` spec (`e2e/shell-relay.spec.ts`, one describe per game,
    fidice included)
-   open both pages with `?ice-policy=relay` and an ICE list naming that relay (written per run under
+   opens both pages with `?ice-policy=relay` and an ICE list naming that relay (written per run under
    `e2e/fixtures/.generated/`, since its port follows the offset), so every candidate must cross it:
-   both games still join and play, "Connected via relay" shows, and the selected candidate pair read
+   every game still joins and plays, "Connected via relay" shows, and the selected candidate pair read
    off each `RTCPeerConnection` is a relay one. Without coturn they skip with the install line
    (`brew install coturn` / `apt-get install coturn`); `E2E_TURN=off` leaves the relay out on
    purpose. `e2e/gin-dom-parity.spec.ts` plays the same game on the served gin page

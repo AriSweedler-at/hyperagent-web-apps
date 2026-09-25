@@ -4,7 +4,7 @@
 // is the table's 🌐 (beside gin's leave button, backgammon's menu button), shown for pass and play
 // alone, its tooltip naming who hosts and who joins; under the curtain gin offers nothing but the
 // reveal, while backgammon, where the phone changes hands under it, offers "Continue online" there
-// too (SHELL.curtainButtons and the driver's `curtainOffer`, e2./fixtures/online-games.ts).
+// too (SHELL.curtainButtons and the driver's `curtainOffer`, e2e/fixtures/online-games.ts).
 // `#shareCodeBtn` hands the invite to the share sheet where there is one (a phone's OS menu) and to
 // the clipboard otherwise (desktop); an invite link fills the join form and leaves the address bar;
 // the offer survives a reload of the waiting room; and cancelling the room before anyone joined

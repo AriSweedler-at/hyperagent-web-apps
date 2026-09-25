@@ -55,7 +55,7 @@ export type GameSpec = Readonly<{
  * by name: what the two pages spell differently while their ids agree. Data only (strings, lists,
  * one RegExp), so tools/games.test.ts pins every row with toEqual and a node script reads the
  * registry without Playwright; what needs a Page or a seat's name (the curtain's sub line, the
- * table half once the shell has connected) is the game's row in e2./fixtures/online-games.ts.
+ * table half once the shell has connected) is the game's row in e2e/fixtures/online-games.ts.
  */
 export type ShellSpec = Readonly<{
   /** `#homeScreen h1`. */
@@ -89,7 +89,7 @@ export type ShellSpec = Readonly<{
 /**
  * The games with the shared shell (the home screen, the waiting rooms, the curtain, the toast:
  * docs/design/shared-shell.md §3.1); fidice joins with its restyle (§4.6). A game here without a
- * SHELL row, or a row in e2./fixtures/online-games.ts, is a type error.
+ * SHELL row, or a row in e2e/fixtures/online-games.ts, is a type error.
  */
 export type ShellGame = 'gin-rummy' | 'backgammon';
 export const SHELL_GAMES: ReadonlyArray<ShellGame> = ['gin-rummy', 'backgammon'];

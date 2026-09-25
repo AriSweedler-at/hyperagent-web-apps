@@ -3,7 +3,7 @@
 // table's names and its 🌐), what each page says in its own words read off tools/games.ts SHELL, and
 // the code shape off web/shared/lib/roomCode.ts. e2e/shell-*.spec.ts drive both games through these
 // once; e2e/fixtures/gin.ts and backgammon.ts compose their pass-and-play starters from `startLocal`
-// and keep the table halves (what a hand or a board shows), which e2./fixtures/online-games.ts rows
+// and keep the table halves (what a hand or a board shows), which e2e/fixtures/online-games.ts rows
 // up per game for the shell specs. This file may not import either: they import it
 // (import-x/no-cycle). Nothing here reads a documented hook: whose room opened and who took the
 // phone are read from the elements a player sees.
