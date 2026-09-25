@@ -1,11 +1,16 @@
-// The world the session scenarios run in, shared by three suites (docs/design/shared-shell.md A1):
-// sessions.test.ts beside this file drives the shared sessions over a fake codec, and each game's
+// The world the session scenarios run in, shared by four suites (docs/design/shared-shell.md A1):
+// sessions.test.ts beside this file drives the shared sessions over a fake codec, each game's
 // net/sessions.test.ts drives its wrappers through the same world to pin its own bytes (peer id,
-// welcome, lobby, one refused and one accepted frame). One manual fake broker, one fake clock, a
-// scripted ICE loader, and a log of every event the sessions raise, so a scenario reads as the
-// legacy page's status and toast sequence. It lives in web/shared/net rather than beside a game
-// because the zone rules let a game's net/ reach only shared/net and the transport, clock and peer
-// edges; the fake codec stays in the test beside it (a game's suite never sees it).
+// welcome, lobby, one refused and one accepted frame), and sessions.seats.test.ts drives the host
+// over three and four seats (docs/design/n-seat-sessions.md §4.4). One manual fake broker, one fake
+// clock, a scripted ICE loader, and a log of every event the sessions raise, so a scenario reads
+// as the legacy page's status and toast sequence. The host recorder logs `['frame', frame]` and
+// `['guestGone', iceFailed]` by default, one argument, so the two-seat suites read what they always
+// read; `world({ seats: true })` logs the seat too (`['frame', frame, 2]`), spelled as two explicit
+// recorders rather than a spread of the arguments so the default cannot drift. It lives in
+// web/shared/net rather than beside a game because the zone rules let a game's net/ reach only
+// shared/net and the transport, clock and peer edges; the fake codec stays in the test beside it
+// (a game's suite never sees it).
 import type { IceLoader, IceResult, NetDeps } from '../edge/peer.ts';
 import { fakeClock, type FakeClock } from '../edge/clock.fake.ts';
 import { fakeBroker, type FakeBroker } from '../edge/transport.fake.ts';
@@ -130,6 +135,8 @@ export type WorldOptions = Readonly<{
   ice?: IceResult | null;
   /** What `describe` reports for a channel's path ('direct' by default). */
   path?: string;
+  /** Log the seat with `frame` and `guestGone` (false by default: the two-seat suites' one-argument log). */
+  seats?: boolean;
 }>;
 
 export const world = (options: WorldOptions = {}): World => {
@@ -151,14 +158,27 @@ export const world = (options: WorldOptions = {}): World => {
     (...args: ReadonlyArray<unknown>): void => {
       log.push([name, ...args]);
     };
+  const seats = options.seats ?? false;
   const hostEvents: HostEvents<unknown> = {
     status: record('status'),
     toast: record('toast'),
     holdWakeLock: record('holdWakeLock'),
     persist: record('persist'),
     restart: record('restart'),
-    frame: record('frame'),
-    guestGone: record('guestGone'),
+    frame: seats
+      ? (frame, seat) => {
+          log.push(['frame', frame, seat]);
+        }
+      : (frame) => {
+          log.push(['frame', frame]);
+        },
+    guestGone: seats
+      ? (iceFailed, seat) => {
+          log.push(['guestGone', iceFailed, seat]);
+        }
+      : (iceFailed) => {
+          log.push(['guestGone', iceFailed]);
+        },
   };
   const guestEvents: GuestEvents<unknown> = {
     status: record('status'),
@@ -246,6 +266,23 @@ export const connectFrom = (p: Party, peerId: string): Connection => {
   c.onMessage((data) => p.received.push(data));
   return c;
 };
+
+/** A guest at an N-seat table: its party and the channel it opened to the room. */
+export type Guest = Readonly<{ party: Party; conn: Connection }>;
+
+/**
+ * `n` parties connected to `room` one after another, the broker flushed between each so they are
+ * seated in this order (the lowest free seat at connection): a seats scenario opens with a table
+ * of three in one line.
+ */
+export const guests = (w: World, room: string, n: number): ReadonlyArray<Guest> =>
+  Array.from({ length: n }, () => {
+    const p = party(w, undefined);
+    w.broker.flush();
+    const conn = connectFrom(p, room);
+    w.broker.flush();
+    return { party: p, conn };
+  });
 
 /** What a hand-driven host answers with: its welcome on open, its lobby on a join. */
 export type HostAnswer = Readonly<{ welcome: unknown; lobby: unknown }>;
