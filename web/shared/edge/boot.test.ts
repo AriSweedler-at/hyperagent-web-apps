@@ -470,6 +470,8 @@ type Options = Readonly<{
   stored?: Readonly<Record<string, string>>;
   audio?: boolean;
   confirm?: boolean;
+  /** No `window.__rng` installed: the boot falls back to `Math.random`. */
+  unseeded?: boolean;
   /** The game's own hooks, as gin passes them, over the log so a test can see the order they ran in. */
   hooks?: (log: Log) => NonNullable<BootConfig<Fake, App, Extra>['hooks']>;
 }>;
@@ -562,7 +564,7 @@ const bootPage = (options: Options = {}) => {
         status: 404,
         arrayBuffer: () => Promise.resolve(new ArrayBuffer(3)),
       }),
-    __rng: mulberry32(7),
+    ...(options.unseeded === true ? {} : { __rng: mulberry32(7) }),
     ...(options.audio === true ? { AudioContext: FakeAudioContext } : {}),
   };
   const nav: NavigatorLike & ShareNavigatorLike = {
@@ -1062,7 +1064,9 @@ describe('bootShell', () => {
     expect(given).toEqual([b.boot, b.boot]);
     expect(b.boot.store).toBe(b.store);
     expect(b.boot.now()).toBe(b.clock.now());
-    expect(typeof b.boot.rng()).toBe('number');
+    expect(b.boot.rng).toBe(b.win.__rng);
     expect(b.boot.toast).toBeDefined();
+    // Without the harness's seeded rng the boot draws from Math.random.
+    expect(bootPage({ unseeded: true }).boot.rng).toBe(Math.random);
   });
 });
