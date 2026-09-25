@@ -23,6 +23,7 @@ import {
   whenTransportReady,
   type IceLoader,
   type IceResult,
+  type NetDeps,
 } from './peer.ts';
 
 const STUN_ONLY: IceResult = { iceServers: [], source: 'fallback', hasTurn: false, error: null };
@@ -102,15 +103,14 @@ describe('whenTransportReady', () => {
   test('without a loader the callback runs at once with null', () => {
     const broker = fakeBroker();
     const seen: (IceResult | null)[] = [];
-    whenTransportReady(
-      {
-        transportFor: () => broker.transport(),
-        ice: null,
-        clock: fakeClock(),
-        onWake: () => undefined,
-      },
-      (ice) => seen.push(ice),
-    );
+    // The sessions' full NetDeps passes: the helper reads `ice` alone (its parameter is the Pick).
+    const deps: NetDeps = {
+      transportFor: () => broker.transport(),
+      ice: null,
+      clock: fakeClock(),
+      onWake: () => undefined,
+    };
+    whenTransportReady(deps, (ice) => seen.push(ice));
     expect(seen).toEqual([null]);
   });
 

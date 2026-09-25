@@ -106,9 +106,13 @@ export const describePeerError = (e: TransportError): string => {
 /**
  * `whenTransportReady`: run `ready(ice)` once the ICE servers are in hand, or at once with null when
  * there is no loader. `ice.load()` never rejects (web/shared/edge/ice.ts); a rejection is treated
- * as no ICE all the same.
+ * as no ICE all the same. Only `ice` is read, so fidice's PeerDeps (NetDeps without `onWake`;
+ * docs/design/dry-round-2.md H2) passes as well as the sessions' NetDeps.
  */
-export const whenTransportReady = (deps: NetDeps, ready: (ice: IceResult | null) => void): void => {
+export const whenTransportReady = (
+  deps: Pick<NetDeps, 'ice'>,
+  ready: (ice: IceResult | null) => void,
+): void => {
   if (deps.ice === null) {
     ready(null);
     return;

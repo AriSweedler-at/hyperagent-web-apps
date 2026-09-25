@@ -367,7 +367,7 @@ writing) that is ample for text-only game traffic.
 ```
 web/index.html               landing page, the first Vite entry (no scripts); dist/index.html is byte-identical
 web/public/.nojekyll         copied to dist/ so Pages serves dotfiles and folders untouched
-web/shared/lib/              shared pure TypeScript: result, rng, json decoders, roomCode, clock types
+web/shared/lib/              shared pure TypeScript: result, rng, json decoders, roomCode, name, clock types
 web/shared/edge/             shared effects: ice, transport (the only importer of peerjs) + fake, clock, storage, dom, fx, share
 web/shared/styles/           tokens.css (the shared palette, :root only), base.css (shared primitives), CONTRACT.md
 web/shared/ui/               reserved for the roadmap's shared screen builders (README only)

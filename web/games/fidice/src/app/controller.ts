@@ -8,10 +8,13 @@
 // countdown; a repeat of the toast showing or last queued is dropped, and leaving a table drops
 // the queue behind the toast showing.
 import type { Clock, Timer } from '../../../../shared/lib/clock.ts';
+import { normaliseName } from '../../../../shared/lib/name.ts';
+import { validateCode } from '../../../../shared/lib/roomCode.ts';
 import { difficultyById } from '../bots/registry.ts';
 import { CATEGORY_INFO, groupByKey, handAt } from '../domain/hands.ts';
+import { cleanName } from '../domain/lobby.ts';
 import { suggestHands } from '../domain/search.ts';
-import type { Action, PublicState, Rank, Seat } from '../domain/types.ts';
+import { NAME_RULE, type Action, type PublicState, type Rank, type Seat } from '../domain/types.ts';
 import type { ClientSession } from '../net/client.ts';
 import type { HostOptions, HostSession } from '../net/host.ts';
 import type { Role } from '../net/protocol.ts';
@@ -375,7 +378,7 @@ export class Controller {
   }
 
   private submitForm(): void {
-    const name = this.ui.nameForm.name.trim().slice(0, 16) || 'Player';
+    const name = normaliseName(this.ui.nameForm.name, NAME_RULE);
     this.deps.effects.storage.set(NAME_KEY, name);
     this.hostName = name;
     const p = this.ui.pending;
@@ -389,9 +392,7 @@ export class Controller {
         autostart: false,
       });
     else if (p.kind === 'local') {
-      const locals = this.ui.nameForm.locals
-        .map((n) => n.trim().slice(0, 16))
-        .filter((n) => n.length > 0);
+      const locals = this.ui.nameForm.locals.map(cleanName).filter((n) => n.length > 0);
       if (locals.length === 0) {
         this.set({ error: 'Add at least one more player to pass the phone to.' });
         return;
@@ -415,11 +416,14 @@ export class Controller {
         botChoice: this.ui.nameForm.botChoice,
       });
     else {
-      const code = this.ui.joinCode.trim().toUpperCase();
-      if (code.length !== 5) {
-        this.set({ error: 'Codes are 5 characters' });
+      // The legacy check (trim, upper-case, the length alone; docs/design/dry-round-2.md H3), spelled
+      // once per game in web/shared/lib/roomCode.ts with FIDICE_CODE_LENGTH_ERROR as its refusal.
+      const checked = validateCode('fidice', this.ui.joinCode);
+      if (!checked.ok) {
+        this.set({ error: checked.error });
         return;
       }
+      const code = checked.value;
       this.set({ joinCode: code, pending: { kind: 'join', code } });
       this.joinAs(code, 'player', name);
     }

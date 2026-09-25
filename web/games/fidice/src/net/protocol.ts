@@ -8,7 +8,7 @@
 import { arrayOf, boolean, integer } from '../../../../shared/lib/json.ts';
 import { isRank } from '../domain/hands.ts';
 import { err, ok, type Result } from '../domain/result.ts';
-import type { Action, PublicState, Seat } from '../domain/types.ts';
+import { NAME_RULE, type Action, type PublicState, type Seat } from '../domain/types.ts';
 
 export type Role = 'player' | 'spectator';
 export type ClientMessage =
@@ -70,7 +70,8 @@ const decodeClientMessage = (x: unknown): Result<ClientMessage, DecodeFailure> =
     return ok({
       t: 'hello',
       role,
-      name: typeof name === 'string' ? name.slice(0, 16) : null,
+      // Cut, not trimmed: the seat (lobby.ts makeHuman) normalises what the wire carried.
+      name: typeof name === 'string' ? name.slice(0, NAME_RULE.max) : null,
       token: typeof token === 'string' ? token.slice(0, 64) : null,
     });
   }
