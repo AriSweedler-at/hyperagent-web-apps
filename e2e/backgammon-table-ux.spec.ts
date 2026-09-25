@@ -6,8 +6,10 @@
 // through an empty waypoint as one flight, a bear-off shrunk onto the newest slab, and none at
 // all for the last move of a pass-and-play turn, which flips the board); a stack of five takes
 // a sixth without rebuilding its coins (the top one keeps its element and takes the count badge,
-// nothing flashes); and a double, forced through the page's `window.__rng` hook, plays the
-// `doubles` cue after `roll` once the dice have settled. The roll modal itself (up for the seat to
+// nothing flashes); a checker dragged by hand (§4.12) lights its source past the threshold, marks
+// the lit cell under the pointer `drop` and commits the move on release; and a double, forced
+// through the page's `window.__rng` hook, plays the `doubles` cue after `roll` once the dice have
+// settled. The roll modal itself (up for the seat to
 // roll, dismissed by nothing, its tumble and settle) is e2e/backgammon-local.spec.ts's.
 import type { Page } from '@playwright/test';
 
@@ -17,6 +19,7 @@ import {
   bgSetup,
   bgStartLocal,
   bgTap,
+  ownPlace,
   ownPointId,
   requireBoard,
   type Viewport,
@@ -181,6 +184,56 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#board .selected')).toHaveCount(0);
       await expect(targets).toHaveCount(0);
       expect((await requireBoard(page)).played).toEqual([]);
+    });
+
+    test('a checker dragged by hand: past the threshold the source lights, over a lit target the cell takes the drop mark, the release makes the move', async ({
+      player,
+      project,
+    }) => {
+      const { page } = player;
+      await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
+      await bgReveal(page);
+      const v = await seated(page, 0);
+      const eight = page.locator(`#${ownPointId(v, 8)}`);
+      const five = page.locator(`#${ownPointId(v, 5)}`);
+      const ghost = page.locator('.drag-ghost');
+      // The coins of a freshly seated position slide into place (`.checker`'s 160ms transform
+      // transition, the stacking side flips with the seat): measured once they stand still.
+      await page.waitForTimeout(200);
+      const from = await eight.locator('.checker.top').boundingBox();
+      const to = await five.boundingBox();
+      if (from === null || to === null) throw new Error('the checker or the 5-point has no box');
+      const grab = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+      await page.mouse.move(grab.x, grab.y);
+      await page.mouse.down();
+      // Under DRAG_THRESHOLD (8px) the press is a tap in the making: nothing lit, no ghost.
+      await page.mouse.move(grab.x + 4, grab.y);
+      await expect(ghost).toHaveCount(0);
+      await expect(eight).not.toHaveClass(/\bselected\b/);
+      // Past it the drag begins (design §4.12): the source is selected, its targets light, and the
+      // ghost, the checker's clone, sits on the body.
+      await page.mouse.move(grab.x + 12, grab.y + 12, { steps: 2 });
+      await expect(ghost).toHaveCount(1);
+      await expect(eight).toHaveClass(/\bselected\b/);
+      await expect(five).toHaveClass(/\btarget\b/);
+      await expect(five).not.toHaveClass(/\bdrop\b/);
+      // Over the lit 5-point the cell takes the `drop` mark.
+      await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 6 });
+      await expect(five).toHaveClass(/\bdrop\b/);
+      // Released there: the default chain is committed (8/5 with the 3), the ghost is gone, the
+      // marks are cleared, and the coin stands on the 5-point.
+      await page.mouse.up();
+      await expect.poll(async () => (await requireBoard(page)).played.length).toBe(1);
+      const after = await requireBoard(page);
+      const [move] = after.played;
+      if (move === undefined) throw new Error('no move played');
+      expect([ownPlace(after, move.from), ownPlace(after, move.to), move.die]).toEqual([8, 5, 3]);
+      await expect(ghost).toHaveCount(0);
+      await expect(page.locator('#board .drop')).toHaveCount(0);
+      await expect(page.locator('#board .selected')).toHaveCount(0);
+      await expect(page.locator('.flyer, .checker.arriving, .checker.settling')).toHaveCount(0);
+      await expect(five.locator('.checker')).toHaveCount(1);
+      await expect(eight.locator('.checker')).toHaveCount(2);
     });
 
     test('a move flies: the clone leaves the source coin and lands on the destination coin, in FLY_MS', async ({
