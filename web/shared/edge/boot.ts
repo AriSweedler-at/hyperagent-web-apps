@@ -314,9 +314,13 @@ export type BootConfig<G extends BootTypes, App extends BootApp<G>, Ex extends o
     paintSound: (doc: DocumentLike, enabled: boolean) => void;
     /** The classes a game puts on the toast for a message (backgammon's `hit`); none for gin. */
     toastMarks?: (message: string) => ToastMarks;
-    /** The three input writes the paint does not own (ui/home.ts): the game's, because gin fills the Score Counter's inputs too. */
-    fillName: (doc: DocumentLike, name: string) => void;
-    fillP2Name: (doc: DocumentLike, name: string) => void;
+    /**
+     * The three input writes the paint does not own (ui/home.ts): the game's, because gin fills the
+     * Score Counter's inputs too. `isDefault` is the fill's `default` mark (shell.ts), which the
+     * game's fill paints as `data-default` so the input clears on the first tap.
+     */
+    fillName: (doc: DocumentLike, name: string, isDefault: boolean) => void;
+    fillP2Name: (doc: DocumentLike, name: string, isDefault: boolean) => void;
     setCode: (doc: DocumentLike, value: string) => void;
   }>;
   /** The game's fx.ts `createFx`: the shared cue player over its table and its sound key. */
@@ -508,11 +512,11 @@ export const bootShell = <
       revealRule(doc, slot, rule);
     },
     page: {
-      fillName: (name) => {
-        cfg.paint.fillName(doc, name);
+      fillName: (name, isDefault) => {
+        cfg.paint.fillName(doc, name, isDefault);
       },
-      fillP2Name: (name) => {
-        cfg.paint.fillP2Name(doc, name);
+      fillP2Name: (name, isDefault) => {
+        cfg.paint.fillP2Name(doc, name, isDefault);
       },
       setCode: (value) => {
         cfg.paint.setCode(doc, value);

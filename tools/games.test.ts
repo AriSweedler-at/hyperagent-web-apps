@@ -47,6 +47,7 @@ describe('the games registry', () => {
           hostAnswered:
             /^Connected to .+'s room \(playing to \d+\)\. Waiting for the host to start/,
           connDot: '#connDot',
+          localNames: ['Ari', 'Lavi'],
           localFields: [['localTargetInput', '100']],
           curtainButtons: 1,
         },
@@ -86,6 +87,7 @@ describe('the games registry', () => {
           modes: ['Online', 'Pass the phone'],
           hostAnswered: /^Connected — waiting for .+ to start$/,
           connDot: '#oppDot',
+          localNames: ['Ari', 'Ethan'],
           localFields: [
             ['localVariantSel', 'portes'],
             ['localMatchLengthSel', '5'],
@@ -122,6 +124,7 @@ describe('the games registry', () => {
           modes: ['Online', 'Pass the phone'],
           hostAnswered: /^Connected — waiting for .+ to deal$/,
           connDot: '#oppDot',
+          localNames: ['Ari', 'Lavi'],
           localFields: [
             ['localPlayersSel', '2'],
             ['localMatchSel', '2'],

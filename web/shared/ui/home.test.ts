@@ -6,6 +6,7 @@ import { describe, expect, test } from 'vitest';
 
 import { fakeEl, fakePage, fakeTarget, type FakeEl, type FakePage } from '../edge/page.fake.ts';
 import {
+  DEFAULT_MARK,
   bindHomeShell,
   bindLongPress,
   blocksCodeInput,
@@ -139,6 +140,19 @@ describe('the input writes the reducer raises as effects', () => {
     expect(p.get('p1NameInput').value()).toBe('Ann');
     setCodeInput(p.doc, 'AB');
     expect(p.get('codeInput').value()).toBe('AB');
+  });
+
+  test('a default fill marks its inputs (data-default) for the first-tap clear; a plain fill takes the mark off', () => {
+    const p = shellPage();
+    fillInputs(p.doc, ['nameInput', 'p1NameInput'], 'Ari', true);
+    expect(p.get('nameInput').attr(DEFAULT_MARK)).toBe('1');
+    expect(p.get('p1NameInput').attr(DEFAULT_MARK)).toBe('1');
+    expect(p.get('p2NameInput').attr(DEFAULT_MARK)).toBeNull();
+    // A remembered or typed name (no flag) is never marked, and unmarks what the default marked.
+    fillInputs(p.doc, ['nameInput', 'p1NameInput'], 'Ann');
+    expect(p.get('nameInput').attr(DEFAULT_MARK)).toBeNull();
+    expect(p.get('p1NameInput').attr(DEFAULT_MARK)).toBeNull();
+    expect(p.get('p1NameInput').value()).toBe('Ann');
   });
 });
 
@@ -321,6 +335,37 @@ describe('bindHomeShell', () => {
       intent('cancel'),
       intent('cancel'),
     ]);
+  });
+
+  test('a prefilled default clears on its first focus or tap, once, and nothing is dispatched; a remembered or typed name stays', () => {
+    const { p, intents } = wired();
+    fillInputs(p.doc, ['nameInput', 'p1NameInput'], 'Ari', true);
+    fillInputs(p.doc, ['p2NameInput'], 'Lavi', true);
+    // A keyboard focus clears the first seat and takes the mark, so what is typed next stays put.
+    p.get('p1NameInput').fire('focus');
+    expect(p.get('p1NameInput').value()).toBe('');
+    expect(p.get('p1NameInput').attr(DEFAULT_MARK)).toBeNull();
+    type(p, 'p1NameInput', 'Zoë');
+    p.get('p1NameInput').fire('focus');
+    p.get('p1NameInput').fire('pointerdown');
+    expect(p.get('p1NameInput').value()).toBe('Zoë');
+    // A pointer clears before the focus lands; the focus then finds no mark.
+    p.get('p2NameInput').fire('pointerdown');
+    expect(p.get('p2NameInput').value()).toBe('');
+    p.get('p2NameInput').fire('focus');
+    expect(p.get('p2NameInput').value()).toBe('');
+    // The online name is filled with the same default and clears the same way; a remembered
+    // name (filled without the flag) is left alone.
+    p.get('nameInput').fire('focus');
+    expect(p.get('nameInput').value()).toBe('');
+    fillInputs(p.doc, ['nameInput'], 'Ann');
+    p.get('nameInput').fire('focus');
+    p.get('nameInput').fire('pointerdown');
+    expect(p.get('nameInput').value()).toBe('Ann');
+    // The clear is the page's alone: no intent, so a seat left empty still starts as the default.
+    expect(intents).toEqual([]);
+    p.get('localBtn').fire('click');
+    expect(intents).toEqual([intent('local/click', 'Zoë', '', '50')]);
   });
 
   test('the code input: beforeinput blocks suggestions, input reports the value and type', () => {

@@ -59,6 +59,15 @@ describe('the input writes the reducer raises as effects', () => {
     expect(p.get('p1NameInput').value()).toBe('Ann');
     setCodeInput(p.doc, 'AB');
     expect(p.get('codeInput').value()).toBe('AB');
+    // The shell's default fill marks its inputs for the first-tap clear; a plain fill unmarks.
+    fillNameInputs(p.doc, 'Ari', true);
+    fillP2NameInput(p.doc, 'Lavi', true);
+    ['nameInput', 'p1NameInput', 'p2NameInput'].forEach((id) => {
+      expect(p.get(id).attr('data-default'), id).toBe('1');
+    });
+    fillP2NameInput(p.doc, 'Bob');
+    expect(p.get('p2NameInput').attr('data-default')).toBeNull();
+    expect(p.get('p1NameInput').attr('data-default')).toBe('1');
   });
 });
 
@@ -117,6 +126,27 @@ describe('paintHome', () => {
     expect(p.get(EXTRA_NAME_INPUTS[3]).hidden()).toBe(true);
     expect(p.get(EXTRA_NAME_INPUTS[2]).value()).toBe('Cara');
     expect(p.get(EXTRA_NAME_INPUTS[3]).value()).toBe('Dan');
+    // Remembered or typed names carry no mark.
+    expect(p.get(EXTRA_NAME_INPUTS[2]).attr('data-default')).toBeNull();
+    expect(p.get(EXTRA_NAME_INPUTS[3]).attr('data-default')).toBeNull();
+    // Nothing remembered (null): the seat shows its default (the owner's Sandro and Grant), marked
+    // for the first-tap clear; a seat emptied by that tap ('') shows empty, unmarked.
+    paintHome(p.doc, withOpts({ seatCount: 4 }, { extraNames: { 2: null, 3: null } }));
+    expect(p.get(EXTRA_NAME_INPUTS[2]).value()).toBe('Sandro');
+    expect(p.get(EXTRA_NAME_INPUTS[3]).value()).toBe('Grant');
+    expect(p.get(EXTRA_NAME_INPUTS[2]).attr('data-default')).toBe('1');
+    expect(p.get(EXTRA_NAME_INPUTS[3]).attr('data-default')).toBe('1');
+    paintHome(p.doc, withOpts({ seatCount: 4 }, { extraNames: { 2: '', 3: null } }));
+    expect(p.get(EXTRA_NAME_INPUTS[2]).value()).toBe('');
+    expect(p.get(EXTRA_NAME_INPUTS[2]).attr('data-default')).toBeNull();
+    expect(p.get(EXTRA_NAME_INPUTS[3]).attr('data-default')).toBe('1');
+    paintHome(
+      p.doc,
+      withOpts(
+        { seatCount: 3, gamesToWin: 1, removedTwo: 'S', exchange: true },
+        { extraNames: { 2: 'Cara', 3: 'Dan' } },
+      ),
+    );
     expect(p.get('localMatchSel').value()).toBe('1');
     expect(p.get('localRemovedTwoSel').value()).toBe('S');
     expect(p.get('exchangeChk').checked()).toBe(true);
@@ -221,6 +251,22 @@ describe('bindHome', () => {
     expect(r.intents.slice(-2)).toEqual([
       { type: 'pname/typed', seat: 2, value: 'Cara' },
       { type: 'pname/typed', seat: 3, value: 'Dan ' },
+    ]);
+    // A third or fourth seat showing its default (painted marked) clears on its first tap and
+    // tells the reducer the seat is empty; the second tap, and a tap on a typed name, do nothing.
+    paintHome(p.doc, withOpts({ seatCount: 4 }, { extraNames: { 2: null, 3: null } }));
+    const before = r.intents.length;
+    p.get(EXTRA_NAME_INPUTS[2]).fire('focus');
+    expect(p.get(EXTRA_NAME_INPUTS[2]).value()).toBe('');
+    expect(p.get(EXTRA_NAME_INPUTS[2]).attr('data-default')).toBeNull();
+    p.get(EXTRA_NAME_INPUTS[2]).fire('focus');
+    p.get(EXTRA_NAME_INPUTS[2]).fire('pointerdown');
+    expect(r.intents.slice(before)).toEqual([{ type: 'pname/typed', seat: 2, value: '' }]);
+    p.get(EXTRA_NAME_INPUTS[3]).fire('pointerdown');
+    expect(p.get(EXTRA_NAME_INPUTS[3]).value()).toBe('');
+    expect(r.intents.slice(before)).toEqual([
+      { type: 'pname/typed', seat: 2, value: '' },
+      { type: 'pname/typed', seat: 3, value: '' },
     ]);
     // The shell's own controls are bound through the shared binder: a tab click, for one.
     p.get('tabRulesBtn').fire('click', { target: fakeTarget({ id: 'tabRulesBtn' }) });

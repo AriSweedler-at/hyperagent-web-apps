@@ -52,6 +52,13 @@ export type Opts = GameOptions;
 export { DEFAULT_OPTS };
 
 export const DEFAULT_NAME = 'Ari';
+/**
+ * The four pass-and-play seats when nothing is remembered or typed (the owner, 2026-09-25:
+ * "briscola is Ari and Lavi (with p3 Sandro and p4 Grant)"); the first is `#nameInput`'s markup
+ * value (DEFAULT_NAME) too, since the shell's `fillName` reaches that input. The first two are
+ * tools/games.ts SHELL's `localNames` for the e2e; ui/home.ts paints the third and fourth.
+ */
+export const LOCAL_NAMES: ReadonlyArray<string> = ['Ari', 'Lavi', 'Sandro', 'Grant'];
 export const LEAVE_LOCAL_MSG = 'End this game? The score will be cleared.';
 export const LEAVE_ONLINE_MSG = 'Leave this match? The table will close.';
 /** `#guestWaitStatus` once the host's lobby frame names the room (tools/games.ts SHELL `hostAnswered` pins the shape). */
@@ -102,6 +109,7 @@ export const pickOpts = (from: GameOptions): GameOptions =>
 export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
   id: 'briscola',
   names: { default: DEFAULT_NAME },
+  localNames: LOCAL_NAMES,
   tabs: { list: HOME_TABS, default: DEFAULT_HOME_TAB },
   modes: {
     default: DEFAULT_PLAY_MODE,

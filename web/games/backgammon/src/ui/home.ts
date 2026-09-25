@@ -37,15 +37,16 @@ import {
 /**
  * The first player's name into every input that shows it: the online name and pass-and-play's
  * first seat (one name, `backgammon_name`). `setValue` leaves the input being typed in alone, so
- * the fill after a keystroke moves only the other input.
+ * the fill after a keystroke moves only the other input; `isDefault` marks the shell's prefill for
+ * the first-tap clear (shared home.ts `fillInputs`).
  */
-export const fillNameInputs = (doc: DocumentLike, name: string): void => {
-  fillInputs(doc, ['nameInput', 'p1NameInput'], name);
+export const fillNameInputs = (doc: DocumentLike, name: string, isDefault = false): void => {
+  fillInputs(doc, ['nameInput', 'p1NameInput'], name, isDefault);
 };
 
 /** The second player's name into pass-and-play's second seat. */
-export const fillP2NameInput = (doc: DocumentLike, name: string): void => {
-  fillInputs(doc, ['p2NameInput'], name);
+export const fillP2NameInput = (doc: DocumentLike, name: string, isDefault = false): void => {
+  fillInputs(doc, ['p2NameInput'], name, isDefault);
 };
 
 /** The shell's helpers, kept under their gin names for main.ts and the tests. */

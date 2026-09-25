@@ -52,10 +52,13 @@ export type ShellEffectDeps<G extends ShellTypes> = Readonly<{
   share: (code: string) => void;
   /** `revealRule(document, slot, rule)` (web/shared/edge/glossary.ts): scroll to the rule and flash it. */
   revealRule: (slot: RulesSlot, rule: string) => void;
-  /** The three input writes the paint does not own (they would fight the player's typing). */
+  /**
+   * The three input writes the paint does not own (they would fight the player's typing);
+   * `isDefault` is the fill's `default` mark (shell.ts: the prefill the page clears on the first tap).
+   */
   page: Readonly<{
-    fillName: (name: string) => void;
-    fillP2Name: (name: string) => void;
+    fillName: (name: string, isDefault: boolean) => void;
+    fillP2Name: (name: string, isDefault: boolean) => void;
     setCode: (value: string) => void;
   }>;
   dispatch: (intent: Intent<G>) => void;
@@ -147,10 +150,10 @@ export const runShellEffect = <G extends ShellTypes>(
       deps.revealRule(effect.slot, effect.rule);
       return;
     case 'fillName':
-      deps.page.fillName(effect.name);
+      deps.page.fillName(effect.name, effect.default === true);
       return;
     case 'fillP2Name':
-      deps.page.fillP2Name(effect.name);
+      deps.page.fillP2Name(effect.name, effect.default === true);
       return;
     case 'setCode':
       deps.page.setCode(effect.value);

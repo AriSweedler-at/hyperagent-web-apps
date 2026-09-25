@@ -75,6 +75,10 @@ export const normalise = (html: string): string =>
     // (`#rrBody`'s `data-key`, the shared keyed slot since docs/design/dry-round-2.md D1; the
     // legacy page carries no data-key anywhere the oracle snapshots).
     .replace(/ data-key="[^"]*"/g, '')
+    // The name inputs' prefilled defaults carry `data-default` until their first tap
+    // (web/shared/ui/home.ts `fillInputs`; the owner's first-tap clear of 2026-09-25); the legacy
+    // page prefilled nothing and so marks nothing.
+    .replace(/ data-default="1"/g, '')
     // A hidden curtain keeps the text of its last showing, and the new page shows one the legacy
     // never had: a knock hands the phone to the defender to lay off (§7b). Unseen, it is blanked.
     .replace(

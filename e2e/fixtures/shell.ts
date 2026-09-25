@@ -22,8 +22,14 @@ export const DEFAULT_NAMES: Names = ['Ann', 'Bob'];
 export const ONLINE_NAMES: Names = ['Host', 'Guest'];
 /** What `#nameInput` starts at on both pages (each game's shellConfig.ts DEFAULT_NAME). */
 export const DEFAULT_NAME = 'Ari';
-/** What the two pass-and-play inputs show when nothing is remembered (web/shared/ui/shell.ts DEFAULT_LOCAL_NAMES). */
-export const DEFAULT_LOCAL_NAMES: Names = ['Ari', 'Lavi'];
+/**
+ * What the game's two pass-and-play inputs show when nothing is remembered, and who is seated
+ * when they are left empty: the registry's row (tools/games.ts SHELL `localNames`; the game's
+ * shellConfig.ts `localNames`, else web/shared/ui/shell.ts DEFAULT_LOCAL_NAMES).
+ */
+export const localNames = (game: ShellGame): Names => SHELL[game].localNames;
+/** The attribute a prefilled default carries until its first tap (web/shared/ui/home.ts DEFAULT_MARK). */
+export const DEFAULT_MARK = 'data-default';
 
 // ---- the shell's copy, byte-identical in both src trees (design §6, risk 10) --------------------
 

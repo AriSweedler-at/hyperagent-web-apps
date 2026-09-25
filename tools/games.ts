@@ -95,6 +95,12 @@ export type ShellSpec = Readonly<{
   hostAnswered: RegExp;
   /** The table's connection dot, `on` while the peer is connected. */
   connDot: string;
+  /**
+   * What the two pass-and-play inputs show when nothing is remembered, and who is seated when they
+   * are left empty: the game's shellConfig.ts `localNames` (backgammon; the owner, 2026-09-25:
+   * "backgammon is Ari and Ethan"), else web/shared/ui/shell.ts DEFAULT_LOCAL_NAMES (gin).
+   */
+  localNames: readonly [string, string];
   /** The pass-and-play panel's fields beyond the two names, each with the value it starts at. */
   localFields: ReadonlyArray<readonly [id: string, value: string]>;
   /**
@@ -121,6 +127,7 @@ export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
     modes: ['🌐 Online', '📱 Pass & Play', '🧪 Sandbox'],
     hostAnswered: /^Connected to .+'s room \(playing to \d+\)\. Waiting for the host to start/,
     connDot: '#connDot',
+    localNames: ['Ari', 'Lavi'],
     localFields: [['localTargetInput', '100']],
     curtainButtons: 1,
   },
@@ -132,6 +139,7 @@ export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
     // ui/state.ts `hostRoomMsg`: only the host's `lobby` reply carries the host's name.
     hostAnswered: /^Connected — waiting for .+ to start$/,
     connDot: '#oppDot',
+    localNames: ['Ari', 'Ethan'],
     localFields: [
       ['localVariantSel', 'portes'],
       ['localMatchLengthSel', '5'],
@@ -146,6 +154,8 @@ export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
     // shellConfig.ts `hostRoomMsg`: only the host's `lobby` reply carries the host's name.
     hostAnswered: /^Connected — waiting for .+ to deal$/,
     connDot: '#oppDot',
+    // The first two of shellConfig.ts LOCAL_NAMES (the owner's "Ari and Lavi (with p3 Sandro and p4 Grant)"); the third and fourth are the page's.
+    localNames: ['Ari', 'Lavi'],
     // The two selects in view (the house rules sit in a closed <details>, out of a driver's reach):
     // two players, best of three (D3).
     localFields: [

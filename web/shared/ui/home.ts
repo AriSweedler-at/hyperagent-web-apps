@@ -29,12 +29,14 @@ import {
   queryAllIn,
   readValue,
   requireId,
+  setAttr,
   setText,
   setValue,
   stopPropagation,
   targetValueOf,
   toggleClass,
   type DocumentLike,
+  type Element,
   type PageLike,
 } from '../edge/dom.ts';
 import { tabButtonId } from './ids.ts';
@@ -86,13 +88,50 @@ export const homeView = <Tab extends string, Resume>(
 });
 
 /**
+ * The attribute a prefilled default carries (`fillInputs` with `isDefault`; the DOM parity oracle
+ * normalises it away): `bindClearDefault` clears the input on its first tap and drops the mark.
+ */
+export const DEFAULT_MARK = 'data-default';
+
+/**
  * A value into every input that shows it (the saved names at `initHome`: the online name, the
  * pass-and-play seats, gin's Score Counter players). `setValue` leaves the input being typed in
- * alone, so the fill after a keystroke moves only the other inputs.
+ * alone, so the fill after a keystroke moves only the other inputs. `isDefault` is the fill's
+ * `default` mark (shell.ts: nothing remembered, the game's default shown): the input is marked so
+ * the first tap clears it; a remembered or typed name (no mark) takes the mark off.
  */
-export const fillInputs = (doc: DocumentLike, ids: ReadonlyArray<string>, value: string): void => {
+export const fillInputs = (
+  doc: DocumentLike,
+  ids: ReadonlyArray<string>,
+  value: string,
+  isDefault = false,
+): void => {
   ids.forEach((id) => {
-    setValue(requireId(doc, id), value);
+    const input = requireId(doc, id);
+    setValue(input, value);
+    setAttr(input, DEFAULT_MARK, isDefault ? '1' : null);
+  });
+};
+
+/** A marked input (a prefilled default) empties and loses its mark; any other is left alone. */
+export const clearDefault = (input: Element): void => {
+  if (dataOf(input, 'default') === null) return;
+  setAttr(input, DEFAULT_MARK, null);
+  setValue(input, '');
+};
+
+/**
+ * The first tap or focus on a prefilled default clears it, once, as the Score Counter clears its 0
+ * (the owner, 2026-09-25: "when you click on a pre-filled name for the first time it will clear
+ * it. Similar to how when you click on the '0' in the gin rummy score keeper it will clear it").
+ * Both events, since a pointer clears before the focus lands and a keyboard focus has no pointer;
+ * the second finds no mark. Left empty, the seat still starts as the default (`localPlayers`).
+ */
+export const bindClearDefault = (input: Element): void => {
+  ['focus', 'pointerdown'].forEach((type) => {
+    listen(input, type, () => {
+      clearDefault(input);
+    });
   });
 };
 
@@ -259,6 +298,11 @@ export const bindHomeShell = <I, Tab extends string, Start>(
   const p2NameInput = requireId(doc, 'p2NameInput');
   listen(p2NameInput, 'input', () => {
     dispatch(intents.p2NameTyped(readValue(p2NameInput)));
+  });
+  // A prefilled default clears on its first tap (the owner, 2026-09-25); gin's Score Counter inputs
+  // are bound the same way by its own binder.
+  [nameInput, p1NameInput, p2NameInput].forEach((input) => {
+    bindClearDefault(input);
   });
   listenId(doc, 'hostBtn', 'click', () => {
     dispatch(intents.hostClick(readValue(nameInput), cfg.startOptions.host(doc)));
