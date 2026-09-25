@@ -608,14 +608,17 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
   /**
    * What a finished game leaves in the device's history (web/shared/lib/recentGames.ts), read off
    * the view the first time `engine.over` says so: the game's identity (`keyOf`, its start time,
-   * so a re-sent frame or a repaint records nothing and a rematch records again), its final
-   * score as the game spells it (gin "104–87", backgammon "5–3") and the winning seat, or null
-   * when nobody won.
+   * so a re-sent frame or a repaint records nothing and a rematch records again), every seat's
+   * name in seat order (`playersOf`: the view has them for every role, and a game with more than
+   * two seats names them all), its final score as the game spells it (gin "104–87", backgammon
+   * "5–3") and the winner, or null when nobody won: a seat, or the side seat 0 is on where a game
+   * plays in sides (briscola's teams), so `outcomeFor` reads it against the user's seat either way.
    */
   result: Readonly<{
     keyOf: (view: G['View']) => string;
+    playersOf: (view: G['View']) => ReadonlyArray<string>;
     scoreOf: (view: G['View']) => string;
-    winnerOf: (view: G['View']) => Seat | null;
+    winnerOf: (view: G['View']) => SeatOf<G> | null;
   }>;
   /** The game's protocol.ts builders the shell sends. */
   frames: Readonly<{
@@ -854,9 +857,7 @@ export const userSeatOf = (role: Role | null): Seat | null => {
  * the user's seat) goes first into `recentGames` and out as the `recordGame` effect, and its key
  * is kept so a re-sent frame, a repaint, a re-render or the guest's late `state` frame of the
  * same game records nothing more. Every view change ends in `painted` below, so pass-and-play,
- * the host and the guest all reach here. The names are the engine's where the game is here
- * (pass-and-play, the host), else the room's two names in seat order (the guest; a host that
- * never named itself, which no welcome frame allows, reads as the default host name).
+ * the host and the guest all reach here, each reading the names off its own view.
  */
 const recordResult = <G extends ShellTypes>(
   app: ShellApp<G>,
@@ -873,8 +874,7 @@ const recordResult = <G extends ShellTypes>(
   const game: RecentGame = {
     at: ctx.now(),
     mode: s.role === 'local' ? 'local' : 'online',
-    players:
-      s.game !== null ? cfg.engine.names(s.game) : [s.oppName ?? cfg.names.default, s.myName],
+    players: cfg.result.playersOf(view),
     score: cfg.result.scoreOf(view),
     winner,
     outcome: outcomeFor(seat, winner),

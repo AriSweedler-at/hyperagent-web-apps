@@ -113,6 +113,7 @@ export const BACKGAMMON_SHELL: ShellGameData<Backgammon> = {
   // rematch opens under a new one), its score the match score, its victor `matchWinner`.
   result: {
     keyOf: (view) => String(view.startedAt),
+    playersOf: (view) => view.players.map((p) => p.name),
     scoreOf: (view) => `${String(view.match.score[0])}–${String(view.match.score[1])}`,
     winnerOf: (view) => matchWinner(view.match),
   },

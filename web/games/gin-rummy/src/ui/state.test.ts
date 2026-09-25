@@ -1476,6 +1476,7 @@ describe('the finished game`s record (the owner, 2026-09-25)', () => {
   test('the adapters: the deal`s clock is the key, the two totals the score, the seat `readyAfterRound` named the victor', () => {
     const v = viewFor(drawn, 0);
     expect(GIN.result.keyOf(v)).toBe(String(drawn.startedAt));
+    expect(GIN.result.playersOf(v)).toEqual(['Ann', 'Jeff']);
     expect(GIN.result.scoreOf(v)).toBe('0–0');
     expect(GIN.result.winnerOf(v)).toBeNull();
     const finished: View = {

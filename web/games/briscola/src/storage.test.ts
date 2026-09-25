@@ -27,6 +27,7 @@ import {
   readP4Name,
   readPlayMode,
   readSave,
+  readRecentGames,
   readSoundFont,
   readSoundState,
   soundEnabled,
@@ -39,7 +40,9 @@ import {
   writeP4Name,
   writePlayMode,
   writeSave,
+  writeRecentGames,
   writeSoundFont,
+  appendRecentGame,
   writeSoundState,
 } from './storage.ts';
 
@@ -90,6 +93,7 @@ describe('frozen constants', () => {
       'briscola_playMode',
       'briscola_sound',
       'briscola_soundFont',
+      'briscola_recentGames',
       'briscola_cardPack',
       'briscola_players',
       'briscola_match',
@@ -359,5 +363,31 @@ describe('the room options', () => {
     expect(readOpts(store)).toEqual({ ...OPTS, scoperta: true });
     s.setItem(STORAGE_KEYS.players, '4');
     expect(readOpts(store)).toEqual({ ...OPTS, seatCount: 4, partnerPeek: true });
+  });
+});
+
+describe('the finished matches (the owner`s history, 2026-09-25)', () => {
+  test('a JSON list under the game`s own key, newest first; a missing or foreign value reads as none', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    expect(STORAGE_KEYS.recentGames).toBe('briscola_recentGames');
+    expect(readRecentGames(store)).toEqual([]);
+    const first = {
+      at: 1_700_000_000_000,
+      mode: 'local' as const,
+      players: ['Ann', 'Bob', 'Cara', 'Dan'],
+      score: '2–0',
+      winner: 0,
+      outcome: 'win' as const,
+    };
+    const second = { ...first, at: first.at + 1, winner: 1, outcome: 'loss' as const };
+    expect(appendRecentGame(store, first).ok).toBe(true);
+    expect(appendRecentGame(store, second).ok).toBe(true);
+    expect(s.map.get(STORAGE_KEYS.recentGames)).toBe(JSON.stringify([second, first]));
+    expect(readRecentGames(store)).toEqual([second, first]);
+    expect(writeRecentGames(store, [first]).ok).toBe(true);
+    expect(readRecentGames(store)).toEqual([first]);
+    s.setItem(STORAGE_KEYS.recentGames, '{"not":"a list"}');
+    expect(readRecentGames(store)).toEqual([]);
   });
 });

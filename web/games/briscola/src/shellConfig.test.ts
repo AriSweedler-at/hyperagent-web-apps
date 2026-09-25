@@ -192,6 +192,18 @@ describe('the engine adapters over a pair', () => {
     if (played.ok) expect(played.value.trick).toHaveLength(1);
   });
 
+  test('the finished match`s record: the deal`s clock, every name, the games won per side, the winning side', () => {
+    const { result } = BRISCOLA_SHELL;
+    const v = viewFor(game, 0);
+    expect(result.keyOf(v)).toBe(String(game.startedAt));
+    expect(result.playersOf(v)).toEqual(['Ann', 'Bob']);
+    expect(result.scoreOf(v)).toBe('0–0');
+    expect(result.winnerOf(v)).toBeNull();
+    const won = { ...v, match: { ...v.match, wins: [1, 2] }, matchOver: true };
+    expect(result.scoreOf(won)).toBe('1–2');
+    expect(result.winnerOf(won)).toBe(1);
+  });
+
   test('renameGuest renames seat 1 alone; decodeState is the engine decoder', () => {
     const renamed = engine.renameGuest(game, 'Zed');
     expect(renamed.players.map((p) => p.name)).toEqual(['Ann', 'Zed']);

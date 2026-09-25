@@ -81,7 +81,14 @@ type State = Readonly<{
   moves: number;
   over: boolean;
 }>;
-type View = Readonly<{ seat: Seat; turn: Seat; moves: number; over: boolean; isMyTurn: boolean }>;
+type View = Readonly<{
+  seat: Seat;
+  turn: Seat;
+  moves: number;
+  over: boolean;
+  isMyTurn: boolean;
+  names: Readonly<[string, string]>;
+}>;
 type Action = Readonly<{ type: 'move' | 'end' | 'bad' }>;
 type Opts = Readonly<{ level: number }>;
 type Table = Readonly<{ curtain: Seat | null; marks: ReadonlyArray<string> }>;
@@ -123,6 +130,7 @@ const viewFor = (game: State, seat: Seat): View => ({
   moves: game.moves,
   over: game.over,
   isMyTurn: game.turn === seat,
+  names: [game.players[0].name, game.players[1].name],
 });
 const apply = (game: State, seat: Seat, action: Action): Result<State, string> =>
   action.type === 'bad' || seat !== game.turn
@@ -212,6 +220,7 @@ const FAKE: ShellConfig<Fake> = {
   // same one), the score counts the moves, the ender wins unless nobody moved (a draw).
   result: {
     keyOf: (view) => `${String(view.moves)}:${String(view.turn)}`,
+    playersOf: (view) => view.names,
     scoreOf: (view) => `${String(view.moves)} moves`,
     winnerOf: (view) => (view.over && view.moves > 0 ? view.turn : null),
   },
@@ -1317,19 +1326,16 @@ describe('the finished game`s record (the owner, 2026-09-25)', () => {
     expect(won.app.shell.recorded).toBe('3:1');
     // The host re-broadcasts (a rejoin): nothing more.
     expect(records(broadcast(won.app, ctx, FAKE).effects)).toEqual([]);
-    // The guest: the host's welcome named it, then the state frame of the finished game, then
-    // the same frame re-sent.
-    const g = run(seated(), {
-      type: 'guest/frame',
-      frame: { t: 'welcome', hostName: 'Ann', level: 3 },
-    }).app;
+    // The guest: the host's state frame of the finished game (the names are the frame's: the
+    // host's game seats Ann and Jeff), then the same frame re-sent.
+    const g = seated();
     const frame = { t: 'state', view: viewFor(game(won.app), 1) } as const;
     const got = run(g, { type: 'guest/frame', frame });
     expect(records(got.effects)).toEqual([
       {
         at: NOW,
         mode: 'online',
-        players: ['Ann', 'Bo'],
+        players: ['Ann', 'Jeff'],
         score: '3 moves',
         winner: 1,
         outcome: 'win',
@@ -1338,9 +1344,6 @@ describe('the finished game`s record (the owner, 2026-09-25)', () => {
     expect(got.app.shell.recentGames).toHaveLength(1);
     const resent = run(got.app, { type: 'guest/frame', frame }, { type: 'render' });
     expect(records(resent.effects)).toEqual([]);
-    // A guest that never heard the host's name records the default host name for seat 0.
-    const nameless = run(withShell(g, { oppName: null }), { type: 'guest/frame', frame });
-    expect(records(nameless.effects)[0]?.players).toEqual(['Ari', 'Bo']);
   });
 
   test('a game still on records nothing, whatever the paint', () => {

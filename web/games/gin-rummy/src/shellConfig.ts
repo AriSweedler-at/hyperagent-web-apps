@@ -91,6 +91,7 @@ export const GIN_SHELL: ShellGameData<Gin> = {
   // deals under a new one), its score the two totals, its victor the seat `readyAfterRound` named.
   result: {
     keyOf: (view) => String(view.startedAt),
+    playersOf: (view) => view.players.map((p) => p.name),
     scoreOf: (view) => `${String(view.players[0].total)}–${String(view.players[1].total)}`,
     winnerOf: (view) => view.winner,
   },
