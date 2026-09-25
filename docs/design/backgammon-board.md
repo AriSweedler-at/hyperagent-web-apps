@@ -476,8 +476,10 @@ readable beneath) with §2.4's curtain copy from `curtainText(view, incoming)` (
 and table-tested): `#curtainLast` is `lastTurnText(view, incoming)`, the turn just finished with
 its hits in the incoming player's numbering through `hitsAgainst`, or the opening roll before any
 turn. One tap dispatches `curtain/reveal`; the roll modal (§4.7) then asks the revealed seat for the roll
-(until 2026-09-24 the button rolled too, promised as `data-rolls`; the shared curtain still takes
-`attrs`, and no game passes one). `#curtainHandoffBtn` "Continue online" is gin's handoff (`handoff/click`).
+(until 2026-09-24 the button rolled too, promised as `data-rolls` through an `attrs` field on the
+shared `CurtainText`; docs/design/dry-round-2.md E10 deleted that field and the button argument of
+`onReveal` once no game passed or read one). `#curtainHandoffBtn` "Continue online" is gin's
+handoff (`handoff/click`).
 `curtainMode: 'never'` (the menu toggle, persisted) skips the overlay; nothing is hidden either way
 (Q4). A forfeited roll (R14) keeps the roller's dice on show for `NO_MOVE_MS` before the curtain
 rises.
