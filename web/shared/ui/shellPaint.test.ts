@@ -3,8 +3,11 @@
 // games' render.test.ts suites pin through their wrappers.
 import { describe, expect, test } from 'vitest';
 
+import { closestFrom, dataOf } from '../edge/dom.ts';
 import { fakeEl, fakePage, fakeTarget, type FakePage } from '../edge/page.fake.ts';
 import {
+  bindButtons,
+  bindLongPress,
   bindSheets,
   hideToast,
   paintHandoff,
@@ -34,6 +37,9 @@ const page = (): FakePage =>
     fakeEl('closeRulesBtn'),
     fakeEl('menuOverlay', { classes: ['overlay', 'hidden'] }),
     fakeEl('closeMenuBtn'),
+    fakeEl('stockPile'),
+    fakeEl('undoBtn', { attrs: { disabled: '' } }),
+    fakeEl('hand'),
   ]);
 
 const shown = (p: FakePage): ReadonlyArray<string> => SCREENS.filter((id) => !p.get(id).hidden());
@@ -185,5 +191,112 @@ describe('paintSheet / bindSheets', () => {
     expect(intents.at(-1)).toEqual({ type: 'menu/toggle' });
     p.fire('keydown', { key: 'x' });
     expect(intents).toHaveLength(2);
+  });
+});
+
+describe('bindButtons', () => {
+  const BUTTONS = [
+    ['stockPile', { type: 'stock/tap' }],
+    ['soundBtn', { type: 'sound/toggle' }],
+    ['undoBtn', { type: 'undo/click' }],
+  ] as const;
+
+  test("every entry's click dispatches its constant; a disabled control is not skipped by default", () => {
+    const p = page();
+    const intents: Intent[] = [];
+    bindButtons(
+      p.doc,
+      (i: Intent) => {
+        intents.push(i);
+      },
+      BUTTONS,
+    );
+    p.get('stockPile').fire('click');
+    p.get('soundBtn').fire('click');
+    p.get('undoBtn').fire('click');
+    p.get('stockPile').fire('pointerdown');
+    expect(intents).toEqual([
+      { type: 'stock/tap' },
+      { type: 'sound/toggle' },
+      { type: 'undo/click' },
+    ]);
+  });
+
+  test('skipDisabled: true drops the click on a disabled control and no other; false drops none', () => {
+    const skipping = page();
+    const skipped: Intent[] = [];
+    bindButtons(
+      skipping.doc,
+      (i: Intent) => {
+        skipped.push(i);
+      },
+      BUTTONS,
+      { skipDisabled: true },
+    );
+    skipping.get('undoBtn').fire('click');
+    skipping.get('soundBtn').fire('click');
+    expect(skipped).toEqual([{ type: 'sound/toggle' }]);
+    skipping.get('undoBtn').el.removeAttribute('disabled');
+    skipping.get('undoBtn').fire('click');
+    expect(skipped.at(-1)).toEqual({ type: 'undo/click' });
+    const plain = page();
+    const all: Intent[] = [];
+    bindButtons(
+      plain.doc,
+      (i: Intent) => {
+        all.push(i);
+      },
+      BUTTONS,
+      { skipDisabled: false },
+    );
+    plain.get('undoBtn').fire('click');
+    expect(all).toEqual([{ type: 'undo/click' }]);
+  });
+
+  test('a missing id throws at bind time, as listenId does', () => {
+    const p = page();
+    expect(() => {
+      bindButtons(p.doc, () => undefined, [['noSuchBtn', { type: 'x' }]]);
+    }).toThrow('missing element #noSuchBtn');
+  });
+});
+
+describe('bindLongPress', () => {
+  const wiredPress = (
+    press: Intent | ((e: Readonly<Event>) => Intent | null),
+  ): Readonly<{ p: FakePage; intents: Intent[] }> => {
+    const p = page();
+    const intents: Intent[] = [];
+    bindLongPress(
+      p.get('hand').el,
+      (i: Intent) => {
+        intents.push(i);
+      },
+      { press, release: { type: 'release' } },
+    );
+    return { p, intents };
+  };
+
+  test('a constant press on pointerdown; release on pointerup, pointerleave and pointercancel', () => {
+    const { p, intents } = wiredPress({ type: 'press' });
+    p.get('hand').fire('pointerdown');
+    p.get('hand').fire('pointerup');
+    p.get('hand').fire('pointerleave');
+    p.get('hand').fire('pointercancel');
+    p.get('hand').fire('click');
+    expect(intents.map((i) => i.type)).toEqual(['press', 'release', 'release', 'release']);
+  });
+
+  test('a press function names the intent from the event, or null for nothing to press', () => {
+    const card = fakeEl('card', { attrs: { 'data-card': 'AS' } });
+    const { p, intents } = wiredPress((e) => {
+      const el = closestFrom(e, '.card');
+      return el === null ? null : { type: `press:${dataOf(el, 'card') ?? ''}` };
+    });
+    p.get('hand').fire('pointerdown');
+    expect(intents).toEqual([]);
+    p.get('hand').fire('pointerdown', { target: fakeTarget({ closest: { '.card': card } }) });
+    p.get('hand').fire('pointerup');
+    expect(intents).toEqual([{ type: 'press:AS' }, { type: 'release' }]);
   });
 });

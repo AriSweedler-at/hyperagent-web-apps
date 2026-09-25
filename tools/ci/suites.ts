@@ -141,6 +141,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // 100/100/100/100 through home.test.ts over the same fake page.
         // keyed.ts, the keyed slot out of shellPaint.ts (docs/design/dry-round-2.md D1), measures
         // 100/100/100/100 through keyed.test.ts over a fake element; the folder stays at 100.
+        // D2's bindButtons and press-as-function bindLongPress (shellPaint.ts, items E4 and E5)
+        // measure 100/100/100/100 through five shellPaint.test.ts cases over the fake page (every
+        // entry's click, skipDisabled on and off, the missing id, the constant and the function
+        // press); the folder stays at 100 (230 lines, 103 functions, 253 statements, 80 branches).
         'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The coin game (dry-round-2.md F3): the two-seat engine the replay driver under test/shared
         // is proved on, and the shared shell's fake game to come. It exists to be exercised, so
@@ -227,6 +231,11 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // web/shared/edge/page.fake.ts `shellPage`, on top of D1: ui 98.08/97.13/97.05/94.16 before,
       // 98.07/97.10/97.04/94.14 after (the same 24 lines uncovered, 1252 → 1246 lines; the wrapper
       // measures 100 on every metric).
+      // Re-measured when D2 (dry-round-2 E4, E5) bound bindTable's fifteen constant controls through
+      // web/shared/ui/shellPaint.ts bindButtons and the card press through its bindLongPress:
+      // ui 98.07/97.10/97.04/94.14 before, 98.52/98.18/97.55/94.58 after (the press and the three
+      // release closures the bind test never fired left with the click closures; render.test.ts
+      // gained the press-and-release case; the row stands).
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,

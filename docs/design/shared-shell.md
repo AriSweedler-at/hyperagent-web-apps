@@ -132,7 +132,7 @@ Identical share = identical lines / lines of the smaller file (difflib), whole f
 web/shared/
   ui/                         new zone: may import shared/lib, shared/edge/dom.ts, shared/edge/clock.ts; never a game
     shell.ts                  reduceShell, ShellState, ShellIntent, ShellEffect, runShellEffect, hostContextOf, guestContextOf, saveFor, readHome
-    shellPaint.ts             paintScreen, paintWaiting, showToast/hideToast, paintSound, paintHandoff, paintSheet, bindSheets (re-exports ensureKeyed)
+    shellPaint.ts             paintScreen, paintWaiting, showToast/hideToast, paintSound, paintHandoff, paintSheet, bindSheets, bindButtons + bindLongPress (dry-round-2.md D2) (re-exports ensureKeyed)
     keyed.ts                  ensureKeyed, the keyed slot both table halves repaint through (out of shellPaint.ts in dry-round-2.md D1)
     home.ts                   paintTabs, paintPlayMode, paintSubmenu, paintResume, bindHomeShell, bindLongPress, fillInputs, setCodeInput, blocksCodeInput, tabButtonId
     curtain.ts                CurtainText, paintCurtain, bindCurtain
@@ -354,6 +354,8 @@ export const paintHandoff = (doc: Document, label: string | null): void;        
 export const paintSheet = (doc: Document, id: string, open: boolean): void;
 export const bindSheets = <I>(doc: Document, sheets: ReadonlyArray<{ overlay: string; close: string; intent: I }>, dispatch: (i: I) => void, opts?: { escapeFallback?: I }): void;
 export const ensureKeyed = (el: Element, key: string, markup: () => string): void;           // gin ensurePile, bg ensureKeyed + renderRules; in keyed.ts since dry-round-2.md D1
+export const bindButtons = <I>(doc: Document, dispatch: (i: I) => void, entries: ReadonlyArray<readonly [id: string, intent: I]>, opts?: { skipDisabled: boolean }): void;   // dry-round-2.md D2 E4: gin bindTable's constant blocks, bg button()
+export const bindLongPress = <I>(el: Element, dispatch: (i: I) => void, intents: { press: I | ((e: Event) => I | null); release: I }): void;   // D2 E5: home.ts's, press widened for gin's card press
 
 // home.ts
 export type HomeView<Tab extends string> = Readonly<{ homeTab: Tab; playMode: PlayMode; submenuOpen: boolean; resumeLabel: string | null }>;
@@ -452,7 +454,7 @@ Its N-seat `HostSession` is the seed for any fourth game that needs more than tw
 
 Rules for every PR: code moves, it is not rewritten; both games' suites run unchanged against thin wrappers; wire bytes and storage literals do not change; a new shared folder is registered (eslint zone row + `except` entries, vitest `coverage.include` + a thresholds group measured in the same PR, tsconfig includes) in the PR that creates it; each PR re-measures the per-folder coverage rows it shrinks (README step 5: nothing existing goes down). Main is unprotected: watch CI, then merge; never `--auto`.
 
-The second round under the same rules, measured on main after Waves A-B with C2/C3 in flight (what else hoists out of the table UI, the engines, the styles and markup, fidice and the harness, and how each kernel is unit-tested on the fakes), is [docs/design/dry-round-2.md](dry-round-2.md); its Wave D1 (`web/shared/ui/keyed.ts`) landed first.
+The second round under the same rules, measured on main after Waves A-B with C2/C3 in flight (what else hoists out of the table UI, the engines, the styles and markup, fidice and the harness, and how each kernel is unit-tested on the fakes), is [docs/design/dry-round-2.md](dry-round-2.md); its Wave D1 (`web/shared/ui/keyed.ts`) landed first; D2 (`bindButtons` and the press-as-function `bindLongPress` in `shellPaint.ts`) is in too.
 
 Sequencing against the in-flight work: **bg-online (PR-D)** edits exactly the shell slice (`ONLINE_MODE_SHOWN` in `ui/state.ts`, `paintOnlineOption` in `home.ts`, `paintHandoff`/`curtainHandoffBtn` in `render.ts`/`local.ts`, `index.html`'s default mode, `e2e/fixtures/backgammon.ts`, `backgammon-local.spec.ts`, `tools/parity/computed-styles.ts`, and re-records backgammon's two computed-style goldens); **bg-polish** touches only `theme.css`. Both are unpushed worktrees today. Wave A touches none of those files and can land before them; Waves B-D wait.
 

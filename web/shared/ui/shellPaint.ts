@@ -14,6 +14,7 @@
 // compiles them (they need the DOM lib through dom.ts).
 import {
   hasClass,
+  isDisabled,
   keyOf,
   listen,
   listenId,
@@ -23,6 +24,7 @@ import {
   targetIdOf,
   toggleClass,
   type DocumentLike,
+  type Element,
   type PageLike,
 } from '../edge/dom.ts';
 
@@ -141,6 +143,68 @@ export const bindSheets = <I>(
     if (keyOf(e) !== 'Escape') return;
     const open = sheets.find((s) => !hasClass(requireId(doc, s.overlay), 'hidden'));
     dispatch(open === undefined ? opts.escapeFallback : open.intent);
+  });
+};
+
+/**
+ * A table of controls that each dispatch one constant intent on click, bound in one call
+ * (docs/design/dry-round-2.md D2, item E4): the eleven `listenId(doc, id, 'click', () =>
+ * dispatch({ ... }))` blocks gin's `bindTable` spelled and the sixteen `button(...)` lines
+ * backgammon's did, which differed only in the id and the literal. A missing id throws at bind
+ * time, as `listenId` does. `skipDisabled` is backgammon's `button()`: a click on a control that
+ * carries `disabled` dispatches nothing (gin's constant controls never carry it and leave it off;
+ * its `#actions` row is delegated and checks the attribute itself).
+ */
+export type ButtonIntents<I> = ReadonlyArray<readonly [id: string, intent: I]>;
+
+export const bindButtons = <I>(
+  doc: DocumentLike,
+  dispatch: Dispatch<I>,
+  entries: ButtonIntents<I>,
+  opts?: Readonly<{ skipDisabled: boolean }>,
+): void => {
+  entries.forEach(([id, intent]) => {
+    const el = requireId(doc, id);
+    listen(el, 'click', () => {
+      if (opts?.skipDisabled === true && isDisabled(el)) return;
+      dispatch(intent);
+    });
+  });
+};
+
+/**
+ * What a long press dispatches: `press` at pointerdown, one intent or a function of the event
+ * that names the intent, or null for a pointer that landed on nothing pressable (gin's hand: a
+ * card's id, or the felt between the cards); `release` when the pointer lifts, leaves or is
+ * cancelled. The timer that turns a press into a long press is the reducer's, not this binder's.
+ */
+export type LongPressIntents<I> = Readonly<{
+  press: I | ((e: Readonly<Event>) => I | null);
+  release: I;
+}>;
+
+const isPressOf = <I>(
+  press: LongPressIntents<I>['press'],
+): press is (e: Readonly<Event>) => I | null => typeof press === 'function';
+
+/**
+ * home.ts's `bindLongPress` (the Play tab's submenu) with `press` widened to a function for gin's
+ * card press (docs/design/dry-round-2.md D2, item E5); the home shell adopts this one when C2 has
+ * landed (Wave G: its `press` is the constant form, so the call reads the same).
+ */
+export const bindLongPress = <I>(
+  el: Element,
+  dispatch: Dispatch<I>,
+  intents: LongPressIntents<I>,
+): void => {
+  listen(el, 'pointerdown', (e) => {
+    const intent = isPressOf(intents.press) ? intents.press(e) : intents.press;
+    if (intent !== null) dispatch(intent);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => {
+    listen(el, ev, () => {
+      dispatch(intents.release);
+    });
   });
 };
 

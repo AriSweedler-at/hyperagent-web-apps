@@ -56,6 +56,8 @@ import { flipCards } from './hand/flip.ts';
 import { phoneRows, samePicture } from './hand/picture.ts';
 import { SORT_MODES, type SortMode } from '../sort.ts';
 import {
+  bindButtons,
+  bindLongPress,
   bindSheets as bindShellSheets,
   paintHandoff as paintShellHandoff,
   paintScreen as paintShellScreen,
@@ -680,49 +682,54 @@ export const paint = (doc: PageLike, app: App, handView: HandView): void => {
 
 const isSortMode = (mode: string | null): mode is SortMode => SORT_MODES.some((s) => s === mode);
 
+/** The card an event landed on, by its `data-card` id; null between the cards. */
+const cardIdFrom = (e: Readonly<Event>): string | null => {
+  const card = closestFrom(e, '.card');
+  return card === null ? null : dataOf(card, 'card');
+};
+
 /** The table's, the sheets' and the endgame's controls, each an intent (the legacy click handlers). */
 export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
-  listenId(doc, 'stockPile', 'click', () => {
-    dispatch({ type: 'stock/tap' });
-  });
-  listenId(doc, 'discardPile', 'click', () => {
-    dispatch({ type: 'discard/tap' });
-  });
+  // The controls whose click is one constant (docs/design/dry-round-2.md D2, item E4); the rest
+  // read the event.
+  bindButtons(doc, dispatch, [
+    ['stockPile', { type: 'stock/tap' }],
+    ['discardPile', { type: 'discard/tap' }],
+    ['soundBtn', { type: 'sound/toggle' }],
+    ['deadwoodInfo', { type: 'meld/open' }],
+    ['discardsBtn', { type: 'discards/open' }],
+    ['arrangeBtn', { type: 'arrange/open' }],
+    ['rrContinueBtn', { type: 'act', action: { type: 'ready' } }],
+    ['rrHideBtn', { type: 'result/hide' }],
+    ['rematchBtn', { type: 'act', action: { type: 'ready' } }],
+    ['leaveBtn', { type: 'leave/request' }],
+    ['leaveBtnEnd', { type: 'leave/request' }],
+    ['handoffBtn', { type: 'handoff/click' }],
+    ['rulesBtnGame', { type: 'rules/open' }],
+    ['historyBtn', { type: 'history/open', who: 'game' }],
+    ['historyBtnEnd', { type: 'history/open', who: 'game' }],
+  ]);
   listenId(doc, 'hand', 'click', (e) => {
-    const card = closestFrom(e, '.card');
-    const id = card === null ? null : dataOf(card, 'card');
+    const id = cardIdFrom(e);
     if (id !== null) dispatch({ type: 'card/tap', cardId: id });
-  });
-  listenId(doc, 'soundBtn', 'click', () => {
-    dispatch({ type: 'sound/toggle' });
-  });
-  listenId(doc, 'deadwoodInfo', 'click', () => {
-    dispatch({ type: 'meld/open' });
-  });
-  listenId(doc, 'discardsBtn', 'click', () => {
-    dispatch({ type: 'discards/open' });
   });
   listenId(doc, 'discardsHandToggle', 'change', () => {
     dispatch({ type: 'discards/toggleHand' });
-  });
-  listenId(doc, 'arrangeBtn', 'click', () => {
-    dispatch({ type: 'arrange/open' });
   });
   listenId(doc, 'arrangeModes', 'click', (e) => {
     const btn = closestFrom(e, 'button[data-sort]');
     const mode = btn === null ? null : dataOf(btn, 'sort');
     if (isSortMode(mode)) dispatch({ type: 'hand/arrange', mode });
   });
-  // A long press on a card (the pointer held for the reducer's timer) makes or breaks a meld by hand.
-  listenId(doc, 'hand', 'pointerdown', (e) => {
-    const card = closestFrom(e, '.card');
-    const id = card === null ? null : dataOf(card, 'card');
-    if (id !== null) dispatch({ type: 'card/press', cardId: id });
-  });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => {
-    listenId(doc, 'hand', ev, () => {
-      dispatch({ type: 'card/release' });
-    });
+  // A long press on a card (the pointer held for the reducer's timer) makes or breaks a meld by
+  // hand (docs/design/dry-round-2.md D2, item E5); bound before the dragger so its pointerdown
+  // and release listeners on #hand run first, as they did.
+  bindLongPress(requireId(doc, 'hand'), dispatch, {
+    press: (e): Intent | null => {
+      const id = cardIdFrom(e);
+      return id === null ? null : { type: 'card/press', cardId: id };
+    },
+    release: { type: 'card/release' },
   });
   // A loose card dragged by hand: the ghost, the glide of the others, the landing (dragger.ts).
   bindDrag(doc, dispatch);
@@ -736,31 +743,6 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
     if (btn === null || isDisabled(btn)) return;
     const act = dataOf(btn, 'act');
     if (act !== null) dispatch({ type: 'action/click', act });
-  });
-  listenId(doc, 'rrContinueBtn', 'click', () => {
-    dispatch({ type: 'act', action: { type: 'ready' } });
-  });
-  listenId(doc, 'rrHideBtn', 'click', () => {
-    dispatch({ type: 'result/hide' });
-  });
-  listenId(doc, 'rematchBtn', 'click', () => {
-    dispatch({ type: 'act', action: { type: 'ready' } });
-  });
-  ['leaveBtn', 'leaveBtnEnd'].forEach((id) => {
-    listenId(doc, id, 'click', () => {
-      dispatch({ type: 'leave/request' });
-    });
-  });
-  listenId(doc, 'handoffBtn', 'click', () => {
-    dispatch({ type: 'handoff/click' });
-  });
-  listenId(doc, 'rulesBtnGame', 'click', () => {
-    dispatch({ type: 'rules/open' });
-  });
-  ['historyBtn', 'historyBtnEnd'].forEach((id) => {
-    listenId(doc, id, 'click', () => {
-      dispatch({ type: 'history/open', who: 'game' });
-    });
   });
 };
 
