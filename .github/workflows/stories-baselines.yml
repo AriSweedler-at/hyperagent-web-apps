@@ -1,5 +1,6 @@
-# Records the linux screenshot baselines of the stories spec (e2e/gin-stories.spec.ts; docs/ARCHITECTURE.md
-# "Testing pyramid" 5) on the same runner image CI's e2e job uses. Playwright compares every
+# Records the linux screenshot baselines of a stories spec (the `spec` input; e2e/gin-stories.spec.ts by
+# default, docs/ARCHITECTURE.md "Testing pyramid" 5; any spec over e2e/fixtures/stories.ts `storiesSpec`
+# can name itself, dry-round-2.md I3) on the same runner image CI's e2e job uses. Playwright compares every
 # `toHaveScreenshot` against a per-platform file (playwright.config.ts `snapshotPathTemplate`:
 # e2e/__screenshots__/gin-stories.spec.ts/<story>--<viewport>-<platform>.png). The -darwin.png files
 # are recorded on the owner's machine with the same command; the -linux.png files come from here,
@@ -8,7 +9,7 @@
 # whose PR changes how the table looks; the e2e job of ci.yml FAILS on that branch until the -linux.png
 # files this job records are committed:
 #
-#   gh workflow run stories-baselines.yml --ref <branch>
+#   gh workflow run stories-baselines.yml --ref <branch> [-f spec=e2e/<game>-stories.spec.ts]
 #   gh run watch "$(gh run list --workflow stories-baselines.yml --branch <branch> --limit 1 --json databaseId --jq '.[0].databaseId')"
 #   gh run download -n stories-baselines-linux -D e2e/__screenshots__
 #   git add e2e/__screenshots__ && git commit -m "test(e2e): Record the linux story baselines"
@@ -19,6 +20,10 @@ name: Stories baselines (linux)
 
 on:
   workflow_dispatch:
+    inputs:
+      spec:
+        description: The stories spec whose baselines are recorded
+        default: e2e/gin-stories.spec.ts
 
 permissions:
   contents: read
@@ -43,7 +48,7 @@ jobs:
         uses: ./.github/actions/playwright-chromium
       # Builds dist/ first (test:e2e), starts the pages server, records or rewrites every baseline.
       - name: Record the linux baselines of every story at both screenshot viewports
-        run: npm run test:e2e -- e2e/gin-stories.spec.ts --project pages --update-snapshots=all
+        run: npm run test:e2e -- "${{ inputs.spec }}" --project pages --update-snapshots=all
       - name: Upload the baselines
         uses: actions/upload-artifact@v4
         with:
