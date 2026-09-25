@@ -8,12 +8,12 @@
 // derived file's own frame size back so a stale tree fails until the tool is re-run.
 //
 //   node --experimental-strip-types tools/card-packs.ts build
-//       every PACK_SOURCES entry, idempotent (none today: no sourced deck has a licence the owner
-//       has accepted; docs/design/card-packs.md "Licences")
+//       every PACK_SOURCES entry, idempotent (today napoletane, the sheet the owner supplied on
+//       2026-09-25; docs/design/card-packs.md §7)
 //   node --experimental-strip-types tools/card-packs.ts add <name> --deck italian40 --faces <dir> [--back <img>] \
 //       --label … --author … --source-url … --licence … [--licence-url …] [--note …] [--mask <id>:<x>,<y>,<w>,<h>]… [--map <file>]
 //   node --experimental-strip-types tools/card-packs.ts add <name> --deck italian40 --sheet <img> --rows C,D,S,B \
-//       --cols A,2,3,4,5,6,7,F,C,R [--back <img>] … (the same pack options)
+//       --cols A,2,3,4,5,6,7,F,C,R [--grid <inset>] [--back <img>] … (the same pack options)
 //   node --experimental-strip-types tools/card-packs.ts check
 //   node --experimental-strip-types tools/card-packs.ts preview <name> [--deck italian40] [--width 120] [--out <png>]
 //
@@ -24,16 +24,30 @@
 // split by a gap under MIN_GUTTER px are merged, so a card's white interior is not a gutter), each
 // cell trimmed to its ink box plus TRIM_MARGIN, then every cell normalised to the grid's median size
 // centred on its ink box (the prototype's three-column cells came out 6% narrower because the
-// threes' border is fainter). `--mask` paints a white rectangle over a region of one face (source
-// pixels, after the cut) before deriving: the maker's mark on an ace of coins. No raw loops (the
-// repo's lint), so the pixel work runs inside the page scripts, which are strings.
+// threes' border is fainter). That wants a printed border and a white gutter; a sheet of borderless
+// cards laid edge to edge on the scanner bed (the owner's Napoletane sheet) has neither: its white
+// margins read as gutters and a six's two pip columns as two cards. `--grid <inset>` cuts such a
+// sheet instead: `cols × rows` equal cells, each interior line snapped to the seam between two cards
+// (a thin grey scan shadow with paper either side, scored along the row within GRID_SNAP px; a row
+// that shows none takes the seam the other rows found, else the equal line), every cell equalised
+// to the median card (a cell on the sheet's edge keeps its seam and grows outward, past a scan that
+// clipped the outer margins), then `inset` px shaved so the seam's shadow stays out. `--mask` paints
+// a white rectangle over a region of one face (source pixels, after the cut) before deriving: the
+// maker's mark on an ace of coins. No raw loops (the repo's lint), so the pixel work runs inside the
+// page scripts, which are strings.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { chromium, type Page } from '@playwright/test';
 
-import { DECKS, cardIds, isDeckKind, type DeckKind } from '../web/shared/lib/cards/decks.ts';
+import {
+  DECKS,
+  cardIds,
+  isDeckKind,
+  splitId,
+  type DeckKind,
+} from '../web/shared/lib/cards/decks.ts';
 import {
   CARD_PACKS,
   FACE_WIDTH,
@@ -51,6 +65,14 @@ export const GUTTER_SHARE = 0.02;
 export const MIN_GUTTER = 4;
 /** Kept around a cell's ink box so the card's own border is the edge. */
 export const TRIM_MARGIN = 6;
+/** `--grid`: how far from the equal grid's line the seam between two cards may sit (a hand-laid sheet drifts). */
+export const GRID_SNAP = 40;
+/** `--grid`: the share of a seam's length that must read as a thin grey line for the seam to count. */
+export const MIN_SEAM = 0.4;
+/** `--grid`: a pixel whose darkest channel is under this is not bare paper (a card's scan shadow is 160–240). */
+export const PAPER = 245;
+/** `--grid`: paper this many px either side of a seam; a sword's edge fails the test, its blade being there. */
+export const SEAM_CLEAR = 6;
 /** The caps the manifest test holds a pack to. */
 export const MAX_FACE_BYTES = 120_000;
 export const MAX_PACK_BYTES = 6_000_000;
@@ -67,6 +89,8 @@ export type SourceSpec = Readonly<{
         file: string;
         rows: ReadonlyArray<string>;
         cols: ReadonlyArray<string>;
+        /** Null: cells from the ink profiles (a bordered sheet with gutters); a number: the seam grid, this many px shaved per side. */
+        grid: number | null;
       }>;
   back: string | null;
   label: string;
@@ -79,8 +103,33 @@ export type SourceSpec = Readonly<{
   map: string | null;
 }>;
 
-/** The sourced packs `build` derives: none ships until the owner accepts a licence (see the header). */
-export const PACK_SOURCES: Readonly<Record<string, SourceSpec>> = {};
+/**
+ * The sourced packs `build` derives, each the `add` that made it (docs/design/card-packs.md §7):
+ * `napoletane` is the one sheet the owner supplied on 2026-09-25, so the rule that no sourced deck
+ * ships is lifted for it alone; the Trocche100 per-card scans stay out.
+ */
+export const PACK_SOURCES: Readonly<Record<string, SourceSpec>> = {
+  napoletane: {
+    deck: 'italian40',
+    faces: {
+      kind: 'sheet',
+      file: 'assets/cards/napoletane/sheet.jpg',
+      // The sheet's own order, top to bottom and left to right (assets/cards/napoletane/SOURCES.txt).
+      rows: ['D', 'C', 'B', 'S'],
+      cols: ['A', '2', '3', '4', '5', '6', '7', 'F', 'C', 'R'],
+      grid: 6,
+    },
+    back: null,
+    label: 'Napoletane',
+    author: 'Florixc (Wikimedia Commons)',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Carte_napoletane_al_completo.jpg',
+    licence: 'Public domain',
+    licenceUrl: 'https://commons.wikimedia.org/wiki/Template:PD-self',
+    note: 'Supplied by the owner on 2026-09-25; the Neapolitan pattern, one sheet of 40',
+    masks: [],
+    map: null,
+  },
+};
 
 // ---- paths ---------------------------------------------------------------------------------------
 
@@ -287,6 +336,87 @@ export const normaliseCells = (boxes: ReadonlyArray<Rect>, sheet: Size): Readonl
     w,
     h,
   }));
+};
+
+// ---- the seam grid (`--grid`): the pure half ----------------------------------------------------
+
+/** The `n + 1` lines that cut `extent` into `n` equal cells: 0 first, `extent` last. */
+export const gridLines = (extent: number, n: number): ReadonlyArray<number> =>
+  Array.from({ length: n + 1 }, (_, k) => Math.round((k * extent) / n));
+
+/**
+ * Where one interior grid line's seam runs along each row (or column) it crosses. `scores[r][i]` is
+ * the seam score at `line - snap + i` along row `r`: the best offset wins when its score reaches
+ * `min`; a row that shows no seam (the shadow fades where the scanner's light fell flat) takes the
+ * median of the rows that found one, and a seam no row found is the grid line itself.
+ */
+export const seamPositions = (
+  line: number,
+  scores: ReadonlyArray<ReadonlyArray<number>>,
+  snap: number = GRID_SNAP,
+  min: number = MIN_SEAM,
+): ReadonlyArray<number> => {
+  const found = scores.map((row) => {
+    const best = row.reduce((b, s, i) => (s > (row[b] ?? -1) ? i : b), 0);
+    return (row[best] ?? 0) >= min ? line - snap + best : null;
+  });
+  const seen = found.filter((p): p is number => p !== null);
+  const fallback = seen.length === 0 ? line : median(seen);
+  return found.map((p) => p ?? fallback);
+};
+
+/**
+ * The cells a seam grid bounds, row-major: `vertical[r]` is row `r`'s `cols + 1` x lines (0 first,
+ * the sheet's width last), `horizontal[c]` column `c`'s `rows + 1` y lines.
+ */
+export const cellsFromSeams = (
+  vertical: ReadonlyArray<ReadonlyArray<number>>,
+  horizontal: ReadonlyArray<ReadonlyArray<number>>,
+): ReadonlyArray<Rect> =>
+  vertical.flatMap((xs, r) =>
+    xs.slice(0, -1).map((x, c) => {
+      const y = horizontal[c]?.[r] ?? 0;
+      return { x, y, w: (xs[c + 1] ?? x) - x, h: (horizontal[c]?.[r + 1] ?? y) - y };
+    }),
+  );
+
+/**
+ * Every cell takes the grid's median size (the cards are one physical size; a seam a few px off
+ * made a cell a few px small): centred where it was, except that a cell on the sheet's edge keeps
+ * its seam side and grows outward, past the sheet when the scan clipped the outer margin (what
+ * lies outside is drawn as paper). Not clamped, unlike `normaliseCells`, for that reason.
+ */
+export const equaliseCells = (cells: ReadonlyArray<Rect>, sheet: Size): ReadonlyArray<Rect> => {
+  const w = median(cells.map((c) => c.w));
+  const h = median(cells.map((c) => c.h));
+  const place = (start: number, length: number, size: number, extent: number): number =>
+    start <= 0
+      ? start + length - size
+      : start + length >= extent
+        ? start
+        : Math.round(start + length / 2 - size / 2);
+  return cells.map((c) => ({
+    x: place(c.x, c.w, w, sheet.width),
+    y: place(c.y, c.h, h, sheet.height),
+    w,
+    h,
+  }));
+};
+
+/** The rectangle with `inset` px shaved from each side: the seam's own shadow stays out of the cut. */
+export const shrink = (r: Rect, inset: number): Rect => ({
+  x: r.x + inset,
+  y: r.y + inset,
+  w: r.w - 2 * inset,
+  h: r.h - 2 * inset,
+});
+
+/** `--grid <inset>`: a whole number of px shaved from each side of a seam-grid cell; absent, the ink cutter. */
+export const gridInset = (value: string | null): number | null => {
+  if (value === null) return null;
+  if (!/^\d+$/.test(value))
+    throw new Error(`--grid ${value}: expected a whole number of px to shave per side`);
+  return Number(value);
 };
 
 // ---- the manifest --------------------------------------------------------------------------------
@@ -566,7 +696,11 @@ const drawDerived = (
     const crop = ${JSON.stringify(crop)} ?? { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
     const cut = document.createElement('canvas'); cut.width = crop.w; cut.height = crop.h;
     const cctx = cut.getContext('2d'); cctx.fillStyle = '#fff'; cctx.fillRect(0, 0, crop.w, crop.h);
-    cctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+    // A seam-grid cell may reach past a scan that clipped the outer cards: only the part inside the
+    // picture is drawn, and what lies outside stays paper white.
+    const sx = Math.max(0, crop.x), sy = Math.max(0, crop.y);
+    const sw = Math.min(img.naturalWidth, crop.x + crop.w) - sx, sh = Math.min(img.naturalHeight, crop.y + crop.h) - sy;
+    if (sw > 0 && sh > 0) cctx.drawImage(img, sx, sy, sw, sh, sx - crop.x, sy - crop.y, sw, sh);
     for (const m of ${JSON.stringify(mask)}) { cctx.fillStyle = '#fff'; cctx.fillRect(m.x, m.y, m.w, m.h); }
     const out = document.createElement('canvas'); out.width = ${String(size.width)}; out.height = ${String(size.height)};
     const ctx = out.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
@@ -617,6 +751,43 @@ const inkBoxes = (
     });
   })()`);
 
+/**
+ * `--grid`: the seam score at every offset within GRID_SNAP of each interior grid line, along each
+ * row it crosses (vertical seams) or column (horizontal). A pixel scores when its 3 px window is not
+ * paper and both sides SEAM_CLEAR px away are: a card's scan shadow is a thin grey line with paper
+ * either side, where a sword or a pip has its own body beside its edge. The middle 80% of each
+ * cell's span is scored, clear of the rounded corners and the crossing seams.
+ */
+const seamScores = (
+  page: Page,
+  src: string,
+  size: Size,
+  cols: number,
+  rows: number,
+): Promise<
+  Readonly<{
+    vertical: ReadonlyArray<ReadonlyArray<ReadonlyArray<number>>>;
+    horizontal: ReadonlyArray<ReadonlyArray<ReadonlyArray<number>>>;
+  }>
+> =>
+  page.evaluate(`(async () => {
+    const img = new Image(); img.src = ${JSON.stringify(src)}; await img.decode();
+    const W = img.naturalWidth, H = img.naturalHeight;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+    const d = ctx.getImageData(0, 0, W, H).data;
+    const P = ${String(PAPER)}, C = ${String(SEAM_CLEAR)}, S = ${String(GRID_SNAP)};
+    const at = (x, y) => { if (x < 0 || y < 0 || x >= W || y >= H) return 255; const i = (y * W + x) * 4; return Math.min(d[i], d[i + 1], d[i + 2]); };
+    const xs = ${JSON.stringify(gridLines(size.width, cols))}, ys = ${JSON.stringify(gridLines(size.height, rows))};
+    const inner = (a, b) => [a + Math.round((b - a) * 0.1), b - Math.round((b - a) * 0.1)];
+    const vScore = (x, y0, y1) => { let n = 0; for (let y = y0; y < y1; y++) if (Math.min(at(x - 1, y), at(x, y), at(x + 1, y)) < P && at(x - C, y) >= P && at(x + C, y) >= P) n++; return n / (y1 - y0); };
+    const hScore = (y, x0, x1) => { let n = 0; for (let x = x0; x < x1; x++) if (Math.min(at(x, y - 1), at(x, y), at(x, y + 1)) < P && at(x, y - C) >= P && at(x, y + C) >= P) n++; return n / (x1 - x0); };
+    const offsets = Array.from({ length: 2 * S + 1 }, (_, i) => i - S);
+    const vertical = xs.slice(1, -1).map((gx) => ys.slice(0, -1).map((gy, r) => { const [y0, y1] = inner(gy, ys[r + 1]); return offsets.map((o) => vScore(gx + o, y0, y1)); }));
+    const horizontal = ys.slice(1, -1).map((gy) => xs.slice(0, -1).map((gx, c) => { const [x0, x1] = inner(gx, xs[c + 1]); return offsets.map((o) => hScore(gy + o, x0, x1)); }));
+    return { vertical, horizontal };
+  })()`);
+
 // ---- add / build ---------------------------------------------------------------------------------
 
 type Face = Readonly<{
@@ -652,33 +823,79 @@ const facesFromDir = async (
   return faces.flat();
 };
 
-/** The faces of one sheet: the grid found from the ink profiles, refused on a wrong count. */
+/** The cells of a bordered sheet with gutters: the grid found from the ink profiles, refused on a wrong count. */
+const cellsFromInk = async (
+  page: Page,
+  src: string,
+  rows: number,
+  cols: number,
+): Promise<ReadonlyArray<Rect>> => {
+  const { size, cols: colProfile, rows: rowProfile } = await inkProfiles(page, src);
+  const colRuns = findCells(colProfile, cols);
+  const rowRuns = findCells(rowProfile, rows);
+  console.log(
+    `sheet ${String(size.width)}×${String(size.height)}; columns ${JSON.stringify(colRuns)}; rows ${JSON.stringify(rowRuns)}`,
+  );
+  if (colRuns.length !== cols || rowRuns.length !== rows)
+    throw new Error(
+      `found ${String(colRuns.length)} columns and ${String(rowRuns.length)} rows, asked for ${String(cols)} × ${String(rows)}: pass --cols/--rows that match the sheet, or cut it by hand`,
+    );
+  const cells = rowRuns.flatMap(([y0, y1]) =>
+    colRuns.map(([x0, x1]) => ({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 })),
+  );
+  return normaliseCells(await inkBoxes(page, src, cells), size);
+};
+
+/** The cells of a borderless sheet laid edge to edge (`--grid`): the seam grid, equalised and shaved. */
+const cellsFromGrid = async (
+  page: Page,
+  src: string,
+  rows: number,
+  cols: number,
+  inset: number,
+): Promise<ReadonlyArray<Rect>> => {
+  const size = await naturalSize(page, src);
+  const scores = await seamScores(page, src, size, cols, rows);
+  const xs = gridLines(size.width, cols);
+  const ys = gridLines(size.height, rows);
+  // One position per row for each interior vertical seam (per column for a horizontal one), then
+  // each row's and column's full list of lines, the sheet's edges first and last.
+  const vSeams = xs.slice(1, -1).map((gx, k) => seamPositions(gx, scores.vertical[k] ?? []));
+  const hSeams = ys.slice(1, -1).map((gy, k) => seamPositions(gy, scores.horizontal[k] ?? []));
+  const vertical = Array.from({ length: rows }, (_, r) => [
+    0,
+    ...vSeams.map((s) => s[r] ?? 0),
+    size.width,
+  ]);
+  const horizontal = Array.from({ length: cols }, (_, c) => [
+    0,
+    ...hSeams.map((s) => s[c] ?? 0),
+    size.height,
+  ]);
+  console.log(
+    `sheet ${String(size.width)}×${String(size.height)}; seams per row ${JSON.stringify(vertical)}; per column ${JSON.stringify(horizontal)}`,
+  );
+  return equaliseCells(cellsFromSeams(vertical, horizontal), size).map((c) => shrink(c, inset));
+};
+
+/** The faces of one sheet, row-major, the ids `<col><row>`: `--rows`/`--cols` in the sheet's own order. */
 const facesFromSheet = async (
   page: Page,
   deck: DeckKind,
   file: string,
   rows: ReadonlyArray<string>,
   cols: ReadonlyArray<string>,
+  grid: number | null,
 ): Promise<ReadonlyArray<Face>> => {
-  const src = dataUrl(resolve(ROOT, file));
-  const { size, cols: colProfile, rows: rowProfile } = await inkProfiles(page, src);
-  const colRuns = findCells(colProfile, cols.length);
-  const rowRuns = findCells(rowProfile, rows.length);
-  console.log(
-    `sheet ${String(size.width)}×${String(size.height)}; columns ${JSON.stringify(colRuns)}; rows ${JSON.stringify(rowRuns)}`,
-  );
-  if (colRuns.length !== cols.length || rowRuns.length !== rows.length)
-    throw new Error(
-      `found ${String(colRuns.length)} columns and ${String(rowRuns.length)} rows, asked for ${String(cols.length)} × ${String(rows.length)}: pass --cols/--rows that match the sheet, or cut it by hand`,
-    );
-  const cells = rowRuns.flatMap(([y0, y1]) =>
-    colRuns.map(([x0, x1]) => ({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 })),
-  );
-  const boxes = normaliseCells(await inkBoxes(page, src, cells), size);
   const ids = rows.flatMap((r) => cols.map((c) => `${c}${r}`));
   const strangers = ids.filter((id) => !cardIds(deck).includes(id));
   if (strangers.length > 0)
     throw new Error(`--rows/--cols name cards ${deck} has not: ${strangers.join(' ')}`);
+  const src = dataUrl(resolve(ROOT, file));
+  const boxes =
+    grid === null
+      ? await cellsFromInk(page, src, rows.length, cols.length)
+      : await cellsFromGrid(page, src, rows.length, cols.length, grid);
   return ids.map((id, i) => {
     const box = boxes[i] ?? { x: 0, y: 0, w: 1, h: 1 };
     return { id, src, crop: box, sourceWidth: box.w, aspect: box.w / box.h };
@@ -699,7 +916,14 @@ const derive = async (page: Page, name: string, spec: SourceSpec): Promise<void>
           spec.faces.dir,
           spec.map === null ? {} : parseMap(readFileSync(resolve(ROOT, spec.map), 'utf8')),
         )
-      : await facesFromSheet(page, spec.deck, spec.faces.file, spec.faces.rows, spec.faces.cols);
+      : await facesFromSheet(
+          page,
+          spec.deck,
+          spec.faces.file,
+          spec.faces.rows,
+          spec.faces.cols,
+          spec.faces.grid,
+        );
   if (faces.length === 0) throw new Error('no faces found');
   const ext: Ext = 'jpg';
   const aspect = median(faces.map((f) => f.aspect));
@@ -787,6 +1011,18 @@ const deriveBack = async (page: Page, name: string, file: string): Promise<Manif
 
 // ---- preview -------------------------------------------------------------------------------------
 
+/**
+ * The corner indices an `indices: 'overlay'` pack's stylesheet adds (docs/design/card-packs.md §3),
+ * sketched at the size a table prints them, so the preview shows whether the pictures leave them
+ * room: the index top-left and turned bottom-right, as cardFace.ts's two `rank` spans are placed.
+ */
+const indexHtml = (index: string, width: number): string => {
+  const font = `position:absolute;font:700 ${String(Math.round(width * 0.14))}px/1 system-ui,sans-serif;color:#1c1c1c;`;
+  const x = String(Math.round(width * 0.05));
+  const y = String(Math.round(width * 0.04));
+  return `<span style="${font}top:${y}px;left:${x}px">${index}</span><span style="${font}right:${x}px;bottom:${y}px;transform:rotate(180deg)">${index}</span>`;
+};
+
 /** Every face of a pack and its back, at `width` CSS px on a baize, as one PNG: what a reviewer looks at. */
 const preview = async (
   page: Page,
@@ -800,10 +1036,13 @@ const preview = async (
   if (faces?.kind !== 'files') throw new Error(`${name} has no files for ${deck}`);
   const height = Math.round(width / faces.aspect);
   const largest = Math.max(...faces.widths);
-  const card = (url: string): string =>
-    `<div style="width:${String(width)}px;height:${String(height)}px;background:url('${dataUrl(resolve(ROOT, servedToPublic(url)))}') center/100% 100% no-repeat;margin:4px;display:inline-block;border-radius:${String(Math.round(width * DECKS[deck].radius))}px"></div>`;
+  const card = (url: string, index: string | null = null): string =>
+    `<div style="position:relative;width:${String(width)}px;height:${String(height)}px;background:url('${dataUrl(resolve(ROOT, servedToPublic(url)))}') center/100% 100% no-repeat;margin:4px;display:inline-block;border-radius:${String(Math.round(width * DECKS[deck].radius))}px">${index === null ? '' : indexHtml(index, width)}</div>`;
   const cells = cardIds(deck).map((id) =>
-    card(`${faces.dir}/${largest === 0 ? id : `${id}-${String(largest)}`}.${faces.ext}`),
+    card(
+      `${faces.dir}/${largest === 0 ? id : `${id}-${String(largest)}`}.${faces.ext}`,
+      faces.indices === 'overlay' ? (splitId(deck, id)?.rank.index ?? null) : null,
+    ),
   );
   const perRow = DECKS[deck].ranks.length;
   const rows = DECKS[deck].suits.map(
@@ -880,6 +1119,7 @@ const specFromFlags = (flags: Flags): SourceSpec => {
             file: sheet,
             rows: need(flags, 'rows').split(','),
             cols: need(flags, 'cols').split(','),
+            grid: gridInset(one(flags, 'grid')),
           }
         : { kind: 'files', dir: dir ?? '' },
     back: one(flags, 'back'),
