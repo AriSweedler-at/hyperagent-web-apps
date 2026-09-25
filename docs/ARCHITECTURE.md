@@ -982,9 +982,10 @@ Step 12, phase 2 (gin paint, wiring, scorer screen, oracle):
   the pure scorer modules, with the dialogs, screens, download and SpeechRecognition injected.
 - `@shared/edge/dom` grew listeners, values, styles, queries, the `e.target` casts and
   `PageLike`; `@shared/edge/page.fake` is a string-backed static-page fake (the ui zone may import
-  it); `@shared/edge/share` the Web Share / clipboard chain. `web/raw-imports.d.ts` declares Vite's
-  `?raw` import for the tests that build the fake from `index.html`; ambient `.d.ts` files are
-  exempt from the erasable-syntax ban.
+  it; its `shellPage` assembles a shell page's mode buttons once, so each game's `ui/page.fake.ts`
+  declares only its table's queries, dry-round-2 E7); `@shared/edge/share` the Web Share / clipboard
+  chain. `web/raw-imports.d.ts` declares Vite's `?raw` import for the tests that build the fake from
+  `index.html`; ambient `.d.ts` files are exempt from the erasable-syntax ban.
 - The DOM-snapshot oracle is `tools/parity/gin-dom-parity.ts`, run locally by hand and in CI as
   `e2e/gin-dom-parity.spec.ts` on the `next` project; `e2e/gin-resume.spec.ts` covers host resume
   and guest rejoin on every project; `PORTED_PAGES` lists gin-rummy, so the `next` project runs

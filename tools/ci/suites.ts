@@ -119,7 +119,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // and prefs.ts's decodeSave became a taggedUnion table: shared/lib still 100/100/100/100
       // (game.ts, json.ts and protocol.ts each 100 on every metric), the edge folder
       // 99.72/99.35/99.75/96.59 before, 99.72/99.35/99.75/96.56 after (prefs.ts still 100 on every
-      // metric; the same lines uncovered elsewhere, fewer branches in the folder).
+      // metric; the same lines uncovered elsewhere, fewer branches in the folder). Again when D3
+      // (dry-round-2 E7) moved the two games' page-fake assembly into page.fake.ts `shellPage`, every
+      // new branch under page.fake.test.ts: the folder 99.72/99.36/99.75/96.57 before,
+      // 99.72/99.37/99.76/96.62 after (measured on main at 0b1bec3 and this branch rebased onto it).
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The shared shell's helpers and painters (docs/design/glossary-links.md §3;
@@ -205,6 +208,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // table and added ENGINE (index.ts) and actorOf: engine 99.80/99.45/98.30/94.98 before,
       // 99.79/99.44/98.25/94.72 after (the same lines uncovered, a smaller folder; decode.ts and
       // index.ts measure 100 on every metric); the row stands.
+      // Re-measured when D3 (dry-round-2 E7) moved the page-fake assembly out of ui/page.fake.ts into
+      // web/shared/edge/page.fake.ts `shellPage`, on top of D1: ui 98.08/97.13/97.05/94.16 before,
+      // 98.07/97.10/97.04/94.14 after (the same 24 lines uncovered, 1252 → 1246 lines; the wrapper
+      // measures 100 on every metric).
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -367,6 +374,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // table and added ENGINE (index.ts): engine 99.17/99.46/98.94/97.14 before,
       // 99.14/99.45/98.90/97.00 after (the same lines uncovered, a smaller folder; decode.ts and
       // index.ts measure 100 on every metric); the row stands.
+      // Re-measured when D3 (dry-round-2 E7) moved the page-fake assembly out of ui/page.fake.ts into
+      // web/shared/edge/page.fake.ts `shellPage`: ui 99.59/100/98.68/92.53 before, 99.59/100/98.68/92.52
+      // after (the same 6 lines uncovered, 1471 → 1467 lines; the wrapper measures 100 on every metric).
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
