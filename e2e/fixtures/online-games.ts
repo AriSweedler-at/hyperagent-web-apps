@@ -1,46 +1,79 @@
-// The table half of each shell game for e2e/shell-*.spec.ts (docs/design/shared-shell.md §6.3, the
-// `afterConnect` of §6.1): what a shell spec must ask the game itself once the shell has done its
-// part, one row per SHELL_GAMES entry, over the game's own fixtures (e2e/fixtures/gin.ts,
-// backgammon.ts). A shell game without a row is a type error here. Its own file because those
-// fixtures import e2e/fixtures/shell.ts (import-x/no-cycle). The connection itself is here too:
-// what every online shell spec opens with before it asks the game anything.
+// One row per game for the online specs (e2e/shell-online.spec.ts and shell-relay.spec.ts loop
+// over every game, fidice included: dry-round-2.md H1) and the table half of each shell game for
+// the other e2e/shell-*.spec.ts (docs/design/shared-shell.md §6.3, the `afterConnect` of §6.1):
+// what a spec must ask the game itself once the connection has done its part, over the game's own
+// fixtures (e2e/fixtures/gin.ts, backgammon.ts, fidice.ts). A game without a row is a type error
+// here. Its own file because those fixtures import e2e/fixtures/shell.ts (import-x/no-cycle). The
+// connection itself is here too: what every online spec opens with before it asks the game anything.
 import { expect, type Page } from '@playwright/test';
 
-import type { ShellGame } from '../../tools/games.ts';
+import type { Game, ShellGame } from '../../tools/games.ts';
 import { bgBoardsAgree, bgHostStarts, boardKey, readBoard, requireBoard } from './backgammon.ts';
+import { fidiceHostStarts, fidiceSameRound, fidiceSeatName, fidiceSeats } from './fidice.ts';
 import { ginHostDeals, ginPassUpcard, readTable } from './gin.ts';
 import { openGame, type GameHooks } from './player.ts';
-import { ONLINE_NAMES, hostRoom, join, joinedMsg, reveal, roomOpen, takeOffer } from './shell.ts';
+import { ONLINE_NAMES, joinedMsg, reveal, roomOpen, takeOffer } from './shell.ts';
 import type { Project } from './site.ts';
-import type { Players } from './two-players.ts';
+import { hostRoom, joinByCode, type Players } from './two-players.ts';
 
-export type ShellDriver = Readonly<{
-  /** The curtain's sub line for the seat taking the phone (`first`) while the other looks away. */
-  curtainSub: (first: string, other: string) => string;
+/** What the online specs ask of any game once host and guest have opened their pages. */
+export type OnlineDriver = Readonly<{
+  /**
+   * The host has seen the join (`connect` ends here): the shell's `#hostWaitStatus`; fidice's two
+   * lobbies showing the same two seats, each side marked as itself, the guest told to wait.
+   */
+  joined: (host: Page, guest: Page) => Promise<void>;
   /** The host starts from the waiting room; both tables come up. */
   start: (host: Page, guest: Page) => Promise<void>;
-  /** The table as one page shows it, as one comparable string. */
-  snapshot: (page: Page) => Promise<string>;
-  /** Both tables agree (the guest's frame arrives a beat later); resolves with the host's snapshot. */
-  agree: (host: Page, guest: Page) => Promise<string>;
-  /** The opening both tables must show right after `start`: the deal, or the seeded opening roll. */
+  /** The opening both tables must show right after `start`: the deal, or the seeded opening roll, or round 1 with the cup at one seat. */
   expectOpening: (host: Page, guest: Page) => Promise<void>;
-  /** What the host's save carries beyond the shell's `role`, `code`, `myName` and `oppName`. */
-  hostSave: Readonly<Record<string, unknown>>;
-  /** What the pass-and-play save carries beyond `role: 'local'` once the first seat has revealed. */
-  localSave: Readonly<Record<string, unknown>>;
-  /** Something of the game itself a seated page shows: the hand's cards, the board (e2e/shell-liveness.spec.ts). */
-  table: string;
-  /** The handoff offered while a curtain is up (e2e/shell-handoff.spec.ts, the case under the curtain). */
-  curtainOffer: Readonly<{
-    /** The case, as its test is titled. */
-    title: string;
-    /** From the first curtain of a fresh game to the curtain the case is about. */
-    toCurtain: (page: Page) => Promise<void>;
-    /** Take the offer from under that curtain; resolves with the room's confirmed code. */
-    take: (page: Page) => Promise<string>;
-  }>;
+  /** The names once the table is up: the shell's `#oppName` crossed over. Fidice's seats carried theirs in the lobby (`joined`). */
+  expectNames?: (host: Page, guest: Page) => Promise<void>;
+  /**
+   * Who toasts "Connected via relay" (e2e/fixtures/relay.ts RELAY_TOAST) on a relay-forced game:
+   * both shell pages (web/shared/edge/peer.ts PATH_RELAY_MSG); fidice's guest alone.
+   */
+  relayToasts: ReadonlyArray<'host' | 'guest'>;
 }>;
+
+/** A shell game's row: the online half and what the other shell specs ask of its table. */
+export type ShellDriver = OnlineDriver &
+  Readonly<{
+    /** The curtain's sub line for the seat taking the phone (`first`) while the other looks away. */
+    curtainSub: (first: string, other: string) => string;
+    /** The table as one page shows it, as one comparable string. */
+    snapshot: (page: Page) => Promise<string>;
+    /** Both tables agree (the guest's frame arrives a beat later); resolves with the host's snapshot. */
+    agree: (host: Page, guest: Page) => Promise<string>;
+    /** What the host's save carries beyond the shell's `role`, `code`, `myName` and `oppName`. */
+    hostSave: Readonly<Record<string, unknown>>;
+    /** What the pass-and-play save carries beyond `role: 'local'` once the first seat has revealed. */
+    localSave: Readonly<Record<string, unknown>>;
+    /** Something of the game itself a seated page shows: the hand's cards, the board (e2e/shell-liveness.spec.ts). */
+    table: string;
+    /** The handoff offered while a curtain is up (e2e/shell-handoff.spec.ts, the case under the curtain). */
+    curtainOffer: Readonly<{
+      /** The case, as its test is titled. */
+      title: string;
+      /** From the first curtain of a fresh game to the curtain the case is about. */
+      toCurtain: (page: Page) => Promise<void>;
+      /** Take the offer from under that curtain; resolves with the room's confirmed code. */
+      take: (page: Page) => Promise<string>;
+    }>;
+  }>;
+
+/** The shell's own online half, the same for both shell games (their shell copy is byte-identical). */
+const shellOnline: Pick<OnlineDriver, 'joined' | 'expectNames' | 'relayToasts'> = {
+  joined: async (host) => {
+    await expect(host.locator('#hostWaitStatus')).toContainText(joinedMsg(ONLINE_NAMES[1]));
+  },
+  expectNames: async (host, guest) => {
+    await expect(host.locator('#oppName')).toHaveText(ONLINE_NAMES[1]);
+    await expect(guest.locator('#oppName')).toHaveText(ONLINE_NAMES[0]);
+  },
+  // #toast keeps its text after the `show` class drops, so the assertion cannot miss the window.
+  relayToasts: ['host', 'guest'],
+};
 
 /** The deal both gin tables show: ten cards each, 31 in the stock, hand 1. */
 const GIN_DEALT = {
@@ -53,6 +86,7 @@ const GIN_DEALT = {
 const ginSnapshot = async (page: Page): Promise<string> => JSON.stringify(await readTable(page));
 
 const gin: ShellDriver = {
+  ...shellOnline,
   curtainSub: (_first, other) => `${other}, look away`,
   start: ginHostDeals,
   snapshot: ginSnapshot,
@@ -90,6 +124,7 @@ const gin: ShellDriver = {
 const bgSnapshot = async (page: Page): Promise<string> => boardKey(await readBoard(page));
 
 const backgammon: ShellDriver = {
+  ...shellOnline,
   curtainSub: () => 'Your turn. Roll when you have the phone.',
   start: bgHostStarts,
   snapshot: bgSnapshot,
@@ -119,9 +154,38 @@ const backgammon: ShellDriver = {
   },
 };
 
+/** Fidice's legacy lobby and table (e2e/fixtures/fidice.ts), until its restyle brings the shell (shared-shell.md §4.6). */
+const fidice: OnlineDriver = {
+  joined: async (host, guest) => {
+    // Both lobbies show the same two seats, each side marked as itself.
+    await expect(fidiceSeats(host)).toHaveCount(2);
+    await expect(fidiceSeatName(host, 0)).toContainText(ONLINE_NAMES[0]);
+    await expect(fidiceSeatName(host, 0)).toContainText('(you)');
+    await expect(fidiceSeatName(host, 1)).toContainText(ONLINE_NAMES[1]);
+    await expect(fidiceSeatName(guest, 0)).toContainText(ONLINE_NAMES[0]);
+    await expect(fidiceSeatName(guest, 1)).toContainText(ONLINE_NAMES[1]);
+    await expect(fidiceSeatName(guest, 1)).toContainText('(you)');
+    await expect(guest.locator('#startHint')).toContainText('Waiting for the host to start');
+    await expect(guest.locator('#btnStart')).toHaveCount(0);
+  },
+  start: fidiceHostStarts,
+  expectOpening: fidiceSameRound,
+  // Only the guest toasts: fidice's client transport probes the path PATH_PROBE_MS after its
+  // channel opens and shows the toast for TOAST_MS (web/games/fidice/src/net/peerjs.ts
+  // describePath), while the host side has no such probe, so the guest's #toast is the one to
+  // catch, and promptly: it empties again when the toast clears.
+  relayToasts: ['guest'],
+};
+
 export const SHELL_DRIVERS: Readonly<Record<ShellGame, ShellDriver>> = {
   'gin-rummy': gin,
   backgammon,
+};
+
+/** Every game's online row: the shell games' drivers and fidice's. */
+export const ONLINE_DRIVERS: Readonly<Record<Game, OnlineDriver>> = {
+  ...SHELL_DRIVERS,
+  fidice,
 };
 
 /**
@@ -133,14 +197,14 @@ export const SHELL_DRIVERS: Readonly<Record<ShellGame, ShellDriver>> = {
 export const connect = async (
   players: Players,
   project: Project,
-  game: ShellGame,
+  game: Game,
   hooks: GameHooks = {},
 ): Promise<string> => {
   const { host, guest } = players;
   await openGame(host, project, game, hooks);
   await openGame(guest, project, game, hooks);
-  const code = await hostRoom(host.page, game, ONLINE_NAMES[0]);
-  await join(guest.page, game, ONLINE_NAMES[1], code);
-  await expect(host.page.locator('#hostWaitStatus')).toContainText(joinedMsg(ONLINE_NAMES[1]));
+  const code = await hostRoom(host, game, ONLINE_NAMES[0]);
+  await joinByCode(guest, game, code, ONLINE_NAMES[1]);
+  await ONLINE_DRIVERS[game].joined(host.page, guest.page);
   return code;
 };

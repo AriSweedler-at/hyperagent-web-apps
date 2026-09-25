@@ -1,4 +1,5 @@
-// The table on the fake DOM: the holder's seat (.seat.holder, read by e2e/fidice-online), the
+// The table on the fake DOM: the holder's seat (.seat.holder, read by e2e/shell-online through
+// fidice's row in e2e/fixtures/online-games.ts), the
 // "Round N" label, the turn bar, dice zones, the numbered steps for each stage of a turn, the bid
 // picker, the reveal with its countdown, game over, and the pass-the-phone cover.
 import { describe, expect, test } from 'vitest';

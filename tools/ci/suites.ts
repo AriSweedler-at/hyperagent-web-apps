@@ -48,6 +48,14 @@ export type E2eSpec = Readonly<{
  */
 const SHELL_SPECS: ReadonlyArray<string> = ['**/shell-*.spec.ts'];
 
+/**
+ * The two of them written over every game (dry-round-2.md H1): the room and the relay-forced game
+ * loop over tools/games.ts GAMES, fidice's row in e2e/fixtures/online-games.ts driving its legacy
+ * lobby, so fidice's suite claims these two alone and each game suite inverts the other two tags.
+ */
+const ONLINE_SPEC_NAMES: ReadonlyArray<string> = ['shell-online.spec.ts', 'shell-relay.spec.ts'];
+const ONLINE_SPECS: ReadonlyArray<string> = ONLINE_SPEC_NAMES.map((name) => `**/${name}`);
+
 export type SuiteSpec = Readonly<{
   /** vitest include globs `npm test` runs, and `npm run test:<suite>` with them. */
   unit: ReadonlyArray<string>;
@@ -244,7 +252,7 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
     e2e: {
       files: ['**/gin-*.spec.ts', ...SHELL_SPECS],
       tag: '@gin-rummy',
-      otherTags: ['@backgammon'],
+      otherTags: ['@backgammon', '@fidice'],
     },
   },
   fidice: {
@@ -300,7 +308,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         },
       },
     },
-    e2e: { files: ['**/fidice-*.spec.ts'], otherTags: [] },
+    // Fidice's own online and relay specs folded into the two online shell specs (H1): its e2e job
+    // plays their fidice describes and nothing else, until the restyle brings it the shell (§4.6).
+    e2e: { files: [...ONLINE_SPECS], tag: '@fidice', otherTags: ['@gin-rummy', '@backgammon'] },
   },
   backgammon: {
     // Colocated only: no legacy leg (its oracle is engine/replay.test.ts); its wire goldens under
@@ -386,7 +396,7 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
     e2e: {
       files: ['**/backgammon-*.spec.ts', ...SHELL_SPECS],
       tag: '@backgammon',
-      otherTags: ['@gin-rummy'],
+      otherTags: ['@gin-rummy', '@fidice'],
     },
   },
   site: {
@@ -539,6 +549,14 @@ export const RULES: ReadonlyArray<Rule> = [
     ],
     runs: 'everything',
     why: 'the harness, the build and lint configuration, the frozen oracles and the shared code every game imports',
+  },
+  {
+    // The two online specs loop over every game (H1): a spec change runs fidice's e2e job too, each
+    // job playing its own game's describes through its tag. Above the shell rule, which would claim
+    // them for the two shell games alone.
+    globs: ONLINE_SPEC_NAMES.map((name) => `e2e/${name}`),
+    runs: [e2eJob('gin'), e2eJob('fidice'), e2eJob('backgammon')],
+    why: "the online specs: a describe per game, fidice included, each run by that game's e2e job through its tag",
   },
   {
     // One describe per shell game, each played by that game's e2e job through its tag (the gin and
