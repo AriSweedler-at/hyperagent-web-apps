@@ -3,7 +3,7 @@
 // test/dist/shell-markup.test.ts pins byte for byte. The page is Prettier's, so the composer formats
 // the render with the repo's config and the residue here (`blocks`: the head with its two fonts, the
 // table with its three relative seat cells, the stock with the briscola under it, the trick band, the
-// score strip and the three-slot hand; the endgame; the last-trick and result sheets; the option
+// score strip and the three-slot hand; the endgame; the result sheet; the option
 // selects and the four name inputs) is the committed, formatted bytes, cut out of the page with the
 // blank line each follows; the looks (`look`) are the theme's classes, as backgammon's are. The
 // table ships the 2-player shape (#seatR2 shown, R1 and R3 hidden) so the page fake and the goldens
@@ -308,9 +308,6 @@ const blocks: ShellBlocks = {
             <div class="pile-label" id="stockCount">Stock · 34</div>
           </div>
           <div class="trick" id="trick" data-players="2" data-lead="" aria-live="off"></div>
-          <button class="pile-peek desk-only" id="lastTrickBtn" aria-label="Last trick" disabled>
-            🔍
-          </button>
         </div>
 
         <div class="score-strip" id="scoreStrip" data-mode="players"></div>
@@ -319,6 +316,7 @@ const blocks: ShellBlocks = {
         <div class="hand-area">
           <div class="hand-header">
             <span id="myName">You</span>
+            <span class="seat-taken my-tricks" id="myTricks" data-count="0"></span>
             <span class="my-taken" id="myTaken">You: 0</span>
           </div>
           <div class="hand" id="hand" data-slots="3">
@@ -330,7 +328,6 @@ const blocks: ShellBlocks = {
             <button class="btn btn-primary grow" id="playBtn" disabled>Play</button>
             <div class="waiting-note hidden" id="waitNote">Waiting…</div>
             <button class="btn btn-secondary btn-sm hidden" id="resultChipBtn">Result</button>
-            <button class="btn btn-secondary btn-sm" id="lastTrickSheetBtn" disabled>Last trick</button>
           </div>
         </div>
       </div>`,
@@ -355,16 +352,6 @@ const blocks: ShellBlocks = {
           Continue online
         </button>`,
   sheetsBefore: `
-    <!-- LAST TRICK (design §5.1): the previous trick as mid cards with their chips. -->
-    <div id="lastTrickOverlay" class="overlay hidden">
-      <div class="sheet centered">
-        <div class="sheet-title" id="ltTitle">Last trick</div>
-        <div class="trick-cards" id="ltCards"></div>
-        <div class="sheet-sub" id="ltSub"></div>
-        <button class="btn btn-primary btn-block" id="closeLastTrickBtn">Close</button>
-      </div>
-    </div>
-
     <!-- GAME RESULT (design §5.1): the sheet over the dimmed table; the match end is the shell's
          #endgameScreen. -->
     <div id="resultOverlay" class="overlay hidden">

@@ -39,7 +39,7 @@ export const SEED = 7;
 /** The clock every story reads. */
 export const EPOCH = 1_700_000_000_000;
 
-export type SheetState = 'none' | 'lastTrickOverlay' | 'historyOverlay' | 'resultOverlay';
+export type SheetState = 'none' | 'historyOverlay' | 'resultOverlay';
 
 /** What the table must show for a story, in the terms the DOM exposes (design §5.6). */
 export type StoryFacts = Readonly<{
@@ -232,13 +232,11 @@ export const factsOf = (app: App): StoryFacts => {
     stockCount,
     stockEmpty: stockCount <= 1,
     briscolaGone: !(v.trumpOnTable || settle?.trick.trumpTaken === true),
-    sheet: app.table.lastTrickOpen
-      ? 'lastTrickOverlay'
-      : app.table.historyOpen
-        ? 'historyOverlay'
-        : resultOpen(app) && !v.matchOver
-          ? 'resultOverlay'
-          : 'none',
+    sheet: app.table.historyOpen
+      ? 'historyOverlay'
+      : resultOpen(app) && !v.matchOver
+        ? 'resultOverlay'
+        : 'none',
   };
 };
 
@@ -269,9 +267,6 @@ const hold2 = chain((c) => {
   return playFirst(c, second);
 });
 const settled2 = chain((c) => revealed(c, trick(c, localStart(c, 2))));
-const lastTrick2 = chain((c) =>
-  run(c, revealed(c, trick(c, localStart(c, 2))), [{ type: 'lastTrick/open' }]),
-);
 const history2 = chain((c) =>
   run(c, revealed(c, trick(c, localStart(c, 2))), [{ type: 'history/open' }]),
 );
@@ -324,7 +319,6 @@ export const STORIES: ReadonlyArray<Story> = [
     title: 'Settled: the fan empty, the stock at 32, the winner revealed to lead',
     app: settled2,
   }),
-  story({ id: 'last-trick-sheet-2p', title: 'The last trick on its sheet', app: lastTrick2 }),
   story({
     id: 'history-sheet-2p',
     title: 'The history sheet: the deal and one trick',

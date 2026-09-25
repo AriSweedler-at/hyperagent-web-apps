@@ -156,19 +156,6 @@ const playFirst = (app: App): Step => {
   return run(app, { type: 'card/tap', cardId: id }, { type: 'card/tap', cardId: id });
 };
 
-/** The settle beat run to its end (at most the three stages). */
-const settled = (app: App): Step =>
-  Array.from({ length: 3 }).reduce<Step>(
-    (s) =>
-      s.app.table.settle === null
-        ? s
-        : {
-            app: run(s.app, { type: 'settle/elapsed' }).app,
-            effects: [...s.effects, ...run(s.app, { type: 'settle/elapsed' }).effects],
-          },
-    { app, effects: [] },
-  );
-
 /** One step of a whole game: the curtain lifted, a trick settled, or the first legal card played. */
 const advance = (app: App): App => {
   if (app.table.curtain !== null) return revealed(app);
@@ -202,7 +189,6 @@ describe('the initial app', () => {
       selected: null,
       settle: null,
       drag: null,
-      lastTrickOpen: false,
       resultDismissed: false,
       historyOpen: false,
       curtain: null,
@@ -521,13 +507,8 @@ describe('pass and play: the lift, the play, the settle beat and the curtain', (
     expect(run(start, { type: 'escape' }).app).toBe(start);
   });
 
-  test('the last-trick sheet opens only once a trick has been taken; the history and rules sheets toggle', () => {
+  test('the history and rules sheets toggle', () => {
     const start = revealed(local());
-    expect(run(start, { type: 'lastTrick/open' }).app).toBe(start);
-    const taken = settled(playFirst(revealed(playFirst(start).app)).app).app;
-    const open = run(taken, { type: 'lastTrick/open' }).app;
-    expect(open.table.lastTrickOpen).toBe(true);
-    expect(run(open, { type: 'lastTrick/close' }).app.table.lastTrickOpen).toBe(false);
     expect(
       run(start, { type: 'history/open' }, { type: 'history/close' }).app.table.historyOpen,
     ).toBe(false);

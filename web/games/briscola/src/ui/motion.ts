@@ -1,5 +1,6 @@
 // The settle beat's motion (docs/design/briscola-board.md §2, §4.2): a resolved trick is held with
-// the taking card lifted, then its cards fly to the winner's cell, then a back flies from the stock
+// the taking card lifted, then its cards fly to the newest chip of the winner's taken strip (the
+// painter has laid it, hidden, for the flight to land on), then a back flies from the stock
 // to each drawer in draw order (the winner first), the last one from the briscola when the trump
 // card was taken, and the view is painted cold. The stages and their timers are the reducer's
 // (`settle: {stage: 'hold' | 'fly' | 'draw'}`, effects as data); this module gives it the durations
@@ -76,8 +77,8 @@ export type Flight = Readonly<{
 export const STOCK: Target = { id: 'stock', within: '.card' };
 /** The trump card under the stock. */
 export const BRISCOLA: Target = { id: 'briscola', within: '.card' };
-/** My taken count in the hand header, where my won trick lands. */
-export const MY_TAKEN: Target = { id: 'myTaken' };
+/** The newest chip of my taken strip in the hand header, where my won trick lands. */
+export const MY_TRICKS: Target = { id: 'myTricks', within: '.chip:last-child' };
 /** A seat's card in the fan. */
 export const fanCard = (seat: Seat): Target => ({
   id: 'trick',
@@ -93,19 +94,28 @@ export const seatCards = (cell: RelativeCell): Target => ({
   id: seatCellId(cell),
   within: '.seat-cards .card:last-child',
 });
-/** A relative cell's taken stack (a won trick lands on it). */
+/** The newest chip of a relative cell's taken strip (a won trick lands on it). */
 export const seatTaken = (cell: RelativeCell): Target => ({
   id: seatCellId(cell),
-  within: '.seat-taken',
+  within: '.seat-taken .chip:last-child',
 });
 
-/** Every card of the trick, in play order, to the winner's cell, together. */
+/**
+ * Every card of the trick, in play order, to the newest chip of the winner's strip, together; the
+ * chip hides (`arriving`) until they land, so the row grows as the cards reach it.
+ */
 export const trickFlights = (
   trick: Pick<TrickRecord, 'cards'>,
   to: Target,
   d: Durations,
 ): ReadonlyArray<Flight> =>
-  trick.cards.map((p) => ({ from: fanCard(p.seat), to, ms: d.flyMs, delayMs: 0 }));
+  trick.cards.map((p) => ({
+    from: fanCard(p.seat),
+    to,
+    ms: d.flyMs,
+    delayMs: 0,
+    hideArrival: true as const,
+  }));
 
 /**
  * One back per drawer in `drew` order (the winner first), leaving `drawGapMs` apart; the last from
@@ -149,7 +159,7 @@ export const settleTimeline = (trick: Pick<TrickRecord, 'drew'>, d: Durations): 
  * a reconnect replaying frames), not play: they are culled before new ones launch.
  */
 export const MAX_LIVE_FLYERS = 12;
-/** The smallest a clone shrinks to (a landing on a count chip), so it never vanishes mid-flight. */
+/** The smallest a clone shrinks to (a landing on a chip), so it never vanishes mid-flight. */
 const MIN_SCALE = 0.05;
 /** The source's state classes, which must not fly with its clone. */
 const STRIP: ReadonlyArray<string> = ['taking', 'selected', 'playable', 'arriving', 'dragging'];

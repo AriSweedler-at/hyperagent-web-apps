@@ -24,7 +24,7 @@ const readFacts = (page: Page): Promise<StoryFacts> =>
   const shown = (id) => !document.getElementById(id).classList.contains('hidden');
   const hand = document.getElementById('hand');
   const stock = document.getElementById('stock');
-  const sheets = ['lastTrickOverlay', 'historyOverlay', 'resultOverlay'];
+  const sheets = ['historyOverlay', 'resultOverlay'];
   return {
     screen: shown('endgameScreen') ? 'endgameScreen' : 'tableScreen',
     players: Number(document.getElementById('seats').getAttribute('data-players')),

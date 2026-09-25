@@ -1,9 +1,9 @@
 // The table's pure builders (docs/design/briscola.md §5.2 "The DOM", §5.5, §5.6, §5.7): the markup
 // strings the painter writes into the keyed containers of `#tableScreen`, the keys that say when a
 // container must be rebuilt, and the small copy the containers carry (the lead cue, the stock
-// label, the game badge, the last trick's line). Everything is a function of a `View`'s parts, a
-// few UI facts (the kept slots, the lifted card, the taking seat) and the chosen card pack, tested
-// as strings like backgammon's ui/board.ts. It imports the engine and the shared card packs only:
+// label, the game badge, the score cells). Everything is a function of a `View`'s parts, a few UI
+// facts (the kept slots, the lifted card, the taking seat, the chip in flight) and the chosen card
+// pack, tested as strings like backgammon's ui/board.ts. It imports the engine and the shared card packs only:
 // the reducer imports this module, never the reverse, and the DOM is the painter's.
 //
 // Faces and backs come only through the shared packs (web/shared/ui/cardFace.ts, D11): a face is
@@ -34,7 +34,6 @@ import {
   type Seat,
   type SeatCount,
   type Suit,
-  type TrickRecord,
   type View,
 } from '../engine/index.ts';
 
@@ -225,7 +224,10 @@ export type SeatCell = Readonly<{
   name: string;
   handCount: number;
   hand: Cards | null;
+  /** The tricks taken, one chip each (through the hold and the flight, as before the trick, render.ts `tricksShown`). */
   tricks: number;
+  /** The trick in flight to this seat: one more chip, painted so the flight can land on it (`arriving`, hidden until it does). */
+  arriving?: boolean;
   /** Online: whether the seat's channel is open; null for a local seat (the dot hides). */
   connected: boolean | null;
   /** The dot's id where a page fixes one (`SHELL.briscola.connDot`, `#oppDot` in the 2-player cell). */
@@ -234,7 +236,7 @@ export type SeatCell = Readonly<{
   nameId?: string;
 }>;
 
-/** "2 tricks", "1 trick", nothing at 0 (the stack the flights land on is still there). */
+/** "2 tricks", "1 trick", nothing at 0 (the score strip's `.sc-tricks`). */
 export const tricksText = (tricks: number): string =>
   tricks === 0 ? '' : tricks === 1 ? '1 trick' : `${String(tricks)} tricks`;
 
@@ -247,14 +249,34 @@ export const seatCardsHtml = (
     ? Array.from({ length: cell.handCount }, () => backHtml('tiny')).join('')
     : cell.hand.map((c) => cardHtml(pack, c.id, 'tiny')).join('');
 
-/** The cell's key: name, what is held (ids where shown), the trick count, the dot's state and the pack. */
+/**
+ * The taken tricks as a row of face-down chips (docs/design/briscola-battle.md §7 G; the owner:
+ * "the tricks should stack up and make a row and get larger as you take more"): one `chip` back
+ * per trick, the pack's back at chip size, each stepping right of the one before (theme.css
+ * `.seat-taken`, layout.ts `chipStep`), so the row grows with every trick and the newest lies on
+ * top. `arriving` appends the chip the trick in flight lands on, hidden until it does
+ * (ui/motion.ts `hideArrival`); the same chips fill `#myTricks` in the hand header.
+ */
+export const chipsHtml = (tricks: number, arriving = false): string =>
+  Array.from({ length: tricks + (arriving ? 1 : 0) }, () => backHtml('chip')).join('');
+
+/** The chips a strip shows: its tricks, and the one arriving. */
+export const chipCount = (cell: Pick<SeatCell, 'tricks' | 'arriving'>): number =>
+  cell.tricks + (cell.arriving === true ? 1 : 0);
+
+/** The strip's key: how many chips it shows (an arriving chip counts), and the pack that draws their backs. */
+export const stripKey = (cell: Pick<SeatCell, 'tricks' | 'arriving'>, packName: string): string =>
+  `${String(chipCount(cell))}|${packName}`;
+
+/** The cell's key: name, what is held (ids where shown), the chips, the dot's state and the pack. */
 export const seatKey = (cell: SeatCell, packName: string): string =>
-  `${cell.name}|${cell.hand === null ? String(cell.handCount) : cell.hand.map((c) => c.id).join(',')}|${String(cell.tricks)}|${cell.connected === null ? '-' : cell.connected ? 'on' : 'off'}|${packName}`;
+  `${cell.name}|${cell.hand === null ? String(cell.handCount) : cell.hand.map((c) => c.id).join(',')}|${String(chipCount(cell))}|${cell.connected === null ? '-' : cell.connected ? 'on' : 'off'}|${packName}`;
 
 /**
- * The inside of a `.seat` cell: the name, the held cards, the taken stack (`.seat-taken
- * [data-count]`, where a won trick flies to) and the connection dot (`on`/`off`, hidden for a local
- * seat). The cell's own marks (`hidden`, `data-seat`, `to-move`, `gone`) are the painter's toggles.
+ * The inside of a `.seat` cell: the name, the held cards, the taken strip (`.seat-taken
+ * [data-count]`, its chips and `--n` for the CSS's step; where a won trick flies to) and the
+ * connection dot (`on`/`off`, hidden for a local seat). The cell's own marks (`hidden`,
+ * `data-seat`, `to-move`, `gone`) are the painter's toggles.
  */
 export const seatHtml = (pack: CardPack, cell: SeatCell): string => {
   const dot =
@@ -264,7 +286,8 @@ export const seatHtml = (pack: CardPack, cell: SeatCell): string => {
   const dotWithId =
     cell.dotId === undefined ? dot : dot.replace('<span ', `<span id="${cell.dotId}" `);
   const nameId = cell.nameId === undefined ? '' : ` id="${cell.nameId}"`;
-  return `<span class="seat-name"${nameId}>${escapeHtml(cell.name)}</span><span class="seat-cards">${seatCardsHtml(pack, cell)}</span><span class="seat-taken" data-count="${String(cell.tricks)}">${tricksText(cell.tricks)}</span>${dotWithId}`;
+  const chips = chipCount(cell);
+  return `<span class="seat-name"${nameId}>${escapeHtml(cell.name)}</span><span class="seat-cards">${seatCardsHtml(pack, cell)}</span><span class="seat-taken" data-count="${String(chips)}" style="--n:${String(chips)}">${chipsHtml(cell.tricks, cell.arriving)}</span>${dotWithId}`;
 };
 
 // ---- the stock and the briscola (§5.2 `.stock-area`, T3) ----------------------------------------------
@@ -373,22 +396,3 @@ export const gameBadgeText = (gameNo: number, match: Match): string =>
       : [`${String(match.draws)} ${match.draws === 1 ? 'draw' : 'draws'}`]),
     matchLabel(match.gamesToWin),
   ].join(' · ');
-
-// ---- the last trick (§5.2 `#lastTrickOverlay`) ---------------------------------------------------------
-
-/** "Trick 5" (`#ltTitle`). */
-export const lastTrickTitle = (trick: Pick<TrickRecord, 'no'>): string =>
-  `Trick ${String(trick.no)}`;
-
-/** "Bob took it · 13 points" / "You took it · 13 points" (`#ltSub`, and the curtain's `#curtainLast`). */
-export const lastTrickText = (
-  players: ReadonlyArray<Player>,
-  me: Seat,
-  trick: Pick<TrickRecord, 'winner' | 'points'>,
-): string => `${whoName(players, me, trick.winner)} took it · ${String(trick.points)} points`;
-
-/** The previous trick as the fan with the winner's card taking (`#ltCards`). */
-export const lastTrickHtml = (
-  trick: Pick<TrickRecord, 'cards' | 'winner'>,
-  o: Omit<TrickOptions, 'taking'>,
-): string => trickHtml(trick.cards, { ...o, taking: trick.winner });

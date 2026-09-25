@@ -1,9 +1,10 @@
 // The table's builders as strings (docs/design/briscola.md §5.2, §5.5, §5.6): the faces come
 // through the pack (`linea`'s picture, the glyph where a pack has none), the hand is always three
 // slots with the button semantics on the held ones, the fan carries `data-seat` and a chip per
-// play, the seats show what they hold, the stock empties to nothing, the score cells read per
-// player or per team with one leader at most, and every key changes exactly when its container's
-// picture does. Names are escaped.
+// play, the seats show what they hold and a chip per trick taken (the row growing, the arriving
+// one laid for the flight), the stock empties to nothing, the score cells read per player or per
+// team with one leader at most, and every key changes exactly when its container's picture does.
+// Names are escaped.
 import { describe, expect, test } from 'vitest';
 
 import { packByName } from '../../../../shared/lib/cards/packs.ts';
@@ -13,12 +14,11 @@ import {
   cardHtml,
   cardLabelEn,
   cellOfSeat,
+  chipCount,
+  chipsHtml,
   gameBadgeText,
   handHtml,
   handKey,
-  lastTrickHtml,
-  lastTrickText,
-  lastTrickTitle,
   leadCue,
   matchLabel,
   scoreCells,
@@ -35,6 +35,7 @@ import {
   stockHtml,
   stockKey,
   stockLabel,
+  stripKey,
   trickHtml,
   trickKey,
   tricksText,
@@ -217,15 +218,20 @@ describe('seats', () => {
     tricks: 2,
     connected: true as boolean | null,
   };
-  test('the cell: name, tiny backs per card held, the taken stack with its count, the dot on/off/hidden', () => {
+  const CHIP = '<div class="card back chip"></div>';
+  test('the cell: name, tiny backs per card held, the taken strip with a chip per trick and its count, the dot on/off/hidden', () => {
     expect(seatHtml(LINEA, cell)).toBe(
-      '<span class="seat-name">Jeff</span><span class="seat-cards"><div class="card back tiny"></div><div class="card back tiny"></div><div class="card back tiny"></div></span><span class="seat-taken" data-count="2">2 tricks</span><span class="conn-dot on"></span>',
+      `<span class="seat-name">Jeff</span><span class="seat-cards"><div class="card back tiny"></div><div class="card back tiny"></div><div class="card back tiny"></div></span><span class="seat-taken" data-count="2" style="--n:2">${CHIP}${CHIP}</span><span class="conn-dot on"></span>`,
     );
     expect(seatHtml(LINEA, { ...cell, connected: false, tricks: 1 })).toContain(
-      '<span class="seat-taken" data-count="1">1 trick</span><span class="conn-dot off"></span>',
+      `<span class="seat-taken" data-count="1" style="--n:1">${CHIP}</span><span class="conn-dot off"></span>`,
     );
     expect(seatHtml(LINEA, { ...cell, connected: null, tricks: 0 })).toContain(
-      '<span class="seat-taken" data-count="0"></span><span class="conn-dot" hidden></span>',
+      '<span class="seat-taken" data-count="0" style="--n:0"></span><span class="conn-dot" hidden></span>',
+    );
+    // The trick in flight: one chip more than the tricks, for the cards to land on.
+    expect(seatHtml(LINEA, { ...cell, tricks: 0, arriving: true })).toContain(
+      `<span class="seat-taken" data-count="1" style="--n:1">${CHIP}</span>`,
     );
     expect(seatHtml(LINEA, { ...cell, dotId: 'oppDot' })).toContain(
       '<span id="oppDot" class="conn-dot on"></span>',
@@ -240,12 +246,36 @@ describe('seats', () => {
     expect(seatCardsHtml(GLYPH, { handCount: 0, hand: null })).toBe('');
   });
 
-  test('seatKey changes with the name, what is held, the tricks, the dot and the pack', () => {
+  test('seatKey changes with the name, what is held, the chips (an arriving one counts), the dot and the pack', () => {
     expect(seatKey(cell, 'linea')).toBe('Jeff|3|2|on|linea');
     expect(seatKey({ ...cell, hand: [AC] }, 'linea')).toBe('Jeff|AC|2|on|linea');
     expect(seatKey({ ...cell, connected: null }, 'linea')).toBe('Jeff|3|2|-|linea');
     expect(seatKey({ ...cell, connected: false }, 'napoletane')).toBe('Jeff|3|2|off|napoletane');
+    expect(seatKey({ ...cell, arriving: true }, 'linea')).toBe('Jeff|3|3|on|linea');
     expect(tricksText(0)).toBe('');
+    expect(tricksText(1)).toBe('1 trick');
+    expect(tricksText(7)).toBe('7 tricks');
+  });
+
+  test('the chips: one back per trick, the arriving one appended, the row as long as the count at 0, 1, 7 and 20', () => {
+    expect(chipsHtml(0)).toBe('');
+    expect(chipsHtml(1)).toBe(CHIP);
+    expect(chipsHtml(7).match(/class="card back chip"/g)).toHaveLength(7);
+    expect(chipsHtml(20).match(/class="card back chip"/g)).toHaveLength(20);
+    expect(chipsHtml(0, true)).toBe(CHIP);
+    expect(chipsHtml(7, true).match(/class="card back chip"/g)).toHaveLength(8);
+    // A chip is a plain back: no id, no face, nothing of the trick's cards on it.
+    expect(chipsHtml(3)).not.toContain('data-card');
+    expect(chipCount({ tricks: 7 })).toBe(7);
+    expect(chipCount({ tricks: 7, arriving: true })).toBe(8);
+    expect(chipCount({ tricks: 0, arriving: false })).toBe(0);
+  });
+
+  test('stripKey: the chips shown and the pack; a flight in progress is another key, a name is not', () => {
+    expect(stripKey({ tricks: 2 }, 'linea')).toBe('2|linea');
+    expect(stripKey({ tricks: 2, arriving: true }, 'linea')).toBe('3|linea');
+    expect(stripKey({ tricks: 3 }, 'linea')).toBe(stripKey({ tricks: 2, arriving: true }, 'linea'));
+    expect(stripKey({ tricks: 0 }, 'napoletane')).toBe('0|napoletane');
   });
 });
 
@@ -352,28 +382,5 @@ describe('the score strip and the game badge', () => {
       'Game 4 · 1–0–1 · 2 draws · best of 5',
     );
     expect(matchLabel(1)).toBe('one game');
-  });
-});
-
-describe('the last trick', () => {
-  const trick = {
-    no: 5,
-    leader: 1 as Seat,
-    cards: [
-      { seat: 1 as Seat, card: AC },
-      { seat: 0 as Seat, card: card('RB') },
-    ],
-    winner: 1 as Seat,
-    points: 15,
-    drew: [1 as Seat, 0 as Seat],
-    trumpTaken: false,
-  };
-  test('the title, the line and the fan with the winner taking', () => {
-    expect(lastTrickTitle(trick)).toBe('Trick 5');
-    expect(lastTrickText(PLAYERS, 0, trick)).toBe('Jeff took it · 15 points');
-    expect(lastTrickText(PLAYERS, 1, trick)).toBe('You took it · 15 points');
-    expect(lastTrickHtml(trick, { players: PLAYERS, me: 0, pack: LINEA })).toBe(
-      trickHtml(trick.cards, { players: PLAYERS, me: 0, pack: LINEA, taking: 1 }),
-    );
   });
 });

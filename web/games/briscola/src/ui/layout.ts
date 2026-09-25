@@ -1,6 +1,7 @@
 // The pure twin of the table's CSS (docs/design/briscola.md §5.3, §5.6 "Geometry oracle"; the shape
 // of backgammon's ui/board/layout.ts). theme.css sizes every card from `--card-w`, a clamp() of the
-// viewport, and the pack's `--aspect`; places the other seats in three relative cells; fans the
+// viewport, and the pack's `--aspect`; places the other seats in three relative cells; stacks each
+// seat's taken tricks as a row of chips stepping `CHIP_STEP` apart until the strip is full; fans the
 // trick by `--fan-overlap` and 4° per card; and lies the briscola across under the stock, rotated
 // about its centre and slid 0.55 of a width outward. This module holds the same numbers as data and
 // the same seat mapping, so the geometry e2e (e2e/fixtures/briscola-geometry.ts) and the painter
@@ -126,6 +127,30 @@ export const seatCells = (n: SeatCount, me: Seat): Readonly<Record<Cell, Seat | 
       return [cell, r === undefined ? null : (((me + r) % n) as Seat)];
     }),
   ) as Record<Cell, Seat | null>;
+
+// ---- the taken strips (docs/design/briscola-battle.md §7 G) -------------------------------------------
+
+/** A chip (one taken trick, face down) is this tall: the hand header's row; its width is the pack's aspect of it. */
+export const CHIP_H = 24;
+export const chipWidth = (aspect: number = DEFAULT_ASPECT): number => CHIP_H * aspect;
+/** Each chip after the first steps this far right of the one before, while the strip has room. */
+export const CHIP_STEP = 6;
+/**
+ * How wide a strip may grow (`--strip-w`): beside the tiny backs of a seat cell (a third of a phone
+ * at 2 to 4 players leaves 48px), and in my hand header between my name and my points.
+ */
+export const STRIP_WIDTHS: Readonly<Record<Layout, Readonly<{ seat: number; mine: number }>>> = {
+  phone: { seat: 48, mine: 132 },
+  desktop: { seat: 96, mine: 240 },
+};
+/** The step for `n` chips in a strip `stripW` wide: CHIP_STEP, or less once the row would outgrow the strip. */
+export const chipStep = (n: number, stripW: number, aspect: number = DEFAULT_ASPECT): number =>
+  n <= 1 ? CHIP_STEP : Math.min(CHIP_STEP, (stripW - chipWidth(aspect)) / (n - 1));
+/** The row's width for `n` chips: nothing at 0, one chip, then a step more per chip, never past `stripW`. */
+export const stripWidth = (n: number, stripW: number, aspect: number = DEFAULT_ASPECT): number =>
+  n === 0 ? 0 : chipWidth(aspect) + (n - 1) * chipStep(n, stripW, aspect);
+/** The most tricks one seat can take: every card of the deck in tricks of `n`. */
+export const MAX_TRICKS: Readonly<Record<SeatCount, number>> = { 2: 20, 3: 13, 4: 10 };
 
 // ---- the trick fan ----------------------------------------------------------------------------------
 
