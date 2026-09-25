@@ -6,10 +6,12 @@
    inherit gin's green felt; test/tokens.test.ts holds both). What follows under a shell selector is
    what this theme alone declares: its type (Lora and Bodoni through the font tokens; `font-family:
    inherit` on every control), its hairlines and shadows, the gold underline of the open tab, the
-   curtain's terracotta scrim. An Italian café: a cream page with a
-   CSS-only linen weave, one espresso panel for the home shell, quiet bottle-green baize for the two
-   table surfaces (the centre band and the hand), terracotta as the one accent (never ink on the
-   felt: 1.3:1), gold as a hairline; Bodoni Moda for the title and the room code, Lora for text and
+   curtain's terracotta scrim. An Italian café on an Oahu lanai (the owner, 2026-09-25: "a bit
+   more hawaiian themed ... Subtle motifs"; design §3): a cream page with a CSS-only linen weave
+   that reads as sand, one espresso panel for the home shell, shallow lagoon water for the two table
+   surfaces (the centre band and the hand; cream 5.3–9.3:1, the numbers the baize had), terracotta
+   as the one accent (never ink on the felt), a dune-sand hairline where the café had gold, and one
+   drawn motif, a honu (assets/honu.svg) as a faint watermark at the page's foot; Bodoni Moda for the title and the room code, Lora for text and
    the points (a Bodoni zero at 20px lost its hairlines). The card box is `--card-w` wide and `--card-w / --aspect` tall; `--aspect` is the chosen
    pack's, written once on #tableScreen by the pack painter (0.518 for linea, the deck's default);
    the layout is designed for [0.50, 0.62]. web/games/briscola/src/ui/layout.ts is the pure twin of
@@ -22,14 +24,14 @@
   --card-2: #e9dfcc;
   --accent: #a6442b;
   --accent-dark: #7a2f1d;
-  --gold: #c9a227;
+  --gold: #d6b97f;
   --text: #2b1d14;
   --muted: #6b5a4a;
   --danger: #b7472a;
   --go: #a3b070;
   --go-text: #1f2a12;
   --radius: 12px;
-  --felt: radial-gradient(ellipse at 50% 35%, #3a6b4f 0%, #2f5842 60%, #244634 100%);
+  --felt: radial-gradient(ellipse at 50% 35%, #2c6d6b 0%, #235a59 60%, #194645 100%);
   /* The fourteen shell tokens (web/shared/styles/shell.css reads them; CONTRACT.md "Shell tokens"):
      the espresso panel is every shell surface and bar, cream its fill, the panel's dimmed cream its
      ink on a bar, the accent its emphasis, this theme's hairline-and-shadow its shadow, one radius. */
@@ -48,13 +50,13 @@
   --radius-inner: var(--radius);
   --radius-tab: 9px;
   /* The game's own tokens: only the ones a rule below reads. */
-  --baize: #2f5842;
-  --baize-edge: #1d3a2b;
+  --baize: #235a59;
+  --baize-edge: #163f3e;
   --panel: linear-gradient(180deg, #4a3529 0%, #3b2a20 60%, #2c1e17 100%);
   --panel-2: linear-gradient(180deg, #5a4232 0%, #4a3529 100%);
   --cream: #f7f1e6;
   --cream-dim: rgba(247, 241, 230, 0.72);
-  --hair: rgba(201, 162, 39, 0.62);
+  --hair: rgba(214, 185, 127, 0.62);
   --terracotta-pale: #e7c9bb;
   --card-face: #fbf6ea;
   --card-edge: rgba(43, 29, 20, 0.18);
@@ -85,12 +87,17 @@ body {
     repeating-linear-gradient(0deg, rgba(43, 29, 20, 0.03) 0 1px, transparent 1px 4px),
     repeating-linear-gradient(90deg, rgba(43, 29, 20, 0.03) 0 1px, transparent 1px 4px);
 }
+/* The column is a stacking context one above the two fixed marks below (the trim, the honu), so
+   they paint under it and show only where the linen does; the overlays (50), the flyers (60) and
+   the toast (100) are its siblings and stay above it. */
 #app {
+  position: relative;
+  z-index: 1;
   padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
 }
-/* The trim (backgammon's rule in this palette): a quiet baize-edge band along the viewport's edge
-   with a gold hairline on its inner side, fixed and inert, at z-index 0 under every positioned
-   thing (overlays 50, flyers 60, the toast 100) and away from every control (#app's gutters). */
+/* The trim (backgammon's rule in this palette): a quiet deep-water band along the viewport's edge
+   with a sand hairline on its inner side, fixed and inert, at z-index 0 under #app and every
+   positioned thing, and away from every control (#app's gutters). */
 body::before {
   content: '';
   position: fixed;
@@ -107,6 +114,25 @@ body::before {
   #app {
     padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
   }
+}
+/* The one motif (design §3; the owner: "turtles ... Subtle motifs"): a honu, a line-drawn green sea
+   turtle (assets/honu.svg: a 96px box, 3px strokes, no colour of its own), as a watermark at the
+   page's foot in the page's ink at 10% through a mask; fixed and inert at z-index 0 like the trim,
+   under #app, so it shows below the home panels and beside the laptop's column and never over a
+   control; at the table the phone's hand felt covers it. Vite inlines the file (under 4 KB). */
+body::after {
+  content: '';
+  position: fixed;
+  right: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  width: 112px;
+  height: 112px;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--text);
+  -webkit-mask: url(./assets/honu.svg) center / contain no-repeat;
+  mask: url(./assets/honu.svg) center / contain no-repeat;
+  opacity: 0.1;
 }
 /* Bodoni Moda for the title and the room code only (design D22; the points went to Lora, .sc-points); Lora everywhere else. */
 h1 {
@@ -151,7 +177,7 @@ h1 {
 .card-box input[type='number'],
 .card-box select,
 .card-box textarea {
-  border-color: rgba(201, 162, 39, 0.4);
+  border-color: rgba(214, 185, 127, 0.4);
 }
 .card-box .score-row {
   background: var(--cream);
@@ -464,7 +490,7 @@ label {
 }
 .mode-switch {
   color: var(--cream);
-  border-top: 1px solid rgba(201, 162, 39, 0.35);
+  border-top: 1px solid rgba(214, 185, 127, 0.35);
   box-shadow: var(--shadow-shell);
 }
 .mode-btn {

@@ -116,9 +116,9 @@ culls a burst. Durations `HOLD_MS 900 / FLY_MS 320 / DRAW_MS 260 / DRAW_GAP_MS 1
 The thirteen shared tokens are redeclared on the café palette (`test/tokens.test.ts` holds it; a
 partial override would inherit gin's felt): `--bg #ede3d1` (cream; `--text` 12.8:1, `--muted` 5.2:1,
 `--accent` 4.7:1), `--card #f7f1e6`, `--card-2 #e9dfcc`, `--accent #a6442b` (terracotta; 1.3:1 on
-the baize, so never ink on the felt), `--accent-dark #7a2f1d` (the curtain wash), `--gold #c9a227`
-(hairlines only), `--text #2b1d14`, `--muted #6b5a4a`, `--danger #b7472a`, `--radius 12px`, `--felt`
-(a bottle-green radial gradient `#3a6b4f → #2f5842 → #244634`; cream 5.5–9.3:1), `--go #a3b070` with
+the baize, so never ink on the felt), `--accent-dark #7a2f1d` (the curtain wash), `--gold #d6b97f`
+(a dune sand; hairlines only), `--text #2b1d14`, `--muted #6b5a4a`, `--danger #b7472a`, `--radius 12px`, `--felt`
+(a lagoon-teal radial gradient `#2c6d6b → #235a59 → #194645`; cream 5.3–9.3:1), `--go #a3b070` with
 `--go-text #1f2a12` (6.4:1; `.btn-go` carries an olive hairline and the primary's shadow). Game
 tokens: `--baize`, `--baize-edge`, `--panel` (espresso), `--cream`, `--cream-dim` (5.1:1 on the
 baize), `--terracotta-pale` (the turn mark's fill), `--card-face #fbf6ea`, `--card-edge`, the four
@@ -152,8 +152,30 @@ Every tap target is ≥ 44 px on the short axis at 390 × 844 (hand cards 111 ×
 `.btn-sm` and `.icon-btn` 44 px, the trick band as a drop and tap target). Below the floor the
 document scrolls (622 px on the phone, 611 px on the desktop; 375 × 667 fits at a 623 px column).
 The page is cream with a CSS-only linen weave; the home shell's boxes sit on the espresso panel with
-a gold hairline and cream text ("subtle but recognizable": one accent, gold as hairline, the cards
+a sand hairline and cream text ("subtle but recognizable": one accent, sand as hairline, the cards
 as ornate as their pack).
+
+The Hawaiian shift (the owner, 2026-09-25: "Make the briscola a bit more hawaiian themed. I play
+this in Oahu with my friends. Beach, turtles, poke, dolphins. Subtle motifs"; the standing rule from
+backgammon: "subtle but recognizable"). Three candidates were built on the tokens alone and read at
+390 × 844 and 1280 × 800: (a) the felt as shallow water with a sand hairline and one honu watermark;
+(b) a sand page with a deep-ocean panel, a wave line along the trim and a dolphin on the result
+sheet; (c) the café palette with poke-coral and seaweed accents and a honu in the empty stock slot.
+(b) erased the espresso and read as backgammon's blue with a zigzag edge; (c) read as no change at
+all (a coral that keeps 4.5:1 on the cream is terracotta, and the stock empties once a game). (a) is
+the theme, the quietest that still says Hawaii at a glance (sand, water, a turtle): `--felt` is a
+lagoon teal (`#2c6d6b → #235a59 → #194645`; cream 5.3 / 7.0 / 9.3:1 and cream-dim 4.5:1 at the mid
+stop, the numbers the bottle green had), `--baize` / `--baize-edge` `#235a59` / `#163f3e` (the
+trim, the fan's chips, the stock's back before the pack paints), `--gold` a dune sand `#d6b97f`
+(hairlines only, as before; `--hair` and the panel's field edges follow), and one drawn motif,
+`assets/honu.svg` (a line-drawn green sea turtle: an ellipse, a head, four flippers, one column of
+scutes; 96 px, 3 px strokes, no colour of its own) as `body::after` at the page's foot, the page's
+ink at 10% through a mask, fixed and inert at z-index 0. `#app` takes `position: relative; z-index:
+1`, so both fixed marks (the trim, the honu) paint under the column and the honu shows only where
+the linen does: below the home panels, beside the laptop's column, never over a control; the phone's
+hand felt covers it at the table. Everything else stays the café's: the linen, the espresso, the
+terracotta, the cards. Not taken: the wave line and the dolphin (a second and third motif), any
+change to the cards. The About copy names Oahu in one sentence.
 
 ## 4. The interaction model (`ui/state.ts`, `App = { shell, table }`)
 
