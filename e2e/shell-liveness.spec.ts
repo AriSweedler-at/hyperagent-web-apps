@@ -23,7 +23,7 @@ import { SHELL, SHELL_GAMES, type ShellGame } from '../tools/games.ts';
 import { HB_MS } from '../web/shared/net/liveness.ts';
 import { newPlayer, openGame, type Player } from './fixtures/player.ts';
 import { ONLINE_NAMES } from './fixtures/shell.ts';
-import { SHELL_DRIVERS, connect } from './fixtures/shell-games.ts';
+import { SHELL_DRIVERS, connect } from './fixtures/online-games.ts';
 import type { Project } from './fixtures/site.ts';
 import { LIVENESS_TIMEOUT, WEBRTC_TIMEOUT } from './fixtures/timeouts.ts';
 import { expect, test, type Players } from './fixtures/two-players.ts';
@@ -52,7 +52,7 @@ type Shell = Readonly<{
   table: string;
 }>;
 
-/** A shell game's row here, off its registry row (tools/games.ts SHELL) and its driver (e2e/fixtures/shell-games.ts). */
+/** A shell game's row here, off its registry row (tools/games.ts SHELL) and its driver (e2./fixtures/online-games.ts). */
 const shellOf = (game: ShellGame): Shell => ({
   game,
   start: SHELL_DRIVERS[game].start,

@@ -15,7 +15,7 @@ import { peerIdFor } from '../web/shared/lib/roomCode.ts';
 import { expectPeerOptions, openGame, type GameHooks } from './fixtures/player.ts';
 import { RELAY_TOAST, expectRelayPath, skipWithoutRelay } from './fixtures/relay.ts';
 import { ONLINE_NAMES, hostRoom } from './fixtures/shell.ts';
-import { SHELL_DRIVERS, connect } from './fixtures/shell-games.ts';
+import { SHELL_DRIVERS, connect } from './fixtures/online-games.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 const RELAY_GAME: GameHooks = { relay: true, ice: 'turn' };

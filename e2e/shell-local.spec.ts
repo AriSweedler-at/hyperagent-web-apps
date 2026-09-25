@@ -9,7 +9,7 @@
 import { SHELL_GAMES } from '../tools/games.ts';
 import { DESKTOP, PHONE, type Viewport } from './fixtures/geometry.ts';
 import { DEFAULT_NAMES, curtainTitle, readSave, reveal, startLocal } from './fixtures/shell.ts';
-import { SHELL_DRIVERS } from './fixtures/shell-games.ts';
+import { SHELL_DRIVERS } from './fixtures/online-games.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 

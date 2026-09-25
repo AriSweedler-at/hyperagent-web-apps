@@ -13,7 +13,7 @@ import { REGISTRY, SHELL_GAMES } from '../tools/games.ts';
 import { peerIdFor } from '../web/shared/lib/roomCode.ts';
 import { expectPeerOptions } from './fixtures/player.ts';
 import { ONLINE_NAMES } from './fixtures/shell.ts';
-import { SHELL_DRIVERS, connect } from './fixtures/shell-games.ts';
+import { SHELL_DRIVERS, connect } from './fixtures/online-games.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 SHELL_GAMES.forEach((game) => {

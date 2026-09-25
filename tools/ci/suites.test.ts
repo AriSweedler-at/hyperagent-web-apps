@@ -509,7 +509,7 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   ['the registry', ['tools/games.ts'], EVERYTHING],
   ['this table', ['tools/ci/suites.ts'], EVERYTHING],
   ['a shared e2e fixture', ['e2e/fixtures/two-players.ts'], EVERYTHING],
-  ['the shell fixtures', ['e2e/fixtures/shell.ts', 'e2e/fixtures/shell-games.ts'], EVERYTHING],
+  ['the shell fixtures', ['e2e/fixtures/shell.ts', 'e2./fixtures/online-games.ts'], EVERYTHING],
   ['a page-side recorder', ['e2e/browser/record-pc.js'], EVERYTHING],
   ['a frozen legacy page', ['legacy/gin-rummy/index.html'], EVERYTHING],
   ['a workflow', ['.github/workflows/ci.yml'], EVERYTHING],

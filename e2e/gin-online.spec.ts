@@ -4,7 +4,7 @@
 // shell's half (the room, the join, the deal on both tables, the names, the recorded Peer
 // constructions with the ?peer= and ?ice= hooks) is e2e/shell-online.spec.ts, for both shell games.
 import { ginDrawAndDiscard, ginHostDeals, ginPassUpcard, isMyTurn } from './fixtures/gin.ts';
-import { connect } from './fixtures/shell-games.ts';
+import { connect } from './fixtures/online-games.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 test(

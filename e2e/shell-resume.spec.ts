@@ -16,7 +16,7 @@ import {
   resumeLabel,
   startLocal,
 } from './fixtures/shell.ts';
-import { SHELL_DRIVERS, connect } from './fixtures/shell-games.ts';
+import { SHELL_DRIVERS, connect } from './fixtures/online-games.ts';
 import { pagePath } from './fixtures/site.ts';
 import { BROKER_TIMEOUT, WEBRTC_TIMEOUT } from './fixtures/timeouts.ts';
 import { expect, test } from './fixtures/two-players.ts';
