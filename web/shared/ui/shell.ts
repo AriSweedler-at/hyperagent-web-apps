@@ -29,6 +29,7 @@ import {
   type HostFrame,
 } from '../lib/protocol.ts';
 import { formatError, type Decoder } from '../lib/json.ts';
+import { appendCapped, outcomeFor, type RecentGame } from '../lib/recentGames.ts';
 import type { Result } from '../lib/result.ts';
 import type { Rng } from '../lib/rng.ts';
 import { randomCode, sanitiseCode, validateCode, type Game } from '../lib/roomCode.ts';
@@ -155,6 +156,8 @@ export type HomeSnapshot<G extends ShellTypes> = Readonly<{
   /** A bad value read as the default (main.ts logs it). */
   soundFont: SoundFontName;
   save: Save<G> | null;
+  /** The finished games this device remembers, newest first (web/shared/lib/recentGames.ts). */
+  recentGames: ReadonlyArray<RecentGame>;
 }> &
   G['Home'];
 
@@ -216,6 +219,18 @@ export type ShellState<G extends ShellTypes> = Readonly<{
   codeDraft: string;
   /** The font every cue plays in (docs/design/sound-fonts.md §6). */
   soundFont: SoundFontName;
+  /**
+   * The finished games this device remembers, newest first, at most RECENT_GAMES_CAP: read at
+   * `home/init`, the record of a game that just ended put first as its `recordGame` effect
+   * appends the same record to storage (web/shared/lib/recentGames.ts).
+   */
+  recentGames: ReadonlyArray<RecentGame>;
+  /**
+   * The key (`cfg.result.keyOf` of its view) of the game whose result was recorded, so a re-sent
+   * frame or a repaint of the same finished game records nothing; null until a game ends, and
+   * again after a leave.
+   */
+  recorded: string | null;
 }>;
 
 export type ShellApp<G extends ShellTypes> = Readonly<{ shell: ShellState<G>; table: G['Table'] }>;
@@ -381,6 +396,12 @@ export type ShellEffect<G extends ShellTypes> =
   | Readonly<{ type: 'writeHomeTab'; tab: Tab<G> }>
   | Readonly<{ type: 'writePlayMode'; mode: PlayMode }>
   | Readonly<{ type: 'writeSoundFont'; font: SoundFontName }>
+  /**
+   * A game just ended on this device (the owner, 2026-09-25: "after a game is finished (either
+   * online or pass-and-play) the datetime & score should be recorded, including the victor"):
+   * the record, appended first to the game's `recentGames` pref; the shell state already holds it.
+   */
+  | Readonly<{ type: 'recordGame'; game: RecentGame }>
   /** Scroll `rule` into view inside the rules `slot` that is on screen and flash it (web/shared/edge/glossary.ts). */
   | Readonly<{ type: 'revealRule'; slot: RulesSlot; rule: string }>
   /** `ms` null is the default duration. */
@@ -435,6 +456,7 @@ export const SHELL_EFFECT_TYPES = [
   'writeHomeTab',
   'writePlayMode',
   'writeSoundFont',
+  'recordGame',
   'revealRule',
   'toast',
   'send',
@@ -490,6 +512,12 @@ export type Pref<St, T> = Readonly<{
   write: (store: St, value: T) => unknown;
 }>;
 
+/** The finished games over the game's store (prefs.ts `RecentGamesPref` fits): the list or [], and one record put first. */
+export type RecentGamesPref<St> = Readonly<{
+  read: (store: St) => ReadonlyArray<RecentGame>;
+  append: (store: St, game: RecentGame) => unknown;
+}>;
+
 /** The shell's readers and writers the game builds over its keys (prefs.ts `shellStore`). */
 export type ShellPrefs<G extends ShellTypes> = Readonly<{
   name: Pref<G['Store'], string>;
@@ -497,6 +525,7 @@ export type ShellPrefs<G extends ShellTypes> = Readonly<{
   homeTab: Pref<G['Store'], Tab<G>>;
   playMode: Pref<G['Store'], PlayMode>;
   soundFont: Pref<G['Store'], SoundFontName>;
+  recentGames: RecentGamesPref<G['Store']>;
   save: Readonly<{
     readSave: (store: G['Store']) => Result<Save<G>, unknown>;
     writeSave: (store: G['Store'], save: Save<G>) => unknown;
@@ -575,6 +604,18 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     renameGuest: (game: G['State'], name: string) => G['State'];
     /** The engine state off `position/load`'s hand-made object (the save's decoder); its error names the path. */
     decodeState: Decoder<G['State']>;
+  }>;
+  /**
+   * What a finished game leaves in the device's history (web/shared/lib/recentGames.ts), read off
+   * the view the first time `engine.over` says so: the game's identity (`keyOf`, its start time,
+   * so a re-sent frame or a repaint records nothing and a rematch records again), its final
+   * score as the game spells it (gin "104–87", backgammon "5–3") and the winning seat, or null
+   * when nobody won.
+   */
+  result: Readonly<{
+    keyOf: (view: G['View']) => string;
+    scoreOf: (view: G['View']) => string;
+    winnerOf: (view: G['View']) => Seat | null;
   }>;
   /** The game's protocol.ts builders the shell sends. */
   frames: Readonly<{
@@ -788,6 +829,70 @@ export const fresh = (
   key: string,
 ): Readonly<{ mem: CueMemory; fresh: boolean }> => ({ mem: { key }, fresh: mem.key !== key });
 
+// ---- the finished game's record ---------------------------------------------------------------
+
+/**
+ * The seat the device's user sits in (the owner: "p1 on the device should be considered the
+ * user"): seat 0 in pass-and-play (the first name) and for the host, seat 1 for the guest; none
+ * at home.
+ */
+export const userSeatOf = (role: Role | null): Seat | null => {
+  switch (role) {
+    case 'local':
+    case 'host':
+      return 0;
+    case 'guest':
+      return 1;
+    case null:
+      return null;
+  }
+};
+
+/**
+ * Once per finished game (the owner, 2026-09-25): when the view first shows the game over, its
+ * record (the clock, the mode, the seats' names, the game's score and winner, the outcome from
+ * the user's seat) goes first into `recentGames` and out as the `recordGame` effect, and its key
+ * is kept so a re-sent frame, a repaint, a re-render or the guest's late `state` frame of the
+ * same game records nothing more. Every view change ends in `painted` below, so pass-and-play,
+ * the host and the guest all reach here. The names are the engine's where the game is here
+ * (pass-and-play, the host), else the room's two names in seat order (the guest; a host that
+ * never named itself, which no welcome frame allows, reads as the default host name).
+ */
+const recordResult = <G extends ShellTypes>(
+  app: ShellApp<G>,
+  ctx: Ctx,
+  cfg: ShellConfig<G>,
+): Step<G> => {
+  const s = app.shell;
+  const view = s.view;
+  const seat = userSeatOf(s.role);
+  if (view === null || seat === null || !cfg.engine.over(view)) return pure(app);
+  const key = cfg.result.keyOf(view);
+  if (s.recorded === key) return pure(app);
+  const winner = cfg.result.winnerOf(view);
+  const game: RecentGame = {
+    at: ctx.now(),
+    mode: s.role === 'local' ? 'local' : 'online',
+    players:
+      s.game !== null ? cfg.engine.names(s.game) : [s.oppName ?? cfg.names.default, s.myName],
+    score: cfg.result.scoreOf(view),
+    winner,
+    outcome: outcomeFor(seat, winner),
+  };
+  return step(withShell(app, { recorded: key, recentGames: appendCapped(s.recentGames, game) }), {
+    type: 'recordGame',
+    game,
+  });
+};
+
+/** The game's `rendered` hook, then the finished game's record: every view change ends here. */
+const painted = <G extends ShellTypes>(
+  app: ShellApp<G>,
+  prev: G['View'] | null,
+  ctx: Ctx,
+  cfg: ShellConfig<G>,
+): Step<G> => andThen(cfg.table.rendered(app, prev, ctx), (a) => recordResult(a, ctx, cfg));
+
 // ---- flows -------------------------------------------------------------------------------------
 
 /** `broadcast()`: my view, the guest's view on the wire, the table's per-view reset, saved, rendered. */
@@ -807,7 +912,7 @@ export const broadcast = <G extends ShellTypes>(
       { type: 'send', frame: cfg.frames.state(cfg.engine.viewFor(game, 1)) },
       { type: 'persist' },
     ),
-    (a) => cfg.table.rendered(a, app.shell.view, ctx),
+    (a) => painted(a, app.shell.view, ctx, cfg),
   );
 };
 
@@ -857,7 +962,7 @@ export const localBroadcast = <G extends ShellTypes>(
       ...(curtain !== null && !initial ? [{ type: 'fx', cue: 'yourTurn' } as const] : []),
       ...effects,
     ),
-    (a) => cfg.table.rendered(a, prev, ctx),
+    (a) => painted(a, prev, ctx, cfg),
   );
 };
 
@@ -965,7 +1070,7 @@ const guestGone = <G extends ShellTypes>(
   const s = app.shell;
   if (s.handoff) return pure(withHostStatus(app, cfg.copy.handoff(s.code ?? '', s.oppName)));
   if (s.game !== null && s.view !== null && !cfg.engine.over(s.view))
-    return andThen(cfg.table.rendered(app, s.view, ctx), (a) =>
+    return andThen(painted(app, s.view, ctx, cfg), (a) =>
       step(a, toast(guestGoneMsg(a.shell.oppName, a.shell.code), GONE_TOAST_MS)),
     );
   if (s.game === null)
@@ -1027,13 +1132,14 @@ const guestFrame = <G extends ShellTypes>(
       // The host refused the guest's move.
       return cfg.table.refuse(app, frame.msg);
     case 'state':
-      return cfg.table.rendered(
+      return painted(
         {
           shell: { ...app.shell, view: frame.view, oppConnected: true },
           table: cfg.table.reset(app.table, 'frame'),
         },
         app.shell.view,
         ctx,
+        cfg,
       );
   }
 };
@@ -1109,6 +1215,7 @@ const initHome = <G extends ShellTypes>(
               homeTab: home.homeTab,
               playMode: home.playMode,
               soundFont: home.soundFont,
+              recentGames: home.recentGames,
             }),
             home,
           ),
@@ -1206,6 +1313,7 @@ const leaveFinish = <G extends ShellTypes>(app: ShellApp<G>, cfg: ShellConfig<G>
         revealed: null,
         handoff: false,
         cues: cfg.cues.initial,
+        recorded: null,
       },
       table: cfg.table.reset(app.table, 'leave'),
     },
@@ -1430,7 +1538,7 @@ export const reduceShell = <G extends ShellTypes>(
       };
       const v = lost.shell.view;
       if (v !== null && !cfg.engine.over(v))
-        return andThen(cfg.table.rendered(lost, v, ctx), (a) =>
+        return andThen(painted(lost, v, ctx, cfg), (a) =>
           step(a, toast(LOST_HOST_MSG, GONE_TOAST_MS)),
         );
       return showScreen(withGuestStatus(lost, DISCONNECTED_MSG), 'guestWaitScreen');
@@ -1470,7 +1578,7 @@ export const reduceShell = <G extends ShellTypes>(
     case 'visible':
       return s.role === null ? pure(app) : step(app, { type: 'wakeLock', hold: true });
     case 'render':
-      return cfg.table.rendered(app, s.view, ctx);
+      return painted(app, s.view, ctx, cfg);
     case 'persist':
       return step(app, { type: 'persist' });
   }
@@ -1508,6 +1616,8 @@ export const initialShell = <G extends ShellTypes>(cfg: ShellConfig<G>): ShellSt
   longPressed: false,
   codeDraft: '',
   soundFont: DEFAULT_SOUND_FONT,
+  recentGames: [],
+  recorded: null,
 });
 
 /** `persist()`: the save for the current role, or null when there is nothing to save. */
@@ -1532,7 +1642,7 @@ export const saveFor = <G extends ShellTypes>(s: ShellState<G>): Save<G> | null 
   }
 };
 
-/** `initHome`'s reads: the names, the tab and mode (defaults when unreadable), the font, the save, and the game's own keys. */
+/** `initHome`'s reads: the names, the tab and mode (defaults when unreadable), the font, the save, the finished games, and the game's own keys. */
 export const readHome = <G extends ShellTypes>(
   store: G['Store'],
   cfg: ShellConfig<G>,
@@ -1550,6 +1660,7 @@ export const readHome = <G extends ShellTypes>(
     playMode: mode.ok ? mode.value : cfg.modes.default,
     soundFont: font.ok ? font.value : DEFAULT_SOUND_FONT,
     save: save.ok ? save.value : null,
+    recentGames: cfg.prefs.recentGames.read(store),
     ...cfg.home.read(store),
   };
 };

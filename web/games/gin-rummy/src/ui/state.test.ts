@@ -45,6 +45,7 @@ import {
   resumeLabel,
   runEffect,
   saveFor,
+  GIN,
   type App,
   type Effect,
   type EffectDeps,
@@ -88,6 +89,7 @@ const home: HomeSnapshot = {
   cardBack: 'default',
   soundFont: 'default',
   save: null,
+  recentGames: [],
   scorer: null,
 };
 
@@ -1443,6 +1445,7 @@ describe('storage', () => {
       cardBack: 'yu-gi-oh',
       soundFont: 'arcade',
       save: { role: 'guest', code: 'KQZM', myName: 'Jeff' },
+      recentGames: [],
       scorer: {
         players: [
           { id: 'a', name: 'A' },
@@ -1466,6 +1469,65 @@ describe('storage', () => {
       sort: 'suit',
       soundFont: 'default',
     });
+  });
+});
+
+describe('the finished game`s record (the owner, 2026-09-25)', () => {
+  test('the adapters: the deal`s clock is the key, the two totals the score, the seat `readyAfterRound` named the victor', () => {
+    const v = viewFor(drawn, 0);
+    expect(GIN.result.keyOf(v)).toBe(String(drawn.startedAt));
+    expect(GIN.result.scoreOf(v)).toBe('0–0');
+    expect(GIN.result.winnerOf(v)).toBeNull();
+    const finished: View = {
+      ...v,
+      phase: 'gameOver',
+      winner: 1,
+      players: [
+        { ...v.players[0], total: 87 },
+        { ...v.players[1], total: 104 },
+      ],
+    };
+    expect(GIN.result.scoreOf(finished)).toBe('87–104');
+    expect(GIN.result.winnerOf(finished)).toBe(1);
+  });
+
+  test('pass and play: the game over records once, a loss for the first name when the second wins; a repaint records nothing more', () => {
+    const start = run(
+      initialApp,
+      { type: 'home/init', home },
+      { type: 'local/click', p1: 'Ann', p2: 'Bob', target: '100' },
+    ).app;
+    const g = start.shell.game;
+    if (g === null) throw new Error('no game');
+    const finished: View = {
+      ...viewFor(g, 0),
+      phase: 'gameOver',
+      winner: 1,
+      players: [
+        { ...g.players[0], total: 87 },
+        { ...g.players[1], total: 104 },
+      ],
+    };
+    const over = { ...start, shell: { ...start.shell, view: finished } };
+    const painted = run(over, { type: 'render' });
+    expect(painted.effects.filter((e) => e.type === 'recordGame')).toEqual([
+      {
+        type: 'recordGame',
+        game: {
+          at: NOW,
+          mode: 'local',
+          players: ['Ann', 'Bob'],
+          score: '87–104',
+          winner: 1,
+          outcome: 'loss',
+        },
+      },
+    ]);
+    expect(painted.app.shell.recentGames).toHaveLength(1);
+    expect(painted.app.shell.screen).toBe('endgameScreen');
+    expect(run(painted.app, { type: 'render' }).effects.map((e) => e.type)).not.toContain(
+      'recordGame',
+    );
   });
 });
 

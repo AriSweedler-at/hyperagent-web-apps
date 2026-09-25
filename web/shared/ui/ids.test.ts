@@ -38,6 +38,7 @@ describe('SHELL_IDS', () => {
       button: 'historyBtn',
       overlay: 'historyOverlay',
       list: 'historyList',
+      recent: 'recentGames',
       close: 'closeHistoryBtn',
     });
     Object.values(HISTORY_IDS).forEach((id) => {

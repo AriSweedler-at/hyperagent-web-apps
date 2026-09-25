@@ -25,6 +25,7 @@ import {
 import { err, ok, type Result } from '../lib/result.ts';
 import { packsFor, type CardPackFor } from '../lib/cards/packs.ts';
 import type { DeckKind } from '../lib/cards/decks.ts';
+import { appendCapped, decodeRecentGames, type RecentGame } from '../lib/recentGames.ts';
 import { ROOM_CODE, isWellFormedCode, type Game } from '../lib/roomCode.ts';
 import { SOUND_FONTS, type SoundFontName } from '../lib/sound/fonts.ts';
 import type { StorageError, Store } from './storage.ts';
@@ -104,6 +105,35 @@ export const soundPref = (key: string): SoundPref => {
       const state = pref.read(store);
       return !(state.ok && state.value === 'off');
     },
+  };
+};
+
+// ---- the finished games ----------------------------------------------------------------------
+
+/**
+ * The finished games a device remembers (web/shared/lib/recentGames.ts, the owner's "save up to 20
+ * games of history in browser storage"), as JSON under one key: `read` is the stored list or []
+ * (a missing, unreadable or foreign value reads as none: a record is a convenience, never a
+ * save), `write` stores a list as is, `append` puts one finished game first and keeps the newest
+ * `RECENT_GAMES_CAP`, re-reading the store so a second tab's records are kept too.
+ */
+export type RecentGamesPref = Readonly<{
+  read: (store: Store) => ReadonlyArray<RecentGame>;
+  write: (store: Store, games: ReadonlyArray<RecentGame>) => Result<null, StorageError>;
+  append: (store: Store, game: RecentGame) => Result<null, StorageError>;
+}>;
+
+export const recentGamesPref = (key: string): RecentGamesPref => {
+  const read = (store: Store): ReadonlyArray<RecentGame> => {
+    const stored = store.readJson(key, decodeRecentGames);
+    return stored.ok ? stored.value : [];
+  };
+  const write = (store: Store, games: ReadonlyArray<RecentGame>): Result<null, StorageError> =>
+    store.writeJson(key, games);
+  return {
+    read,
+    write,
+    append: (store, game) => write(store, appendCapped(read(store), game)),
   };
 };
 
@@ -237,6 +267,8 @@ export type ShellKeys = Readonly<{
   playMode: string;
   sound: string;
   soundFont: string;
+  /** The finished games (`<game>_recentGames`, JSON; web/shared/lib/recentGames.ts). */
+  recentGames: string;
 }>;
 
 /** The shell's readers and writers over one game's keys: what `web/shared/ui/shell.ts` reads `initHome` from and `shellEffects.ts` writes the effects through. */
@@ -248,13 +280,16 @@ export type ShellStore<S, X extends object, Tab extends string> = Readonly<{
   playMode: TextPref<PlayMode>;
   sound: SoundPref;
   soundFont: TextPref<SoundFontName>;
+  /** The finished games, newest first, at most RECENT_GAMES_CAP (the `recordGame` effect appends). */
+  recentGames: RecentGamesPref;
   save: ShellSave<S, X>;
 }>;
 
 /**
- * The shell's store for a game: the seven preferences and the save, each over the game's own key,
- * so a game's storage.ts spells its keys once and destructures its `readName`/`writeName`/… from
- * here (docs/design/shared-shell.md §5 C2 "shellStore/shellKeys onto prefs.ts").
+ * The shell's store for a game: the seven preferences, the finished games and the save, each over
+ * the game's own key, so a game's storage.ts spells its keys once and destructures its
+ * `readName`/`writeName`/… from here (docs/design/shared-shell.md §5 C2 "shellStore/shellKeys onto
+ * prefs.ts").
  */
 export const shellStore = <S, X extends object, Tab extends string>(
   keys: ShellKeys,
@@ -271,6 +306,7 @@ export const shellStore = <S, X extends object, Tab extends string>(
   playMode: textPref(keys.playMode, decodePlayMode),
   sound: soundPref(keys.sound),
   soundFont: textPref(keys.soundFont, decodeSoundFont),
+  recentGames: recentGamesPref(keys.recentGames),
   save: shellSave({
     key: keys.save,
     game: cfg.game,

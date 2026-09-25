@@ -82,6 +82,11 @@ export const STORAGE_KEYS = {
    * game on the origin keeps its own choice (docs/design/sound-fonts.md §6); set from the console for now.
    */
   soundFont: 'backgammon_soundFont',
+  /**
+   * The finished matches this device remembers (web/shared/lib/recentGames.ts, JSON, newest
+   * first, at most 20; the owner's game history of 2026-09-25). This game's own key, like the font.
+   */
+  recentGames: 'backgammon_recentGames',
   /** The ruleset the home screen last chose (bare string, a shipped variant only). */
   variant: 'backgammon_variant',
   /** The match length the home screen last chose (bare string naming one of MATCH_LENGTHS). */
@@ -159,6 +164,12 @@ export const {
   enabled: soundEnabled,
 } = SHELL_STORE.sound;
 export const { read: readSoundFont, write: writeSoundFont } = SHELL_STORE.soundFont;
+/** The finished matches: the stored list or [], and one match put first under the cap. */
+export const {
+  read: readRecentGames,
+  write: writeRecentGames,
+  append: appendRecentGame,
+} = SHELL_STORE.recentGames;
 
 // ---- this page's own preferences -----------------------------------------------------------
 
