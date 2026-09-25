@@ -461,6 +461,18 @@
         </div>
 
         <div class="controls" id="controls">
+          <!-- Whose turn (the owner, 2026-09-25): a small arrow in the mover's checker colours that
+               points at their side of the table (data-seat, data-side from render.ts paintTurn);
+               their tray wears the same colours (theme.css .off.to-move). -->
+          <svg
+            class="turn-arrow hidden"
+            id="turnArrow"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M12 21 5 13h4V3h6v10h4z" />
+          </svg>
           <div class="me-strip">
             <span class="name" id="myName">You</span>
             <span class="pips" id="pipsMe">167</span>

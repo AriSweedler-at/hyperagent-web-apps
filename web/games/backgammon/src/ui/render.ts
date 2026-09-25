@@ -81,6 +81,7 @@ import {
   placeAria,
   pointId,
   resultText,
+  type Side,
   sideOf,
   sourcesOf,
   stackKey,
@@ -640,6 +641,35 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
   setAttr(toggle, 'data-next', app.table.curtainMode === 'always' ? 'never' : 'always');
 };
 
+// ---- whose turn (the owner, 2026-09-25) -----------------------------------------------------------
+
+/** The seat to act and which side of the table they sit at, as the view shows it; null when nobody acts. */
+type Turn = Readonly<{ actor: Seat; side: Side }>;
+const turnOf = (v: View | null): Turn | null =>
+  v === null || v.matchOver || v.actor === null
+    ? null
+    : { actor: v.actor, side: v.actor === v.me.idx ? 'near' : 'far' };
+
+/**
+ * Whose turn, at a glance (the owner, 2026-09-25: "add a small indicator like an arrow that turns
+ * around and/or highlights the active user's end state that is colorized like the chips they are
+ * playing with"; the board does not flip when the phone is handed across): the actor's tray wears
+ * `to-move` (theme.css: a wash and a hairline in that checker's colours) and `#turnArrow` takes the
+ * actor's seat (`data-seat`, the same colours) and side (`data-side`: `near` when the actor is the
+ * viewer, `far` when the opponent, so the arrow turns round while they move online). Both follow
+ * `View.actor`: no game, the match over, or a finished game shows neither.
+ */
+export const paintTurn = (doc: DocumentLike, v: View | null): void => {
+  const turn = turnOf(v);
+  ([0, 1] as const).forEach((seat) => {
+    toggleClass(requireId(doc, offIdFor(seat)), 'to-move', turn?.actor === seat);
+  });
+  const arrow = requireId(doc, 'turnArrow');
+  toggleClass(arrow, 'hidden', turn === null);
+  setAttr(arrow, 'data-seat', turn === null ? null : String(turn.actor));
+  setAttr(arrow, 'data-side', turn === null ? null : turn.side);
+};
+
 // ---- the whole paint ------------------------------------------------------------------------------
 
 /** The position a paint is keyed on: a change flies the checkers `flightsBetween` names (design §3.9). */
@@ -677,6 +707,7 @@ const paintTable = (doc: DocumentLike, app: App, v: View, hits: ReadonlySet<Poin
  */
 const paintGame = (doc: PageLike, app: App): void => {
   const v = app.shell.view;
+  paintTurn(doc, v);
   if (v === null) {
     paintSheet(doc, 'resultOverlay', false);
     paintSheet(doc, 'cubeOverlay', false);

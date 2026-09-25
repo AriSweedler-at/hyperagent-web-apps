@@ -42,7 +42,7 @@ the rules by rule (`rules R13`).
 `#gameBadge` "Game 3 · 2–1 · to 5", `#rulesBtnGame #historyBtn` on the desktop, `#soundBtn` with
 `aria-pressed`), `#statusLine` (`#statusText`, `#statusDice.sr-only`), `#board` (its places, and
 last the roll modal `#rollOverlay.roll-modal`: `#rollModalTitle #rollModalSub #rollModalDice
-#rollModalBtn` "Buen mazal! roll" and `#doubleBtn`, §4.7), `.controls` (`#myName #pipsMe`,
+#rollModalBtn` "Buen mazal! roll" and `#doubleBtn`, §4.7), `.controls` (`#turnArrow`, `#myName #pipsMe`,
 `#undoBtn` disabled rather than hidden, the reserved hidden `#doneBtn`, the roll slot holding
 `#diceMini` / `#waitNote` / `#resultChipBtn`, then `#moveChips` and `#chipCancelBtn`). Points carry `data-abs` (static),
 `data-own`, `pt-a`/`pt-b` (absolute parity, the two triangle shades) and `pt-near`/`pt-far` (own
@@ -50,7 +50,12 @@ last the roll modal `#rollOverlay.roll-modal`: `#rollModalTitle #rollModalSub #r
 are colour-fixed and CSS places them near or far by `#board[data-seat]`. `paintSeat` rewrites
 `data-own`, `pt-near`/`pt-far` and `data-seat` only when the seat differs, so the markup ships seat
 0's and the page fake and the goldens see a whole board before any paint. The opponent's name
-pulses (`.opp-strip.to-move`) while they are to move.
+pulses (`.opp-strip.to-move`) while they are to move. Whose turn it is reads at a glance (the
+owner, 2026-09-25: "default, no flip. Hand the phone across. And add a small indicator like an
+arrow that turns around and/or highlights the active user's end state that is colorized like the
+chips they are playing with"): `paintTurn` puts `to-move` on the actor's tray and `data-seat` /
+`data-side` on `#turnArrow`, the small arrow beside the mover's strip (§3.7); both follow
+`view.actor`, so a finished game or no game shows neither.
 
 ### 2.2 Keys, highlights and flights
 
@@ -216,6 +221,7 @@ keep the board and every control clear of it. No pattern: the meander stays the 
 | `arriving` | the just-landed checker during a flight | `visibility: hidden` |
 | `settling` | the top coin of a stack already five tall while the sixth flies in | `::after { visibility: hidden }`: the count badge waits for the landing; the coin itself stays |
 | `inert` on `#board` | not my turn / not moving | `pointer-events: none` on `.point,.bar,.off`; no outlines, no glow |
+| `to-move` on `.off`; `data-seat="0\|1"` + `data-side="near\|far"` on `#turnArrow` | the actor's tray; the arrow (the owner, 2026-09-25) | the tray: a soft wash and a hairline in that checker's colours (nacre at .22 under a `--gold` line for Light, `--accent-dark` at .3 under a `--nazar` line for Dark), through `:where(#offLight)` / `:where(#offDark)` so `.off.target`, later at the same specificity, still wins on a lit tray; the arrow: a 22px filled arrow in the same face and ring colours, pointing down at the near side, `rotate(180deg)` for `far` (the opponent moving, online), `transform`, `fill` and `stroke` over 200ms (none under reduced motion); hidden with the strip while `#controls.choosing` |
 | `theirs` on `.die` | the opponent's roll | `filter: saturate(.7) brightness(.85)` |
 | `used` on `.die` | a consumed die | `opacity: .4` and a diagonal slash over the pips |
 | `dead` on `.die` | no maximal play uses it | `opacity: .4`, a `--danger` strike, `aria-disabled` |
@@ -636,7 +642,9 @@ checkers; `.point.can-move` set equals `sourcesOf(view)`; `.point.selected`, `.s
 `.die.picked`; `#moveChips .chip` count and `data-*`; `#rollOverlay` visible per `rollModalOpen`,
 `#rollModalBtn` disabled while `#board[data-rolling]`, `#board[data-rolled]` once the dice stand
 (the specs' wait after a roll); `#statusText` (pinned strings from `statusText`); `#curtainBtn` text;
-`#curtainLast`; `#rsTitle`; `#gameBadge`; the toast "Kapará…" after the reveal. Painter tests over
+`#curtainLast`; `#rsTitle`; `#gameBadge`; the toast "Kapará…" after the reveal;
+`#turnArrow[data-seat][data-side]` and `.off.to-move` equal `view.actor` and its side (hidden with
+no actor). Painter tests over
 `backgammonPage(markup)` (from `index.html?raw`, gin's `optionsFromMarkup`) assert the keyed
 rebuild: two paints with the same board and a changed selection leave the checker elements
 identical (`data-key` unchanged) and only toggle classes.
