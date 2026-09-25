@@ -668,7 +668,7 @@ seeded rng; `state.test.ts` asserts the hit toast comes on the reveal and never 
 `vitest.config.ts` (coverage rows and thresholds at measured minus 5/5/5/3), the dist guards
 (`GAMES`-driven; `dist-parity` splits `GAMES` from `LEGACY_GAMES`; `class-contract` floors are per
 game because the board builders make most names by template), `backgammon-grid.test.ts`,
-`test/tokens.test.ts`, `playwright.config.ts PAGE_ONLY_SPECS` (`backgammon-local`,
+`test/tokens.test.ts`, `PAGE_ONLY_SPECS` (`backgammon-local`,
 `backgammon-geometry`), `tools/parity/computed-styles.ts` (`SELECTORS.backgammon`,
 `driveBackgammon`; the two goldens under `test/fixtures/styles/`), `.github/workflows/nightly.yml`
 (`BG_REPLAY_GAMES=1000`). `index.html` and `theme.css` are new files with no legacy twin and stay

@@ -11,7 +11,7 @@
 // guest's reconnect opens no second channel, so no "lost", no "room full", no dot flicker (the
 // review's B4). Once per shell game, since the sessions are shared and each game keeps only its
 // codec and its ids: one describe per game off tools/games.ts, tagged `@<game>` so each game's e2e
-// job plays its own (see shell-home.spec.ts); on `pages` only (playwright.config.ts
+// job plays its own (see shell-home.spec.ts); on `pages` only (e2e/fixtures/site.ts
 // PAGE_ONLY_SPECS): the wait is the sessions' timers, not the origin's. Status and toast texts are
 // collected by a MutationObserver from the moment of interest, so a message that flashed between
 // two polls is not missed.
