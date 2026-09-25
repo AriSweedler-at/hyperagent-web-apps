@@ -21,6 +21,7 @@ import {
   SUITS,
   applyAction,
   createGame,
+  decodeState,
   matchOver,
   nameOf,
   normaliseOptions,
@@ -128,6 +129,8 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
     create: (players, opts, rng, now) => createGame(players, opts, rng, now),
     apply: applyAction,
     viewFor,
+    /** `position/load` (`window.__briscola.setup`): the save's decoder, E20's invariants refined. */
+    decodeState,
     over: (view) => view.matchOver,
     finished: (game) => matchOver(game.match),
     names: (game) => [nameOf(game.players, 0), nameOf(game.players, 1)],

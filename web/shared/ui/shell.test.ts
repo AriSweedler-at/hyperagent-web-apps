@@ -1037,10 +1037,11 @@ describe('pass and play', () => {
     ].forEach(([p1, p2]) => {
       expect(localSeats([p1 ?? '', p2 ?? ''])).toEqual(localPlayers(p1 ?? '', p2 ?? ''));
     });
-    // Three and four: defaults by seat, ids by seat, a clash with any earlier seat suffixed by its number.
+    // Three and four: the owner's names default the first two seats, `Player N` the rest, ids by
+    // seat, a clash with any earlier seat suffixed by its number.
     expect(localSeats(['Ann', '', 'Cara'])).toEqual([
       { id: 'p1', name: 'Ann' },
-      { id: 'p2', name: 'Player 2' },
+      { id: 'p2', name: DEFAULT_LOCAL_NAMES[1] },
       { id: 'p3', name: 'Cara' },
     ]);
     expect(localSeats(['Ann', 'ann', 'Bob', 'ANN'])).toEqual([

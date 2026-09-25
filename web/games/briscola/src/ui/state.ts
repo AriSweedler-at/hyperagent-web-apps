@@ -30,14 +30,17 @@
 // beat is paint-driven, so it plays the same on every device from one `state` frame, and in
 // pass-and-play the curtain waits for it (`viewer` keeps the phone holder's view while a trick
 // settles). Sounds are event-driven (docs/design/briscola-sound-history.md §3.5, §5): `rendered`
-// finds the events new since the view it replaces and gathers their phrases (`phraseOf`,
-// ui/sound.ts) into ONE `phrases` effect, played back to back in the App's font (the shape of
-// web/shared/ui/eventEffects.ts), once per view (`cues.key`), so a re-sent frame plays nothing;
-// the card laid and the turn chime stay `fx` rows of the table.
+// finds the events new since the view it replaces (`continuedEvents` says which stream that view
+// continues) and hands them to the shared `eventEffects` (web/shared/ui/eventEffects.ts), which
+// gathers their phrases (`phraseOf`, ui/sound.ts) into ONE `phrases` effect the shell plays back to
+// back in the App's font, once per view (`cues.key`), so a re-sent frame plays nothing; the card
+// laid and the turn chime stay `fx` rows of the table.
 import {
   GONE_TOAST_MS,
   NOT_CONNECTED_MSG,
+  SANDBOX_LOCAL_ONLY_MSG,
   andThen as then,
+  badPositionMsg,
   broadcast,
   guestContextOf as shellGuestContextOf,
   hostContextOf as shellHostContextOf,
@@ -74,18 +77,9 @@ import {
   type TimerId as SharedTimerId,
 } from '../../../../shared/ui/shell.ts';
 import { runShellEffect, type ShellEffectDeps } from '../../../../shared/ui/shellEffects.ts';
-import type { Phrase } from '../../../../shared/lib/sound/phrase.ts';
+import { eventEffects } from '../../../../shared/ui/eventEffects.ts';
 import { isCardPackFor } from '../../../../shared/lib/cards/packs.ts';
-import { formatError } from '../../../../shared/lib/json.ts';
-import {
-  HAND_SIZE,
-  actorOf,
-  applyAction,
-  createGame,
-  decodeState,
-  nameOf,
-  viewFor,
-} from '../engine/index.ts';
+import { HAND_SIZE, actorOf, applyAction, createGame, nameOf, viewFor } from '../engine/index.ts';
 import type {
   Action,
   Cards,
@@ -288,9 +282,8 @@ export const HOLD_MS = 900;
 export const FLY_MS = 320;
 export const DRAW_MS = 260;
 export const DRAW_GAP_MS = 160;
-/** `sandbox/load` outside pass-and-play, and a position the decoder refuses. */
-export const SANDBOX_LOCAL_ONLY_MSG = 'Positions can only be set up in pass-and-play.';
-export const badPositionMsg = (error: string): string => `That position is not valid: ${error}`;
+/** `position/load` (`window.__briscola.setup`) outside pass-and-play, and a position the decoder refuses: the shell's strings. */
+export { SANDBOX_LOCAL_ONLY_MSG, badPositionMsg };
 /** `guest/lost` once the match is over: the host closed the table, there is nothing to rejoin. */
 export const hostLeftMsg = (hostName: string): string => `${hostName} left the table.`;
 /** A guest's "Next game": the host deals (D20). */
@@ -339,12 +332,7 @@ export type TableIntent =
   /** `#p3NameInput` / `#p4NameInput` typed: remembered under its key. */
   | Readonly<{ type: 'pname/typed'; seat: ExtraSeat; value: string }>
   /** The hook's `cardPack(name)`: a pack that draws the Italian deck is shown from now on and remembered; anything else is ignored. */
-  | Readonly<{ type: 'cardPack/set'; pack: string }>
-  /**
-   * `window.__briscola.setup(state)` (e2e and stories): the pass-and-play game's engine state is
-   * replaced by `state` (decoded, so a hand-made object is checked); refused outside a local game.
-   */
-  | Readonly<{ type: 'sandbox/load'; state: unknown }>;
+  | Readonly<{ type: 'cardPack/set'; pack: string }>;
 
 /** Every handler and every network event: the shell's intents and the table's. */
 export type Intent = SharedIntent<Briscola>;
@@ -368,8 +356,6 @@ export type Context = Ctx;
 
 const tap: Effect = { type: 'fx', cue: 'tap' };
 const fx = (cue: Cue): Effect => ({ type: 'fx', cue });
-/** The events' phrases of one paint, back to back PHRASE_GAP_MS apart with one buzz (web/shared/edge/cuePlayer.ts `playPhrases`). */
-const phrasesFx = (phrases: ReadonlyArray<Phrase>): Effect => ({ type: 'phrases', phrases });
 const settleTimer = (ms: number): Effect => ({
   type: 'startTimer',
   id: 'settle',
@@ -436,20 +422,22 @@ export const playedBetween = (prev: View, next: View): Played | null => {
 };
 
 /**
- * The events `next` carries that `prev` did not (docs/design/briscola-sound-history.md §3.5): `id`
- * is an event's index in the stream, so a continuation is a slice past `prev`'s last event; a
- * stream that does not carry that event at that index (a rematch, a hand-made position) is new,
- * and every event of it is. The shared `newEvents` (web/shared/lib/events.ts, S1) keeps only ids
- * past `prev`'s last and leaves a fresh stream to the caller (`prev` null, a cold paint): here a
- * rematch's deal must chime from the same mounted view, hence this reading of the ids.
+ * The events of `prev` that `next` continues, for the shared `eventEffects` (web/shared/lib/
+ * events.ts: an event is new when its id passes the last one seen, so a stream must run on): a
+ * stream that carries `prev`'s last event at its index continues it (one match, its ids running on
+ * across games), so `prev`'s events; a rematch opens a new stream after a finished match, so none
+ * (its deal chimes); a stream `prev` never saw while no match ended (a hand-made position,
+ * `position/load`) is null: painted cold, nothing chimes.
  */
-export const newEvents = (prev: View | null, next: View): ReadonlyArray<GameEvent> => {
-  const last = prev?.events.at(-1);
-  if (last === undefined) return prev === null ? [] : next.events;
-  const same = next.events[last.id];
-  return same?.kind === last.kind && same.at === last.at && same.seat === last.seat
-    ? next.events.slice(last.id + 1)
-    : next.events;
+export const continuedEvents = (prev: View, next: View): ReadonlyArray<GameEvent> | null => {
+  const last = prev.events.at(-1);
+  const same = last === undefined ? undefined : next.events[last.id];
+  const continues =
+    last !== undefined &&
+    same?.kind === last.kind &&
+    same.at === last.at &&
+    same.seat === last.seat;
+  return continues ? prev.events : prev.matchOver ? [] : null;
 };
 
 /** The view a cue memory keys on: the game and its last event, so a re-sent frame plays nothing. */
@@ -473,14 +461,20 @@ export const cuesBetween = (prev: View, next: View, role: Role | null): Readonly
 };
 
 /**
- * One phrase per event new since `prev`, for this device (`phraseOf`: the winner's or the loser's
- * cell of a trick, the deal, the result), in event order; the shell plays them back to back.
+ * The one `phrases` effect of the events new since `prev` (`eventEffects`, docs/design/
+ * briscola-sound-history.md §3.5), each event's phrase for this device (`phraseOf`: the winner's
+ * or the loser's cell of a trick, the deal, the result), in event order; none for a cold paint.
  */
-export const phrasesBetween = (prev: View, next: View, role: Role | null): ReadonlyArray<Phrase> =>
-  newEvents(prev, next).flatMap((e) => {
-    const phrase = phraseOf(e, next.me, role);
-    return phrase === null ? [] : [phrase];
-  });
+export const phrasesBetween = (
+  prev: View,
+  next: View,
+  role: Role | null,
+): ReadonlyArray<Effect> => {
+  const continued = continuedEvents(prev, next);
+  return continued === null
+    ? []
+    : eventEffects<GameEvent, Briscola>(continued, next.events, (e) => phraseOf(e, next.me, role));
+};
 
 // ---- the settle beat ----------------------------------------------------------------------------
 
@@ -564,7 +558,7 @@ const rendered = (app: App, prev: View | null): Step => {
       table: { ...settled(app.table, view), settle, lastPainted: prev },
     },
     ...cues.map(fx),
-    ...(phrases.length === 0 ? [] : [phrasesFx(phrases)]),
+    ...phrases,
     ...(settle !== null && starts ? [settleTimer(settleMs(settle))] : []),
     { type: 'scrollTop' },
   );
@@ -730,30 +724,6 @@ const tableCleared = (table: Table): Table => ({
   extraNames: table.extraNames,
 });
 
-/** `window.__briscola.setup(state)`: the pass-and-play game's position, curtain down for the actor. */
-const sandboxLoad = (app: App, raw: unknown, ctx: Context): Step => {
-  if (app.shell.role !== 'local' || app.shell.game === null)
-    return step(app, toast(SANDBOX_LOCAL_ONLY_MSG));
-  const decoded = decodeState(raw);
-  if (!decoded.ok) return step(app, toast(badPositionMsg(formatError(decoded.error))));
-  const game = decoded.value;
-  // No `prev` view: the position paints cold (no beat, no sound; the cue memory primed).
-  return localBroadcast(
-    withTable(
-      withShell(app, {
-        game,
-        view: null,
-        revealed: actorOf(game) ?? game.turn,
-        cues: INITIAL_CUES,
-      }),
-      { ...tableCleared(app.table) },
-    ),
-    true,
-    ctx,
-    BRISCOLA,
-  );
-};
-
 /** Escape (§5.5): what is up goes, one thing per press: a drag, a lift, the last-trick sheet, the history, the rules. */
 const escape = (app: App): Step => {
   const t = app.table;
@@ -866,8 +836,6 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
             pack: intent.pack,
           })
         : pure(app);
-    case 'sandbox/load':
-      return sandboxLoad(app, intent.state, ctx);
   }
 };
 

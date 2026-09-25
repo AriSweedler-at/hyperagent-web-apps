@@ -199,7 +199,7 @@ const LAST_THREE: Position = {
 /** The last three tricks played out from `p` by the first-legal policy, the beat settled: the result sheet, or the end screen. */
 const playedOut = (ctx: Context, p: Position): App => {
   const start = run(ctx, revealed(ctx, localStart(ctx, 2)), [
-    { type: 'sandbox/load', state: position(p) },
+    { type: 'position/load', state: position(p) },
   ]);
   const plays = Array.from({ length: 6 }).reduce<App>((a) => {
     const game = a.shell.game;
@@ -280,7 +280,7 @@ const revealed3 = chain((c) => revealed(c, localStart(c, 3)));
 const deal4 = chain((c) => localStart(c, 4));
 const revealed4 = chain((c) => revealed(c, localStart(c, 4)));
 const stockEmpty2 = chain((c) =>
-  run(c, revealed(c, localStart(c, 2)), [{ type: 'sandbox/load', state: position(LAST_THREE) }]),
+  run(c, revealed(c, localStart(c, 2)), [{ type: 'position/load', state: position(LAST_THREE) }]),
 );
 const result2 = chain((c) => playedOut(c, LAST_THREE));
 const matchOver2 = chain((c) => playedOut(c, { ...LAST_THREE, wins: [1, 0] }));

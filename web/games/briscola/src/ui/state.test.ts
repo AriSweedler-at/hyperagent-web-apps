@@ -9,7 +9,8 @@ import { describe, expect, test } from 'vitest';
 import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
 import { createStore, type StorageLike } from '../../../../shared/edge/storage.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
-import { sequenceOf, type Phrase } from '../../../../shared/lib/sound/phrase.ts';
+import { newEvents } from '../../../../shared/lib/events.ts';
+import { sequenceOf } from '../../../../shared/lib/sound/phrase.ts';
 import { MESSAGES, actorOf, applyAction, createGame, viewFor } from '../engine/index.ts';
 import type { GameEvent, State, TrickRecord, View } from '../engine/index.ts';
 import {
@@ -18,7 +19,7 @@ import {
   state as stateFrame,
   toast as toastFrame,
 } from '../protocol.ts';
-import { STORAGE_KEYS } from '../storage.ts';
+import { DEFAULT_CARD_PACK, STORAGE_KEYS } from '../storage.ts';
 import { CUES } from './sound.ts';
 import {
   DEFAULT_OPTS,
@@ -44,8 +45,8 @@ import {
   hostRoomMsg,
   initialApp,
   initialTable,
+  continuedEvents,
   liveView,
-  newEvents,
   nextStage,
   phrasesBetween,
   playedBetween,
@@ -78,13 +79,13 @@ const run = runIntents(reduce, ctx);
 const kinds = (effects: ReadonlyArray<Effect>): ReadonlyArray<string> => effects.map((e) => e.type);
 const toasts = (effects: ReadonlyArray<Effect>): ReadonlyArray<unknown> =>
   effects.flatMap((e) => (e.type === 'toast' ? [[e.message, e.ms]] : []));
-/** The shell's `phrases` effect (web/shared/ui/shell.ts since S1), spelled here so the test reads it before the tree gains it. */
-type PhrasesEffect = Readonly<{ type: 'phrases'; phrases: ReadonlyArray<Phrase> }>;
-const isPhrases = (e: Effect | PhrasesEffect): e is PhrasesEffect => e.type === 'phrases';
-const phrasesOf = (effects: ReadonlyArray<Effect | PhrasesEffect>): ReadonlyArray<PhrasesEffect> =>
+/** The shell's `phrases` effects (web/shared/ui/shell.ts): the events' phrases of one paint. */
+type PhrasesEffect = Extract<Effect, Readonly<{ type: 'phrases' }>>;
+const isPhrases = (e: Effect): e is PhrasesEffect => e.type === 'phrases';
+const phrasesOf = (effects: ReadonlyArray<Effect>): ReadonlyArray<PhrasesEffect> =>
   effects.flatMap((e) => (isPhrases(e) ? [e] : []));
 /** The cue ids an intent plays, in effect order: `fx` rows, and the steps of a `phrases` effect. */
-const cues = (effects: ReadonlyArray<Effect | PhrasesEffect>): ReadonlyArray<string> =>
+const cues = (effects: ReadonlyArray<Effect>): ReadonlyArray<string> =>
   effects.flatMap((e) =>
     isPhrases(e)
       ? e.phrases.flatMap((p) => sequenceOf(p).steps.map((s) => s.cue))
@@ -116,7 +117,7 @@ const home: HomeSnapshot = {
   soundFont: 'default',
   save: null,
   opts: DEFAULT_OPTS,
-  cardPack: 'linea',
+  cardPack: DEFAULT_CARD_PACK,
   p3Name: null,
   p4Name: null,
 };
@@ -204,7 +205,7 @@ describe('the initial app', () => {
       historyOpen: false,
       curtain: null,
       lastPainted: null,
-      cardPack: 'linea',
+      cardPack: DEFAULT_CARD_PACK,
       extraNames: { 2: '', 3: '' },
     });
     expect(SCREENS).toEqual([
@@ -214,7 +215,7 @@ describe('the initial app', () => {
       'tableScreen',
       'endgameScreen',
     ]);
-    expect(SHELL_INTENT_TYPES).toHaveLength(43);
+    expect(SHELL_INTENT_TYPES).toHaveLength(44);
     expect(EMPTY_SLOTS).toEqual([null, null, null]);
   });
 });
@@ -234,7 +235,7 @@ describe('home', () => {
     expect(app.table.cardPack).toBe('default');
     expect(app.table.extraNames).toEqual({ 2: 'Cara', 3: '' });
     expect(app.shell.resume).toBeNull();
-    expect(kinds(effects)).toEqual(['scrollTop', 'fillName']);
+    expect(kinds(effects)).toEqual(['scrollTop', 'fillName', 'fillP2Name']);
   });
 
   test('opts/set parses the raw selects against the current room, normalises and remembers; the home switches read on/off', () => {
@@ -304,7 +305,14 @@ describe('pass and play: seating two, three and four', () => {
     expect(app.table.curtain).toBe(g.turn);
     expect(view(app).me.idx).toBe(g.turn);
     expect(app.table.slots.every((s) => s !== null)).toBe(true);
-    expect(kinds(effects.slice(1))).toEqual(['wakeLock', 'persist', 'scrollTop', 'writeOpts']);
+    expect(kinds(effects.slice(1))).toEqual([
+      'fillName',
+      'fillP2Name',
+      'wakeLock',
+      'persist',
+      'scrollTop',
+      'writeOpts',
+    ]);
     // A cold paint: no sound with the first curtain, the cue memory primed.
     expect(cues(effects)).toEqual([]);
     expect(app.shell.cues.key).toBe(cueKey(view(app)));
@@ -406,7 +414,7 @@ describe('pass and play: the lift, the play, the settle beat and the curtain', (
     expect(phrased).toHaveLength(1);
     const prevView = first.shell.view;
     if (prevView === null) throw new Error('no view before the trick');
-    expect(phrased[0]?.phrases).toEqual(phrasesBetween(prevView, view(second.app), 'local'));
+    expect(phrased).toEqual(phrasesBetween(prevView, view(second.app), 'local'));
     const last = phrased[0]?.phrases.at(-1);
     expect(last === undefined ? '' : sequenceOf(last).steps.at(-1)?.cue).toMatch(/\.trick\./);
     // A tap while the beat runs is dropped: the hand is inert.
@@ -590,7 +598,7 @@ describe('pass and play: whole games through the tap policy', () => {
     expect(run(start, { type: 'exchange/click' }).app).toBe(start);
   });
 
-  test('sandbox/load replaces the pass-and-play position, curtain down for the actor; refused elsewhere and for junk', () => {
+  test("position/load (the shell's, over the engine decoder) replaces the pass-and-play position, curtain down for the actor; refused elsewhere and for junk", () => {
     const start = local();
     const other = createGame(
       [
@@ -602,16 +610,16 @@ describe('pass and play: whole games through the tap policy', () => {
       mulberry32(99),
       () => NOW,
     );
-    const loaded = run(start, { type: 'sandbox/load', state: JSON.parse(JSON.stringify(other)) });
+    const loaded = run(start, { type: 'position/load', state: JSON.parse(JSON.stringify(other)) });
     expect(game(loaded.app)).toEqual(other);
     expect(loaded.app.shell.revealed).toBe(other.turn);
     expect(loaded.app.table.curtain).toBeNull();
     expect(view(loaded.app).me.idx).toBe(other.turn);
     expect(loaded.app.table.settle).toBeNull();
     expect(cues(loaded.effects)).toEqual([]);
-    const junk = run(start, { type: 'sandbox/load', state: { nope: 1 } });
+    const junk = run(start, { type: 'position/load', state: { nope: 1 } });
     expect(toasts(junk.effects)).toEqual([[badPositionMsg('$.players: expected array'), null]]);
-    const home1 = run(initialApp, { type: 'sandbox/load', state: other });
+    const home1 = run(initialApp, { type: 'position/load', state: other });
     expect(toasts(home1.effects)).toEqual([[SANDBOX_LOCAL_ONLY_MSG, null]]);
   });
 });
@@ -634,7 +642,13 @@ describe('hosting and joining (two seats)', () => {
       game: null,
     });
     expect(app.shell.code).toMatch(/^[A-HJ-NP-Z]{4}$/);
-    expect(kinds(effects.slice(1))).toEqual(['scrollTop', 'startHost', 'writeOpts']);
+    expect(kinds(effects.slice(1))).toEqual([
+      'fillName',
+      'fillP2Name',
+      'scrollTop',
+      'startHost',
+      'writeOpts',
+    ]);
     expect(effects.at(-1)).toEqual({ type: 'writeOpts', opts: { ...DEFAULT_OPTS, gamesToWin: 1 } });
   });
 
@@ -999,7 +1013,7 @@ describe('the pure twins', () => {
     expect(settleSlots([], hand('AC'))).toEqual(['AC', null, null]);
   });
 
-  test('trickResolvedBetween, playedBetween, newEvents and cueKey read the change between two views of one game', () => {
+  test('trickResolvedBetween, playedBetween, continuedEvents and cueKey read the change between two views of one game', () => {
     const start = revealed(local({ localMatch: '1' }));
     const v0 = view(start);
     const first = playFirst(start).app;
@@ -1013,10 +1027,13 @@ describe('the pure twins', () => {
     // Across a skipped trick: nothing laid, the trick not the one that just resolved.
     expect(playedBetween(v0, v2)).toBeNull();
     expect(trickResolvedBetween(v0, v2)).toEqual(v2.lastTrick);
-    expect(newEvents(v0, v1)).toEqual([]);
-    expect(newEvents(v1, v2).map((e: GameEvent) => e.kind)).toEqual(['trick']);
-    expect(newEvents(null, v2)).toEqual([]);
-    // A stream that does not carry prev's last event is new whole (a rematch, a position).
+    // One match continues its stream: prev's events, so the shared `newEvents` finds the trick alone.
+    expect(continuedEvents(v0, v1)).toEqual(v0.events);
+    expect(continuedEvents(v1, v2)).toEqual(v1.events);
+    expect(newEvents(continuedEvents(v1, v2), v2.events).map((e: GameEvent) => e.kind)).toEqual([
+      'trick',
+    ]);
+    // A stream prev never saw while no match ended (a hand-made position) paints cold.
     const fresh = viewFor(
       createGame(
         [
@@ -1029,7 +1046,10 @@ describe('the pure twins', () => {
       ),
       0,
     );
-    expect(newEvents(v2, fresh)).toEqual(fresh.events);
+    expect(continuedEvents(v2, fresh)).toBeNull();
+    // After a finished match a new stream is a rematch: nothing continued, so its deal chimes.
+    expect(continuedEvents({ ...v2, matchOver: true }, fresh)).toEqual([]);
+    expect(newEvents([], fresh.events)).toEqual(fresh.events);
     expect(cueKey(v0)).not.toBe(cueKey(v1));
     expect(cueKey(v1)).not.toBe(cueKey(v2));
     // Online: the other seat's card is theirs, and the turn passing to me chimes.

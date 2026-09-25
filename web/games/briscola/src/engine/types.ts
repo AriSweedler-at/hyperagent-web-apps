@@ -6,6 +6,7 @@
 // web/shared/lib/game.ts's (the two-seat contract, DRY round 2 F1), re-exported under the names the
 // modules import; `Seat` is this engine's own, four wide, so `game.ts`'s `Seat`, `Pair`, `SEATS`,
 // `otherSeat` and `setAt` do not apply (index.ts says what of `TwoSeatEngine` fits).
+import type { GameEvent as SharedGameEvent } from '../../../../shared/lib/events.ts';
 import type { Now, Player, RuleError } from '../../../../shared/lib/game.ts';
 
 export type { Now, Player, RuleError };
@@ -157,19 +158,14 @@ export const EVENT_KINDS = ['game', 'deal', 'trick', 'exchange', 'result'] as co
 /** What the engine records (E18): a play mid-trick is not an event, the trick that resolves it is. */
 export type EventKind = (typeof EVENT_KINDS)[number];
 /**
- * One event of the match's stream (design/briscola-sound-history §3.5, §5): `id` is its index in
- * `events`, so a painter keys a row and a cue memory on it; `seat` is who it is about (the dealer,
- * the winner, the exchanger; null for a game's opening and its result); `data` is the kind's own.
- * The sentence is not stored: log.ts's `summaryOf` and `detailOf` derive it, so sound and history
- * read the same event.
+ * One event of the match's stream (design/briscola-sound-history §3.5, §5): the shared
+ * `GameEvent` (web/shared/lib/events.ts, what the sound binding and the history panel read) with
+ * the seat narrowed to this engine's. `id` is its index in `events`, so a painter keys a row and a
+ * cue memory on it; `seat` is who it is about (the dealer, the winner, the exchanger; null for a
+ * game's opening and its result); `data` is the kind's own. The sentence is not stored: log.ts's
+ * `summaryOf` and `detailOf` derive it, so sound and history read the same event.
  */
-type Event<K extends EventKind, D> = Readonly<{
-  id: number;
-  kind: K;
-  seat: Seat | null;
-  at: number;
-  data: D;
-}>;
+type Event<K extends EventKind, D> = SharedGameEvent<K, D> & Readonly<{ seat: Seat | null }>;
 /** D6: a later game of the match announces itself before its deal. */
 export type GameData = Readonly<{ gameNo: number; dealer: Seat }>;
 /** E4: the deal, and the card turned. */

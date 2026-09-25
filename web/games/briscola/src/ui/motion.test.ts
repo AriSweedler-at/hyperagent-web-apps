@@ -1,9 +1,10 @@
 // The settle beat's plans and its one DOM step (docs/design/briscola.md §5.3, §5.4): the durations
 // and their reduced-motion twins, the trick's cards to the winner's cell together, the draws
 // winner-first `DRAW_GAP_MS` apart with the briscola last and turned, the reducer's timeline; and,
-// over the page fake, a clone fixed where the card stood and sent to the arrival's centre at the
-// scale that fits, the briscola starting across and righting itself, the arrival hidden until the
-// clone lands or the fallback fires, nothing flying where nothing can be measured or cloned.
+// over the page fake, the shared kernel's clone (web/shared/edge/motion.ts `launchClone`) fixed
+// where the card stood and sent to the arrival's centre at the scale that fits, the briscola
+// starting across and righting itself, the arrival hidden until the clone lands or the fallback
+// fires, nothing flying where nothing can be measured or cloned.
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import type { Rect } from '../../../../shared/edge/dom.ts';
@@ -14,14 +15,12 @@ import {
   MAX_LIVE_FLYERS,
   MY_TAKEN,
   REDUCED_DURATIONS,
-  REDUCED_MOTION_QUERY,
   STOCK,
   drawFlights,
   durationsFor,
   fanCard,
   flyCards,
   handCard,
-  prefersReducedMotion,
   seatCards,
   seatTaken,
   settleTimeline,
@@ -44,14 +43,6 @@ describe('durations', () => {
     expect(REDUCED_DURATIONS).toEqual({ holdMs: 300, flyMs: 1, drawMs: 1, drawGapMs: 1 });
     expect(durationsFor(false)).toBe(DURATIONS);
     expect(durationsFor(true)).toBe(REDUCED_DURATIONS);
-  });
-
-  test('the preference is read through matchMedia; a window without it prefers motion', () => {
-    expect(prefersReducedMotion({})).toBe(false);
-    expect(
-      prefersReducedMotion({ matchMedia: (q) => ({ matches: q === REDUCED_MOTION_QUERY }) }),
-    ).toBe(true);
-    expect(prefersReducedMotion({ matchMedia: () => ({ matches: false }) })).toBe(false);
   });
 });
 
@@ -186,11 +177,10 @@ describe('flyCards', () => {
       t.clone.style('height'),
     ]).toEqual(['100px', '200px', '69px', '133px']);
     expect(t.clone.style('--card-w')).toBe('69px');
-    expect(t.clone.style('transform-origin')).toBe('50% 50%');
-    expect(t.clone.style('transition-duration')).toBe('320ms');
+    expect(t.clone.style('--fly-ms')).toBe('320ms');
     expect(t.clone.style('transition-delay')).toBeNull();
     // Centres: (134.5, 266.5) to (320, 610); the 40 × 20 stack fits the card at 20 / 133.
-    expect(t.clone.style('transform')).toBe('translate(185.5px, 343.5px) rotate(0) scale(0.15)');
+    expect(t.clone.style('transform')).toBe('translate(185.5px, 343.5px) scale(0.15, 0.15)');
     expect(t.clone.removed()).toBe(false);
     t.clone.fire('transitionend');
     expect(t.clone.removed()).toBe(true);
@@ -201,7 +191,7 @@ describe('flyCards', () => {
     const draw: Flight = { ...t.flight, ms: 260, delayMs: 160, hideArrival: true };
     expect(flyCards(t.page.doc, [draw])).toBe(1);
     expect(t.landed.hasClass('arriving')).toBe(true);
-    expect(t.clone.style('transition-duration')).toBe('260ms');
+    expect(t.clone.style('--fly-ms')).toBe('260ms');
     expect(t.clone.style('transition-delay')).toBe('160ms');
     expect(t.clone.style('animation-delay')).toBe('160ms');
     t.clone.fire('transitionend');
@@ -219,8 +209,10 @@ describe('flyCards', () => {
       t.clone.style('height'),
     ]).toEqual(['132px', '168px', '69px', '133px']);
     expect(t.clone.style('--card-w')).toBe('69px');
-    // Centres: (166.5, 234.5) to (320, 610).
-    expect(t.clone.style('transform')).toBe('translate(153.5px, 375.5px) rotate(0) scale(0.15)');
+    // Centres: (166.5, 234.5) to (320, 610); the clone started at rotate(90deg) (the kernel's own test).
+    expect(t.clone.style('transform')).toBe(
+      'translate(153.5px, 375.5px) scale(0.15, 0.15) rotate(0)',
+    );
   });
 
   test('a transition that never ends: the fallback timer clears the flight once, after ms + delay + slack', () => {
@@ -277,9 +269,9 @@ describe('the landing scale', () => {
   test('a clone never shrinks below the floor on a tiny arrival, and grows onto a larger one', () => {
     const tiny = table({ toAt: rect(300, 600, 1, 1) });
     flyCards(tiny.page.doc, [tiny.flight]);
-    expect(tiny.clone.style('transform')).toContain('scale(0.05)');
+    expect(tiny.clone.style('transform')).toContain('scale(0.05, 0.05)');
     const grown = table({ toAt: rect(300, 600, 138, 266) });
     flyCards(grown.page.doc, [grown.flight]);
-    expect(grown.clone.style('transform')).toContain('scale(2)');
+    expect(grown.clone.style('transform')).toContain('scale(2, 2)');
   });
 });

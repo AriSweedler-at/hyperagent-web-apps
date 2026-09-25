@@ -61,7 +61,7 @@ export type ShellTypes = Readonly<{
   View: unknown;
   Action: unknown;
   /**
-   * The seats beyond the shell's two, for a game whose table holds more (briscola's `2 | 3`); a
+   * The seats beyond the shell's two, for a game whose table seats three or four (`2 | 3`); a
    * two-seat game leaves it out, and every flow types on `0 | 1` as before (`SeatOf<G>`).
    */
   Seat?: number;
@@ -710,15 +710,16 @@ export const localPlayers = (p1raw: string, p2raw: string): Readonly<[Player, Pl
 
 /**
  * The seats of a pass-and-play table with any number of players, from its name inputs in seat
- * order: `localPlayers`'s rule at every seat (`Player N` for an empty name, ` N` appended to a name
- * an earlier seat already has, case-insensitively), so a game with more than two seats names them
- * as the two-seat games do and `localSeats([p1, p2])` is `localPlayers(p1, p2)`. The game with the
- * extra seats creates its own engine state from these and hands it to `startLocal`.
+ * order: `localPlayers`'s rule at every seat (the owner's two names for the first two empty ones,
+ * `Player N` for an empty seat beyond, ` N` appended to a name an earlier seat already has,
+ * case-insensitively), so a game with more than two seats names them as the two-seat games do and
+ * `localSeats([p1, p2])` is `localPlayers(p1, p2)`. The game with the extra seats creates its own
+ * engine state from these and hands it to `startLocal`.
  */
 export const localSeats = (raws: ReadonlyArray<string>): ReadonlyArray<Player> =>
   raws.reduce<ReadonlyArray<Player>>((seated, raw, i) => {
     const n = String(i + 1);
-    const name = nameOr(raw, `Player ${n}`);
+    const name = nameOr(raw, DEFAULT_LOCAL_NAMES[i] ?? `Player ${n}`);
     const taken = seated.some((p) => p.name.toLowerCase() === name.toLowerCase());
     return [...seated, { id: `p${n}`, name: taken ? `${name} ${n}` : name }];
   }, []);

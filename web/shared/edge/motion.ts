@@ -13,7 +13,8 @@
 //   removed when the transition ends or after `ms` + `delay` + LAUNCH_SLACK_MS. The transition and
 //   the lift are the theme's (`.flyer` in backgammon's theme.css); a `delay` is written inline on
 //   BOTH transition-delay and animation-delay so a staggered flight neither moves nor rises before
-//   its turn. Backgammon's checkers fly this way.
+//   its turn; a `turn` starts the clone rotated by that many degrees and rights it on the way (a
+//   card lying across a pile). Backgammon's checkers fly this way, and the cards of a trick.
 // - `reducedMotion`: `prefers-reduced-motion: reduce`, read from matchMedia once and remembered,
 //   for a caller that wants to pass `ms: 1`. Neither game reads it yet: on main gin's flip wrote
 //   its 200ms transition inline without consulting the media query, and backgammon's flight takes
@@ -88,6 +89,8 @@ export type LaunchOptions = Readonly<{
   delay: number;
   /** Scale the clone from `from`'s box into `to`'s along the way (a checker flattening into a slab). */
   scale: boolean;
+  /** Degrees the clone starts turned by (its box is `from`, the thing's own), righting itself as it flies; none when absent or 0. */
+  turn?: number;
   /** After the clone is removed, whether by its transition's end or the fallback. */
   onDone: () => void;
 }>;
@@ -112,7 +115,8 @@ export const launchClone = (
   setStyle(clone, 'top', px(from.top));
   setStyle(clone, 'width', px(from.width));
   setStyle(clone, 'height', px(from.height));
-  setStyle(clone, 'transform', 'none');
+  const turn = o.turn ?? 0;
+  setStyle(clone, 'transform', turn === 0 ? 'none' : `rotate(${String(turn)}deg)`);
   if (o.delay > 0) {
     setStyle(clone, 'transition-delay', `${String(o.delay)}ms`);
     setStyle(clone, 'animation-delay', `${String(o.delay)}ms`);
@@ -123,7 +127,7 @@ export const launchClone = (
   const scale = o.scale
     ? ` scale(${ratio(to.width, from.width)}, ${ratio(to.height, from.height)})`
     : '';
-  setStyle(clone, 'transform', `${translate}${scale}`);
+  setStyle(clone, 'transform', `${translate}${scale}${turn === 0 ? '' : ' rotate(0)'}`);
   afterTransition(
     clone,
     () => {

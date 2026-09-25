@@ -185,6 +185,16 @@ describe('launchClone', () => {
     expect(t.done).toHaveBeenCalledTimes(1);
   });
 
+  test('a turned source starts rotated by its degrees and rights itself with the translate and the scale', () => {
+    const t = table(true, { turn: 90 });
+    launchClone(t.page.doc, t.source.el, rect(100, 200), rect(300, 600, 7, 26), t.options);
+    expect(t.log.slice(5)).toEqual([
+      'transform=rotate(90deg)',
+      'read',
+      'transform=translate(200px, 400px) scale(0.175, 0.65) rotate(0)',
+    ]);
+  });
+
   test('a source of no size scales by 1 rather than dividing by zero; a source that cannot clone launches nothing', () => {
     const flat = table();
     launchClone(flat.page.doc, flat.source.el, rect(100, 200, 0, 0), rect(300, 600), flat.options);

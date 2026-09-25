@@ -1,7 +1,7 @@
 // The shared history panel (docs/design/briscola-sound-history.md §6): one `<details>` row per
 // event of a game's stream (web/shared/lib/events.ts), the short `<summary>` line the game's
-// `EventCopy` spells, and the structured detail that unfolds on a click, keyed through the keyed
-// slot so a row the player opened survives every repaint until a new event arrives. The panel
+// `EventCopy` spells, and the structured detail that unfolds on a click, keyed on the stream so a
+// row the player opened survives every repaint, a new event's row appended after it. The panel
 // reads the SAME event the sound played (§3.5): the engine appends it, `rendered` finds it new,
 // its phrase plays, and this row appears. No kind, seat or word of a game is known here:
 // `data-kind`, `data-seat` and `data-value` carry the game's words for its theme, and `<details>`
@@ -10,16 +10,20 @@
 // "later"). Not lint-pure: `paintHistory` and `scrollHistoryToEnd` write the document through
 // dom.ts, carved out of the pure profile like keyed.ts (eslint.config.js `PURE`).
 import {
+  appendHtml,
+  dataOf,
   queryIn,
   requireId,
   safeHtml,
   scrollIntoView,
+  setAttr,
+  setHtml,
   trustedHtml,
   type DocumentLike,
+  type Element,
   type SafeHtml,
 } from '../edge/dom.ts';
 import { lastEventId, type EventCopy, type GameEvent } from '../lib/events.ts';
-import { ensureKeyed } from './keyed.ts';
 
 /** Any event the panel renders: the stream's shape, the kind and data left to the game. */
 export type HistoryEvent = GameEvent<string, unknown>;
@@ -73,13 +77,41 @@ export const historyKey = (events: ReadonlyArray<Readonly<{ id: number }>>): str
   return last === null ? '-' : String(last);
 };
 
+/** The list's `data-key`: the stream's name before the last id when the game names one (`<stream>:<id>`), the id alone otherwise. */
+const listKey = (stream: string, events: ReadonlyArray<Readonly<{ id: number }>>): string =>
+  stream === '' ? historyKey(events) : `${stream}:${historyKey(events)}`;
+
 /**
- * Paint `#<listId>` from the stream through the keyed slot (keyed.ts): the list is rebuilt only
- * when a new event arrives (the key is the last id), so a `<details>` the player opened stays
- * open through every other repaint (a sheet toggled, a re-sent frame, a name retyped), and the
- * browser keeps the panel's own state. The numbering precondition `newEvents` states (events.ts)
- * holds here too: a stream that restarts at 0 under the same last id would keep the old rows, so
- * a game continues its ids across games or clears the slot's `data-key` when a new game starts.
+ * The id the painted rows end at, when `events` carries on from them under the same stream name
+ * (its last row wears that id, the stream has passed it): the rows to append are the ids after it.
+ * Null when the list must be rebuilt: nothing painted, another stream, the ids restarted, or the
+ * last row is not the one the key says (the list was rewritten by something else).
+ */
+const appendAfter = (
+  list: Element,
+  painted: string | null,
+  stream: string,
+  events: ReadonlyArray<Readonly<{ id: number }>>,
+): number | null => {
+  if (painted === null) return null;
+  const cut = painted.lastIndexOf(':');
+  const name = cut < 0 ? '' : painted.slice(0, cut);
+  const id = Number(painted.slice(cut + 1));
+  const last = lastEventId(events);
+  if (name !== stream || !Number.isInteger(id) || last === null || last <= id) return null;
+  if (!events.some((e) => e.id === id)) return null;
+  const row = queryIn(list, 'details.history-row:last-of-type');
+  return row !== null && dataOf(row, 'id') === String(id) ? id : null;
+};
+
+/**
+ * Paint `#<listId>` from the stream: the list is keyed on the stream's name (`stream`, a match's
+ * start or a game number; '' for a game whose ids never restart) and its last id, so a repaint of
+ * the same stream writes nothing and a `<details>` the player opened stays open through it (a
+ * sheet toggled, a re-sent frame, a name retyped); a new event of the same stream is APPENDED as
+ * one row after the ones there, so the open row survives that too; a stream under another name,
+ * or one whose ids restarted (a rematch that keeps the name), rebuilds the list whole. The
+ * browser keeps the panel's own state throughout.
  */
 export const paintHistory = <E extends HistoryEvent, C>(
   doc: DocumentLike,
@@ -87,11 +119,21 @@ export const paintHistory = <E extends HistoryEvent, C>(
   events: ReadonlyArray<E>,
   copy: EventCopy<E, C>,
   ctx: C,
+  stream = '',
 ): void => {
-  ensureKeyed(
-    requireId(doc, listId),
-    historyKey(events),
-    () => historyHtml(events, copy, ctx).markup,
+  const list = requireId(doc, listId);
+  const key = listKey(stream, events);
+  const painted = dataOf(list, 'key');
+  if (painted === key) return;
+  const after = appendAfter(list, painted, stream, events);
+  setAttr(list, 'data-key', key);
+  if (after === null) {
+    setHtml(list, historyHtml(events, copy, ctx));
+    return;
+  }
+  appendHtml(
+    list,
+    safeHtml`${events.filter((e) => e.id > after).map((e) => historyRowHtml(e, copy, ctx))}`,
   );
 };
 
