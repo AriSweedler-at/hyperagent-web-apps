@@ -214,22 +214,25 @@ describe('the engine adapters over a pair', () => {
 });
 
 describe('home.read', () => {
-  test('defaults on an empty store; the pack and the third and fourth names when stored', () => {
+  test('defaults on an empty store; the pack, the language and the third and fourth names when stored', () => {
     const empty = createStore(fakeStorage());
     expect(BRISCOLA_SHELL.home.read(empty)).toEqual({
       opts: DEFAULT_OPTS,
       cardPack: DEFAULT_CARD_PACK,
+      lang: 'it',
       p3Name: null,
       p4Name: null,
     });
     const storage = fakeStorage();
     storage.setItem(STORAGE_KEYS.cardPack, 'linea');
+    storage.setItem(STORAGE_KEYS.lang, 'en');
     storage.setItem(STORAGE_KEYS.p3Name, 'Cara');
     storage.setItem(STORAGE_KEYS.p4Name, 'Dan');
     storage.setItem(STORAGE_KEYS.players, '4');
     expect(BRISCOLA_SHELL.home.read(createStore(storage))).toEqual({
       opts: { ...DEFAULT_OPTS, seatCount: 4 },
       cardPack: 'linea',
+      lang: 'en',
       p3Name: 'Cara',
       p4Name: 'Dan',
     });

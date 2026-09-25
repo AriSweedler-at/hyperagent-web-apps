@@ -7,6 +7,9 @@ import { createGame } from './engine/index.ts';
 import {
   ALL_KEYS,
   DEFAULT_CARD_PACK,
+  DEFAULT_LANG,
+  LANGUAGE_PACKS,
+  LANG_PREF,
   DEFAULT_HOME_TAB,
   DEFAULT_OPTS,
   DEFAULT_PLAY_MODE,
@@ -19,6 +22,7 @@ import {
   STORAGE_KEYS,
   clearSave,
   readCardPack,
+  readLang,
   readHomeTab,
   readName,
   readOpts,
@@ -32,6 +36,7 @@ import {
   readSoundState,
   soundEnabled,
   writeCardPack,
+  writeLang,
   writeHomeTab,
   writeName,
   writeOpts,
@@ -82,7 +87,7 @@ const OPTS_JSON =
   '"seatCount":2,"gamesToWin":2,"removedTwo":"C","exchange":false,"scoperta":false,"partnerPeek":false';
 
 describe('frozen constants', () => {
-  test('the sixteen keys, the tabs, modes, sound states, the defaults and the name cap (design §5.8)', () => {
+  test('the seventeen keys, the tabs, modes, sound states, the defaults and the name cap (design §5.8)', () => {
     expect(ALL_KEYS).toEqual([
       'briscolaMP_v1',
       'briscola_name',
@@ -95,6 +100,7 @@ describe('frozen constants', () => {
       'briscola_soundFont',
       'briscola_recentGames',
       'briscola_cardPack',
+      'briscola_lang',
       'briscola_players',
       'briscola_match',
       'briscola_removedTwo',
@@ -307,6 +313,35 @@ describe('the bare-string preferences', () => {
           reason: `$: expected one of ${italian.map((p) => `"${p}"`).join(' | ')}`,
         },
       });
+    });
+  });
+
+  test('the language pack round-trips as a bare string under briscola_lang, refuses a stranger, and reads Italian by default', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    expect(DEFAULT_LANG).toBe('it');
+    expect(readLang(store)).toEqual({
+      ok: false,
+      error: { kind: 'missing', key: STORAGE_KEYS.lang },
+    });
+    expect(LANG_PREF.orDefault(store)).toBe('it');
+    LANGUAGE_PACKS.forEach((name) => {
+      expect(writeLang(store, name).ok).toBe(true);
+      expect(s.map.get(STORAGE_KEYS.lang)).toBe(name);
+      expect(readLang(store)).toEqual({ ok: true, value: name });
+      expect(LANG_PREF.orDefault(store)).toBe(name);
+    });
+    ['fr', ''].forEach((bad) => {
+      s.setItem(STORAGE_KEYS.lang, bad);
+      expect(readLang(store)).toEqual({
+        ok: false,
+        error: {
+          kind: 'invalid',
+          key: STORAGE_KEYS.lang,
+          reason: `$: expected one of ${LANGUAGE_PACKS.map((p) => `"${p}"`).join(' | ')}`,
+        },
+      });
+      expect(LANG_PREF.orDefault(store)).toBe('it');
     });
   });
 });

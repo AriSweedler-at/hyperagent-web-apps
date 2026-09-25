@@ -80,7 +80,16 @@ import {
 import { runShellEffect, type ShellEffectDeps } from '../../../../shared/ui/shellEffects.ts';
 import { eventEffects } from '../../../../shared/ui/eventEffects.ts';
 import { isCardPackFor } from '../../../../shared/lib/cards/packs.ts';
-import { HAND_SIZE, actorOf, applyAction, createGame, nameOf, viewFor } from '../engine/index.ts';
+import { isLanguagePack, type LanguagePackName } from '../../../../shared/lib/lang/packs.ts';
+import {
+  HAND_SIZE,
+  actorOf,
+  applyAction,
+  cardById,
+  createGame,
+  nameOf,
+  viewFor,
+} from '../engine/index.ts';
 import type {
   Action,
   Cards,
@@ -99,10 +108,12 @@ import { BRISCOLA_SHELL, parseOpts } from '../shellConfig.ts';
 import {
   DECK_KIND,
   DEFAULT_CARD_PACK,
+  DEFAULT_LANG,
   DEFAULT_PLAY_MODE,
   EXTRA_NAME_PREFS,
   HOME_TABS,
   writeCardPack,
+  writeLang,
   writeOpts,
   type CardPack,
   type HomeTab,
@@ -144,7 +155,14 @@ export {
   pickOpts,
 } from '../shellConfig.ts';
 // ui/home.ts paints the tabs and modes from the lists storage.ts decodes; ui/ may not import storage.ts.
-export { DEFAULT_PLAY_MODE, HOME_TABS, type CardPack, type HomeTab, type PlayMode };
+export {
+  DEFAULT_PLAY_MODE,
+  HOME_TABS,
+  type CardPack,
+  type HomeTab,
+  type LanguagePackName,
+  type PlayMode,
+};
 export { INITIAL_CUES, type CueState };
 
 // ---- the state ---------------------------------------------------------------------------------
@@ -188,10 +206,11 @@ export type Raw = Readonly<{
 /** The seats beyond the shell's two: the third and fourth players (D1). */
 export type ExtraSeat = 2 | 3;
 
-/** What `initHome` reads beyond the shell's keys: the room options, the card pack, the third and fourth names. */
+/** What `initHome` reads beyond the shell's keys: the room options, the card pack, the language pack, the third and fourth names. */
 export type Home = Readonly<{
   opts: GameOptions;
   cardPack: CardPack;
+  lang: LanguagePackName;
   p3Name: string | null;
   p4Name: string | null;
 }>;
@@ -213,7 +232,7 @@ export type Briscola = Readonly<{
   Tab: HomeTab;
   Mode: PlayMode;
   Screen: ScreenId;
-  Timer: 'settle';
+  Timer: 'settle' | 'tip';
   Cue: Cue;
   Cues: CueState;
   Resume: never;
@@ -231,6 +250,11 @@ export type SettleStage = 'hold' | 'fly' | 'draw';
 export type Settle = Readonly<{ stage: SettleStage; trick: TrickRecord }>;
 /** A card dragged from the hand (ui/table/dragger.ts): its id and whether it is over the trick. */
 export type Drag = Readonly<{ card: string; over: boolean }>;
+/**
+ * The card-name tip over a hand card (docs/design/language-packs.md §5): armed by a hover or a
+ * touch press (`shown` false while the `tip` timer runs), shown when the timer fires.
+ */
+export type Tip = Readonly<{ card: string; shown: boolean }>;
 
 /** The table's interaction memory (§5.4 `Table`). Session only: never saved, never on the wire. */
 export type Table = Readonly<{
@@ -250,6 +274,14 @@ export type Table = Readonly<{
   lastPainted: View | null;
   /** `briscola_cardPack`: the pack the faces and backs are drawn from (`body[data-card-pack]`, `--aspect`). */
   cardPack: CardPack;
+  /** `briscola_lang`: the language pack the cards are named in (the captions, the tip, the aria labels). */
+  lang: LanguagePackName;
+  /** The card-name tip over a hand card, armed or shown; null when none. */
+  tip: Tip | null;
+  /** A touch long-press showed the tip: the click its release fires must not lift this card (cleared by that tap). */
+  swallowTap: string | null;
+  /** `#cardViewOverlay`: the card shown large with its name (the briscola tapped), or none. */
+  cardView: string | null;
   /**
    * The third and fourth pass-and-play names as last read from their keys or typed into their
    * inputs; null when neither (the input shows the seat's default, shellConfig.ts LOCAL_NAMES,
@@ -275,6 +307,10 @@ export const initialTable: Table = {
   curtain: null,
   lastPainted: null,
   cardPack: DEFAULT_CARD_PACK,
+  lang: DEFAULT_LANG,
+  tip: null,
+  swallowTap: null,
+  cardView: null,
   extraNames: { 2: null, 3: null },
 };
 // ---- the strings and beats the app (not the sessions) writes ---------------------------------
@@ -284,6 +320,9 @@ export const HOLD_MS = 900;
 export const FLY_MS = 320;
 export const DRAW_MS = 260;
 export const DRAW_GAP_MS = 160;
+/** The card-name tip (docs/design/language-packs.md §5): a hover shows it after this long, a touch press after a little longer. */
+export const TIP_HOVER_MS = 400;
+export const TIP_PRESS_MS = 450;
 /** `position/load` (`window.__briscola.setup`) outside pass-and-play, and a position the decoder refuses: the shell's strings. */
 export { SANDBOX_LOCAL_ONLY_MSG, badPositionMsg };
 /** `guest/lost` once the match is over: the host closed the table, there is nothing to rejoin. */
@@ -331,7 +370,18 @@ export type TableIntent =
   /** `#p3NameInput` / `#p4NameInput` typed: remembered under its key. */
   | Readonly<{ type: 'pname/typed'; seat: ExtraSeat; value: string }>
   /** The hook's `cardPack(name)`: a pack that draws the Italian deck is shown from now on and remembered; anything else is ignored. */
-  | Readonly<{ type: 'cardPack/set'; pack: string }>;
+  | Readonly<{ type: 'cardPack/set'; pack: string }>
+  /** The hook's `lang(name)`: a language pack names the cards from now on and is remembered; anything else is ignored. */
+  | Readonly<{ type: 'lang/set'; name: string }>
+  /** A pointer over a hand card (a hover) or a touch pressing one: the tip's timer starts for that card. */
+  | Readonly<{ type: 'tip/arm'; card: string; press: boolean }>
+  /** The `tip` timer fired: the name shows. */
+  | Readonly<{ type: 'tip/show' }>
+  /** The pointer left, pressed, or lifted: the tip goes; `swallow` (a touch lift) keeps the click it fires from lifting the card. */
+  | Readonly<{ type: 'tip/hide'; swallow?: boolean }>
+  /** A face-up card tapped for a closer look (the briscola, D24 aside): `#cardViewOverlay` shows it large with its name. */
+  | Readonly<{ type: 'cardView/open'; card: string }>
+  | Readonly<{ type: 'cardView/close' }>;
 
 /** Every handler and every network event: the shell's intents and the table's. */
 export type Intent = SharedIntent<Briscola>;
@@ -341,11 +391,12 @@ export type ShellIntent = SharedShellIntent<Briscola>;
 
 export type TimerId = SharedTimerId<Briscola>;
 
-/** Briscola's own effects, handled by `runEffect` before the shared runner: the three preferences this page alone keeps. */
+/** Briscola's own effects, handled by `runEffect` before the shared runner: the four preferences this page alone keeps. */
 export type TableEffect =
   | Readonly<{ type: 'writeOpts'; opts: GameOptions }>
   | Readonly<{ type: 'rememberPName'; seat: ExtraSeat; name: string }>
-  | Readonly<{ type: 'writeCardPack'; pack: CardPack }>;
+  | Readonly<{ type: 'writeCardPack'; pack: CardPack }>
+  | Readonly<{ type: 'writeLang'; name: LanguagePackName }>;
 
 export type Effect = SharedEffect<Briscola>;
 
@@ -716,16 +767,18 @@ const revealer: ShellConfig<Briscola>['local']['revealer'] = (game) => ({
   effects: [],
 });
 
-/** What a game leaves behind when it is left, lost or handed off: the table's memory; the card pack and the names stay. */
+/** What a game leaves behind when it is left, lost or handed off: the table's memory; the card pack, the language and the names stay. */
 const tableCleared = (table: Table): Table => ({
   ...initialTable,
   cardPack: table.cardPack,
+  lang: table.lang,
   extraNames: table.extraNames,
 });
 
-/** Escape (§5.5): what is up goes, one thing per press: a drag, a lift, the history, the rules. */
+/** Escape (§5.5): what is up goes, one thing per press: the card view, a drag, a lift, the history, the rules. */
 const escape = (app: App): Step => {
   const t = app.table;
+  if (t.cardView !== null) return pure(withTable(app, { cardView: null }));
   if (t.drag !== null) return pure(withTable(app, { drag: null, selected: null }));
   if (t.selected !== null) return pure(withTable(app, { selected: null }));
   if (t.historyOpen) return pure(withTable(app, { historyOpen: false }));
@@ -758,6 +811,8 @@ const playSelected = (app: App, ctx: Context): Step => {
 const cardTap = (app: App, cardId: string, ctx: Context): Step => {
   // The click a drag's release fires reaches a card: a drag lifts nothing.
   if (app.table.drag !== null) return pure(app);
+  // The click a touch long-press's lift fires: the player was reading the card's name, not playing it.
+  if (app.table.swallowTap === cardId) return pure(withTable(app, { swallowTap: null }));
   const v = liveView(app);
   if (v?.legal.includes(cardId) !== true) return pure(app);
   if (app.table.selected === cardId) return commit(app, cardId, ctx);
@@ -779,7 +834,11 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
       return v?.legal.includes(intent.cardId) !== true
         ? pure(app)
         : pure(
-            withTable(app, { drag: { card: intent.cardId, over: false }, selected: intent.cardId }),
+            withTable(app, {
+              drag: { card: intent.cardId, over: false },
+              selected: intent.cardId,
+              tip: null,
+            }),
           );
     case 'card/dragOver':
       return t.drag === null || t.drag.over === intent.over
@@ -792,8 +851,14 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
         ? commit(dropped, t.drag.card, ctx)
         : pure(dropped);
     }
-    case 'exchange/click':
-      return v?.canExchange === true ? act(app, { type: 'exchange' }, ctx) : pure(app);
+    case 'exchange/click': {
+      // The trump card tapped: the exchange while it is offered (D24); otherwise a closer look at it.
+      if (v?.canExchange === true) return act(app, { type: 'exchange' }, ctx);
+      const shown = app.shell.view;
+      return shown?.trumpOnTable !== true
+        ? pure(app)
+        : pure(withTable(app, { cardView: shown.trumpCard.id }));
+    }
     case 'next/click':
       return nextClick(app, ctx);
     case 'result/peek':
@@ -828,6 +893,40 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
             pack: intent.pack,
           })
         : pure(app);
+    case 'lang/set':
+      return isLanguagePack(intent.name)
+        ? step(withTable(app, { lang: intent.name }), { type: 'writeLang', name: intent.name })
+        : pure(app);
+    case 'tip/arm': {
+      // A hand card of mine, face up: under the curtain and over a stranger nothing arms.
+      const held = app.shell.view?.me.hand.some((c) => c.id === intent.card) === true;
+      if (!held || t.curtain !== null) return pure(app);
+      if (t.tip?.card === intent.card && t.tip.shown) return pure(app);
+      return step(withTable(app, { tip: { card: intent.card, shown: false }, swallowTap: null }), {
+        type: 'startTimer',
+        id: 'tip',
+        ms: intent.press ? TIP_PRESS_MS : TIP_HOVER_MS,
+        then: { type: 'tip/show' },
+      });
+    }
+    case 'tip/show':
+      return t.tip === null ? pure(app) : pure(withTable(app, { tip: { ...t.tip, shown: true } }));
+    case 'tip/hide':
+      return t.tip === null
+        ? pure(app)
+        : step(
+            withTable(app, {
+              tip: null,
+              swallowTap: intent.swallow === true && t.tip.shown ? t.tip.card : t.swallowTap,
+            }),
+            { type: 'cancelTimer', id: 'tip' },
+          );
+    case 'cardView/open':
+      return cardById(intent.card) === null
+        ? pure(app)
+        : pure(withTable(app, { cardView: intent.card }));
+    case 'cardView/close':
+      return pure(withTable(app, { cardView: null }));
   }
 };
 
@@ -867,6 +966,7 @@ export const BRISCOLA: ShellConfig<Briscola> = {
       table: {
         ...app.table,
         cardPack: home.cardPack,
+        lang: home.lang,
         extraNames: { 2: home.p3Name, 3: home.p4Name },
       },
     }),
@@ -963,7 +1063,7 @@ export const guestContextOf = (app: App): GuestContext => shellGuestContextOf(ap
 /** The adapters an effect reaches: the shell's (web/shared/ui/shellEffects.ts); briscola adds none. main.ts constructs the real ones, tests record. */
 export type EffectDeps = ShellEffectDeps<Briscola>;
 
-/** One effect against the adapters; `app` is the state after the step that produced it. Briscola's three first, then the shell's runner. */
+/** One effect against the adapters; `app` is the state after the step that produced it. Briscola's four first, then the shell's runner. */
 export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
   if (isShellEffect(effect)) {
     runShellEffect(app.shell, effect, deps, BRISCOLA);
@@ -978,6 +1078,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'writeCardPack':
       writeCardPack(deps.store, effect.pack);
+      return;
+    case 'writeLang':
+      writeLang(deps.store, effect.name);
       return;
   }
 };

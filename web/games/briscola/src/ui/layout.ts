@@ -26,34 +26,34 @@ export const ASPECT_RANGE = { min: 0.5, max: 0.62 } as const;
 
 /**
  * theme.css `#tableScreen` on a phone: `--card-w: clamp(72px, min((100vw - 56px) / 3, (100dvh -
- * 560px) * aspect), 124px)`. `fixedH` is everything in the column that is not a card (#app padding
- * 24, topbar 44, seats 86, the band's 30px of label and chips, score strip 44, status 22, hand header
- * 24, hand padding 14, actions 54, five 8px gaps, the hand area's 16px of padding).
+ * 576px) * aspect), 124px)`. `fixedH` is everything in the column that is not a card (#app padding
+ * 24, topbar 44, seats 86, the band's 46px of label, chips and card names, score strip 44, status 22,
+ * hand header 24, hand padding 14, actions 54, five 8px gaps, the hand area's 16px of padding).
  */
 export const PHONE_GEOMETRY = {
   gutters: 56,
   columns: 3,
-  chromeH: 560,
+  chromeH: 576,
   minCardW: 72,
   maxCardW: 124,
   tinyW: 26,
-  fixedH: 398,
+  fixedH: 414,
   seatsH: 86,
 } as const;
-/** From 900px: `clamp(80px, (100dvh - 522px) * aspect, 132px)`; #app padding 32, seats 96, a 200px score column. */
+/** From 900px: `clamp(80px, (100dvh - 542px) * aspect, 132px)`; #app padding 32, seats 96, a 200px score column (378 fixed and a mid card at the widest aspect, 164). */
 export const DESKTOP_GEOMETRY = {
-  chromeH: 522,
+  chromeH: 542,
   minCardW: 80,
   maxCardW: 132,
   tinyW: 30,
-  fixedH: 362,
+  fixedH: 378,
   seatsH: 96,
   scoreW: 200,
 } as const;
 /** `--mid-w`: the fan, the stock and the briscola draw at this fraction of a hand card. */
 export const MID_RATIO = 0.62;
-/** The centre band is a mid card plus this: the stock's label beneath, the fan's chips. */
-export const BAND_EXTRA = 30;
+/** The centre band is a mid card plus this: the stock's label and the briscola's name beneath, the fan's chips and card names (docs/design/language-packs.md §5). */
+export const BAND_EXTRA = 46;
 /** The rows above the hand keep these heights in every phase (theme.css; the oracle's frame). */
 export const ROW_HEIGHTS = {
   topbar: 44,

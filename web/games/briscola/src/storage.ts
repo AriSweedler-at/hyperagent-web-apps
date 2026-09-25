@@ -23,6 +23,7 @@ import {
   decodePlayMode,
   decodeSoundFont,
   decodeSoundState,
+  langPref,
   namePref,
   readTextWith,
   shellStore,
@@ -36,6 +37,7 @@ import {
   type TextPref,
 } from '../../../shared/edge/prefs.ts';
 import { defaultPackFor, type CardPackFor } from '../../../shared/lib/cards/packs.ts';
+import type { LanguagePackName } from '../../../shared/lib/lang/packs.ts';
 import { literal, map, refine, string, type Decoder } from '../../../shared/lib/json.ts';
 import type { Result } from '../../../shared/lib/result.ts';
 import {
@@ -72,6 +74,7 @@ export {
   SOUND_FONTS,
   type SoundFontName,
 } from '../../../shared/lib/sound/fonts.ts';
+export { LANGUAGE_PACKS, type LanguagePackName } from '../../../shared/lib/lang/packs.ts';
 
 export const STORAGE_KEYS = {
   /** The game in progress: pass-and-play, or the host's table and game, or the guest's table. */
@@ -98,6 +101,8 @@ export const STORAGE_KEYS = {
   recentGames: 'briscola_recentGames',
   /** The card pack (web/shared/lib/cards/packs.ts, bare string): one of the packs that draw the Italian deck (docs/design/card-packs.md §2). */
   cardPack: 'briscola_cardPack',
+  /** The language pack the cards are named in (web/shared/lib/lang/packs.ts, bare string): the tooltip, the captions, the aria labels (docs/design/language-packs.md §3). */
+  lang: 'briscola_lang',
   /** The room options the home screen last chose (D3), one bare string each: `2`|`3`|`4`, `1`|`2`|`3`, a suit letter, `on`|`off` ×3. */
   players: 'briscola_players',
   match: 'briscola_match',
@@ -117,6 +122,8 @@ export const DEFAULT_PLAY_MODE: PlayMode = 'online';
 export const DECK_KIND = 'italian40';
 export type CardPack = CardPackFor<typeof DECK_KIND>;
 export const DEFAULT_CARD_PACK: CardPack = defaultPackFor(DECK_KIND);
+/** The cards are named in Italian unless the console (or a settings panel later) says otherwise. */
+export const DEFAULT_LANG: LanguagePackName = 'it';
 
 /** The room's terms as the home screen starts (D3): two players, best of three, the 2 di coppe out at three, every house rule off. */
 export const DEFAULT_OPTS: GameOptions = normaliseOptions(2, {});
@@ -185,6 +192,10 @@ export const { read: readCardPack, write: writeCardPack } = cardPackPref(
   STORAGE_KEYS.cardPack,
   DECK_KIND,
 );
+
+/** The language pack, one of the shared packs; `orDefault` is Italian when the key is missing or unreadable. */
+export const LANG_PREF = langPref(STORAGE_KEYS.lang, DEFAULT_LANG);
+export const { read: readLang, write: writeLang } = LANG_PREF;
 
 /** A number stored as its digits (`"3"`), read back as one of `values` (the refine admits those alone, so the cast holds): the seat count and the games to win. */
 const digitsOf = <T extends number>(values: ReadonlyArray<T>): Decoder<T> =>

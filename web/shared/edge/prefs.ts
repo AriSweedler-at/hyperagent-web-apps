@@ -27,6 +27,7 @@ import { packsFor, type CardPackFor } from '../lib/cards/packs.ts';
 import type { DeckKind } from '../lib/cards/decks.ts';
 import { appendCapped, decodeRecentGames, type RecentGame } from '../lib/recentGames.ts';
 import { ROOM_CODE, isWellFormedCode, type Game } from '../lib/roomCode.ts';
+import { LANGUAGE_PACKS, type LanguagePackName } from '../lib/lang/packs.ts';
 import { SOUND_FONTS, type SoundFontName } from '../lib/sound/fonts.ts';
 import type { StorageError, Store } from './storage.ts';
 
@@ -48,6 +49,8 @@ export const decodeSoundFont: Decoder<SoundFontName> = literal(...SOUND_FONTS);
  */
 export const decodeCardPackFor = <K extends DeckKind>(kind: K): Decoder<CardPackFor<K>> =>
   literal(...packsFor(kind));
+/** The language pack a game names its cards in (docs/design/language-packs.md §3): one of the shared packs. */
+export const decodeLanguagePack: Decoder<LanguagePackName> = literal(...LANGUAGE_PACKS);
 
 const invalid = (key: string, error: Parameters<typeof formatError>[0]): StorageError => ({
   kind: 'invalid',
@@ -90,6 +93,24 @@ export const namePref = (key: string): TextPref<string> => ({
 /** A game's card-pack preference under its own key, validated for its deck kind like the sound font. */
 export const cardPackPref = <K extends DeckKind>(key: string, kind: K): TextPref<CardPackFor<K>> =>
   textPref(key, decodeCardPackFor(kind));
+
+export type LangPref = TextPref<LanguagePackName> &
+  Readonly<{
+    /** The stored pack, or the game's default when the key is missing or unreadable (the read never logs). */
+    orDefault: (store: Store) => LanguagePackName;
+  }>;
+
+/** A game's language-pack preference under its own key, with the game's default beside the reader (docs/design/language-packs.md §3). */
+export const langPref = (key: string, defaultName: LanguagePackName): LangPref => {
+  const pref = textPref(key, decodeLanguagePack);
+  return {
+    ...pref,
+    orDefault: (store) => {
+      const stored = pref.read(store);
+      return stored.ok ? stored.value : defaultName;
+    },
+  };
+};
 
 export type SoundPref = TextPref<SoundState> &
   Readonly<{

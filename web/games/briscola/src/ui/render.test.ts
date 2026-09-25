@@ -10,6 +10,7 @@ import { describe, expect, test } from 'vitest';
 import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
 import { fakeEl, fakeTarget, type FakeEl } from '../../../../shared/edge/page.fake.ts';
 import { packByName } from '../../../../shared/lib/cards/packs.ts';
+import { langByName } from '../../../../shared/lib/lang/packs.ts';
 import { resolveAspect } from '../../../../shared/lib/cards/resolve.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import {
@@ -55,7 +56,7 @@ import {
   type Intent,
   type Raw,
 } from './state.ts';
-import { handKey, trickKey } from './table.ts';
+import { cardNameOf, handKey, trickKey } from './table.ts';
 
 import MARKUP from '../../index.html?raw';
 
@@ -82,6 +83,7 @@ const home: HomeSnapshot = {
   recentGames: [],
   opts: DEFAULT_OPTS,
   cardPack: 'linea',
+  lang: 'it',
   p3Name: null,
   p4Name: null,
 };
@@ -142,7 +144,11 @@ const declareHand = (
   const slots = ids.map((id) =>
     fakeEl(`slot-${id}`, { queries: { '.card': [cards.get(id) ?? fakeEl('x')] } }),
   );
-  const p = briscolaPage(MARKUP, { hand: { queries: { '.slot': slots } } }, [
+  // The tip painter finds a held card by its id on `#hand`; the slot toggles find them through `.slot`.
+  const byId = Object.fromEntries(
+    ids.map((id) => [`.card[data-card="${id}"]`, [cards.get(id) ?? fakeEl('x')]]),
+  );
+  const p = briscolaPage(MARKUP, { hand: { queries: { '.slot': slots, ...byId } } }, [
     ...slots,
     ...cards.values(),
   ]);
@@ -225,7 +231,7 @@ describe('the two-player table', () => {
     // The hand: the three dealt cards left to right, face down under the curtain, inert.
     const ids = v.me.hand.map((card) => card.id);
     expect(app.table.slots).toEqual(ids);
-    expect(p.get('hand').attr('data-key')).toBe(handKey(ids, 'linea', true));
+    expect(p.get('hand').attr('data-key')).toBe(`${handKey(ids, 'linea', true)}|it`);
     expect(p.get('hand').hasClass('hidden-cards')).toBe(true);
     expect(p.get('hand').hasClass('inert')).toBe(true);
     expect(p.get('hand').hasClass('active')).toBe(false);
@@ -300,7 +306,7 @@ describe('the two-player table', () => {
     const { page: p, cards, slots } = declareHand(ids);
     paint(p.doc, app);
     expect(p.get('curtainOverlay').hidden()).toBe(true);
-    expect(p.get('hand').attr('data-key')).toBe(handKey(ids, 'linea'));
+    expect(p.get('hand').attr('data-key')).toBe(`${handKey(ids, 'linea')}|it`);
     expect(p.get('hand').hasClass('active')).toBe(true);
     expect(p.get('hand').hasClass('hidden-cards')).toBe(false);
     // A fresh build paints `playable` on every held card; the slots are the accessible buttons.
@@ -323,7 +329,7 @@ describe('the two-player table', () => {
     if (first === undefined || second === undefined) throw new Error('short hand');
     const lifted = run(app, { type: 'card/tap', cardId: first }).app;
     paint(p.doc, lifted);
-    expect(p.get('hand').attr('data-key')).toBe(handKey(ids, 'linea'));
+    expect(p.get('hand').attr('data-key')).toBe(`${handKey(ids, 'linea')}|it`);
     expect(cards.get(first)?.hasClass('selected')).toBe(true);
     expect(cards.get(second)?.hasClass('selected')).toBe(false);
     expect(slots[0]?.attr('aria-pressed')).toBe('true');
@@ -337,7 +343,7 @@ describe('the two-player table', () => {
     // The same App again: nothing changes.
     paint(p.doc, moved);
     expect(cards.get(second)?.hasClass('selected')).toBe(true);
-    expect(p.get('hand').attr('data-key')).toBe(handKey(ids, 'linea'));
+    expect(p.get('hand').attr('data-key')).toBe(`${handKey(ids, 'linea')}|it`);
   });
 
   test('a card played: the trick keyed on `seat:card`, the hand keeps its hole, the phone changes hands', () => {
@@ -352,7 +358,7 @@ describe('the two-player table', () => {
     if (laid === undefined) throw new Error('nothing laid');
     expect(laid.seat).toBe(me);
     expect(laid.card.id).toBe(ids[0]);
-    expect(p.get('trick').attr('data-key')).toBe(`${trickKey([laid])}|linea`);
+    expect(p.get('trick').attr('data-key')).toBe(`${trickKey([laid])}|linea|it`);
     expect(p.get('trick').text()).toContain(`data-seat="${String(me)}"`);
     expect(p.get('trick').text()).toContain(`style="--i:0"`);
     expect(p.get('trick').text()).toContain(`<span class="who">${v.me.name}</span>`);
@@ -364,11 +370,11 @@ describe('the two-player table', () => {
     expect(p.get('curtainTitle').text()).toBe(`Pass the phone to ${next.me.name}`);
     expect(p.get('hand').hasClass('hidden-cards')).toBe(true);
     expect(p.get('hand').attr('data-key')).toBe(
-      handKey(
+      `${handKey(
         next.me.hand.map((card) => card.id),
         'linea',
         true,
-      ),
+      )}|it`,
     );
     // My side of the table as they see it: my seat holds two cards and is not to move.
     expect(
@@ -398,7 +404,7 @@ describe('the two-player table', () => {
     const start = game(two).startedAt;
     paint(p.doc, two);
     // Hold: both cards on the table, the winner's `taking`; the tallies as before the trick.
-    expect(p.get('trick').attr('data-key')).toBe(`${trickKey(trick.cards)}|linea`);
+    expect(p.get('trick').attr('data-key')).toBe(`${trickKey(trick.cards)}|linea|it`);
     expect(p.get('trick').text()).toContain(' taking"');
     expect(p.get('trick').text()).toContain(`data-seat="${String(trick.winner)}"`);
     expect(p.get('statusText').text()).toBe(takesText(v.players, me, trick));
@@ -596,7 +602,7 @@ describe('the game over, the result sheet and the match end', () => {
     expect(p.get('stock').hasClass('empty')).toBe(true);
     expect(p.get('stock').text()).toBe('');
     expect(p.get('briscola').hasClass('gone')).toBe(true);
-    expect(p.get('hand').attr('data-key')).toBe(handKey(['AC', null, null], 'linea'));
+    expect(p.get('hand').attr('data-key')).toBe(`${handKey(['AC', null, null], 'linea')}|it`);
     expect(p.get('statusText').text()).toBe('Your turn — play a card');
     // Ann leads the asso, Bob answers with the tre: the game is over once the beat has played.
     const over = settled(playFirst(revealed(playFirst(start))));
@@ -753,5 +759,127 @@ describe('bindAll', () => {
     p.get('menuBtn').fire('click');
     p.fire('keydown', { key: 'Escape' });
     expect(p.get('menuOverlay').hidden()).toBe(true);
+  });
+});
+
+describe('card names (docs/design/language-packs.md §5): the captions, the tip and the card view', () => {
+  const IT = langByName('it');
+  const EN = langByName('en');
+
+  test('every play wears its caption and the briscola its line under the stock, in the App`s language; a switch repaints them', () => {
+    const start = revealed(local());
+    const v = view(start);
+    const p = page();
+    paint(p.doc, start);
+    expect(p.get('briscolaName').text()).toBe(cardNameOf(IT, v.trumpCard.id));
+    expect(p.get('briscolaName').text()).toMatch(/ di /);
+    const played = playFirst(start);
+    const laid = view(played).trick[0];
+    if (laid === undefined) throw new Error('nothing played');
+    paint(p.doc, played);
+    expect(p.get('trick').text()).toContain(
+      `<span class="card-name">${cardNameOf(IT, laid.card.id)}</span>`,
+    );
+    expect(p.get('trick').text()).toContain(`aria-label="${cardNameOf(IT, laid.card.id)}"`);
+    const english = run(played, { type: 'lang/set', name: 'en' }).app;
+    paint(p.doc, english);
+    expect(p.get('trick').attr('data-key')).toBe(`${trickKey([laid])}|linea|en`);
+    expect(p.get('trick').text()).toContain(
+      `<span class="card-name">${cardNameOf(EN, laid.card.id)}</span>`,
+    );
+    expect(p.get('briscolaName').text()).toMatch(/ of /);
+    expect(p.get('briscola').attr('data-key')).toBe(`${v.trumpCard.id}|linea|en`);
+    // The briscola drawn: no line under the stock.
+    const last = lastTrickPosition(start);
+    paint(p.doc, last);
+    expect(p.get('briscola').hasClass('gone')).toBe(true);
+    expect(p.get('briscolaName').text()).toBe('');
+  });
+
+  test('the tip: hidden until the timer shows it over a card the hand holds, placed at the card`s top centre, named in the language; hidden again on hide, under the curtain and without its card', () => {
+    const start = revealed(local());
+    const card = view(start).legal[0] ?? '';
+    const { page: p, cards } = declareHand(view(start).me.hand.map((c) => c.id));
+    paint(p.doc, start);
+    expect(p.get('cardTip').hidden()).toBe(true);
+    const armed = run(start, { type: 'tip/arm', card, press: false }).app;
+    paint(p.doc, armed);
+    expect(p.get('cardTip').hidden()).toBe(true);
+    const shown = run(armed, { type: 'tip/show' }).app;
+    paint(p.doc, shown);
+    expect(p.get('cardTip').hidden()).toBe(false);
+    expect(p.get('cardTip').text()).toBe(cardNameOf(IT, card));
+    expect(p.get('cardTip').attr('data-card')).toBe(card);
+    expect(cards.has(card)).toBe(true);
+    // A fake measures as zeros: the tip lands at the card's rect (the CSS lifts it clear).
+    expect(p.get('cardTip').style('left')).toBe('0px');
+    expect(p.get('cardTip').style('top')).toBe('0px');
+    paint(p.doc, run(shown, { type: 'lang/set', name: 'en' }).app);
+    expect(p.get('cardTip').text()).toBe(cardNameOf(EN, card));
+    paint(p.doc, run(shown, { type: 'tip/hide' }).app);
+    expect(p.get('cardTip').hidden()).toBe(true);
+    // Shown in the App but the card is not in the hand's markup (played away): hidden.
+    const bare = page();
+    paint(bare.doc, shown);
+    expect(bare.get('cardTip').hidden()).toBe(true);
+    // Under the curtain a shown tip is never painted (the hand is face down).
+    const curtained: App = { ...shown, table: { ...shown.table, curtain: 0 } };
+    paint(p.doc, curtained);
+    expect(p.get('cardTip').hidden()).toBe(true);
+  });
+
+  test('the card view: the face keyed on the card, the pack and the language, its name beneath; closed, the sheet hides', () => {
+    const start = revealed(local());
+    const p = page();
+    paint(p.doc, start);
+    expect(p.get('cardViewOverlay').hidden()).toBe(true);
+    const open = run(start, { type: 'cardView/open', card: 'RD' }).app;
+    paint(p.doc, open);
+    expect(p.get('cardViewOverlay').hidden()).toBe(false);
+    expect(p.get('cardViewFace').attr('data-key')).toBe('RD|linea|it');
+    expect(p.get('cardViewFace').text()).toContain('data-card="RD"');
+    expect(p.get('cardViewFace').text()).toContain('aria-label="re di denari"');
+    expect(p.get('cardViewName').text()).toBe('re di denari');
+    paint(p.doc, run(open, { type: 'lang/set', name: 'en' }).app);
+    expect(p.get('cardViewFace').attr('data-key')).toBe('RD|linea|en');
+    expect(p.get('cardViewName').text()).toBe('king of coins');
+    paint(p.doc, run(open, { type: 'cardView/close' }).app);
+    expect(p.get('cardViewOverlay').hidden()).toBe(true);
+  });
+
+  test('bindTip: a fine pointer arms on over and drops on out or a press; a touch arms on down and drops on up with the click swallowed; nothing over a face-down hand; the sheet closes', () => {
+    const card = fakeEl('card-7D', { attrs: { 'data-card': '7D' } });
+    const p = briscolaPage(MARKUP, {}, [card]);
+    const r = recorder();
+    bindAll(p.doc, r.dispatch);
+    const over = { target: fakeTarget({ closest: { '.card[data-card]': card } }) };
+    p.get('hand').fire('pointerover', { ...over, pointerType: 'mouse' });
+    p.get('hand').fire('pointerover', { ...over, pointerType: 'touch' });
+    p.get('hand').fire('pointerover', { target: fakeTarget({ id: 'hand' }), pointerType: 'mouse' });
+    p.get('hand').fire('pointerout', { pointerType: 'mouse' });
+    p.get('hand').fire('pointerdown', { ...over, pointerType: 'mouse' });
+    p.get('hand').fire('pointerdown', { ...over, pointerType: 'touch' });
+    p.get('hand').fire('pointerup', { ...over, pointerType: 'touch' });
+    p.get('hand').fire('pointerup', { ...over, pointerType: 'mouse' });
+    p.get('hand').fire('pointercancel', { pointerType: 'touch' });
+    expect(r.intents).toEqual([
+      { type: 'tip/arm', card: '7D', press: false },
+      { type: 'tip/hide' },
+      { type: 'tip/hide' },
+      { type: 'tip/arm', card: '7D', press: true },
+      { type: 'tip/hide', swallow: true },
+      { type: 'tip/hide' },
+      { type: 'tip/hide' },
+    ]);
+    // Face down (under the curtain): a hover or a press over a back arms nothing.
+    p.get('hand').el.classList.add('hidden-cards');
+    p.get('hand').fire('pointerover', { ...over, pointerType: 'mouse' });
+    p.get('hand').fire('pointerdown', { ...over, pointerType: 'touch' });
+    expect(r.intents.slice(7)).toEqual([{ type: 'tip/hide' }]);
+    // The card view's close button and backdrop.
+    p.get('closeCardViewBtn').fire('click');
+    p.get('cardViewOverlay').fire('click', { target: fakeTarget({ id: 'cardViewOverlay' }) });
+    p.get('cardViewOverlay').fire('click', { target: fakeTarget({ id: 'cardViewName' }) });
+    expect(r.intents.slice(8)).toEqual([{ type: 'cardView/close' }, { type: 'cardView/close' }]);
   });
 });

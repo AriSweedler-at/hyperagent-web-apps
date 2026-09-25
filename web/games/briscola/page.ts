@@ -306,6 +306,7 @@ const blocks: ShellBlocks = {
             </div>
             <div class="briscola" id="briscola"></div>
             <div class="pile-label" id="stockCount">Stock · 34</div>
+            <div class="pile-label card-name" id="briscolaName"></div>
           </div>
           <div class="trick" id="trick" data-players="2" data-lead="" aria-live="off"></div>
         </div>
@@ -352,6 +353,16 @@ const blocks: ShellBlocks = {
           Continue online
         </button>`,
   sheetsBefore: `
+    <!-- CARD VIEW (docs/design/language-packs.md §5): the briscola tapped, shown large with its name
+         in the chosen language pack; no game state changes. -->
+    <div id="cardViewOverlay" class="overlay hidden">
+      <div class="sheet centered card-view">
+        <div class="card-view-face" id="cardViewFace"></div>
+        <div class="sheet-sub" id="cardViewName"></div>
+        <button class="btn btn-primary btn-block" id="closeCardViewBtn">Close</button>
+      </div>
+    </div>
+
     <!-- GAME RESULT (design §5.1): the sheet over the dimmed table; the match end is the shell's
          #endgameScreen. -->
     <div id="resultOverlay" class="overlay hidden">
@@ -378,7 +389,10 @@ const blocks: ShellBlocks = {
           <button class="btn btn-ghost btn-block" id="menuLeaveBtn">Leave the table</button>
         </div>
       </div>
-    </div>`,
+    </div>
+
+    <!-- CARD TIP (docs/design/language-packs.md §5): a hand card's name on hover or a long press, placed over the card by the painter. -->
+    <div id="cardTip" class="card-tip hidden" role="tooltip"></div>`,
   rulesIcon: '',
 };
 

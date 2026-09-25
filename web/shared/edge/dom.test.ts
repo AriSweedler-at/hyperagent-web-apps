@@ -19,6 +19,7 @@ import {
   keyOf,
   listen,
   listenId,
+  pointerTypeOf,
   preventDefault,
   queryAllIn,
   queryIn,
@@ -304,6 +305,8 @@ describe('events (over page.fake.ts)', () => {
     expect(targetValueOf(bare)).toBe('');
     expect(closestFrom(bare, '.card')).toBeNull();
     expect(keyOf(bare)).toBe('');
+    expect(pointerTypeOf(bare)).toBe('');
+    expect(pointerTypeOf(card.fire('pointerdown', { pointerType: 'touch' }))).toBe('touch');
     expect(inputTypeOf(bare)).toBe('');
     expect(inputDataOf(bare)).toBeNull();
   });

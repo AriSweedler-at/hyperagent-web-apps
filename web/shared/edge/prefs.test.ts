@@ -7,11 +7,13 @@ import {
   SOUND_STATES,
   cardPackPref,
   decodeCardPackFor,
+  decodeLanguagePack,
   decodeName,
   decodePlayMode,
   decodeSoundFont,
   decodeSoundState,
   namePref,
+  langPref,
   readTextWith,
   recentGamesPref,
   shellSave,
@@ -93,6 +95,34 @@ describe('cardPackPref', () => {
           '$: expected one of "default" | "blue-stripe" | "yu-gi-oh" | "empty" | "linea" | "napoletane" | "american"',
       },
     });
+  });
+});
+
+describe('langPref', () => {
+  test('round-trips a pack name as a bare string under the key, refuses a stranger, and orDefault gives the game its default', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    const pref = langPref('briscola_lang', 'it');
+    expect(pref.read(store)).toEqual({
+      ok: false,
+      error: { kind: 'missing', key: 'briscola_lang' },
+    });
+    expect(pref.orDefault(store)).toBe('it');
+    expect(pref.write(store, 'en')).toEqual({ ok: true, value: null });
+    expect(s.map.get('briscola_lang')).toBe('en');
+    expect(pref.read(store)).toEqual({ ok: true, value: 'en' });
+    expect(pref.orDefault(store)).toBe('en');
+    s.setItem('briscola_lang', 'fr');
+    expect(pref.read(store)).toEqual({
+      ok: false,
+      error: {
+        kind: 'invalid',
+        key: 'briscola_lang',
+        reason: '$: expected one of "it" | "en" | "en-plates"',
+      },
+    });
+    expect(pref.orDefault(store)).toBe('it');
+    expect(decodeLanguagePack('en-plates')).toEqual({ ok: true, value: 'en-plates' });
   });
 });
 

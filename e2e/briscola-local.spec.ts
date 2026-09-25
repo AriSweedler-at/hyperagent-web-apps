@@ -15,8 +15,13 @@
 // and the open row survives the next trick's repaint. The sounds: the hook's cue player is spied
 // and a briscola stealing a big card plays the briscola sting before the win, a lost small trick
 // nothing (pass and play hears the winner's phrase, so the loser's silence is asserted on the same
-// engine event through `phraseOf`). The deals come from the seeded `Math.random` every player
-// context installs (e2e/fixtures/seed.ts), which main.ts reads as `window.__rng ?? Math.random`.
+// engine event through `phraseOf`). The card names (docs/design/language-packs.md §5): every play
+// on the table wears its caption and the briscola its line under the stock in the language pack's
+// words, a hover over a hand card at the laptop brings the tip up after 400ms, the console hook
+// switches the pack live (Italian "di" to English "of") and refuses a stranger with one line, and a
+// tap on the briscola opens the card view with the card large and named. The deals come from the
+// seeded `Math.random` every player context installs (e2e/fixtures/seed.ts), which main.ts reads
+// as `window.__rng ?? Math.random`.
 import type { Page } from '@playwright/test';
 
 import {
@@ -55,6 +60,7 @@ import {
   trickShown,
   type Viewport,
 } from './fixtures/briscola.ts';
+import { cardName as packName, langByName } from '../web/shared/lib/lang/packs.ts';
 import { DESKTOP, PHONE } from './fixtures/geometry.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
@@ -607,5 +613,131 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       expect(lost.length).toBeGreaterThan(0);
       expect(lost.every((c) => c.startsWith('bad.'))).toBe(true);
     });
+  });
+});
+
+// ---- card names (docs/design/language-packs.md §5) --------------------------------------------------
+
+const IT = langByName('it');
+const EN = langByName('en');
+const LANG_KEY = 'briscola_lang';
+const named = (lang: typeof IT, id: string): string => packName(lang, 'italian40', id) ?? '';
+
+Object.entries(VIEWPORTS).forEach(([name, vp]) => {
+  test.describe(`${name} card names`, () => {
+    test('every play wears its caption and the briscola its line, in Italian then in English through the hook; a tap on the briscola opens the card view', async ({
+      player,
+      project,
+    }) => {
+      const { page } = player;
+      const errors: string[] = [];
+      page.on('console', (m) => {
+        if (m.type() === 'error') errors.push(m.text());
+      });
+      await briscolaStartLocal(page, pagePath(project, 'briscola'), vp);
+      const v = await requireView(page);
+      expect(await page.evaluate('window.__briscola.langName()')).toBe('it');
+      expect(await page.evaluate(`localStorage.getItem('${LANG_KEY}')`)).toBeNull();
+      // The briscola's line under the stock, and its face labelled, in Italian.
+      await expect(page.locator('#briscolaName')).toHaveText(named(IT, v.trumpCard.id));
+      await expect(page.locator('#briscolaName')).toHaveText(/ di /);
+      await expect(page.locator('#briscola .card')).toHaveAttribute(
+        'aria-label',
+        named(IT, v.trumpCard.id),
+      );
+      // A card played: its caption under the chip.
+      await briscolaReveal(page);
+      const first = FIRST_LEGAL(v);
+      await playCard(page, first);
+      await expect(page.locator('#trick .play .card-name')).toHaveText([named(IT, first)]);
+      await expect(page.locator(`#trick .card[data-card="${first}"]`)).toHaveAttribute(
+        'aria-label',
+        named(IT, first),
+      );
+      // The hook switches the language live and remembers it: the caption and the line read English.
+      await page.evaluate("window.__briscola.lang('en')");
+      expect(await page.evaluate('window.__briscola.langName()')).toBe('en');
+      expect(await page.evaluate(`localStorage.getItem('${LANG_KEY}')`)).toBe('en');
+      await expect(page.locator('#trick .play .card-name')).toHaveText([named(EN, first)]);
+      await expect(page.locator('#trick .play .card-name')).toHaveText([/ of /]);
+      await expect(page.locator('#briscolaName')).toHaveText(named(EN, v.trumpCard.id));
+      // A stranger is refused with one line; nothing changes.
+      await page.evaluate("window.__briscola.lang('fr')");
+      expect(errors).toEqual([
+        'briscola_lang: "fr" is not a language pack; kept the current one. One of: it, en, en-plates.',
+      ]);
+      expect(await page.evaluate('window.__briscola.langName()')).toBe('en');
+      // The briscola tapped (the exchange is off): the card view shows it large and named; Close puts it away.
+      await revealIfCurtain(page);
+      await page.locator('#briscola .card').click();
+      await expect(page.locator('#cardViewOverlay')).toBeVisible();
+      await expect(page.locator('#cardViewFace .card')).toHaveAttribute(
+        'data-card',
+        v.trumpCard.id,
+      );
+      await expect(page.locator('#cardViewName')).toHaveText(named(EN, v.trumpCard.id));
+      const face = await page.locator('#cardViewFace .card').boundingBox();
+      expect(face?.width ?? 0).toBeGreaterThanOrEqual(Math.min(240, vp.width * 0.6) - 1);
+      await page.locator('#closeCardViewBtn').click();
+      await expect(page.locator('#cardViewOverlay')).toBeHidden();
+      // Escape closes it too.
+      await page.locator('#briscola .card').click();
+      await expect(page.locator('#cardViewOverlay')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('#cardViewOverlay')).toBeHidden();
+      // A stored stranger is logged at boot and dropped: Italian stands.
+      await page.evaluate(`localStorage.setItem('${LANG_KEY}', 'tartan')`);
+      await page.reload();
+      await expect(
+        page.locator('#homeScreen, #tableScreen, #curtainOverlay').first(),
+      ).toBeVisible();
+      await expect.poll(() => errors.length).toBe(2);
+      expect(errors[1]).toContain('"tartan" is not a language pack');
+      expect(await page.evaluate(`localStorage.getItem('${LANG_KEY}')`)).toBeNull();
+    });
+  });
+});
+
+test.describe('desktop card tip', () => {
+  test('a hover over a hand card shows its Italian name after the delay; the hook switches it to English; leaving hides it', async ({
+    player,
+    project,
+  }) => {
+    const { page } = player;
+    await briscolaStartLocal(page, pagePath(project, 'briscola'), DESKTOP);
+    await briscolaReveal(page);
+    const v = await requireView(page);
+    const first = FIRST_LEGAL(v);
+    const tip = page.locator('#cardTip');
+    await expect(tip).toBeHidden();
+    await page.locator(`#hand .card[data-card="${first}"]`).hover();
+    await expect(tip).toBeVisible();
+    await expect(tip).toHaveText(named(IT, first));
+    await expect(tip).toHaveText(/ di /);
+    await expect(tip).toHaveAttribute('data-card', first);
+    // Over the card, above it: the tip's box ends where the card's begins.
+    const card = await page.locator(`#hand .card[data-card="${first}"]`).boundingBox();
+    const box = await tip.boundingBox();
+    expect(box).not.toBeNull();
+    expect(card).not.toBeNull();
+    if (box !== null && card !== null) {
+      expect(box.y + box.height).toBeLessThanOrEqual(card.y + 1);
+      expect(Math.abs(box.x + box.width / 2 - (card.x + card.width / 2))).toBeLessThanOrEqual(2);
+    }
+    await page.evaluate("window.__briscola.lang('en')");
+    await expect(tip).toHaveText(named(EN, first));
+    await expect(tip).toHaveText(/ of /);
+    // The pointer leaves the hand: the tip goes.
+    await page.mouse.move(8, 8);
+    await expect(tip).toBeHidden();
+    // The face-up briscola wiggles out of the deck on hover: a transform beyond the rest.
+    // The harness has no DOM types (tsconfig.node.json): the style is read by source, as the hooks are.
+    const transform = (): Promise<string> =>
+      page.evaluate<string>(
+        "getComputedStyle(document.querySelector('#briscola .card')).transform",
+      );
+    const before = await transform();
+    await page.locator('#briscola .card').hover();
+    await expect.poll(transform).not.toBe(before);
   });
 });

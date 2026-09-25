@@ -19,7 +19,11 @@
 // overlays' controls into intents (one delegated click on `#hand`; Enter/Space on a focused slot is
 // the same tap, §5.5); the input wiring of the home screen and the curtain is beside their paints.
 // The phone's menu sheet is the one thing toggled here rather than painted from the App (see
-// `bindMenu`).
+// `bindMenu`). The cards' names come from the App's language pack (docs/design/language-packs.md
+// §5): every face-up card's `aria-label`, the `.card-name` caption under each play and under the
+// stock for the briscola, the `#cardTip` over a hovered or long-pressed hand card (`paintTip`, from
+// `table.tip`; `bindTip` turns the hand's pointer events into its intents) and the card view's
+// line (`paintCardView`, from `table.cardView`).
 import {
   closestFrom,
   dataOf,
@@ -28,9 +32,11 @@ import {
   keyOf,
   listen,
   listenId,
+  pointerTypeOf,
   preventDefault,
   queryAllIn,
   queryIn,
+  rectOf,
   requireId,
   setAttr,
   setDisabled,
@@ -47,6 +53,7 @@ import {
 } from '../../../../shared/edge/dom.ts';
 import { defaultPackFor, packByName, type CardPack } from '../../../../shared/lib/cards/packs.ts';
 import { resolveAspect, resolveBack } from '../../../../shared/lib/cards/resolve.ts';
+import { langByName, type LanguagePack } from '../../../../shared/lib/lang/packs.ts';
 import { suitSymbolId } from '../../../../shared/lib/cards/suits.ts';
 import { backImageCss } from '../../../../shared/ui/cardFace.ts';
 import { paintHistory } from '../../../../shared/ui/history.ts';
@@ -97,7 +104,9 @@ import {
 import {
   DECK_KIND,
   briscolaHtml,
+  cardHtml,
   cardLabelEn,
+  cardNameOf,
   cellOfSeat,
   chipCount,
   chipsHtml,
@@ -353,19 +362,31 @@ export const paintSeats = (doc: DocumentLike, app: App, v: View, b: Beat, pack: 
  * the trump card is left) and `#briscola` (the trump card keyed on its id, `gone` once drawn with
  * its box kept, `tappable` while the exchange is offered to me), both as before the beat's draw.
  */
-export const paintStock = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPack): void => {
+export const paintStock = (
+  doc: DocumentLike,
+  app: App,
+  v: View,
+  b: Beat,
+  pack: CardPack,
+  lang: LanguagePack,
+): void => {
   const count = stockShown(v, b);
   const stock = requireId(doc, 'stock');
   setAttr(stock, 'data-count', String(count));
   setAttr(stock, 'aria-label', `Stock, ${String(count)} cards`);
-  ensureKeyed(stock, `${stockKey(count, v.stockTop)}|${pack.name}`, () =>
-    stockHtml(pack, count, v.stockTop),
+  ensureKeyed(stock, `${stockKey(count, v.stockTop)}|${pack.name}|${lang.name}`, () =>
+    stockHtml(pack, count, v.stockTop, lang),
   );
   toggleClass(stock, 'empty', count <= 1);
   setText(requireId(doc, 'stockCount'), stockLabel(count));
   const briscola = requireId(doc, 'briscola');
-  ensureKeyed(briscola, `${v.trumpCard.id}|${pack.name}`, () => briscolaHtml(pack, v.trumpCard));
-  toggleClass(briscola, 'gone', !trumpOnTableShown(v, b));
+  const onTable = trumpOnTableShown(v, b);
+  ensureKeyed(briscola, `${v.trumpCard.id}|${pack.name}|${lang.name}`, () =>
+    briscolaHtml(pack, v.trumpCard, lang),
+  );
+  // The briscola's name under the stock's count (its own box is rotated), gone with the card.
+  setText(requireId(doc, 'briscolaName'), onTable ? cardNameOf(lang, v.trumpCard.id) : '');
+  toggleClass(briscola, 'gone', !onTable);
   toggleClass(briscola, 'tappable', liveView(app) !== null && v.canExchange);
 };
 
@@ -377,7 +398,14 @@ export const paintStock = (doc: DocumentLike, app: App, v: View, b: Beat, pack: 
  * outside it); `arriving` hides the cards while their clones fly to the winner; the leader's cue
  * (`data-lead`, `:empty::before`) while the trick is empty; the drag's `drop-ready`/`drop` marks.
  */
-const paintTrick = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPack): void => {
+const paintTrick = (
+  doc: DocumentLike,
+  app: App,
+  v: View,
+  b: Beat,
+  pack: CardPack,
+  lang: LanguagePack,
+): void => {
   const trick = requireId(doc, 'trick');
   const me = v.me.idx;
   setAttr(trick, 'data-players', String(v.options.seatCount));
@@ -388,8 +416,8 @@ const paintTrick = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPac
     'data-lead',
     cards.length === 0 && v.phase === 'trick' ? leadCue(v.players, me, v.leader) : '',
   );
-  ensureKeyed(trick, `${trickKey(cards)}|${pack.name}`, () =>
-    trickHtml(cards, { players: v.players, me, pack, taking }),
+  ensureKeyed(trick, `${trickKey(cards)}|${pack.name}|${lang.name}`, () =>
+    trickHtml(cards, { players: v.players, me, pack, taking, lang }),
   );
   queryAllIn(trick, '.card').forEach((card) => {
     toggleClass(card, 'taking', taking !== null && dataOf(card, 'seat') === String(taking));
@@ -494,15 +522,22 @@ const paintSlot = (
  * slot's marks refreshed outside the key. `#myName`, my strip of chips (`#myTricks`: one per trick
  * taken, `data-count` and `--n`, the arriving one laid through the flight) and `#myTaken` above it.
  */
-export const paintHand = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPack): void => {
+export const paintHand = (
+  doc: DocumentLike,
+  app: App,
+  v: View,
+  b: Beat,
+  pack: CardPack,
+  lang: LanguagePack,
+): void => {
   const hand = requireId(doc, 'hand');
   const live = liveView(app) !== null;
   const faceDown = app.table.curtain !== null;
   const slots = app.table.slots;
   const selected = app.table.selected;
   const playable = live ? v.legal : [];
-  ensureKeyed(hand, handKey(slots, pack.name, faceDown), () =>
-    handHtml(pack, slots, { selected, playable, faceDown }),
+  ensureKeyed(hand, `${handKey(slots, pack.name, faceDown)}|${lang.name}`, () =>
+    handHtml(pack, slots, { selected, playable, faceDown, lang }),
   );
   toggleClass(hand, 'active', live);
   toggleClass(hand, 'inert', !live);
@@ -694,15 +729,22 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
 
 // ---- the whole table, the beat's flights and the whole paint ------------------------------------------------
 
-const paintTable = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPack): void => {
+const paintTable = (
+  doc: DocumentLike,
+  app: App,
+  v: View,
+  b: Beat,
+  pack: CardPack,
+  lang: LanguagePack,
+): void => {
   paintTrump(doc, v);
   setText(requireId(doc, 'gameBadge'), gameBadgeText(v.gameNo, v.match));
   paintSeats(doc, app, v, b, pack);
-  paintStock(doc, app, v, b, pack);
-  paintTrick(doc, app, v, b, pack);
+  paintStock(doc, app, v, b, pack, lang);
+  paintTrick(doc, app, v, b, pack, lang);
   paintScore(doc, v, b);
   setText(requireId(doc, 'statusText'), statusText(app, v));
-  paintHand(doc, app, v, b, pack);
+  paintHand(doc, app, v, b, pack, lang);
   paintActions(doc, app, v, b);
 };
 
@@ -740,7 +782,7 @@ const flightsFor = (v: View, b: Beat, drawn: string | null): ReadonlyArray<Fligh
  * result sheet and the beat's flights, launched once per stage (`#tableScreen[data-beat]` remembers
  * the stage last flown, so a repaint mid-flight launches nothing).
  */
-const paintGame = (doc: PageLike, app: App, pack: CardPack): void => {
+const paintGame = (doc: PageLike, app: App, pack: CardPack, lang: LanguagePack): void => {
   const v = app.shell.view;
   const screen = requireId(doc, 'tableScreen');
   if (v === null) {
@@ -755,7 +797,7 @@ const paintGame = (doc: PageLike, app: App, pack: CardPack): void => {
     setAttr(screen, 'data-beat', null);
     return;
   }
-  paintTable(doc, app, v, b, pack);
+  paintTable(doc, app, v, b, pack, lang);
   paintResult(doc, app, v);
   const beat =
     b.trick === null || b.stage === null
@@ -766,17 +808,59 @@ const paintGame = (doc: PageLike, app: App, pack: CardPack): void => {
   flyCards(doc, flightsFor(v, b, drawnCardId(app, v, b)));
 };
 
+// ---- the card names: the tip over a hand card and the card view (docs/design/language-packs.md §5) ----
+
+/**
+ * `#cardTip`: the name of the hand card `table.tip` shows, in the App's language, placed at the
+ * card's top centre (the CSS lifts it clear); hidden while no tip is shown, while the card has
+ * left the hand, or while the hand is down. Fixed on the body, so it clears the table's overflow.
+ */
+export const paintTip = (doc: DocumentLike, app: App, lang: LanguagePack): void => {
+  const tip = requireId(doc, 'cardTip');
+  const t = app.table.tip;
+  const card =
+    t === null || !t.shown || app.table.curtain !== null
+      ? null
+      : queryIn(requireId(doc, 'hand'), `.card[data-card="${t.card}"]`);
+  toggleClass(tip, 'hidden', card === null);
+  if (t === null || card === null) return;
+  const r = rectOf(card);
+  setText(tip, cardNameOf(lang, t.card));
+  setAttr(tip, 'data-card', t.card);
+  setStyle(tip, 'left', `${String(r.left + r.width / 2)}px`);
+  setStyle(tip, 'top', `${String(r.top)}px`);
+};
+
+/** `#cardViewOverlay`: the card `table.cardView` names, large through the pack (keyed on the card, the pack and the language), its name beneath. */
+export const paintCardView = (
+  doc: DocumentLike,
+  app: App,
+  pack: CardPack,
+  lang: LanguagePack,
+): void => {
+  const id = app.table.cardView;
+  paintSheet(doc, 'cardViewOverlay', id !== null);
+  if (id === null) return;
+  ensureKeyed(requireId(doc, 'cardViewFace'), `${id}|${pack.name}|${lang.name}`, () =>
+    cardHtml(pack, id, '', lang),
+  );
+  setText(requireId(doc, 'cardViewName'), cardNameOf(lang, id));
+};
+
 /** Everything, from the App alone. */
 export const paint = (doc: PageLike, app: App): void => {
   const pack = packByName(app.table.cardPack);
+  const lang = langByName(app.table.lang);
   paintScreen(doc, app);
   paintWaiting(doc, app);
   paintHome(doc, app);
   paintPack(doc, app.table.cardPack);
   paintCurtain(doc, app);
   paintHandoff(doc, app);
-  paintGame(doc, app, pack);
+  paintGame(doc, app, pack, lang);
   paintOverlays(doc, app);
+  paintTip(doc, app, lang);
+  paintCardView(doc, app, pack, lang);
 };
 
 // ---- input wiring (§5.4, §5.5) ------------------------------------------------------------------------------
@@ -788,6 +872,7 @@ const SHEETS: ReadonlyArray<Sheet<Intent>> = [
   { overlay: 'rulesOverlay', close: 'closeRulesBtn', intent: { type: 'rules/close' } },
   { overlay: 'historyOverlay', close: 'closeHistoryBtn', intent: { type: 'history/close' } },
   { overlay: 'resultOverlay', close: 'rsPeekBtn', intent: { type: 'result/peek' } },
+  { overlay: 'cardViewOverlay', close: 'closeCardViewBtn', intent: { type: 'cardView/close' } },
 ];
 
 /**
@@ -837,6 +922,42 @@ const bindMenu = (doc: PageLike, dispatch: Dispatch): void => {
   });
 };
 
+/** The hand card under a pointer event, or null for the felt, an empty slot or the hand face down (never a back). */
+const tipCardOf = (doc: DocumentLike, e: Readonly<Event>): string | null => {
+  if (hasClass(requireId(doc, 'hand'), 'hidden-cards')) return null;
+  const card = closestFrom(e, '.card[data-card]');
+  return card === null ? null : dataOf(card, 'card');
+};
+
+/**
+ * The card-name tip's pointer wiring over `#hand` (docs/design/language-packs.md §5): a fine
+ * pointer arms it on `pointerover` and drops it on `pointerout` or a press; a touch arms it on
+ * `pointerdown` (the long press) and drops it when the finger lifts, the lift swallowing the click
+ * it fires so the card is not lifted too. The timers are the reducer's (`tip/arm`, `tip/show`).
+ */
+export const bindTip = (doc: PageLike, dispatch: Dispatch): void => {
+  const hand = requireId(doc, 'hand');
+  const touch = (e: Readonly<Event>): boolean => pointerTypeOf(e) === 'touch';
+  listen(hand, 'pointerover', (e) => {
+    const card = tipCardOf(doc, e);
+    if (card !== null && !touch(e)) dispatch({ type: 'tip/arm', card, press: false });
+  });
+  listen(hand, 'pointerout', () => {
+    dispatch({ type: 'tip/hide' });
+  });
+  listen(hand, 'pointerdown', (e) => {
+    const card = tipCardOf(doc, e);
+    if (card !== null && touch(e)) dispatch({ type: 'tip/arm', card, press: true });
+    else dispatch({ type: 'tip/hide' });
+  });
+  listen(hand, 'pointerup', (e) => {
+    dispatch(touch(e) ? { type: 'tip/hide', swallow: true } : { type: 'tip/hide' });
+  });
+  listen(hand, 'pointercancel', () => {
+    dispatch({ type: 'tip/hide' });
+  });
+};
+
 /** The table's, the sheets' and the endgame's controls, each an intent. */
 export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   listenId(doc, 'hand', 'click', (e) => {
@@ -878,6 +999,7 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
     { skipDisabled: true },
   );
   bindMenu(doc, dispatch);
+  bindTip(doc, dispatch);
 };
 
 /**

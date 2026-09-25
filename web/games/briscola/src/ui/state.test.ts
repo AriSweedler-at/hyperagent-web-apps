@@ -11,8 +11,17 @@ import { createStore, type StorageLike } from '../../../../shared/edge/storage.t
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { newEvents } from '../../../../shared/lib/events.ts';
 import { sequenceOf } from '../../../../shared/lib/sound/phrase.ts';
-import { MESSAGES, actorOf, applyAction, createGame, viewFor } from '../engine/index.ts';
-import type { GameEvent, State, TrickRecord, View } from '../engine/index.ts';
+import {
+  MESSAGES,
+  actorOf,
+  applyAction,
+  cardById,
+  createGame,
+  deckFor,
+  viewFor,
+  withPosition,
+} from '../engine/index.ts';
+import type { Card, GameEvent, State, TrickRecord, View } from '../engine/index.ts';
 import {
   action as actionFrame,
   lobby,
@@ -35,6 +44,8 @@ import {
   SANDBOX_LOCAL_ONLY_MSG,
   SCREENS,
   SHELL_INTENT_TYPES,
+  TIP_HOVER_MS,
+  TIP_PRESS_MS,
   WAITING_FOR_GUEST_MSG,
   badPositionMsg,
   cueKey,
@@ -120,6 +131,7 @@ const home: HomeSnapshot = {
   recentGames: [],
   opts: DEFAULT_OPTS,
   cardPack: DEFAULT_CARD_PACK,
+  lang: 'it',
   p3Name: null,
   p4Name: null,
 };
@@ -148,6 +160,12 @@ const local = (raw: Raw = {}, snapshot: HomeSnapshot = home): App =>
 
 /** The curtain lifted for whoever must act. */
 const revealed = (app: App): App => run(app, { type: 'curtain/reveal' }).app;
+/** A card of the deck by id; a typo is a test bug. */
+const c = (id: string): Card => {
+  const card = cardById(id);
+  if (card === null) throw new Error(`no card ${id}`);
+  return card;
+};
 
 /** The tap policy: the first legal card lifted, then played (two taps). */
 const playFirst = (app: App): Step => {
@@ -194,6 +212,10 @@ describe('the initial app', () => {
       curtain: null,
       lastPainted: null,
       cardPack: DEFAULT_CARD_PACK,
+      lang: 'it',
+      tip: null,
+      swallowTap: null,
+      cardView: null,
       extraNames: { 2: null, 3: null },
     });
     expect(SCREENS).toEqual([
@@ -587,8 +609,11 @@ describe('pass and play: whole games through the tap policy', () => {
     const legal = view(start).legal[0] ?? '';
     const ok = run(start, { type: 'act', action: { type: 'play', cardId: legal } });
     expect(game(ok.app).trick[0]?.card.id).toBe(legal);
-    // `exchange/click` is nothing while the table does not play the exchange.
-    expect(run(start, { type: 'exchange/click' }).app).toBe(start);
+    // `exchange/click` while the table does not play the exchange: a closer look at the trump card instead.
+    const looked = run(start, { type: 'exchange/click' });
+    expect(looked.app.table.cardView).toBe(game(start).trumpCard.id);
+    expect(looked.app.shell).toBe(start.shell);
+    expect(looked.effects).toEqual([]);
   });
 
   test("position/load (the shell's, over the engine decoder) replaces the pass-and-play position, curtain down for the actor; refused elsewhere and for junk", () => {
@@ -1049,5 +1074,148 @@ describe('the pure twins', () => {
     expect(cuesBetween(viewFor(game(start), 1), viewFor(game(first), 1), 'host')).toEqual(
       v1.trick[0]?.seat === 1 ? ['move.play'] : ['move.opp', 'yourTurn'],
     );
+  });
+});
+
+describe('card names: the language pack, the tip and the card view (docs/design/language-packs.md §5)', () => {
+  const first = (app: App): string => {
+    const id = view(app).legal[0];
+    if (id === undefined) throw new Error('nothing legal');
+    return id;
+  };
+
+  test('lang/set takes a language pack and remembers it, refuses a stranger; home/init reads it; a left table keeps it', () => {
+    const en = run(initialApp, { type: 'lang/set', name: 'en' });
+    expect(en.app.table.lang).toBe('en');
+    expect(en.effects).toEqual([{ type: 'writeLang', name: 'en' }]);
+    expect(run(en.app, { type: 'lang/set', name: 'fr' }).app).toBe(en.app);
+    const read = run(initialApp, { type: 'home/init', home: { ...home, lang: 'en-plates' } }).app;
+    expect(read.table.lang).toBe('en-plates');
+    const table = run(
+      local({}, { ...home, lang: 'en' }),
+      { type: 'leave/confirmed' },
+      { type: 'leave/finish' },
+    );
+    expect(table.app.table.lang).toBe('en');
+    expect(TIP_HOVER_MS).toBe(400);
+    expect(TIP_PRESS_MS).toBe(450);
+  });
+
+  test('tip/arm arms the tip timer for a hand card (a hover 400ms, a press 450ms); tip/show shows it; tip/hide drops it and the timer', () => {
+    const start = revealed(local());
+    const card = first(start);
+    const hover = run(start, { type: 'tip/arm', card, press: false });
+    expect(hover.app.table.tip).toEqual({ card, shown: false });
+    expect(hover.effects).toEqual([
+      { type: 'startTimer', id: 'tip', ms: TIP_HOVER_MS, then: { type: 'tip/show' } },
+    ]);
+    const press = run(start, { type: 'tip/arm', card, press: true });
+    expect(press.effects).toEqual([
+      { type: 'startTimer', id: 'tip', ms: TIP_PRESS_MS, then: { type: 'tip/show' } },
+    ]);
+    const shown = run(hover.app, { type: 'tip/show' });
+    expect(shown.app.table.tip).toEqual({ card, shown: true });
+    expect(shown.effects).toEqual([]);
+    // Over the same card while shown: nothing restarts.
+    expect(run(shown.app, { type: 'tip/arm', card, press: false }).app).toBe(shown.app);
+    const hidden = run(shown.app, { type: 'tip/hide' });
+    expect(hidden.app.table.tip).toBeNull();
+    expect(hidden.app.table.swallowTap).toBeNull();
+    expect(hidden.effects).toEqual([{ type: 'cancelTimer', id: 'tip' }]);
+    // Nothing armed: nothing to hide or show.
+    expect(run(hidden.app, { type: 'tip/hide' }).app).toBe(hidden.app);
+    expect(run(hidden.app, { type: 'tip/show' }).app).toBe(hidden.app);
+    // Another card takes over the tip.
+    const other = view(start).me.hand.find((c) => c.id !== card)?.id ?? '';
+    expect(run(shown.app, { type: 'tip/arm', card: other, press: false }).app.table.tip).toEqual({
+      card: other,
+      shown: false,
+    });
+  });
+
+  test('a touch lift after the tip showed swallows the click that follows: the card is not lifted once; an early lift swallows nothing', () => {
+    const start = revealed(local());
+    const card = first(start);
+    const long = run(
+      start,
+      { type: 'tip/arm', card, press: true },
+      { type: 'tip/show' },
+      { type: 'tip/hide', swallow: true },
+    ).app;
+    expect(long.table.tip).toBeNull();
+    expect(long.table.swallowTap).toBe(card);
+    const tapped = run(long, { type: 'card/tap', cardId: card });
+    expect(tapped.app.table.selected).toBeNull();
+    expect(tapped.app.table.swallowTap).toBeNull();
+    expect(tapped.effects).toEqual([]);
+    expect(run(tapped.app, { type: 'card/tap', cardId: card }).app.table.selected).toBe(card);
+    // A tap on another card is not swallowed; the marker stays for its card.
+    const other = view(start).me.hand.find((c) => c.id !== card)?.id ?? '';
+    expect(run(long, { type: 'card/tap', cardId: other }).app.table.swallowTap).toBe(card);
+    // Lifted before the timer fired: no swallow.
+    const early = run(
+      start,
+      { type: 'tip/arm', card, press: true },
+      { type: 'tip/hide', swallow: true },
+    ).app;
+    expect(early.table.swallowTap).toBeNull();
+    // A new press clears a stale marker.
+    expect(run(long, { type: 'tip/arm', card, press: true }).app.table.swallowTap).toBeNull();
+  });
+
+  test('the tip never arms under the curtain or for a card not in my hand; a drag drops it', () => {
+    const down = local();
+    expect(down.table.curtain).not.toBeNull();
+    const held = view(down).me.hand[0]?.id ?? '';
+    expect(run(down, { type: 'tip/arm', card: held, press: false }).app).toBe(down);
+    const start = revealed(down);
+    expect(run(start, { type: 'tip/arm', card: 'ZZ', press: false }).app).toBe(start);
+    const theirs = view(start).others[0]?.hand?.[0]?.id ?? 'RB';
+    expect(view(start).me.hand.some((c) => c.id === theirs)).toBe(false);
+    expect(run(start, { type: 'tip/arm', card: theirs, press: false }).app).toBe(start);
+    const card = first(start);
+    const dragged = run(
+      start,
+      { type: 'tip/arm', card, press: true },
+      { type: 'tip/show' },
+      { type: 'card/dragStart', cardId: card },
+    ).app;
+    expect(dragged.table.tip).toBeNull();
+    expect(dragged.table.drag).toEqual({ card, over: false });
+  });
+
+  test('the card view opens on a card of the deck and closes; Escape closes it before anything else; the trump card tapped opens it while it lies on the table', () => {
+    const start = revealed(local());
+    const open = run(start, { type: 'cardView/open', card: 'RD' });
+    expect(open.app.table.cardView).toBe('RD');
+    expect(open.effects).toEqual([]);
+    expect(run(start, { type: 'cardView/open', card: 'ZZ' }).app).toBe(start);
+    expect(run(open.app, { type: 'cardView/close' }).app.table.cardView).toBeNull();
+    const lifted = run(open.app, { type: 'card/tap', cardId: first(start) }).app;
+    const escaped = run(lifted, { type: 'escape' }).app;
+    expect(escaped.table.cardView).toBeNull();
+    expect(escaped.table.selected).toBe(first(start));
+    // The trump card: a look while it lies under the stock (the exchange is not offered here).
+    expect(view(start).canExchange).toBe(false);
+    expect(run(start, { type: 'exchange/click' }).app.table.cardView).toBe(
+      view(start).trumpCard.id,
+    );
+    // Drawn: nothing to look at.
+    const g = game(start);
+    const rest = deckFor(g.options).filter((card) => card.id !== 'AC' && card.id !== '3C');
+    const drawn: State = {
+      ...withPosition(g, [[c('AC')], [c('3C')]], [], c('RB'), 0),
+      piles: [rest, []],
+    };
+    const last = run(start, {
+      type: 'position/load',
+      state: JSON.parse(JSON.stringify(drawn)),
+    }).app;
+    expect(view(last).trumpOnTable).toBe(false);
+    expect(run(last, { type: 'exchange/click' }).app).toBe(last);
+    // A left table drops the view.
+    expect(
+      run(open.app, { type: 'leave/confirmed' }, { type: 'leave/finish' }).app.table.cardView,
+    ).toBeNull();
   });
 });

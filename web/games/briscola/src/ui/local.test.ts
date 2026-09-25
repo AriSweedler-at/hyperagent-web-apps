@@ -44,6 +44,7 @@ const home: HomeSnapshot = {
   recentGames: [],
   opts: DEFAULT_OPTS,
   cardPack: 'linea',
+  lang: 'it',
   p3Name: null,
   p4Name: null,
 };

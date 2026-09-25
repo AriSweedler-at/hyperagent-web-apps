@@ -645,17 +645,17 @@ details.history-row > .history-detail dt {
    of the viewport, every row above the hand keeps one height in every phase, and the fallbacks at
    the end of this file let a short viewport scroll instead of clipping the actions row. */
 #tableScreen {
-  /* Phone: everything that is not a card measures 398px (#app padding 24, topbar 44, seats 86, the
-     centre band's 30px of label and chips, score strip 44, status 22, hand header 24, hand padding
-     14, actions 54, five 8px gaps and the hand area's 16px of padding); the column is that plus a
-     hand card and a mid card (0.62 of one), so the height budget is (100dvh - 560px) * aspect of
-     card width and the width budget three cards in the 334px between the gutters: 111px at
-     390x844 with the deck's 0.518, a 215px card, a 133px mid card, 746px in all (layout.ts
+  /* Phone: everything that is not a card measures 414px (#app padding 24, topbar 44, seats 86, the
+     centre band's 46px of label, chips and card names, score strip 44, status 22, hand header 24,
+     hand padding 14, actions 54, five 8px gaps and the hand area's 16px of padding); the column is
+     that plus a hand card and a mid card (0.62 of one), so the height budget is (100dvh - 576px) *
+     aspect of card width and the width budget three cards in the 334px between the gutters: 111px
+     at 390x844 with the deck's 0.518, a 215px card, a 133px mid card, 762px in all (layout.ts
      cardWidth, columnHeight). --aspect is rewritten by the pack painter from resolveAspect. */
   --aspect: 0.518;
   --card-w: clamp(
     72px,
-    min(calc((100vw - 56px) / 3), calc((100dvh - 560px) * var(--aspect))),
+    min(calc((100vw - 56px) / 3), calc((100dvh - 576px) * var(--aspect))),
     124px
   );
   --mid-w: calc(var(--card-w) * 0.62);
@@ -839,7 +839,7 @@ details.history-row > .history-detail dt {
 
 /* ---------- the centre band: the stock with the briscola under it, the trick fan ---------- */
 .table-center {
-  height: calc(var(--mid-w) / var(--aspect) + 30px);
+  height: calc(var(--mid-w) / var(--aspect) + 46px);
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -853,7 +853,7 @@ details.history-row > .history-detail dt {
   position: relative;
 }
 /* Room for the stock and the briscola's protruding half: the stock's width plus 0.55 of it plus half
-   the card's height (layout.ts briscolaBox); the label sits in the 30px beneath. */
+   the card's height (layout.ts briscolaBox); the label and the briscola's name sit in the 46px beneath. */
 .stock-area {
   position: relative;
   width: calc(var(--mid-w) * 1.05 + var(--mid-w) / var(--aspect) / 2);
@@ -940,10 +940,14 @@ details.history-row > .history-detail dt {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  height: calc(var(--mid-w) / var(--aspect) + 24px);
+  height: calc(var(--mid-w) / var(--aspect) + 40px);
   min-width: 0;
   border-radius: var(--radius);
   position: relative;
+}
+/* At two players the fan has room: the two plays sit apart so each card's name can be wider than the card. */
+#trick[data-players='2'] {
+  gap: 24px;
 }
 .trick {
   --n: 1;
@@ -1335,6 +1339,79 @@ details.history-row > .history-detail dt {
   touch-action: none;
 }
 
+/* ---------- card names (docs/design/language-packs.md §5): the chosen language pack's words ---------- */
+/* A hand card's children take no pointer events, so a hover over a corner index is a hover over the
+   card (no flicker of the tip), and a long press brings up no callout over the picture. */
+#hand .card {
+  -webkit-touch-callout: none;
+}
+#hand .card > * {
+  pointer-events: none;
+}
+/* The caption: one quiet cream line, the muted text of the felt, cut with an ellipsis where the card
+   is narrower than its name (the chip's rule). Under a play it hangs beneath the chip; under the
+   stock it is the briscola's line after the count. */
+.card-name {
+  color: var(--cream-dim);
+  font-size: 0.62rem;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.play .card-name {
+  position: absolute;
+  left: 50%;
+  bottom: -38px;
+  transform: translateX(-50%);
+  max-width: calc(var(--mid-w) + 24px);
+  text-align: center;
+}
+.play:not(:last-child) .card-name {
+  left: calc(var(--mid-w) * (1 - var(--fan-overlap)) / 2);
+  max-width: min(calc(var(--mid-w) + 24px), calc(var(--mid-w) * (1 - var(--fan-overlap)) - 2px));
+}
+.pile-label.card-name {
+  max-width: calc(var(--mid-w) * 1.05 + var(--mid-w) / var(--aspect) / 2);
+}
+/* The tip over a hand card (hover after 400ms, a touch press after 450ms): a small low-contrast
+   pill, no arrow, placed by the painter at the card's top centre; inert to the pointer. */
+.card-tip {
+  position: fixed;
+  z-index: 70;
+  transform: translate(-50%, calc(-100% - 10px));
+  background: rgba(43, 29, 20, 0.82);
+  color: var(--cream);
+  font-size: 0.72rem;
+  line-height: 20px;
+  padding: 0 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* The briscola wiggles out of the deck under a fine pointer (transform alone, the card's own 160ms;
+   reduced motion shortens it with every card's), and a tap opens the card view. */
+@media (hover: hover) and (pointer: fine) {
+  .briscola:not(.gone) .card {
+    cursor: pointer;
+  }
+  .briscola:not(.gone):hover .card {
+    transform: translateY(-8px) rotate(-3deg);
+  }
+}
+/* The card view: the face at 240px (or 60vw) on the sheet, its name beneath as the sheet's sub line. */
+.card-view {
+  align-items: center;
+}
+.card-view-face {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 12px;
+}
+.card-view-face .card {
+  --card-w: min(240px, 60vw);
+}
+
 /* ---------- the endgame (design §5.1 "Bravi!") ---------- */
 #endgameScreen h1 {
   margin-bottom: 14px;
@@ -1349,10 +1426,10 @@ details.history-row > .history-detail dt {
     max-width: 1000px;
   }
   #tableScreen {
-    /* Everything that is not a card measures 362px here; the height budget is (100dvh - 522px) *
-       aspect of card width, capped at 132px (a 255px card, a 158px mid card): 775px in all at
-       1280x800 (layout.ts). */
-    --card-w: clamp(80px, calc((100dvh - 522px) * var(--aspect)), 132px);
+    /* Everything that is not a card measures 378px here; the height budget is (100dvh - 542px) *
+       aspect of card width (378 and a mid card at the widest aspect), capped at 132px (a 255px
+       card, a 158px mid card): 791px in all at 1280x800 (layout.ts). */
+    --card-w: clamp(80px, calc((100dvh - 542px) * var(--aspect)), 132px);
     --tiny-w: 30px;
     grid-template-columns: minmax(0, 1fr) 200px;
     grid-template-areas:
@@ -1423,10 +1500,10 @@ details.history-row > .history-detail dt {
 }
 
 /* ---------- short viewports ---------- */
-/* With --card-w floored at 72px the phone column is 623px (layout.ts columnHeight at the floor);
+/* With --card-w floored at 72px the phone column is 639px (layout.ts columnHeight at the floor);
    below that the document scrolls instead of clipping the actions row (touch-action: none stays
    scoped to the hand's cards, so the page can still be scrolled from the table). */
-@media (max-height: 622px) and (max-width: 899px) {
+@media (max-height: 638px) and (max-width: 899px) {
   body.fixed-screen,
   body.fixed-screen #app {
     height: auto;
@@ -1440,8 +1517,8 @@ details.history-row > .history-detail dt {
     overflow: visible;
   }
 }
-/* The desktop floors at 80px cards (612px); shorter windows scroll too. */
-@media (max-height: 611px) and (min-width: 900px) {
+/* The desktop floors at 80px cards (628px); shorter windows scroll too. */
+@media (max-height: 627px) and (min-width: 900px) {
   body.fixed-screen,
   body.fixed-screen #app {
     height: auto;

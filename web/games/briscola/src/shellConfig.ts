@@ -39,6 +39,7 @@ import {
   DEFAULT_OPTS,
   DEFAULT_PLAY_MODE,
   HOME_TABS,
+  LANG_PREF,
   SHELL_STORE,
   readCardPack,
   readOpts,
@@ -162,7 +163,7 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
   frames: { lobby, state, toast, action },
   cues: { initial: INITIAL_CUES },
   home: {
-    // This page's own keys: the six options (defaults when unreadable), the card pack, the third and fourth names.
+    // This page's own keys: the six options (defaults when unreadable), the card pack, the language pack, the third and fourth names.
     read: (store) => {
       const pack = readCardPack(store);
       const p3 = readP3Name(store);
@@ -170,6 +171,7 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
       return {
         opts: readOpts(store),
         cardPack: pack.ok ? pack.value : DEFAULT_CARD_PACK,
+        lang: LANG_PREF.orDefault(store),
         p3Name: p3.ok ? p3.value : null,
         p4Name: p4.ok ? p4.value : null,
       };

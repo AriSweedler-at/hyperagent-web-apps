@@ -67,9 +67,9 @@ describe('the card clamps (theme.css #tableScreen --card-w)', () => {
     expect(tinyWidth('desktop')).toBe(30);
   });
 
-  test('a short phone floors at 72px: the height budget (107px * aspect) is under the floor', () => {
+  test('a short phone floors at 72px: the height budget (91px * aspect) is under the floor', () => {
     expect(cardWidth(PHONE_SHORT)).toBe(PHONE_GEOMETRY.minCardW);
-    expect(cardWidth({ width: 390, height: 700 })).toBeCloseTo(140 * DEFAULT_ASPECT, 3);
+    expect(cardWidth({ width: 390, height: 720 })).toBeCloseTo(144 * DEFAULT_ASPECT, 3);
   });
 
   test('the column fits both design viewports at both aspects, and the short phone at the floor', () => {
@@ -78,8 +78,8 @@ describe('the card clamps (theme.css #tableScreen --card-w)', () => {
       expect(columnHeight(DESKTOP, aspect)).toBeLessThanOrEqual(DESKTOP.height);
       expect(fits(PHONE, aspect) && fits(DESKTOP, aspect)).toBe(true);
     });
-    // 398 + 139 + 86 at the 72px floor with the default deck: the short phone does not scroll.
-    expect(columnHeight(PHONE_SHORT)).toBeCloseTo(623, 0);
+    // 414 + 139 + 86 at the 72px floor with the default deck: the short phone does not scroll.
+    expect(columnHeight(PHONE_SHORT)).toBeCloseTo(639, 0);
     expect(fits(PHONE_SHORT)).toBe(true);
     expect(fits({ width: 375, height: 600 })).toBe(false);
   });
@@ -99,8 +99,8 @@ describe('the card clamps (theme.css #tableScreen --card-w)', () => {
     });
   });
 
-  test('the band is a mid card plus 30px; the fixed rows are the design heights', () => {
-    expect(bandHeight(cardWidth(PHONE))).toBeCloseTo(69 / DEFAULT_ASPECT + 30, 0);
+  test('the band is a mid card plus 46px; the fixed rows are the design heights', () => {
+    expect(bandHeight(cardWidth(PHONE))).toBeCloseTo(69 / DEFAULT_ASPECT + 46, 0);
     expect(ROW_HEIGHTS).toEqual({ topbar: 44, score: 44, status: 22, handHeader: 24, actions: 54 });
     expect(PHONE_GEOMETRY.seatsH).toBe(86);
     expect(DESKTOP_GEOMETRY.seatsH).toBe(96);

@@ -8,11 +8,13 @@
 import { describe, expect, test } from 'vitest';
 
 import { packByName } from '../../../../shared/lib/cards/packs.ts';
+import { langByName } from '../../../../shared/lib/lang/packs.ts';
 import { cardById, type Card, type Player, type Seat } from '../engine/index.ts';
 import {
   briscolaHtml,
   cardHtml,
   cardLabelEn,
+  cardNameOf,
   cellOfSeat,
   chipCount,
   chipsHtml,
@@ -382,5 +384,60 @@ describe('the score strip and the game badge', () => {
       'Game 4 · 1–0–1 · 2 draws · best of 5',
     );
     expect(matchLabel(1)).toBe('one game');
+  });
+});
+
+describe('card names through the language pack (docs/design/language-packs.md §5)', () => {
+  const IT = langByName('it');
+  const EN = langByName('en');
+
+  test("cardNameOf speaks the pack; a face named carries role and aria-label (a picture's alt replaced); a stranger is ''", () => {
+    expect(cardNameOf(IT, 'RD')).toBe('re di denari');
+    expect(cardNameOf(EN, 'RD')).toBe('king of coins');
+    expect(cardNameOf(IT, 'ZZ')).toBe('');
+    expect(cardHtml(LINEA, 'AC', '', EN)).toBe(
+      LINEA_AC('').replace('aria-label="asso di coppe"', 'aria-label="ace of cups"'),
+    );
+    expect(cardHtml(LINEA, 'AC', 'mid', IT)).toBe(LINEA_AC(' mid'));
+    expect(cardHtml(GLYPH, 'RB', 'mid', EN)).toBe(
+      GLYPH_RB.replace(
+        'class="card face glyph suit-B" data-card="RB"',
+        'class="card face glyph suit-B mid" data-card="RB" role="img" aria-label="king of batons"',
+      ),
+    );
+    expect(cardHtml(LINEA, 'ZZ', 'mid', EN)).toBe('<div class="card back mid"></div>');
+  });
+
+  test('a play carries a .card-name caption after its chip, in the pack`s language; the briscola, the stock top and the hand faces are named too', () => {
+    const trick = [
+      { seat: 1 as Seat, card: AC },
+      { seat: 0 as Seat, card: card('RB') },
+    ];
+    const html = trickHtml(trick, { players: PLAYERS, me: 0, pack: LINEA, taking: null, lang: EN });
+    expect(html).toBe(
+      `<div class="play" role="group" aria-label="Ace of cups, played by Jeff" style="--i:0">${withDataSeat(
+        cardHtml(LINEA, 'AC', 'mid', EN),
+        1,
+      )}<span class="who">Jeff</span><span class="card-name">ace of cups</span></div>` +
+        `<div class="play" role="group" aria-label="Re of batons, played by you" style="--i:1">${withDataSeat(
+          cardHtml(LINEA, 'RB', 'mid', EN),
+          0,
+        )}<span class="who">You</span><span class="card-name">king of batons</span></div>`,
+    );
+    expect(
+      trickHtml(trick, { players: PLAYERS, me: 0, pack: LINEA, taking: null, lang: IT }),
+    ).toContain('<span class="card-name">re di bastoni</span>');
+    // Without a language nothing is named: the pins above stand.
+    expect(trickHtml(trick, { players: PLAYERS, me: 0, pack: LINEA, taking: null })).not.toContain(
+      'card-name',
+    );
+    expect(briscolaHtml(LINEA, AC, EN)).toBe(cardHtml(LINEA, 'AC', 'mid', EN));
+    expect(stockHtml(LINEA, 2, AC, EN)).toBe(cardHtml(LINEA, 'AC', 'mid', EN));
+    expect(stockHtml(LINEA, 34, null, EN)).toBe('<div class="card back mid"></div>');
+    const hand = handHtml(LINEA, ['AC', null, null], { selected: null, playable: [], lang: EN });
+    expect(hand).toContain('aria-label="ace of cups"');
+    expect(handHtml(LINEA, ['AC', null, null], { selected: null, playable: [] })).not.toContain(
+      'ace of cups',
+    );
   });
 });
