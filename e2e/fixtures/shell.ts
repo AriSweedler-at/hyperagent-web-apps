@@ -141,6 +141,27 @@ export const join = async (
   });
 };
 
+/** Remember `name` under the game's name key, as a player who typed it on an earlier visit would have; the page must be on the game's origin. */
+export const rememberName = async (page: Page, game: ShellGame, name: string): Promise<void> => {
+  await page.evaluate(
+    `localStorage.setItem(${JSON.stringify(prefKey(game, 'name'))}, ${JSON.stringify(name)})`,
+  );
+};
+
+/**
+ * Follow an invite link (`?join=<code>`): the guest is sat down at once, no name typed and no tap
+ * on `#joinBtn` (the owner, 2026-09-25: "it shouldn't make you THEN click 'sit down'"), and the
+ * link leaves the address bar. Resolves once the host has answered the join.
+ */
+export const followInvite = async (page: Page, game: ShellGame, url: string): Promise<void> => {
+  await page.goto(url);
+  await expect(page.locator('#guestWaitScreen')).toBeVisible();
+  expect(new URL(page.url()).searchParams.has('join')).toBe(false);
+  await expect(page.locator('#guestWaitStatus')).toHaveText(SHELL[game].hostAnswered, {
+    timeout: WEBRTC_TIMEOUT,
+  });
+};
+
 // ---- online: the start ----------------------------------------------------------------------------
 
 /**

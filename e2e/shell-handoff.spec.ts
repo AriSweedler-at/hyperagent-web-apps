@@ -6,7 +6,8 @@
 // reveal, while backgammon, where the phone changes hands under it, offers "Continue online" there
 // too (SHELL.curtainButtons and the driver's `curtainOffer`, e2e/fixtures/online-games.ts).
 // `#shareCodeBtn` hands the invite to the share sheet where there is one (a phone's OS menu) and to
-// the clipboard otherwise (desktop); an invite link fills the join form and leaves the address bar;
+// the clipboard otherwise (desktop); an invite link fills the join form, sits the guest down at once
+// (no tap on Sit down: the owner, 2026-09-25) and leaves the address bar, a malformed one seats nobody;
 // the offer survives a reload of the waiting room; and cancelling the room before anyone joined
 // gives the game back to pass and play, the table as it stood. The two-device game is @online
 // (WebRTC between two contexts): pass and play opened no Peer, the handoff opened the room's, and
@@ -14,15 +15,16 @@
 import type { Page } from '@playwright/test';
 
 import { SHELL, SHELL_GAMES, type ShellGame } from '../tools/games.ts';
-import { peerIdFor } from '../web/shared/lib/roomCode.ts';
+import { ROOM_CODE, peerIdFor } from '../web/shared/lib/roomCode.ts';
 import { PHONE } from './fixtures/geometry.ts';
-import { gameQuery } from './fixtures/player.ts';
+import { gameQuery, invitePath } from './fixtures/player.ts';
 import {
   DEFAULT_NAMES,
   INVITE_COPIED_MSG,
   curtainTitle,
   prefKey,
   readPref,
+  rememberName,
   resumeLabel,
   reveal,
   roomOpen,
@@ -48,19 +50,9 @@ Object.defineProperty(navigator, 'clipboard', {
   value: { writeText: (text) => { window.__copied = text; return Promise.resolve(); } },
 });`;
 
-/** The page's path with the harness hooks (`?peer=`, `?ice=`) and `extra` query parameters. */
-const gameUrl = (
-  project: Project,
-  game: ShellGame,
-  extra: Readonly<Record<string, string>> = {},
-): string => {
-  const params = new URLSearchParams(gameQuery());
-  Object.entries(extra).forEach(([key, value]) => {
-    params.set(key, value);
-  });
-  const query = params.toString();
-  return `${pagePath(project, game)}${query === '' ? '' : `?${query}`}`;
-};
+/** The page's path with the harness hooks (`?peer=`, `?ice=`). */
+const gameUrl = (project: Project, game: ShellGame): string =>
+  `${pagePath(project, game)}${gameQuery()}`;
 
 /** The page's origin and path: what the invite link is built from, whatever the query or hash. */
 const pageUrlOf = (page: Page): string => {
@@ -153,7 +145,7 @@ SHELL_GAMES.forEach((game) => {
       expect(await cancelAndResume(page, driver)).toBe(before);
     });
 
-    test('an invite link fills the join form: the code, the Play tab, online; nothing stored, and the link leaves the address bar', async ({
+    test('an invite link sits the guest down at once: the waiting room with no tap, nothing stored, the link out of the address bar; cancel is the home screen with the code still in the form', async ({
       player,
       project,
     }) => {
@@ -162,21 +154,41 @@ SHELL_GAMES.forEach((game) => {
       await page.evaluate(
         `localStorage.setItem(${JSON.stringify(prefKey(game, 'homeTab'))}, 'rules'); localStorage.setItem(${JSON.stringify(prefKey(game, 'playMode'))}, 'local');`,
       );
-      await page.goto(gameUrl(project, game, { join: 'kqzm' }));
-      await expect(page.locator('#playPanel')).toBeVisible();
-      await expect(page.locator('#onlineModeContent')).toBeVisible();
-      await expect(page.locator('#codeInput')).toHaveValue('KQZM');
+      // A room nobody hosts: the guest is in its waiting room all the same, the session asking after it.
+      await page.goto(invitePath(project, game, 'kqzm'));
+      await expect(page.locator('#guestWaitScreen')).toBeVisible();
+      await expect(page.locator('#homeScreen')).toBeHidden();
       expect(await readPref(page, game, 'playMode')).toBe('local');
       expect(await readPref(page, game, 'homeTab')).toBe('rules');
       expect(await readPref(page, game, 'name')).toBeNull();
-      // The link is spent: the harness hooks stay, the invite's parameters do not, so a reload is the
-      // ordinary home screen (the stored Rules tab and pass-and-play mode).
+      // The link is spent: the harness hooks stay, the invite's parameters do not.
       const url = new URL(page.url());
       expect(url.searchParams.has('join')).toBe(false);
       expect(url.search).toBe(gameQuery());
+      // Cancel is the ordinary home screen (the link stored nothing: the Rules tab comes back) with
+      // the code the link filled still in the form, so the guest can try again by hand.
+      await page.locator('#cancelGuestBtn').click();
+      await expect(page.locator('#homeScreen')).toBeVisible();
+      await expect(page.locator('#rulesPanel')).toBeVisible();
+      await expect(page.locator('#codeInput')).toHaveValue('KQZM');
+      // A reload is the ordinary home screen (the stored Rules tab and pass-and-play mode).
       await page.reload();
       await expect(page.locator('#rulesPanel')).toBeVisible();
       await expect(page.locator('#codeInput')).toHaveValue('');
+    });
+
+    test('a malformed invite (a code of the wrong length) seats nobody: the join form with the code and the message, no Peer opened', async ({
+      player,
+      project,
+    }) => {
+      const { page } = player;
+      await page.goto(invitePath(project, game, 'ab'));
+      await expect(page.locator('#homeScreen')).toBeVisible();
+      await expect(page.locator('#onlineModeContent')).toBeVisible();
+      await expect(page.locator('#codeInput')).toHaveValue('AB');
+      await expect(page.locator('#toast')).toHaveText(ROOM_CODE[game].lengthError);
+      await expect(page.locator('#guestWaitScreen')).toBeHidden();
+      expect(await player.peerCalls()).toEqual([]);
     });
 
     test(
@@ -188,12 +200,13 @@ SHELL_GAMES.forEach((game) => {
         // Pass and play opened no Peer; the handoff opened the room's.
         expect((await host.peerCalls()).map((c) => c.id)).toEqual([peerIdFor(game, code)]);
 
-        // The link puts the code in the form; Bob types his name and joins as himself.
-        await guest.page.goto(gameUrl(project, game, { join: code }));
-        await expect(guest.page.locator('#codeInput')).toHaveValue(code);
-        await guest.page.locator('#nameInput').fill(BOB);
-        await guest.page.locator('#joinBtn').click();
+        // Bob's phone remembers his name from an earlier visit; the link sits him down as himself,
+        // with nothing to type and nothing to tap.
+        await guest.page.goto(gameUrl(project, game));
+        await rememberName(guest.page, game, BOB);
+        await guest.page.goto(invitePath(project, game, code));
         await expect(guest.page.locator('#guestWaitScreen')).toBeVisible();
+        await expect(guest.page.locator('#codeInput')).toHaveValue(code);
 
         // The host's join handler keeps the seat, takes the guest's name and broadcasts the game.
         await expect(host.page.locator('#tableScreen')).toBeVisible({ timeout: WEBRTC_TIMEOUT });

@@ -282,7 +282,11 @@ export type ShellIntent<G extends ShellTypes> =
   | Readonly<{ type: 'submenu/dismiss' }>
   /** `#codeInput` input: the raw value and the InputEvent's type. */
   | Readonly<{ type: 'code/typed'; value: string; inputType: string }>
-  /** `?join=<code>` at boot (an invite link): the code into `#codeInput`, the Play tab, online mode. */
+  /**
+   * `?join=<code>` at boot (an invite link): the code into `#codeInput`, the Play tab, online
+   * mode, then the join `#joinBtn` would have dispatched, under the name the input shows (the
+   * owner, 2026-09-25: "it shouldn't make you THEN click 'sit down'"). Nothing while seated.
+   */
   | Readonly<{ type: 'join/link'; code: string }>
   /** `#soundBtn`. */
   | Readonly<{ type: 'sound/toggle' }>
@@ -1475,11 +1479,21 @@ export const reduceShell = <G extends ShellTypes>(
       return step(withShell(app, { codeDraft: value }), { type: 'setCode', value });
     }
     case 'join/link': {
-      // The invite link: the code is in the form; the mode is shown, not stored.
+      // The invite link is the tap on `#joinBtn` (the owner, 2026-09-25: "it should immediately act
+      // as if you have clicked that already"): the form is filled first, as it was, so a refusal or
+      // a cancel leaves the code in the input on the Play tab in online mode (the mode is shown, not
+      // stored), then `join/click` with that code and the name the input shows, the remembered one
+      // or the game's first default, which the click's rule reads as untouched. A bad code is the
+      // click's toast over the filled form; a link followed while seated changes nothing.
+      if (s.role !== null) return pure(app);
       const code = sanitiseCode(cfg.id, intent.code);
+      const name = s.p1Name === '' ? localNameFor(localNamesOf(cfg), 0) : s.p1Name;
       return andThen(
-        setHomeTab(withShell(app, { playMode: 'online', codeDraft: code }), 'play', false, cfg),
-        (a) => step(a, { type: 'setCode', value: code }),
+        andThen(
+          setHomeTab(withShell(app, { playMode: 'online', codeDraft: code }), 'play', false, cfg),
+          (a) => step(a, { type: 'setCode', value: code }),
+        ),
+        (a) => reduceShell(a, { type: 'join/click', name, code }, ctx, cfg),
       );
     }
     case 'sound/toggle':

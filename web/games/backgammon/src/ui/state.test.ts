@@ -427,7 +427,7 @@ describe('home', () => {
     expect(run(held.app, { type: 'submenu/dismiss' }).app.shell.submenuOpen).toBe(false);
   });
 
-  test('code/typed sanitises, keeps the last good code on a replacement; join/link fills the code and shows online', () => {
+  test('code/typed sanitises, keeps the last good code on a replacement; join/link fills the code, shows online and sits the guest down', () => {
     const typed = run(initialApp, { type: 'code/typed', value: 'ab1c', inputType: 'insertText' });
     expect(typed.app.shell.codeDraft).toBe('ABC');
     expect(typed.effects).toEqual([{ type: 'setCode', value: 'ABC' }]);
@@ -442,8 +442,15 @@ describe('home', () => {
       playMode: 'online',
       codeDraft: 'WXYZ',
       homeTab: 'play',
+      role: 'guest',
+      code: 'WXYZ',
+      screen: 'guestWaitScreen',
     });
-    expect(linked.effects).toEqual([{ type: 'setCode', value: 'WXYZ' }]);
+    expect(linked.effects).toEqual([
+      { type: 'setCode', value: 'WXYZ' },
+      { type: 'scrollTop' },
+      { type: 'startGuest', code: 'WXYZ', attempt: 1 },
+    ]);
   });
 
   test('sound/toggle, soundFont/set and share/click are effects', () => {

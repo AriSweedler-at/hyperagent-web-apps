@@ -179,8 +179,10 @@ inside the Peer `config`, for the `@relay` specs' relay-forced games), `?join=<c
 game's invite convention, built by `web/shared/lib/invite.ts` and read by `web/shared/edge/invite.ts`; fidice keeps its `#join=` /
 `#watch=` fragments for now. Gin and backgammon: the invite link `#shareCodeBtn` shares, the link alone with no
 text beside it (`shareInvite`, web/shared/edge/boot.ts); `main.ts` calls the same module's
-`applyInviteLink` after `home/init`, which dispatches `join/link`, so the code sits in the join
-form on the Play tab in online mode, then drops it from the address bar with
+`applyInviteLink` after `home/init`, which dispatches `join/link`: the code goes into the join
+form on the Play tab in online mode and the guest is sat down at once, as a tap on `#joinBtn`
+under the remembered name (else the game's default) would have done; a code of the wrong length
+toasts over the filled form instead, and the link is then dropped from the address bar with
 `history.replaceState`, the other parameters kept), `?story=<id>` (gin only: `main.ts`
 reads it before anything else and, when present, imports `src/stories/boot.ts` and returns, so the
 page paints one catalogued table state from `src/stories/catalogue.ts` with the real `paint` and

@@ -64,9 +64,11 @@ export type InviteWindowLike = Readonly<{
 
 /**
  * An invite link (`?join=<code>`, docs/ARCHITECTURE.md "Documented test hooks"): the code goes
- * into the join form once the home screen is up and leaves the address bar, so a reload or a
- * bookmark of this page lands on the ordinary home screen (the other hooks, `?peer=` and
- * `?ice=`, stay). main.ts calls it right after `home/init`; `joinByLink` is its `join/link`.
+ * to the reducer once the home screen is up, which fills the join form and sits the guest down
+ * as a tap on `#joinBtn` would (shell.ts `join/link`), and leaves the address bar, so a reload or
+ * a bookmark of this page lands on the ordinary home screen (the other hooks, `?peer=` and
+ * `?ice=`, stay). `bootShell` calls it right after `home/init`, so the remembered name is in the
+ * App the reducer reads; `joinByLink` is its `join/link`.
  */
 export const applyInviteLink = (
   win: InviteWindowLike,
@@ -605,8 +607,8 @@ export const bootShell = <
   (win as unknown as Record<string, unknown>)[cfg.game.hook] = hook;
 
   dispatch({ type: 'home/init', home: homeSnapshot() });
-  // An invite link (`?join=<code>`): into the join form now that the home screen is up, and out of
-  // the address bar (`applyInviteLink` above).
+  // An invite link (`?join=<code>`): the guest is sat down now that the home screen is up, and the
+  // code is out of the address bar (`applyInviteLink` above).
   applyInviteLink(win, (code) => {
     dispatch({ type: 'join/link', code });
   });

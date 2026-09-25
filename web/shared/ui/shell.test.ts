@@ -677,7 +677,87 @@ describe('home', () => {
       homeTab: 'play',
       playMode: 'online',
     });
-    expect(linked.effects).toEqual([{ type: 'setCode', value: 'KQZM' }]);
+    expect(linked.effects[0]).toEqual({ type: 'setCode', value: 'KQZM' });
+  });
+
+  test('join/link sits the guest down as the tap on #joinBtn would: the same state and effects after the form is filled, under the remembered name or the default; a bad code is the tap`s toast over the filled form; nothing while seated', () => {
+    // Nothing remembered: the input shows the game's first default, which the tap reads as untouched.
+    const linked = run(withShell(initialApp, { homeTab: 'rules', playMode: 'local' }), {
+      type: 'join/link',
+      code: 'kqzm9',
+    });
+    const filled = run(withShell(initialApp, { homeTab: 'rules', playMode: 'local' }), {
+      type: 'tab/set',
+      tab: 'play',
+    }).app;
+    const tapped = run(withShell(filled, { playMode: 'online', codeDraft: 'KQZM' }), {
+      type: 'join/click',
+      name: 'Ari',
+      code: 'KQZM',
+    });
+    expect(linked.app).toEqual(tapped.app);
+    expect(linked.app.shell).toMatchObject({
+      role: 'guest',
+      code: 'KQZM',
+      myName: 'Jeff',
+      netAttempt: 1,
+      screen: 'guestWaitScreen',
+      guestStatus: { text: 'Connecting KQZM', pulse: true },
+      codeDraft: 'KQZM',
+      homeTab: 'play',
+      playMode: 'online',
+    });
+    expect(linked.effects).toEqual([{ type: 'setCode', value: 'KQZM' }, ...tapped.effects]);
+    expect(tapped.effects).toEqual([
+      { type: 'scrollTop' },
+      { type: 'startGuest', code: 'KQZM', attempt: 1 },
+    ]);
+    // A remembered name (home/init put it in the input and marked the name touched) joins as itself.
+    const remembered = run(
+      initialApp,
+      { type: 'home/init', home: { ...home, name: 'Zoë' } },
+      { type: 'join/link', code: 'KQZM' },
+    );
+    expect(remembered.app.shell).toMatchObject({
+      role: 'guest',
+      myName: 'Zoë',
+      screen: 'guestWaitScreen',
+    });
+    expect(remembered.effects.at(-1)).toEqual({ type: 'startGuest', code: 'KQZM', attempt: 1 });
+    // A name typed since joins too, trimmed as the tap trims it.
+    const typed = run(
+      initialApp,
+      { type: 'name/typed', value: ' Eve ' },
+      { type: 'join/link', code: 'KQZM' },
+    );
+    expect(typed.app.shell.myName).toBe('Eve');
+    // A bad code: the form is filled and the tap's toast shows; nobody is seated.
+    const bad = run(withShell(initialApp, { homeTab: 'rules' }), { type: 'join/link', code: 'ab' });
+    expect(bad.app.shell).toMatchObject({
+      role: null,
+      screen: 'homeScreen',
+      codeDraft: 'AB',
+      homeTab: 'play',
+      playMode: 'online',
+    });
+    expect(bad.effects).toEqual([
+      { type: 'setCode', value: 'AB' },
+      { type: 'toast', message: 'Enter the 4-letter room code.', ms: null },
+    ]);
+    // Seated already (a link followed again, the same room or another): nothing.
+    const seatedGuest = linked.app;
+    expect(run(seatedGuest, { type: 'join/link', code: 'KQZM' })).toEqual({
+      app: seatedGuest,
+      effects: [],
+    });
+    expect(run(seatedGuest, { type: 'join/link', code: 'WXYZ' })).toEqual({
+      app: seatedGuest,
+      effects: [],
+    });
+    expect(run(seated(), { type: 'join/link', code: 'KQZM' })).toEqual({
+      app: seated(),
+      effects: [],
+    });
   });
 
   test('screen/show, sound/toggle, soundFont/set and share/click', () => {

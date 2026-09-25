@@ -123,6 +123,21 @@ export const openGame = async (
 };
 
 /**
+ * The invite for `code` as a guest's browser opens it in the harness: the game's page with the
+ * `?peer=` and `?ice=` hooks and `?join=<code>` (web/shared/lib/invite.ts JOIN_PARAM) beside them.
+ */
+export const invitePath = (
+  project: Project,
+  game: PageName,
+  code: string,
+  hooks: GameHooks = {},
+): string => {
+  const params = new URLSearchParams(gameQuery(hooks));
+  params.set('join', code);
+  return `${pagePath(project, game)}?${params.toString()}`;
+};
+
+/**
  * The PeerJS options a page must have built from the harness's URL: the ?ice= list (the STUN-only
  * fixture, or the TURN one when `{ ice: 'turn' }` opened the page) through HyperIce.peerConfig,
  * with `iceTransportPolicy` when `{ relay: true }` did, plus the ?peer= broker override unless the
