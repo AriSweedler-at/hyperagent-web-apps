@@ -10,16 +10,19 @@ import {
   bindLongPress,
   blocksCodeInput,
   fillInputs,
+  homeView,
   paintHomeShell,
   paintPlayMode,
   paintResume,
   paintSubmenu,
   paintTabs,
   setCodeInput,
+  shellIntents,
   tabButtonId,
   type HomeView,
   type ShellIntentBuilders,
 } from './home.ts';
+import type { ShellIntent, ShellTypes } from './shell.ts';
 
 const TABS = ['play', 'rules', 'about'] as const;
 type Tab = (typeof TABS)[number];
@@ -362,6 +365,111 @@ describe('bindHomeShell', () => {
       intent('submenu/pick', ''),
       intent('submenu/dismiss'),
       intent('submenu/dismiss'),
+    ]);
+  });
+});
+
+describe('homeView', () => {
+  const label = (r: Readonly<{ kind: string; code: string }>): string => `Rejoin room ${r.code}`;
+
+  test('reads the tab, the mode and the submenu flag; labels the resume offer through the game, null for none', () => {
+    expect(
+      homeView({ homeTab: 'play', playMode: 'online', submenuOpen: false, resume: null }, label),
+    ).toEqual(view());
+    expect(
+      homeView(
+        {
+          homeTab: 'rules',
+          playMode: 'local',
+          submenuOpen: true,
+          resume: { kind: 'guest', code: 'KQZM' },
+        },
+        label,
+      ),
+    ).toEqual({
+      homeTab: 'rules',
+      playMode: 'local',
+      submenuOpen: true,
+      resumeLabel: 'Rejoin room KQZM',
+    });
+  });
+});
+
+describe('shellIntents', () => {
+  /** The shell's bag with the two members the builders read narrowed: the page above's three tabs and one start option. */
+  type Fake = Omit<ShellTypes, 'Raw' | 'Tab'> &
+    Readonly<{ Raw: Readonly<{ opt: string }>; Tab: Tab }>;
+  const intents = shellIntents<Fake>();
+
+  test('every builder spells its intent as both games did; the start clicks spread the options after the names', () => {
+    expect(intents.nameTyped(' Ann ')).toEqual({ type: 'name/typed', value: ' Ann ' });
+    expect(intents.p1NameTyped('Zoë')).toEqual({ type: 'p1name/typed', value: 'Zoë' });
+    expect(intents.p2NameTyped('Bob')).toEqual({ type: 'p2name/typed', value: 'Bob' });
+    const host = intents.hostClick(' Ann ', { opt: '75' });
+    expect(host).toEqual({ type: 'host/click', name: ' Ann ', opt: '75' });
+    expect(Object.keys(host)).toEqual(['type', 'name', 'opt']);
+    expect(intents.joinClick(' Ann ', 'abcd')).toEqual({
+      type: 'join/click',
+      name: ' Ann ',
+      code: 'abcd',
+    });
+    expect(intents.codeTyped('ab', 'insertText')).toEqual({
+      type: 'code/typed',
+      value: 'ab',
+      inputType: 'insertText',
+    });
+    expect(intents.hostDeal).toEqual({ type: 'host/deal' });
+    const local = intents.localClick('Zoë', 'Bob', { opt: '25' });
+    expect(local).toEqual({ type: 'local/click', p1: 'Zoë', p2: 'Bob', opt: '25' });
+    expect(Object.keys(local)).toEqual(['type', 'p1', 'p2', 'opt']);
+    expect(intents.tabSet('about')).toEqual({ type: 'tab/set', tab: 'about' });
+    expect(intents.modeSet('local')).toEqual({ type: 'mode/set', mode: 'local' });
+    expect(intents.submenuPress).toEqual({ type: 'submenu/press' });
+    expect(intents.submenuRelease).toEqual({ type: 'submenu/release' });
+    expect(intents.tabPlayClick).toEqual({ type: 'tab/playClick' });
+    expect(intents.submenuPick('local')).toEqual({ type: 'submenu/pick', mode: 'local' });
+    expect(intents.submenuDismiss).toEqual({ type: 'submenu/dismiss' });
+    expect(intents.resumeClick).toEqual({ type: 'resume/click' });
+    expect(intents.shareClick).toEqual({ type: 'share/click' });
+    expect(intents.cancel).toEqual({ type: 'cancel' });
+  });
+
+  test('bound through bindHomeShell they dispatch the records both games pin, the options read at the click', () => {
+    const p = shellPage();
+    const seen: ShellIntent<Fake>[] = [];
+    bindHomeShell(
+      p.doc,
+      (i) => {
+        seen.push(i);
+      },
+      {
+        tabs: TABS,
+        startOptions: {
+          host: (doc) => ({ opt: (doc.getElementById('optInput') as HTMLInputElement).value }),
+          local: (doc) => ({
+            opt: (doc.getElementById('localOptInput') as HTMLInputElement).value,
+          }),
+        },
+        intents,
+      },
+    );
+    type(p, 'optInput', '75');
+    p.get('hostBtn').fire('click');
+    type(p, 'p2NameInput', 'Bob');
+    type(p, 'localOptInput', '25');
+    p.get('localBtn').fire('click');
+    p.get('tabAboutBtn').fire('click');
+    p.get('codeInput').fire('input', {
+      target: fakeTarget({ value: 'ab' }),
+      inputType: 'insertText',
+    });
+    p.get('cancelGuestBtn').fire('click');
+    expect(seen).toEqual([
+      { type: 'host/click', name: 'Ari', opt: '75' },
+      { type: 'local/click', p1: 'Ari', p2: 'Bob', opt: '25' },
+      { type: 'tab/set', tab: 'about' },
+      { type: 'code/typed', value: 'ab', inputType: 'insertText' },
+      { type: 'cancel' },
     ]);
   });
 });
