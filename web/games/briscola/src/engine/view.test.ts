@@ -9,7 +9,8 @@ import { cardById, idsOf } from './cards.ts';
 import { seatsOf } from './seats.ts';
 import { createGame, withPosition } from './setup.ts';
 import type { Card, Cards, CreateGameOptions, Players, Seat, SeatCount, State } from './types.ts';
-import { legalActions, viewFor } from './view.ts';
+import { lastPlayed, legalActions, viewFor } from './view.ts';
+import { playText } from './log.ts';
 
 const P = {
   a: { id: 'a', name: 'Ari' },
@@ -71,8 +72,7 @@ const VIEW_KEYS = [
   'matchOver',
   'result',
   'games',
-  'log',
-  'lastAction',
+  'events',
   'startedAt',
   'endedAt',
 ];
@@ -98,7 +98,9 @@ describe('viewFor (V1-V4, V8)', () => {
     expect(v.actor).toBe(1);
     expect(v.isMyTurn).toBe(false);
     expect(v.legal).toEqual([]);
-    expect(v.lastAction?.text).toBe('Ari led the asso di spade');
+    // E6: the card led is on the table; the status line derives its sentence (playText) from it.
+    expect(lastPlayed(v)).toEqual({ seat: 0, card: c('AS') });
+    expect(playText(v.players[0]?.name ?? '', c('AS'), true)).toBe('Ari led the asso di spade');
     expect(Object.keys(v)).toEqual(VIEW_KEYS);
     expect(Object.keys(v.me)).toEqual(['idx', 'id', 'name', 'side', 'hand']);
     expect(Object.keys(v.others[0] ?? {})).toEqual(['idx', 'id', 'name', 'side', 'handCount']);
@@ -181,6 +183,18 @@ describe('viewFor (V1-V4, V8)', () => {
     expect(viewFor(four, 0).taken).toEqual([11, 11, 10, 4]);
   });
 
+  test('lastPlayed: null after the deal, the last card on the table, then the last card of the trick taken', () => {
+    const s0 = at(2, ['AS 3D 7C', 'RB 2C 5S'], '5D 6D 7D FD 4C', '4C');
+    expect(lastPlayed(s0)).toBeNull();
+    expect(lastPlayed(viewFor(s0, 1))).toBeNull();
+    const s1 = must(applyAction(s0, 0, { type: 'play', cardId: 'AS' }, () => 0, now));
+    expect(lastPlayed(viewFor(s1, 1))).toEqual({ seat: 0, card: c('AS') });
+    const s2 = must(applyAction(s1, 1, { type: 'play', cardId: 'RB' }, () => 0, now));
+    expect(s2.trick).toEqual([]);
+    expect(lastPlayed(s2)).toEqual({ seat: 1, card: c('RB') });
+    expect(lastPlayed(viewFor(s2, 0))).toEqual({ seat: 1, card: c('RB') });
+  });
+
   test('others runs in play order from every viewer, at three and at four', () => {
     expect(viewFor(game(3), 0).others.map((o) => o.idx)).toEqual([1, 2]);
     expect(viewFor(game(3), 1).others.map((o) => o.idx)).toEqual([2, 0]);
@@ -201,7 +215,7 @@ describe('viewFor (V1-V4, V8)', () => {
       expect(v.trumpOnTable).toBe(true);
       expect(v.match).toEqual(s.match);
       expect(v.matchOver).toBe(false);
-      expect(v.log).toEqual(s.log);
+      expect(v.events).toEqual(s.events);
       expect(v.players).toEqual(s.players);
       expect(v.options).toEqual(s.options);
       expect(v.canExchange).toBe(false);

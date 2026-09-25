@@ -2,7 +2,7 @@
 // the only redaction. It carries the viewer's own hand, every other seat as a count (its hand too
 // under scoperta, or the partner's once the stock is out under the partner peek), the trick, the
 // trump card, the stock's count (and its top card under scoperta), the running score per seat and
-// per side, the last trick and the log; never `piles`, never `stock`. `legal` is filled for the
+// per side, the last trick and the events; never `piles`, never `stock`. `legal` is filled for the
 // actor alone. `others` runs in play order from the viewer so a painter seats them without
 // arithmetic. The literal is built in types.ts's key order so a `state` frame re-encodes byte for
 // byte.
@@ -10,7 +10,7 @@ import { actorOf, canExchange } from './apply.ts';
 import { idsOf } from './cards.ts';
 import { matchOver, sideTotals, takenOf, tricksOf } from './score.ts';
 import { seatsFrom, sideOf } from './seats.ts';
-import type { Action, Cards, Player, Seat, SeatView, State, View } from './types.ts';
+import type { Action, Cards, Played, Player, Seat, SeatView, State, View } from './types.ts';
 
 const NOBODY: Player = { id: '', name: '' };
 
@@ -82,12 +82,19 @@ export const viewFor = (state: State, seat: Seat): View => {
     matchOver: matchOver(state.match),
     result: state.result,
     games: state.games,
-    log: state.log,
-    lastAction: state.lastAction,
+    events: state.events,
     startedAt: state.startedAt,
     endedAt: state.endedAt,
   };
 };
+
+/**
+ * E6: the card played last, for the status line ("Ari led the asso di coppe", `playText`): the last
+ * of the trick on the table, else the last of the trick just taken; null after a deal. Derived, so
+ * neither the state nor the wire carries it.
+ */
+export const lastPlayed = (game: Pick<State, 'trick' | 'lastTrick'>): Played | null =>
+  game.trick.at(-1) ?? game.lastTrick?.cards.at(-1) ?? null;
 
 /** Every action the viewer may send now (the replay policy and the `__briscola.legal()` hook use it). */
 export const legalActions = (view: View): ReadonlyArray<Action> => {

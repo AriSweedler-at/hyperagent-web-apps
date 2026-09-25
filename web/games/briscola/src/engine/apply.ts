@@ -4,19 +4,20 @@
 // card from the hand to the trick; the n-th card resolves the trick, draws for every seat while
 // the stock lasts and hands the lead to the winner, all in the same state; the last trick ends the
 // game and tallies the match; `next` at `over` deals the following game. The rng is read by `next`
-// alone (the shuffle); the clock stamps every log entry.
+// alone (the shuffle); the clock stamps every event. What the engine records is the event stream
+// (E18): one `trick` event per resolved trick carrying `trickFacts`' reading of it, one `exchange`,
+// one `result`; a play mid-trick is on the table (`trick`) and nowhere else.
 import { err, ok, type Result } from '../../../../shared/lib/result.ts';
 import type { Rng } from '../../../../shared/lib/rng.ts';
-import { exchangeCardFor, pointsOf, trickWinner } from './cards.ts';
-import { entry, exchangeText, nameOf, playText, resultText, trickText } from './log.ts';
+import { carichiLost, exchangeCardFor, pointsOf, trickFacts, trickWinner } from './cards.ts';
 import { matchAfter, matchOver, resultOf } from './score.ts';
 import { nextSeat, seatsFrom, sideOf } from './seats.ts';
 import { nextGame } from './setup.ts';
 import type {
   Action,
   Cards,
+  GameEvent,
   GameRecord,
-  LogEntry,
   Now,
   RuleError,
   Seat,
@@ -73,13 +74,11 @@ export const canExchange = (state: State, seat: Seat): boolean =>
   sideHasTrick(state, seat) &&
   swapCard(state, seat) !== undefined;
 
-/** Append entries; the last one becomes `lastAction` (E18). */
-const withLog = (state: State, entries: ReadonlyArray<LogEntry>): State => {
-  const last = entries.at(-1);
-  return last === undefined
-    ? state
-    : { ...state, log: [...state.log, ...entries], lastAction: last };
-};
+/** Append one event; its id is its index in the stream (E18). */
+const withEvent = (state: State, make: (id: number) => GameEvent): State => ({
+  ...state,
+  events: [...state.events, make(state.events.length)],
+});
 
 /** E14's refusals in order, then the swap: the held card goes under the stock, the trump card into the hand. */
 const exchange = (state: State, seat: Seat, now: Now): Applied => {
@@ -91,7 +90,7 @@ const exchange = (state: State, seat: Seat, now: Now): Applied => {
   const took = state.trumpCard;
   const at = now();
   return ok(
-    withLog(
+    withEvent(
       {
         ...state,
         trumpCard: gave,
@@ -101,14 +100,14 @@ const exchange = (state: State, seat: Seat, now: Now): Applied => {
         stock: [...state.stock.slice(0, -1), gave],
         exchanges: [...state.exchanges, { seat, gave, took }],
       },
-      [entry(seat, 'exchange', exchangeText(nameOf(state.players, seat), gave, took), at)],
+      (id) => ({ id, kind: 'exchange', seat, at, data: { seat, gave, took } }),
     ),
   );
 };
 
 /**
  * E12/E13: the last trick has been taken: the result from the piles, the match tallied, the
- * record added, one `result` line naming the match winner when this game decided it.
+ * record added, one `result` event saying whether this game decided the match.
  */
 const finishGame = (state: State, at: number): State => {
   const n = state.options.seatCount;
@@ -122,9 +121,15 @@ const finishGame = (state: State, at: number): State => {
     totals: result.totals,
     endedAt: at,
   };
-  return withLog(
+  return withEvent(
     { ...state, phase: 'over', match, result, games: [...state.games, record], endedAt: at },
-    [entry(null, 'result', resultText(state.players, n, result, match, matchOver(match)), at)],
+    (id) => ({
+      id,
+      kind: 'result',
+      seat: null,
+      at,
+      data: { ...result, decided: matchOver(match), wins: match.wins },
+    }),
   );
 };
 
@@ -155,7 +160,8 @@ const resolveTrick = (state: State, at: number): State => {
     drew,
     trumpTaken,
   };
-  const taken = withLog(
+  const facts = trickFacts(state.trumpCard.s, state.trick);
+  const taken = withEvent(
     {
       ...state,
       leader: winner,
@@ -167,31 +173,46 @@ const resolveTrick = (state: State, at: number): State => {
       trickNo: lastTrick.no,
       lastTrick,
     },
-    [entry(winner, 'trick', trickText(nameOf(state.players, winner), points, trumpTaken), at)],
+    (id) => ({
+      id,
+      kind: 'trick',
+      seat: winner,
+      at,
+      data: {
+        no: lastTrick.no,
+        leader: state.leader,
+        cards: state.trick,
+        winner,
+        winnerSide: sideOf(n, winner),
+        points,
+        valueClass: facts.valueClass,
+        winningCard: facts.winningCard,
+        winningClass: facts.winningClass,
+        briscola: facts.briscola,
+        steal: facts.steal,
+        overtrump: facts.overtrump,
+        carichiLost: carichiLost(winner, state.trick),
+        drew,
+        trumpTaken: trumpTaken ? (drew.at(-1) ?? null) : null,
+      },
+    }),
   );
   return hands.every((hand) => hand.length === 0) ? finishGame(taken, at) : taken;
 };
 
-/** E6: any card of the hand; the card joins the trick, the turn passes, `lastAction` says so. */
+/** E6: any card of the hand; the card joins the trick, the turn passes; the n-th card resolves the trick. */
 const play = (state: State, seat: Seat, cardId: string, now: Now): Applied => {
   const card = handOf(state, seat).find((c) => c.id === cardId);
   if (card === undefined) return err(MESSAGES.NOT_IN_HAND);
   const n = state.options.seatCount;
-  const at = now();
   const trick = [...state.trick, { seat, card }];
   const next: State = {
     ...state,
     turn: nextSeat(n, seat),
     hands: state.hands.map((hand, s) => (s === seat ? hand.filter((c) => c.id !== cardId) : hand)),
     trick,
-    lastAction: entry(
-      seat,
-      'play',
-      playText(nameOf(state.players, seat), card, state.trick.length === 0),
-      at,
-    ),
   };
-  return ok(trick.length === n ? resolveTrick(next, at) : next);
+  return ok(trick.length === n ? resolveTrick(next, now()) : next);
 };
 
 /**

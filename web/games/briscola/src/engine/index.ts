@@ -57,6 +57,7 @@ export {
 export {
   decodeAction,
   decodeCard,
+  decodeEvent,
   decodeOptions,
   decodeSeat,
   decodeState,
@@ -64,13 +65,17 @@ export {
 } from './decode.ts';
 export {
   dealText,
+  detailOf,
   exchangeText,
   gameText,
+  nameOf,
   playText,
   resultText,
   sideName,
+  summaryOf,
   trickText,
 } from './log.ts';
+export type { Detail } from './log.ts';
 export {
   freshMatch,
   matchAfter,
@@ -88,6 +93,7 @@ export {
   DECK_POINTS,
   DEFAULT_GAMES_TO_WIN,
   DEFAULT_REMOVED_TWO,
+  EVENT_KINDS,
   GAMES_TO_WIN,
   HAND_SIZE,
   LABEL,
@@ -102,13 +108,17 @@ export type {
   Card,
   Cards,
   CreateGameOptions,
+  DealData,
+  EventKind,
+  EventOf,
   Exchange,
+  ExchangeData,
+  GameData,
+  GameEvent,
   GameOptions,
   GameRecord,
   GameResult,
   GamesToWin,
-  LogEntry,
-  LogKind,
   Match,
   Now,
   Phase,
@@ -116,6 +126,7 @@ export type {
   Player,
   Players,
   Rank,
+  ResultData,
   RuleError,
   Seat,
   SeatCount,
@@ -123,10 +134,11 @@ export type {
   Side,
   State,
   Suit,
+  TrickData,
   TrickFacts,
   TrickRecord,
   ValueClass,
   View,
   WinningClass,
 } from './types.ts';
-export { legalActions, viewFor } from './view.ts';
+export { lastPlayed, legalActions, viewFor } from './view.ts';

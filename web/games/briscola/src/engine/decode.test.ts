@@ -11,13 +11,14 @@ import { cardById } from './cards.ts';
 import {
   decodeAction,
   decodeCard,
+  decodeEvent,
   decodeOptions,
   decodeSeat,
   decodeState,
   decodeView,
 } from './decode.ts';
 import { seatsOf } from './seats.ts';
-import { createGame } from './setup.ts';
+import { createGame, withPosition } from './setup.ts';
 import type { Card, Cards, CreateGameOptions, Players, SeatCount, State } from './types.ts';
 import { legalActions, viewFor } from './view.ts';
 
@@ -256,14 +257,24 @@ describe('decodeState refuses what the engine never emits (V6, V7, E20)', () => 
     expect(extra.ok && !('cappotto' in extra.value)).toBe(true);
   });
 
-  test('the phase, the log kinds and the seats decode as literals', () => {
+  test('the phase, the event kinds and the seats decode as literals; the events are numbered by index', () => {
     const s = base();
     expect(failureOf(decodeState(viaJson({ ...s, phase: 'dealing' })))).toBe(
       '$.phase: expected one of "deal" | "trick" | "draw" | "over"',
     );
-    expect(failureOf(decodeState(viaJson({ ...s, log: [{ ...s.log[0], kind: 'hit' }] })))).toBe(
-      '$.log[0].kind: expected one of "game" | "deal" | "play" | "trick" | "exchange" | "result"',
+    expect(
+      failureOf(decodeState(viaJson({ ...s, events: [{ ...s.events[0], kind: 'play' }] }))),
+    ).toBe('$.events[0].kind: expected one of "game" | "deal" | "trick" | "exchange" | "result"');
+    expect(failureOf(decodeState(viaJson({ ...s, events: [{ ...s.events[0], id: 1 }] })))).toBe(
+      '$: expected events numbered by their index',
     );
+    expect(
+      failureOf(decodeView(viaJson({ ...viewFor(s, 0), events: [{ ...s.events[0], id: 1 }] }))),
+    ).toBe('$: expected events numbered by their index');
+    // The kind decides the data: a deal's data under a trick's kind is refused at the first missing field.
+    expect(
+      failureOf(decodeState(viaJson({ ...s, events: [{ ...s.events[0], kind: 'trick' }] }))),
+    ).toBe('$.events[0].data.no: expected integer in [1, 9007199254740991]');
     expect(failureOf(decodeSeat(4))).toBe('$: expected one of 0 | 1 | 2 | 3');
     expect(decodeSeat(3)).toEqual({ ok: true, value: 3 });
     expect(failureOf(decodeState('nope'))).toBe('$: expected object');
@@ -331,5 +342,124 @@ describe('decodeAction (E3, E20)', () => {
       '$.type: expected one of "play" | "exchange" | "next"',
     );
     expect(failureOf(decodeAction(null))).toBe('$: expected object');
+  });
+});
+
+describe('decodeEvent: the stream re-encodes byte for byte, the key order pinned (E18, E20)', () => {
+  /** `s0:AS s1:2C`: each seat holds the card it plays over a stock of fillers, and the first seat leads. */
+  const played = (n: SeatCount, trump: Card, text: string): State => {
+    const moves = text.split(' ').map((token) => {
+      const [seat, id] = token.split(':');
+      return [Number(seat?.slice(1)), c(id ?? '')] as const;
+    });
+    const hands = seatsOf(n).map((seat) =>
+      moves.filter(([s]) => s === seat).map(([, card]) => card),
+    );
+    const stock = [...cs('5D 6D 7D FD').slice(0, n), trump];
+    const start = withPosition(
+      createGame(players(n), {}, mulberry32(1), now),
+      hands,
+      stock,
+      trump,
+      moves[0]?.[0] === 1 ? 1 : 0,
+    );
+    return moves.reduce((s, [seat, card]) => {
+      const r = applyAction(
+        s,
+        seat as 0 | 1 | 2 | 3,
+        { type: 'play', cardId: card.id },
+        () => 0,
+        now,
+      );
+      if (!r.ok) throw new Error(r.error);
+      return r.value;
+    }, start);
+  };
+  const at = String(now());
+
+  test('a deal event', () => {
+    const s = createGame(players(2), {}, mulberry32(1), now);
+    const [deal] = s.events;
+    expect(JSON.stringify(deal)).toBe(
+      `{"id":0,"kind":"deal","seat":${String(s.dealer)},"at":${at},"data":{"dealer":${String(s.dealer)},"trumpCard":${JSON.stringify(s.trumpCard)}}}`,
+    );
+    expect(JSON.stringify(decodeEvent(viaJson(deal)))).toBe(
+      `{"ok":true,"value":${JSON.stringify(deal)}}`,
+    );
+  });
+
+  test('a trick event: the steal of the asso di spade by the 2 di coppe', () => {
+    const s = played(2, c('4C'), 's0:AS s1:2C');
+    const trick = s.events.at(-1);
+    expect(JSON.stringify(trick)).toBe(
+      `{"id":1,"kind":"trick","seat":1,"at":${at},"data":{"no":1,"leader":0,"cards":[{"seat":0,"card":{"id":"AS","r":1,"s":"S"}},{"seat":1,"card":{"id":"2C","r":2,"s":"C"}}],"winner":1,"winnerSide":1,"points":11,"valueClass":"big","winningCard":{"id":"2C","r":2,"s":"C"},"winningClass":"pip","briscola":true,"steal":true,"overtrump":false,"carichiLost":[0],"drew":[1,0],"trumpTaken":null}}`,
+    );
+    expect(JSON.stringify(decodeEvent(viaJson(trick)))).toBe(
+      `{"ok":true,"value":${JSON.stringify(trick)}}`,
+    );
+  });
+
+  test('a game, an exchange and a result event', () => {
+    const s = createGame(players(2), { exchange: true, gamesToWin: 1 }, mulberry32(1), now);
+    const over: State = {
+      ...s,
+      phase: 'over',
+      hands: [[], []],
+      stock: [],
+      piles: [cs('AC 3C'), cs('AD 3D')],
+      result: { winner: 0, totals: [21, 21], draw: true },
+      endedAt: now(),
+    };
+    const nextGame = applyAction(over, 0, { type: 'next' }, mulberry32(2), now);
+    if (!nextGame.ok) throw new Error(nextGame.error);
+    const [, game, deal] = nextGame.value.events;
+    expect(JSON.stringify(game)).toBe(
+      `{"id":1,"kind":"game","seat":null,"at":${at},"data":{"gameNo":2,"dealer":${String(nextGame.value.dealer)}}}`,
+    );
+    expect(deal?.kind).toBe('deal');
+    const swap = withPosition(
+      { ...s, piles: [cs('2B 4B'), []] },
+      [cs('7C 2D'), cs('3D 4D')],
+      cs('2S AC'),
+      c('AC'),
+      0,
+    );
+    const exchanged = applyAction(swap, 0, { type: 'exchange' }, () => 0, now);
+    if (!exchanged.ok) throw new Error(exchanged.error);
+    expect(JSON.stringify(exchanged.value.events.at(-1))).toBe(
+      `{"id":1,"kind":"exchange","seat":0,"at":${at},"data":{"seat":0,"gave":{"id":"7C","r":7,"s":"C"},"took":{"id":"AC","r":1,"s":"C"}}}`,
+    );
+    const last = withPosition(
+      { ...s, piles: [cs('3C 3D 3S 3B RC RD FC'), cs('AD AS AB RS RB CC CD CS CB FD FS FB')] },
+      [cs('AC'), cs('2D')],
+      [],
+      c('CC'),
+      0,
+    );
+    const finished = [
+      [0, 'AC'],
+      [1, '2D'],
+    ].reduce<State>((st, [seat, id]) => {
+      const r = applyAction(
+        st,
+        seat === 1 ? 1 : 0,
+        { type: 'play', cardId: String(id) },
+        () => 0,
+        now,
+      );
+      if (!r.ok) throw new Error(r.error);
+      return r.value;
+    }, last);
+    expect(JSON.stringify(finished.events.at(-1))).toBe(
+      `{"id":2,"kind":"result","seat":null,"at":${at},"data":{"winner":0,"totals":[61,59],"draw":false,"decided":true,"wins":[1,0]}}`,
+    );
+    [game, exchanged.value.events.at(-1), finished.events.at(-1)].forEach((e) => {
+      expect(JSON.stringify(decodeEvent(viaJson(e)))).toBe(
+        `{"ok":true,"value":${JSON.stringify(e)}}`,
+      );
+    });
+    expect(failureOf(decodeEvent({ id: 0, kind: 'play', seat: 0, at: 1 }))).toBe(
+      '$.kind: expected one of "game" | "deal" | "trick" | "exchange" | "result"',
+    );
   });
 });
