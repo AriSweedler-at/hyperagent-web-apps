@@ -231,7 +231,15 @@ const zones = [
     // A shell game's page.ts is data for tools/shell-markup.ts: its slot values and the residue
     // blocks of its index.html, typed by web/shared/markup/shell.ts and importing nothing else.
     target: './web/games/*/page.ts',
-    from: ['./web/shared/edge/**', './web/shared/net/**', './web/shared/ui/**', `${GAME_SRC}/**`],
+    from: [
+      './web/shared/edge/**',
+      './web/shared/net/**',
+      './web/shared/ui/**',
+      './web/shared/lib/**',
+      './web/shared/example/**',
+      './web/shared/styles/**',
+      `${GAME_SRC}/**`,
+    ],
     message: 'page.ts imports only the ShellPage types from web/shared/markup.',
   },
   ...gamePairZones,

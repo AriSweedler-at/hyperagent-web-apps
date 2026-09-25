@@ -1,9 +1,10 @@
 // The committed shell pages are what the shared partials render (docs/design/dry-round-2.md §3 row
 // G2, §5 Wave F row F2; the drift idiom of backgammon-grid.test.ts): web/games/<g>/index.html is
 // pinned, byte for byte, to tools/shell-markup.ts composing web/shared/markup/shell/*.html with the
-// game's page.ts (Prettier's output of it where Prettier owns the file), so an edit to a partial, a
-// page.ts or a committed page alone fails here until `node --experimental-strip-types
-// tools/shell-markup.ts --write` is re-run and both agree. The partials' ids, with the ones the
+// game's page.ts (Prettier's output of it where Prettier owns the file), so an edit to a partial or
+// a page.ts fails here until `node --experimental-strip-types tools/shell-markup.ts --write` is
+// re-run, and an edit to the committed page alone fails until it is moved into the page.ts block or
+// the partial that spells it (--write overwrites the page). The partials' ids, with the ones the
 // games' blocks place (BLOCK_IDS: the options' three, the table's controls and the two screens;
 // SCREEN_IDS: the leave button, on the table in gin and the endgame in backgammon), are exactly
 // SHELL_IDS: what the shared painters reach by id is what the shared markup spells, once. Reads the

@@ -84,10 +84,14 @@ const report = (game: ShellGame, composed: string, write: boolean): boolean => {
   }
   const a = composed.split('\n');
   const b = committed.split('\n');
-  const at = a.findIndex((line, i) => line !== b[i]);
+  // Over the longer side: a page that only gained trailing lines differs at the render's end.
+  const at =
+    Array.from({ length: Math.max(a.length, b.length) }, (_, i) => i).find((i) => a[i] !== b[i]) ??
+    0;
   console.log(`${path}: differs from the render at line ${String(at + 1)}`);
   console.log(`  rendered:  ${a[at] ?? '<end>'}`);
   console.log(`  committed: ${b[at] ?? '<end>'}`);
+  console.log(`  ${path} is composed: an edit made there is overwritten by --write`);
   return false;
 };
 
@@ -97,7 +101,10 @@ const main = async (): Promise<void> => {
   const composed = await Promise.all(SHELL_GAMES.map((game) => composePage(game, templates)));
   const fine = SHELL_GAMES.map((game, i) => report(game, composed[i] ?? '', write));
   if (!fine.every(Boolean)) {
-    console.log('run `node --experimental-strip-types tools/shell-markup.ts --write`');
+    console.log(
+      'put the change in web/games/<g>/page.ts or web/shared/markup/shell/*.html, then run',
+    );
+    console.log('  node --experimental-strip-types tools/shell-markup.ts --write');
     process.exitCode = 1;
   }
 };
