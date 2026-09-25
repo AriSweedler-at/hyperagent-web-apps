@@ -136,10 +136,13 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // 100/100/100/100 through keyed.test.ts over a fake element; the folder stays at 100.
         'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
-        // The two-seat sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios
-        // once over a fake codec (sessions.test.ts beside them, with sessions.harness.ts), the two
+        // The sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios once
+        // over a fake codec (sessions.test.ts beside them, with sessions.harness.ts), the two
         // games' byte-pinning suites through their wrappers and the gin wire-corpus replay. Measured
-        // at the move (lines/functions/statements/branches): 100/100/100/97.8.
+        // at the move (lines/functions/statements/branches): 100/100/100/97.8. Re-measured when the
+        // host grew to N seats (docs/design/n-seat-sessions.md; sessions.seats.test.ts covers the
+        // seat paths): 99.54/100/99.59/99.38, the two uncovered lines being the stale-open guard the
+        // fake broker cannot drive (n-seat-sessions.md §6.3).
         'web/shared/net/**': { lines: 95, functions: 95, statements: 95, branches: 94 },
       },
     },
