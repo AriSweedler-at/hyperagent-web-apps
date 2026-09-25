@@ -538,6 +538,13 @@ docs run only `check`. The levels below say which suite holds them.
   both games' `net/{host,guest}.ts` are wrappers). Fidice's N-seat `HostSession`/`ClientSession`
   stay its own (§4.6): moving its client onto the shared pipe would change pinned behaviour (its
   12 s single timeout against gin's 40 x 3 s retries), a product decision, not a DRY pass.
+- The second DRY round (docs/design/dry-round-2.md): the measured inventory of what else hoists
+  out of the per-game code after the shared shell (table-UI kernels, engine primitives and
+  decoders, the shell stylesheet and markup, fidice's small adoptions, the harness), ranked by
+  value over risk, sequenced in waves against the in-flight PRs, with a unit-test plan on the
+  repo's fakes for every kernel. Landed: D1, the keyed slot (`web/shared/ui/keyed.ts`:
+  `ensureKeyed` out of `shellPaint.ts`; gin's piles, table melds and result body key through it
+  under `data-key`).
 
 ## Deviations (recorded as the steps land)
 
