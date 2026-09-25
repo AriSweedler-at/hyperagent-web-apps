@@ -355,3 +355,51 @@ at 100% coverage; `web/shared/edge/**` at its ratchet.
 A master volume per game (a gain the player multiplies in); per-game default fonts (a game may name
 one other than `default` in its table); the first sample font and its licensing; fidice's table;
 "call the dice" voices for Sheshbesh as a font of its own.
+
+## 12. Checking sound on an iPhone
+
+The owner (2026-09-25): "Audio didn't work on safari iphone pro max 15", then "perhaps start muted
+on mobile so tapping the unmute is what enables sound and then it works from there". What iPhone
+Safari holds against a page, and what the shared edge does about each:
+
+| WebKit rule | What the code did before | What it does now |
+| --- | --- | --- |
+| An `AudioContext` starts `suspended` and only `resume()`s inside a gesture WebKit counts (`touchend`, `click`, `keydown`; a `pointerdown` handler counts too, a `passive` one or an awaited one may not) | `bootShell` warmed on `pointerdown`, `touchstart`, `keydown`, all `{ passive: true }` | The four gestures `pointerdown`, `touchend`, `click`, `keydown`, none passive, `resume()` called synchronously in the handler (`boot.ts`; `fx.ts` `ensure`) |
+| The ringer (silent) switch mutes Web Audio until the page has played a media element; iOS 17+ also honours `navigator.audioSession.type` | Nothing played a media element | `edge/unlock.ts`: `audioSession.type = 'playback'` when present, and one looping, inline, silent `<audio>` (an embedded 76-byte WAV) played inside the gesture that turns sound on, and on the first gesture when sound is already on |
+| After a backgrounding or a call the state is `interrupted` (WebKit's own) and stays so until a `resume()` | Only `suspended` was resumed | `ensure` resumes `suspended` and `interrupted`; `visibilitychange` to visible warms once more, and the next gesture again |
+| `currentTime` does not advance while suspended, so a note booked before the resume never sounds | `tone` dropped every note while the state was not `running` | A note asked for while the resume is in flight is held and booked at its offset once the context runs (`PENDING_TONE_MAX_S`, 1 s, drops stale ones): the unmute tap chimes |
+| `webkitAudioContext` on old builds | `win.AudioContext ?? win.webkitAudioContext` | Unchanged |
+| A stored `<game>_sound` of `off` | Off means off | Unchanged; and on a phone the default is now off (below) |
+
+**A phone starts muted.** `bootShell` asks `matchMedia('(pointer: coarse)')`; when it matches and
+no `<game>_sound` is stored, the cues start disabled (`soundPref.enabled(store, false)`), the
+speaker button paints 🔇, and no gesture makes a context. The tap on the speaker is the gesture:
+`toggle` flips the preference to `on` (remembered), `warm` makes and resumes the context, the
+unlock plays its silent loop, the tap chime is held for the resume and sounds when it lands, and
+from then on every cue plays as on a desktop. A remembered `on` or `off` wins over the default;
+a desktop (fine pointer, or no `matchMedia`) keeps today's default, on.
+
+**The checklist (one screen, on the phone):**
+
+1. Ringer switch (or the Action button's Silent mode) off; volume up. Close the tab first if the
+   page was open before this build.
+2. Open games.sweedler.com/gin-rummy/ (or backgammon, briscola). The speaker in the header shows
+   🔇: sound starts off on a phone.
+3. Tap the speaker once. It shows 🔊 and you hear the tap chime. Nothing else is needed: the
+   preference is remembered (`ginRummy_sound` = `on`), and every later cue plays.
+4. Play a move: the cue for it sounds. Background Safari, come back, tap anything: the cues sound
+   again (the `interrupted` context was resumed).
+5. Ringer switch on (Silent): the cues still sound. If they stop, the media unlock did not take:
+   tap the speaker twice (off, on) and try again, then report it.
+6. From the console (Safari on a Mac, Develop menu): `__gin.soundFontName()` is `default`,
+   `__gin.fx.enabled()` is `true` after the tap, `document.querySelector('audio[playsinline]')`
+   is the silent loop, and `__gin.soundFont('arcade')` changes the voice of the next cue.
+
+Tests: `web/shared/edge/fx.test.ts` (a held note booked after the resume, a stale one dropped,
+`interrupted` resumed), `unlock.test.ts` (the loop made once and played each call, the session
+asked for, a document without `createElement` ignored, the WAV's header), `prefs.test.ts` (the
+fallback), `boot.test.ts` (the four gestures bound without `passive`, the phone default, a
+remembered preference winning, the visible warm), and `e2e/gin-sound-font.spec.ts` (a touch
+context starts muted and the speaker's tap turns it on and remembers it; the desktop starts on).
+Not checked here: a real iPhone. Playwright's WebKit was not installed at this Playwright's
+revision, so the owner's phone is the oracle for rows one to three.

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  PENDING_TONE_MAX_S,
   createAudioCues,
   createWakeLock,
   vibrate,
@@ -192,10 +193,20 @@ type FakeContext = Readonly<{
   resumed: () => number;
 }>;
 
-const fakeContext = (initial = 'running'): FakeContext => {
+/** What the fake does when `resume()` is called: run (as a browser does inside a gesture) and move its clock. */
+type ResumeOptions = Readonly<{ runOnResume?: boolean; advanceOnResume?: number }>;
+
+const settle = async (): Promise<void> => {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
+const fakeContext = (initial = 'running', resume: ResumeOptions = {}): FakeContext => {
   const calls: Call[] = [];
   let state = initial;
   let resumed = 0;
+  const clock = { now: 10 };
   const destination: AudioNodeLike = { connect: (t) => t };
   const param = (name: string) => ({
     setValueAtTime: (v: number, t: number) => calls.push([`${name}.set`, v, t]),
@@ -205,11 +216,17 @@ const fakeContext = (initial = 'running'): FakeContext => {
     get state() {
       return state;
     },
-    currentTime: 10,
+    get currentTime() {
+      return clock.now;
+    },
     destination,
+    // As a browser: the state flips and the clock moves while the promise settles, never in the call.
     resume: () => {
       resumed += 1;
-      return Promise.resolve();
+      return Promise.resolve().then(() => {
+        if (resume.runOnResume === true) state = 'running';
+        clock.now += resume.advanceOnResume ?? 0;
+      });
     },
     createOscillator: () => {
       const osc = {
@@ -330,6 +347,53 @@ describe('createAudioCues', () => {
     f.setState('running');
     cues.tone(660, 0, 0.05);
     expect(f.calls.length).toBeGreaterThan(0);
+  });
+
+  test('iPhone Safari: a note asked for while the resume is in flight is booked at its offset once the context runs', async () => {
+    // The unmute tap: `toggle` warms (resume in flight) and plays the tap chime in the same tick.
+    const f = fakeContext('suspended', { runOnResume: true });
+    const cues = createAudioCues({ makeContext: () => f.ctx });
+    cues.seq([{ freq: 660, dur: 0.05 }], 'triangle', 0.08, 0.4);
+    expect(f.calls).toEqual([]);
+    await settle();
+    expect(f.resumed()).toBe(1);
+    expect(f.calls.filter(([name]) => name === 'osc.start')).toEqual([['osc.start', 10.4]]);
+    expect(f.calls.find(([name]) => name === 'gain.ramp')).toEqual(['gain.ramp', 0.08, 10.412]);
+    // Nothing is held twice: the flush drained the queue.
+    await settle();
+    expect(f.calls.filter(([name]) => name === 'osc.start')).toHaveLength(1);
+  });
+
+  test('a note held for a context that still does not run, or held too long, is dropped', async () => {
+    const stays = fakeContext('suspended');
+    const cues = createAudioCues({ makeContext: () => stays.ctx });
+    cues.tone(660, 0, 0.05);
+    await settle();
+    expect(stays.calls).toEqual([]);
+    // The state flips later without a resume of ours: the dropped note does not reappear.
+    stays.setState('running');
+    await settle();
+    expect(stays.calls).toEqual([]);
+
+    const late = fakeContext('suspended', {
+      runOnResume: true,
+      advanceOnResume: PENDING_TONE_MAX_S + 0.5,
+    });
+    const lateCues = createAudioCues({ makeContext: () => late.ctx });
+    lateCues.tone(660, 0, 0.05);
+    await settle();
+    expect(late.calls).toEqual([]);
+  });
+
+  test("WebKit's `interrupted` (the tab backgrounded, a call) is resumed on the next warm, like suspended", () => {
+    const f = fakeContext('interrupted');
+    const cues = createAudioCues({ makeContext: () => f.ctx });
+    cues.warm();
+    expect(f.resumed()).toBe(1);
+    const closed = fakeContext('closed');
+    const closedCues = createAudioCues({ makeContext: () => closed.ctx });
+    closedCues.warm();
+    expect(closed.resumed()).toBe(0);
   });
 
   test('disabled cues touch nothing; enabling later works', () => {

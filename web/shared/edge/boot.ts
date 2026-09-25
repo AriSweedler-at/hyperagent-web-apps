@@ -52,6 +52,7 @@ import { browserNetDeps } from './netDeps.ts';
 import type { NetDeps } from './peer.ts';
 import { shareText, type ShareNavigatorLike } from './share.ts';
 import { createSampleCache } from './sound.ts';
+import { createAudioUnlock, type UnlockDocumentLike, type UnlockNavigatorLike } from './unlock.ts';
 import type { Store } from './storage.ts';
 
 // ---- the invite link ------------------------------------------------------------------------
@@ -211,8 +212,15 @@ export type BootApp<G extends BootTypes> = Readonly<{
   }>;
 }>;
 
-/** The page's `document` as the boot reads it: the paint's and the binders' view, plus its visibility. */
-export type BootDocumentLike = PageLike & Readonly<{ visibilityState: string }>;
+/**
+ * The page's `document` as the boot reads it: the paint's and the binders' view, its visibility,
+ * and (optional, so the fakes need nothing) `createElement` for the audio unlock's silent loop.
+ */
+export type BootDocumentLike = PageLike &
+  Readonly<{
+    visibilityState: string;
+    createElement?: (tag: 'audio') => HTMLAudioElement;
+  }>;
 
 /** `fetch`'s answer as `fetchArrayBuffer` reads it. */
 export type ResponseLike = Readonly<{
@@ -232,6 +240,8 @@ export type BootWindowLike = InviteWindowLike &
     __rng?: Rng;
     AudioContext?: new () => unknown;
     webkitAudioContext?: new () => unknown;
+    /** `matchMedia('(pointer: coarse)')`: a phone or tablet, where sound starts muted (sound-fonts.md §12). */
+    matchMedia?: (query: string) => Readonly<{ matches: boolean }>;
   }>;
 
 /**
@@ -240,6 +250,7 @@ export type BootWindowLike = InviteWindowLike &
  * `bootShell` widens the real object to the structural subset, as both main.ts files did.
  */
 export type BootNavigatorLike = ShareNavigatorLike &
+  UnlockNavigatorLike &
   Readonly<{ wakeLock?: NavigatorLike['wakeLock'] }>;
 
 /** The page's objects, injected: main.ts passes the real ones, boot.test.ts the fakes. */
@@ -298,8 +309,12 @@ export type BootConfig<G extends BootTypes, App extends BootApp<G>, Ex extends o
     debug: number;
   }>;
   sound: Readonly<{
-    /** The game's `soundEnabled(store)` (storage.ts): the preference under its own sound key. */
-    enabled: (store: G['Store']) => boolean;
+    /**
+     * The game's `soundEnabled(store, fallback)` (storage.ts, prefs.ts `soundPref`): the
+     * preference under its own sound key; `fallback` is what no stored preference counts as
+     * (the boot passes `false` on a coarse-pointer device, sound-fonts.md §12).
+     */
+    enabled: (store: G['Store'], fallback: boolean) => boolean;
     /** The game's own sound-font key (`STORAGE_KEYS.soundFont`): checked before every home read, named in the console hook's refusal. */
     fontKey: string;
   }>;
@@ -403,10 +418,26 @@ export const bootShell = <
   const navLike = nav as NavigatorLike;
   const wakeLock: WakeLock = createWakeLock(navLike);
   const AudioCtor = win.AudioContext ?? win.webkitAudioContext;
+  // A phone starts muted (the owner, 2026-09-25: "start muted on mobile so tapping the unmute is
+  // what enables sound"; sound-fonts.md §12): iPhone Safari only lets audio start inside a tap
+  // it counts, and the speaker button's tap is one. A remembered preference still wins, and a
+  // page without `matchMedia` (the boot test's window) keeps the desktop default, on.
+  const coarsePointer = win.matchMedia?.('(pointer: coarse)').matches === true;
   const audio = createAudioCues({
     makeContext: AudioCtor === undefined ? undefined : () => new AudioCtor() as AudioContextLike,
-    enabled: cfg.sound.enabled(store),
+    enabled: cfg.sound.enabled(store, !coarsePointer),
   });
+  // The silent-switch unlock (unlock.ts): run inside the tap that turns sound on, and on the first
+  // gesture over a page whose sound is already on.
+  // The DOM lib types `appendChild` over full nodes; the unlock appends the one element it made,
+  // so the body is widened to the structural subset, as `nav` is above.
+  const unlock = createAudioUnlock(
+    {
+      ...(doc.createElement === undefined ? {} : { createElement: doc.createElement.bind(doc) }),
+      body: doc.body as unknown as UnlockDocumentLike['body'],
+    },
+    nav,
+  );
 
   let app: App = cfg.reducer.initialApp;
   let session: SessionLike<'host', HostFrameOf<G>> | SessionLike<'guest', GuestFrameOf<G>> | null =
@@ -425,6 +456,9 @@ export const bootShell = <
     },
     store,
     onToggle: (enabled) => {
+      // Still inside the speaker button's tap (`toggle` runs synchronously from the click): the
+      // one gesture an iPhone lets the media unlock and the context's resume ride on.
+      if (enabled) unlock.unlock();
       cfg.paint.paintSound(doc, enabled);
     },
   });
@@ -556,17 +590,25 @@ export const bootShell = <
   cfg.paint.paintSound(doc, fx.enabled());
   // Browsers only let audio start after a user gesture: warm the context on the first tap, and
   // the table's samples in the App's font with it (cuePlayer.ts `warm`), so no phrase waits.
-  ['pointerdown', 'touchstart', 'keydown'].forEach((event) => {
-    doc.addEventListener(
-      event,
-      () => {
-        fx.warm(app.shell.soundFont);
-      },
-      { passive: true },
-    );
+  // The four are the gestures WebKit counts as activation (sound-fonts.md §12): `pointerdown`
+  // for the desktop's first click, `touchend` and `click` for a phone (a tap that scrolls never
+  // clicks, its `touchend` still counts), `keydown` for a keyboard; none is passive and none
+  // awaits before `resume()`, so the call lands inside the gesture. Each also plays the silent
+  // unlock loop when sound is on, so the ringer switch stops muting a page whose sound was
+  // remembered on; while muted, nothing is made until the speaker button's tap (`onToggle`).
+  ['pointerdown', 'touchend', 'click', 'keydown'].forEach((event) => {
+    doc.addEventListener(event, () => {
+      if (!fx.enabled()) return;
+      fx.warm(app.shell.soundFont);
+      unlock.unlock();
+    });
   });
   doc.addEventListener('visibilitychange', () => {
-    if (doc.visibilityState === 'visible') dispatch({ type: 'visible' });
+    if (doc.visibilityState !== 'visible') return;
+    // Back from the background: WebKit leaves the context `interrupted`; the warm asks it to resume
+    // (allowed outside a gesture once the interruption ended, and asked again on the next tap).
+    fx.warm(app.shell.soundFont);
+    dispatch({ type: 'visible' });
   });
 
   // The test/debug hook (docs/ARCHITECTURE.md "Documented test hooks"): read-only state, actions

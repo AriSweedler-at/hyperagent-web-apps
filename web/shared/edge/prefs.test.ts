@@ -169,6 +169,20 @@ describe('soundPref', () => {
     expect(sound.read(store).ok).toBe(false);
     expect(sound.enabled(store)).toBe(true);
   });
+
+  test('a fallback of false (a phone, sound-fonts.md §12): missing and garbage count as off; a remembered on or off still wins', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    const sound = soundPref('g_sound');
+    expect(sound.enabled(store, false)).toBe(false);
+    expect(sound.enabled(store, true)).toBe(true);
+    s.setItem('g_sound', 'OFF');
+    expect(sound.enabled(store, false)).toBe(false);
+    expect(sound.write(store, 'on').ok).toBe(true);
+    expect(sound.enabled(store, false)).toBe(true);
+    expect(sound.write(store, 'off').ok).toBe(true);
+    expect(sound.enabled(store, true)).toBe(false);
+  });
 });
 
 describe('shellSave', () => {

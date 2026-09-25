@@ -82,10 +82,17 @@ export const gameQuery = (hooks: GameHooks = {}): string => {
   return query === '' ? '' : `?${query}`;
 };
 
+/** How a player's context differs from the default desktop one. */
+export type PlayerOptions = Readonly<{
+  /** A phone: touch events and a coarse pointer (`matchMedia('(pointer: coarse)')` matches), so sound starts muted (sound-fonts.md §12). */
+  phone?: true;
+}>;
+
 export const newPlayer = async (
   browser: Browser,
   role: Role,
   testInfo: TestInfo,
+  options: PlayerOptions = {},
 ): Promise<Player> => {
   const seed = seedFor([...RUN_SALT, testInfo.project.name, ...testInfo.titlePath, role]);
   // Two permissions the pages never ask for. Camera and microphone: Chromium gathers ICE host
@@ -102,6 +109,7 @@ export const newPlayer = async (
       'microphone',
       ...(isDeployed() ? (['local-network-access'] as const) : []),
     ],
+    ...(options.phone === true ? { hasTouch: true } : {}),
   });
   await context.addInitScript({ content: seedScript(seed) });
   await context.addInitScript({ path: RECORD_PEER_SCRIPT });

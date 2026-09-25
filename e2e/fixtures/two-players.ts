@@ -40,7 +40,7 @@ const DRIVERS: Readonly<Record<OnlineGame, Driver>> = {
   briscola: shellDriver('briscola'),
 };
 
-type Fixtures = { project: Project; player: Player; players: Players };
+type Fixtures = { project: Project; player: Player; phone: Player; players: Players };
 
 export const test = base.extend<Fixtures>({
   project: async ({}, use, testInfo) => {
@@ -48,6 +48,13 @@ export const test = base.extend<Fixtures>({
   },
   player: async ({ browser }, use, testInfo) => {
     const player = await newPlayer(browser, 'solo', testInfo);
+    await use(player);
+    await player.context.close();
+    expect(player.watched.errors(), 'uncaught exceptions').toEqual([]);
+  },
+  /** The `player` on a phone: a touch context with a coarse pointer (e2e/fixtures/player.ts `phone`). */
+  phone: async ({ browser }, use, testInfo) => {
+    const player = await newPlayer(browser, 'solo', testInfo, { phone: true });
     await use(player);
     await player.context.close();
     expect(player.watched.errors(), 'uncaught exceptions').toEqual([]);
