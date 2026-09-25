@@ -5,7 +5,10 @@
 // the deal is on the table (three cards each, the stock's count, the briscola lying under it and
 // named in the badge), the first curtain names the leader and tells everyone else to look away,
 // the next curtain names the next seat, a trick resolves to the engine's winner with the score
-// strip ticking and the last trick on its sheet. A position seated through `window.__briscola.setup`
+// strip ticking and the last trick on its sheet. A card dragged by hand past the threshold lifts, the
+// ghost sits on the pointer with no tween (its computed transition is none and its drawn transform
+// is the kernel's translate right after a move), the trick takes `drop-ready` then `drop`, and the
+// release plays the card. A position seated through `window.__briscola.setup`
 // plays the last three tricks to the result sheet, the match badge and, with a game already won,
 // the match's end screen; the running score always equals the view's `sides`. The history sheet
 // shows one row per event whose line is the engine's `summaryOf`, expands to `detailOf`'s pairs,
@@ -72,6 +75,27 @@ const listNames = (names: ReadonlyArray<string>): string =>
   names.length <= 1
     ? (names[0] ?? '')
     : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1] ?? ''}`;
+
+/** The trick's `drop` class as a whole token: `\bdrop\b` would also match inside `drop-ready`. */
+const DROP = /(^|\s)drop(\s|$)/;
+
+/**
+ * How far the drag's ghost is drawn from where the kernel put it: its computed `transition-property`
+ * and the distance (px, to the tenth) between the `translate` in its inline style and the matrix
+ * `getComputedStyle` reports, which is the tween's current value while one runs and the target when
+ * none does.
+ */
+const ghostLag = (page: Page): Promise<Readonly<{ transitionProperty: string; px: number }>> =>
+  page.evaluate<Readonly<{ transitionProperty: string; px: number }>>(
+    `(() => {
+      const g = document.querySelector('.drag-ghost');
+      const cs = getComputedStyle(g);
+      const cur = (/matrix\\(([^)]*)\\)/.exec(cs.transform)?.[1] ?? '0,0,0,0,0,0').split(',').map(Number).slice(4);
+      const w = /translate\\(([-\\d.]+)px,\\s*([-\\d.]+)px\\)/.exec(g.style.transform);
+      const want = w ? [Number(w[1]), Number(w[2])] : [0, 0];
+      return { transitionProperty: cs.transitionProperty, px: Math.round(Math.hypot(want[0] - cur[0], want[1] - cur[1]) * 10) / 10 };
+    })()`,
+  );
 
 /** `#curtainSub` for the seat `incoming`: everyone else, told to look away. */
 const lookAway = (v: View, incoming: Seat): string =>
@@ -286,6 +310,56 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         );
         await closeLastTrick(page);
       });
+    });
+
+    test('a card dragged by hand (design §5.4): past the threshold the ghost follows the pointer with no tween, the trick lights, over it the trick takes the drop mark, the release plays the card', async ({
+      player,
+      project,
+    }) => {
+      const { page } = player;
+      await briscolaStartLocal(page, pagePath(project, 'briscola'), vp);
+      await briscolaReveal(page);
+      const v = await requireView(page);
+      const [cardId] = v.legal;
+      if (cardId === undefined) throw new Error('the leader has no legal card');
+      const card = page.locator(`#hand .card[data-card="${cardId}"]`);
+      const trick = page.locator('#trick');
+      const ghost = page.locator('.drag-ghost');
+      await expect(card).toHaveClass(/\bplayable\b/);
+      const from = await card.boundingBox();
+      const to = await trick.boundingBox();
+      if (from === null || to === null) throw new Error('the card or the trick has no box');
+      const grab = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+      await page.mouse.move(grab.x, grab.y);
+      await page.mouse.down();
+      // Under DRAG_THRESHOLD (8px) the press is a tap in the making: no ghost, nothing lit.
+      await page.mouse.move(grab.x + 4, grab.y);
+      await expect(ghost).toHaveCount(0);
+      await expect(trick).not.toHaveClass(/\bdrop-ready\b/);
+      // Past it the drag begins: the reducer lifts the card (`dragging`), the trick shows it may
+      // take a drop, and the ghost, the card's clone, sits on the body.
+      await page.mouse.move(grab.x + 12, grab.y - 12, { steps: 2 });
+      await expect(ghost).toHaveCount(1);
+      await expect(card).toHaveClass(/\bdragging\b/);
+      await expect(trick).toHaveClass(/\bdrop-ready\b/);
+      await expect(trick).not.toHaveClass(DROP);
+      // The ghost is on the finger, not tweening toward it: `.card`'s 160ms transform transition,
+      // which the clone inherits, is reset on `.drag-ghost`, so right after a move the transform
+      // drawn is the translate the kernel wrote (a tween would still be at the old place).
+      expect(await ghostLag(page)).toEqual({ transitionProperty: 'none', px: 0 });
+      // Over the band it takes the `drop` mark; the ghost is still on the finger.
+      await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 6 });
+      await expect(trick).toHaveClass(DROP);
+      expect(await ghostLag(page)).toEqual({ transitionProperty: 'none', px: 0 });
+      // Released there: the card is played (no glide: the repaint places it), the ghost is gone,
+      // the marks are cleared.
+      await page.mouse.up();
+      await expect(page.locator(`#trick .card[data-card="${cardId}"]`)).toHaveCount(1);
+      expect(await trickShown(page)).toEqual([[cardId, String(v.me.idx)]]);
+      await expect(ghost).toHaveCount(0);
+      await expect(trick).not.toHaveClass(/\bdrop-ready\b/);
+      await expect(page.locator('#hand .card.dragging')).toHaveCount(0);
+      expect(await heldCards(page)).not.toContain(cardId);
     });
 
     test("a seated position plays the last three tricks to the result sheet and the match badge; the running score is the view's", async ({

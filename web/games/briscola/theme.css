@@ -1298,10 +1298,18 @@ details.history-row > .history-detail dt {
   pointer-events: none;
   transition: transform var(--fly-ms) cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+/* The ghost is the card's clone, so it inherits `.card`'s 160ms transform transition: left in
+   place, every pointer move's `translate` was tweened and the ghost trailed the finger by ~55px at
+   a normal swipe, catching up ~100ms after it stopped (measured, PR "Card dragging follows the
+   finger"). `transition: none` here, as gin's and backgammon's ghosts have; the glide back on a
+   release off the trick is `.landing`'s alone. `will-change` keeps the face on its own layer. */
 .drag-ghost {
   position: fixed;
   z-index: 60;
   pointer-events: none;
+  will-change: transform;
+  transition: none;
+  animation: none;
 }
 .drag-ghost.landing {
   transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
