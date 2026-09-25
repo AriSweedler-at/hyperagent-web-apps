@@ -455,6 +455,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // after (the same 6 lines uncovered, 1467 → 1218 lines; the row stands); shellConfig.ts
       // measures 100/100/100/100 through state.test.ts. Measured on this branch rebased onto main
       // at 75dc0bd (#89).
+      // Re-measured when Wave E3 (dry-round-2 items E3/E4) replaced ui/render.ts's `button()` and
+      // its sixteen calls with one shellPaint `bindButtons` table and keyed the match score and the
+      // history list through web/shared/ui/keyed.ts: ui 99.51/100/98.65/92.08 before,
+      // 99.50/100/98.62/92.12 after (the same 6 lines uncovered, 1218 → 1195 lines; the row stands).
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
