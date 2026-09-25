@@ -121,28 +121,81 @@ export type AudioCueOptions = Readonly<{
   enabled?: boolean;
 }>;
 
+/** A note asked for while the context was not yet running: booked again, at its offset, once it is. */
+type PendingTone = Readonly<{
+  freq: number;
+  start: number;
+  dur: number;
+  type: OscillatorType;
+  gain: number;
+}>;
+
 /**
- * The legacy gin `fx.ensure`/`tone`/`seq`: a lazily created context, resumed when suspended, and
- * never queued into while it is not running (mobile browsers keep it suspended until a gesture).
+ * How long a note may wait for the context to run (seconds). iPhone Safari resolves `resume()` a
+ * few ms after the gesture that allowed it; a note still waiting a whole second later belongs to a
+ * moment that has passed (a phrase from before the tab was backgrounded) and is dropped.
+ */
+export const PENDING_TONE_MAX_S = 1;
+
+/**
+ * The context states that want a `resume()`: `suspended` (every browser, before the first gesture)
+ * and WebKit's `interrupted` (a phone call, the tab backgrounded, another app took the audio
+ * session), which iPhone Safari leaves the context in until the page resumes it from a gesture.
+ */
+const wantsResume = (state: string): boolean => state === 'suspended' || state === 'interrupted';
+
+/**
+ * The legacy gin `fx.ensure`/`tone`/`seq`: a lazily created context, resumed when suspended (or
+ * interrupted, as WebKit says after a backgrounding), and never queued into while it is not
+ * running (mobile browsers keep it suspended until a gesture). A note asked for while the resume
+ * is in flight is held and booked at its offset once the context runs, so the tap that unmutes
+ * a phone chimes; the desktop path (a context made inside a gesture is running at once) is
+ * untouched, since nothing is held when the state is already `running`.
  */
 export const createAudioCues = (options: AudioCueOptions): AudioCues => {
   let enabled = options.enabled ?? true;
   let ctx: AudioContextLike | null = null;
+  let pending: PendingTone[] = [];
+  let pendingSince = 0;
 
   const ensure = (): AudioContextLike | null => {
     if (!enabled || options.makeContext === undefined) return null;
     try {
       ctx ??= options.makeContext();
-      if (ctx.state === 'suspended') ctx.resume().catch(() => undefined);
+      if (wantsResume(ctx.state)) {
+        const c = ctx;
+        c.resume()
+          .then(() => {
+            flushPending(c);
+          })
+          .catch(() => undefined);
+      }
       return ctx;
     } catch {
       return null;
     }
   };
 
+  /** Every held note, booked now at its offset, if the context runs; dropped when it still does not or they are stale. */
+  const flushPending = (c: AudioContextLike): void => {
+    const held = pending;
+    pending = [];
+    if (held.length === 0 || c.state !== 'running') return;
+    if (c.currentTime - pendingSince > PENDING_TONE_MAX_S) return;
+    held.forEach((t) => {
+      tone(t.freq, t.start, t.dur, t.type, t.gain);
+    });
+  };
+
   const tone: AudioCues['tone'] = (freq, start, dur, type = 'sine', gain = 0.18) => {
     const c = ensure();
-    if (c?.state !== 'running') return;
+    if (c === null) return;
+    if (c.state !== 'running') {
+      // A resume is in flight (or the state is closed, in which case the flush finds nothing to do).
+      if (pending.length === 0) pendingSince = c.currentTime;
+      pending = [...pending, { freq, start, dur, type, gain }];
+      return;
+    }
     try {
       const t0 = c.currentTime + start;
       const o = c.createOscillator();

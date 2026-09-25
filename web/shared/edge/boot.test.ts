@@ -477,6 +477,8 @@ type Options = Readonly<{
   hash?: string;
   stored?: Readonly<Record<string, string>>;
   audio?: boolean;
+  /** The window answers `matchMedia('(pointer: coarse)')` with this (a phone: true); none, no `matchMedia` at all. */
+  coarse?: boolean;
   confirm?: boolean;
   /** No `window.__rng` installed: the boot falls back to `Math.random`. */
   unseeded?: boolean;
@@ -505,6 +507,12 @@ type Log = Readonly<{
   hosts: FakeHost[];
   guests: FakeGuest[];
   warms: { count: number; fonts: (SoundFontName | undefined)[] };
+  /** Every document listener the boot bound, with its options. */
+  listeners: (readonly [string, unknown])[];
+  /** Every `matchMedia` query the boot asked the window. */
+  queries: string[];
+  /** The `fallback` each `cfg.sound.enabled(store, fallback)` call carried. */
+  fallbacks: boolean[];
 }>;
 
 /** One booted page: what the boot was given, and everything it touched, recorded. */
@@ -519,14 +527,6 @@ const bootPage = (options: Options = {}) => {
     fakeEl('rulesList', { queries: { '#rule-knock': [ruleEl] } }),
   ]);
   const visibility = { state: 'visible' };
-  const doc: BootDocumentLike = {
-    getElementById: p.doc.getElementById,
-    body: p.doc.body,
-    addEventListener: p.doc.addEventListener,
-    get visibilityState() {
-      return visibility.state;
-    },
-  };
   const log: Log = {
     order: [],
     intents: [],
@@ -546,6 +546,21 @@ const bootPage = (options: Options = {}) => {
     hosts: [],
     guests: [],
     warms: { count: 0, fonts: [] },
+    listeners: [],
+    queries: [],
+    fallbacks: [],
+  };
+  const doc: BootDocumentLike = {
+    getElementById: p.doc.getElementById,
+    body: p.doc.body,
+    // Recorded with its options: the audio gestures must be bound without `passive` (§12).
+    addEventListener: (type, fn, options) => {
+      log.listeners.push([type, options]);
+      p.doc.addEventListener(type, fn);
+    },
+    get visibilityState() {
+      return visibility.state;
+    },
   };
   const pending = { effects: [] as ReadonlyArray<FakeEffect> };
   const win: BootWindowLike & Record<string, unknown> = {
@@ -575,6 +590,14 @@ const bootPage = (options: Options = {}) => {
       }),
     ...(options.unseeded === true ? {} : { __rng: mulberry32(7) }),
     ...(options.audio === true ? { AudioContext: FakeAudioContext } : {}),
+    ...(options.coarse === undefined
+      ? {}
+      : {
+          matchMedia: (query: string) => {
+            log.queries.push(query);
+            return { matches: options.coarse === true };
+          },
+        }),
   };
   const nav: NavigatorLike & ShareNavigatorLike = {
     vibrate: (pattern) => {
@@ -669,7 +692,15 @@ const bootPage = (options: Options = {}) => {
   const cfg: BootConfig<Fake, App, Extra> = {
     page: { doc, win, nav, store, clock },
     game: { hook: '__fake', title: 'Fake', debug: 0 },
-    sound: { enabled: (s) => !s.readText(SOUND_KEY).ok, fontKey: FONT_KEY },
+    // prefs.ts `soundPref.enabled`: a stored 'on'/'off' wins; otherwise the boot's fallback.
+    sound: {
+      enabled: (s, fallback) => {
+        log.fallbacks.push(fallback);
+        const stored = s.readText(SOUND_KEY);
+        return stored.ok ? stored.value === 'on' : fallback;
+      },
+      fontKey: FONT_KEY,
+    },
     reducer: {
       initialApp,
       reduce,
@@ -998,30 +1029,75 @@ describe('bootShell', () => {
     await expect(fetchArrayBuffer(b.win)('missing.wav')).rejects.toThrow('404 missing.wav');
   });
 
-  test("audio warms on the first gesture through the page's AudioContext; the page visible again dispatches `visible`", () => {
+  test("audio warms on the first gesture through the page's AudioContext; the page visible again warms and dispatches `visible`", () => {
     FakeAudioContext.made = 0;
     const b = bootPage({ audio: true });
-    // The three gestures each warm the player; the context is made once, on the first.
+    // The four gestures WebKit counts (sound-fonts.md §12) each warm the player, none passive;
+    // the context is made once, on the first. `touchstart` is no longer one: a passive
+    // scroll-blocking listener is what iPhone Safari would not count.
+    // (The jargon binder's document click comes first; the audio's four are bound after the binders.)
+    const gestures = b.log.listeners.filter(([type]) =>
+      ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'].includes(type),
+    );
+    expect(gestures.slice(-4)).toEqual([
+      ['pointerdown', undefined],
+      ['touchend', undefined],
+      ['click', undefined],
+      ['keydown', undefined],
+    ]);
+    expect(gestures.some(([type]) => type === 'touchstart')).toBe(false);
     b.p.fire('pointerdown');
-    b.p.fire('touchstart');
+    b.p.fire('touchend');
+    b.p.fire('click');
     b.p.fire('keydown');
-    expect(b.log.warms.count).toBe(3);
+    expect(b.log.warms.count).toBe(4);
     // Each gesture warms in the App's font, so the table's samples are fetched with the context.
-    expect(b.log.warms.fonts).toEqual(['default', 'default', 'default']);
+    expect(b.log.warms.fonts).toEqual(['default', 'default', 'default', 'default']);
     b.fxDeps.value?.audio.warm();
     b.fxDeps.value?.audio.warm();
     expect(FakeAudioContext.made).toBe(1);
-    // Hidden: nothing; visible: the intent.
+    // Hidden: nothing; visible: a warm (an `interrupted` context asked to resume) and the intent.
     b.visibility.state = 'hidden';
     b.p.fire('visibilitychange');
     expect(seen(b)).toEqual(['home/init']);
+    expect(b.log.warms.count).toBe(4);
     b.visibility.state = 'visible';
     b.p.fire('visibilitychange');
     expect(seen(b)).toEqual(['home/init', 'visible']);
+    expect(b.log.warms.count).toBe(5);
     // Without a constructor the cues have no context and warming is silent.
     const silent = bootPage();
     silent.fxDeps.value?.audio.warm();
     expect(silent.fxDeps.value?.audio.context()).toBeNull();
+  });
+
+  test('a phone starts muted (the owner, 2026-09-25): a coarse pointer makes the fallback off; a remembered preference wins; a desktop or a window without matchMedia keeps on', () => {
+    // A fresh phone visitor: muted, and no gesture warms a muted player (the tap on the speaker
+    // is the gesture that turns it on, through `toggle`, which the fx fake stands in for here).
+    const phone = bootPage({ audio: true, coarse: true });
+    expect(phone.log.queries).toEqual(['(pointer: coarse)']);
+    expect(phone.log.fallbacks).toEqual([false]);
+    expect(phone.fxDeps.value?.audio.enabled()).toBe(false);
+    expect(phone.log.sounds).toEqual([false]);
+    phone.p.fire('pointerdown');
+    phone.p.fire('touchend');
+    expect(phone.log.warms.count).toBe(0);
+    // The phone that remembered sound on plays from the first tap, as a desktop does.
+    const returning = bootPage({ audio: true, coarse: true, stored: { [SOUND_KEY]: 'on' } });
+    expect(returning.fxDeps.value?.audio.enabled()).toBe(true);
+    returning.p.fire('touchend');
+    expect(returning.log.warms.count).toBe(1);
+    // A desktop (a fine pointer) and a window with no `matchMedia` at all: on, as before.
+    expect(bootPage({ coarse: false }).log.fallbacks).toEqual([true]);
+    const bare = bootPage();
+    expect(bare.log.queries).toEqual([]);
+    expect(bare.log.fallbacks).toEqual([true]);
+    expect(bare.fxDeps.value?.audio.enabled()).toBe(true);
+    // A desktop that remembered off stays off, and its gestures warm nothing.
+    const off = bootPage({ stored: { [SOUND_KEY]: 'off' } });
+    expect(off.fxDeps.value?.audio.enabled()).toBe(false);
+    off.p.fire('click');
+    expect(off.log.warms.count).toBe(0);
   });
 
   test("the share chain and the wake lock: the invite on the page's origin and path to the clipboard with the copied toast; the lock held and dropped without a navigator lock", async () => {

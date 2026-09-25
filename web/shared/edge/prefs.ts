@@ -93,17 +93,22 @@ export const cardPackPref = <K extends DeckKind>(key: string, kind: K): TextPref
 
 export type SoundPref = TextPref<SoundState> &
   Readonly<{
-    /** `safeGet(FX_KEY) !== 'off'`: on unless the key says off (missing or unreadable counts as on). */
-    enabled: (store: Store) => boolean;
+    /**
+     * `safeGet(FX_KEY) !== 'off'`: on unless the key says off (missing or unreadable counts as
+     * on). `fallback` is what a missing or unreadable key counts as instead: the boot passes
+     * `false` on a touch device (docs/design/sound-fonts.md §12), where sound starts muted and the
+     * tap on the speaker is the gesture that unlocks it; a remembered `on` or `off` always wins.
+     */
+    enabled: (store: Store, fallback?: boolean) => boolean;
   }>;
 
 export const soundPref = (key: string): SoundPref => {
   const pref = textPref(key, decodeSoundState);
   return {
     ...pref,
-    enabled: (store) => {
+    enabled: (store, fallback = true) => {
       const state = pref.read(store);
-      return !(state.ok && state.value === 'off');
+      return state.ok ? state.value === 'on' : fallback;
     },
   };
 };
