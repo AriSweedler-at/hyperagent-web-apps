@@ -415,10 +415,17 @@ web/index.html               landing page, the first Vite entry (no scripts); di
 web/public/.nojekyll         copied to dist/ so Pages serves dotfiles and folders untouched
 web/public/shared/cards/     the served card-pack files: backs/ (gin's five, copied), linea/ (generated), napoletane/ (cut from the
                              owner's sheet); docs/design/card-packs.md
-web/shared/lib/              shared pure TypeScript: result, rng, json decoders, roomCode, name, clock types, sound fonts, card packs (cards/)
-web/shared/edge/             shared effects: ice, transport (the only importer of peerjs) + fake, clock, storage, dom, fx, share
-web/shared/styles/           tokens.css (the shared palette, :root only), base.css (shared primitives), CONTRACT.md
-web/shared/ui/               reserved for the roadmap's shared screen builders (README only)
+web/shared/lib/              shared pure TypeScript: result, rng, json decoders, roomCode, name, game (the two-seat contract), protocol
+                             (the wire skeleton), drag (the drag numbers), clock types, sound fonts (sound/), card packs (cards/)
+web/shared/edge/             shared effects: ice, transport (the only importer of peerjs) + fake, clock, storage, prefs, dom, fx, share,
+                             peer, netDeps, sound, cuePlayer, glossary, invite, drag (the pointer-drag kernel), boot (bootShell),
+                             page.fake (shellPage)
+web/shared/net/              the sessions (host, guest, liveness) every shell game's net/ wraps; up to four guests since #87
+web/shared/ui/               the shared shell: shell (the reducer), shellEffects, shellPaint, home, curtain, toast, keyed, ids, glossary,
+                             stories, cardFace; README.md
+web/shared/markup/           shell/*.html, the shell's partials, and shell.ts (renderShell); tools/shell-markup.ts composes each shell page
+web/shared/styles/           tokens.css (the shared palette, :root only), base.css (shared primitives), shell.css (the shell games'
+                             token-only shell rules), CONTRACT.md
 web/shared/example/coin/     the coin game: the two-seat engine the shared replay driver is proved on (100% row; the shell's future fake)
 web/games/gin-rummy/         index.html, theme.css, main.ts, src/{engine,protocol.ts,storage.ts,net,ui,scorer}
 web/games/fidice/            index.html, theme.css, main.ts, MANIFEST.json, src/{assets,domain,bots,net,view,app}
@@ -432,11 +439,13 @@ test/fixtures/legacy/        sha256-pinned cuts of the legacy cores, the gin wir
 test/fixtures/styles/        computed-style goldens, <game>.<viewport>.json
 test/parity/                 describe.each([legacy, current]) suites and the seeded replays
 test/shared/                 replay.ts (the seeded driver: dice, picks, shards, the env knob, round trips) and engine-helpers.ts (PLAYERS, now, viaJson, must, countingRng, runIntents)
-test/dist/                   the dist guards and the class contract (the site suite: npm run test:site)
+test/dist/                   the dist guards (shell-markup's drift test among them) and the class contract (the site suite: npm run test:site)
 test/integration/            the real transport through a local PeerServer in Chromium (npm run test:shared-integration)
 test/tools/                  tests of the tools below
-e2e/                         Playwright specs; fixtures/ (site, player, two-players, offline, seed); browser/ init scripts
-tools/                       serve-dist, proxy-dev, hooks-verify; legacy/ extractors and recorders; parity/ drivers; card-backs,
+e2e/                         Playwright specs; fixtures/ (site, player, two-players, shell, online-games, stories, geometry, offline, seed,
+                             one table fixture per game); browser/ init scripts
+tools/                       serve-dist, proxy-dev, hooks-verify, games.ts (REGISTRY), shell-markup.ts (the shell pages from the partials);
+                             legacy/ extractors and recorders; parity/ drivers; card-backs,
                              card-packs (derive a pack, cut a sheet by gutters or by seams, mask, check, preview) and linea (the drawn Italian deck);
 tools/ci/                    suites.ts (the one table: suite -> tests, coverage rows, specs, and change -> jobs), affected.ts, run-affected.ts
 infra/games-proxy/           Cloudflare Worker (TypeScript) serving the site at games.sweedler.com
