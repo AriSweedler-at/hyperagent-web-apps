@@ -1,40 +1,38 @@
 // The stories catalogue on the served page (docs/design/gin-draw-ghost-slot.md §7 and §8;
 // docs/ARCHITECTURE.md "Testing pyramid" 5). Every story of web/games/gin-rummy/src/stories/
 // catalogue.ts is opened through the page's `?story=<id>` hook at a phone, a laptop and a short
-// phone, and four things are asserted from the DOM a player sees: the facts the catalogue derived
-// from the engine and the picture (slot and card counts, the ghost cell's class, the fresh, locked,
-// selected and hand-made cards, the phone row count, the Arrange button, the sort mode, the piles,
-// the buttons and their state, the status line, the open sheet); the geometry (`#app` and `#hand`
+// phone by the shared e2e/fixtures/stories.ts `storiesSpec` (docs/design/dry-round-2.md I3), which
+// asserts the facts, the stability and the screenshots against the committed per-platform baselines
+// (`e2e/__screenshots__/gin-stories.spec.ts/<id>--<viewport>-<platform>.png`; a missing baseline
+// fails). What is gin's stays here: the facts the catalogue derived from the engine and the picture
+// as the DOM shows them (slot and card counts, the ghost cell's class, the fresh, locked, selected
+// and hand-made cards, the phone row count, the Arrange button, the sort mode, the piles, the
+// buttons and their state, the status line, the open sheet); the geometry (`#app` and `#hand`
 // never scroll, the eleven cells are one size, a meld never splits a row, the rows on a phone are
 // the ones `data-rows` announces and one on the laptop: e2e/fixtures/gin.ts `expectHandRows`; a
 // three-row hand on a phone too short for it scrolls the document to a reachable actions row
-// instead); the stability the owner asked for (a story with `sameHandAs` holds the same card at
-// the same pixel rectangle in each of the first ten slots as that story, so a draw and an accept
-// move nothing); and, at the two screenshot viewports, a screenshot compared against the committed
-// per-platform baseline (`e2e/__screenshots__/gin-stories.spec.ts/<id>--<viewport>-<platform>.png`,
-// playwright.config.ts `snapshotPathTemplate`); a story with a sheet open shoots `body` at both
-// viewports, since the overlays are siblings of `#app`. A missing baseline fails: CI is never
-// green with no visual coverage. Re-recording: `npm run test:e2e -- e2e/gin-stories.spec.ts --project pages
-// --update-snapshots` on macOS, and the `stories-baselines.yml` workflow for linux. Runs once, on
-// `pages`: both origins serve the same bytes.
-import { expect, test, type Page } from '@playwright/test';
+// instead); the first ten slots' rectangles for `sameHandAs`; and the slot count the table is
+// settled at. Re-recording: `npm run test:e2e -- e2e/gin-stories.spec.ts --project pages
+// --update-snapshots` on macOS, and the `stories-baselines.yml` workflow for linux. Filter by title
+// (`--grep "phone upcard-mine"`): the reporter locates every story test at the fixture's
+// `test(...)`, not at a line of this file, so `gin-stories.spec.ts:<line>` selects nothing.
+import { expect, type Page } from '@playwright/test';
 
 import {
   STORIES,
   storyById,
+  type Story,
   type StoryFacts,
 } from '../web/games/gin-rummy/src/stories/catalogue.ts';
 import { expectHandRows } from './fixtures/gin.ts';
-import { ALLOWED_FAILURES } from './fixtures/offline.ts';
-import { pagePath } from './fixtures/site.ts';
-import { watchPage } from './fixtures/watch.ts';
+import { storiesSpec, type StoryViewport } from './fixtures/stories.ts';
 
-type Viewport = Readonly<{ width: number; height: number; columns: 6 | 11; shot: boolean }>;
+type Viewport = StoryViewport & Readonly<{ columns: 6 | 11 }>;
 const VIEWPORTS: Readonly<Record<string, Viewport>> = {
-  phone: { width: 390, height: 844, columns: 6, shot: true },
-  desktop: { width: 1280, height: 800, columns: 11, shot: true },
+  phone: { width: 390, height: 844, columns: 6, shot: true, body: true },
+  desktop: { width: 1280, height: 800, columns: 11, shot: true, body: false },
   // Geometry only: an iPhone SE, where the cards shrink to their floor and a third row scrolls.
-  'phone-short': { width: 375, height: 667, columns: 6, shot: false },
+  'phone-short': { width: 375, height: 667, columns: 6, shot: false, body: false },
 };
 
 /** The facts as the served DOM shows them, in the catalogue's terms. */
@@ -102,28 +100,14 @@ type Geometry = Readonly<{
   actionsReachable: boolean;
   short: boolean;
 }>;
-type Rects = Readonly<Record<string, readonly [number, number, number, number]>>;
-
-const near = (a: number, b: number): boolean => Math.abs(a - b) <= 0.5;
-
-/** `slots`: eleven cells, less one per card the defender laid off onto the knocker's melds (§7b). */
-const openStory = async (page: Page, id: string, slots = 11): Promise<void> => {
-  await page.goto(`${pagePath('pages', 'gin-rummy')}?story=${id}`);
-  await expect(page.locator('#tableScreen')).toBeVisible();
-  await expect(page.locator('#hand .slot')).toHaveCount(slots);
-};
 
 /**
  * The hand grid (`expectHandRows`), the phone rows the catalogue computed (`rows`), and the page:
  * `#app` never scrolls; the document scrolls only for a third row on a phone too short for it
  * (theme.css's `:has(#hand[data-rows="3"])` fallback), and then to a reachable actions row.
  */
-const expectGeometry = async (
-  page: Page,
-  vp: Viewport,
-  rows: number,
-  cells: number,
-): Promise<void> => {
+const expectGeometry = async (page: Page, story: Story, vp: Viewport): Promise<void> => {
+  const { rows, slots: cells } = story.facts;
   const laid = await expectHandRows(page, vp.columns, cells);
   if (vp.columns === 6) expect(laid, 'rows vs the catalogue').toBe(rows);
   const g = await page.evaluate<Geometry>(GEOMETRY);
@@ -133,57 +117,20 @@ const expectGeometry = async (
   if (!mayScroll) expect(g.document, 'the page scrolls').toBe(true);
 };
 
-const expectSameRects = (now: Rects, then: Rects, id: string): void => {
-  expect(Object.keys(now).sort(), `${id}: the first ten cards`).toEqual(Object.keys(then).sort());
-  Object.entries(then).forEach(([card, rect]) => {
-    const here = now[card];
-    expect(here, `${id}: card ${card}`).toBeDefined();
-    if (here === undefined) return;
-    rect.forEach((side, i) => {
-      expect(
-        near(here[i] ?? NaN, side),
-        `${id}: card ${card} moved (${['x', 'y', 'w', 'h'][i] ?? ''})`,
-      ).toBe(true);
-    });
-  });
-};
-
-Object.entries(VIEWPORTS).forEach(([name, vp]) => {
-  test.describe(name, () => {
-    test.use({ viewport: { width: vp.width, height: vp.height } });
-
-    STORIES.forEach((story) => {
-      test(story.id, async ({ page }, testInfo) => {
-        test.skip(
-          testInfo.project.name !== 'pages',
-          'runs once: the stories are the same bytes on both origins',
-        );
-        const watched = watchPage(page, ALLOWED_FAILURES);
-        await openStory(page, story.id, story.facts.slots);
-
-        // The facts, the geometry, and the owner's sentence: the same card in the same place.
-        expect(await page.evaluate<StoryFacts>(FACTS)).toEqual(story.facts);
-        await expectGeometry(page, vp, story.facts.rows, story.facts.slots);
-        if (story.sameHandAs !== undefined) {
-          const other = storyById(story.sameHandAs);
-          expect(other, story.sameHandAs).not.toBeNull();
-          const mine = await page.evaluate<Rects>(RECTS);
-          await openStory(page, story.sameHandAs);
-          expectSameRects(mine, await page.evaluate<Rects>(RECTS), story.id);
-          await openStory(page, story.id, story.facts.slots);
-        }
-
-        if (vp.shot && story.screenshot) {
-          const target = name === 'phone' || story.facts.sheet !== 'none' ? 'body' : '#app';
-          await expect(page.locator(target)).toHaveScreenshot(`${story.id}--${name}.png`, {
-            animations: 'disabled',
-            caret: 'hide',
-            maxDiffPixelRatio: 0.002,
-          });
-        }
-        expect(watched.errors(), 'uncaught exceptions').toEqual([]);
-        expect(watched.failures(), 'failed requests').toEqual([]);
-      });
-    });
-  });
+storiesSpec<Story, Viewport, StoryFacts>({
+  game: 'gin-rummy',
+  stories: STORIES,
+  storyById,
+  viewports: VIEWPORTS,
+  // `slots`: eleven cells, less one per card the defender laid off onto the knocker's melds (§7b).
+  settled: async (page, story) => {
+    await expect(page.locator('#hand .slot')).toHaveCount(story.facts.slots);
+  },
+  readFacts: (page) => page.evaluate<StoryFacts>(FACTS),
+  expectFacts: (facts, story) => {
+    expect(facts).toEqual(story.facts);
+  },
+  geometry: expectGeometry,
+  stable: { sameAs: (story) => story.sameHandAs, rects: RECTS },
+  sheetOpen: (story) => story.facts.sheet !== 'none',
 });
