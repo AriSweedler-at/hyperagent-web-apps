@@ -308,8 +308,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // 8b50ce9 and this branch rebased onto it (#96 touched neither folder).
       // Re-measured when G2 (dry-round-2 F6) routed cues.ts `nextCue`'s once-per-key rule through
       // web/shared/ui/shell.ts `fresh` and added `decodeState` to shellConfig.ts for the shell's
-      // `position/load`: ui 98.26/97.93/97.35/94.33 before, 98.26/97.93/97.36/94.33 after (the same
-      // 17 lines uncovered, 977 → 978 lines); shellConfig.ts still 100/100/100/100.
+      // `position/load`: ui 98.80/97.95/98.12/95.06 before, 98.81/97.95/98.12/95.06 after (the same
+      // 11 lines uncovered, 920 → 921 lines); shellConfig.ts still 100/100/100/100. Measured on
+      // this branch rebased onto main at 60c50d6 (#102).
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -495,9 +496,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // this branch rebased onto it (#96 touched neither folder).
       // Re-measured when G2 (dry-round-2 F5/F6) moved `sandboxLoad` and its two strings out of
       // ui/state.ts into web/shared/ui/shell.ts `position/load` and keyed `rendered`'s cues on the
-      // shared `fresh`: ui 99.50/100/98.62/92.12 before, 99.49/100/98.61/92.15 after (the same 6
-      // lines uncovered, 1195 → 1185 lines; the row stands); shellConfig.ts (now with
-      // `decodeState`) still 100/100/100/100.
+      // shared `fresh`: ui 99.47/100/98.71/92.06 before, 99.47/100/98.70/92.09 after (the same 6
+      // lines uncovered, 1141 → 1131 lines; the row stands); shellConfig.ts (now with
+      // `decodeState`) still 100/100/100/100. Measured on this branch rebased onto main at 60c50d6
+      // (#102).
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
