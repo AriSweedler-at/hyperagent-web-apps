@@ -11,6 +11,7 @@
 // (shellEffects.ts) is exercised here too, which is what holds the `web/shared/ui/**` row at 100.
 import { describe, expect, test } from 'vitest';
 
+import { boolean, literal, number, object, pair, string } from '../lib/json.ts';
 import { err, ok, type Result } from '../lib/result.ts';
 import { mulberry32 } from '../lib/rng.ts';
 import { SOUND_FONTS } from '../lib/sound/fonts.ts';
@@ -22,10 +23,13 @@ import {
   LOST_HOST_MSG,
   OPPONENT_LEFT_MSG,
   ROOM_FULL_MSG,
+  SANDBOX_LOCAL_ONLY_MSG,
   SHELL_EFFECT_TYPES,
   SHELL_INTENT_TYPES,
   WAITING_FOR_GUEST_MSG,
+  badPositionMsg,
   broadcast,
+  fresh,
   guestContextOf,
   guestGoneMsg,
   hostContextOf,
@@ -46,6 +50,7 @@ import {
   toast,
   withShell,
   withTable,
+  type CueMemory,
   type Effect,
   type HomeSnapshot,
   type Intent,
@@ -184,6 +189,14 @@ const FAKE: ShellConfig<Fake> = {
     renameGuest: (game, name) => ({
       ...game,
       players: [game.players[0], { ...game.players[1], name }],
+    }),
+    // The hand-made state a `position/load` carries, checked field by field as the games' save decoders check theirs.
+    decodeState: object({
+      players: pair(object({ id: string, name: string })),
+      level: number,
+      turn: literal(0, 1),
+      moves: number,
+      over: boolean,
     }),
   },
   frames: {
@@ -369,10 +382,11 @@ describe('the initial shell and the partitions', () => {
     });
   });
 
-  test('the 43 shell intents and 27 shell effects are listed once; the guards partition a game`s unions', () => {
-    expect(SHELL_INTENT_TYPES).toHaveLength(43);
-    expect(new Set(SHELL_INTENT_TYPES).size).toBe(43);
+  test('the 44 shell intents and 27 shell effects are listed once; the guards partition a game`s unions', () => {
+    expect(SHELL_INTENT_TYPES).toHaveLength(44);
+    expect(new Set(SHELL_INTENT_TYPES).size).toBe(44);
     expect(SHELL_INTENT_TYPES).toContain('curtain/reveal');
+    expect(SHELL_INTENT_TYPES).toContain('position/load');
     expect(SHELL_INTENT_TYPES).toContain('persist');
     expect(SHELL_EFFECT_TYPES).toHaveLength(27);
     expect(new Set(SHELL_EFFECT_TYPES).size).toBe(27);
@@ -1004,6 +1018,47 @@ describe('pass and play', () => {
     expect(passed.effects[1]).toEqual({ type: 'fx', cue: 'yourTurn' });
     // Reveal with no game is a no-op.
     expect(run(initialApp, { type: 'curtain/reveal' })).toEqual({ app: initialApp, effects: [] });
+  });
+
+  test('position/load: the decoded state replaces the pass-and-play game, the phone with whoever must act and no curtain; refused in any other role and for a state the decoder refuses', () => {
+    const start = local();
+    const next: State = { ...game(start), turn: 1, moves: 4 };
+    const { app, effects } = run(start, { type: 'position/load', state: next });
+    expect(game(app)).toEqual(next);
+    // The revealer's seat (the mover) holds the phone, so the viewer raises no curtain.
+    expect(app.shell).toMatchObject({ revealed: 1, view: viewFor(next, 1), screen: 'tableScreen' });
+    expect(app.table.curtain).toBeNull();
+    // Reset as a start resets, the new view, painted against the view before; initial, so no
+    // "your turn" chime: the game's own cue for the new position plays after the save and the viewer's effect.
+    expect(marks(app).slice(-3)).toEqual(['startLocal', 'view', `rendered:prev@${String(NOW)}`]);
+    expect(effects).toEqual([
+      { type: 'persist' },
+      { type: 'ownFx' },
+      { type: 'fx', cue: 'ding' },
+      { type: 'scrollTop' },
+    ]);
+    // A state the decoder refuses: the toast names the path; nothing else changes.
+    const junk = run(start, { type: 'position/load', state: { nope: true } });
+    expect(junk.app).toBe(start);
+    expect(junk.effects).toEqual([toast(badPositionMsg('$.players: expected array'))]);
+    // Any other role, and the home screen: refused with the one toast, the App untouched.
+    const refused = [toast(SANDBOX_LOCAL_ONLY_MSG)];
+    expect(run(hosting(), { type: 'position/load', state: next }).effects).toEqual(refused);
+    expect(run(seated(), { type: 'position/load', state: next }).effects).toEqual(refused);
+    const home = run(initialApp, { type: 'position/load', state: next });
+    expect(home).toEqual({ app: initialApp, effects: refused });
+  });
+});
+
+describe('the cue memory', () => {
+  test('fresh: a key not yet played for is fresh and remembered, the same key again is not, a new key is fresh again', () => {
+    const first = fresh({ key: null }, 'round:1');
+    expect(first).toEqual({ mem: { key: 'round:1' }, fresh: true });
+    expect(fresh(first.mem, 'round:1')).toEqual({ mem: { key: 'round:1' }, fresh: false });
+    expect(fresh(first.mem, 'round:2')).toEqual({ mem: { key: 'round:2' }, fresh: true });
+    // A memory extending the record (gin's `turnKey`) passes as it is; the result carries the key alone.
+    const extended: CueMemory & Readonly<{ turnKey: string }> = { key: 'a', turnKey: 'x' };
+    expect(fresh(extended, 'a')).toEqual({ mem: { key: 'a' }, fresh: false });
   });
 });
 

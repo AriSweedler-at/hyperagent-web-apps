@@ -2,7 +2,7 @@
 // built from the page's own markup (ui/page.fake.ts over web/games/backgammon/index.html), so
 // every id, initial class, value and data attribute is the real one. The Apps come from the
 // reducer driven the way the page drives it (a seeded pass-and-play match, positions seated
-// through `sandbox/load`), so what the painter sees is what main.ts hands it.
+// through `position/load`), so what the painter sees is what main.ts hands it.
 import { describe, expect, test } from 'vitest';
 
 import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
@@ -84,7 +84,7 @@ const revealed = (app: App): App => run(app, { type: 'curtain/reveal' }).app;
 /** A pass-and-play game at `position` for `turn`, mid-turn with `dice` or waiting to roll when null. */
 const at = (text: string, turn: Seat, dice: Dice | null, app: App = local()): App =>
   revealed(
-    run(app, { type: 'sandbox/load', state: withPosition(game(app), pos(text), turn, dice) }).app,
+    run(app, { type: 'position/load', state: withPosition(game(app), pos(text), turn, dice) }).app,
   );
 /** Seat 0's own point `own` as the page's id (`ownOf(0, abs) === abs + 1`). */
 const pt = (own: number): string => `point-${String(own)}`;

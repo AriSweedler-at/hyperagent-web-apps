@@ -576,7 +576,7 @@ the net deps with `closeNet` before every restart and the `netAttempt` ticket, t
 `bindAll`, then `home/init` and the `?join=` link. The documented hook `window.__backgammon` = `{
 get app, dispatch, act(action), render, showScreen, initHome, fx, legal(), view(), setup(state),
 soundFont(name), soundFontName() }`; `setup` seats a position for e2e and stories (pass-and-play
-only, `sandbox/load`).
+only, the shell's `position/load`).
 
 ### 5.3 Online, hidden then shown
 

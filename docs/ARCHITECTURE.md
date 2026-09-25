@@ -136,7 +136,7 @@ docs/design/sound-fonts.md),
 `window.__backgammon` (`app` as a getter, `dispatch(intent)`, `act(action)` through the reducer,
 `legal()` the engine's legal actions for my view, `view()`, `render()`, `showScreen(id)`,
 `initHome()`, `fx`, `setup(state)`, which seats any decodable engine `State` at a pass-and-play
-table for e2e and stories (`sandbox/load`; refused with a toast in any other role), and
+table for e2e and stories (the shell's `position/load`; refused with a toast in any other role), and
 `soundFont(name)` / `soundFontName()` under the page's own `backgammon_soundFont` key:
 docs/design/backgammon-board.md §4, §7),
 `window.__rng` (a seeded rng installed before boot), `#rule-<id>` (gin and backgammon: a rule deep
