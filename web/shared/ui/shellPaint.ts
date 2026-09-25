@@ -1,9 +1,9 @@
 // The shell's painters and binders both game pages carried under the same names
 // (docs/design/shared-shell.md §4.4 "Painters and binders"; §5 B1 moved them here): the screen
 // switch, the waiting rooms, the toast, the sound and handoff buttons and the sheets (the keyed
-// slot moved on to keyed.ts in docs/design/dry-round-2.md D1 and is re-exported below). Each is
-// gin's `ui/render.ts` body (backgammon copied it word for word, docs/design/
-// backgammon-board.md §4) over web/shared/edge/dom.ts, with the App replaced by the small view it
+// slot moved on to keyed.ts in docs/design/dry-round-2.md D1). Each is gin's `ui/render.ts` body
+// (backgammon copied it word for word, docs/design/backgammon-board.md §4) over
+// web/shared/edge/dom.ts, with the App replaced by the small view it
 // read: `paint(doc, app)` in a game composes these with its own table painters, so the same App
 // paints the same DOM as before the move (the DOM-snapshot oracle tools/parity/gin-dom-parity.ts
 // and both render.test.ts suites hold it). What a game adds on top (gin's `data-card-back`,
@@ -207,8 +207,3 @@ export const bindLongPress = <I>(
     });
   });
 };
-
-// The keyed slot lives in keyed.ts since docs/design/dry-round-2.md D1 (item E3: gin's table half
-// adopts it there); the name stays exported here so backgammon's `ui/render.ts` import holds
-// until its own adoption (Wave E3).
-export { ensureKeyed } from './keyed.ts';

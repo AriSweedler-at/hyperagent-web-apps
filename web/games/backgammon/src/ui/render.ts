@@ -8,7 +8,9 @@
 // table is this game's.
 //
 // The board is keyed (design §2.2): every container of `#board` carries `data-key` and is
-// rebuilt from ui/board.ts's templates only when its key changes, so a selection change never
+// rebuilt from ui/board.ts's templates only when its key changes (web/shared/ui/keyed.ts's
+// `ensureKeyed`, docs/design/dry-round-2.md D1; the match score and the history list, once spelled
+// by hand, key through it too since Wave E3), so a selection change never
 // recreates checkers and the `.selected` lift transitions; highlights, `data-die` and the aria
 // labels are refreshed outside the key on every paint. A move changes the key of exactly two
 // containers (three with a hit), and `flightsBetween` + ui/board/fly.ts fly the checkers between
@@ -94,7 +96,6 @@ import { flyMoves } from './board/fly.ts';
 import {
   bindButtons,
   bindSheets as bindShellSheets,
-  ensureKeyed,
   paintHandoff as paintShellHandoff,
   paintScreen as paintShellScreen,
   paintSheet,
@@ -104,6 +105,7 @@ import {
   type Sheet,
   type ToastMarks,
 } from '../../../../shared/ui/shellPaint.ts';
+import { ensureKeyed } from '../../../../shared/ui/keyed.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { aboutHtml } from './about.ts';
@@ -586,10 +588,7 @@ const paintEndgame = (doc: DocumentLike, app: App, v: View): void => {
   setText(requireId(doc, 'resultSub'), matchSubText(v));
   const score = requireId(doc, 'matchScore');
   const key = `${String(v.games.length)}:${String(v.startedAt)}`;
-  if (dataOf(score, 'key') !== key) {
-    setAttr(score, 'data-key', key);
-    setHtml(score, scoreHtml(v));
-  }
+  ensureKeyed(score, key, () => scoreHtml(v).markup);
   const next = requireId(doc, 'nextGameBtn');
   setText(next, nextLabel(app, v));
   setDisabled(next, nextWaits(app, v));
@@ -632,10 +631,7 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
     const list = requireId(doc, 'historyList');
     const v = app.shell.view;
     const key = v === null ? '-' : `${String(v.gameNo)}:${String(v.log.length)}`;
-    if (dataOf(list, 'key') !== key) {
-      setAttr(list, 'data-key', key);
-      setHtml(list, historyHtml(v));
-    }
+    ensureKeyed(list, key, () => historyHtml(v).markup);
   }
   paintSheet(doc, 'menuOverlay', app.table.menuOpen);
   // The binder has no App: the mode a change switches to is painted onto the checkbox.
