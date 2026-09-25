@@ -76,19 +76,6 @@
         "--back-colour": 19
       }
     },
-    "0119a015ab16": {
-      "v": [171, 144, 170, 35, 144, 35, 144, 170, 127, 0, 84, 97, 145, 145, 36, 51, 90, 144, 205],
-      "vars": {
-        "--aspect": 29,
-        "--back": 204,
-        "--back-colour": 19,
-        "--card-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 94,
-        "--mid-w": 128,
-        "--tiny-w": 93
-      }
-    },
     "01d90e182c85": {
       "v": [161, 144, 170, 121, 144, 35, 187, 170, 131, 126, 60, 110, 108, 145, 36, 51, 44, 144, 205],
       "vars": {
@@ -100,6 +87,19 @@
         "--fly-ms": 94,
         "--mid-w": 128,
         "--suit-ink": 12,
+        "--tiny-w": 93
+      }
+    },
+    "02e0e487ee31": {
+      "v": [171, 144, 151, 35, 144, 35, 156, 151, 127, 126, 84, 110, 145, 145, 36, 51, 90, 144, 205],
+      "vars": {
+        "--aspect": 29,
+        "--back": 204,
+        "--back-colour": 19,
+        "--card-w": 129,
+        "--fan-overlap": 23,
+        "--fly-ms": 94,
+        "--mid-w": 128,
         "--tiny-w": 93
       }
     },
@@ -354,6 +354,19 @@
     },
     "3025d6595f4a": {
       "v": [161, 144, 170, 61, 144, 35, 187, 170, 131, 126, 78, 97, 145, 145, 36, 51, 81, 144, 205],
+      "vars": {
+        "--aspect": 29,
+        "--back": 204,
+        "--back-colour": 19,
+        "--card-w": 129,
+        "--fan-overlap": 23,
+        "--fly-ms": 94,
+        "--mid-w": 128,
+        "--tiny-w": 93
+      }
+    },
+    "30496a86060a": {
+      "v": [171, 144, 170, 35, 144, 35, 144, 170, 127, 126, 84, 110, 145, 145, 36, 51, 90, 144, 205],
       "vars": {
         "--aspect": 29,
         "--back": 204,
@@ -1304,19 +1317,6 @@
         "--back-colour": 19
       }
     },
-    "c3f464d1c658": {
-      "v": [171, 144, 151, 35, 144, 35, 156, 151, 127, 0, 84, 97, 145, 145, 36, 51, 90, 144, 205],
-      "vars": {
-        "--aspect": 29,
-        "--back": 204,
-        "--back-colour": 19,
-        "--card-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 94,
-        "--mid-w": 128,
-        "--tiny-w": 93
-      }
-    },
     "c51b674f22b2": {
       "v": [171, 144, 185, 122, 144, 35, 144, 185, 127, 126, 74, 110, 145, 145, 36, 51, 58, 144, 205],
       "vars": {
@@ -1806,7 +1806,7 @@
         ".overlay.curtain": "9cf8895f5c96",
         ".overlay.curtain .btn-ghost": "0a67a9eaaa76",
         ".sc-name": "ee50c7ca746b",
-        ".sc-points": "0119a015ab16",
+        ".sc-points": "30496a86060a",
         ".sc-tricks": "f4cf7a8649dc",
         ".score-cell": "6bf9c85c58c0",
         ".score-cell.mine": "6bf9c85c58c0",
@@ -1878,9 +1878,9 @@
         ".play": null,
         ".play .card": null,
         ".play .who": null,
-        ".sc-points": "c3f464d1c658",
+        ".sc-points": "02e0e487ee31",
         ".score-cell": "6bf9c85c58c0",
-        ".score-cell.leading .sc-points": "c3f464d1c658",
+        ".score-cell.leading .sc-points": "02e0e487ee31",
         ".trick:empty::before": "b1a04115ab47"
       }
     },
@@ -1967,7 +1967,7 @@
         ".overlay.curtain": "9cf8895f5c96",
         ".pile-peek": "70ef368b49dc",
         ".pile-peek:disabled": "70ef368b49dc",
-        ".sc-points": "0119a015ab16",
+        ".sc-points": "30496a86060a",
         ".score-cell.leading .sc-points": null,
         ".slot.empty::before": null,
         ".stock": "4201bd7cd325",
@@ -1996,8 +1996,8 @@
         ".play .card": "a26f3a1be822",
         ".play .card.taking": "a26f3a1be822",
         ".play .who": "ebd22b9f3c1c",
-        ".sc-points": "c3f464d1c658",
-        ".score-cell.leading .sc-points": "c3f464d1c658",
+        ".sc-points": "02e0e487ee31",
+        ".score-cell.leading .sc-points": "02e0e487ee31",
         ".score-row": "97fb89929640",
         ".slot.empty::before": "b289888590c9",
         ".stock": "00ac314aa306",
@@ -2032,7 +2032,7 @@
         ".play .card": "28ed8402efc8",
         ".play .card.taking": "28ed8402efc8",
         ".play .who": "eeed7ff52f8e",
-        ".sc-points": "0119a015ab16",
+        ".sc-points": "30496a86060a",
         ".score-cell.leading .sc-points": null,
         ".seat": "555528ba2ba2",
         ".seat-name": "687fd15f3a03",
