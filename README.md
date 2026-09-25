@@ -295,7 +295,7 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
 9. The proxy needs nothing: the Worker's catch-all maps `games.sweedler.com/<g>/` to
    `/hyperagent-web-apps/games/<g>/`.
 
-The existing files a game edits, verified by `grep -rl backgammon` over the tree at `3b8fc8b`
+The existing files a game edits, verified by `grep -rl backgammon` over the tree at `9bf1548`
 (every other file naming a game is a comment, that game's own folder or a test of it):
 `web/shared/lib/roomCode.ts` (the `Game` union, the room-code row, the code normaliser),
 `tools/games.ts` (`GameSuite`, the `REGISTRY` row; `ShellGame`, `SHELL_GAMES` and `SHELL` for a
@@ -305,14 +305,19 @@ shell game), `tools/ci/suites.ts` (the suite row), `eslint.config.js` (`GAMES`),
 `test/fixtures/styles/`), `e2e/fixtures/online-games.ts` (the driver row),
 `e2e/fixtures/two-players.ts` (the `DRIVERS` row), `package.json` (`test:<g>`, `test:e2e:<g>`),
 `web/shared/styles/CONTRACT.md` (its rows) and, for a shell game, `tools/shell-markup.ts`
-(`PAGES`); plus the four lists that pin the games by name: `tools/games.test.ts`,
-`tools/ci/suites.test.ts`, `tools/ci/affected.test.ts`, `web/shared/lib/roomCode.test.ts`. Only
+(`PAGES`) and `web/shared/ui/ids.ts` (its own `SHELL_GAMES`, the list `tools/games.ts` exports
+spelled a second time; `test/dist/shell-ids.test.ts` iterates it, so a shell page left out of it is
+never checked for the shell ids); plus the six lists that pin the games by name:
+`tools/games.test.ts`, `tools/ci/suites.test.ts`, `tools/ci/affected.test.ts`,
+`web/shared/lib/roomCode.test.ts`, `web/shared/ui/ids.test.ts`, `test/dist/classes.test.ts`
+(`OWNERS`, read off `GAMES`). Only
 when the game has one: `e2e/fixtures/site.ts` (`PAGE_ONLY_SPECS`, a page-only spec),
 `.github/workflows/nightly.yml` (a seeded replay step), `test/tokens.test.ts` (a theme's `:root`
 pin). Not edited: `.github/workflows/ci.yml`, `playwright.config.ts`, `vitest.config.ts`, `infra/`
 (the alias table aside). `docs/design/dry-round-2.md` §1 item 8 counted eight files plus
-`CONTRACT.md`: it left out `two-players.ts`'s `DRIVERS` row, `package.json`'s two scripts and the
-pins, and its I7 (`PAGE_ONLY_SPECS` self-declared per spec) was optional and did not land.
+`CONTRACT.md`: it left out `two-players.ts`'s `DRIVERS` row, `package.json`'s two scripts,
+`ui/ids.ts`'s `SHELL_GAMES` and the pins, and its I7 (`PAGE_ONLY_SPECS` self-declared per spec) was
+optional and did not land.
 
 A second URL name for a game (`sheshbesh` for backgammon) is an alias, not a game: one row in
 `ALIASES` in `tools/games.ts` and the same row in `infra/games-proxy/worker.ts` (its test pins the
@@ -415,14 +420,15 @@ web/index.html               landing page, the first Vite entry (no scripts); di
 web/public/.nojekyll         copied to dist/ so Pages serves dotfiles and folders untouched
 web/public/shared/cards/     the served card-pack files: backs/ (gin's five, copied), linea/ (generated), napoletane/ (cut from the
                              owner's sheet); docs/design/card-packs.md
-web/shared/lib/              shared pure TypeScript: result, rng, json decoders, roomCode, name, game (the two-seat contract), protocol
-                             (the wire skeleton), drag (the drag numbers), clock types, sound fonts (sound/), card packs (cards/)
+web/shared/lib/              shared pure TypeScript: result, rng, json decoders, roomCode, name, invite, shuffle, events, game (the
+                             two-seat contract), protocol (the wire skeleton), drag (the drag numbers), clock types, sound (sound/:
+                             cues, fonts, phrases), card packs (cards/)
 web/shared/edge/             shared effects: ice, transport (the only importer of peerjs) + fake, clock, storage, prefs, dom, fx, share,
-                             peer, netDeps, sound, cuePlayer, glossary, invite, drag (the pointer-drag kernel), boot (bootShell),
-                             page.fake (shellPage)
+                             peer, netDeps, sound, cuePlayer, glossary, invite, drag (the pointer-drag kernel), motion (glide,
+                             launchClone, reducedMotion), boot (bootShell), page.fake (shellPage)
 web/shared/net/              the sessions (host, guest, liveness) every shell game's net/ wraps; up to four guests since #87
-web/shared/ui/               the shared shell: shell (the reducer), shellEffects, shellPaint, home, curtain, toast, keyed, ids, glossary,
-                             stories, cardFace; README.md
+web/shared/ui/               the shared shell: shell (the reducer), shellEffects, eventEffects, shellPaint, home, curtain, toast, keyed,
+                             ids (SHELL_IDS, SHELL_GAMES), glossary, stories, cardFace; README.md
 web/shared/markup/           shell/*.html, the shell's partials, and shell.ts (renderShell); tools/shell-markup.ts composes each shell page
 web/shared/styles/           tokens.css (the shared palette, :root only), base.css (shared primitives), shell.css (the shell games'
                              token-only shell rules), CONTRACT.md

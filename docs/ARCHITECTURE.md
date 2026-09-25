@@ -47,19 +47,21 @@ and tests that prove it land before the code they protect.
 │   ├── shared/                  the only code both games may import (alias @shared/*)
 │   │   ├── lib/                 PURE: result, rng, json (decoders), roomCode (alphabets, prefixes, sanitiser), cards
 │   │   │                        (the deck kinds, the card packs and their resolution), name (normaliseName),
-│   │   │                        game (the two-seat contract), protocol (the wire skeleton), drag (the drag
-│   │   │                        threshold and hit-test), sound/ (cues, fonts), algorithms (the loop escape
-│   │   │                        hatch), clock (types)
+│   │   │                        invite, shuffle, events, game (the two-seat contract), protocol (the wire
+│   │   │                        skeleton), drag (the drag threshold and hit-test), sound/ (cues, fonts, phrase),
+│   │   │                        algorithms (the loop escape hatch), clock (types)
 │   │   ├── edge/                EFFECTS: ice, transport (only importer of 'peerjs'; ?peer= override),
 │   │   │                        transport.fake, clock, storage, prefs (the shell's readers/writers over a
 │   │   │                        Store: name, play mode, sound, sound font, shellSave), dom, fx, peer, netDeps,
 │   │   │                        sound, cuePlayer, glossary, invite, share, drag (the pointer-drag kernel, E1),
-│   │   │                        boot (bootShell, C3), page.fake (shellPage over the committed markup)
+│   │   │                        motion (glide, launchClone, reducedMotion, E2), boot (bootShell, C3), page.fake
+│   │   │                        (shellPage over the committed markup)
 │   │   ├── net/                 the sessions (host, guest, liveness) gin's and backgammon's net/ wrap, codec and
 │   │   │                        game injected (docs/design/shared-shell.md §4.5; up to four guests since #87,
 │   │   │                        docs/design/n-seat-sessions.md); sessions.harness for their suites
-│   │   ├── ui/                  the shared shell: shell (the reducer), shellEffects, shellPaint, home, curtain,
-│   │   │                        toast, keyed, ids (SHELL_IDS), glossary, stories (bootStories), cardFace
+│   │   ├── ui/                  the shared shell: shell (the reducer), shellEffects, eventEffects, shellPaint,
+│   │   │                        home, curtain, toast, keyed, ids (SHELL_IDS, SHELL_GAMES), glossary, stories
+│   │   │                        (bootStories), cardFace
 │   │   ├── markup/              shell/{page,home,waiting,curtain,sheets,toast}.html, the shell's partials, and
 │   │   │                        shell.ts (renderShell); tools/shell-markup.ts composes each shell page from them
 │   │   └── styles/              tokens.css (:root tokens only), base.css (shared primitives), shell.css (the shell
@@ -87,8 +89,8 @@ and tests that prove it land before the code they protect.
 ├── test/                        fixtures/legacy (sha256-pinned .cjs cores), fixtures/backgammon-wire (self-recorded
 │                                frames), fixtures/styles (computed-style goldens), parity/ (describe.each([legacy,
 │                                current])), dist/ (asset-urls, check-dist-paths, dist-parity, class-contract,
-│                                backgammon-grid, shell-markup), shared/ (replay.ts, the seeded replay driver, and
-│                                engine-helpers.ts, both engines' test scaffolding; dry-round-2 D6)
+│                                classes, shell-ids, backgammon-grid, shell-markup), shared/ (replay.ts, the seeded
+│                                replay driver, and engine-helpers.ts, both engines' test scaffolding; dry-round-2 D6)
 ├── e2e/                         Playwright specs; fixtures/ (two-players, player, shell, online-games, stories,
 │                                geometry, site, and one table fixture per game)
 ├── tools/                       serve-dist, proxy-dev, games.ts (REGISTRY), shell-markup.ts (the shell pages from
@@ -124,6 +126,7 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 | `web/shared/edge/netDeps.ts` | `@shared/edge/{transport,ice,clock,peer}` | `browserNetDeps({ search, debug, onWake? })`: the `NetDeps` a page hands its sessions, once for the three pages: `realTransport` at the page's PeerJS log level (gin 0, fidice 1, backgammon 0; e2e `expectPeerOptions` pins each), the browser ICE loader, the real clock and the legacy `keepPeerAlive` wake listeners (`document` visibilitychange, `window` online). Constructed in `bootShell` (`web/shared/edge/boot.ts`, C3) and fidice's `main.ts` only. |
 | `web/shared/edge/boot.ts` | shared/lib, `@shared/edge/{invite,share,fx,glossary,netDeps,sound,storage,cuePlayer,dom,peer}`, `@shared/ui/{toast,glossary}`, `@shared/net` and `@shared/ui/{shell,shellEffects,shellPaint}` (types) | The boot helpers both shell `main.ts` files spelled line for line (docs/design/shared-shell.md §4.5, moved in B3): `applyInviteLink(window, joinByLink)` (the `?join=` code into the join form after `home/init`, then out of the address bar with `history.replaceState`, the other hooks and the hash kept), `shareInvite(navigator, { title, code, pageUrl, toast })` (the share sheet, else the clipboard with `INVITE_COPIED_MSG`, else `roomCodeMsg(code)` for `SHARE_FALLBACK_MS`; the three constants live here now) and `sessionEvents<G, H>({ dispatch, toast, wakeLock })` (a session's `HostEvents`/`GuestEvents` as the reducer's intents). Under `edge`, not `ui`, because it reaches the invite readers, the share sheet, the wake lock and the sessions' event types, which the ui zone refuses. `bootShell<G, App, Ex>(cfg)` (C3) is the boot itself: over `cfg.page` (the document, window, navigator, store and clock main.ts passes) it builds the wake lock, Web Audio, the game's cue player, the toaster and named timers, `browserNetDeps`, `dispatch` with the no-repaint rule, the shell's `EffectDeps`, binds the page, installs the documented hook under `cfg.game.hook` and runs `home/init`, the invite link and the rule deep link; a game supplies its reducer, painters, sessions, `createFx`, `legal`, its own effect adapters (`deps`) and hook members and the `hooks` that run before the home read, before and after the binders. Constructed in `main.ts` only; `boot.test.ts` boots a FAKE game on the page fake. |
 | `web/shared/edge/drag.ts` | shared/lib (`lib/drag.ts`: `Point`, `Rect`, `DRAG_THRESHOLD`, `startedDrag`, the hit-test both draggers spelled; DOM-free so gin's `ui/hand/drag.ts` can import it under tsconfig.node), `@shared/edge/dom` | The pointer-drag kernel gin's `ui/hand/dragger.ts` and backgammon's `ui/board/dragger.ts` both were (docs/design/dry-round-2.md E1, #102): `bindDrag(surface, config)` runs one `Session` at a time from a press `pick` accepts, through `DRAG_THRESHOLD`, the ghost (a clone fixed on the body, sized by its `sizeVar`, the lift classes stripped), pointer capture, `targetAt` on every move with the over intents on a change, the ghost's `Motion` (`DIRECT` follow by default; gin plugs its momentum in), and a release that `land`s the ghost (`LAND_MS`, `.landing`, `FALLBACK_MS`) before the end intents. Each game's dragger keeps its hit-tests and intents over it; `drag.test.ts` proves the kernel on the page fake with fake rects and a stubbed rAF. |
+| `web/shared/edge/motion.ts` | `@shared/edge/dom` (`rectOf`, `afterTransition`, `cloneInto`, `setStyle`, the class helpers; `Rect`) | The motion kernel gin's `ui/hand/flip.ts` and backgammon's `ui/board/fly.ts` both wrote by hand (docs/design/dry-round-2.md E2, #109): `glide(el, from, to, {ms, ease})`, FLIP's release (an inverted translate under no transition, one forced layout read, then the transition on and the transform cleared; the inline styles clear at the transition's end or `ms + GLIDE_SLACK_MS`), `launchClone(doc, source, from, to, {classes, strip, sizeVar, ms, delay, scale, onDone})`, a clone fixed over `from` on the body and sent to `to` by one transform, removed at the end or after `ms + delay + LAUNCH_SLACK_MS`, and `reducedMotionOf(host)` / `reducedMotion()`, `prefers-reduced-motion: reduce` read from `matchMedia` once (neither game consults it yet: a behaviour change of its own). Each game keeps its choreography (gin's 200 ms flip, backgammon's staggered flights and the theme's `.flyer`); the kernel names no game and needs no layout on a fake. |
 | `web/shared/styles/shell.css` | `tokens.css` (reads the shell tokens, declares no custom property of its own) | The shell games' shell rules once, token-only (docs/design/dry-round-2.md G1, Wave F row F1, #103): the page, the home screen's boxes, buttons, fields and tabs, the waiting rooms, the overlays and sheets, the curtain, the toast. A shell page links tokens.css, base.css, this file, then its theme.css, so a theme rule of equal specificity still wins; the declarations the two type scales disagree on stay in each theme under the same selectors (G5, with the Fidice restyle), and fidice links no shell.css before then. `test/tokens.test.ts` pins what it reads and declares; the four shell goldens pin every computed value on every shell selector. |
 | `engine` / `domain` / `bots` | shared/lib, siblings | Pure. `applyAction(state, seat, action, rng): Result<State, RuleError>` (gin), `apply(s, actor, action, rng): Result` (fidice), `applyAction(state, seat, action, rng, now): Result<State, string>` (backgammon and briscola, with `createGame`/`nextGame` taking the same injected `rng` and `now`; briscola's `seat` is `0..3` and the state's `seatCount` says which are at the table). Return new state; never mutate. `viewFor` / `redactFor` are the only redaction (backgammon hides nothing: its `View` adds the per-seat selectors `legal`, `plays`, `canDouble`, `pips`; briscola's carries the viewer's hand, counts for the others, the trick, the trump card, the stock's count and the running score, never the piles or the stock). Each two-seat engine's `index.ts` publishes `ENGINE: TwoSeatEngine<State, View, Action, Opts>` (`web/shared/lib/game.ts`): `create`, `apply`, `viewFor`, `legalActions`, `actorOf`, `over` and the three decoders under one set of names, the surface the shared shell, the replay harness and the codecs type against; gin's `create` seats the players into `createGame`'s options and its `actorOf` names the first seat not yet ready between hands. |
 | `web/shared/lib/protocol.ts` | itself | The two-seat wire skeleton gin and backgammon share (the shared-shell design §4.5): `twoSeatProtocol({ decodeAction, decodeView, room })` returns the seven frame builders and the three decoders in the legacy key order (`welcome`/`lobby` spread the game's room after `hostName`), with `isGuestFrame`, `guestNameFor` and the `WIRE_TAGS`/`NAME_MAX`/`TOAST_MAX`/`DEFAULT_GUEST_NAME` literals. |
@@ -525,13 +528,17 @@ docs run only `check`. The levels below say which suite holds them.
 - New game: `web/games/<g>/{index.html, main.ts, theme.css, src/}` plus tests, a coverage entry,
   `CONTRACT.md` rows and its name in the registry (`Game` in `web/shared/lib/roomCode.ts` with its
   room-code row, then a `REGISTRY` row in `tools/games.ts`; `eslint.config.js` spells `GAMES` once
-  more); nothing else in `web/shared` changes. Vite picks up the folder; the
+  more); nothing else in `web/shared` changes but, for a shell game, `SHELL_GAMES` in
+  `web/shared/ui/ids.ts` (the list `test/dist/shell-ids.test.ts` checks the shell ids over; the
+  same list `tools/games.ts` exports, spelled twice). Vite picks up the folder; the
   proxy needs no change; the dist guards, the e2e page list and the computed-style tool enumerate
   from the registry; e2e gets one spec per mode, a `DRIVERS` row in `e2e/fixtures/two-players.ts`
   and a driver row in `e2e/fixtures/online-games.ts`; `tools/ci/suites.ts` gets the suite row and
-  `package.json` two scripts; `ci.yml` is not edited. Sheshbesh landed this way (docs/design/
-  backgammon-board.md §6). The README's "Add a game" is the step-by-step version and ends with every
-  existing file a game edits, as grep finds them.
+  `package.json` two scripts; the six pins (`tools/games.test.ts`, `tools/ci/suites.test.ts`,
+  `tools/ci/affected.test.ts`, `web/shared/lib/roomCode.test.ts`, `web/shared/ui/ids.test.ts`,
+  `test/dist/classes.test.ts`) spell the name once more; `ci.yml` is not edited. Sheshbesh landed
+  this way (docs/design/backgammon-board.md §6). The README's "Add a game" is the step-by-step
+  version and ends with every existing file a game edits, as grep finds them.
 - New rule or action: add the variant to the `Action` union in `engine/types.ts`, the reducer branch
   in `game.ts` (exhaustiveness check fails until every switch handles it), the codec case in
   `protocol.ts`, a table test and a recorded golden. Wire-visible changes add a version field.
