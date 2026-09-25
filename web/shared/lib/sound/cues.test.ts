@@ -2,7 +2,7 @@
 // these, so a rename here is a shared change and this list is where it shows first.
 import { describe, expect, test } from 'vitest';
 
-import { SOUND_CUES } from './cues.ts';
+import { SHELL_CUES, SOUND_CUES } from './cues.ts';
 
 describe('the cue vocabulary', () => {
   test('twenty generic cues, in the design doc order, no duplicates', () => {
@@ -37,5 +37,15 @@ describe('the cue vocabulary', () => {
         expect(SOUND_CUES).not.toContain(name);
       },
     );
+  });
+});
+
+describe("the shell's rows (dry-round-2.md E9)", () => {
+  test('tap, yourTurn, win and lose, each on a generic cue with a buzz; every game spreads them', () => {
+    expect(Object.keys(SHELL_CUES)).toEqual(['tap', 'yourTurn', 'win', 'lose']);
+    Object.values(SHELL_CUES).forEach(({ cue, buzz }) => {
+      expect(SOUND_CUES).toContain(cue);
+      expect(typeof buzz === 'number' ? [buzz] : buzz).not.toHaveLength(0);
+    });
   });
 });
