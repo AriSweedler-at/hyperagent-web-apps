@@ -1908,15 +1908,27 @@ describe('the remote handoff of a pass-and-play game', () => {
     ]);
   });
 
-  test('join/link: the invite code into the join form, the Play tab and online mode; nothing stored', () => {
+  test('join/link: the invite code into the join form, the Play tab and online mode, then the guest sat down; nothing stored', () => {
     const linked = run(
       { ...initialApp, shell: { ...initialApp.shell, homeTab: 'rules', playMode: 'local' } },
       { type: 'join/link', code: 'kqzm9' },
     );
     expect(linked.app).toMatchObject({
-      shell: { codeDraft: 'KQZM', homeTab: 'play', playMode: 'online', nameTouched: false },
+      shell: {
+        codeDraft: 'KQZM',
+        homeTab: 'play',
+        playMode: 'online',
+        nameTouched: false,
+        role: 'guest',
+        code: 'KQZM',
+        screen: 'guestWaitScreen',
+      },
     });
-    expect(linked.effects).toEqual([{ type: 'setCode', value: 'KQZM' }]);
+    expect(linked.effects).toEqual([
+      { type: 'setCode', value: 'KQZM' },
+      { type: 'scrollTop' },
+      { type: 'startGuest', code: 'KQZM', attempt: 1 },
+    ]);
   });
 });
 

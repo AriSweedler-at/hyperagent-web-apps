@@ -10,9 +10,9 @@
 // host, a move propagating). Both origins: a spec about the origin. Tagged per game (see
 // shell-home.spec.ts) and @online (ci.yml's broker job and the nightly grep for it). Fidice's row
 // in e2e/fixtures/online-games.ts replaced its own e2e/fidice-online.spec.ts (dry-round-2.md H1).
-import { GAMES, REGISTRY } from '../tools/games.ts';
+import { GAMES, REGISTRY, SHELL_GAMES } from '../tools/games.ts';
 import { peerIdFor } from '../web/shared/lib/roomCode.ts';
-import { ONLINE_DRIVERS, connect } from './fixtures/online-games.ts';
+import { ONLINE_DRIVERS, SHELL_DRIVERS, connect, connectByLink } from './fixtures/online-games.ts';
 import { expectPeerOptions } from './fixtures/player.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -38,6 +38,28 @@ GAMES.forEach((game) => {
         expectPeerOptions(hostCall, spec.debug);
         expect(guestCall?.id).toBeNull();
         expectPeerOptions(guestCall, spec.debug);
+      },
+    );
+  });
+});
+
+// The shell games' invite (the owner, 2026-09-25: "when you visit a '?join=TNJQ' link, it
+// shouldn't make you THEN click 'sit down'"): the guest, its name remembered from an earlier visit,
+// follows the link and is sat down at once, no tap; the host sees the join and starts, and both
+// tables show the opening with the names crossed over as when the code was typed.
+SHELL_GAMES.forEach((game) => {
+  test.describe(game, { tag: `@${game}` }, () => {
+    const driver = SHELL_DRIVERS[game];
+
+    test(
+      'the guest follows the invite link: seated at once under the remembered name, no tap; the host starts, both see the opening',
+      { tag: '@online' },
+      async ({ players, project }) => {
+        const { host, guest } = players;
+        await connectByLink(players, project, game);
+        await driver.start(host.page, guest.page);
+        await driver.expectOpening(host.page, guest.page);
+        await driver.expectNames?.(host.page, guest.page);
       },
     );
   });

@@ -18,12 +18,14 @@ import {
 import { fidiceHostStarts, fidiceSameRound, fidiceSeatName, fidiceSeats } from './fidice.ts';
 import type { Viewport } from './geometry.ts';
 import { ginPassUpcard, ginStartLocal, readTable } from './gin.ts';
-import { openGame, type GameHooks } from './player.ts';
+import { invitePath, openGame, type GameHooks } from './player.ts';
 import {
   DEFAULT_NAMES,
   ONLINE_NAMES,
+  followInvite,
   hostStarts,
   joinedMsg,
+  rememberName,
   reveal,
   roomOpen,
   takeOffer,
@@ -393,5 +395,26 @@ export const connect = async (
   const code = await hostRoom(host, game, ONLINE_NAMES[0]);
   await joinByCode(guest, game, code, ONLINE_NAMES[1]);
   await ONLINE_DRIVERS[game].joined(host.page, guest.page);
+  return code;
+};
+
+/**
+ * `connect` with the guest following the invite instead of typing (the shell games): its name
+ * remembered from an earlier visit, the guest opens the link and is sat down with no tap
+ * (`followInvite`); the host sees the join. Resolves with the code, the host in its waiting room.
+ */
+export const connectByLink = async (
+  players: Players,
+  project: Project,
+  game: ShellGame,
+  hooks: GameHooks = {},
+): Promise<string> => {
+  const { host, guest } = players;
+  await openGame(host, project, game, hooks);
+  await openGame(guest, project, game, hooks);
+  await rememberName(guest.page, game, ONLINE_NAMES[1]);
+  const code = await hostRoom(host, game, ONLINE_NAMES[0]);
+  await followInvite(guest.page, game, invitePath(project, game, code, hooks));
+  await SHELL_DRIVERS[game].joined(host.page, guest.page);
   return code;
 };
