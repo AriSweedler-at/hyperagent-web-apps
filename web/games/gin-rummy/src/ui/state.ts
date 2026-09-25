@@ -5,103 +5,119 @@
 // record, plus what the legacy kept in the DOM or in closures (the screen shown, the two waiting
 // statuses, the netAttempt ticket, the curtain, the cue machine's memory), split in two as
 // backgammon splits it (docs/design/shared-shell.md §4.1, C1): `shell` is the home screen, the
-// waiting rooms and the session, field for field as backgammon names them, the record C2 lifts
-// into the shared shell reducer; `table` is the hand's own state (the tapped card, the ghost
-// slot, the picture, a drag, the sheets, the curtain, the sandbox editor), which stays gin's.
-// `Intent` is every handler and every network event, partitioned the same way
+// waiting rooms and the session, the record the shared shell reducer owns since C2
+// (web/shared/ui/shell.ts `reduceShell`, over the config `GIN` below: gin's shellConfig.ts half,
+// the id, names, tabs, copy, option codec, engine adapters, frames and store, completed here with
+// the table hooks the shared flows call: `reset` per site, `rendered`, `refuse`, pass-and-play's
+// `viewer`/`revealer`, and the home snapshot's own part); `table` is the hand's own state (the
+// tapped card, the ghost slot, the picture, a drag, the sheets, the curtain, the sandbox editor),
+// which stays gin's. `Intent` is every handler and every network event, partitioned the same way
 // (`SHELL_INTENT_TYPES`), and `reduce` returns the next App with a list of `Effect`s: what to
-// persist, toast, send, play or open, as data. main.ts runs the effects through the real
-// adapters (`runEffect`) and paints the App (ui/render.ts); the tests run the reducer alone.
-// `persist`/`saveFor` and `readHome` are the legacy `persist()`/`loadSaved()`/`initHome` reads,
-// through storage.ts, producing the same `ginRummyMP_v1` bytes as the captured fixtures
-// (test/parity/gin.state.test.ts).
+// persist, toast, send, play or open, as data. main.ts runs the effects through the real adapters
+// (`runEffect`: gin's four, then the shared runner) and paints the App (ui/render.ts); the tests
+// run the reducer alone. `persist`/`saveFor` and `readHome` are the legacy
+// `persist()`/`loadSaved()`/`initHome` reads, through storage.ts, producing the same
+// `ginRummyMP_v1` bytes as the captured fixtures (test/parity/gin.state.test.ts).
 //
-// Phase 2 adds what the legacy kept in the DOM or in handler closures for the paint and the
-// wiring: the rules and history overlays, the Play tab's long-press submenu (its timer is an
-// effect main.ts arms), the code input's last good value, and the two input writes `initHome`
-// and the code handler made (effects, so the paint never fights the player's typing).
+// Gin's residue on the shell (§4.3): the sandbox mode (shown while the first player is named
+// `sandbox`, never stored: `GIN_SHELL.modes.parse`, and the fallback to pass-and-play when a
+// typed name no longer unlocks it, `withP1Name` after the shell's own step in `reduce`), the
+// Score Counter's resume offer (`Resume`'s `scorer` kind, `GIN.home.resume`/`resumeExtra`), and
+// the `scorer`/`copy`/`writeSort`/`writeCardBack` effects `runEffect` handles before delegating.
 //
 // Two legacy traits kept on purpose: the reducer runs `render()`'s state effects wherever the
 // legacy called `render()` (the cue machine steps, the screen flips to the table, a selection no
 // longer in hand is dropped), and a leave closes the network before the state is reset, so the
 // session's own close still raises the "disconnected" toast the legacy raised.
-import { randomCode, sanitiseCode, validateCode } from '../../../../shared/lib/roomCode.ts';
-import type { Rng } from '../../../../shared/lib/rng.ts';
 import {
-  applyAction,
-  canTakeBack,
-  createGame,
-  fitsOnto,
-  idsOf,
-  inPlay,
-  viewFor,
-} from '../engine/index.ts';
-import type { Action, Now, Seat, State, View } from '../engine/types.ts';
+  LONG_PRESS_MS,
+  NOT_CONNECTED_MSG,
+  guestContextOf as shellGuestContextOf,
+  hostContextOf as shellHostContextOf,
+  hostDispatch,
+  initialShell as shellInitial,
+  isShellEffect,
+  isShellIntent,
+  localBroadcast,
+  localPlayers,
+  localSeated,
+  pure,
+  readHome as shellReadHome,
+  reduceShell,
+  resumeFor as shellResumeFor,
+  saveFor as shellSaveFor,
+  step,
+  andThen as then,
+  toast,
+  withShell,
+  withTable,
+  type Ctx,
+  type Effect as SharedEffect,
+  type HomeSnapshot as SharedHomeSnapshot,
+  type Intent as SharedIntent,
+  type Resume as SharedResume,
+  type ShellApp,
+  type ShellConfig,
+  type ShellIntent as SharedShellIntent,
+  type ShellState,
+  type Step as SharedStep,
+  type TableReset,
+  type TimerId as SharedTimerId,
+} from '../../../../shared/ui/shell.ts';
+import { runShellEffect, type ShellEffectDeps } from '../../../../shared/ui/shellEffects.ts';
+import { applyAction, canTakeBack, fitsOnto, idsOf, inPlay } from '../engine/index.ts';
+import type { Action, Seat, State, View } from '../engine/types.ts';
 import type { GuestContext } from '../net/guest.ts';
-import { connectingMsg } from '../net/guest.ts';
 import type { HostContext } from '../net/host.ts';
-import { OPENING_MSG, handoffMsg } from '../net/host.ts';
-import {
-  DEFAULT_GUEST_NAME,
-  action as actionFrame,
-  guestNameFor,
-  lobby as lobbyFrame,
-  state as stateFrame,
-  toast as toastFrame,
-  type GuestFrame,
-  type HostFrame,
-} from '../protocol.ts';
+import { action as actionFrame } from '../protocol.ts';
 import type { ScorerState } from '../scorer/scores.ts';
+import { GIN_SHELL } from '../shellConfig.ts';
 import {
   DEFAULT_CARD_BACK,
   DEFAULT_SORT,
-  DEFAULT_SOUND_FONT,
-  readCardBack,
-  readSort,
-  readSoundFont,
   writeCardBack,
   writeSort,
-  writeSoundFont,
   type CardBack,
   type SortMode,
-  type SoundFontName,
-  DEFAULT_HOME_TAB,
-  DEFAULT_PLAY_MODE,
   HOME_TABS,
-  NAME_MAX,
-  clearSave,
-  readHomeTab,
-  readName,
-  readP2Name,
-  readPlayMode,
-  readSave,
-  readScorerState,
-  writeHomeTab,
-  writeName,
-  writeP2Name,
-  writePlayMode,
-  writeSave,
   type HomeTab,
+  type HostExtra,
   type PlayMode as StoredPlayMode,
   type Save,
   type Store,
 } from '../storage.ts';
-import {
-  DEFAULT_PRESET,
-  dealMap,
-  formatMap,
-  parseMap,
-  presetById,
-  randomMap,
-  unlocksSandbox,
-} from '../sandbox.ts';
-import { INITIAL_CUES, nextCue, oppDrawCue, selectionIn, type Cue, type CueState } from './cues.ts';
+import { dealMap, formatMap, parseMap, presetById, randomMap, unlocksSandbox } from '../sandbox.ts';
+import { DEFAULT_PRESET } from '../sandbox.ts';
+import { nextCue, oppDrawCue, selectionIn, type Cue, type CueState } from './cues.ts';
 import { drawSource, settleDraw, type DrawStage } from './hand/draw.ts';
 import type { DropTarget } from './hand/drag.ts';
 import { arrangedOf, declarable, toggleMeld, type HumanMelds } from './hand/arrange.ts';
 import { settlePicture, type Picture, moveLoose, samePicture } from './hand/picture.ts';
-import type { RulesSlot } from './rules.ts';
 
+// The shell's strings and helpers the tests and painters import from here, as before C2.
+export {
+  DISCONNECTED_MSG,
+  GONE_TOAST_MS,
+  LONG_PRESS_MS,
+  LOST_HOST_MSG,
+  NOT_CONNECTED_MSG,
+  OPPONENT_LEFT_MSG,
+  ROOM_FULL_MSG,
+  SHELL_INTENT_TYPES,
+  WAITING_FOR_GUEST_MSG,
+  guestGoneMsg,
+  joinedMsg,
+  type Role,
+  type WaitStatus,
+} from '../../../../shared/ui/shell.ts';
+export {
+  DEFAULT_NAME,
+  DEFAULT_TARGET,
+  LEAVE_LOCAL_MSG,
+  LEAVE_ONLINE_MSG,
+  hostRoomMsg,
+  parseTarget,
+} from '../shellConfig.ts';
 // ---- the state ---------------------------------------------------------------------------------
 
 // ui/home.ts paints the tabs from the same list storage.ts decodes; ui/ may not import storage.ts.
@@ -118,9 +134,6 @@ export type Sandbox = Readonly<{
   /** `#sandboxHelpOverlay` open. */
   helpOpen: boolean;
 }>;
-
-export type Role = 'host' | 'guest' | 'local';
-
 /** The seven top-level screens `showScreen` toggled between. */
 export const SCREENS = [
   'homeScreen',
@@ -133,94 +146,56 @@ export const SCREENS = [
 ] as const;
 export type ScreenId = (typeof SCREENS)[number];
 
-/** `#hostWaitStatus` / `#guestWaitStatus`: the text and whether it still pulses. */
-export type WaitStatus = Readonly<{ text: string; pulse: boolean }>;
+/**
+ * What the home screen's resume box offers (`initHome`), in the legacy's order of precedence: the
+ * Score Counter's session first (gin's own, the shell's `G['Resume']`), then a live pass-and-play
+ * or hosted game, then a guest room (web/shared/ui/shell.ts `ShellResume`).
+ */
+export type Resume = SharedResume<Gin>;
 
-/** What the home screen's resume box offers (`initHome`), in the legacy's order of precedence. */
-export type Resume =
-  | Readonly<{ kind: 'scorer'; state: ScorerState }>
-  | Readonly<{ kind: 'local'; game: State }>
-  | Readonly<{
-      kind: 'host';
-      code: string;
-      myName: string;
-      target: number;
-      game: State;
-      oppName: string | null;
-      /** The save's `handoff` mark: the offer reads as the handoff, and the room resumes as one. */
-      handoff: boolean;
-    }>
-  | Readonly<{ kind: 'guest'; code: string; myName: string }>;
+/**
+ * Gin's types for the shared shell (web/shared/ui/shell.ts `ShellTypes`): the room's terms are the
+ * target (the host save's own field, storage.ts `HostExtra`, and the welcome frame's `Room`), the
+ * raw option off the inputs is the target as typed, the modes include the sandbox, the resume
+ * offers include the Score Counter's session, `initHome` also reads the sort, the card back and
+ * that session, and the table's own intents and effects are the unions below.
+ */
+export type Gin = Readonly<{
+  Opts: HostExtra;
+  Raw: Readonly<{ target: string }>;
+  State: State;
+  View: View;
+  Action: Action;
+  Table: Table;
+  Tab: HomeTab;
+  Mode: PlayMode;
+  Screen: ScreenId;
+  Timer: 'cardPress';
+  Cue: Cue;
+  Cues: CueState;
+  Resume: Readonly<{ kind: 'scorer'; state: ScorerState }>;
+  Home: Readonly<{ sort: SortMode; cardBack: CardBack; scorer: ScorerState | null }>;
+  Intent: TableIntent;
+  Effect: TableEffect;
+  Store: Store;
+}>;
 
 /**
  * Everything but the table's own state, split from the legacy `app` object as backgammon splits
  * it (docs/design/shared-shell.md §4.1, C1): the home screen, the waiting rooms and the session
  * (role, code, names, the engine `State` for the host and pass-and-play, my `View` for every
  * role), the resume offer, the rules sheet and the Play tab's submenu, under backgammon's field
- * names, with `target` where backgammon has `matchLength` and `variant`. `game` and `view` sit
- * here too: the shell owns the session (who plays, from which device), the table only remembers
- * taps and sheets. This is the record C2 lifts into the shared shell reducer.
+ * names, with `opts: { target }` where backgammon has `{ matchLength, variant }`. `game` and
+ * `view` sit here too: the shell owns the session (who plays, from which device), the table only
+ * remembers taps and sheets. Since C2 the record is the shared shell reducer's (`ShellState`).
  */
-export type Shell = Readonly<{
-  // ---- the legacy `app` object, field for field ----
-  role: Role | null;
-  code: string | null;
-  myName: string;
-  target: number;
-  /** The engine state: host and pass-and-play only. */
-  game: State | null;
-  /** My redacted view: every role. */
-  view: View | null;
-  oppName: string | null;
-  oppConnected: boolean;
-  nameTouched: boolean;
-  /** Pass-and-play: the seat that tapped "show my cards" this turn. */
-  revealed: Seat | null;
-  homeTab: HomeTab;
-  playMode: PlayMode;
-  /**
-   * The first player's name as last read from `ginRummy_name` or typed into any of its inputs:
-   * the sandbox mode shows while it is `sandbox` (src/sandbox.ts `unlocksSandbox`).
-   */
-  p1Name: string;
-  // ---- what the legacy kept in the DOM or in closures ----
-  screen: ScreenId;
-  /** The `netAttempt` ticket: bumped by every start, cancel and leave. */
-  netAttempt: number;
-  hostStatus: WaitStatus;
-  guestStatus: WaitStatus;
-  /** `#startGameBtn` shown (a guest is in the lobby). */
-  startGameVisible: boolean;
-  /**
-   * The hosted game came from pass-and-play (`#handoffBtn`, the 🌐 in the table's top bar) and its remote
-   * seat has not joined yet: the wait screen tells the player to send the invite, a guest that
-   * drops before its join leaves the wait screen as it is, and cancelling the room gives the game
-   * back to pass-and-play. Saved with the host save (storage.ts `HostSave.handoff`), so a reload
-   * resumes the offer. Cleared by the guest's join and by every leave and cancel.
-   */
-  handoff: boolean;
-  /** `ginRummy_name`, as `initHome` put it in the inputs. */
-  savedName: string | null;
-  resume: Resume | null;
-  /** `#rulesOverlay` open. */
-  rulesOpen: boolean;
-  /** `playCuesFor`'s memory. */
-  cues: CueState;
-  /** `#playSubmenu` held open by a long press on the Play tab (`force-open`). */
-  submenuOpen: boolean;
-  /** A long press just opened the submenu, so the click that follows must not switch tabs. */
-  longPressed: boolean;
-  /** `#codeInput` as last sanitised (the legacy `lastGoodCode`). */
-  codeDraft: string;
-  /** The font every cue plays in (`ginRummy_soundFont`, docs/design/sound-fonts.md §6). */
-  soundFont: SoundFontName;
-}>;
+export type Shell = ShellState<Gin>;
 
 /**
  * The table's own state (backgammon's `Table`, docs/design/shared-shell.md §4.1): the tapped
  * card, the ghost draw slot, the kept picture, the melds made by hand, a drag, the sheets, the
  * pass-and-play curtain, the sandbox editor and gin's two table preferences (`sort`, `cardBack`).
- * Never saved but for those two, never on the wire; gin's alone when C2 lifts the shell. The
+ * Never saved but for those two, never on the wire; gin's alone since C2 lifted the shell. The
  * legacy's `hostSeated` (set, never read) is gone: it stayed only so the hook's `app` kept the
  * legacy's members, and this split changes that shape anyway.
  */
@@ -269,44 +244,11 @@ export type Table = Readonly<{
   discardsWithHand: boolean;
 }>;
 
-export type App = Readonly<{ shell: Shell; table: Table }>;
+export type App = ShellApp<Gin>;
 
 // What a table leaves behind when a hand is dealt, left or lost: the ghost cell's stage, the kept
 // picture and the melds made by hand all belong to the hand that just ended.
 const HAND_CLEARED = { draw: null, picture: null, human: null, drag: null } as const;
-
-export const DEFAULT_NAME = 'Ari';
-export const DEFAULT_TARGET = 100;
-
-export const initialShell: Shell = {
-  role: null,
-  code: null,
-  myName: DEFAULT_NAME,
-  target: DEFAULT_TARGET,
-  game: null,
-  view: null,
-  oppName: null,
-  oppConnected: false,
-  nameTouched: false,
-  revealed: null,
-  homeTab: DEFAULT_HOME_TAB,
-  playMode: DEFAULT_PLAY_MODE,
-  p1Name: '',
-  screen: 'homeScreen',
-  netAttempt: 0,
-  hostStatus: { text: OPENING_MSG, pulse: true },
-  guestStatus: { text: 'Connecting…', pulse: true },
-  startGameVisible: false,
-  handoff: false,
-  savedName: null,
-  resume: null,
-  rulesOpen: false,
-  cues: INITIAL_CUES,
-  submenuOpen: false,
-  longPressed: false,
-  codeDraft: '',
-  soundFont: DEFAULT_SOUND_FONT,
-};
 
 export const initialTable: Table = {
   selectedCard: null,
@@ -326,102 +268,24 @@ export const initialTable: Table = {
   discardsWithHand: false,
 };
 
-export const initialApp: App = { shell: initialShell, table: initialTable };
-
-/** The Play tab opens its submenu after this long a press. */
-export const LONG_PRESS_MS = 450;
 export const SANDBOX_COPIED_MSG = 'Copied for the console';
 /** The console call that deals `map`: what `#sbCopyBtn` copies. */
 export const consoleCall = (map: string): string => `__gin.sandbox(\`${map}\`)`;
 /** The sandbox mode shows while the first player is named `sandbox`. */
 export const sandboxUnlocked = (app: App): boolean => unlocksSandbox(app.shell.p1Name);
+// ---- the strings the table (not the shell, not the sessions) writes ---------------------------
 
-// ---- the strings the app (not the sessions) wrote --------------------------------------------
-
-export const NOT_CONNECTED_MSG = 'Not connected to the host.';
-export const WAITING_FOR_GUEST_MSG = 'Waiting for your opponent to join.';
-export const OPPONENT_LEFT_MSG = 'Opponent left. Waiting for someone to join…';
-export const ROOM_FULL_MSG = 'That room already has two players.';
-export const LOST_HOST_MSG = 'Lost connection to the host — reconnecting…';
-export const DISCONNECTED_MSG = 'Disconnected from the host — reconnecting…';
 export const FORCE_STOCK_MSG = 'Both players passed — you must draw from the stock.';
 export const LOCKED_CARD_MSG = "You can't discard the card you just took from the discard pile.";
 export const NO_MELD_MSG = 'No meld to make with that card.';
 export const ONE_WAY_MSG = 'This hand can only be melded one way.';
-export const LEAVE_LOCAL_MSG = 'End this game? Scores will be cleared.';
-export const LEAVE_ONLINE_MSG = 'Leave this game? The room will close.';
-export const joinedMsg = (name: string): string => `${name} joined! Ready when you are.`;
-export const hostRoomMsg = (hostName: string, target: number): string =>
-  `Connected to ${hostName}'s room (playing to ${String(target)}). Waiting for the host to start…`;
-export const guestGoneMsg = (oppName: string | null, code: string | null): string =>
-  `${oppName ?? 'Opponent'} disconnected — they can rejoin with code ${String(code)}.`;
-/** `onGuestGone`'s toast lasts this long, as does `LOST_HOST_MSG`. */
-export const GONE_TOAST_MS = 4000;
-
 // ---- intents -----------------------------------------------------------------------------------
 
-/** What the legacy `initHome` read from storage, in one snapshot (`readHome`). */
-export type HomeSnapshot = Readonly<{
-  name: string | null;
-  /** The pass-and-play second name: this page's own key, so a legacy session has none. */
-  p2Name: string | null;
-  homeTab: HomeTab;
-  playMode: StoredPlayMode;
-  /** How the hand is arranged: this page's own key, so a legacy session has the default. */
-  sort: SortMode;
-  /** The card back: this page's own key; a bad value read as the default (main.ts logs it). */
-  cardBack: CardBack;
-  /** The sound font: this page's own key; a bad value read as the default (main.ts logs it). */
-  soundFont: SoundFontName;
-  save: Save | null;
-  scorer: ScorerState | null;
-}>;
+/** What the legacy `initHome` read from storage, in one snapshot (`readHome`): the shell's keys and gin's (`Gin['Home']`: the sort, the card back, the Score Counter session). */
+export type HomeSnapshot = SharedHomeSnapshot<Gin>;
 
-export type Intent =
-  // ---- home ----
-  | Readonly<{ type: 'home/init'; home: HomeSnapshot }>
-  | Readonly<{ type: 'name/typed'; value: string }>
-  | Readonly<{ type: 'p1name/typed'; value: string }>
-  | Readonly<{ type: 'p2name/typed'; value: string }>
-  /** `setHomeTab(tab, { persist })`: an unknown tab is `play`. */
-  | Readonly<{ type: 'tab/set'; tab: string; persist?: boolean }>
-  /**
-   * A glossary link (docs/design/glossary-links.md) or a `#rule-<id>` deep link at boot: the Rules
-   * tab on the home screen, the rules overlay anywhere else, then the rule scrolled to and flashed.
-   */
-  | Readonly<{ type: 'rules/show'; rule: string }>
-  /** `setPlayMode(mode)`: `sandbox` while unlocked, `local`, else `online`. */
-  | Readonly<{ type: 'mode/set'; mode: string }>
-  /** `#hostBtn`: the raw input values. */
-  | Readonly<{ type: 'host/click'; name: string; target: string }>
-  /** `#joinBtn`: the raw input values. */
-  | Readonly<{ type: 'join/click'; name: string; code: string }>
-  /** `#localBtn`: the raw input values. */
-  | Readonly<{ type: 'local/click'; p1: string; p2: string; target: string }>
-  /** `#resumeBtn`: whatever `app.resume` offers. */
-  | Readonly<{ type: 'resume/click' }>
-  /**
-   * `#handoffBtn` (the 🌐 beside the table's leave button, pass-and-play alone): the game goes on
-   * as a hosted room.
-   */
-  | Readonly<{ type: 'handoff/click' }>
-  /** `#cancelHostBtn` / `#cancelGuestBtn`. */
-  | Readonly<{ type: 'cancel' }>
-  | Readonly<{ type: 'cancel/finish' }>
-  /** The hook's `showScreen(id)` (the scorer screens use it). */
-  | Readonly<{ type: 'screen/show'; screen: ScreenId }>
-  /** `#tabPlayBtn` pointerdown: the long-press timer starts. */
-  | Readonly<{ type: 'submenu/press' }>
-  /** `#tabPlayBtn` pointerup/leave/cancel: the timer is cancelled. */
-  | Readonly<{ type: 'submenu/release' }>
-  /** The long-press timer fired. */
-  | Readonly<{ type: 'submenu/longPress' }>
-  /** `#tabPlayBtn` click: the Play tab, unless a long press just opened the submenu. */
-  | Readonly<{ type: 'tab/playClick' }>
-  /** A `#playSubmenu` button. */
-  | Readonly<{ type: 'submenu/pick'; mode: string }>
-  /** A click outside `#tabPlayWrap`. */
-  | Readonly<{ type: 'submenu/dismiss' }>
+/** The table's half of `Intent`: gin's own, after the shell's 43 (web/shared/ui/shell.ts `ShellIntent`). */
+export type TableIntent =
   // ---- a card dragged by hand (ui/hand/dragger.ts) ----
   /** The pointer moved off a pressed card: a loose card of the hand, or a laid-off card on the table (§7b). */
   | Readonly<{ type: 'card/dragStart'; cardId: string; from?: 'hand' | 'table' }>
@@ -436,8 +300,6 @@ export type Intent =
   | Readonly<{ type: 'card/dragEnd'; over?: DropTarget | null }>
   /** `__gin.cardBack(name)` (the console, for now): a valid preset is shown and remembered. */
   | Readonly<{ type: 'cardBack/set'; back: CardBack }>
-  /** `__gin.soundFont(name)` (the console, for now): a valid font plays from now on and is remembered. */
-  | Readonly<{ type: 'soundFont/set'; font: SoundFontName }>
   // ---- the sandbox (src/sandbox.ts), shown while the first player is named `sandbox` ----
   /** `#sbPreset`: a preset's map into the editor. */
   | Readonly<{ type: 'sandbox/preset'; id: string }>
@@ -453,32 +315,10 @@ export type Intent =
    * (no names: Player 1 and Player 2): the map dealt as a pass-and-play game, or its error shown.
    */
   | Readonly<{ type: 'sandbox/start'; map: string; p1?: string; p2?: string }>
-  /** `#codeInput` input: the raw value and the InputEvent's type. */
-  | Readonly<{ type: 'code/typed'; value: string; inputType: string }>
-  /** `?join=<code>` at boot (an invite link): the code into `#codeInput`, the Play tab, online mode. */
-  | Readonly<{ type: 'join/link'; code: string }>
-  /** `#soundBtn`. */
-  | Readonly<{ type: 'sound/toggle' }>
-  /** `#shareCodeBtn`. */
-  | Readonly<{ type: 'share/click' }>
   | Readonly<{ type: 'rules/open' }>
   | Readonly<{ type: 'rules/close' }>
   | Readonly<{ type: 'history/open'; who: 'game' | 'scorer' }>
   | Readonly<{ type: 'history/close' }>
-  // ---- net: host ----
-  /** `startHost(resumeCode)`: null draws a fresh code. */
-  | Readonly<{ type: 'host/start'; code: string | null }>
-  | Readonly<{ type: 'host/status'; text: string; stopPulse: boolean }>
-  | Readonly<{ type: 'host/frame'; frame: GuestFrame }>
-  | Readonly<{ type: 'host/guestGone'; iceFailed: string | null }>
-  /** `#startGameBtn`. */
-  | Readonly<{ type: 'host/deal' }>
-  // ---- net: guest ----
-  | Readonly<{ type: 'guest/start'; code: string }>
-  | Readonly<{ type: 'guest/status'; text: string; stopPulse: boolean }>
-  | Readonly<{ type: 'guest/connected' }>
-  | Readonly<{ type: 'guest/frame'; frame: HostFrame }>
-  | Readonly<{ type: 'guest/lost' }>
   // ---- the table ----
   /** `act(action)`: every role. */
   | Readonly<{ type: 'act'; action: Action }>
@@ -505,146 +345,35 @@ export type Intent =
   | Readonly<{ type: 'card/press'; cardId: string }>
   | Readonly<{ type: 'card/release' }>
   /** The long press fired: a meld with the card by hand, or that meld dissolved. */
-  | Readonly<{ type: 'hand/mark'; cardId: string }>
-  /** `#curtainBtn`. */
-  | Readonly<{ type: 'curtain/reveal' }>
-  | Readonly<{ type: 'leave/request' }>
-  | Readonly<{ type: 'leave/confirmed' }>
-  | Readonly<{ type: 'leave/finish' }>
-  /** The page became visible: the wake lock is taken again while in a game. */
-  | Readonly<{ type: 'visible' }>
-  /** The hook's `render()`. */
-  | Readonly<{ type: 'render' }>
-  /** A session asked the app to persist. */
-  | Readonly<{ type: 'persist' }>;
+  | Readonly<{ type: 'hand/mark'; cardId: string }>;
 
 /**
- * The shell's half of `Intent`, backgammon's list under gin's names (docs/design/shared-shell.md
- * §4.2; C1): what the shared shell reducer owns once C2 lands. Everything else is the table's,
- * including gin's own `cardBack/set`, the sandbox editor and the rules and history sheets, and,
- * as in backgammon's partition, the leave flow, the curtain, `visible`, `render` and `persist`.
+ * Every handler and every network event: the shell's intents (backgammon's list under gin's
+ * names, docs/design/shared-shell.md §4.2; the shared reducer's since C2) and the table's,
+ * including gin's own `cardBack/set`, the sandbox editor and the rules and history sheets.
  */
-export const SHELL_INTENT_TYPES = [
-  'home/init',
-  'name/typed',
-  'p1name/typed',
-  'p2name/typed',
-  'tab/set',
-  'rules/show',
-  'mode/set',
-  'host/click',
-  'join/click',
-  'local/click',
-  'resume/click',
-  'handoff/click',
-  'cancel',
-  'cancel/finish',
-  'screen/show',
-  'submenu/press',
-  'submenu/release',
-  'submenu/longPress',
-  'tab/playClick',
-  'submenu/pick',
-  'submenu/dismiss',
-  'code/typed',
-  'join/link',
-  'sound/toggle',
-  'soundFont/set',
-  'share/click',
-  'host/start',
-  'host/status',
-  'host/frame',
-  'host/guestGone',
-  'host/deal',
-  'guest/start',
-  'guest/status',
-  'guest/connected',
-  'guest/frame',
-  'guest/lost',
-] as const satisfies ReadonlyArray<Intent['type']>;
-export type ShellIntent = Extract<Intent, { type: (typeof SHELL_INTENT_TYPES)[number] }>;
-export type TableIntent = Exclude<Intent, ShellIntent>;
-const isShellIntent = (intent: Intent): intent is ShellIntent =>
-  (SHELL_INTENT_TYPES as ReadonlyArray<string>).includes(intent.type);
+export type Intent = SharedIntent<Gin>;
+export type ShellIntent = SharedShellIntent<Gin>;
 
 // ---- effects -----------------------------------------------------------------------------------
 
-export type Effect =
-  | Readonly<{ type: 'persist' }>
-  | Readonly<{ type: 'clearSave' }>
-  /** A handed-off game given back to pass-and-play: the room was cancelled before anyone joined. */
-  | Readonly<{ type: 'saveLocal'; game: State }>
-  | Readonly<{ type: 'rememberName'; name: string }>
-  | Readonly<{ type: 'rememberP2Name'; name: string }>
-  | Readonly<{ type: 'writeHomeTab'; tab: HomeTab }>
-  | Readonly<{ type: 'writePlayMode'; mode: StoredPlayMode }>
+/** Gin's own effects, handled by `runEffect` before the shared runner: two table preferences, the Score Counter, the clipboard. */
+export type TableEffect =
   | Readonly<{ type: 'writeSort'; sort: SortMode }>
   | Readonly<{ type: 'writeCardBack'; back: CardBack }>
-  | Readonly<{ type: 'writeSoundFont'; font: SoundFontName }>
-  /** Scroll `rule` into view inside the rules `slot` that is on screen and flash it (web/shared/edge/glossary.ts). */
-  | Readonly<{ type: 'revealRule'; slot: RulesSlot; rule: string }>
-  /** `ms` null is the default duration. */
-  | Readonly<{ type: 'toast'; message: string; ms: number | null }>
-  /** To the current session's channel, if open. */
-  | Readonly<{ type: 'send'; frame: HostFrame | GuestFrame }>
-  | Readonly<{ type: 'fx'; cue: Cue | 'tap' }>
-  | Readonly<{ type: 'wakeLock'; hold: boolean }>
-  | Readonly<{ type: 'startHost'; code: string; attempt: number; resume: boolean }>
-  | Readonly<{ type: 'startGuest'; code: string; attempt: number }>
-  /** Close the current session's channel and destroy its Peer. */
-  | Readonly<{ type: 'closeNet' }>
-  /** `confirm(message)`: dispatch `then` when the player agrees. */
-  | Readonly<{ type: 'confirm'; message: string; then: Intent }>
-  /** Dispatch `intent` next, after the effects before it ran. */
-  | Readonly<{ type: 'then'; intent: Intent }>
-  /** Re-read storage and dispatch `home/init`. */
-  | Readonly<{ type: 'initHome' }>
-  /** `showScreen`'s `window.scrollTo(0, 0)`. */
-  | Readonly<{ type: 'scrollTop' }>
   /** `window.__scorer.resume()`: the resume box's Score Counter session. */
   | Readonly<{ type: 'scorer'; call: 'resume' }>
-  /** Arm a named timer that dispatches `then` after `ms`; arming again restarts it. */
-  | Readonly<{ type: 'startTimer'; id: TimerId; ms: number; then: Intent }>
-  | Readonly<{ type: 'cancelTimer'; id: TimerId }>
-  /** `fx.toggle()`. */
-  | Readonly<{ type: 'toggleSound' }>
-  /** The invite for `code` (its link) through the share sheet or the clipboard. */
-  | Readonly<{ type: 'share'; code: string }>
-  /** The first player's name into every input that shows it (`initHome`, and after a keystroke). */
-  | Readonly<{ type: 'fillName'; name: string }>
-  /** The second player's name into every input that shows it. */
-  | Readonly<{ type: 'fillP2Name'; name: string }>
-  /** `#codeInput`'s value after sanitising. */
-  | Readonly<{ type: 'setCode'; value: string }>
   /** `text` to the clipboard (`#sbCopyBtn`: the sandbox map as a console call). */
   | Readonly<{ type: 'copy'; text: string }>;
 
-export type TimerId = 'longPress' | 'cardPress';
+export type Effect = SharedEffect<Gin>;
 
-export type Step = Readonly<{ app: App; effects: ReadonlyArray<Effect> }>;
+export type TimerId = SharedTimerId<Gin>;
 
-export type Context = Readonly<{ rng: Rng; now: Now }>;
+export type Step = SharedStep<Gin>;
 
-const pure = (app: App): Step => ({ app, effects: [] });
-const step = (app: App, ...effects: ReadonlyArray<Effect>): Step => ({ app, effects });
-/** Run `f` after `s`, keeping `s`'s effects first. */
-const then = (s: Step, f: (app: App) => Step): Step => {
-  const next = f(s.app);
-  return { app: next.app, effects: [...s.effects, ...next.effects] };
-};
-const toast = (message: string, ms: number | null = null): Effect => ({
-  type: 'toast',
-  message,
-  ms,
-});
-const withShell = (app: App, over: Partial<Shell>): App => ({
-  ...app,
-  shell: { ...app.shell, ...over },
-});
-const withTable = (app: App, over: Partial<Table>): App => ({
-  ...app,
-  table: { ...app.table, ...over },
-});
+export type Context = Ctx;
+
 /**
  * A refused move: the toast, and a draw that was awaited never leaves the ghost slot pending. A
  * `shown` stage is kept: only `__gin.act` can send a move the engine refuses while the drawn card
@@ -653,35 +382,18 @@ const withTable = (app: App, over: Partial<Table>): App => ({
  */
 const refuse = (app: App, message: string): Step =>
   step(app.table.draw?.kind === 'waiting' ? withTable(app, { draw: null }) : app, toast(message));
-
 // ---- helpers, as the legacy had them ------------------------------------------------------------
-
-/** `parseInt(v, 10)`, falling back to 100 unless a positive integer. */
-export const parseTarget = (raw: string): number => {
-  const t = parseInt(raw, 10);
-  return !Number.isNaN(t) && t > 0 ? t : DEFAULT_TARGET;
-};
-
-/** `(value.trim() || fallback).slice(0, 20)`. */
-const nameOr = (raw: string, fallback: string): string => {
-  const trimmed = raw.trim();
-  return (trimmed === '' ? fallback : trimmed).slice(0, NAME_MAX);
-};
-
 const withSandbox = (app: App, over: Partial<Sandbox>): App =>
   withTable(app, { sandbox: { ...app.table.sandbox, ...over } });
-
-/** The first name as typed; a sandbox that the name no longer unlocks falls back to pass-and-play. */
-const withP1Name = (app: App, value: string): App =>
-  withShell(app, {
-    p1Name: value,
-    playMode:
-      app.shell.playMode === 'sandbox' && !unlocksSandbox(value) ? 'local' : app.shell.playMode,
-  });
-
-const showScreen = (app: App, screen: ScreenId): Step =>
-  step(withShell(app, { screen }), { type: 'scrollTop' });
-
+/**
+ * After a name is typed (the shell's `name/typed`/`p1name/typed` set `p1Name`): a sandbox that the
+ * name no longer unlocks falls back to pass-and-play. Gin's alone, so `reduce` runs it after the
+ * shell's own step (docs/design/shared-shell.md §4.3.2).
+ */
+const withP1Name = (app: App): App =>
+  app.shell.playMode === 'sandbox' && !unlocksSandbox(app.shell.p1Name)
+    ? withShell(app, { playMode: 'local' })
+    : app;
 /**
  * The state side of the legacy `render()`: nothing without a view; else the cue machine steps
  * (its cue is played), the opponent's pickup chimes when `prev` (the view this one replaces, given
@@ -708,69 +420,7 @@ const rendered = (app: App, prev: View | null = null): Step => {
     { type: 'scrollTop' },
   );
 };
-
-const withHostStatus = (app: App, text: string, stopPulse = false): App =>
-  withShell(app, { hostStatus: { text, pulse: stopPulse ? false : app.shell.hostStatus.pulse } });
-const withGuestStatus = (app: App, text: string, stopPulse = false): App =>
-  withShell(app, {
-    guestStatus: { text, pulse: stopPulse ? false : app.shell.guestStatus.pulse },
-  });
-
-/** `app.game.players[1].name = name` on a rejoin. */
-const renameGuest = (game: State, name: string): State => ({
-  ...game,
-  players: [game.players[0], { ...game.players[1], name }],
-});
-
 // ---- flows -------------------------------------------------------------------------------------
-
-/** `broadcast()`: my view, the guest's view on the wire, selection cleared, saved, rendered. */
-const broadcast = (app: App): Step => {
-  const game = app.shell.game;
-  if (game === null) return pure(app);
-  return then(
-    step(
-      withTable(withShell(app, { view: viewFor(game, 0) }), { selectedCard: null }),
-      { type: 'send', frame: stateFrame(viewFor(game, 1)) },
-      { type: 'persist' },
-    ),
-    (a) => rendered(a, app.shell.view),
-  );
-};
-
-/** `dispatch(pIdx, action)`, host only: apply, or refuse to the mover; then broadcast. */
-const hostDispatch = (app: App, seat: Seat, action: Action, ctx: Context): Step => {
-  if (app.shell.game === null) return pure(app);
-  const res = applyAction(app.shell.game, seat, action, ctx.rng, ctx.now);
-  if (!res.ok) {
-    return seat === 0
-      ? refuse(app, res.error)
-      : step(app, { type: 'send', frame: toastFrame(res.error) });
-  }
-  return broadcast(withTable(withShell(app, { game: res.value }), { resultDismissed: false }));
-};
-
-/**
- * `localBroadcast(initial)`: the mover's view while a hand is in play, the revealed player's (or
- * seat 0's) otherwise; the curtain comes up when the phone must change hands, chiming unless this
- * is the start or a reveal.
- */
-const localBroadcast = (app: App, initial: boolean): Step => {
-  const game = app.shell.game;
-  if (game === null) return pure(app);
-  const playing = inPlay(game.phase);
-  const viewIdx: Seat = playing ? game.turn : (app.shell.revealed ?? 0);
-  const curtain = playing && app.shell.revealed !== game.turn ? game.turn : null;
-  return then(
-    step(
-      withTable(withShell(app, { view: viewFor(game, viewIdx) }), { selectedCard: null, curtain }),
-      { type: 'persist' },
-      ...(curtain !== null && !initial ? [{ type: 'fx', cue: 'yourTurn' } as const] : []),
-    ),
-    rendered,
-  );
-};
-
 /** `localAct(action)`: `ready` is applied for both seats; anything else for the mover. */
 const localAct = (app: App, action: Action, ctx: Context): Step => {
   const game = app.shell.game;
@@ -783,6 +433,8 @@ const localAct = (app: App, action: Action, ctx: Context): Step => {
     return localBroadcast(
       withTable(withShell(app, { game: r2.ok ? r2.value : g1 }), { resultDismissed: false }),
       false,
+      ctx,
+      GIN,
     );
   }
   const res = applyAction(game, game.turn, action, ctx.rng, ctx.now);
@@ -790,53 +442,10 @@ const localAct = (app: App, action: Action, ctx: Context): Step => {
   return localBroadcast(
     withTable(withShell(app, { game: res.value }), { resultDismissed: false }),
     false,
+    ctx,
+    GIN,
   );
 };
-
-/** `startLocal(p1, p2, target, savedGame)` with the game already made; `human` is the sandbox's hand-made melds. */
-const startLocal = (app: App, game: State, human: HumanMelds | null = null): Step =>
-  then(
-    step(
-      withTable(
-        withShell(app, { role: 'local', code: null, oppConnected: true, game, revealed: null }),
-        { resultDismissed: false, ...HAND_CLEARED, human },
-      ),
-      { type: 'wakeLock', hold: true },
-    ),
-    (a) => localBroadcast(a, true),
-  );
-
-/** `startHost(resumeCode)` up to the network: the session is the `startHost` effect. */
-const startHost = (app: App, resumeCode: string | null, ctx: Context): Step => {
-  const code = resumeCode ?? randomCode('gin-rummy', ctx.rng);
-  const attempt = app.shell.netAttempt + 1;
-  return then(
-    showScreen(
-      withHostStatus(
-        withShell(app, { role: 'host', code, netAttempt: attempt, startGameVisible: false }),
-        OPENING_MSG,
-      ),
-      'hostWaitScreen',
-    ),
-    (a) => step(a, { type: 'startHost', code, attempt, resume: resumeCode !== null }),
-  );
-};
-
-/** `startGuest(code)` up to the network: the session is the `startGuest` effect. */
-const startGuest = (app: App, code: string): Step => {
-  const attempt = app.shell.netAttempt + 1;
-  return then(
-    showScreen(
-      withGuestStatus(
-        withShell(app, { role: 'guest', code, netAttempt: attempt }),
-        connectingMsg(code),
-      ),
-      'guestWaitScreen',
-    ),
-    (a) => step(a, { type: 'startGuest', code, attempt }),
-  );
-};
-
 /**
  * `act(action)`: a tap, then by role. A draw (the stock, the discard pile, the upcard) first opens
  * the ghost cell for the card, so the ten cards on screen keep their places until the player
@@ -858,7 +467,7 @@ const act = (app: App, action: Action, ctx: Context): Step => {
       case 'local':
         return localAct(a, action, ctx);
       case 'host':
-        return hostDispatch(a, 0, action, ctx);
+        return hostDispatch(a, 0, action, ctx, GIN);
       case 'guest':
       case null:
         // The legacy tested `app.conn && app.conn.open`; a guest's channel is open exactly while
@@ -869,95 +478,9 @@ const act = (app: App, action: Action, ctx: Context): Step => {
     }
   });
 };
-
-/**
- * `onGuestGone()` after `oppConnected` was cleared. During a handoff nobody has joined yet (the
- * hand is there, but the room still waits for the invite to be followed), so a channel that closed
- * or failed before its join leaves the wait screen saying to send the invite, with no toast.
- */
-const guestGone = (app: App): Step => {
-  if (app.shell.handoff)
-    return pure(withHostStatus(app, handoffMsg(app.shell.code ?? '', app.shell.oppName)));
-  if (app.shell.game !== null && app.shell.view !== null && app.shell.view.phase !== 'gameOver')
-    return then(rendered(app), (a) =>
-      step(a, toast(guestGoneMsg(a.shell.oppName, a.shell.code), GONE_TOAST_MS)),
-    );
-  if (app.shell.game === null)
-    return pure(withShell(withHostStatus(app, OPPONENT_LEFT_MSG), { startGameVisible: false }));
-  return pure(app);
-};
-
-/** `onGuestMsg(conn, msg)` for a decoded frame. */
-const hostFrame = (app: App, frame: GuestFrame, ctx: Context): Step => {
-  switch (frame.t) {
-    case 'join': {
-      const name = guestNameFor(frame.name, app.shell.myName);
-      const connected = withShell(app, { oppConnected: true, oppName: name, handoff: false });
-      if (app.shell.game !== null) {
-        // Rejoin: keep the seat, refresh the name.
-        return broadcast(withShell(connected, { game: renameGuest(app.shell.game, name) }));
-      }
-      return step(
-        withShell(withHostStatus(connected, joinedMsg(name)), { startGameVisible: true }),
-        { type: 'send', frame: lobbyFrame(app.shell.myName, { target: app.shell.target }) },
-      );
-    }
-    case 'action':
-      return app.shell.game === null ? pure(app) : hostDispatch(app, 1, frame.action, ctx);
-  }
-};
-
-/** `onHostMsg(msg)` for a decoded frame. */
-const guestFrame = (app: App, frame: HostFrame): Step => {
-  switch (frame.t) {
-    case 'welcome':
-    case 'lobby':
-      return pure(
-        withGuestStatus(
-          withShell(app, { oppName: frame.hostName, target: frame.target }),
-          hostRoomMsg(frame.hostName, frame.target),
-        ),
-      );
-    case 'full':
-      return pure(withGuestStatus(app, ROOM_FULL_MSG));
-    case 'toast':
-      // The host refused the guest's move: a draw that was awaited is over.
-      return refuse(app, frame.msg);
-    case 'state':
-      return rendered(
-        withTable(withShell(app, { view: frame.view, oppConnected: true }), {
-          selectedCard: null,
-          resultDismissed: false,
-        }),
-        app.shell.view,
-      );
-  }
-};
-
-/** The resume box `initHome` showed, in the legacy order of precedence, or null. */
-export const resumeFor = (save: Save | null, scorer: ScorerState | null): Resume | null => {
-  if (scorer !== null) return { kind: 'scorer', state: scorer };
-  if (save === null) return null;
-  switch (save.role) {
-    case 'local':
-      return save.game.phase !== 'gameOver' ? { kind: 'local', game: save.game } : null;
-    case 'host':
-      return save.game !== null && save.game.phase !== 'gameOver'
-        ? {
-            kind: 'host',
-            code: save.code,
-            myName: save.myName,
-            target: save.target,
-            game: save.game,
-            oppName: save.oppName,
-            handoff: save.handoff === true,
-          }
-        : null;
-    case 'guest':
-      return { kind: 'guest', code: save.code, myName: save.myName };
-  }
-};
-
+/** The resume box `initHome` showed, in the legacy order of precedence, or null: the Score Counter's session first, then the shell's three save roles. */
+export const resumeFor = (save: Save | null, scorer: ScorerState | null): Resume | null =>
+  scorer !== null ? { kind: 'scorer', state: scorer } : shellResumeFor(save, GIN);
 /** `#resumeBtn`'s label for a resume offer. */
 export const resumeLabel = (resume: Resume): string => {
   switch (resume.kind) {
@@ -975,126 +498,6 @@ export const resumeLabel = (resume: Resume): string => {
 /** `#handoffBtn`'s tooltip, and a handed-off room's resume offer: seat 0 keeps this device and hosts; seat 1 joins through the invite. */
 export const handoffLabel = (game: State): string =>
   `Continue online: ${game.players[0].name} hosts, ${game.players[1].name} joins by invite`;
-
-/** `setHomeTab(tab, opts)`. */
-const setHomeTab = (app: App, tab: string, persist: boolean): Step => {
-  const known = HOME_TABS.find((t) => t === tab) ?? DEFAULT_HOME_TAB;
-  return step(
-    withShell(app, { homeTab: known }),
-    ...(persist ? [{ type: 'writeHomeTab', tab: known } as const] : []),
-  );
-};
-
-/** `initHome()` over a storage snapshot: the saved names go into the three name inputs. */
-const initHome = (app: App, home: HomeSnapshot): Step =>
-  then(showScreen(app, 'homeScreen'), (a) =>
-    then(
-      then(
-        step(
-          withTable(
-            withShell(a, {
-              savedName: home.name,
-              p1Name: home.name ?? '',
-              nameTouched: home.name !== null ? true : a.shell.nameTouched,
-              homeTab: home.homeTab,
-              playMode: home.playMode,
-              soundFont: home.soundFont,
-            }),
-            { sort: home.sort, cardBack: home.cardBack },
-          ),
-          ...(home.name === null ? [] : [{ type: 'fillName', name: home.name } as const]),
-          ...(home.p2Name === null ? [] : [{ type: 'fillP2Name', name: home.p2Name } as const]),
-        ),
-        (b) => setHomeTab(b, home.homeTab, false),
-      ),
-      (b) => pure(withShell(b, { resume: resumeFor(home.save, home.scorer) })),
-    ),
-  );
-
-/** `#resumeBtn` for each offer. */
-const resume = (app: App, offer: Resume, ctx: Context): Step => {
-  switch (offer.kind) {
-    case 'scorer':
-      return step(app, { type: 'scorer', call: 'resume' });
-    case 'local':
-      return startLocal(app, offer.game);
-    case 'host':
-      return startHost(
-        withShell(app, {
-          myName: offer.myName,
-          target: offer.target,
-          game: offer.game,
-          oppName: offer.oppName,
-          view: viewFor(offer.game, 0),
-          // A handoff nobody joined resumes as one, under the code the invite already carries.
-          handoff: offer.handoff,
-        }),
-        offer.code,
-        ctx,
-      );
-    case 'guest':
-      return startGuest(withShell(app, { myName: offer.myName }), offer.code);
-  }
-};
-
-/**
- * `#handoffBtn`: the pass-and-play game goes on as a hosted room with a
- * fresh code. Seat 0 keeps this device as the host; seat 1 joins from its own through the invite,
- * and the host's join handler takes it as a rejoin (the seat is kept, the name refreshed, the hand
- * broadcast). From the table the pass-and-play marks (the curtain, the revealed seat, the draw
- * stage, a selection, the meld chooser) are cleared as a leave clears them.
- */
-const handoff = (app: App, game: State, ctx: Context): Step =>
-  startHost(
-    withTable(
-      withShell(app, {
-        myName: game.players[0].name,
-        target: game.target,
-        game,
-        oppName: game.players[1].name,
-        oppConnected: false,
-        view: viewFor(game, 0),
-        revealed: null,
-        handoff: true,
-      }),
-      { selectedCard: null, curtain: null, meldChooser: false, draw: null },
-    ),
-    null,
-    ctx,
-  );
-
-/** `leaveGame()` after the confirm and the network close: the reset, then home. */
-const leaveFinish = (app: App): Step =>
-  step(
-    withTable(
-      withShell(app, {
-        netAttempt: app.shell.netAttempt + 1,
-        role: null,
-        game: null,
-        view: null,
-        oppConnected: false,
-        code: null,
-        revealed: null,
-        handoff: false,
-      }),
-      { curtain: null, meldChooser: false, ...HAND_CLEARED },
-    ),
-    { type: 'clearSave' },
-    { type: 'initHome' },
-  );
-
-/**
- * `#cancelHostBtn` / `#cancelGuestBtn` after the Peer is destroyed. A handed-off game nobody
- * joined goes back to pass-and-play instead of being cleared with the room.
- */
-const cancelFinish = (app: App): Step =>
-  step(
-    withShell(app, { role: null, netAttempt: app.shell.netAttempt + 1, handoff: false }),
-    app.shell.handoff && app.shell.game !== null
-      ? { type: 'saveLocal', game: app.shell.game }
-      : { type: 'clearSave' },
-    { type: 'initHome' },
-  );
 
 /** A `data-act` button. */
 const actionClick = (app: App, which: string, ctx: Context): Step => {
@@ -1136,215 +539,7 @@ const fitsMeld = (v: View, cardId: string, onto: number | null): boolean => {
   const meld = onto === null || lo === undefined ? undefined : lo.extended[onto];
   return v.isMyTurn && card !== undefined && meld !== undefined && fitsOnto(card, meld);
 };
-
-// ---- the reducer -------------------------------------------------------------------------------
-
-const shellIntent = (app: App, intent: ShellIntent, ctx: Context): Step => {
-  switch (intent.type) {
-    // ---- home ----
-    case 'home/init':
-      return initHome(app, intent.home);
-    // A name typed into any of its inputs is remembered trimmed and shown, as typed, in the others
-    // (the online name, pass-and-play's seats and the Score Counter's players are the same two
-    // names); the fill writes only inputs whose value differs, so the one being typed in is left alone.
-    case 'name/typed':
-      return step(
-        withP1Name(withShell(app, { nameTouched: true }), intent.value),
-        { type: 'rememberName', name: intent.value.trim() },
-        { type: 'fillName', name: intent.value },
-      );
-    case 'p1name/typed':
-      return step(
-        withP1Name(app, intent.value),
-        { type: 'rememberName', name: intent.value.trim() },
-        { type: 'fillName', name: intent.value },
-      );
-    case 'p2name/typed':
-      return step(
-        app,
-        { type: 'rememberP2Name', name: intent.value.trim() },
-        { type: 'fillP2Name', name: intent.value },
-      );
-    case 'tab/set':
-      return setHomeTab(app, intent.tab, intent.persist !== false);
-    case 'rules/show': {
-      // On the home screen the Rules tab is the rules; anywhere else (the table, a waiting room,
-      // the scorer) the overlay is, and its own copy of the list is the one to scroll.
-      const home = app.shell.screen === 'homeScreen';
-      const shown = home
-        ? setHomeTab(app, 'rules', true)
-        : pure(withShell(app, { rulesOpen: true }));
-      return then(shown, (a) =>
-        step(a, {
-          type: 'revealRule',
-          slot: home ? 'rulesList' : 'rulesOverlayList',
-          rule: intent.rule,
-        }),
-      );
-    }
-    case 'mode/set': {
-      // The sandbox is shown, never stored: a reload lands on the stored mode.
-      if (intent.mode === 'sandbox')
-        return pure(sandboxUnlocked(app) ? withShell(app, { playMode: 'sandbox' }) : app);
-      const mode: StoredPlayMode = intent.mode === 'local' ? 'local' : 'online';
-      return step(withShell(app, { playMode: mode }), { type: 'writePlayMode', mode });
-    }
-    case 'host/click':
-      return startHost(
-        withShell(app, {
-          myName: nameOr(intent.name, DEFAULT_NAME),
-          target: parseTarget(intent.target),
-          game: null,
-          oppName: null,
-          oppConnected: false,
-        }),
-        null,
-        ctx,
-      );
-    case 'join/click': {
-      const code = validateCode('gin-rummy', intent.code);
-      if (!code.ok) return step(app, toast(code.error));
-      const typed = intent.name.trim();
-      const myName = (
-        typed !== '' && (app.shell.nameTouched || typed !== DEFAULT_NAME)
-          ? typed
-          : DEFAULT_GUEST_NAME
-      ).slice(0, NAME_MAX);
-      return startGuest(withShell(app, { myName }), code.value);
-    }
-    case 'local/click': {
-      const p1 = nameOr(intent.p1, 'Player 1');
-      const p2raw = nameOr(intent.p2, 'Player 2');
-      const p2 = p2raw.toLowerCase() === p1.toLowerCase() ? `${p2raw} 2` : p2raw;
-      const game = createGame(
-        {
-          players: [
-            { id: 'p1', name: p1 },
-            { id: 'p2', name: p2 },
-          ],
-          target: parseTarget(intent.target),
-        },
-        ctx.rng,
-        ctx.now,
-      );
-      return startLocal(app, game);
-    }
-    case 'resume/click':
-      return app.shell.resume === null ? pure(app) : resume(app, app.shell.resume, ctx);
-    case 'handoff/click':
-      // The home screen's offer, or the game in play on the pass-and-play curtain.
-      if (app.shell.role === 'local' && app.shell.game !== null)
-        return handoff(app, app.shell.game, ctx);
-      return app.shell.resume?.kind === 'local'
-        ? handoff(app, app.shell.resume.game, ctx)
-        : pure(app);
-    case 'cancel':
-      return step(app, { type: 'closeNet' }, { type: 'then', intent: { type: 'cancel/finish' } });
-    case 'cancel/finish':
-      return cancelFinish(app);
-    case 'screen/show':
-      return showScreen(app, intent.screen);
-    case 'submenu/press':
-      return step(withShell(app, { longPressed: false }), {
-        type: 'startTimer',
-        id: 'longPress',
-        ms: LONG_PRESS_MS,
-        then: { type: 'submenu/longPress' },
-      });
-    case 'submenu/release':
-      return step(app, { type: 'cancelTimer', id: 'longPress' });
-    case 'submenu/longPress':
-      return step(withShell(app, { longPressed: true, submenuOpen: true }), {
-        type: 'fx',
-        cue: 'tap',
-      });
-    case 'tab/playClick':
-      // The long press already opened the submenu; the click that follows must not switch tabs.
-      return app.shell.longPressed
-        ? pure(withShell(app, { longPressed: false }))
-        : setHomeTab(withShell(app, { submenuOpen: false }), 'play', true);
-    case 'submenu/pick':
-      return then(reduce(app, { type: 'mode/set', mode: intent.mode }, ctx), (a) =>
-        setHomeTab(withShell(a, { submenuOpen: false }), 'play', true),
-      );
-    case 'submenu/dismiss':
-      return pure(withShell(app, { submenuOpen: false }));
-    case 'soundFont/set':
-      return step(withShell(app, { soundFont: intent.font }), {
-        type: 'writeSoundFont',
-        font: intent.font,
-      });
-    case 'code/typed': {
-      // A keyboard suggestion that swapped earlier letters arrives as a replacement: keep the last good code.
-      const value =
-        intent.inputType === 'insertReplacementText'
-          ? app.shell.codeDraft
-          : sanitiseCode('gin-rummy', intent.value);
-      return step(withShell(app, { codeDraft: value }), { type: 'setCode', value });
-    }
-    case 'join/link': {
-      // The invite link: the code is in the form; the mode is shown, not stored.
-      const code = sanitiseCode('gin-rummy', intent.code);
-      return then(
-        setHomeTab(withShell(app, { playMode: 'online', codeDraft: code }), 'play', false),
-        (a) => step(a, { type: 'setCode', value: code }),
-      );
-    }
-    case 'sound/toggle':
-      return step(app, { type: 'toggleSound' });
-    case 'share/click':
-      return app.shell.code === null
-        ? pure(app)
-        : step(app, { type: 'share', code: app.shell.code });
-    // ---- net: host ----
-    case 'host/start':
-      return startHost(app, intent.code, ctx);
-    case 'host/status':
-      return pure(withHostStatus(app, intent.text, intent.stopPulse));
-    case 'host/frame':
-      return hostFrame(app, intent.frame, ctx);
-    case 'host/guestGone': {
-      const gone = withShell(app, { oppConnected: false });
-      return intent.iceFailed === null
-        ? guestGone(gone)
-        : pure(withHostStatus(gone, intent.iceFailed));
-    }
-    case 'host/deal': {
-      if (!app.shell.oppConnected) return step(app, toast(WAITING_FOR_GUEST_MSG));
-      const game = createGame(
-        {
-          players: [
-            { id: 'host', name: app.shell.myName },
-            // A connected opponent has a name; the fallback only satisfies the type.
-            { id: 'guest', name: app.shell.oppName ?? DEFAULT_GUEST_NAME },
-          ],
-          target: app.shell.target,
-        },
-        ctx.rng,
-        ctx.now,
-      );
-      return broadcast(
-        withTable(withShell(app, { game }), { resultDismissed: false, ...HAND_CLEARED }),
-      );
-    }
-    // ---- net: guest ----
-    case 'guest/start':
-      return startGuest(app, intent.code);
-    case 'guest/status':
-      return pure(withGuestStatus(app, intent.text, intent.stopPulse));
-    case 'guest/connected':
-      return pure(withShell(app, { oppConnected: true }));
-    case 'guest/frame':
-      return guestFrame(app, intent.frame);
-    case 'guest/lost': {
-      const lost = withTable(withShell(app, { oppConnected: false }), { ...HAND_CLEARED });
-      if (lost.shell.view !== null && lost.shell.view.phase !== 'gameOver')
-        return then(rendered(lost), (a) => step(a, toast(LOST_HOST_MSG, GONE_TOAST_MS)));
-      return showScreen(withGuestStatus(lost, DISCONNECTED_MSG), 'guestWaitScreen');
-    }
-  }
-};
-
+// ---- the table's reducer ---------------------------------------------------------------------
 const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
   switch (intent.type) {
     case 'cardBack/set':
@@ -1376,22 +571,20 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
     case 'sandbox/start': {
       const parsed = parseMap(intent.map);
       if (!parsed.ok) return pure(withSandbox(app, { map: intent.map, error: parsed.error }));
-      const p1 = nameOr(intent.p1 ?? '', 'Player 1');
-      const p2raw = nameOr(intent.p2 ?? '', 'Player 2');
-      const p2 = p2raw.toLowerCase() === p1.toLowerCase() ? `${p2raw} 2` : p2raw;
-      const game = dealMap(
-        parsed.value,
-        [
-          { id: 'p1', name: p1 },
-          { id: 'p2', name: p2 },
-        ],
-        ctx.now,
-      );
+      const game = dealMap(parsed.value, localPlayers(intent.p1 ?? '', intent.p2 ?? ''), ctx.now);
       const human: HumanMelds | null =
         parsed.value.melds.length === 0
           ? null
           : { hand: game.handNumber, groups: parsed.value.melds.map(idsOf) };
-      return startLocal(withSandbox(app, { map: intent.map, error: null }), game, human);
+      // `startLocal` with the map's hand-made melds seated between the table's reset and the
+      // first broadcast, where the shared flow has no slot for them (shared-shell.md §4.3.2).
+      const seated = withTable(
+        localSeated(withSandbox(app, { map: intent.map, error: null }), game, GIN),
+        { human },
+      );
+      return then(step(seated, { type: 'wakeLock', hold: true }), (a) =>
+        localBroadcast(a, true, ctx, GIN),
+      );
     }
     case 'rules/open':
       return pure(withShell(app, { rulesOpen: true }));
@@ -1608,249 +801,130 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
         ? then(step(marked, { type: 'fx', cue: 'tap' }), rendered)
         : act(marked, { type: 'setMelds', melds: groups }, ctx);
     }
-    case 'curtain/reveal': {
-      if (app.shell.game === null) return pure(app);
-      return then(
-        step(withTable(withShell(app, { revealed: app.shell.game.turn }), { curtain: null }), {
-          type: 'fx',
-          cue: 'tap',
-        }),
-        (a) => localBroadcast(a, true),
-      );
-    }
-    case 'leave/request':
-      return step(app, {
-        type: 'confirm',
-        message: app.shell.role === 'local' ? LEAVE_LOCAL_MSG : LEAVE_ONLINE_MSG,
-        then: { type: 'leave/confirmed' },
-      });
-    case 'leave/confirmed':
-      // The network closes before the reset (see the header), then `leave/finish` resets.
-      return step(
-        app,
-        { type: 'wakeLock', hold: false },
-        { type: 'closeNet' },
-        { type: 'then', intent: { type: 'leave/finish' } },
-      );
-    case 'leave/finish':
-      return leaveFinish(app);
-    case 'visible':
-      return app.shell.role === null ? pure(app) : step(app, { type: 'wakeLock', hold: true });
-    case 'render':
-      return rendered(app);
-    case 'persist':
-      return step(app, { type: 'persist' });
   }
 };
 
-export const reduce = (app: App, intent: Intent, ctx: Context): Step =>
-  isShellIntent(intent) ? shellIntent(app, intent, ctx) : tableIntent(app, intent, ctx);
+// ---- the shell's hooks into the table, and the config (docs/design/shared-shell.md §4.3) ---------
+
+/**
+ * What the table drops where a shared flow resets it, site by site as the legacy did there
+ * (§4.3.2): a hand's start, a deal, a leave and the host lost clear the hand (`HAND_CLEARED`), the
+ * leave also the sheets left open on the table; the handoff keeps the picture, the hand-made melds
+ * and a drag (the hand goes on as a hosted room) and clears only the pass-and-play marks; a new
+ * view drops the selection, an applied action re-shows the result sheet, a guest's `state` frame
+ * does both.
+ */
+const reset = (table: Table, at: TableReset): Table => {
+  switch (at) {
+    case 'startLocal':
+    case 'deal':
+      return { ...table, resultDismissed: false, ...HAND_CLEARED };
+    case 'handoff':
+      return { ...table, selectedCard: null, curtain: null, meldChooser: false, draw: null };
+    case 'leave':
+      return { ...table, curtain: null, meldChooser: false, ...HAND_CLEARED };
+    case 'lost':
+      return { ...table, ...HAND_CLEARED };
+    case 'view':
+      return { ...table, selectedCard: null };
+    case 'applied':
+      return { ...table, resultDismissed: false };
+    case 'frame':
+      return { ...table, selectedCard: null, resultDismissed: false };
+  }
+};
+
+/**
+ * `localBroadcast`'s seat: the mover's view while a hand is in play, the revealed player's (or
+ * seat 0's) otherwise; the curtain comes up when the phone must change hands. Nothing else is
+ * handed over (backgammon toasts its hits here).
+ */
+const viewer: ShellConfig<Gin>['local']['viewer'] = (app, game) => {
+  const playing = inPlay(game.phase);
+  const seat: Seat = playing ? game.turn : (app.shell.revealed ?? 0);
+  return {
+    seat,
+    curtain: playing && app.shell.revealed !== game.turn ? game.turn : null,
+    effects: [],
+  };
+};
+
+/** `curtain/reveal`: the mover lifts the curtain; nothing to tell them. */
+const revealer: ShellConfig<Gin>['local']['revealer'] = (game) => ({
+  seat: game.turn,
+  effects: [],
+});
+
+/** Gin's shell config: shellConfig.ts's half completed with the table hooks and the home snapshot's own part (the sort and the card back onto the table; the Score Counter's offer first). */
+export const GIN: ShellConfig<Gin> = {
+  ...GIN_SHELL,
+  table: { initial: initialTable, reset, rendered, refuse },
+  local: { viewer, revealer },
+  home: {
+    ...GIN_SHELL.home,
+    apply: (app, home) => withTable(app, { sort: home.sort, cardBack: home.cardBack }),
+    resume: (home) => resumeFor(home.save, home.scorer),
+    resumeExtra: (app) => step(app, { type: 'scorer', call: 'resume' }),
+  },
+};
+
+export const initialShell: Shell = shellInitial(GIN);
+
+export const initialApp: App = { shell: initialShell, table: initialTable };
+
+// ---- the reducer -------------------------------------------------------------------------------
+
+export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
+  if (!isShellIntent(intent)) return tableIntent(app, intent, ctx);
+  const s = reduceShell(app, intent, ctx, GIN);
+  // The typed first name unlocks or locks the sandbox mode: gin's alone, after the shell's step.
+  return intent.type === 'name/typed' || intent.type === 'p1name/typed'
+    ? { ...s, app: withP1Name(s.app) }
+    : s;
+};
 
 // ---- storage: persist and resume -------------------------------------------------------------
 
 /** `persist()`: the save for the current role, or null when there is nothing to save. */
-export const saveFor = (app: App): Save | null => {
-  switch (app.shell.role) {
-    case 'local':
-      return app.shell.game === null ? null : { role: 'local', game: app.shell.game };
-    case 'host':
-      return {
-        role: 'host',
-        code: app.shell.code ?? '',
-        myName: app.shell.myName,
-        target: app.shell.target,
-        game: app.shell.game,
-        oppName: app.shell.oppName,
-        ...(app.shell.handoff ? { handoff: true } : {}),
-      };
-    case 'guest':
-      return { role: 'guest', code: app.shell.code ?? '', myName: app.shell.myName };
-    case null:
-      return null;
-  }
-};
+export const saveFor = (app: App): Save | null => shellSaveFor(app.shell);
 
 /** `initHome`'s reads: the names, the tab and mode (defaults when unreadable), the save, the scorer session. */
-export const readHome = (store: Store): HomeSnapshot => {
-  const name = readName(store);
-  const p2Name = readP2Name(store);
-  const tab = readHomeTab(store);
-  const mode = readPlayMode(store);
-  const sort = readSort(store);
-  const back = readCardBack(store);
-  const font = readSoundFont(store);
-  const save = readSave(store);
-  const scorer = readScorerState(store);
-  return {
-    name: name.ok ? name.value : null,
-    p2Name: p2Name.ok ? p2Name.value : null,
-    homeTab: tab.ok ? tab.value : DEFAULT_HOME_TAB,
-    playMode: mode.ok ? mode.value : DEFAULT_PLAY_MODE,
-    sort: sort.ok ? sort.value : DEFAULT_SORT,
-    cardBack: back.ok ? back.value : DEFAULT_CARD_BACK,
-    soundFont: font.ok ? font.value : DEFAULT_SOUND_FONT,
-    save: save.ok ? save.value : null,
-    scorer: scorer.ok ? scorer.value : null,
-  };
-};
+export const readHome = (store: Store): HomeSnapshot => shellReadHome(store, GIN);
 
 // ---- what the sessions read back ---------------------------------------------------------------
 
-export const hostContextOf = (app: App): HostContext => ({
-  attempt: app.shell.netAttempt,
-  role: app.shell.role,
-  code: app.shell.code,
-  myName: app.shell.myName,
-  target: app.shell.target,
-  hasGame: app.shell.game !== null,
-  handoff: app.shell.handoff,
-  oppName: app.shell.oppName,
-  oppConnected: app.shell.oppConnected,
-});
+export const hostContextOf = (app: App): HostContext => shellHostContextOf(app.shell);
 
-export const guestContextOf = (app: App): GuestContext => ({
-  attempt: app.shell.netAttempt,
-  role: app.shell.role,
-  code: app.shell.code,
-  myName: app.shell.myName,
-  oppConnected: app.shell.oppConnected,
-});
+export const guestContextOf = (app: App): GuestContext => shellGuestContextOf(app.shell);
 
 // ---- running the effects -----------------------------------------------------------------------
 
-/** The adapters an effect reaches; main.ts constructs the real ones, tests record. */
-export type EffectDeps = Readonly<{
-  store: Store;
-  toast: (message: string, ms: number | null) => void;
-  /** A cue in the App's font: the reducer's state is the source of truth for both. */
-  fx: (cue: Cue | 'tap', font: SoundFontName) => void;
-  wakeLock: (hold: boolean) => void;
-  net: Readonly<{
-    startHost: (code: string, attempt: number, resume: boolean) => void;
-    startGuest: (code: string, attempt: number) => void;
-    send: (frame: HostFrame | GuestFrame) => void;
-    close: () => void;
+/** The adapters an effect reaches: the shell's (web/shared/ui/shellEffects.ts) plus gin's Score Counter and clipboard; main.ts constructs the real ones, tests record. */
+export type EffectDeps = ShellEffectDeps<Gin> &
+  Readonly<{
+    scorer: Readonly<{ resume: () => void }>;
+    /** `text` to the clipboard, silently (the reducer toasts). */
+    copy: (text: string) => void;
   }>;
-  confirm: (message: string) => boolean;
-  scrollTop: () => void;
-  scorer: Readonly<{ resume: () => void }>;
-  timers: Readonly<{
-    start: (id: TimerId, ms: number, then: Intent) => void;
-    cancel: (id: TimerId) => void;
-  }>;
-  toggleSound: () => void;
-  /** The invite for the room `code`: its link, through the share sheet or the clipboard. */
-  share: (code: string) => void;
-  /** `text` to the clipboard, silently (the reducer toasts). */
-  copy: (text: string) => void;
-  /** `revealRule(document, slot, rule)` (web/shared/edge/glossary.ts): scroll to the rule and flash it. */
-  revealRule: (slot: RulesSlot, rule: string) => void;
-  /** The three input writes the paint does not own (they would fight the player's typing). */
-  page: Readonly<{
-    fillName: (name: string) => void;
-    fillP2Name: (name: string) => void;
-    setCode: (value: string) => void;
-  }>;
-  dispatch: (intent: Intent) => void;
-}>;
 
-/** One effect against the adapters; `app` is the state after the step that produced it. */
+/** One effect against the adapters; `app` is the state after the step that produced it. Gin's four first, then the shell's runner. */
 export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
+  if (isShellEffect(effect)) {
+    runShellEffect(app.shell, effect, deps, GIN);
+    return;
+  }
   switch (effect.type) {
-    case 'persist': {
-      const save = saveFor(app);
-      if (save !== null) writeSave(deps.store, save);
-      return;
-    }
-    case 'clearSave':
-      clearSave(deps.store);
-      return;
-    case 'saveLocal':
-      writeSave(deps.store, { role: 'local', game: effect.game });
-      return;
-    case 'rememberName':
-      writeName(deps.store, effect.name);
-      return;
-    case 'rememberP2Name':
-      writeP2Name(deps.store, effect.name);
-      return;
-    case 'writeHomeTab':
-      writeHomeTab(deps.store, effect.tab);
-      return;
-    case 'writePlayMode':
-      writePlayMode(deps.store, effect.mode);
-      return;
     case 'writeSort':
       writeSort(deps.store, effect.sort);
       return;
     case 'writeCardBack':
       writeCardBack(deps.store, effect.back);
       return;
-    case 'writeSoundFont':
-      writeSoundFont(deps.store, effect.font);
-      return;
-    case 'toast':
-      deps.toast(effect.message, effect.ms);
-      return;
-    case 'send':
-      deps.net.send(effect.frame);
-      return;
-    case 'fx':
-      deps.fx(effect.cue, app.shell.soundFont);
-      return;
-    case 'wakeLock':
-      deps.wakeLock(effect.hold);
-      return;
-    case 'startHost':
-      deps.net.startHost(effect.code, effect.attempt, effect.resume);
-      return;
-    case 'startGuest':
-      deps.net.startGuest(effect.code, effect.attempt);
-      return;
-    case 'closeNet':
-      deps.net.close();
-      return;
-    case 'confirm':
-      if (deps.confirm(effect.message)) deps.dispatch(effect.then);
-      return;
-    case 'then':
-      deps.dispatch(effect.intent);
-      return;
-    case 'initHome':
-      deps.dispatch({ type: 'home/init', home: readHome(deps.store) });
-      return;
-    case 'scrollTop':
-      deps.scrollTop();
-      return;
     case 'scorer':
       deps.scorer[effect.call]();
       return;
-    case 'startTimer':
-      deps.timers.start(effect.id, effect.ms, effect.then);
-      return;
-    case 'cancelTimer':
-      deps.timers.cancel(effect.id);
-      return;
-    case 'toggleSound':
-      deps.toggleSound();
-      return;
-    case 'share':
-      deps.share(effect.code);
-      return;
-    case 'fillName':
-      deps.page.fillName(effect.name);
-      return;
-    case 'fillP2Name':
-      deps.page.fillP2Name(effect.name);
-      return;
-    case 'setCode':
-      deps.page.setCode(effect.value);
-      return;
     case 'copy':
       deps.copy(effect.text);
-      return;
-    case 'revealRule':
-      deps.revealRule(effect.slot, effect.rule);
       return;
   }
 };

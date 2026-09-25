@@ -7,8 +7,10 @@
 // file existed are the strings it writes after it: the decoders are the same decoders, and the
 // host literal keeps `saveLiteral`'s order `role, code, myName, <extra>, game, oppName, handoff?`
 // (test/parity/gin.storage.test.ts round-trips the legacy captures byte for byte; both games'
-// storage.test.ts pin the literals). An edge because it takes a `Store` (./storage.ts); nothing
-// here touches the browser itself, so prefs.test.ts runs it over a Map.
+// storage.test.ts pin the literals). `shellStore` (§5 C2) groups the readers and writers the shell
+// reducer needs over a game's keys, the object its `ShellConfig.prefs` carries. An edge because it
+// takes a `Store` (./storage.ts); nothing here touches the browser itself, so prefs.test.ts runs it
+// over a Map.
 import {
   formatError,
   literal,
@@ -211,3 +213,56 @@ export const shellSave = <S, X extends object>(
     clearSave: (store) => store.remove(cfg.key),
   };
 };
+
+// ---- the shell's store -----------------------------------------------------------------------
+
+/** The keys every shell keeps, as a game's `STORAGE_KEYS` names them (its own keys sit beside these). */
+export type ShellKeys = Readonly<{
+  save: string;
+  name: string;
+  p2Name: string;
+  homeTab: string;
+  playMode: string;
+  sound: string;
+  soundFont: string;
+}>;
+
+/** The shell's readers and writers over one game's keys: what `web/shared/ui/shell.ts` reads `initHome` from and `shellEffects.ts` writes the effects through. */
+export type ShellStore<S, X extends object, Tab extends string> = Readonly<{
+  name: TextPref<string>;
+  /** The pass-and-play second name, under `rememberName`'s rule; the legacy never stored it. */
+  p2Name: TextPref<string>;
+  homeTab: TextPref<Tab>;
+  playMode: TextPref<PlayMode>;
+  sound: SoundPref;
+  soundFont: TextPref<SoundFontName>;
+  save: ShellSave<S, X>;
+}>;
+
+/**
+ * The shell's store for a game: the seven preferences and the save, each over the game's own key,
+ * so a game's storage.ts spells its keys once and destructures its `readName`/`writeName`/… from
+ * here (docs/design/shared-shell.md §5 C2 "shellStore/shellKeys onto prefs.ts").
+ */
+export const shellStore = <S, X extends object, Tab extends string>(
+  keys: ShellKeys,
+  cfg: Readonly<{
+    game: Game;
+    decodeGame: Decoder<S>;
+    hostExtra: Readonly<{ decode: Decoder<X>; literal: (save: HostSave<S, X>) => X }>;
+    decodeHomeTab: Decoder<Tab>;
+  }>,
+): ShellStore<S, X, Tab> => ({
+  name: namePref(keys.name),
+  p2Name: namePref(keys.p2Name),
+  homeTab: textPref(keys.homeTab, cfg.decodeHomeTab),
+  playMode: textPref(keys.playMode, decodePlayMode),
+  sound: soundPref(keys.sound),
+  soundFont: textPref(keys.soundFont, decodeSoundFont),
+  save: shellSave({
+    key: keys.save,
+    game: cfg.game,
+    decodeGame: cfg.decodeGame,
+    hostExtra: cfg.hostExtra,
+  }),
+});

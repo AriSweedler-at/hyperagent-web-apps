@@ -67,10 +67,10 @@ const VARIANT_SELECTS = ['variantSel', 'localVariantSel'] as const;
 /** The options into both panels' selects (written only when they differ, so an open select is left alone). */
 const paintOptions = (doc: DocumentLike, app: App): void => {
   MATCH_LENGTH_SELECTS.forEach((id) => {
-    setValue(requireId(doc, id), String(app.shell.matchLength));
+    setValue(requireId(doc, id), String(app.shell.opts.matchLength));
   });
   VARIANT_SELECTS.forEach((id) => {
-    setValue(requireId(doc, id), app.shell.variant);
+    setValue(requireId(doc, id), app.shell.opts.variant);
   });
 };
 

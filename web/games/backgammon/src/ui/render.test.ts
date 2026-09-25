@@ -112,7 +112,10 @@ describe("the shell painters (gin's names)", () => {
     expect(p.get('aboutCopy').text()).toContain('data-rule="cube">doubling cube</a>');
     expect(p.get('aboutCopy').text()).toContain('data-rule="crawford">Crawford rule</a>');
     // The paint follows the game in play's ruleset, else the home screen's choice.
-    paint(p.doc, { ...initialApp, shell: { ...initialApp.shell, variant: 'portes' } });
+    paint(p.doc, {
+      ...initialApp,
+      shell: { ...initialApp.shell, opts: { ...initialApp.shell.opts, variant: 'portes' } },
+    });
     expect(p.get('aboutCopy').attr('data-key')).toBe('portes');
     expect(p.get('rulesList').attr('data-key')).toBe('portes');
   });

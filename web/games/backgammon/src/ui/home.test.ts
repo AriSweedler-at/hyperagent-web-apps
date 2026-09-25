@@ -97,8 +97,7 @@ describe('paintHome', () => {
       shell({
         playMode: 'local',
         submenuOpen: true,
-        matchLength: 3,
-        variant: 'backgammon',
+        opts: { matchLength: 3, variant: 'backgammon' },
         resume: { kind: 'guest', code: 'KQZM', myName: 'Jo' },
       }),
     );

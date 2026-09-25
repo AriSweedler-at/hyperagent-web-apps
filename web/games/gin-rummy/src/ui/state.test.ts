@@ -125,7 +125,7 @@ describe('the initial app', () => {
         role: null,
         code: null,
         myName: 'Ari',
-        target: 100,
+        opts: { target: 100 },
         game: null,
         view: null,
         oppName: null,
@@ -156,11 +156,11 @@ describe('the initial app', () => {
     ]);
   });
 
-  test('the shell`s intents are listed once, for the shared shell reducer to come', () => {
+  test('the shell`s intents are listed once, the shared shell reducer`s 43 (C2 took the curtain, the leave flow, visible, render and persist from the table side)', () => {
     expect(SHELL_INTENT_TYPES).toContain('home/init');
     expect(SHELL_INTENT_TYPES).toContain('guest/lost');
     expect(SHELL_INTENT_TYPES).not.toContain('card/tap');
-    expect(SHELL_INTENT_TYPES).toHaveLength(36);
+    expect(SHELL_INTENT_TYPES).toHaveLength(43);
     expect(new Set(SHELL_INTENT_TYPES).size).toBe(SHELL_INTENT_TYPES.length);
   });
 });
@@ -253,7 +253,7 @@ describe('home', () => {
 
   test('typing the second name remembers it trimmed under its own key, fills its other input and touches nothing', () => {
     expect(run(initialApp, { type: 'p2name/typed', value: ' Bob ' })).toEqual({
-      app: initialApp,
+      app: { ...initialApp, shell: { ...initialApp.shell, p2Name: ' Bob ' } },
       effects: [
         { type: 'rememberP2Name', name: 'Bob' },
         { type: 'fillP2Name', name: ' Bob ' },
@@ -380,7 +380,7 @@ describe('hosting', () => {
       shell: {
         role: 'host',
         myName: 'Ann',
-        target: 75,
+        opts: { target: 75 },
         game: null,
         oppName: null,
         oppConnected: false,
@@ -397,7 +397,7 @@ describe('hosting', () => {
     ]);
     // An empty name is Ari, a long one is cut to 20; a bad target is 100.
     const defaults = run(initialApp, { type: 'host/click', name: '', target: 'x' }).app;
-    expect(defaults).toMatchObject({ shell: { myName: 'Ari', target: 100 } });
+    expect(defaults).toMatchObject({ shell: { myName: 'Ari', opts: { target: 100 } } });
     expect(
       run(initialApp, { type: 'host/click', name: 'A'.repeat(25), target: '1' }).app.shell.myName,
     ).toBe('A'.repeat(20));
@@ -621,7 +621,7 @@ describe('joining', () => {
     expect(welcomed.app).toMatchObject({
       shell: {
         oppName: 'Ann',
-        target: 75,
+        opts: { target: 75 },
         guestStatus: { text: hostRoomMsg('Ann', 75), pulse: true },
       },
     });
@@ -1352,7 +1352,7 @@ describe('resume', () => {
         role: 'host',
         code: 'LRZL',
         myName: 'Ann',
-        target: 75,
+        opts: { target: 75 },
         game: drawn,
         oppName: 'Jeff',
         view: viewFor(drawn, 0),
@@ -1402,6 +1402,7 @@ describe('storage', () => {
     storage.setItem(STORAGE_KEYS.p2Name, 'Bob');
     storage.setItem(STORAGE_KEYS.homeTab, 'rules');
     storage.setItem(STORAGE_KEYS.playMode, 'local');
+    storage.setItem(STORAGE_KEYS.sort, 'rank');
     storage.setItem(STORAGE_KEYS.cardBack, 'yu-gi-oh');
     storage.setItem(STORAGE_KEYS.soundFont, 'arcade');
     storage.setItem(STORAGE_KEYS.save, '{"role":"guest","code":"KQZM","myName":"Jeff"}');
@@ -1422,7 +1423,7 @@ describe('storage', () => {
       p2Name: 'Bob',
       homeTab: 'rules',
       playMode: 'local',
-      sort: 'suit',
+      sort: 'rank',
       cardBack: 'yu-gi-oh',
       soundFont: 'arcade',
       save: { role: 'guest', code: 'KQZM', myName: 'Jeff' },
@@ -1440,11 +1441,13 @@ describe('storage', () => {
     storage.setItem(STORAGE_KEYS.homeTab, 'settings');
     storage.setItem(STORAGE_KEYS.save, 'not json');
     storage.setItem(STORAGE_KEYS.p2Name, '');
+    storage.setItem(STORAGE_KEYS.sort, 'sideways');
     storage.setItem(STORAGE_KEYS.soundFont, 'plaid');
     expect(readHome(store)).toMatchObject({
       homeTab: 'play',
       save: null,
       p2Name: null,
+      sort: 'suit',
       soundFont: 'default',
     });
   });
@@ -1665,7 +1668,7 @@ describe('the remote handoff of a pass-and-play game', () => {
       shell: {
         role: 'host',
         myName: 'Ann',
-        target: 100,
+        opts: { target: 100 },
         game: drawn,
         oppName: 'Jeff',
         oppConnected: false,

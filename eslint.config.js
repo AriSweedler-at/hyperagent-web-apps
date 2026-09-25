@@ -13,10 +13,13 @@ import tseslint from 'typescript-eslint';
 const PURE = [
   'web/shared/lib/**/*.ts',
   // The shared shell's pure helpers (web/shared/ui/glossary.ts first, docs/design/glossary-links.md
-  // §3; ids.ts). Its painters and binders (shellPaint.ts, curtain.ts, toast.ts, home.ts: they write
-  // the document, docs/design/shared-shell.md §4.4; keyed.ts, the keyed slot, dry-round-2.md D1)
-  // are carved out the way scorer/main.ts is below; tsconfig.pure.json excludes the same five.
-  'web/shared/ui/!(shellPaint|curtain|toast|home|keyed).ts',
+  // §3; ids.ts; the shell reducer shell.ts, docs/design/shared-shell.md §4.2). Its painters and
+  // binders (shellPaint.ts, curtain.ts, toast.ts, home.ts: they write the document, §4.4; keyed.ts,
+  // the keyed slot, dry-round-2.md D1) are carved out the way scorer/main.ts is below;
+  // tsconfig.pure.json excludes the same five. The shell's effect runner (shellEffects.ts) is
+  // carved out too: it calls the adapters, statements the pure profile refuses, while staying
+  // DOM-free, so tsconfig.pure.json still compiles it.
+  'web/shared/ui/!(shellPaint|curtain|toast|home|keyed|shellEffects).ts',
   'web/games/*/src/engine/**/*.ts',
   'web/games/*/src/domain/**/*.ts',
   'web/games/*/src/bots/**/*.ts',
@@ -325,8 +328,14 @@ const zones = [
   },
   {
     // Reducers over intents: "everything below" in the boundary table, so only the edges and
-    // main.ts are off limits (main.ts constructs the adapters and injects them).
-    target: [`${GAME_SRC}/ui/state.ts`, `${GAME_SRC}/app/controller.ts`],
+    // main.ts are off limits (main.ts constructs the adapters and injects them). A game's
+    // shellConfig.ts (docs/design/shared-shell.md §4.3: the half of its shell config spelled from
+    // its engine, protocol and storage) has the reducer's reach.
+    target: [
+      `${GAME_SRC}/ui/state.ts`,
+      `${GAME_SRC}/app/controller.ts`,
+      `${GAME_SRC}/shellConfig.ts`,
+    ],
     from: ['./web/shared/edge/**', './web/games/*/main.ts'],
     message:
       'ui/state.ts and app/controller.ts import everything below them, never an edge or main.ts.',

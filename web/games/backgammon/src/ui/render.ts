@@ -137,7 +137,7 @@ export const renderAbout = (doc: DocumentLike, variant: ShippedVariant): void =>
 
 /** The rules the player is looking at: the game in play's, else the home screen's choice; the About copy follows. */
 const paintRules = (doc: DocumentLike, app: App): void => {
-  const variant = app.shell.view?.variant ?? app.shell.variant;
+  const variant = app.shell.view?.variant ?? app.shell.opts.variant;
   renderRules(doc, variant);
   renderAbout(doc, variant);
 };

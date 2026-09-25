@@ -97,8 +97,8 @@ const home: HomeSnapshot = {
   p2Name: null,
   homeTab: 'play',
   playMode: 'local',
-  variant: 'portes',
   matchLength: 5,
+  variant: 'portes',
   curtainMode: 'always',
   soundFont: 'default',
   save: null,
@@ -203,8 +203,7 @@ describe('the initial app', () => {
       role: null,
       code: null,
       myName: 'Ari',
-      matchLength: 5,
-      variant: 'portes',
+      opts: { matchLength: 5, variant: 'portes' },
       game: null,
       view: null,
       oppName: null,
@@ -254,7 +253,7 @@ describe('the initial app', () => {
     expect(run(app, { type: 'mode/set', mode: 'sandbox' }).app.shell.playMode).toBe('online');
   });
 
-  test('the shell`s intents are listed once, for the shared shell reducer to come', () => {
+  test('the shell`s intents are listed once, the shared shell reducer`s (C2), backgammon`s two selects its own', () => {
     expect(SHELL_INTENT_TYPES).toContain('home/init');
     expect(SHELL_INTENT_TYPES).toContain('guest/lost');
     expect(SHELL_INTENT_TYPES).not.toContain('point/tap');
@@ -271,8 +270,8 @@ describe('home', () => {
       p2Name: 'Bob',
       homeTab: 'rules',
       playMode: 'online',
-      variant: 'backgammon',
       matchLength: 7,
+      variant: 'backgammon',
       curtainMode: 'never',
       soundFont: 'felt',
       save: { role: 'local', game: saved },
@@ -286,8 +285,7 @@ describe('home', () => {
       nameTouched: true,
       homeTab: 'rules',
       playMode: 'online',
-      variant: 'backgammon',
-      matchLength: 7,
+      opts: { matchLength: 7, variant: 'backgammon' },
       soundFont: 'felt',
       resume: { kind: 'local', game: saved },
     });
@@ -359,14 +357,14 @@ describe('home', () => {
       'online',
     );
     const western = run(initialApp, { type: 'variant/set', variant: 'backgammon' });
-    expect(western.app.shell.variant).toBe('backgammon');
+    expect(western.app.shell.opts.variant).toBe('backgammon');
     expect(western.effects).toEqual([{ type: 'writeVariant', variant: 'backgammon' }]);
     expect(run(initialApp, { type: 'variant/set', variant: 'plakoto' })).toEqual({
       app: initialApp,
       effects: [],
     });
     const seven = run(initialApp, { type: 'matchLength/set', length: '7' });
-    expect(seven.app.shell.matchLength).toBe(7);
+    expect(seven.app.shell.opts.matchLength).toBe(7);
     expect(seven.effects).toEqual([{ type: 'writeMatchLength', length: 7 }]);
     expect(run(initialApp, { type: 'matchLength/set', length: 4 })).toEqual({
       app: initialApp,
@@ -460,8 +458,7 @@ describe('hosting', () => {
     expect(app.shell).toMatchObject({
       role: 'host',
       myName: 'Ari',
-      matchLength: 7,
-      variant: 'backgammon',
+      opts: { matchLength: 7, variant: 'backgammon' },
       game: null,
       oppName: null,
       oppConnected: false,
@@ -653,8 +650,7 @@ describe('joining', () => {
     });
     expect(welcomed.app.shell).toMatchObject({
       oppName: 'Ann',
-      matchLength: 7,
-      variant: 'backgammon',
+      opts: { matchLength: 7, variant: 'backgammon' },
       guestStatus: { text: hostRoomMsg('Ann'), pulse: true },
     });
     expect(
@@ -756,8 +752,7 @@ describe('pass and play', () => {
       code: null,
       oppConnected: true,
       revealed: null,
-      matchLength: 3,
-      variant: 'backgammon',
+      opts: { matchLength: 3, variant: 'backgammon' },
       screen: 'tableScreen',
       view: viewFor(g, g.turn),
     });
@@ -1543,8 +1538,7 @@ describe('resume', () => {
       role: 'host',
       code: 'ABCD',
       myName: 'Ann',
-      matchLength: 3,
-      variant: 'backgammon',
+      opts: { matchLength: 3, variant: 'backgammon' },
       oppName: 'Jeff',
       handoff: true,
       game: g,
@@ -1621,8 +1615,8 @@ describe('storage', () => {
       p2Name: 'Bob',
       homeTab: 'about',
       playMode: 'online',
-      variant: 'backgammon',
       matchLength: 7,
+      variant: 'backgammon',
       curtainMode: 'never',
       soundFont: 'felt',
       save: null,
@@ -1741,8 +1735,8 @@ describe('runEffect', () => {
       p2Name: 'Bob',
       homeTab: 'about',
       playMode: 'online',
-      variant: 'backgammon',
       matchLength: 7,
+      variant: 'backgammon',
       curtainMode: 'never',
       soundFont: 'arcade',
     });
