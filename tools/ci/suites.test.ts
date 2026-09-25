@@ -229,8 +229,8 @@ describe('every test file belongs to exactly one suite', () => {
     expect(counts['gin']).toBeGreaterThanOrEqual(44);
     expect(counts['fidice']).toBeGreaterThanOrEqual(17);
     expect(counts['backgammon']).toBeGreaterThanOrEqual(21);
-    // The engine's five suites (docs/design/briscola-rules.md §2.2-2.4), added with PR-2.
-    expect(counts['briscola']).toBeGreaterThanOrEqual(5);
+    // The engine's six files (docs/design/briscola-rules.md §5), added with PR-2.
+    expect(counts['briscola']).toBeGreaterThanOrEqual(6);
     expect(counts['site']).toBeGreaterThanOrEqual(8);
     expect(counts['harness']).toBeGreaterThanOrEqual(6);
   });
@@ -308,7 +308,7 @@ const ROWS_BEFORE: ReadonlyArray<readonly [string, Suite, Thresholds]> = [
     { lines: 100, functions: 100, statements: 100, branches: 92 },
   ],
   // Added with the briscola engine (docs/design/briscola-rules.md, the plan's PR-2): the engine
-  // row at measured 100/100/100/96.5 minus 5/5/5/3, and the forward algorithms row, as backgammon's.
+  // row at measured 100/100/100/96.4 minus 5/5/5/3, and the forward algorithms row, as backgammon's.
   [
     'web/games/briscola/src/engine/**',
     'briscola',

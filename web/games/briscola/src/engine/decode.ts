@@ -7,7 +7,9 @@
 // trump card under the stock, whole tricks in the piles and whole draws in the stock, a result
 // iff the game is over), since a save that disagrees would wedge the game; play legality stays
 // with `applyAction`. Every card id is refused outside the `LABEL + suit` grammar, every flag
-// outside its literals.
+// outside its literals. `count` and `timestamp` are web/shared/lib/game.ts's (DRY round 2 F1);
+// `seat` is not: this engine's seats are four (E21).
+import { count, timestamp } from '../../../../shared/lib/game.ts';
 import {
   arrayOf,
   boolean,
@@ -18,12 +20,12 @@ import {
   optional,
   refine,
   string,
+  taggedUnion,
   type Decoder,
 } from '../../../../shared/lib/json.ts';
 import { deckFor, idsOf, isCardId } from './cards.ts';
 import { nextSeat, sidesOf } from './seats.ts';
 import {
-  ACTION_TYPES,
   LABEL,
   type Action,
   type Card,
@@ -56,9 +58,6 @@ const seatCount = literal(2, 3, 4);
 const gamesToWin = literal(1, 2, 3);
 const phase: Decoder<Phase> = literal('deal', 'trick', 'draw', 'over');
 const logKind: Decoder<LogKind> = literal('game', 'deal', 'play', 'trick', 'exchange', 'result');
-const count = integer(0);
-/** Wall-clock milliseconds as the engine's `Now` reports them. */
-const timestamp = integer(0);
 
 /** A card whose `id` is `LABEL[r] + s` (D10): the three fields agree or the card is refused. */
 export const decodeCard: Decoder<Card> = refine(
@@ -282,7 +281,6 @@ export const decodeView: Decoder<View> = checked(
   VIEW_CHECKS,
 );
 
-const actionHead = object({ type: literal(...ACTION_TYPES) });
 /** E20: a `cardId` outside the `LABEL + suit` grammar is refused here; whether it is held is `applyAction`'s. */
 const playAction: Decoder<Action> = object({
   type: literal('play'),
@@ -291,16 +289,12 @@ const playAction: Decoder<Action> = object({
 const exchangeAction: Decoder<Action> = object({ type: literal('exchange') });
 const nextAction: Decoder<Action> = object({ type: literal('next') });
 
-/** A player's action as the wire `action` frame carries it: the type decides which keys follow. */
-export const decodeAction: Decoder<Action> = (input) => {
-  const head = actionHead(input);
-  if (!head.ok) return head;
-  switch (head.value.type) {
-    case 'play':
-      return playAction(input);
-    case 'exchange':
-      return exchangeAction(input);
-    case 'next':
-      return nextAction(input);
-  }
-};
+/**
+ * A player's action as the wire `action` frame carries it: the type decides which keys follow, one
+ * case per ACTION_TYPES entry in its order (so a refused type names them in that order).
+ */
+export const decodeAction: Decoder<Action> = taggedUnion('type', {
+  play: playAction,
+  exchange: exchangeAction,
+  next: nextAction,
+});

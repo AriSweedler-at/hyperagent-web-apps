@@ -2,7 +2,13 @@
 // One N-seat engine for 2, 3 and 4 players (D1): seats are 0..n-1, play runs to the next index,
 // and with four the even seats are one side (D6). Key order here is the wire and save order:
 // setup.ts and apply.ts build every literal in it and decode.ts declares the fields in it, so a
-// decoded value re-encodes byte for byte (E20).
+// decoded value re-encodes byte for byte (E20). The player, the clock and the refusal text are
+// web/shared/lib/game.ts's (the two-seat contract, DRY round 2 F1), re-exported under the names the
+// modules import; `Seat` is this engine's own, four wide, so `game.ts`'s `Seat`, `Pair`, `SEATS`,
+// `otherSeat` and `setAt` do not apply (index.ts says what of `TwoSeatEngine` fits).
+import type { Now, Player, RuleError } from '../../../../shared/lib/game.ts';
+
+export type { Now, Player, RuleError };
 
 export type Suit = 'C' | 'D' | 'S' | 'B'; // coppe, denari, spade, bastoni
 /** 1 asso, 2..7, 8 fante, 9 cavallo, 10 re: the indices regional Italian decks print. */
@@ -86,7 +92,6 @@ export type GameOptions = Readonly<{
  */
 export type CreateGameOptions = Partial<Omit<GameOptions, 'seatCount'>>;
 
-export type Player = Readonly<{ id: string; name: string }>;
 /** Two, three or four players in seat order: the host is seat 0 (D1, E23). */
 export type Players =
   | readonly [Player, Player]
@@ -233,6 +238,3 @@ export type View = Readonly<{
   startedAt: number;
   endedAt: number | null;
 }>;
-
-/** Milliseconds since the epoch, injected (`Date.now` in main.ts, a constant in tests). */
-export type Now = () => number;

@@ -113,6 +113,7 @@ E25's order. Every text is a `MESSAGES` entry worded for the player:
 ## 5. Tests
 
 `cards.test.ts` (the deck pins, the seat arithmetic, T1–T10 as selectors, the exchange table),
+`index.test.ts` (`ENGINE`'s members and its fit to the two-seat contract, §6),
 `apply.test.ts` (the table rows T1–T12, D1–D8, W1–W6, S1–S7, M1–M5, X1–X11, E1–E4 and the reserved
 phases: 65 tests), `view.test.ts` (V1–V4, V8, the `others` order, the views' agreement),
 `decode.test.ts` (V5 at 2, 3 and 4 seats, V6, V7, E3, every refinement named) and
@@ -130,9 +131,21 @@ E15/E16, `legal` for the actor alone, `others` in play order); log growth per ac
 accounting (E19); byte stability every 25th step; termination after `deckSize / n` tricks with
 `Σ totals === 120`, the match decided and `next` refused. Coverage asserted per suite: a draw, a
 win by each side, `trumpTaken` by each seat, an exchange chain, a 0-point trick, a trick won by an
-off-suit trump, partner-peek hands present. 121 tests, under a second.
+off-suit trump, partner-peek hands present. 124 tests, under a second.
 
 ## 6. Corrected at implementation
+
+- **The two-seat contract landed first (`web/shared/lib/game.ts`, DRY round 2 D5/F1).** `Player`,
+  `Now` and `RuleError` are re-exported from it; `count` and `timestamp` and the `taggedUnion`
+  action table come from the shared decoders. `index.ts` publishes `ENGINE` on
+  `TwoSeatEngine<State, View, Action, CreateGameOptions>` as far as four seats allow. What fits:
+  `create` (a `Pair<Player>` is one of the `Players` tuples), `apply` and `viewFor` (a function
+  over seats 0..3 accepts a seat 0..1), `legalActions`, `over` (the match decided) and the three
+  decoders. What does not: `actorOf` returns a seat 0..3, which the contract's `Seat | null` (0..1)
+  cannot hold; `NSeatEngine` widens that one slot, and a shell typing against the contract narrows
+  it at its config boundary until the contract is N-seat (the plan's risk 4). `game.ts`'s `Seat`,
+  `Pair`, `SEATS`, `otherSeat` and `setAt` are not used: this engine's `Seat` is four wide and its
+  seat arithmetic is `seats.ts`.
 
 - **`seatCount` is not an input.** The design's `CreateGameOptions = Partial<GameOptions>` carried
   `seatCount` beside `players`; with `players.length === seatCount` required, one of the two is

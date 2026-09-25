@@ -18,6 +18,7 @@ import type {
   GameRecord,
   LogEntry,
   Now,
+  RuleError,
   Seat,
   State,
   TrickRecord,
@@ -40,7 +41,7 @@ export const MESSAGES = {
   DRAW_PENDING: 'Drawing…',
 } as const;
 
-type Applied = Result<State, string>;
+type Applied = Result<State, RuleError>;
 
 /** E24: who may act: `turn` in 'trick', nobody at 'over' (`next` is open to every seat) and in the reserved phases. */
 export const actorOf = (state: State): Seat | null => (state.phase === 'trick' ? state.turn : null);
