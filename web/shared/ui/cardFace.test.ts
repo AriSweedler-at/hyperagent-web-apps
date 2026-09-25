@@ -4,9 +4,9 @@
 // (web/games/gin-rummy/src/ui/cards.test.ts): this leaf may not import a game.
 import { describe, expect, test } from 'vitest';
 
-import { cardIds, DECKS } from '../lib/cards/decks.ts';
+import { cardIds, DECKS, splitId } from '../lib/cards/decks.ts';
 import { packByName, type CardPack } from '../lib/cards/packs.ts';
-import { resolveFace, type FaceSpec } from '../lib/cards/resolve.ts';
+import { relabelledId, resolveFace, type FaceSpec } from '../lib/cards/resolve.ts';
 import {
   SUIT_SPRITE_SVG,
   backFallbackImageCss,
@@ -37,6 +37,35 @@ describe('faceHtml', () => {
       const red = id.endsWith('H') || id.endsWith('D');
       expect(html).toContain(`<div class="card ${red ? 'red' : 'black'}" data-card="${id}">`);
     });
+  });
+
+  test("an american face is the default pack's French glyph of the relabelled card, the Italian id on data-card: all forty", () => {
+    const american = packByName('american');
+    expect(faceHtml(face(american, 'italian40', 'FC'))).toBe(
+      '<div class="card red" data-card="FC"><span class="rank">J</span><span class="suit">♥</span><span class="rank br">J</span></div>',
+    );
+    expect(faceHtml(face(american, 'italian40', 'RB'), { extra: 'big selected' })).toBe(
+      '<div class="card black big selected" data-card="RB"><span class="rank">K</span><span class="suit">♣</span><span class="rank br">K</span></div>',
+    );
+    expect(faceHtml(face(american, 'italian40', 'AD'))).toBe(
+      '<div class="card red" data-card="AD"><span class="rank">A</span><span class="suit">♦</span><span class="rank br">A</span></div>',
+    );
+    const faces = american.decks.italian40;
+    if (faces?.kind !== 'glyph' || faces.relabel === undefined) throw new Error('relabelled');
+    const relabel = faces.relabel;
+    // The pin over the deck: byte for byte the French glyph of the mapped card, save the id.
+    const pinned = cardIds('italian40').map((id) => {
+      const split = splitId('italian40', id);
+      const to = split === null ? null : relabelledId(relabel, split);
+      if (to === null) throw new Error(id);
+      const french = faceHtml(face(packByName('default'), 'french52', to));
+      expect(french).toContain(`data-card="${to}"`);
+      expect(faceHtml(face(american, 'italian40', id))).toBe(
+        french.replace(`data-card="${to}"`, `data-card="${id}"`),
+      );
+      return to;
+    });
+    expect(new Set(pinned).size).toBe(40);
   });
 
   test('an Italian glyph prints the index twice and one symbol from the sprite, classed by suit', () => {

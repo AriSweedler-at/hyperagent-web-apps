@@ -18,23 +18,39 @@ import {
 } from './packs.ts';
 
 describe('the card packs', () => {
-  test("five packs: gin's four backs in gin's order, then the drawn Italian deck; names unique and self-consistent", () => {
-    expect(CARD_PACKS).toEqual(['default', 'blue-stripe', 'yu-gi-oh', 'empty', 'linea']);
+  test("seven packs: gin's four backs in gin's order, the drawn Italian deck, the owner's Napoletane sheet, gin's cards relabelled as `american`; names unique and self-consistent", () => {
+    expect(CARD_PACKS).toEqual([
+      'default',
+      'blue-stripe',
+      'yu-gi-oh',
+      'empty',
+      'linea',
+      'napoletane',
+      'american',
+    ]);
     expect(new Set(CARD_PACKS).size).toBe(CARD_PACKS.length);
     CARD_PACKS.forEach((name) => {
       const pack = packByName(name);
       expect(pack.name).toBe(name);
       expect(pack.label).not.toBe('');
       expect(Object.keys(pack.decks).length).toBeGreaterThan(0);
-      // A drawn pack carries no attribution; a sourced one must (test/card-packs.test.ts).
-      expect(pack.attribution).toBeNull();
+      // A drawn pack carries no attribution; the sourced sheet must (test/card-packs.test.ts).
+      expect(pack.attribution === null).toBe(name !== 'napoletane');
     });
     expect(FACE_WIDTH).toBe(120);
   });
 
-  test("packsFor: gin's four for french52 (the legacy literal); the four glyph packs and linea for italian40", () => {
+  test("packsFor: gin's four for french52 (the legacy literal); the four glyph packs, linea, napoletane and american for italian40", () => {
     expect(packsFor('french52')).toEqual(['default', 'blue-stripe', 'yu-gi-oh', 'empty']);
-    expect(packsFor('italian40')).toEqual(['default', 'blue-stripe', 'yu-gi-oh', 'empty', 'linea']);
+    expect(packsFor('italian40')).toEqual([
+      'default',
+      'blue-stripe',
+      'yu-gi-oh',
+      'empty',
+      'linea',
+      'napoletane',
+      'american',
+    ]);
     DECK_KINDS.forEach((kind) => {
       packsFor(kind).forEach((name) => {
         expect(packByName(name).decks[kind]).toBeDefined();
@@ -72,12 +88,58 @@ describe('the card packs', () => {
     expect(linea.back.kind).toBe('svg');
   });
 
-  test('the defaults: gin starts on `default`, an Italian table on `linea`; each is a pack for its kind', () => {
-    expect(DEFAULT_CARD_PACKS).toEqual({ french52: 'default', italian40: 'linea' });
+  test("napoletane: forty JPEG faces for italian40 at 1x and 2x (the 338 px cells serve no 3x), no printed indices, no back of its own, the sheet's attribution", () => {
+    const napoletane = packByName('napoletane');
+    expect(napoletane.label).toBe('Napoletane');
+    expect(napoletane.decks.french52).toBeUndefined();
+    expect(napoletane.decks.italian40).toMatchObject({
+      kind: 'files',
+      dir: '../../shared/cards/napoletane/italian40',
+      ext: 'jpg',
+      widths: [120, 240],
+      indices: 'overlay',
+      inset: 0,
+    });
+    if (napoletane.decks.italian40?.kind !== 'files') throw new Error('napoletane has files');
+    expect(napoletane.decks.italian40.ids).toHaveLength(40);
+    // The Neapolitan card's own proportion, long and thin (the sheet's cells are 338 × 586).
+    expect(napoletane.decks.italian40.aspect).toBeCloseTo(0.577, 3);
+    // No back on the sheet: the default pack's back is painted (resolve.ts).
+    expect(napoletane.back).toEqual({ kind: 'none' });
+    expect(napoletane.attribution).toEqual({
+      author: 'Florixc (Wikimedia Commons)',
+      sourceUrl: 'https://commons.wikimedia.org/wiki/File:Carte_napoletane_al_completo.jpg',
+      licence: 'Public domain',
+      // The template the file page bears (PD-old-70 with the Public Domain Mark), not PD-self.
+      licenceUrl: 'https://commons.wikimedia.org/wiki/Template:PD-old-70',
+      note: 'Supplied by the owner on 2026-09-25; the Neapolitan pattern, one sheet of 40',
+    });
+  });
+
+  test("american: gin's glyphs relabelled for italian40 alone (coppe hearts, denari diamonds, spade spades, bastoni clubs; fante J, cavallo Q, re K), gin's default back, no attribution", () => {
+    const american = packByName('american');
+    expect(american.label).toBe('American');
+    expect(american.decks.french52).toBeUndefined();
+    expect(american.decks.italian40).toEqual({
+      kind: 'glyph',
+      relabel: {
+        deck: 'french52',
+        suits: { C: 'H', D: 'D', S: 'S', B: 'C' },
+        ranks: { F: 'J', C: 'Q', R: 'K' },
+      },
+    });
+    // The back is gin's `default` as data, not a copy: the one picture, the one URL.
+    expect(american.back).toBe(packByName('default').back);
+    expect(american.attribution).toBeNull();
+  });
+
+  test("the defaults: gin starts on `default`, an Italian table on the owner's `napoletane`; each is a pack for its kind", () => {
+    expect(DEFAULT_CARD_PACKS).toEqual({ french52: 'default', italian40: 'napoletane' });
     DECK_KINDS.forEach((kind) => {
       expect(isCardPackFor(kind, defaultPackFor(kind))).toBe(true);
-      // The default's back is painted, never `none`: it is what a back-less pack falls back to.
-      expect(packByName(defaultPackFor(kind)).back.kind).not.toBe('none');
+      // A default may have no back of its own (napoletane's sheet has none): resolveBack then
+      // paints the `default` pack's, which is never `none`.
+      expect(packByName('default').back.kind).not.toBe('none');
     });
   });
 
@@ -90,7 +152,12 @@ describe('the card packs', () => {
       expect(isCardPackFor('french52', v)).toBe(false);
     });
     expect(isCardPackFor('french52', 'linea')).toBe(false);
+    expect(isCardPackFor('french52', 'napoletane')).toBe(false);
+    // Gin's cards relabelled are an Italian table's choice, never gin's (its four stay four).
+    expect(isCardPackFor('french52', 'american')).toBe(false);
     expect(isCardPackFor('italian40', 'linea')).toBe(true);
+    expect(isCardPackFor('italian40', 'napoletane')).toBe(true);
+    expect(isCardPackFor('italian40', 'american')).toBe(true);
     expect(isCardPackFor('italian40', 'yu-gi-oh')).toBe(true);
   });
 
@@ -99,7 +166,7 @@ describe('the card packs', () => {
       'ginRummy_cardPack: "plaid" is not a card pack for this deck; kept the current one. One of: default, blue-stripe, yu-gi-oh, empty.',
     );
     expect(badCardPackMsg('briscola_cardPack', 'italian40', 'tartan')).toBe(
-      'briscola_cardPack: "tartan" is not a card pack for this deck; kept the current one. One of: default, blue-stripe, yu-gi-oh, empty, linea.',
+      'briscola_cardPack: "tartan" is not a card pack for this deck; kept the current one. One of: default, blue-stripe, yu-gi-oh, empty, linea, napoletane, american.',
     );
   });
 });

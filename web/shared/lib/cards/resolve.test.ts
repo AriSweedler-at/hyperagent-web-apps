@@ -4,9 +4,15 @@
 // shipped pack is either, and the shapes must still resolve).
 import { describe, expect, test } from 'vitest';
 
-import { DECKS, cardIds } from './decks.ts';
-import { packByName, type CardPack } from './packs.ts';
-import { attributionLine, resolveAspect, resolveBack, resolveFace } from './resolve.ts';
+import { DECKS, cardIds, splitId } from './decks.ts';
+import { packByName, type CardPack, type Relabel } from './packs.ts';
+import {
+  attributionLine,
+  relabelledId,
+  resolveAspect,
+  resolveBack,
+  resolveFace,
+} from './resolve.ts';
 
 /** A sourced pack two cards short, with no back of its own: what the Romane CC0 set would be. */
 const PARTIAL: CardPack = {
@@ -102,6 +108,19 @@ describe('resolveFace', () => {
       inset: 0,
       indices: 'printed',
     });
+    expect(resolveFace(packByName('napoletane'), 'italian40', 'AD')).toEqual({
+      kind: 'image',
+      id: 'AD',
+      index: 'A',
+      alt: 'asso di denari',
+      urls: [
+        { ratio: 1, url: '../../shared/cards/napoletane/italian40/AD-120.jpg' },
+        { ratio: 2, url: '../../shared/cards/napoletane/italian40/AD-240.jpg' },
+      ],
+      aspect: 0.577,
+      inset: 0,
+      indices: 'overlay',
+    });
     expect(resolveFace(PARTIAL, 'italian40', 'AD')).toEqual({
       kind: 'image',
       id: 'AD',
@@ -142,18 +161,136 @@ describe('resolveFace', () => {
   });
 });
 
+/** The american table with a hole and a stranger: bastoni unmapped, the re sent to a rank no French deck has. */
+const HOLED: Relabel = {
+  deck: 'french52',
+  suits: { C: 'H', D: 'D', S: 'S' },
+  ranks: { F: 'J', C: 'Q', R: 'X' },
+};
+const holed = (relabel: Relabel): CardPack => ({
+  ...packByName('american'),
+  decks: { italian40: { kind: 'glyph', relabel } },
+});
+
+describe('the relabelled glyph (the american pack)', () => {
+  test("an Italian card resolves to the French glyph of its relabel, keeping its own id: the fante di coppe is gin's J♥ under data-card FC", () => {
+    const american = packByName('american');
+    expect(resolveFace(american, 'italian40', 'FC')).toEqual({
+      kind: 'glyph',
+      deck: 'french52',
+      id: 'FC',
+      rank: DECKS.french52.ranks[10],
+      suit: DECKS.french52.suits[1],
+    });
+    // The ace keeps its index; denari are diamonds, spade spades, bastoni clubs; cavallo Q, re K.
+    expect(resolveFace(american, 'italian40', 'AD')).toMatchObject({
+      id: 'AD',
+      rank: { index: 'A' },
+      suit: { id: 'D', symbol: '♦', colour: 'red' },
+    });
+    expect(resolveFace(american, 'italian40', '7S')).toMatchObject({
+      id: '7S',
+      rank: { index: '7' },
+      suit: { id: 'S', symbol: '♠', colour: 'black' },
+    });
+    expect(resolveFace(american, 'italian40', 'CB')).toMatchObject({
+      id: 'CB',
+      rank: { index: 'Q' },
+      suit: { id: 'C', symbol: '♣', colour: 'black' },
+    });
+    expect(resolveFace(american, 'italian40', 'RB')).toMatchObject({
+      id: 'RB',
+      rank: { index: 'K' },
+      suit: { id: 'C', symbol: '♣' },
+    });
+    expect(resolveFace(american, 'italian40', 'KC')).toBeNull();
+    // A French card asked of it draws the plain French glyph: the pack has no faces for that kind.
+    expect(resolveFace(american, 'french52', 'AS')).toEqual(
+      resolveFace(packByName('default'), 'french52', 'AS'),
+    );
+  });
+
+  test('relabelledId maps all forty onto forty distinct French cards; every id, rank and suit lands', () => {
+    const faces = packByName('american').decks.italian40;
+    if (faces?.kind !== 'glyph' || faces.relabel === undefined) throw new Error('relabelled');
+    const table = faces.relabel;
+    const mapped = cardIds('italian40').map((id) => {
+      const split = splitId('italian40', id);
+      if (split === null) throw new Error(id);
+      return relabelledId(table, split);
+    });
+    expect(new Set(mapped).size).toBe(40);
+    mapped.forEach((to) => {
+      expect(to === null ? [] : cardIds('french52')).toContain(to);
+    });
+    expect(mapped.slice(0, 10)).toEqual([
+      'AH',
+      '2H',
+      '3H',
+      '4H',
+      '5H',
+      '6H',
+      '7H',
+      'JH',
+      'QH',
+      'KH',
+    ]);
+    expect(mapped.slice(30)).toEqual(['AC', '2C', '3C', '4C', '5C', '6C', '7C', 'JC', 'QC', 'KC']);
+  });
+
+  test("a hole in the table draws this deck's own glyph for that card alone, silently: an unmapped suit, a rank sent to a stranger", () => {
+    const pack = holed(HOLED);
+    const split = (id: string) => {
+      const s = splitId('italian40', id);
+      if (s === null) throw new Error(id);
+      return s;
+    };
+    expect(relabelledId(HOLED, split('AB'))).toBeNull();
+    expect(relabelledId(HOLED, split('RC'))).toBe('XH');
+    expect(relabelledId(HOLED, split('FC'))).toBe('JH');
+    // Bastoni: no French suit, so the Italian glyph (the sprite's baton), id and all.
+    expect(resolveFace(pack, 'italian40', 'AB')).toEqual({
+      kind: 'glyph',
+      deck: 'italian40',
+      id: 'AB',
+      rank: DECKS.italian40.ranks[0],
+      suit: DECKS.italian40.suits[3],
+    });
+    // The re: `XH` is no French card, so the Italian glyph too.
+    expect(resolveFace(pack, 'italian40', 'RC')).toMatchObject({
+      kind: 'glyph',
+      deck: 'italian40',
+      id: 'RC',
+    });
+    // The rest still relabel.
+    expect(resolveFace(pack, 'italian40', 'FC')).toMatchObject({
+      deck: 'french52',
+      id: 'FC',
+      rank: { index: 'J' },
+    });
+  });
+});
+
 describe('resolveBack, resolveAspect, attributionLine', () => {
   test("a pack's own back stands; `none` takes the fallback's; two `none`s give the bare navy field", () => {
     const dflt = packByName('default');
     expect(resolveBack(packByName('yu-gi-oh'), dflt)).toBe(packByName('yu-gi-oh').back);
     expect(resolveBack(PARTIAL, dflt)).toBe(dflt.back);
+    // The Napoletane sheet has no back: an Italian table paints the default's behind it.
+    expect(resolveBack(packByName('napoletane'), dflt)).toBe(dflt.back);
+    // American carries gin's default back as its own: it stands whatever the fallback is.
+    expect(resolveBack(packByName('american'), SPRITE)).toBe(dflt.back);
     expect(resolveBack(PARTIAL, SPRITE)).toEqual({ kind: 'css', colour: '#1e3a8a' });
   });
 
-  test("the aspect is the pictures' own for a files or sprite pack, else the deck kind's nominal", () => {
+  test("the aspect is the pictures' own for a files or sprite pack, the printed deck's for a relabelled glyph, else the deck kind's nominal", () => {
     expect(resolveAspect(packByName('linea'), 'italian40')).toBe(100 / 193);
     expect(resolveAspect(packByName('linea'), 'french52')).toBe(DECKS.french52.aspect);
+    expect(resolveAspect(packByName('napoletane'), 'italian40')).toBe(0.577);
     expect(resolveAspect(packByName('yu-gi-oh'), 'italian40')).toBe(0.518);
+    // Gin's card at an Italian table is gin's 100 × 144, not the long thin Italian cut.
+    expect(resolveAspect(packByName('american'), 'italian40')).toBe(100 / 144);
+    expect(resolveAspect(packByName('american'), 'french52')).toBe(100 / 144);
     expect(resolveAspect(PARTIAL, 'italian40')).toBe(0.53);
     expect(resolveAspect(SPRITE, 'italian40')).toBe(0.53);
   });
@@ -162,7 +299,11 @@ describe('resolveBack, resolveAspect, attributionLine', () => {
     expect(attributionLine(PARTIAL)).toBe(
       'Cards: Romane — Marteau i Georges (Wikimedia Commons), CC0',
     );
+    expect(attributionLine(packByName('napoletane'))).toBe(
+      'Cards: Napoletane — Florixc (Wikimedia Commons), Public domain',
+    );
     expect(attributionLine(packByName('linea'))).toBeNull();
     expect(attributionLine(packByName('yu-gi-oh'))).toBeNull();
+    expect(attributionLine(packByName('american'))).toBeNull();
   });
 });

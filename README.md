@@ -379,7 +379,8 @@ writing) that is ample for text-only game traffic.
 ```
 web/index.html               landing page, the first Vite entry (no scripts); dist/index.html is byte-identical
 web/public/.nojekyll         copied to dist/ so Pages serves dotfiles and folders untouched
-web/public/shared/cards/     the served card-pack files: backs/ (gin's five, copied) and linea/ (generated); docs/design/card-packs.md
+web/public/shared/cards/     the served card-pack files: backs/ (gin's five, copied), linea/ (generated), napoletane/ (cut from the
+                             owner's sheet); docs/design/card-packs.md
 web/shared/lib/              shared pure TypeScript: result, rng, json decoders, roomCode, name, clock types, sound fonts, card packs (cards/)
 web/shared/edge/             shared effects: ice, transport (the only importer of peerjs) + fake, clock, storage, dom, fx, share
 web/shared/styles/           tokens.css (the shared palette, :root only), base.css (shared primitives), CONTRACT.md
@@ -390,6 +391,8 @@ web/games/fidice/            index.html, theme.css, main.ts, MANIFEST.json, src/
 web/games/backgammon/        index.html, theme.css, main.ts, src/{engine,protocol.ts,storage.ts,fx.ts,net,ui,ui/board}
 web/games/briscola/          src/engine only so far (docs/design/briscola-rules.md): the N-seat engine for 2, 3 and 4
                              players, its tests and the seeded replay; the page follows (docs/design/briscola.md)
+assets/cards/<pack>/         a sourced card pack's pictures as supplied, with SOURCES.txt (napoletane: the owner's sheet); tools/card-packs.ts
+                             cuts them into web/public/shared/cards/<pack>/ (docs/design/card-packs.md §5, §7)
 legacy/                      the pre-migration pages and shared/ice.js, verbatim; never served, never edited (legacy/README.md)
 test/fixtures/legacy/        sha256-pinned cuts of the legacy cores, the gin wire frames and storage captures
 test/fixtures/styles/        computed-style goldens, <game>.<viewport>.json
@@ -400,7 +403,7 @@ test/integration/            the real transport through a local PeerServer in Ch
 test/tools/                  tests of the tools below
 e2e/                         Playwright specs; fixtures/ (site, player, two-players, offline, seed); browser/ init scripts
 tools/                       serve-dist, proxy-dev, hooks-verify; legacy/ extractors and recorders; parity/ drivers; card-backs,
-                             card-packs (derive, cut, mask, check, preview a pack) and linea (the drawn Italian deck);
+                             card-packs (derive a pack, cut a sheet by gutters or by seams, mask, check, preview) and linea (the drawn Italian deck);
 tools/ci/                    suites.ts (the one table: suite -> tests, coverage rows, specs, and change -> jobs), affected.ts, run-affected.ts
 infra/games-proxy/           Cloudflare Worker (TypeScript) serving the site at games.sweedler.com
 infra/turn-worker/           Cloudflare Worker (plain JS) minting TURN credentials at turn.sweedler.com

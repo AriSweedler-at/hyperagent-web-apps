@@ -2,7 +2,10 @@
 // both card games' ui/ may import it. The glyph renderer is gin's ui/cards.ts today, moved behind
 // the pack: for a `french52` glyph it prints byte for byte what `cardHtml(card)` prints (the rank
 // label, gin's suit symbol, the rank again bottom-right, `red`/`black` by suit; gin's
-// ui/cards.test.ts pins the 52), so gin can adopt it without a golden moving. An `italian40` glyph
+// ui/cards.test.ts pins the 52), so gin can adopt it without a golden moving. A relabelled glyph
+// (the `american` pack: briscola's `FC` as gin's `J♥`) arrives from resolve.ts as a `french52` glyph
+// spec carrying the Italian id, so the same branch prints it and only `data-card` differs from
+// gin's (test/card-packs.test.ts pins the 40 against `cardHtml`). An `italian40` glyph
 // prints the rank index in two corners and one suit symbol from the shared sprite (`SUIT_SPRITE_SVG`,
 // inlined once at the top of a page that shows Italian cards). A `files` or `sprite` face paints the
 // pack's picture as the box's background from its document-relative URL, one `url()` per

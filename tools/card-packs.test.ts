@@ -1,41 +1,78 @@
 // The card-pack tool's pure half (docs/design/card-packs.md §4, §7 "tools"): the id mapping from
 // Commons-style names, the derived paths and sizes, the ratio cut-off, the size readers, the gutter
-// finder and the cell normaliser over synthetic input, the mask and map parsers, the manifest text
-// and the argument parser. The Chromium drawing is exercised by running `add` and `preview` by hand.
+// finder and the cell normaliser over synthetic input, the seam grid's pure half (`--grid`: the equal
+// lines, the seam picker with its two fallbacks, the cells, the equaliser that may leave the sheet,
+// the shave, the paper past a card's seams), the mask and map parsers, the manifest text and the
+// argument parser. The Chromium
+// drawing is exercised by running `add` and `preview` by hand (napoletane's preview is read at 120
+// and 240 px: every card in its cell, no ink cut, the overlay indices in clean corners).
 import { describe, expect, test } from 'vitest';
 
 import {
+  GRID_SNAP,
   GUTTER_SHARE,
   MAX_FACE_BYTES,
   MAX_PACK_BYTES,
+  MIN_SEAM,
   PACK_SOURCES,
+  PAPER,
   RATIOS,
+  SEAM_CLEAR,
+  cellsFromSeams,
   constName,
   derivedBack,
   derivedFace,
   derivedSize,
+  equaliseCells,
   extOf,
   findCells,
+  gridInset,
+  gridLines,
   idFromFileName,
   imageSize,
   manifestSource,
   manualLines,
   normaliseCells,
+  paperPastSeams,
   parseArgs,
   parseMap,
   parseMask,
   ratiosFor,
+  seamPositions,
   servedDir,
   servedToPublic,
+  shrink,
 } from './card-packs.ts';
 
 describe('constants', () => {
-  test('three ratios, no sourced pack until a licence is accepted, the caps', () => {
+  test("three ratios, the caps, the seam grid's knobs", () => {
     expect(RATIOS).toEqual([1, 2, 3]);
-    expect(PACK_SOURCES).toEqual({});
     expect(MAX_FACE_BYTES).toBe(120_000);
     expect(MAX_PACK_BYTES).toBe(6_000_000);
     expect(GUTTER_SHARE).toBe(0.02);
+    expect(GRID_SNAP).toBe(40);
+    expect(MIN_SEAM).toBe(0.4);
+    expect(PAPER).toBe(245);
+    expect(SEAM_CLEAR).toBe(6);
+  });
+
+  test("one sourced pack, the sheet the owner supplied: napoletane, cut as a seam grid in the sheet's own order", () => {
+    expect(Object.keys(PACK_SOURCES)).toEqual(['napoletane']);
+    expect(PACK_SOURCES['napoletane']).toMatchObject({
+      deck: 'italian40',
+      faces: {
+        kind: 'sheet',
+        file: 'assets/cards/napoletane/sheet.jpg',
+        rows: ['D', 'C', 'B', 'S'],
+        cols: ['A', '2', '3', '4', '5', '6', '7', 'F', 'C', 'R'],
+        grid: 6,
+      },
+      back: null,
+      label: 'Napoletane',
+      licence: 'Public domain',
+      masks: [],
+      map: null,
+    });
   });
 });
 
@@ -297,5 +334,112 @@ describe('masks, manifests and arguments', () => {
       flags: { deck: ['italian40'], mask: ['AD:1,2,3,4', 'AC:5,6,7,8'], label: ['X'] },
     });
     expect(parseArgs([])).toEqual({ positional: [], flags: {} });
+  });
+});
+
+describe('the seam grid (--grid)', () => {
+  test('gridLines cuts an extent into n equal cells: 0 first, the extent last, rounded', () => {
+    expect(gridLines(3507, 10)).toEqual([
+      0, 351, 701, 1052, 1403, 1754, 2104, 2455, 2806, 3156, 3507,
+    ]);
+    expect(gridLines(2398, 4)).toEqual([0, 600, 1199, 1799, 2398]);
+    expect(gridLines(10, 1)).toEqual([0, 10]);
+  });
+
+  test('seamPositions: the best offset per row when it reaches the minimum; the median of the rows that found it otherwise; the line when none did', () => {
+    // Four rows across one seam near line 1052, snap 3: scores at offsets -3 … +3.
+    const rows = [
+      [0, 0, 0.9, 1, 0.5, 0, 0],
+      [0, 0, 0, 0, 0.3, 0.2, 0],
+      [0.1, 0, 0, 0, 0, 0.7, 0.8],
+      [0.5, 0, 0, 0, 0, 0, 0],
+    ];
+    expect(seamPositions(1052, rows, 3, 0.4)).toEqual([1052, 1052, 1055, 1049]);
+    expect(seamPositions(600, [[0.1, 0.2, 0.1], []], 1, 0.4)).toEqual([600, 600]);
+    expect(seamPositions(600, [], 1)).toEqual([]);
+    // A plateau of equal maxima: its first offset.
+    expect(seamPositions(100, [[0, 1, 1, 1, 0]], 2)).toEqual([99]);
+  });
+
+  test("cellsFromSeams: row-major cells between each row's x lines and each column's y lines", () => {
+    const vertical = [
+      [0, 10, 20],
+      [0, 12, 20],
+    ];
+    const horizontal = [
+      [0, 5, 9],
+      [0, 6, 9],
+    ];
+    expect(cellsFromSeams(vertical, horizontal)).toEqual([
+      { x: 0, y: 0, w: 10, h: 5 },
+      { x: 10, y: 0, w: 10, h: 6 },
+      { x: 0, y: 5, w: 12, h: 4 },
+      { x: 12, y: 6, w: 8, h: 3 },
+    ]);
+    expect(cellsFromSeams([], [])).toEqual([]);
+  });
+
+  test("equaliseCells: the median size centred, but a cell on the sheet's edge keeps its seam side and may leave the sheet", () => {
+    const sheet = { width: 100, height: 60 };
+    const cells = [
+      { x: 0, y: 0, w: 30, h: 28 },
+      { x: 30, y: 0, w: 36, h: 28 },
+      { x: 66, y: 0, w: 34, h: 28 },
+      { x: 0, y: 28, w: 30, h: 32 },
+      { x: 30, y: 28, w: 36, h: 32 },
+      { x: 66, y: 28, w: 34, h: 32 },
+    ];
+    // The median cell is 34 × 32: the clipped left column and top row grow past 0; the right
+    // column and bottom row keep their inner seam; the middle is centred.
+    expect(equaliseCells(cells, sheet)).toEqual([
+      { x: -4, y: -4, w: 34, h: 32 },
+      { x: 31, y: -4, w: 34, h: 32 },
+      { x: 66, y: -4, w: 34, h: 32 },
+      { x: -4, y: 28, w: 34, h: 32 },
+      { x: 31, y: 28, w: 34, h: 32 },
+      { x: 66, y: 28, w: 34, h: 32 },
+    ]);
+    expect(equaliseCells([], sheet)).toEqual([]);
+  });
+
+  test("paperPastSeams: an interior cell narrower than the median, equalised and shaved, shows its neighbours past its own seams; those strips are paper, in the cut's pixels", () => {
+    const sheet = { width: 3507, height: 2398 };
+    // Napoletane's 3S as the tool found it: 332 px between its seams (686, 1018) in a row whose
+    // median card is 350 wide; the median frame centred on it reaches 9 px into 2S and 4S.
+    const seams = { x: 686, y: 1800, w: 332, h: 598 };
+    const [cut] = equaliseCells([seams, { x: 1018, y: 1800, w: 350, h: 598 }], sheet).map((c) =>
+      shrink(c, 6),
+    );
+    expect(cut).toEqual({ x: 683, y: 1806, w: 338, h: 586 });
+    expect(paperPastSeams(cut ?? seams, seams, sheet, 6)).toEqual([
+      { x: 0, y: 0, w: 9, h: 586 },
+      { x: 329, y: 0, w: 9, h: 586 },
+    ]);
+    // A cell at least the median wide keeps `inset` px inside its seams on its own: no strip.
+    const wide = { x: 1370, y: 1196, w: 360, h: 604 };
+    expect(paperPastSeams(shrink(wide, 6), wide, sheet, 6)).toEqual([]);
+    // Narrower than the median both ways (332 × 590 against 350 × 600): a strip on every side,
+    // 9 px across and 5 px down, the sides first.
+    const small = { x: 686, y: 591, w: 332, h: 590 };
+    expect(paperPastSeams({ x: 683, y: 592, w: 338, h: 588 }, small, sheet, 6)).toEqual([
+      { x: 0, y: 0, w: 9, h: 588 },
+      { x: 329, y: 0, w: 9, h: 588 },
+      { x: 0, y: 0, w: 338, h: 5 },
+      { x: 0, y: 583, w: 338, h: 5 },
+    ]);
+    // The sheet's corner cell, clipped by the scan: equalising anchored it on its two interior
+    // seams and grew it past the sheet, where there is no seam to keep off (drawDerived paints
+    // past the scan), so nothing is paper here.
+    const corner = { x: 0, y: 0, w: 337, h: 591 };
+    expect(paperPastSeams({ x: -7, y: -3, w: 338, h: 588 }, corner, sheet, 6)).toEqual([]);
+  });
+
+  test('shrink shaves the inset from every side; gridInset reads --grid as whole px or refuses it', () => {
+    expect(shrink({ x: 10, y: 20, w: 100, h: 200 }, 6)).toEqual({ x: 16, y: 26, w: 88, h: 188 });
+    expect(gridInset(null)).toBeNull();
+    expect(gridInset('6')).toBe(6);
+    expect(gridInset('0')).toBe(0);
+    expect(() => gridInset('six')).toThrow('--grid six');
+    expect(() => gridInset('-2')).toThrow('--grid -2');
   });
 });
