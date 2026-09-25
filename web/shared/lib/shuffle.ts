@@ -5,8 +5,12 @@
 // letter: from the top, one rng call per step, m − 1 calls for m items.
 import type { Rng } from './rng.ts';
 
+// `slice(j, j + 1)` reads the swapped-in item without a fallback branch: `i` and `j` are always in
+// range here, and web/shared/lib is held at 100% branches, so a `?? item` would be dead code.
 const swapped = <T>(items: ReadonlyArray<T>, i: number, j: number): ReadonlyArray<T> =>
-  items.map((item, k) => (k === i ? (items[j] ?? item) : k === j ? (items[i] ?? item) : item));
+  items.flatMap((item, k) =>
+    k === i ? items.slice(j, j + 1) : k === j ? items.slice(i, i + 1) : [item],
+  );
 
 /**
  * Fisher-Yates from the top: for i = m − 1 down to 1, swap `i` with a draw in [0, i]. One rng

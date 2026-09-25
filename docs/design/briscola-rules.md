@@ -169,6 +169,11 @@ off-suit trump, partner-peek hands present. 124 tests, under a second.
 - **`decodeOptions` refines the flags to their seat counts** (`scoperta ⇒ 2`, `partnerPeek ⇒ 4`),
   one check beyond E20's list, since `createGame` stores them so and a save that disagreed would
   reveal a hand the table did not agree to.
+- **`decodeState` checks hand sizes and the leader's turn**, two more beyond E20's list: every
+  seat holds the same number of cards (a card in the trick counting as held), three while the
+  stock lasts (§2.4 invariant 2); and `turn === leader` while the trick is empty (the replay's
+  invariant 3). A save with hands of 4 and 2 decodes clean under E20's checks alone and wedges
+  the game at the seat that runs out first; a stale `leader` misrecords the next `lastTrick`.
 - **`decodeView` carries its own agreement checks** (a seat for every other player, whole draws
   with `trumpOnTable` matching, a result iff over, a score per seat and per side) so a wire
   `state` frame is refused for the same kinds of disagreement a save is.

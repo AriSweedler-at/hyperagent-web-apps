@@ -152,6 +152,29 @@ describe('decodeState refuses what the engine never emits (V6, V7, E20)', () => 
         result: { winner: 0, totals: [61, 59], draw: false },
       }),
     ],
+    [
+      'hands of three while the stock lasts, equal hands after',
+      // One card moved from Jeff's hand to Ari's: the deck is whole, the hands are 4 and 2.
+      (s: State): unknown => ({
+        ...s,
+        hands: [
+          [...(s.hands[0] ?? []), ...(s.hands[1] ?? []).slice(0, 1)],
+          (s.hands[1] ?? []).slice(1),
+        ],
+      }),
+    ],
+    [
+      'hands of three while the stock lasts, equal hands after',
+      // Two stock cards dealt out early: equal hands of 4 with the stock still whole and even.
+      (s: State): unknown => ({
+        ...s,
+        hands: [
+          [...(s.hands[0] ?? []), ...s.stock.slice(0, 1)],
+          [...(s.hands[1] ?? []), ...s.stock.slice(1, 2)],
+        ],
+        stock: s.stock.slice(2),
+      }),
+    ],
     ['a win count per side', (s: State): unknown => ({ ...s, match: { ...s.match, wins: [0] } })],
     [
       'a trick led by the leader, the turn after its last card',
@@ -162,6 +185,10 @@ describe('decodeState refuses what the engine never emits (V6, V7, E20)', () => 
         leader: 1,
         turn: 1,
       }),
+    ],
+    [
+      'the leader on turn while the trick is empty',
+      (s: State): unknown => ({ ...s, turn: s.leader === 0 ? 1 : 0 }),
     ],
   ])('%s', (expected, mutate) => {
     const r = decodeState(viaJson(mutate(base())));

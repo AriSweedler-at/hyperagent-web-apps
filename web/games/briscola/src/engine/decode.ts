@@ -6,9 +6,12 @@
 // and piles as seats, the deck's multiset exactly once across hands, stock, trick and piles, the
 // trump card under the stock, whole tricks in the piles and whole draws in the stock, a result
 // iff the game is over), since a save that disagrees would wedge the game; play legality stays
-// with `applyAction`. Every card id is refused outside the `LABEL + suit` grammar, every flag
-// outside its literals. `count` and `timestamp` are web/shared/lib/game.ts's (DRY round 2 F1);
-// `seat` is not: this engine's seats are four (E21).
+// with `applyAction`. Hand sizes are checked too (three each while the stock lasts, equal after,
+// a card in the trick counting as held) and the leader on turn while the trick is empty: the
+// first disagreement leaves a seat to play from an empty hand, the second misrecords the next
+// trick's leader. Every card id is refused outside the `LABEL + suit` grammar, every flag outside
+// its literals. `count` and `timestamp` are web/shared/lib/game.ts's (DRY round 2 F1); `seat` is
+// not: this engine's seats are four (E21).
 import { count, timestamp } from '../../../../shared/lib/game.ts';
 import {
   arrayOf,
@@ -26,6 +29,7 @@ import {
 import { deckFor, idsOf, isCardId } from './cards.ts';
 import { nextSeat, sidesOf } from './seats.ts';
 import {
+  HAND_SIZE,
   LABEL,
   type Action,
   type Card,
@@ -164,6 +168,17 @@ const STATE_CHECKS: ReadonlyArray<Check<State>> = [
     (s) => s.phase !== 'over' || s.hands.every((hand) => hand.length === 0),
     'empty hands once the game is over',
   ],
+  [
+    // A seat's card in the trick is still one of its three; unequal hands wedge the game at the
+    // seat that runs out first (design §2.4 invariant 2).
+    (s) => {
+      const held = s.hands.map(
+        (hand, seat) => hand.length + (s.trick.some((p) => p.seat === seat) ? 1 : 0),
+      );
+      return held.every((size) => size === held[0] && (s.stock.length === 0 || size === HAND_SIZE));
+    },
+    'hands of three while the stock lasts, equal hands after',
+  ],
   [(s) => s.match.wins.length === sidesOf(s.options.seatCount), 'a win count per side'],
   [
     (s) => {
@@ -177,6 +192,7 @@ const STATE_CHECKS: ReadonlyArray<Check<State>> = [
     },
     'a trick led by the leader, the turn after its last card',
   ],
+  [(s) => s.trick.length > 0 || s.turn === s.leader, 'the leader on turn while the trick is empty'],
 ];
 
 /** The host's full state, as the save holds it (setup.ts's key order). */
