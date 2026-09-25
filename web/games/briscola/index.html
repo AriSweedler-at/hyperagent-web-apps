@@ -364,6 +364,9 @@
             <button class="btn btn-primary grow" id="playBtn" disabled>Play</button>
             <div class="waiting-note hidden" id="waitNote">Waiting…</div>
             <button class="btn btn-secondary btn-sm hidden" id="resultChipBtn">Result</button>
+            <button class="pile-peek" id="deckBtn" title="View deck" aria-label="View deck">
+              🃏
+            </button>
           </div>
         </div>
       </div>
@@ -419,6 +422,20 @@
         <div class="empty-note" id="rsMatch"></div>
         <button class="btn btn-go btn-block" id="rsNextBtn">Next game</button>
         <button class="btn btn-ghost btn-block btn-sm" id="rsPeekBtn">Look at the table</button>
+      </div>
+    </div>
+
+    <!-- DECK (the owner, 2026-09-25; gin's discards sheet on the forty, src/ui/deck.ts): the four
+         suit rows as chips of the pack, what is gone greyed, my hand greyed too with the toggle. -->
+    <div id="deckOverlay" class="overlay hidden">
+      <div class="sheet">
+        <div class="sheet-title">Deck</div>
+        <div class="sheet-sub" id="deckSub"></div>
+        <div class="dk-grid" id="deckList"></div>
+        <label class="dk-toggle"
+          ><input type="checkbox" id="deckIncludeHand" /> Include the cards in my hand</label
+        >
+        <button class="btn btn-ghost btn-block btn-sm" id="closeDeckBtn">Close</button>
       </div>
     </div>
 

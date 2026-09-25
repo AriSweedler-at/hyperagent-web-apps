@@ -39,6 +39,7 @@ import {
   rectOf,
   requireId,
   setAttr,
+  setChecked,
   setDisabled,
   setHidden,
   setHtml,
@@ -136,6 +137,7 @@ import {
   type SeatCell,
 } from './table.ts';
 import { aboutHtml } from './about.ts';
+import { deckHtml, deckKey, deckOf, deckSubText } from './deck.ts';
 import { bindDrag } from './dragger.ts';
 import { bindHome, paintHome } from './home.ts';
 import { RULES_SLOT_IDS, rulesItemsHtml } from './rules.ts';
@@ -727,6 +729,26 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
   }
 };
 
+// ---- the deck sheet (ui/deck.ts; the owner's ask of 2026-09-25, gin's discards sheet on the forty) ----------
+
+/**
+ * `#deckOverlay` while the table has a view: the count line, the four suit rows keyed on what is
+ * gone, what is mine, the toggle and the pack (a trick taken or a toggle rebuilds them, a lift does
+ * not), and the toggle's box as the App has it.
+ */
+const paintDeck = (doc: DocumentLike, app: App, pack: CardPack): void => {
+  const v = app.shell.view;
+  const open = app.table.deckOpen && v !== null;
+  paintSheet(doc, 'deckOverlay', open);
+  if (!open) return;
+  const deck = deckOf(v, app.table.deckWithHand);
+  setText(requireId(doc, 'deckSub'), deckSubText(deck));
+  ensureKeyed(requireId(doc, 'deckList'), `${deckKey(deck)}|${pack.name}`, () =>
+    deckHtml(pack, deck),
+  );
+  setChecked(requireId(doc, 'deckIncludeHand'), app.table.deckWithHand);
+};
+
 // ---- the whole table, the beat's flights and the whole paint ------------------------------------------------
 
 const paintTable = (
@@ -861,6 +883,7 @@ export const paint = (doc: PageLike, app: App): void => {
   paintOverlays(doc, app);
   paintTip(doc, app, lang);
   paintCardView(doc, app, pack, lang);
+  paintDeck(doc, app, pack);
 };
 
 // ---- input wiring (§5.4, §5.5) ------------------------------------------------------------------------------
@@ -871,6 +894,7 @@ export const paint = (doc: PageLike, app: App): void => {
 const SHEETS: ReadonlyArray<Sheet<Intent>> = [
   { overlay: 'rulesOverlay', close: 'closeRulesBtn', intent: { type: 'rules/close' } },
   { overlay: 'historyOverlay', close: 'closeHistoryBtn', intent: { type: 'history/close' } },
+  { overlay: 'deckOverlay', close: 'closeDeckBtn', intent: { type: 'deck/close' } },
   { overlay: 'resultOverlay', close: 'rsPeekBtn', intent: { type: 'result/peek' } },
   { overlay: 'cardViewOverlay', close: 'closeCardViewBtn', intent: { type: 'cardView/close' } },
 ];
@@ -987,6 +1011,7 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
     dispatch,
     [
       ['playBtn', { type: 'play/click' }],
+      ['deckBtn', { type: 'deck/open' }],
       ['resultChipBtn', { type: 'result/open' }],
       ['rsNextBtn', { type: 'next/click' }],
       ['nextGameBtn', { type: 'next/click' }],
@@ -998,6 +1023,10 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
     ],
     { skipDisabled: true },
   );
+  // The deck sheet's toggle (ui/deck.ts): the box's change is the intent; the paint writes it back.
+  listenId(doc, 'deckIncludeHand', 'change', () => {
+    dispatch({ type: 'deck/toggleHand' });
+  });
   bindMenu(doc, dispatch);
   bindTip(doc, dispatch);
 };

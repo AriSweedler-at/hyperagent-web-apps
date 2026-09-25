@@ -27,6 +27,7 @@ import {
 import type { RecentGame } from '../../../../shared/lib/recentGames.ts';
 import { historyKey } from '../../../../shared/ui/history.ts';
 import { recentGamesHtml } from '../../../../shared/ui/recentGames.ts';
+import { deckKey, deckOf, deckSubText } from './deck.ts';
 import { briscolaPage, type BriscolaPage } from './page.fake.ts';
 import {
   DRAWING_STATUS,
@@ -881,5 +882,82 @@ describe('card names (docs/design/language-packs.md §5): the captions, the tip 
     p.get('cardViewOverlay').fire('click', { target: fakeTarget({ id: 'cardViewOverlay' }) });
     p.get('cardViewOverlay').fire('click', { target: fakeTarget({ id: 'cardViewName' }) });
     expect(r.intents.slice(8)).toEqual([{ type: 'cardView/close' }, { type: 'cardView/close' }]);
+  });
+});
+
+describe('the deck sheet', () => {
+  /** The `data-card` ids of the chips whose class list ends in `mark` (` chip gone`, ` chip held`), in row order. */
+  const chips = (p: BriscolaPage, mark: string): ReadonlyArray<string> =>
+    [
+      ...p
+        .get('deckList')
+        .text()
+        .matchAll(/<div class="card [^"]*" data-card="([^"]+)"/g),
+    ]
+      .filter((m) => m[0].includes(`${mark}" data-card`))
+      .map((m) => m[1] ?? '');
+
+  test('shut until opened; open, the count line, the forty keyed on what is gone and the toggle; my hand greyed on the toggle; a lift rebuilds nothing; a trick taken does', () => {
+    const p = page();
+    const start = revealed(local());
+    paint(p.doc, start);
+    expect(p.get('deckOverlay').hidden()).toBe(true);
+    expect(p.get('deckBtn').disabled()).toBe(false);
+    const open = run(start, { type: 'deck/open' }).app;
+    paint(p.doc, open);
+    expect(p.get('deckOverlay').hidden()).toBe(false);
+    const v = view(open);
+    const deck = deckOf(v, false);
+    expect(p.get('deckSub').text()).toBe(deckSubText(deck));
+    expect(p.get('deckSub').text()).toBe('36 unseen · 34 in the stock');
+    expect(p.get('deckList').attr('data-key')).toBe(`${deckKey(deck)}|linea`);
+    expect(p.get('deckList').text().match(/ chip/g)).toHaveLength(40);
+    expect(chips(p, ' chip gone')).toEqual([v.trumpCard.id]);
+    expect(chips(p, ' chip held')).toEqual([]);
+    expect(p.get('deckIncludeHand').checked()).toBe(false);
+    // The toggle: my three greyed with the ring, the count line says so, the box follows the App.
+    const withHand = run(open, { type: 'deck/toggleHand' }).app;
+    paint(p.doc, withHand);
+    expect(p.get('deckIncludeHand').checked()).toBe(true);
+    expect(new Set(chips(p, ' chip held'))).toEqual(new Set(v.me.hand.map((card) => card.id)));
+    expect(chips(p, ' chip gone')).toEqual([v.trumpCard.id]);
+    expect(p.get('deckSub').text()).toBe('36 unseen · 34 in the stock · 3 in your hand');
+    expect(p.get('deckList').attr('data-key')).toBe(`${deckKey(deckOf(v, true))}|linea`);
+    // A lift changes no key; a trick taken greys its two cards.
+    const key = p.get('deckList').attr('data-key');
+    const lifted = run(withHand, { type: 'card/tap', cardId: v.legal[0] ?? '' }).app;
+    paint(p.doc, lifted);
+    expect(p.get('deckList').attr('data-key')).toBe(key);
+    const taken = settled(playFirst(revealed(playFirst(withHand))));
+    const after = run(taken, { type: 'deck/open' }).app;
+    paint(p.doc, after);
+    const trick = view(after).lastTrick?.cards.map((play) => play.card.id) ?? [];
+    expect(trick).toHaveLength(2);
+    expect(new Set(chips(p, ' chip gone'))).toEqual(new Set([...trick, view(after).trumpCard.id]));
+    expect(p.get('deckSub').text()).toBe('34 unseen · 32 in the stock · 3 in your hand');
+    // Closed: hidden, the list left as it was.
+    paint(p.doc, run(after, { type: 'deck/close' }).app);
+    expect(p.get('deckOverlay').hidden()).toBe(true);
+  });
+
+  test('bindAll: the button, the close, the backdrop and the toggle are the deck intents', () => {
+    const p = page();
+    const r = recorder();
+    bindAll(p.doc, r.dispatch);
+    p.get('deckBtn').fire('click');
+    p.get('closeDeckBtn').fire('click');
+    p.get('deckOverlay').fire('click', { target: fakeTarget({ id: 'deckOverlay' }) });
+    p.get('deckOverlay').fire('click', { target: fakeTarget({ id: 'deckList' }) });
+    p.get('deckIncludeHand').fire('change');
+    expect(r.intents).toEqual([
+      { type: 'deck/open' },
+      { type: 'deck/close' },
+      { type: 'deck/close' },
+      { type: 'deck/toggleHand' },
+    ]);
+    // Escape with the sheet up is its close.
+    p.get('deckOverlay').el.classList.remove('hidden');
+    p.fire('keydown', { key: 'Escape' });
+    expect(r.intents.at(-1)).toEqual({ type: 'deck/close' });
   });
 });

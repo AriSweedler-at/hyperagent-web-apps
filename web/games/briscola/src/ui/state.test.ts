@@ -209,6 +209,8 @@ describe('the initial app', () => {
       drag: null,
       resultDismissed: false,
       historyOpen: false,
+      deckOpen: false,
+      deckWithHand: false,
       curtain: null,
       lastPainted: null,
       cardPack: DEFAULT_CARD_PACK,
@@ -1217,5 +1219,34 @@ describe('card names: the language pack, the tip and the card view (docs/design/
     expect(
       run(open.app, { type: 'leave/confirmed' }, { type: 'leave/finish' }).app.table.cardView,
     ).toBeNull();
+  });
+});
+
+// The deck sheet (ui/deck.ts): last, since its deal would shift the seeded flows above.
+describe('the deck sheet', () => {
+  test('the deck sheet opens with a tap over a view, its toggle is remembered across openings, Escape and Close shut it', () => {
+    // No view, no sheet (the button is on the table, but the hook can ask).
+    expect(run(initialApp, { type: 'deck/open' }).app).toBe(initialApp);
+    const start = revealed(local());
+    expect(start.table).toMatchObject({ deckOpen: false, deckWithHand: false });
+    const open = run(start, { type: 'deck/open' });
+    expect(open.app.table.deckOpen).toBe(true);
+    expect(cues(open.effects)).toEqual(['tap']);
+    const toggled = run(open.app, { type: 'deck/toggleHand' }).app;
+    expect(toggled.table.deckWithHand).toBe(true);
+    expect(run(toggled, { type: 'deck/toggleHand' }).app.table.deckWithHand).toBe(false);
+    const closed = run(toggled, { type: 'deck/close' }).app;
+    expect(closed.table).toMatchObject({ deckOpen: false, deckWithHand: true });
+    expect(run(toggled, { type: 'escape' }).app.table).toMatchObject({
+      deckOpen: false,
+      deckWithHand: true,
+    });
+    // A lift survives the sheet; the reducer's Escape (the hook's: the binder closes an open sheet
+    // itself) drops the lift first, as for every sheet, and takes the sheet on the next press.
+    const lifted = run(toggled, { type: 'card/tap', cardId: view(toggled).legal[0] ?? '' }).app;
+    expect(lifted.table.selected).not.toBeNull();
+    const once = run(lifted, { type: 'escape' }).app;
+    expect(once.table).toMatchObject({ deckOpen: true, selected: null });
+    expect(run(once, { type: 'escape' }).app.table.deckOpen).toBe(false);
   });
 });

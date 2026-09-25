@@ -613,6 +613,67 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       expect(lost.length).toBeGreaterThan(0);
       expect(lost.every((c) => c.startsWith('bad.'))).toBe(true);
     });
+
+    test('the deck sheet: the forty as chips of the pack in suit rows, what is gone greyed, the toggle greys my hand, the count is the view`s', async ({
+      player,
+      project,
+    }) => {
+      // The owner (2026-09-25): "similar to the gin rummy deck viewer, add a view deck button with
+      // the 'include hand' toggle that lets you see what's left in the deck. Arrange it the same
+      // way." The DOM must agree with the view the page holds (ui/deck.ts is the model; its own
+      // suite pins it; here the facts are read off the view directly).
+      const { page } = player;
+      await briscolaStartLocal(page, pagePath(project, 'briscola'), vp);
+      await briscolaReveal(page);
+      const settled = await playTrick(page);
+      await revealIfCurtain(page);
+      const v = await requireView(page);
+      expect(v.trickNo).toBe(1);
+      const trick = settled.lastTrick;
+      if (trick === null) throw new Error('no trick resolved');
+      const idsOf = (mark: string): Promise<ReadonlyArray<string | null>> =>
+        page.evaluate<ReadonlyArray<string | null>>(
+          `Array.from(document.querySelectorAll('#deckList .card.chip${mark}')).map((c) => c.getAttribute('data-card'))`,
+        );
+      await expect(page.locator('#deckOverlay')).toBeHidden();
+      await page.locator('#deckBtn').click();
+      await expect(page.locator('#deckOverlay')).toBeVisible();
+      await expect(page.locator('#deckList .dk-row')).toHaveCount(4);
+      await expect(page.locator('#deckList .dk-row .dk-suit use')).toHaveCount(4);
+      await expect(page.locator('#deckList .card.chip')).toHaveCount(40);
+      // Gone: the trick just taken and the briscola, nothing else; none of mine held yet.
+      const gone = [...trick.cards.map((p) => p.card.id), v.trumpCard.id];
+      expect(new Set(await idsOf('.gone'))).toEqual(new Set(gone));
+      await expect(page.locator('#deckList .card.chip.gone')).toHaveCount(gone.length);
+      await expect(page.locator('#deckList .card.chip.held')).toHaveCount(0);
+      // Unseen: the stock less the briscola lying in it, plus the other hand.
+      const unseen = v.stockCount - 1 + (v.others[0]?.handCount ?? 0);
+      expect(unseen).toBe(40 - gone.length - v.me.hand.length);
+      await expect(page.locator('#deckSub')).toHaveText(
+        `${String(unseen)} unseen · ${String(v.stockCount)} in the stock`,
+      );
+      await expect(page.locator('#deckIncludeHand')).not.toBeChecked();
+      // The toggle greys my hand (it removes nothing) and the count line says so.
+      await page.locator('#deckIncludeHand').check();
+      await expect(page.locator('#deckList .card.chip.held')).toHaveCount(3);
+      expect(new Set(await idsOf('.held'))).toEqual(new Set(v.me.hand.map((c) => c.id)));
+      await expect(page.locator('#deckList .card.chip')).toHaveCount(40);
+      await expect(page.locator('#deckSub')).toHaveText(
+        `${String(unseen)} unseen · ${String(v.stockCount)} in the stock · 3 in your hand`,
+      );
+      // Close, reopen (the toggle is remembered), the backdrop closes, Escape closes.
+      await page.locator('#closeDeckBtn').click();
+      await expect(page.locator('#deckOverlay')).toBeHidden();
+      await page.locator('#deckBtn').click();
+      await expect(page.locator('#deckOverlay')).toBeVisible();
+      await expect(page.locator('#deckIncludeHand')).toBeChecked();
+      await page.locator('#deckOverlay').click({ position: { x: 4, y: 4 } });
+      await expect(page.locator('#deckOverlay')).toBeHidden();
+      await page.locator('#deckBtn').click();
+      await expect(page.locator('#deckOverlay')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('#deckOverlay')).toBeHidden();
+    });
   });
 });
 

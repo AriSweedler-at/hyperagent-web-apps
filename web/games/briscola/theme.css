@@ -585,6 +585,70 @@ label {
   color: var(--muted);
   flex-shrink: 0;
 }
+/* The deck sheet (src/ui/deck.ts; gin's discards sheet, gin-arrangement-and-discards.md §8, on the
+   forty): one row per suit led by its sprite symbol, the ten ranks as chip faces of the pack, so
+   the ten fill the sheet's width: the overlay's 32px and the sheet's 36px of padding, the 18px suit
+   column and nine 3px gaps leave (100vw - 113px) for them, capped where the sheet stops growing
+   (34px in a 420px sheet). The card's aspect is the body's --aspect, the pack painter's. A card seen
+   this game is greyed as gin greys a discard; my own, with the toggle, greyed less with the ring. */
+.dk-grid {
+  --chip-w: min(34px, calc((100vw - 113px) / 10));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.dk-row {
+  display: grid;
+  grid-template-columns: 18px repeat(10, var(--chip-w));
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+}
+.dk-suit {
+  width: 18px;
+  height: 18px;
+}
+.dk-row .card.chip {
+  --card-w: var(--chip-w);
+}
+/* The cell of a card this deck does not hold (the removed two at three players): the chip's box, empty. */
+.dk-out {
+  width: var(--chip-w);
+  height: calc(var(--chip-w) / var(--aspect));
+}
+/* A chip's index a size up from the card's proportion: 9px on a 28px chip, where 7px would blur. */
+.dk-row .card.chip .rank {
+  font-size: 0.34em;
+}
+.card.chip.gone,
+.card.chip.held {
+  opacity: 0.22;
+  filter: grayscale(1);
+  box-shadow: none;
+}
+.card.chip.held {
+  opacity: 0.45;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.dk-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.dk-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.sheet .dk-toggle + .btn-block {
+  margin-top: 14px;
+}
 /* The history (docs/design/briscola-sound-history.md §6; the rows are shell.css's, painted by the
    shared web/shared/ui/history.ts over src/ui/history.ts's copy): the list scrolls inside the
    sheet; a deal or a game's opening reads as an aside, a result as the line that matters, a
@@ -1186,6 +1250,26 @@ details.history-row > .history-detail dt {
 }
 .actions .btn-primary {
   width: auto;
+}
+/* The deck sheet's button (src/ui/deck.ts) at the actions row's right: gin's round `pile-peek`, here
+   the phone's 44px tap target (design §5.5; e2e expectTargets), a cream disc with the card edge's
+   hairline as the secondary buttons beside it. */
+.actions .pile-peek {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--fill);
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+  color: var(--text);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.actions .pile-peek:active {
+  transform: scale(0.96);
 }
 .waiting-note {
   flex: 1;

@@ -268,6 +268,9 @@ export type Table = Readonly<{
   resultDismissed: boolean;
   /** `#historyOverlay` shown. */
   historyOpen: boolean;
+  /** `#deckOverlay` (ui/deck.ts) shown, and whether it greys the cards in my hand too. Session only. */
+  deckOpen: boolean;
+  deckWithHand: boolean;
   /** Pass-and-play: the seat the phone is handed to, or null when the curtain is down. */
   curtain: Seat | null;
   /** The view the previous paint showed (main.ts paints after every intent): the flights' `prev`. */
@@ -304,6 +307,8 @@ export const initialTable: Table = {
   drag: null,
   resultDismissed: false,
   historyOpen: false,
+  deckOpen: false,
+  deckWithHand: false,
   curtain: null,
   lastPainted: null,
   cardPack: DEFAULT_CARD_PACK,
@@ -359,6 +364,10 @@ export type TableIntent =
   | Readonly<{ type: 'result/open' }>
   | Readonly<{ type: 'history/open' }>
   | Readonly<{ type: 'history/close' }>
+  /** `#deckBtn` (the deck sheet, ui/deck.ts), `#closeDeckBtn` and `#deckIncludeHand`. */
+  | Readonly<{ type: 'deck/open' }>
+  | Readonly<{ type: 'deck/close' }>
+  | Readonly<{ type: 'deck/toggleHand' }>
   | Readonly<{ type: 'rules/open' }>
   | Readonly<{ type: 'rules/close' }>
   /** Escape (§5.5): cancels a drag, drops a lift, closes a sheet, in that order of what is up. */
@@ -775,12 +784,13 @@ const tableCleared = (table: Table): Table => ({
   extraNames: table.extraNames,
 });
 
-/** Escape (§5.5): what is up goes, one thing per press: the card view, a drag, a lift, the history, the rules. */
+/** Escape (§5.5): what is up goes, one thing per press: the card view, a drag, a lift, the deck, the history, the rules. */
 const escape = (app: App): Step => {
   const t = app.table;
   if (t.cardView !== null) return pure(withTable(app, { cardView: null }));
   if (t.drag !== null) return pure(withTable(app, { drag: null, selected: null }));
   if (t.selected !== null) return pure(withTable(app, { selected: null }));
+  if (t.deckOpen) return pure(withTable(app, { deckOpen: false }));
   if (t.historyOpen) return pure(withTable(app, { historyOpen: false }));
   if (app.shell.rulesOpen) return pure(withShell(app, { rulesOpen: false }));
   return pure(app);
@@ -869,6 +879,12 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
       return pure(withTable(app, { historyOpen: true }));
     case 'history/close':
       return pure(withTable(app, { historyOpen: false }));
+    case 'deck/open':
+      return app.shell.view === null ? pure(app) : step(withTable(app, { deckOpen: true }), tap);
+    case 'deck/close':
+      return pure(withTable(app, { deckOpen: false }));
+    case 'deck/toggleHand':
+      return pure(withTable(app, { deckWithHand: !t.deckWithHand }));
     case 'rules/open':
       return pure(withShell(app, { rulesOpen: true }));
     case 'rules/close':
