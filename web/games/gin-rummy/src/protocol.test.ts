@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
+import { viaJson } from '../../../../test/shared/engine-helpers.ts';
 import { mulberry32 } from '../../../shared/lib/rng.ts';
 import { createGame, viewFor } from './engine/index.ts';
 import {
@@ -35,8 +36,6 @@ const view = viewFor(
   ),
   1,
 );
-
-const viaJson = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
 
 describe('frozen constants', () => {
   test('the seven tags, the name cap and the default guest name are the legacy literals', () => {
