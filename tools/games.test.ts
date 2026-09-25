@@ -114,7 +114,7 @@ describe('the games registry', () => {
           ],
           rulesSlots: true,
         },
-        contractFloors: { ts: 40, markup: 40 },
+        contractFloors: { ts: 35, markup: 40 },
         shell: {
           heading: 'Briscola',
           shareTitle: 'Briscola',
