@@ -14,7 +14,12 @@
     "web/games/*/src/bots/**/*.ts",
     "web/games/*/src/protocol.ts",
     "web/games/*/src/net/protocol.ts",
-    "web/games/*/src/scorer/**/*.ts"
+    "web/games/*/src/scorer/**/*.ts",
+    // The coin game (dry-round-2.md F3): a pure two-seat engine like the games' engine/ folders,
+    // and the replay driver and test scaffolding under test/shared that the engine tests beside the
+    // engines import (a composite project lists every file it compiles); both name no node type.
+    "web/shared/example/**/*.ts",
+    "test/shared/**/*.ts"
   ],
   // The Score Counter's screen (docs/MIGRATION.md step 12) is an edge, and its test runs on the
   // DOM page fake; eslint.config.js spells the same carve-out as `scorer/!(main|*.test).ts`. The

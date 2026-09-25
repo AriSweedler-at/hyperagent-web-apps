@@ -2,9 +2,9 @@
 // to the same JSON text after decoding; and the rejections the decoders owe the trust boundary.
 import { describe, expect, test } from 'vitest';
 
-import { formatError, type DecodeError } from '../../../../shared/lib/json.ts';
+import { failureOf, now, viaJson } from '../../../../../test/shared/engine-helpers.ts';
+import { driveGame } from '../../../../../test/shared/replay.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
-import { actorOf, applyAction } from './apply.ts';
 import {
   decodeAction,
   decodeBoard,
@@ -16,43 +16,38 @@ import {
   decodeView,
   pair,
 } from './decode.ts';
+import { ENGINE } from './index.ts';
 import { createGame } from './setup.ts';
+import { PLAYERS } from './test-helpers.ts';
 import { ACTION_TYPES, type State } from './types.ts';
-import { legalActions, viewFor } from './view.ts';
+import { viewFor } from './view.ts';
 
-const PLAYERS = [
-  { id: 'a', name: 'Ari' },
-  { id: 'b', name: 'Jeff' },
-] as const;
-const now = (): number => 1_700_000_000_000;
-const viaJson = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
-const failureOf = (r: { ok: boolean; error?: DecodeError }): string =>
-  r.ok || r.error === undefined ? 'ok' : formatError(r.error);
 const seats = [0, 1] as const;
 
 /** One seeded Western match to 3 played by a random policy: the state after every action. */
 const trace = (seed: number): ReadonlyArray<State> => {
-  const dice = mulberry32(seed);
-  const pick = mulberry32(seed * 7919);
-  const start = createGame(PLAYERS, { matchLength: 3, rotation: ['backgammon'] }, dice, now);
-  // A fixed range stands in for a loop (the repo bans raw loops everywhere); finished matches pass through.
-  return Array.from({ length: 20_000 }).reduce<ReadonlyArray<State>>(
-    (states) => {
-      const s = states.at(-1) ?? start;
-      if (s.phase === 'over' && viewFor(s, 0).matchOver) return states;
-      const actor = actorOf(s) ?? 0;
-      // Doubling and passing are rare, as at a real table, or every game ends in a few steps.
-      const actions = legalActions(viewFor(s, actor)).filter(
+  const states: State[] = [];
+  const run = driveGame(ENGINE, {
+    seed,
+    now,
+    start: (dice, clock) =>
+      createGame(PLAYERS, { matchLength: 3, rotation: ['backgammon'] }, dice, clock),
+    // Doubling and passing are rare, as at a real table, or every game ends in a few steps.
+    policy: (_view, pick, legal) => {
+      const actions = legal.filter(
         (a) => (a.type !== 'double' || pick() < 0.1) && (a.type !== 'pass' || pick() < 0.2),
       );
       const action = actions[Math.floor(pick() * actions.length)];
       if (action === undefined) throw new Error(`no action at step ${String(states.length)}`);
-      const r = applyAction(s, actor, action, dice, now);
-      if (!r.ok) throw new Error(r.error);
-      return [...states, r.value];
+      return action;
     },
-    [start],
-  );
+    stepCap: 20_000,
+    over: (s) => s.phase === 'over' && viewFor(s, 0).matchOver,
+    onStep: ({ after }) => {
+      states.push(after);
+    },
+  });
+  return [run.start, ...states];
 };
 
 describe('decodeState / decodeView round-trip the engine text', () => {

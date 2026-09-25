@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
+import { now } from '../../../../test/shared/engine-helpers.ts';
 import { mulberry32 } from '../../../shared/lib/rng.ts';
 import { applyAction, bestMelding, idsOf, viewFor } from './engine/index.ts';
 import type { Cards, State } from './engine/index.ts';
@@ -17,7 +18,6 @@ import {
 } from './sandbox.ts';
 import { phoneRows } from './ui/hand/picture.ts';
 
-const now = (): number => 1_700_000_000_000;
 const PLAYERS = [
   { id: 'p1', name: 'sandbox' },
   { id: 'p2', name: 'Bob' },

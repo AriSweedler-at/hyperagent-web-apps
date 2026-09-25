@@ -46,7 +46,9 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: selected.flatMap((s) => [...SUITES[s].coverage.include]),
-      exclude: ['**/*.test.ts'],
+      // A game's test scaffolding beside its engine (web/games/backgammon/src/engine/test-helpers.ts,
+      // dry-round-2.md F4) is test code by name, like *.test.ts: out of the denominator.
+      exclude: ['**/*.test.ts', '**/test-helpers.ts'],
       thresholds: Object.fromEntries(
         selected.flatMap((s) => Object.entries(SUITES[s].coverage.thresholds)),
       ),

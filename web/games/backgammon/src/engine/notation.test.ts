@@ -14,21 +14,10 @@ import {
   pointName,
   pointsText,
 } from './notation.ts';
-import type { Board, Move } from './types.ts';
+import { START, mv, pos } from './test-helpers.ts';
 import { VARIANTS } from './variants.ts';
 
 const R = VARIANTS.portes;
-const pos = (text: string): Board => {
-  const r = parsePosition(text, R);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
-const mv = (seat: 0 | 1, text: string): Move => {
-  const r = parseMove(seat, text, R);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
-const START = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';
 
 describe('move text (R28)', () => {
   test('pointName and moveText speak the mover own numbering', () => {

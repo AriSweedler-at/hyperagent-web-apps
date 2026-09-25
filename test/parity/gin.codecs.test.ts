@@ -6,82 +6,79 @@
 import { describe, expect, test } from 'vitest';
 
 import * as current from '../../web/games/gin-rummy/src/engine/index.ts';
-import type { Seat, State } from '../../web/games/gin-rummy/src/engine/index.ts';
-import { mulberry32 } from '../../web/shared/lib/rng.ts';
-import { loadLegacyGin, type GinState } from './gin.api.ts';
+import type { Seat } from '../../web/games/gin-rummy/src/engine/index.ts';
+import { PLAYERS, now, viaJson } from '../shared/engine-helpers.ts';
+import { driveGame, roundTrips } from '../shared/replay.ts';
+import { loadLegacyGin, type GinAction, type GinState, type GinView } from './gin.api.ts';
 import { storageCaptures, wireFrames } from './gin.fixtures.ts';
 import { actor, policy } from './gin.policy.ts';
 
 const legacy = loadLegacyGin();
 const SEEDS = Array.from({ length: 12 }, (_, i) => i + 101);
 const STEP_CAP = 5000;
-const PLAYERS = [
-  { id: 'a', name: 'Alice' },
-  { id: 'b', name: 'Bob' },
-] as const;
-const now = (): number => 1_700_000_000_000;
-
-const viaJson = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
-
-/** Decoding the JSON text gives back a value whose JSON text is the same. */
-const roundTrips = (
-  label: string,
-  decode: (x: unknown) => { ok: boolean },
-  value: unknown,
-): void => {
-  const text = JSON.stringify(value);
-  const r = decode(JSON.parse(text)) as { ok: boolean; value?: unknown; error?: unknown };
-  expect(r.ok, `${label}: ${JSON.stringify(r.error)}`).toBe(true);
-  expect(JSON.stringify(r.value), label).toBe(text);
-};
 
 type Counted = { states: number; views: number };
 
+/** Every state and both views after a step, re-encoded byte for byte. */
+const roundTripsStep = <S>(
+  label: string,
+  state: S,
+  viewFor: (s: S, seat: Seat) => unknown,
+): void => {
+  roundTrips(`${label} state`, current.decodeState, state);
+  roundTrips(`${label} view 0`, current.decodeView, viewFor(state, 0));
+  roundTrips(`${label} view 1`, current.decodeView, viewFor(state, 1));
+};
+
 /** One seeded game on the current engine, every state and view round-tripped. */
 const currentGame = (seed: number): Counted => {
-  const rng = mulberry32(seed);
-  const choices = mulberry32(seed * 7919);
-  const step = (acc: { state: State; n: number }): { state: State; n: number } => {
-    const { state, n } = acc;
-    if (n >= STEP_CAP || state.phase === 'gameOver') return acc;
-    const seat = actor(state as unknown as GinState) as Seat;
-    const view = current.viewFor(state, seat);
-    const legacyView = viaJson(view) as Parameters<typeof policy>[1];
-    const action = policy(choices, legacyView, viaJson(current.legalActions(view)) as never);
-    const r = current.applyAction(state, seat, action, rng, now);
-    if (!r.ok) throw new Error(r.error);
-    const label = `seed ${String(seed)} step ${String(n + 1)}`;
-    roundTrips(`${label} state`, current.decodeState, r.value);
-    roundTrips(`${label} view 0`, current.decodeView, current.viewFor(r.value, 0));
-    roundTrips(`${label} view 1`, current.decodeView, current.viewFor(r.value, 1));
-    return step({ state: r.value, n: n + 1 });
-  };
-  const start = current.createGame({ players: PLAYERS, target: 100, dealer: 0 }, rng, now);
-  const final = step({ state: start, n: 0 });
-  expect(final.state.phase).toBe('gameOver');
-  return { states: final.n, views: final.n * 2 };
+  const run = driveGame(current.ENGINE, {
+    seed,
+    now,
+    start: (rng, clock) =>
+      current.createGame({ players: PLAYERS, target: 100, dealer: 0 }, rng, clock),
+    policy: (view, pick, legal) =>
+      policy(pick, viaJson(view) as Parameters<typeof policy>[1], viaJson(legal) as never),
+    stepCap: STEP_CAP,
+    over: (s) => s.phase === 'gameOver',
+    onStep: ({ after, step }) => {
+      roundTripsStep(`seed ${String(seed)} step ${String(step + 1)}`, after, current.viewFor);
+    },
+  });
+  expect(run.state.phase).toBe('gameOver');
+  return { states: run.steps, views: run.steps * 2 };
 };
 
 /** The same on the legacy engine: its states and views are what the pages actually stored/sent. */
 const legacyGame = (seed: number): Counted => {
-  const rng = mulberry32(seed);
-  const choices = mulberry32(seed * 7919);
-  const state = legacy.createGame({ players: [...PLAYERS], target: 100, dealer: 1, rng });
-  const step = (n: number): number => {
-    if (n >= STEP_CAP || state.phase === 'gameOver') return n;
-    const seat = actor(state);
-    const view = legacy.viewFor(state, seat);
-    const action = policy(choices, view, legacy.legalActions(view));
-    const r = legacy.applyAction(state, seat, action, rng);
-    if (!r.ok) throw new Error(r.error);
-    const label = `legacy seed ${String(seed)} step ${String(n + 1)}`;
-    roundTrips(`${label} state`, current.decodeState, state);
-    roundTrips(`${label} view 0`, current.decodeView, legacy.viewFor(state, 0));
-    roundTrips(`${label} view 1`, current.decodeView, legacy.viewFor(state, 1));
-    return step(n + 1);
-  };
-  const steps = step(0);
-  return { states: steps, views: steps * 2 };
+  const run = driveGame<GinState, GinView, GinAction>(
+    {
+      // The legacy mutates in place and answers `{ ok }`: the state it was handed is the state after.
+      apply: (s, seat, a, rng) => {
+        const r = legacy.applyAction(s, seat, a, rng);
+        return r.ok ? { ok: true, value: s } : { ok: false, error: r.error };
+      },
+      viewFor: legacy.viewFor,
+      legalActions: legacy.legalActions,
+      actorOf: (s) => actor(s) as Seat,
+    },
+    {
+      seed,
+      now,
+      start: (rng) => legacy.createGame({ players: [...PLAYERS], target: 100, dealer: 1, rng }),
+      policy: (view, pick, legal) => policy(pick, view, [...legal]),
+      stepCap: STEP_CAP,
+      over: (s) => s.phase === 'gameOver',
+      onStep: ({ after, step }) => {
+        roundTripsStep(
+          `legacy seed ${String(seed)} step ${String(step + 1)}`,
+          after,
+          legacy.viewFor,
+        );
+      },
+    },
+  );
+  return { states: run.steps, views: run.steps * 2 };
 };
 
 // Re-encoding every state and view of the seeded games takes ~1.5 s here and ~6 s on a CI runner

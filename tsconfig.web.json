@@ -10,5 +10,7 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": []
   },
-  "include": ["web/**/*.ts"]
+  // test/shared holds the replay driver and the test scaffolding the engine tests beside the
+  // engines import (dry-round-2.md F3, F4); a composite project lists every file it compiles.
+  "include": ["web/**/*.ts", "test/shared/**/*.ts"]
 }

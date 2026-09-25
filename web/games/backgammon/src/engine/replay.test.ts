@@ -5,34 +5,26 @@
 // exactly a hit, the wrong seat refused, every single step not offered refused, both seats'
 // views agreeing on the board, the log growing by the expected lines, the rng read only by rolls
 // and openings, byte-stable re-encoding, and `legalMoves` set-equal to the first moves of the
-// maximal plays (the enumeration is the oracle). Each suite also asserts outcome coverage. Loops
-// and mutation are fine in a test; the driver has to live here because a helper module under
-// engine/ would fall under the pure zone's rules and the coverage thresholds.
+// maximal plays (the enumeration is the oracle). Each suite also asserts outcome coverage. The
+// seeded driver (dice, picks, the policy before each apply, the rng accounting) is
+// test/shared/replay.ts's `driveGame` (dry-round-2.md F3); the invariants stay here, the
+// backgammon-only scaffolding beside the engine in test-helpers.ts.
 import { describe, expect, test } from 'vitest';
 
-import { mulberry32 } from '../../../../shared/lib/rng.ts';
+import { epoch as now } from '../../../../../test/shared/engine-helpers.ts';
+import {
+  byteStable,
+  driveGame,
+  replayScale,
+  seeds,
+  type Step as DrivenStep,
+} from '../../../../../test/shared/replay.ts';
 import * as bg from './index.ts';
-import type { Action, Seat, ShippedVariant, State, View } from './index.ts';
+import type { Action, ShippedVariant, State, View } from './index.ts';
+import { PLAYERS } from './test-helpers.ts';
 
-const PLAYERS = [
-  { id: 'a', name: 'Ari' },
-  { id: 'b', name: 'Jeff' },
-] as const;
-const now = (): number => 0;
 /** A random match of 3 runs a few hundred steps; the cap only turns a hang into a failure. */
 const STEP_CAP = 20_000;
-
-type Counted = { n: number; rng: () => number };
-const counting = (inner: () => number): Counted => {
-  const c: Counted = {
-    n: 0,
-    rng: () => {
-      c.n += 1;
-      return inner();
-    },
-  };
-  return c;
-};
 
 /** Doubles at 15%, undoes at 5%, passes at 25%, otherwise a uniformly random legal move. */
 const choose = (view: View, pick: () => number): Action => {
@@ -54,25 +46,8 @@ const choose = (view: View, pick: () => number): Action => {
 };
 
 const keys = (moves: ReadonlyArray<bg.Move>): ReadonlySet<string> => new Set(moves.map(bg.moveKey));
-const stable = (
-  value: unknown,
-  decode: (u: unknown) => { ok: boolean; value?: unknown },
-): boolean => {
-  const text = JSON.stringify(value);
-  const r = decode(JSON.parse(text) as unknown);
-  return r.ok && JSON.stringify(r.value) === text;
-};
 
-type Step = Readonly<{
-  before: State;
-  after: State;
-  view: View;
-  actor: Seat;
-  action: Action;
-  rngCalls: number;
-  step: number;
-  cov: Set<string>;
-}>;
+type Step = DrivenStep<State, View, Action> & Readonly<{ cov: Set<string> }>;
 
 /** A cheap assertion for the per-step invariants: `expect` per check would dominate the run. */
 const ensure = (ok: boolean, label: string, what: string): void => {
@@ -80,16 +55,7 @@ const ensure = (ok: boolean, label: string, what: string): void => {
 };
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
-const checkStep = ({
-  before,
-  after,
-  view,
-  actor,
-  action,
-  rngCalls,
-  step,
-  cov,
-}: Step): readonly [View, View] => {
+const checkStep = ({ before, after, view, actor, action, rngCalls, step, cov }: Step): void => {
   const rules = bg.rulesOf(before.variant);
   const label = `step ${String(step)} ${action.type}`;
   const opp = bg.otherSeat(actor);
@@ -229,7 +195,7 @@ const checkStep = ({
   if (after.phase === 'over' && before.phase !== 'over') {
     const r = after.result;
     ensure(r !== null, label, 'no result');
-    if (r === null) return [v0, v1];
+    if (r === null) return;
     ensure(r.multiplier <= rules.maxMultiplier, label, 'multiplier above the cap');
     ensure(r.points === r.multiplier * r.cube, label, 'points');
     ensure(after.match.score[r.winner] === before.match.score[r.winner] + r.points, label, 'score');
@@ -250,18 +216,17 @@ const checkStep = ({
   // 9. Byte stability every 25th step (decode.test.ts round-trips every state of a whole match).
   if (step % 25 === 0)
     ensure(
-      stable(after, bg.decodeState) && stable(v0, bg.decodeView) && stable(v1, bg.decodeView),
+      byteStable(after, bg.decodeState) &&
+        byteStable(v0, bg.decodeView) &&
+        byteStable(v1, bg.decodeView),
       label,
       'not byte-stable',
     );
-  return [v0, v1];
 };
 
-type Run = Readonly<{ state: State; view: View; steps: number; done: boolean }>;
-
 /**
- * One seeded match (`rotation`, `matchLength`) to the end. The dice stream and the policy's picks
- * are independent generators; a fixed range stands in for a loop (raw loops are banned).
+ * One seeded match (`rotation`, `matchLength`) to the end: the shared driver's dice and picks,
+ * the invariants of `checkStep` on every step.
  */
 const playMatch = (
   seed: number,
@@ -269,82 +234,48 @@ const playMatch = (
   matchLength: number,
   cov: Set<string>,
 ): number => {
-  const dice = counting(mulberry32(seed));
-  const pick = mulberry32(seed * 7919);
-  const start = bg.createGame(PLAYERS, { matchLength, rotation }, dice.rng, now);
-  const run = Array.from({ length: STEP_CAP }).reduce<Run>(
-    ({ state, view, steps, done }) => {
-      if (done) return { state, view, steps, done };
-      const actor = bg.actorOf(state) ?? 0;
+  const run = driveGame(bg.ENGINE, {
+    seed,
+    now,
+    start: (dice, clock) => bg.createGame(PLAYERS, { matchLength, rotation }, dice, clock),
+    policy: (view, pick) => choose(view, pick),
+    stepCap: STEP_CAP,
+    over: (s) => s.phase === 'over' && bg.matchOver(s.match),
+    onStep: ({ before, after, view, actor, action, rngCalls, step }) => {
       // The higher-die rule at work: two different dice, either playable alone, only one move deep.
       if (
-        state.phase === 'moving' &&
-        state.played.length === 0 &&
-        state.dice !== null &&
-        state.dice[0] !== state.dice[1] &&
+        before.phase === 'moving' &&
+        before.played.length === 0 &&
+        before.dice !== null &&
+        before.dice[0] !== before.dice[1] &&
         view.plays.every((p) => p.length === 1) &&
         bg.singleSteps(
-          state.board,
+          before.board,
           actor,
-          Math.min(...state.dice) as bg.Die,
-          bg.rulesOf(state.variant),
+          Math.min(...before.dice) as bg.Die,
+          bg.rulesOf(before.variant),
         ).length > 0
       )
         cov.add('higherDie');
-      const action = choose(view, pick);
-      const before = dice.n;
-      const r = bg.applyAction(state, actor, action, dice.rng, now);
-      expect(
-        r.ok ? 'ok' : r.error,
-        `seed ${String(seed)} step ${String(steps)} ${action.type}`,
-      ).toBe('ok');
-      if (!r.ok) return { state, view, steps, done: true };
-      const views = checkStep({
-        before: state,
-        after: r.value,
-        view,
-        actor,
-        action,
-        rngCalls: dice.n - before,
-        step: steps,
-        cov,
-      });
-      const over = r.value.phase === 'over' && bg.matchOver(r.value.match);
-      // The next actor's view, computed by the checks already, drives the next step.
-      return {
-        state: r.value,
-        view: views[bg.actorOf(r.value) ?? 0],
-        steps: steps + 1,
-        done: over,
-      };
+      checkStep({ before, after, view, actor, action, rngCalls, step, cov });
     },
-    { state: start, view: bg.viewFor(start, bg.actorOf(start) ?? 0), steps: 0, done: false },
-  );
+  });
   expect(run.done, `seed ${String(seed)} did not finish in ${String(STEP_CAP)} steps`).toBe(true);
   expect(bg.matchWinner(run.state.match), `seed ${String(seed)}`).not.toBeNull();
-  expect(bg.applyAction(run.state, 0, { type: 'next' }, dice.rng, now)).toEqual({
+  expect(bg.applyAction(run.state, 0, { type: 'next' }, run.rng, now)).toEqual({
     ok: false,
     error: bg.MESSAGES.MATCH_OVER,
   });
   return run.steps;
 };
 
-const seeds = (from: number, count: number): ReadonlyArray<number> =>
-  Array.from({ length: count }, (_, i) => from + i);
-
 /**
  * How many matches the three suites play together: 91 by default (60 + 25 + 6; every push and PR,
  * about eight seconds), `BG_REPLAY_GAMES=1000` in .github/workflows/nightly.yml beside gin's
  * `GIN_REPLAY_GAMES`, lower for a quick local run. Each suite keeps its share of the total, and the
- * outcome-coverage assertions expect at least the default. Read off `globalThis`: this file is
- * compiled by tsconfig.web.json (no node types) while vitest runs it in node.
+ * outcome-coverage assertions expect at least the default.
  */
-const env = (globalThis as { process?: { env?: Readonly<Record<string, string | undefined>> } })
-  .process?.env;
-const DEFAULT_MATCHES = 91;
-const SCALE = Number(env?.['BG_REPLAY_GAMES'] ?? DEFAULT_MATCHES) / DEFAULT_MATCHES;
-const share = (base: number): number => Math.max(1, Math.round(base * SCALE));
-const TIMEOUT_MS = Math.ceil(120_000 * Math.max(1, SCALE));
+const { share, timeoutMs: TIMEOUT_MS } = replayScale('BG_REPLAY_GAMES', 91);
 
 describe('seeded random play to the end (R33)', () => {
   test(

@@ -217,6 +217,12 @@ const ROWS_BEFORE: ReadonlyArray<readonly [string, Suite, Thresholds]> = [
   ['web/shared/lib/**', 'shared', { lines: 100, functions: 100, branches: 100, statements: 100 }],
   // Added after the partition (docs/design/glossary-links.md §3): held at 100 like shared/lib.
   ['web/shared/ui/**', 'shared', { lines: 100, functions: 100, branches: 100, statements: 100 }],
+  // Added by dry-round-2.md F3: the coin game the replay driver is proved on, held at 100.
+  [
+    'web/shared/example/**',
+    'shared',
+    { lines: 100, functions: 100, branches: 100, statements: 100 },
+  ],
   ['web/shared/edge/**', 'shared', { lines: 94, functions: 94, statements: 93, branches: 90 }],
   ['web/shared/net/**', 'shared', { lines: 95, functions: 95, statements: 95, branches: 94 }],
   [
@@ -352,6 +358,8 @@ const INCLUDE_BEFORE: ReadonlyArray<string> = [
   'web/shared/net/**/*.ts',
   // Added after the partition (docs/design/glossary-links.md §3): the shared shell's pure helpers.
   'web/shared/ui/**/*.ts',
+  // Added by dry-round-2.md F3: the coin game.
+  'web/shared/example/**/*.ts',
   'web/games/fidice/src/domain/**/*.ts',
   'web/games/fidice/src/bots/**/*.ts',
   'web/games/fidice/src/net/**/*.ts',
@@ -520,6 +528,16 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   ['the hooks', ['.githooks/pre-push', 'tools/hooks-verify.sh'], []],
   ['a Claude settings file', ['.claude/settings.json'], []],
   ['shared code', ['web/shared/lib/rng.ts'], EVERYTHING],
+  // The coin game and the replay driver (dry-round-2.md F3, F4): no game imports the coin; the
+  // driver is imported by the coin self-test and both engines' replays and codec tests.
+  ['the coin game', ['web/shared/example/coin/coin.ts'], ['shared']],
+  ['the coin self-test', ['web/shared/example/coin/coin.test.ts'], ['shared']],
+  ['the replay driver', ['test/shared/replay.ts'], ['shared', 'gin', 'backgammon']],
+  [
+    'the engine-test scaffolding',
+    ['test/shared/engine-helpers.ts'],
+    ['shared', 'gin', 'backgammon'],
+  ],
   ['a shared stylesheet', ['web/shared/styles/tokens.css'], EVERYTHING],
   ['a shared test alone', ['web/shared/edge/prefs.test.ts'], EVERYTHING],
   ['a harness tool', ['tools/serve-dist.ts'], EVERYTHING],

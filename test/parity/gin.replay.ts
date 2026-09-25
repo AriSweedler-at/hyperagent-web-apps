@@ -23,7 +23,9 @@
 // a card fresh right after a redeal, and that the stock-undo normaliser fired, over its own range.
 // GIN_REPLAY_GAMES sets the game count: 400 by default (every push and PR; the four shards take
 // about six seconds beside each other and every outcome still shows in each), 1000 in
-// .github/workflows/nightly.yml, and lower for a quick local run.
+// .github/workflows/nightly.yml, and lower for a quick local run. The knob and the shard ranges
+// are test/shared/replay.ts's `replayScale` and `shard` (dry-round-2.md F3); the two-leg compare
+// itself stays here, the one driver with a legacy leg.
 import { describe, expect, test } from 'vitest';
 
 import * as current from '../../web/games/gin-rummy/src/engine/index.ts';
@@ -35,21 +37,18 @@ import type {
   View,
 } from '../../web/games/gin-rummy/src/engine/index.ts';
 import { mulberry32 } from '../../web/shared/lib/rng.ts';
+// The current engine's clock; the legacy reads Date.now, so both timestamps are masked.
+import { PLAYERS, epoch as now } from '../shared/engine-helpers.ts';
+import { replayScale, shard } from '../shared/replay.ts';
 import { loadLegacyGin, type GinAction, type GinState, type GinView } from './gin.api.ts';
 import { multiFit } from './gin.layoffs.ts';
 import { actor, policy } from './gin.policy.ts';
 
 const legacy = loadLegacyGin();
-const GAMES = Number(process.env['GIN_REPLAY_GAMES'] ?? 400);
+const { games: GAMES } = replayScale('GIN_REPLAY_GAMES', 400);
 const SHARDS = 4;
 /** A seeded game averages ~430 steps; the cap only exists to turn a hang into a failure. */
 const STEP_CAP = 5000;
-const PLAYERS = [
-  { id: 'a', name: 'Alice' },
-  { id: 'b', name: 'Bob' },
-] as const;
-/** The current engine's clock; the legacy reads Date.now, so both timestamps are masked. */
-const now = (): number => 0;
 
 /** JSON with the wall-clock fields zeroed; comparing the text pins key order too. */
 const masked = (value: unknown): string =>
@@ -230,17 +229,10 @@ const replay = (seed: number): Replay => {
   };
 };
 
-/** Seeds of shard `n` (0-based): the n-th of SHARDS equal ranges of 1..GAMES. */
-const seedsOf = (shard: number): ReadonlyArray<number> => {
-  const from = Math.floor((shard * GAMES) / SHARDS) + 1;
-  const to = Math.floor(((shard + 1) * GAMES) / SHARDS);
-  return Array.from({ length: to - from + 1 }, (_, i) => from + i);
-};
-
-/** Registers shard `n`'s test; each `gin.replay.<n+1>.test.ts` calls this once. */
-export const replayShard = (shard: number): void => {
-  const seeds = seedsOf(shard);
-  describe(`gin engine parity: legacy vs current, full games (shard ${String(shard + 1)} of ${String(SHARDS)})`, () => {
+/** Registers shard `n`'s test (the n-th of SHARDS ranges of 1..GAMES); each `gin.replay.<n+1>.test.ts` calls this once. */
+export const replayShard = (n: number): void => {
+  const seeds = shard(n, SHARDS, GAMES);
+  describe(`gin engine parity: legacy vs current, full games (shard ${String(n + 1)} of ${String(SHARDS)})`, () => {
     test(`seeds ${String(seeds[0])}..${String(seeds.at(-1))} agree on every state, both views and both legal-action lists after every action`, () => {
       const games = seeds.map(replay);
       const outcomes = new Set(games.flatMap((g) => [...g.outcomes]));

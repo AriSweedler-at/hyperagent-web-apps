@@ -4,24 +4,21 @@
 // the status and result copy, the aria labels and the flights between two paints.
 import { describe, expect, test } from 'vitest';
 
+import { NOW, now } from '../../../../../test/shared/engine-helpers.ts';
 import {
   applyAction,
   createGame,
-  parseMove,
-  parsePosition,
-  VARIANTS,
   viewFor,
   withPosition,
   type Action,
-  type Board,
   type Dice,
-  type Move,
   type PlayedMove,
   type Seat,
   type ShippedVariant,
   type State,
   type View,
 } from '../engine/index.ts';
+import { PLAYERS, START, mv, pos, scripted } from '../engine/test-helpers.ts';
 import {
   absOfId,
   barHtml,
@@ -64,29 +61,6 @@ import {
   type Chain,
 } from './board.ts';
 
-const R = VARIANTS.portes;
-const NOW = 1_700_000_000_000;
-const now = (): number => NOW;
-/** Dice come from a scripted queue: `(d - 0.5) / 6` makes `rollDie` yield exactly `d`. */
-const scripted = (...dice: ReadonlyArray<number>): (() => number) => {
-  const queue = [...dice];
-  return () => ((queue.shift() ?? 1) - 0.5) / 6;
-};
-const PLAYERS = [
-  { id: 'a', name: 'Ari' },
-  { id: 'b', name: 'Jeff' },
-] as const;
-
-const pos = (text: string): Board => {
-  const r = parsePosition(text, R);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
-const mv = (seat: Seat, text: string): Move => {
-  const r = parseMove(seat, text, R);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
 /** A game in `variant` (portes: Light starts, waiting to roll) with the given position set. */
 const stateAt = (
   text: string,
@@ -110,7 +84,6 @@ const step = (state: State, seat: Seat, action: Action): State => {
 const move = (state: State, text: string): State =>
   step(state, state.turn, { type: 'move', ...mv(state.turn, text) });
 
-const START = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';
 /** T13: a Dark blot on Light's 5-point. */
 const BLOT_ON_5 = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:4 20:1 | bar 0/0 | off 0/0';
 /** Design §4.3: a Dark blot on Light's 7-point, so 13 reaches 4 two ways with 6-3. */

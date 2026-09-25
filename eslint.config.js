@@ -25,6 +25,8 @@ const PURE = [
   'web/games/*/src/net/protocol.ts',
   // gin's scorer maths; scorer/main.ts is the Score Counter's screen (docs/MIGRATION.md step 12).
   'web/games/*/src/scorer/!(main).ts',
+  // The coin game (dry-round-2.md F3): a two-seat engine held to the engines' profile.
+  'web/shared/example/**/*.ts',
 ];
 const ALGORITHMS = ['**/*.algorithms.ts'];
 const EDGES = [
@@ -45,6 +47,9 @@ const EDGES = [
 const RNG_ALLOWED = ['web/games/*/main.ts', 'web/shared/edge/**/*.ts'];
 const TESTS_AND_TOOLS = [
   '**/*.test.ts',
+  // A game's test scaffolding beside its engine (backgammon's `scripted`, `pos`, `mv`;
+  // dry-round-2.md F4): test code by name, like *.test.ts, so it may hold a counter or throw.
+  '**/test-helpers.ts',
   'e2e/**/*.ts',
   'tools/**/*.ts',
   'test/**/*.ts',

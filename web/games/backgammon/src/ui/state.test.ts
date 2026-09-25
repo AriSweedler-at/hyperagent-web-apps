@@ -4,18 +4,11 @@
 // R14 beat), the effects as data, and `runEffect` against recorded adapters.
 import { describe, expect, test } from 'vitest';
 
+import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
 import { createStore, type StorageLike } from '../../../../shared/edge/storage.ts';
-import { mulberry32, type Rng } from '../../../../shared/lib/rng.ts';
-import {
-  actorOf,
-  applyAction,
-  MESSAGES,
-  parsePosition,
-  VARIANTS,
-  viewFor,
-  withPosition,
-} from '../engine/index.ts';
-import type { Board, Dice, Seat, State, View } from '../engine/index.ts';
+import { mulberry32 } from '../../../../shared/lib/rng.ts';
+import { actorOf, applyAction, MESSAGES, viewFor, withPosition } from '../engine/index.ts';
+import type { Dice, Seat, State, View } from '../engine/index.ts';
 import { connectingMsg } from '../net/guest.ts';
 import { OPENING_MSG, handoffMsg } from '../net/host.ts';
 import {
@@ -24,6 +17,7 @@ import {
   state as stateFrame,
   toast as toastFrame,
 } from '../protocol.ts';
+import { pos, scripted } from '../engine/test-helpers.ts';
 import { STORAGE_KEYS } from '../storage.ts';
 import { effectiveSelection, sourcesOf, targetsOf } from './board.ts';
 import { CUES } from './sound.ts';
@@ -74,19 +68,10 @@ import {
   type Step,
 } from './state.ts';
 
-const NOW = 1_700_000_000_000;
 const ctx = { rng: mulberry32(7), now: () => NOW };
-const R = VARIANTS.portes;
 
 /** Dispatch intents in turn, collecting every effect. */
-const run = (app: App, ...intents: ReadonlyArray<Intent>): Step =>
-  intents.reduce<Step>(
-    (s, intent) => {
-      const next = reduce(s.app, intent, ctx);
-      return { app: next.app, effects: [...s.effects, ...next.effects] };
-    },
-    { app, effects: [] },
-  );
+const run = runIntents(reduce, ctx);
 
 const kinds = (effects: ReadonlyArray<Effect>): ReadonlyArray<string> => effects.map((e) => e.type);
 const toasts = (effects: ReadonlyArray<Effect>): ReadonlyArray<unknown> =>
@@ -96,17 +81,6 @@ const cues = (effects: ReadonlyArray<Effect>): ReadonlyArray<string> =>
 const sends = (effects: ReadonlyArray<Effect>): ReadonlyArray<unknown> =>
   effects.flatMap((e) => (e.type === 'send' ? [e.frame] : []));
 
-/** An rng whose successive `rollDie` results are exactly `dice`; 1s once the script runs out. */
-const scripted = (...dice: ReadonlyArray<number>): Rng => {
-  let i = 0;
-  return () => ((dice[i++] ?? 1) - 0.5) / 6;
-};
-
-const pos = (text: string): Board => {
-  const r = parsePosition(text, R);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
 const game = (app: App): State => {
   const g = app.shell.game;
   if (g === null) throw new Error('no game');

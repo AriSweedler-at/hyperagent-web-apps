@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
+import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
 import { createStore, type StorageLike } from '../../../../shared/edge/storage.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { STOCK_DRAW_FINAL_MSG, applyAction, createGame, viewFor } from '../engine/index.ts';
@@ -46,22 +47,12 @@ import {
   type Effect,
   type EffectDeps,
   type HomeSnapshot,
-  type Intent,
-  type Step,
 } from './state.ts';
 
-const NOW = 1_700_000_000_000;
 const ctx = { rng: mulberry32(7), now: () => NOW };
 
 /** Dispatch intents in turn, collecting every effect. */
-const run = (app: App, ...intents: ReadonlyArray<Intent>): Step =>
-  intents.reduce<Step>(
-    (s, intent) => {
-      const next = reduce(s.app, intent, ctx);
-      return { app: next.app, effects: [...s.effects, ...next.effects] };
-    },
-    { app, effects: [] },
-  );
+const run = runIntents(reduce, ctx);
 
 const kinds = (effects: ReadonlyArray<Effect>): ReadonlyArray<string> => effects.map((e) => e.type);
 const toasts = (effects: ReadonlyArray<Effect>): ReadonlyArray<unknown> =>

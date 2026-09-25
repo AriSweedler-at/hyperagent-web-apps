@@ -22,8 +22,8 @@ it must register.
 
 | Suite | vitest `unit` (in `npm test`) | `standalone` (only `test:<suite>`) | Coverage rows | e2e specs |
 |---|---|---|---|---|
-| `shared` | `web/shared/**/*.test.ts`, `test/parity/{ice,roomCode}.legacy.test.ts` | | `web/shared/{lib,edge,net}/**` | |
-| `shared-integration` | (the fake two-seat game, when it lands) | `test/integration/**` (Chromium; `browser: true`) | | |
+| `shared` | `web/shared/**/*.test.ts` (the coin game's among them), `test/parity/{ice,roomCode}.legacy.test.ts` | | `web/shared/{lib,ui,edge,net,example}/**` | |
+| `shared-integration` | (the coin game's integration tests through the shared shell, when they land) | `test/integration/**` (Chromium; `browser: true`) | | |
 | `gin` | `web/games/gin-rummy/**/*.test.ts`, `test/parity/gin.*`, `test/fixtures/legacy/gin-wire.test.ts`, `test/card-backs.test.ts` | | the 10 gin rows | `**/gin-*.spec.ts`; `**/shell-*.spec.ts` tagged `@gin-rummy` (`@backgammon`, `@fidice` inverted) |
 | `fidice` | `web/games/fidice/**/*.test.ts`, `test/parity/fidice.*`, `test/tools/debundle-fidice.test.ts` | | the 7 fidice rows | `**/shell-online.spec.ts`, `**/shell-relay.spec.ts` tagged `@fidice` (`@gin-rummy`, `@backgammon` inverted) |
 | `backgammon` | `web/games/backgammon/**/*.test.ts` | | the 7 backgammon rows | `**/backgammon-*.spec.ts`; `**/shell-*.spec.ts` tagged `@backgammon` (`@gin-rummy`, `@fidice` inverted) |
@@ -168,7 +168,12 @@ scripts, stopping at the first failure and listing what CI adds (the browser sui
 
 ## Not yet
 
-- The fake two-seat game (`web/shared/example/coin`) and its integration tests join
-  `shared-integration.unit` with the shared shell (the design's §4 and P3); `test:shared` then runs
-  both projects so shared's rows see a real consumer.
+- The coin game (`web/shared/example/coin`) landed with the second DRY round (F3): a real
+  `TwoSeatEngine` (`web/shared/lib/game.ts`) with byte-stable decoders, published as `ENGINE` as
+  the games' engines publish theirs, claimed by `shared`'s `web/shared/**/*.test.ts` glob and held
+  at 100/100/100/100 as the replay driver's self-test. Its integration tests through the shared
+  shell join `shared-integration.unit` when the shell boots it (the design's §4 and P3);
+  `test:shared` then runs both projects so shared's rows see a real consumer.
+- `test/shared/**` (the replay driver and the engine-test scaffolding, F3/F4) has a RULES row
+  (shared, gin, backgammon: the suites whose tests import it) and no coverage row: test code.
 - `test:dist` and `test:integration` go after one release.

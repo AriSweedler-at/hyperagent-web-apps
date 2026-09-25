@@ -5,10 +5,12 @@
 // through `sandbox/load`), so what the painter sees is what main.ts hands it.
 import { describe, expect, test } from 'vitest';
 
+import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
 import { fakeEl, fakeTarget } from '../../../../shared/edge/page.fake.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
-import { VARIANTS, parsePosition, viewFor, withPosition } from '../engine/index.ts';
-import type { Board, Dice, Seat, State, View } from '../engine/index.ts';
+import { viewFor, withPosition } from '../engine/index.ts';
+import type { Dice, Seat, State, View } from '../engine/index.ts';
+import { pos } from '../engine/test-helpers.ts';
 import { backgammonPage, type BackgammonPage } from './page.fake.ts';
 import {
   HIT_TOAST_PREFIX,
@@ -43,36 +45,13 @@ import {
 } from './render.ts';
 import { aboutHtml } from './about.ts';
 import { rulesItemsHtml } from './rules.ts';
-import {
-  SCREENS,
-  initialApp,
-  reduce,
-  type App,
-  type HomeSnapshot,
-  type Intent,
-  type Step,
-} from './state.ts';
+import { SCREENS, initialApp, reduce, type App, type HomeSnapshot, type Intent } from './state.ts';
 
 import MARKUP from '../../index.html?raw';
 
 const page = (): BackgammonPage => backgammonPage(MARKUP);
-const NOW = 1_700_000_000_000;
 const ctx = { rng: mulberry32(7), now: () => NOW };
-const R = VARIANTS.portes;
-
-const run = (app: App, ...intents: ReadonlyArray<Intent>): Step =>
-  intents.reduce<Step>(
-    (s, intent) => {
-      const next = reduce(s.app, intent, ctx);
-      return { app: next.app, effects: [...s.effects, ...next.effects] };
-    },
-    { app, effects: [] },
-  );
-const pos = (text: string): Board => {
-  const r = parsePosition(text, R);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
+const run = runIntents(reduce, ctx);
 const game = (app: App): State => {
   const g = app.shell.game;
   if (g === null) throw new Error('no game');

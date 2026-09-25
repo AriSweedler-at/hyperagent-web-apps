@@ -1,17 +1,11 @@
 import { describe, expect, test } from 'vitest';
 
-import { formatError } from '../../../../shared/lib/json.ts';
+import { PLAYERS, failureOf, now, viaJson } from '../../../../../test/shared/engine-helpers.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { ACTION_TYPES, decodeAction, decodeCard, decodeState, decodeView, pair } from './decode.ts';
 import { applyAction, createGame } from './game.ts';
 import type { Action, State } from './types.ts';
 import { viewFor } from './view.ts';
-
-const now = (): number => 1_700_000_000_000;
-const PLAYERS = [
-  { id: 'a', name: 'Alice' },
-  { id: 'b', name: 'Bob' },
-] as const;
 
 /** A state a few moves in: both passed the upcard, the non-dealer drew from the stock. */
 const midHand = (): State => {
@@ -27,11 +21,6 @@ const midHand = (): State => {
     return r.value;
   }, g0);
 };
-
-/** Through JSON, as the wire and localStorage carry it. */
-const viaJson = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
-const failureOf = (r: { ok: boolean; error?: unknown }): string =>
-  r.ok ? 'ok' : formatError(r.error as Parameters<typeof formatError>[0]);
 
 describe('decodeState / decodeView round-trip the engine text', () => {
   test('a fresh game and a mid-hand state, with and without lastDrawn', () => {
