@@ -79,6 +79,45 @@ export const baseUrl = (project: Project): string =>
   project === 'proxy'
     ? `${PROXY_ORIGIN}/`
     : `${isDeployed() ? DEPLOYED_PAGES_ORIGIN : PAGES_ORIGIN}${PAGES_BASE_PATH}`;
+
+/**
+ * Specs about the page alone, not its origin (the hand's geometry and flows, the stories, the
+ * scorer, the shell's home, pass-and-play and liveness, the two parity oracles): both origins serve
+ * the same bytes and the second run only cost CI minutes, so they play on `pages` only and every
+ * other project leaves them out (`ignoredSpecs`, each project's `testIgnore` in
+ * playwright.config.ts). A spec about an origin (the smoke, the two-peer games, resume, the
+ * handoff's invite link, the relay-forced games) is not listed and runs on both. Beside PROJECTS
+ * since dry-round-2.md I7 (D11), so the projects and what each plays are read in one place.
+ */
+export const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
+  '**/backgammon-geometry.spec.ts',
+  '**/backgammon-glossary.spec.ts',
+  '**/backgammon-local.spec.ts',
+  '**/backgammon-table-ux.spec.ts',
+  '**/computed-styles.spec.ts',
+  '**/gin-drag-discard.spec.ts',
+  '**/gin-arrange.spec.ts',
+  '**/gin-card-back.spec.ts',
+  '**/gin-discard.spec.ts',
+  '**/gin-dom-parity.spec.ts',
+  '**/gin-draw.spec.ts',
+  '**/gin-geometry.spec.ts',
+  '**/gin-glossary.spec.ts',
+  '**/gin-layoff.spec.ts',
+  '**/gin-local.spec.ts',
+  '**/gin-sandbox.spec.ts',
+  '**/gin-scorer.spec.ts',
+  '**/gin-sound-font.spec.ts',
+  '**/gin-stories.spec.ts',
+  '**/shell-home.spec.ts',
+  // The sessions' silence watch is a timer, the same on either origin.
+  '**/shell-liveness.spec.ts',
+  '**/shell-local.spec.ts',
+];
+
+/** The specs a project leaves out: the page-only ones on every project but `pages`. */
+export const ignoredSpecs = (project: Project): ReadonlyArray<string> =>
+  project === 'pages' ? [] : PAGE_ONLY_SPECS;
 /** Local PeerServer (`peer` package) that `?peer=host:port` aims the pages at. */
 export const PEER_HOST = LOCAL_HOST;
 export const PEER_PORT = PORTS.peer;

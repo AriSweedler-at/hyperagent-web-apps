@@ -29,6 +29,8 @@ describe('the games registry', () => {
       'gin-rummy': {
         title: 'Gin Rummy',
         hook: 'window.__gin',
+        suite: 'gin',
+        specs: ['**/gin-*.spec.ts'],
         storage: { saveKey: 'ginRummyMP_v1', prefix: 'ginRummy_' },
         debug: 0,
         pageShape: {
@@ -51,6 +53,8 @@ describe('the games registry', () => {
       fidice: {
         title: "Fidice — one-cup liar's dice",
         hook: 'window.__fidice',
+        suite: 'fidice',
+        specs: [],
         debug: 1,
         pageShape: { ids: ['app'], rulesSlots: false },
         contractFloors: { ts: 50, markup: -1 },
@@ -58,6 +62,8 @@ describe('the games registry', () => {
       backgammon: {
         title: 'Sheshbesh — backgammon',
         hook: 'window.__backgammon',
+        suite: 'backgammon',
+        specs: ['**/backgammon-*.spec.ts'],
         storage: { saveKey: 'backgammonMP_v1', prefix: 'backgammon_' },
         debug: 0,
         pageShape: {

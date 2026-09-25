@@ -7,7 +7,7 @@ import { relative, resolve } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
-import { GAMES } from '../games.ts';
+import { GAMES, REGISTRY } from '../games.ts';
 import { matchesAny } from './glob.ts';
 import {
   E2E_SUITES,
@@ -192,6 +192,30 @@ describe('every test file belongs to exactly one suite', () => {
     // The browser suite is the only one `npm test` leaves out, the built one the only one that builds.
     expect(SUITE_NAMES.filter((s) => SUITES[s].browser)).toEqual(['shared-integration']);
     expect(SUITE_NAMES.filter((s) => SUITES[s].needsBuild)).toEqual(['site']);
+  });
+
+  test('the game e2e rows are read off the registry (dry-round-2.md I6): the rows the table spelled', () => {
+    // The literals the table held before the derivation (gin's otherTags now in GAMES order; the
+    // grepInvert alternation reads the same), so a registry edit that changes a row (a renamed
+    // suite, a game gaining or losing `shell`, a spec glob) shows here first.
+    expect(SUITES.gin.e2e).toStrictEqual({
+      files: ['**/gin-*.spec.ts', '**/shell-*.spec.ts'],
+      tag: '@gin-rummy',
+      otherTags: ['@fidice', '@backgammon'],
+    });
+    expect(SUITES.fidice.e2e).toStrictEqual({
+      files: ['**/shell-online.spec.ts', '**/shell-relay.spec.ts'],
+      tag: '@fidice',
+      otherTags: ['@gin-rummy', '@backgammon'],
+    });
+    expect(SUITES.backgammon.e2e).toStrictEqual({
+      files: ['**/backgammon-*.spec.ts', '**/shell-*.spec.ts'],
+      tag: '@backgammon',
+      otherTags: ['@gin-rummy', '@fidice'],
+    });
+    // Every game names a suite of its own (two rows naming one suite would drop a game from the
+    // reverse map silently), and every game suite is some game's.
+    expect([...GAME_SUITES].sort()).toEqual(GAMES.map((game) => REGISTRY[game].suite).sort());
   });
 
   test('the per-suite file counts as cut over (the table of the design, re-counted on main)', () => {

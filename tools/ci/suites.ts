@@ -12,12 +12,16 @@
 // the games a shared spec drives (the shell specs: one tagged describe per game, each game's job
 // playing its own), every threshold row sits under a coverage.include glob of its own suite (vitest
 // passes an empty glob's row silently: an empty coverage map summarises to 100%), and the
-// change -> jobs table below holds. Node builtins only, so `node --experimental-strip-types
-// tools/ci/affected.ts` runs before `npm ci` in CI.
+// change -> jobs table below holds. The game suites' rows are read off tools/games.ts REGISTRY
+// (each row's `suite`, `specs` and `shell`: dry-round-2.md I6), so a fourth game registers there
+// and adds one SUITES row. Node builtins only (games.ts imports a type alone), so `node
+// --experimental-strip-types tools/ci/affected.ts` runs before `npm ci` in CI.
+import { GAMES, REGISTRY, type Game, type GameSuite } from '../games.ts';
 import { matchesAny } from './glob.ts';
 
-export type Suite =
-  'shared' | 'shared-integration' | 'gin' | 'fidice' | 'backgammon' | 'site' | 'harness';
+export type { GameSuite };
+
+export type Suite = 'shared' | 'shared-integration' | GameSuite | 'site' | 'harness';
 
 /** One coverage row: vitest's `coverage.thresholds[glob]` shape. */
 export type Thresholds = Readonly<{
@@ -56,6 +60,30 @@ const SHELL_SPECS: ReadonlyArray<string> = ['**/shell-*.spec.ts'];
  */
 const ONLINE_SPEC_NAMES: ReadonlyArray<string> = ['shell-online.spec.ts', 'shell-relay.spec.ts'];
 const ONLINE_SPECS: ReadonlyArray<string> = ONLINE_SPEC_NAMES.map((name) => `**/${name}`);
+
+/**
+ * The game each game suite tests: REGISTRY's `suite` column read backwards. It is the folder under
+ * web/games/ the suite's rules name and the `@<game>` tag its describes of a shared spec carry.
+ */
+const GAME_OF: Readonly<Record<GameSuite, Game>> = Object.fromEntries(
+  GAMES.map((game) => [REGISTRY[game].suite, game]),
+) as Record<GameSuite, Game>;
+
+/**
+ * A game suite's Playwright half, read off its registry row (dry-round-2.md I6): the game's own
+ * specs (`specs`), then the shell specs for a row with `shell` or the two online specs for a row
+ * without (every game has a describe in those two: H1), its `@<game>` tag and the other games'
+ * tags, so each game's e2e job plays its own describes alone.
+ */
+const gameE2e = (suite: GameSuite): E2eSpec => {
+  const game = GAME_OF[suite];
+  const row = REGISTRY[game];
+  return {
+    files: [...row.specs, ...(row.shell === undefined ? ONLINE_SPECS : SHELL_SPECS)],
+    tag: `@${game}`,
+    otherTags: GAMES.filter((g) => g !== game).map((g) => `@${g}`),
+  };
+};
 
 export type SuiteSpec = Readonly<{
   /** vitest include globs `npm test` runs, and `npm run test:<suite>` with them. */
@@ -294,12 +322,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         'web/games/gin-rummy/src/fx.ts': { lines: 95, functions: 95, statements: 95, branches: 97 },
       },
     },
-    // Gin's own specs and its describes of the shell specs (`@gin-rummy`; backgammon's left out).
-    e2e: {
-      files: ['**/gin-*.spec.ts', ...SHELL_SPECS],
-      tag: '@gin-rummy',
-      otherTags: ['@backgammon', '@fidice'],
-    },
+    // Gin's own specs and its describes of the shell specs (`@gin-rummy`; the other games' left out).
+    e2e: gameE2e('gin'),
   },
   fidice: {
     unit: [
@@ -356,7 +380,7 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
     },
     // Fidice's own online and relay specs folded into the two online shell specs (H1): its e2e job
     // plays their fidice describes and nothing else, until the restyle brings it the shell (§4.6).
-    e2e: { files: [...ONLINE_SPECS], tag: '@fidice', otherTags: ['@gin-rummy', '@backgammon'] },
+    e2e: gameE2e('fidice'),
   },
   backgammon: {
     // Colocated only: no legacy leg (its oracle is engine/replay.test.ts); its wire goldens under
@@ -446,12 +470,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         },
       },
     },
-    // Backgammon's own specs and its describes of the shell specs (`@backgammon`; gin's left out).
-    e2e: {
-      files: ['**/backgammon-*.spec.ts', ...SHELL_SPECS],
-      tag: '@backgammon',
-      otherTags: ['@gin-rummy', '@fidice'],
-    },
+    // Backgammon's own specs and its describes of the shell specs (`@backgammon`; the others' left out).
+    e2e: gameE2e('backgammon'),
   },
   site: {
     unit: [
@@ -523,25 +543,17 @@ export type Rule = Readonly<{ globs: ReadonlyArray<string>; runs: Selection; why
  * A game suite: the suites whose CI jobs share one shape, so ci.yml runs them as two matrix jobs
  * (`game`: `npm run test:<suite> -- --coverage`; `e2e-game`: `npm run test:e2e:<suite>` under
  * Chromium and coturn) over the lists the `changes` job emits (dry-round-2.md I1). A fourth game
- * joins GAME_FOLDERS and its SUITES row; ci.yml is not edited.
+ * names its suite on its tools/games.ts REGISTRY row and adds its SUITES row; ci.yml is not edited.
  */
-export type GameSuite = 'gin' | 'fidice' | 'backgammon';
-
-const GAME_FOLDERS: Readonly<Record<GameSuite, string>> = {
-  gin: 'gin-rummy',
-  fidice: 'fidice',
-  backgammon: 'backgammon',
-};
-
 export const isGameSuite = (suite: Suite): suite is GameSuite =>
-  (Object.keys(GAME_FOLDERS) as ReadonlyArray<string>).includes(suite);
+  (Object.keys(GAME_OF) as ReadonlyArray<string>).includes(suite);
 
 /** The game suites in job order: the values of the two matrix jobs' `strategy.matrix.suite`. */
 export const GAME_SUITES: ReadonlyArray<GameSuite> = SUITE_NAMES.filter(isGameSuite);
 
 /** The rows every game gets: its folder, its parity oracles, its specs and its style goldens. */
 const gameRules = (game: GameSuite): ReadonlyArray<Rule> => {
-  const folder = GAME_FOLDERS[game];
+  const folder = GAME_OF[game];
   return [
     {
       globs: [`web/games/${folder}/**`],

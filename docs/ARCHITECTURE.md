@@ -334,7 +334,8 @@ build: Chromium from `.github/actions/playwright-chromium` (actions/cache by Pla
 the OS packages every run, the download only on a miss), coturn from `.github/actions/coturn` for
 the game matrix (apt; the system service it starts is stopped; `e2e-site` has no relay spec and
 runs with `E2E_TURN=off`); four workers under CI;
-projects pages + proxy, the page-only specs on pages alone: `PAGE_ONLY_SPECS`; PeerServer from the
+projects pages + proxy, the page-only specs on pages alone: `PAGE_ONLY_SPECS` in
+`e2e/fixtures/site.ts`; PeerServer from the
 `peer` package on :9000; coturn on :3478 started by `playwright.config.ts` with one static
 long-term credential, loopback only, no TLS, its relay ports right above (`e2e/fixtures/site.ts`
 `turnServerCommand`), reached through an ICE list the config writes under

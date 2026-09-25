@@ -129,8 +129,10 @@ lists `tools/ci/affected.ts --github` prints beside the booleans (`GAME_SUITES` 
 filtered to the selected jobs), with `fail-fast: false` (one game's failure cancels no other) and
 `if: ... != '[]'` (GitHub refuses an empty matrix, so an empty list skips the job whole; the checks
 read `game (gin)` and `e2e-game (gin)`, with no `name:` override, since a job skipped before its
-matrix expands would show the raw expression as its name). A fourth game registers in
-`suites.ts` alone. The unit suites run once, instrumented, against their own rows. `site` builds
+matrix expands would show the raw expression as its name). A fourth game registers in its
+`tools/games.ts` REGISTRY row (`suite`, `specs`, `shell`) and its `suites.ts` row, whose e2e half
+and change rules are read off the registry (dry-round-2 I6). The unit suites run once,
+instrumented, against their own rows. `site` builds
 and uploads `dist/`, which `deploy` downloads. The game e2e matrix installs Chromium and coturn
 (every game has a relay spec); `e2e-site` runs with `E2E_TURN=off`. A push to main or a
 `workflow_dispatch` selects everything. GitHub skips a job whose `needs` were skipped unless it

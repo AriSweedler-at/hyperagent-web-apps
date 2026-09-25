@@ -4,8 +4,9 @@
 // against :4173). A spec about an origin (the smoke test, the two-peer games, the resume, the
 // handoff's invite link, the relay-forced games) runs on both; a spec about the page alone (the
 // hand's geometry and flows, the stories, the scorer, the two parity oracles) runs on `pages`
-// only (PAGE_ONLY_SPECS), since both origins serve the same bytes and the second run only cost CI
-// minutes. Every port here is e2e/fixtures/site.ts PORTS, the bases named above
+// only (e2e/fixtures/site.ts PAGE_ONLY_SPECS, every other project's `testIgnore`), since both
+// origins serve the same bytes and the second run only cost CI minutes. Every port here is
+// e2e/fixtures/site.ts PORTS, the bases named above
 // plus `E2E_PORT_OFFSET`, so a second run can sit beside one that holds the defaults. dist/ is the
 // only tree since docs/MIGRATION.md step 13 cut the last page over (the dark `next` project that
 // played a port before its flip is retired); the pages origin also publishes the frozen legacy gin
@@ -50,38 +51,13 @@ import {
   PROXY_ORIGIN,
   TURN_SKIP_REASON,
   baseUrl,
+  ignoredSpecs,
   isDeployed,
   turnServerCommand,
   turnStatus,
 } from './e2e/fixtures/site.ts';
 
 const CI = process.env['CI'] !== undefined && process.env['CI'] !== '';
-/** Specs about the page alone, not its origin: they run on `pages` only. */
-const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
-  '**/backgammon-geometry.spec.ts',
-  '**/backgammon-glossary.spec.ts',
-  '**/backgammon-local.spec.ts',
-  '**/backgammon-table-ux.spec.ts',
-  '**/computed-styles.spec.ts',
-  '**/gin-drag-discard.spec.ts',
-  '**/gin-arrange.spec.ts',
-  '**/gin-card-back.spec.ts',
-  '**/gin-discard.spec.ts',
-  '**/gin-dom-parity.spec.ts',
-  '**/gin-draw.spec.ts',
-  '**/gin-geometry.spec.ts',
-  '**/gin-glossary.spec.ts',
-  '**/gin-layoff.spec.ts',
-  '**/gin-local.spec.ts',
-  '**/gin-sandbox.spec.ts',
-  '**/gin-scorer.spec.ts',
-  '**/gin-sound-font.spec.ts',
-  '**/gin-stories.spec.ts',
-  '**/shell-home.spec.ts',
-  // The sessions' silence watch is a timer, the same on either origin.
-  '**/shell-liveness.spec.ts',
-  '**/shell-local.spec.ts',
-];
 /** The suite `E2E_SUITE` names, or none; a name with no e2e half is an error, never a full run. */
 const e2eSuiteFromEnv = (value: string | undefined): Suite | undefined => {
   if (value === undefined || value === '') return undefined;
@@ -143,10 +119,11 @@ export default defineConfig({
       args: ['--disable-features=WebRtcHideLocalIpsWithMdns', '--no-first-run'],
     },
   },
+  // The page-only specs on `pages` alone (site.ts PAGE_ONLY_SPECS); Playwright's default is [].
   projects: PROJECTS.map((name) => ({
     name,
     use: { baseURL: baseUrl(name) },
-    ...(name === 'proxy' ? { testIgnore: [...PAGE_ONLY_SPECS] } : {}),
+    testIgnore: [...ignoredSpecs(name)],
   })),
   webServer: [
     // Deployed, serve-dist still runs: it is where the deployed page fetches its `?ice=` lists.
