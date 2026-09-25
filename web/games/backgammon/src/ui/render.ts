@@ -8,7 +8,9 @@
 // table is this game's.
 //
 // The board is keyed (design §2.2): every container of `#board` carries `data-key` and is
-// rebuilt from ui/board.ts's templates only when its key changes, so a selection change never
+// rebuilt from ui/board.ts's templates only when its key changes (web/shared/ui/keyed.ts's
+// `ensureKeyed`, docs/design/dry-round-2.md D1; the match score and the history list, once spelled
+// by hand, key through it too since Wave E3), so a selection change never
 // recreates checkers and the `.selected` lift transitions; highlights, `data-die` and the aria
 // labels are refreshed outside the key on every paint. A move changes the key of exactly two
 // containers (three with a hit), and `flightsBetween` + ui/board/fly.ts fly the checkers between
@@ -20,7 +22,6 @@ import {
   closestFrom,
   dataOf,
   hasClass,
-  isDisabled,
   keyOf,
   listen,
   listenId,
@@ -93,8 +94,8 @@ import {
 import { bindDrag } from './board/dragger.ts';
 import { flyMoves } from './board/fly.ts';
 import {
+  bindButtons,
   bindSheets as bindShellSheets,
-  ensureKeyed,
   paintHandoff as paintShellHandoff,
   paintScreen as paintShellScreen,
   paintSheet,
@@ -104,6 +105,7 @@ import {
   type Sheet,
   type ToastMarks,
 } from '../../../../shared/ui/shellPaint.ts';
+import { ensureKeyed } from '../../../../shared/ui/keyed.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { aboutHtml } from './about.ts';
@@ -586,10 +588,7 @@ const paintEndgame = (doc: DocumentLike, app: App, v: View): void => {
   setText(requireId(doc, 'resultSub'), matchSubText(v));
   const score = requireId(doc, 'matchScore');
   const key = `${String(v.games.length)}:${String(v.startedAt)}`;
-  if (dataOf(score, 'key') !== key) {
-    setAttr(score, 'data-key', key);
-    setHtml(score, scoreHtml(v));
-  }
+  ensureKeyed(score, key, () => scoreHtml(v).markup);
   const next = requireId(doc, 'nextGameBtn');
   setText(next, nextLabel(app, v));
   setDisabled(next, nextWaits(app, v));
@@ -632,10 +631,7 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
     const list = requireId(doc, 'historyList');
     const v = app.shell.view;
     const key = v === null ? '-' : `${String(v.gameNo)}:${String(v.log.length)}`;
-    if (dataOf(list, 'key') !== key) {
-      setAttr(list, 'data-key', key);
-      setHtml(list, historyHtml(v));
-    }
+    ensureKeyed(list, key, () => historyHtml(v).markup);
   }
   paintSheet(doc, 'menuOverlay', app.table.menuOpen);
   // The binder has no App: the mode a change switches to is painted onto the checkbox.
@@ -757,14 +753,6 @@ const bindSheets = (doc: PageLike, dispatch: Dispatch): void => {
   bindShellSheets(doc, SHEETS, dispatch, { escapeFallback: { type: 'chip/cancel' } });
 };
 
-/** A button's click as one intent, skipped while it is disabled. */
-const button = (doc: PageLike, id: string, intent: Intent, dispatch: Dispatch): void => {
-  const el = requireId(doc, id);
-  listen(el, 'click', () => {
-    if (!isDisabled(el)) dispatch(intent);
-  });
-};
-
 /** The table's, the sheets' and the endgame's controls, each an intent. */
 export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   listenId(doc, 'board', 'click', (e) => {
@@ -787,22 +775,33 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
     const index = chip === null ? null : dataOf(chip, 'index');
     if (index !== null) dispatch({ type: 'chip/tap', index: Number(index) });
   });
-  button(doc, 'chipCancelBtn', { type: 'chip/cancel' }, dispatch);
-  button(doc, 'undoBtn', { type: 'undo/click' }, dispatch);
-  button(doc, 'doubleBtn', { type: 'double/click' }, dispatch);
-  button(doc, 'doneBtn', { type: 'done/click' }, dispatch);
-  button(doc, 'rollModalBtn', { type: 'roll/click' }, dispatch);
-  button(doc, 'resultChipBtn', { type: 'result/open' }, dispatch);
-  button(doc, 'rsNextBtn', { type: 'next/click' }, dispatch);
-  button(doc, 'nextGameBtn', { type: 'next/click' }, dispatch);
-  button(doc, 'takeBtn', { type: 'take/click' }, dispatch);
-  button(doc, 'passBtn', { type: 'pass/click' }, dispatch);
-  button(doc, 'leaveBtn', { type: 'leave/request' }, dispatch);
-  button(doc, 'menuBtn', { type: 'menu/toggle' }, dispatch);
-  button(doc, 'soundBtn', { type: 'sound/toggle' }, dispatch);
-  button(doc, 'handoffBtn', { type: 'handoff/click' }, dispatch);
-  button(doc, 'rulesBtnGame', { type: 'rules/toggle' }, dispatch);
-  button(doc, 'historyBtn', { type: 'history/toggle' }, dispatch);
+  // The controls whose click is one constant (docs/design/dry-round-2.md D2, item E4; this game's
+  // adoption is Wave E3), in the order the `button()` lines held; `skipDisabled` is what that
+  // helper did: a click on a control carrying `disabled` dispatches nothing (the paint disables
+  // `#undoBtn`, `#rollModalBtn`, `#rsNextBtn` and `#nextGameBtn` while their move is not on).
+  bindButtons(
+    doc,
+    dispatch,
+    [
+      ['chipCancelBtn', { type: 'chip/cancel' }],
+      ['undoBtn', { type: 'undo/click' }],
+      ['doubleBtn', { type: 'double/click' }],
+      ['doneBtn', { type: 'done/click' }],
+      ['rollModalBtn', { type: 'roll/click' }],
+      ['resultChipBtn', { type: 'result/open' }],
+      ['rsNextBtn', { type: 'next/click' }],
+      ['nextGameBtn', { type: 'next/click' }],
+      ['takeBtn', { type: 'take/click' }],
+      ['passBtn', { type: 'pass/click' }],
+      ['leaveBtn', { type: 'leave/request' }],
+      ['menuBtn', { type: 'menu/toggle' }],
+      ['soundBtn', { type: 'sound/toggle' }],
+      ['handoffBtn', { type: 'handoff/click' }],
+      ['rulesBtnGame', { type: 'rules/toggle' }],
+      ['historyBtn', { type: 'history/toggle' }],
+    ],
+    { skipDisabled: true },
+  );
   // The menu's rows close the menu and open what they name.
   listenId(doc, 'menuRulesBtn', 'click', () => {
     dispatch({ type: 'menu/toggle' });
