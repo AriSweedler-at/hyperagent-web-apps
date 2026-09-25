@@ -90,7 +90,7 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 | `web/shared/lib` | itself | Leaf modules. `Result<T,E>` (`ok/err/map/andThen`), `Rng = () => number`, `mulberry32`, JSON decoders, `roomCode` constants (`'ginrummy-ari-'`, `'fidice-'`, alphabets). |
 | `web/shared/lib/invite.ts` | itself | The invite link: `inviteUrl(code, pageUrl)` is `<pageUrl>?join=<code>` (pure). |
 | `web/shared/edge/invite.ts` | itself | `joinCodeFrom(search)` and `withoutJoin(search)`: a boot reads the code and drops it from the address bar through the platform's `URLSearchParams`. |
-| `web/shared/ui` | shared/lib, `@shared/edge/dom` (and its fakes); the clock fake for `toast.ts`'s test | The shared shell's helpers and painters, held at 100%. `glossary.ts` (docs/design/glossary-links.md): `RuleItem`, `Glossary`, `ruleAnchor(id)`, `linkJargon(html, glossary, { except })`, `rulesListHtml(items, glossary)`, `ruleFromHash(hash)`; `ids.ts` (`SHELL_IDS`): both lint-pure like shared/lib. `shellPaint.ts`, `curtain.ts` and `toast.ts` (docs/design/shared-shell.md §4.4, moved out of both games in B1) write through `@shared/edge/dom` and are carved out of the pure profile like `scorer/main.ts`; each game's `ui/render.ts`, `ui/local.ts` and `main.ts` compose them under the old names. |
+| `web/shared/ui` | shared/lib, `@shared/edge/dom` (and its fakes); the clock fake for `toast.ts`'s test | The shared shell's helpers and painters, held at 100%. `glossary.ts` (docs/design/glossary-links.md): `RuleItem`, `Glossary`, `ruleAnchor(id)`, `linkJargon(html, glossary, { except })`, `rulesListHtml(items, glossary)`, `ruleFromHash(hash)`; `ids.ts` (`SHELL_IDS`): both lint-pure like shared/lib. `shellPaint.ts`, `curtain.ts` and `toast.ts` (docs/design/shared-shell.md §4.4, moved out of both games in B1) and `keyed.ts` (the keyed slot `ensureKeyed`, docs/design/dry-round-2.md D1) write through `@shared/edge/dom` and are carved out of the pure profile like `scorer/main.ts`; each game's `ui/render.ts`, `ui/local.ts` and `main.ts` compose them under the old names. |
 | `web/shared/edge/glossary.ts` | shared/lib, shared/ui, `@shared/edge/dom` | `bindJargon(doc, onRule)` (one delegated click on `a.jargon`) and `revealRule(doc, slotId, ruleId)` (scroll into view inside the named rules slot a frame after the paint, `.rule-flash` for 1.2 s); each game's `main.ts` wires both. |
 | `web/shared/lib/sound/` | itself | The sound fonts (docs/design/sound-fonts.md): `cues.ts` the twenty generic cues every game maps its events onto; `sound.ts` `Sound` (`synth`, `sample`, `silence`), `Note`, `OscillatorType`; `fonts.ts` `SOUND_FONTS`, `fontByName`, `resolveSound` (partial fonts fall back to the total `default`), `isSoundFont`, `badSoundFontMsg(key, value)`; `fonts/<name>.ts` the fonts as data. |
 | `web/shared/edge/sound.ts` | shared/lib, `@shared/edge/fx` | `playSound(audio, sound, deps)`: a synth through `AudioCues.seq`, a sample fetched and decoded once per URL into the cues' context, silence nothing; every failure silent. A game's `fx.ts` plays its table's cue in the App's font through it. |
@@ -538,6 +538,13 @@ docs run only `check`. The levels below say which suite holds them.
   both games' `net/{host,guest}.ts` are wrappers). Fidice's N-seat `HostSession`/`ClientSession`
   stay its own (§4.6): moving its client onto the shared pipe would change pinned behaviour (its
   12 s single timeout against gin's 40 x 3 s retries), a product decision, not a DRY pass.
+- The second DRY round (docs/design/dry-round-2.md): the measured inventory of what else hoists
+  out of the per-game code after the shared shell (table-UI kernels, engine primitives and
+  decoders, the shell stylesheet and markup, fidice's small adoptions, the harness), ranked by
+  value over risk, sequenced in waves against the in-flight PRs, with a unit-test plan on the
+  repo's fakes for every kernel. Landed: D1, the keyed slot (`web/shared/ui/keyed.ts`:
+  `ensureKeyed` out of `shellPaint.ts`; gin's piles, table melds and result body key through it
+  under `data-key`).
 
 ## Deviations (recorded as the steps land)
 

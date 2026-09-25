@@ -6,7 +6,6 @@ import { describe, expect, test } from 'vitest';
 import { fakeEl, fakePage, fakeTarget, type FakePage } from '../edge/page.fake.ts';
 import {
   bindSheets,
-  ensureKeyed,
   hideToast,
   paintHandoff,
   paintScreen,
@@ -186,24 +185,5 @@ describe('paintSheet / bindSheets', () => {
     expect(intents.at(-1)).toEqual({ type: 'menu/toggle' });
     p.fire('keydown', { key: 'x' });
     expect(intents).toHaveLength(2);
-  });
-});
-
-describe('ensureKeyed', () => {
-  test('rebuilds the element only when the key changes, and records the key', () => {
-    const el = fakeEl('dice', { text: 'old' });
-    const builds: string[] = [];
-    const markup = (): string => {
-      builds.push('built');
-      return '<b>new</b>';
-    };
-    ensureKeyed(el.el, 'k1', markup);
-    expect(el.attr('data-key')).toBe('k1');
-    expect(el.text()).toBe('<b>new</b>');
-    ensureKeyed(el.el, 'k1', markup);
-    expect(builds).toHaveLength(1);
-    ensureKeyed(el.el, 'k2', markup);
-    expect(builds).toHaveLength(2);
-    expect(el.attr('data-key')).toBe('k2');
   });
 });

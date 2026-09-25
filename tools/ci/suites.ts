@@ -116,6 +116,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // 100/100/100/100 over the fake page.
         // home.ts, the home shell both games' ui/home.ts compose (shared-shell.md §5 B2), measures
         // 100/100/100/100 through home.test.ts over the same fake page.
+        // keyed.ts, the keyed slot out of shellPaint.ts (docs/design/dry-round-2.md D1), measures
+        // 100/100/100/100 through keyed.test.ts over a fake element; the folder stays at 100.
         'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
         // The two-seat sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios
@@ -182,6 +184,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // Re-measured when B3 moved roomCodeMsg, INVITE_COPIED_MSG and SHARE_FALLBACK_MS out of
       // ui/state.ts into web/shared/edge/boot.ts: ui 98.1/97.1/97.0/94.0 (roomCodeMsg was the one
       // function this suite never called, so functions rose; nothing went down and the row stands).
+      // Re-measured when D1 (docs/design/dry-round-2.md) keyed the piles, the table melds and the
+      // result body through web/shared/ui/keyed.ts: ui 98.09/97.09/97.06/94.03 before,
+      // 98.08/97.13/97.05/94.16 after (the same 24 lines uncovered in a smaller folder; the row stands).
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,

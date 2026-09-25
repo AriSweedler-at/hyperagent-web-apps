@@ -63,6 +63,7 @@ import {
   paintWaiting as paintShellWaiting,
   type Sheet,
 } from '../../../../shared/ui/shellPaint.ts';
+import { ensureKeyed } from '../../../../shared/ui/keyed.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { aboutHtml } from './about.ts';
@@ -157,8 +158,9 @@ const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
 };
 
 /**
- * Rebuild a pile only when the card it shows changes (`data-pile-key`), so the element survives
- * re-renders and its CSS size transition can animate; the label is refreshed every time.
+ * Rebuild a pile only when the card it shows changes (the shared keyed slot, `data-key`; it was
+ * `data-pile-key` before docs/design/dry-round-2.md D1), so the element survives re-renders and
+ * its CSS size transition can animate; the label is refreshed every time.
  */
 const ensurePile = (
   el: ReturnType<typeof requireId>,
@@ -166,10 +168,7 @@ const ensurePile = (
   label: string,
   key: string,
 ): void => {
-  if (dataOf(el, 'pile-key') !== key) {
-    setAttr(el, 'data-pile-key', key);
-    setHtml(el, trustedHtml(`${cardMarkup}<div class="pile-label"></div>`));
-  }
+  ensureKeyed(el, key, () => `${cardMarkup}<div class="pile-label"></div>`);
   const lab = queryIn(el, '.pile-label');
   if (lab !== null) setText(lab, label);
 };
@@ -252,38 +251,26 @@ const paintTableMelds = (doc: DocumentLike, app: App, v: View): void => {
     return;
   }
   const shell = `${String(v.handNumber)}:${String(lo.knocker)}:${String(lo.melds.length)}`;
-  if (dataOf(melds, 'key') !== shell) {
-    setAttr(melds, 'data-key', shell);
-    setHtml(
-      melds,
-      trustedHtml(
-        lo.melds
-          .map((_, i) => `<div class="${meldGroupClass(i)} locked" data-onto="${String(i)}"></div>`)
-          .join(''),
-      ),
-    );
-  }
+  ensureKeyed(melds, shell, () =>
+    lo.melds
+      .map((_, i) => `<div class="${meldGroupClass(i)} locked" data-onto="${String(i)}"></div>`)
+      .join(''),
+  );
   const laid = new Set(lo.laidOff.map((e) => e.card.id));
   const dragging = app.table.drag?.from === 'table' ? app.table.drag.cardId : null;
   queryAllIn(melds, '.meld-group').forEach((group, i) => {
     const cards = lo.extended[i] ?? [];
     const key = `${idsOf(cards).join(' ')}:${dragging ?? ''}`;
-    if (dataOf(group, 'key') !== key) {
-      setAttr(group, 'data-key', key);
-      setHtml(
-        group,
-        trustedHtml(
-          cards
-            .map((c) =>
-              cardHtml(c, {
-                mini: true,
-                extra: laid.has(c.id) ? (c.id === dragging ? 'laid dragging' : 'laid') : 'pinned',
-              }),
-            )
-            .join(''),
-        ),
-      );
-    }
+    ensureKeyed(group, key, () =>
+      cards
+        .map((c) =>
+          cardHtml(c, {
+            mini: true,
+            extra: laid.has(c.id) ? (c.id === dragging ? 'laid dragging' : 'laid') : 'pinned',
+          }),
+        )
+        .join(''),
+    );
     toggleClass(group, 'drop', app.table.drag?.onto === i);
   });
 };
@@ -514,13 +501,12 @@ const paintRoundResult = (doc: DocumentLike, app: App, v: View): void => {
   setText(requireId(doc, 'rrTitle'), text.title);
   setText(requireId(doc, 'rrSub'), text.sub);
   // The body is built once per result: its melds lay themselves out when they first appear
-  // (theme.css `layOut`), and a repaint (a toast, a tap, a frame) must not replay that.
+  // (theme.css `layOut`), and a repaint (a toast, a tap, a frame) must not replay that. The key
+  // sits in `data-key` (the shared keyed slot; `data-result-key` before dry-round-2.md D1), which
+  // the DOM-snapshot oracle strips before comparing the sheet with the legacy page's.
   const body = requireId(doc, 'rrBody');
   const key = `${String(v.handNumber)}:${String(v.result?.ts ?? 0)}:${String(v.me.idx)}`;
-  if (dataOf(body, 'result-key') !== key) {
-    setAttr(body, 'data-result-key', key);
-    setHtml(body, text.body);
-  }
+  ensureKeyed(body, key, () => text.body.markup);
   const btn = requireId(doc, 'rrContinueBtn');
   setDisabled(btn, v.ready[v.me.idx]);
   setText(btn, continueLabel(v));

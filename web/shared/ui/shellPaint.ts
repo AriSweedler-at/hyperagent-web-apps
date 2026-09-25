@@ -1,7 +1,8 @@
 // The shell's painters and binders both game pages carried under the same names
 // (docs/design/shared-shell.md §4.4 "Painters and binders"; §5 B1 moved them here): the screen
-// switch, the waiting rooms, the toast, the sound and handoff buttons, the sheets and the keyed
-// slot. Each is gin's `ui/render.ts` body (backgammon copied it word for word, docs/design/
+// switch, the waiting rooms, the toast, the sound and handoff buttons and the sheets (the keyed
+// slot moved on to keyed.ts in docs/design/dry-round-2.md D1 and is re-exported below). Each is
+// gin's `ui/render.ts` body (backgammon copied it word for word, docs/design/
 // backgammon-board.md §4) over web/shared/edge/dom.ts, with the App replaced by the small view it
 // read: `paint(doc, app)` in a game composes these with its own table painters, so the same App
 // paints the same DOM as before the move (the DOM-snapshot oracle tools/parity/gin-dom-parity.ts
@@ -12,20 +13,16 @@
 // tsconfig.pure.json) carves them out the way scorer/main.ts is, and tsconfig.web.json alone
 // compiles them (they need the DOM lib through dom.ts).
 import {
-  dataOf,
   hasClass,
   keyOf,
   listen,
   listenId,
   requireId,
   setAttr,
-  setHtml,
   setText,
   targetIdOf,
   toggleClass,
-  trustedHtml,
   type DocumentLike,
-  type Element,
   type PageLike,
 } from '../edge/dom.ts';
 
@@ -147,13 +144,7 @@ export const bindSheets = <I>(
   });
 };
 
-/**
- * Rebuild `el` from `markup` only when `key` differs from its `data-key`, so its children survive
- * a paint (backgammon's keyed board, docs/design/backgammon-board.md §2.2, and its rules slots).
- * Gin's piles keep their own `ensurePile` (`data-pile-key` plus a label refreshed every paint).
- */
-export const ensureKeyed = (el: Element, key: string, markup: () => string): void => {
-  if (dataOf(el, 'key') === key) return;
-  setAttr(el, 'data-key', key);
-  setHtml(el, trustedHtml(markup()));
-};
+// The keyed slot lives in keyed.ts since docs/design/dry-round-2.md D1 (item E3: gin's table half
+// adopts it there); the name stays exported here so backgammon's `ui/render.ts` import holds
+// until its own adoption (Wave E3).
+export { ensureKeyed } from './keyed.ts';
