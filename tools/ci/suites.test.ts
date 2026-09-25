@@ -7,7 +7,7 @@ import { relative, resolve } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
-import { SHELL_GAMES } from '../games.ts';
+import { GAMES } from '../games.ts';
 import { matchesAny } from './glob.ts';
 import {
   E2E_SUITES,
@@ -85,19 +85,24 @@ describe('every test file belongs to exactly one suite', () => {
     const orphans = SPEC_FILES.filter((f) => e2eClaimants(f).length === 0);
     expect(orphans, 'unclaimed specs: add the glob to a suite e2e row').toEqual([]);
     // A shared spec file (the shell specs alone) is claimed by the suites of the games it drives,
-    // each with its own tag and the others' in otherTags, so every describe runs in exactly one job.
+    // each with its own tag, and a suite's otherTags are the tags of every suite it shares any
+    // file with (the shell games share the seven shell specs, and the two online ones with fidice
+    // too: dry-round-2.md H1), so every describe runs in exactly one job.
     const shared = SPEC_FILES.filter((f) => e2eClaimants(f).length > 1);
     expect(shared).toEqual(SPEC_FILES.filter((f) => f.startsWith('e2e/shell-')));
     shared.forEach((f) => {
-      const claimants = e2eClaimants(f);
-      claimants.forEach((s) => {
-        const e2e = SUITES[s].e2e;
-        expect(e2e?.tag, `${f}: ${s} shares a spec file and needs a tag`).toBeDefined();
-        const others = claimants.filter((o) => o !== s).map((o) => SUITES[o].e2e?.tag);
-        expect([...(e2e?.otherTags ?? [])].sort(), `${f}: ${s}'s otherTags`).toEqual(
-          [...others].sort(),
-        );
+      e2eClaimants(f).forEach((s) => {
+        expect(SUITES[s].e2e?.tag, `${f}: ${s} shares a spec file and needs a tag`).toBeDefined();
       });
+    });
+    E2E_SUITES.forEach((s) => {
+      const others = shared
+        .filter((f) => e2eClaimants(f).includes(s))
+        .flatMap((f) => e2eClaimants(f).filter((o) => o !== s))
+        .map((o) => SUITES[o].e2e?.tag);
+      expect([...(SUITES[s].e2e?.otherTags ?? [])].sort(), `${s}'s otherTags`).toEqual(
+        [...new Set(others)].sort(),
+      );
     });
     // A tag or an otherTags entry with nothing shared would silently narrow a suite's run.
     E2E_SUITES.filter((s) => SUITES[s].e2e?.tag !== undefined).forEach((s) => {
@@ -108,7 +113,7 @@ describe('every test file belongs to exactly one suite', () => {
     });
   });
 
-  test('the shell specs: one describe per shell game, tagged by game, the two game suites claiming them', () => {
+  test('the shell specs: one describe per game, tagged by game, the game suites claiming them', () => {
     const shellSpecs = SPEC_FILES.filter((f) => f.startsWith('e2e/shell-'));
     expect(shellSpecs).toEqual([
       'e2e/shell-handoff.spec.ts',
@@ -123,12 +128,14 @@ describe('every test file belongs to exactly one suite', () => {
       const tag = SUITES[s].e2e?.tag;
       return tag === undefined ? [] : [tag];
     });
-    expect([...tags].sort()).toEqual(SHELL_GAMES.map((g) => `@${g}`).sort());
+    expect([...tags].sort()).toEqual(GAMES.map((g) => `@${g}`).sort());
     shellSpecs.forEach((f) => {
       const source = readFileSync(resolve(REPO_ROOT, f), 'utf8');
       // The repo idiom (docs/design/shared-shell.md §6.3): a forEach over the registry, the
       // describe titled and tagged by the game, so --grep @<game> and the suites' grepInvert compose.
-      expect(source, f).toContain('SHELL_GAMES.forEach((game) => {');
+      // The two online specs loop over every game (dry-round-2.md H1), the rest over the shell games.
+      const games = e2eClaimants(f).includes('fidice') ? 'GAMES' : 'SHELL_GAMES';
+      expect(source, f).toContain(`${games}.forEach((game) => {`);
       expect(source, f).toContain('test.describe(game, { tag: `@${game}` }, () => {');
     });
     // The row for a shell spec runs the e2e jobs of exactly the suites that claim it.
@@ -480,7 +487,8 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   ],
   ['a gin spec', ['e2e/gin-online.spec.ts'], ['e2e-gin']],
   ['a backgammon spec', ['e2e/backgammon-online.spec.ts'], ['e2e-backgammon']],
-  ['a shell spec', ['e2e/shell-online.spec.ts'], ['e2e-gin', 'e2e-backgammon']],
+  ['a shell spec', ['e2e/shell-home.spec.ts'], ['e2e-gin', 'e2e-backgammon']],
+  ['an online spec', ['e2e/shell-relay.spec.ts'], ['e2e-gin', 'e2e-fidice', 'e2e-backgammon']],
   [
     'a shell spec beside a backgammon change',
     ['e2e/shell-handoff.spec.ts', 'web/games/backgammon/src/ui/state.ts'],
@@ -518,7 +526,7 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   ['the registry', ['tools/games.ts'], EVERYTHING],
   ['this table', ['tools/ci/suites.ts'], EVERYTHING],
   ['a shared e2e fixture', ['e2e/fixtures/two-players.ts'], EVERYTHING],
-  ['the shell fixtures', ['e2e/fixtures/shell.ts', 'e2e/fixtures/shell-games.ts'], EVERYTHING],
+  ['the shell fixtures', ['e2e/fixtures/shell.ts', 'e2e/fixtures/online-games.ts'], EVERYTHING],
   ['a page-side recorder', ['e2e/browser/record-pc.js'], EVERYTHING],
   ['a frozen legacy page', ['legacy/gin-rummy/index.html'], EVERYTHING],
   ['a workflow', ['.github/workflows/ci.yml'], EVERYTHING],

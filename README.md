@@ -140,11 +140,11 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    host reload and guest rejoin, the handoff; `docs/design/shared-shell.md` D1), and the `@online`
    specs (gin's deal and turns, fidice lobby/start, backgammon roll/move) in a host and a guest context that meet through `?peer=` and
    take a STUN-only ICE list through `?ice=`; fonts and CDNs are answered from local copies and
-   `Math.random` is seeded. The `@relay` specs (`e2e/shell-relay.spec.ts` for gin and backgammon,
-   `e2e/fidice-relay.spec.ts`)
-   open both pages with `?ice-policy=relay` and an ICE list naming that relay (written per run under
+   `Math.random` is seeded. The `@relay` spec (`e2e/shell-relay.spec.ts`, one describe per game,
+   fidice included)
+   opens both pages with `?ice-policy=relay` and an ICE list naming that relay (written per run under
    `e2e/fixtures/.generated/`, since its port follows the offset), so every candidate must cross it:
-   both games still join and play, "Connected via relay" shows, and the selected candidate pair read
+   every game still joins and plays, "Connected via relay" shows, and the selected candidate pair read
    off each `RTCPeerConnection` is a relay one. Without coturn they skip with the install line
    (`brew install coturn` / `apt-get install coturn`); `E2E_TURN=off` leaves the relay out on
    purpose. `e2e/gin-dom-parity.spec.ts` plays the same game on the served gin page
@@ -253,8 +253,11 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    `new Peer` call). Both run on both projects (`npm run test:e2e:<g>` runs the game's specs alone),
    and the online one against the deployed page in nightly, for free. A game built on the shared
    shell (the home screen, the waiting rooms, the curtain: `docs/design/shared-shell.md` §3.1) joins
-   `SHELL_GAMES` and `SHELL` in `tools/games.ts` and gets a row in `e2e/fixtures/shell-games.ts`
-   instead: `e2e/shell-*.spec.ts` then drive its shell, and its suite row lists them with the tag.
+   `SHELL_GAMES` and `SHELL` in `tools/games.ts` and gets a `ShellDriver` row in
+   `e2e/fixtures/online-games.ts` instead: `e2e/shell-*.spec.ts` then drive its shell, and its suite
+   row lists them with the tag. A game with its own lobby (fidice today) gets an `OnlineDriver` row
+   there instead of an online spec of its own: `e2e/shell-online.spec.ts` and `shell-relay.spec.ts`
+   loop over every game, and its suite row lists those two with the tag.
 9. The proxy needs nothing: the Worker's catch-all maps `games.sweedler.com/<g>/` to
    `/hyperagent-web-apps/games/<g>/`.
 

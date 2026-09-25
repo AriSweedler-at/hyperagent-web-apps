@@ -4,7 +4,7 @@
 // is the table's 🌐 (beside gin's leave button, backgammon's menu button), shown for pass and play
 // alone, its tooltip naming who hosts and who joins; under the curtain gin offers nothing but the
 // reveal, while backgammon, where the phone changes hands under it, offers "Continue online" there
-// too (SHELL.curtainButtons and the driver's `curtainOffer`, e2e/fixtures/shell-games.ts).
+// too (SHELL.curtainButtons and the driver's `curtainOffer`, e2e/fixtures/online-games.ts).
 // `#shareCodeBtn` hands the invite to the share sheet where there is one (a phone's OS menu) and to
 // the clipboard otherwise (desktop); an invite link fills the join form and leaves the address bar;
 // the offer survives a reload of the waiting room; and cancelling the room before anyone joined
@@ -29,7 +29,7 @@ import {
   startLocal,
   takeOffer,
 } from './fixtures/shell.ts';
-import { SHELL_DRIVERS, type ShellDriver } from './fixtures/shell-games.ts';
+import { SHELL_DRIVERS, type ShellDriver } from './fixtures/online-games.ts';
 import { pagePath, type Project } from './fixtures/site.ts';
 import { WEBRTC_TIMEOUT } from './fixtures/timeouts.ts';
 import { expect, test } from './fixtures/two-players.ts';

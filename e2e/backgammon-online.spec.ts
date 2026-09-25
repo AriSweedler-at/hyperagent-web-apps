@@ -19,7 +19,7 @@ import {
   readBoard,
   requireBoard,
 } from './fixtures/backgammon.ts';
-import { connect } from './fixtures/shell-games.ts';
+import { connect } from './fixtures/online-games.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 /** An action through the documented hook, as the sandbox and the style driver play (docs/ARCHITECTURE.md). */

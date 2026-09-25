@@ -10,7 +10,7 @@ export const fidiceLobbyCode = async (page: Page): Promise<string> => {
   return code.innerText();
 };
 
-/** Host a table; resolves with the lobby code once the host is registered on the broker. */
+/** Host a table; resolves with the lobby code once the host is registered on the broker, its one seat shown. */
 export const fidiceHostLobby = async (page: Page, name: string): Promise<string> => {
   await page.locator('#btnCreate').click();
   await expect(page.locator('#screen-name')).toBeVisible();
@@ -18,6 +18,7 @@ export const fidiceHostLobby = async (page: Page, name: string): Promise<string>
   await page.locator('#btnNameGo').click();
   const code = await fidiceLobbyCode(page);
   await expect(page.locator('#startHint')).toContainText('Share the player link');
+  await expect(fidiceSeats(page)).toHaveCount(1);
   return code;
 };
 
@@ -40,3 +41,27 @@ export const fidiceSeatName = (page: Page, seat: number): Locator =>
 /** The "Round N" label on the game screen. */
 export const fidiceRound = (page: Page): Locator =>
   page.locator('#screen-game').getByText(/^Round \d+$/);
+
+// ---- online: the table (the fidice row of e2e/fixtures/online-games.ts) -------------------------
+
+/** The host starts from the lobby; both game screens come up. */
+export const fidiceHostStarts = async (host: Page, guest: Page): Promise<void> => {
+  const start = host.locator('#btnStart');
+  await expect(start).toBeEnabled();
+  await start.click();
+  await expect(host.locator('#screen-game')).toBeVisible();
+  await expect(guest.locator('#screen-game')).toBeVisible();
+};
+
+/** Both game screens show the same round, with the cup at the same seat. */
+export const fidiceSameRound = async (host: Page, guest: Page): Promise<void> => {
+  await expect(fidiceRound(host)).toHaveText('Round 1');
+  await expect(fidiceRound(guest)).toHaveText('Round 1');
+  const holder = host.locator('#screen-game .seat.holder');
+  await expect(holder).toHaveCount(1);
+  const holderSeat = await holder.getAttribute('data-seat');
+  await expect(guest.locator('#screen-game .seat.holder')).toHaveAttribute(
+    'data-seat',
+    holderSeat ?? '',
+  );
+};

@@ -24,9 +24,9 @@ it must register.
 |---|---|---|---|---|
 | `shared` | `web/shared/**/*.test.ts`, `test/parity/{ice,roomCode}.legacy.test.ts` | | `web/shared/{lib,edge,net}/**` | |
 | `shared-integration` | (the fake two-seat game, when it lands) | `test/integration/**` (Chromium; `browser: true`) | | |
-| `gin` | `web/games/gin-rummy/**/*.test.ts`, `test/parity/gin.*`, `test/fixtures/legacy/gin-wire.test.ts`, `test/card-backs.test.ts` | | the 10 gin rows | `**/gin-*.spec.ts`; `**/shell-*.spec.ts` tagged `@gin-rummy` (`@backgammon` inverted) |
-| `fidice` | `web/games/fidice/**/*.test.ts`, `test/parity/fidice.*`, `test/tools/debundle-fidice.test.ts` | | the 7 fidice rows | `**/fidice-*.spec.ts` |
-| `backgammon` | `web/games/backgammon/**/*.test.ts` | | the 7 backgammon rows | `**/backgammon-*.spec.ts`; `**/shell-*.spec.ts` tagged `@backgammon` (`@gin-rummy` inverted) |
+| `gin` | `web/games/gin-rummy/**/*.test.ts`, `test/parity/gin.*`, `test/fixtures/legacy/gin-wire.test.ts`, `test/card-backs.test.ts` | | the 10 gin rows | `**/gin-*.spec.ts`; `**/shell-*.spec.ts` tagged `@gin-rummy` (`@backgammon`, `@fidice` inverted) |
+| `fidice` | `web/games/fidice/**/*.test.ts`, `test/parity/fidice.*`, `test/tools/debundle-fidice.test.ts` | | the 7 fidice rows | `**/shell-online.spec.ts`, `**/shell-relay.spec.ts` tagged `@fidice` (`@gin-rummy`, `@backgammon` inverted) |
+| `backgammon` | `web/games/backgammon/**/*.test.ts` | | the 7 backgammon rows | `**/backgammon-*.spec.ts`; `**/shell-*.spec.ts` tagged `@backgammon` (`@gin-rummy`, `@fidice` inverted) |
 | `site` | `test/tokens.test.ts`, `test/ratchet.test.ts`, `infra/games-proxy/worker.test.ts` | `test/dist/**` (`needsBuild: true`) | `infra/games-proxy/worker.ts` | `**/smoke.spec.ts`, `**/computed-styles.spec.ts` |
 | `harness` | `test/tools/{serve-dist,proxy-dev,computed-styles}.test.ts`, `test/fixtures/legacy/{frozen,manifest}.test.ts`, `tools/**/*.test.ts` | | | |
 
@@ -41,9 +41,12 @@ over `tools/games.ts`, one `test.describe(game, { tag: '@<game>' })` per game. B
 list the files (`e2e.files`) with their own tag (`e2e.tag`) and the other's in `e2e.otherTags`,
 which `playwright.config.ts` turns into `grepInvert`, so `e2e-gin` plays gin's describes and
 `e2e-backgammon` backgammon's, each once, and a CLI `--grep` (`@online|@relay`, `@gin-rummy`)
-composes with it. The accounting allows a spec file several claimants only when every claimant
-carries a tag and inverts exactly the others', and pins the seven files and the idiom (the liveness
-spec was `site`'s cross-game file until the tags could split it). Why not a
+composes with it. The two online specs (`shell-online`, `shell-relay`) loop over `GAMES` instead
+(dry-round-2.md H1): fidice's `OnlineDriver` row in `e2e/fixtures/online-games.ts` drives its legacy
+lobby, its suite claims those two files tagged `@fidice`, and every game suite inverts the tags of
+the suites it shares any file with. The accounting allows a spec file several claimants only when
+every claimant carries a tag and its `otherTags` are exactly that union, and pins the seven files
+and the idiom (the liveness spec was `site`'s cross-game file until the tags could split it). Why not a
 suite of their own: an `e2e-shell` job would need its own coturn (four of the six relay through
 it), its own ci.yml entry and script, and would run for a fidice-only change too; under `site` the
 relay spec would have to install coturn there. The game jobs already run for a change to their game
@@ -86,7 +89,8 @@ paths and `everything` anywhere selects every job. `check` (typecheck, lint, hoo
 | `web/games/<g>/**` | `<g>`, `e2e-<g>`, `site`, `e2e-site`, `harness` |
 | `test/parity/<g>.*` | `<g>` |
 | `e2e/<g>-*.spec.ts` (and `e2e/__screenshots__/**` for gin) | `e2e-<g>` |
-| `e2e/shell-*.spec.ts` | `e2e-gin`, `e2e-backgammon` (each plays its game's describes) |
+| `e2e/shell-online.spec.ts`, `e2e/shell-relay.spec.ts` | `e2e-gin`, `e2e-fidice`, `e2e-backgammon` (each plays its game's describes; `dry-round-2.md` H1) |
+| `e2e/shell-*.spec.ts` (the rest) | `e2e-gin`, `e2e-backgammon` (each plays its game's describes) |
 | `test/fixtures/styles/<g>.*` | `e2e-site` |
 | `test/fixtures/legacy/gin-*`, `test/fixtures/legacy/fidice-*` | `<g>`, `harness` |
 | `test/card-backs.test.ts` | `gin` |

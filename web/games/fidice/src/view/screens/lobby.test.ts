@@ -1,5 +1,6 @@
 // The lobby on the fake DOM: the code and links, the seats (data-seat, .me, bot controls), the
-// host's controls and #startHint (which e2e/fidice-online reads), and what each control dispatches.
+// host's controls and #startHint (which e2e/shell-online reads through fidice's row in
+// e2e/fixtures/online-games.ts), and what each control dispatches.
 import { describe, expect, test } from 'vitest';
 
 import { describeProfile, strategyFor } from '../../bots/registry.ts';
