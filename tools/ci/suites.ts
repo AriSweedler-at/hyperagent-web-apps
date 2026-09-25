@@ -2,9 +2,10 @@
 // vitest.config.ts (one project per suite, the coverage block computed from VITEST_SUITE),
 // playwright.config.ts (E2E_SUITE -> testMatch), tools/ci/affected.ts (which CI jobs a diff
 // selects) and the pre-push hook through tools/ci/run-affected.ts; nothing else spells a path list.
-// Seven suites, decided by path alone: `shared` (web/shared unit tests and the two legacy oracles
-// that read only shared code), `shared-integration` (the transport contract in Chromium; the fake
-// two-seat game of the design's §4 joins it), one per game (its colocated tests, its parity
+// Seven suites, decided by path alone: `shared` (web/shared unit tests, the two legacy oracles
+// that read only shared code and the coin game the replay driver is proved on),
+// `shared-integration` (the transport contract in Chromium; the coin game's integration tests
+// through the shared shell join it), one per game (its colocated tests, its parity
 // oracles, its fixture pins), `site` (guards over the built site or over every page at once) and
 // `harness` (the harness testing itself). tools/ci/suites.test.ts is the accounting: every
 // *.test.ts is claimed by exactly one suite and every e2e spec by exactly one, or by the suites of
@@ -107,6 +108,7 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         'web/shared/edge/**/*.ts',
         'web/shared/net/**/*.ts',
         'web/shared/ui/**/*.ts',
+        'web/shared/example/**/*.ts',
       ],
       // The shared pure library stays at 100% lines, functions and statements
       // (docs/ARCHITECTURE.md "*.algorithms.ts"). Measured at the ratchet
@@ -135,6 +137,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // keyed.ts, the keyed slot out of shellPaint.ts (docs/design/dry-round-2.md D1), measures
         // 100/100/100/100 through keyed.test.ts over a fake element; the folder stays at 100.
         'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        // The coin game (dry-round-2.md F3): the two-seat engine the replay driver under test/shared
+        // is proved on, and the shared shell's fake game to come. It exists to be exercised, so
+        // every branch has a row in coin.test.ts. Measured at the move: 100/100/100/100.
+        'web/shared/example/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
         // The two-seat sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios
         // once over a fake codec (sessions.test.ts beside them, with sessions.harness.ts), the two
@@ -145,8 +151,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
     },
   },
   'shared-integration': {
-    // The fake two-seat game of docs/design/test-partition.md §4 lands here (node, milliseconds);
-    // until then the suite is the transport contract alone.
+    // The coin game's integration tests through the shared shell (docs/design/test-partition.md
+    // "Not yet") land here (node, milliseconds); until then the suite is the transport contract
+    // alone. The coin game itself and its unit tests are `shared`'s (web/shared/example/coin).
     unit: [],
     // The real PeerJS transport through a local PeerServer in Chromium (test/integration/): its
     // own vitest config until the partition; the browser flag carries its timeouts now.
@@ -568,6 +575,20 @@ export const RULES: ReadonlyArray<Rule> = [
     why: 'prose, hooks and the hand-deployed worker: only the check job reads them',
   },
   {
+    // The coin game (dry-round-2.md F3): imported by its own test and, later, the shared shell's
+    // integration tests; no game reaches it, so it runs shared alone, not everything.
+    globs: ['web/shared/example/**'],
+    runs: ['shared'],
+    why: 'the coin game: the replay driver self-test in shared; no game imports it',
+  },
+  {
+    // The replay driver and the engine-test scaffolding (dry-round-2.md F3, F4): imported by the
+    // coin self-test (shared) and by the two engines' replays and codec tests.
+    globs: ['test/shared/**'],
+    runs: ['shared', 'gin', 'backgammon'],
+    why: 'the shared replay driver and test scaffolding: the coin self-test and both engines drive games through them',
+  },
+  {
     globs: [
       // The harness drives every suite: the two origins, the extractors, the drivers, the registry.
       'tools/**',
@@ -588,7 +609,8 @@ export const RULES: ReadonlyArray<Rule> = [
       'vitest.config.ts',
       'playwright.config.ts',
       'web/raw-imports.d.ts',
-      // Every game imports shared, the site smokes every game and a token moves every golden.
+      // Every game imports shared, the site smokes every game and a token moves every golden
+      // (web/shared/example, which no game imports, has its own row above).
       'web/shared/**',
     ],
     runs: 'everything',
