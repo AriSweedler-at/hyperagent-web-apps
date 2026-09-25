@@ -393,9 +393,9 @@ export const bindHomeShell = <I>(doc: Document, dispatch: (i: I) => void, cfg: R
 export const bindLongPress = <I>(el: Element, dispatch: (i: I) => void, intents: { press: I; release: I }): void;
 
 // curtain.ts
-export type CurtainText = Readonly<{ title: string; sub: string; last: string; button: string; attrs?: Readonly<Record<string, string | null>> }>;   // bg puts data-rolls in attrs
+export type CurtainText = Readonly<{ title: string; sub: string; last: string; button: string }>;   // the attrs field bg's data-rolls rode on went with dry-round-2.md E10
 export const paintCurtain = (doc: Document, text: CurtainText | null): void;   // null hides; texts untouched while hidden (both games' comment)
-export const bindCurtain = <I>(doc: Document, dispatch: (i: I) => void, onReveal: (btn: Element) => ReadonlyArray<I>): void;   // gin [curtain/reveal]; bg [curtain/reveal, roll/click] read from data-rolls
+export const bindCurtain = <I>(doc: Document, dispatch: (i: I) => void, onReveal: () => ReadonlyArray<I>): void;   // both games [curtain/reveal]; bg's roll is the roll modal's (E10 dropped the button argument)
 
 // toast.ts
 export const createToaster = (doc: Document, clock: Clock, defaultMs = 2600, classify?: (msg: string) => string | null): (message: string, ms?: number | null) => void;   // gin's single restarting timer; fidice keeps its queue

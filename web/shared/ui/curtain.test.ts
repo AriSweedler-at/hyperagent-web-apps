@@ -28,24 +28,14 @@ describe('paintCurtain', () => {
     expect(p.get('curtainSub').text()).toBe('Ann, look away 👀');
     expect(p.get('curtainLast').text()).toBe('Ann passed on the upcard.');
     expect(p.get('curtainBtn').text()).toBe("I'm Bob — show my cards");
-    expect(p.get('curtainBtn').attr('data-rolls')).toBeNull();
     paintCurtain(p.doc, null);
     expect(p.get('curtainOverlay').hidden()).toBe(true);
     expect(p.get('curtainTitle').text()).toBe('Pass the phone to Bob');
   });
-
-  test('attrs land on the button: a string sets, null removes', () => {
-    const p = page();
-    paintCurtain(p.doc, { ...TEXT, button: 'Bob — roll', attrs: { 'data-rolls': '1' } });
-    expect(p.get('curtainBtn').text()).toBe('Bob — roll');
-    expect(p.get('curtainBtn').attr('data-rolls')).toBe('1');
-    paintCurtain(p.doc, { ...TEXT, button: 'Bob — your turn', attrs: { 'data-rolls': null } });
-    expect(p.get('curtainBtn').attr('data-rolls')).toBeNull();
-  });
 });
 
 describe('bindCurtain', () => {
-  test('one tap dispatches what onReveal reads off the button, in order, at that moment', () => {
+  test('one tap dispatches what onReveal returns, in order, at that moment', () => {
     const p = page();
     const intents: string[] = [];
     bindCurtain(
@@ -53,11 +43,11 @@ describe('bindCurtain', () => {
       (i: string) => {
         intents.push(i);
       },
-      (btn) => (btn.getAttribute('data-rolls') === '1' ? ['reveal', 'roll'] : ['reveal']),
+      // Asked at each tap, not at bind time: the second tap sees the first's intent dispatched.
+      () => (intents.length === 0 ? ['reveal'] : ['reveal', 'roll']),
     );
     p.get('curtainBtn').fire('click');
     expect(intents).toEqual(['reveal']);
-    p.get('curtainBtn').el.setAttribute('data-rolls', '1');
     p.get('curtainBtn').fire('click');
     expect(intents).toEqual(['reveal', 'reveal', 'roll']);
   });
