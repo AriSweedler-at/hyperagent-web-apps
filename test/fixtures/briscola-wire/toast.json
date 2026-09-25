@@ -1,0 +1,10 @@
+[
+  {
+    "t": "toast",
+    "msg": "It is not your turn"
+  },
+  {
+    "t": "toast",
+    "msg": "That card is not in your hand"
+  }
+]
