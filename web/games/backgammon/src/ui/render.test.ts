@@ -558,6 +558,52 @@ describe('the table', () => {
     expect(p.get('point-1').hasClass('pt-near')).toBe(true);
   });
 
+  test('whose turn (the owner, 2026-09-25): the arrow and the lit tray follow the actor in their checker colours; the other seat sees the arrow turned; a finished game or no game shows neither', () => {
+    const p = page();
+    const start = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';
+    const arrow = p.get('turnArrow');
+    expect(arrow.hidden()).toBe(true);
+    // Light to move, in Light's own view: the arrow points at the near side in Light's colours
+    // (`data-seat="0"` picks them in theme.css) and Light's tray is lit; nothing on Dark's.
+    const light = at(start, 0, [3, 1]);
+    paint(p.doc, light);
+    expect(arrow.hidden()).toBe(false);
+    expect(arrow.attr('data-seat')).toBe('0');
+    expect(arrow.attr('data-side')).toBe('near');
+    expect(p.get('offLight').hasClass('to-move')).toBe(true);
+    expect(p.get('offDark').hasClass('to-move')).toBe(false);
+    // Dark to move (the phone handed across: the view is Dark's): the colours and the lit tray
+    // switch; the arrow still points near, since the mover is the viewer.
+    paint(p.doc, at(start, 1, [3, 1], light));
+    expect(arrow.attr('data-seat')).toBe('1');
+    expect(arrow.attr('data-side')).toBe('near');
+    expect(p.get('offLight').hasClass('to-move')).toBe(false);
+    expect(p.get('offDark').hasClass('to-move')).toBe(true);
+    // Light's turn seen from Dark's seat (online, the opponent moving): the arrow turns round.
+    paint(p.doc, withView(light, viewFor(game(light), 1)));
+    expect(arrow.attr('data-seat')).toBe('0');
+    expect(arrow.attr('data-side')).toBe('far');
+    expect(p.get('offLight').hasClass('to-move')).toBe(true);
+    expect(p.get('offDark').hasClass('to-move')).toBe(false);
+    // A finished game has no actor: neither shows; the next position brings them back.
+    const over = run(at('L: 1:1 | D: 13:2 | bar 0/0 | off 14/13', 0, [6, 6]), {
+      type: 'off/tap',
+    }).app;
+    expect(view(over).phase).toBe('over');
+    paint(p.doc, over);
+    expect(arrow.hidden()).toBe(true);
+    expect(arrow.attr('data-seat')).toBeNull();
+    expect(arrow.attr('data-side')).toBeNull();
+    expect(p.get('offLight').hasClass('to-move')).toBe(false);
+    expect(p.get('offDark').hasClass('to-move')).toBe(false);
+    paint(p.doc, light);
+    expect(arrow.hidden()).toBe(false);
+    // No game at all (the home screen): hidden, no tray lit.
+    paint(p.doc, initialApp);
+    expect(arrow.hidden()).toBe(true);
+    expect(p.get('offLight').hasClass('to-move')).toBe(false);
+  });
+
   test('the pure copy: badge, wait note, next button, match title, score rows, cube offer, bar key', () => {
     const app = revealed(local());
     const v = view(app);

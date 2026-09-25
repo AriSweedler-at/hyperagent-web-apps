@@ -9,8 +9,10 @@
 // nothing flashes); a checker dragged by hand (§4.12) lights its source past the threshold, marks
 // the lit cell under the pointer `drop` and commits the move on release; and a double, forced
 // through the page's `window.__rng` hook, plays the `doubles` cue after `roll` once the dice have
-// settled. The roll modal itself (up for the seat to
-// roll, dismissed by nothing, its tumble and settle) is e2e/backgammon-local.spec.ts's.
+// settled; and whose turn it is reads at a glance (the owner, 2026-09-25): `#turnArrow` and the
+// mover's tray wear the mover's checker colours and switch seats when a move ends the turn. The
+// roll modal itself (up for the seat to roll, dismissed by nothing, its tumble and settle) is
+// e2e/backgammon-local.spec.ts's.
 import type { Page } from '@playwright/test';
 
 import {
@@ -442,6 +444,52 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await page.evaluate('new Promise((done) => requestAnimationFrame(() => done(null)))');
       const shot2 = await point.screenshot();
       expect(shot1.equals(shot2)).toBe(true);
+    });
+
+    test("whose turn: the arrow and the lit tray wear the mover's checker colours and switch seats when a move ends the turn", async ({
+      player,
+      project,
+    }) => {
+      const { page } = player;
+      await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
+      await reveal(page);
+      await seated(page, 0);
+      const arrow = page.locator('#turnArrow');
+      const offLight = page.locator('#offLight');
+      const offDark = page.locator('#offDark');
+      // Light to move in Light's view: the arrow points near in Light's colours (`data-seat="0"`),
+      // Light's tray wears the wash and the hairline Dark's plain tray has not (design §3.7).
+      await expect(arrow).toBeVisible();
+      await expect(arrow).toHaveAttribute('data-seat', '0');
+      await expect(arrow).toHaveAttribute('data-side', 'near');
+      await expect(offLight).toHaveClass(/\bto-move\b/);
+      await expect(offDark).not.toHaveClass(/\bto-move\b/);
+      const lightArrow = await styleOf(page, '#turnArrow', null, ['fill', 'stroke']);
+      const lit = await styleOf(page, '#offLight', null, ['background-color', 'box-shadow']);
+      const plain = await styleOf(page, '#offDark', null, ['background-color', 'box-shadow']);
+      expect(lit['background-color']).not.toBe(plain['background-color']);
+      expect(lit['box-shadow']).not.toBe(plain['box-shadow']);
+      // 8/5 6/5 ends the turn: the phone goes to Dark, whose view the board shows (the curtain up
+      // over it). The arrow recolours to Dark's checker (still near: the mover is the viewer) and
+      // the lit tray is Dark's; Light's is plain again.
+      await bgMove(page, 8, 5);
+      const next = await bgMove(page, 6, 5);
+      expect(next.turn).toBe(1);
+      await expect(arrow).toHaveAttribute('data-seat', '1');
+      await expect(arrow).toHaveAttribute('data-side', 'near');
+      await expect(offDark).toHaveClass(/\bto-move\b/);
+      await expect(offLight).not.toHaveClass(/\bto-move\b/);
+      // The colours turn over 200ms (design §3.7): read once the transition has settled.
+      const arrowColour = (prop: string): Promise<string> =>
+        styleOf(page, '#turnArrow', null, [prop]).then((s) => s[prop] ?? '');
+      await expect.poll(() => arrowColour('fill')).not.toBe(lightArrow['fill']);
+      await expect.poll(() => arrowColour('stroke')).not.toBe(lightArrow['stroke']);
+      const dark = await styleOf(page, '#offDark', null, ['background-color', 'box-shadow']);
+      expect(dark['background-color']).not.toBe(plain['background-color']);
+      expect(dark['background-color']).not.toBe(lit['background-color']);
+      expect(await styleOf(page, '#offLight', null, ['background-color'])).toEqual({
+        'background-color': plain['background-color'],
+      });
     });
 
     test('a double: the excited cue plays after the roll cue, once the dice have settled', async ({
