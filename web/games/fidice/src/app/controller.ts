@@ -9,6 +9,7 @@
 // the queue behind the toast showing.
 import type { Clock, Timer } from '../../../../shared/lib/clock.ts';
 import { normaliseName } from '../../../../shared/lib/name.ts';
+import { validateCode } from '../../../../shared/lib/roomCode.ts';
 import { difficultyById } from '../bots/registry.ts';
 import { CATEGORY_INFO, groupByKey, handAt } from '../domain/hands.ts';
 import { cleanName } from '../domain/lobby.ts';
@@ -415,11 +416,14 @@ export class Controller {
         botChoice: this.ui.nameForm.botChoice,
       });
     else {
-      const code = this.ui.joinCode.trim().toUpperCase();
-      if (code.length !== 5) {
-        this.set({ error: 'Codes are 5 characters' });
+      // The legacy check (trim, upper-case, the length alone; docs/design/dry-round-2.md H3), spelled
+      // once per game in web/shared/lib/roomCode.ts with FIDICE_CODE_LENGTH_ERROR as its refusal.
+      const checked = validateCode('fidice', this.ui.joinCode);
+      if (!checked.ok) {
+        this.set({ error: checked.error });
         return;
       }
+      const code = checked.value;
       this.set({ joinCode: code, pending: { kind: 'join', code } });
       this.joinAs(code, 'player', name);
     }
