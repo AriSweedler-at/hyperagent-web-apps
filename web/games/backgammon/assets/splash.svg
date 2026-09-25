@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Sheshbesh">
+  <!-- The link-preview card (docs/design/link-previews.md §2), in the Sheshbesh theme (theme.css): the aegean
+       panel, nacre text, a gold hairline, six olive-wood points and two plain checkers.
+       tools/splash.ts renders it to web/public/games/backgammon/splash.png. -->
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d4266"/>
+      <stop offset="0.6" stop-color="#0b3c5d"/>
+      <stop offset="1" stop-color="#082e49"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#panel)"/>
+  <rect x="26" y="26" width="1148" height="578" rx="6" fill="none" stroke="#c9a227" stroke-width="2" stroke-opacity="0.85"/>
+  <g transform="translate(118 604)">
+    <polygon points="0,0 160,0 80,-230" fill="#a67c52"/>
+    <polygon points="160,0 320,0 240,-230" fill="#6e4b2a"/>
+    <polygon points="320,0 480,0 400,-230" fill="#a67c52"/>
+    <polygon points="480,0 640,0 560,-230" fill="#6e4b2a"/>
+    <polygon points="640,0 800,0 720,-230" fill="#a67c52"/>
+    <polygon points="800,0 960,0 880,-230" fill="#6e4b2a"/>
+    <circle cx="80" cy="-42" r="36" fill="#f3ecdf" stroke="#d9cbad" stroke-width="3"/>
+    <circle cx="80" cy="-118" r="36" fill="#f3ecdf" stroke="#d9cbad" stroke-width="3"/>
+    <circle cx="880" cy="-42" r="36" fill="#4a2e1c" stroke="#2a1a12" stroke-width="3"/>
+  </g>
+  <text x="96" y="236" font-family="Georgia, 'Times New Roman', serif" font-size="124" fill="#f3ecdf">Sheshbesh</text>
+  <text x="102" y="300" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="36" fill="#f3ecdf" fill-opacity="0.74">backgammon, the Sephardic way</text>
+  <text x="1104" y="86" text-anchor="end" font-family="Georgia, 'Times New Roman', serif" font-size="26" fill="#f3ecdf" fill-opacity="0.55" letter-spacing="1">games.sweedler.com</text>
+</svg>

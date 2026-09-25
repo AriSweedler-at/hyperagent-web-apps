@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Briscola">
+  <!-- The link-preview card (docs/design/link-previews.md §2), in Briscola's quiet Hawaiian theme (theme.css):
+       sand, a lagoon band, the sand hairline where they meet, terracotta for the title, the honu (assets/honu.svg)
+       as a faint watermark and three plain cards on the water. tools/splash.ts renders it to
+       web/public/games/briscola/splash.png. -->
+  <defs>
+    <linearGradient id="lagoon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c6d6b"/>
+      <stop offset="1" stop-color="#194645"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#ede3d1"/>
+  <rect x="0" y="410" width="1200" height="220" fill="url(#lagoon)"/>
+  <rect x="0" y="406" width="1200" height="4" fill="#d6b97f"/>
+  <g transform="translate(884 56) scale(3.1)" fill="none" stroke="#2b1d14" stroke-opacity="0.13" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="48" cy="52" rx="21" ry="26"/>
+    <path d="M42 27c-1-9 13-9 12 0"/>
+    <path d="M28 40c-12-4-20 4-20 16 6-4 14-4 22 0M68 40c12-4 20 4 20 16-6-4-14-4-22 0M34 75c-7 4-11 10-9 16 4-4 10-8 16-12M62 75c7 4 11 10 9 16-4-4-10-8-16-12"/>
+    <path d="M41 44h14l3 8-3 8H41l-3-8zM41 44l3-12h8l3 12M41 60l3 12h8l3-12M38 52H27M58 52h11"/>
+  </g>
+  <text x="96" y="250" font-family="'Bodoni 72', Didot, Georgia, 'Times New Roman', serif" font-size="132" fill="#a6442b">Briscola</text>
+  <rect x="100" y="282" width="130" height="3" fill="#d6b97f"/>
+  <text x="100" y="340" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="34" fill="#6b5a4a">The Italian card game, for two, three or four.</text>
+  <g transform="translate(900 520)">
+    <g transform="rotate(-12) translate(-60 6)">
+      <rect x="-60" y="-90" width="120" height="180" rx="10" fill="#fbf6ea" stroke="#a6442b" stroke-width="3"/>
+    </g>
+    <g transform="rotate(0)">
+      <rect x="-60" y="-90" width="120" height="180" rx="10" fill="#fbf6ea" stroke="#a6442b" stroke-width="3"/>
+    </g>
+    <g transform="rotate(12) translate(60 6)">
+      <rect x="-60" y="-90" width="120" height="180" rx="10" fill="#fbf6ea" stroke="#a6442b" stroke-width="3"/>
+    </g>
+  </g>
+  <text x="98" y="580" font-family="Georgia, 'Times New Roman', serif" font-size="26" fill="#f7f1e6" fill-opacity="0.8" letter-spacing="1">games.sweedler.com</text>
+</svg>

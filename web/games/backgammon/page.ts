@@ -72,11 +72,26 @@ const blocks: ShellBlocks = {
 <html lang="en">
   <head>
     <meta property="og:title" content="Sheshbesh" />
+    <meta
+      property="og:description"
+      content="Sheshbesh: backgammon the Sephardic-Greek way. Pass one phone, or open a table online and send the link."
+    />
     <meta property="og:type" content="website" />
-    <meta property="og:image:width" content="1024" />
-    <meta property="og:image:height" content="1024" />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:url" content="https://games.sweedler.com/backgammon/" />
+    <meta property="og:image" content="https://games.sweedler.com/backgammon/splash.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Sheshbesh: olive-wood points and two checkers on an aegean blue panel"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Sheshbesh" />
+    <meta
+      name="twitter:description"
+      content="Sheshbesh: backgammon the Sephardic-Greek way. Pass one phone, or open a table online and send the link."
+    />
+    <meta name="twitter:image" content="https://games.sweedler.com/backgammon/splash.png" />
     <meta charset="UTF-8" />
     <meta
       name="viewport"

@@ -1,7 +1,22 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, expect, test, vi } from 'vitest';
 
-import { ALIASES as REGISTRY_ALIASES } from '../../tools/games.ts';
-import worker, { ALIASES, DEFAULT_UPSTREAM, type Env, mapPath, unmapPath } from './worker.ts';
+import { ALIASES as REGISTRY_ALIASES, SHELL_GAMES } from '../../tools/games.ts';
+import { JOIN_PARAM as INVITE_PARAM } from '../../web/shared/lib/invite.ts';
+import { ROOM_CODE } from '../../web/shared/lib/roomCode.ts';
+import worker, {
+  ALIASES,
+  DEFAULT_UPSTREAM,
+  type Env,
+  JOIN_PARAM,
+  joinCode,
+  joinPreview,
+  mapPath,
+  metaContent,
+  unmapPath,
+} from './worker.ts';
 
 const ORIGIN = 'https://games.sweedler.com';
 const GH = 'https://arisweedler-at.github.io';
@@ -299,6 +314,262 @@ describe('fetch handler', () => {
         const res = await worker.fetch(new Request(`${ORIGIN}/fidice/`, { method: 'HEAD' }));
         expect(res.status).toBe(200);
         expect(res.headers.get('content-length')).toBe('12');
+      },
+    ));
+});
+
+// ---- Link previews (docs/design/link-previews.md §3) ----------------------------------------
+
+/** A page as tools/shell-markup.ts composes it: one meta per line, property/name before content. */
+const PAGE = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta property="og:title" content="Sheshbesh" />
+    <meta property="og:description" content="Backgammon the Sephardic way." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://games.sweedler.com/backgammon/" />
+    <meta property="og:image" content="https://games.sweedler.com/backgammon/splash.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Sheshbesh" />
+    <meta name="twitter:description" content="Backgammon the Sephardic way." />
+    <title>Sheshbesh — backgammon</title>
+  </head>
+  <body>
+    <div id="app">og:title is not a tag here</div>
+  </body>
+</html>
+`;
+const INVITE = 'https://games.sweedler.com/backgammon/?join=TNJQ';
+
+/** PAGE with its five preview tags rewritten for TNJQ, spelled out. */
+const PREVIEWED = PAGE.replace(
+  '<meta property="og:title" content="Sheshbesh" />',
+  '<meta property="og:title" content="Join Sheshbesh: code TNJQ" />',
+)
+  .replace(
+    '<meta property="og:description" content="Backgammon the Sephardic way." />',
+    `<meta property="og:description" content="You're invited to Sheshbesh. Open the link to sit down; the room code is TNJQ." />`,
+  )
+  .replace(
+    '<meta property="og:url" content="https://games.sweedler.com/backgammon/" />',
+    `<meta property="og:url" content="${INVITE}" />`,
+  )
+  .replace(
+    '<meta name="twitter:title" content="Sheshbesh" />',
+    '<meta name="twitter:title" content="Join Sheshbesh: code TNJQ" />',
+  )
+  .replace(
+    '<meta name="twitter:description" content="Backgammon the Sephardic way." />',
+    `<meta name="twitter:description" content="You're invited to Sheshbesh. Open the link to sit down; the room code is TNJQ." />`,
+  );
+
+const htmlUpstream: Upstream = () =>
+  new Response(PAGE, {
+    status: 200,
+    headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'content-length': String(PAGE.length),
+      'content-encoding': 'identity',
+      etag: '"page-1"',
+    },
+  });
+
+describe('joinCode: the invite code in ?join=, when it has a room code shape', () => {
+  test('is web/shared/lib/invite.ts JOIN_PARAM', () => {
+    expect(JOIN_PARAM).toBe(INVITE_PARAM);
+  });
+
+  test.each([
+    ['?join=TNJQ', 'TNJQ'],
+    ['?join=tnjq', 'tnjq'],
+    ['?join=AB3D9', 'AB3D9'],
+    ['?peer=x&join=TNJQ&ice=y', 'TNJQ'],
+  ])('%s carries %s', (query, code) => {
+    expect(joinCode(new URL(ORIGIN + '/gin-rummy/' + query))).toBe(code);
+  });
+
+  test.each([
+    '',
+    '?',
+    '?join=',
+    '?join=ABC',
+    '?join=ABCDEF',
+    '?join=AB-D',
+    '?join=A%20BC',
+    '?room=TNJQ',
+  ])('%s carries none', (query) => {
+    expect(joinCode(new URL(ORIGIN + '/gin-rummy/' + query))).toBeUndefined();
+  });
+
+  test("every game's room codes fit the shape (web/shared/lib/roomCode.ts), six characters do not", () => {
+    Object.values(ROOM_CODE).forEach(({ alphabet, length }) => {
+      const first = alphabet[0] ?? '';
+      const last = alphabet[alphabet.length - 1] ?? '';
+      expect(joinCode(new URL(`${ORIGIN}/x/?join=${first.repeat(length)}`))).toBe(
+        first.repeat(length),
+      );
+      expect(joinCode(new URL(`${ORIGIN}/x/?join=${last.repeat(length)}`))).toBe(
+        last.repeat(length),
+      );
+      // The shape is one regex for every game (four or five), so six is the first length it refuses.
+      expect(joinCode(new URL(`${ORIGIN}/x/?join=${first.repeat(6)}`))).toBeUndefined();
+    });
+  });
+});
+
+describe('joinPreview: the code in the Open Graph head', () => {
+  test('rewrites the two titles, the two descriptions and og:url; nothing else moves', () => {
+    expect(joinPreview(PAGE, 'TNJQ', INVITE)).toBe(PREVIEWED);
+  });
+
+  test('metaContent reads a property or a name; a tag the page lacks is undefined', () => {
+    expect(metaContent(PAGE, 'og:title')).toBe('Sheshbesh');
+    expect(metaContent(PAGE, 'twitter:card')).toBe('summary_large_image');
+    expect(metaContent(PAGE, 'og:image:alt')).toBeUndefined();
+    expect(metaContent(PREVIEWED, 'og:title')).toBe('Join Sheshbesh: code TNJQ');
+  });
+
+  test('the title stays the page name, the image the game splash', () => {
+    const previewed = joinPreview(PAGE, 'TNJQ', INVITE);
+    expect(previewed).toContain('<title>Sheshbesh — backgammon</title>');
+    expect(metaContent(previewed, 'og:image')).toBe(
+      'https://games.sweedler.com/backgammon/splash.png',
+    );
+  });
+
+  test('a page without an og:title comes back untouched', () => {
+    const bare = '<!doctype html><html><head><title>x</title></head><body></body></html>';
+    expect(joinPreview(bare, 'TNJQ', INVITE)).toBe(bare);
+  });
+
+  test('a page with an og:title but no other preview tags gains none: only what it has is rewritten', () => {
+    const one = '<head><meta property="og:title" content="Fidice" /></head>';
+    expect(joinPreview(one, 'AB3D9', INVITE)).toBe(
+      '<head><meta property="og:title" content="Join Fidice: code AB3D9" /></head>',
+    );
+  });
+
+  test('attribute characters in the invite URL are escaped', () => {
+    const previewed = joinPreview(PAGE, 'TNJQ', 'https://x.test/?a=1&b="<2>"');
+    expect(previewed).toContain(
+      '<meta property="og:url" content="https://x.test/?a=1&amp;b=&quot;&lt;2&gt;&quot;" />',
+    );
+  });
+
+  test("gin's page, spelled without self-closing slashes, is rewritten the same way", () => {
+    const gin =
+      '<meta property="og:title" content="Gin Rummy">\n<meta name="twitter:title" content="Gin Rummy">';
+    expect(joinPreview(gin, 'TQBF', INVITE)).toBe(
+      '<meta property="og:title" content="Join Gin Rummy: code TQBF">\n<meta name="twitter:title" content="Join Gin Rummy: code TQBF">',
+    );
+  });
+
+  test('every committed shell page has the five tags the rewrite names, and its og:title is the game', () => {
+    SHELL_GAMES.forEach((game) => {
+      const page = readFileSync(
+        resolve(import.meta.dirname, '../../web/games', game, 'index.html'),
+        'utf8',
+      );
+      const name = metaContent(page, 'og:title') ?? '';
+      expect(name, game).not.toBe('');
+      const previewed = joinPreview(page, 'TNJQ', INVITE);
+      expect(metaContent(previewed, 'og:title')).toBe(`Join ${name}: code TNJQ`);
+      expect(metaContent(previewed, 'twitter:title')).toBe(`Join ${name}: code TNJQ`);
+      expect(metaContent(previewed, 'og:description')).toContain('TNJQ');
+      expect(metaContent(previewed, 'twitter:description')).toContain('TNJQ');
+      expect(metaContent(previewed, 'og:url')).toBe(INVITE);
+      expect(metaContent(previewed, 'og:image')).toBe(
+        `https://games.sweedler.com/${game}/splash.png`,
+      );
+    });
+  });
+});
+
+describe('fetch handler: link previews', () => {
+  test('a GET for a page with ?join=CODE gets the rewritten head; length and encoding go, the rest of the headers stay', () =>
+    withUpstream(htmlUpstream, async () => {
+      const res = await get('/backgammon/?join=TNJQ');
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(PREVIEWED);
+      expect(res.headers.get('content-length')).toBeNull();
+      expect(res.headers.get('content-encoding')).toBeNull();
+      expect(res.headers.get('content-type')).toBe('text/html; charset=utf-8');
+      expect(res.headers.get('etag')).toBe('"page-1"');
+    }));
+
+  test('the invite in og:url is this origin, the requested path and the code alone (an alias keeps its name; the harness hooks are dropped)', () =>
+    withUpstream(htmlUpstream, async () => {
+      const alias = await (await get('/sheshbesh/?peer=abc&join=TNJQ&ice=x')).text();
+      expect(metaContent(alias, 'og:url')).toBe(`${ORIGIN}/sheshbesh/?join=TNJQ`);
+      expect(metaContent(alias, 'og:title')).toBe('Join Sheshbesh: code TNJQ');
+    }));
+
+  test('the query still reaches upstream whole', () =>
+    withUpstream(
+      (req) => {
+        expect(new URL(req.url).search).toBe('?peer=abc&join=TNJQ');
+        return htmlUpstream(req);
+      },
+      async () => {
+        expect((await get('/backgammon/?peer=abc&join=TNJQ')).status).toBe(200);
+      },
+    ));
+
+  test.each([
+    ['no code', '/backgammon/'],
+    ['a code of the wrong shape', '/backgammon/?join=TNJ'],
+    ['another parameter', '/backgammon/?room=TNJQ'],
+  ])('a page under %s streams through untouched, length and all', (_why, path) =>
+    withUpstream(htmlUpstream, async () => {
+      const res = await get(path);
+      expect(await res.text()).toBe(PAGE);
+      expect(res.headers.get('content-length')).toBe(String(PAGE.length));
+      expect(res.headers.get('content-encoding')).toBe('identity');
+    }),
+  );
+
+  test('a non-HTML response under ?join= is untouched (the page requests its script with the query intact)', () =>
+    withUpstream(
+      () =>
+        new Response('export {};', {
+          status: 200,
+          headers: { 'content-type': 'text/javascript', 'content-length': '10' },
+        }),
+      async () => {
+        const res = await get('/backgammon/app-abc.js?join=TNJQ');
+        expect(await res.text()).toBe('export {};');
+        expect(res.headers.get('content-length')).toBe('10');
+      },
+    ));
+
+  test('an upstream error page under ?join= is untouched', () =>
+    withUpstream(
+      () =>
+        new Response(PAGE, {
+          status: 404,
+          headers: { 'content-type': 'text/html; charset=utf-8', 'content-length': '5' },
+        }),
+      async () => {
+        const res = await get('/nope/?join=TNJQ');
+        expect(res.status).toBe(404);
+        expect(await res.text()).toBe(PAGE);
+        expect(res.headers.get('content-length')).toBe('5');
+      },
+    ));
+
+  test('HEAD under ?join= passes through with its length: there is no body to rewrite', () =>
+    withUpstream(
+      () =>
+        new Response(null, {
+          status: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8', 'content-length': '77' },
+        }),
+      async () => {
+        const res = await worker.fetch(
+          new Request(`${ORIGIN}/backgammon/?join=TNJQ`, { method: 'HEAD' }),
+        );
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-length')).toBe('77');
       },
     ));
 });
