@@ -25,6 +25,7 @@ import {
   pickOpts,
 } from './shellConfig.ts';
 import { DEFAULT_CARD_PACK, SHELL_STORE, STORAGE_KEYS } from './storage.ts';
+import { initialShell } from './ui/state.ts';
 
 const NOW = 1_700_000_000_000;
 const PAIR: Players = [
@@ -63,15 +64,15 @@ describe('the copy', () => {
   });
 
   test('the play mode: local or online, anything else online', () => {
-    expect(BRISCOLA_SHELL.modes.parse('local', 'online')).toEqual({
+    expect(BRISCOLA_SHELL.modes.parse('local', initialShell)).toEqual({
       shown: 'local',
       stored: 'local',
     });
-    expect(BRISCOLA_SHELL.modes.parse('online', 'local')).toEqual({
+    expect(BRISCOLA_SHELL.modes.parse('online', initialShell)).toEqual({
       shown: 'online',
       stored: 'online',
     });
-    expect(BRISCOLA_SHELL.modes.parse('sandbox', 'local')).toEqual({
+    expect(BRISCOLA_SHELL.modes.parse('sandbox', initialShell)).toEqual({
       shown: 'online',
       stored: 'online',
     });
