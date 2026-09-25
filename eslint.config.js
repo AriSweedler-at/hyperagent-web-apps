@@ -337,11 +337,13 @@ const zones = [
       `${GAME_SRC}/storage.ts`,
     ],
     // dom.fake.ts is the structural DOM the view tests render into (docs/MIGRATION.md step 9);
-    // page.fake.ts the static-page fake the gin ui/page.fake.ts fixture builds on (step 12).
+    // page.fake.ts the static-page fake the gin ui/page.fake.ts fixture builds on (step 12);
+    // drag.ts the pointer-drag kernel both games' draggers configure (dry-round-2.md E1).
     except: [
       '**/web/shared/edge/dom.ts',
       '**/web/shared/edge/dom.fake.ts',
       '**/web/shared/edge/page.fake.ts',
+      '**/web/shared/edge/drag.ts',
     ],
     message: 'ui/ and view/ render views; DOM access only through @shared/edge/dom.',
   },
