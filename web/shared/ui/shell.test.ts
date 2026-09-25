@@ -18,6 +18,7 @@ import { SHELL_CUES } from '../lib/sound/cues.ts';
 import { SOUND_FONTS } from '../lib/sound/fonts.ts';
 import {
   CONNECTING_MSG,
+  DEFAULT_LOCAL_NAMES,
   DISCONNECTED_MSG,
   GONE_TOAST_MS,
   LONG_PRESS_MS,
@@ -434,17 +435,33 @@ describe('home', () => {
       { type: 'fillName', name: 'Ann' },
       { type: 'fillP2Name', name: 'Bob' },
     ]);
-    // Nothing saved: no fills, nameTouched untouched, an unknown tab falls back to the default.
+    // Nothing saved: the inputs are filled with the defaults (the owner's names, 2026-09-25) and the
+    // shell's state keeps none of them, nameTouched untouched, an unknown tab falls back to the default.
     const plain = run(initialApp, {
       type: 'home/init',
       home: { ...home, homeTab: 'score' as 'play' },
     });
-    expect(plain.app.shell).toMatchObject({ nameTouched: false, savedName: null, homeTab: 'play' });
-    expect(plain.effects).toEqual([{ type: 'scrollTop' }]);
-    // A saved second name alone fills its input and nothing else.
+    expect(plain.app.shell).toMatchObject({
+      nameTouched: false,
+      savedName: null,
+      p1Name: '',
+      p2Name: '',
+      homeTab: 'play',
+    });
+    expect(DEFAULT_LOCAL_NAMES).toEqual(['Ari', 'Lavi']);
+    expect(plain.effects).toEqual([
+      { type: 'scrollTop' },
+      { type: 'fillName', name: 'Ari' },
+      { type: 'fillP2Name', name: 'Lavi' },
+    ]);
+    // A saved second name wins over its default; the first seat still shows its default.
     expect(run(initialApp, { type: 'home/init', home: { ...home, p2Name: 'Bob' } })).toMatchObject({
       app: { shell: { nameTouched: false, savedName: null, p2Name: 'Bob' } },
-      effects: [{ type: 'scrollTop' }, { type: 'fillP2Name', name: 'Bob' }],
+      effects: [
+        { type: 'scrollTop' },
+        { type: 'fillName', name: 'Ari' },
+        { type: 'fillP2Name', name: 'Bob' },
+      ],
     });
     // The offer: the shell's three from the save, the game's own first.
     expect(
@@ -965,10 +982,21 @@ describe('pass and play', () => {
       { type: 'ownFx' },
       { type: 'scrollTop' },
     ]);
+    // Empty inputs seat the shell's defaults (the owner's names, 2026-09-25), on the table too.
     expect(localPlayers('', '')).toEqual([
-      { id: 'p1', name: 'Player 1' },
-      { id: 'p2', name: 'Player 2' },
+      { id: 'p1', name: 'Ari' },
+      { id: 'p2', name: 'Lavi' },
     ]);
+    expect(localPlayers(' ', 'lavi')).toEqual([
+      { id: 'p1', name: 'Ari' },
+      { id: 'p2', name: 'lavi' },
+    ]);
+    const empty = run(initialApp, { type: 'local/click', p1: '', p2: '', level: '1' });
+    expect(game(empty.app).players).toEqual([
+      { id: 'p1', name: 'Ari' },
+      { id: 'p2', name: 'Lavi' },
+    ]);
+    expect(empty.app.shell.screen).toBe('tableScreen');
     expect(localPlayers('A'.repeat(25), 'b')[0].name).toBe('A'.repeat(20));
     // The two halves the sandbox composes: the seat and the broadcast.
     expect(localSeated(initialApp, dealt, FAKE)).toEqual({
@@ -1109,8 +1137,11 @@ describe('resume and the handoff', () => {
       game: dealt,
       screen: 'tableScreen',
     });
+    // The home read fills the two seats with their defaults (nothing saved) before the game resumes.
     expect(kinds(localGame.effects)).toEqual([
       'scrollTop',
+      'fillName',
+      'fillP2Name',
       'wakeLock',
       'persist',
       'ownFx',

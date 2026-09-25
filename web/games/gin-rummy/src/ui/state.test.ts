@@ -3,11 +3,13 @@ import { describe, expect, test } from 'vitest';
 import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
 import { createStore, type StorageLike } from '../../../../shared/edge/storage.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
+import { DEFAULT_LOCAL_NAMES } from '../../../../shared/ui/shell.ts';
 import { STOCK_DRAW_FINAL_MSG, applyAction, createGame, viewFor } from '../engine/index.ts';
 import type { Action, Seat, State, View } from '../engine/index.ts';
 import { CONNECTED_MSG, connectingMsg } from '../net/guest.ts';
 import { OPENING_MSG, WAITING_MSG, handoffMsg } from '../net/host.ts';
 import { DEFAULT_PRESET, dealMap, parseMap, presetById } from '../sandbox.ts';
+import { DEFAULT_NAME } from '../shellConfig.ts';
 import { STORAGE_KEYS } from '../storage.ts';
 import { arrangedOf } from './hand/arrange.ts';
 import { engineOf } from './hand/picture.ts';
@@ -191,9 +193,17 @@ describe('home', () => {
       { type: 'fillName', name: 'Ann' },
       { type: 'fillP2Name', name: 'Bob' },
     ]);
+    // Nothing saved: the shell's defaults go into the inputs (shell.ts DEFAULT_LOCAL_NAMES), the
+    // state keeps none of them. `fillName` reaches `#nameInput` too, so the first must be what that
+    // input's markup already holds (shellConfig.ts DEFAULT_NAME).
     const plain = run(initialApp, { type: 'home/init', home });
-    expect(plain.app.shell.nameTouched).toBe(false);
-    expect(plain.effects).toEqual([{ type: 'scrollTop' }]);
+    expect(plain.app.shell).toMatchObject({ nameTouched: false, savedName: null, p1Name: '' });
+    expect(plain.effects).toEqual([
+      { type: 'scrollTop' },
+      { type: 'fillName', name: DEFAULT_LOCAL_NAMES[0] },
+      { type: 'fillP2Name', name: DEFAULT_LOCAL_NAMES[1] },
+    ]);
+    expect(DEFAULT_NAME).toBe(DEFAULT_LOCAL_NAMES[0]);
   });
 
   test('tab/set persists a known tab, maps an unknown one to play, wakes the scorer on score', () => {
@@ -266,10 +276,14 @@ describe('home', () => {
         { type: 'fillP2Name', name: '' },
       ],
     });
-    // A saved second name alone fills its input and nothing else.
+    // A saved second name wins over its default; the first seat still shows its default.
     expect(run(initialApp, { type: 'home/init', home: { ...home, p2Name: 'Bob' } })).toMatchObject({
       app: { shell: { nameTouched: false, savedName: null } },
-      effects: [{ type: 'scrollTop' }, { type: 'fillP2Name', name: 'Bob' }],
+      effects: [
+        { type: 'scrollTop' },
+        { type: 'fillName', name: DEFAULT_LOCAL_NAMES[0] },
+        { type: 'fillP2Name', name: 'Bob' },
+      ],
     });
   });
 
@@ -750,7 +764,7 @@ describe('pass and play', () => {
     expect(kinds(effects)).toEqual(['wakeLock', 'persist', 'scrollTop']);
     expect(effects[0]).toEqual({ type: 'wakeLock', hold: true });
     const defaults = run(initialApp, { type: 'local/click', p1: '', p2: '', target: '' }).app;
-    expect(defaults.shell.game?.players.map((p) => p.name)).toEqual(['Player 1', 'Player 2']);
+    expect(defaults.shell.game?.players.map((p) => p.name)).toEqual(['Ari', 'Lavi']);
     expect(defaults.shell.game?.target).toBe(100);
   });
 
@@ -2095,12 +2109,12 @@ describe('the sandbox', () => {
     expect(dealt.app.shell.game).toMatchObject({ turn: 0, phase: 'draw', handNumber: 1 });
     expect(dealt.app.table.human).toBeNull();
     expect(kinds(dealt.effects)).toEqual(['wakeLock', 'persist', 'scrollTop']);
-    // The console deals with default names; a hand-made meld in the map is the player's.
+    // The console deals with the shell's default names; a hand-made meld in the map is the player's.
     const made = run(initialApp, {
       type: 'sandbox/start',
       map: presetById('hand-made-set')?.map ?? '',
     });
-    expect(made.app.shell.game?.players.map((p) => p.name)).toEqual(['Player 1', 'Player 2']);
+    expect(made.app.shell.game?.players.map((p) => p.name)).toEqual(['Ari', 'Lavi']);
     expect(made.app.table.human).toEqual({ hand: 1, groups: [['7S', '7H', '7D']] });
     expect(made.app.table.picture?.groups.map((g) => g.map((c) => c.id))).toEqual([
       ['7S', '7H', '7D'],
