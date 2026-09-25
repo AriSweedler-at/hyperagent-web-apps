@@ -280,8 +280,8 @@ export const fakePage = (elements: ReadonlyArray<FakeEl>): FakePage => {
 // same regular expressions (docs/design/shared-shell.md §5 B1): one fake element per `id="…"` in
 // the page's markup, with the classes, attributes and the input value as the markup has them, so a
 // fixture cannot drift from its page. This is backgammon's richer version (data attributes and the
-// boolean `disabled`/`checked` the controls ship with); each game's fixture now declares only the
-// children the paint reaches through queries and the mode buttons its switch carries.
+// boolean `disabled`/`checked` the controls ship with); each game's fixture now declares only its
+// table's own queries (the mode buttons come from `shellPage` below).
 
 const TAG = /<(\w+)([^>]*?)\bid="([^"]+)"([^>]*)>/g;
 

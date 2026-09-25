@@ -244,7 +244,7 @@ describe('shellPage', () => {
 </div>`;
   const MODES = ['online', 'local', 'sandbox'] as const;
 
-  test('the switch and the submenu hold one button per mode, in order, found by id and by the paints’ queries; the rest of the page still comes from the markup', () => {
+  test('the switch and the submenu hold one button per mode, in order, found by id and by the queries the paints use; the rest of the page still comes from the markup', () => {
     const page = shellPage(MARKUP, { modes: MODES });
     expect(page.modeButtons.map((b) => b.id)).toEqual([
       'modeSwitch-online',
@@ -306,7 +306,7 @@ describe('shellPage', () => {
     expect(submenu.querySelector('button[data-mode="online"]')).toBeNull();
   });
 
-  test('declared, extra and more join the shell’s own; a game’s declared for a shell id replaces the shell’s entry', () => {
+  test('declared, extra and more join the shell entries; a declared entry for a shell id replaces the shell one whole', () => {
     const strip = fakeEl('oppStrip', { classes: ['opp-strip'] });
     const child = fakeEl('child');
     const page = shellPage(
