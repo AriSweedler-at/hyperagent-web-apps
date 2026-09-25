@@ -71,6 +71,10 @@ describe('faceHtml', () => {
     expect(faceHtml(spec, { extra: 'selected' })).toBe(
       '<div class="card face selected" data-card="7S" role="img" aria-label="sette di spade" style="--face-inset:0.04;background-image:url(../../shared/cards/x/italian40/7S-240.jpg);background-image:image-set(url(../../shared/cards/x/italian40/7S-120.jpg) 1x, url(../../shared/cards/x/italian40/7S-240.jpg) 2x, url(../../shared/cards/x/italian40/7S-360.jpg) 3x)"><span class="rank">7</span><span class="rank br">7</span></div>',
     );
+    // A spec with no picture at all (the type allows it; a manifest never does) paints `url()`, not a crash.
+    expect(faceHtml({ ...spec, urls: [], indices: 'printed' })).toContain(
+      'style="--face-inset:0.04;background-image:url()"',
+    );
     // Without a 2x file the plain url() is the first one listed.
     expect(
       faceHtml({

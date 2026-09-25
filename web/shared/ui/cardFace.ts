@@ -7,7 +7,7 @@
 // inlined once at the top of a page that shows Italian cards). A `files` or `sprite` face paints the
 // pack's picture as the box's background from its document-relative URL, one `url()` per
 // device-pixel ratio through `image-set()` with a plain `url()` first for browsers without it. A back
-// is gin's `<div class="card back">` and the picture comes from the pack through `backImageCss`.
+// is gin's `backHtml` markup and the picture comes from the pack through `backImageCss`.
 // Class names are spelled through the constants below, never in a `class="…"` literal, so the
 // class-contract extraction (test/dist/classes.ts) does not read them into every game's list; the
 // names a stylesheet must know are rows of web/shared/styles/CONTRACT.md.
@@ -40,7 +40,7 @@ const plainUrl = (urls: ReadonlyArray<RatioUrl>): string =>
 
 /** Two `background-image` declarations: the plain one first, so a browser that knows `image-set()` keeps the second. */
 const pictureCss = (urls: ReadonlyArray<RatioUrl>): string =>
-  urls.length === 1
+  urls.length <= 1
     ? `background-image:url(${plainUrl(urls)})`
     : `background-image:url(${plainUrl(urls)});background-image:image-set(${imageSet(urls)})`;
 
