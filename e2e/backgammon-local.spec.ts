@@ -8,9 +8,9 @@
 // both dice bear the same checker off; a hit raises the Kapará toast for the player hit; a
 // bear-off ends the game with the gammon named on the result sheet; a match end reaches the end
 // screen; the Western variant shows the cube and the Double button, and a double runs through the
-// curtain to Take. Positions are seated through `window.__backgammon.setup` (ui/state.ts
-// `sandbox/load`); the dice come from the seeded `Math.random` every player context installs
-// (e2e/fixtures/seed.ts), which main.ts reads as `window.__rng ?? Math.random`.
+// curtain to Take. Positions are seated through `window.__backgammon.setup` (the shell's
+// `position/load`, web/shared/ui/shell.ts); the dice come from the seeded `Math.random` every
+// player context installs (e2e/fixtures/seed.ts), which main.ts reads as `window.__rng ?? Math.random`.
 import type { Page } from '@playwright/test';
 
 import { diceText, type View } from '../web/games/backgammon/src/engine/index.ts';

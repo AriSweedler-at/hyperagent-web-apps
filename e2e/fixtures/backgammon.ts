@@ -200,8 +200,8 @@ export const bgUndo = async (page: Page): Promise<View> => {
 };
 
 /**
- * Seat a position through `window.__backgammon.setup` (pass-and-play only; ui/state.ts
- * `sandbox/load`): the actor's view comes up with no curtain. Resolves once the page shows it.
+ * Seat a position through `window.__backgammon.setup` (pass-and-play only; the shell's
+ * `position/load`): the actor's view comes up with no curtain. Resolves once the page shows it.
  */
 export const bgSetup = async (page: Page, state: State): Promise<View> => {
   // The harness has no DOM types (tsconfig.node.json): the hook is called by source, as gin's is.
