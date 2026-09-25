@@ -22,7 +22,9 @@ import {
   type State,
   type View,
 } from '../engine/index.ts';
+import type { RecentGame } from '../../../../shared/lib/recentGames.ts';
 import { historyKey } from '../../../../shared/ui/history.ts';
+import { recentGamesHtml } from '../../../../shared/ui/recentGames.ts';
 import { briscolaPage, type BriscolaPage } from './page.fake.ts';
 import {
   DRAWING_STATUS,
@@ -76,6 +78,7 @@ const home: HomeSnapshot = {
   playMode: 'local',
   soundFont: 'default',
   save: null,
+  recentGames: [],
   opts: DEFAULT_OPTS,
   cardPack: 'linea',
   p3Name: null,
@@ -495,6 +498,19 @@ describe('the history sheet', () => {
     expect(p.get('historyList').attr('data-key')).toBe(
       `${String(v.startedAt)}:${historyKey(v.events)}`,
     );
+    // The finished matches under the events (web/shared/ui/recentGames.ts): none yet; one line each once there are.
+    expect(p.get('recentGames').text()).toBe('');
+    const record: RecentGame = {
+      at: NOW,
+      mode: 'local',
+      players: ['Ann', 'Bob', 'Cara', 'Dan'],
+      score: '2–1',
+      winner: 0,
+      outcome: 'win',
+    };
+    paint(p.doc, { ...app, shell: { ...app.shell, recentGames: [record] } });
+    expect(p.get('recentGames').text()).toBe(recentGamesHtml([record]).markup);
+    expect(p.get('recentGames').text()).toContain('Ann · Bob · Cara · Dan');
     expect(
       (
         p

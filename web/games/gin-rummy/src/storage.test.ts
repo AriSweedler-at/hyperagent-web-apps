@@ -29,6 +29,7 @@ import {
   readSave,
   readScorerState,
   readSort,
+  readRecentGames,
   readSoundFont,
   readSoundState,
   soundEnabled,
@@ -40,7 +41,9 @@ import {
   writeSave,
   writeScorerState,
   writeSort,
+  writeRecentGames,
   writeSoundFont,
+  appendRecentGame,
   writeSoundState,
 } from './storage.ts';
 
@@ -72,7 +75,7 @@ const game = createGame(
 );
 
 describe('frozen constants', () => {
-  test('the six kept legacy keys, the second name, the sort, the card pack and the sound font, the tabs, modes, sound states and the name cap', () => {
+  test('the six kept legacy keys, the second name, the sort, the card pack, the sound font and the finished games, the tabs, modes, sound states and the name cap', () => {
     expect(ALL_KEYS).toEqual([
       'ginRummyMP_v1',
       'ginRummy_name',
@@ -83,6 +86,7 @@ describe('frozen constants', () => {
       'ginRummy_sort',
       'ginRummy_cardPack',
       'ginRummy_soundFont',
+      'ginRummy_recentGames',
       'ginRummyScorerState_v2',
     ]);
     expect(HOME_TABS).toEqual(['play', 'rules', 'score', 'about']);
@@ -193,6 +197,32 @@ describe('the sound font preference', () => {
         reason: '$: expected one of "default" | "felt" | "arcade"',
       },
     });
+  });
+});
+
+describe('the finished games (the owner`s history, 2026-09-25)', () => {
+  test('a JSON list under the game`s own key, newest first; a missing or foreign value reads as none', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    expect(STORAGE_KEYS.recentGames).toBe('ginRummy_recentGames');
+    expect(readRecentGames(store)).toEqual([]);
+    const first = {
+      at: 1_700_000_000_000,
+      mode: 'local' as const,
+      players: ['Ann', 'Bob'],
+      score: '5–0',
+      winner: 0,
+      outcome: 'win' as const,
+    };
+    const second = { ...first, at: first.at + 1, winner: 1, outcome: 'loss' as const };
+    expect(appendRecentGame(store, first).ok).toBe(true);
+    expect(appendRecentGame(store, second).ok).toBe(true);
+    expect(s.map.get(STORAGE_KEYS.recentGames)).toBe(JSON.stringify([second, first]));
+    expect(readRecentGames(store)).toEqual([second, first]);
+    expect(writeRecentGames(store, [first]).ok).toBe(true);
+    expect(readRecentGames(store)).toEqual([first]);
+    s.setItem(STORAGE_KEYS.recentGames, '{"not":"a list"}');
+    expect(readRecentGames(store)).toEqual([]);
   });
 });
 

@@ -86,7 +86,8 @@
   // src/ui, so the globs reach only the two. The shared shell's painters and binders
   // (web/shared/ui/{shellPaint,curtain,toast,home}.ts, docs/design/shared-shell.md §4.4; keyed.ts,
   // dry-round-2.md D1; stories.ts, the stories page, dry-round-2.md I3; history.ts, the history
-  // panel, briscola-sound-history.md §6) are DOM modules too and stay out with their tests; ids.ts
+  // panel, briscola-sound-history.md §6; recentGames.ts, the finished games under it) are DOM
+  // modules too and stay out with their tests; ids.ts
   // (a list) stays in for test/dist/shell-ids.test.ts.
   "exclude": [
     "test/fixtures/legacy/*.cjs",
@@ -97,6 +98,7 @@
     "web/shared/ui/keyed*.ts",
     "web/shared/ui/stories*.ts",
     "web/shared/ui/history*.ts",
+    "web/shared/ui/recentGames*.ts",
     "web/games/*/src/ui/render*.ts",
     "web/games/*/src/ui/home*.ts",
     "web/games/*/src/ui/local*.ts",

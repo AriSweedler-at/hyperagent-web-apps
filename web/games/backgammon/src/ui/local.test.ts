@@ -116,6 +116,7 @@ describe('paintCurtain', () => {
     curtainMode: 'always',
     soundFont: 'default',
     save: null,
+    recentGames: [],
   };
   const started: App = [
     { type: 'home/init', home } as const,

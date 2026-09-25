@@ -20,7 +20,7 @@ const PURE = [
   // below; tsconfig.pure.json excludes the same seven. The shell's effect runner (shellEffects.ts)
   // is carved out too: it calls the adapters, statements the pure profile refuses, while staying
   // DOM-free, so tsconfig.pure.json still compiles it.
-  'web/shared/ui/!(shellPaint|curtain|toast|home|keyed|shellEffects|stories|history).ts',
+  'web/shared/ui/!(shellPaint|curtain|toast|home|keyed|shellEffects|stories|history|recentGames).ts',
   'web/games/*/src/engine/**/*.ts',
   'web/games/*/src/domain/**/*.ts',
   'web/games/*/src/bots/**/*.ts',

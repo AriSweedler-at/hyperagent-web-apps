@@ -308,6 +308,72 @@ details.history-row > .history-detail dt {
 details.history-row > .history-detail dd {
   margin: 0;
 }
+/* ---------- the finished games under the history list (web/shared/ui/recentGames.ts) ---------- */
+/* One line per game, newest first (the owner's game history, 2026-09-25): the local time muted,
+   the names, the game's score in the display face, and W, L or D at the end, the mark alone
+   carrying the outcome's colour (the accent for a win, the danger red for a loss, muted for a
+   draw). The slot collapses when it lists nothing. Token-only, as the rest of this sheet. */
+.recent-games:empty {
+  display: none;
+}
+.recent-games {
+  margin-top: 14px;
+  border-top: 1px solid var(--fill);
+  padding-top: 10px;
+}
+.recent-games-title {
+  margin: 0 0 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.recent-games-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.recent-game {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 2px;
+  border-bottom: 1px solid var(--fill);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+.recent-game:last-child {
+  border-bottom: none;
+}
+.recent-game-when {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.recent-game-players {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-game-score {
+  font-family: var(--font-display);
+  flex-shrink: 0;
+}
+.recent-game-outcome {
+  font-weight: 700;
+  min-width: 1.2em;
+  text-align: center;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.recent-game[data-outcome='win'] .recent-game-outcome {
+  color: var(--accent);
+}
+.recent-game[data-outcome='loss'] .recent-game-outcome {
+  color: var(--danger);
+}
 /* The About tab's prose (each game's about.ts). */
 .card-box.prose p {
   margin: 0 0 12px;

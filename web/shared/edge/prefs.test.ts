@@ -13,11 +13,13 @@ import {
   decodeSoundState,
   namePref,
   readTextWith,
+  recentGamesPref,
   shellSave,
   shellStore,
   soundPref,
   textPref,
 } from './prefs.ts';
+import { RECENT_GAMES_CAP, type RecentGame } from '../lib/recentGames.ts';
 import { createStore, unavailableStore, type StorageLike } from './storage.ts';
 
 const fakeStorage = (): StorageLike & Readonly<{ map: Map<string, string> }> => {
@@ -311,8 +313,57 @@ describe('shellSave', () => {
   });
 });
 
+/** One finished game as the shell records it (web/shared/lib/recentGames.ts). */
+const RECORD: RecentGame = {
+  at: 1_700_000_000_000,
+  mode: 'local',
+  players: ['Ann', 'Bob'],
+  score: '104–87',
+  winner: 0,
+  outcome: 'win',
+};
+
+describe('recentGamesPref', () => {
+  test('reads [] for a missing, unreadable or foreign value; writes a list as JSON; append puts the newest first and keeps the cap', () => {
+    const storage = fakeStorage();
+    const store = createStore(storage);
+    const pref = recentGamesPref('g_recentGames');
+    expect(pref.read(store)).toEqual([]);
+    storage.map.set('g_recentGames', 'not json');
+    expect(pref.read(store)).toEqual([]);
+    storage.map.set('g_recentGames', '{"at":1}');
+    expect(pref.read(store)).toEqual([]);
+    expect(pref.write(store, [RECORD])).toEqual({ ok: true, value: null });
+    expect(storage.map.get('g_recentGames')).toBe(JSON.stringify([RECORD]));
+    expect(pref.read(store)).toEqual([RECORD]);
+    const second: RecentGame = { ...RECORD, at: RECORD.at + 1, outcome: 'loss', winner: 1 };
+    expect(pref.append(store, second)).toEqual({ ok: true, value: null });
+    expect(pref.read(store)).toEqual([second, RECORD]);
+    // A bad entry beside good ones is dropped on the read, and the next append writes the clean list.
+    storage.map.set('g_recentGames', JSON.stringify([second, { junk: 1 }, RECORD]));
+    expect(pref.read(store)).toEqual([second, RECORD]);
+    // The cap: twenty-one appends keep the newest twenty.
+    const many = Array.from({ length: RECENT_GAMES_CAP + 1 }, (_, i) => ({
+      ...RECORD,
+      at: RECORD.at + 100 + i,
+    }));
+    many.forEach((g) => pref.append(store, g));
+    const kept = pref.read(store);
+    expect(kept).toHaveLength(RECENT_GAMES_CAP);
+    expect(kept[0]).toEqual(many.at(-1));
+    expect(kept.at(-1)).toEqual(many[1]);
+    // An unavailable store: the read is [] and the writes report it, nothing throws.
+    const gone = unavailableStore('private window');
+    expect(pref.read(gone)).toEqual([]);
+    expect(pref.append(gone, RECORD)).toEqual({
+      ok: false,
+      error: { kind: 'unavailable', key: 'g_recentGames', reason: 'private window' },
+    });
+  });
+});
+
 describe('shellStore', () => {
-  test('groups the seven preferences and the save over one game`s keys, each under its own key, for the shell config to carry', () => {
+  test('groups the seven preferences, the finished games and the save over one game`s keys, each under its own key, for the shell config to carry', () => {
     const storage = fakeStorage();
     const store = createStore(storage);
     const keys = {
@@ -323,6 +374,7 @@ describe('shellStore', () => {
       playMode: 'g_playMode',
       sound: 'g_sound',
       soundFont: 'g_soundFont',
+      recentGames: 'g_recentGames',
       extra: 'g_extra',
     } as const;
     const shell = shellStore<
@@ -344,6 +396,7 @@ describe('shellStore', () => {
     shell.playMode.write(store, 'local');
     shell.sound.write(store, 'off');
     shell.soundFont.write(store, 'felt');
+    shell.recentGames.append(store, RECORD);
     shell.save.writeSave(store, {
       role: 'host',
       code: 'ABCD',
@@ -359,6 +412,7 @@ describe('shellStore', () => {
       ['g_playMode', 'local'],
       ['g_sound', 'off'],
       ['g_soundFont', 'felt'],
+      ['g_recentGames', JSON.stringify([RECORD])],
       [
         'g_save',
         '{"role":"host","code":"ABCD","myName":"Ann","level":3,"game":{"n":1},"oppName":null}',
@@ -367,6 +421,7 @@ describe('shellStore', () => {
     expect(shell.name.read(store)).toEqual({ ok: true, value: 'Ann' });
     expect(shell.homeTab.read(store)).toEqual({ ok: true, value: 'rules' });
     expect(shell.sound.enabled(store)).toBe(false);
+    expect(shell.recentGames.read(store)).toEqual([RECORD]);
     expect(shell.save.readSave(store)).toMatchObject({
       ok: true,
       value: { role: 'host', level: 3 },

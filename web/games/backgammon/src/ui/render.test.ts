@@ -7,7 +7,9 @@ import { describe, expect, test } from 'vitest';
 
 import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
 import { fakeEl, fakeTarget } from '../../../../shared/edge/page.fake.ts';
+import type { RecentGame } from '../../../../shared/lib/recentGames.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
+import { recentGamesHtml } from '../../../../shared/ui/recentGames.ts';
 import { viewFor, withPosition } from '../engine/index.ts';
 import type { Dice, Seat, State, View } from '../engine/index.ts';
 import { pos } from '../engine/test-helpers.ts';
@@ -72,6 +74,7 @@ const home: HomeSnapshot = {
   curtainMode: 'always',
   soundFont: 'default',
   save: null,
+  recentGames: [],
 };
 /** A pass-and-play match, curtain up for the starter. */
 const local = (matchLength = '5', variant = 'portes'): App =>
@@ -526,6 +529,20 @@ describe('the table', () => {
       /<div class="history-row" data-kind="roll"><span class="who">(Ann|Bob)<\/span> rolled \d-\d<\/div>$/,
     );
     expect(p.get('historyList').text()).toContain('<span class="who">');
+    // The finished matches under the log (web/shared/ui/recentGames.ts): none yet; one line each once there are.
+    expect(p.get('recentGames').text()).toBe('');
+    const record: RecentGame = {
+      at: NOW,
+      mode: 'online',
+      players: ['Ann', 'Jeff'],
+      score: '3–5',
+      winner: 1,
+      outcome: 'loss',
+    };
+    const remembered = run(rolled, { type: 'history/toggle' }, { type: 'menu/toggle' }).app;
+    paint(p.doc, { ...remembered, shell: { ...remembered.shell, recentGames: [record] } });
+    expect(p.get('recentGames').text()).toBe(recentGamesHtml([record]).markup);
+    expect(p.get('recentGames').text()).toContain('data-outcome="loss"');
     expect(p.get('menuOverlay').hidden()).toBe(false);
     expect(p.get('menuCurtainToggle').checked()).toBe(true);
     expect(p.get('menuCurtainToggle').attr('data-next')).toBe('never');

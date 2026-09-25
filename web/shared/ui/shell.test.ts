@@ -12,6 +12,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { boolean, literal, number, object, pair, string } from '../lib/json.ts';
+import type { RecentGame } from '../lib/recentGames.ts';
 import { err, ok, type Result } from '../lib/result.ts';
 import { mulberry32 } from '../lib/rng.ts';
 import { SHELL_CUES } from '../lib/sound/cues.ts';
@@ -53,6 +54,7 @@ import {
   startLocal,
   step,
   toast,
+  userSeatOf,
   withShell,
   withTable,
   type CueMemory,
@@ -79,7 +81,14 @@ type State = Readonly<{
   moves: number;
   over: boolean;
 }>;
-type View = Readonly<{ seat: Seat; turn: Seat; moves: number; over: boolean; isMyTurn: boolean }>;
+type View = Readonly<{
+  seat: Seat;
+  turn: Seat;
+  moves: number;
+  over: boolean;
+  isMyTurn: boolean;
+  names: Readonly<[string, string]>;
+}>;
 type Action = Readonly<{ type: 'move' | 'end' | 'bad' }>;
 type Opts = Readonly<{ level: number }>;
 type Table = Readonly<{ curtain: Seat | null; marks: ReadonlyArray<string> }>;
@@ -121,6 +130,7 @@ const viewFor = (game: State, seat: Seat): View => ({
   moves: game.moves,
   over: game.over,
   isMyTurn: game.turn === seat,
+  names: [game.players[0].name, game.players[1].name],
 });
 const apply = (game: State, seat: Seat, action: Action): Result<State, string> =>
   action.type === 'bad' || seat !== game.turn
@@ -138,6 +148,7 @@ const KEYS = {
   homeTab: 'fake_homeTab',
   playMode: 'fake_playMode',
   soundFont: 'fake_soundFont',
+  recentGames: 'fake_recentGames',
   colour: 'fake_colour',
 } as const;
 const TABS = ['play', 'rules', 'about'] as const;
@@ -204,6 +215,14 @@ const FAKE: ShellConfig<Fake> = {
       moves: number,
       over: boolean,
     }),
+  },
+  // The finished game's record: the position is the game's identity (a re-sent frame shows the
+  // same one), the score counts the moves, the ender wins unless nobody moved (a draw).
+  result: {
+    keyOf: (view) => `${String(view.moves)}:${String(view.turn)}`,
+    playersOf: (view) => view.names,
+    scoreOf: (view) => `${String(view.moves)} moves`,
+    winnerOf: (view) => (view.over && view.moves > 0 ? view.turn : null),
   },
   frames: {
     lobby: (hostName, opts) => ({ t: 'lobby', hostName, ...opts }),
@@ -272,6 +291,14 @@ const FAKE: ShellConfig<Fake> = {
     homeTab: pref(KEYS.homeTab, TABS),
     playMode: pref(KEYS.playMode, ['online', 'local']),
     soundFont: pref(KEYS.soundFont, SOUND_FONTS),
+    recentGames: {
+      read: (store) => JSON.parse(store.get(KEYS.recentGames) ?? '[]') as ReadonlyArray<RecentGame>,
+      append: (store, game) =>
+        store.set(
+          KEYS.recentGames,
+          JSON.stringify([game, ...(JSON.parse(store.get(KEYS.recentGames) ?? '[]') as unknown[])]),
+        ),
+    },
     save: {
       readSave: (store) => {
         const raw = store.get(KEYS.save);
@@ -322,6 +349,7 @@ const home: Snapshot = {
   playMode: 'online',
   soundFont: 'default',
   save: null,
+  recentGames: [],
   colour: 'green',
 };
 
@@ -331,6 +359,15 @@ const PLAYERS: Readonly<[Player, Player]> = [
 ];
 const dealt: State = { players: PLAYERS, level: 3, turn: 0, moves: 0, over: false };
 const over: State = { ...dealt, over: true };
+/** One finished game as the shell records it: seat 0 ended `dealt` after two moves. */
+const RECORD: RecentGame = {
+  at: NOW,
+  mode: 'online',
+  players: ['Ann', 'Jeff'],
+  score: '2 moves',
+  winner: 0,
+  outcome: 'win',
+};
 
 /** A host in the lobby with a connected guest named Jeff. */
 const lobby = (): App =>
@@ -385,18 +422,21 @@ describe('the initial shell and the partitions', () => {
       longPressed: false,
       codeDraft: '',
       soundFont: 'default',
+      recentGames: [],
+      recorded: null,
     });
   });
 
-  test('the 44 shell intents and 28 shell effects are listed once; the guards partition a game`s unions', () => {
+  test('the 44 shell intents and 29 shell effects are listed once; the guards partition a game`s unions', () => {
     expect(SHELL_INTENT_TYPES).toHaveLength(44);
     expect(new Set(SHELL_INTENT_TYPES).size).toBe(44);
     expect(SHELL_INTENT_TYPES).toContain('curtain/reveal');
     expect(SHELL_INTENT_TYPES).toContain('position/load');
     expect(SHELL_INTENT_TYPES).toContain('persist');
-    expect(SHELL_EFFECT_TYPES).toHaveLength(28);
-    expect(new Set(SHELL_EFFECT_TYPES).size).toBe(28);
+    expect(SHELL_EFFECT_TYPES).toHaveLength(29);
+    expect(new Set(SHELL_EFFECT_TYPES).size).toBe(29);
     expect(SHELL_EFFECT_TYPES).toContain('phrases');
+    expect(SHELL_EFFECT_TYPES).toContain('recordGame');
     expect(isShellIntent<Fake>({ type: 'home/init', home })).toBe(true);
     expect(isShellIntent<Fake>({ type: 'own' })).toBe(false);
     expect(isShellEffect<Fake>({ type: 'persist' })).toBe(true);
@@ -1172,6 +1212,147 @@ describe('pass and play', () => {
   });
 });
 
+describe('the finished game`s record (the owner, 2026-09-25)', () => {
+  const records = (effects: ReadonlyArray<FakeEffect>): ReadonlyArray<RecentGame> =>
+    effects.flatMap((e) => (e.type === 'recordGame' ? [e.game] : []));
+  /** The engine's `end` for the seat whose turn it is, through the shell's pass-and-play position load. */
+  const ended = (start: App, moves: number, ender: Seat): FakeStep => {
+    const g = game(start);
+    return run(start, {
+      type: 'position/load',
+      state: { ...g, moves, turn: ender, over: true },
+    });
+  };
+
+  test('the user`s seat: the first name and the host are seat 0, the guest seat 1, nobody at home', () => {
+    expect(userSeatOf('local')).toBe(0);
+    expect(userSeatOf('host')).toBe(0);
+    expect(userSeatOf('guest')).toBe(1);
+    expect(userSeatOf(null)).toBeNull();
+  });
+
+  test('pass and play: the game`s end records it once, first in the shell and as the effect; a repaint, a re-render and the same position again record nothing', () => {
+    const start = local();
+    expect(start.shell.recentGames).toEqual([]);
+    // Seat 0 moves, seat 1 moves, seat 0 ends: seat 0 (the device's user) wins 2–0.
+    const done = ended(start, 2, 0);
+    const record: RecentGame = {
+      at: NOW,
+      mode: 'local',
+      players: ['Ann', 'Bob'],
+      score: '2 moves',
+      winner: 0,
+      outcome: 'win',
+    };
+    expect(records(done.effects)).toEqual([record]);
+    expect(done.app.shell.recentGames).toEqual([record]);
+    expect(done.app.shell.recorded).toBe('2:0');
+    expect(done.app.shell.screen).toBe('endgameScreen');
+    // The effect follows the paint's own (the mark says the game was rendered first).
+    expect(kinds(done.effects).indexOf('recordGame')).toBeGreaterThan(
+      kinds(done.effects).indexOf('persist'),
+    );
+    const again = run(done.app, { type: 'render' }, { type: 'render' });
+    expect(records(again.effects)).toEqual([]);
+    expect(again.app.shell.recentGames).toEqual([record]);
+    const reloaded = run(done.app, { type: 'position/load', state: { ...game(done.app) } });
+    expect(records(reloaded.effects)).toEqual([]);
+  });
+
+  test('the outcome is the first seat`s: a loss when seat 1 ends it, a draw when nobody moved', () => {
+    const lost = ended(local(), 1, 1);
+    expect(records(lost.effects)).toEqual([
+      {
+        at: NOW,
+        mode: 'local',
+        players: ['Ann', 'Bob'],
+        score: '1 moves',
+        winner: 1,
+        outcome: 'loss',
+      },
+    ]);
+    const drawn = ended(local(), 0, 0);
+    expect(records(drawn.effects)).toEqual([
+      {
+        at: NOW,
+        mode: 'local',
+        players: ['Ann', 'Bob'],
+        score: '0 moves',
+        winner: null,
+        outcome: 'draw',
+      },
+    ]);
+  });
+
+  test('a second game after a leave is recorded too, newest first, and the leave forgets the key', () => {
+    const first = ended(local(), 2, 0);
+    const left = run(first.app, { type: 'leave/finish' }).app;
+    expect(left.shell.recorded).toBeNull();
+    expect(left.shell.recentGames).toEqual(first.app.shell.recentGames);
+    const second = ended(
+      run(left, { type: 'local/click', p1: 'Cy', p2: 'Di', level: '1' }).app,
+      2,
+      0,
+    );
+    expect(records(second.effects)).toHaveLength(1);
+    expect(second.app.shell.recentGames.map((g) => g.players)).toEqual([
+      ['Cy', 'Di'],
+      ['Ann', 'Bob'],
+    ]);
+    // `home/init` reads the stored list into the shell.
+    expect(
+      run(initialApp, { type: 'home/init', home: { ...home, recentGames: [RECORD] } }).app.shell
+        .recentGames,
+    ).toEqual([RECORD]);
+  });
+
+  test('online, the host: the guest`s winning move records a loss for the host once; the guest, from the same frame, a win once', () => {
+    const h = hosting();
+    const moved = hostDispatch(h, 0, { type: 'move' }, ctx, FAKE);
+    const guestMoved = hostDispatch(moved.app, 1, { type: 'move' }, ctx, FAKE);
+    const hostEnded = hostDispatch(guestMoved.app, 0, { type: 'move' }, ctx, FAKE);
+    expect(records([...moved.effects, ...guestMoved.effects, ...hostEnded.effects])).toEqual([]);
+    const won = hostDispatch(hostEnded.app, 1, { type: 'end' }, ctx, FAKE);
+    expect(records(won.effects)).toEqual([
+      {
+        at: NOW,
+        mode: 'online',
+        players: ['Ann', 'Jeff'],
+        score: '3 moves',
+        winner: 1,
+        outcome: 'loss',
+      },
+    ]);
+    expect(won.app.shell.recorded).toBe('3:1');
+    // The host re-broadcasts (a rejoin): nothing more.
+    expect(records(broadcast(won.app, ctx, FAKE).effects)).toEqual([]);
+    // The guest: the host's state frame of the finished game (the names are the frame's: the
+    // host's game seats Ann and Jeff), then the same frame re-sent.
+    const g = seated();
+    const frame = { t: 'state', view: viewFor(game(won.app), 1) } as const;
+    const got = run(g, { type: 'guest/frame', frame });
+    expect(records(got.effects)).toEqual([
+      {
+        at: NOW,
+        mode: 'online',
+        players: ['Ann', 'Jeff'],
+        score: '3 moves',
+        winner: 1,
+        outcome: 'win',
+      },
+    ]);
+    expect(got.app.shell.recentGames).toHaveLength(1);
+    const resent = run(got.app, { type: 'guest/frame', frame }, { type: 'render' });
+    expect(records(resent.effects)).toEqual([]);
+  });
+
+  test('a game still on records nothing, whatever the paint', () => {
+    expect(records(run(local(), { type: 'render' }).effects)).toEqual([]);
+    expect(records(run(hosting(), { type: 'render' }).effects)).toEqual([]);
+    expect(records(run(seated(), { type: 'guest/lost' }).effects)).toEqual([]);
+  });
+});
+
 describe('the cue memory', () => {
   test('fresh: a key not yet played for is fresh and remembered, the same key again is not, a new key is fresh again', () => {
     const first = fresh({ key: null }, 'round:1');
@@ -1431,6 +1612,7 @@ describe('storage and what the sessions read back', () => {
     store.set(KEYS.playMode, 'local');
     store.set(KEYS.soundFont, 'arcade');
     store.set(KEYS.save, JSON.stringify({ role: 'guest', code: 'KQZM', myName: 'Jeff' }));
+    store.set(KEYS.recentGames, JSON.stringify([RECORD]));
     store.set(KEYS.colour, 'red');
     expect(readHome(store, FAKE)).toEqual({
       name: 'Ann',
@@ -1439,6 +1621,7 @@ describe('storage and what the sessions read back', () => {
       playMode: 'local',
       soundFont: 'arcade',
       save: { role: 'guest', code: 'KQZM', myName: 'Jeff' },
+      recentGames: [RECORD],
       colour: 'red',
     });
     store.set(KEYS.homeTab, 'settings');
@@ -1538,12 +1721,15 @@ describe('runShellEffect', () => {
     runShellEffect(shell, { type: 'writeHomeTab', tab: 'about' }, deps, FAKE);
     runShellEffect(shell, { type: 'writePlayMode', mode: 'local' }, deps, FAKE);
     runShellEffect(shell, { type: 'writeSoundFont', font: 'felt' }, deps, FAKE);
+    runShellEffect(shell, { type: 'recordGame', game: RECORD }, deps, FAKE);
+    runShellEffect(shell, { type: 'recordGame', game: { ...RECORD, at: NOW + 1 } }, deps, FAKE);
     expect([...store.entries()].filter(([k]) => k !== KEYS.save)).toEqual([
       [KEYS.name, 'Ann'],
       [KEYS.p2Name, 'Bob'],
       [KEYS.homeTab, 'about'],
       [KEYS.playMode, 'local'],
       [KEYS.soundFont, 'felt'],
+      [KEYS.recentGames, JSON.stringify([{ ...RECORD, at: NOW + 1 }, RECORD])],
     ]);
     runShellEffect(shell, { type: 'rememberName', name: '' }, deps, FAKE);
     expect(store.has(KEYS.name)).toBe(false);
