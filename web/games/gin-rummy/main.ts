@@ -2,39 +2,27 @@
 // them; no logic). Phase 1 of docs/MIGRATION.md step 12: the real Transport (web/shared/edge/
 // transport.ts, which bundles PeerJS and honours `?peer=`), the ICE loader, localStorage, the
 // clock, `Math.random` (or the harness's `window.__rng`), Web Audio, vibration and the wake lock
-// are built here and handed to the reducer (src/ui/state.ts) through `runEffect`, to the sessions
-// (src/net) through their deps, and to the paint (src/ui/render.ts). What the legacy page did
-// with the PeerJS CDN <script> and shared/ice.js arrives with this module instead, so index.html
-// loads neither and defines neither `window.Peer` nor `window.HyperIce`; `window.__gin` stays as
-// the documented test hook with the members the legacy exposed.
+// are built by the shared boot (web/shared/edge/boot.ts `bootShell`, docs/design/shared-shell.md
+// §4.5, §5 C3: what this file and backgammon's spelled line for line) and handed to the reducer
+// (src/ui/state.ts) through `runEffect`, to the sessions (src/net) through their deps, and to the
+// paint (src/ui/render.ts). What the legacy page did with the PeerJS CDN <script> and
+// shared/ice.js arrives with this module instead, so index.html loads neither and defines neither
+// `window.Peer` nor `window.HyperIce`; `window.__gin` stays as the documented test hook with the
+// members the legacy exposed. This file keeps what is gin's alone: the stories page, the Score
+// Counter, the card back, the sandbox, the layoffs hook and the clipboard `copy`.
+import { bootShell, type BootCtx } from '../../shared/edge/boot.ts';
 import { realClock } from '../../shared/edge/clock.ts';
-import {
-  createAudioCues,
-  createWakeLock,
-  vibrate,
-  type AudioContextLike,
-  type NavigatorLike,
-} from '../../shared/edge/fx.ts';
 import type { ShareNavigatorLike } from '../../shared/edge/share.ts';
-import { bindJargon, revealRule } from '../../shared/edge/glossary.ts';
-import { createSampleCache } from '../../shared/edge/sound.ts';
-import { browserStore } from '../../shared/edge/storage.ts';
-import { applyInviteLink, sessionEvents, shareInvite } from '../../shared/edge/boot.ts';
-import { browserNetDeps } from '../../shared/edge/netDeps.ts';
-import type { Rng } from '../../shared/lib/rng.ts';
-import { ruleFromHash } from '../../shared/ui/glossary.ts';
-import { createTimers, createToaster } from '../../shared/ui/toast.ts';
+import { browserStore, type Store } from '../../shared/edge/storage.ts';
 import { bestLayoffActions, legalActions } from './src/engine/index.ts';
 import type { Action } from './src/engine/types.ts';
 import { createFx } from './src/fx.ts';
 import { GuestSession } from './src/net/guest.ts';
 import { HostSession } from './src/net/host.ts';
-import type { NetDeps } from '../../shared/edge/peer.ts';
-import { isGuestFrame, type GuestFrame, type HostFrame } from './src/protocol.ts';
-import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
+import { isGuestFrame } from './src/protocol.ts';
+import { createScorer, type Scorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
 import { STORAGE_KEYS, migrateCardBack, soundEnabled } from './src/storage.ts';
 import { badCardBackMsg, isCardBack, type CardBack } from './src/cardBack.ts';
-import { badSoundFontMsg, isSoundFont } from '../../shared/lib/sound/fonts.ts';
 import { formatMap, mapOf } from './src/sandbox.ts';
 import { slotHandView } from './src/ui/hand/SlotHandView.ts';
 import { fillNameInputs, fillP2NameInput, renderSandbox, setCodeInput } from './src/ui/home.ts';
@@ -44,17 +32,15 @@ import {
   hostContextOf,
   initialApp,
   readHome,
-  type HomeSnapshot,
   reduce,
   runEffect,
   type App,
   type EffectDeps,
-  type Intent,
-  type ScreenId,
-  type TimerId,
+  type Gin,
 } from './src/ui/state.ts';
 
-type Scorer = Readonly<{ resume: () => void }>;
+/** Gin's effect adapters beside the shell's: the Score Counter and the clipboard. */
+type GinDeps = Pick<EffectDeps, 'scorer' | 'copy'>;
 
 /** `exportGame()`'s download: a Blob behind an anchor clicked once, its URL revoked 2 s later. */
 const downloadText = (fileName: string, text: string): void => {
@@ -70,219 +56,36 @@ const downloadText = (fileName: string, text: string): void => {
   }, 2000);
 };
 
-const boot = (): void => {
-  // The stories page (docs/design/gin-draw-ghost-slot.md §8; docs/ARCHITECTURE.md "Documented test
-  // hooks"): `?story=<id>` paints one catalogued table state and constructs no adapter at all. The
-  // catalogue arrives as its own chunk (a dynamic import), so the game's entry carries none of it.
-  const params = new URLSearchParams(location.search);
-  const story = params.get('story');
-  if (story !== null) {
-    void import('./src/stories/boot.ts').then((stories) => {
-      stories.bootStory(document, story, params.has('nav'), params.has('live'));
-    });
-    return;
+/** The card back (src/cardBack.ts): a value the console left in storage that names no preset is logged and dropped before every home read, so the default stands and a reload logs it once. */
+const dropBadCardBack = (store: Store): void => {
+  const storedBack = store.readText(STORAGE_KEYS.cardPack);
+  if (storedBack.ok && !isCardBack(storedBack.value)) {
+    console.error(badCardBackMsg(storedBack.value));
+    store.remove(STORAGE_KEYS.cardPack);
   }
+};
 
-  // The documented test hooks on this page (docs/ARCHITECTURE.md "Documented test hooks"): a seeded
-  // rng a harness installs before boot, the app hook set after it, and the Score Counter's screen
-  // (src/scorer/main.ts) registering itself as the legacy `window.__scorer` did.
-  const page = window as Window & { __rng?: Rng; __gin?: unknown; __scorer?: Scorer };
-  const store = browserStore();
-  // The card back's key was renamed when the shared card packs landed (docs/design/card-packs.md
-  // §2.2): a value left under the old key moves over once, and one that names no preset is logged
-  // under the new key's message and dropped.
-  const strayBack = migrateCardBack(store);
-  if (strayBack !== null) console.error(badCardBackMsg(strayBack));
-  // The card back (src/cardBack.ts) and the sound font (docs/design/sound-fonts.md §6): a value
-  // the console left in storage that names no preset is logged and dropped before every home
-  // read, so the default stands and a reload logs it once.
-  const homeSnapshot = (): HomeSnapshot => {
-    const storedBack = store.readText(STORAGE_KEYS.cardPack);
-    if (storedBack.ok && !isCardBack(storedBack.value)) {
-      console.error(badCardBackMsg(storedBack.value));
-      store.remove(STORAGE_KEYS.cardPack);
-    }
-    const storedFont = store.readText(STORAGE_KEYS.soundFont);
-    if (storedFont.ok && !isSoundFont(storedFont.value)) {
-      console.error(badSoundFontMsg(STORAGE_KEYS.soundFont, storedFont.value));
-      store.remove(STORAGE_KEYS.soundFont);
-    }
-    return readHome(store);
-  };
-  const rng: Rng = page.__rng ?? Math.random;
-  const now = (): number => realClock.now();
-  // The DOM lib types `vibrate` over a mutable array and `AudioNode.connect` over full nodes; the
-  // edge reads readonly patterns and calls the structural subset, so the real objects are widened.
-  const nav = navigator as unknown as NavigatorLike;
-  const wakeLock = createWakeLock(nav);
-  const audioGlobals = globalThis as unknown as Readonly<{
-    AudioContext?: new () => unknown;
-    webkitAudioContext?: new () => unknown;
-  }>;
-  const AudioCtor = audioGlobals.AudioContext ?? audioGlobals.webkitAudioContext;
-  const audio = createAudioCues({
-    makeContext: AudioCtor === undefined ? undefined : () => new AudioCtor() as AudioContextLike,
-    enabled: soundEnabled(store),
-  });
-
-  let app: App = initialApp;
-  let session: HostSession | GuestSession | null = null;
-  /** The reducer's named timers (the Play tab's long press); arming one again restarts it. */
-  const timers = createTimers<TimerId>(realClock);
-  /** The legacy `toast(msg, ms)` with its 2.6 s default; a new toast restarts the one hide timer. */
-  const toast = createToaster(document, realClock);
-
-  const fx = createFx({
-    audio,
-    // The sample seam (docs/design/sound-fonts.md §3): a document-relative URL, so both origins serve it.
-    sound: {
-      fetchBuffer: (url) =>
-        fetch(url).then((r) => {
-          if (!r.ok) throw new Error(`${String(r.status)} ${url}`);
-          return r.arrayBuffer();
-        }),
-      cache: createSampleCache(),
-    },
-    vibrate: (pattern) => {
-      vibrate(nav, pattern);
-    },
-    store,
-    onToggle: (enabled) => {
-      paintSound(document, enabled);
-    },
-  });
-
-  // PeerJS log level 0 as on the legacy page (e2e expectPeerOptions pins it); the shared deps
-  // (web/shared/edge/netDeps.ts) read the ?peer= hook and wake the sessions on visibility/online.
-  const netDeps: NetDeps = browserNetDeps({ search: location.search, debug: 0 });
-
-  // The hand is drawn by the slot view with the ghost draw slot (docs/ARCHITECTURE.md "Seams
-  // reserved": the view is another module and this choice; docs/design/gin-draw-ghost-slot.md).
-  // Nothing is measured after a paint: the table's geometry is bounded by the viewport in theme.css.
-  const repaint = (): void => {
-    paint(document, app, slotHandView);
-  };
-
-  const dispatch = (intent: Intent): void => {
-    const step = reduce(app, intent, { rng, now });
-    // The paint is a function of the App, so an unchanged App needs none. This matters on a
-    // card's pointerdown: a repaint would replace the element under the pointer, and the
-    // browser would then drop the click that was to follow.
-    const changed = step.app !== app;
-    app = step.app;
-    step.effects.forEach((effect) => {
-      runEffect(app, effect, deps);
-    });
-    if (changed) repaint();
-  };
-
-  // The sessions' events as intents, toasts and the wake lock (web/shared/edge/boot.ts).
-  const { host: hostEvents, guest: guestEvents } = sessionEvents<GuestFrame, HostFrame>({
-    dispatch,
-    toast,
-    wakeLock,
-  });
-
-  const deps: EffectDeps = {
-    store,
-    toast,
-    fx: (cue, font) => {
-      fx.play(cue, font);
-    },
-    wakeLock: (hold) => {
-      if (hold) void wakeLock.hold();
-      else wakeLock.drop();
-    },
-    net: {
-      startHost: (code, attempt, resume) => {
-        session = new HostSession(
-          { ...netDeps, read: () => hostContextOf(app), events: hostEvents },
-          { code, attempt, resume },
-        );
-      },
-      startGuest: (code, attempt) => {
-        session = new GuestSession(
-          { ...netDeps, read: () => guestContextOf(app), events: guestEvents },
-          { code, attempt },
-        );
-      },
-      send: (frame) => {
-        if (session === null) return;
-        if (session.kind === 'host') {
-          if (!isGuestFrame(frame)) session.send(frame);
-        } else if (isGuestFrame(frame)) session.send(frame);
-      },
-      close: () => {
-        session?.close();
-      },
-    },
-    confirm: (message) => window.confirm(message),
-    scrollTop: () => {
-      window.scrollTo(0, 0);
-    },
-    scorer: {
-      resume: () => page.__scorer?.resume(),
-    },
-    timers: {
-      start: (id, ms, then) => {
-        timers.start(id, ms, () => {
-          dispatch(then);
-        });
-      },
-      cancel: timers.cancel,
-    },
-    toggleSound: () => {
-      fx.toggle(app.shell.soundFont);
-    },
-    share: (code) => {
-      // The share sheet, else the clipboard with a toast, else the code itself (web/shared/edge/boot.ts).
-      void shareInvite(navigator, {
-        title: 'Gin Rummy',
-        code,
-        pageUrl: `${location.origin}${location.pathname}`,
-        toast,
-      });
-    },
-    copy: (text) => {
-      // The clipboard alone, no share sheet: a console call is for the keyboard, not a friend.
-      const nav: ShareNavigatorLike = navigator;
-      void nav.clipboard?.writeText(text).catch(() => undefined);
-    },
-    revealRule: (slot, rule) => {
-      revealRule(document, slot, rule);
-    },
-    page: {
-      fillName: (name) => {
-        fillNameInputs(document, name);
-      },
-      fillP2Name: (name) => {
-        fillP2NameInput(document, name);
-      },
-      setCode: (value) => {
-        setCodeInput(document, value);
-      },
-    },
-    dispatch: (intent) => {
-      dispatch(intent);
-    },
-  };
-
-  // The Score Counter: `window.SpeechRecognition || window.webkitSpeechRecognition` as the legacy read it.
+/**
+ * The Score Counter (src/scorer/main.ts): `window.SpeechRecognition || window.webkitSpeechRecognition`
+ * as the legacy read it, the reducer's screens through `dispatch`, and the legacy `window.__scorer`.
+ */
+const bootScorer = (ctx: BootCtx<Gin, App>): Scorer => {
+  const { dispatch, homeSnapshot } = ctx;
   const speechGlobals = globalThis as unknown as Readonly<{
     SpeechRecognition?: new () => SpeechRecognizerLike;
     webkitSpeechRecognition?: new () => SpeechRecognizerLike;
   }>;
   const SpeechCtor = speechGlobals.SpeechRecognition ?? speechGlobals.webkitSpeechRecognition;
-  const scorer = createScorer({
+  return createScorer({
     doc: document,
-    store,
-    now,
-    rng,
+    store: ctx.store,
+    now: ctx.now,
+    rng: ctx.rng,
     fx: (cue) => {
-      fx.play(cue, app.shell.soundFont);
+      ctx.fx.play(cue, ctx.app().shell.soundFont);
     },
     toast: (message) => {
-      toast(message, null);
+      ctx.toast(message, null);
     },
     dialogs: {
       prompt: (message, initial) => window.prompt(message, initial),
@@ -310,115 +113,129 @@ const boot = (): void => {
     formatTime: fmtTime,
     formatDateTime: (ts) => new Date(ts).toLocaleString(),
   });
-  page.__scorer = scorer;
+};
 
-  renderRules(document);
-  renderAbout(document);
-  renderSandbox(document);
-  bindAll(document, dispatch);
-  // A tap on jargon in the About copy or in a rule (docs/design/glossary-links.md) shows that rule.
-  bindJargon(document, (rule) => {
-    dispatch({ type: 'rules/show', rule });
-  });
-  scorer.bind();
-  paintSound(document, fx.enabled());
-  // Browsers only let audio start after a user gesture: warm the context on the first tap.
-  ['pointerdown', 'touchstart', 'keydown'].forEach((event) => {
-    document.addEventListener(
-      event,
-      () => {
-        fx.warm();
+const boot = (): void => {
+  // The stories page (docs/design/gin-draw-ghost-slot.md §8; docs/ARCHITECTURE.md "Documented test
+  // hooks"): `?story=<id>` paints one catalogued table state and constructs no adapter at all. The
+  // catalogue arrives as its own chunk (a dynamic import), so the game's entry carries none of it.
+  const params = new URLSearchParams(location.search);
+  const story = params.get('story');
+  if (story !== null) {
+    void import('./src/stories/boot.ts').then((stories) => {
+      stories.bootStory(document, story, params.has('nav'), params.has('live'));
+    });
+    return;
+  }
+
+  // The Score Counter's screen registers itself as the legacy `window.__scorer` did, and the
+  // `scorer` effect resumes it through that name (the screen is built after the effect adapters).
+  const page = window as Window & { __scorer?: Scorer };
+  const store = browserStore();
+  // The card back's key was renamed when the shared card packs landed (docs/design/card-packs.md
+  // §2.2): a value left under the old key moves over once, and one that names no preset is logged
+  // under the new key's message and dropped.
+  const strayBack = migrateCardBack(store);
+  if (strayBack !== null) console.error(badCardBackMsg(strayBack));
+  bootShell<Gin, App, GinDeps>({
+    page: { doc: document, win: window, nav: navigator, store, clock: realClock },
+    // PeerJS log level 0 as on the legacy page (e2e expectPeerOptions pins it, tools/games.ts REGISTRY).
+    game: { hook: '__gin', title: 'Gin Rummy', debug: 0 },
+    sound: { enabled: soundEnabled, fontKey: STORAGE_KEYS.soundFont },
+    reducer: { initialApp, reduce, runEffect, readHome, hostContextOf, guestContextOf },
+    paint: {
+      // The hand is drawn by the slot view with the ghost draw slot (docs/ARCHITECTURE.md "Seams
+      // reserved": the view is another module and this choice; docs/design/gin-draw-ghost-slot.md).
+      // Nothing is measured after a paint: the table's geometry is bounded by the viewport in theme.css.
+      paint: (doc, app) => {
+        paint(doc, app, slotHandView);
       },
-      { passive: true },
-    );
+      bindAll,
+      paintSound,
+      fillName: fillNameInputs,
+      fillP2Name: fillP2NameInput,
+      setCode: setCodeInput,
+    },
+    fx: createFx,
+    net: { Host: HostSession, Guest: GuestSession, isGuestFrame },
+    legal: legalActions,
+    deps: {
+      scorer: {
+        resume: () => page.__scorer?.resume(),
+      },
+      copy: (text) => {
+        // The clipboard alone, no share sheet: a console call is for the keyboard, not a friend.
+        const nav: ShareNavigatorLike = navigator;
+        void nav.clipboard?.writeText(text).catch(() => undefined);
+      },
+    },
+    hooks: {
+      home: dropBadCardBack,
+      // The static markup and the Score Counter's screen before the binders; its controls bound after them.
+      render: (ctx) => {
+        page.__scorer = bootScorer(ctx);
+        renderRules(document);
+        renderAbout(document);
+        renderSandbox(document);
+      },
+      bind: () => {
+        page.__scorer?.bind();
+      },
+      // The members the legacy exposed beyond the shared ones (read-only state; actions go through the reducer).
+      hook: ({ app, dispatch }) => ({
+        act: (action: Action) => {
+          dispatch({ type: 'act', action });
+        },
+        setHomeTab: (tab: string, opts?: Readonly<{ persist?: boolean }>) => {
+          dispatch({
+            type: 'tab/set',
+            tab,
+            ...(opts?.persist === false ? { persist: false } : {}),
+          });
+        },
+        setPlayMode: (mode: string) => {
+          dispatch({ type: 'mode/set', mode });
+        },
+        /**
+         * The layoffs the engine used to make by itself, then `finishLayoff` (§7b): what the drivers
+         * (e2e/fixtures/gin-play.ts, tools/parity) play through a knock's layoff phase to land where
+         * the automatic layoff landed. Host and pass-and-play only (the game is here).
+         */
+        layoffs: (): ReadonlyArray<Action> => {
+          const game = app().shell.game;
+          return game === null ? [] : bestLayoffActions(game);
+        },
+        // The sandbox from the console (src/sandbox.ts): deal a map; read the table back as one.
+        sandbox: (map: string) => {
+          dispatch({ type: 'sandbox/start', map });
+        },
+        sandboxMap: (): string | null => {
+          const game = app().shell.game;
+          return game === null ? null : formatMap(mapOf(game));
+        },
+        /**
+         * The card pack, from the console for now (docs/design/card-packs.md §2.2): a pack that draws
+         * a French deck is shown and remembered; anything else is logged and refused. `cardBack` is
+         * the documented older name of the same hook, kept as an alias for one release.
+         */
+        cardPack: (name: string): void => {
+          if (!isCardBack(name)) {
+            console.error(badCardBackMsg(name));
+            return;
+          }
+          dispatch({ type: 'cardBack/set', back: name });
+        },
+        cardPackName: (): CardBack => app().table.cardBack,
+        cardBack: (name: string): void => {
+          if (!isCardBack(name)) {
+            console.error(badCardBackMsg(name));
+            return;
+          }
+          dispatch({ type: 'cardBack/set', back: name });
+        },
+      }),
+    },
   });
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') dispatch({ type: 'visible' });
-  });
-
-  // The test/debug hook, with the members the legacy exposed (read-only state; actions go through
-  // the reducer). `app` is a getter so a reader always sees the current record.
-  page.__gin = {
-    get app(): App {
-      return app;
-    },
-    act: (action: Action) => {
-      dispatch({ type: 'act', action });
-    },
-    render: () => {
-      dispatch({ type: 'render' });
-    },
-    showScreen: (screen: ScreenId) => {
-      dispatch({ type: 'screen/show', screen });
-    },
-    initHome: () => {
-      dispatch({ type: 'home/init', home: homeSnapshot() });
-    },
-    fx,
-    setHomeTab: (tab: string, opts?: Readonly<{ persist?: boolean }>) => {
-      dispatch({ type: 'tab/set', tab, ...(opts?.persist === false ? { persist: false } : {}) });
-    },
-    setPlayMode: (mode: string) => {
-      dispatch({ type: 'mode/set', mode });
-    },
-    /** The engine's legal actions for my view. */
-    legal: (): ReadonlyArray<Action> =>
-      app.shell.view === null ? [] : legalActions(app.shell.view),
-    /**
-     * The layoffs the engine used to make by itself, then `finishLayoff` (§7b): what the drivers
-     * (e2e/fixtures/gin-play.ts, tools/parity) play through a knock's layoff phase to land where
-     * the automatic layoff landed. Host and pass-and-play only (the game is here).
-     */
-    layoffs: (): ReadonlyArray<Action> =>
-      app.shell.game === null ? [] : bestLayoffActions(app.shell.game),
-    // The sandbox from the console (src/sandbox.ts): deal a map; read the table back as one.
-    sandbox: (map: string) => {
-      dispatch({ type: 'sandbox/start', map });
-    },
-    sandboxMap: (): string | null =>
-      app.shell.game === null ? null : formatMap(mapOf(app.shell.game)),
-    /**
-     * The card pack, from the console for now (docs/design/card-packs.md §2.2): a pack that draws
-     * a French deck is shown and remembered; anything else is logged and refused. `cardBack` is
-     * the documented older name of the same hook, kept as an alias for one release.
-     */
-    cardPack: (name: string): void => {
-      if (!isCardBack(name)) {
-        console.error(badCardBackMsg(name));
-        return;
-      }
-      dispatch({ type: 'cardBack/set', back: name });
-    },
-    cardPackName: (): CardBack => app.table.cardBack,
-    cardBack: (name: string): void => {
-      if (!isCardBack(name)) {
-        console.error(badCardBackMsg(name));
-        return;
-      }
-      dispatch({ type: 'cardBack/set', back: name });
-    },
-    /** The sound font, from the console for now (docs/design/sound-fonts.md §6): a font plays from now on and is remembered; anything else is logged and refused. */
-    soundFont: (name: string): void => {
-      if (!isSoundFont(name)) {
-        console.error(badSoundFontMsg(STORAGE_KEYS.soundFont, name));
-        return;
-      }
-      dispatch({ type: 'soundFont/set', font: name });
-    },
-    soundFontName: (): string => app.shell.soundFont,
-    dispatch,
-  };
-
-  dispatch({ type: 'home/init', home: homeSnapshot() });
-  // An invite link (`?join=<code>`): into the join form now that the home screen is up, and out of
-  // the address bar (web/shared/edge/boot.ts).
-  applyInviteLink(window, (code) => {
-    dispatch({ type: 'join/link', code });
-  });
-  // A rule deep link (`#rule-<id>`, docs/design/glossary-links.md §1): the Rules tab, scrolled to
-  // that rule. The hash stays, so the link can be copied from the address bar.
-  const rule = ruleFromHash(location.hash);
-  if (rule !== null) dispatch({ type: 'rules/show', rule });
 };
 
 boot();
