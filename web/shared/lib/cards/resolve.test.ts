@@ -102,6 +102,19 @@ describe('resolveFace', () => {
       inset: 0,
       indices: 'printed',
     });
+    expect(resolveFace(packByName('napoletane'), 'italian40', 'AD')).toEqual({
+      kind: 'image',
+      id: 'AD',
+      index: 'A',
+      alt: 'asso di denari',
+      urls: [
+        { ratio: 1, url: '../../shared/cards/napoletane/italian40/AD-120.jpg' },
+        { ratio: 2, url: '../../shared/cards/napoletane/italian40/AD-240.jpg' },
+      ],
+      aspect: 0.577,
+      inset: 0,
+      indices: 'overlay',
+    });
     expect(resolveFace(PARTIAL, 'italian40', 'AD')).toEqual({
       kind: 'image',
       id: 'AD',
@@ -147,12 +160,15 @@ describe('resolveBack, resolveAspect, attributionLine', () => {
     const dflt = packByName('default');
     expect(resolveBack(packByName('yu-gi-oh'), dflt)).toBe(packByName('yu-gi-oh').back);
     expect(resolveBack(PARTIAL, dflt)).toBe(dflt.back);
+    // The Napoletane sheet has no back: an Italian table paints the default's behind it.
+    expect(resolveBack(packByName('napoletane'), dflt)).toBe(dflt.back);
     expect(resolveBack(PARTIAL, SPRITE)).toEqual({ kind: 'css', colour: '#1e3a8a' });
   });
 
   test("the aspect is the pictures' own for a files or sprite pack, else the deck kind's nominal", () => {
     expect(resolveAspect(packByName('linea'), 'italian40')).toBe(100 / 193);
     expect(resolveAspect(packByName('linea'), 'french52')).toBe(DECKS.french52.aspect);
+    expect(resolveAspect(packByName('napoletane'), 'italian40')).toBe(0.577);
     expect(resolveAspect(packByName('yu-gi-oh'), 'italian40')).toBe(0.518);
     expect(resolveAspect(PARTIAL, 'italian40')).toBe(0.53);
     expect(resolveAspect(SPRITE, 'italian40')).toBe(0.53);
@@ -161,6 +177,9 @@ describe('resolveBack, resolveAspect, attributionLine', () => {
   test('the About line names the pack, the author and the licence; a drawn pack has none', () => {
     expect(attributionLine(PARTIAL)).toBe(
       'Cards: Romane — Marteau i Georges (Wikimedia Commons), CC0',
+    );
+    expect(attributionLine(packByName('napoletane'))).toBe(
+      'Cards: Napoletane — Florixc (Wikimedia Commons), Public domain',
     );
     expect(attributionLine(packByName('linea'))).toBeNull();
     expect(attributionLine(packByName('yu-gi-oh'))).toBeNull();

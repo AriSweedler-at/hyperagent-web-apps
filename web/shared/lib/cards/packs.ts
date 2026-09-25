@@ -14,9 +14,17 @@ import { BLUE_STRIPE_PACK } from './packs/blue-stripe.ts';
 import { DEFAULT_PACK } from './packs/default.ts';
 import { EMPTY_PACK } from './packs/empty.ts';
 import { LINEA_PACK } from './packs/linea.ts';
+import { NAPOLETANE_PACK } from './packs/napoletane.ts';
 import { YU_GI_OH_PACK } from './packs/yu-gi-oh.ts';
 
-export const CARD_PACKS = ['default', 'blue-stripe', 'yu-gi-oh', 'empty', 'linea'] as const;
+export const CARD_PACKS = [
+  'default',
+  'blue-stripe',
+  'yu-gi-oh',
+  'empty',
+  'linea',
+  'napoletane',
+] as const;
 export type CardPackName = (typeof CARD_PACKS)[number];
 
 /** The width, in CSS pixels, a face file is derived at for device-pixel ratio 1 (`widths` are multiples of it). */
@@ -102,6 +110,7 @@ const PACKS = {
   'yu-gi-oh': YU_GI_OH_PACK,
   empty: EMPTY_PACK,
   linea: LINEA_PACK,
+  napoletane: NAPOLETANE_PACK,
 } as const satisfies Readonly<Record<CardPackName, CardPack>>;
 
 /** The names of the packs that draw a deck kind, read off the table's literal types. */

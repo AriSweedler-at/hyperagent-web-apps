@@ -13,6 +13,9 @@ test/fixtures/legacy/gin-wire/
 # Written by tools/linea.ts in one line per field (the forty ids on one line); tools/linea.test.ts
 # compares the committed file to the tool's output, so the tool's text is the committed bytes.
 web/shared/lib/cards/packs/linea.ts
+# Written by tools/card-packs.ts in the same one-line-per-field shape from assets/cards/napoletane
+# (docs/design/card-packs.md §5); `check` and the manifest test read it against the derived files.
+web/shared/lib/cards/packs/napoletane.ts
 # The shell's markup partials (docs/design/dry-round-2.md row G2): `{{slot}}` holes in gin's
 # hand-owned layout, which tools/shell-markup.ts fills into each shell page and formats only where
 # Prettier owns that page (this file decides); reflowing the partials would reflow gin's page.

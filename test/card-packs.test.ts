@@ -42,7 +42,7 @@ describe('every pack is whole on disk', () => {
     expect(checkPack(packByName(name), read)).toEqual([]);
   });
 
-  test('the derived trees fit the budget; linea is forty faces and a back of a few KB each', () => {
+  test('the derived trees fit the budget; linea is forty faces and a back of a few KB each; napoletane eighty JPEGs', () => {
     const files = (dir: string): ReadonlyArray<Readonly<{ path: string; bytes: number }>> =>
       existsSync(resolve(ROOT, dir))
         ? cardIds('italian40')
@@ -55,6 +55,19 @@ describe('every pack is whole on disk', () => {
     expect(linea).toBeGreaterThan(40 * 500);
     expect(linea).toBeLessThan(MAX_PACK_BYTES);
     expect(publicDir('linea')).toBe('web/public/shared/cards/linea');
+    // Napoletane: eighty JPEGs (forty faces at 120 and 240 px) of a few to thirty KB each, and no back.
+    const jpegs = (dir: string): ReadonlyArray<Readonly<{ path: string; bytes: number }>> =>
+      cardIds('italian40')
+        .flatMap((id) => [120, 240].map((w) => `${dir}/italian40/${id}-${String(w)}.jpg`))
+        .filter((p) => existsSync(resolve(ROOT, p)))
+        .map((p) => ({ path: p, bytes: readFileSync(resolve(ROOT, p)).byteLength }));
+    const napoletane = packBytes('napoletane', jpegs);
+    expect(jpegs(publicDir('napoletane'))).toHaveLength(80);
+    expect(napoletane).toBeGreaterThan(80 * 2_000);
+    expect(napoletane).toBeLessThan(MAX_PACK_BYTES);
+    expect(existsSync(resolve(ROOT, 'web/public/shared/cards/napoletane/back-120.jpg'))).toBe(
+      false,
+    );
   });
 
   test('checkPack names what is wrong: a missing file, a wrong size, a rooted URL, a partial or unattributed pack', () => {

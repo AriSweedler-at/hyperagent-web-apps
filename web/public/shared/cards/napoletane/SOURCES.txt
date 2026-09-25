@@ -1,0 +1,8 @@
+# The Napoletane pack's served files (docs/design/card-packs.md §5, §7): derived, not sources.
+# tools/card-packs.ts cut assets/cards/napoletane/sheet.jpg (its provenance and licence in
+# assets/cards/napoletane/SOURCES.txt: Florixc, Wikimedia Commons, public domain, supplied by the
+# owner on 2026-09-25) with `build` (PACK_SOURCES.napoletane: --grid 6, rows D,C,B,S, columns
+# A,2,3,4,5,6,7,F,C,R) into italian40/<id>-120.jpg and <id>-240.jpg, 120 x 208 and 240 x 416,
+# JPEG at 0.86, for device-pixel ratios 1 and 2 (the 338 px cells serve no 3x). No back: the
+# sheet has none, so the default pack's is painted. Re-run the tool rather than editing these;
+# `check` reads every file's frame size back against web/shared/lib/cards/packs/napoletane.ts.
