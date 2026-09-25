@@ -1,0 +1,1731 @@
+/* Briscola's theme (docs/design/briscola.md §5.3, D22; the owner: "subtle but recognizable", the
+   cards as ornate as the pack). The page links web/shared/styles/tokens.css and base.css before this
+   file, and :root below redeclares every one of the thirteen shared names (a partial override would
+   inherit gin's green felt; test/tokens.test.ts holds it). An Italian café: a cream page with a
+   CSS-only linen weave, one espresso panel for the home shell, quiet bottle-green baize for the two
+   table surfaces (the centre band and the hand), terracotta as the one accent (never ink on the
+   felt: 1.3:1), gold as a hairline; Bodoni Moda for the title, the room code and the points, Lora
+   for text. The card box is `--card-w` wide and `--card-w / --aspect` tall; `--aspect` is the chosen
+   pack's, written once on #tableScreen by the pack painter (0.518 for linea, the deck's default);
+   the layout is designed for [0.50, 0.62]. web/games/briscola/src/ui/layout.ts is the pure twin of
+   the clamps, the seat cells and the briscola's rotated box. Prettier formats this file. */
+:root {
+  /* The thirteen shared names, on this game's palette (design §5.3; --go and --go-text: the call
+     to action, docs/ARCHITECTURE.md "Calls to action"). */
+  --bg: #ede3d1;
+  --card: #f7f1e6;
+  --card-2: #e9dfcc;
+  --accent: #a6442b;
+  --accent-dark: #7a2f1d;
+  --gold: #c9a227;
+  --text: #2b1d14;
+  --muted: #6b5a4a;
+  --danger: #b7472a;
+  --go: #a3b070;
+  --go-text: #1f2a12;
+  --radius: 12px;
+  --felt: radial-gradient(ellipse at 50% 35%, #3a6b4f 0%, #2f5842 60%, #244634 100%);
+  /* The game's own tokens: only the ones a rule below reads. */
+  --baize: #2f5842;
+  --baize-edge: #1d3a2b;
+  --panel: linear-gradient(180deg, #4a3529 0%, #3b2a20 60%, #2c1e17 100%);
+  --panel-2: linear-gradient(180deg, #5a4232 0%, #4a3529 100%);
+  --cream: #f7f1e6;
+  --cream-dim: rgba(247, 241, 230, 0.72);
+  --hair: rgba(201, 162, 39, 0.62);
+  --terracotta-pale: #e7c9bb;
+  --card-face: #fbf6ea;
+  --card-edge: rgba(43, 29, 20, 0.18);
+  /* The four print colours of the Italian suits (web/shared/lib/cards/suits.ts): a glyph card's
+     index and the trump badge's hairline. */
+  --suit-C: #c81e1e;
+  --suit-D: #d3a12a;
+  --suit-S: #1d4ed8;
+  --suit-B: #2f7d32;
+  --serif-display: 'Bodoni Moda', 'GFS Didot', 'Didot', 'Bodoni MT', Georgia, serif;
+  --serif-text: 'Lora', 'Cardo', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  /* Off the table (the last-trick sheet, the history rows) cards draw at these; #tableScreen sets
+     its own from the viewport. --back and --back-colour are the pack's, written by the pack painter
+     (web/shared/ui/cardFace.ts backImageCss); until then a back is a plain baize-edge field. */
+  --aspect: 0.518;
+  --card-w: 72px;
+  --mid-w: 56px;
+  --tiny-w: 26px;
+  --back: none;
+  --back-colour: var(--baize-edge);
+}
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+html,
+body {
+  padding: 0;
+  min-height: 100%;
+  /* The linen (design §5.3): the cream with a faint weave drawn by two repeating gradients at 3%
+     alpha, a 4px period each way; CSS only, so smoke's request check sees only the fonts. */
+  background-color: var(--bg);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(43, 29, 20, 0.03) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgba(43, 29, 20, 0.03) 0 1px, transparent 1px 4px);
+  color: var(--text);
+  font-family: var(--serif-text);
+  overscroll-behavior-y: contain;
+}
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+}
+/* The trim (backgammon's rule in this palette): a quiet baize-edge band along the viewport's edge
+   with a gold hairline on its inner side, fixed and inert, at z-index 0 under every positioned
+   thing (overlays 50, flyers 60, the toast 100) and away from every control (#app's gutters). */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border: 6px solid var(--baize-edge);
+  box-shadow: inset 0 0 0 1px var(--gold);
+}
+@media (min-width: 900px) {
+  body::before {
+    border-width: 10px;
+  }
+  #app {
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+}
+/* Bodoni Moda for the title, the room code and the points only (design D22); Lora everywhere else. */
+h1 {
+  font-family: var(--serif-display);
+  font-weight: 400;
+  font-size: 2.1rem;
+  line-height: 1.1;
+  margin: 10px 0 0;
+  text-align: center;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+.masthead {
+  margin: 4px 0 14px;
+}
+.subtitle {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  margin: 4px 0 14px;
+}
+.masthead .subtitle {
+  letter-spacing: 0.06em;
+  font-style: italic;
+}
+/* The panel (design §5.3): every box of the home shell (the Play panel's cards, the resume box, the
+   waiting rooms, the match-over screen) in espresso with a gold hairline inset and cream text; the
+   tab bar and the mode switch below wear the same. */
+.card-box {
+  background: var(--panel);
+  color: var(--cream);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow:
+    inset 0 0 0 1px var(--hair),
+    0 8px 22px rgba(44, 30, 23, 0.28);
+}
+.card-box label,
+.card-box .field-label,
+.card-box .empty-note,
+.card-box .sheet-sub,
+.card-box .muted,
+.card-box summary {
+  color: var(--cream-dim);
+}
+.card-box .room-code {
+  color: var(--cream);
+}
+.card-box input[type='text'],
+.card-box input[type='number'],
+.card-box select,
+.card-box textarea {
+  border-color: rgba(201, 162, 39, 0.4);
+}
+.card-box .score-row {
+  background: var(--cream);
+  color: var(--text);
+}
+/* Keyboard focus on the panel: the terracotta ring would vanish into the espresso, so it is gold. */
+#app
+  :is(.tabbar, .mode-switch, .card-box)
+  :is(.btn, .tab-btn, .mode-btn, button, summary):focus-visible {
+  outline-color: var(--gold);
+}
+/* A game in progress: the resume box wears a stronger gold hairline than its neighbours. */
+.card-box.resume {
+  box-shadow:
+    inset 0 0 0 2px var(--gold),
+    0 8px 22px rgba(44, 30, 23, 0.28);
+}
+.card-box.centered,
+.centered {
+  text-align: center;
+}
+.card-box > label + *,
+.card-box > label + .row {
+  margin-top: 8px;
+}
+.card-box > .row + .row,
+.card-box > .row + .field,
+.card-box > .field + .row,
+.card-box > .row + details,
+.card-box > .field + details {
+  margin-top: 10px;
+}
+.card-box.prose p {
+  margin: 0 0 12px;
+  line-height: 1.5;
+  font-size: 0.98rem;
+}
+.card-box.prose p:last-child {
+  margin-bottom: 0;
+}
+/* House rules (design D3): the four switches folded under a native <details>, no TS state. */
+.house-rules {
+  margin-top: 10px;
+}
+.house-rules summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 6px 2px;
+  border-radius: 8px;
+}
+.house-rules[open] summary {
+  margin-bottom: 8px;
+}
+.house-rules .field + .check-row {
+  margin-top: 10px;
+}
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 2px;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  color: var(--cream);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  cursor: pointer;
+}
+.check-row input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  flex-shrink: 0;
+  accent-color: var(--go);
+}
+/* ---------- buttons, inputs, small chrome ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 14px 18px;
+  min-height: 54px;
+  transition:
+    transform 0.08s ease,
+    filter 0.15s ease;
+  user-select: none;
+  color: var(--text);
+}
+.btn:active {
+  transform: scale(0.96);
+  filter: brightness(0.95);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+/* The primary button a step lighter than the panel, with the same hairline, cream text (10.2:1). */
+.btn-primary {
+  background: var(--panel-2);
+  color: var(--cream);
+  width: 100%;
+  font-size: 1.1rem;
+  box-shadow:
+    inset 0 0 0 1px var(--hair),
+    0 6px 16px rgba(44, 30, 23, 0.28);
+}
+.btn-primary:hover:not(:active) {
+  filter: brightness(1.08);
+}
+/* The call to action (docs/ARCHITECTURE.md "Calls to action"): Open a table, Sit down, Start, Next
+   game and Rematch in the shared --go with the page's ink; on the cream (1.8:1) an olive hairline and
+   the primary's shadow give it its edge, backgammon's answer. */
+.btn-go {
+  background: var(--go);
+  color: var(--go-text);
+  font-size: 1.1rem;
+  box-shadow:
+    inset 0 0 0 1px rgba(95, 113, 51, 0.6),
+    0 6px 16px rgba(44, 30, 23, 0.28);
+}
+.btn-go:hover:not(:active) {
+  filter: brightness(1.06);
+}
+/* Secondary buttons are cream: a step lighter than the linen, a fill on the panel and the baize. In
+   a sheet (already the card colour) they take the darker card tone. */
+.btn-secondary {
+  background: var(--cream);
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+}
+.sheet .btn-secondary {
+  background: var(--card-2);
+  box-shadow: none;
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid rgba(43, 29, 20, 0.18);
+}
+.card-box .btn-ghost,
+.overlay.curtain .btn-ghost {
+  color: var(--cream-dim);
+  border-color: rgba(247, 241, 230, 0.3);
+}
+.btn-block {
+  width: 100%;
+}
+.btn-sm {
+  padding: 10px 12px;
+  min-height: 44px;
+  font-size: 0.9rem;
+}
+.row .btn {
+  white-space: nowrap;
+}
+#localBtn,
+.card-box + .btn-block {
+  margin-bottom: 4px;
+}
+input[type='text'],
+input[type='number'],
+select,
+textarea {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: var(--radius);
+  background: var(--cream);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 400;
+  outline: none;
+  border: 1px solid rgba(43, 29, 20, 0.14);
+  min-height: 48px;
+}
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 55%,
+    calc(100% - 13px) 55%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 34px;
+}
+input::placeholder {
+  color: var(--muted);
+  font-weight: 400;
+}
+label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.field-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding-left: 2px;
+}
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.row + .row,
+.row + .btn {
+  margin-top: 10px;
+}
+.row.tight {
+  gap: 6px;
+}
+.row.between {
+  justify-content: space-between;
+}
+.grow {
+  flex: 1;
+}
+.icon-btn {
+  background: var(--cream);
+  border: none;
+  color: var(--text);
+  border-radius: var(--radius);
+  width: 44px;
+  height: 44px;
+  font-size: 1.1rem;
+  font-family: inherit;
+  flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+}
+.code-input {
+  text-align: center;
+  letter-spacing: 0.4em;
+  font-size: 1.5rem !important;
+  text-transform: uppercase;
+  font-family: var(--serif-display);
+}
+.room-code {
+  font-family: var(--serif-display);
+  font-size: 3rem;
+  letter-spacing: 0.3em;
+  text-align: center;
+  color: var(--accent);
+  font-weight: 400;
+  padding-left: 0.3em;
+  margin: 6px 0 10px;
+}
+.empty-note {
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: center;
+  padding: 8px 0 0;
+  line-height: 1.4;
+}
+.empty-note.left {
+  text-align: left;
+  padding: 8px 2px 0;
+}
+.muted {
+  color: var(--muted);
+}
+.pulse {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--cream);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 0 12px;
+  height: 32px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+}
+.badge.dim {
+  color: var(--muted);
+}
+/* The trump badge (design §5.2): the suit's symbol from the sprite, its Italian name, and a hairline
+   in the suit's print colour on the left (`s-<suit>`, the painter's template; the shape carries the
+   information, the colour is decoration). */
+.badge.trump {
+  padding-left: 10px;
+}
+.badge.trump::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--suit-ink, var(--card-edge));
+  flex-shrink: 0;
+}
+.badge.trump .suit {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.badge.trump.s-coppe {
+  --suit-ink: var(--suit-C);
+}
+.badge.trump.s-denari {
+  --suit-ink: var(--suit-D);
+}
+.badge.trump.s-spade {
+  --suit-ink: var(--suit-S);
+}
+.badge.trump.s-bastoni {
+  --suit-ink: var(--suit-B);
+}
+.conn-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #b3a693;
+  flex-shrink: 0;
+}
+.conn-dot.on {
+  background: #5f7133;
+}
+.conn-dot.off {
+  background: var(--danger);
+}
+:is(.btn, .icon-btn, .tab-btn, .mode-btn, .pile-peek, .card, .slot, summary):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+/* On the baize the accent is 1.3:1, so the ring there is cream. */
+:is(.table-center, .hand-area) :is(.card, .slot, .btn, .pile-peek):focus-visible {
+  outline-color: var(--cream);
+}
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* ---------- top tabs and the mode switch (gin's shapes on the espresso panel) ---------- */
+.tabbar {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 16px;
+  background: var(--panel);
+  color: var(--cream);
+  border-radius: var(--radius);
+  padding: 4px;
+  box-shadow:
+    inset 0 0 0 1px var(--hair),
+    0 8px 22px rgba(44, 30, 23, 0.28);
+}
+.tab-wrap {
+  position: relative;
+  flex: 1.2;
+  display: flex;
+}
+.tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--cream-dim);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 11px 6px;
+  min-height: 44px;
+  border-radius: 9px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* The open tab: cream with the gold underline. */
+.tab-btn.active {
+  background: var(--cream);
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--gold);
+}
+.tab-wrap .tab-btn::after {
+  content: ' \25BE';
+  opacity: 0.55;
+  font-size: 0.8em;
+}
+.tab-panel.hidden {
+  display: none !important;
+}
+.tab-submenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  z-index: 30;
+  background: var(--panel);
+  color: var(--cream);
+  border: none;
+  border-radius: var(--radius);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow:
+    inset 0 0 0 1px var(--hair),
+    0 10px 26px rgba(44, 30, 23, 0.35);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.12s,
+    transform 0.12s;
+}
+.tab-submenu::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 8px;
+}
+.tab-submenu.force-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+@media (hover: hover) {
+  .tab-wrap:hover .tab-btn:not(.active) + .tab-submenu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+  .tab-submenu button:hover {
+    background: rgba(247, 241, 230, 0.12);
+    color: var(--cream);
+  }
+}
+.tab-submenu button {
+  background: transparent;
+  border: none;
+  color: var(--cream-dim);
+  font-family: inherit;
+  text-align: left;
+  padding: 11px 12px;
+  border-radius: 9px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tab-submenu button.active {
+  background: var(--cream);
+  color: var(--text);
+}
+/* With the Play panel open and its mode switch shown the tab bar flows into the switch. */
+.tabbar:has(+ #playPanel:not(.hidden) > .mode-switch:not(.hidden)) {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow:
+    inset 1px 1px 0 var(--hair),
+    inset -1px 0 0 var(--hair),
+    0 8px 22px rgba(44, 30, 23, 0.28);
+}
+.mode-switch {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 4px;
+  background: var(--panel);
+  color: var(--cream);
+  border-top: 1px solid rgba(201, 162, 39, 0.35);
+  border-radius: 0 0 var(--radius) var(--radius);
+  box-shadow:
+    inset 0 0 0 1px var(--hair),
+    0 8px 22px rgba(44, 30, 23, 0.28);
+}
+.mode-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--cream-dim);
+  font-family: inherit;
+  font-weight: 700;
+  padding: 9px 6px;
+  min-height: 44px;
+  border-radius: 9px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mode-btn.active {
+  background: var(--cream);
+  color: var(--text);
+}
+.rules-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rules-list li {
+  font-size: 0.92rem;
+  line-height: 1.45;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+}
+#rulesOverlay .rules-list li {
+  background: var(--card-2);
+  box-shadow: none;
+}
+.rules-list li strong {
+  color: var(--accent);
+}
+/* Glossary links (docs/design/glossary-links.md; web/shared/ui/glossary.ts writes them): jargon is a
+   link to its rule, a dotted hairline in the accent; the rule it lands on flashes once. */
+.jargon {
+  color: var(--accent);
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+/* On the espresso panel (the About copy) the accent is lost, so a link there is cream with a gold hairline. */
+.card-box .jargon {
+  color: var(--cream);
+  text-decoration-color: var(--gold);
+}
+.rule-flash {
+  animation: rule-flash 1.2s ease-out;
+}
+@keyframes rule-flash {
+  from {
+    background-color: rgba(166, 68, 43, 0.18);
+  }
+}
+
+/* ---------- overlays and sheets ---------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(43, 29, 20, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+/* The curtain (design §5.4): the terracotta dark at 78%, the table readable beneath, the hand face down. */
+.overlay.curtain {
+  background: rgba(122, 47, 29, 0.78);
+}
+.overlay.curtain .sheet {
+  background: var(--panel);
+  color: var(--cream);
+  box-shadow:
+    inset 0 0 0 1px var(--hair),
+    0 18px 48px rgba(44, 30, 23, 0.45);
+}
+.overlay.curtain .sheet-sub,
+.overlay.curtain .empty-note {
+  color: var(--cream-dim);
+}
+.sheet {
+  background: var(--card);
+  border-radius: 20px;
+  padding: 22px 18px;
+  max-width: 420px;
+  width: 100%;
+  max-height: 88dvh;
+  overflow-y: auto;
+  box-shadow: 0 18px 48px rgba(44, 30, 23, 0.35);
+}
+.sheet-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-align: center;
+  margin: 4px 0 2px;
+}
+.row .sheet-title {
+  margin: 0;
+  text-align: left;
+}
+.sheet-sub {
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+.sheet .btn-block + .btn-block {
+  margin-top: 8px;
+}
+.sheet .rules-list + .btn,
+.sheet .row + .btn-block,
+.sheet .empty-note + .btn-block,
+.sheet .score-list + .btn-block {
+  margin-top: 14px;
+}
+.score-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.score-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--card-2);
+  font-size: 0.92rem;
+}
+.score-row .who {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+/* The last trick's cards (design §5.1): the fan's rules at the sheet's card size. */
+.trick-cards {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: calc(var(--mid-w) / var(--aspect) + 30px);
+  margin: 10px 0 4px;
+}
+/* The history (docs/design/briscola-sound-history.md §6): one native <details> per event, newest
+   last; the summary is the event's sentence with the actor as `.who`, the detail a <dl> of the
+   cards played, the winner and the points. `data-kind` names the event, `data-value` the trick's
+   value class, so the theme colours a row without any TS toggling a class. Until the shared
+   web/shared/ui/history.ts lands briscola paints these rows itself (src/ui/history.ts). */
+.history {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 60dvh;
+  overflow-y: auto;
+}
+details.history-row {
+  border-bottom: 1px solid rgba(43, 29, 20, 0.08);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+.history-row > summary {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 8px 4px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 8px;
+}
+.history-row > summary::-webkit-details-marker {
+  display: none;
+}
+.history-row > summary::before {
+  content: '\25B8';
+  color: var(--muted);
+  font-size: 0.8em;
+  flex-shrink: 0;
+  transition: transform 0.12s;
+}
+.history-row[open] > summary::before {
+  transform: rotate(90deg);
+}
+.history-row .who {
+  color: var(--muted);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.history-row[data-kind='deal'] > summary,
+.history-row[data-kind='game'] > summary {
+  color: var(--muted);
+  font-style: italic;
+}
+.history-row[data-kind='result'] > summary {
+  font-weight: 700;
+}
+.history-row[data-value='pointless'] > summary {
+  color: var(--muted);
+}
+.history-row[data-value='big'] > summary,
+.history-row[data-value='huge'] > summary {
+  color: var(--accent);
+}
+.history-row[data-value='huge'] > summary {
+  font-weight: 700;
+}
+dl.history-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--card-2);
+  font-size: 0.88rem;
+}
+.history-detail dt {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-top: 2px;
+}
+.history-detail dd {
+  margin: 0;
+}
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(20px);
+  background: var(--accent-dark);
+  color: var(--cream);
+  font-weight: 700;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(44, 30, 23, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s;
+  z-index: 100;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ---------- the table: geometry (design §5.3; src/ui/layout.ts is the twin) ---------- */
+/* At the table the page never scrolls (gin's rule): the card width is a clamp() of the viewport,
+   every row above the hand keeps one height in every phase, and the fallbacks at the end of this
+   file let a short viewport scroll instead of clipping the actions row. */
+body.fixed-screen,
+body.fixed-screen #app {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+#tableScreen {
+  /* Phone: everything that is not a card measures 398px (#app padding 24, topbar 44, seats 86, the
+     centre band's 30px of label and chips, score strip 44, status 22, hand header 24, hand padding
+     14, actions 54, five 8px gaps and the hand area's 16px of padding); the column is that plus a
+     hand card and a mid card (0.62 of one), so the height budget is (100dvh - 560px) * aspect of
+     card width and the width budget three cards in the 334px between the gutters: 111px at
+     390x844 with the deck's 0.518, a 215px card, a 133px mid card, 746px in all (layout.ts
+     cardWidth, columnHeight). --aspect is rewritten by the pack painter from resolveAspect. */
+  --aspect: 0.518;
+  --card-w: clamp(
+    72px,
+    min(calc((100vw - 56px) / 3), calc((100dvh - 560px) * var(--aspect))),
+    124px
+  );
+  --mid-w: calc(var(--card-w) * 0.62);
+  --tiny-w: 26px;
+  --fan-overlap: 0;
+  --fly-ms: 320ms;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto auto 1fr;
+  grid-template-areas:
+    'top'
+    'seats'
+    'center'
+    'score'
+    'status'
+    'hand';
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+#tableScreen > .topbar {
+  grid-area: top;
+}
+#tableScreen > .seats {
+  grid-area: seats;
+}
+#tableScreen > .table-center {
+  grid-area: center;
+}
+#tableScreen > .score-strip {
+  grid-area: score;
+}
+#tableScreen > .status-line {
+  grid-area: status;
+}
+#tableScreen > .hand-area {
+  grid-area: hand;
+}
+/* The fan's overlap by seat count (design §5.1): none at two, .35 of a card at three, .45 at four
+   (the design's .6 leaves a 28px strip per card, too narrow for its chip; .45 leaves 38px). */
+#trick[data-players='3'] {
+  --fan-overlap: 0.35;
+}
+#trick[data-players='4'] {
+  --fan-overlap: 0.45;
+}
+
+/* ---------- the topbar ---------- */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+}
+.topbar .badges {
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+}
+.topbar .badge {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The game badge is text alone, so it is a block that can ellipsise (a flex box cannot). */
+.topbar .badge.dim {
+  display: block;
+  line-height: 32px;
+}
+.topbar .badge.trump {
+  flex-shrink: 0;
+}
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ---------- the seats row (design §5.3: a three-column grid, one height at every count) ---------- */
+.seats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-areas: 'left top right';
+  height: 86px;
+  align-items: start;
+}
+.seat {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    'name dot'
+    'cards taken';
+  justify-content: center;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 6px;
+  min-width: 0;
+  padding: 2px 4px;
+}
+.seat[hidden] {
+  display: none;
+}
+.seat[data-pos='left'] {
+  grid-area: left;
+}
+.seat[data-pos='top'] {
+  grid-area: top;
+}
+.seat[data-pos='right'] {
+  grid-area: right;
+}
+.seat-name {
+  grid-area: name;
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 20px;
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  position: relative;
+}
+.seat .conn-dot {
+  grid-area: dot;
+}
+.seat .conn-dot[hidden] {
+  display: none;
+}
+/* Whose turn: a terracotta disc before the name, pulsing (on the cream the accent reads 4.7:1). */
+.seat.to-move .seat-name::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 6px;
+  vertical-align: 2px;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.seat.gone .seat-name {
+  color: var(--muted);
+  font-style: italic;
+}
+.seat-cards {
+  grid-area: cards;
+  display: flex;
+  align-items: flex-start;
+  min-height: calc(var(--tiny-w) / var(--aspect));
+  min-width: var(--tiny-w);
+}
+.seat-cards .card + .card {
+  margin-left: -10px;
+}
+/* The tricks taken ("2 tricks", table.ts tricksText) beside the backs; nothing to say at 0. */
+.seat-taken {
+  grid-area: taken;
+  align-self: end;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 16px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.seat-taken[data-count='0'] {
+  visibility: hidden;
+}
+
+/* ---------- the centre band: the stock with the briscola under it, the trick fan ---------- */
+.table-center {
+  height: calc(var(--mid-w) / var(--aspect) + 30px);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px 0;
+  background: var(--felt);
+  border-radius: var(--radius);
+  box-shadow:
+    inset 0 0 0 1px var(--baize-edge),
+    inset 0 0 24px rgba(0, 0, 0, 0.18);
+  color: var(--cream);
+  position: relative;
+}
+/* Room for the stock and the briscola's protruding half: the stock's width plus 0.55 of it plus half
+   the card's height (layout.ts briscolaBox); the label sits in the 30px beneath. */
+.stock-area {
+  position: relative;
+  width: calc(var(--mid-w) * 1.05 + var(--mid-w) / var(--aspect) / 2);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.stock {
+  position: relative;
+  z-index: 1;
+}
+/* Three cards' thickness as two shadow offsets, no extra elements. */
+.stock .card.back {
+  box-shadow:
+    2px 2px 0 var(--card-face),
+    2px 2px 0 1px var(--card-edge),
+    4px 4px 0 var(--card-face),
+    4px 4px 0 1px var(--card-edge),
+    0 1px 2px rgba(0, 0, 0, 0.25);
+}
+/* Only the briscola left (or the stock out): #stock holds no card, so the box itself keeps a mid
+   card's size as a dashed outline in the cream, and nothing shifts. */
+.stock.empty {
+  width: var(--mid-w);
+  height: calc(var(--mid-w) / var(--aspect));
+  border: 2px dashed var(--cream-dim);
+  border-radius: calc(var(--mid-w) * 0.08);
+}
+/* The briscola (design §5.3, T3): the trump card lies across, half under the stock, its outer half
+   visible; rotated about its centre and slid 0.55 of a card width outward, at z-index 0 to the
+   stock's 1; the box stays when the card is gone so nothing shifts. */
+.briscola {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: var(--mid-w);
+  height: calc(var(--mid-w) / var(--aspect));
+  transform: rotate(90deg) translate(0, calc(var(--mid-w) * -0.55));
+  transition: transform var(--fly-ms) cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.briscola.gone {
+  visibility: hidden;
+}
+/* The exchange (design §5.4): the trump card is tappable, a cream glow says so. */
+.briscola.tappable .card {
+  cursor: pointer;
+  box-shadow:
+    0 0 0 3px var(--cream-dim),
+    0 1px 2px rgba(0, 0, 0, 0.25);
+  animation: tappable 1.6s ease-in-out infinite;
+}
+@keyframes tappable {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px var(--cream-dim),
+      0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px rgba(247, 241, 230, 0.35),
+      0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+}
+.pile-label {
+  color: var(--cream-dim);
+  font-size: 0.78rem;
+  line-height: 16px;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+}
+/* The trick fan (design §5.3): a flex row centred in what the band leaves right of the stock; card
+   i (`--i`, inline) overlaps by --fan-overlap of a card from the second on, rises in z, and its card
+   tilts 4° per step about the fan's middle (`--n`, the count, which the container reads off its
+   own children with :has(), so the painter writes only `--i`). The tilt is the card's, not the
+   wrapper's, so the `.who` chip hanging beneath stays in a straight row. `.who` is also the actor's
+   name in a history row and a score row, so the chip's rules are the fan's alone. */
+.trick {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  height: calc(var(--mid-w) / var(--aspect) + 24px);
+  min-width: 0;
+  border-radius: var(--radius);
+  position: relative;
+}
+.trick,
+.trick-cards {
+  --n: 1;
+}
+:is(.trick, .trick-cards):has(> .play:nth-child(2):last-child) {
+  --n: 2;
+}
+:is(.trick, .trick-cards):has(> .play:nth-child(3):last-child) {
+  --n: 3;
+}
+:is(.trick, .trick-cards):has(> .play:nth-child(4):last-child) {
+  --n: 4;
+}
+.trick:empty::before {
+  content: attr(data-lead);
+  align-self: center;
+  color: var(--cream-dim);
+  font-style: italic;
+  font-size: 0.95rem;
+}
+.play {
+  position: relative;
+  flex-shrink: 0;
+  z-index: calc(1 + var(--i, 0));
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+.play .card {
+  transform: rotate(calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * 4deg));
+}
+.play + .play {
+  margin-left: calc(var(--mid-w) * var(--fan-overlap) * -1);
+}
+.trick-cards .play + .play {
+  margin-left: 0;
+}
+.play .who {
+  position: absolute;
+  left: 50%;
+  bottom: -22px;
+  transform: translateX(-50%);
+  background: var(--baize-edge);
+  color: var(--cream);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  max-width: 9ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Under an overlapped card only its left strip shows, so its chip centres under that strip and is
+   no wider than it; the last card's chip centres under the whole card. */
+.play:not(:last-child) .who {
+  left: calc(var(--mid-w) * (1 - var(--fan-overlap)) / 2);
+  max-width: min(9ch, calc(var(--mid-w) * (1 - var(--fan-overlap)) - 2px));
+}
+.trick-cards .who {
+  background: var(--card-2);
+  color: var(--text);
+}
+/* The hold beat: the winning card lifts with a cream outline, the others dim. */
+.play .card.taking {
+  transform: translateY(-6px) rotate(calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * 4deg));
+  box-shadow:
+    0 0 0 3px var(--cream),
+    0 8px 16px rgba(0, 0, 0, 0.35);
+}
+:is(.trick, .trick-cards):has(.taking) .card:not(.taking) {
+  opacity: 0.8;
+}
+/* A hand card in the air over the band (design §5.4): a dashed cream outline, brighter when it may drop. */
+.trick.drop-ready {
+  outline: 2px dashed var(--cream-dim);
+  outline-offset: -6px;
+}
+.trick.drop {
+  outline-color: var(--cream);
+  outline-style: solid;
+}
+/* The desktop's round peek at the band's right (the phone has #lastTrickSheetBtn in the actions). */
+.pile-peek {
+  align-self: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(247, 241, 230, 0.16);
+  color: var(--cream);
+  font-size: 1.1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.pile-peek:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ---------- the score strip (design D9, §5.3): live and public, a cell per player or per team ---------- */
+.score-strip {
+  display: flex;
+  gap: 8px;
+  height: 44px;
+}
+.score-cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.sc-name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.sc-points {
+  font-family: var(--serif-display);
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  padding: 2px 0;
+}
+.sc-tricks {
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* Three cells across a phone: the tricks count goes, the points stay. */
+@media (max-width: 899px) {
+  .score-strip:has(> :nth-child(3)) .sc-tricks {
+    display: none;
+  }
+  .score-strip:has(> :nth-child(3)) .score-cell {
+    padding: 0 8px;
+    gap: 6px;
+  }
+}
+/* The leading side: its points in the accent (4.7:1 on the cream) with a gold underline. */
+.score-cell.leading .sc-points {
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--gold);
+}
+/* My own (or my team's) cell: a terracotta hairline on the left. */
+.score-cell.mine {
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    inset 0 0 0 1px var(--card-edge);
+}
+.status-line {
+  text-align: center;
+  height: 22px;
+  line-height: 22px;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 6px;
+}
+
+/* ---------- the hand area (design §5.3): the baize panel, three slots, the actions row ---------- */
+.hand-area {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 4px;
+  background: var(--felt);
+  border-radius: var(--radius);
+  box-shadow:
+    inset 0 0 0 1px var(--baize-edge),
+    inset 0 0 24px rgba(0, 0, 0, 0.18);
+  color: var(--cream);
+}
+.hand-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 24px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+.my-taken {
+  color: var(--cream-dim);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+/* Exactly three slots (design §5.4): a played card's slot stays where it was and the other two never
+   move; the slack of a tall phone gathers around the cards. */
+.hand {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, var(--card-w));
+  grid-auto-rows: calc(var(--card-w) / var(--aspect));
+  gap: 0 12px;
+  justify-content: center;
+  align-content: center;
+  padding: 14px 0 0;
+  min-height: calc(var(--card-w) / var(--aspect) + 14px);
+}
+.slot {
+  position: relative;
+  width: var(--card-w);
+  height: calc(var(--card-w) / var(--aspect));
+  border-radius: calc(var(--card-w) * 0.08);
+}
+.slot.empty::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px dashed var(--cream-dim);
+  opacity: 0.6;
+}
+.hand.inert {
+  pointer-events: none;
+}
+.hand.active .card {
+  cursor: pointer;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 54px;
+  margin-top: 8px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.actions .btn {
+  white-space: nowrap;
+}
+.actions .btn-primary {
+  width: auto;
+}
+.waiting-note {
+  flex: 1;
+  color: var(--cream-dim);
+  font-size: 0.9rem;
+  font-style: italic;
+  text-align: left;
+  padding-left: 6px;
+}
+
+/* ---------- cards (design §5.3; the markup is web/shared/ui/cardFace.ts's) ---------- */
+/* Every card dimension derives from --card-w and the pack's --aspect; font-size is --card-w so a
+   glyph's index and symbol size themselves in em. The picture, when the pack has one, is the box's
+   own inline background-image, so nothing here names a file. */
+.card {
+  position: relative;
+  width: var(--card-w);
+  height: calc(var(--card-w) / var(--aspect));
+  font-size: var(--card-w);
+  border-radius: calc(var(--card-w) * 0.08);
+  background-color: var(--card-face);
+  color: var(--text);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.25),
+    0 0 0 1px var(--card-edge);
+  flex-shrink: 0;
+  user-select: none;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+/* A picture face: the pack's picture fills the content box; `--face-inset` (inline, the pack's) pads
+   a scan that was trimmed to its printed area so it gets a margin back. */
+.card.face {
+  background-origin: content-box;
+  background-clip: border-box;
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  padding: calc(var(--card-w) * var(--face-inset, 0));
+}
+/* A glyph face: the rank's index in two corners, one suit symbol from the sprite in the middle. */
+.card.glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card .rank {
+  position: absolute;
+  top: 0.05em;
+  left: 0.08em;
+  font-family: var(--serif-text);
+  font-size: 0.26em;
+  font-weight: 800;
+  line-height: 1;
+}
+.card .rank.br {
+  top: auto;
+  left: auto;
+  bottom: 0.05em;
+  right: 0.08em;
+  transform: rotate(180deg);
+}
+.card.glyph .suit {
+  width: 60%;
+  height: 62%;
+}
+.card.glyph.suit-C .rank {
+  color: var(--suit-C);
+}
+.card.glyph.suit-D .rank {
+  color: var(--suit-D);
+}
+.card.glyph.suit-S .rank {
+  color: var(--suit-S);
+}
+.card.glyph.suit-B .rank {
+  color: var(--suit-B);
+}
+/* A back: the pack's picture (--back, one picture at every size) over its own colour; a French back
+   on an Italian table is painted cover, cropping its sides rather than stretching (design D13). */
+.card.back {
+  background-color: var(--back-colour);
+  background-image: var(--back);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.card.mid {
+  --card-w: var(--mid-w);
+}
+.card.tiny {
+  --card-w: var(--tiny-w);
+}
+.card.playable {
+  cursor: pointer;
+}
+/* Lifted (gin's gesture): 12px up with the terracotta ring; the ring reads against the ivory card. */
+.card.selected {
+  transform: translateY(-12px);
+  box-shadow:
+    0 0 0 3px var(--accent),
+    0 8px 16px rgba(0, 0, 0, 0.35);
+}
+.card.arriving {
+  visibility: hidden;
+}
+.card.dragging {
+  opacity: 0.35;
+}
+/* Under the curtain (design §5.4) the hand paints backs: the pack's back over the inline picture. */
+.hand.hidden-cards .card {
+  background-image: var(--back) !important;
+  background-color: var(--back-colour);
+  background-origin: border-box;
+  background-size: cover;
+  padding: 0;
+}
+.hand.hidden-cards .card .rank,
+.hand.hidden-cards .card .suit {
+  visibility: hidden;
+}
+/* Flights (src/ui/table/fly.ts) and the drag's ghost (web/shared/edge/drag.ts): fixed, inert, over everything but the toast. */
+.flyer {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  transition: transform var(--fly-ms) cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.drag-ghost {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+}
+.drag-ghost.landing {
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+#hand .card {
+  touch-action: none;
+}
+
+/* ---------- the endgame (design §5.1 "Bravi!") ---------- */
+#endgameScreen h1 {
+  margin-bottom: 14px;
+}
+.desk-only {
+  display: none;
+}
+
+/* ---------- the desktop (design §5.1): a wider column, the score strip a column beside the band ---------- */
+@media (min-width: 900px) {
+  body.fixed-screen #app {
+    max-width: 1000px;
+  }
+  #tableScreen {
+    /* Everything that is not a card measures 362px here; the height budget is (100dvh - 522px) *
+       aspect of card width, capped at 132px (a 255px card, a 158px mid card): 775px in all at
+       1280x800 (layout.ts). */
+    --card-w: clamp(80px, calc((100dvh - 522px) * var(--aspect)), 132px);
+    --tiny-w: 30px;
+    grid-template-columns: minmax(0, 1fr) 200px;
+    grid-template-areas:
+      'top top'
+      'seats seats'
+      'center score'
+      'status status'
+      'hand hand';
+  }
+  .seats {
+    height: 96px;
+    grid-template-columns: 1fr 2fr 1fr;
+  }
+  .seat-name {
+    max-width: 18ch;
+  }
+  .table-center {
+    padding: 0 16px;
+    gap: 16px;
+  }
+  .score-strip {
+    flex-direction: column;
+    height: auto;
+    justify-content: center;
+  }
+  .score-cell {
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+  }
+  .hand {
+    gap: 0 16px;
+  }
+  .desk-only {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* ---------- motion (design §5.3) ---------- */
+@media (prefers-reduced-motion: reduce) {
+  #tableScreen {
+    --fly-ms: 1ms;
+  }
+  .pulse,
+  .seat.to-move .seat-name::before,
+  .briscola.tappable .card,
+  .rule-flash {
+    animation: none;
+  }
+  .card,
+  .play,
+  .briscola,
+  .flyer,
+  .drag-ghost.landing,
+  .tab-submenu,
+  #toast {
+    transition-duration: 1ms;
+  }
+}
+
+/* ---------- short viewports ---------- */
+/* With --card-w floored at 72px the phone column is 623px (layout.ts columnHeight at the floor);
+   below that the document scrolls instead of clipping the actions row (touch-action: none stays
+   scoped to the hand's cards, so the page can still be scrolled from the table). */
+@media (max-height: 622px) and (max-width: 899px) {
+  body.fixed-screen,
+  body.fixed-screen #app {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  body.fixed-screen #app {
+    min-height: 100dvh;
+  }
+  #tableScreen {
+    overflow: visible;
+  }
+}
+/* The desktop floors at 80px cards (612px); shorter windows scroll too. */
+@media (max-height: 611px) and (min-width: 900px) {
+  body.fixed-screen,
+  body.fixed-screen #app {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  body.fixed-screen #app {
+    min-height: 100dvh;
+  }
+  #tableScreen {
+    overflow: visible;
+  }
+}
