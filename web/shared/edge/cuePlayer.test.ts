@@ -6,8 +6,9 @@
 // and the wiring of its key beside its fx.ts.
 import { describe, expect, test } from 'vitest';
 
-import type { CueSpec as LibCueSpec, SoundCue } from '../lib/sound/cues.ts';
-import { fontByName, resolveSound, type SoundFontName } from '../lib/sound/fonts.ts';
+import { SHELL_CUES, type CueId, type CueSpec as LibCueSpec } from '../lib/sound/cues.ts';
+import { fontByName, resolveCue, resolveSound, type SoundFontName } from '../lib/sound/fonts.ts';
+import { PHRASE_GAP_MS, joinBuzz, phraseMs, type Phrase } from '../lib/sound/phrase.ts';
 import { createCuePlayer, type CueSpec, type SoundState } from './cuePlayer.ts';
 import type { AudioCues, Note, OscillatorType } from './fx.ts';
 import { createSampleCache } from './sound.ts';
@@ -29,8 +30,8 @@ const fakeAudio = (initial = true): Readonly<{ audio: AudioCues; calls: Call[] }
     tone: (freq, start, dur, type, gain) => {
       calls.push(['tone', freq, start, dur, type, gain]);
     },
-    seq: (notes: ReadonlyArray<Note>, type?: OscillatorType, gain?: number) => {
-      calls.push(['seq', notes, type, gain]);
+    seq: (notes: ReadonlyArray<Note>, type?: OscillatorType, gain?: number, start?: number) => {
+      calls.push(['seq', notes, type, gain, start]);
     },
     warm: () => {
       calls.push(['warm']);
@@ -71,10 +72,10 @@ const world = (
   return { player, calls, buzzes, toggles, persisted };
 };
 
-/** What a font says a synth cue sounds like, as the audio edge receives it. */
-const seqOf = (font: SoundFontName, cue: SoundCue): Call => {
+/** What a font says a synth cue sounds like, as the audio edge receives it: a row plays at 0. */
+const seqOf = (font: SoundFontName, cue: CueId): Call => {
   const sound = resolveSound(fontByName(font), cue);
-  return sound.kind === 'synth' ? ['seq', sound.notes, sound.voice, sound.gain] : ['not synth'];
+  return sound.kind === 'synth' ? ['seq', sound.notes, sound.voice, sound.gain, 0] : ['not synth'];
 };
 
 describe('createCuePlayer', () => {
@@ -129,5 +130,91 @@ describe('createCuePlayer', () => {
     expect(buzzes).toEqual([CUES.tap.buzz]);
     player.warm();
     expect(calls.at(-1)).toEqual(['warm']);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Phrases (docs/design/sound-fonts.md §2.2): a long row, a run, and the warm over a font
+// ---------------------------------------------------------------------------------------------
+type Long = 'steal' | 'result';
+const LONG: Readonly<Record<Long | 'tap', Phrase>> = {
+  tap: SHELL_CUES.tap,
+  // A qualified two-step row: the arcade font voices neither leaf, so the walk lands on its base cues.
+  steal: { steps: [{ cue: 'good.trick.steal' }, { cue: 'score', gapMs: 40 }], buzz: [30, 40, 30] },
+  result: SHELL_CUES.win,
+};
+
+const longWorld = (): Readonly<{
+  player: ReturnType<typeof createCuePlayer<Long>>;
+  calls: Call[];
+  buzzes: unknown[];
+}> => {
+  const { audio, calls } = fakeAudio(true);
+  const buzzes: unknown[] = [];
+  const player = createCuePlayer<Long>({
+    audio,
+    sound: {
+      fetchBuffer: () => Promise.reject(new Error('no samples here')),
+      cache: createSampleCache(),
+    },
+    vibrate: (pattern) => buzzes.push(pattern),
+    cues: LONG,
+    persist: () => undefined,
+    onToggle: () => undefined,
+  });
+  return { player, calls, buzzes };
+};
+
+/** A font's synth cue as a `seq` call at an offset (seconds). */
+const seqAt = (font: SoundFontName, cue: CueId, start: number): Call => {
+  const sound = resolveSound(fontByName(font), cue);
+  return sound.kind === 'synth'
+    ? ['seq', sound.notes, sound.voice, sound.gain, start]
+    : ['not synth'];
+};
+
+describe('createCuePlayer over phrases', () => {
+  test('a two-step row books its second step after the first`s declared length plus the gap; the buzz is the row`s', () => {
+    const { player, calls, buzzes } = longWorld();
+    player.play('steal', 'arcade');
+    const first = resolveCue(fontByName('arcade'), 'good.trick.steal');
+    expect(calls).toEqual([
+      seqAt('arcade', 'good', 0),
+      seqAt('arcade', 'score', (first.ms + 40) / 1000),
+    ]);
+    expect(buzzes).toEqual([[30, 40, 30]]);
+  });
+
+  test('playPhrases runs phrases PHRASE_GAP_MS apart with one joined vibrate; an empty run plays nothing', () => {
+    const { player, calls, buzzes } = longWorld();
+    player.playPhrases([LONG.steal, LONG.result], 'default');
+    const font = fontByName('default');
+    const stealMs = phraseMs(font, LONG.steal);
+    const at = (stealMs + PHRASE_GAP_MS) / 1000;
+    expect(calls).toEqual([
+      seqAt('default', 'good', 0),
+      seqAt('default', 'score', (resolveCue(font, 'good').ms + 40) / 1000),
+      seqAt('default', 'victory', at),
+    ]);
+    expect(buzzes).toEqual([
+      joinBuzz([
+        { buzz: [30, 40, 30], atMs: 0 },
+        { buzz: SHELL_CUES.win.buzz, atMs: stealMs + PHRASE_GAP_MS },
+      ]),
+    ]);
+    player.playPhrases([], 'default');
+    expect(calls).toHaveLength(3);
+    expect(buzzes).toHaveLength(1);
+  });
+
+  test('warm(font) warms the context and the table`s samples in that font (none in the shipped fonts); disabled, nothing', () => {
+    const { player, calls } = longWorld();
+    player.warm('arcade');
+    expect(calls).toEqual([['warm']]);
+    player.warm();
+    expect(calls).toEqual([['warm'], ['warm']]);
+    const off = world(false);
+    off.player.warm('arcade');
+    expect(off.calls).toEqual([]);
   });
 });
