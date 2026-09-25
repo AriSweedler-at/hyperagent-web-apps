@@ -5,9 +5,13 @@
 // painter takes a small view record, not an App: the two reducers are still separate (§4.2 lands in
 // Wave C), so a game builds the `HomeView` from its own state. The binder takes the game's intent
 // constructors (`ShellIntentBuilders`) and its `startOptions` readers, so this module never imports
-// a game's Intent type (eslint.config.js: shared code never imports a game). What stays with each
-// game: gin's sandbox editor and Score Counter name inputs, backgammon's two selects, and the tab
-// list each storage.ts decodes (`HOME_TABS`), which the game passes in.
+// a game's Intent type (eslint.config.js: shared code never imports a game). Since C2 the shell's
+// state and intents are one type each (shell.ts `ShellState`, `ShellIntent`), so the reader
+// (`homeView`) and the constructors (`shellIntents`) both games' ui/home.ts then spelled word for
+// word live here too (docs/design/dry-round-2.md E8, Wave G row G1). What stays with each game:
+// gin's sandbox editor and Score Counter name inputs, backgammon's two selects, the inputs its
+// start buttons read (`startOptions`), and the tab list each storage.ts decodes (`HOME_TABS`),
+// which the game passes in.
 //
 // One legacy trait both games kept, kept here: `renderPlayMode` ran only when the Play tab was
 // shown or the mode was set, so the mode buttons' `active` marks (the submenu's are visible on
@@ -31,10 +35,11 @@ import {
   targetValueOf,
   toggleClass,
   type DocumentLike,
-  type Element,
   type PageLike,
 } from '../edge/dom.ts';
 import { tabButtonId } from './ids.ts';
+import type { ShellIntent, ShellTypes, Tab as ShellTab } from './shell.ts';
+import { bindLongPress } from './shellPaint.ts';
 
 // The tab ids moved to ids.ts (pure) for the computed-style oracle; the import path holds.
 export { tabButtonId };
@@ -52,6 +57,33 @@ export type HomeShellShape<Tab extends string> = Readonly<{
   tabs: ReadonlyArray<Tab>;
   modes: ReadonlyArray<string>;
 }>;
+
+/**
+ * What `homeView` reads off the game's shell slice: the four fields of shell.ts's `ShellState`
+ * the home screen paints from. Structural, generic over the slice's tab and resume types, so a
+ * game passes `app.shell` and infers both; `ShellState<G>` is one such slice.
+ */
+export type HomeSlice<Tab extends string, Resume> = Readonly<{
+  homeTab: Tab;
+  playMode: string;
+  submenuOpen: boolean;
+  resume: Resume | null;
+}>;
+
+/**
+ * The `HomeView` off the shell slice, the resume offer labelled by the game (`resumeLabel` is
+ * each game's copy: gin's Score Counter offer has no shared label; null when there is nothing to
+ * resume). Both `ui/home.ts` spelled this reader word for word (docs/design/dry-round-2.md E8).
+ */
+export const homeView = <Tab extends string, Resume>(
+  shell: HomeSlice<Tab, Resume>,
+  resumeLabel: (resume: Resume) => string,
+): HomeView<Tab> => ({
+  homeTab: shell.homeTab,
+  playMode: shell.playMode,
+  submenuOpen: shell.submenuOpen,
+  resumeLabel: shell.resume === null ? null : resumeLabel(shell.resume),
+});
 
 /**
  * A value into every input that shows it (the saved names at `initHome`: the online name, the
@@ -156,6 +188,40 @@ export type ShellIntentBuilders<I, Tab extends string, Start> = Readonly<{
   cancel: I;
 }>;
 
+/**
+ * The shell's intents as both `ui/home.ts` spelled them, word for word, each under its own Intent
+ * type (docs/design/dry-round-2.md E8). Since C2 the shell's half of every game's Intent is
+ * shell.ts's `ShellIntent<G>`, so the builders are written once, generic over the game's bag:
+ * `tab/set` carries its tab, and the two start clicks spread its raw option values (`G['Raw']`)
+ * after the names, so every intent keeps the literal key order the games' home.test.ts pin. A
+ * game passes them as `bindHomeShell`'s `intents`; one that spells a shell intent differently
+ * would pass its own record instead (none does).
+ */
+export const shellIntents = <G extends ShellTypes>(): ShellIntentBuilders<
+  ShellIntent<G>,
+  ShellTab<G>,
+  G['Raw']
+> => ({
+  nameTyped: (value) => ({ type: 'name/typed', value }),
+  p1NameTyped: (value) => ({ type: 'p1name/typed', value }),
+  p2NameTyped: (value) => ({ type: 'p2name/typed', value }),
+  hostClick: (name, options) => ({ type: 'host/click', name, ...options }),
+  joinClick: (name, code) => ({ type: 'join/click', name, code }),
+  codeTyped: (value, inputType) => ({ type: 'code/typed', value, inputType }),
+  hostDeal: { type: 'host/deal' },
+  localClick: (p1, p2, options) => ({ type: 'local/click', p1, p2, ...options }),
+  tabSet: (tab) => ({ type: 'tab/set', tab }),
+  modeSet: (mode) => ({ type: 'mode/set', mode }),
+  submenuPress: { type: 'submenu/press' },
+  submenuRelease: { type: 'submenu/release' },
+  tabPlayClick: { type: 'tab/playClick' },
+  submenuPick: (mode) => ({ type: 'submenu/pick', mode }),
+  submenuDismiss: { type: 'submenu/dismiss' },
+  resumeClick: { type: 'resume/click' },
+  shareClick: { type: 'share/click' },
+  cancel: { type: 'cancel' },
+});
+
 /** What `bindHomeShell` needs from a game: its tabs, its start-option readers and its intents. */
 export type HomeShellBindings<I, Tab extends string, Start> = Readonly<{
   tabs: ReadonlyArray<Tab>;
@@ -167,21 +233,13 @@ export type HomeShellBindings<I, Tab extends string, Start> = Readonly<{
   intents: ShellIntentBuilders<I, Tab, Start>;
 }>;
 
-/** A long press: `press` on pointerdown, `release` when the pointer lifts, leaves or is cancelled. */
-export const bindLongPress = <I>(
-  el: Element,
-  dispatch: (intent: I) => void,
-  intents: Readonly<{ press: I; release: I }>,
-): void => {
-  listen(el, 'pointerdown', () => {
-    dispatch(intents.press);
-  });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => {
-    listen(el, ev, () => {
-      dispatch(intents.release);
-    });
-  });
-};
+/**
+ * A long press: `press` on pointerdown, `release` when the pointer lifts, leaves or is cancelled.
+ * shellPaint.ts's since Wave G (its `press` widened to a function for gin's card press,
+ * docs/design/dry-round-2.md E5; the Play tab passes the constant form); re-exported under the
+ * name home.test.ts and the B2 row gave it.
+ */
+export { bindLongPress };
 
 /** Every shell control of the home screen and the two waiting screens, as the legacy registered them. */
 export const bindHomeShell = <I, Tab extends string, Start>(

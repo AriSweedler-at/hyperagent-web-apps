@@ -2,12 +2,13 @@
 // the document only through the shared DOM edge). `paintHome` reads the App (ui/state.ts) and
 // `bindHome` turns each control into an intent. The shell every game's home screen shares (the
 // tabs, the mode switch and its submenu, the code field, the resume box, the start, join, share
-// and cancel buttons) is web/shared/ui/home.ts since docs/design/shared-shell.md §5 B2; this file
+// and cancel buttons) is web/shared/ui/home.ts since docs/design/shared-shell.md §5 B2, and so are
+// its view reader and intent builders since docs/design/dry-round-2.md E8 (Wave G); this file
 // composes it with what is Sheshbesh's alone: the two selects (match length, rules) each mode
-// panel carries. The three input writes that are not a paint (the saved names at `initHome`, the
-// sanitised room code as it is typed) are effects the reducer raises and main.ts runs through
-// `fillNameInputs` / `fillP2NameInput` / `setCodeInput`, so the paint never overwrites what the
-// player is typing.
+// panel carries, and the two its start buttons read. The three input writes that are not a paint
+// (the saved names at `initHome`, the sanitised room code as it is typed) are effects the reducer
+// raises and main.ts runs through `fillNameInputs` / `fillP2NameInput` / `setCodeInput`, so the
+// paint never overwrites what the player is typing.
 import {
   listenId,
   readValue,
@@ -20,15 +21,15 @@ import {
 import {
   bindHomeShell,
   fillInputs,
+  homeView,
   paintHomeShell,
-  type HomeView,
-  type ShellIntentBuilders,
+  shellIntents,
 } from '../../../../shared/ui/home.ts';
 import {
   HOME_TABS,
   resumeLabel,
   type App,
-  type HomeTab,
+  type Backgammon,
   type Intent,
   type PlayMode,
 } from './state.ts';
@@ -74,43 +75,10 @@ const paintOptions = (doc: DocumentLike, app: App): void => {
   });
 };
 
-/** What the shared shell paints, read off the App's shell slice. */
-const homeView = (app: App): HomeView<HomeTab> => ({
-  homeTab: app.shell.homeTab,
-  playMode: app.shell.playMode,
-  submenuOpen: app.shell.submenuOpen,
-  resumeLabel: app.shell.resume === null ? null : resumeLabel(app.shell.resume),
-});
-
-/** The tabs and panels, the play mode, the submenu's `force-open`, and the resume box; then the selects. */
+/** The tabs and panels, the play mode, the submenu's `force-open`, and the resume box (the shell's view, labelled by Sheshbesh's `resumeLabel`); then the selects. */
 export const paintHome = (doc: DocumentLike, app: App): void => {
-  paintHomeShell(doc, homeView(app), { tabs: HOME_TABS, modes: PLAY_MODES });
+  paintHomeShell(doc, homeView(app.shell, resumeLabel), { tabs: HOME_TABS, modes: PLAY_MODES });
   paintOptions(doc, app);
-};
-
-/** What the two start buttons read beside the names: their panel's match length and rules. */
-type StartOptions = Readonly<{ matchLength: string; variant: string }>;
-
-/** The shell's intents as Sheshbesh spells them (the shared binder never imports this file's Intent). */
-const SHELL_INTENTS: ShellIntentBuilders<Intent, HomeTab, StartOptions> = {
-  nameTyped: (value) => ({ type: 'name/typed', value }),
-  p1NameTyped: (value) => ({ type: 'p1name/typed', value }),
-  p2NameTyped: (value) => ({ type: 'p2name/typed', value }),
-  hostClick: (name, options) => ({ type: 'host/click', name, ...options }),
-  joinClick: (name, code) => ({ type: 'join/click', name, code }),
-  codeTyped: (value, inputType) => ({ type: 'code/typed', value, inputType }),
-  hostDeal: { type: 'host/deal' },
-  localClick: (p1, p2, options) => ({ type: 'local/click', p1, p2, ...options }),
-  tabSet: (tab) => ({ type: 'tab/set', tab }),
-  modeSet: (mode) => ({ type: 'mode/set', mode }),
-  submenuPress: { type: 'submenu/press' },
-  submenuRelease: { type: 'submenu/release' },
-  tabPlayClick: { type: 'tab/playClick' },
-  submenuPick: (mode) => ({ type: 'submenu/pick', mode }),
-  submenuDismiss: { type: 'submenu/dismiss' },
-  resumeClick: { type: 'resume/click' },
-  shareClick: { type: 'share/click' },
-  cancel: { type: 'cancel' },
 };
 
 /**
@@ -130,7 +98,10 @@ const bindOptions = (doc: PageLike, dispatch: (intent: Intent) => void): void =>
   });
 };
 
-/** Every control of the home screen and the two waiting screens. */
+/**
+ * Every control of the home screen and the two waiting screens: the shell's under the shared
+ * intents, with the match length and rules each start button reads beside the names.
+ */
 export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
   bindHomeShell(doc, dispatch, {
     tabs: HOME_TABS,
@@ -144,7 +115,7 @@ export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): voi
         variant: readValue(requireId(d, 'localVariantSel')),
       }),
     },
-    intents: SHELL_INTENTS,
+    intents: shellIntents<Backgammon>(),
   });
   bindOptions(doc, dispatch);
 };

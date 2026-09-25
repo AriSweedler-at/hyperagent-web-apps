@@ -27,6 +27,7 @@ import {
   type Element,
   type PageLike,
 } from '../edge/dom.ts';
+import type { ShellState, ShellTypes } from './shell.ts';
 
 export type Dispatch<I> = (intent: I) => void;
 
@@ -106,6 +107,29 @@ export const paintHandoff = (doc: DocumentLike, label: string | null): void => {
   const btn = requireId(doc, 'handoffBtn');
   toggleClass(btn, 'hidden', label === null);
   if (label !== null) setAttr(btn, 'title', label);
+};
+
+/**
+ * The opponent's connection dot on the table (gin `#connDot`, backgammon `#oppDot`;
+ * docs/design/dry-round-2.md E6): lit while the other seat's channel is open, hidden in
+ * pass-and-play, where there is no channel. Both `paintOpponent`s spelled the class string and
+ * the tooltip word for word over the two shell fields; the reader is shared too, now that
+ * `ShellState` (shell.ts, C2) is the one type both games read it from.
+ */
+export type ConnDotView = Readonly<{ connected: boolean; hidden: boolean }>;
+
+export const connDotView = (
+  shell: Pick<ShellState<ShellTypes>, 'oppConnected' | 'role'>,
+): ConnDotView => ({ connected: shell.oppConnected, hidden: shell.role === 'local' });
+
+/** The dot's whole class attribute: `conn-dot on|off`, plus `hidden` in pass-and-play. */
+export const connDotClass = (v: ConnDotView): string =>
+  `conn-dot ${v.connected ? 'on' : 'off'}${v.hidden ? ' hidden' : ''}`;
+
+export const paintConnDot = (doc: DocumentLike, id: string, v: ConnDotView): void => {
+  const dot = requireId(doc, id);
+  setAttr(dot, 'class', connDotClass(v));
+  setAttr(dot, 'title', v.connected ? 'Connected' : 'Disconnected');
 };
 
 /** A sheet's overlay follows its flag. */

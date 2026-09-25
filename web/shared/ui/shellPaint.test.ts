@@ -9,7 +9,10 @@ import {
   bindButtons,
   bindLongPress,
   bindSheets,
+  connDotClass,
+  connDotView,
   hideToast,
+  paintConnDot,
   paintHandoff,
   paintScreen,
   paintSheet,
@@ -33,6 +36,7 @@ const page = (): FakePage =>
     fakeEl('toast'),
     fakeEl('soundBtn', { text: '🔊', attrs: { title: 'Sound & vibration' } }),
     fakeEl('handoffBtn', { classes: ['icon-btn', 'hidden'], attrs: { title: 'Continue online' } }),
+    fakeEl('connDot', { classes: ['conn-dot', 'off'], attrs: { title: 'Disconnected' } }),
     fakeEl('rulesOverlay', { classes: ['overlay', 'hidden'] }),
     fakeEl('closeRulesBtn'),
     fakeEl('menuOverlay', { classes: ['overlay', 'hidden'] }),
@@ -298,5 +302,36 @@ describe('bindLongPress', () => {
     p.get('hand').fire('pointerdown', { target: fakeTarget({ closest: { '.card': card } }) });
     p.get('hand').fire('pointerup');
     expect(intents).toEqual([{ type: 'press:AS' }, { type: 'release' }]);
+  });
+});
+
+describe('paintConnDot', () => {
+  test('connDotView reads the two shell fields; connDotClass is the whole attribute both games pinned', () => {
+    expect(connDotView({ oppConnected: false, role: null })).toEqual({
+      connected: false,
+      hidden: false,
+    });
+    expect(connDotView({ oppConnected: true, role: 'host' })).toEqual({
+      connected: true,
+      hidden: false,
+    });
+    expect(connDotView({ oppConnected: true, role: 'local' })).toEqual({
+      connected: true,
+      hidden: true,
+    });
+    expect(connDotClass({ connected: false, hidden: false })).toBe('conn-dot off');
+    expect(connDotClass({ connected: true, hidden: false })).toBe('conn-dot on');
+    expect(connDotClass({ connected: true, hidden: true })).toBe('conn-dot on hidden');
+    expect(connDotClass({ connected: false, hidden: true })).toBe('conn-dot off hidden');
+  });
+
+  test('writes the class attribute whole (no other class survives) and the tooltip', () => {
+    const p = page();
+    paintConnDot(p.doc, 'connDot', { connected: true, hidden: false });
+    expect(p.get('connDot').attr('class')).toBe('conn-dot on');
+    expect(p.get('connDot').attr('title')).toBe('Connected');
+    paintConnDot(p.doc, 'connDot', { connected: false, hidden: true });
+    expect(p.get('connDot').attr('class')).toBe('conn-dot off hidden');
+    expect(p.get('connDot').attr('title')).toBe('Disconnected');
   });
 });
