@@ -198,6 +198,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // shell.test.ts over a FAKE_GAME; the folder stays at 100 on every metric. Again with G2
         // (dry-round-2.md F5/F6: `position/load` and the once-keyed cue memory into shell.ts,
         // 238 lines, 207 branches): the folder measures 100/100/100/100 (571 lines, 342 branches).
+        // stories.ts, the stories page gin's src/stories/boot.ts spelled (dry-round-2.md I3, Wave G3:
+        // the index, the nav bar, the live binding and the boot over an injected catalogue, paint,
+        // reducer and effect runner), measures 100/100/100/100 through stories.test.ts over the
+        // fake page and a three-story fake catalogue; the folder stays at 100 on every metric.
         'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The coin game (dry-round-2.md F3): the two-seat engine the replay driver under test/shared
         // is proved on, and the shared shell's fake game to come. It exists to be exercised, so
