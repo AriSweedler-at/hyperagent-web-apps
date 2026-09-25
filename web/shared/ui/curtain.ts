@@ -3,18 +3,12 @@
 // up (the legacy `showCurtain` left the texts as they were when it hid the sheet, and both games
 // kept that rule), and the curtain button's wiring. The copy itself is each game's `curtainText`
 // (gin: who takes the phone and who looks away; backgammon: the phase's verb and the last turn),
-// and what one tap does is the game's too: `onReveal` reads it off the button, so backgammon's
-// `data-rolls` promise (painted through `attrs`) needs no App here. Not lint-pure: see
-// shellPaint.ts.
-import {
-  listenId,
-  requireId,
-  setAttr,
-  setText,
-  toggleClass,
-  type DocumentLike,
-  type Element,
-} from '../edge/dom.ts';
+// and what one tap does is the game's too: `onReveal` names the intents, so no App is needed
+// here. Until backgammon's roll modal (#79, docs/design/backgammon-board.md §4.7) the button also
+// carried a `data-rolls` promise, painted through an `attrs` field on `CurtainText` and read back
+// by `onReveal(btn)`; docs/design/dry-round-2.md §3 row E10 deleted both once no game passed or
+// read one. Not lint-pure: see shellPaint.ts.
+import { listenId, requireId, setText, toggleClass, type DocumentLike } from '../edge/dom.ts';
 
 import type { Dispatch } from './shellPaint.ts';
 
@@ -23,8 +17,6 @@ export type CurtainText = Readonly<{
   sub: string;
   last: string;
   button: string;
-  /** Attributes painted onto `#curtainBtn` beside its label (backgammon's `data-rolls`); null removes one. */
-  attrs?: Readonly<Record<string, string | null>>;
 }>;
 
 /** `#curtainOverlay` and its texts; hidden (texts untouched) when no seat is waiting (`text` null). */
@@ -35,25 +27,20 @@ export const paintCurtain = (doc: DocumentLike, text: CurtainText | null): void 
   setText(requireId(doc, 'curtainTitle'), text.title);
   setText(requireId(doc, 'curtainSub'), text.sub);
   setText(requireId(doc, 'curtainLast'), text.last);
-  const btn = requireId(doc, 'curtainBtn');
-  setText(btn, text.button);
-  Object.entries(text.attrs ?? {}).forEach((attr: readonly [string, string | null]) => {
-    setAttr(btn, attr[0], attr[1]);
-  });
+  setText(requireId(doc, 'curtainBtn'), text.button);
 };
 
 /**
- * `#curtainBtn`: one tap dispatches, in order, what `onReveal` reads off the button at that
- * moment (gin: the reveal; backgammon: the reveal, then the roll when `data-rolls` says so).
+ * `#curtainBtn`: one tap dispatches, in order, what `onReveal` returns at that moment (both
+ * games: the reveal; backgammon's roll is the roll modal's, design §4.7).
  */
 export const bindCurtain = <I>(
   doc: DocumentLike,
   dispatch: Dispatch<I>,
-  onReveal: (btn: Element) => ReadonlyArray<I>,
+  onReveal: () => ReadonlyArray<I>,
 ): void => {
-  const btn = requireId(doc, 'curtainBtn');
   listenId(doc, 'curtainBtn', 'click', () => {
-    onReveal(btn).forEach((intent) => {
+    onReveal().forEach((intent) => {
       dispatch(intent);
     });
   });
