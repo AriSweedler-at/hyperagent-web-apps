@@ -86,7 +86,8 @@ h1 {
 /* The call to action (docs/ARCHITECTURE.md "Calls to action"; the owner, 2026-09-24: "all the
    'start game' buttons should be green and should stand out well"): every button that opens,
    joins or starts a game, and only those, in the shared --go and --go-text at .btn-primary's type
-   size. Each theme adds its own hover, ring or edge. */
+   size. Each theme adds its own hover, ring or edge. A theme's .btn-primary fill follows this file,
+   so the two classes are never combined: a button is one or the other. */
 .btn-go {
   background: var(--go);
   color: var(--go-text);
