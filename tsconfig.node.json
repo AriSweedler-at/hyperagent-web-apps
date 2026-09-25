@@ -69,6 +69,7 @@
     "web/games/fidice/src/view/scenarios.ts",
     "web/games/gin-rummy/src/**/*.ts",
     "web/games/backgammon/src/**/*.ts",
+    "web/games/briscola/src/**/*.ts",
     "web/raw-imports.d.ts",
     "web/shared/edge/storage.ts",
     "web/shared/edge/prefs.ts",

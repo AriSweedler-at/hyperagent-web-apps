@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 import { STORAGE_KEYS as BACKGAMMON_KEYS } from '../web/games/backgammon/src/storage.ts';
+import { STORAGE_KEYS as BRISCOLA_KEYS } from '../web/games/briscola/src/storage.ts';
 import { STORAGE_KEYS as GIN_KEYS } from '../web/games/gin-rummy/src/storage.ts';
 import {
   ALIASES,
@@ -18,8 +19,8 @@ import {
 } from './games.ts';
 
 describe('the games registry', () => {
-  test('lists the three built games in landing order; the two migrated ones have a legacy page', () => {
-    expect(GAMES).toEqual(['gin-rummy', 'fidice', 'backgammon']);
+  test('lists the four built games in landing order; the two migrated ones have a legacy page', () => {
+    expect(GAMES).toEqual(['gin-rummy', 'fidice', 'backgammon', 'briscola']);
     expect(Object.keys(REGISTRY)).toEqual(GAMES);
     expect(LEGACY_GAMES).toEqual(['gin-rummy', 'fidice']);
   });
@@ -92,6 +93,42 @@ describe('the games registry', () => {
           curtainButtons: 2,
         },
       },
+      briscola: {
+        title: 'Briscola — cards',
+        hook: 'window.__briscola',
+        suite: 'briscola',
+        specs: ['**/briscola-*.spec.ts'],
+        storage: { saveKey: 'briscolaMP_v1', prefix: 'briscola_' },
+        debug: 0,
+        pageShape: {
+          ids: [
+            'app',
+            'homeScreen',
+            'tableScreen',
+            'hand',
+            'trick',
+            'stock',
+            'briscola',
+            'scoreStrip',
+            'toast',
+          ],
+          rulesSlots: true,
+        },
+        contractFloors: { ts: 40, markup: 40 },
+        shell: {
+          heading: 'Briscola',
+          shareTitle: 'Briscola',
+          tabs: ['Play', 'Rules', 'About'],
+          modes: ['Online', 'Pass the phone'],
+          hostAnswered: /^Connected — waiting for .+ to deal$/,
+          connDot: '#oppDot',
+          localFields: [
+            ['localPlayersSel', '2'],
+            ['localMatchSel', '2'],
+          ],
+          curtainButtons: 2,
+        },
+      },
     });
   });
 
@@ -99,7 +136,7 @@ describe('the games registry', () => {
     // The shell specs (e2e/shell-*.spec.ts) iterate SHELL_GAMES and read the save and the
     // preference keys through the storage row, so a shell game must have both.
     expect(SHELL_GAMES).toEqual(GAMES.filter((game) => REGISTRY[game].shell !== undefined));
-    expect(SHELL_GAMES).toEqual(['gin-rummy', 'backgammon']);
+    expect(SHELL_GAMES).toEqual(['gin-rummy', 'backgammon', 'briscola']);
     SHELL_GAMES.forEach((game) => {
       expect(REGISTRY[game].shell).toBe(SHELL[game]);
       expect(REGISTRY[game].storage, game).toBeDefined();
@@ -123,6 +160,7 @@ describe('the games registry', () => {
     };
     pin(REGISTRY['gin-rummy'].storage, GIN_KEYS);
     pin(REGISTRY.backgammon.storage, BACKGAMMON_KEYS);
+    pin(REGISTRY.briscola.storage, BRISCOLA_KEYS);
     expect(REGISTRY.fidice.storage).toBeUndefined();
   });
 
@@ -132,6 +170,7 @@ describe('the games registry', () => {
       'gin-rummy': 'Gin Rummy',
       fidice: "Fidice — one-cup liar's dice",
       backgammon: 'Sheshbesh — backgammon',
+      briscola: 'Briscola — cards',
     });
   });
 
@@ -140,11 +179,17 @@ describe('the games registry', () => {
       'gin-rummy': 'window.__gin',
       fidice: 'window.__fidice',
       backgammon: 'window.__backgammon',
+      briscola: 'window.__briscola',
     });
   });
 
   test('the landing hrefs are games/<g>/ in GAMES order', () => {
-    expect(LANDING_HREFS).toEqual(['games/gin-rummy/', 'games/fidice/', 'games/backgammon/']);
+    expect(LANDING_HREFS).toEqual([
+      'games/gin-rummy/',
+      'games/fidice/',
+      'games/backgammon/',
+      'games/briscola/',
+    ]);
   });
 
   test('sheshbesh is an alias of backgammon: a game folder, never a game or a landing link', () => {

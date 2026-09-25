@@ -19,7 +19,7 @@ export type { Game };
  * of its own e2e specs. A game's row names its suite (dry-round-2.md I6), and a name here without
  * a suites.ts row is a type error there.
  */
-export type GameSuite = 'gin' | 'fidice' | 'backgammon';
+export type GameSuite = 'gin' | 'fidice' | 'backgammon' | 'briscola';
 
 /** The pages smoke opens: every game and the landing page. */
 export type PageName = Game | 'landing';
@@ -109,8 +109,8 @@ export type ShellSpec = Readonly<{
  * docs/design/shared-shell.md §3.1); fidice joins with its restyle (§4.6). A game here without a
  * SHELL row, or a row in e2e/fixtures/online-games.ts, is a type error.
  */
-export type ShellGame = 'gin-rummy' | 'backgammon';
-export const SHELL_GAMES: ReadonlyArray<ShellGame> = ['gin-rummy', 'backgammon'];
+export type ShellGame = 'gin-rummy' | 'backgammon' | 'briscola';
+export const SHELL_GAMES: ReadonlyArray<ShellGame> = ['gin-rummy', 'backgammon', 'briscola'];
 
 /** One shell row per shell game; REGISTRY carries each as its `shell`. */
 export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
@@ -136,6 +136,23 @@ export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
       ['localVariantSel', 'portes'],
       ['localMatchLengthSel', '5'],
     ],
+    curtainButtons: 2,
+  },
+  briscola: {
+    heading: 'Briscola',
+    shareTitle: 'Briscola',
+    tabs: ['Play', 'Rules', 'About'],
+    modes: ['Online', 'Pass the phone'],
+    // shellConfig.ts `hostRoomMsg`: only the host's `lobby` reply carries the host's name.
+    hostAnswered: /^Connected — waiting for .+ to deal$/,
+    connDot: '#oppDot',
+    // The two selects in view (the house rules sit in a closed <details>, out of a driver's reach):
+    // two players, best of three (D3).
+    localFields: [
+      ['localPlayersSel', '2'],
+      ['localMatchSel', '2'],
+    ],
+    // The reveal and "Continue online": the handoff is offered under the curtain at two seats (D17).
     curtainButtons: 2,
   },
 };
@@ -187,6 +204,32 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
     },
     contractFloors: { ts: 35, markup: 40 },
     shell: SHELL.backgammon,
+  },
+  briscola: {
+    title: 'Briscola — cards',
+    hook: 'window.__briscola',
+    suite: 'briscola',
+    specs: ['**/briscola-*.spec.ts'],
+    storage: { saveKey: 'briscolaMP_v1', prefix: 'briscola_' },
+    debug: 0,
+    // Gin-shaped: static screens, the table's fixed slots (the hand, the fan, the stock and the
+    // briscola under it, the score strip) and the same empty rules slots (docs/design/briscola.md §5.8).
+    pageShape: {
+      ids: [
+        'app',
+        'homeScreen',
+        'tableScreen',
+        'hand',
+        'trick',
+        'stock',
+        'briscola',
+        'scoreStrip',
+        'toast',
+      ],
+      rulesSlots: true,
+    },
+    contractFloors: { ts: 40, markup: 40 },
+    shell: SHELL.briscola,
   },
 };
 
