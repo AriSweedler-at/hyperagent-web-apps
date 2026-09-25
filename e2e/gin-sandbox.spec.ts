@@ -3,7 +3,7 @@
 // its hand and its pile; a bad map says what is wrong and deals nothing; the console's
 // `__gin.sandbox(map)` deals too, with the stock's named top the next draw, and
 // `__gin.sandboxMap()` reads the table back as a map.
-import { ginReveal } from './fixtures/gin.ts';
+import { reveal } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -45,7 +45,7 @@ test('sandbox: unlocked by the name, a preset deals its map, a bad map is refuse
   await expect(page.locator('#sbMap')).toHaveValue(new RegExp(`^p1: ${TWO_WAYS}\\n`));
   await expect(page.locator('#sbError')).toHaveText('');
   await page.locator('#sbStartBtn').click();
-  await ginReveal(page);
+  await reveal(page);
   await expect(page.locator('#hand .card')).toHaveCount(10);
   const held = await page.evaluate<ReadonlyArray<string | null>>(
     "Array.from(document.querySelectorAll('#hand .card')).map((e) => e.getAttribute('data-card')).sort()",
@@ -57,7 +57,7 @@ test('sandbox: unlocked by the name, a preset deals its map, a bad map is refuse
 
   // The console: the named stock top is the next draw; the table reads back as a map.
   await page.evaluate(`window.__gin.sandbox('${CONSOLE_MAP}')`);
-  await ginReveal(page);
+  await reveal(page);
   await page.locator('#stockPile').click();
   await expect(page.locator('#hand .slot.ghost.shown .card')).toHaveAttribute('data-card', 'KC');
   const back = await page.evaluate<string | null>('window.__gin.sandboxMap()');

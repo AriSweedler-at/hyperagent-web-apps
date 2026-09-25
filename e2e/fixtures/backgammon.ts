@@ -1,9 +1,9 @@
 // Drives the Sheshbesh board through its DOM (docs/design/backgammon-board.md §7 "Testability"): the
 // roll modal, the points, bars and trays a player taps, and the curtain's game words. The shell
-// around it (the room, the join, the curtain's reveal, the pass-and-play start) is
-// e2e/fixtures/shell.ts, driven once for both shell games; `bgReveal` and `bgStartLocal` stay
-// exported here so the backgammon specs keep their names. The one
-// thing read from the documented hook (`window.__backgammon`, docs/ARCHITECTURE.md)
+// around it (the room, the join, the host's start, the curtain's reveal, the pass-and-play start) is
+// e2e/fixtures/shell.ts, driven once for both shell games and imported by the backgammon specs
+// directly (dry-round-2.md I5); `bgStartLocal` here composes `startLocal` with the panel's selects.
+// The one thing read from the documented hook (`window.__backgammon`, docs/ARCHITECTURE.md)
 // is the engine's `View` (`readBoard`), which the specs use as the oracle for what the DOM must
 // show (which points may move, where a tap lands); positions are seated through its `setup`, built
 // here in node from the same engine the page runs (`bgPosition`). Own numbering (1..24 from the
@@ -29,8 +29,7 @@ import {
 } from '../../web/games/backgammon/src/engine/index.ts';
 import { mulberry32 } from '../../web/shared/lib/rng.ts';
 import type { Viewport } from './geometry.ts';
-import { DEFAULT_NAMES, reveal, startLocal, type Names } from './shell.ts';
-import { WEBRTC_TIMEOUT } from './timeouts.ts';
+import { DEFAULT_NAMES, startLocal, type Names } from './shell.ts';
 
 export type { Viewport, Names };
 export { DEFAULT_NAMES };
@@ -50,16 +49,6 @@ export const requireBoard = async (page: Page): Promise<View> => {
 };
 
 // ---- online: the table ------------------------------------------------------------------------
-
-/** The host starts the match; both tables appear (online shows no curtain). */
-export const bgHostStarts = async (host: Page, guest: Page): Promise<void> => {
-  await expect(host.locator('#startGameBtn')).toBeVisible({ timeout: WEBRTC_TIMEOUT });
-  await host.locator('#startGameBtn').click();
-  await expect(host.locator('#tableScreen')).toBeVisible();
-  await expect(guest.locator('#tableScreen')).toBeVisible();
-  await expect(host.locator('#curtainOverlay')).toBeHidden();
-  await expect(guest.locator('#curtainOverlay')).toBeHidden();
-};
 
 /** What both boards must agree on: the position, whose turn, the phase, the dice and the log so far. */
 export const boardKey = (v: View | null): string =>
@@ -112,9 +101,6 @@ export const bgCurtain = async (page: Page): Promise<Curtain> => {
     button: await page.locator('#curtainBtn').innerText(),
   };
 };
-
-/** Hand the phone over: the seat behind the curtain taps its button; the curtain goes (the shell's). */
-export const bgReveal = reveal;
 
 /**
  * Start pass-and-play (the shell's `startLocal`: Ann and Bob unless `names` says otherwise, at

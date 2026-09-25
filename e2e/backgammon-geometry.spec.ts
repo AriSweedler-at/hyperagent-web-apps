@@ -15,7 +15,6 @@ import { POINT_INDICES, rulesOf, type Seat } from '../web/games/backgammon/src/e
 import {
   bgMove,
   bgPosition,
-  bgReveal,
   bgRoll,
   bgSetup,
   bgStartLocal,
@@ -32,6 +31,7 @@ import {
   type Frame,
   type Viewport,
 } from './fixtures/geometry.ts';
+import { reveal } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -80,7 +80,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
 
       // The curtain's tap reveals (design §4.9); the roll modal is up over the board, and its
       // button rolls (design §4.7): the frame holds through both.
-      await bgReveal(page);
+      await reveal(page);
       await expect(page.locator('#rollOverlay')).toBeVisible();
       await check('modal up');
       const v = await bgRoll(page);
@@ -117,7 +117,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       const frame = rulesOf('portes');
       const expectSeat = async (seat: Seat): Promise<void> => {
         const g = await boardGeometry(page);

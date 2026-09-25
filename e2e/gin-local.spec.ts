@@ -8,9 +8,9 @@
 import type { Page } from '@playwright/test';
 
 import { DESKTOP } from './fixtures/geometry.ts';
-import { ginAcceptDraw, ginDiscardFirstFree, ginReveal, ginTakeUpcard } from './fixtures/gin.ts';
+import { ginAcceptDraw, ginDiscardFirstFree, ginTakeUpcard } from './fixtures/gin.ts';
 import { playToRoundOver, readView } from './fixtures/gin-play.ts';
-import { DEFAULT_NAMES, curtainTitle, startLocal } from './fixtures/shell.ts';
+import { DEFAULT_NAMES, curtainTitle, reveal, startLocal } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -57,7 +57,7 @@ test('pass and play: the curtain covers the hand; one full turn (take the upcard
   await expect(title).toHaveText(curtainTitle(DEFAULT_NAMES));
   const first = (await title.innerText()).replace('Pass the phone to ', '');
   const other = first === DEFAULT_NAMES[0] ? DEFAULT_NAMES[1] : DEFAULT_NAMES[0];
-  await ginReveal(page);
+  await reveal(page);
   await expect(page.locator('#hand .card')).toHaveCount(10);
   await expect(page.locator('#statusBanner')).toHaveClass(/mine/);
   await expect(page.locator('#statusSub')).toHaveText('Take the upcard or pass');

@@ -14,7 +14,6 @@ import type { Page } from '@playwright/test';
 import {
   bgMove,
   bgPosition,
-  bgReveal,
   bgSetup,
   bgStartLocal,
   bgTap,
@@ -22,6 +21,7 @@ import {
   requireBoard,
   type Viewport,
 } from './fixtures/backgammon.ts';
+import { reveal } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -109,7 +109,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       const check = async (seat: 0 | 1): Promise<void> => {
         const v = await seated(page, seat);
         expect(v.me.idx).toBe(seat);
@@ -159,7 +159,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       const v = await seated(page, 0);
       const eight = page.locator(`#${ownPointId(v, 8)}`);
       const targets = page.locator('#board .target, #board .target-2');
@@ -189,7 +189,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       const v = await seated(page, 0);
       // The source is tapped first: the selected coin lifts 4px, and the clone leaves from there.
       await bgTap(page, 8);
@@ -227,7 +227,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       // 2-2 from the start: own 13 to own 9 in one tap on the `target-2`, through own 11, which
       // is empty before and after (design §3.9: the legs fold into one flight).
       const v = await bgSetup(page, bgPosition({ text: START, turn: 0, dice: [2, 2] }));
@@ -261,7 +261,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       // Light bearing off with 6-5: the 6 takes the coin on own 6 to the tray (T10).
       const v = await bgSetup(
         page,
@@ -310,7 +310,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       const v = await seated(page, 0);
       await bgMove(page, 8, 5);
       await trackFlights(page);
@@ -334,7 +334,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       // Light to play 2-1 from the start: 8/6 with the 2 puts a sixth coin on own 6.
       const v = await bgSetup(page, bgPosition({ text: START, turn: 0, dice: [2, 1] }));
       const six = `#${ownPointId(v, 6)}`;
@@ -403,7 +403,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
           'window.__rng = () => (window.__rngFixed === undefined ? Math.random() : window.__rngFixed);',
       });
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       await bgSetup(page, bgPosition({ text: START, turn: 0 }));
       // The fx hook is the page's cue player: wrap `play` to record what the reducer raises.
       await page.evaluate(`(() => {

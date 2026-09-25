@@ -3,8 +3,9 @@
 // draw + discard through the UI, the host's table reflects it, and both discards sheets agree. The
 // shell's half (the room, the join, the deal on both tables, the names, the recorded Peer
 // constructions with the ?peer= and ?ice= hooks) is e2e/shell-online.spec.ts, for both shell games.
-import { ginDrawAndDiscard, ginHostDeals, ginPassUpcard, isMyTurn } from './fixtures/gin.ts';
+import { ginDrawAndDiscard, ginPassUpcard, isMyTurn } from './fixtures/gin.ts';
 import { connect } from './fixtures/online-games.ts';
+import { hostStarts } from './fixtures/shell.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 test(
@@ -13,7 +14,7 @@ test(
   async ({ players, project }) => {
     const { host, guest } = players;
     await connect(players, project, 'gin-rummy');
-    await ginHostDeals(host.page, guest.page);
+    await hostStarts(host.page, guest.page);
 
     // Upcard phase: the non-dealer decides, then the dealer. Both pass, so the non-dealer must draw
     // from the stock. Whichever side dealt, the guest ends up in the draw phase.

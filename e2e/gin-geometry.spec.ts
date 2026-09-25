@@ -28,14 +28,9 @@ import {
   readFrame,
   type Frame,
 } from './fixtures/geometry.ts';
-import {
-  expectHandRows,
-  ginAcceptDraw,
-  ginPassUpcard,
-  ginReveal,
-  ginStartLocal,
-} from './fixtures/gin.ts';
+import { expectHandRows, ginAcceptDraw, ginPassUpcard, ginStartLocal } from './fixtures/gin.ts';
 import { chooseDiscard, finishTurn, playToRoundOver, selectCard } from './fixtures/gin-play.ts';
+import { reveal } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -131,10 +126,10 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
 
       // Both pass: the first player draws from the stock.
       await ginPassUpcard(page);
-      await ginReveal(page);
+      await reveal(page);
       await check('upcard, second seat');
       await ginPassUpcard(page);
-      await ginReveal(page);
+      await reveal(page);
       await expect(page.locator('#hand .slot.ghost.open')).toHaveCount(1);
       await check('draw');
       const turn = await frameOf(page);

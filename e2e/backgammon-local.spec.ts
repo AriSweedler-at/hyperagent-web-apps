@@ -18,7 +18,6 @@ import {
   bgCurtain,
   bgMove,
   bgPosition,
-  bgReveal,
   bgRoll,
   bgSetup,
   bgStartLocal,
@@ -31,6 +30,7 @@ import {
   type Viewport,
 } from './fixtures/backgammon.ts';
 import { boardGeometry, expectBoardGeometry } from './fixtures/backgammon-geometry.ts';
+import { reveal } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -156,7 +156,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       // Before a roll: the modal over the board, blank dice; the roll fills them (design §4.7).
       await bgSetup(page, bgPosition({ text: START, turn: 0 }));
       await expect(page.locator('#rollOverlay')).toBeVisible();
@@ -211,7 +211,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       const v = await bgSetup(page, bgPosition({ text: TWO_ORDERS, turn: 0, dice: [6, 3] }));
       await bgTap(page, 13);
       // 13/7* with the 6 and 13/10 with the 3 are single steps; 13/4 needs both and the paths
@@ -246,7 +246,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       const v = await bgSetup(page, bgPosition({ text: BOTH_SUFFICE, turn: 0, dice: [6, 5] }));
       expect(v.me.idx).toBe(0);
       // The tray disc names both dice; the tap opens two chips, the higher die first (design §4.4).
@@ -294,7 +294,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       await bgSetup(page, bgPosition({ text: BOTH_SUFFICE, turn: 0, dice: [6, 5], score: [3, 0] }));
       await expect(page.locator('#gameBadge')).toHaveText('Game 1 · 3–0 · to 5');
       await bgMove(page, 4, 'off');
@@ -315,7 +315,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       await bgSetup(page, bgPosition({ text: BLOT_ON_FIVE, turn: 0, dice: [3, 1] }));
       await bgMove(page, 8, 7);
       const after = await bgMove(page, 8, 5);
@@ -332,7 +332,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       // toast, in his own numbering (docs/design/backgammon-board.md §4.9).
       const toast = page.locator('#toast');
       await expect(toast).not.toHaveClass(/\bshow\b/);
-      await bgReveal(page);
+      await reveal(page);
       await expect(toast).toBeVisible();
       await expect(toast).toHaveText('Kapará. Ann hit you on your 20-point.');
       await expect(toast).toHaveClass(/\bhit\b/);
@@ -354,7 +354,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       // The starter already holds the opening pair: the button reveals and no roll modal comes (Q4).
       const curtain = await bgCurtain(page);
       expect(curtain.button).toBe(`${first} — play ${diceText(dice)}`);
-      await bgReveal(page);
+      await reveal(page);
       expect((await requireBoard(page)).phase).toBe('moving');
       await expect(page.locator('#rollOverlay')).toBeHidden();
       await expect(page.locator('#dice .die:not(.blank)')).toHaveCount(2);
@@ -378,7 +378,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         sub: 'Ann doubles to 2',
         button: 'Bob — answer',
       });
-      await bgReveal(page);
+      await reveal(page);
       await expect(page.locator('#cubeOverlay')).toBeVisible();
       await expect(page.locator('#cubeOfferText')).toHaveText('Ann doubles to 2. Take or pass?');
       await expect(page.locator('#passBtn')).toHaveText('Pass (Ann wins 1)');
@@ -391,7 +391,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         sub: 'Your turn. Roll when you have the phone.',
         button: 'Ann — your turn',
       });
-      await bgReveal(page);
+      await reveal(page);
       await expect(page.locator('#rollOverlay')).toBeVisible();
       await expect(page.locator('#doubleBtn')).toBeHidden();
       await expect(page.locator('#cube')).toHaveText('2');
@@ -404,7 +404,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       const v = await requireBoard(page);
       expectBoardGeometry(await boardGeometry(page), v.me.idx, false, 'rolled');
     });

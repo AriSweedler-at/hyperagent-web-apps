@@ -2,7 +2,8 @@
 // games' pages agree on (the home form, the waiting rooms, the curtain, the resume button, the
 // table's names and its 🌐), what each page says in its own words read off tools/games.ts SHELL, and
 // the code shape off web/shared/lib/roomCode.ts. e2e/shell-*.spec.ts drive both games through these
-// once; e2e/fixtures/gin.ts and backgammon.ts compose their pass-and-play starters from `startLocal`
+// once; the game specs import `reveal` and `hostStarts` from here too (dry-round-2.md I5).
+// e2e/fixtures/gin.ts and backgammon.ts compose their pass-and-play starters from `startLocal`
 // and keep the table halves (what a hand or a board shows), which e2e/fixtures/online-games.ts rows
 // up per game for the shell specs. This file may not import either: they import it
 // (import-x/no-cycle). Nothing here reads a documented hook: whose room opened and who took the
@@ -130,6 +131,21 @@ export const join = async (
   await expect(page.locator('#guestWaitStatus')).toHaveText(SHELL[game].hostAnswered, {
     timeout: WEBRTC_TIMEOUT,
   });
+};
+
+// ---- online: the start ----------------------------------------------------------------------------
+
+/**
+ * The host starts from the waiting room; both tables appear. What the tables show next is each
+ * game's (`expectOpening` on its e2e/fixtures/online-games.ts row; backgammon's `start` adds that
+ * online has no curtain). Moved here from gin's `ginHostDeals` and backgammon's `bgHostStarts`,
+ * whose first four statements were the same (dry-round-2.md I5).
+ */
+export const hostStarts = async (host: Page, guest: Page): Promise<void> => {
+  await expect(host.locator('#startGameBtn')).toBeVisible({ timeout: WEBRTC_TIMEOUT });
+  await host.locator('#startGameBtn').click();
+  await expect(host.locator('#tableScreen')).toBeVisible();
+  await expect(guest.locator('#tableScreen')).toBeVisible();
 };
 
 // ---- pass and play: the curtain -------------------------------------------------------------------
