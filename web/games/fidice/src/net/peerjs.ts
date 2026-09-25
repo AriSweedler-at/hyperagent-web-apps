@@ -6,7 +6,7 @@
 // which honours the `?peer=` hook), and the ICE loader (or null: the page without shared/ice.js).
 // The Peer still exists only once `ice.load()` resolves, listeners registered before then are
 // queued and replayed in order, and the relay probe runs on the injected Clock.
-import type { IceResult, NetDeps } from '../../../../shared/edge/peer.ts';
+import { whenTransportReady, type IceResult, type NetDeps } from '../../../../shared/edge/peer.ts';
 import type { Connection, PeerHandle } from '../../../../shared/edge/transport.ts';
 import { peerIdFor } from '../../../../shared/lib/roomCode.ts';
 import type { ClientTransport, ErrorKind, HostTransport } from './session.ts';
@@ -64,11 +64,10 @@ const deferredPeer = (id: string | undefined, deps: PeerDeps): DeferredPeer => {
       fn(created, iceResult);
     });
   };
-  if (deps.ice)
-    void deps.ice.load().then(create, () => {
-      create(null);
-    });
-  else peer = deps.transportFor(null).open(id);
+  // Without a loader `create(null)` runs at once (the shared helper; docs/design/dry-round-2.md
+  // H2): nothing is queued or closed yet, and no Transport's `open` throws, so the Peer is made
+  // synchronously as before.
+  whenTransportReady(deps, create);
   return {
     ready,
     onError: (fn) => {
