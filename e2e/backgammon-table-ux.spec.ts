@@ -192,7 +192,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
     }) => {
       const { page } = player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
-      await bgReveal(page);
+      await reveal(page);
       const v = await seated(page, 0);
       const eight = page.locator(`#${ownPointId(v, 8)}`);
       const five = page.locator(`#${ownPointId(v, 5)}`);
