@@ -58,5 +58,6 @@ paints cold), the flights through the shared `launchClone` (which gained `turn` 
 lying across the stock), and `window.__briscola.setup` is the shell's `position/load` over
 `engine.decodeState`; the two-player cell across carries `#oppName` (the shell specs' name for the
 other seat); the drag from the hand to the trick is `src/ui/dragger.ts` over the shared kernel; the
-Rules and About tabs are `src/ui/{rules,glossary,about}.ts`; the score strip's Bodoni is the variable
-face with its optical-size axis, so a `0` at 20 px keeps its hairlines.
+Rules and About tabs are `src/ui/{rules,glossary,about}.ts`; the score strip's points are Lora 700,
+not Bodoni (D22's third use): on the live page a Bodoni zero at 20 px read as `()` whatever optical
+size the face was asked for, so the display face keeps the title and the room code alone.

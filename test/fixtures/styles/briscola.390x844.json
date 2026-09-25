@@ -360,6 +360,18 @@
         "--mid-w": 128
       }
     },
+    "368091e009cc": {
+      "v": [171, 144, 170, 35, 144, 35, 144, 170, 127, 126, 84, 110, 145, 145, 36, 51, 90, 144, 205],
+      "vars": {
+        "--aspect": 29,
+        "--back": 204,
+        "--back-colour": 19,
+        "--card-w": 129,
+        "--fan-overlap": 23,
+        "--fly-ms": 93,
+        "--mid-w": 128
+      }
+    },
     "3a2747fb467e": {
       "v": [161, 144, 170, 121, 144, 35, 187, 170, 131, 126, 61, 110, 108, 145, 36, 51, 45, 144, 205],
       "vars": {
@@ -371,6 +383,18 @@
         "--fly-ms": 93,
         "--mid-w": 128,
         "--suit-ink": 12
+      }
+    },
+    "3be59c3c487b": {
+      "v": [171, 144, 151, 35, 144, 35, 156, 151, 127, 126, 84, 110, 145, 145, 36, 51, 90, 144, 205],
+      "vars": {
+        "--aspect": 29,
+        "--back": 204,
+        "--back-colour": 19,
+        "--card-w": 129,
+        "--fan-overlap": 23,
+        "--fly-ms": 93,
+        "--mid-w": 128
       }
     },
     "3cba7b00d48b": {
@@ -456,30 +480,6 @@
         "--aspect": 29,
         "--back": 204,
         "--back-colour": 19
-      }
-    },
-    "50645c500831": {
-      "v": [171, 144, 151, 35, 144, 35, 156, 151, 127, 0, 84, 96, 145, 145, 36, 51, 90, 144, 205],
-      "vars": {
-        "--aspect": 29,
-        "--back": 204,
-        "--back-colour": 19,
-        "--card-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 93,
-        "--mid-w": 128
-      }
-    },
-    "546a6e4bee50": {
-      "v": [171, 144, 170, 35, 144, 35, 144, 170, 127, 0, 84, 96, 145, 145, 36, 51, 90, 144, 205],
-      "vars": {
-        "--aspect": 29,
-        "--back": 204,
-        "--back-colour": 19,
-        "--card-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 93,
-        "--mid-w": 128
       }
     },
     "5a4138a996b5": {
@@ -1763,7 +1763,7 @@
         ".overlay.curtain": "9cf8895f5c96",
         ".overlay.curtain .btn-ghost": "0a67a9eaaa76",
         ".sc-name": "5bf0bbfcd16e",
-        ".sc-points": "546a6e4bee50",
+        ".sc-points": "368091e009cc",
         ".sc-tricks": "9e28c861f278",
         ".score-cell": "f11393e380f8",
         ".score-cell.mine": "f11393e380f8",
@@ -1835,9 +1835,9 @@
         ".play": null,
         ".play .card": null,
         ".play .who": null,
-        ".sc-points": "50645c500831",
+        ".sc-points": "3be59c3c487b",
         ".score-cell": "f11393e380f8",
-        ".score-cell.leading .sc-points": "50645c500831",
+        ".score-cell.leading .sc-points": "3be59c3c487b",
         ".trick:empty::before": "e7dc863c3eae"
       }
     },
@@ -1924,7 +1924,7 @@
         ".overlay.curtain": "9cf8895f5c96",
         ".pile-peek": "00c636c740d9",
         ".pile-peek:disabled": "00c636c740d9",
-        ".sc-points": "546a6e4bee50",
+        ".sc-points": "368091e009cc",
         ".score-cell.leading .sc-points": null,
         ".slot.empty::before": null,
         ".stock": "43600b435d2e",
@@ -1953,8 +1953,8 @@
         ".play .card": "ccde4d0d8f16",
         ".play .card.taking": "ccde4d0d8f16",
         ".play .who": "6ad166ec6fc5",
-        ".sc-points": "50645c500831",
-        ".score-cell.leading .sc-points": "50645c500831",
+        ".sc-points": "3be59c3c487b",
+        ".score-cell.leading .sc-points": "3be59c3c487b",
         ".score-row": "97fb89929640",
         ".slot.empty::before": "939dcc1de094",
         ".stock": "8feb26b9d0fe",
@@ -1989,7 +1989,7 @@
         ".play .card": "28ed8402efc8",
         ".play .card.taking": "28ed8402efc8",
         ".play .who": "eeed7ff52f8e",
-        ".sc-points": "546a6e4bee50",
+        ".sc-points": "368091e009cc",
         ".sc-tricks": "2f2ac387dc00",
         ".score-cell": "2b07af3bb2ce",
         ".score-cell.leading .sc-points": null,
