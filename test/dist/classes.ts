@@ -3,7 +3,9 @@
 // carries and the ones its built stylesheets style. The extraction is a handful of documented
 // regular expressions over source text, not a parser: a name a helper builds (`cardClass`,
 // `abs-${sym}`) is invisible here on purpose and is listed in web/shared/styles/CONTRACT.md
-// instead, which test/dist/class-contract.test.ts reads through `parseContract`.
+// instead, which test/dist/class-contract.test.ts reads through `parseContract`. The row scoping
+// (`OWNERS`, `ownersOf`) and the stylesheet link-order policy (`OWN_SHEET`, `SHEETS_MAX`) that both
+// dist guards apply live here too (docs/design/dry-round-2.md G3, G4).
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { posix, resolve, sep } from 'node:path';
 
