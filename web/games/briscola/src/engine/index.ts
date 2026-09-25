@@ -39,15 +39,20 @@ export { actorOf, applyAction, canExchange, MESSAGES } from './apply.ts';
 export {
   cardById,
   cardName,
+  carichiLost,
   deckFor,
   exchangeCardFor,
   idsOf,
   isCardId,
+  isCarico,
   makeCard,
   makeDeck,
   pointsOf,
   SUIT_NAME,
+  trickFacts,
   trickWinner,
+  valueClassOf,
+  winningClassOf,
 } from './cards.ts';
 export {
   decodeAction,
@@ -118,7 +123,10 @@ export type {
   Side,
   State,
   Suit,
+  TrickFacts,
   TrickRecord,
+  ValueClass,
   View,
+  WinningClass,
 } from './types.ts';
 export { legalActions, viewFor } from './view.ts';

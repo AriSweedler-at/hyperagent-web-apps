@@ -117,6 +117,22 @@ export type TrickRecord = Readonly<{
 }>;
 /** E14, public. */
 export type Exchange = Readonly<{ seat: Seat; gave: Card; took: Card }>;
+/** The trick's points by class (design §4): 0, 1–9, 10–19, 20 and up (22 is the most a trick holds). */
+export type ValueClass = 'pointless' | 'small' | 'big' | 'huge';
+/** The class of the card that took a trick (design §4); `pip` is the 7, 6, 5, 4 or 2. */
+export type WinningClass = 'asso' | 'tre' | 're' | 'cavallo' | 'fante' | 'pip';
+/** What `trickFacts` reads off a complete trick (design §4, §5), stored on the `trick` event. */
+export type TrickFacts = Readonly<{
+  winningCard: Card;
+  winningClass: WinningClass;
+  /** The winning card is a trump. */
+  briscola: boolean;
+  /** A trump took an opponent's asso or tre of the led suit, a card that would otherwise have won. */
+  steal: boolean;
+  /** A trump won over another trump. */
+  overtrump: boolean;
+  valueClass: ValueClass;
+}>;
 /** `wins` per side (E13). */
 export type Match = Readonly<{
   gamesToWin: GamesToWin;
