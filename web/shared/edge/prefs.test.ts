@@ -88,7 +88,7 @@ describe('cardPackPref', () => {
         kind: 'invalid',
         key: 'briscola_cardPack',
         reason:
-          '$: expected one of "default" | "blue-stripe" | "yu-gi-oh" | "empty" | "linea" | "napoletane"',
+          '$: expected one of "default" | "blue-stripe" | "yu-gi-oh" | "empty" | "linea" | "napoletane" | "american"',
       },
     });
   });

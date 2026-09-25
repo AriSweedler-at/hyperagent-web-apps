@@ -3,10 +3,11 @@
 // so this reads each one back through the tool's own `checkPack` (the `check` command's body): it
 // exists, its frame size or viewBox agrees with the manifest, the URLs are `../../shared/`-relative,
 // a `files` pack is total and attributed, no face is over the cap and no pack's tree over the
-// budget. Two pins keep the vocabulary honest against the engines: `cardIds('french52')` is gin's
-// `makeDeck` in gin's order (this file may import a game; web/shared may not), and
-// `packsFor('french52')` is the legacy literal of gin's src/cardBack.ts. In the `shared` suite
-// (tools/ci/suites.ts) because it reads nothing a game builds.
+// budget. Three pins keep the vocabulary honest against the engines: `cardIds('french52')` is gin's
+// `makeDeck` in gin's order (this file may import a game; web/shared may not),
+// `packsFor('french52')` is the legacy literal of gin's src/cardBack.ts, and the `american` pack's
+// forty faces are gin's `cardHtml` of the relabelled card (docs/design/card-packs.md §3). In the
+// `shared` suite (tools/ci/suites.ts) because it reads nothing a game builds.
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -20,8 +21,11 @@ import {
   type ReadBytes,
 } from '../tools/card-packs.ts';
 import { makeDeck } from '../web/games/gin-rummy/src/engine/cards.ts';
-import { cardIds } from '../web/shared/lib/cards/decks.ts';
+import { cardHtml } from '../web/games/gin-rummy/src/ui/cards.ts';
+import { cardIds, splitId } from '../web/shared/lib/cards/decks.ts';
 import { CARD_PACKS, packByName, packsFor } from '../web/shared/lib/cards/packs.ts';
+import { relabelledId, resolveFace } from '../web/shared/lib/cards/resolve.ts';
+import { faceHtml } from '../web/shared/ui/cardFace.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const read: ReadBytes = (path) =>
@@ -34,6 +38,33 @@ describe('the vocabulary against the engines', () => {
 
   test("packsFor('french52') is gin's legacy card-back literal, in order", () => {
     expect(packsFor('french52')).toEqual(['default', 'blue-stripe', 'yu-gi-oh', 'empty']);
+  });
+
+  test("the american pack's forty faces are gin's cardHtml of forty distinct French cards, the Italian id on data-card", () => {
+    const american = packByName('american');
+    const faces = american.decks.italian40;
+    if (faces?.kind !== 'glyph' || faces.relabel === undefined) throw new Error('relabelled');
+    const relabel = faces.relabel;
+    const gin = makeDeck();
+    const pinned = cardIds('italian40').map((id) => {
+      const split = splitId('italian40', id);
+      const to = split === null ? null : relabelledId(relabel, split);
+      const card = gin.find((c) => c.id === to);
+      const spec = resolveFace(american, 'italian40', id);
+      if (to === null || card === undefined || spec === null) throw new Error(id);
+      // Byte for byte gin's markup, save `data-card`, which stays the card the briscola engine deals.
+      expect(cardHtml(card)).toContain(`data-card="${to}"`);
+      expect(faceHtml(spec)).toBe(cardHtml(card).replace(`data-card="${to}"`, `data-card="${id}"`));
+      expect(faceHtml(spec, { extra: 'big selected' })).toBe(
+        cardHtml(card, { big: true, selected: true }).replace(
+          `data-card="${to}"`,
+          `data-card="${id}"`,
+        ),
+      );
+      return to;
+    });
+    expect(pinned).toHaveLength(40);
+    expect(new Set(pinned).size).toBe(40);
   });
 });
 
@@ -159,6 +190,36 @@ describe('every pack is whole on disk', () => {
       'linea/italian40: KC is not a card',
       '/sheet.jpg: not ../../shared/-relative',
     ]);
+    // A relabel with a hole (bastoni unmapped), a stranger (the re sent to `X`) and a collision
+    // (denari onto hearts, where coppe already are): each card named once per fault.
+    const american = packByName('american');
+    expect(
+      checkPack(
+        {
+          ...american,
+          decks: {
+            italian40: {
+              kind: 'glyph',
+              relabel: {
+                deck: 'french52',
+                suits: { C: 'H', D: 'H', S: 'S' },
+                ranks: { F: 'J', C: 'Q', R: 'X' },
+              },
+            },
+          },
+        },
+        read,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        'american/italian40: AB has no french52 suit in the relabel',
+        'american/italian40: RB has no french52 suit in the relabel',
+        'american/italian40: RC relabels to XH, not a french52 card',
+        'american/italian40: RS relabels to XS, not a french52 card',
+        'american/italian40: AD relabels to AH, as AC does',
+        'american/italian40: CD relabels to QH, as CC does',
+      ]),
+    );
     // A raster back whose files are the wrong picture, and one with an unknown extension.
     const yugi = packByName('yu-gi-oh');
     expect(checkPack(yugi, () => Buffer.from('<svg viewBox="0 0 100 144"/>'))).toEqual([

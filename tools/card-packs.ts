@@ -44,6 +44,7 @@ import { chromium, type Page } from '@playwright/test';
 import {
   DECKS,
   cardIds,
+  isCardId,
   isDeckKind,
   splitId,
   type DeckKind,
@@ -53,7 +54,9 @@ import {
   FACE_WIDTH,
   packByName,
   type CardPack,
+  type Relabel,
 } from '../web/shared/lib/cards/packs.ts';
+import { relabelledId } from '../web/shared/lib/cards/resolve.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -541,6 +544,34 @@ const checkFile = (
 
 const isServed = (url: string): boolean => url.startsWith('../../shared/');
 
+/**
+ * A relabel table's faults (docs/design/card-packs.md §3): a card whose suit the table does not map,
+ * a card mapped onto no card of the target deck, two cards mapped onto one. Resolution draws the
+ * deck's own glyph for the first two, silently; the third would show one picture twice. All three
+ * are manifest errors a hand-written pack file may carry, so `check` names them card by card.
+ */
+const relabelProblems = (name: string, kind: DeckKind, relabel: Relabel): ReadonlyArray<string> => {
+  const mapped = cardIds(kind).map((id) => {
+    const split = splitId(kind, id);
+    return { id, to: split === null ? null : relabelledId(relabel, split) };
+  });
+  const at = `${name}/${kind}`;
+  return [
+    ...mapped
+      .filter((m) => m.to === null)
+      .map((m) => `${at}: ${m.id} has no ${relabel.deck} suit in the relabel`),
+    ...mapped
+      .filter((m) => m.to !== null && !isCardId(relabel.deck, m.to))
+      .map((m) => `${at}: ${m.id} relabels to ${String(m.to)}, not a ${relabel.deck} card`),
+    ...mapped.flatMap((m, i) => {
+      const first = mapped.find((o) => o.to === m.to);
+      return m.to === null || first === undefined || mapped.indexOf(first) === i
+        ? []
+        : [`${at}: ${m.id} relabels to ${m.to}, as ${first.id} does`];
+    }),
+  ];
+};
+
 /** Every problem with one pack's data and derived files; empty when the pack is whole. */
 export const checkPack = (pack: CardPack, read: ReadBytes): ReadonlyArray<string> => {
   const back = pack.back;
@@ -568,7 +599,8 @@ export const checkPack = (pack: CardPack, read: ReadBytes): ReadonlyArray<string
         : [];
   const deckProblems = Object.entries(pack.decks).flatMap(([kind, faces]) => {
     if (!isDeckKind(kind)) return [`${pack.name}: ${kind} is not a deck kind`];
-    if (faces.kind === 'glyph') return [];
+    if (faces.kind === 'glyph')
+      return faces.relabel === undefined ? [] : relabelProblems(pack.name, kind, faces.relabel);
     // A sourced pack (rasters, or any sheet) says whose pictures they are; a drawn SVG pack (linea) need not.
     if (pack.attribution === null && (faces.kind === 'sprite' || faces.ext !== 'svg'))
       return [`${pack.name}: a ${faces.kind} pack needs an attribution`];
