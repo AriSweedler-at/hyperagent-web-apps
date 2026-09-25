@@ -27,6 +27,7 @@ it must register.
 | `gin` | `web/games/gin-rummy/**/*.test.ts`, `test/parity/gin.*`, `test/fixtures/legacy/gin-wire.test.ts`, `test/card-backs.test.ts` | | the 10 gin rows | `**/gin-*.spec.ts`; `**/shell-*.spec.ts` tagged `@gin-rummy` (`@backgammon`, `@fidice` inverted) |
 | `fidice` | `web/games/fidice/**/*.test.ts`, `test/parity/fidice.*`, `test/tools/debundle-fidice.test.ts` | | the 7 fidice rows | `**/shell-online.spec.ts`, `**/shell-relay.spec.ts` tagged `@fidice` (`@gin-rummy`, `@backgammon` inverted) |
 | `backgammon` | `web/games/backgammon/**/*.test.ts` | | the 7 backgammon rows | `**/backgammon-*.spec.ts`; `**/shell-*.spec.ts` tagged `@backgammon` (`@gin-rummy`, `@fidice` inverted) |
+| `briscola` | `web/games/briscola/**/*.test.ts` | | the 2 briscola rows (the engine, and `*.algorithms.ts` forward) | (none until the page lands: `docs/design/briscola.md` PR-4; a plain `briscola` job in ci.yml until it joins the game matrix) |
 | `site` | `test/tokens.test.ts`, `test/ratchet.test.ts`, `infra/games-proxy/worker.test.ts` | `test/dist/**` (`needsBuild: true`) | `infra/games-proxy/worker.ts` | `**/smoke.spec.ts`, `**/computed-styles.spec.ts` |
 | `harness` | `test/tools/{serve-dist,proxy-dev,computed-styles}.test.ts`, `test/fixtures/legacy/{frozen,manifest}.test.ts`, `tools/**/*.test.ts` | | | |
 
@@ -157,9 +158,13 @@ another game). `shared` did not: `web/shared/edge/**` read 85.6/84.0/85.2/83.1
 own (unlike the other fakes) and the drag/FLIP helpers of `dom.ts` were exercised only by the
 games' painter tests. The row was not lowered: the shared suite gained `dom.fake.test.ts`, the
 geometry/frames/pointers block of `dom.test.ts`, the page fake's remaining members and two `ice.ts`
-branches, and reads 99.6/97.0/99.3/99.7 there now. The one forward row is backgammon's
-`engine/*.algorithms.ts` (no such file yet; it binds the first one to 100% and vitest passes it
-vacuously until then; `suites.test.ts` lists it as such).
+branches, and reads 99.6/97.0/99.3/99.7 there now. The forward rows are backgammon's and
+briscola's `engine/*.algorithms.ts` (no such file yet in either; each binds the first one to 100% and
+vitest passes it vacuously until then; `suites.test.ts` lists them as such). The `briscola` suite
+joined with its engine (`docs/design/briscola-rules.md` §5): 121 tests over five files, the engine
+row measured 100/100/100/96.5 and set at 95/95/95/93; the row `web/games/briscola/**` runs
+`briscola`, `site` (the ratchet over web/) and `harness` (the accounting) until the page earns
+`gameRules('briscola')`.
 
 ## Local loop
 
