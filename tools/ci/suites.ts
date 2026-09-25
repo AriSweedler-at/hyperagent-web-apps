@@ -204,8 +204,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // fake page and a three-story fake catalogue; the folder stays at 100 on every metric.
         // Wave G1's paintConnDot (shellPaint.ts, dry-round-2 E6) and homeView/shellIntents (home.ts,
         // E8) measure 100/100/100/100 through two shellPaint.test.ts and three home.test.ts cases
-        // over the fake page; the folder stays at 100 (575 lines, 186 functions, 621 statements,
-        // 343 branches).
+        // over the fake page; the folder stays at 100 (622 lines, 200 functions, 674 statements,
+        // 367 branches, with #103's `tabButtonId` in ids.ts, G3's stories.ts and #106's cardFace.ts).
         'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The coin game (dry-round-2.md F3): the two-seat engine the replay driver under test/shared
         // is proved on, and the shared shell's fake game to come. It exists to be exercised, so
@@ -322,9 +322,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // Re-measured when Wave G1 (dry-round-2 E6, E8) moved the connection dot's class and paint
       // out of ui/render.ts into web/shared/ui/shellPaint.ts paintConnDot, and the home view reader
       // and SHELL_INTENTS record out of ui/home.ts into web/shared/ui/home.ts homeView and
-      // shellIntents: ui 98.26/97.93/97.35/94.33 before, 98.23/97.85/97.32/94.39 after (the same 17
-      // lines uncovered, 977 → 962 lines; home.ts and the shared modules measure 100 on every
-      // metric; the row stands). Measured on this branch on main at 569d04d (#96).
+      // shellIntents: ui 98.81/97.95/98.12/95.06 before, 98.79/97.86/98.10/95.13 after (the same 11
+      // lines uncovered, 921 → 906 lines; home.ts and the shared modules measure 100 on every
+      // metric; the row stands). Measured on this branch rebased onto main at 77776e8 (#106).
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -517,9 +517,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // Re-measured when Wave G1 (dry-round-2 E6, E8) moved the connection dot's class and paint
       // out of ui/render.ts into web/shared/ui/shellPaint.ts paintConnDot, and the home view reader
       // and SHELL_INTENTS record out of ui/home.ts into web/shared/ui/home.ts homeView and
-      // shellIntents: ui 99.50/100/98.62/92.12 before, 99.49/100/98.61/92.16 after (the same 6
-      // lines uncovered, 1195 → 1180 lines; home.ts and the shared modules measure 100 on every
-      // metric; the row stands). Measured on this branch on main at 569d04d (#96).
+      // shellIntents: ui 99.47/100/98.70/92.09 before, 99.46/100/98.68/92.12 after (the same 6
+      // lines uncovered, 1131 → 1116 lines; home.ts and the shared modules measure 100 on every
+      // metric; the row stands). Measured on this branch rebased onto main at 77776e8 (#106).
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
