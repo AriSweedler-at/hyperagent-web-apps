@@ -2,9 +2,10 @@
 // DOM", §5.4 "Interaction", §5.6 "Testability"; docs/ARCHITECTURE.md "Module boundaries": ui/
 // reaches the document only through the shared DOM edge). `paint(doc, app)` is idempotent and runs
 // after every intent: the screen switch and the waiting statuses, the home screen (ui/home.ts), the
-// card pack's tokens, the curtain (ui/local.ts), the table, the result sheet, the endgame and the
-// overlays, each written from the App (ui/state.ts) alone, so the same App always paints the same
-// DOM. Backgammon's ui/render.ts is the shape; the table is this game's.
+// card pack's tokens, the curtain (ui/local.ts), the table, the result sheet (where every game
+// ends, with Play again; the shell's end screen is never shown) and the overlays, each written
+// from the App (ui/state.ts) alone, so the same App always paints the same DOM. Backgammon's
+// ui/render.ts is the shape; the table is this game's.
 //
 // The table is keyed (§5.2): every container carries `data-key` and is rebuilt from ui/table.ts's
 // builders only when its key changes (web/shared/ui/keyed.ts `ensureKeyed`), so a lift never
@@ -19,7 +20,11 @@
 // overlays' controls into intents (one delegated click on `#hand`; Enter/Space on a focused slot is
 // the same tap, §5.5); the input wiring of the home screen and the curtain is beside their paints.
 // The phone's menu sheet is the one thing toggled here rather than painted from the App (see
-// `bindMenu`).
+// `bindMenu`). The cards' names come from the App's language pack (docs/design/language-packs.md
+// §5): every face-up card's `aria-label`, the `.card-name` caption under each play and under the
+// stock for the briscola, the `#cardTip` over a hovered or long-pressed hand card (`paintTip`, from
+// `table.tip`; `bindTip` turns the hand's pointer events into its intents) and the card view's
+// line (`paintCardView`, from `table.cardView`).
 import {
   closestFrom,
   dataOf,
@@ -28,11 +33,14 @@ import {
   keyOf,
   listen,
   listenId,
+  pointerTypeOf,
   preventDefault,
   queryAllIn,
   queryIn,
+  rectOf,
   requireId,
   setAttr,
+  setChecked,
   setDisabled,
   setHidden,
   setHtml,
@@ -47,6 +55,7 @@ import {
 } from '../../../../shared/edge/dom.ts';
 import { defaultPackFor, packByName, type CardPack } from '../../../../shared/lib/cards/packs.ts';
 import { resolveAspect, resolveBack } from '../../../../shared/lib/cards/resolve.ts';
+import { langByName, type LanguagePack } from '../../../../shared/lib/lang/packs.ts';
 import { suitSymbolId } from '../../../../shared/lib/cards/suits.ts';
 import { backImageCss } from '../../../../shared/ui/cardFace.ts';
 import { paintHistory } from '../../../../shared/ui/history.ts';
@@ -69,7 +78,6 @@ import {
   SUIT_NAME,
   cardById,
   exchangeCardFor,
-  matchWinner,
   nameOf,
   resultText,
   seatsOfSide,
@@ -97,15 +105,15 @@ import {
 import {
   DECK_KIND,
   briscolaHtml,
+  cardHtml,
   cardLabelEn,
+  cardNameOf,
   cellOfSeat,
   chipCount,
   chipsHtml,
-  gameBadgeText,
   handHtml,
   handKey,
   leadCue,
-  matchLabel,
   scoreCells,
   scoreKey,
   scoreMode,
@@ -127,6 +135,7 @@ import {
   type SeatCell,
 } from './table.ts';
 import { aboutHtml } from './about.ts';
+import { deckHtml, deckKey, deckOf, deckSubText } from './deck.ts';
 import { bindDrag } from './dragger.ts';
 import { bindHome, paintHome } from './home.ts';
 import { RULES_SLOT_IDS, rulesItemsHtml } from './rules.ts';
@@ -281,7 +290,7 @@ const drawnCardId = (app: App, v: View, b: Beat): string | null => {
   return v.me.hand.find((c) => !prev.me.hand.some((p) => p.id === c.id))?.id ?? null;
 };
 
-// ---- the topbar: the trump badge and the game badge (§5.2) ------------------------------------------
+// ---- the topbar: the trump badge (§5.2) --------------------------------------------------------------
 
 /** `#trumpBadge`: the suit's mark (`s-<suit>`), its sprite symbol, its Italian name and the English aria label (§5.5). */
 export const paintTrump = (doc: DocumentLike, v: View): void => {
@@ -353,19 +362,31 @@ export const paintSeats = (doc: DocumentLike, app: App, v: View, b: Beat, pack: 
  * the trump card is left) and `#briscola` (the trump card keyed on its id, `gone` once drawn with
  * its box kept, `tappable` while the exchange is offered to me), both as before the beat's draw.
  */
-export const paintStock = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPack): void => {
+export const paintStock = (
+  doc: DocumentLike,
+  app: App,
+  v: View,
+  b: Beat,
+  pack: CardPack,
+  lang: LanguagePack,
+): void => {
   const count = stockShown(v, b);
   const stock = requireId(doc, 'stock');
   setAttr(stock, 'data-count', String(count));
   setAttr(stock, 'aria-label', `Stock, ${String(count)} cards`);
-  ensureKeyed(stock, `${stockKey(count, v.stockTop)}|${pack.name}`, () =>
-    stockHtml(pack, count, v.stockTop),
+  ensureKeyed(stock, `${stockKey(count, v.stockTop)}|${pack.name}|${lang.name}`, () =>
+    stockHtml(pack, count, v.stockTop, lang),
   );
   toggleClass(stock, 'empty', count <= 1);
   setText(requireId(doc, 'stockCount'), stockLabel(count));
   const briscola = requireId(doc, 'briscola');
-  ensureKeyed(briscola, `${v.trumpCard.id}|${pack.name}`, () => briscolaHtml(pack, v.trumpCard));
-  toggleClass(briscola, 'gone', !trumpOnTableShown(v, b));
+  const onTable = trumpOnTableShown(v, b);
+  ensureKeyed(briscola, `${v.trumpCard.id}|${pack.name}|${lang.name}`, () =>
+    briscolaHtml(pack, v.trumpCard, lang),
+  );
+  // The briscola's name under the stock's count (its own box is rotated), gone with the card.
+  setText(requireId(doc, 'briscolaName'), onTable ? cardNameOf(lang, v.trumpCard.id) : '');
+  toggleClass(briscola, 'gone', !onTable);
   toggleClass(briscola, 'tappable', liveView(app) !== null && v.canExchange);
 };
 
@@ -377,7 +398,14 @@ export const paintStock = (doc: DocumentLike, app: App, v: View, b: Beat, pack: 
  * outside it); `arriving` hides the cards while their clones fly to the winner; the leader's cue
  * (`data-lead`, `:empty::before`) while the trick is empty; the drag's `drop-ready`/`drop` marks.
  */
-const paintTrick = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPack): void => {
+const paintTrick = (
+  doc: DocumentLike,
+  app: App,
+  v: View,
+  b: Beat,
+  pack: CardPack,
+  lang: LanguagePack,
+): void => {
   const trick = requireId(doc, 'trick');
   const me = v.me.idx;
   setAttr(trick, 'data-players', String(v.options.seatCount));
@@ -388,8 +416,8 @@ const paintTrick = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPac
     'data-lead',
     cards.length === 0 && v.phase === 'trick' ? leadCue(v.players, me, v.leader) : '',
   );
-  ensureKeyed(trick, `${trickKey(cards)}|${pack.name}`, () =>
-    trickHtml(cards, { players: v.players, me, pack, taking }),
+  ensureKeyed(trick, `${trickKey(cards)}|${pack.name}|${lang.name}`, () =>
+    trickHtml(cards, { players: v.players, me, pack, taking, lang }),
   );
   queryAllIn(trick, '.card').forEach((card) => {
     toggleClass(card, 'taking', taking !== null && dataOf(card, 'seat') === String(taking));
@@ -422,7 +450,7 @@ export const takesText = (
 ): string =>
   `${whoName(players, me, trick.winner)} take${trick.winner === me ? '' : 's'} the trick · ${String(trick.points)} points`;
 
-/** The game's result as one line (E12): "Ann wins 71–49", "A draw, 60–60", "Ann and Cara win 65–55 and take the match 2–0". */
+/** The game's result as one line (E12): "Ann wins 71–49", "A draw, 60–60", "Ann and Cara win 65–55"; never the engine's match clause (one game per sitting). */
 export const resultLine = (v: View): string => {
   const r = v.result;
   if (r === null) return '';
@@ -430,7 +458,7 @@ export const resultLine = (v: View): string => {
     winner: r.winner,
     totals: r.totals,
     draw: r.draw,
-    decided: v.matchOver,
+    decided: false,
     wins: v.match.wins,
   });
 };
@@ -494,15 +522,22 @@ const paintSlot = (
  * slot's marks refreshed outside the key. `#myName`, my strip of chips (`#myTricks`: one per trick
  * taken, `data-count` and `--n`, the arriving one laid through the flight) and `#myTaken` above it.
  */
-export const paintHand = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPack): void => {
+export const paintHand = (
+  doc: DocumentLike,
+  app: App,
+  v: View,
+  b: Beat,
+  pack: CardPack,
+  lang: LanguagePack,
+): void => {
   const hand = requireId(doc, 'hand');
   const live = liveView(app) !== null;
   const faceDown = app.table.curtain !== null;
   const slots = app.table.slots;
   const selected = app.table.selected;
   const playable = live ? v.legal : [];
-  ensureKeyed(hand, handKey(slots, pack.name, faceDown), () =>
-    handHtml(pack, slots, { selected, playable, faceDown }),
+  ensureKeyed(hand, `${handKey(slots, pack.name, faceDown)}|${lang.name}`, () =>
+    handHtml(pack, slots, { selected, playable, faceDown, lang }),
   );
   toggleClass(hand, 'active', live);
   toggleClass(hand, 'inert', !live);
@@ -547,7 +582,7 @@ const paintActions = (doc: DocumentLike, app: App, v: View, b: Beat): void => {
   );
 };
 
-// ---- the result sheet, the endgame (§5.1) ----------------------------------------------------------------
+// ---- the result sheet (§5.1) -----------------------------------------------------------------------------
 
 /** A side's name: "Ann" at two and three players, "Ann & Cara" for a four-player team (the strip's spelling). */
 export const sideLabel = (players: View['players'], n: SeatCount, side: Side): string =>
@@ -594,24 +629,17 @@ export const sideRowsHtml = (v: View): string => {
     .join('');
 };
 
-/** `#rsMatch`: "Games: Ann 1 · Bob 0 · draws 1 · best of 3" (D7). */
-export const matchText = (v: View): string => {
-  const n = v.options.seatCount;
-  const wins = sideList(n).map(
-    (side) => `${sideLabel(v.players, n, side)} ${String(v.match.wins[side] ?? 0)}`,
-  );
-  const draws = v.match.draws === 0 ? [] : [`draws ${String(v.match.draws)}`];
-  return `Games: ${[...wins, ...draws, matchLabel(v.match.gamesToWin)].join(' · ')}`;
-};
+/** `#rsReplayBtn`'s words: the owner's "replay button at the end" (2026-09-25). */
+export const PLAY_AGAIN_LABEL = 'Play again';
 
-/** A guest's "Next game" waits for the host to deal (D20); the host and the phone deal at once. */
-export const nextWaits = (app: App): boolean => app.shell.role === 'guest';
-export const nextLabel = (app: App, v: View): string =>
-  nextWaits(app) ? waitingToDealMsg(nameOf(v.players, 0)) : v.matchOver ? 'Rematch' : 'Next game';
+/** A guest's Play again waits for the host to deal (D20); the host and the phone deal at once. */
+export const replayWaits = (app: App): boolean => app.shell.role === 'guest';
+export const replayLabel = (app: App, v: View): string =>
+  replayWaits(app) ? waitingToDealMsg(nameOf(v.players, 0)) : PLAY_AGAIN_LABEL;
 
-/** `#resultOverlay` at `phase 'over'` once the last trick has settled (ui/state.ts `resultOpen`), the match end being the endgame screen's. */
+/** `#resultOverlay` at `phase 'over'` once the last trick has settled (ui/state.ts `resultOpen`): where every game ends, decided or drawn. */
 const paintResult = (doc: DocumentLike, app: App, v: View): void => {
-  paintSheet(doc, 'resultOverlay', resultOpen(app) && !v.matchOver);
+  paintSheet(doc, 'resultOverlay', resultOpen(app));
   if (v.phase !== 'over') return;
   const text = resultSheetText(v);
   setText(requireId(doc, 'rsTitle'), text.title);
@@ -621,52 +649,9 @@ const paintResult = (doc: DocumentLike, app: App, v: View): void => {
     `${String(v.startedAt)}:${String(v.gameNo)}:${String(v.endedAt)}`,
     () => sideRowsHtml(v),
   );
-  setText(requireId(doc, 'rsMatch'), matchText(v));
-  const next = requireId(doc, 'rsNextBtn');
-  setText(next, nextLabel(app, v));
-  setDisabled(next, nextWaits(app));
-};
-
-/** `#resultTitle`: "Bravi! Ann takes the match 2–0" / "Bravi! Ann & Cara take the match 2–1" (D23). */
-export const matchTitle = (v: View): string => {
-  const n = v.options.seatCount;
-  const w = matchWinner(v.match);
-  if (w === null) return 'Match over';
-  const plural = seatsOfSide(n, w).length > 1;
-  return `Bravi! ${sideLabel(v.players, n, w)} ${plural ? 'take' : 'takes'} the match ${scoreline(v.match.wins, w)}`;
-};
-
-/** `#resultSub`: "3 games", "4 games · 1 draw". */
-export const matchSubText = (v: View): string => {
-  const games = `${String(v.games.length)} game${v.games.length === 1 ? '' : 's'}`;
-  const d = v.match.draws;
-  return d === 0 ? games : `${games} · ${String(d)} draw${d === 1 ? '' : 's'}`;
-};
-
-/** `#matchScore`: one row per finished game, "Game 1 · Ann · 71–49" (a draw names nobody). */
-export const gamesHtml = (v: View): string => {
-  const n = v.options.seatCount;
-  return v.games
-    .map((g) => {
-      const who = g.winner === null ? 'a draw' : sideLabel(v.players, n, g.winner);
-      const totals =
-        g.winner === null ? g.totals.map(String).join('–') : scoreline(g.totals, g.winner);
-      return `<div class="score-row"><span>Game ${String(g.gameNo)}</span><span class="who">${escapeHtml(who)}</span><span>${totals}</span></div>`;
-    })
-    .join('');
-};
-
-const paintEndgame = (doc: DocumentLike, app: App, v: View): void => {
-  setText(requireId(doc, 'resultTitle'), matchTitle(v));
-  setText(requireId(doc, 'resultSub'), matchSubText(v));
-  ensureKeyed(
-    requireId(doc, 'matchScore'),
-    `${String(v.startedAt)}:${String(v.games.length)}`,
-    () => gamesHtml(v),
-  );
-  const next = requireId(doc, 'nextGameBtn');
-  setText(next, nextLabel(app, v));
-  setDisabled(next, nextWaits(app));
+  const replay = requireId(doc, 'rsReplayBtn');
+  setText(replay, replayLabel(app, v));
+  setDisabled(replay, replayWaits(app));
 };
 
 // ---- the sheets: rules, history ------------------------------------------------------------------------------
@@ -692,17 +677,43 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
   }
 };
 
+// ---- the deck sheet (ui/deck.ts; the owner's ask of 2026-09-25, gin's discards sheet on the forty) ----------
+
+/**
+ * `#deckOverlay` while the table has a view: the count line, the four suit rows keyed on what is
+ * gone, what is mine, the toggle and the pack (a trick taken or a toggle rebuilds them, a lift does
+ * not), and the toggle's box as the App has it.
+ */
+const paintDeck = (doc: DocumentLike, app: App, pack: CardPack): void => {
+  const v = app.shell.view;
+  const open = app.table.deckOpen && v !== null;
+  paintSheet(doc, 'deckOverlay', open);
+  if (!open) return;
+  const deck = deckOf(v, app.table.deckWithHand);
+  setText(requireId(doc, 'deckSub'), deckSubText(deck));
+  ensureKeyed(requireId(doc, 'deckList'), `${deckKey(deck)}|${pack.name}`, () =>
+    deckHtml(pack, deck),
+  );
+  setChecked(requireId(doc, 'deckIncludeHand'), app.table.deckWithHand);
+};
+
 // ---- the whole table, the beat's flights and the whole paint ------------------------------------------------
 
-const paintTable = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPack): void => {
+const paintTable = (
+  doc: DocumentLike,
+  app: App,
+  v: View,
+  b: Beat,
+  pack: CardPack,
+  lang: LanguagePack,
+): void => {
   paintTrump(doc, v);
-  setText(requireId(doc, 'gameBadge'), gameBadgeText(v.gameNo, v.match));
   paintSeats(doc, app, v, b, pack);
-  paintStock(doc, app, v, b, pack);
-  paintTrick(doc, app, v, b, pack);
+  paintStock(doc, app, v, b, pack, lang);
+  paintTrick(doc, app, v, b, pack, lang);
   paintScore(doc, v, b);
   setText(requireId(doc, 'statusText'), statusText(app, v));
-  paintHand(doc, app, v, b, pack);
+  paintHand(doc, app, v, b, pack, lang);
   paintActions(doc, app, v, b);
 };
 
@@ -736,11 +747,11 @@ const flightsFor = (v: View, b: Beat, drawn: string | null): ReadonlyArray<Fligh
 };
 
 /**
- * The game screens from a view: the endgame once the match is over and settled, else the table, its
- * result sheet and the beat's flights, launched once per stage (`#tableScreen[data-beat]` remembers
- * the stage last flown, so a repaint mid-flight launches nothing).
+ * The game screens from a view: the table, its result sheet and the beat's flights, launched once
+ * per stage (`#tableScreen[data-beat]` remembers the stage last flown, so a repaint mid-flight
+ * launches nothing).
  */
-const paintGame = (doc: PageLike, app: App, pack: CardPack): void => {
+const paintGame = (doc: PageLike, app: App, pack: CardPack, lang: LanguagePack): void => {
   const v = app.shell.view;
   const screen = requireId(doc, 'tableScreen');
   if (v === null) {
@@ -749,13 +760,7 @@ const paintGame = (doc: PageLike, app: App, pack: CardPack): void => {
     return;
   }
   const b = beatOf(app.table.settle);
-  if (v.matchOver && b.stage === null) {
-    paintEndgame(doc, app, v);
-    paintSheet(doc, 'resultOverlay', false);
-    setAttr(screen, 'data-beat', null);
-    return;
-  }
-  paintTable(doc, app, v, b, pack);
+  paintTable(doc, app, v, b, pack, lang);
   paintResult(doc, app, v);
   const beat =
     b.trick === null || b.stage === null
@@ -766,17 +771,60 @@ const paintGame = (doc: PageLike, app: App, pack: CardPack): void => {
   flyCards(doc, flightsFor(v, b, drawnCardId(app, v, b)));
 };
 
+// ---- the card names: the tip over a hand card and the card view (docs/design/language-packs.md §5) ----
+
+/**
+ * `#cardTip`: the name of the hand card `table.tip` shows, in the App's language, placed at the
+ * card's top centre (the CSS lifts it clear); hidden while no tip is shown, while the card has
+ * left the hand, or while the hand is down. Fixed on the body, so it clears the table's overflow.
+ */
+export const paintTip = (doc: DocumentLike, app: App, lang: LanguagePack): void => {
+  const tip = requireId(doc, 'cardTip');
+  const t = app.table.tip;
+  const card =
+    t === null || !t.shown || app.table.curtain !== null
+      ? null
+      : queryIn(requireId(doc, 'hand'), `.card[data-card="${t.card}"]`);
+  toggleClass(tip, 'hidden', card === null);
+  if (t === null || card === null) return;
+  const r = rectOf(card);
+  setText(tip, cardNameOf(lang, t.card));
+  setAttr(tip, 'data-card', t.card);
+  setStyle(tip, 'left', `${String(r.left + r.width / 2)}px`);
+  setStyle(tip, 'top', `${String(r.top)}px`);
+};
+
+/** `#cardViewOverlay`: the card `table.cardView` names, large through the pack (keyed on the card, the pack and the language), its name beneath. */
+export const paintCardView = (
+  doc: DocumentLike,
+  app: App,
+  pack: CardPack,
+  lang: LanguagePack,
+): void => {
+  const id = app.table.cardView;
+  paintSheet(doc, 'cardViewOverlay', id !== null);
+  if (id === null) return;
+  ensureKeyed(requireId(doc, 'cardViewFace'), `${id}|${pack.name}|${lang.name}`, () =>
+    cardHtml(pack, id, '', lang),
+  );
+  setText(requireId(doc, 'cardViewName'), cardNameOf(lang, id));
+};
+
 /** Everything, from the App alone. */
 export const paint = (doc: PageLike, app: App): void => {
   const pack = packByName(app.table.cardPack);
+  const lang = langByName(app.table.lang);
   paintScreen(doc, app);
   paintWaiting(doc, app);
   paintHome(doc, app);
   paintPack(doc, app.table.cardPack);
   paintCurtain(doc, app);
   paintHandoff(doc, app);
-  paintGame(doc, app, pack);
+  paintGame(doc, app, pack, lang);
   paintOverlays(doc, app);
+  paintTip(doc, app, lang);
+  paintCardView(doc, app, pack, lang);
+  paintDeck(doc, app, pack);
 };
 
 // ---- input wiring (§5.4, §5.5) ------------------------------------------------------------------------------
@@ -787,7 +835,9 @@ export const paint = (doc: PageLike, app: App): void => {
 const SHEETS: ReadonlyArray<Sheet<Intent>> = [
   { overlay: 'rulesOverlay', close: 'closeRulesBtn', intent: { type: 'rules/close' } },
   { overlay: 'historyOverlay', close: 'closeHistoryBtn', intent: { type: 'history/close' } },
+  { overlay: 'deckOverlay', close: 'closeDeckBtn', intent: { type: 'deck/close' } },
   { overlay: 'resultOverlay', close: 'rsPeekBtn', intent: { type: 'result/peek' } },
+  { overlay: 'cardViewOverlay', close: 'closeCardViewBtn', intent: { type: 'cardView/close' } },
 ];
 
 /**
@@ -837,7 +887,43 @@ const bindMenu = (doc: PageLike, dispatch: Dispatch): void => {
   });
 };
 
-/** The table's, the sheets' and the endgame's controls, each an intent. */
+/** The hand card under a pointer event, or null for the felt, an empty slot or the hand face down (never a back). */
+const tipCardOf = (doc: DocumentLike, e: Readonly<Event>): string | null => {
+  if (hasClass(requireId(doc, 'hand'), 'hidden-cards')) return null;
+  const card = closestFrom(e, '.card[data-card]');
+  return card === null ? null : dataOf(card, 'card');
+};
+
+/**
+ * The card-name tip's pointer wiring over `#hand` (docs/design/language-packs.md §5): a fine
+ * pointer arms it on `pointerover` and drops it on `pointerout` or a press; a touch arms it on
+ * `pointerdown` (the long press) and drops it when the finger lifts, the lift swallowing the click
+ * it fires so the card is not lifted too. The timers are the reducer's (`tip/arm`, `tip/show`).
+ */
+export const bindTip = (doc: PageLike, dispatch: Dispatch): void => {
+  const hand = requireId(doc, 'hand');
+  const touch = (e: Readonly<Event>): boolean => pointerTypeOf(e) === 'touch';
+  listen(hand, 'pointerover', (e) => {
+    const card = tipCardOf(doc, e);
+    if (card !== null && !touch(e)) dispatch({ type: 'tip/arm', card, press: false });
+  });
+  listen(hand, 'pointerout', () => {
+    dispatch({ type: 'tip/hide' });
+  });
+  listen(hand, 'pointerdown', (e) => {
+    const card = tipCardOf(doc, e);
+    if (card !== null && touch(e)) dispatch({ type: 'tip/arm', card, press: true });
+    else dispatch({ type: 'tip/hide' });
+  });
+  listen(hand, 'pointerup', (e) => {
+    dispatch(touch(e) ? { type: 'tip/hide', swallow: true } : { type: 'tip/hide' });
+  });
+  listen(hand, 'pointercancel', () => {
+    dispatch({ type: 'tip/hide' });
+  });
+};
+
+/** The table's and the sheets' controls, each an intent (the shell's leave button too, though the menu's row is the one reached). */
 export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   listenId(doc, 'hand', 'click', (e) => {
     const intent = handIntentOf(e);
@@ -860,15 +946,15 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
     dispatch({ type: 'exchange/click' });
   });
   // The controls whose click is one constant; `skipDisabled`: a click on a control carrying
-  // `disabled` dispatches nothing (the paint disables the play button and Next).
+  // `disabled` dispatches nothing (the paint disables the play button and Play again).
   bindButtons(
     doc,
     dispatch,
     [
       ['playBtn', { type: 'play/click' }],
+      ['deckBtn', { type: 'deck/open' }],
       ['resultChipBtn', { type: 'result/open' }],
-      ['rsNextBtn', { type: 'next/click' }],
-      ['nextGameBtn', { type: 'next/click' }],
+      ['rsReplayBtn', { type: 'replay/click' }],
       ['leaveBtn', { type: 'leave/request' }],
       ['soundBtn', { type: 'sound/toggle' }],
       ['handoffBtn', { type: 'handoff/click' }],
@@ -877,7 +963,12 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
     ],
     { skipDisabled: true },
   );
+  // The deck sheet's toggle (ui/deck.ts): the box's change is the intent; the paint writes it back.
+  listenId(doc, 'deckIncludeHand', 'change', () => {
+    dispatch({ type: 'deck/toggleHand' });
+  });
   bindMenu(doc, dispatch);
+  bindTip(doc, dispatch);
 };
 
 /**

@@ -3,7 +3,8 @@
 // summary with its actor lifted out as the chip, the detail pairs as a `<dl>`, a trick's value
 // class on the row, newest last, the empty note; a line that does not open with its actor is
 // printed whole; names escaped by the panel. The list's keys and the appended rows are the shared
-// panel's own tests.
+// panel's own tests. A result row is the game's alone: the engine's match clause and its tally row
+// stay off the sheet (one game per sitting, the owner, 2026-09-25).
 import { describe, expect, test } from 'vitest';
 
 import { historyHtml, historyRowHtml } from '../../../../shared/ui/history.ts';
@@ -18,6 +19,8 @@ import {
 import {
   EMPTY_HISTORY_MSG,
   HISTORY_COPY,
+  detailText,
+  lineOf,
   summaryText,
   valueOf,
   whoOf,
@@ -103,13 +106,41 @@ describe('the copy, rendered by the shared panel', () => {
       '<details class="history-row" data-kind="game" data-id="2"><summary>Game 2 begins</summary><dl class="history-detail"><dt>Dealer</dt><dd>Jeff</dd></dl></details>',
     );
     expect(row(RESULT)).toContain(
-      `data-kind="result" data-id="3"><summary>${summaryOf(RESULT, PLAYERS, 2)}</summary>`,
+      `data-kind="result" data-id="3"><summary>${lineOf(RESULT, CTX)}</summary>`,
     );
+    expect(lineOf(RESULT, CTX)).toBe('Jeff wins 67–53');
     expect(row(DEAL)).toContain(
       '<summary><span class="who">Ari</span> dealt · the briscola is the sette di bastoni</summary>',
     );
     expect([GAME, RESULT, DEAL].map(valueOf)).toEqual([null, null, null]);
     expect(whoOf(RESULT, CTX)).toBeNull();
+  });
+
+  test('a result row reads the game`s result alone: no match clause in the line, no tally row in the detail, whatever the engine`s event says', () => {
+    const decided: GameEvent = {
+      ...RESULT,
+      data: { winner: 0, totals: [71, 49], draw: false, decided: true, wins: [1, 0] },
+    };
+    expect(summaryOf(decided, PLAYERS, 2)).toBe('Ari wins 71–49 and takes the match 1–0');
+    expect(lineOf(decided, CTX)).toBe('Ari wins 71–49');
+    expect(whoOf(decided, CTX)).toBeNull();
+    expect(summaryText(decided, CTX)).toBe('Ari wins 71–49');
+    expect(detailOf(decided, PLAYERS, 2).map(([label]) => label)).toEqual(['Ari', 'Jeff', 'Match']);
+    expect(detailText(decided, CTX)).toEqual([
+      ['Ari', '71'],
+      ['Jeff', '49'],
+    ]);
+    expect(row(decided)).toBe(
+      '<details class="history-row" data-kind="result" data-id="3"><summary>Ari wins 71–49</summary><dl class="history-detail"><dt>Ari</dt><dd>71</dd><dt>Jeff</dt><dd>49</dd></dl></details>',
+    );
+    const drawn: GameEvent = {
+      ...RESULT,
+      data: { winner: null, totals: [60, 60], draw: true, decided: false, wins: [0, 0] },
+    };
+    expect(lineOf(drawn, CTX)).toBe('A draw, 60–60');
+    // Every other kind is the engine's line and detail, untouched.
+    expect(lineOf(TRICK, CTX)).toBe(summaryOf(TRICK, PLAYERS, 2));
+    expect(detailText(TRICK, CTX)).toEqual(detailOf(TRICK, PLAYERS, 2));
   });
 
   test('a name is escaped in the chip and in the detail', () => {

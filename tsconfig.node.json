@@ -106,6 +106,8 @@
     "web/games/*/src/ui/*/dragger*.ts",
     "web/games/*/src/ui/dragger*.ts",
     "web/games/*/src/ui/table*.ts",
+    // The deck sheet's builders (briscola's ui/deck.ts) paint through table.ts's cardHtml, so they follow it out.
+    "web/games/briscola/src/ui/deck*.ts",
     "web/games/gin-rummy/src/ui/hand/flip*.ts",
     "web/games/gin-rummy/src/scorer/main*.ts",
     "web/games/*/src/stories/boot.ts",

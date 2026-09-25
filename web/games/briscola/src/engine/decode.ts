@@ -56,7 +56,7 @@ import {
 
 /** E21: every seat a table could have; `applyAction` refuses one the table does not (BAD_SEAT). */
 export const decodeSeat: Decoder<Seat> = literal(0, 1, 2, 3);
-const side: Decoder<Side> = literal(0, 1, 2);
+const side: Decoder<Side> = literal(0, 1, 2, 3);
 const suit: Decoder<Suit> = literal('C', 'D', 'S', 'B');
 const rank: Decoder<Rank> = literal(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 const seatCount = literal(2, 3, 4);

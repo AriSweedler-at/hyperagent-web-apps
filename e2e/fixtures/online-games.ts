@@ -329,7 +329,7 @@ const briscola: ShellDriver = {
     await expect(guest.locator('#hand .card')).toHaveCount(3);
   },
   // The host's save carries the room's six terms (protocol.ts's order) and the game at its first deal.
-  hostSave: { seatCount: 2, gamesToWin: 2, game: { gameNo: 1 } },
+  hostSave: { seatCount: 2, gamesToWin: 1, game: { gameNo: 1 } },
   localSave: { game: { gameNo: 1, trickNo: 0 } },
   table: '#hand .card',
   curtainOffer: {
@@ -343,15 +343,15 @@ const briscola: ShellDriver = {
     },
   },
   // The Rules and About copy (ui/rules.ts, ui/glossary.ts, ui/about.ts): "briscola" in the About
-  // copy lands on the briscola rule; the trick rule names the draw, as the last tricks do.
+  // copy lands on the briscola rule; the trick rule names the draw, the draw rule the trick.
   glossary: {
     aboutTerm: 'briscola',
     aboutRule: 'briscola',
     innerFrom: 'trick',
     innerTo: 'draw',
-    deepLink: 'scoring',
-    overlayFrom: 'last-tricks',
-    overlayTo: 'draw',
+    deepLink: 'goal',
+    overlayFrom: 'draw',
+    overlayTo: 'trick',
     openRulesOverTable: async (page, url, viewport) => {
       await briscolaStartLocal(page, url, viewport);
       await briscolaReveal(page);

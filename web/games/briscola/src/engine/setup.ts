@@ -3,8 +3,9 @@
 // play order (the leader first, the dealer last), the trump card turned and laid under the stock,
 // and the `State` literal in types.ts's key order. `createGame` is infallible: the `Players` tuple
 // fixes the seat count and every option has a default. `nextGame` deals the following game of the
-// same match with the dealer rotated; `withPosition` seats a position for tests, stories and
-// `__briscola.setup`.
+// same match with the dealer rotated; `replayGame` starts a new match for the same table with the
+// dealer rotated too (the page's Play again); `withPosition` seats a position for tests, stories
+// and `__briscola.setup`.
 import type { Rng } from '../../../../shared/lib/rng.ts';
 import { shuffle } from '../../../../shared/lib/shuffle.ts';
 import { deckFor, makeCard } from './cards.ts';
@@ -144,6 +145,24 @@ export const createGame = (
   const dealer = drawDealer(options.seatCount, rng);
   return startGame(players, options, 1, dealer, freshMatch(options), [], [], rng, now);
 };
+
+/**
+ * A new match for the same players and options after `state`'s: game 1, a fresh tally and stream,
+ * the dealer the seat after `state`'s, so the deal passes on as it does within a match (E13) and
+ * the rng is not read for it (m − 1 calls, the shuffle alone).
+ */
+export const replayGame = (state: State, rng: Rng, now: Now): State =>
+  startGame(
+    state.players,
+    state.options,
+    1,
+    nextSeat(state.options.seatCount, state.dealer),
+    freshMatch(state.options),
+    [],
+    [],
+    rng,
+    now,
+  );
 
 /** E13: the following game of the same match: the dealer rotates, the record of the finished game is already in `games`. */
 export const nextGame = (state: State, rng: Rng, now: Now): State =>

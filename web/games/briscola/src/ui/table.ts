@@ -1,7 +1,7 @@
 // The table's pure builders (docs/design/briscola.md §5.2 "The DOM", §5.5, §5.6, §5.7): the markup
 // strings the painter writes into the keyed containers of `#tableScreen`, the keys that say when a
 // container must be rebuilt, and the small copy the containers carry (the lead cue, the stock
-// label, the game badge, the score cells). Everything is a function of a `View`'s parts, a few UI
+// label, the score cells). Everything is a function of a `View`'s parts, a few UI
 // facts (the kept slots, the lifted card, the taking seat, the chip in flight) and the chosen card
 // pack, tested as strings like backgammon's ui/board.ts. It imports the engine and the shared card packs only:
 // the reducer imports this module, never the reverse, and the DOM is the painter's.
@@ -13,10 +13,15 @@
 // so the hand's button semantics (`role`, `tabindex`, `aria-label`, `aria-pressed`, §5.5) sit on
 // the `.slot` that holds the card, and a fan card's `data-seat` (§5.6 `#trick .card[data-seat]`)
 // is written into that tag by `withDataSeat`, the one attribute a face never carries itself.
-// Names are the shell's normalised ones but are escaped anyway: a name is a player's text.
+// Names are the shell's normalised ones but are escaped anyway: a name is a player's text. A
+// card's name comes from the chosen language pack (web/shared/lib/lang/packs.ts, docs/design/
+// language-packs.md): the face's `aria-label` wherever a `lang` is passed, and a `.card-name`
+// caption under each play of the trick (the owner: the suits are unfamiliar, so the table says
+// what was played) and under the stock for the briscola.
 import { DECKS } from '../../../../shared/lib/cards/decks.ts';
 import type { CardPack } from '../../../../shared/lib/cards/packs.ts';
 import { resolveFace } from '../../../../shared/lib/cards/resolve.ts';
+import { cardName, type LanguagePack } from '../../../../shared/lib/lang/packs.ts';
 import { escapeHtml } from '../../../../shared/edge/dom.ts';
 import { backHtml, faceHtml } from '../../../../shared/ui/cardFace.ts';
 import {
@@ -25,10 +30,9 @@ import {
   nameOf,
   seatsOfSide,
   sideList,
+  sidesOf,
   type Card,
   type Cards,
-  type GamesToWin,
-  type Match,
   type Played,
   type Player,
   type Seat,
@@ -56,14 +60,23 @@ const RANK_EN: Readonly<Record<number, string>> = {
 export const cardLabelEn = (card: Card): string =>
   `${RANK_EN[card.r] ?? String(card.r)} of ${ITALIAN.suits.find((s) => s.id === card.s)?.english ?? SUIT_NAME[card.s]}`;
 
+/** The card's name in the language pack ("re di denari"); '' for a stranger, which never reaches a caption. */
+export const cardNameOf = (lang: LanguagePack, id: string): string =>
+  cardName(lang, DECK_KIND, id) ?? '';
+
 /**
  * A face-up card through the pack, `extra` classes appended (`mid`, `tiny`, `selected`,
- * `playable`, `taking`); an id outside the deck (never on the wire) paints a back so a bug shows
- * as a back, not a crash.
+ * `playable`, `taking`), its name from `lang` as the face's `aria-label` when one is given; an id
+ * outside the deck (never on the wire) paints a back so a bug shows as a back, not a crash.
  */
-export const cardHtml = (pack: CardPack, id: string, extra = ''): string => {
+export const cardHtml = (pack: CardPack, id: string, extra = '', lang?: LanguagePack): string => {
   const spec = resolveFace(pack, DECK_KIND, id);
-  return spec === null ? backHtml(extra) : faceHtml(spec, extra === '' ? {} : { extra });
+  if (spec === null) return backHtml(extra);
+  const name = lang === undefined ? undefined : cardNameOf(lang, id);
+  return faceHtml(spec, {
+    ...(extra === '' ? {} : { extra }),
+    ...(name === undefined ? {} : { name }),
+  });
 };
 
 /** `data-seat` written into the card's opening tag: the one attribute `faceHtml` cannot carry. */
@@ -116,6 +129,8 @@ export type HandOptions = Readonly<{
   playable: ReadonlyArray<string>;
   /** Under the curtain the held cards paint as backs (`#hand.hidden-cards`, D17). */
   faceDown?: boolean;
+  /** The language the faces are named in (`aria-label`); absent, the faces carry no name. */
+  lang?: LanguagePack;
 }>;
 
 const EMPTY_MARK = '∅';
@@ -143,6 +158,7 @@ const slotHtml = (pack: CardPack, id: string | null, o: HandOptions): string => 
     pack,
     id,
     classes(selected ? 'selected' : '', playable ? 'playable' : ''),
+    o.lang,
   )}</div>`;
 };
 
@@ -186,6 +202,8 @@ export type TrickOptions = Readonly<{
   pack: CardPack;
   /** The seat whose card is taking the trick (`.taking`, the hold of the settle beat), or none. */
   taking: Seat | null;
+  /** The language of the faces' labels and the `.card-name` caption under each play; absent, neither. */
+  lang?: LanguagePack;
 }>;
 
 /** "You" for my seat, else the seat's name. */
@@ -200,19 +218,24 @@ export const trickKey = (trick: ReadonlyArray<Played>): string =>
 export const leadCue = (players: ReadonlyArray<Player>, me: Seat, leader: Seat): string =>
   leader === me ? 'You lead' : `${nameOf(players, leader)} leads`;
 
+/** The caption under a play (docs/design/language-packs.md §5): the card's name in the pack's language. */
+const captionHtml = (lang: LanguagePack | undefined, id: string): string =>
+  lang === undefined ? '' : `<span class="card-name">${cardNameOf(lang, id)}</span>`;
+
 const playHtml = (o: TrickOptions, p: Played, i: number): string => {
   const who = whoName(o.players, o.me, p.seat);
   const label = `${cardLabelEn(p.card)}, played by ${p.seat === o.me ? 'you' : who}`;
   return `<div class="play" role="group" aria-label="${escapeHtml(label)}" style="--i:${String(i)}">${withDataSeat(
-    cardHtml(o.pack, p.card.id, classes('mid', p.seat === o.taking ? 'taking' : '')),
+    cardHtml(o.pack, p.card.id, classes('mid', p.seat === o.taking ? 'taking' : ''), o.lang),
     p.seat,
-  )}<span class="who">${escapeHtml(who)}</span></div>`;
+  )}<span class="who">${escapeHtml(who)}</span>${captionHtml(o.lang, p.card.id)}</div>`;
 };
 
 /**
  * The fan in play order, the leader's card first: each play is a `.play` column (`--i` for the
- * CSS's z-order, overlap and tilt) holding the `mid` face with `data-seat` and a `.who` chip
- * beneath; the taking card wears `taking`.
+ * CSS's z-order, overlap and tilt) holding the `mid` face with `data-seat`, a `.who` chip
+ * beneath and, with a `lang`, the card's name as a `.card-name` caption; the taking card wears
+ * `taking`.
  */
 export const trickHtml = (trick: ReadonlyArray<Played>, o: TrickOptions): string =>
   trick.map((p, i) => playHtml(o, p, i)).join('');
@@ -304,15 +327,21 @@ export const stockKey = (count: number, top: Card | null): string =>
  * under scoperta, E15), nothing once only the trump card is left (`#stock.empty`, the painter's
  * dashed outline) or the stock is out.
  */
-export const stockHtml = (pack: CardPack, count: number, top: Card | null): string =>
-  count <= 1 ? '' : top === null ? backHtml('mid') : cardHtml(pack, top.id, 'mid');
+export const stockHtml = (
+  pack: CardPack,
+  count: number,
+  top: Card | null,
+  lang?: LanguagePack,
+): string =>
+  count <= 1 ? '' : top === null ? backHtml('mid') : cardHtml(pack, top.id, 'mid', lang);
 
 /**
- * The inside of `#briscola`: the trump card as a `mid` face, laid across under the stock by the
- * CSS; `gone` (its box kept) and `tappable` (E14) are the painter's toggles. Keyed by the card's id.
+ * The inside of `#briscola`: the trump card as a `mid` face (named in `lang`), laid across under the
+ * stock by the CSS; `gone` (its box kept) and `tappable` (E14) are the painter's toggles. Keyed by
+ * the card's id; its caption is `#briscolaName` under the stock's label (the box is rotated).
  */
-export const briscolaHtml = (pack: CardPack, trumpCard: Card): string =>
-  cardHtml(pack, trumpCard.id, 'mid');
+export const briscolaHtml = (pack: CardPack, trumpCard: Card, lang?: LanguagePack): string =>
+  cardHtml(pack, trumpCard.id, 'mid', lang);
 
 export type TrumpBadge = Readonly<{
   /** `s-coppe`: the suit mark's class (§5.7 `s-${suit}` over the Italian name). */
@@ -329,7 +358,7 @@ export const trumpBadge = (suit: Suit): TrumpBadge => ({
   aria: `Briscola: ${ITALIAN.suits.find((s) => s.id === suit)?.english ?? SUIT_NAME[suit]}`,
 });
 
-// ---- the score strip and the game badge (D9, §5.2 `#scoreStrip`, `#gameBadge`) -------------------------
+// ---- the score strip (D9, §5.2 `#scoreStrip`) -----------------------------------------------------------
 
 export type ScoreMode = 'players' | 'teams';
 export type ScoreCell = Readonly<{
@@ -340,16 +369,16 @@ export type ScoreCell = Readonly<{
   leading: boolean;
 }>;
 
-/** Per player at two and three, per team at four (`#scoreStrip[data-mode]`). */
-export const scoreMode = (n: SeatCount): ScoreMode => (n === 4 ? 'teams' : 'players');
+/** Per player while every seat is its own side (`#scoreStrip[data-mode]`; no teams at four since 2026-09-25); `teams` waits for the day they return. */
+export const scoreMode = (n: SeatCount): ScoreMode => (sidesOf(n) === n ? 'players' : 'teams');
 
 type ScoreSource = Pick<View, 'players' | 'options' | 'taken' | 'tricks' | 'sides'> &
   Readonly<{ me: Pick<View['me'], 'idx' | 'side'> }>;
 
 /**
- * The cells in side order: "Ann (you)" / "Bob" with `taken` and `tricks` per seat, or "Ann & Cara"
- * with the side's points and its seats' tricks summed; `mine` marks my cell, `leading` the one
- * strictly ahead (nobody at a tie, so nobody at 0–0).
+ * The cells in side order: "Ann (you)" / "Bob" with `taken` and `tricks` per seat (a side is one
+ * seat; a team's "Ann & Cara" is kept for the day teams return); `mine` marks my cell, `leading`
+ * the one strictly ahead (nobody at a tie, so nobody at 0–0).
  */
 export const scoreCells = (v: ScoreSource): ReadonlyArray<ScoreCell> => {
   const n = v.options.seatCount;
@@ -357,7 +386,7 @@ export const scoreCells = (v: ScoreSource): ReadonlyArray<ScoreCell> => {
     const seats = seatsOfSide(n, side);
     const mine = side === v.me.side;
     const name =
-      n === 4
+      seats.length > 1
         ? seats.map((seat) => nameOf(v.players, seat)).join(' & ')
         : `${nameOf(v.players, seats[0] ?? 0)}${mine ? ' (you)' : ''}`;
     return {
@@ -381,18 +410,3 @@ const scoreCellHtml = (c: ScoreCell): string =>
 
 export const scoreStripHtml = (cells: ReadonlyArray<ScoreCell>): string =>
   cells.map(scoreCellHtml).join('');
-
-/** "one game", "best of 3", "best of 5" (D3, D7). */
-export const matchLabel = (gamesToWin: GamesToWin): string =>
-  gamesToWin === 1 ? 'one game' : `best of ${String(gamesToWin * 2 - 1)}`;
-
-/** "Game 1 · 0–0 · best of 3", "Game 3 · 1–0 · 1 draw · best of 3" (`#gameBadge`; wins in side order). */
-export const gameBadgeText = (gameNo: number, match: Match): string =>
-  [
-    `Game ${String(gameNo)}`,
-    match.wins.map(String).join('–'),
-    ...(match.draws === 0
-      ? []
-      : [`${String(match.draws)} ${match.draws === 1 ? 'draw' : 'draws'}`]),
-    matchLabel(match.gamesToWin),
-  ].join(' · ');

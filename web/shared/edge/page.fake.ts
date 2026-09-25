@@ -23,6 +23,8 @@ export type FireInit = Readonly<{
   clientX?: number;
   clientY?: number;
   pointerId?: number;
+  /** A pointer event's kind (`mouse`, `touch`). */
+  pointerType?: string;
 }>;
 
 /** How a test describes the target of a delegated event: what `closest` finds, an id, a value. */
@@ -85,6 +87,7 @@ const makeEvent = (type: string, target: unknown, init: FireInit): FakeEvent => 
     clientX: init.clientX ?? 0,
     clientY: init.clientY ?? 0,
     pointerId: init.pointerId ?? 0,
+    pointerType: init.pointerType ?? '',
     preventDefault: () => {
       flags.prevented = true;
     },

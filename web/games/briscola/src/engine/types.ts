@@ -64,8 +64,8 @@ export const HAND_SIZE = 3;
 
 export type Seat = 0 | 1 | 2 | 3;
 export type SeatCount = 2 | 3 | 4;
-/** A scoring unit: the seat itself for 2 and 3 players, `seat % 2` for 4 (E12). */
-export type Side = 0 | 1 | 2;
+/** A scoring unit: the seat itself at every count (E12; no teams at four since 2026-09-25, D6 a future mode). */
+export type Side = 0 | 1 | 2 | 3;
 export type GamesToWin = 1 | 2 | 3;
 
 export const SEAT_COUNTS: ReadonlyArray<SeatCount> = [2, 3, 4];

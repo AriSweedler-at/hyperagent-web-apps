@@ -3,10 +3,10 @@
 // for, the default host name, the tabs, the two stored modes, the copy the shared flows paint (the
 // two leave confirms, the guest's status once the host has answered, and the sessions' three
 // status strings the shell paints before a session speaks), the option codec (`GameOptions`, the
-// room's six terms: the host save's own fields, the welcome frame's, the resume offer's, each raw
-// select or switch falling back to the shell's current value and the whole normalised as the
-// engine normalises a room), the engine adapters, the frame builders, the cue memory's start and
-// the shell's store. The first game booted through the shared shell (D18): the table hooks
+// room's six terms: the host save's own fields, the welcome frame's, the resume offer's; the home
+// screen sets the seat count alone, the rest are the fixed `TABLE_TERMS`, and the whole is
+// normalised as the engine normalises a room), the engine adapters, the frame builders, the cue
+// memory's start and the shell's store. The first game booted through the shared shell (D18): the table hooks
 // (`rendered` with the settle beat and the event-driven cues, `refuse`, the per-site `reset`,
 // pass-and-play's `viewer`/`revealer` over two, three or four seats) and the rest of `home` are the
 // reducer's (ui/state.ts `BRISCOLA`), which completes this record; a value import both ways would
@@ -16,21 +16,15 @@ import type { ShellGameData } from '../../../shared/ui/shell.ts';
 import { connectingMsg } from '../../../shared/net/guest.ts';
 import { OPENING_MSG, handoffMsg } from '../../../shared/net/host.ts';
 import {
-  GAMES_TO_WIN,
   SEAT_COUNTS,
-  SUITS,
   applyAction,
   createGame,
   decodeState,
-  matchOver,
-  matchWinner,
   nameOf,
   normaliseOptions,
   viewFor,
   type GameOptions,
-  type GamesToWin,
   type SeatCount,
-  type Suit,
 } from './engine/index.ts';
 import { action, lobby, state, toast } from './protocol.ts';
 import {
@@ -39,7 +33,10 @@ import {
   DEFAULT_OPTS,
   DEFAULT_PLAY_MODE,
   HOME_TABS,
+  LANG_PREF,
+  ONE_GAME,
   SHELL_STORE,
+  TABLE_TERMS,
   readCardPack,
   readOpts,
   readP3Name,
@@ -50,7 +47,7 @@ import { INITIAL_CUES } from './ui/sound.ts';
 import type { Briscola, Raw } from './ui/state.ts';
 
 export type Opts = GameOptions;
-export { DEFAULT_OPTS };
+export { DEFAULT_OPTS, ONE_GAME, TABLE_TERMS };
 
 export const DEFAULT_NAME = 'Ari';
 /**
@@ -61,41 +58,24 @@ export const DEFAULT_NAME = 'Ari';
  */
 export const LOCAL_NAMES: ReadonlyArray<string> = ['Ari', 'Lavi', 'Sandro', 'Grant'];
 export const LEAVE_LOCAL_MSG = 'End this game? The score will be cleared.';
-export const LEAVE_ONLINE_MSG = 'Leave this match? The table will close.';
+export const LEAVE_ONLINE_MSG = 'Leave this game? The table will close.';
 /** `#guestWaitStatus` once the host's lobby frame names the room (tools/games.ts SHELL `hostAnswered` pins the shape). */
 export const hostRoomMsg = (hostName: string): string =>
   `Connected — waiting for ${hostName} to deal`;
 
-/** The match badge's words for a target (D7): one game, or the best of 2n − 1. */
-export const matchLabel = (gamesToWin: GamesToWin): string =>
-  gamesToWin === 1 ? 'one game' : `best of ${String(gamesToWin * 2 - 1)}`;
-
 /** A seat count from a select's raw value (`"3"`), else `fallback`. */
 export const parseSeatCount = (raw: string | undefined, fallback: SeatCount): SeatCount =>
   SEAT_COUNTS.find((n) => String(n) === raw) ?? fallback;
-/** The games to win from a select's raw value (`"2"` is best of three), else `fallback`. */
-export const parseGamesToWin = (raw: string | undefined, fallback: GamesToWin): GamesToWin =>
-  GAMES_TO_WIN.find((n) => String(n) === raw) ?? fallback;
-/** A suit letter from a select's raw value, else `fallback`. */
-export const parseSuit = (raw: string | undefined, fallback: Suit): Suit =>
-  SUITS.find((s) => s === raw) ?? fallback;
-/** A house rule from a switch's raw value: `on` (or `true`) is on, any other string off, absent keeps `fallback`. */
-export const parseFlag = (raw: string | undefined, fallback: boolean): boolean =>
-  raw === undefined ? fallback : raw === 'on' || raw === 'true';
 
 /**
- * The room's terms off the raw inputs (`Raw`): the Online selects or their pass-and-play twins,
- * whichever the click carried, each falling back to the shell's current value; normalised so the
- * two-player-only and four-player-only rules never store true elsewhere (E15, E16).
+ * The room's terms off the raw inputs (`Raw`): the seat count from the Online select or its
+ * pass-and-play twin, whichever the click carried, falling back to the shell's current count; the
+ * rest are the fixed `TABLE_TERMS` (one game, the house rules at their defaults), whatever the
+ * current room carried (a resumed save may still hold a match), normalised as the engine
+ * normalises a room (E15, E16).
  */
 export const parseOpts = (raw: Raw, current: GameOptions): GameOptions =>
-  normaliseOptions(parseSeatCount(raw.players ?? raw.localPlayers, current.seatCount), {
-    gamesToWin: parseGamesToWin(raw.match ?? raw.localMatch, current.gamesToWin),
-    removedTwo: parseSuit(raw.removedTwo ?? raw.localRemovedTwo, current.removedTwo),
-    exchange: parseFlag(raw.exchange ?? raw.localExchange, current.exchange),
-    scoperta: parseFlag(raw.scoperta ?? raw.localScoperta, current.scoperta),
-    partnerPeek: parseFlag(raw.partnerPeek ?? raw.localPartnerPeek, current.partnerPeek),
-  });
+  normaliseOptions(parseSeatCount(raw.players ?? raw.localPlayers, current.seatCount), TABLE_TERMS);
 
 /** The six option fields alone off a record that carries them (a welcome frame, a save, an offer), normalised. */
 export const pickOpts = (from: GameOptions): GameOptions =>
@@ -140,8 +120,10 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
     viewFor,
     /** `position/load` (`window.__briscola.setup`): the save's decoder, E20's invariants refined. */
     decodeState,
-    over: (view) => view.matchOver,
-    finished: (game) => matchOver(game.match),
+    // One game per sitting (the owner, 2026-09-25): a game is over when its last trick is played,
+    // decided or drawn; the engine's match runs on underneath (a save from before may hold one).
+    over: (view) => view.phase === 'over',
+    finished: (game) => game.phase === 'over',
     names: (game) => [nameOf(game.players, 0), nameOf(game.players, 1)],
     /** `game.players[1].name = name` on a rejoin. */
     renameGuest: (game, name) => ({
@@ -149,20 +131,20 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
       players: game.players.map((p, i) => (i === 1 ? { ...p, name } : p)),
     }),
   },
-  // The finished match's record (the owner, 2026-09-25): a match is its deal's clock (a rematch
-  // deals under a new one), every seat's name, its score the games won per side, its victor the
-  // side `matchWinner` names: side 0 is seat 0's (and seat 2's) in every seat count, so the
-  // outcome for the device's user reads off it as off a seat.
+  // The finished game's record (the owner, 2026-09-25): a game is its deal's clock (Play again
+  // deals under a new one), every seat's name, its score the points per side ("71–49", "60–60"),
+  // its victor the side the result names (null for a draw): side 0 is seat 0's (and seat 2's) in
+  // every seat count, so the outcome for the device's user reads off it as off a seat.
   result: {
     keyOf: (view) => String(view.startedAt),
     playersOf: (view) => view.players.map((p) => p.name),
-    scoreOf: (view) => view.match.wins.map(String).join('–'),
-    winnerOf: (view) => matchWinner(view.match),
+    scoreOf: (view) => (view.result?.totals ?? view.sides).map(String).join('–'),
+    winnerOf: (view) => view.result?.winner ?? null,
   },
   frames: { lobby, state, toast, action },
   cues: { initial: INITIAL_CUES },
   home: {
-    // This page's own keys: the six options (defaults when unreadable), the card pack, the third and fourth names.
+    // This page's own keys: the seat count (the default when unreadable) on the fixed terms, the card pack, the language pack, the third and fourth names.
     read: (store) => {
       const pack = readCardPack(store);
       const p3 = readP3Name(store);
@@ -170,6 +152,7 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
       return {
         opts: readOpts(store),
         cardPack: pack.ok ? pack.value : DEFAULT_CARD_PACK,
+        lang: LANG_PREF.orDefault(store),
         p3Name: p3.ok ? p3.value : null,
         p4Name: p4.ok ? p4.value : null,
       };

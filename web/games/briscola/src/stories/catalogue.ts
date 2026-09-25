@@ -5,7 +5,7 @@
 // seeded pass-and-play start (`mulberry32(SEED)`, the clock pinned at EPOCH): the deal for two,
 // three and four seats, the reveal, a lift, a card laid, a trick held by the settle beat and
 // settled, the two sheets, and positions seated through `sandbox/load` for the last three tricks,
-// the result sheet and the match's end. The facts are derived from the App in the terms the DOM
+// and the result sheet. The facts are derived from the App in the terms the DOM
 // exposes (never from the renderer), so e2e/briscola-stories.spec.ts (facts against the served
 // DOM, the geometry oracle, screenshots) is an independent oracle of the paint. Pure data and pure
 // builders: no DOM, no clock, so vitest, Playwright and the page's own chunk all import it.
@@ -41,10 +41,8 @@ export const EPOCH = 1_700_000_000_000;
 
 export type SheetState = 'none' | 'historyOverlay' | 'resultOverlay';
 
-/** What the table must show for a story, in the terms the DOM exposes (design §5.6). */
+/** What the table must show for a story, in the terms the DOM exposes (design §5.6); the table is the one screen a story shows. */
 export type StoryFacts = Readonly<{
-  /** The screen shown: the table, or the end screen once the match is decided and settled. */
-  screen: 'tableScreen' | 'endgameScreen';
   /** `#seats[data-players]`. */
   players: number;
   /** `#curtainOverlay` shown. */
@@ -98,7 +96,6 @@ const localStart = (ctx: Context, n: 2 | 3 | 4): App =>
       p1: NAMES[0] ?? '',
       p2: NAMES[1] ?? '',
       localPlayers: String(n),
-      localMatch: '2',
       ...(n >= 3 ? { p3: NAMES[2] } : {}),
       ...(n === 4 ? { p4: NAMES[3] } : {}),
     },
@@ -153,7 +150,6 @@ type Position = Readonly<{
   hands: readonly [ReadonlyArray<string>, ReadonlyArray<string>];
   trumpCard: string;
   leader: Seat;
-  wins?: readonly [number, number];
 }>;
 
 /**
@@ -165,7 +161,7 @@ const position = (p: Position): State => {
     { id: 'p1', name: NAMES[0] ?? '' },
     { id: 'p2', name: NAMES[1] ?? '' },
   ];
-  const fresh = createGame(players, { gamesToWin: 2 }, mulberry32(SEED), () => EPOCH);
+  const fresh = createGame(players, {}, mulberry32(SEED), () => EPOCH);
   const hands = p.hands.map((ids) => ids.map(card));
   const held = new Set(p.hands.flat());
   const rest = deckFor(fresh.options).filter((c) => !held.has(c.id));
@@ -178,7 +174,6 @@ const position = (p: Position): State => {
     ...seated,
     piles,
     trickNo: piles.reduce((sum, pile) => sum + pile.length, 0) / 2,
-    match: { ...seated.match, wins: p.wins === undefined ? seated.match.wins : [...p.wins] },
     events:
       deal?.kind === 'deal'
         ? [{ ...deal, data: { dealer: deal.data.dealer, trumpCard } }]
@@ -196,7 +191,7 @@ const LAST_THREE: Position = {
   leader: 0,
 };
 
-/** The last three tricks played out from `p` by the first-legal policy, the beat settled: the result sheet, or the end screen. */
+/** The last three tricks played out from `p` by the first-legal policy, the beat settled: the result sheet. */
 const playedOut = (ctx: Context, p: Position): App => {
   const start = run(ctx, revealed(ctx, localStart(ctx, 2)), [
     { type: 'position/load', state: position(p) },
@@ -221,7 +216,6 @@ export const factsOf = (app: App): StoryFacts => {
   const settle = app.table.settle;
   const stockCount = v.stockCount + (settle === null ? 0 : settle.trick.drew.length);
   return {
-    screen: app.shell.screen === 'endgameScreen' ? 'endgameScreen' : 'tableScreen',
     players: v.options.seatCount,
     curtain: app.table.curtain !== null,
     handCards: app.table.slots.filter((slot) => slot !== null).length,
@@ -232,11 +226,7 @@ export const factsOf = (app: App): StoryFacts => {
     stockCount,
     stockEmpty: stockCount <= 1,
     briscolaGone: !(v.trumpOnTable || settle?.trick.trumpTaken === true),
-    sheet: app.table.historyOpen
-      ? 'historyOverlay'
-      : resultOpen(app) && !v.matchOver
-        ? 'resultOverlay'
-        : 'none',
+    sheet: app.table.historyOpen ? 'historyOverlay' : resultOpen(app) ? 'resultOverlay' : 'none',
   };
 };
 
@@ -342,7 +332,7 @@ export const STORIES: ReadonlyArray<Story> = [
   }),
   story({
     id: 'revealed-4p',
-    title: 'Four seats revealed: three cells, the team strip, a stock of 28',
+    title: 'Four seats revealed: three cells, four score cells (no teams), a stock of 28',
     app: revealed4,
     screenshot: true,
   }),
@@ -353,7 +343,7 @@ export const STORIES: ReadonlyArray<Story> = [
   }),
   story({
     id: 'result-win-2p',
-    title: 'The game over: the result sheet, Ann wins 96-24',
+    title: 'The game over: the result sheet, Ann wins 96-24, Play again',
     app: result2,
     screenshot: true,
   }),

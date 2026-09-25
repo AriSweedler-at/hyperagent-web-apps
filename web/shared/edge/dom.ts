@@ -240,6 +240,10 @@ export const inputDataOf = (e: Readonly<Event>): string | null =>
 /** `KeyboardEvent.key`, '' for other events. */
 export const keyOf = (e: Readonly<Event>): string => (e as Partial<KeyboardEvent>).key ?? '';
 
+/** `PointerEvent.pointerType` (`mouse`, `pen`, `touch`), '' for other events: a hover shows a tip, a touch long-presses for it. */
+export const pointerTypeOf = (e: Readonly<Event>): string =>
+  (e as Partial<PointerEvent>).pointerType ?? '';
+
 export const preventDefault = (e: Readonly<Event>): void => {
   e.preventDefault();
 };

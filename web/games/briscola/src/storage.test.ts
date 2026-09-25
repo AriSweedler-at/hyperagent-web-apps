@@ -7,6 +7,9 @@ import { createGame } from './engine/index.ts';
 import {
   ALL_KEYS,
   DEFAULT_CARD_PACK,
+  DEFAULT_LANG,
+  LANGUAGE_PACKS,
+  LANG_PREF,
   DEFAULT_HOME_TAB,
   DEFAULT_OPTS,
   DEFAULT_PLAY_MODE,
@@ -19,6 +22,7 @@ import {
   STORAGE_KEYS,
   clearSave,
   readCardPack,
+  readLang,
   readHomeTab,
   readName,
   readOpts,
@@ -32,6 +36,7 @@ import {
   readSoundState,
   soundEnabled,
   writeCardPack,
+  writeLang,
   writeHomeTab,
   writeName,
   writeOpts,
@@ -70,19 +75,20 @@ const game = createGame(
   mulberry32(1),
   NOW,
 );
+/** The fixed terms at two seats: one game per sitting, the house rules at the engine's defaults. */
 const OPTS = {
   seatCount: 2,
-  gamesToWin: 2,
+  gamesToWin: 1,
   removedTwo: 'C',
   exchange: false,
   scoperta: false,
   partnerPeek: false,
 } as const;
 const OPTS_JSON =
-  '"seatCount":2,"gamesToWin":2,"removedTwo":"C","exchange":false,"scoperta":false,"partnerPeek":false';
+  '"seatCount":2,"gamesToWin":1,"removedTwo":"C","exchange":false,"scoperta":false,"partnerPeek":false';
 
 describe('frozen constants', () => {
-  test('the sixteen keys, the tabs, modes, sound states, the defaults and the name cap (design §5.8)', () => {
+  test('the thirteen keys (the match and house-rule keys retired), the tabs, modes, sound states, the defaults and the name cap (design §5.8)', () => {
     expect(ALL_KEYS).toEqual([
       'briscolaMP_v1',
       'briscola_name',
@@ -95,12 +101,8 @@ describe('frozen constants', () => {
       'briscola_soundFont',
       'briscola_recentGames',
       'briscola_cardPack',
+      'briscola_lang',
       'briscola_players',
-      'briscola_match',
-      'briscola_removedTwo',
-      'briscola_exchange',
-      'briscola_scoperta',
-      'briscola_partnerPeek',
     ]);
     // Nothing of the other games': the games on one origin never read each other's keys.
     ALL_KEYS.forEach((key) => {
@@ -309,60 +311,86 @@ describe('the bare-string preferences', () => {
       });
     });
   });
+
+  test('the language pack round-trips as a bare string under briscola_lang, refuses a stranger, and reads Italian by default', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    expect(DEFAULT_LANG).toBe('it');
+    expect(readLang(store)).toEqual({
+      ok: false,
+      error: { kind: 'missing', key: STORAGE_KEYS.lang },
+    });
+    expect(LANG_PREF.orDefault(store)).toBe('it');
+    LANGUAGE_PACKS.forEach((name) => {
+      expect(writeLang(store, name).ok).toBe(true);
+      expect(s.map.get(STORAGE_KEYS.lang)).toBe(name);
+      expect(readLang(store)).toEqual({ ok: true, value: name });
+      expect(LANG_PREF.orDefault(store)).toBe(name);
+    });
+    ['fr', ''].forEach((bad) => {
+      s.setItem(STORAGE_KEYS.lang, bad);
+      expect(readLang(store)).toEqual({
+        ok: false,
+        error: {
+          kind: 'invalid',
+          key: STORAGE_KEYS.lang,
+          reason: `$: expected one of ${LANGUAGE_PACKS.map((p) => `"${p}"`).join(' | ')}`,
+        },
+      });
+      expect(LANG_PREF.orDefault(store)).toBe('it');
+    });
+  });
 });
 
 describe('the room options', () => {
-  test('readOpts: the defaults on an empty store; writeOpts stores digits, a suit letter and on/off, read back whole', () => {
+  test('readOpts: the defaults on an empty store; writeOpts stores the seat count alone, read back on the fixed terms', () => {
     const s = fakeStorage();
     const store = createStore(s);
     expect(readOpts(store)).toEqual(OPTS);
-    const chosen = {
+    writeOpts(store, {
       seatCount: 3,
       gamesToWin: 3,
       removedTwo: 'D',
       exchange: true,
       scoperta: false,
       partnerPeek: false,
-    } as const;
-    writeOpts(store, chosen);
+    });
+    expect([...s.map.keys()]).toEqual([STORAGE_KEYS.players]);
     expect(s.map.get(STORAGE_KEYS.players)).toBe('3');
-    expect(s.map.get(STORAGE_KEYS.match)).toBe('3');
-    expect(s.map.get(STORAGE_KEYS.removedTwo)).toBe('D');
-    expect(s.map.get(STORAGE_KEYS.exchange)).toBe('on');
-    expect(s.map.get(STORAGE_KEYS.scoperta)).toBe('off');
-    expect(s.map.get(STORAGE_KEYS.partnerPeek)).toBe('off');
-    expect(readOpts(store)).toEqual(chosen);
-    const four = { ...chosen, seatCount: 4, partnerPeek: true } as const;
-    writeOpts(store, four);
-    expect(readOpts(store)).toEqual(four);
-    const open = { ...chosen, seatCount: 2, partnerPeek: false, scoperta: true } as const;
-    writeOpts(store, open);
-    expect(s.map.get(STORAGE_KEYS.scoperta)).toBe('on');
-    expect(readOpts(store)).toEqual(open);
+    expect(readOpts(store)).toEqual({ ...OPTS, seatCount: 3 });
+    writeOpts(store, { ...OPTS, seatCount: 4 });
+    expect(readOpts(store)).toEqual({ ...OPTS, seatCount: 4 });
   });
 
-  test('a garbage key falls back to its default alone, and a stored pair the rules refuse is normalised (scoperta at three, the peek at two)', () => {
+  test('a garbage count falls back to two; the retired match and house-rule keys are never read', () => {
     const s = fakeStorage();
     const store = createStore(s);
-    writeOpts(store, { ...OPTS, seatCount: 4, gamesToWin: 3, removedTwo: 'B', exchange: true });
-    s.setItem(STORAGE_KEYS.match, '5');
-    s.setItem(STORAGE_KEYS.removedTwo, 'coppe');
-    s.setItem(STORAGE_KEYS.exchange, 'yes');
-    expect(readOpts(store)).toEqual({
-      ...OPTS,
-      seatCount: 4,
-      gamesToWin: 2,
-      removedTwo: 'C',
-      exchange: false,
-    });
-    s.setItem(STORAGE_KEYS.players, '3');
-    s.setItem(STORAGE_KEYS.scoperta, 'on');
-    s.setItem(STORAGE_KEYS.partnerPeek, 'on');
-    expect(readOpts(store)).toEqual({ ...OPTS, seatCount: 3 });
+    s.setItem(STORAGE_KEYS.players, '5');
+    expect(readOpts(store)).toEqual(OPTS);
     s.setItem(STORAGE_KEYS.players, '2');
-    expect(readOpts(store)).toEqual({ ...OPTS, scoperta: true });
-    s.setItem(STORAGE_KEYS.players, '4');
-    expect(readOpts(store)).toEqual({ ...OPTS, seatCount: 4, partnerPeek: true });
+    s.setItem('briscola_match', '3');
+    s.setItem('briscola_removedTwo', 'B');
+    s.setItem('briscola_exchange', 'on');
+    s.setItem('briscola_scoperta', 'on');
+    s.setItem('briscola_partnerPeek', 'on');
+    expect(readOpts(store)).toEqual(OPTS);
+  });
+
+  test('a save whose game still holds a match (an older page dealt it) reads back whole: the engine keeps the match', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    const older = createGame(
+      [
+        { id: 'p1', name: 'Ann' },
+        { id: 'p2', name: 'Bob' },
+      ],
+      { gamesToWin: 2 },
+      mulberry32(3),
+      NOW,
+    );
+    expect(older.match.gamesToWin).toBe(2);
+    expect(writeSave(store, { role: 'local', game: older }).ok).toBe(true);
+    expect(readSave(store)).toEqual({ ok: true, value: { role: 'local', game: older } });
   });
 });
 

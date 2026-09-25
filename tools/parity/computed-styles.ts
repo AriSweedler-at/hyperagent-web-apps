@@ -535,7 +535,7 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.score-line',
   ],
   // Briscola (docs/design/briscola-board.md §3, §6): after the shell's 43, the home panel's own
-  // shapes (the selects, the house-rules disclosure, the switches), then the table: the trump badge
+  // shapes (the seat count select), the rules' table of points, then the table: the trump badge
   // with its suit, the seats row in its three cells and the turn mark, the stock with the trump card
   // under it, the fan with its chips and the taking card, the score strip (per player or per team,
   // the leader), the taken strips and their chips, the hand's three slots and the card in each of
@@ -552,9 +552,9 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.field-label',
     'select',
     '.btn-block',
-    '.check-row',
-    '.house-rules',
-    '.house-rules summary',
+    '.rank-table',
+    '.rank-table th',
+    '.rank-table td',
     '.empty-note.left',
     '.topbar .badges',
     '.badge.trump',
@@ -990,8 +990,8 @@ const SHELL_DRIVE: Readonly<Record<ShellGame, ShellDrive>> = {
     submenuShot: null,
     localModeShot: 'home: play tab, pass the phone',
     curtainShot: 'local: dealt, curtain up',
-    // Two players, best of three (so the match reaches a second game).
-    localValues: { localPlayersSel: '2', localMatchSel: '2' },
+    // Two players; one game per sitting, so Play again deals anew.
+    localValues: { localPlayersSel: '2' },
   },
 };
 
@@ -1495,7 +1495,7 @@ const driveBackgammon = async (page: Page, shot: Shot): Promise<void> => {
 /**
  * Plays the seeded policy through briscola's hook (`__briscola.legal()` -> `__briscola.act(a)`, the
  * page's own seeded Math.random picking uniformly) until `stop`, a JS predicate over the actor's
- * view, holds; a game's end stops it too unless `nextGames` lets it play `next` on to the match end.
+ * view, holds, or the game ends.
  * In-page, so a whole game costs no round trips; pass and play applies the actor's action whoever
  * holds the phone, so the curtain names the actor afterwards and the driver reveals it before a
  * shot. Every resolved trick starts the settle beat (docs/design/briscola-board.md §4.2), during
@@ -1505,14 +1505,13 @@ const driveBackgammon = async (page: Page, shot: Shot): Promise<void> => {
  * and the flying clones a paint launched inside one task are swept here with the `arriving` mark
  * their landing would have cleared. Returns the phase it stopped in.
  */
-const fastForwardBr = (page: Page, stop: string, nextGames = false): Promise<string> =>
+const fastForwardBr = (page: Page, stop: string): Promise<string> =>
   page.evaluate<string>(`(() => {
     const br = window.__briscola;
     const stop = (v) => (${stop});
     for (let n = 0; n < 20000; n += 1) {
       const v = br.view();
-      if (v === null || v.matchOver || stop(v)) break;
-      if (v.phase === 'over' && !${String(nextGames)}) break;
+      if (v === null || v.phase === 'over' || stop(v)) break;
       const acts = br.legal();
       if (acts.length === 0) {
         if (br.app.table.settle === null) break;
@@ -1529,8 +1528,7 @@ const fastForwardBr = (page: Page, stop: string, nextGames = false): Promise<str
 
 /**
  * The settle beat (hold, fly, draw), the flights and the toast are timed; a shot waits them out. The
- * `arriving` mark is read on the shown table alone: a match that ends mid-beat leaves the fan's
- * cards marked under the endgame screen, where no paint clears them.
+ * `arriving` mark is read on the shown table alone.
  */
 const settleBr = async (page: Page): Promise<void> => {
   await page.waitForFunction(
@@ -1546,14 +1544,14 @@ const playFirstCard = async (page: Page): Promise<void> => {
 
 /**
  * Briscola (docs/design/briscola-board.md §6), after the shell (driveShell, which dealt a two-player
- * best of three under the curtain): the pack pinned to `linea` first through the hook (the drawn
+ * game under the curtain): the pack pinned to `linea` first through the hook (the drawn
  * deck, so the golden records no picture pack's aspect or back and the deck's default may change
  * under it), the first trick by hand (my hand, a card lifted, a card played and the curtain for the
  * other seat, the second seat's play, the trick taken with the settle beat waited out, the table
  * after it with the winner's one chip), the menu, history and rules sheets, then the seeded policy through the
- * hook to the game's end (the result sheet and the table behind it), the second game's curtain
- * with the badge counting, the match end on the endgame screen; last a three-seat and a four-seat
- * table dealt, for the seats row, the fan and the score strip in their other two shapes.
+ * hook to the game's end (the result sheet and the table behind it) and Play again's curtain over
+ * the new deal; last a three-seat and a four-seat table dealt, for the seats row, the fan and the
+ * score strip in their other two shapes.
  */
 const driveBriscola = async (page: Page, shot: Shot): Promise<void> => {
   const snap = async (name: string): Promise<void> => {
@@ -1599,21 +1597,18 @@ const driveBriscola = async (page: Page, shot: Shot): Promise<void> => {
   await snap('table: rules sheet');
   await page.keyboard.press('Escape');
 
-  // ---- the game over: the result sheet, the table behind it, the next game, the match end ----
+  // ---- the game over: the result sheet, the table behind it, Play again's new deal ----
   await fastForwardBr(page, "v.phase === 'over'");
   await visible(page, '#resultOverlay');
   await snap('game over: result sheet');
   await click(page, '#rsPeekBtn');
   await snap('game over: table behind the sheet');
   await click(page, '#resultChipBtn');
-  await click(page, '#rsNextBtn');
+  await click(page, '#rsReplayBtn');
   await visible(page, '#curtainOverlay');
-  await snap('game 2: curtain up, the badge counts');
-  await fastForwardBr(page, 'false', true);
-  await visible(page, '#endgameScreen');
-  await snap('match over: endgame screen');
-  await click(page, '#leaveBtn');
-  await visible(page, '#homeScreen');
+  await snap('play again: curtain up for the new deal');
+  await reveal();
+  await leaveTable();
 
   // ---- three and four seats: the seats row, the fan and the score strip in their other shapes ----
   await page.locator('#localPlayersSel').selectOption('3');

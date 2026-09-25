@@ -63,11 +63,11 @@ const STEAL: TrickData = {
 };
 
 describe('the sentence builders (E4, E6, E8, E12, E14, E23)', () => {
-  test('names: the player at the seat, "Seat n" past the table; a side at four is "Ari and Kim"', () => {
+  test('names: the player at the seat, "Seat n" past the table; a side at four is one player', () => {
     expect(nameOf(P.slice(0, 2), 1)).toBe('Jeff');
     expect(nameOf(P.slice(0, 2), 3)).toBe('Seat 3');
-    expect(sideName(P, 4, 0)).toBe('Ari and Kim');
-    expect(sideName(P, 4, 1)).toBe('Jeff and Dan');
+    expect(sideName(P, 4, 0)).toBe('Ari');
+    expect(sideName(P, 4, 1)).toBe('Jeff');
     expect(sideName(P.slice(0, 3), 3, 2)).toBe('Kim');
   });
 
@@ -103,8 +103,14 @@ describe('the sentence builders (E4, E6, E8, E12, E14, E23)', () => {
       resultText(P.slice(0, 2), 2, { ...base, winner: 1, totals: [59, 61], decided: true }),
     ).toBe('Jeff wins 61–59 and takes the match 1–0');
     expect(
-      resultText(P, 4, { winner: 1, totals: [54, 66], draw: false, decided: true, wins: [1, 2] }),
-    ).toBe('Jeff and Dan win 66–54 and take the match 2–1');
+      resultText(P, 4, {
+        winner: 1,
+        totals: [54, 66, 0, 0],
+        draw: false,
+        decided: true,
+        wins: [1, 2, 0, 0],
+      }),
+    ).toBe('Jeff wins 66–54–0–0 and takes the match 2–1–0–0');
     expect(
       resultText(P.slice(0, 3), 3, {
         winner: null,
@@ -274,15 +280,23 @@ describe('detailOf: the expanded rows per kind (E18)', () => {
           kind: 'result',
           seat: null,
           at: AT,
-          data: { winner: 1, totals: [54, 66], draw: false, decided: false, wins: [1, 1] },
+          data: {
+            winner: 1,
+            totals: [54, 66, 0, 0],
+            draw: false,
+            decided: false,
+            wins: [1, 1, 0, 0],
+          },
         },
         P,
         4,
       ),
     ).toEqual([
-      ['Ari and Kim', '54'],
-      ['Jeff and Dan', '66'],
-      ['Match', 'Ari and Kim 1 · Jeff and Dan 1'],
+      ['Ari', '54'],
+      ['Jeff', '66'],
+      ['Kim', '0'],
+      ['Dan', '0'],
+      ['Match', 'Ari 1 · Jeff 1 · Kim 0 · Dan 0'],
     ]);
     expect(
       detailOf(

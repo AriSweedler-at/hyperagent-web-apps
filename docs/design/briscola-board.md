@@ -10,7 +10,7 @@ panel are `docs/design/briscola-sound-history.md`. Conventions follow backgammon
 `index.html` (composed from `page.ts` by `tools/shell-markup.ts`), a pure `reduce`/`runEffect`
 (`ui/state.ts`), painters over `web/shared/edge/dom.ts`, markup builders tested as strings, keyed
 repaints, `body.fixed-screen` with no page scroll at 390 × 844 and 1280 × 800. Seats are `0..n-1`,
-the host is seat 0, play runs to the next seat index; with four the even seats are one side. The
+the host is seat 0, play runs to the next seat index; every seat is its own side (no teams at four since 2026-09-25). The
 code's comments cite this document by section (`design §4.2`) and the rules by rule (`E14`).
 
 Perspective: I sit at the bottom; the other seats are placed by relative index `r = (seat − me + n)
@@ -23,7 +23,7 @@ the shell's under `web/shared/ui/ids.ts`.
 
 ```
 ┌──────────────────────────────────────────────┐ #app padding 12
-│ ☰        Game 1 · 0–0 · best of 3   ♣ coppe  🔊 │ .topbar 44: #menuBtn, #gameBadge, #trumpBadge, #soundBtn
+│ ☰                          ♣ coppe  🔊 │ .topbar 44: #menuBtn, #trumpBadge, #soundBtn
 │              ┌──┐  Bob  ·  3 cards            │ #seats 86 (2 players: r2 across the top)
 │              │▒▒│  ▪▪▪ 2 tricks               │   .seat[data-pos=top]: name, tiny backs, taken count
 │              └──┘                            │
@@ -47,10 +47,11 @@ The markup ships the two-player shape (`#seatR2` shown, `#seatR1`/`#seatR3` hidd
 and the goldens see a whole table before any paint. The topbar is backgammon's on both viewports:
 `#menuBtn` (☰) opens `#menuOverlay` with `#menuRulesBtn #menuHistoryBtn #menuLeaveBtn`;
 `#rulesBtnGame` and `#historyBtn` are `desk-only` (two badges and four 44 px buttons do not fit
-390 px); `#leaveBtn` is on the endgame screen. The badges: `#gameBadge` ("Game 1 · 0–0 · best of 3";
-"Game 3 · 1–0 · 1 draw · best of 3"; it ellipsises past ~190 px) and `#trumpBadge` (`.badge.trump
-.s-<suit>`, a `<use href="#suit-<id>">` of the shared suit sprite inlined at `body` afterbegin at
-boot, `#trumpName`, an English `aria-label` "Briscola: cups").
+390 px); `#leaveBtn` is on the endgame screen, which is never shown since 2026-09-25 (the menu's
+row is the leave a player reaches). The one badge: `#trumpBadge` (`.badge.trump .s-<suit>`, a `<use
+href="#suit-<id>">` of the shared suit sprite inlined at `body` afterbegin at boot, `#trumpName`, an
+English `aria-label` "Briscola: cups"); the game badge ("Game 1 · 0–0 · best of 3") went with the
+match (one game per sitting).
 
 The seats row `#seats[data-players]` is a three-column grid (`left top right`, 86 px at every count,
 `1fr 2fr 1fr` from 900 px); `seatCells(n, me)` (pure, `ui/table.ts`) maps the cells to seats: 2 →
@@ -80,13 +81,14 @@ cells `.sc-tricks` hides. `#statusLine` (`aria-live="polite"`) writes `#statusTe
 button: `role="button" tabindex="0" aria-pressed aria-label` "7 of cups, play" / "Re of swords,
 lifted"), `#actions` with `#playBtn`, `#waitNote`, `#resultChipBtn` and `#lastTrickSheetBtn`.
 
-Home residue (`page.ts`): `#playersSel` (3 and 4 disabled "online soon", D16), `#matchSel`,
-`#removedTwoSel`, `#exchangeChk #scopertaChk #partnerPeekChk` under a `details.house-rules`; their
-`local*` twins, `#localPlayersSel` showing `#moreNames` (`#p3NameInput #p4NameInput`). Sheets:
-`#lastTrickOverlay` (`#ltTitle #ltCards #ltSub #closeLastTrickBtn`), `#resultOverlay` (`#rsTitle
-#rsSub #rsScore #rsMatch #rsNextBtn #rsPeekBtn`), `#menuOverlay` (`#closeMenuBtn`), the shell's
-rules, history and curtain overlays (`#curtainHandoffBtn` "Continue online" at two players alone),
-the endgame (`#resultTitle #resultSub #matchScore #nextGameBtn #leaveBtn`). 111 ids, none repeated.
+Home residue (`page.ts`): `#playersSel` (3 and 4 disabled "online soon", D16) and its twin
+`#localPlayersSel` showing `#moreNames` (`#p3NameInput #p4NameInput`); the match select and the
+house-rules disclosure went on 2026-09-25 (the owner: "take out the 'match' dropdown" / "get rid of
+the option to set house rules entirely"). Sheets: `#lastTrickOverlay` (`#ltTitle #ltCards #ltSub
+#closeLastTrickBtn`), `#resultOverlay` (`#rsTitle #rsSub #rsScore #rsReplayBtn` "Play again"
+`#rsPeekBtn`), `#menuOverlay` (`#closeMenuBtn`), the shell's rules, history and curtain overlays
+(`#curtainHandoffBtn` "Continue online" at two players alone), the endgame the shell requires
+(`#endgameScreen h1`, `#leaveBtn`), never shown.
 
 ## 2. Keys, highlights and flights
 
@@ -208,10 +210,13 @@ Ann vs Bob"; "Ann, Bob and Cara" at three or more), `handoffLabel`, `seatNames`,
 - **Online** (two seats in this PR): `#hand.inert` during the other seat's turn; `.conn-dot.on`;
   the host applies both seats' actions and broadcasts one `state` frame; a guest's `next` is refused
   ("Waiting for Ann to deal"); `guest/lost` after a finished match is `hostLeft`, backgammon's.
-- **Result and match**: `#resultOverlay` opens at `phase 'over'` for every seat; `#rsNextBtn` →
-  `next`; `#rsPeekBtn` closes it and shows `#resultChipBtn`; `matchOver` → the shell's endgame
-  screen ("Bravi! Ann takes the match 2–0", one row per game); a 60–60 draw counts for nobody and
-  the badge shows it.
+- **Result, one game per sitting** (2026-09-25): `#resultOverlay` opens at `phase 'over'` for every
+  seat, decided or drawn, over the table (the shell's endgame screen is never shown); `#rsReplayBtn`
+  "Play again" (`.btn-go`) → `replay/click`: after a draw the engine's `next` (the deal rotates, the
+  draw carried), after a decided game `replayGame` (a new match for the same table, the deal passed
+  on); a guest's button reads "Waiting for Ann to deal" and is disabled; `#rsPeekBtn` closes the
+  sheet and shows `#resultChipBtn`. The status line and the history read the game's result alone,
+  never the engine's match clause.
 - **Exchange** (flag): `view.canExchange` marks `#briscola.tappable` and the status adds "· you may
   swap your 7 of cups for it"; a tap on it dispatches `exchange/click`.
 
@@ -231,15 +236,16 @@ beat is paint-driven, so it plays the same on every device from one `state` fram
 ## 5. The shell (`src/shellConfig.ts`, completed in `ui/state.ts` as `BRISCOLA: ShellConfig<Briscola>`)
 
 `id 'briscola'`; names default `Ari`; tabs play/rules/about; modes online (default) and local;
-copy: "End this game? The score will be cleared." / "Leave this match? The table will close." /
-`hostRoomMsg` "Connected — waiting for Ann to deal" (`SHELL.briscola.hostAnswered`), `matchLabel`
-("one game", "best of 3"); opts: `DEFAULT_OPTS = normaliseOptions(2, {})`, `parseOpts` off the raw
-selects and switches (`players match removedTwo exchange scoperta partnerPeek` and their `local*`
-twins, each falling back to the shell's current value, the whole normalised so scoperta is two-player
-and the partner peek four-player), `pickOpts` off a frame or a save; engine adapters over the pair
+copy: "End this game? The score will be cleared." / "Leave this game? The table will close." /
+`hostRoomMsg` "Connected — waiting for Ann to deal" (`SHELL.briscola.hostAnswered`); opts:
+`DEFAULT_OPTS = normaliseOptions(2, TABLE_TERMS)` (`{ gamesToWin: 1 }`: one game per sitting, the
+house rules at the engine's defaults), `parseOpts` off the raw seat count (`players` or its
+`localPlayers` twin, falling back to the shell's current count) onto the fixed terms, `pickOpts` off
+a frame or a save (the six terms as the wire and the save spell them); engine adapters over the pair
 (`create`, `apply`, `viewFor`, `over = matchOver`, `finished`, `names`, `renameGuest`); frames from
 `protocol.ts` (the room is the six `GameOptions` after `hostName`; the host save carries the same six
-between `myName` and `game`, `briscolaMP_v1`); `home.read` adds the six options, the card pack
+between `myName` and `game`, `briscolaMP_v1`); `home.read` adds the seat count (`briscola_players`;
+the match and house-rule keys are retired, never read), the card pack
 (`briscola_cardPack`, validated for the Italian deck) and the third and fourth names
 (`briscola_p3Name`, `briscola_p4Name`). What the shared shell lacked and gained, with tests
 (docs/design/shared-shell.md §4.3.2 gets a point 11): `ShellTypes.Seat` and `SeatOf<G>` (seats
@@ -267,7 +273,7 @@ hidden-cards`; `#trick .card[data-seat]` in `view.trick` order, `.taking`, `#tri
 `#trumpBadge .s-<suit>`; `#seats[data-players]`, `#seatR1|R2|R3[hidden][data-seat]`, the tiny backs
 = `handCount`, `.seat-taken[data-count]`, `.to-move`, `.gone`; `#scoreStrip[data-mode] .score-cell`,
 `.leading`, `.mine`; `#statusText`; `#playBtn[disabled]`; `#lastTrickSheetBtn[disabled]`;
-`#rsTitle`, `#rsMatch`, `#gameBadge`, `#curtainSub`, `#curtainLast`; `body[data-card-pack]`,
+`#rsTitle`, `#rsReplayBtn`, `#curtainSub`, `#curtainLast`; `body[data-card-pack]`,
 `#tableScreen` style `--aspect`. The hook `window.__briscola` (D19): the shell's members (`app`,
 `dispatch`, `render`, `showScreen`, `initHome`, `fx`, `legal()`, `soundFont`, `soundFontName`) and
 its own `act(action)`, `view()`, `events()`, `setup(state)` (`sandbox/load`, pass and play only),
@@ -276,9 +282,9 @@ its own `act(action)`, `view()`, `events()`, `setup(state)` (`sandbox/load`, pas
 Pure twins: `ui/layout.ts` against the CSS (`layout.test.ts`, 15 cases); `seatCells` for every
 `(n, me)`; `handKey`/`trickKey`/`seatKey`/`stockKey`/`scoreKey`; `trickFlights`/`drawFlights`
 (winner first, the briscola last and turned); the copy (`statusText`, `curtainText`, `resultSheetText`,
-`scoreCells`, `lastTrickText`, `gameBadgeText`) as strings; the reducer through whole games for 2, 3
+`scoreCells`, `lastTrickText`) as strings; the reducer through whole games for 2, 3
 and 4 seats by a tap policy asserting the settle stages and timers, `settleSlots`, the curtain names,
-the match tally through a draw and a match end (`state.test.ts`); the painters over the page fake
+Play again after a decided game and after a draw, an older save's match running on (`state.test.ts`); the painters over the page fake
 asserting the keyed rebuild; the wire goldens under `test/fixtures/briscola-wire/` (self-recorded:
 `BRISCOLA_WIRE_RECORD=1 … -u` re-records). Geometry oracle (`e2e/fixtures/briscola.ts`, on
 `geometry.ts`): every hand card inside `#hand`, the three slots equal, disjoint and in increasing x;
@@ -298,8 +304,7 @@ letters); `REGISTRY.briscola` (`title 'Briscola — cards'`, `hook 'window.__bri
 'briscola_' }`, `pageShape { ids: app homeScreen tableScreen hand trick stock briscola scoreStrip
 toast, rulesSlots: true }`, `contractFloors { ts: 40, markup: 40 }`) and `SHELL.briscola` (`heading`
 and `shareTitle` "Briscola", tabs Play/Rules/About, modes Online / Pass the phone, `hostAnswered
-/^Connected — waiting for .+ to deal$/`, `connDot '#oppDot'`, `localFields [localPlayersSel 2,
-localMatchSel 2]` (the house rules sit in a closed `<details>`, out of a driver's reach),
+/^Connected — waiting for .+ to deal$/`, `connDot '#oppDot'`, `localFields [localPlayersSel 2]`,
 `curtainButtons 2`) in `tools/games.ts`; `GameSuite`, `ShellGame`, `SHELL_GAMES` (there and in
 `web/shared/ui/ids.ts`) gain it; `tools/ci/suites.ts` gives the `briscola` suite its page rows
 (protocol, storage, shellConfig, ui, net, fx: backgammon's figures) and `gameE2e('briscola')`, the
@@ -328,7 +333,7 @@ default may change under it): the first trick by hand (my hand; a card lifted; a
 the curtain for the other seat; the second seat's play; the trick taken, the settle beat waited out;
 the table after it), the menu, history, rules and last-trick sheets, then the seeded policy through
 the hook (`legal()` -> `act(a)`, the loop walking the settle beat with `settle/elapsed` where
-`legal()` is empty) to the game's end (the result sheet, the table behind it), the second game's
-curtain with the badge counting, the match end on the endgame screen; last a three-seat and a
+`legal()` is empty) to the game's end (the result sheet, the table behind it) and Play again's
+curtain over the new deal; last a three-seat and a
 four-seat table dealt, for the seats row, the fan and the score strip in their other two shapes.
 Recorded at 390 × 844 and 1280 × 800; `--game briscola` records the two alone.

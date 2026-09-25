@@ -11,7 +11,14 @@ import { cardById, deckFor, idsOf, pointsOf } from './cards.ts';
 import { playText, summaryOf } from './log.ts';
 import { matchOver, matchWinner } from './score.ts';
 import { nextSeat, seatsOf } from './seats.ts';
-import { createGame, drawDealer, nextGame, normaliseOptions, withPosition } from './setup.ts';
+import {
+  createGame,
+  drawDealer,
+  nextGame,
+  normaliseOptions,
+  replayGame,
+  withPosition,
+} from './setup.ts';
 import type {
   Action,
   Card,
@@ -153,11 +160,11 @@ describe('tricks (T1-T12): the winner takes, draws first and leads', () => {
     expect(trickData(s)).toMatchObject({ no: 1, winner, points, trumpTaken: null });
   });
 
-  test('T7: the 21 points sit in piles[2] and side 0 reads 21 in every view', () => {
+  test('T7: the 21 points sit in piles[2] and side 2 (the seat itself) reads 21 in every view', () => {
     const s = trick(4, 'C', 's0:2D s1:4D s2:AC s3:3C');
     expect(pointsOf(s.piles[2] ?? [])).toBe(21);
     seatsOf(4).forEach((seat) => {
-      expect(viewFor(s, seat).sides).toEqual([21, 0]);
+      expect(viewFor(s, seat).sides).toEqual([0, 0, 21, 0]);
       expect(viewFor(s, seat).taken).toEqual([0, 0, 21, 0]);
     });
   });
@@ -284,7 +291,7 @@ describe('trick events (F1-F6): the facts of the trick, once, on the event', () 
     expect(trickData(s)).toMatchObject({
       ...NO_FLAGS,
       winner: 3,
-      winnerSide: 1,
+      winnerSide: 3,
       points: 0,
       valueClass: 'pointless',
       winningCard: c('6D'),
@@ -311,30 +318,30 @@ describe('trick events (F1-F6): the facts of the trick, once, on the event', () 
     expect(texts(s).at(-1)).toBe('Jeff took the trick · 22 points · stolen with a briscola');
   });
 
-  test("F6 steal at three and at four: the opponents' carichi are lost, a partner's asso is not stolen", () => {
+  test("F6 steal at three and at four: every other seat's carichi are lost (no partners at four)", () => {
     expect(trickData(trick(3, 'B', 's0:AC s1:5C s2:2B'))).toMatchObject({
       winner: 2,
       steal: true,
       carichiLost: [0],
       valueClass: 'big',
     });
-    // Seat 2 (side 0) trumps: Jeff's tre is stolen, partner Ari's asso went to the side.
+    // Seat 2 trumps: Ari's asso and Jeff's tre are both stolen (a free-for-all: nobody is a partner).
     const four = trick(4, 'B', 's0:AC s1:3C s2:2B s3:5D');
     expect(trickData(four)).toMatchObject({
       winner: 2,
-      winnerSide: 0,
+      winnerSide: 2,
       points: 21,
       valueClass: 'huge',
       steal: true,
       overtrump: false,
-      carichiLost: [1],
+      carichiLost: [0, 1],
     });
     expect(texts(four).at(-1)).toBe('Kim took the trick · 21 points · stolen with a briscola');
-    // A trump over the partner's asso and two pips: no steal, nothing lost.
+    // A trump over an asso and two pips: the asso is anyone else's, so it is stolen.
     expect(trickData(trick(4, 'B', 's0:AC s1:5D s2:2B s3:6D'))).toMatchObject({
       briscola: true,
-      steal: false,
-      carichiLost: [],
+      steal: true,
+      carichiLost: [0],
     });
   });
 
@@ -420,7 +427,7 @@ describe('the deal (D1-D7)', () => {
     expect(s.hands[nextSeat(4, s.dealer)]).toEqual(deck.slice(0, 3));
     expect(s.hands[s.dealer]).toEqual(deck.slice(9, 12));
     expect(s.trumpCard).toEqual(deck[12]);
-    expect(s.match.wins).toEqual([0, 0]);
+    expect(s.match.wins).toEqual([0, 0, 0, 0]);
     expect(s.piles).toEqual([[], [], [], []]);
   });
 
@@ -481,6 +488,37 @@ describe('the deal (D1-D7)', () => {
     expect(s.stock).toHaveLength(30);
     // nextGame is what `next` calls; the same stream gives the same deal.
     expect(nextGame(over, counting(mulberry32(6)), now)).toEqual(s);
+  });
+
+  test('replayGame: a new match for the same table after a decided one, the dealer passed on, the tally and the stream fresh, no rng read for the dealer', () => {
+    const over: State = {
+      ...game(3, { gamesToWin: 1 }),
+      phase: 'over',
+      dealer: 1,
+      hands: [[], [], []],
+      result: { winner: 0, totals: [61, 30, 29], draw: false },
+      match: { gamesToWin: 1, wins: [1, 0, 0], draws: 0 },
+      games: [{ gameNo: 1, dealer: 1, trump: 'S', winner: 0, totals: [61, 30, 29], endedAt: NOW }],
+      endedAt: NOW,
+    };
+    const rng = counting(mulberry32(6));
+    const s = replayGame(over, rng, now);
+    // The shuffle alone: 38 cards at three (E19), the dealer taken from the finished game.
+    expect(rng.calls()).toBe(38);
+    expect(s.dealer).toBe(2);
+    expect([s.leader, s.turn]).toEqual([0, 0]);
+    expect(s.gameNo).toBe(1);
+    expect(s.players).toBe(over.players);
+    expect(s.options).toBe(over.options);
+    expect(s.match).toEqual({ gamesToWin: 1, wins: [0, 0, 0], draws: 0 });
+    expect(s.games).toEqual([]);
+    expect(s.events.map((e) => e.kind)).toEqual(['deal']);
+    expect(s.events[0]).toMatchObject({ id: 0, kind: 'deal', seat: 2, data: { dealer: 2 } });
+    expect(s.phase).toBe('trick');
+    expect(s.result).toBeNull();
+    expect(s.stock).toHaveLength(30);
+    // The seat after the last one wraps to the first.
+    expect(replayGame({ ...over, dealer: 2 }, mulberry32(1), now).dealer).toBe(0);
   });
 
   test('D7: scoperta is stored false at three and four seats, kept at two; the partner peek the other way round (E15, E16)', () => {
@@ -657,14 +695,15 @@ describe('results (S1-S7)', () => {
     expect(s.games[0]?.winner).toBeNull();
   });
 
-  test('S3: n4 taken [30, 20, 35, 35] → sides [65, 55], side 0 wins, "Ari and Kim win 65–55"', () => {
+  test('S3: n4 taken [30, 20, 35, 35] → four sides, a tie for the top: a draw, "A draw, 30–20–35–35"', () => {
     const s = finish(
       lastTrick(4, ['3C RC CC FC', '3D 3S', 'AD AS 3B CD', 'AB RD RS RB CS CB FD FS FB']),
     );
     expect(viewFor(s, 0).taken).toEqual([30, 20, 35, 35]);
-    expect(s.result).toEqual({ winner: 0, totals: [65, 55], draw: false });
-    expect(texts(s).at(-1)).toBe('Ari and Kim win 65–55');
-    expect(s.match.wins).toEqual([1, 0]);
+    expect(viewFor(s, 0).sides).toEqual([30, 20, 35, 35]);
+    expect(s.result).toEqual({ winner: null, totals: [30, 20, 35, 35], draw: true });
+    expect(texts(s).at(-1)).toBe('A draw, 30–20–35–35');
+    expect(s.match).toMatchObject({ wins: [0, 0, 0, 0], draws: 1 });
   });
 
   test('S4: n3 [50, 40, 30] → seat 0 wins without 61', () => {
@@ -732,14 +771,17 @@ describe('the match (M1-M5)', () => {
     expect(fail(apply(s, 1, { type: 'next' }))).toBe(MESSAGES.MATCH_OVER);
   });
 
-  test('M1 at four: "Jeff and Dan win 55–65 … and take the match 1–2" reads the pair\'s verbs', () => {
+  test('M1 at four: one player per side, the winner first in the line, "Dan wins … and takes the match 1–0–0–0"', () => {
     const before = {
       ...lastTrick(4, ['3C RC CC FC', '3D 3S AD', 'AS 3B CD', 'AB RD RS RB CS CB FD FS FB']),
-      match: { gamesToWin: 1 as const, wins: [0, 0], draws: 0 },
+      match: { gamesToWin: 1 as const, wins: [0, 0, 0, 0], draws: 0 },
     };
     const s = finish(before);
-    expect(s.result).toEqual({ winner: 1, totals: [54, 66], draw: false });
-    expect(texts(s).at(-1)).toBe('Jeff and Dan win 66–54 and take the match 1–0');
+    const totals = viewFor(s, 0).taken;
+    expect(s.result).toEqual({ winner: 3, totals, draw: false });
+    expect(texts(s).at(-1)).toBe(
+      `Dan wins ${[totals[3], totals[0], totals[1], totals[2]].map(String).join('–')} and takes the match 1–0–0–0`,
+    );
   });
 
   test('M2: gamesToWin 1: the first decided game ends the match; a draw first does not', () => {
@@ -882,12 +924,10 @@ describe('the exchange (X1-X11)', () => {
     expect(fail(exchange(s, 0))).toBe(MESSAGES.NOT_YOUR_TURN);
   });
 
-  test("X9: n4, the partner took the trick, piles[0] empty → ok (the side's tricks count)", () => {
+  test("X9: n4, another seat took the trick, piles[0] empty → not yet (no partners: only a trick of one's own counts)", () => {
     const s0 = table(4, 'AC', '7C 2D', 2);
     expect(s0.piles[0]).toEqual([]);
-    expect(canExchange(s0, 0)).toBe(true);
-    const s = must(exchange(s0, 0));
-    expect(s.trumpCard).toEqual(c('7C'));
+    expect(canExchange(s0, 0)).toBe(false);
     // An opponent's trick would not do: seat 1 (side 1) holding the 7 with only side 0's trick.
     const opp = at(4, {
       hands: ['2D', '7C 3D', '5D', 'FD'],

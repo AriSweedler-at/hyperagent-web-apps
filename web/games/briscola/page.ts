@@ -3,9 +3,10 @@
 // test/dist/shell-markup.test.ts pins byte for byte. The page is Prettier's, so the composer formats
 // the render with the repo's config and the residue here (`blocks`: the head with its two fonts, the
 // table with its three relative seat cells, the stock with the briscola under it, the trick band, the
-// score strip and the three-slot hand; the endgame; the result sheet; the option
-// selects and the four name inputs) is the committed, formatted bytes, cut out of the page with the
-// blank line each follows; the looks (`look`) are the theme's classes, as backgammon's are. The
+// score strip and the three-slot hand; the endgame the shell requires; the result sheet; the two
+// seat-count selects and the four name inputs) is the committed, formatted bytes, cut out of the
+// page with the blank line each follows; the looks (`look`) are the theme's classes, as
+// backgammon's are. The
 // table ships the 2-player shape (#seatR2 shown, R1 and R3 hidden) so the page fake and the goldens
 // see a whole table before any paint; the Italian suit sprite (web/shared/ui/cardFace.ts
 // SUIT_SPRITE_SVG) is inlined at boot, not here, so it cannot drift from suits.ts.
@@ -120,48 +121,14 @@ const blocks: ShellBlocks = {
   submenuExtra: '',
   extraTabs: '',
   switchExtra: '',
-  hostFields: `              <div class="row">
-                <div class="field grow">
-                  <span class="field-label">Players</span>
-                  <select id="playersSel">
-                    <option value="2" selected>2 players</option>
-                    <option value="3" disabled>3 players · online soon</option>
-                    <option value="4" disabled>4 players · online soon</option>
-                  </select>
-                </div>
-                <div class="field grow">
-                  <span class="field-label">Match</span>
-                  <select id="matchSel">
-                    <option value="1">One game</option>
-                    <option value="2" selected>Best of 3</option>
-                    <option value="3">Best of 5</option>
-                  </select>
-                </div>
+  hostFields: `              <div class="field">
+                <span class="field-label">Players</span>
+                <select id="playersSel">
+                  <option value="2" selected>2 players</option>
+                  <option value="3" disabled>3 players · online soon</option>
+                  <option value="4" disabled>4 players · online soon</option>
+                </select>
               </div>
-              <details class="house-rules">
-                <summary>House rules</summary>
-                <div class="field">
-                  <span class="field-label">With three players, the deck drops</span>
-                  <select id="removedTwoSel">
-                    <option value="C" selected>the 2 di coppe</option>
-                    <option value="D">the 2 di denari</option>
-                    <option value="S">the 2 di spade</option>
-                    <option value="B">the 2 di bastoni</option>
-                  </select>
-                </div>
-                <label class="check-row">
-                  <input type="checkbox" id="exchangeChk" />
-                  <span>Swap the 7 (or the 2) of trumps for the trump card</span>
-                </label>
-                <label class="check-row">
-                  <input type="checkbox" id="scopertaChk" />
-                  <span>Scoperta: hands face up (two players)</span>
-                </label>
-                <label class="check-row">
-                  <input type="checkbox" id="partnerPeekChk" />
-                  <span>Partners see each other's hand (four players)</span>
-                </label>
-              </details>
               <button class="btn btn-go btn-block" id="hostBtn">Open a table</button>`,
   localFields: `            <div class="card-box">
               <div class="row">
@@ -210,40 +177,6 @@ const blocks: ShellBlocks = {
                   autocomplete="off"
                 />
               </div>
-            </div>
-            <div class="card-box">
-              <div class="field">
-                <span class="field-label">Match</span>
-                <select id="localMatchSel">
-                  <option value="1">One game</option>
-                  <option value="2" selected>Best of 3</option>
-                  <option value="3">Best of 5</option>
-                </select>
-              </div>
-              <details class="house-rules">
-                <summary>House rules</summary>
-                <div class="field">
-                  <span class="field-label">With three players, the deck drops</span>
-                  <select id="localRemovedTwoSel">
-                    <option value="C" selected>the 2 di coppe</option>
-                    <option value="D">the 2 di denari</option>
-                    <option value="S">the 2 di spade</option>
-                    <option value="B">the 2 di bastoni</option>
-                  </select>
-                </div>
-                <label class="check-row">
-                  <input type="checkbox" id="localExchangeChk" />
-                  <span>Swap the 7 (or the 2) of trumps for the trump card</span>
-                </label>
-                <label class="check-row">
-                  <input type="checkbox" id="localScopertaChk" />
-                  <span>Scoperta: hands face up (two players)</span>
-                </label>
-                <label class="check-row">
-                  <input type="checkbox" id="localPartnerPeekChk" />
-                  <span>Partners see each other's hand (four players)</span>
-                </label>
-              </details>
             </div>`,
   playExtra: '',
   extraPanels: '',
@@ -268,7 +201,6 @@ const blocks: ShellBlocks = {
             </button>
           </div>
           <div class="row tight badges">
-            <div class="badge dim" id="gameBadge">Game 1 · 0–0 · best of 3</div>
             <div class="badge trump s-coppe" id="trumpBadge" title="Briscola: cups">
               <svg class="suit" aria-hidden="true"><use /></svg>
               <span id="trumpName">coppe</span>
@@ -321,6 +253,7 @@ const blocks: ShellBlocks = {
             </div>
             <div class="briscola" id="briscola"></div>
             <div class="pile-label" id="stockCount">Stock · 34</div>
+            <div class="pile-label card-name" id="briscolaName"></div>
           </div>
           <div class="trick" id="trick" data-players="2" data-lead="" aria-live="off"></div>
         </div>
@@ -343,40 +276,54 @@ const blocks: ShellBlocks = {
             <button class="btn btn-primary grow" id="playBtn" disabled>Play</button>
             <div class="waiting-note hidden" id="waitNote">Waiting…</div>
             <button class="btn btn-secondary btn-sm hidden" id="resultChipBtn">Result</button>
+            <button class="pile-peek" id="deckBtn" title="View deck" aria-label="View deck">🃏</button>
           </div>
         </div>
       </div>`,
-  endgame: `      <!-- ENDGAME: the match is over (design §5.1 "Bravi!"). -->
+  endgame: `      <!-- ENDGAME: the shell's fifth screen (web/shared/markup/shell.ts BLOCK_IDS), which this page
+           never shows: one game per sitting ends on the result sheet over the table, with Play again
+           (the owner, 2026-09-25). The shell's leave button lives here as backgammon's does; the menu's
+           row is the one a player reaches. -->
       <div id="endgameScreen" class="hidden">
-        <h1>Match over</h1>
-        <div class="card-box centered">
-          <div class="sheet-title" id="resultTitle">Bravi!</div>
-          <div class="sheet-sub" id="resultSub"></div>
-        </div>
-        <div class="card-box">
-          <label>Games</label>
-          <div class="score-list" id="matchScore"></div>
-        </div>
-        <div class="row">
-          <button class="btn btn-secondary grow" id="leaveBtn">Leave</button>
-          <button class="btn btn-go grow" id="nextGameBtn">Rematch</button>
-        </div>
+        <h1>Game over</h1>
+        <button class="btn btn-secondary btn-block" id="leaveBtn">Leave the table</button>
       </div>`,
   curtainIcon: '',
   curtainExtra: `        <button class="btn btn-ghost btn-block btn-sm" id="curtainHandoffBtn">
           Continue online
         </button>`,
   sheetsBefore: `
-    <!-- GAME RESULT (design §5.1): the sheet over the dimmed table; the match end is the shell's
-         #endgameScreen. -->
+    <!-- CARD VIEW (docs/design/language-packs.md §5): the briscola tapped, shown large with its name
+         in the chosen language pack; no game state changes. -->
+    <div id="cardViewOverlay" class="overlay hidden">
+      <div class="sheet centered card-view">
+        <div class="card-view-face" id="cardViewFace"></div>
+        <div class="sheet-sub" id="cardViewName"></div>
+        <button class="btn btn-primary btn-block" id="closeCardViewBtn">Close</button>
+      </div>
+    </div>
+
+    <!-- GAME RESULT (design §5.1): the sheet over the dimmed table, where every game ends; Play again
+         deals anew for the same players (the deal passes to the next seat). -->
     <div id="resultOverlay" class="overlay hidden">
       <div class="sheet centered">
         <div class="sheet-title" id="rsTitle">Game over</div>
         <div class="sheet-sub" id="rsSub"></div>
         <div class="score-list" id="rsScore"></div>
-        <div class="empty-note" id="rsMatch"></div>
-        <button class="btn btn-go btn-block" id="rsNextBtn">Next game</button>
+        <button class="btn btn-go btn-block" id="rsReplayBtn">Play again</button>
         <button class="btn btn-ghost btn-block btn-sm" id="rsPeekBtn">Look at the table</button>
+      </div>
+    </div>
+
+    <!-- DECK (the owner, 2026-09-25; gin's discards sheet on the forty, src/ui/deck.ts): the four
+         suit rows as chips of the pack, what is gone greyed, my hand greyed too with the toggle. -->
+    <div id="deckOverlay" class="overlay hidden">
+      <div class="sheet">
+        <div class="sheet-title">Deck</div>
+        <div class="sheet-sub" id="deckSub"></div>
+        <div class="dk-grid" id="deckList"></div>
+        <label class="dk-toggle"><input type="checkbox" id="deckIncludeHand" /> Include the cards in my hand</label>
+        <button class="btn btn-ghost btn-block btn-sm" id="closeDeckBtn">Close</button>
       </div>
     </div>`,
   sheetsAfter: `
@@ -393,7 +340,10 @@ const blocks: ShellBlocks = {
           <button class="btn btn-ghost btn-block" id="menuLeaveBtn">Leave the table</button>
         </div>
       </div>
-    </div>`,
+    </div>
+
+    <!-- CARD TIP (docs/design/language-packs.md §5): a hand card's name on hover or a long press, placed over the card by the painter. -->
+    <div id="cardTip" class="card-tip hidden" role="tooltip"></div>`,
   rulesIcon: '',
 };
 

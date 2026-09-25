@@ -67,6 +67,13 @@ describe('linkJargon', () => {
     );
   });
 
+  test('a table is data, not prose: nothing inside it is linked, the text around it still is', () => {
+    const table = '<table class="t"><tr><th>knock</th><td>a set</td></tr></table>';
+    expect(linkJargon(`knock ${table} run`, GLOSSARY)).toBe(
+      `${link('knock', 'knock')} ${table} ${link('melds', 'run')}`,
+    );
+  });
+
   test('linking twice adds nothing: the links already there are skipped', () => {
     const once = linkJargon('knock and cube', GLOSSARY);
     expect(linkJargon(once, GLOSSARY)).toBe(once);

@@ -3,7 +3,6 @@
 // fake knows no `<option selected>`, so a test sets a select's value as a player would pick it.
 import { describe, expect, test } from 'vitest';
 
-import { setChecked } from '../../../../shared/edge/dom.ts';
 import { fakeTarget } from '../../../../shared/edge/page.fake.ts';
 import {
   EXTRA_NAME_INPUTS,
@@ -23,6 +22,20 @@ import { DEFAULT_OPTS, initialApp, type App, type Intent } from './state.ts';
 
 import MARKUP from '../../index.html?raw';
 
+/** The controls the owner took off the home screen (2026-09-25): the match select and the house rules, in both panels. */
+const GONE_IDS = [
+  'matchSel',
+  'localMatchSel',
+  'removedTwoSel',
+  'localRemovedTwoSel',
+  'exchangeChk',
+  'localExchangeChk',
+  'scopertaChk',
+  'localScopertaChk',
+  'partnerPeekChk',
+  'localPartnerPeekChk',
+];
+
 const page = (): BriscolaPage => briscolaPage(MARKUP);
 /** Type into an input, or pick a select's option, as the player would. */
 const type = (p: BriscolaPage, id: string, value: string): void => {
@@ -33,14 +46,10 @@ const withOpts = (over: Partial<App['shell']['opts']>, table: Partial<App['table
   shell: { ...initialApp.shell, opts: { ...DEFAULT_OPTS, ...over } },
   table: { ...initialApp.table, ...table },
 });
-/** A page with every select at its shipped default, as a browser would report it. */
+/** A page with both selects at their shipped default, as a browser would report it. */
 const defaults = (p: BriscolaPage): void => {
   type(p, 'playersSel', '2');
-  type(p, 'matchSel', '2');
-  type(p, 'removedTwoSel', 'C');
   type(p, 'localPlayersSel', '2');
-  type(p, 'localMatchSel', '2');
-  type(p, 'localRemovedTwoSel', 'C');
 };
 const recorder = (): Readonly<{ intents: Intent[]; dispatch: (i: Intent) => void }> => {
   const intents: Intent[] = [];
@@ -96,14 +105,12 @@ describe('paintHome', () => {
     expect(p.get('onlineModeContent').hidden()).toBe(false);
     expect(p.get('localModeContent').hidden()).toBe(true);
     expect(p.get('resumeBox').hidden()).toBe(true);
-    // The defaults (D3): two players, best of three, the 2 di coppe out, every house rule off.
+    // The default (D3): two players; the match and the house rules have no controls at all.
     expect(p.get('localPlayersSel').value()).toBe('2');
-    expect(p.get('matchSel').value()).toBe('2');
-    expect(p.get('localMatchSel').value()).toBe('2');
-    expect(p.get('removedTwoSel').value()).toBe('C');
-    expect(p.get('localRemovedTwoSel').value()).toBe('C');
-    expect(p.get('exchangeChk').checked()).toBe(false);
-    expect(p.get('localScopertaChk').checked()).toBe(false);
+    GONE_IDS.forEach((id) => {
+      expect(MARKUP).not.toContain(`id="${id}"`);
+    });
+    expect(MARKUP).not.toContain('house-rules');
     // Two seats: the third and fourth name inputs are put away.
     expect(p.get('moreNames').hidden()).toBe(true);
     expect(p.get(EXTRA_NAME_INPUTS[3]).hidden()).toBe(true);
@@ -111,15 +118,9 @@ describe('paintHome', () => {
     expect(p.get('playersSel').value()).toBe('');
   });
 
-  test('three and four seats show the extra names, painted from the table`s memory; the switches follow the terms', () => {
+  test('three and four seats show the extra names, painted from the table`s memory', () => {
     const p = page();
-    paintHome(
-      p.doc,
-      withOpts(
-        { seatCount: 3, gamesToWin: 1, removedTwo: 'S', exchange: true },
-        { extraNames: { 2: 'Cara', 3: 'Dan' } },
-      ),
-    );
+    paintHome(p.doc, withOpts({ seatCount: 3 }, { extraNames: { 2: 'Cara', 3: 'Dan' } }));
     expect(p.get('localPlayersSel').value()).toBe('3');
     expect(p.get('moreNames').hidden()).toBe(false);
     expect(p.get(EXTRA_NAME_INPUTS[2]).hidden()).toBe(false);
@@ -140,110 +141,48 @@ describe('paintHome', () => {
     expect(p.get(EXTRA_NAME_INPUTS[2]).value()).toBe('');
     expect(p.get(EXTRA_NAME_INPUTS[2]).attr('data-default')).toBeNull();
     expect(p.get(EXTRA_NAME_INPUTS[3]).attr('data-default')).toBe('1');
-    paintHome(
-      p.doc,
-      withOpts(
-        { seatCount: 3, gamesToWin: 1, removedTwo: 'S', exchange: true },
-        { extraNames: { 2: 'Cara', 3: 'Dan' } },
-      ),
-    );
-    expect(p.get('localMatchSel').value()).toBe('1');
-    expect(p.get('localRemovedTwoSel').value()).toBe('S');
-    expect(p.get('exchangeChk').checked()).toBe(true);
-    expect(p.get('localExchangeChk').checked()).toBe(true);
-    paintHome(p.doc, withOpts({ seatCount: 4, partnerPeek: true }));
+    paintHome(p.doc, withOpts({ seatCount: 4 }));
+    expect(p.get('localPlayersSel').value()).toBe('4');
     expect(p.get(EXTRA_NAME_INPUTS[3]).hidden()).toBe(false);
-    expect(p.get('localPartnerPeekChk').checked()).toBe(true);
-    expect(p.get('exchangeChk').checked()).toBe(false);
   });
 });
 
 describe('bindHome', () => {
-  test('the start buttons carry the raw terms of their panel (`Raw`), the switches as on/off, the extra names with Start', () => {
+  test('the start buttons carry the raw seat count of their panel (`Raw`), the extra names with Start', () => {
     const p = page();
     defaults(p);
     const r = recorder();
     bindHome(p.doc, r.dispatch);
     type(p, 'nameInput', 'Ann');
-    setChecked(p.get('exchangeChk').el, true);
     p.get('hostBtn').fire('click');
-    expect(r.intents).toEqual([
-      {
-        type: 'host/click',
-        name: 'Ann',
-        players: '2',
-        match: '2',
-        removedTwo: 'C',
-        exchange: 'on',
-        scoperta: 'off',
-        partnerPeek: 'off',
-      },
-    ]);
-    expect(readHostOptions(p.doc)).toEqual({
-      players: '2',
-      match: '2',
-      removedTwo: 'C',
-      exchange: 'on',
-      scoperta: 'off',
-      partnerPeek: 'off',
-    });
+    expect(r.intents).toEqual([{ type: 'host/click', name: 'Ann', players: '2' }]);
+    expect(readHostOptions(p.doc)).toEqual({ players: '2' });
     type(p, 'p1NameInput', 'Ann');
     type(p, 'p2NameInput', 'Bob');
     type(p, 'localPlayersSel', '3');
-    type(p, 'localMatchSel', '1');
-    type(p, 'localRemovedTwoSel', 'D');
     type(p, EXTRA_NAME_INPUTS[2], 'Cara');
-    setChecked(p.get('localScopertaChk').el, true);
     p.get('localBtn').fire('click');
     expect(r.intents.at(-1)).toEqual({
       type: 'local/click',
       p1: 'Ann',
       p2: 'Bob',
       localPlayers: '3',
-      localMatch: '1',
-      localRemovedTwo: 'D',
-      localExchange: 'off',
-      localScoperta: 'on',
-      localPartnerPeek: 'off',
       p3: 'Cara',
       p4: '',
     });
     expect(readLocalOptions(p.doc).p3).toBe('Cara');
   });
 
-  test('a changed control remembers its panel`s terms at once; the third and fourth names as typed', () => {
+  test('a changed select remembers its panel`s count at once; the third and fourth names as typed', () => {
     const p = page();
     defaults(p);
     const r = recorder();
     bindHome(p.doc, r.dispatch);
     type(p, 'localPlayersSel', '4');
     p.get('localPlayersSel').fire('change');
-    expect(r.intents).toEqual([
-      {
-        type: 'opts/set',
-        raw: {
-          localPlayers: '4',
-          localMatch: '2',
-          localRemovedTwo: 'C',
-          localExchange: 'off',
-          localScoperta: 'off',
-          localPartnerPeek: 'off',
-        },
-      },
-    ]);
-    setChecked(p.get('partnerPeekChk').el, true);
-    p.get('partnerPeekChk').fire('change');
-    expect(r.intents.at(-1)).toEqual({
-      type: 'opts/set',
-      raw: {
-        players: '2',
-        match: '2',
-        removedTwo: 'C',
-        exchange: 'off',
-        scoperta: 'off',
-        partnerPeek: 'on',
-      },
-    });
+    expect(r.intents).toEqual([{ type: 'opts/set', raw: { localPlayers: '4' } }]);
+    p.get('playersSel').fire('change');
+    expect(r.intents.at(-1)).toEqual({ type: 'opts/set', raw: { players: '2' } });
     type(p, EXTRA_NAME_INPUTS[2], 'Cara');
     p.get(EXTRA_NAME_INPUTS[2]).fire('input');
     type(p, EXTRA_NAME_INPUTS[3], 'Dan ');

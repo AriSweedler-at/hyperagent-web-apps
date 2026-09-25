@@ -1,5 +1,5 @@
 // The stories (docs/design/briscola.md §5.6): each catalogued table state served at `?story=<id>`
-// shows the facts its catalogue row records (the screen, the seats, the curtain, the hand's cards
+// shows the facts its catalogue row records (the seats, the curtain, the hand's cards
 // and marks, the fan, the stock and the briscola, the sheet open), passes the geometry oracle at a
 // phone and a laptop, and, for the marked ones, matches its committed per-platform screenshot
 // (`<story>--<viewport>-<platform>.png` under e2e/__screenshots__/, recorded with
@@ -26,7 +26,6 @@ const readFacts = (page: Page): Promise<StoryFacts> =>
   const stock = document.getElementById('stock');
   const sheets = ['historyOverlay', 'resultOverlay'];
   return {
-    screen: shown('endgameScreen') ? 'endgameScreen' : 'tableScreen',
     players: Number(document.getElementById('seats').getAttribute('data-players')),
     curtain: shown('curtainOverlay'),
     handCards: document.querySelectorAll('#hand .slot .card').length,
@@ -50,9 +49,9 @@ storiesSpec<Story, StoryViewport, StoryFacts>({
     phone: { ...PHONE, shot: true, body: true },
     desktop: { ...DESKTOP, shot: true, body: false },
   },
-  settled: async (page, story) => {
-    // The table is laid once the three slots are there; the end screen shows no hand.
-    if (story.facts.screen === 'tableScreen') await page.locator('#hand .slot').nth(2).waitFor();
+  settled: async (page) => {
+    // The table is laid once the three slots are there.
+    await page.locator('#hand .slot').nth(2).waitFor();
   },
   readFacts,
   expectFacts: (facts, story) => {
@@ -62,8 +61,7 @@ storiesSpec<Story, StoryViewport, StoryFacts>({
       );
   },
   geometry: async (page, story) => {
-    if (story.facts.screen === 'tableScreen')
-      expectTableGeometry(await tableGeometry(page), story.id);
+    expectTableGeometry(await tableGeometry(page), story.id);
   },
   sheetOpen: (story) => story.facts.sheet !== 'none' || story.facts.curtain,
 });

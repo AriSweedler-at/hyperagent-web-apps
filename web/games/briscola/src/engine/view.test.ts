@@ -129,20 +129,17 @@ describe('viewFor (V1-V4, V8)', () => {
     expect(viewFor(at(2, ['AS 3D 7C', 'RB 2C 5S'], '5D 6D 4C', '4C'), 0).stockTop).toBeNull();
   });
 
-  test("V3: n4 partnerPeek, stock []: seat 1 sees seats 2, 3, 0 in that order and only seat 3's hand; with a stock, none", () => {
+  test('V3: n4 partnerPeek, stock []: seat 1 sees seats 2, 3, 0 in that order and no hand (no partners); with a stock, none', () => {
     const hands = ['AS 3D', 'RB 2C', '5S 6S', '7S FS'];
     const s = at(4, hands, '', '4C', 1, { partnerPeek: true });
     const v = viewFor(s, 1);
     expect(v.others.map((o) => o.idx)).toEqual([2, 3, 0]);
-    expect(v.others.map((o) => 'hand' in o)).toEqual([false, true, false]);
-    expect(v.others[1]?.hand).toEqual(cs('7S FS'));
-    expect(v.others.map((o) => o.side)).toEqual([0, 1, 0]);
+    expect(v.others.map((o) => 'hand' in o)).toEqual([false, false, false]);
+    expect(v.others.map((o) => o.side)).toEqual([2, 3, 0]);
     expect(v.me.side).toBe(1);
-    // Seat 3 sees seat 1's in return; the opponents see no hand.
-    expect(viewFor(s, 3).others.find((o) => o.idx === 1)?.hand).toEqual(cs('RB 2C'));
-    expect(viewFor(s, 0).others.every((o) => !('hand' in o))).toBe(false);
-    expect(viewFor(s, 0).others.find((o) => o.idx === 2)?.hand).toEqual(cs('5S 6S'));
-    expect(viewFor(s, 0).others.find((o) => o.idx === 1)).not.toHaveProperty('hand');
+    // Nobody is anybody's partner: seat 3 sees no hand either.
+    expect(viewFor(s, 3).others.find((o) => o.idx === 1)?.hand).toBeUndefined();
+    expect(viewFor(s, 0).others.every((o) => !('hand' in o))).toBe(true);
     // With cards in the stock nobody peeks.
     const early = at(4, hands, '5D 6D 7D 4C', '4C', 1, { partnerPeek: true });
     expect(viewFor(early, 1).others.every((o) => !('hand' in o))).toBe(true);
@@ -163,7 +160,7 @@ describe('viewFor (V1-V4, V8)', () => {
     expect(legalActions(viewFor(s, 0))).toEqual([]);
   });
 
-  test('V8: n3 over [50, 40, 30]: sides has three entries; n4 gives two', () => {
+  test('V8: n3 over [50, 40, 30]: sides has three entries; n4 gives four (one per seat)', () => {
     const three: State = {
       ...game(3),
       phase: 'over',
@@ -179,7 +176,7 @@ describe('viewFor (V1-V4, V8)', () => {
     expect(v.isMyTurn).toBe(false);
     expect(legalActions(v)).toEqual([{ type: 'next' }]);
     const four = { ...game(4), piles: [cs('AD'), cs('AS'), cs('3C'), cs('RC')] };
-    expect(viewFor(four, 0).sides).toEqual([21, 15]);
+    expect(viewFor(four, 0).sides).toEqual([11, 11, 10, 4]);
     expect(viewFor(four, 0).taken).toEqual([11, 11, 10, 4]);
   });
 
