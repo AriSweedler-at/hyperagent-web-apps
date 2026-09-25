@@ -490,7 +490,10 @@ export const resumeLabel = (resume: Resume): string => {
     case 'local':
       return `Resume pass & play: ${resume.game.players.map((p) => p.name).join(' vs ')}`;
     case 'host':
-      return resume.handoff ? handoffLabel(resume.game) : `Resume hosting room ${resume.code}`;
+      // A room still waiting for its first guest has no game to hand off (lobby-resume.md D3).
+      return resume.handoff && resume.game !== null
+        ? handoffLabel(resume.game)
+        : `Resume hosting room ${resume.code}`;
     case 'guest':
       return `Rejoin room ${resume.code}`;
   }

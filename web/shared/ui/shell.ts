@@ -123,6 +123,8 @@ export type HostSave<G extends ShellTypes> = Readonly<{
     oppName: string | null;
     /** Written only when true (the shell's `handoff`), so every other host save keeps the legacy literal. */
     handoff?: true;
+    /** When the room was (re)opened, written only while it waits for its first guest (`game` null; docs/design/lobby-resume.md D1). */
+    at?: number;
   }>;
 export type GuestSave = Readonly<{ role: 'guest'; code: string; myName: string }>;
 export type Save<G extends ShellTypes> = LocalSave<G> | HostSave<G> | GuestSave;
@@ -135,10 +137,13 @@ export type HostResume<G extends ShellTypes> = Readonly<{
 }> &
   G['Opts'] &
   Readonly<{
-    game: G['State'];
+    /** The game in play, or null for a room still waiting for its first guest (lobby-resume.md D3). */
+    game: G['State'] | null;
     oppName: string | null;
     /** The save's `handoff` mark: the offer reads as the handoff, and the room resumes as one. */
     handoff: boolean;
+    /** The save's `at`: when a waiting room was (re)opened, or null (a game in play, or a save from before the stamp). */
+    at: number | null;
   }>;
 export type ShellResume<G extends ShellTypes> =
   | Readonly<{ kind: 'local'; game: G['State'] }>
@@ -208,6 +213,12 @@ export type ShellState<G extends ShellTypes> = Readonly<{
   /** The saved name, as `initHome` put it in the inputs. */
   savedName: string | null;
   resume: Resume<G> | null;
+  /**
+   * When this device opened or reopened its room (`startHost`, the clock), null otherwise: the
+   * waiting-room save's `at` (lobby-resume.md D2), which decides whether a reload resumes the
+   * lobby by itself (`resume/auto`) or offers it.
+   */
+  openedAt: number | null;
   /** `#rulesOverlay` open (the in-game rules sheet; the home tab is `homeTab`). */
   rulesOpen: boolean;
   cues: G['Cues'];
@@ -261,6 +272,12 @@ export type ShellIntent<G extends ShellTypes> =
   | (Readonly<{ type: 'local/click'; p1: string; p2: string }> & G['Raw'])
   /** `#resumeBtn`: whatever `shell.resume` offers. */
   | Readonly<{ type: 'resume/click' }>
+  /**
+   * The boot, after the invite link (the owner, 2026-09-25: "When the host of a lobby refreshes,
+   * it shouldn't drop the lobby"): a waiting room this device opened within WAITING_RESUME_MS
+   * resumes by itself; every other offer waits for its tap. Nothing while seated.
+   */
+  | Readonly<{ type: 'resume/auto' }>
   /** `#handoffBtn` (pass-and-play alone): the game goes on as a hosted room. */
   | Readonly<{ type: 'handoff/click' }>
   /** `#cancelHostBtn` / `#cancelGuestBtn`. */
@@ -328,10 +345,11 @@ export type ShellIntent<G extends ShellTypes> =
   | Readonly<{ type: 'persist' }>;
 
 /**
- * The shell's half of a game's `Intent` union: 44 types, backgammon's 38 less its two option
+ * The shell's half of a game's `Intent` union: 45 types, backgammon's 38 less its two option
  * selects (`variant/set`, `matchLength/set`, its own) plus the seven both games kept on the table
  * side after C1 (the curtain reveal, the leave flow, `visible`, `render`, `persist`), plus
- * `position/load`, backgammon's `sandbox/load` generalised (dry-round-2.md F5).
+ * `position/load`, backgammon's `sandbox/load` generalised (dry-round-2.md F5), plus
+ * `resume/auto`, the boot's lobby resume (lobby-resume.md D4).
  */
 export const SHELL_INTENT_TYPES = [
   'home/init',
@@ -345,6 +363,7 @@ export const SHELL_INTENT_TYPES = [
   'join/click',
   'local/click',
   'resume/click',
+  'resume/auto',
   'handoff/click',
   'cancel',
   'cancel/finish',
@@ -689,6 +708,13 @@ export type ShellGameData<G extends ShellTypes> = Omit<ShellConfig<G>, 'table' |
 
 /** The Play tab opens its submenu after this long a press. */
 export const LONG_PRESS_MS = 450;
+/**
+ * A waiting room saved (opened or reopened) within this long resumes by itself at boot
+ * (`resume/auto`; lobby-resume.md D4): long enough for a phone to discard the tab while the host
+ * chats the invite around, short enough that a room left open days ago never opens itself and
+ * is offered instead.
+ */
+export const WAITING_RESUME_MS = 30 * 60_000;
 /** The guest wait screen's first status, before the session speaks. */
 export const CONNECTING_MSG = 'Connecting…';
 export const NOT_CONNECTED_MSG = 'Not connected to the host.';
@@ -1033,7 +1059,13 @@ const startHost = <G extends ShellTypes>(
   return andThen(
     showScreen(
       withHostStatus(
-        withShell(app, { role: 'host', code, netAttempt: attempt, startGameVisible: false }),
+        withShell(app, {
+          role: 'host',
+          code,
+          netAttempt: attempt,
+          startGameVisible: false,
+          openedAt: ctx.now(),
+        }),
         cfg.copy.opening,
       ),
       'hostWaitScreen',
@@ -1150,7 +1182,12 @@ const guestFrame = <G extends ShellTypes>(
 
 // ---- home, resume, leave ---------------------------------------------------------------------
 
-/** The resume box `initHome` shows for a save, or null (a finished game is not offered); the game's own offers come first through `cfg.home.resume`. */
+/**
+ * The resume box `initHome` shows for a save, or null (a finished game is not offered); the game's
+ * own offers come first through `cfg.home.resume`. A host save with no game is the waiting room
+ * this device opened (lobby-resume.md D3): offered under its code, with the save's stamp, so
+ * `resume/auto` can tell a moment ago from last week.
+ */
 export const resumeFor = <G extends ShellTypes>(
   save: Save<G> | null,
   cfg: ShellConfig<G>,
@@ -1160,7 +1197,7 @@ export const resumeFor = <G extends ShellTypes>(
     case 'local':
       return cfg.engine.finished(save.game) ? null : { kind: 'local', game: save.game };
     case 'host':
-      return save.game !== null && !cfg.engine.finished(save.game)
+      return save.game === null || !cfg.engine.finished(save.game)
         ? {
             kind: 'host',
             code: save.code,
@@ -1169,6 +1206,7 @@ export const resumeFor = <G extends ShellTypes>(
             game: save.game,
             oppName: save.oppName,
             handoff: save.handoff === true,
+            at: save.at ?? null,
           }
         : null;
     case 'guest':
@@ -1179,6 +1217,18 @@ export const resumeFor = <G extends ShellTypes>(
 const SHELL_RESUME_KINDS: ReadonlySet<string> = new Set(['local', 'host', 'guest']);
 const isShellResume = <G extends ShellTypes>(offer: Resume<G>): offer is ShellResume<G> =>
   SHELL_RESUME_KINDS.has(offer.kind);
+
+/** The room this device hosts, as the home screen offers it: the host offer, or null. */
+const hostOffer = <G extends ShellTypes>(s: ShellState<G>): HostResume<G> | null =>
+  s.resume !== null && isShellResume(s.resume) && s.resume.kind === 'host' ? s.resume : null;
+
+/**
+ * `resume/auto`'s rule (lobby-resume.md D4): the offer is this device's waiting room (no game),
+ * stamped, and opened within WAITING_RESUME_MS of now. A mid-game room, an unstamped save (from
+ * before the stamp) and an old lobby wait for their tap.
+ */
+const resumesItself = <G extends ShellTypes>(offer: HostResume<G>, now: number): boolean =>
+  offer.game === null && offer.at !== null && now - offer.at <= WAITING_RESUME_MS;
 
 /** `setHomeTab(tab, opts)`. */
 const setHomeTab = <G extends ShellTypes>(
@@ -1254,7 +1304,8 @@ const resume = <G extends ShellTypes>(
           opts: cfg.opts.pick(offer),
           game: offer.game,
           oppName: offer.oppName,
-          view: cfg.engine.viewFor(offer.game, 0),
+          // A waiting room has no game and no view yet: it reopens as it was, every seat free.
+          view: offer.game === null ? null : cfg.engine.viewFor(offer.game, 0),
           // A handoff nobody joined resumes as one, under the code the invite already carries.
           handoff: offer.handoff,
         }),
@@ -1434,6 +1485,11 @@ export const reduceShell = <G extends ShellTypes>(
     }
     case 'resume/click':
       return s.resume === null ? pure(app) : resume(app, s.resume, ctx, cfg);
+    case 'resume/auto': {
+      if (s.role !== null) return pure(app);
+      const own = hostOffer(s);
+      return own !== null && resumesItself(own, ctx.now()) ? resume(app, own, ctx, cfg) : pure(app);
+    }
     case 'handoff/click': {
       // The home screen's offer, or the game in play on the pass-and-play curtain.
       if (s.role === 'local' && s.game !== null) return handoff(app, s.game, ctx, cfg);
@@ -1487,6 +1543,11 @@ export const reduceShell = <G extends ShellTypes>(
       // click's toast over the filled form; a link followed while seated changes nothing.
       if (s.role !== null) return pure(app);
       const code = sanitiseCode(cfg.id, intent.code);
+      // The device's own invite (the owner, 2026-09-25: "when a host device clicks the JOIN code
+      // it should resume hosting"): the room it hosts, waiting or mid-game, comes back as the
+      // Resume tap would bring it, and nobody joins.
+      const own = hostOffer(s);
+      if (own !== null && own.code === code) return resume(app, own, ctx, cfg);
       const name = s.p1Name === '' ? localNameFor(localNamesOf(cfg), 0) : s.p1Name;
       return andThen(
         andThen(
@@ -1624,6 +1685,7 @@ export const initialShell = <G extends ShellTypes>(cfg: ShellConfig<G>): ShellSt
   handoff: false,
   savedName: null,
   resume: null,
+  openedAt: null,
   rulesOpen: false,
   cues: cfg.cues.initial,
   submenuOpen: false,
@@ -1648,6 +1710,8 @@ export const saveFor = <G extends ShellTypes>(s: ShellState<G>): Save<G> | null 
         game: s.game,
         oppName: s.oppName,
         ...(s.handoff ? { handoff: true } : {}),
+        // The stamp rides only on the waiting room (lobby-resume.md D1): a game's save is the legacy literal.
+        ...(s.game === null && s.openedAt !== null ? { at: s.openedAt } : {}),
       };
     case 'guest':
       return { role: 'guest', code: s.code ?? '', myName: s.myName };

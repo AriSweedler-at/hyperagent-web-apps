@@ -818,12 +818,15 @@ describe('bootShell', () => {
       'hook',
       'intent:home/init',
       'intent:join/link',
+      'intent:resume/auto',
       'intent:rules/show',
     ]);
     expect(b.log.sounds).toEqual([true]);
     expect(b.log.intents[0]).toEqual({ type: 'home/init', home: HOME });
     expect(b.log.intents[1]).toEqual({ type: 'join/link', code: 'KQZM' });
-    expect(b.log.intents[2]).toEqual({ type: 'rules/show', rule: 'knock' });
+    // The lobby's own resume comes after the link (docs/design/lobby-resume.md D4), before the rule.
+    expect(b.log.intents[2]).toEqual({ type: 'resume/auto' });
+    expect(b.log.intents[3]).toEqual({ type: 'rules/show', rule: 'knock' });
     // The invite left the address bar, the other hook and the hash kept.
     expect(b.log.replaced).toEqual(['/fake/?peer=127.0.0.1%3A9000#rule-knock']);
     expect(b.boot.app().home).toEqual(HOME);
@@ -831,8 +834,13 @@ describe('bootShell', () => {
     const jargon = fakeEl('j', { attrs: { 'data-rule': 'undercut' } });
     b.p.fire('click', { target: fakeTarget({ closest: { 'a.jargon': jargon } }) });
     expect(b.log.intents.at(-1)).toEqual({ type: 'rules/show', rule: 'undercut' });
-    // A bare page without hooks: home/init alone.
-    expect(bootPage().log.order).toEqual(['bindAll', 'paintSound', 'intent:home/init']);
+    // A bare page without hooks: home/init, then the lobby's own resume.
+    expect(bootPage().log.order).toEqual([
+      'bindAll',
+      'paintSound',
+      'intent:home/init',
+      'intent:resume/auto',
+    ]);
   });
 
   test("the hook: the shared members, the getter app, the game's own members after them", () => {
@@ -919,7 +927,11 @@ describe('bootShell', () => {
   test('dispatch: the reducer gets the seeded rng and the clock; an unchanged App paints nothing, a changed one paints once after the effects ran against it', () => {
     const b = bootPage();
     const rng = mulberry32(7);
-    expect(b.log.ctx).toEqual([[rng(), b.clock.now()]]);
+    // Two intents at boot (home/init, resume/auto), each reduced with the seeded rng and the clock.
+    expect(b.log.ctx).toEqual([
+      [rng(), b.clock.now()],
+      [rng(), b.clock.now()],
+    ]);
     expect(b.log.paints).toHaveLength(1);
     b.run([{ type: 'own', tag: 'a' }]);
     expect(b.log.paints).toHaveLength(1);
@@ -939,7 +951,7 @@ describe('bootShell', () => {
     // A refused confirm dispatches nothing.
     const refused = bootPage({ confirm: false });
     refused.run([{ type: 'confirm', message: 'Leave?', then: { type: 'render' } }]);
-    expect(seen(refused)).toEqual(['home/init', 'step']);
+    expect(seen(refused)).toEqual(['home/init', 'resume/auto', 'step']);
   });
 
   test("the page adapters: the toast with the game's marks, scrollTop, the three input writes, the rule reveal", () => {
@@ -1059,11 +1071,11 @@ describe('bootShell', () => {
     // Hidden: nothing; visible: a warm (an `interrupted` context asked to resume) and the intent.
     b.visibility.state = 'hidden';
     b.p.fire('visibilitychange');
-    expect(seen(b)).toEqual(['home/init']);
+    expect(seen(b)).toEqual(['home/init', 'resume/auto']);
     expect(b.log.warms.count).toBe(4);
     b.visibility.state = 'visible';
     b.p.fire('visibilitychange');
-    expect(seen(b)).toEqual(['home/init', 'visible']);
+    expect(seen(b)).toEqual(['home/init', 'resume/auto', 'visible']);
     expect(b.log.warms.count).toBe(5);
     // Without a constructor the cues have no context and warming is silent.
     const silent = bootPage();
