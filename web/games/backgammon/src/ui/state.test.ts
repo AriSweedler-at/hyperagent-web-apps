@@ -7,6 +7,7 @@ import { describe, expect, test } from 'vitest';
 import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
 import { createStore, type StorageLike } from '../../../../shared/edge/storage.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
+import { DEFAULT_LOCAL_NAMES } from '../../../../shared/ui/shell.ts';
 import { actorOf, applyAction, MESSAGES, viewFor, withPosition } from '../engine/index.ts';
 import type { Dice, Seat, State, View } from '../engine/index.ts';
 import { connectingMsg } from '../net/guest.ts';
@@ -18,6 +19,7 @@ import {
   toast as toastFrame,
 } from '../protocol.ts';
 import { pos, scripted } from '../engine/test-helpers.ts';
+import { DEFAULT_NAME } from '../shellConfig.ts';
 import { STORAGE_KEYS } from '../storage.ts';
 import { effectiveSelection, sourcesOf, targetsOf } from './board.ts';
 import { CUES } from './sound.ts';
@@ -295,10 +297,17 @@ describe('home', () => {
       { type: 'fillName', name: 'Ann' },
       { type: 'fillP2Name', name: 'Bob' },
     ]);
-    // Nothing saved: no fills, the defaults, an unknown tab falls back to play.
+    // Nothing saved: the shell's defaults go into the inputs (shell.ts DEFAULT_LOCAL_NAMES) and the
+    // state keeps none of them; the defaults, an unknown tab falls back to play. `fillName` reaches
+    // `#nameInput` too, so the first must be what that input's markup already holds (DEFAULT_NAME).
     const bare = run(initialApp, { type: 'home/init', home: { ...home, homeTab: 'play' } });
-    expect(kinds(bare.effects)).toEqual(['scrollTop']);
-    expect(bare.app.shell.resume).toBeNull();
+    expect(bare.effects).toEqual([
+      { type: 'scrollTop' },
+      { type: 'fillName', name: DEFAULT_LOCAL_NAMES[0] },
+      { type: 'fillP2Name', name: DEFAULT_LOCAL_NAMES[1] },
+    ]);
+    expect(bare.app.shell).toMatchObject({ resume: null, p1Name: '', p2Name: '', savedName: null });
+    expect(DEFAULT_NAME).toBe(DEFAULT_LOCAL_NAMES[0]);
   });
 
   test('names typed are remembered trimmed and echoed to the other inputs', () => {
@@ -757,11 +766,19 @@ describe('pass and play', () => {
       view: viewFor(g, g.turn),
     });
     expect(app.table).toMatchObject({ curtain: g.turn, selected: null, resultOpen: false });
+    // The home read fills the seats with their defaults (nothing saved) before the start.
     // Initial: no "your turn" chime with the first curtain.
-    expect(kinds(effects)).toEqual(['scrollTop', 'wakeLock', 'persist', 'scrollTop']);
-    expect(effects[1]).toEqual({ type: 'wakeLock', hold: true });
+    expect(kinds(effects)).toEqual([
+      'scrollTop',
+      'fillName',
+      'fillP2Name',
+      'wakeLock',
+      'persist',
+      'scrollTop',
+    ]);
+    expect(effects[3]).toEqual({ type: 'wakeLock', hold: true });
     const defaults = run(initialApp, { type: 'local/click', p1: '', p2: '' }).app;
-    expect(game(defaults).players.map((p) => p.name)).toEqual(['Player 1', 'Player 2']);
+    expect(game(defaults).players.map((p) => p.name)).toEqual(['Ari', 'Lavi']);
     expect(game(defaults).options.matchLength).toBe(5);
     expect(game(defaults).phase).toBe('toRoll');
   });

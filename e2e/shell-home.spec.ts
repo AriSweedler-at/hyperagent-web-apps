@@ -17,7 +17,7 @@ import type { Page } from '@playwright/test';
 
 import { REGISTRY, SHELL, SHELL_GAMES } from '../tools/games.ts';
 import { DESKTOP, PHONE, type Viewport } from './fixtures/geometry.ts';
-import { DEFAULT_NAME, readPref } from './fixtures/shell.ts';
+import { DEFAULT_LOCAL_NAMES, DEFAULT_NAME, readPref } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -87,9 +87,10 @@ SHELL_GAMES.forEach((game) => {
             /\bactive\b/,
           );
           await expect.poll(() => readPref(page, game, 'playMode')).toBe('local');
-          // The second seat starts empty (an empty name plays as the page's placeholder), and the
-          // panel's own fields at their defaults.
-          await expect(page.locator('#p2NameInput')).toHaveValue('');
+          // Nothing remembered: the two seats show the shell's defaults (shell.ts
+          // DEFAULT_LOCAL_NAMES, the owner's names), and the panel's own fields theirs.
+          await expect(page.locator('#p1NameInput')).toHaveValue(DEFAULT_LOCAL_NAMES[0]);
+          await expect(page.locator('#p2NameInput')).toHaveValue(DEFAULT_LOCAL_NAMES[1]);
           await Promise.all(
             shell.localFields.map(([id, value]) =>
               expect(page.locator(`#${id}`)).toHaveValue(value),

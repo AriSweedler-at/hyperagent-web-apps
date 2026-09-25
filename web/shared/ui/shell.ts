@@ -672,10 +672,19 @@ const nameOr = (raw: string, fallback: string): string => {
   return (trimmed === '' ? fallback : trimmed).slice(0, NAME_MAX);
 };
 
-/** Two players from the pass-and-play inputs: defaults, and " 2" on a clash (gin's sandbox deals them too). */
+/**
+ * The two pass-and-play seats when their inputs are empty, and what `initHome` fills the inputs
+ * with when nothing is remembered (the owner, 2026-09-25: "Make the default p1 ari and p2 lavi",
+ * spelled as the proper names). The first is also the online name input's markup default (each
+ * game's shellConfig.ts DEFAULT_NAME, pinned there), since `fillName` reaches that input too and
+ * must find the name it already shows. A game with more seats keeps `Player N` from the third on.
+ */
+export const DEFAULT_LOCAL_NAMES: readonly [string, string] = ['Ari', 'Lavi'];
+
+/** Two players from the pass-and-play inputs: the defaults, and " 2" on a clash (gin's sandbox deals them too). */
 export const localPlayers = (p1raw: string, p2raw: string): Readonly<[Player, Player]> => {
-  const p1 = nameOr(p1raw, 'Player 1');
-  const p2 = nameOr(p2raw, 'Player 2');
+  const p1 = nameOr(p1raw, DEFAULT_LOCAL_NAMES[0]);
+  const p2 = nameOr(p2raw, DEFAULT_LOCAL_NAMES[1]);
   return [
     { id: 'p1', name: p1 },
     { id: 'p2', name: p2.toLowerCase() === p1.toLowerCase() ? `${p2} 2` : p2 },
@@ -1014,9 +1023,10 @@ const setHomeTab = <G extends ShellTypes>(
 };
 
 /**
- * `initHome()` over a storage snapshot: the saved names go into the name inputs (effects, so the
- * paint never fights the player's typing), the game's own part into the App (`cfg.home.apply`),
- * the tab applied without persisting, then the resume offer.
+ * `initHome()` over a storage snapshot: the saved names, or the defaults where none is saved, go
+ * into the name inputs (effects, so the paint never fights the player's typing; the shell's state
+ * keeps only what was saved or typed), the game's own part into the App (`cfg.home.apply`), the
+ * tab applied without persisting, then the resume offer.
  */
 const initHome = <G extends ShellTypes>(
   app: ShellApp<G>,
@@ -1039,8 +1049,8 @@ const initHome = <G extends ShellTypes>(
             }),
             home,
           ),
-          ...(home.name === null ? [] : [{ type: 'fillName', name: home.name } as const]),
-          ...(home.p2Name === null ? [] : [{ type: 'fillP2Name', name: home.p2Name } as const]),
+          { type: 'fillName', name: home.name ?? DEFAULT_LOCAL_NAMES[0] },
+          { type: 'fillP2Name', name: home.p2Name ?? DEFAULT_LOCAL_NAMES[1] },
         ),
         (b) => setHomeTab(b, home.homeTab, false, cfg),
       ),

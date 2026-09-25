@@ -312,7 +312,7 @@ export type TableIntent =
   | Readonly<{ type: 'sandbox/copy' }>
   /**
    * `#sbStartBtn` (the names from the pass-and-play inputs) or the console's `__gin.sandbox(map)`
-   * (no names: Player 1 and Player 2): the map dealt as a pass-and-play game, or its error shown.
+   * (no names: the shell's defaults, Ari and Lavi): the map dealt as a pass-and-play game, or its error shown.
    */
   | Readonly<{ type: 'sandbox/start'; map: string; p1?: string; p2?: string }>
   | Readonly<{ type: 'rules/open' }>

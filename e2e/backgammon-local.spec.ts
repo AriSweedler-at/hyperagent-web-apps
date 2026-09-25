@@ -75,7 +75,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#variantSel')).toHaveValue('portes');
       await expect(page.locator('#matchLengthSel')).toHaveValue('5');
       await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
-      // Gin's convention: the second seat is a placeholder, and an empty name plays as "Jeff".
+      // Gin's convention: the second seat keeps its placeholder under the shell's prefilled default.
       await expect(page.locator('#p2NameInput')).toHaveAttribute('placeholder', 'Player 2');
       await page.locator('#tabRulesBtn').click();
       await expect(page.locator('#rulesList li')).toHaveCount(9);

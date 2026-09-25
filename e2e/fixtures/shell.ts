@@ -20,8 +20,10 @@ export type Names = Readonly<[string, string]>;
 export const DEFAULT_NAMES: Names = ['Ann', 'Bob'];
 /** The two peers of an online game. */
 export const ONLINE_NAMES: Names = ['Host', 'Guest'];
-/** What `#nameInput` starts at on both pages (each game's ui/state.ts DEFAULT_NAME). */
+/** What `#nameInput` starts at on both pages (each game's shellConfig.ts DEFAULT_NAME). */
 export const DEFAULT_NAME = 'Ari';
+/** What the two pass-and-play inputs show when nothing is remembered (web/shared/ui/shell.ts DEFAULT_LOCAL_NAMES). */
+export const DEFAULT_LOCAL_NAMES: Names = ['Ari', 'Lavi'];
 
 // ---- the shell's copy, byte-identical in both src trees (design §6, risk 10) --------------------
 
