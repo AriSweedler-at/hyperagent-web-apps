@@ -633,22 +633,60 @@ describe('the affected scripts the hook runs', () => {
 const CI_YML = readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8');
 
 describe('ci.yml carries the graph the table describes', () => {
-  test.each(JOBS)('%s is a job gated on its changes output, and ci-ok needs it', (job) => {
-    expect(CI_YML).toContain(
-      `\n  ${job}:\n    needs: changes\n    if: needs.changes.outputs.${job} == 'true'\n`,
-    );
-    expect(CI_YML).toContain(`      ${job}: \${{ steps.affected.outputs.${job} }}\n`);
-    const ciOk = CI_YML.slice(CI_YML.indexOf('\n  ci-ok:'), CI_YML.indexOf('\n  deploy:'));
-    expect(ciOk, 'ci-ok needs').toContain(`\n      - ${job}\n`);
+  /** The six jobs the two matrix jobs replaced (dry-round-2.md I1): no longer spelled in ci.yml. */
+  const gameJobs: ReadonlyArray<Job> = [...GAME_SUITES, ...GAME_SUITES.map(e2eJob)];
+  const ciOk = CI_YML.slice(CI_YML.indexOf('\n  ci-ok:'), CI_YML.indexOf('\n  deploy:'));
+
+  test.each(JOBS.filter((job) => !gameJobs.includes(job)))(
+    '%s is a job gated on its changes output, and ci-ok needs it',
+    (job) => {
+      expect(CI_YML).toContain(
+        `\n  ${job}:\n    needs: changes\n    if: needs.changes.outputs.${job} == 'true'\n`,
+      );
+      expect(CI_YML).toContain(`      ${job}: \${{ steps.affected.outputs.${job} }}\n`);
+      expect(ciOk, 'ci-ok needs').toContain(`\n      - ${job}\n`);
+    },
+  );
+
+  test.each([
+    ['game', 'games', 'test:', '${{ matrix.suite }}'],
+    ['e2e-game', 'e2e-games', 'test:e2e:', 'e2e-${{ matrix.suite }}'],
+  ] as const)(
+    '%s is a matrix job over the %s list the changes job emits, skipped whole on [], and ci-ok needs it',
+    (job, list, script, name) => {
+      // The guard comes first: GitHub refuses an empty matrix, so `[]` must skip the job instead.
+      expect(CI_YML).toContain(
+        `\n  ${job}:\n    needs: changes\n    if: needs.changes.outputs.${list} != '[]'\n` +
+          `    strategy:\n      fail-fast: false\n      matrix:\n` +
+          `        suite: \${{ fromJSON(needs.changes.outputs.${list}) }}\n` +
+          `    name: ${name}\n`,
+      );
+      expect(CI_YML).toContain(`      ${list}: \${{ steps.affected.outputs.${list} }}\n`);
+      expect(CI_YML).toContain(`run: npm run ${script}\${{ matrix.suite }}`);
+      expect(ciOk, 'ci-ok needs').toContain(`\n      - ${job}\n`);
+    },
+  );
+
+  test('no game is spelled in ci.yml: the matrix source is GAME_SUITES through affected.ts', () => {
+    // affected.test.ts pins that `games=` and `e2e-games=` list GAME_SUITES on --all; the scripts
+    // tests above pin `test:<g>` and `test:e2e:<g>` for every suite, so each matrix entry has its
+    // command. A fourth game registers in tools/ci/suites.ts alone.
+    gameJobs.forEach((job) => {
+      expect(CI_YML, job).not.toContain(`\n  ${job}:\n`);
+      expect(CI_YML, job).not.toContain(`outputs.${job}`);
+      expect(ciOk, job).not.toContain(`- ${job}\n`);
+    });
+    const broker = CI_YML.slice(CI_YML.indexOf('\n  broker:'), CI_YML.indexOf('\n  ci-ok:'));
+    expect(broker).toContain("\n    if: needs.changes.outputs.e2e-games != '[]'\n");
+    expect(CI_YML).toContain('name: playwright-report-${{ matrix.suite }}');
   });
 
   test('check is always on, ci-ok needs changes and is always(), deploy needs ci-ok alone and only on main', () => {
     const check = CI_YML.slice(CI_YML.indexOf('\n  check:'), CI_YML.indexOf('\n  shared:'));
     expect(check).not.toContain('needs:');
     expect(check).not.toContain('\n    if:');
-    const ciOk = CI_YML.slice(CI_YML.indexOf('\n  ci-ok:'), CI_YML.indexOf('\n  deploy:'));
     expect(ciOk).toContain('\n      - check\n');
-    // Skipped is green in ci-ok, so a failed `changes` must be a failed need, not eleven skips.
+    // Skipped is green in ci-ok, so a failed `changes` must be a failed need, not a row of skips.
     expect(ciOk).toContain('\n      - changes\n');
     expect(ciOk).toContain('\n    if: always()\n');
     expect(ciOk).not.toContain('- broker');
