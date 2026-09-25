@@ -251,10 +251,12 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    row (step 7: `suite` names the `test/parity/<g>.*` prefix and the folder, `specs` its own e2e
    globs, `shell` adds the shell specs with the tag), so a change under `web/games/<g>/**` runs `<g>`,
    `e2e-<g>`, `site`, `e2e-site` and `harness`. `tools/ci/suites.test.ts`
-   fails until every new test file is claimed by exactly one suite; `npm run test:<g>` is then the
-   game's own loop and CI's two matrix jobs (`game`, `e2e-game`) pick `<g>` up from `GAME_SUITES`
-   through `tools/ci/affected.ts`: `.github/workflows/ci.yml` is not edited (the same test pins
-   that no game is spelled there).
+   fails until every new test file is claimed by exactly one suite, and its lists of the suites, the
+   jobs and the tags (with `tools/ci/affected.test.ts`'s matrices and `tools/games.test.ts`'s
+   `GAMES`) each gain the name; `npm run test:<g>` (two `package.json` scripts, `test:<g>` and
+   `test:e2e:<g>`, spelled as the others') is then the game's own loop and CI's two matrix jobs
+   (`game`, `e2e-game`) pick `<g>` up from `GAME_SUITES` through `tools/ci/affected.ts`:
+   `.github/workflows/ci.yml` is not edited (the same test pins that no game is spelled there).
 6. A class TypeScript builds in a way the extraction cannot see, a hook with no rule, or dead CSS
    gets a row in `web/shared/styles/CONTRACT.md`; otherwise `class-contract.test.ts` fails after the
    build.
@@ -266,19 +268,51 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    fixtures, the dist guards and
    `tools/parity/computed-styles.ts` enumerate from them (then record the game's two goldens). Add a
    card to `web/index.html`.
-8. One e2e spec per mode: `e2e/<g>-local.spec.ts` and `e2e/<g>-online.spec.ts` tagged `@online`
-   (host and guest through `e2e/fixtures/two-players.ts`; `expectPeerOptions` on the recorded
-   `new Peer` call). Both run on both projects (`npm run test:e2e:<g>` runs the game's specs alone),
-   and the online one against the deployed page in nightly, for free. A game built on the shared
-   shell (the home screen, the waiting rooms, the curtain: `docs/design/shared-shell.md` §3.1) joins
-   `SHELL_GAMES` and `SHELL` in `tools/games.ts` and gets a `ShellDriver` row in
-   `e2e/fixtures/online-games.ts` instead: `e2e/shell-*.spec.ts` then drive its shell, and `gameE2e`
-   lists them on its suite row with the tag, off the `shell` row. A game with its own lobby (fidice
-   today) gets an `OnlineDriver` row there instead of an online spec of its own:
-   `e2e/shell-online.spec.ts` and `shell-relay.spec.ts` loop over every game, and `gameE2e` lists
-   those two on a row without `shell`; the game's own specs are its row's `specs`.
+8. One e2e spec per mode: `e2e/<g>-local.spec.ts` and `e2e/<g>-online.spec.ts` tagged `@online`,
+   both on the fixtures of `e2e/fixtures/two-players.ts`: `player` is one browser context and
+   `players` two (host and guest), each seeded, recording its `new Peer` calls and aimed at the
+   local PeerServer, and every context a spec opened is checked for uncaught exceptions at teardown.
+   That fixture keeps one `DRIVERS` row per game (host a room, read its code, join by code; a game
+   the registry knows without one is a type error), a shell game's being `shellDriver('<g>')`. The
+   online spec opens with `connect(players, project, '<g>')` from `e2e/fixtures/online-games.ts`,
+   which hosts, joins and asserts the connection through the game's row there, and then asks only
+   the game's half (a legal play propagating, both tables agreeing), as `gin-online.spec.ts` and
+   `backgammon-online.spec.ts` do; the shell's half (the room, the join, the start on both tables,
+   the names, `expectPeerOptions` on the recorded `new Peer` call) is `e2e/shell-online.spec.ts`,
+   once for every game. Both run on both projects (`npm run test:e2e:<g>` runs the game's specs
+   alone), and the online one against the deployed page in nightly, for free; a spec about the page
+   alone (geometry, stories, pass-and-play) is listed in `PAGE_ONLY_SPECS` in `e2e/fixtures/site.ts`
+   and plays on `pages` only. A game built on the shared shell (the home screen, the waiting rooms,
+   the curtain: `docs/design/shared-shell.md` §3.1) joins `SHELL_GAMES` and `SHELL` in
+   `tools/games.ts` and gets a `ShellDriver` row in `e2e/fixtures/online-games.ts` (its `glossary`
+   terms included): `e2e/shell-*.spec.ts` then drive its shell (home, local, online, relay, resume,
+   handoff, liveness, glossary), and `gameE2e` lists them on its suite row with the tag, off the
+   `shell` row. A game with its own lobby (fidice today) gets an `OnlineDriver` row there instead of
+   an online spec of its own: `e2e/shell-online.spec.ts` and `shell-relay.spec.ts` loop over every
+   game, and `gameE2e` lists those two on a row without `shell`; the game's own specs are its row's
+   `specs`. The shared host session seats up to four guests (`docs/design/n-seat-sessions.md`); the
+   two-seat games keep every byte, and `players` is still host and guest.
 9. The proxy needs nothing: the Worker's catch-all maps `games.sweedler.com/<g>/` to
    `/hyperagent-web-apps/games/<g>/`.
+
+The existing files a game edits, verified by `grep -rl backgammon` over the tree at `3b8fc8b`
+(every other file naming a game is a comment, that game's own folder or a test of it):
+`web/shared/lib/roomCode.ts` (the `Game` union, the room-code row, the code normaliser),
+`tools/games.ts` (`GameSuite`, the `REGISTRY` row; `ShellGame`, `SHELL_GAMES` and `SHELL` for a
+shell game), `tools/ci/suites.ts` (the suite row), `eslint.config.js` (`GAMES`),
+`tsconfig.node.json` (the `src/**` include), `web/index.html` (the card),
+`tools/parity/computed-styles.ts` (its selectors and driver, then its two goldens under
+`test/fixtures/styles/`), `e2e/fixtures/online-games.ts` (the driver row),
+`e2e/fixtures/two-players.ts` (the `DRIVERS` row), `package.json` (`test:<g>`, `test:e2e:<g>`),
+`web/shared/styles/CONTRACT.md` (its rows) and, for a shell game, `tools/shell-markup.ts`
+(`PAGES`); plus the four lists that pin the games by name: `tools/games.test.ts`,
+`tools/ci/suites.test.ts`, `tools/ci/affected.test.ts`, `web/shared/lib/roomCode.test.ts`. Only
+when the game has one: `e2e/fixtures/site.ts` (`PAGE_ONLY_SPECS`, a page-only spec),
+`.github/workflows/nightly.yml` (a seeded replay step), `test/tokens.test.ts` (a theme's `:root`
+pin). Not edited: `.github/workflows/ci.yml`, `playwright.config.ts`, `vitest.config.ts`, `infra/`
+(the alias table aside). `docs/design/dry-round-2.md` §1 item 8 counted eight files plus
+`CONTRACT.md`: it left out `two-players.ts`'s `DRIVERS` row, `package.json`'s two scripts and the
+pins, and its I7 (`PAGE_ONLY_SPECS` self-declared per spec) was optional and did not land.
 
 A second URL name for a game (`sheshbesh` for backgammon) is an alias, not a game: one row in
 `ALIASES` in `tools/games.ts` and the same row in `infra/games-proxy/worker.ts` (its test pins the
