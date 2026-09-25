@@ -121,7 +121,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // 99.72/99.35/99.75/96.59 before, 99.72/99.35/99.75/96.56 after (prefs.ts still 100 on every
       // metric; the same lines uncovered elsewhere, fewer branches in the folder). Again when D3
       // (dry-round-2 E7) moved the two games' page-fake assembly into page.fake.ts `shellPage`, every
-      // new branch under page.fake.test.ts: the folder at 99.73/99.37/99.76/96.65.
+      // new branch under page.fake.test.ts: the folder 99.72/99.36/99.75/96.57 before,
+      // 99.72/99.37/99.76/96.62 after (measured on main at 0b1bec3 and this branch rebased onto it).
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The shared shell's helpers and painters (docs/design/glossary-links.md §3;
