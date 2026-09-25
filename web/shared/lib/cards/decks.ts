@@ -25,7 +25,7 @@ export type SuitSpec = Readonly<{
 export type RankSpec = Readonly<{
   /** What the id starts with: `A`, `10`, `K`, `F`. */
   id: string;
-  /** What the glyph renderer prints in the corners: the same letters today, kept apart so a pack may print `8` for the fante. */
+  /** What the corners print (the glyph, and a picture's overlay): the same letters today, kept apart so a pack may print `8` for the fante. */
   index: string;
   /** The rank's name in the deck's language: "asso", "ace". */
   label: string;

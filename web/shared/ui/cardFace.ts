@@ -47,7 +47,7 @@ const pictureCss = (urls: ReadonlyArray<RatioUrl>): string =>
 /** The corner indices a picture without printed ones gets (`indices: 'overlay'`); nothing otherwise. */
 const overlay = (spec: Extract<FaceSpec, Readonly<{ kind: 'image' | 'sprite' }>>): string =>
   spec.indices === 'overlay'
-    ? `<span class="${RANK}">${spec.id.slice(0, -1)}</span><span class="${RANK_BR}">${spec.id.slice(0, -1)}</span>`
+    ? `<span class="${RANK}">${spec.index}</span><span class="${RANK_BR}">${spec.index}</span>`
     : '';
 
 const glyphHtml = (

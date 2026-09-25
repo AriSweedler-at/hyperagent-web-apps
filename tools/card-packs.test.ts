@@ -221,6 +221,9 @@ describe('masks, manifests and arguments', () => {
         note: "the Neapolitan pattern, a Dal Negro print; the maker's mark masked",
       },
     });
+    expect(text.split('\n')[1]).toBe(
+      "// the Neapolitan pattern, a Dal Negro print; the maker's mark masked (Trocche100 (Wikimedia Commons), Public domain).",
+    );
     expect(text).toContain('export const NAPOLETANE_PACK = {');
     expect(text).toContain("  name: 'napoletane',");
     expect(text).toContain(
@@ -235,22 +238,22 @@ describe('masks, manifests and arguments', () => {
     );
     expect(text).toContain('    licenceUrl: null,');
     expect(text.endsWith('} as const satisfies CardPack;\n')).toBe(true);
-    // A back-less pack and an SVG back.
-    expect(
-      manifestSource({
-        name: 'x',
-        deck: 'italian40',
-        label: 'X',
-        ext: 'png',
-        widths: [120],
-        ids: [],
-        aspect: 0.5,
-        inset: 0.04,
-        indices: 'printed',
-        back: null,
-        attribution: { author: 'a', sourceUrl: 'u', licence: 'CC0', licenceUrl: 'l', note: '' },
-      }),
-    ).toContain("  back: { kind: 'none' },");
+    // A back-less pack, whose empty note leaves no bare parenthesis in the header; an SVG back.
+    const backless = manifestSource({
+      name: 'x',
+      deck: 'italian40',
+      label: 'X',
+      ext: 'png',
+      widths: [120],
+      ids: [],
+      aspect: 0.5,
+      inset: 0.04,
+      indices: 'printed',
+      back: null,
+      attribution: { author: 'a', sourceUrl: 'u', licence: 'CC0', licenceUrl: 'l', note: '' },
+    });
+    expect(backless).toContain("  back: { kind: 'none' },");
+    expect(backless.split('\n')[1]).toBe('// a, CC0.');
     expect(
       manifestSource({
         name: 'x',

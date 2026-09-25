@@ -95,6 +95,7 @@ describe('resolveFace', () => {
     expect(resolveFace(packByName('linea'), 'italian40', '7S')).toEqual({
       kind: 'image',
       id: '7S',
+      index: '7',
       alt: 'sette di spade',
       urls: [{ ratio: 1, url: '../../shared/cards/linea/italian40/7S.svg' }],
       aspect: 100 / 193,
@@ -104,6 +105,7 @@ describe('resolveFace', () => {
     expect(resolveFace(PARTIAL, 'italian40', 'AD')).toEqual({
       kind: 'image',
       id: 'AD',
+      index: 'A',
       alt: 'asso di denari',
       urls: [
         { ratio: 1, url: '../../shared/cards/romane/italian40/AD-120.png' },
@@ -126,6 +128,7 @@ describe('resolveFace', () => {
     expect(resolveFace(SPRITE, 'italian40', 'AD')).toEqual({
       kind: 'sprite',
       id: 'AD',
+      index: 'A',
       alt: 'asso di denari',
       sheets: SPRITE.decks.italian40?.kind === 'sprite' ? SPRITE.decks.italian40.sheets : [],
       columns: 10,

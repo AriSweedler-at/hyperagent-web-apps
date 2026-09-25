@@ -25,6 +25,8 @@ export type FaceSpec =
   | Readonly<{
       kind: 'image';
       id: string;
+      /** The rank's printed index for `indices: 'overlay'` corners (decks.ts keeps it apart from the id). */
+      index: string;
       /** The card's name in the deck's language, for assistive technology. */
       alt: string;
       urls: ReadonlyArray<RatioUrl>;
@@ -36,6 +38,7 @@ export type FaceSpec =
   | Readonly<{
       kind: 'sprite';
       id: string;
+      index: string;
       alt: string;
       sheets: ReadonlyArray<RatioUrl>;
       columns: number;
@@ -90,6 +93,7 @@ export const resolveFace = (pack: CardPack, kind: DeckKind, id: string): FaceSpe
       ? {
           kind: 'image',
           id,
+          index: split.rank.index,
           alt,
           urls: faceUrls(faces, id),
           aspect: faces.aspect,
@@ -104,6 +108,7 @@ export const resolveFace = (pack: CardPack, kind: DeckKind, id: string): FaceSpe
     : {
         kind: 'sprite',
         id,
+        index: split.rank.index,
         alt,
         sheets: faces.sheets,
         ...gridOf(faces.cells),
