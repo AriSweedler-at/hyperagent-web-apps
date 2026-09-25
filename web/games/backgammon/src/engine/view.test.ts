@@ -3,33 +3,14 @@
 // game, and `legalActions` per phase for the actor, which the replay policy draws from.
 import { describe, expect, test } from 'vitest';
 
+import { epoch as now, must } from '../../../../../test/shared/engine-helpers.ts';
 import { applyAction } from './apply.ts';
-import { parsePosition } from './notation.ts';
 import { createGame, withPosition } from './setup.ts';
-import { PLAYS_CAP, type Board, type Seat, type State } from './types.ts';
-import { VARIANTS } from './variants.ts';
+import { PLAYERS, START, pos, scripted } from './test-helpers.ts';
+import { PLAYS_CAP, type Seat, type State } from './types.ts';
 import { legalActions, viewFor } from './view.ts';
 
-const PLAYERS = [
-  { id: 'a', name: 'Ari' },
-  { id: 'b', name: 'Jeff' },
-] as const;
-const now = (): number => 0;
-const scripted = (...dice: ReadonlyArray<number>): (() => number) => {
-  let i = 0;
-  return () => ((dice[i++] ?? 1) - 0.5) / 6;
-};
-const pos = (text: string): Board => {
-  const r = parsePosition(text, VARIANTS.portes);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
-const START = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';
 const western = createGame(PLAYERS, { rotation: ['backgammon'] }, scripted(3, 1), now);
-const must = <T>(r: { ok: true; value: T } | { ok: false; error: string }): T => {
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
 
 describe('viewFor', () => {
   test('key order is the wire order; both seats see the same board and pips', () => {

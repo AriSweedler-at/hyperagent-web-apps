@@ -20,17 +20,12 @@ import {
   stackAt,
   topIs,
 } from './board.ts';
-import { parsePosition } from './notation.ts';
-import type { Board, Stack, VariantRules } from './types.ts';
+import { START as START_TEXT, pos } from './test-helpers.ts';
+import type { Stack, VariantRules } from './types.ts';
 import { VARIANTS } from './variants.ts';
 
 const R = VARIANTS.portes;
-const pos = (text: string): Board => {
-  const r = parsePosition(text, R);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
-const START = pos('L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0');
+const START = pos(START_TEXT);
 
 describe('primitives', () => {
   test('otherSeat, setAt, stackAt, topIs', () => {

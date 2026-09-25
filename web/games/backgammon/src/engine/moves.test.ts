@@ -28,29 +28,19 @@ import {
   singleSteps,
   sortMoves,
 } from './moves.ts';
-import { moveLabel, parseMove, parsePosition } from './notation.ts';
+import { moveLabel } from './notation.ts';
 import { pipCount } from './score.ts';
 import { createGame, withPosition } from './setup.ts';
+import { START, mv, pos } from './test-helpers.ts';
 import type { Board, Dice, Move, Seat } from './types.ts';
 import { VARIANTS } from './variants.ts';
 
 const R = VARIANTS.portes;
-const pos = (text: string): Board => {
-  const r = parsePosition(text, R);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
-const mv = (seat: Seat, text: string): Move => {
-  const r = parseMove(seat, text, R);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
 const labels = (board: Board, seat: Seat, moves: ReadonlyArray<Move>): ReadonlyArray<string> =>
   moves.map((m) => moveLabel(board, seat, m, R));
 const sorted = (xs: ReadonlyArray<string>): ReadonlyArray<string> => [...xs].sort();
 const keys = (moves: ReadonlyArray<Move>): ReadonlySet<string> => new Set(moves.map(moveKey));
 
-const START = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';
 const D_START = 'D: 24:2 13:5 8:3 6:5';
 const D_ANCHOR = 'D: 13:5 8:3 6:5 1:2';
 

@@ -4,19 +4,15 @@
 import { describe, expect, test } from 'vitest';
 
 import { afterMove } from './board.ts';
-import { parseMove, parsePosition } from './notation.ts';
+import { parseMove } from './notation.ts';
 import { crawfordFor, matchOver, matchWinner, multiplierFor, pipCount, winnerOf } from './score.ts';
-import type { Board, Match, Seat } from './types.ts';
+import { START as START_TEXT, pos } from './test-helpers.ts';
+import type { Match, Seat } from './types.ts';
 import { VARIANTS } from './variants.ts';
 
 const P = VARIANTS.portes;
 const W = VARIANTS.backgammon;
-const pos = (text: string): Board => {
-  const r = parsePosition(text, P);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
-const START = pos('L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0');
+const START = pos(START_TEXT);
 
 describe('pipCount (R24)', () => {
   test('167 each at the start; T9, T14; a hit adds 25 minus the blot own point', () => {

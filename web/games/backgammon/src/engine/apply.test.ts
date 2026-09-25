@@ -3,52 +3,24 @@
 // (auto-end, forfeited roll, hits, bear-off finishes), the cube, Crawford and the match.
 import { describe, expect, test } from 'vitest';
 
+import {
+  NOW,
+  countingRng as counting,
+  must,
+  now,
+} from '../../../../../test/shared/engine-helpers.ts';
 import type { Rng } from '../../../../shared/lib/rng.ts';
 import { actorOf, applyAction, canDouble, MESSAGES } from './apply.ts';
 import { legalMoves, remainingDice } from './moves.ts';
-import { moveLabel, parseMove, parsePosition } from './notation.ts';
+import { moveLabel } from './notation.ts';
 import { createGame, nextGame, OPENING_TIE_CAP, withPosition } from './setup.ts';
-import type { Action, Board, Dice, Move, Seat, ShippedVariant, State } from './types.ts';
+import { PLAYERS, START, mv, pos, scripted } from './test-helpers.ts';
+import type { Action, Dice, Seat, ShippedVariant, State } from './types.ts';
 import { VARIANTS } from './variants.ts';
 
 const R = VARIANTS.portes;
-const PLAYERS = [
-  { id: 'a', name: 'Ari' },
-  { id: 'b', name: 'Jeff' },
-] as const;
-const NOW = 1_700_000_000_000;
-const now = (): number => NOW;
-/** An rng whose successive `rollDie` results are exactly `dice`; 1s once the script runs out. */
-const scripted = (...dice: ReadonlyArray<number>): Rng => {
-  let i = 0;
-  return () => ((dice[i++] ?? 1) - 0.5) / 6;
-};
-/** Counts the calls so a test can pin how often the engine reads the rng. */
-const counting = (inner: Rng): Rng & { calls: () => number } => {
-  let n = 0;
-  const rng = (): number => {
-    n += 1;
-    return inner();
-  };
-  return Object.assign(rng, { calls: () => n });
-};
-const pos = (text: string): Board => {
-  const r = parsePosition(text, R);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
-const mv = (seat: Seat, text: string): Move => {
-  const r = parseMove(seat, text, R);
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
 const moveAction = (seat: Seat, text: string): Action => ({ type: 'move', ...mv(seat, text) });
-const must = <T>(r: { ok: true; value: T } | { ok: false; error: string }): T => {
-  if (!r.ok) throw new Error(r.error);
-  return r.value;
-};
 const fail = (r: { ok: boolean; error?: string }): string => (r.ok ? 'ok' : (r.error ?? ''));
-const START = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';
 
 const game = (variant: ShippedVariant, matchLength = 5, rng: Rng = scripted(3, 1)): State =>
   createGame(PLAYERS, { matchLength, rotation: [variant] }, rng, now);
