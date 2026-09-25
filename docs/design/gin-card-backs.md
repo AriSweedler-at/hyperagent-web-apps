@@ -61,6 +61,18 @@ The sound font (docs/design/sound-fonts.md §6) is chosen the same way: its own 
 (`ginRummy_soundFont`), `App.soundFont` read at `home/init`, `soundFont/set` → `writeSoundFont`,
 `__gin.soundFont(name)` and the same boot drop in `homeSnapshot`; a settings panel later paints both.
 
+### 3b. Since the card packs (docs/design/card-packs.md §4.1)
+
+The four presets are the shared card packs that draw `french52` (`web/shared/lib/cards/packs.ts`):
+`src/cardBack.ts` is a view over them (`CARD_BACKS = packsFor('french52')`, the same four names in
+the same order), the key is `ginRummy_cardPack` (a value under the retired `ginRummy_cardBack`
+moves over once at boot through `storage.ts` `migrateCardBack`), the refusal line reads
+`ginRummy_cardPack: "x" is not a card pack for this deck; kept the current one. One of: default,
+blue-stripe, yu-gi-oh, empty.`, and the console hook is `__gin.cardPack(name)` /
+`__gin.cardPackName()` with `__gin.cardBack(name)` kept as an alias for one release. The pictures,
+`body[data-card-back]` and its values, theme.css and every golden did not move; the back files are
+also served at `../../shared/cards/backs/` for the other card games.
+
 ## 4. Oracles
 
 - `test/card-backs.test.ts`: the derived raster files exist at the tool's sizes (§1b).

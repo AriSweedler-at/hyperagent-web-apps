@@ -8,7 +8,7 @@
 // pack's picture as the box's background from its document-relative URL, one `url()` per
 // device-pixel ratio through `image-set()` with a plain `url()` first for browsers without it. A back
 // is gin's `backHtml` markup and the picture comes from the pack through `backImageCss`.
-// Class names are spelled through the constants below, never in a `class="…"` literal, so the
+// Class names are spelled through the constants below, never as a literal class attribute, so the
 // class-contract extraction (test/dist/classes.ts) does not read them into every game's list; the
 // names a stylesheet must know are rows of web/shared/styles/CONTRACT.md.
 import type { FaceSpec, PaintedBack, RatioUrl } from '../lib/cards/resolve.ts';
