@@ -48,6 +48,62 @@ events onto them (section 5). Adding a cue is a shared change (every game may th
 Twenty cues. "For the most part generic": `roll` and `challenge` name mechanics rather than
 feelings, but dice and a raised stake are shared by more than one game, so they stay.
 
+### 2.1 Qualified cues (2026-09-25, briscola-sound-history.md §3.1)
+
+A game may say more than the base without adding a word here: a **qualified cue** is a base cue
+followed by dotted segments of the GAME's own vocabulary.
+
+```ts
+export type CueId = SoundCue | `${SoundCue}.${string}`; // 'good', 'good.trick', 'good.trick.briscola.steal'
+export type VoiceId = 'voice' | `voice.${string}`; // announcer lines, a namespace of their own
+export type Buzz = number | ReadonlyArray<number>;
+export type CueSpec = Readonly<{ cue: CueId; buzz: Buzz }>; // a table row; `cue` may be qualified
+export const baseOf = (id: CueId): SoundCue; // 'good.trick.steal' -> 'good'
+export const ladder = (id): ReadonlyArray<typeof id>; // ['good.trick.steal', 'good.trick', 'good']
+export const isCueId = (value: string): value is CueId; // [a-z]+(\.[a-z0-9-]+)* with a known base
+export const decodeCueId: Decoder<CueId>;
+```
+
+The segments after the base are the game's words (briscola says `trick`, `briscola`, `steal`;
+gin may say `knock`): the shared code never interprets them, it only walks the **ladder**, most
+specific first, down to the base. A font voices any prefix it likes (section 4): a simple font
+voices the twenty base cues and covers every qualified cue a game ever spells; a rich one voices
+the leaves. `decodeCueId` is the spelling the asset tool (section 8) reads back from a file name:
+lower case, digits and hyphens, dots between segments.
+
+### 2.2 Phrases (`web/shared/lib/sound/phrase.ts`)
+
+What one event plays when one sting is not enough ("the briscola THEN the victory"):
+
+```ts
+export type Step = Readonly<{ cue: CueId; gapMs?: number }>; // after the previous step ends (+ gap)
+export type Voice = Readonly<{ cue: VoiceId; atMs: number; gain?: number }>; // a layer over the steps
+export type Sequence = Readonly<{ steps: ReadonlyArray<Step>; voices?: ReadonlyArray<Voice>; buzz: Buzz }>;
+export type Phrase = Sequence | CueSpec; // a row IS the one-step phrase
+export const spec = (cue: CueId, buzz: Buzz): Sequence; // today's row as a phrase
+export const sequenceOf = (phrase: Phrase): Sequence;
+export const schedule = (font: SoundFont, phrase: Phrase): ReadonlyArray<{ sound; atMs; ms }>;
+export const phraseMs = (font, phrase): number; // where the last step or voice ends
+export const place = (font, phrases, gapMs): ReadonlyArray<{ atMs; slots; buzz }>; // back to back
+export const joinBuzz = (parts: ReadonlyArray<{ buzz; atMs }>): ReadonlyArray<number>; // one vibrate
+export const PHRASE_GAP_MS = 120; // between two events' phrases in one paint
+```
+
+- `steps` play back to back; each starts where the one before ends, plus its `gapMs`. `voices`
+  start `atMs` after the phrase does, in parallel, in the `voice.*` namespace the default font
+  leaves silent; `gain` overrides the font's. One `buzz` per phrase, as a row has always had.
+- `CueSpec` is a member of `Phrase`, so gin's and backgammon's `Record<E, CueSpec>` tables ARE
+  `Record<E, Phrase>` tables with no edit, `SHELL_CUES` is unchanged, and every fx.test.ts pin
+  stands: a row schedules as one sound at 0 with its buzz, exactly as before.
+- `schedule` is pure and reads only DECLARED lengths (section 4 `durationsMs`; a synth's summed
+  from its notes by `soundMs`, section 3), so the edge books every step ahead in one tick and
+  never waits on a decode to know when the next begins. A silent step keeps its place (0 ms, its
+  gap) and is not played.
+- `place` runs several phrases `PHRASE_GAP_MS` apart (an event stream's new events in one paint,
+  briscola-sound-history.md §8 risk 3), and `joinBuzz` makes ONE vibrate pattern for the run, each
+  buzz at its phrase's start, the pauses measured from the schedule (a 0 ms "on" is slipped in
+  where the pattern so far ends on an "off", so the pause stays an off).
+
 ## 3. Sounds (`web/shared/lib/sound/sound.ts`)
 
 ```ts
@@ -74,6 +130,9 @@ export type Sound =
   `gap` key when none is given, so a font's literal reads as the legacy tables did),
   `synth(voice, gain, notes)`, `sample(url, gain)`, the `SILENCE` constant and `MAX_GAIN` (0.3),
   which the font validity test reads.
+- `soundMs(sound)` (2026-09-25): a synth's length in whole ms, where its last note ends (each note
+  starts `gap ?? dur` after the one before, as `AudioCues.seq` plays them); silence is 0; a sample
+  is `null`, its length not being in its URL: the font declares it (section 4).
 
 ## 4. Fonts (`web/shared/lib/sound/fonts.ts` + `fonts/<name>.ts`)
 
@@ -84,17 +143,39 @@ export type SoundFont = Readonly<{
   name: SoundFontName;
   /** What a settings panel shows. */
   label: string;
-  /** Partial: a cue a font does not compose falls back to the `default` font's sound. */
-  sounds: Readonly<Partial<Record<SoundCue, Sound>>>;
+  /** Partial, keys may be qualified: a cue a font does not compose walks the ladder, then `base`, then `default`. */
+  sounds: Readonly<Partial<Record<CueId, Sound>>>;
+  /** Announcer lines (`voice.*`, the same ladder); absent means silence. The default has none. */
+  voices?: Readonly<Partial<Record<VoiceId, Sound>>>;
+  /** A sample's length, measured by the asset tool; a synth's is summed; an undeclared sample is 400 ms. */
+  durationsMs?: Readonly<Partial<Record<CueId | VoiceId, number>>>;
+  /** "Voices: … (licence)", printed under a recorded font. */
+  credits?: string;
+  /** One more rung before `default`: the font this one re-voices a few cues of. */
+  base?: SoundFontName;
 }>;
 export const DEFAULT_SOUND_FONT: SoundFontName = 'default';
+export const SAMPLE_MS_FALLBACK = 400;
 export const isSoundFont = (value: string): value is SoundFontName;
 /** `<key>: "x" is not a sound font; kept the current one. One of: default, felt, arcade.` */
 export const badSoundFontMsg = (key: string, value: string): string;
 export const fontByName = (name: SoundFontName): SoundFont;
-/** The font's sound for the cue, else the default font's: the default is total, so never undefined. */
-export const resolveSound = (font: SoundFont, cue: SoundCue): Sound;
+export type Resolved = Readonly<{ sound: Sound; ms: number }>;
+/** The first hit along the id's ladder in the font, then its base, then default; the default's base cue always answers. */
+export const resolveCue = (font: SoundFont, id: CueId): Resolved;
+export const resolveSound = (font: SoundFont, id: CueId): Sound; // resolveCue(...).sound
+/** The same walk over `voices`; `{ SILENCE, 0 }` when no rung voices it. */
+export const resolveVoice = (font: SoundFont, id: VoiceId): Resolved;
 ```
+
+**The ladder** (2026-09-25, briscola-sound-history.md §3.3). `resolveCue(font, 'good.trick.steal')`
+tries `good.trick.steal`, `good.trick`, `good` in the font's `sounds`; then the same three in
+`fontByName(font.base)` if the font names a base (one rung, not a chain); then in `default`, whose
+rung is a direct read of `DEFAULT_SOUNDS[baseOf(id)]` since it voices base cues only. A font that
+voices only base cues therefore behaves exactly as before, and every qualified cue a game spells
+is total by the same pin. The length comes from the rung that supplied the sound: `durationsMs`
+beside that key, else `soundMs(sound)` for a synth, else `SAMPLE_MS_FALLBACK`. Voices walk the
+same rungs over `voices`; none means silence, which is what the default font says for every line.
 
 | Font | Character | Notes |
 | --- | --- | --- |
@@ -204,15 +285,28 @@ that already exists.
    root-relative URLs.
 4. No game changes: every game sees the font through its own preference.
 
+**Files named by cue id** (the convention the coming tool reads, briscola-sound-history.md §7, PR
+S5; not built yet). A recorded font is a folder of files whose stems are cue ids in the
+`decodeCueId` spelling: `good.trick.briscola.steal.mp3` becomes the row `'good.trick.briscola.steal'`
+of `sounds`, `voice.trick.steal.mp3` a row of `voices`, `victory.mp3` the base row. The tool
+(`tools/sound-fonts.ts add <name> --dir <folder>`) will write `fonts/<name>.ts` from the folder,
+measure each file into `durationsMs`, refuse a stem that is no cue id or a file over the size cap,
+and a manifest test will read every URL back. Until then a sample font is written by hand to the
+same shape, and an undeclared duration is the 400 ms fallback.
+
 ## 9. Module map and boundaries
 
 | Module | Zone | Holds |
 | --- | --- | --- |
-| `web/shared/lib/sound/cues.ts` | pure | `SOUND_CUES`, `SoundCue`, one comment per cue (section 2); `CueSpec` and `SHELL_CUES`, the shell's four rows every table spreads (section 5) |
-| `web/shared/lib/sound/sound.ts` | pure | `Sound`, `Note`, `OscillatorType` (moved here from `web/shared/edge/fx.ts`, which imports them) |
-| `web/shared/lib/sound/fonts.ts` | pure | `SOUND_FONTS`, `SoundFontName`, `DEFAULT_SOUND_FONT`, `isSoundFont`, `badSoundFontMsg`, `fontByName`, `resolveSound` |
+| `web/shared/lib/sound/cues.ts` | pure | `SOUND_CUES`, `SoundCue`, one comment per cue (section 2); `CueSpec` and `SHELL_CUES`, the shell's four rows every table spreads (section 5); the qualified ids `CueId`, `VoiceId`, `Buzz`, `baseOf`, `ladder`, `isSoundCue`, `isCueId`, `decodeCueId` (section 2.1) |
+| `web/shared/lib/sound/sound.ts` | pure | `Sound`, `Note`, `OscillatorType` (moved here from `web/shared/edge/fx.ts`, which imports them); `soundMs` |
+| `web/shared/lib/sound/phrase.ts` | pure | `Step`, `Voice`, `Sequence`, `Phrase`, `spec`, `sequenceOf`, `Slot`, `schedule`, `phraseMs`, `Placed`, `place`, `joinBuzz`, `PHRASE_GAP_MS` (section 2.2) |
+| `web/shared/lib/sound/fonts.ts` | pure | `SOUND_FONTS`, `SoundFontName`, `DEFAULT_SOUND_FONT`, `SAMPLE_MS_FALLBACK`, `isSoundFont`, `badSoundFontMsg`, `fontByName`, `Resolved`, `resolveCue`, `resolveSound`, `resolveVoice` (the ladder, section 4) |
+| `web/shared/lib/events.ts` | pure | `GameEvent<K, D>`, `EventCopy<E, C>`, `EventSound<E, R>`, `lastEventId`, `newEvents` (briscola-sound-history.md §3.5): the event stream sound and history read alike |
+| `web/shared/ui/eventEffects.ts` | ui (pure) | `eventEffects(prev, next, phraseOf)`: the new events' phrases as one `phrases` shell effect; the shell's `ShellEffect` gains `{ type: 'phrases', phrases }`, run through the same `fx` dep as a cue (`web/shared/ui/shellEffects.ts`), which `bootShell` routes to the cue player's `play` or `playPhrases` |
 | `web/shared/lib/sound/fonts/{default,felt,arcade}.ts` | pure | the fonts as data |
-| `web/shared/edge/sound.ts` | edge | `playSound(audio, sound, deps)`: synth through `AudioCues.seq`; sample through `deps.fetchBuffer` and the context's `decodeAudioData`/`createBufferSource`, both optional on `AudioContextLike` so the oscillator fakes need no change; `silence` does nothing; every failure silent. Corrected at implementation: `deps` is `{ fetchBuffer, cache }`, the cache from `createSampleCache()` made once by main.ts, and the context comes from `AudioCues.context()`, an accessor added to `web/shared/edge/fx.ts` (its `ensure()`), so the `AudioCues` fakes gain one line |
+| `web/shared/edge/sound.ts` | edge | `playSound(audio, sound, deps)`: synth through `AudioCues.seq`; sample through `deps.fetchBuffer` and the context's `decodeAudioData`/`createBufferSource`, both optional on `AudioContextLike` so the oscillator fakes need no change; `silence` does nothing; every failure silent. Corrected at implementation: `deps` is `{ fetchBuffer, cache }`, the cache from `createSampleCache()` made once by main.ts, and the context comes from `AudioCues.context()`, an accessor added to `web/shared/edge/fx.ts` (its `ensure()`), so the `AudioCues` fakes gain one line. Since the phrases: `playSlot` books one `Slot` at `currentTime + atMs` (`AudioCues.seq` took a `start` for it), `playSlots` warms every sample of a schedule then books each slot in one tick, `playPhrase(audio, font, phrase, deps)`, `warmSamples`; a sample decoded more than `SAMPLE_LATE_MS` (120) past its slot is skipped, never late (briscola-sound-history.md §8 risk 2) |
+| `web/shared/edge/cuePlayer.ts` | edge | `createCuePlayer(deps)` over a `Record<E \| 'tap', Phrase>` table: `play(event, font)` (a row plays as it always did: one sound at 0, its buzz), `playPhrases(phrases, font)` (a run `PHRASE_GAP_MS` apart, one joined vibrate), `toggle`, `enabled`, `warm(font?)` (the context, and with a font the table's samples in it) |
 | `web/games/<game>/src/ui/sound.ts` | game ui | the event → `{cue, buzz}` table (section 5) |
 | `web/games/<game>/src/fx.ts` | game | plays a table entry through the edge with the App's font; the sound toggle |
 | `web/games/<game>/src/storage.ts` | game | the key, decoder, reader, writer |
@@ -236,7 +330,17 @@ at 100% coverage; `web/shared/edge/**` at its ratchet.
   (`cues.test.ts`); each game's fx.test.ts pins the four against its frozen copy and that its
   table's rows are those objects; cuePlayer.test.ts compiles a row by both `CueSpec` paths.
 - **edge**: `playSound` for each kind over fakes; a failing fetch and a failing decode are silent;
-  the sample cache fetches once per URL.
+  the sample cache fetches once per URL. Phrases (2026-09-25): a slot at an offset (a synth's
+  `seq` start, a sample's `when`); a sample decoded past its slot skipped and one within the grace
+  started, over a moving fake clock; `warmSamples` fetching once and playing nothing; a two-step
+  phrase queued in one tick from declared lengths; the cue player's long row, a run with the
+  joined buzz, `warm(font)`; the boot's one `fx` dep routing a cue to `play` and phrases to
+  `playPhrases`, and warming in the App's font on each gesture.
+- **lib, qualified** (2026-09-25): `ladder` cases and `baseOf`; `decodeCueId` accept/reject
+  tables; `resolveCue` through the font, a `base`, then default, with lengths declared, summed or
+  the fallback; `resolveVoice` to silence; `schedule` offsets (order, gaps, a silent step, a voice
+  at 0 over a two-step phrase, a gain override); `place` and `joinBuzz`; `newEvents`/`lastEventId`;
+  `eventEffects` (one effect in order, silent events dropped, nothing new, first paint).
 - **game**: storage round trip and the refusal of unknown names (the legacy-capture parity suite,
   test/parity/gin.storage.test.ts, lists the key as this page's own); `soundFont/set` writes and
   the `fx` effect carries the font; `homeSnapshot()` drops a bad value (in `bootShell` since C3:

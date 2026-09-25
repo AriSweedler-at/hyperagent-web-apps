@@ -178,6 +178,14 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // lib/drag.test.ts): shared/lib still 100/100/100/100; the edge folder 99.75/99.42/99.78/96.78
       // before, 99.76/99.44/99.79/97.03 after (the same three lines uncovered elsewhere, 1188 → 1273
       // lines). Measured on main at 569d04d (#96) and this branch rebased onto it.
+      // Re-measured when S1 of docs/design/briscola-sound-history.md (qualified cues, phrases, the
+      // font ladder, the slot player, lib/events.ts and ui/eventEffects.ts) landed: shared/lib and
+      // shared/ui still 100/100/100/100 (phrase.ts, events.ts, eventEffects.ts each with a test
+      // beside them, fonts.ts's ladder and cues.ts's decoder covered branch for branch); the edge
+      // folder 99.76/99.44/99.79/97.02 before, 99.77/99.45/99.79/97.08 after (sound.ts's slot player
+      // and cuePlayer.ts's phrases each 100 on every metric; the games' fx.test.ts pins and suites
+      // ran unchanged, a CueSpec row being a one-step phrase). Measured on main at 60c50d6 (#102)
+      // and this branch rebased onto it.
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The shared shell's helpers and painters (docs/design/glossary-links.md §3;
