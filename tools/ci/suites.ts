@@ -144,6 +144,7 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         'web/shared/net/**/*.ts',
         'web/shared/ui/**/*.ts',
         'web/shared/example/**/*.ts',
+        'web/shared/markup/**/*.ts',
       ],
       // The shared pure library stays at 100% lines, functions and statements
       // (docs/ARCHITECTURE.md "*.algorithms.ts"). Measured at the ratchet
@@ -193,6 +194,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // is proved on, and the shared shell's fake game to come. It exists to be exercised, so
         // every branch has a row in coin.test.ts. Measured at the move: 100/100/100/100.
         'web/shared/example/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        // The shell markup renderer (dry-round-2.md G2): pure string substitution whose every
+        // branch (a slot, a block, an empty block, each error) has a row in shell.test.ts.
+        // Measured at the move: 100/100/100/100.
+        'web/shared/markup/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
         // The sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios once
         // over a fake codec (sessions.test.ts beside them, with sessions.harness.ts), the two

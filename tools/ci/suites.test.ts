@@ -251,6 +251,12 @@ const ROWS_BEFORE: ReadonlyArray<readonly [string, Suite, Thresholds]> = [
     'shared',
     { lines: 100, functions: 100, branches: 100, statements: 100 },
   ],
+  // Added by dry-round-2.md G2: the shell markup renderer, pure string substitution, held at 100.
+  [
+    'web/shared/markup/**',
+    'shared',
+    { lines: 100, functions: 100, branches: 100, statements: 100 },
+  ],
   ['web/shared/edge/**', 'shared', { lines: 94, functions: 94, statements: 93, branches: 90 }],
   ['web/shared/net/**', 'shared', { lines: 95, functions: 95, statements: 95, branches: 94 }],
   [
@@ -410,6 +416,8 @@ const INCLUDE_BEFORE: ReadonlyArray<string> = [
   'web/shared/ui/**/*.ts',
   // Added by dry-round-2.md F3: the coin game.
   'web/shared/example/**/*.ts',
+  // Added by dry-round-2.md G2: the shell markup renderer.
+  'web/shared/markup/**/*.ts',
   'web/games/fidice/src/domain/**/*.ts',
   'web/games/fidice/src/bots/**/*.ts',
   'web/games/fidice/src/net/**/*.ts',

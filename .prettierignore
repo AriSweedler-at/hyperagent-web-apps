@@ -13,6 +13,11 @@ test/fixtures/legacy/gin-wire/
 # Written by tools/linea.ts in one line per field (the forty ids on one line); tools/linea.test.ts
 # compares the committed file to the tool's output, so the tool's text is the committed bytes.
 web/shared/lib/cards/packs/linea.ts
+# The shell's markup partials (docs/design/dry-round-2.md row G2): `{{slot}}` holes in gin's
+# hand-owned layout, which tools/shell-markup.ts fills into each shell page and formats only where
+# Prettier owns that page (this file decides); reflowing the partials would reflow gin's page.
+# The renderer beside them (web/shared/markup/shell.ts) is formatted.
+web/shared/markup/shell/
 # Written by tools/parity/computed-styles.ts in its own compact layout (one screen per line, the
 # value table inline) so a golden diff reads as a selector/property change; the tool's output is
 # the committed bytes (docs/MIGRATION.md step 14).

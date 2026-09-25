@@ -48,6 +48,10 @@
     "e2e/**/*.ts",
     "web/shared/lib/**/*.ts",
     "web/shared/ui/**/*.ts",
+    // The shell markup renderer and the shell games' page.ts (dry-round-2.md G2): tools/shell-markup.ts
+    // composes each web/games/<g>/index.html from them and test/dist/shell-markup.test.ts pins it.
+    "web/shared/markup/**/*.ts",
+    "web/games/*/page.ts",
     "web/shared/edge/clock.ts",
     "web/shared/edge/clock.fake.ts",
     "web/shared/edge/ice.ts",

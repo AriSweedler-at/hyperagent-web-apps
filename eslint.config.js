@@ -30,6 +30,10 @@ const PURE = [
   'web/games/*/src/scorer/!(main).ts',
   // The coin game (dry-round-2.md F3): a two-seat engine held to the engines' profile.
   'web/shared/example/**/*.ts',
+  // The shell markup renderer (dry-round-2.md G2: strings in, a Result out) and each shell game's
+  // page.ts, the slot values and residue tools/shell-markup.ts composes its index.html from.
+  'web/shared/markup/**/*.ts',
+  'web/games/*/page.ts',
 ];
 const ALGORITHMS = ['**/*.algorithms.ts'];
 const EDGES = [

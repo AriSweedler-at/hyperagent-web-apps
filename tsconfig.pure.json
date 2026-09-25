@@ -19,7 +19,11 @@
     // and the replay driver and test scaffolding under test/shared that the engine tests beside the
     // engines import (a composite project lists every file it compiles); both name no node type.
     "web/shared/example/**/*.ts",
-    "test/shared/**/*.ts"
+    "test/shared/**/*.ts",
+    // The shell markup renderer (dry-round-2.md G2) and the shell games' page.ts it is fed: strings
+    // and a Result, no DOM and no file (tools/shell-markup.ts reads the partials and writes the page).
+    "web/shared/markup/**/*.ts",
+    "web/games/*/page.ts"
   ],
   // The Score Counter's screen (docs/MIGRATION.md step 12) is an edge, and its test runs on the
   // DOM page fake; eslint.config.js spells the same carve-out as `scorer/!(main|*.test).ts`. The
