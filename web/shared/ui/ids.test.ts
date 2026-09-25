@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { SHELL_GAMES, SHELL_IDS } from './ids.ts';
+import { HISTORY_IDS, SHELL_GAMES, SHELL_IDS } from './ids.ts';
 
 describe('SHELL_IDS', () => {
   test('is a list of distinct, well-formed ids for the two shell games; the built pages are checked in test/dist', () => {
@@ -31,5 +31,17 @@ describe('SHELL_IDS', () => {
         'curtainBtn',
       ]),
     );
+  });
+
+  test('the history sheet ids (web/shared/ui/history.ts paints the list) are all shell ids', () => {
+    expect(HISTORY_IDS).toEqual({
+      button: 'historyBtn',
+      overlay: 'historyOverlay',
+      list: 'historyList',
+      close: 'closeHistoryBtn',
+    });
+    Object.values(HISTORY_IDS).forEach((id) => {
+      expect(SHELL_IDS).toContain(id);
+    });
   });
 });

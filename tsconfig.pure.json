@@ -29,9 +29,10 @@
   // DOM page fake; eslint.config.js spells the same carve-out as `scorer/!(main|*.test).ts`. The
   // shared shell's painters and binders (docs/design/shared-shell.md §4.4) write the document
   // through web/shared/edge/dom.ts and stay out with their tests the same way (eslint.config.js
-  // `web/shared/ui/!(shellPaint|curtain|toast|home|keyed|shellEffects|stories).ts`, where
+  // `web/shared/ui/!(shellPaint|curtain|toast|home|keyed|shellEffects|stories|history).ts`, where
   // shellEffects.ts is out of the lint profile alone: DOM-free, it compiles here; stories.ts, the
-  // stories page of dry-round-2.md I3, writes the document like the painters); tsconfig.web.json
+  // stories page of dry-round-2.md I3, and history.ts, the history panel of
+  // briscola-sound-history.md §6, write the document like the painters); tsconfig.web.json
   // compiles them.
   "exclude": [
     "web/games/*/src/scorer/main*.ts",
@@ -40,6 +41,7 @@
     "web/shared/ui/toast*.ts",
     "web/shared/ui/home*.ts",
     "web/shared/ui/keyed*.ts",
-    "web/shared/ui/stories*.ts"
+    "web/shared/ui/stories*.ts",
+    "web/shared/ui/history*.ts"
   ]
 }

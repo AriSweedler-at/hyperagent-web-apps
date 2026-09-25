@@ -15,11 +15,12 @@ const PURE = [
   // The shared shell's pure helpers (web/shared/ui/glossary.ts first, docs/design/glossary-links.md
   // §3; ids.ts; the shell reducer shell.ts, docs/design/shared-shell.md §4.2). Its painters and
   // binders (shellPaint.ts, curtain.ts, toast.ts, home.ts: they write the document, §4.4; keyed.ts,
-  // the keyed slot, dry-round-2.md D1; stories.ts, the stories page, dry-round-2.md I3) are carved
-  // out the way scorer/main.ts is below; tsconfig.pure.json excludes the same six. The shell's
-  // effect runner (shellEffects.ts) is carved out too: it calls the adapters, statements the pure
-  // profile refuses, while staying DOM-free, so tsconfig.pure.json still compiles it.
-  'web/shared/ui/!(shellPaint|curtain|toast|home|keyed|shellEffects|stories).ts',
+  // the keyed slot, dry-round-2.md D1; stories.ts, the stories page, dry-round-2.md I3; history.ts,
+  // the history panel, briscola-sound-history.md §6) are carved out the way scorer/main.ts is
+  // below; tsconfig.pure.json excludes the same seven. The shell's effect runner (shellEffects.ts)
+  // is carved out too: it calls the adapters, statements the pure profile refuses, while staying
+  // DOM-free, so tsconfig.pure.json still compiles it.
+  'web/shared/ui/!(shellPaint|curtain|toast|home|keyed|shellEffects|stories|history).ts',
   'web/games/*/src/engine/**/*.ts',
   'web/games/*/src/domain/**/*.ts',
   'web/games/*/src/bots/**/*.ts',

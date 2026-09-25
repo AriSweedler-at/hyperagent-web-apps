@@ -220,6 +220,14 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // E8) measure 100/100/100/100 through two shellPaint.test.ts and three home.test.ts cases
         // over the fake page; the folder stays at 100 (622 lines, 200 functions, 674 statements,
         // 367 branches, with #103's `tabButtonId` in ids.ts, G3's stories.ts and #106's cardFace.ts).
+        // history.ts, the shared history panel (docs/design/briscola-sound-history.md §6, PR S3:
+        // `<details>` rows over a game's EventCopy, the list keyed on the last event id, the scroll
+        // to the newest row) and ids.ts's HISTORY_IDS measure 100/100/100/100 through
+        // history.test.ts over the fake page and one ids.test.ts case; the folder stays at 100 on
+        // every metric, 625/201/677/370 (lines/functions/statements/branches) before,
+        // 649/211/704/390 after (history.ts is 23/10/26/20 of it, ids.ts one line and statement
+        // more), no edge file touched. Measured on this branch rebased onto main at 9bf1548 (#109),
+        // the before being the after less the two changed files' totals.
         'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The coin game (dry-round-2.md F3): the two-seat engine the replay driver under test/shared
         // is proved on, and the shared shell's fake game to come. It exists to be exercised, so
