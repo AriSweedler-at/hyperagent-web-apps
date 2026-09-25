@@ -41,6 +41,7 @@ const home: HomeSnapshot = {
   playMode: 'local',
   soundFont: 'default',
   save: null,
+  recentGames: [],
   opts: DEFAULT_OPTS,
   cardPack: 'linea',
   p3Name: null,

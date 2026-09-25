@@ -91,6 +91,11 @@ export const STORAGE_KEYS = {
   sound: 'briscola_sound',
   /** The sound font (web/shared/lib/sound/fonts.ts, bare string): this game's own key (docs/design/sound-fonts.md §6). */
   soundFont: 'briscola_soundFont',
+  /**
+   * The finished matches this device remembers (web/shared/lib/recentGames.ts, JSON, newest
+   * first, at most 20; the owner's game history of 2026-09-25). This game's own key, like the font.
+   */
+  recentGames: 'briscola_recentGames',
   /** The card pack (web/shared/lib/cards/packs.ts, bare string): one of the packs that draw the Italian deck (docs/design/card-packs.md §2). */
   cardPack: 'briscola_cardPack',
   /** The room options the home screen last chose (D3), one bare string each: `2`|`3`|`4`, `1`|`2`|`3`, a suit letter, `on`|`off` ×3. */
@@ -157,6 +162,12 @@ export const {
   enabled: soundEnabled,
 } = SHELL_STORE.sound;
 export const { read: readSoundFont, write: writeSoundFont } = SHELL_STORE.soundFont;
+/** The finished matches: the stored list or [], and one match put first under the cap. */
+export const {
+  read: readRecentGames,
+  write: writeRecentGames,
+  append: appendRecentGame,
+} = SHELL_STORE.recentGames;
 
 // ---- this page's own preferences -----------------------------------------------------------
 

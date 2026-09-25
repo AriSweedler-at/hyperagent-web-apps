@@ -50,6 +50,7 @@ import { suitSymbolId } from '../../../../shared/lib/cards/suits.ts';
 import { backImageCss } from '../../../../shared/ui/cardFace.ts';
 import { paintHistory } from '../../../../shared/ui/history.ts';
 import { HISTORY_IDS } from '../../../../shared/ui/ids.ts';
+import { paintRecentGames } from '../../../../shared/ui/recentGames.ts';
 import { reducedMotion } from '../../../../shared/edge/motion.ts';
 import { ensureKeyed } from '../../../../shared/ui/keyed.ts';
 import {
@@ -666,7 +667,7 @@ const paintOverlays = (doc: DocumentLike, app: App, pack: CardPack): void => {
   // One `<details>` per event (the shared panel over ui/history.ts's copy), the match's start
   // naming the stream: a repaint with nothing new leaves open rows open, a new event is appended
   // after them, and a new match (whose ids start over) rebuilds the list.
-  if (app.table.historyOpen)
+  if (app.table.historyOpen) {
     paintHistory(
       doc,
       HISTORY_IDS.list,
@@ -675,6 +676,9 @@ const paintOverlays = (doc: DocumentLike, app: App, pack: CardPack): void => {
       { players: v?.players ?? [], n: v?.options.seatCount ?? 2 },
       String(v?.startedAt ?? ''),
     );
+    // The finished matches under this match's events (web/shared/ui/recentGames.ts).
+    paintRecentGames(doc, app.shell.recentGames);
+  }
   const last = v?.lastTrick ?? null;
   const open = app.table.lastTrickOpen && v !== null && last !== null;
   paintSheet(doc, 'lastTrickOverlay', open);

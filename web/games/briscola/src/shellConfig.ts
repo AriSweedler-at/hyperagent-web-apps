@@ -23,6 +23,7 @@ import {
   createGame,
   decodeState,
   matchOver,
+  matchWinner,
   nameOf,
   normaliseOptions,
   viewFor,
@@ -139,6 +140,16 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
       ...game,
       players: game.players.map((p, i) => (i === 1 ? { ...p, name } : p)),
     }),
+  },
+  // The finished match's record (the owner, 2026-09-25): a match is its deal's clock (a rematch
+  // deals under a new one), every seat's name, its score the games won per side, its victor the
+  // side `matchWinner` names: side 0 is seat 0's (and seat 2's) in every seat count, so the
+  // outcome for the device's user reads off it as off a seat.
+  result: {
+    keyOf: (view) => String(view.startedAt),
+    playersOf: (view) => view.players.map((p) => p.name),
+    scoreOf: (view) => view.match.wins.map(String).join('–'),
+    winnerOf: (view) => matchWinner(view.match),
   },
   frames: { lobby, state, toast, action },
   cues: { initial: INITIAL_CUES },

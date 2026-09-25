@@ -116,6 +116,7 @@ const home: HomeSnapshot = {
   playMode: 'local',
   soundFont: 'default',
   save: null,
+  recentGames: [],
   opts: DEFAULT_OPTS,
   cardPack: DEFAULT_CARD_PACK,
   p3Name: null,

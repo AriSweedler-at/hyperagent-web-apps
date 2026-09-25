@@ -1603,6 +1603,7 @@ describe('the finished match`s record (the owner, 2026-09-25)', () => {
     const l = local();
     const v = view(l);
     expect(BACKGAMMON.result.keyOf(v)).toBe(String(game(l).startedAt));
+    expect(BACKGAMMON.result.playersOf(v)).toEqual(['Ann', 'Bob']);
     expect(BACKGAMMON.result.scoreOf(v)).toBe('0–0');
     expect(BACKGAMMON.result.winnerOf(v)).toBeNull();
     const won: View = { ...v, match: { ...v.match, score: [2, 5] }, matchOver: true };
