@@ -132,10 +132,13 @@ export const isCardPackFor = <K extends DeckKind>(
   value: string,
 ): value is CardPackFor<K> => packsFor(kind).some((n) => n === value);
 
-/** Each deck kind's default pack: gin's `default` back over glyph faces; the drawn Italian deck. */
+/**
+ * Each deck kind's default pack: gin's `default` back over glyph faces; the Neapolitan sheet the
+ * owner supplied (docs/design/card-packs.md §7.1), `linea` staying the drawn fallback.
+ */
 export const DEFAULT_CARD_PACKS: Readonly<{ [K in DeckKind]: CardPackFor<K> }> = {
   french52: 'default',
-  italian40: 'linea',
+  italian40: 'napoletane',
 };
 
 export const defaultPackFor = <K extends DeckKind>(kind: K): CardPackFor<K> =>

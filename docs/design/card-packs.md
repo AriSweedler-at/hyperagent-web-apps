@@ -33,7 +33,7 @@ boxes; swords and batons are parallel verticals, an honest simplification of the
 ## 2. Packs (`web/shared/lib/cards/packs.ts` + `packs/<name>.ts`)
 
 ```ts
-CARD_PACKS = ['default', 'blue-stripe', 'yu-gi-oh', 'empty', 'linea']
+CARD_PACKS = ['default', 'blue-stripe', 'yu-gi-oh', 'empty', 'linea', 'napoletane']
 Back  = svg { url, aspect, colour } | image { urls: {ratio, url}[], aspect, colour } | css { colour } | none
 Faces = glyph | files { dir, ext, widths, ids, aspect, inset, indices } | sprite { sheets, cell, cells, aspect, inset, indices }
 CardPack = { name, label, back, decks: Partial<Record<DeckKind, Faces>>, attribution: Attribution | null }
@@ -45,12 +45,15 @@ badCardPackMsg(key, kind, value)   // `<key>: "<value>" is not a card pack for t
 | --- | --- | --- | --- | --- |
 | `default`, `blue-stripe`, `yu-gi-oh`, `empty` | gin's four, as pack data pointing at `../../shared/cards/backs/` | glyph | glyph | none (drawn; the owner's own picture) |
 | `linea` | `svg`, a terracotta lattice with a four-suit medallion | — | `files`, 40 svg, `widths: [0]`, aspect 100/193 (0.518), `indices: 'printed'` | none (generated) |
+| `napoletane` | `none` (the default's is painted) | — | `files`, 40 jpg, `widths: [120, 240]`, aspect 0.577, `indices: 'overlay'` | Florixc (Wikimedia Commons), Public domain: the sheet the owner supplied (§7.1) |
 
 Each pack file is `as const satisfies CardPack`, so `CardPackFor<K>` is read off the table's literal
 types: `packsFor('french52')` is typed and pinned as gin's legacy literal `['default', 'blue-stripe',
-'yu-gi-oh', 'empty']` in order, and `packsFor('italian40')` adds `linea` (a glyph pack draws every
-deck kind; a pictures-only pack draws its own). `DEFAULT_CARD_PACKS` is per deck kind: `default`
-for `french52`, `linea` for `italian40`, the first per-game default sound-fonts.md §11 deferred.
+'yu-gi-oh', 'empty']` in order, and `packsFor('italian40')` adds `linea` and `napoletane` (a glyph
+pack draws every deck kind; a pictures-only pack draws its own). `DEFAULT_CARD_PACKS` is per deck
+kind: `default` for `french52`, `napoletane` for `italian40` (the owner's sheet, §7.1; `linea` stays
+the drawn fallback every clone has and the stories' pack), the first per-game default
+sound-fonts.md §11 deferred.
 
 **Resolution** (`resolve.ts`): `resolveFace(pack, kind, id)` gives a `FaceSpec` (`glyph` with the
 rank and suit specs; `image` with the URLs per device-pixel ratio, the alt, aspect, inset and
@@ -88,7 +91,7 @@ briscola page's rows arrive with its stylesheet.
 | Game | Key | Deck kind | Default |
 | --- | --- | --- | --- |
 | gin-rummy | `ginRummy_cardPack` (was `ginRummy_cardBack`) | `french52` | `default` |
-| briscola | `briscola_cardPack` | `italian40` | `linea` (until the owner accepts a sourced deck) |
+| briscola | `briscola_cardPack` | `italian40` | `napoletane` (the owner's sheet, §7.1) |
 
 `web/shared/edge/prefs.ts` builds the readers: `decodeCardPackFor(kind) = literal(...packsFor(kind))`
 and `cardPackPref(key, kind)` beside `decodeSoundFont`, so a stored `linea` is refused under gin's
@@ -117,9 +120,9 @@ the `linea` refusal and the migration case.
 ## 5. The tool (`tools/card-packs.ts`, Playwright, the shape of `tools/card-backs.ts`)
 
 ```
-node --experimental-strip-types tools/card-packs.ts build                    # every PACK_SOURCES entry (none today); idempotent
+node --experimental-strip-types tools/card-packs.ts build                    # every PACK_SOURCES entry (napoletane); idempotent
 node --experimental-strip-types tools/card-packs.ts add <name> --deck italian40 --faces <dir> [--back <img>] --label … --author … --source-url … --licence … [--licence-url …] [--note …] [--mask <id>:<x>,<y>,<w>,<h>]… [--map <file>]
-node --experimental-strip-types tools/card-packs.ts add <name> --deck italian40 --sheet <img> --rows C,D,S,B --cols A,2,3,4,5,6,7,F,C,R [--back <img>] …
+node --experimental-strip-types tools/card-packs.ts add <name> --deck italian40 --sheet <img> --rows C,D,S,B --cols A,2,3,4,5,6,7,F,C,R [--grid <inset>] [--back <img>] …
 node --experimental-strip-types tools/card-packs.ts check                    # the manifest test as a CLI
 node --experimental-strip-types tools/card-packs.ts preview <name> [--deck italian40] [--width 120] [--out <png>]
 ```
@@ -135,7 +138,19 @@ node --experimental-strip-types tools/card-packs.ts preview <name> [--deck itali
 - Sheet mode: the share of non-white pixels per column and row; a run under 2% is a gutter; the
   `cols × rows` longest runs between gutters are the cells (runs split by a gap under 4 px merged);
   each cell trimmed to its ink box plus 6 px, then every cell normalised to the grid's median size
-  centred on its ink box. The tool prints the grid it found and refuses on a wrong count.
+  centred on its ink box. The tool prints the grid it found and refuses on a wrong count. That
+  wants a printed border and a white gutter.
+- Grid mode (`--grid <inset>`), for a sheet of borderless cards laid edge to edge on the scanner
+  bed (the owner's Napoletane sheet: to the ink cutter its white margins are gutters and a six's two
+  pip columns two cards): `cols × rows` equal cells; each interior grid line snapped, row by row, to
+  the seam between two cards, scored within `GRID_SNAP` (40 px) as the share of the row's middle
+  80 % where a 3 px window is darker than `PAPER` (245) with paper `SEAM_CLEAR` (6 px) either side
+  (a card's scan shadow is a thin grey line; a sword's edge fails, its blade being there); a row that
+  shows no seam over `MIN_SEAM` (0.4) takes the median of the rows that did, a seam no row shows
+  the grid line; every cell equalised to the median card, a cell on the sheet's edge anchored on
+  its seam and grown outward past the sheet (the scan clipped the outer margins; what lies outside
+  is drawn as paper); then `inset` px shaved. No ink trimming: the card's own margins are the
+  picture. The tool prints the seams it found.
 - Derivation: `FACE_WIDTH = 120` CSS px, `RATIOS = [1, 2, 3]`, a ratio only when the source is at
   least that wide (a 263 px source yields `[1, 2]`), height = `round(width / aspect)`, JPEG at 0.86.
   `--mask` paints a white rectangle over a region of one face before deriving: a maker's mark.
@@ -145,6 +160,9 @@ node --experimental-strip-types tools/card-packs.ts preview <name> [--deck itali
   attributed, a face under 120 KB, a pack's tree under 6 MB.
 - Two manual lines: `add` prints the name to add to `CARD_PACKS` and the row for `PACKS`; `check`
   fails until both are done.
+- `preview` sketches the two corner indices on an `overlay` pack's faces at the size a table prints
+  them (top-left, and turned bottom-right, as cardFace.ts places its two `rank` spans), so a
+  reviewer sees whether the pictures leave them room.
 
 ## 6. The fallback pack, `linea` (`tools/linea.ts`, node, no browser)
 
@@ -186,6 +204,34 @@ prints the two lines. If the owner accepts a deck: copy its download folder (wit
 not, the Romane CC0 set is the one worth completing, and the owner's own picture goes through the
 same `add`.
 
+### 7.1 The Napoletane sheet the owner supplied (2026-09-25)
+
+The owner sent `File:Carte_napoletane_al_completo.jpg` from Wikimedia Commons (uploader and artist
+Florixc, "Own work", 2009-09-06; licence Public domain, Commons `pd`, Copyrighted False, attribution
+not required; 3507 × 2398, 2,038,168 bytes, sha256 `7f192cb10e81cfdc3f63817988998984f80f7751a717c519dac3fef5de03fc5d`)
+with the words "This is the briscola card pack full scan. You will need to dispatch a workflow to
+cut out each individual card, which will be an image and overlayed on the cards. […] I want to have
+a napoletane card pack, american card pack, and eventually a tuscany card pack (but I will share the
+tuscany scan(s) later, so just implement what you can for now and remember this for later)". The
+owner supplied it, so the rule above is lifted for this file alone; its facts are here and in
+`assets/cards/napoletane/SOURCES.txt`, the file itself committed unchanged as `sheet.jpg`. The sheet
+is 4 × 10 in its own order, rows denari, coppe, bastoni, spade and columns A 2 3 4 5 6 7 fante
+cavallo re (`--rows D,C,B,S --cols A,2,3,4,5,6,7,F,C,R`; the preview confirms the eagle ace is `AD`
+and the amphora ace `AC`). Nothing is masked: the eagle on the ace of coins and the arms on the four
+are the pattern's art, and no card names a maker. The cards are borderless and butted edge to edge
+(3507 ≈ 10 × 351, 2398 ≈ 4 × 600, hand-laid up to 32 px off an equal grid, the outer margins
+clipped by the scan, each edge a faint 160–240 grey shadow), which the ink cutter cannot cut, so
+grid mode (§5) was written for it: `build` (`PACK_SOURCES.napoletane`, `--grid 6`) finds the seams
+(row 1: 337 691 1036 1386 1741 2095 2451 2808 3153; rows at ≈ 590 1195 1798), cuts forty 338 × 586
+cells, aspect 0.577, at 120 and 240 px (a 338 px cell serves no 3x without upscaling): 80 JPEGs,
+1.12 MB, `indices: 'overlay'` (the pattern prints none; the corners are clean at 120 px), no back
+(the sheet has none; the default's is painted). It is the `italian40` default; `linea` stays the
+fallback and the stories' pack. The Trocche100 per-card scans in the table above remain unshipped:
+the owner's supply covers this file, not that maker's redraw. The owner's `american` pack ("the
+regular cards that you use for gin rummy … just hearts clubs diamonds spades") and the `tuscany`
+pack (its scan to come; a sheet with printed borders and gutters takes the ink cutter, one laid edge
+to edge `--grid`) are the next two entries of this section.
+
 ## 8. Module map, boundaries, tests
 
 | Module | Zone | Holds |
@@ -193,12 +239,14 @@ same `add`.
 | `web/shared/lib/cards/decks.ts` | pure | `DECK_KINDS`, `DeckSpec`, `DECKS`, `cardIds`, `isCardId`, `splitId`, `cardName` |
 | `web/shared/lib/cards/suits.ts` | pure | `ITALIAN_SUIT_SYMBOLS`, `suitSymbol`, `suitSymbolId`, `placedSymbol`, `fmt` |
 | `web/shared/lib/cards/packs.ts` | pure | `CARD_PACKS`, the types, `FACE_WIDTH`, `packByName`, `isCardPack`, `packsFor`, `isCardPackFor`, `CardPackFor<K>`, `DEFAULT_CARD_PACKS`, `defaultPackFor`, `badCardPackMsg` |
-| `web/shared/lib/cards/packs/<name>.ts` | pure data | gin's four, hand-written; `linea`, generated (in .prettierignore) |
+| `web/shared/lib/cards/packs/<name>.ts` | pure data | gin's four, hand-written; `linea` and `napoletane`, generated (in .prettierignore) |
 | `web/shared/lib/cards/resolve.ts` | pure | `FaceSpec`, `PaintedBack`, `resolveFace`, `resolveBack`, `resolveAspect`, `attributionLine` |
 | `web/shared/ui/cardFace.ts` | ui, lint-pure | `faceHtml`, `backHtml`, `backImageCss`, `backFallbackImageCss`, `SUIT_SPRITE_SVG` |
 | `web/shared/edge/prefs.ts` | edge | `decodeCardPackFor(kind)`, `cardPackPref(key, kind)` |
 | `web/public/shared/cards/backs/` | served | copies of gin's five back files with a `SOURCES.txt` (a Vite build serves only `public/` as files, so the pack data cannot point into the gin folder; gin's own copies stay for its theme) |
 | `web/public/shared/cards/linea/` | served | the forty faces and the back |
+| `assets/cards/napoletane/` | source | the owner's sheet as supplied (`sheet.jpg`) and its `SOURCES.txt` (§7.1) |
+| `web/public/shared/cards/napoletane/` | served | the eighty derived faces under `italian40/` and a `SOURCES.txt` naming the tool run |
 | `tools/card-packs.ts`, `tools/linea.ts` | tools | §5, §6 |
 | `test/card-packs.test.ts` | `shared` suite | the manifest test and the two engine pins (under `test/`: the pure tsconfig compiling `web/shared/lib` has no node types) |
 
@@ -207,7 +255,8 @@ lib only and no DOM; `web/shared/lib/**` and `web/shared/ui/**` measure 100/100/
 modules (the shared suite's rows hold); `web/shared/edge/**` at 99.75/96.6/99.4/99.7. Tests beside
 every module (`decks`, `suits`, `packs`, `resolve`, `cardFace`, `prefs`), `tools/card-packs.test.ts`
 (the id mapping, paths, the ratio cut-off, the size readers, the gutter finder and the cell
-normaliser over synthetic input, masks, the manifest text, the argument parser),
+normaliser over synthetic input, the seam grid's pure half, masks, the manifest text, the argument
+parser),
 `tools/linea.test.ts`, gin's `cardBack`, `storage` (the round trip and `migrateCardBack`) and
 `ui/cards` (the glyph pin) tests, `e2e/gin-card-back.spec.ts`.
 
@@ -228,4 +277,12 @@ normaliser over synthetic input, masks, the manifest text, the argument parser),
 - A drawn SVG `files` pack needs no attribution; a raster or sprite pack does (the test's rule).
 - The `glyphs?: Record<suit, url>` field was dropped: the sprite is inline markup, not files.
 - `preview` joined the tool's commands: the sheet a reviewer reads is how a pack is judged.
-- No sourced deck ships (§7); `PACK_SOURCES` is empty until the owner's decision.
+- The ink cutter assumes a printed border and a white gutter; the owner's Napoletane sheet has
+  neither, so `--grid <inset>` (the seam grid, §5) joined sheet mode, with `equaliseCells` allowed
+  past the sheet where `normaliseCells` clamps, and the draw clipping the source rectangle itself
+  so what lies outside the scan is paper.
+- `preview` sketches the overlay indices on an `overlay` pack's faces: legibility on the picture is
+  part of judging a pack.
+- One sourced deck ships after all, because the owner supplied it (§7.1): `PACK_SOURCES` holds
+  `napoletane` and its test pins that one entry; the `italian40` default is `napoletane`, not
+  `linea`.

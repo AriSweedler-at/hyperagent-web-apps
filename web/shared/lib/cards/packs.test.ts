@@ -113,12 +113,13 @@ describe('the card packs', () => {
     });
   });
 
-  test('the defaults: gin starts on `default`, an Italian table on `linea`; each is a pack for its kind', () => {
-    expect(DEFAULT_CARD_PACKS).toEqual({ french52: 'default', italian40: 'linea' });
+  test("the defaults: gin starts on `default`, an Italian table on the owner's `napoletane`; each is a pack for its kind", () => {
+    expect(DEFAULT_CARD_PACKS).toEqual({ french52: 'default', italian40: 'napoletane' });
     DECK_KINDS.forEach((kind) => {
       expect(isCardPackFor(kind, defaultPackFor(kind))).toBe(true);
-      // The default's back is painted, never `none`: it is what a back-less pack falls back to.
-      expect(packByName(defaultPackFor(kind)).back.kind).not.toBe('none');
+      // A default may have no back of its own (napoletane's sheet has none): resolveBack then
+      // paints the `default` pack's, which is never `none`.
+      expect(packByName('default').back.kind).not.toBe('none');
     });
   });
 
