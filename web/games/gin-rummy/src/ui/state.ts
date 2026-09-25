@@ -195,7 +195,7 @@ export type Shell = ShellState<Gin>;
  * The table's own state (backgammon's `Table`, docs/design/shared-shell.md §4.1): the tapped
  * card, the ghost draw slot, the kept picture, the melds made by hand, a drag, the sheets, the
  * pass-and-play curtain, the sandbox editor and gin's two table preferences (`sort`, `cardBack`).
- * Never saved but for those two, never on the wire; gin's alone when C2 lifts the shell. The
+ * Never saved but for those two, never on the wire; gin's alone since C2 lifted the shell. The
  * legacy's `hostSeated` (set, never read) is gone: it stayed only so the hook's `app` kept the
  * legacy's members, and this split changes that shape anyway.
  */

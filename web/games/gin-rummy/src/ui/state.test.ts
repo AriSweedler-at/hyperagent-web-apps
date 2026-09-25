@@ -1402,6 +1402,7 @@ describe('storage', () => {
     storage.setItem(STORAGE_KEYS.p2Name, 'Bob');
     storage.setItem(STORAGE_KEYS.homeTab, 'rules');
     storage.setItem(STORAGE_KEYS.playMode, 'local');
+    storage.setItem(STORAGE_KEYS.sort, 'rank');
     storage.setItem(STORAGE_KEYS.cardBack, 'yu-gi-oh');
     storage.setItem(STORAGE_KEYS.soundFont, 'arcade');
     storage.setItem(STORAGE_KEYS.save, '{"role":"guest","code":"KQZM","myName":"Jeff"}');
@@ -1422,7 +1423,7 @@ describe('storage', () => {
       p2Name: 'Bob',
       homeTab: 'rules',
       playMode: 'local',
-      sort: 'suit',
+      sort: 'rank',
       cardBack: 'yu-gi-oh',
       soundFont: 'arcade',
       save: { role: 'guest', code: 'KQZM', myName: 'Jeff' },
@@ -1440,11 +1441,13 @@ describe('storage', () => {
     storage.setItem(STORAGE_KEYS.homeTab, 'settings');
     storage.setItem(STORAGE_KEYS.save, 'not json');
     storage.setItem(STORAGE_KEYS.p2Name, '');
+    storage.setItem(STORAGE_KEYS.sort, 'sideways');
     storage.setItem(STORAGE_KEYS.soundFont, 'plaid');
     expect(readHome(store)).toMatchObject({
       homeTab: 'play',
       save: null,
       p2Name: null,
+      sort: 'suit',
       soundFont: 'default',
     });
   });

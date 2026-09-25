@@ -253,7 +253,7 @@ describe('the initial app', () => {
     expect(run(app, { type: 'mode/set', mode: 'sandbox' }).app.shell.playMode).toBe('online');
   });
 
-  test('the shell`s intents are listed once, for the shared shell reducer to come', () => {
+  test('the shell`s intents are listed once, the shared shell reducer`s (C2), backgammon`s two selects its own', () => {
     expect(SHELL_INTENT_TYPES).toContain('home/init');
     expect(SHELL_INTENT_TYPES).toContain('guest/lost');
     expect(SHELL_INTENT_TYPES).not.toContain('point/tap');

@@ -173,6 +173,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // measure 100/100/100/100 through five shellPaint.test.ts cases over the fake page (every
         // entry's click, skipDisabled on and off, the missing id, the constant and the function
         // press); the folder stays at 100 (230 lines, 103 functions, 253 statements, 80 branches).
+        // shell.ts and shellEffects.ts, the shell reducer and its effect runner both games'
+        // ui/state.ts delegate to (shared-shell.md §5 C2), measure 100/100/100/100 through
+        // shell.test.ts over a FAKE_GAME; the folder stays at 100 on every metric.
         'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The coin game (dry-round-2.md F3): the two-seat engine the replay driver under test/shared
         // is proved on, and the shared shell's fake game to come. It exists to be exercised, so
@@ -220,6 +223,7 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         'web/games/gin-rummy/src/engine/**/*.ts',
         'web/games/gin-rummy/src/protocol.ts',
         'web/games/gin-rummy/src/storage.ts',
+        'web/games/gin-rummy/src/shellConfig.ts',
         'web/games/gin-rummy/src/cardBack.ts',
         'web/games/gin-rummy/src/ui/**/*.ts',
         'web/games/gin-rummy/src/stories/catalogue.ts',
@@ -264,6 +268,11 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // ui 98.07/97.10/97.04/94.14 before, 98.52/98.18/97.55/94.58 after (the press and the three
       // release closures the bind test never fired left with the click closures; render.test.ts
       // gained the press-and-release case; the row stands).
+      // Re-measured when C2 moved the shell reducer out of ui/state.ts into web/shared/ui/shell.ts
+      // (docs/design/shared-shell.md §4.3.2) and the game's half of its config into
+      // src/shellConfig.ts, a new row below: ui 98.07/97.10/97.04/94.14 before, 97.73/96.76/96.75/93.81
+      // after (the same lines uncovered in a folder ~900 fully covered lines smaller; the row
+      // stands); shellConfig.ts measures 100/100/100/100 through state.test.ts and the parity suites.
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -284,6 +293,12 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
           branches: 97,
         },
         'web/games/gin-rummy/src/storage.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 97,
+        },
+        'web/games/gin-rummy/src/shellConfig.ts': {
           lines: 95,
           functions: 95,
           statements: 95,
@@ -394,6 +409,7 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         'web/games/backgammon/src/engine/**/*.ts',
         'web/games/backgammon/src/protocol.ts',
         'web/games/backgammon/src/storage.ts',
+        'web/games/backgammon/src/shellConfig.ts',
         'web/games/backgammon/src/ui/**/*.ts',
         'web/games/backgammon/src/net/**/*.ts',
         'web/games/backgammon/src/fx.ts',
@@ -425,6 +441,11 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // Re-measured when D3 (dry-round-2 E7) moved the page-fake assembly out of ui/page.fake.ts into
       // web/shared/edge/page.fake.ts `shellPage`: ui 99.59/100/98.68/92.53 before, 99.59/100/98.68/92.52
       // after (the same 6 lines uncovered, 1471 → 1467 lines; the wrapper measures 100 on every metric).
+      // Re-measured when C2 moved the shell reducer out of ui/state.ts into web/shared/ui/shell.ts
+      // (docs/design/shared-shell.md §4.3.2) and the game's half of its config into
+      // src/shellConfig.ts, a new row below: ui 99.59/100/98.68/92.52 before, 99.51/100/98.65/92.09
+      // after (the same lines uncovered in a smaller folder; the row stands); shellConfig.ts
+      // measures 100/100/100/100 through state.test.ts.
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
@@ -445,6 +466,12 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
           branches: 97,
         },
         'web/games/backgammon/src/storage.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 97,
+        },
+        'web/games/backgammon/src/shellConfig.ts': {
           lines: 95,
           functions: 95,
           statements: 95,

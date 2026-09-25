@@ -315,6 +315,11 @@ const ROWS_BEFORE: ReadonlyArray<readonly [string, Suite, Thresholds]> = [
     { lines: 95, functions: 95, statements: 95, branches: 97 },
   ],
   [
+    'web/games/backgammon/src/shellConfig.ts',
+    'backgammon',
+    { lines: 95, functions: 95, statements: 95, branches: 97 },
+  ],
+  [
     'web/games/backgammon/src/ui/**',
     'backgammon',
     { lines: 94, functions: 95, statements: 93, branches: 88 },
@@ -336,6 +341,11 @@ const ROWS_BEFORE: ReadonlyArray<readonly [string, Suite, Thresholds]> = [
   ],
   [
     'web/games/gin-rummy/src/storage.ts',
+    'gin',
+    { lines: 95, functions: 95, statements: 95, branches: 97 },
+  ],
+  [
+    'web/games/gin-rummy/src/shellConfig.ts',
     'gin',
     { lines: 95, functions: 95, statements: 95, branches: 97 },
   ],
@@ -393,11 +403,13 @@ const INCLUDE_BEFORE: ReadonlyArray<string> = [
   'web/games/backgammon/src/engine/**/*.ts',
   'web/games/backgammon/src/protocol.ts',
   'web/games/backgammon/src/storage.ts',
+  'web/games/backgammon/src/shellConfig.ts',
   'web/games/backgammon/src/ui/**/*.ts',
   'web/games/backgammon/src/net/**/*.ts',
   'web/games/backgammon/src/fx.ts',
   'web/games/gin-rummy/src/protocol.ts',
   'web/games/gin-rummy/src/storage.ts',
+  'web/games/gin-rummy/src/shellConfig.ts',
   'web/games/gin-rummy/src/cardBack.ts',
   'web/games/gin-rummy/src/ui/**/*.ts',
   'web/games/gin-rummy/src/stories/catalogue.ts',
