@@ -164,7 +164,7 @@ describe('the captured saves through the reducer', () => {
     if (app.shell.game === null) return;
     expect(app.shell.view).toEqual(viewFor(app.shell.game, 0));
     expect(app.shell.oppName).toBe('Jeff');
-    expect(app.shell.target).toBe(75);
+    expect(app.shell.opts.target).toBe(75);
   });
 });
 

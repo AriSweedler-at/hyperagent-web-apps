@@ -13,7 +13,8 @@
 // button and never stored it, so no capture exists for it. The readers and writers every shell
 // shares (the name rule, the bare-string preferences, the save's three roles) are built by
 // web/shared/edge/prefs.ts (docs/design/shared-shell.md §5 A3) over the keys, the engine decoder
-// and the host save's own field spelled here; the keys and the literals did not move.
+// and the host save's own field spelled here, grouped as the `SHELL_STORE` the shell config carries
+// (§5 C2 `shellStore`); the keys and the literals did not move.
 import { CARD_BACKS, type CardBack } from './cardBack.ts';
 import { SORT_MODES, type SortMode } from './sort.ts';
 import type { Store, StorageError } from '../../../shared/edge/storage.ts';
@@ -25,9 +26,7 @@ import {
   decodePlayMode,
   decodeSoundFont,
   decodeSoundState,
-  namePref,
-  shellSave,
-  soundPref,
+  shellStore,
   textPref,
   type GuestSave as ShellGuestSave,
   type HostSave as ShellHostSave,
@@ -143,41 +142,33 @@ export const decodeScorerState: Decoder<ScorerState> = object({
   startedAt: integer(0),
 });
 
-// ---- the game save ---------------------------------------------------------------------------
+// ---- the shell's store: the game save and the bare-string preferences every shell keeps -----
 
-export const { decodeSave, readSave, writeSave, clearSave } = shellSave<State, HostExtra>({
-  key: STORAGE_KEYS.save,
+export const SHELL_STORE = shellStore<State, HostExtra, HomeTab>(STORAGE_KEYS, {
   game: 'gin-rummy',
   decodeGame: decodeState,
   hostExtra: { decode: hostExtra, literal: (save) => ({ target: save.target }) },
-});
-
-// ---- the bare-string preferences -----------------------------------------------------------
-
-export const { read: readName, write: writeName } = namePref(STORAGE_KEYS.name);
-/** The pass-and-play second name, under `rememberName`'s rule; the legacy never stored it. */
-export const { read: readP2Name, write: writeP2Name } = namePref(STORAGE_KEYS.p2Name);
-export const { read: readHomeTab, write: writeHomeTab } = textPref(
-  STORAGE_KEYS.homeTab,
   decodeHomeTab,
-);
-export const { read: readPlayMode, write: writePlayMode } = textPref(
-  STORAGE_KEYS.playMode,
-  decodePlayMode,
-);
+});
+export const { decodeSave, readSave, writeSave, clearSave } = SHELL_STORE.save;
+export const { read: readName, write: writeName } = SHELL_STORE.name;
+/** The pass-and-play second name, under `rememberName`'s rule; the legacy never stored it. */
+export const { read: readP2Name, write: writeP2Name } = SHELL_STORE.p2Name;
+export const { read: readHomeTab, write: writeHomeTab } = SHELL_STORE.homeTab;
+export const { read: readPlayMode, write: writePlayMode } = SHELL_STORE.playMode;
 export const {
   read: readSoundState,
   write: writeSoundState,
   enabled: soundEnabled,
-} = soundPref(STORAGE_KEYS.sound);
+} = SHELL_STORE.sound;
+export const { read: readSoundFont, write: writeSoundFont } = SHELL_STORE.soundFont;
+
+// ---- this page's own preferences -----------------------------------------------------------
+
 export const { read: readSort, write: writeSort } = textPref(STORAGE_KEYS.sort, decodeSort);
 export const { read: readCardBack, write: writeCardBack } = textPref(
   STORAGE_KEYS.cardBack,
   decodeCardBack,
-);
-export const { read: readSoundFont, write: writeSoundFont } = textPref(
-  STORAGE_KEYS.soundFont,
-  decodeSoundFont,
 );
 
 // ---- the Score Counter -----------------------------------------------------------------------
