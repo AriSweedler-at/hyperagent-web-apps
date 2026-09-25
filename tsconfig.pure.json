@@ -20,12 +20,13 @@
   // DOM page fake; eslint.config.js spells the same carve-out as `scorer/!(main|*.test).ts`. The
   // shared shell's painters and binders (docs/design/shared-shell.md §4.4) write the document
   // through web/shared/edge/dom.ts and stay out with their tests the same way (eslint.config.js
-  // `web/shared/ui/!(shellPaint|curtain|toast|home).ts`); tsconfig.web.json compiles them.
+  // `web/shared/ui/!(shellPaint|curtain|toast|home|keyed).ts`); tsconfig.web.json compiles them.
   "exclude": [
     "web/games/*/src/scorer/main*.ts",
     "web/shared/ui/shellPaint*.ts",
     "web/shared/ui/curtain*.ts",
     "web/shared/ui/toast*.ts",
-    "web/shared/ui/home*.ts"
+    "web/shared/ui/home*.ts",
+    "web/shared/ui/keyed*.ts"
   ]
 }

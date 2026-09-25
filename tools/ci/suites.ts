@@ -116,6 +116,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // 100/100/100/100 over the fake page.
         // home.ts, the home shell both games' ui/home.ts compose (shared-shell.md §5 B2), measures
         // 100/100/100/100 through home.test.ts over the same fake page.
+        // keyed.ts, the keyed slot out of shellPaint.ts (docs/design/dry-round-2.md D1), measures
+        // 100/100/100/100 through keyed.test.ts over a fake element; the folder stays at 100.
         'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
         // The two-seat sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios

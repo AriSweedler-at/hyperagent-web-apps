@@ -14,9 +14,9 @@ const PURE = [
   'web/shared/lib/**/*.ts',
   // The shared shell's pure helpers (web/shared/ui/glossary.ts first, docs/design/glossary-links.md
   // §3; ids.ts). Its painters and binders (shellPaint.ts, curtain.ts, toast.ts, home.ts: they write
-  // the document, docs/design/shared-shell.md §4.4) are carved out the way scorer/main.ts is below;
-  // tsconfig.pure.json excludes the same four.
-  'web/shared/ui/!(shellPaint|curtain|toast|home).ts',
+  // the document, docs/design/shared-shell.md §4.4; keyed.ts, the keyed slot, dry-round-2.md D1)
+  // are carved out the way scorer/main.ts is below; tsconfig.pure.json excludes the same five.
+  'web/shared/ui/!(shellPaint|curtain|toast|home|keyed).ts',
   'web/games/*/src/engine/**/*.ts',
   'web/games/*/src/domain/**/*.ts',
   'web/games/*/src/bots/**/*.ts',
