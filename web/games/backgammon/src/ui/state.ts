@@ -242,6 +242,12 @@ export type Table = Readonly<{
   noMoveUntil: number | null;
   /** The view the previous paint showed (main.ts paints after every intent): `flightsBetween`'s `prev`. */
   lastPainted: View | null;
+  /**
+   * The dice are tumbling (design §4.7): from a roll (mine as it is asked for, anyone's as it
+   * arrives) until the `tumble` timer fires. The roll modal stays up through my own, the board
+   * takes no tap, the painter cycles the faces.
+   */
+  rolling: boolean;
 }>;
 
 export type App = Readonly<{ shell: Shell; table: Table }>;
@@ -297,6 +303,7 @@ export const initialTable: Table = {
   curtainMode: DEFAULT_CURTAIN_MODE,
   noMoveUntil: null,
   lastPainted: null,
+  rolling: false,
 };
 
 export const initialApp: App = { shell: initialShell, table: initialTable };
@@ -309,6 +316,12 @@ export const LONG_PRESS_MS = 450;
 export const SHAKE_MS = 120;
 /** R14: a forfeited roll stays on the table this long before the curtain rises (design §4.5). */
 export const NO_MOVE_MS = 1200;
+/**
+ * The dice tumble this long after a roll (design §4.7): the painter's face cycle (theme.css
+ * `tumble-faces`, 560ms of cycling) fits inside it with the settled faces showing for the rest,
+ * then the roll modal goes and the board answers taps. A cosmetic beat: the engine rolled at once.
+ */
+export const TUMBLE_MS = 700;
 /** `onGuestGone`'s toast lasts this long, as does `LOST_HOST_MSG`. */
 export const GONE_TOAST_MS = 4000;
 export const NOT_CONNECTED_MSG = 'Not connected to the host.';
@@ -447,9 +460,11 @@ export type Intent =
   | Readonly<{ type: 'die/pick'; die: Die }>
   /** A `.chip` in the die-chip tray: commit that chain. */
   | Readonly<{ type: 'chip/tap'; index: number }>
-  /** `#chipCancelBtn`, a tap on the board, or a source tap: the tray closes. */
+  /** `#chipCancelBtn`, Escape, or a source tap: the tray closes. */
   | Readonly<{ type: 'chip/cancel' }>
-  /** `#rollBtn`, `#dice` before the roll, and the curtain button when it promised a roll. */
+  /** A tap on the board's own surface (the felt between the places): the tray closes and the tapped source is let go (design §4.2 rule 2b). */
+  | Readonly<{ type: 'board/tap' }>
+  /** `#rollModalBtn` (design §4.7) and `#dice` before the roll. */
   | Readonly<{ type: 'roll/click' }>
   | Readonly<{ type: 'undo/click' }>
   /** `#doneBtn` is reserved (R13: the turn ends by itself); the intent is accepted and ignored. */
@@ -476,6 +491,8 @@ export type Intent =
   | Readonly<{ type: 'noMove/elapsed' }>
   /** The `shake` timer fired. */
   | Readonly<{ type: 'shake/elapsed' }>
+  /** The `tumble` timer fired: the dice have settled (design §4.7). */
+  | Readonly<{ type: 'tumble/elapsed' }>
   /**
    * `window.__backgammon.setup(state)` (e2e and stories): the pass-and-play game's engine state is
    * replaced by `state` (decoded, so a hand-made object is checked); refused outside a local game.
@@ -542,7 +559,7 @@ const isShellIntent = (intent: Intent): intent is ShellIntent =>
 
 // ---- effects -----------------------------------------------------------------------------------
 
-export type TimerId = 'longPress' | 'shake' | 'noMove';
+export type TimerId = 'longPress' | 'shake' | 'noMove' | 'tumble';
 
 export type Effect =
   | Readonly<{ type: 'persist' }>
@@ -614,9 +631,12 @@ const withTable = (app: App, over: Partial<Table>): App => ({
   ...app,
   table: { ...app.table, ...over },
 });
-/** A refused action: the toast; the tray and the tapped source are dropped so the board matches the state. */
+/** A refused action: the toast; the tray, the tapped source and a tumble are dropped so the board matches the state. */
 const refuse = (app: App, message: string): Step =>
-  step(withTable(app, { selected: null, picked: null, pending: null }), toast(message));
+  step(
+    withTable(app, { selected: null, picked: null, pending: null, rolling: false }),
+    toast(message),
+  );
 
 // ---- the table against a new view -------------------------------------------------------------
 
@@ -676,12 +696,15 @@ const freshNoMove = (prev: View | null, next: View): boolean =>
   next.lastAction.kind === 'noMove' &&
   (prev === null || !sameEntry(prev.lastAction, next.lastAction));
 
+/** `next` carries a roll (played or forfeited, R14) that `prev` had not seen: the roll cue, the tumble. */
+export const rolledBetween = (prev: View, next: View): boolean =>
+  next.lastAction !== null &&
+  (next.lastAction.kind === 'roll' || next.lastAction.kind === 'noMove') &&
+  !sameEntry(prev.lastAction, next.lastAction);
+
 /** The sounds the change from `prev` to `next` earns (ui/sound.ts names); pass-and-play chimes turns with the curtain instead. */
 export const cuesBetween = (prev: View, next: View, role: Role | null): ReadonlyArray<Cue> => {
-  const rolled =
-    next.lastAction !== null &&
-    (next.lastAction.kind === 'roll' || next.lastAction.kind === 'noMove') &&
-    !sameEntry(prev.lastAction, next.lastAction);
+  const rolled = rolledBetween(prev, next);
   const moved = newMovesBetween(prev, next).map((m): Cue =>
     m.hit ? 'hit' : m.to === 'off' ? 'bearOff' : 'place',
   );
@@ -756,12 +779,22 @@ const tableCleared = (table: Table): Table => ({ ...initialTable, curtainMode: t
  * view this one replaces), once per position (`cues.key`), so a re-sent frame plays nothing.
  * The paint itself is main.ts's after every intent.
  */
+const TUMBLE_TIMER: Effect = {
+  type: 'startTimer',
+  id: 'tumble',
+  ms: TUMBLE_MS,
+  then: { type: 'tumble/elapsed' },
+};
+
 const rendered = (app: App, prev: View | null, now: number): Step => {
   const view = app.shell.view;
   if (view === null) return pure(app);
   const key = viewKey(view);
   const fresh = key !== app.shell.cues.key && prev !== null;
   const cues = fresh ? cuesBetween(prev, view, app.shell.role) : [];
+  // A roll that just arrived (mine, or the other seat's) tumbles for TUMBLE_MS (design §4.7); a
+  // tumble already running (the guest's, started at the click) restarts with the faces.
+  const rolled = fresh && rolledBetween(prev, view);
   // Pass-and-play toasts the player hit when the phone reaches them (`handedHits`), not here.
   const hitToasts = fresh && app.shell.role !== 'local' ? hitToastsBetween(prev, view) : [];
   const beat = key !== app.shell.cues.key && freshNoMove(prev, view);
@@ -775,10 +808,12 @@ const rendered = (app: App, prev: View | null, now: number): Step => {
         resultOpen,
         lastPainted: prev,
         noMoveUntil: beat ? now + NO_MOVE_MS : app.table.noMoveUntil,
+        rolling: rolled || app.table.rolling,
       },
     },
     ...cues.map((cue): Effect => ({ type: 'fx', cue })),
     ...hitToasts,
+    ...(rolled ? [TUMBLE_TIMER] : []),
     ...(beat
       ? [
           {
@@ -1244,10 +1279,28 @@ const cancelFinish = (app: App): Step =>
 
 // ---- the table: taps, the tray, the dice, a drag (design §4.2-§4.4) -----------------------
 
-/** My view while I may act and the board is live; null under the curtain or on the other seat's turn. */
+/** My view while I may act and the board is live; null under the curtain, while the dice tumble, or on the other seat's turn. */
 const liveView = (app: App): View | null => {
   const v = app.shell.view;
-  return v?.isMyTurn === true && app.table.curtain === null ? v : null;
+  return v?.isMyTurn === true && app.table.curtain === null && !app.table.rolling ? v : null;
+};
+
+/**
+ * Design §4.7: the roll modal (`#rollOverlay`) is up while it is my turn to roll and the curtain
+ * is down, and stays through my own roll's tumble (a forfeited roll's too, R14) so the dice settle
+ * in it; nothing else opens or closes it. The other seat's tumble shows on the board alone.
+ */
+export const rollModalOpen = (app: App): boolean => {
+  const v = app.shell.view;
+  if (v === null || v.matchOver || app.table.curtain !== null) return false;
+  if (v.phase === 'toRoll' && v.isMyTurn) return true;
+  const last = v.lastAction;
+  return (
+    app.table.rolling &&
+    last !== null &&
+    (last.kind === 'roll' || last.kind === 'noMove') &&
+    last.seat === v.me.idx
+  );
 };
 
 /** `liveView` while I am moving; null when a tap must be dropped (`#board.inert`). */
@@ -1606,9 +1659,19 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
     }
     case 'chip/cancel':
       return pure(withTable(app, { pending: null }));
+    case 'board/tap':
+      return t.pending === null && t.selected === null
+        ? pure(app)
+        : pure(withTable(app, { pending: null, selected: null }));
     case 'roll/click':
-      // The curtain button dispatches `curtain/reveal` first, so the roll lands on a live board.
-      return v?.phase === 'toRoll' ? act(app, [{ type: 'roll' }], ctx) : pure(app);
+      // `#rollModalBtn` (design §4.7): the engine rolls at once; the tumble starts now, so the
+      // guest's modal holds its button until the host's frame brings the faces (the timer then
+      // restarts with them, in `rendered`).
+      return v?.phase === 'toRoll'
+        ? then(step(withTable(app, { rolling: true }), TUMBLE_TIMER), (a) =>
+            act(a, [{ type: 'roll' }], ctx),
+          )
+        : pure(app);
     case 'undo/click':
       return v?.canUndo === true ? act(app, [{ type: 'undo' }], ctx) : pure(app);
     case 'done/click':
@@ -1676,6 +1739,23 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
     }
     case 'shake/elapsed':
       return pure(withTable(app, { shake: null }));
+    case 'tumble/elapsed': {
+      if (!t.rolling) return pure(app);
+      // The dice have settled: a double earns its cue now, after the roll's (design §4.7, §5.1),
+      // on both seats' tables alike (each runs the tumble the roll started).
+      const view = app.shell.view;
+      const last = view?.lastAction ?? null;
+      const doubles =
+        view?.dice !== null &&
+        view?.dice !== undefined &&
+        view.dice[0] === view.dice[1] &&
+        last !== null &&
+        (last.kind === 'roll' || last.kind === 'noMove');
+      return step(
+        withTable(app, { rolling: false }),
+        ...(doubles ? [{ type: 'fx', cue: 'doubles' } as const] : []),
+      );
+    }
     case 'sandbox/load':
       return sandboxLoad(app, intent.state, ctx);
     case 'leave/request':

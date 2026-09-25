@@ -938,11 +938,6 @@ body.fixed-screen #app {
   min-width: 168px;
   min-height: 54px;
 }
-.roll-slot .btn-primary {
-  width: auto;
-  min-width: 168px;
-  padding: 12px 16px;
-}
 .wait-note {
   color: var(--muted);
   font-size: 0.9rem;
@@ -1390,8 +1385,12 @@ body.fixed-screen #app {
     outline-color 120ms;
   touch-action: none;
 }
-/* Five drawn; the sixth onward is the badge on the top visible checker (the point label stays). */
-.checker:nth-child(n + 6) {
+/* Five drawn; the sixth onward is the badge on the top visible checker (the point label stays).
+   Scoped to the places: a flight clone or a drag ghost is a .checker appended to the body, where
+   an unscoped nth-child(n + 6) hid every one of them (the body has more than five children), so
+   no flight was ever seen until 2026-09-24. */
+.point > .checker:nth-child(n + 6),
+.bar > .checker:nth-child(n + 6) {
   display: none;
 }
 .checker.top[data-count]::after {
@@ -1592,43 +1591,52 @@ body.fixed-screen #app {
     inset 0 -2px 3px rgba(42, 26, 18, 0.15),
     0 1px 2px rgba(0, 0, 0, 0.35);
 }
-.die-1::after {
-  background: radial-gradient(circle at 50% 50%, var(--pip));
-}
-.die-2::after {
-  background:
+.die {
+  /* The six faces as pip lists, so the tumble's keyframes can name them too. */
+  --pips-1: radial-gradient(circle at 50% 50%, var(--pip));
+  --pips-2:
     radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
     radial-gradient(circle at var(--hi) var(--hi), var(--pip));
-}
-.die-3::after {
-  background:
+  --pips-3:
     radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
     radial-gradient(circle at 50% 50%, var(--pip)),
     radial-gradient(circle at var(--hi) var(--hi), var(--pip));
-}
-.die-4::after {
-  background:
+  --pips-4:
     radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
     radial-gradient(circle at var(--hi) var(--lo), var(--pip)),
     radial-gradient(circle at var(--lo) var(--hi), var(--pip)),
     radial-gradient(circle at var(--hi) var(--hi), var(--pip));
-}
-.die-5::after {
-  background:
+  --pips-5:
     radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
     radial-gradient(circle at var(--hi) var(--lo), var(--pip)),
     radial-gradient(circle at 50% 50%, var(--pip)),
     radial-gradient(circle at var(--lo) var(--hi), var(--pip)),
     radial-gradient(circle at var(--hi) var(--hi), var(--pip));
-}
-.die-6::after {
-  background:
+  --pips-6:
     radial-gradient(circle at var(--lo) var(--lo), var(--pip)),
     radial-gradient(circle at var(--hi) var(--lo), var(--pip)),
     radial-gradient(circle at var(--lo) 50%, var(--pip)),
     radial-gradient(circle at var(--hi) 50%, var(--pip)),
     radial-gradient(circle at var(--lo) var(--hi), var(--pip)),
     radial-gradient(circle at var(--hi) var(--hi), var(--pip));
+}
+.die-1::after {
+  background: var(--pips-1);
+}
+.die-2::after {
+  background: var(--pips-2);
+}
+.die-3::after {
+  background: var(--pips-3);
+}
+.die-4::after {
+  background: var(--pips-4);
+}
+.die-5::after {
+  background: var(--pips-5);
+}
+.die-6::after {
+  background: var(--pips-6);
 }
 /* Before the roll: two blank nacre squares. */
 .die.blank::before {
@@ -1672,8 +1680,25 @@ body.fixed-screen #app {
 .die.theirs {
   filter: saturate(0.7) brightness(0.85);
 }
-#dice.rolling .die {
-  animation: tumble 350ms ease-out;
+/* The tumble (design §4.7; the owner: "a little die rolling animation. Which for now is just the
+   dice scrolling randomly through their numbers"): while `rolling` (ui/state.ts `table.rolling`,
+   TUMBLE_MS 700) each die turns once and its pips run through a fixed pseudo-random list of
+   faces, one every 70ms for 560ms (`steps(1, end)`: each face holds), then the real faces show for
+   the rest of the beat. Odd and even dice run different lists, so two dice never agree mid-air,
+   and each die starts its list and its turn part-way (`--tumble-shift`, a negative delay of
+   0..3 faces the markup writes from the roll, ui/board.ts `dieHtml`), so no two rolls open on
+   the same faces and the dice settle one after the other, 350..560ms in. A cosmetic run over a
+   roll the engine has already made: no randomness here. */
+.rolling .die {
+  animation: tumble 560ms ease-out;
+  animation-delay: var(--tumble-shift, 0ms);
+}
+.rolling .die::after {
+  animation: tumble-faces-a 560ms steps(1, end);
+  animation-delay: var(--tumble-shift, 0ms);
+}
+.rolling .die:nth-child(even)::after {
+  animation-name: tumble-faces-b;
 }
 @keyframes tumble {
   0% {
@@ -1685,6 +1710,97 @@ body.fixed-screen #app {
   100% {
     transform: rotate(360deg) scale(1);
   }
+}
+@keyframes tumble-faces-a {
+  0% {
+    background: var(--pips-3);
+  }
+  12.5% {
+    background: var(--pips-6);
+  }
+  25% {
+    background: var(--pips-1);
+  }
+  37.5% {
+    background: var(--pips-4);
+  }
+  50% {
+    background: var(--pips-2);
+  }
+  62.5% {
+    background: var(--pips-5);
+  }
+  75% {
+    background: var(--pips-1);
+  }
+  87.5%,
+  100% {
+    background: var(--pips-3);
+  }
+}
+@keyframes tumble-faces-b {
+  0% {
+    background: var(--pips-5);
+  }
+  12.5% {
+    background: var(--pips-2);
+  }
+  25% {
+    background: var(--pips-4);
+  }
+  37.5% {
+    background: var(--pips-6);
+  }
+  50% {
+    background: var(--pips-1);
+  }
+  62.5% {
+    background: var(--pips-3);
+  }
+  75% {
+    background: var(--pips-6);
+  }
+  87.5%,
+  100% {
+    background: var(--pips-2);
+  }
+}
+
+/* ---------- the roll modal (design §4.7) ---------- */
+/* The start-of-turn call to action, over the board alone (a child of #board: the topbar and its
+   menu stay in reach): a dim wash and a sheet with the two dice, the button and, in Western, the
+   Double. It has no close, no backdrop tap and no Escape: it goes when the dice have settled. */
+.roll-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: rgba(42, 26, 18, 0.45);
+}
+.roll-sheet {
+  max-width: 340px;
+  padding: 18px 16px 16px;
+}
+.roll-dice {
+  --die-s: 56px;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin: 4px 0 16px;
+}
+/* On the nacre sheet the blank dice read as two dice, not an empty band: a faint walnut
+   edge and wash (the felt's blanks stay nacre-on-felt). */
+.roll-dice .die.blank::before {
+  background: rgba(42, 26, 18, 0.06);
+  box-shadow: inset 0 0 0 1.5px rgba(42, 26, 18, 0.28);
+}
+.roll-cta {
+  font-size: 1.2rem;
+  min-height: 60px;
 }
 
 /* ---------- highlight states (design §3.7) ---------- */
@@ -1729,11 +1845,35 @@ body.fixed-screen #app {
     calc(var(--i, 0) * var(--stack-step) * var(--sy, 0))
   );
 }
-/* A destination: a 22px nazar disc with the die at the tip end; a combined destination the same
-   disc with a dashed ring and a smaller numeral (`data-die="6+5"`, "?" when the tap opens the tray). */
+/* A destination (the owner: "not just the triangle, but the whole rectangle"): the whole cell
+   wears a translucent nazar wash and a pale ring, over either triangle shade and on the tray; the
+   triangle itself breathes (a slow brightness pulse, `target-glow`, low amplitude) to draw the eye;
+   the die badge sits at the centre of the cell, over the stack, on both viewports. A combined
+   destination is the same cell with the badge as a dashed pill and a smaller numeral
+   (`data-die="6+5"`, "?" when the tap opens the tray). The badge is aegean under nacre digits
+   (9.8:1; the nazar disc it replaced read 4.1:1) with a pale nazar ring so it still reads blue. */
+.point.target,
+.point.target-2,
+.off.target {
+  background-color: rgba(30, 111, 217, 0.16);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 0 0 2px rgba(141, 195, 240, 0.9),
+    0 0 10px rgba(30, 111, 217, 0.35);
+}
 .point.target::before,
 .point.target-2::before {
-  filter: brightness(1.12);
+  filter: brightness(1.15);
+  animation: target-glow 1.4s ease-in-out infinite;
+}
+@keyframes target-glow {
+  0%,
+  100% {
+    filter: brightness(1.1);
+  }
+  50% {
+    filter: brightness(1.3);
+  }
 }
 .target,
 .target-2 {
@@ -1744,74 +1884,42 @@ body.fixed-screen #app {
 .off.target::after {
   content: attr(data-die);
   position: absolute;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--nazar);
+  background: var(--accent);
   color: var(--nacre);
   font:
-    700 0.8rem var(--serif-text),
+    700 0.85rem var(--serif-text),
     serif;
-  line-height: 22px;
+  line-height: 24px;
   text-align: center;
   opacity: 1;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 0 0 1.5px var(--nazar-pale),
+    0 1px 3px rgba(0, 0, 0, 0.35);
   pointer-events: none;
   z-index: 3;
-  left: auto;
+  left: 50%;
   right: auto;
   top: 50%;
   bottom: auto;
-  transform: translateY(-50%);
-}
-.point.pt-far.target::after,
-.point.pt-far.target-2::after {
-  right: 6px;
-}
-.point.pt-near.target::after,
-.point.pt-near.target-2::after {
-  left: 6px;
+  transform: translate(-50%, -50%);
 }
 .point.target-2::after {
   width: auto;
-  min-width: 22px;
-  padding: 0 5px;
-  border-radius: 11px;
+  min-width: 24px;
+  padding: 0 6px;
+  border-radius: 12px;
   background: var(--nacre);
-  color: var(--nazar);
+  color: var(--accent);
   outline: 2px dashed var(--nazar);
   outline-offset: -2px;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   letter-spacing: -0.02em;
 }
 .off.target::after {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 0.7rem;
-}
-@media (min-width: 900px) {
-  .point.target::after,
-  .point.target-2::after {
-    top: auto;
-    bottom: auto;
-    right: auto;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  .point.pt-far.target::after,
-  .point.pt-far.target-2::after {
-    bottom: 6px;
-  }
-  .point.pt-near.target::after,
-  .point.pt-near.target-2::after {
-    top: 6px;
-  }
-  .off.target::after {
-    top: 6px;
-    left: 50%;
-    transform: translateX(-50%);
-  }
+  font-size: 0.72rem;
 }
 /* The only destinations (one maximal play): a harder pulse. */
 .target.only::after,
@@ -1820,10 +1928,10 @@ body.fixed-screen #app {
 }
 /* A destination under a dragged checker. */
 .drop::before {
-  filter: brightness(1.25);
+  filter: brightness(1.3);
 }
 .drop::after {
-  transform: translateY(-50%) scale(1.15);
+  transform: translate(-50%, -50%) scale(1.15);
 }
 /* A blot was just hit here: a warm wash on the triangle. */
 .hit::before {
@@ -1856,8 +1964,12 @@ body.fixed-screen #app {
     transform: translateX(3px);
   }
 }
-/* The just-landed checker during a flight. */
+/* The just-landed checker during a flight; on a stack already five tall the top coin stays and
+   only the badge the landing brings waits for it (`settling`; render.ts ensureStack, fly.ts). */
 .checker.arriving {
+  visibility: hidden;
+}
+.checker.settling::after {
   visibility: hidden;
 }
 /* Not my turn or not moving: nothing glows, nothing takes a tap. */
@@ -1874,20 +1986,39 @@ body.fixed-screen #app {
 
 /* ---------- motion (design §3.8) ---------- */
 /* A flight (ui/board/fly.ts): a clone of the moving checker fixed over the page glides from the
-   source rect to the destination in FLY_MS; toward a tray it flattens into a slab. */
+   source rect to the destination in FLY_MS (200ms, ease-out: "zippy"), lifting a little on the
+   way (`fly-lift`: it rises a few pixels and its shadow deepens at mid-flight, on the individual
+   `translate` and `filter`, so the glide's own transform is untouched and its `transitionend`
+   still ends the flight); toward a tray it flattens into a slab. Staggered flights carry their
+   delay inline on both the transition and the animation. The transform is a translate between
+   the two rects' top-left corners and then the scale, so it scales about that corner
+   (`transform-origin: 0 0`): about the centre, a coin shrinking into a slab would land half the
+   size difference away from it. */
 .flyer {
   position: fixed;
   margin: 0;
   z-index: 60;
   pointer-events: none;
   will-change: transform;
-  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  animation: none;
+  transform-origin: 0 0;
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: fly-lift 200ms ease-out both;
 }
 .flyer.flyer-slab {
   transition:
-    transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    border-radius 260ms;
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-radius 200ms;
+}
+@keyframes fly-lift {
+  0%,
+  100% {
+    translate: 0 0;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+  }
+  50% {
+    translate: 0 -6px;
+    filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.35));
+  }
 }
 /* A checker dragged by hand (ui/board/dragger.ts): the ghost follows the pointer, then glides
    into place or back. */
@@ -1907,10 +2038,13 @@ body.fixed-screen #app {
   transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @media (prefers-reduced-motion: reduce) {
-  #dice.rolling .die,
+  .rolling .die,
+  .rolling .die::after,
   .can-move .checker.top,
   .hit::before,
   .shake,
+  .point.target::before,
+  .point.target-2::before,
   .target.only::after,
   .target-2.only::after,
   .opp-strip.to-move .name {
@@ -1921,6 +2055,9 @@ body.fixed-screen #app {
   .drag-ghost.landing,
   .checker {
     transition-duration: 1ms;
+  }
+  .flyer {
+    animation: none;
   }
 }
 

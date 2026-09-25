@@ -12,12 +12,14 @@ import type { Board, Dice, Seat, State, View } from '../engine/index.ts';
 import { backgammonPage, type BackgammonPage } from './page.fake.ts';
 import {
   HIT_TOAST_PREFIX,
+  ROLLING_STATUS,
   RULES_SLOT_IDS,
   barKey,
   bindAll,
   boardIntentOf,
   connDotClass,
   cubeOfferText,
+  ensureStack,
   gameBadgeText,
   hideToast,
   historyHtml,
@@ -32,7 +34,8 @@ import {
   recordKind,
   renderAbout,
   renderRules,
-  rollLabel,
+  rollSub,
+  rollTitle,
   scoreHtml,
   showToast,
   viewKey,
@@ -254,35 +257,68 @@ describe('the table', () => {
     expect(p.get('gameBadge').text()).toBe('Game 1 · 0–0 · to 5');
     expect(p.get('pipsMe').text()).toBe('167<span class="sr-only"> pips</span>');
     expect(p.get('oppDot').attr('class')).toBe('conn-dot on hidden');
-    expect(p.get('rollBtn').hidden()).toBe(true);
+    expect(p.get('rollOverlay').hidden()).toBe(true);
     expect(p.get('doneBtn').hidden()).toBe(true);
     expect(p.get('cube').hidden()).toBe(true);
     expect(p.get('board').attr('data-view')).toBe(viewKey(v));
   });
 
-  test('revealed and to roll: the roll button, blank dice, the pinned status; rolled: faces, sources, `rolling` once', () => {
+  test('revealed and to roll: the roll modal with blank dice, the pinned status; rolled: the tumble, then faces, sources, the modal down', () => {
     const p = page();
     const toRoll = revealed(local());
     paint(p.doc, toRoll);
     expect(p.get('curtainOverlay').hidden()).toBe(true);
-    expect(p.get('rollBtn').hidden()).toBe(false);
-    expect(p.get('rollBtn').text()).toBe('Buen mazal! <small>roll</small>');
+    // The modal (design §4.7): named for the seat in pass-and-play, two blank dice, the button live.
+    expect(p.get('rollOverlay').hidden()).toBe(false);
+    expect(p.get('rollModalTitle').text()).toBe(`${view(toRoll).me.name} — your turn`);
+    expect(p.get('rollModalSub').text()).toBe('Roll to start your turn');
+    expect(p.get('rollModalDice').text()).toBe(
+      '<span class="die blank" aria-hidden="true"></span><span class="die blank" aria-hidden="true"></span>',
+    );
+    expect(p.get('rollModalDice').hasClass('rolling')).toBe(false);
+    expect(p.get('rollModalBtn').disabled()).toBe(false);
+    expect(p.get('doubleBtn').hidden()).toBe(true);
+    expect(p.get('board').attr('data-rolling')).toBeNull();
+    expect(p.get('board').attr('data-rolled')).toBeNull();
     expect(p.get('undoBtn').disabled()).toBe(true);
     expect(p.get('statusText').text()).toBe('Your turn. Buen mazal!');
     expect(p.get('statusDice').text()).toBe('');
     expect(p.get('dice').attr('aria-label')).toBe('Roll');
     expect(p.get('board').hasClass('inert')).toBe(true);
-    const rolled = run(toRoll, { type: 'roll/click' }).app;
-    paint(p.doc, rolled);
-    const v = view(rolled);
+    // The click: the engine has rolled, the dice tumble in the modal and on the board, the
+    // button holds, the board is still inert (`data-rolling` for the specs).
+    const tumbling = run(toRoll, { type: 'roll/click' }).app;
+    paint(p.doc, tumbling);
+    const v = view(tumbling);
     expect(v.phase).toBe('moving');
-    expect(p.get('rollBtn').hidden()).toBe(true);
+    expect(tumbling.table.rolling).toBe(true);
+    expect(p.get('rollOverlay').hidden()).toBe(false);
+    expect(p.get('rollModalBtn').disabled()).toBe(true);
+    expect(p.get('rollModalDice').hasClass('rolling')).toBe(true);
+    expect(p.get('rollModalDice').text()).toMatch(
+      /^<span class="die die-[1-6]" style="--tumble-shift: -\d+ms" data-die="[1-6]"/,
+    );
+    expect(p.get('dice').hasClass('rolling')).toBe(true);
+    expect(p.get('diceMini').hasClass('rolling')).toBe(true);
+    expect(p.get('board').attr('data-rolling')).toBe('1');
+    expect(p.get('board').attr('data-rolled')).toBeNull();
+    expect(p.get('board').hasClass('inert')).toBe(true);
+    // The status line does not name the roll before the faces settle.
+    expect(p.get('statusText').text()).toBe(ROLLING_STATUS);
+    expect(p.get('statusDice').text()).toBe('');
+    // The tumble ends: the modal goes, the faces stand, the board is live.
+    const rolled = run(tumbling, { type: 'tumble/elapsed' }).app;
+    paint(p.doc, rolled);
+    expect(p.get('rollOverlay').hidden()).toBe(true);
+    expect(p.get('dice').hasClass('rolling')).toBe(false);
+    expect(p.get('diceMini').hasClass('rolling')).toBe(false);
+    expect(p.get('board').attr('data-rolling')).toBeNull();
+    expect(p.get('board').attr('data-rolled')).toBe('1');
     expect(p.get('diceMini').hidden()).toBe(false);
     expect(p.get('diceMini').text()).toBe(p.get('dice').text());
     expect(p.get('dice').text()).toMatch(
-      /^<span class="die die-[1-6]" data-die="[1-6]" aria-label="die [1-6]"><\/span>/,
+      /^<span class="die die-[1-6]" style="--tumble-shift: -\d+ms" data-die="[1-6]" aria-label="die [1-6]"><\/span>/,
     );
-    expect(p.get('dice').hasClass('rolling')).toBe(true);
     expect(p.get('statusDice').text()).toMatch(
       /^(one|two|three|four|five|six) and (one|two|three|four|five|six)$/,
     );
@@ -296,9 +332,10 @@ describe('the table', () => {
     const [first] = sources;
     if (first === undefined || first === 'bar') throw new Error('expected a point source');
     expect(p.get(`point-${String(first + 1)}`).attr('aria-label')).toMatch(/, can move$/);
-    // The same App again: the tumble class is off, the faces untouched.
+    // The same App again: nothing changes.
     paint(p.doc, rolled);
     expect(p.get('dice').hasClass('rolling')).toBe(false);
+    expect(p.get('rollOverlay').hidden()).toBe(true);
   });
 
   test('a tapped source lights its targets outside the key: the checkers are not rebuilt', () => {
@@ -426,7 +463,7 @@ describe('the table', () => {
     expect(p.get('statusText').text()).toBe('Ann wins 1 point');
     expect(p.get('resultChipBtn').hidden()).toBe(true);
     expect(p.get('board').hasClass('inert')).toBe(true);
-    expect(p.get('rollBtn').hidden()).toBe(true);
+    expect(p.get('rollOverlay').hidden()).toBe(true);
     expect(p.get('waitNote').hidden()).toBe(true);
     const peeked = run(over, { type: 'result/peek' }).app;
     paint(p.doc, peeked);
@@ -438,6 +475,12 @@ describe('the table', () => {
     paint(p.doc, won);
     expect(view(won).matchOver).toBe(true);
     expect(shown(p)).toEqual(['endgameScreen']);
+    // The last roll's tumble may still be running as the match ends: no stale mark on the board.
+    paint(p.doc, { ...won, table: { ...won.table, rolling: true } });
+    expect(shown(p)).toEqual(['endgameScreen']);
+    expect(p.get('board').attr('data-rolling')).toBeNull();
+    expect(p.get('board').attr('data-rolled')).toBeNull();
+    expect(p.get('rollOverlay').hidden()).toBe(true);
     expect(p.get('resultOverlay').hidden()).toBe(true);
     expect(p.get('resultTitle').text()).toBe('Ann takes the match 1–0');
     expect(p.get('resultSub').text()).toBe('1 game');
@@ -445,6 +488,50 @@ describe('the table', () => {
       '<div class="score-row"><span>Game 1</span><span class="who">Ann</span><span>single</span><span>1</span></div>',
     );
     expect(p.get('nextGameBtn').text()).toBe('Rematch');
+  });
+
+  test('a stack past five grows and shrinks in place: the drawn coins keep their elements and the top one takes the badge', () => {
+    // Five coins of Light, as the fake elements the container's query returns.
+    const coins = Array.from({ length: 5 }, (_, i) =>
+      fakeEl(`c${String(i)}`, { classes: ['checker', 'ck-light', ...(i === 4 ? ['top'] : [])] }),
+    );
+    const point = fakeEl('pt', { queries: { '.checker': coins } });
+    ensureStack(point.el, 'L6', 0, 6);
+    expect(coins.map((c) => c.hasClass('top'))).toEqual([false, false, false, false, true]);
+    expect(coins[4]?.attr('data-count')).toBe('6');
+    expect(coins.every((c) => !c.removed())).toBe(true);
+    // The sixth is appended (the stylesheet hides it under the fifth), nothing is rebuilt.
+    expect(point.text()).toBe('<div class="checker ck-light" style="--i:5"></div>');
+    expect(point.attr('data-key')).toBe('L6');
+    ensureStack(point.el, 'L6', 0, 6);
+    expect(point.text()).toBe('<div class="checker ck-light" style="--i:5"></div>');
+    // Back to four: the fifth goes, the fourth is the top, no badge anywhere.
+    ensureStack(point.el, 'L4', 0, 4);
+    expect(coins[4]?.removed()).toBe(true);
+    expect(coins.slice(0, 4).map((c) => c.hasClass('top'))).toEqual([false, false, false, true]);
+    expect(coins.slice(0, 4).map((c) => c.attr('data-count'))).toEqual([null, null, null, null]);
+    // Another owner (a blot hit) and an emptied place: the template, as before.
+    ensureStack(point.el, 'D1', 1, 1);
+    expect(point.text()).toBe('<div class="checker ck-dark top" style="--i:0"></div>');
+    ensureStack(point.el, '-0', null, 0);
+    expect(point.text()).toBe('');
+
+    // Through the paint: 8/6 with the 2 puts a sixth coin on the 6-point (`#point-6`).
+    const six = Array.from({ length: 5 }, (_, i) =>
+      fakeEl(`six${String(i)}`, { classes: ['checker', 'ck-light', ...(i === 4 ? ['top'] : [])] }),
+    );
+    const p = backgammonPage(MARKUP, { 'point-6': { queries: { '.checker': six } } });
+    const rolled = at('L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0', 0, [2, 1]);
+    paint(p.doc, rolled);
+    expect(p.get(pt(6)).attr('data-key')).toBe('L5');
+    expect(six[4]?.attr('data-count')).toBeNull();
+    const moved = run(rolled, { type: 'point/tap', point: 7 }, { type: 'point/tap', point: 5 }).app;
+    paint(p.doc, moved);
+    expect(p.get(pt(6)).attr('data-key')).toBe('L6');
+    expect(six[4]?.attr('data-count')).toBe('6');
+    expect(six[4]?.hasClass('top')).toBe(true);
+    expect(six.every((c) => !c.removed())).toBe(true);
+    expect(p.get(pt(6)).text()).toBe('<div class="checker ck-light" style="--i:5"></div>');
   });
 
   test('the sheets: history rows, the menu with the curtain toggle, the rules keyed to the game', () => {
@@ -541,9 +628,10 @@ describe('the table', () => {
     );
     expect(barKey(0, 0)).toBe('-0');
     expect(barKey(1, 2)).toBe('D2');
-    expect(rollLabel(app, v).markup).toBe('Buen mazal! <small>roll</small>');
-    const never: App = { ...app, table: { ...app.table, curtainMode: 'never' } };
-    expect(rollLabel(never, v).markup).toBe(`${v.me.name} — Buen mazal! <small>roll</small>`);
+    expect(rollTitle(app, v)).toBe(`${v.me.name} — your turn`);
+    expect(rollTitle({ ...app, shell: { ...app.shell, role: 'host' } }, v)).toBe('Your turn');
+    expect(rollSub(v)).toBe('Roll to start your turn');
+    expect(rollSub({ ...v, canDouble: true })).toBe('Double, or roll to start your turn');
   });
 });
 
@@ -577,7 +665,7 @@ describe('bindAll', () => {
     });
     expect(boardIntentOf(target({ '.bar': p.get('barBottom') }))).toEqual({ type: 'bar/tap' });
     expect(boardIntentOf(target({ '.off': p.get('offLight') }))).toEqual({ type: 'off/tap' });
-    expect(boardIntentOf(target({}, 'board'))).toEqual({ type: 'chip/cancel' });
+    expect(boardIntentOf(target({}, 'board'))).toEqual({ type: 'board/tap' });
     expect(boardIntentOf(target({}, 'checker'))).toBeNull();
   });
 
@@ -617,7 +705,7 @@ describe('bindAll', () => {
     expect(intents).toEqual([]);
     p.get('undoBtn').el.removeAttribute('disabled');
     p.get('undoBtn').fire('click');
-    p.get('rollBtn').fire('click');
+    p.get('rollModalBtn').fire('click');
     p.get('doubleBtn').fire('click');
     p.get('doneBtn').fire('click');
     p.get('resultChipBtn').fire('click');

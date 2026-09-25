@@ -61,6 +61,7 @@ const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/backgammon-geometry.spec.ts',
   '**/backgammon-glossary.spec.ts',
   '**/backgammon-local.spec.ts',
+  '**/backgammon-table-ux.spec.ts',
   '**/computed-styles.spec.ts',
   '**/gin-drag-discard.spec.ts',
   '**/gin-arrange.spec.ts',

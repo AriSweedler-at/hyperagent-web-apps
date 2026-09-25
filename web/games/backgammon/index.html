@@ -437,6 +437,26 @@
           <div class="bar near" id="barBottom" role="button" tabindex="0"></div>
           <div class="off" id="offLight" data-owner="0" role="button" tabindex="0"></div>
           <div class="off" id="offDark" data-owner="1" role="button" tabindex="0"></div>
+          <!-- ROLL (design §4.7): the start-of-turn call to action, over the board alone (the topbar
+               stays in reach). Nothing dismisses it: it goes when the dice have settled. -->
+          <div
+            class="roll-modal hidden"
+            id="rollOverlay"
+            role="dialog"
+            aria-labelledby="rollModalTitle"
+          >
+            <div class="sheet centered roll-sheet">
+              <div class="sheet-title" id="rollModalTitle">Your turn</div>
+              <div class="sheet-sub" id="rollModalSub">Roll to start your turn</div>
+              <div class="roll-dice" id="rollModalDice" aria-hidden="true"></div>
+              <button class="btn btn-go btn-block roll-cta" id="rollModalBtn">
+                Buen mazal! <small>roll</small>
+              </button>
+              <button class="btn btn-secondary btn-block btn-sm hidden" id="doubleBtn">
+                Double
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="controls" id="controls">
@@ -445,11 +465,11 @@
             <span class="pips" id="pipsMe">167</span>
           </div>
           <button class="btn btn-secondary btn-sm" id="undoBtn" disabled>Undo</button>
-          <button class="btn btn-secondary btn-sm hidden" id="doubleBtn">Double</button>
           <!-- Reserved (design §1 "Turn end"): the turn ends by itself; hidden in every state. -->
           <button class="btn btn-secondary btn-sm hidden" id="doneBtn">Done</button>
+          <!-- The roll slot (design §3.2): the mini dice, the wait note and the result chip share
+               one box; the roll itself is the modal's (#rollOverlay, in the board). -->
           <div class="roll-slot">
-            <button class="btn btn-primary" id="rollBtn">Buen mazal! <small>roll</small></button>
             <div class="dice-mini hidden" id="diceMini"></div>
             <div class="wait-note hidden" id="waitNote">Waiting…</div>
             <button class="btn btn-secondary btn-sm hidden" id="resultChipBtn">Result</button>

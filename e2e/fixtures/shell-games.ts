@@ -90,7 +90,7 @@ const gin: ShellDriver = {
 const bgSnapshot = async (page: Page): Promise<string> => boardKey(await readBoard(page));
 
 const backgammon: ShellDriver = {
-  curtainSub: () => 'Your turn.',
+  curtainSub: () => 'Your turn. Roll when you have the phone.',
   start: bgHostStarts,
   snapshot: bgSnapshot,
   agree: async (host, guest) => boardKey(await bgBoardsAgree(host, guest)),
@@ -104,13 +104,13 @@ const backgammon: ShellDriver = {
     await expect(guest.locator('#gameBadge')).toHaveText('Game 1 · 0–0 · to 5');
   },
   hostSave: { matchLength: 5, variant: 'portes', game: { gameNo: 1 } },
-  // The reveal rolls for the opening winner, so the saved game is mid-turn.
-  localSave: { game: { gameNo: 1, phase: 'moving' } },
+  // The reveal only reveals (the roll is the modal's, design §4.7), so the saved game is at the roll.
+  localSave: { game: { gameNo: 1, phase: 'toRoll' } },
   table: '#board',
   curtainOffer: {
     title:
       "the curtain's Continue online takes the offer too, with the phone about to change hands",
-    // The opening winner's curtain is up as the game starts: it offers the roll and the handoff.
+    // The opening winner's curtain is up as the game starts: it offers the reveal and the handoff.
     toCurtain: () => Promise.resolve(),
     take: async (page) => {
       await page.locator('#curtainHandoffBtn').click();

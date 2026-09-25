@@ -6,8 +6,9 @@
 // "Haptics"). Nothing else in the game names a sound.
 import type { SoundCue } from '../../../../shared/lib/sound/cues.ts';
 
-/** The events of the table (design §5.1): the reducer derives them from the change between two views. */
-export type Cue = 'roll' | 'place' | 'hit' | 'bearOff' | 'yourTurn' | 'win' | 'lose' | 'double';
+/** The events of the table (design §5.1): the reducer derives them from the change between two views, and `doubles` from the settled roll (§4.7). */
+export type Cue =
+  'roll' | 'place' | 'hit' | 'bearOff' | 'yourTurn' | 'win' | 'lose' | 'double' | 'doubles';
 
 /** What one event plays: the cue the font voices, and a vibration pattern. */
 export type CueSpec = Readonly<{ cue: SoundCue; buzz: number | ReadonlyArray<number> }>;
@@ -15,6 +16,9 @@ export type CueSpec = Readonly<{ cue: SoundCue; buzz: number | ReadonlyArray<num
 export const CUES: Readonly<Record<Cue | 'tap', CueSpec>> = {
   tap: { cue: 'tap', buzz: 12 },
   roll: { cue: 'roll', buzz: [20, 30, 20] },
+  // A double, as the tumble settles on it (the owner, 2026-09-24: "a small excited sound"): the
+  // font's favourable notice, small and quick, with a light buzz; both seats hear it, as both hear the roll.
+  doubles: { cue: 'good', buzz: [30, 40, 30] },
   place: { cue: 'move', buzz: 15 },
   // A blot sent to the bar: the font's capture, and the buzz the hit player feels.
   hit: { cue: 'capture', buzz: [60, 40, 60] },

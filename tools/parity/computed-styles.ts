@@ -515,7 +515,6 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.bar.far',
     '.bar.near',
     '#dice',
-    '#dice.rolling .die',
     '.die',
     '.die::before',
     '.die::after',
@@ -534,7 +533,11 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.me-strip .name',
     '.me-strip .pips',
     '.roll-slot',
-    '.roll-slot .btn-primary',
+    '.roll-modal',
+    '.roll-sheet',
+    '.roll-dice',
+    '.roll-dice .die',
+    '.roll-cta',
     '.dice-mini',
     '.dice-mini .die',
     '.wait-note',
@@ -1177,7 +1180,10 @@ const readBg = (page: Page): Promise<BgSummary> =>
  * on to the match end. In-page, so a whole game costs no round trips; the curtain then names the
  * actor and the driver reveals it before a shot. A forfeited roll (R14) leaves the roller's view
  * on show for 1.2 s with nothing legal in it; the driver ends that beat itself (`noMove/elapsed`,
- * the timer's own intent) instead of waiting. Returns the phase it stopped in.
+ * the timer's own intent) instead of waiting. Every act in the loop launches a flight whose clone
+ * only a timer removes, and no timer fires inside one task: the loop sweeps the clones and the
+ * marks they left before it returns (fly.ts culls a burst past MAX_LIVE_FLYERS on its own, but a
+ * whole match is thousands). Returns the phase it stopped in.
  */
 const fastForward = (page: Page, stop: string, nextGames = false): Promise<string> =>
   page.evaluate<string>(`(() => {
@@ -1197,21 +1203,23 @@ const fastForward = (page: Page, stop: string, nextGames = false): Promise<strin
       held = 0;
       bg.act(acts[Math.floor(Math.random() * acts.length)]);
     }
+    document.querySelectorAll('.flyer').forEach((f) => f.remove());
+    document.querySelectorAll('.checker.arriving, .checker.settling').forEach((c) => c.classList.remove('arriving', 'settling'));
     const last = bg.view();
     return last === null ? 'none' : last.phase;
   })()`);
 
-/** Flights and the hit toast are timed; a shot waits them out so two runs read the same classes. */
+/** Flights, the dice tumble and the hit toast are timed; a shot waits them out so two runs read the same classes. */
 const settleBg = async (page: Page): Promise<void> => {
   await page.waitForFunction(
-    `document.querySelectorAll('.flyer, .drag-ghost, .checker.arriving').length === 0 && !document.getElementById('toast').classList.contains('show')`,
+    `document.querySelectorAll('.flyer, .drag-ghost, .checker.arriving, .checker.settling, #board[data-rolling]').length === 0 && !document.getElementById('toast').classList.contains('show')`,
   );
 };
 
 /**
  * Sheshbesh (docs/design/backgammon-board.md §7): the home tabs, a room opened on the local broker
  * (the wait screen with its code, gin's step), then pass the phone: a 3-point portes match with its
- * first turn played by hand (rolled, a
+ * first turn played by hand (the roll modal, rolled, a
  * source selected with its targets, a move, the undo, the turn over under the curtain), the menu,
  * history and rules sheets, then the seeded policy through the hook to the states the CSS draws
  * apart: a checker on the bar, a roll with a dead die, bearing off into the tray, the result sheet
@@ -1257,7 +1265,11 @@ const driveBackgammon = async (page: Page, shot: Shot): Promise<void> => {
   await click(page, '#localBtn');
   await visible(page, '#curtainOverlay');
   await snap('local: match started, curtain up');
+  // The reveal brings the roll modal (design §4.7); its button rolls and the dice tumble.
   await click(page, '#curtainBtn');
+  await visible(page, '#rollOverlay');
+  await snap('local: the roll modal up');
+  await click(page, '#rollModalBtn');
   await snap('local: rolled');
   // Tap a die to force it (design §2.4.4), then release it.
   await click(page, '#dice .die[data-die]');

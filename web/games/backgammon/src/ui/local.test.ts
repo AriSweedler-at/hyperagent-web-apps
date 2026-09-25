@@ -78,27 +78,26 @@ describe('lastTurnText', () => {
 
 describe('curtainText', () => {
   const base: View = { ...bob, log: [entry('move', 0, 'Ann moved 8/5 6/5')] };
-  test('to roll: one tap rolls unless a double is on offer', () => {
+  test('to roll: the button reveals and the sub says the roll waits behind it, or the cube', () => {
     expect(curtainText({ ...base, phase: 'toRoll', canDouble: false }, 1)).toEqual({
       title: 'Pass the phone to Bob',
-      sub: 'Your turn.',
+      sub: 'Your turn. Roll when you have the phone.',
       last: 'Ann moved 8/5 6/5',
-      button: 'Bob — roll',
-      rolls: true,
+      button: 'Bob — your turn',
     });
     expect(curtainText({ ...base, phase: 'toRoll', canDouble: true }, 1)).toMatchObject({
+      sub: 'Your turn. Double, or roll.',
       button: 'Bob — your turn',
-      rolls: false,
     });
   });
   test('the Western opening plays the dice already rolled; a cube offer is answered', () => {
     expect(curtainText({ ...base, phase: 'moving', dice: [6, 3] }, 1)).toMatchObject({
+      sub: 'Your turn.',
       button: 'Bob — play 6-3',
-      rolls: false,
     });
     expect(
       curtainText({ ...base, phase: 'cubeOffered', cube: { value: 1, owner: null } }, 1),
-    ).toMatchObject({ sub: 'Ann doubles to 2', button: 'Bob — answer', rolls: false });
+    ).toMatchObject({ sub: 'Ann doubles to 2', button: 'Bob — answer' });
     expect(curtainText({ ...base, phase: 'over' }, 0)).toMatchObject({
       title: 'Pass the phone to Ann',
       button: 'Ann — look',
@@ -131,11 +130,12 @@ describe('paintCurtain', () => {
     const name = game.players[seat].name;
     expect(p.get('curtainOverlay').hidden()).toBe(false);
     expect(p.get('curtainTitle').text()).toBe(`Pass the phone to ${name}`);
-    expect(p.get('curtainSub').text()).toBe('Your turn.');
+    expect(p.get('curtainSub').text()).toBe('Your turn. Roll when you have the phone.');
     // The first curtain of a game carries the opening roll.
     expect(p.get('curtainLast').text()).toBe(started.shell.game?.log.at(-1)?.text);
-    expect(p.get('curtainBtn').text()).toBe(`${name} — roll`);
-    expect(p.get('curtainBtn').attr('data-rolls')).toBe('1');
+    // The button reveals; the roll is the modal's (design §4.7), so no promise is painted.
+    expect(p.get('curtainBtn').text()).toBe(`${name} — your turn`);
+    expect(p.get('curtainBtn').attr('data-rolls')).toBeNull();
     // The curtain offers the handoff to an online room (ui/state.ts `handoff/click`).
     expect(p.get('curtainHandoffBtn').hidden()).toBe(false);
     const revealed = reduce(started, { type: 'curtain/reveal' }, ctx).app;
@@ -149,7 +149,7 @@ describe('paintCurtain', () => {
 });
 
 describe('bindLocal', () => {
-  test('the curtain button reveals, and rolls when it promised to; the handoff button hands off', () => {
+  test('the curtain button reveals, and only reveals; the handoff button hands off', () => {
     const p = backgammonPage(MARKUP);
     const intents: Intent[] = [];
     bindLocal(p.doc, (i) => {
@@ -157,9 +157,10 @@ describe('bindLocal', () => {
     });
     p.get('curtainBtn').fire('click');
     expect(intents).toEqual([{ type: 'curtain/reveal' }]);
+    // A stale promise on the button (nothing paints one now) changes nothing.
     p.get('curtainBtn').el.setAttribute('data-rolls', '1');
     p.get('curtainBtn').fire('click');
-    expect(intents.slice(1)).toEqual([{ type: 'curtain/reveal' }, { type: 'roll/click' }]);
+    expect(intents.slice(1)).toEqual([{ type: 'curtain/reveal' }]);
     p.get('curtainHandoffBtn').fire('click');
     expect(intents.at(-1)).toEqual({ type: 'handoff/click' });
   });

@@ -16,14 +16,18 @@
 // delegated click on `#board`, design §4.2; Enter/Space on a focused place is the same tap,
 // design §6); the input wiring of the home screen and the curtain is beside their paints.
 import {
+  appendHtml,
   closestFrom,
   dataOf,
+  hasClass,
   isDisabled,
   keyOf,
   listen,
   listenId,
   preventDefault,
+  queryAllIn,
   queryIn,
+  removeElement,
   requireId,
   safeHtml,
   setAttr,
@@ -51,9 +55,11 @@ import {
   type View,
 } from '../engine/index.ts';
 import {
+  VISIBLE_MAX,
   absOfId,
-  barHtml,
   barsOf,
+  checkerHtml,
+  checkersHtml,
   chipsFor,
   chipsHtml,
   chipsKey,
@@ -63,14 +69,15 @@ import {
   diceFor,
   diceHtml,
   diceWords,
+  type DiceModel,
   effectiveSelection,
   flightsBetween,
   offHtml,
   offIdFor,
   ownPoint,
+  ownerOf,
   pipHtml,
   placeAria,
-  pointHtml,
   pointId,
   resultText,
   sideOf,
@@ -101,7 +108,7 @@ import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { aboutHtml } from './about.ts';
 import { RULES_SLOT_IDS, rulesItemsHtml } from './rules.ts';
-import { SCREENS, handoffLabel, type App, type Intent } from './state.ts';
+import { SCREENS, handoffLabel, rollModalOpen, type App, type Intent } from './state.ts';
 
 export type { PageLike };
 export type Dispatch = (intent: Intent) => void;
@@ -226,14 +233,20 @@ const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
 /** The R14 beat is on: the forfeited roll stays on the table and the status line (design §4.5). */
 const holdingNoMove = (app: App): boolean => app.table.noMoveUntil !== null;
 
+/** `#statusText` while the dice tumble (design §4.7): the roll is not named before the faces settle. */
+export const ROLLING_STATUS = 'Rolling…';
+
 const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
   const noMoveShown = holdingNoMove(app);
+  const rolling = app.table.rolling;
   setText(
     requireId(doc, 'statusText'),
-    statusText(v, { pending: app.table.pending, noMoveShown, picked: app.table.picked }),
+    rolling
+      ? ROLLING_STATUS
+      : statusText(v, { pending: app.table.pending, noMoveShown, picked: app.table.picked }),
   );
-  // The dice in words for screen readers (design §6), exactly while faces are shown.
-  const shown = diceFor(v, app.table.picked, noMoveShown).faces.length > 0;
+  // The dice in words for screen readers (design §6), exactly while settled faces are shown.
+  const shown = !rolling && diceFor(v, app.table.picked, noMoveShown).faces.length > 0;
   setText(requireId(doc, 'statusDice'), shown ? diceWords(v.dice) : '');
 };
 
@@ -243,17 +256,58 @@ const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
 export const barKey = (seat: Seat, count: number): string =>
   count === 0 ? '-0' : `${seat === 0 ? 'L' : 'D'}${String(count)}`;
 
+const checkerClass = (seat: Seat): string => (seat === 0 ? 'ck-light' : 'ck-dark');
+
+/**
+ * A stack's checkers reconciled in place (design §2.2 "Keys", §3.4): the container's `data-key`
+ * still names what it shows (`L6`), but while the owner is the same the checker elements already
+ * there are kept, one per index: the extra ones go from the end, new ones are appended, and `top`
+ * and the count badge move onto the top visible one. So a stack growing from five to six (or
+ * back) never rebuilds its five drawn coins: the fifth keeps its element and gains or loses the
+ * badge, and the sixth is the arriving checker, hidden by `nth-child(n + 6)`. An owner change (a
+ * blot hit) or an empty container rebuilds from the template as before. The owner (2026-09-24):
+ * "When there are more than '5' on the stack, there is a flash whenever you place a new one on."
+ */
+export const ensureStack = (el: Element, key: string, seat: Seat | null, count: number): void => {
+  if (dataOf(el, 'key') === key) return;
+  setAttr(el, 'data-key', key);
+  const present = queryAllIn(el, '.checker');
+  const first = present[0];
+  if (seat === null || first === undefined || !hasClass(first, checkerClass(seat))) {
+    setHtml(el, trustedHtml(checkersHtml(seat, count)));
+    return;
+  }
+  present.slice(count).forEach(removeElement);
+  const top = Math.min(count, VISIBLE_MAX) - 1;
+  present.slice(0, count).forEach((checker, i) => {
+    toggleClass(checker, 'top', i === top);
+    setAttr(checker, 'data-count', i === top && count > VISIBLE_MAX ? String(count) : null);
+  });
+  if (count > present.length)
+    appendHtml(
+      el,
+      trustedHtml(
+        Array.from({ length: count - present.length }, (_, i) =>
+          checkerHtml(seat, present.length + i, count),
+        ).join(''),
+      ),
+    );
+};
+
 const paintPlaces = (doc: DocumentLike, v: View): void => {
   POINT_INDICES.forEach((abs) => {
     const stack = v.board.points[abs] ?? [];
-    ensureKeyed(requireId(doc, pointId(abs)), stackKey(stack), () => pointHtml(stack));
+    ensureStack(requireId(doc, pointId(abs)), stackKey(stack), ownerOf(stack), stack.length);
   });
   const bars = barsOf(v);
-  ensureKeyed(requireId(doc, 'barTop'), barKey(bars.top.seat, bars.top.count), () =>
-    barHtml(bars.top.seat, bars.top.count),
-  );
-  ensureKeyed(requireId(doc, 'barBottom'), barKey(bars.bottom.seat, bars.bottom.count), () =>
-    barHtml(bars.bottom.seat, bars.bottom.count),
+  const top = bars.top.count === 0 ? null : bars.top.seat;
+  ensureStack(requireId(doc, 'barTop'), barKey(bars.top.seat, bars.top.count), top, bars.top.count);
+  const bottom = bars.bottom.count === 0 ? null : bars.bottom.seat;
+  ensureStack(
+    requireId(doc, 'barBottom'),
+    barKey(bars.bottom.seat, bars.bottom.count),
+    bottom,
+    bars.bottom.count,
   );
   ([0, 1] as const).forEach((seat) => {
     const off = v.board.off[seat];
@@ -289,9 +343,9 @@ const NO_MARKS: Marks = {
   hit: false,
 };
 
-/** The board is live for me: my turn, moving, no curtain up (design §4.2 rule 9). */
+/** The board is live for me: my turn, moving, no curtain up, the dice settled (design §4.2 rule 9, §4.7). */
 export const isLive = (app: App, v: View): boolean =>
-  v.isMyTurn && v.phase === 'moving' && app.table.curtain === null;
+  v.isMyTurn && v.phase === 'moving' && app.table.curtain === null && !app.table.rolling;
 
 /** The selection and the lit targets this paint shows; nothing when the board is not mine to move. */
 type Lit = Readonly<{
@@ -374,17 +428,33 @@ const paintHighlights = (
 
 // ---- dice, cube, controls (design §2.2 `#dice`, §4.7, §4.3) --------------------------------
 
+/**
+ * `#board[data-rolling]` through a tumble and `#board[data-rolled]` once faces are shown and still
+ * (design §4.7): what the specs and the parity driver wait on. Written by every paint of the table
+ * and cleared when the match is over (the table is not painted then, and the last tumble's timer
+ * must not leave a stale mark on the hidden board).
+ */
+const paintRollMarks = (doc: DocumentLike, rolling: boolean, rolled: boolean): void => {
+  const board = requireId(doc, 'board');
+  setAttr(board, 'data-rolling', rolling ? '1' : null);
+  setAttr(board, 'data-rolled', rolled ? '1' : null);
+};
+
 const paintDice = (doc: DocumentLike, app: App, v: View): void => {
   const model = diceFor(v, app.table.picked, holdingNoMove(app));
   const dice = requireId(doc, 'dice');
-  // `rolling` pulses once when the faces change (a fresh roll): it is on for the paint that brings
-  // them and off again on the next one; the tumble runs its 350ms in between (design §2.2).
-  const roll = model.faces.map((f) => String(f.die)).join('');
-  toggleClass(dice, 'rolling', roll !== '' && dataOf(dice, 'roll') !== roll);
-  setAttr(dice, 'data-roll', roll === '' ? null : roll);
+  // The tumble (design §4.7): `rolling` on the dice while `table.rolling`, the faces cycling under
+  // theme.css `tumble-faces` and settling on the real ones as it ends. The board says which for
+  // the specs: `data-rolling` through the tumble, `data-rolled` once faces are shown and still.
+  const rolling = app.table.rolling;
+  const shown = model.faces.length > 0;
+  toggleClass(dice, 'rolling', rolling);
   ensureKeyed(dice, model.key, () => diceHtml(model));
-  setAttr(dice, 'aria-label', roll === '' ? 'Roll' : `Dice: ${diceWords(v.dice)}`);
-  ensureKeyed(requireId(doc, 'diceMini'), model.key, () => diceHtml(model));
+  setAttr(dice, 'aria-label', shown ? `Dice: ${diceWords(v.dice)}` : 'Roll');
+  const mini = requireId(doc, 'diceMini');
+  ensureKeyed(mini, model.key, () => diceHtml(model));
+  toggleClass(mini, 'rolling', rolling);
+  paintRollMarks(doc, rolling, shown && !rolling);
   const cube = requireId(doc, 'cube');
   toggleClass(cube, 'hidden', !rulesOf(v.variant).cube);
   setText(cube, cubeText(v.cube));
@@ -392,14 +462,42 @@ const paintDice = (doc: DocumentLike, app: App, v: View): void => {
 };
 
 /**
- * `#rollBtn`'s copy (design §4.7): "Buen mazal! (roll)", or the incoming player's name before
- * it in pass-and-play without the curtain, where the button is the only cue that the phone
- * changed hands.
+ * `#rollModalTitle` (design §4.7): in pass-and-play the seat's name, the cue that the phone
+ * changed hands (the only one with the curtain off); online "Your turn".
  */
-export const rollLabel = (app: App, v: View): SafeHtml =>
-  app.shell.role === 'local' && app.table.curtainMode === 'never'
-    ? safeHtml`${v.me.name} — Buen mazal! <small>roll</small>`
-    : trustedHtml('Buen mazal! <small>roll</small>');
+export const rollTitle = (app: App, v: View): string =>
+  app.shell.role === 'local' ? `${v.me.name} — your turn` : 'Your turn';
+
+/** `#rollModalSub`: what the button starts; Western offers the cube first (design §4.8). */
+export const rollSub = (v: View): string =>
+  v.canDouble ? 'Double, or roll to start your turn' : 'Roll to start your turn';
+
+/**
+ * The roll modal (design §4.7, `rollModalOpen`): the call to action over the board while it is my
+ * turn to roll, through my roll's tumble. Its two dice are blank until the click and cycle with
+ * the tumble (`rolling`, as the board's), the button holds while the dice tumble, and `#doubleBtn`
+ * shows beside it when the cube is on offer. Nothing here closes it: the reducer's state does.
+ */
+const paintRoll = (doc: DocumentLike, app: App, v: View): void => {
+  const open = rollModalOpen(app);
+  const rolling = app.table.rolling;
+  paintSheet(doc, 'rollOverlay', open);
+  toggleClass(
+    requireId(doc, 'doubleBtn'),
+    'hidden',
+    !(open && v.phase === 'toRoll' && v.canDouble && !rolling),
+  );
+  if (!open) return;
+  setText(requireId(doc, 'rollModalTitle'), rollTitle(app, v));
+  setText(requireId(doc, 'rollModalSub'), rollSub(v));
+  // The two cubes thrown (a double shows its four on the board, not here).
+  const model = diceFor(v, app.table.picked, holdingNoMove(app));
+  const two: DiceModel = { faces: model.faces.slice(0, 2), theirs: false, key: `${model.key}:2` };
+  const dice = requireId(doc, 'rollModalDice');
+  ensureKeyed(dice, two.key, () => diceHtml(two));
+  toggleClass(dice, 'rolling', rolling);
+  setDisabled(requireId(doc, 'rollModalBtn'), rolling);
+};
 
 /** `#waitNote` (design §4.8, §4.10): `Waiting for Jeff…`, or the cube after my double. */
 export const waitNoteText = (v: View): string =>
@@ -414,16 +512,9 @@ const paintControls = (doc: DocumentLike, app: App, v: View): void => {
   const over = v.phase === 'over';
   // Disabled, not hidden: the controls row keeps its shape (design §4.6).
   setDisabled(requireId(doc, 'undoBtn'), !(mine && v.canUndo));
-  toggleClass(
-    requireId(doc, 'doubleBtn'),
-    'hidden',
-    !(mine && v.phase === 'toRoll' && v.canDouble),
-  );
   // Reserved (design §1 "Turn end"): the turn ends by itself.
   toggleClass(requireId(doc, 'doneBtn'), 'hidden', true);
-  const rollBtn = requireId(doc, 'rollBtn');
-  toggleClass(rollBtn, 'hidden', !(mine && v.phase === 'toRoll'));
-  setHtml(rollBtn, rollLabel(app, v));
+  // The roll is the modal's (`paintRoll`); the slot shows the mini dice while I move.
   toggleClass(requireId(doc, 'diceMini'), 'hidden', !(mine && v.phase === 'moving'));
   const wait = requireId(doc, 'waitNote');
   toggleClass(wait, 'hidden', over || v.isMyTurn || app.table.curtain !== null);
@@ -575,6 +666,7 @@ const paintTable = (doc: DocumentLike, app: App, v: View, hits: ReadonlySet<Poin
   paintPlaces(doc, v);
   paintHighlights(doc, app, v, hits);
   paintDice(doc, app, v);
+  paintRoll(doc, app, v);
   paintControls(doc, app, v);
   toggleClass(requireId(doc, 'board'), 'inert', !isLive(app, v));
   paintResult(doc, app, v);
@@ -598,6 +690,8 @@ const paintGame = (doc: PageLike, app: App): void => {
     paintEndgame(doc, app, v);
     paintSheet(doc, 'resultOverlay', false);
     paintSheet(doc, 'cubeOverlay', false);
+    paintSheet(doc, 'rollOverlay', false);
+    paintRollMarks(doc, false, false);
     return;
   }
   const board = requireId(doc, 'board');
@@ -638,8 +732,8 @@ const absOfPoint = (el: Element): PointIndex | null => {
 /**
  * The intent a tap (or Enter/Space) on `#board` raises, from the element it landed on: a die while
  * moving forces that die, the dice otherwise roll, a point, a bar or a tray names itself; the
- * board's own surface closes the die-chip tray. No seat or viewport logic here: the reducer knows
- * which bar and tray are mine.
+ * board's own surface (the felt) closes the die-chip tray and lets the tapped source go (design
+ * §4.2). No seat or viewport logic here: the reducer knows which bar and tray are mine.
  */
 export const boardIntentOf = (e: Readonly<Event>): Intent | null => {
   const die = closestFrom(e, '.die');
@@ -655,7 +749,7 @@ export const boardIntentOf = (e: Readonly<Event>): Intent | null => {
   }
   if (closestFrom(e, '.bar') !== null) return { type: 'bar/tap' };
   if (closestFrom(e, '.off') !== null) return { type: 'off/tap' };
-  return targetIdOf(e) === 'board' ? { type: 'chip/cancel' } : null;
+  return targetIdOf(e) === 'board' ? { type: 'board/tap' } : null;
 };
 
 /** The sheets' close buttons and backdrops; Escape closes the open sheet, else the die-chip tray (design §6). */
@@ -697,7 +791,7 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   button(doc, 'undoBtn', { type: 'undo/click' }, dispatch);
   button(doc, 'doubleBtn', { type: 'double/click' }, dispatch);
   button(doc, 'doneBtn', { type: 'done/click' }, dispatch);
-  button(doc, 'rollBtn', { type: 'roll/click' }, dispatch);
+  button(doc, 'rollModalBtn', { type: 'roll/click' }, dispatch);
   button(doc, 'resultChipBtn', { type: 'result/open' }, dispatch);
   button(doc, 'rsNextBtn', { type: 'next/click' }, dispatch);
   button(doc, 'nextGameBtn', { type: 'next/click' }, dispatch);

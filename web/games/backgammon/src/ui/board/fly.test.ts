@@ -8,7 +8,14 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { Rect } from '../../../../../shared/edge/dom.ts';
 import { fakeEl, fakePage, type FakeEl } from '../../../../../shared/edge/page.fake.ts';
 import type { Flight } from '../board.ts';
-import { FLY_MS, HIT_DELAY_MS, flyMoves } from './fly.ts';
+import {
+  FLY_MS,
+  HIT_DELAY_MS,
+  MAX_LIVE_FLYERS,
+  STAGGER_MS,
+  flightDelays,
+  flyMoves,
+} from './fly.ts';
 
 const rect = (left: number, top: number, width = 40, height = 40): Rect => ({
   left,
@@ -39,6 +46,12 @@ type Options = Readonly<{
   slab?: boolean;
   cloneable?: boolean;
   empty?: boolean;
+  /** The destination's top coin is there before the repaint too (a stack already five tall). */
+  persisted?: boolean;
+  /** That coin already wore a count badge before the repaint (six or more). */
+  badged?: boolean;
+  /** The repaint puts a count badge on the top coin (five became six). */
+  badgeOnLanding?: boolean;
 }>;
 
 /**
@@ -59,6 +72,7 @@ const table = (o: Options = {}) => {
     o.toAt ?? rect(300, 600),
     null,
   );
+  if (o.badged === true) landed.el.setAttribute('data-count', '6');
   const shown = { painted: false };
   const from = fakeEl('point-8', {
     queries: {
@@ -68,13 +82,16 @@ const table = (o: Options = {}) => {
   });
   const to = fakeEl(o.slab === true ? 'offLight' : 'point-5', {
     queries: {
-      '.checker.top': () => (shown.painted && o.slab !== true ? [landed] : []),
+      '.checker.top': () =>
+        (shown.painted || o.persisted === true) && o.slab !== true ? [landed] : [],
       '.slab': () => (shown.painted && o.slab === true ? [landed] : []),
     },
   });
   const page = fakePage([from, to]);
   const repaint = vi.fn(() => {
     shown.painted = true;
+    if (o.badgeOnLanding === true)
+      landed.el.setAttribute('data-count', o.badged === true ? '7' : '6');
   });
   const flight: Flight =
     o.slab === true
@@ -109,6 +126,60 @@ describe('flyMoves', () => {
     t.clone.fire('transitionend');
     expect(t.clone.removed()).toBe(true);
     expect(t.landed.hasClass('arriving')).toBe(false);
+  });
+
+  test('a stack already five tall keeps its top coin: it is not hidden, and a badge the landing brings waits under `settling`', () => {
+    // Five became six: the fifth coin stayed through the repaint and gained the badge.
+    const grown = table({ persisted: true, badgeOnLanding: true });
+    flyMoves(grown.page.doc, [grown.flight], grown.repaint);
+    expect(grown.landed.hasClass('arriving')).toBe(false);
+    expect(grown.landed.hasClass('settling')).toBe(true);
+    expect(grown.clone.style('transform')).toBe('translate(200px, 400px) scale(1, 1)');
+    grown.clone.fire('transitionend');
+    expect(grown.landed.hasClass('settling')).toBe(false);
+    expect(grown.clone.removed()).toBe(true);
+    // Six became seven: the badge was there and only its number changed; nothing hides.
+    const taller = table({ persisted: true, badged: true, badgeOnLanding: true });
+    flyMoves(taller.page.doc, [taller.flight], taller.repaint);
+    expect(taller.landed.hasClass('arriving')).toBe(false);
+    expect(taller.landed.hasClass('settling')).toBe(false);
+    expect(taller.clone.hasClass('flyer')).toBe(true);
+  });
+
+  test('several flights in one repaint leave staggered: movers STAGGER_MS apart, a hit blot after its mover', () => {
+    const m: Flight = { fromContainer: 'point-8', toContainer: 'point-5' };
+    const h: Flight = { fromContainer: 'point-5', toContainer: 'barTop', hit: true };
+    expect(flightDelays([])).toEqual([]);
+    expect(flightDelays([m])).toEqual([0]);
+    expect(flightDelays([h])).toEqual([HIT_DELAY_MS]);
+    expect(flightDelays([m, h, m, m])).toEqual([0, HIT_DELAY_MS, STAGGER_MS, 2 * STAGGER_MS]);
+    expect(flightDelays([m, m, h])).toEqual([0, STAGGER_MS, STAGGER_MS + HIT_DELAY_MS]);
+    // The second flight's clone waits its turn on both the glide and the lift (the fake hands
+    // both launches the same clone, so its styles are the second's).
+    const t = table();
+    flyMoves(t.page.doc, [t.flight, t.flight], t.repaint);
+    expect(t.clone.style('transition-delay')).toBe(`${String(STAGGER_MS)}ms`);
+    expect(t.clone.style('animation-delay')).toBe(`${String(STAGGER_MS)}ms`);
+  });
+
+  test('a burst: more clones in the air than MAX_LIVE_FLYERS are culled before the next launch', () => {
+    const stale = Array.from({ length: MAX_LIVE_FLYERS + 1 }, (_, i) =>
+      fakeEl(`stale${String(i)}`, { classes: ['checker', 'flyer'] }),
+    );
+    const t = table();
+    // The body reports the stale clones: they go, the new flight launches as usual.
+    Object.assign(t.page.body.el, { querySelectorAll: () => stale.map((s) => s.el) });
+    flyMoves(t.page.doc, [t.flight], t.repaint);
+    expect(stale.every((s) => s.removed())).toBe(true);
+    expect(t.clone.hasClass('flyer')).toBe(true);
+    // At the cap nothing is culled.
+    const few = table();
+    const some = Array.from({ length: MAX_LIVE_FLYERS }, (_, i) =>
+      fakeEl(`live${String(i)}`, { classes: ['checker', 'flyer'] }),
+    );
+    Object.assign(few.page.body.el, { querySelectorAll: () => some.map((s) => s.el) });
+    flyMoves(few.page.doc, [few.flight], few.repaint);
+    expect(some.some((s) => s.removed())).toBe(false);
   });
 
   test('a bear-off lands on the newest slab, scaled to its shape', () => {
