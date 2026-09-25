@@ -142,10 +142,13 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // every branch has a row in coin.test.ts. Measured at the move: 100/100/100/100.
         'web/shared/example/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'web/shared/edge/**': { lines: 94, functions: 94, statements: 93, branches: 90 },
-        // The two-seat sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios
-        // once over a fake codec (sessions.test.ts beside them, with sessions.harness.ts), the two
+        // The sessions gin's net/ became (docs/design/shared-shell.md A1): the 21 scenarios once
+        // over a fake codec (sessions.test.ts beside them, with sessions.harness.ts), the two
         // games' byte-pinning suites through their wrappers and the gin wire-corpus replay. Measured
-        // at the move (lines/functions/statements/branches): 100/100/100/97.8.
+        // at the move (lines/functions/statements/branches): 100/100/100/97.8. Re-measured when the
+        // host grew to N seats (docs/design/n-seat-sessions.md; sessions.seats.test.ts covers the
+        // seat paths, three scenarios over a scripted transport for what the fake broker's FIFO
+        // cannot stage, n-seat-sessions.md §6.3): 100/100/100/100, every file in the folder.
         'web/shared/net/**': { lines: 95, functions: 95, statements: 95, branches: 94 },
       },
     },

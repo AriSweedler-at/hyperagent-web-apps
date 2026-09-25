@@ -229,9 +229,10 @@ describe('sessionEvents', () => {
     host.persist();
     host.restart(null);
     host.restart('ABCD');
-    host.frame({ t: 'join' });
-    host.guestGone(null);
-    host.guestGone('ICE failed');
+    // The session names the seat (1 at capacity 2); the two-seat adapter takes the frame alone.
+    host.frame({ t: 'join' }, 1);
+    host.guestGone(null, 1);
+    host.guestGone('ICE failed', 1);
     expect(r.intents).toEqual([
       { type: 'host/status', text: 'Opening room…', stopPulse: false },
       { type: 'host/status', text: 'Waiting…', stopPulse: true },
