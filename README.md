@@ -235,8 +235,9 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    its e2e glob (`**/<g>-*.spec.ts`) and a `gameRules('<g>')` entry so a change under
    `web/games/<g>/**` runs `<g>`, `e2e-<g>`, `site`, `e2e-site` and `harness`. `tools/ci/suites.test.ts`
    fails until every new test file is claimed by exactly one suite; `npm run test:<g>` is then the
-   game's own loop and CI gains the `<g>` and `e2e-<g>` jobs (add both to `.github/workflows/ci.yml`,
-   which the same test pins against the table).
+   game's own loop and CI's two matrix jobs (`game`, `e2e-game`) pick `<g>` up from `GAME_SUITES`
+   through `tools/ci/affected.ts`: `.github/workflows/ci.yml` is not edited (the same test pins
+   that no game is spelled there).
 6. A class TypeScript builds in a way the extraction cannot see, a hook with no rule, or dead CSS
    gets a row in `web/shared/styles/CONTRACT.md`; otherwise `class-contract.test.ts` fails after the
    build.
@@ -376,7 +377,7 @@ tools/ci/                    suites.ts (the one table: suite -> tests, coverage 
 infra/games-proxy/           Cloudflare Worker (TypeScript) serving the site at games.sweedler.com
 infra/turn-worker/           Cloudflare Worker (plain JS) minting TURN credentials at turn.sweedler.com
 docs/                        ARCHITECTURE.md (the layout and its rules), MIGRATION.md (the plan and its Deviations), design/ (per-feature designs)
-.github/workflows/           ci.yml (changes -> check + one job per suite -> ci-ok -> deploy), nightly.yml (the deployed page through local servers)
+.github/workflows/           ci.yml (changes -> check + one job per shared suite and a matrix per game side -> ci-ok -> deploy), nightly.yml (the deployed page through local servers)
 .github/actions/npm-ci/      the scanned install that rewrites the runner's lockfile copy (see "Develop")
 .githooks/                   pre-commit (chains the template hook), pre-push (npm run check:affected)
 vite.config.ts               root web/, base './', input = every web/**/index.html
