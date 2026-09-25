@@ -16,6 +16,7 @@ import { resolve } from 'node:path';
 import { format, getFileInfo, resolveConfig } from 'prettier';
 
 import { BACKGAMMON_PAGE } from '../web/games/backgammon/page.ts';
+import { BRISCOLA_PAGE } from '../web/games/briscola/page.ts';
 import { GIN_PAGE } from '../web/games/gin-rummy/page.ts';
 import {
   PARTIALS,
@@ -36,6 +37,7 @@ export const pagePath = (game: ShellGame): string => `web/games/${game}/index.ht
 export const PAGES: Readonly<Record<ShellGame, ShellPage>> = {
   'gin-rummy': GIN_PAGE,
   backgammon: BACKGAMMON_PAGE,
+  briscola: BRISCOLA_PAGE,
 };
 
 /** The six partials as committed. */

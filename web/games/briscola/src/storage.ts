@@ -175,19 +175,19 @@ export const { read: readCardPack, write: writeCardPack } = cardPackPref(
   DECK_KIND,
 );
 
-/** A number stored as its digits (`"3"`), read back as one of `values`: the seat count and the games to win. */
-const digitsOf = <T extends number>(values: ReadonlyArray<T>, fallback: T): Decoder<T> =>
+/** A number stored as its digits (`"3"`), read back as one of `values` (the refine admits those alone, so the cast holds): the seat count and the games to win. */
+const digitsOf = <T extends number>(values: ReadonlyArray<T>): Decoder<T> =>
   map(
     refine(
       string,
       (s) => values.some((v) => String(v) === s),
       `one of ${values.map(String).join(' | ')}`,
     ),
-    (s) => values.find((v) => String(v) === s) ?? fallback,
+    (s) => Number(s) as T,
   );
 
-export const decodeSeatCount: Decoder<SeatCount> = digitsOf(SEAT_COUNTS, 2);
-export const decodeGamesToWin: Decoder<GamesToWin> = digitsOf(GAMES_TO_WIN, 2);
+export const decodeSeatCount: Decoder<SeatCount> = digitsOf(SEAT_COUNTS);
+export const decodeGamesToWin: Decoder<GamesToWin> = digitsOf(GAMES_TO_WIN);
 export const decodeSuit: Decoder<Suit> = literal(...SUITS);
 /** A house rule: `on` or `off`, as the sound preference spells a switch. */
 export const decodeFlag: Decoder<SoundState> = decodeSoundState;

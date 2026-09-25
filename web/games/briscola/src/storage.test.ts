@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { createStore, type StorageLike } from '../../../shared/edge/storage.ts';
-import { CARD_PACKS, packsFor } from '../../../shared/lib/cards/packs.ts';
+import { CARD_PACKS, defaultPackFor, packsFor } from '../../../shared/lib/cards/packs.ts';
 import { mulberry32 } from '../../../shared/lib/rng.ts';
 import { createGame } from './engine/index.ts';
 import {
@@ -110,7 +110,7 @@ describe('frozen constants', () => {
     expect(SOUND_FONTS).toEqual(['default', 'felt', 'arcade']);
     expect(DEFAULT_SOUND_FONT).toBe('default');
     expect(DEFAULT_OPTS).toEqual(OPTS);
-    expect(DEFAULT_CARD_PACK).toBe('linea');
+    expect(DEFAULT_CARD_PACK).toBe(defaultPackFor('italian40'));
     expect(NAME_MAX).toBe(20);
   });
 });
@@ -331,6 +331,10 @@ describe('the room options', () => {
     const four = { ...chosen, seatCount: 4, partnerPeek: true } as const;
     writeOpts(store, four);
     expect(readOpts(store)).toEqual(four);
+    const open = { ...chosen, seatCount: 2, partnerPeek: false, scoperta: true } as const;
+    writeOpts(store, open);
+    expect(s.map.get(STORAGE_KEYS.scoperta)).toBe('on');
+    expect(readOpts(store)).toEqual(open);
   });
 
   test('a garbage key falls back to its default alone, and a stored pair the rules refuse is normalised (scoperta at three, the peek at two)', () => {

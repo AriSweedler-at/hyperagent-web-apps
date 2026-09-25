@@ -102,10 +102,14 @@
     "web/games/*/src/ui/local*.ts",
     "web/games/*/src/ui/page.fake.ts",
     "web/games/*/src/ui/*/dragger*.ts",
+    "web/games/*/src/ui/dragger*.ts",
+    "web/games/*/src/ui/table*.ts",
     "web/games/gin-rummy/src/ui/hand/flip*.ts",
     "web/games/gin-rummy/src/scorer/main*.ts",
-    "web/games/gin-rummy/src/stories/boot.ts",
+    "web/games/*/src/stories/boot.ts",
     "web/games/gin-rummy/src/stories/catalogue.test.ts",
-    "web/games/backgammon/src/ui/board/fly*.ts"
+    "web/games/backgammon/src/ui/board/fly*.ts",
+    "web/games/briscola/src/ui/motion*.ts",
+    "web/games/briscola/src/ui/history.test.ts"
   ]
 }
