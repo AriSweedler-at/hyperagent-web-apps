@@ -425,9 +425,9 @@ alone so the topbar and its menu stay in reach): a dim wash and a `.sheet.roll-s
 `#rollModalTitle` ("Your turn"; pass-and-play "{name} — your turn", the cue that the phone changed
 hands and the only one with the curtain off), `#rollModalSub` ("Roll to start your turn"; Western
 with the cube on offer "Double, or roll to start your turn"), `#rollModalDice` (two dice, blank
-until the click), the call to action `#rollModalBtn` "Buen mazal! roll" (`.btn-primary.roll-cta`,
-the strong primary at 1.2rem and 60px; the CTA-colour work gives it its colour class when it
-lands) and `#doubleBtn` "Double" when `v.canDouble` (§4.8). It has no close button, no backdrop
+until the click), the call to action `#rollModalBtn` "Buen mazal! roll" (`.btn-go.roll-cta`: the
+call-to-action olive of docs/ARCHITECTURE.md "Calls to action", the one action that starts a
+turn, at 1.2rem and 60px) and `#doubleBtn` "Double" when `v.canDouble` (§4.8). It has no close button, no backdrop
 tap and no Escape (it is not in `SHEETS`): `rollModalOpen(app)` (ui/state.ts) alone shows it, when
 `phase === 'toRoll'` and it is my turn and the curtain is down, and keeps it up through my own
 roll's tumble (`table.rolling` with `lastAction` a `roll` or `noMove` of my seat); the Western

@@ -494,14 +494,15 @@ docs run only `check`. The levels below say which suite holds them.
   toggled in TS has no CSS rule or vice versa.
 - Calls to action: every button whose press opens, joins or starts a game, hand or round (Host,
   Join, Open a table, Sit down, Start, Start pass & play, Deal the first hand, Start the match, Next
-  hand, Next game, Next round, Rematch, Let's go, Start game, and the Score Counter's Start scoring
-  and New game and the sandbox's Deal the map) wears `.btn-go`, the shared `--go`/`--go-text` of
+  hand, Next game, Next round, Rematch, Let's go, Start game, the Score Counter's Start scoring
+  and New game, the sandbox's Deal the map, and backgammon's roll modal button "Buen mazal!
+  roll", the one action that starts a turn) wears `.btn-go`, the shared `--go`/`--go-text` of
   `web/shared/styles/tokens.css`, which each theme redeclares on its palette and styles. The owner,
   2026-09-24: "the 'open a table' and 'sit down' call-to-action buttons should be a standout
   color. Perhaps a light olive green. As a design principle all the 'start game' buttons should
   be green and should stand out well." So the start button is the one green, the brightest thing
-  on its screen, and apart from the accent the in-game actions keep (Roll, Knock, Discard, Take,
-  Done, Undo, Double, Pass, Leave, Cancel, Back, Resume stay `btn-primary`/`btn-secondary`/
+  on its screen, and apart from the accent the in-game actions keep (Knock, Discard, Take, Done,
+  Undo, Double, Pass, Leave, Cancel, Back, Resume stay `btn-primary`/`btn-secondary`/
   `btn-ghost`); a new start button takes `.btn-go`, never `btn-primary`. `CONTRACT.md` "Tokens"
   tables the three fills and their measured contrasts.
 - Behaviour change: a PR that flips a golden says so in its body and touches only that golden.
