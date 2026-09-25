@@ -570,8 +570,8 @@ later; `sessions.test.ts` is gin's shape.
 
 Turn authority is gin's: the host applies `applyAction` for both seats and broadcasts `viewFor(game,
 1)` as a `state` frame; a refusal to the guest is a `toast` frame; the guest sends `action` frames;
-pass-and-play keeps the `State` in the App with no Peer. `main.ts` boots as gin's: `rng = page.__rng
-?? Math.random` before anything draws, the store, the clock, ICE, the wake lock, the audio cues,
+pass-and-play keeps the `State` in the App with no Peer. `main.ts` boots as gin's (since C3 through
+`bootShell`, docs/design/shared-shell.md §4.5): `rng = page.__rng ?? Math.random` before anything draws, the store, the clock, ICE, the wake lock, the audio cues,
 the net deps with `closeNet` before every restart and the `netAttempt` ticket, the toast timer,
 `bindAll`, then `home/init` and the `?join=` link. The documented hook `window.__backgammon` = `{
 get app, dispatch, act(action), render, showScreen, initHome, fx, legal(), view(), setup(state),

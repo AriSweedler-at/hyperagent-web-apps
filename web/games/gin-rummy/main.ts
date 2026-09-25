@@ -199,13 +199,15 @@ const boot = (): void => {
         /**
          * The layoffs the engine used to make by itself, then `finishLayoff` (§7b): what the drivers
          * (e2e/fixtures/gin-play.ts, tools/parity) play through a knock's layoff phase to land where
-         * the automatic layoff landed. Host and pass-and-play only (the game is here).
+         * the automatic layoff landed. Host and pass-and-play only (the game is here). A local,
+         * because `app()` is a call and its null check cannot narrow a second `app().shell.game`.
          */
         layoffs: (): ReadonlyArray<Action> => {
           const game = app().shell.game;
           return game === null ? [] : bestLayoffActions(game);
         },
-        // The sandbox from the console (src/sandbox.ts): deal a map; read the table back as one.
+        // The sandbox from the console (src/sandbox.ts): deal a map; read the table back as one
+        // (`sandboxMap`: a local as `layoffs`).
         sandbox: (map: string) => {
           dispatch({ type: 'sandbox/start', map });
         },
