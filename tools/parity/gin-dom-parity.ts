@@ -71,8 +71,10 @@ export const normalise = (html: string): string =>
       /<div class="row" style="gap:6px;">(<button[^>]*\bid="leaveBtn"[^>]*>[^<]*<\/button>)<\/div>/g,
       '$1',
     )
-    // The result sheet's body is built once per result and keyed so its lay-out animation runs once.
-    .replace(/ data-result-key="[^"]*"/g, '')
+    // The result sheet's body is built once per result and keyed so its lay-out animation runs once
+    // (`#rrBody`'s `data-key`, the shared keyed slot since docs/design/dry-round-2.md D1; the
+    // legacy page carries no data-key anywhere the oracle snapshots).
+    .replace(/ data-key="[^"]*"/g, '')
     // A hidden curtain keeps the text of its last showing, and the new page shows one the legacy
     // never had: a knock hands the phone to the defender to lay off (§7b). Unseen, it is blanked.
     .replace(

@@ -184,6 +184,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // Re-measured when B3 moved roomCodeMsg, INVITE_COPIED_MSG and SHARE_FALLBACK_MS out of
       // ui/state.ts into web/shared/edge/boot.ts: ui 98.1/97.1/97.0/94.0 (roomCodeMsg was the one
       // function this suite never called, so functions rose; nothing went down and the row stands).
+      // Re-measured when D1 (docs/design/dry-round-2.md) keyed the piles, the table melds and the
+      // result body through web/shared/ui/keyed.ts: ui 98.09/97.09/97.06/94.03 before,
+      // 98.08/97.13/97.05/94.16 after (the same 24 lines uncovered in a smaller folder; the row stands).
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
