@@ -9,6 +9,7 @@ import { expect, test } from 'vitest';
 import { REGISTRY } from '../../tools/games.ts';
 import {
   GAMES,
+  OWNERS,
   cssClasses,
   markupClasses,
   readContract,
@@ -39,7 +40,7 @@ describeDist('CSS <-> TS class contract', (root) => {
   test('CONTRACT.md has rows, each with an owner the tree knows and one or more names', () => {
     expect(contract.length).toBeGreaterThan(0);
     contract.forEach((row) => {
-      expect([...GAMES, 'shared']).toContain(row.owner);
+      expect(OWNERS).toContain(row.owner);
       expect(row.kind).toBe('class');
       expect(row.names.length).toBeGreaterThan(0);
       expect(row.toggledBy !== '' || row.styledIn !== '', `${row.names.join(' ')}: empty row`).toBe(

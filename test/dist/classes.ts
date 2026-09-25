@@ -7,7 +7,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { posix, resolve, sep } from 'node:path';
 
-import { GAMES, type Game } from '../../tools/games.ts';
+import { GAMES, SHELL_GAMES, type Game } from '../../tools/games.ts';
 import { REPO_ROOT, readDist, referencesIn, type DistRoot } from './dist.ts';
 
 export { GAMES, type Game };
@@ -161,6 +161,22 @@ export const parseContract = (markdown: string): ReadonlyArray<Row> =>
 export const readContract = (): ReadonlyArray<Row> =>
   parseContract(readFileSync(CONTRACT_PATH, 'utf8'));
 
-/** The `class` rows that apply to a game: its own and `shared`'s. */
+/**
+ * The owners a row may name: a game, `shared` (every page) or `shell` (the pages with the shared
+ * shell, tools/games.ts SHELL_GAMES). `shared` cannot carry a shell class: it is checked against
+ * fidice's stylesheet too, which has no shell rules until the Fidice restyle (dry-round-2.md G3).
+ */
+export const OWNERS: ReadonlyArray<string> = [...GAMES, 'shared', 'shell'];
+
+const isShellGame = (game: Game): boolean => (SHELL_GAMES as ReadonlyArray<Game>).includes(game);
+
+/** The owners whose `class` rows apply to a game: itself, `shared` and, for a shell game, `shell`. */
+export const ownersOf = (game: Game): ReadonlyArray<string> => [
+  game,
+  'shared',
+  ...(isShellGame(game) ? ['shell'] : []),
+];
+
+/** The `class` rows that apply to a game (`ownersOf`). */
 export const rowsFor = (rows: ReadonlyArray<Row>, game: Game): ReadonlyArray<Row> =>
-  rows.filter((row) => row.kind === 'class' && (row.owner === game || row.owner === 'shared'));
+  rows.filter((row) => row.kind === 'class' && ownersOf(game).includes(row.owner));
