@@ -220,9 +220,17 @@ const cell = <T>(initial: T): Cell<T> => {
 
 /**
  * One guest channel and its heartbeat and silence watch, and the slot it sits in (a rejoin by
- * name moves a channel, so the slot is read through the channel and never captured).
+ * name moves a channel, so the slot is read through the channel and never captured). `failed`:
+ * it raised an error before it ever opened, so it never will (PeerJS closes such a channel with
+ * no `close` event); it stays in its slot, as the legacy kept it, so a later error on it is still
+ * reported, but the seat is empty for the next join, which is its guest's retry.
  */
-type Channel = Readonly<{ conn: Connection; live: Liveness; slot: Cell<Slot> }>;
+type Channel = Readonly<{
+  conn: Connection;
+  live: Liveness;
+  slot: Cell<Slot>;
+  failed: Cell<boolean>;
+}>;
 
 /**
  * A guest seat: its number, the channel sitting in it (null when free: never taken, closed and
@@ -242,10 +250,19 @@ const isChannel = (channel: Channel | null): channel is Channel => channel !== n
 /** The rejoin key of a join name: what the reseat compares (the codec's decoder bounds its length). */
 const rejoinKey = (name: string): string => name.trim().toLowerCase();
 
-/** A seat a same-named join may take back: no channel, or one silent past HB_MISSED_MS. */
+/** A seat with no claim on it: no channel, or one that failed before it opened. */
+const empty = (slot: Slot): boolean => {
+  const channel = slot.channel.get();
+  return channel === null || channel.failed.get();
+};
+
+/** A seat whose channel has not opened yet: the legacy's "not open is free", taken last. */
+const negotiating = (slot: Slot): boolean => slot.channel.get()?.conn.open() === false;
+
+/** A seat a same-named join may take back: empty, or its channel silent past HB_MISSED_MS. */
 const vacated = (slot: Slot): boolean => {
   const channel = slot.channel.get();
-  return channel === null || channel.live.silence() >= HB_MISSED_MS;
+  return channel === null || channel.failed.get() || channel.live.silence() >= HB_MISSED_MS;
 };
 
 export class HostSession<G, H, X> {
@@ -352,11 +369,13 @@ export class HostSession<G, H, X> {
    * two-seat `accept` line for line: free, silent, held, quiet.
    */
   private accept(conn: Connection, ice: IceResult | null): void {
-    // Free: never taken, or a channel that is not open (closed and reported, or a negotiation that
-    // failed before it opened, whose retry this may be).
-    const free = this.slots.find((slot) => {
-      return slot.channel.get()?.conn.open() !== true;
-    });
+    // Free: the lowest empty seat (never taken, closed and reported, or a negotiation that failed
+    // before it opened, whose retry this may be); only when none is empty, the lowest whose channel
+    // is still negotiating. Empty first, so two joins that arrive together (an invite in a group
+    // chat, two players back from one wifi blip) take two seats instead of the second evicting the
+    // first while it negotiates; at one slot the two reads are the two-seat "not open is free"
+    // rule, which seats a failed negotiation's retry at once.
+    const free = this.slots.find(empty) ?? this.slots.find(negotiating);
     if (free !== undefined) {
       this.seat(conn, free, ice);
       return;
@@ -399,13 +418,14 @@ export class HostSession<G, H, X> {
     const live = liveness(conn, deps.clock, () => {
       this.gone(channel);
     });
-    const channel: Channel = { conn, live, slot: cell(slot) };
+    const channel: Channel = { conn, live, slot: cell(slot), failed: cell(false) };
     slot.channel.set(channel);
     const current = (): boolean => channel.slot.get().channel.get() === channel;
     const opened = (): void => {
-      // Replaced while it negotiated (a failed negotiation's slot given to its retry): a channel
-      // that opens afterwards is nobody's seat, and a watch started now would call the seat's real
-      // guest gone at its grace. Closing it sends its guest back through its rejoin.
+      // Replaced while it negotiated (every seat taken, its slot given to the next join as a failed
+      // negotiation's is to its retry): a channel that opens afterwards is nobody's seat, and a
+      // watch started now would call the seat's real guest gone at its grace. Closing it sends its
+      // guest back through its rejoin.
       if (!current()) {
         conn.close();
         return;
@@ -442,12 +462,18 @@ export class HostSession<G, H, X> {
       // fatal, and that close is reported as ever), but its watch stops: a loss is reported here,
       // and the verdict on the silence that follows would report the same guest gone again.
       live.stop();
-      // ICE failed before the channel ever opened: nobody joined (no hand yet, or a handoff whose
-      // invited seat has not made it in), so 'Opponent left' would be wrong.
       const ctx = deps.read();
-      if (!conn.open() && e.type === 'negotiation-failed' && (!ctx.hasGame || ctx.handoff)) {
-        events.guestGone(ICE_FAILED_MSG + relayHint(ice), channel.slot.get().seat);
-        return;
+      if (!conn.open()) {
+        // Failed before it ever opened: the seat is empty again (`empty`), so the retry its guest
+        // makes takes it back rather than the next seat along, leaving this one dead until every
+        // other is taken (and, in a resumed room, blocking the rejoin by name to it).
+        channel.failed.set(true);
+        // ICE failed before the channel ever opened: nobody joined (no hand yet, or a handoff
+        // whose invited seat has not made it in), so 'Opponent left' would be wrong.
+        if (e.type === 'negotiation-failed' && (!ctx.hasGame || ctx.handoff)) {
+          events.guestGone(ICE_FAILED_MSG + relayHint(ice), channel.slot.get().seat);
+          return;
+        }
       }
       events.guestGone(null, channel.slot.get().seat);
     });

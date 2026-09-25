@@ -7,10 +7,21 @@
 // over every seat (the first silence wins, every beat refuses); a held join taking a leaver's seat;
 // rejoin by name into a gone seat, into a silent one, and not into a quiet one; `close`; the
 // two-seat shape at capacity 2 with the one-argument log, the failed negotiation's retry; the
-// `waiting` status.
+// `waiting` status. Three scenarios run over a scripted transport instead of the broker, which
+// opens each channel before the next connection arrives: joins that negotiate at once take
+// distinct seats at four and a failed negotiation's retry takes its seat back, a same-named join
+// is moved into a failed seat, and at two the one slot goes to the later join while the earlier
+// is closed when it opens (the stale-open guard).
 import { describe, expect, test } from 'vitest';
 
 import { ICE_FAILED_MSG, NO_RELAY_HINT } from '../edge/peer.ts';
+import type {
+  Connection,
+  PeerEvents,
+  PeerHandle,
+  Transport,
+  TransportError,
+} from '../edge/transport.ts';
 import { err, ok, type Result } from '../lib/result.ts';
 import { peerIdFor } from '../lib/roomCode.ts';
 import {
@@ -132,6 +143,135 @@ const gone = (w: World): ReadonlyArray<unknown> => w.log.filter((e) => e[0] === 
 const frames = (w: World): ReadonlyArray<unknown> => w.log.filter((e) => e[0] === 'frame');
 /** What a party received, heartbeats aside. */
 const heard = (p: Party): ReadonlyArray<unknown> => p.received.filter((f) => !isHeartbeat(f));
+
+// ---------------------------------------------------------------------------------------------
+// A scripted transport: channels the test opens, fails and reads by hand, so two can sit in
+// negotiation at once (the fake broker opens each channel before the next connection arrives).
+// ---------------------------------------------------------------------------------------------
+
+/** One hand-driven channel at the host: what it was sent, whether it is closed, its levers. */
+type Scripted = Readonly<{
+  sent: unknown[];
+  closed: () => boolean;
+  /** The channel opens: its `onOpen` handlers run. */
+  open: () => void;
+  /** A frame arrives from the guest. */
+  say: (frame: unknown) => void;
+  /** The guest closes its end: the local `close` fires, as it does for an opened channel. */
+  leave: () => void;
+  /** The transport raises `e` on the channel. */
+  fail: (e: TransportError) => void;
+}>;
+
+type ScriptedTransport = Readonly<{
+  transport: Transport;
+  /** The Peer is registered under ROOM. */
+  up: () => void;
+  /** A remote peer connects: the host's `connection` handlers run with a channel not yet open. */
+  arrive: () => Scripted;
+}>;
+
+const scriptedTransport = (): ScriptedTransport => {
+  const handlers: { [K in keyof PeerEvents]: PeerEvents[K][] } = {
+    open: [],
+    connection: [],
+    error: [],
+    disconnected: [],
+    close: [],
+  };
+  const peer: PeerHandle = {
+    id: () => ROOM,
+    on: (event, fn) => {
+      (handlers[event] as PeerEvents[typeof event][]).push(fn);
+    },
+    connect: () => {
+      throw new Error('a host never connects');
+    },
+    reconnect: () => undefined,
+    destroy: () => undefined,
+    destroyed: () => false,
+    disconnected: () => false,
+  };
+  const arrive = (): Scripted => {
+    let isOpen = false;
+    let closed = false;
+    const opens: (() => void)[] = [];
+    const messages: ((data: unknown) => void)[] = [];
+    const closes: (() => void)[] = [];
+    const errors: ((e: TransportError) => void)[] = [];
+    const sent: unknown[] = [];
+    // As PeerJS: the local `close` fires synchronously, and only for a channel that had opened.
+    const close = (): void => {
+      const wasOpen = isOpen;
+      closed = true;
+      isOpen = false;
+      if (wasOpen)
+        closes.forEach((fn) => {
+          fn();
+        });
+    };
+    const conn: Connection = {
+      peer: 'scripted-guest',
+      open: () => isOpen,
+      send: (data) => {
+        sent.push(data);
+      },
+      onOpen: (fn) => {
+        opens.push(fn);
+      },
+      onMessage: (fn) => {
+        messages.push(fn);
+      },
+      onClose: (fn) => {
+        closes.push(fn);
+      },
+      onError: (fn) => {
+        errors.push(fn);
+      },
+      close,
+      peerConnection: () => null,
+    };
+    handlers.connection.forEach((fn) => {
+      fn(conn);
+    });
+    return {
+      sent,
+      closed: () => closed,
+      open: () => {
+        isOpen = true;
+        opens.forEach((fn) => {
+          fn();
+        });
+      },
+      say: (frame) => {
+        messages.forEach((fn) => {
+          fn(frame);
+        });
+      },
+      leave: close,
+      fail: (e) => {
+        errors.forEach((fn) => {
+          fn(e);
+        });
+      },
+    };
+  };
+  return {
+    transport: { open: () => peer },
+    up: () => {
+      handlers.open.forEach((fn) => {
+        fn(ROOM);
+      });
+    },
+    arrive,
+  };
+};
+
+/** `w` with its transport replaced by `wire`; the clock, the log and the recorders are the world's. */
+const over = (w: World, wire: ScriptedTransport): World => ({
+  ...w,
+  deps: { ...w.deps, transportFor: () => wire.transport },
+});
 
 describe('HostSession over four seats', () => {
   test('three guests take seats 1, 2, 3 in the order they connect, each welcomed with its seat and reported as it; a fourth is held and told full once every seat is heard', () => {
@@ -434,6 +574,79 @@ describe('HostSession over four seats', () => {
     ]);
     session.send(state(1), 1); // closed: dropped, no throw
   });
+
+  test('two joins that arrive while both still negotiate take seats 1 and 2, whichever opens first, neither closed; a negotiation that fails leaves its seat empty, and the retry takes it back over a higher empty seat', () => {
+    const w = world({ seats: true });
+    const wire = scriptedTransport();
+    startHost(over(w, wire), cell(hostCtx()));
+    wire.up();
+    expect(w.log).toEqual([['holdWakeLock'], ['status', WAITING_MSG], ['persist']]);
+    // Bo and Cal arrive together (an invite in a group chat): two seats, in the order they
+    // arrived, whichever opens first.
+    const bo = wire.arrive();
+    const cal = wire.arrive();
+    cal.open();
+    bo.open();
+    expect(cal.sent).toEqual([welcome(2)]);
+    expect(bo.sent).toEqual([welcome(1)]);
+    expect([bo.closed(), cal.closed()]).toEqual([false, false]);
+    bo.say(join('Bo'));
+    cal.say(join('Cal'));
+    expect(frames(w)).toEqual([
+      ['frame', join('Bo'), 1],
+      ['frame', join('Cal'), 2],
+    ]);
+    // Cal leaves; its rejoin's negotiation fails before the channel opens: seat 2 reports the
+    // ICE text and is empty again, the dead channel left in it.
+    cal.leave();
+    expect(w.log.at(-1)).toEqual(['guestGone', null, 2]);
+    const dead = wire.arrive();
+    dead.fail({ type: 'negotiation-failed', message: '' });
+    expect(w.log.at(-1)).toEqual(['guestGone', ICE_FAILED_MSG, 2]);
+    // The retry takes seat 2 back, not seat 3; the dead channel is never welcomed or closed here
+    // (PeerJS closes a failed channel itself).
+    const back = wire.arrive();
+    back.open();
+    expect(back.sent).toEqual([welcome(2)]);
+    expect(dead.sent).toEqual([]);
+    expect(dead.closed()).toBe(false);
+    back.say(join('Cal'));
+    expect(w.log.at(-1)).toEqual(['frame', join('Cal'), 2]);
+    expect(gone(w)).toEqual([
+      ['guestGone', null, 2],
+      ['guestGone', ICE_FAILED_MSG, 2],
+    ]);
+  });
+
+  test('rejoin by name into a seat whose channel failed before it opened: the same name on a lower empty seat is moved there, the dead channel closed without a guestGone', () => {
+    const w = world({ seats: true });
+    const wire = scriptedTransport();
+    startHost(over(w, wire), cell(hostCtx()));
+    wire.up();
+    const bo = wire.arrive();
+    bo.open();
+    bo.say(join('Bo'));
+    const cal = wire.arrive();
+    cal.open();
+    cal.say(join('Cal'));
+    // Cal leaves and its rejoin fails at seat 2; then Bo leaves: seat 1 empty, seat 2 dead.
+    cal.leave();
+    const dead = wire.arrive();
+    dead.fail({ type: 'negotiation-failed', message: '' });
+    bo.leave();
+    const mark = w.log.length;
+    // Cal's retry connects to the lowest empty seat, 1, and its join says Cal: seat 2 is its.
+    const back = wire.arrive();
+    back.open();
+    expect(back.sent).toEqual([welcome(1)]);
+    back.say(join('Cal'));
+    expect(w.since(mark)).toEqual([['frame', join('Cal'), 2]]);
+    expect(dead.closed()).toBe(true);
+    // Seat 1 is empty again for a new name.
+    const eve = wire.arrive();
+    eve.open();
+    expect(eve.sent).toEqual([welcome(1)]);
+  });
 });
 
 describe('HostSession at capacity 2 with an N-seat codec', () => {
@@ -463,7 +676,7 @@ describe('HostSession at capacity 2 with an N-seat codec', () => {
 
   test('a negotiation that fails before the channel opens reports the ICE text for its seat; the retry that follows is seated at once, the failed channel never welcomed', async () => {
     const w = world({ ice: STUN_ONLY });
-    const session = startHost(w, cell(hostCtx()), {});
+    const session = startHost(w, cell(hostCtx()), { capacity: 2 });
     await settle();
     w.broker.flush();
     const first = party(w, undefined);
@@ -494,6 +707,25 @@ describe('HostSession at capacity 2 with an N-seat codec', () => {
     expect(first.received).toEqual([welcome(1), HEARTBEAT]);
     // Beside the path toast the ICE loader brings, nothing more: one loss, one join.
     expect(w.since(mark).filter((e) => e[0] !== 'toast')).toHaveLength(2);
+  });
+
+  test('two joins that arrive while both still negotiate: the later takes the one slot (a channel that is not open is a failed negotiation, whose retry this is) and the earlier, opening afterwards, is closed unwelcomed with no guestGone', () => {
+    const w = world();
+    const wire = scriptedTransport();
+    startHost(over(w, wire), cell(hostCtx()), { capacity: 2 });
+    wire.up();
+    const bo = wire.arrive();
+    const cal = wire.arrive();
+    // Bo opens first, but Cal holds the seat: Bo is closed before any welcome, and its `close`
+    // (fired for an opened channel, as PeerJS does) finds it is nobody's seat, so no loss is
+    // reported and Cal's seat is not freed.
+    bo.open();
+    expect(bo.closed()).toBe(true);
+    expect(bo.sent).toEqual([]);
+    cal.open();
+    expect(cal.sent).toEqual([welcome(1)]);
+    expect(cal.closed()).toBe(false);
+    expect(gone(w)).toEqual([]);
   });
 
   test('waiting overrides the open status; without it the status is WAITING_MSG', () => {

@@ -1151,10 +1151,14 @@ Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage r
   seat 1); gin's and backgammon's wrappers are byte-identical (one-parameter
   `welcome`, no `joinName`, `Omit<HostOptions, 'game'>` gaining the two optional fields). The
   harness logs one argument by default and the seat with `world({ seats: true })`;
-  `sessions.seats.test.ts` runs 13 N-seat scenarios. Found on the way and fixed: a channel
-  replaced while it still negotiated (the free-seat rule takes a channel that is not open, so a
-  failed negotiation's retry is seated at once) was welcomed when it later opened and its watch
-  would have reported the seat's real guest gone; `opened` now closes such a channel. The slot
-  shape is readonly records of closures (the edge zone's `type-declaration-immutability`), the
-  channel carrying its slot so a reseat re-points it. `web/shared/net/**` re-measured at
-  99.59/99.38/100/99.54 (statements/branches/functions/lines); the row stays 95/95/95/94.
+  `sessions.seats.test.ts` runs 16 N-seat scenarios, three of them over a scripted `Transport`
+  (a hand-made `PeerHandle` and `Connection`) for what the fake broker's FIFO cannot stage: two
+  channels negotiating at once. A joiner takes the lowest empty seat (never taken, closed, or a
+  channel that failed before it opened) and only when none is empty the seat of a channel still
+  negotiating (the two-seat "not open is free" rule, identical at one slot), so joins arriving
+  together take distinct seats and a failed negotiation's retry takes its own seat back; a
+  channel replaced while it negotiated is closed unwelcomed when it later opens (the two-seat
+  code would have welcomed it and its watch would have reported the seat's real guest gone). The
+  slot shape is readonly records of closures (the edge zone's `type-declaration-immutability`),
+  the channel carrying its slot so a reseat re-points it. `web/shared/net/**` re-measured at
+  100/100/100/100 (statements/branches/functions/lines); the row stays 95/95/95/94.

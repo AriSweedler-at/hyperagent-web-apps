@@ -141,8 +141,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // games' byte-pinning suites through their wrappers and the gin wire-corpus replay. Measured
         // at the move (lines/functions/statements/branches): 100/100/100/97.8. Re-measured when the
         // host grew to N seats (docs/design/n-seat-sessions.md; sessions.seats.test.ts covers the
-        // seat paths): 99.54/100/99.59/99.38, the two uncovered lines being the stale-open guard the
-        // fake broker cannot drive (n-seat-sessions.md §6.3).
+        // seat paths, three scenarios over a scripted transport for what the fake broker's FIFO
+        // cannot stage, n-seat-sessions.md §6.3): 100/100/100/100, every file in the folder.
         'web/shared/net/**': { lines: 95, functions: 95, statements: 95, branches: 94 },
       },
     },
