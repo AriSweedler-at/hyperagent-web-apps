@@ -175,8 +175,13 @@ node --experimental-strip-types tools/card-packs.ts preview <name> [--deck itali
   shows no seam over `MIN_SEAM` (0.4) takes the median of the rows that did, a seam no row shows
   the grid line; every cell equalised to the median card, a cell on the sheet's edge anchored on
   its seam and grown outward past the sheet (the scan clipped the outer margins; what lies outside
-  is drawn as paper); then `inset` px shaved. No ink trimming: the card's own margins are the
-  picture. The tool prints the seams it found.
+  is drawn as paper); then `inset` px shaved, and what the cut still shows past the card's own
+  interior seams painted paper before deriving (`paperPastSeams`: a neighbour laid over a card's
+  margin makes its cell narrower than the median, and the median frame centred on it reaches over
+  the seam into the neighbour, shadow and all; napoletane's 3S is 332 px between its seams against
+  350, 9 px over each side). The card keeps the median scale; the strips are what a wider margin
+  would have been. No ink trimming: the card's own margins are the picture. The tool prints the
+  seams it found.
 - Derivation: `FACE_WIDTH = 120` CSS px, `RATIOS = [1, 2, 3]`, a ratio only when the source is at
   least that wide (a 263 px source yields `[1, 2]`), height = `round(width / aspect)`, JPEG at 0.86.
   `--mask` paints a white rectangle over a region of one face before deriving: a maker's mark.
@@ -233,8 +238,12 @@ same `add`.
 ### 7.1 The Napoletane sheet the owner supplied (2026-09-25)
 
 The owner sent `File:Carte_napoletane_al_completo.jpg` from Wikimedia Commons (uploader and artist
-Florixc, "Own work", 2009-09-06; licence Public domain, Commons `pd`, Copyrighted False, attribution
-not required; 3507 × 2398, 2,038,168 bytes, sha256 `7f192cb10e81cfdc3f63817988998984f80f7751a717c519dac3fef5de03fc5d`)
+Florixc, "Own work", 2009-09-06; licence Public domain as the file page tags it, PD-old-70 ("the
+author's life plus 70 years or fewer") with the Creative Commons Public Domain Mark 1.0, categories
+PD Old and CC-PD-Mark, not PD-self, so `licenceUrl` names `Template:PD-old-70`; Commons metadata
+`pd`, Copyrighted False, attribution not required; recorded as tagged, since "Own work" of 2009 and
+a life-plus-70 term do not agree; 3507 × 2398, 2,038,168 bytes, sha256
+`7f192cb10e81cfdc3f63817988998984f80f7751a717c519dac3fef5de03fc5d`)
 with the words "This is the briscola card pack full scan. You will need to dispatch a workflow to
 cut out each individual card, which will be an image and overlayed on the cards. […] I want to have
 a napoletane card pack, american card pack, and eventually a tuscany card pack (but I will share the
@@ -325,7 +334,9 @@ parser),
 - The ink cutter assumes a printed border and a white gutter; the owner's Napoletane sheet has
   neither, so `--grid <inset>` (the seam grid, §5) joined sheet mode, with `equaliseCells` allowed
   past the sheet where `normaliseCells` clamps, and the draw clipping the source rectangle itself
-  so what lies outside the scan is paper.
+  so what lies outside the scan is paper. Equalising a cell a neighbour overlapped grew its cut over
+  its own seams (3S, 4B, 3D, CD carried a neighbour's hairline), so `paperPastSeams` paints those
+  strips paper rather than clamping the cut, which would have stretched the card to the frame.
 - `preview` sketches the overlay indices on an `overlay` pack's faces: legibility on the picture is
   part of judging a pack.
 - One sourced deck ships after all, because the owner supplied it (§7.1): `PACK_SOURCES` holds

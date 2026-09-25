@@ -110,7 +110,8 @@ describe('the card packs', () => {
       author: 'Florixc (Wikimedia Commons)',
       sourceUrl: 'https://commons.wikimedia.org/wiki/File:Carte_napoletane_al_completo.jpg',
       licence: 'Public domain',
-      licenceUrl: 'https://commons.wikimedia.org/wiki/Template:PD-self',
+      // The template the file page bears (PD-old-70 with the Public Domain Mark), not PD-self.
+      licenceUrl: 'https://commons.wikimedia.org/wiki/Template:PD-old-70',
       note: 'Supplied by the owner on 2026-09-25; the Neapolitan pattern, one sheet of 40',
     });
   });

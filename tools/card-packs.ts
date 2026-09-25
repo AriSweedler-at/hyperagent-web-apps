@@ -31,7 +31,10 @@
 // (a thin grey scan shadow with paper either side, scored along the row within GRID_SNAP px; a row
 // that shows none takes the seam the other rows found, else the equal line), every cell equalised
 // to the median card (a cell on the sheet's edge keeps its seam and grows outward, past a scan that
-// clipped the outer margins), then `inset` px shaved so the seam's shadow stays out. `--mask` paints
+// clipped the outer margins), then `inset` px shaved so the seam's shadow stays out, and whatever
+// the cut still shows past the card's own seams painted paper (a neighbour laid over this card's
+// margin made its cell narrower than the median, so equalising grew the cut over the seam and into
+// the neighbour: the sheet's 3S), as is what lies past the scan's edge. `--mask` paints
 // a white rectangle over a region of one face (source pixels, after the cut) before deriving: the
 // maker's mark on an ace of coins. No raw loops (the repo's lint), so the pixel work runs inside the
 // page scripts, which are strings.
@@ -127,7 +130,9 @@ export const PACK_SOURCES: Readonly<Record<string, SourceSpec>> = {
     author: 'Florixc (Wikimedia Commons)',
     sourceUrl: 'https://commons.wikimedia.org/wiki/File:Carte_napoletane_al_completo.jpg',
     licence: 'Public domain',
-    licenceUrl: 'https://commons.wikimedia.org/wiki/Template:PD-self',
+    // As the file page tags it: PD-old-70 and the Public Domain Mark 1.0, not PD-self
+    // (assets/cards/napoletane/SOURCES.txt, docs/design/card-packs.md §7.1).
+    licenceUrl: 'https://commons.wikimedia.org/wiki/Template:PD-old-70',
     note: 'Supplied by the owner on 2026-09-25; the Neapolitan pattern, one sheet of 40',
     masks: [],
     map: null,
@@ -413,6 +418,35 @@ export const shrink = (r: Rect, inset: number): Rect => ({
   w: r.w - 2 * inset,
   h: r.h - 2 * inset,
 });
+
+/**
+ * The strips of a seam-grid cut that show a neighbouring card, in the cut's own pixels, to be
+ * painted paper before deriving: `cut` is the cell equalised to the median and shaved by `inset`,
+ * `seams` the same cell as its seams bound it. A card a neighbour was laid over has a cell narrower
+ * than the median, and equalising centres the median frame on it, past its seams on both sides, so
+ * the shave from the frame's edge lands on or over the seam and the neighbour's shadow comes with
+ * it (napoletane's 3S: 332 px between its seams against a 350 px median, 9 px over each side). The
+ * card's own picture ends `inset` px inside each interior seam; what the frame shows beyond that is
+ * not this card. A side on the sheet's edge has no seam, only the scan's boundary, and `drawDerived`
+ * paints what lies past that.
+ */
+export const paperPastSeams = (
+  cut: Rect,
+  seams: Rect,
+  sheet: Size,
+  inset: number,
+): ReadonlyArray<Rect> => {
+  const left = seams.x > 0 ? seams.x + inset - cut.x : 0;
+  const right = seams.x + seams.w < sheet.width ? cut.x + cut.w - (seams.x + seams.w - inset) : 0;
+  const top = seams.y > 0 ? seams.y + inset - cut.y : 0;
+  const bottom = seams.y + seams.h < sheet.height ? cut.y + cut.h - (seams.y + seams.h - inset) : 0;
+  return [
+    { x: 0, y: 0, w: left, h: cut.h },
+    { x: cut.w - right, y: 0, w: right, h: cut.h },
+    { x: 0, y: 0, w: cut.w, h: top },
+    { x: 0, y: cut.h - bottom, w: cut.w, h: bottom },
+  ].filter((r) => r.w > 0 && r.h > 0);
+};
 
 /** `--grid <inset>`: a whole number of px shaved from each side of a seam-grid cell; absent, the ink cutter. */
 export const gridInset = (value: string | null): number | null => {
@@ -719,7 +753,7 @@ const drawDerived = (
   page: Page,
   src: string,
   crop: Rect | null,
-  mask: ReadonlyArray<Mask>,
+  mask: ReadonlyArray<Rect>,
   size: Size,
   ext: Ext,
 ): Promise<string> =>
@@ -822,10 +856,15 @@ const seamScores = (
 
 // ---- add / build ---------------------------------------------------------------------------------
 
+/** One cell of a sheet: the source rectangle, and the strips of it (cut pixels) that are not this card. */
+type Cut = Readonly<{ crop: Rect; paper: ReadonlyArray<Rect> }>;
+
 type Face = Readonly<{
   id: string;
   src: string;
   crop: Rect | null;
+  /** Painted paper before deriving, like a `--mask`: a seam-grid cut's strips past the card's seams. */
+  paper: ReadonlyArray<Rect>;
   sourceWidth: number;
   aspect: number;
 }>;
@@ -849,7 +888,16 @@ const facesFromDir = async (
       }
       const src = dataUrl(resolve(ROOT, dir, f));
       const size = await naturalSize(page, src);
-      return [{ id, src, crop: null, sourceWidth: size.width, aspect: size.width / size.height }];
+      return [
+        {
+          id,
+          src,
+          crop: null,
+          paper: [],
+          sourceWidth: size.width,
+          aspect: size.width / size.height,
+        },
+      ];
     }),
   );
   return faces.flat();
@@ -878,14 +926,17 @@ const cellsFromInk = async (
   return normaliseCells(await inkBoxes(page, src, cells), size);
 };
 
-/** The cells of a borderless sheet laid edge to edge (`--grid`): the seam grid, equalised and shaved. */
+/**
+ * The cells of a borderless sheet laid edge to edge (`--grid`): the seam grid, equalised and
+ * shaved, each with the strips it shows past its own seams, to be painted paper.
+ */
 const cellsFromGrid = async (
   page: Page,
   src: string,
   rows: number,
   cols: number,
   inset: number,
-): Promise<ReadonlyArray<Rect>> => {
+): Promise<ReadonlyArray<Cut>> => {
   const size = await naturalSize(page, src);
   const scores = await seamScores(page, src, size, cols, rows);
   const xs = gridLines(size.width, cols);
@@ -907,7 +958,11 @@ const cellsFromGrid = async (
   console.log(
     `sheet ${String(size.width)}×${String(size.height)}; seams per row ${JSON.stringify(vertical)}; per column ${JSON.stringify(horizontal)}`,
   );
-  return equaliseCells(cellsFromSeams(vertical, horizontal), size).map((c) => shrink(c, inset));
+  const seams = cellsFromSeams(vertical, horizontal);
+  return equaliseCells(seams, size).map((c, i) => {
+    const crop = shrink(c, inset);
+    return { crop, paper: paperPastSeams(crop, seams[i] ?? c, size, inset) };
+  });
 };
 
 /** The faces of one sheet, row-major, the ids `<col><row>`: `--rows`/`--cols` in the sheet's own order. */
@@ -924,13 +979,16 @@ const facesFromSheet = async (
   if (strangers.length > 0)
     throw new Error(`--rows/--cols name cards ${deck} has not: ${strangers.join(' ')}`);
   const src = dataUrl(resolve(ROOT, file));
-  const boxes =
+  const cuts: ReadonlyArray<Cut> =
     grid === null
-      ? await cellsFromInk(page, src, rows.length, cols.length)
+      ? (await cellsFromInk(page, src, rows.length, cols.length)).map((crop) => ({
+          crop,
+          paper: [],
+        }))
       : await cellsFromGrid(page, src, rows.length, cols.length, grid);
   return ids.map((id, i) => {
-    const box = boxes[i] ?? { x: 0, y: 0, w: 1, h: 1 };
-    return { id, src, crop: box, sourceWidth: box.w, aspect: box.w / box.h };
+    const { crop, paper } = cuts[i] ?? { crop: { x: 0, y: 0, w: 1, h: 1 }, paper: [] };
+    return { id, src, crop, paper, sourceWidth: crop.w, aspect: crop.w / crop.h };
   });
 };
 
@@ -973,7 +1031,9 @@ const derive = async (page: Page, name: string, spec: SourceSpec): Promise<void>
     return ratios.reduce(async (p, ratio) => {
       const n = await p;
       const size = derivedSize(ratio, aspect);
-      const bytes = bytesOf(await drawDerived(page, face.src, face.crop, masks, size, ext));
+      const bytes = bytesOf(
+        await drawDerived(page, face.src, face.crop, [...masks, ...face.paper], size, ext),
+      );
       const out = derivedFace(name, spec.deck, face.id, size.width, ext);
       writeRepo(out, bytes);
       return n + bytes.byteLength;

@@ -2,7 +2,8 @@
 // Commons-style names, the derived paths and sizes, the ratio cut-off, the size readers, the gutter
 // finder and the cell normaliser over synthetic input, the seam grid's pure half (`--grid`: the equal
 // lines, the seam picker with its two fallbacks, the cells, the equaliser that may leave the sheet,
-// the shave), the mask and map parsers, the manifest text and the argument parser. The Chromium
+// the shave, the paper past a card's seams), the mask and map parsers, the manifest text and the
+// argument parser. The Chromium
 // drawing is exercised by running `add` and `preview` by hand (napoletane's preview is read at 120
 // and 240 px: every card in its cell, no ink cut, the overlay indices in clean corners).
 import { describe, expect, test } from 'vitest';
@@ -32,6 +33,7 @@ import {
   manifestSource,
   manualLines,
   normaliseCells,
+  paperPastSeams,
   parseArgs,
   parseMap,
   parseMask,
@@ -398,6 +400,38 @@ describe('the seam grid (--grid)', () => {
       { x: 66, y: 28, w: 34, h: 32 },
     ]);
     expect(equaliseCells([], sheet)).toEqual([]);
+  });
+
+  test("paperPastSeams: an interior cell narrower than the median, equalised and shaved, shows its neighbours past its own seams; those strips are paper, in the cut's pixels", () => {
+    const sheet = { width: 3507, height: 2398 };
+    // Napoletane's 3S as the tool found it: 332 px between its seams (686, 1018) in a row whose
+    // median card is 350 wide; the median frame centred on it reaches 9 px into 2S and 4S.
+    const seams = { x: 686, y: 1800, w: 332, h: 598 };
+    const [cut] = equaliseCells([seams, { x: 1018, y: 1800, w: 350, h: 598 }], sheet).map((c) =>
+      shrink(c, 6),
+    );
+    expect(cut).toEqual({ x: 683, y: 1806, w: 338, h: 586 });
+    expect(paperPastSeams(cut ?? seams, seams, sheet, 6)).toEqual([
+      { x: 0, y: 0, w: 9, h: 586 },
+      { x: 329, y: 0, w: 9, h: 586 },
+    ]);
+    // A cell at least the median wide keeps `inset` px inside its seams on its own: no strip.
+    const wide = { x: 1370, y: 1196, w: 360, h: 604 };
+    expect(paperPastSeams(shrink(wide, 6), wide, sheet, 6)).toEqual([]);
+    // Narrower than the median both ways (332 × 590 against 350 × 600): a strip on every side,
+    // 9 px across and 5 px down, the sides first.
+    const small = { x: 686, y: 591, w: 332, h: 590 };
+    expect(paperPastSeams({ x: 683, y: 592, w: 338, h: 588 }, small, sheet, 6)).toEqual([
+      { x: 0, y: 0, w: 9, h: 588 },
+      { x: 329, y: 0, w: 9, h: 588 },
+      { x: 0, y: 0, w: 338, h: 5 },
+      { x: 0, y: 583, w: 338, h: 5 },
+    ]);
+    // The sheet's corner cell, clipped by the scan: equalising anchored it on its two interior
+    // seams and grew it past the sheet, where there is no seam to keep off (drawDerived paints
+    // past the scan), so nothing is paper here.
+    const corner = { x: 0, y: 0, w: 337, h: 591 };
+    expect(paperPastSeams({ x: -7, y: -3, w: 338, h: 588 }, corner, sheet, 6)).toEqual([]);
   });
 
   test('shrink shaves the inset from every side; gridInset reads --grid as whole px or refuses it', () => {

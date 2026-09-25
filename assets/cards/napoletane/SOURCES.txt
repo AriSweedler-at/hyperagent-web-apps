@@ -5,8 +5,13 @@ sheet.jpg   Wikimedia Commons  File:Carte_napoletane_al_completo.jpg
             https://commons.wikimedia.org/wiki/File:Carte_napoletane_al_completo.jpg
             uploader and artist Florixc, "Own work", 2009-09-06 (Commons categories: Naples deck,
             PD Old, Complete decks of playing cards laid out, CC-PD-Mark)
-            licence Public domain (Commons LicenseShortName "Public domain", License "pd",
-            Copyrighted "False", AttributionRequired "false"); https://commons.wikimedia.org/wiki/Template:PD-self
+            licence Public domain, as the file page tags it: PD-old-70 ("in the public domain in
+            its country of origin and other countries and areas where the copyright term is the
+            author's life plus 70 years or fewer") and Creative Commons Public Domain Mark 1.0
+            (categories PD Old, CC-PD-Mark), not PD-self; https://commons.wikimedia.org/wiki/Template:PD-old-70
+            Commons metadata LicenseShortName "Public domain", License "pd", Copyrighted "False",
+            AttributionRequired "false". Recorded as tagged: "Own work" of 2009 and a life-plus-70
+            term do not agree, so the licence is the page's claim, not this repo's finding
             3507 x 2398, JPEG, 2,038,168 bytes
             sha256 7f192cb10e81cfdc3f63817988998984f80f7751a717c519dac3fef5de03fc5d
             supplied by the owner on 2026-09-25: "This is the briscola card pack full scan. You will
