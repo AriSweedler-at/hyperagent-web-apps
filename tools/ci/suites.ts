@@ -195,7 +195,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         // press); the folder stays at 100 (230 lines, 103 functions, 253 statements, 80 branches).
         // shell.ts and shellEffects.ts, the shell reducer and its effect runner both games'
         // ui/state.ts delegate to (shared-shell.md §5 C2), measure 100/100/100/100 through
-        // shell.test.ts over a FAKE_GAME; the folder stays at 100 on every metric.
+        // shell.test.ts over a FAKE_GAME; the folder stays at 100 on every metric. Again with G2
+        // (dry-round-2.md F5/F6: `position/load` and the once-keyed cue memory into shell.ts,
+        // 238 lines, 207 branches): the folder measures 100/100/100/100 (571 lines, 342 branches).
         'web/shared/ui/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The coin game (dry-round-2.md F3): the two-seat engine the replay driver under test/shared
         // is proved on, and the shared shell's fake game to come. It exists to be exercised, so
@@ -304,6 +306,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // from web/shared/lib/drag.ts): ui 98.26/97.93/97.35/94.33 before, 98.80/97.95/98.12/95.06
       // after (11 lines uncovered of 920, 977 → 920 lines; the row stands). Measured on main at
       // 8b50ce9 and this branch rebased onto it (#96 touched neither folder).
+      // Re-measured when G2 (dry-round-2 F6) routed cues.ts `nextCue`'s once-per-key rule through
+      // web/shared/ui/shell.ts `fresh` and added `decodeState` to shellConfig.ts for the shell's
+      // `position/load`: ui 98.26/97.93/97.35/94.33 before, 98.26/97.93/97.36/94.33 after (the same
+      // 17 lines uncovered, 977 → 978 lines); shellConfig.ts still 100/100/100/100.
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -487,6 +493,11 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // configures the kernel): ui 99.50/100/98.62/92.12 before, 99.47/100/98.71/92.06 after (the
       // same 6 lines uncovered, 1195 → 1141 lines; the row stands). Measured on main at 8b50ce9 and
       // this branch rebased onto it (#96 touched neither folder).
+      // Re-measured when G2 (dry-round-2 F5/F6) moved `sandboxLoad` and its two strings out of
+      // ui/state.ts into web/shared/ui/shell.ts `position/load` and keyed `rendered`'s cues on the
+      // shared `fresh`: ui 99.50/100/98.62/92.12 before, 99.49/100/98.61/92.15 after (the same 6
+      // lines uncovered, 1195 → 1185 lines; the row stands); shellConfig.ts (now with
+      // `decodeState`) still 100/100/100/100.
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
