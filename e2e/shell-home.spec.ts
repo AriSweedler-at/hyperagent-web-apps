@@ -1,5 +1,7 @@
 // The shell's home screen on both shell games (docs/design/shared-shell.md §6.3), at a phone and a
-// laptop: the title and the heading, the tab bar (theme.css "top tabs") with Play active, Online the
+// laptop: the title and the heading, the tab bar (theme.css "top tabs") with Play active and every
+// tab inside the bar (gin's four fit the phone's width as backgammon's three do: dry-round-2.md I4
+// moved the check here from gin's glossary spec, sized by the game's tab count), Online the
 // default mode and pass and play beside it, the mode pick and the tab picks persisted under the
 // game's own keys (`<prefix>playMode`, `<prefix>homeTab`), the pass-and-play panel's fields at their
 // defaults, Rules and About. The Play tab's submenu opens two ways: a long press (650 ms),
@@ -39,7 +41,7 @@ SHELL_GAMES.forEach((game) => {
 
     Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       test.describe(name, () => {
-        test('home: the title, the heading, the tab bar; Online the default, pass and play beside it, the pick persisted; the tabs', async ({
+        test('home: the title, the heading, the tab bar with every tab inside it; Online the default, pass and play beside it, the pick persisted; the tabs', async ({
           player,
           project,
         }) => {
@@ -49,6 +51,24 @@ SHELL_GAMES.forEach((game) => {
           await expect(page).toHaveTitle(spec.title);
           await expect(page.locator('#homeScreen h1')).toHaveText(shell.heading);
           await expect(page.locator('#topTabbar .tab-btn')).toHaveText(shell.tabs);
+          // Nothing overflows the bar: every tab's box lies inside it.
+          const bar = await page.locator('#topTabbar').boundingBox();
+          // A string expression: the e2e project has no DOM types.
+          const boxes = await page.evaluate<
+            ReadonlyArray<Readonly<{ left: number; right: number; overflows: boolean }>>
+          >(
+            `Array.from(document.querySelectorAll('#topTabbar .tab-btn')).map((el) => {
+              const r = el.getBoundingClientRect();
+              return { left: r.left, right: r.right, overflows: el.scrollWidth > el.clientWidth };
+            })`,
+          );
+          if (bar === null) throw new Error('the tab bar has no box');
+          expect(boxes).toHaveLength(shell.tabs.length);
+          boxes.forEach((b) => {
+            expect(b.left).toBeGreaterThanOrEqual(bar.x - 0.5);
+            expect(b.right).toBeLessThanOrEqual(bar.x + bar.width + 0.5);
+            expect(b.overflows).toBe(false);
+          });
           await expect(page.locator('#tabPlayBtn')).toHaveClass(/\bactive\b/);
           // Online is the default mode (storage.ts DEFAULT_PLAY_MODE in both games): its panel is up
           // with the name; the switch flips to pass and play, and the pick is remembered.
