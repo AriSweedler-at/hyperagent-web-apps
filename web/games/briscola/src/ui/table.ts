@@ -230,6 +230,8 @@ export type SeatCell = Readonly<{
   connected: boolean | null;
   /** The dot's id where a page fixes one (`SHELL.briscola.connDot`, `#oppDot` in the 2-player cell). */
   dotId?: string;
+  /** The name's id where a page fixes one (`#oppName` in the 2-player cell: what the shell specs read as the opponent's name). */
+  nameId?: string;
 }>;
 
 /** "2 tricks", "1 trick", nothing at 0 (the stack the flights land on is still there). */
@@ -261,7 +263,8 @@ export const seatHtml = (pack: CardPack, cell: SeatCell): string => {
       : `<span class="conn-dot ${cell.connected ? 'on' : 'off'}"></span>`;
   const dotWithId =
     cell.dotId === undefined ? dot : dot.replace('<span ', `<span id="${cell.dotId}" `);
-  return `<span class="seat-name">${escapeHtml(cell.name)}</span><span class="seat-cards">${seatCardsHtml(pack, cell)}</span><span class="seat-taken" data-count="${String(cell.tricks)}">${tricksText(cell.tricks)}</span>${dotWithId}`;
+  const nameId = cell.nameId === undefined ? '' : ` id="${cell.nameId}"`;
+  return `<span class="seat-name"${nameId}>${escapeHtml(cell.name)}</span><span class="seat-cards">${seatCardsHtml(pack, cell)}</span><span class="seat-taken" data-count="${String(cell.tricks)}">${tricksText(cell.tricks)}</span>${dotWithId}`;
 };
 
 // ---- the stock and the briscola (§5.2 `.stock-area`, T3) ----------------------------------------------

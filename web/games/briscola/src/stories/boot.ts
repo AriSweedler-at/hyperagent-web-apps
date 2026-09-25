@@ -10,10 +10,10 @@
 // timers (the settle beat needs its `settle` timer, on the page's own clock) and its toasts run,
 // every other effect is dropped, so a flow can be driven from a catalogued state without a game,
 // a store or a network. e2e/briscola-stories.spec.ts opens each story without either flag.
-import type { PageLike } from '../../../../shared/edge/dom.ts';
+import { appendHtml, requireId, trustedHtml, type PageLike } from '../../../../shared/edge/dom.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { SUIT_SPRITE_SVG } from '../../../../shared/ui/cardFace.ts';
-import { bootStories, type StoriesDeps } from '../../../../shared/ui/stories.ts';
+import { STORIES_IDS, bootStories, type StoriesDeps } from '../../../../shared/ui/stories.ts';
 import { bindAll, paint, showToast } from '../ui/render.ts';
 import { reduce, type App, type Effect, type Intent, type TimerId } from '../ui/state.ts';
 import { EPOCH, SEED, STORIES, storyById, type Story } from './catalogue.ts';
@@ -59,7 +59,9 @@ const deps = (doc: PageLike): Deps => ({
 
 /** Paint the story `id` names, or the index when it names none; `nav` adds the bar, `live` the controls. */
 export const bootStory = (doc: PageLike, id: string, nav: boolean, live = false): void => {
-  // The four Italian suit symbols the glyph faces and the trump badge `<use>`, once, before any paint.
-  document.body.insertAdjacentHTML('afterbegin', SUIT_SPRITE_SVG);
+  // The four Italian suit symbols the glyph faces and the trump badge `<use>`, once, before any
+  // paint: a `<symbol>` is found anywhere in the document, so the sprite sits inside `#app`, the one
+  // element this module reaches by id (main.ts puts it first on the body).
+  appendHtml(requireId(doc, STORIES_IDS.app), trustedHtml(SUIT_SPRITE_SVG));
   bootStories(doc, deps(doc), COPY).bootStory(id, nav, live);
 };

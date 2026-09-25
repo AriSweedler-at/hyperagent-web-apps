@@ -22,7 +22,7 @@ import {
   type State,
   type View,
 } from '../engine/index.ts';
-import { historyKey } from './history.ts';
+import { historyKey } from '../../../../shared/ui/history.ts';
 import { briscolaPage, type BriscolaPage } from './page.fake.ts';
 import {
   DRAWING_STATUS,
@@ -118,7 +118,7 @@ const lastTrickPosition = (app: App): App => {
     ...withPosition(g, [[c('AC')], [c('3C')]], [], c('RB'), 0),
     piles: [rest, []],
   };
-  return run(app, { type: 'sandbox/load', state: JSON.parse(JSON.stringify(state)) }).app;
+  return run(app, { type: 'position/load', state: JSON.parse(JSON.stringify(state)) }).app;
 };
 const recorder = (): Readonly<{ intents: Intent[]; dispatch: (i: Intent) => void }> => {
   const intents: Intent[] = [];
@@ -232,7 +232,9 @@ describe('the two-player table', () => {
     expect(p.get('seats').attr('data-players')).toBe('2');
     expect(p.get('seatR2').attr('hidden')).toBeNull();
     expect(p.get('seatR2').attr('data-seat')).toBe(String(other.idx));
-    expect(p.get('seatR2').text()).toContain(`<span class="seat-name">${other.name}</span>`);
+    expect(p.get('seatR2').text()).toContain(
+      `<span class="seat-name" id="oppName">${other.name}</span>`,
+    );
     expect(p.get('seatR2').text()).toContain('id="oppDot"');
     expect(p.get('seatR2').text()).toContain('data-count="0"');
     expect(
@@ -484,14 +486,14 @@ describe('the two-player table', () => {
 });
 
 describe('the history sheet', () => {
-  test('one row per event, keyed on the last event, so an open row survives a repaint and a new event rebuilds', () => {
+  test("one row per event through the shared panel, keyed on the match and the last event, so an open row survives a repaint; a new event is appended (the shared panel's test) or, on this fake without a last row, rebuilt", () => {
     const p = page();
     const app = run(revealed(local()), { type: 'history/open' }).app;
     paint(p.doc, app);
     const v = view(app);
     expect(p.get('historyOverlay').hidden()).toBe(false);
     expect(p.get('historyList').attr('data-key')).toBe(
-      `${String(v.startedAt)}|${historyKey(v.events)}`,
+      `${String(v.startedAt)}:${historyKey(v.events)}`,
     );
     expect(
       (
@@ -509,13 +511,14 @@ describe('the history sheet', () => {
     list.insertAdjacentHTML('beforeend', '<i id="open-mark"></i>');
     paint(p.doc, run(app, { type: 'card/tap', cardId: v.legal[0] ?? '' }).app);
     expect(p.get('historyList').text()).toContain('open-mark');
-    // A trick resolved is a new event: the list is rebuilt with its row, newest last.
+    // A trick resolved is a new event: its row arrives, newest last (appended after the open one in a
+    // browser; this fake answers no last-row query, so the shared panel rebuilds).
     const after = settled(playFirst(revealed(playFirst(app))));
     const w = view(after);
     paint(p.doc, run(after, { type: 'history/open' }).app);
     expect(w.events.at(-1)?.kind).toBe('trick');
     expect(p.get('historyList').attr('data-key')).toBe(
-      `${String(w.startedAt)}|${historyKey(w.events)}`,
+      `${String(w.startedAt)}:${historyKey(w.events)}`,
     );
     expect(p.get('historyList').text()).not.toContain('open-mark');
     expect(p.get('historyList').text()).toMatch(
@@ -532,7 +535,7 @@ describe('the history sheet', () => {
     expect(historyKey(o.events)).toBe(historyKey(v.events));
     paint(p.doc, other);
     expect(p.get('historyList').attr('data-key')).toBe(
-      `${String(o.startedAt)}|${historyKey(o.events)}`,
+      `${String(o.startedAt)}:${historyKey(o.events)}`,
     );
     expect(p.get('historyList').text()).toContain(`${nameOf(o.players, o.dealer)}</span> dealt`);
   });

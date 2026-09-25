@@ -34,10 +34,12 @@ import {
   setAttr,
   setDisabled,
   setHidden,
+  setHtml,
   setStyle,
   setText,
   targetIdOf,
   toggleClass,
+  trustedHtml,
   type DocumentLike,
   type Element,
   type PageLike,
@@ -46,6 +48,9 @@ import { defaultPackFor, packByName, type CardPack } from '../../../../shared/li
 import { resolveAspect, resolveBack } from '../../../../shared/lib/cards/resolve.ts';
 import { suitSymbolId } from '../../../../shared/lib/cards/suits.ts';
 import { backImageCss } from '../../../../shared/ui/cardFace.ts';
+import { paintHistory } from '../../../../shared/ui/history.ts';
+import { HISTORY_IDS } from '../../../../shared/ui/ids.ts';
+import { reducedMotion } from '../../../../shared/edge/motion.ts';
 import { ensureKeyed } from '../../../../shared/ui/keyed.ts';
 import {
   bindButtons,
@@ -74,11 +79,11 @@ import {
   type TrickRecord,
   type View,
 } from '../engine/index.ts';
-import { historyHtml, historyKey } from './history.ts';
+import { HISTORY_COPY } from './history.ts';
 import {
-  DURATIONS,
   MY_TAKEN,
   drawFlights,
+  durationsFor,
   flyCards,
   handCard,
   seatCards,
@@ -119,7 +124,10 @@ import {
   type RelativeCell,
   type SeatCell,
 } from './table.ts';
+import { aboutHtml } from './about.ts';
+import { bindDrag } from './dragger.ts';
 import { bindHome, paintHome } from './home.ts';
+import { RULES_SLOT_IDS, rulesItemsHtml } from './rules.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import {
   SCREENS,
@@ -135,6 +143,21 @@ import {
 
 export type { PageLike };
 export type Dispatch = (intent: Intent) => void;
+
+export { RULES_SLOT_IDS } from './rules.ts';
+
+/** Fill both rules slots from ui/rules.ts (once, at boot), the jargon in each body linked to its rule. */
+export const renderRules = (doc: DocumentLike): void => {
+  const markup = trustedHtml(rulesItemsHtml());
+  RULES_SLOT_IDS.forEach((id) => {
+    setHtml(requireId(doc, id), markup);
+  });
+};
+
+/** Fill `#aboutCopy` from ui/about.ts (once, at boot), its jargon linked to the rules. */
+export const renderAbout = (doc: DocumentLike): void => {
+  setHtml(requireId(doc, 'aboutCopy'), trustedHtml(aboutHtml()));
+};
 
 // ---- the shell (web/shared/ui/shellPaint.ts, each over the App's shell slice) ---------------------
 
@@ -281,7 +304,8 @@ const cellFor = (n: SeatCount, me: Seat, seat: Seat): RelativeCell =>
  * The three relative cells: `#seats[data-players]`, each cell's `hidden` and `data-seat`, its inside
  * keyed on what it shows (the name, the cards held or their count, the tricks, the dot, the pack),
  * `to-move` on the actor's cell between beats and `gone` on a disconnected online seat. At two
- * players the one cell across carries `#oppDot` (tools/games.ts `SHELL.briscola.connDot`).
+ * players the one cell across carries `#oppDot` (tools/games.ts `SHELL.briscola.connDot`) and
+ * `#oppName` (the two-seat shell's name for the other seat, which the shell specs read).
  */
 export const paintSeats = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPack): void => {
   const n = v.options.seatCount;
@@ -302,7 +326,7 @@ export const paintSeats = (doc: DocumentLike, app: App, v: View, b: Beat, pack: 
       hand: other?.hand ?? null,
       tricks: tricksShown(v, b, seat),
       connected: online ? app.shell.oppConnected : null,
-      ...(n === 2 && cell === 'R2' ? { dotId: 'oppDot' } : {}),
+      ...(n === 2 && cell === 'R2' ? { dotId: 'oppDot', nameId: 'oppName' } : {}),
     };
     ensureKeyed(el, seatKey(data, pack.name), () => seatHtml(pack, data));
     toggleClass(el, 'to-move', b.stage === null && v.phase === 'trick' && v.turn === seat);
@@ -428,12 +452,13 @@ export const statusText = (app: App, v: View): string => {
 
 // ---- the hand and the actions row (§5.2 `#hand`, §5.4, §5.5) --------------------------------------------
 
-/** A held slot's toggles outside the key: the card's lift and playability, the slot's button semantics, the drawn card's `arriving`. */
+/** A held slot's toggles outside the key: the card's lift, playability and drag, the slot's button semantics, the drawn card's `arriving`. */
 const paintSlot = (
   slot: Element,
   o: Readonly<{
     selected: string | null;
     playable: ReadonlyArray<string>;
+    dragging: string | null;
     drawn: string | null;
     faceDown: boolean;
   }>,
@@ -445,6 +470,7 @@ const paintSlot = (
   const canPlay = o.playable.includes(id);
   toggleClass(card, 'selected', lifted);
   toggleClass(card, 'playable', canPlay);
+  toggleClass(card, 'dragging', o.dragging === id);
   toggleClass(card, 'arriving', id === o.drawn);
   const button = lifted || canPlay;
   setAttr(slot, 'role', button ? 'button' : null);
@@ -474,8 +500,9 @@ export const paintHand = (doc: DocumentLike, app: App, v: View, b: Beat, pack: C
   toggleClass(hand, 'inert', !live);
   toggleClass(hand, 'hidden-cards', faceDown);
   const drawn = drawnCardId(app, v, b);
+  const dragging = app.table.drag?.card ?? null;
   queryAllIn(hand, '.slot').forEach((slot) => {
-    paintSlot(slot, { selected, playable, drawn, faceDown });
+    paintSlot(slot, { selected, playable, dragging, drawn, faceDown });
   });
   setText(requireId(doc, 'myName'), v.me.name);
   setText(requireId(doc, 'myTaken'), `You: ${String(takenShown(v, b, v.me.idx))}`);
@@ -636,13 +663,17 @@ const paintOverlays = (doc: DocumentLike, app: App, pack: CardPack): void => {
   const v = app.shell.view;
   paintSheet(doc, 'rulesOverlay', app.shell.rulesOpen);
   paintSheet(doc, 'historyOverlay', app.table.historyOpen);
-  // One `<details>` per event (ui/history.ts), keyed on the match and its last event: a repaint
-  // with nothing new leaves open rows open, and a new match (whose ids start over) rebuilds the list.
+  // One `<details>` per event (the shared panel over ui/history.ts's copy), the match's start
+  // naming the stream: a repaint with nothing new leaves open rows open, a new event is appended
+  // after them, and a new match (whose ids start over) rebuilds the list.
   if (app.table.historyOpen)
-    ensureKeyed(
-      requireId(doc, 'historyList'),
-      `${String(v?.startedAt ?? '')}|${historyKey(v?.events ?? [])}`,
-      () => historyHtml(v?.events ?? [], v?.players ?? [], v?.options.seatCount ?? 2),
+    paintHistory(
+      doc,
+      HISTORY_IDS.list,
+      v?.events ?? [],
+      HISTORY_COPY,
+      { players: v?.players ?? [], n: v?.options.seatCount ?? 2 },
+      String(v?.startedAt ?? ''),
     );
   const last = v?.lastTrick ?? null;
   const open = app.table.lastTrickOpen && v !== null && last !== null;
@@ -688,11 +719,12 @@ const landings = (
 const flightsFor = (v: View, b: Beat, drawn: string | null): ReadonlyArray<Flight> => {
   if (b.trick === null) return [];
   const to = landings(v, drawn);
+  const d = durationsFor(reducedMotion());
   switch (b.stage) {
     case 'fly':
-      return trickFlights(b.trick, to.taken(b.trick.winner), DURATIONS);
+      return trickFlights(b.trick, to.taken(b.trick.winner), d);
     case 'draw':
-      return drawFlights(b.trick, to.card, DURATIONS);
+      return drawFlights(b.trick, to.card, d);
     case 'hold':
     case null:
       return [];
@@ -856,5 +888,6 @@ export const bindAll = (doc: PageLike, dispatch: Dispatch): void => {
   bindHome(doc, dispatch);
   bindLocal(doc, dispatch);
   bindTable(doc, dispatch);
+  bindDrag(doc, dispatch);
   bindShellSheets(doc, SHEETS, dispatch, { escapeFallback: { type: 'escape' } });
 };
