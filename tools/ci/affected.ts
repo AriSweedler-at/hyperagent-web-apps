@@ -1,7 +1,9 @@
 // Which CI jobs a diff selects (docs/design/test-partition.md §6.2): the changed paths of
 // `<base>...HEAD` through the change -> jobs table of tools/ci/suites.ts, printed as the `changes`
-// job's outputs (`--github`: one `<job>=true|false` line per job plus `everything=`), as JSON
-// (`--json`) or for a human (the default: each path with the row that claimed it, then the jobs).
+// job's outputs (`--github`: one `<job>=true|false` line per job, the `games=` and `e2e-games=`
+// JSON lists ci.yml's two matrix jobs expand with fromJSON (dry-round-2.md I1), then
+// `everything=`), as JSON (`--json`) or for a human (the default: each path with the row that
+// claimed it, then the jobs).
 // `--all` selects every job without diffing (a push to main, a workflow_dispatch); `--base` defaults
 // to origin/main, which is what the pre-push hook has. Node builtins only, so the `changes` job runs
 // it before `npm ci`. The rules themselves live in suites.ts and are tested there; this file only
@@ -12,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { JOBS, jobsFor, ruleFor, type Job } from './suites.ts';
+import { GAME_SUITES, JOBS, e2eJob, jobsFor, ruleFor, type GameSuite, type Job } from './suites.ts';
 
 export type Format = 'human' | 'github' | 'json';
 
@@ -58,18 +60,40 @@ export const reportFor = (paths: ReadonlyArray<string> | null): Report => ({
 
 const everything = (jobs: ReadonlySet<Job>): boolean => JOBS.every((job) => jobs.has(job));
 
-/** `$GITHUB_OUTPUT` lines: every job, true or false, then `everything`. */
-export const formatGithub = ({ jobs }: Report): string =>
-  [
+/** The two matrix lists: the game suites among the selected jobs, unit side and e2e side. */
+export type Matrices = Readonly<{
+  games: ReadonlyArray<GameSuite>;
+  'e2e-games': ReadonlyArray<GameSuite>;
+}>;
+
+/**
+ * ci.yml's `game` and `e2e-game` jobs take `strategy.matrix.suite` from these (in job order, as
+ * `fromJSON` receives them); an empty list skips the job through its `!= '[]'` guard, since
+ * GitHub refuses an empty matrix outright.
+ */
+export const matrices = (jobs: ReadonlySet<Job>): Matrices => ({
+  games: GAME_SUITES.filter((game) => jobs.has(game)),
+  'e2e-games': GAME_SUITES.filter((game) => jobs.has(e2eJob(game))),
+});
+
+/** `$GITHUB_OUTPUT` lines: every job, true or false, the two matrix lists, then `everything`. */
+export const formatGithub = ({ jobs }: Report): string => {
+  const lists = matrices(jobs);
+  return [
     ...JOBS.map((job) => `${job}=${String(jobs.has(job))}`),
+    // One line each: $GITHUB_OUTPUT takes a value on the key's line, so no indentation.
+    `games=${JSON.stringify(lists.games)}`,
+    `e2e-games=${JSON.stringify(lists['e2e-games'])}`,
     `everything=${String(everything(jobs))}`,
   ].join('\n');
+};
 
 export const formatJson = ({ paths, jobs }: Report): string =>
   JSON.stringify(
     {
       paths,
       jobs: Object.fromEntries(JOBS.map((job) => [job, jobs.has(job)])),
+      ...matrices(jobs),
       everything: everything(jobs),
     },
     null,

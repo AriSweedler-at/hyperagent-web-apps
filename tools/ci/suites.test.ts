@@ -11,11 +11,13 @@ import { SHELL_GAMES } from '../games.ts';
 import { matchesAny } from './glob.ts';
 import {
   E2E_SUITES,
+  GAME_SUITES,
   JOBS,
   RULES,
   SUITES,
   SUITE_NAMES,
   e2eJob,
+  isGameSuite,
   jobsFor,
   type Job,
   type Suite,
@@ -173,6 +175,13 @@ describe('every test file belongs to exactly one suite', () => {
     ]);
     expect(E2E_SUITES).toEqual(['gin', 'fidice', 'backgammon', 'site']);
     expect(JOBS).toEqual([...SUITE_NAMES, 'e2e-gin', 'e2e-fidice', 'e2e-backgammon', 'e2e-site']);
+    // The game suites are the matrix jobs' values: each has both halves (the unit script and the
+    // e2e script the two jobs run), in job order.
+    expect(GAME_SUITES).toEqual(['gin', 'fidice', 'backgammon']);
+    expect(SUITE_NAMES.filter(isGameSuite)).toEqual(GAME_SUITES);
+    GAME_SUITES.forEach((game) => {
+      expect(E2E_SUITES, game).toContain(game);
+    });
     // The browser suite is the only one `npm test` leaves out, the built one the only one that builds.
     expect(SUITE_NAMES.filter((s) => SUITES[s].browser)).toEqual(['shared-integration']);
     expect(SUITE_NAMES.filter((s) => SUITES[s].needsBuild)).toEqual(['site']);
