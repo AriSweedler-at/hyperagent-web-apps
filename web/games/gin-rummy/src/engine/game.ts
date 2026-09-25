@@ -8,6 +8,7 @@
 // RuleError worded for the player, never mutates and never throws. Randomness and the clock are
 // injected: the legacy defaulted to `Math.random` and read `Date.now()` for `startedAt` and every
 // round's `ts`; both are banned here, so callers pass an `Rng` and a `Now`.
+import { SEATS, otherSeat as otherPlayer, setAt } from '../../../../shared/lib/game.ts';
 import { err, ok, type Result } from '../../../../shared/lib/result.ts';
 import type { Rng } from '../../../../shared/lib/rng.ts';
 import { makeDeck, pretty, shuffle } from './cards.ts';
@@ -50,10 +51,8 @@ import type { Phase } from './types.ts';
 
 type Applied = Result<State, RuleError>;
 
-const SEATS: ReadonlyArray<Seat> = [0, 1];
-const otherPlayer = (i: Seat): Seat => (i === 0 ? 1 : 0);
-const setAt = <T>(pair: Pair<T>, seat: Seat, value: T): Pair<T> =>
-  seat === 0 ? [value, pair[1]] : [pair[0], value];
+// SEATS, otherPlayer (the shared `otherSeat`) and setAt are web/shared/lib/game.ts's (DRY round 2,
+// F1); otherPlayer keeps its gin name here and in the export list, since view.ts imports it.
 const cardById = (cards: Cards, id: string): Card | null => cards.find((c) => c.id === id) ?? null;
 const without = (cards: Cards, id: string): Cards => cards.filter((c) => c.id !== id);
 const player = (p: PlayerInfo): PlayerState => ({ id: p.id, name: p.name, total: 0 });
@@ -611,6 +610,16 @@ const applyAction = (state: State, seat: Seat, action: Action, rng: Rng, now: No
   }
 };
 
+/**
+ * Who may act (the two-seat contract's `actorOf`, DRY round 2, F1): between hands the first seat
+ * not yet ready, since `ready` is the only action then and either seat may send it; otherwise the
+ * turn. Gin never has nobody to act (both ready at gameOver deals the rematch), so it is never
+ * null. The seeded parity policy (test/parity/gin.policy.ts `actor`) applies the same rule over
+ * the legacy-shaped state.
+ */
+const actorOf = (state: State): Seat =>
+  state.phase === 'roundOver' || state.phase === 'gameOver' ? (state.ready[0] ? 1 : 0) : state.turn;
+
 /** Legal action list for a view (used by UI + tests), in the legacy order. */
 const legalActions = (view: View): ReadonlyArray<Action> => {
   if (view.phase === 'roundOver' || view.phase === 'gameOver')
@@ -662,5 +671,6 @@ export {
   createGame,
   dealHand,
   applyAction,
+  actorOf,
   legalActions,
 };

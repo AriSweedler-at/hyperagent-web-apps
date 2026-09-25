@@ -14,12 +14,14 @@ import {
   object,
   oneOf,
   optional,
+  pair,
   record,
   refine,
   string,
+  taggedUnion,
   type Decoder,
 } from '../../../../shared/lib/json.ts';
-import { err, ok } from '../../../../shared/lib/result.ts';
+import { count, seat, timestamp } from '../../../../shared/lib/game.ts';
 import { rankLabel } from './cards.ts';
 import type {
   Action,
@@ -35,31 +37,18 @@ import type {
   Meld,
   MeldGroups,
   Melding,
-  Pair,
   PendingDraw,
   Phase,
   PlayerState,
   RoundRecord,
   RoundResult,
-  Seat,
   State,
   UpcardStage,
   View,
 } from './types.ts';
 
-/** Exactly two items, as a tuple. */
-const pair =
-  <T>(item: Decoder<T>): Decoder<Pair<T>> =>
-  (input) => {
-    const items = arrayOf(item)(input);
-    if (!items.ok) return items;
-    const [a, b] = items.value;
-    return items.value.length === 2 && a !== undefined && b !== undefined
-      ? ok([a, b])
-      : err({ path: [], expected: 'array of 2' });
-  };
-
-const seat: Decoder<Seat> = literal(0, 1);
+// `pair`, `seat`, `count` and `timestamp` are web/shared/lib's since DRY round 2 (F1, F2); `pair`
+// is re-exported below because engine tests import it from here.
 const phase: Decoder<Phase> = literal(
   'upcard',
   'draw',
@@ -70,9 +59,6 @@ const phase: Decoder<Phase> = literal(
 );
 const upcardStage: Decoder<UpcardStage> = literal('nonDealer', 'dealer');
 const outcome = literal('gin', 'knock', 'undercut');
-const count = integer(0);
-/** Wall-clock milliseconds as the engine's `Now` reports them. */
-const timestamp = integer(0);
 
 const decodeCard: Decoder<Card> = refine(
   object({
@@ -258,7 +244,6 @@ const ACTION_TYPES = [
   'takeBack',
   'finishLayoff',
 ] as const;
-const actionHead = object({ type: literal(...ACTION_TYPES) });
 const plainAction = object({
   type: literal(
     'ready',
@@ -275,31 +260,24 @@ const layOffAction = object({ type: literal('layOff'), cardId: string, onto: cou
 const meldsAction = object({ type: literal('setMelds'), melds: meldGroups });
 
 /**
- * A player's move as the wire `action` frame carries it: the type decides which keys must follow.
+ * A player's move as the wire `action` frame carries it: the type decides which keys must follow,
+ * one case per ACTION_TYPES entry in its order (so a refused type names them as before).
  * `setMelds` requires `melds` (the step 10 follow-up: the legacy read `action.melds || []`; the UI
  * always sends the key).
  */
-const decodeAction: Decoder<Action> = (input) => {
-  const head = actionHead(input);
-  if (!head.ok) return head;
-  switch (head.value.type) {
-    case 'ready':
-    case 'takeUpcard':
-    case 'passUpcard':
-    case 'drawStock':
-    case 'drawDiscard':
-    case 'undoDraw':
-    case 'finishLayoff':
-      return plainAction(input);
-    case 'discard':
-    case 'knock':
-    case 'takeBack':
-      return cardAction(input);
-    case 'layOff':
-      return layOffAction(input);
-    case 'setMelds':
-      return meldsAction(input);
-  }
-};
+const decodeAction: Decoder<Action> = taggedUnion('type', {
+  ready: plainAction,
+  takeUpcard: plainAction,
+  passUpcard: plainAction,
+  drawStock: plainAction,
+  drawDiscard: plainAction,
+  undoDraw: plainAction,
+  discard: cardAction,
+  knock: cardAction,
+  setMelds: meldsAction,
+  layOff: layOffAction,
+  takeBack: cardAction,
+  finishLayoff: plainAction,
+});
 
 export { ACTION_TYPES, decodeAction, decodeCard, decodeState, decodeView, pair };
