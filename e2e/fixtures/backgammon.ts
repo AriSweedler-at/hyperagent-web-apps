@@ -224,6 +224,9 @@ export const bgSetup = async (page: Page, state: State): Promise<View> => {
     v === null ? '' : JSON.stringify([v.board, v.turn, v.phase, v.dice]);
   await expect.poll(async () => seated(await readBoard(page))).toBe(seated(state));
   await expect(page.locator('#curtainOverlay')).toBeHidden();
+  // Whatever the previous position's last paint left in the air has landed: a spec's first tap
+  // never races a clone or a coin still hidden under it (as the parity driver's `settleBg` waits).
+  await expect(page.locator('.flyer, .checker.arriving, .checker.settling')).toHaveCount(0);
   return requireBoard(page);
 };
 
@@ -247,8 +250,12 @@ export const bgBoard = (text: string, variant: ShippedVariant = 'portes'): Board
   return parsed.value;
 };
 
-/** A fixed clock for the states built here (the page's own clock stamps what it plays). */
-const NOW = 1_700_000_000_000;
+/**
+ * The clock for the states built here (the page's own clock stamps what it plays): each position
+ * gets its own `startedAt`, so two seated one after the other read as two games to the painter
+ * (`flightsBetween`) and the second paints cold instead of "undoing" the first's moves.
+ */
+const stamp = (): number => Date.now();
 
 /**
  * A `State` for `bgSetup`: a fresh match between `names` (seed 1 decides its opening, which the
@@ -265,7 +272,7 @@ export const bgPosition = (p: Position): State => {
     ],
     { matchLength: p.matchLength ?? 5, rotation: [variant] },
     mulberry32(1),
-    () => NOW,
+    stamp,
   );
   const seated = withPosition(fresh, bgBoard(p.text, variant), p.turn, p.dice ?? null);
   return p.score === undefined ? seated : { ...seated, match: { ...seated.match, score: p.score } };

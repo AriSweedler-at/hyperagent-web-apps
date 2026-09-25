@@ -76,8 +76,10 @@ type DelayFold = Readonly<{ out: ReadonlyArray<number>; movers: number; last: nu
 
 /**
  * When each flight leaves, in ms after the repaint: the movers `STAGGER_MS` apart in order (one
- * tap commits one move, so this is the opponent's play or a combined move arriving whole); a hit
- * blot `HIT_DELAY_MS` after the mover that landed on it, so it is seen to be hit.
+ * tap commits one move, so this is the opponent's play, or a double's checkers arriving whole: a
+ * checker played on through a point is one flight, board.ts `foldChains`); a hit blot
+ * `HIT_DELAY_MS` after the mover that landed on it, so it is seen to be hit (and, undone, the
+ * blot comes back that long after the mover has left its point).
  */
 export const flightDelays = (flights: ReadonlyArray<Flight>): ReadonlyArray<number> =>
   flights.reduce<DelayFold>(

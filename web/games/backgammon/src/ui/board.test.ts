@@ -44,6 +44,7 @@ import {
   effectiveSelection,
   MAX_FLIGHTS,
   flightsBetween,
+  foldChains,
   offHtml,
   offIdFor,
   ownPoint,
@@ -237,14 +238,18 @@ describe('dice', () => {
     expect(diceHtml(diceFor(viewAt(START, 0, null)))).toBe(
       '<span class="die blank" aria-hidden="true"></span><span class="die blank" aria-hidden="true"></span>',
     );
+    // Each die starts its tumble part-way (`--tumble-shift`: (face + index) % 4 faces of 70ms).
     expect(diceHtml(diceFor(viewAt(T15, 0, [6, 5]), 5))).toBe(
-      '<span class="die die-6 dead" data-die="6" aria-label="die 6, cannot be played" aria-disabled="true"></span>' +
-        '<span class="die die-5 picked" data-die="5" aria-label="die 5"></span>',
+      '<span class="die die-6 dead" style="--tumble-shift: -140ms" data-die="6" aria-label="die 6, cannot be played" aria-disabled="true"></span>' +
+        '<span class="die die-5 picked" style="--tumble-shift: -140ms" data-die="5" aria-label="die 5"></span>',
+    );
+    expect(diceHtml(diceFor(viewAt(START, 0, [3, 1])))).toContain(
+      '<span class="die die-3" style="--tumble-shift: -210ms" data-die="3" aria-label="die 3"></span><span class="die die-1" style="--tumble-shift: -140ms"',
     );
     expect(diceHtml(diceFor(viewAt(START, 0, [3, 1], 1)))).toContain('class="die die-3 theirs"');
     const after = viewFor(move(stateAt(START, 0, [3, 1]), '8/5'), 0);
     expect(diceHtml(diceFor(after))).toContain(
-      '<span class="die die-3 used" data-die="3" aria-label="die 3, played" aria-disabled="true"></span>',
+      '<span class="die die-3 used" style="--tumble-shift: -210ms" data-die="3" aria-label="die 3, played" aria-disabled="true"></span>',
     );
     expect([diceWords([6, 4]), diceWords([1, 1]), diceWords(null)]).toEqual([
       'six and four',
@@ -556,13 +561,74 @@ describe('flightsBetween', () => {
     expect(flightsBetween(before1, viewFor(t1, 1))).toEqual([]);
   });
 
-  test('an undo reverses the removed tail, the blot first', () => {
+  test("an undo reverses the removed tail; the blot's return is its trip (`hit`), not the mover's", () => {
     const hit = move(t13, '8/5*');
     const undone = step(hit, 0, { type: 'undo' });
     expect(flightsBetween(viewFor(hit, 0), viewFor(undone, 0))).toEqual([
-      { fromContainer: 'barTop', toContainer: 'point-5' },
+      { fromContainer: 'barTop', toContainer: 'point-5', hit: true },
       { fromContainer: 'point-5', toContainer: 'point-8' },
     ]);
+  });
+
+  test('a paint that changes the seat shown flies nothing: pass-and-play flips the board at the turn end', () => {
+    const one = move(t1, '8/5');
+    const done = move(one, '6/5');
+    // The same turn end, seen from the seat that stays (online): the last move flies.
+    expect(flightsBetween(viewFor(one, 0), viewFor(done, 0))).toHaveLength(1);
+    // Pass-and-play: the view is now Dark's, the points mirrored; the move paints cold.
+    expect(flightsBetween(viewFor(one, 0), viewFor(done, 1))).toEqual([]);
+    expect(flightsBetween(viewFor(t1, 1), viewFor(done, 0))).toEqual([]);
+  });
+
+  test('a checker played on through a waypoint flies once, from where it stood to where it ended', () => {
+    // 2-2 from the start: 13/11/9 as one combined move (a target-2 tap); own 11 is empty before
+    // and after, so neither leg alone could be measured.
+    const twos = stateAt(START, 0, [2, 2]);
+    const two = move(move(twos, '13/11'), '11/9');
+    expect(two.played).toHaveLength(2);
+    expect(flightsBetween(viewFor(twos, 0), viewFor(two, 0))).toEqual([
+      { fromContainer: 'point-13', toContainer: 'point-9' },
+    ]);
+    // The whole double, 13/11 twice then 11/9 twice, arriving in one frame with the turn's end
+    // (the fourth move ends it, R13): two checkers fly, as seen from the seat that stays.
+    const three = move(move(move(twos, '13/11'), '13/11'), '11/9');
+    const four = move(three, '11/9');
+    expect(four.phase).toBe('toRoll');
+    expect(flightsBetween(viewFor(twos, 0), viewFor(four, 0))).toEqual([
+      { fromContainer: 'point-13', toContainer: 'point-9' },
+      { fromContainer: 'point-13', toContainer: 'point-9' },
+    ]);
+    // Three moves undone: the checker that went on comes back whole, the other one leg.
+    const back = step(three, 0, { type: 'undo' });
+    expect(back.played).toEqual([]);
+    expect(flightsBetween(viewFor(three, 0), viewFor(back, 0))).toEqual([
+      { fromContainer: 'point-9', toContainer: 'point-13' },
+      { fromContainer: 'point-11', toContainer: 'point-13' },
+    ]);
+    // A hit at the waypoint (design §4.3: 13/7*/4 with 6-3): the mover flies through, the blot
+    // leaves the waypoint for the bar, and the blot is never taken for the mover.
+    const sixThree = stateAt(BLOT_ON_7, 0, [6, 3]);
+    const through = move(move(sixThree, '13/7*'), '7/4');
+    expect(flightsBetween(viewFor(sixThree, 0), viewFor(through, 0))).toEqual([
+      { fromContainer: 'point-13', toContainer: 'point-4' },
+      { fromContainer: 'point-7', toContainer: 'barTop', hit: true },
+    ]);
+    expect(
+      foldChains([
+        { fromContainer: 'barTop', toContainer: 'point-5', hit: true },
+        { fromContainer: 'point-5', toContainer: 'point-8' },
+      ]),
+    ).toEqual([
+      { fromContainer: 'barTop', toContainer: 'point-5', hit: true },
+      { fromContainer: 'point-5', toContainer: 'point-8' },
+    ]);
+    // A slab is where a checker ends, never a waypoint.
+    expect(
+      foldChains([
+        { fromContainer: 'point-1', toContainer: 'offLight', slab: true },
+        { fromContainer: 'offLight', toContainer: 'point-2' },
+      ]),
+    ).toHaveLength(2);
   });
 
   test('the turn ends: the finished play beyond what was shown, from either side of the table', () => {

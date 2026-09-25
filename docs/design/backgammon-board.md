@@ -238,8 +238,10 @@ lift on the way (`fly-lift`, 200ms: the clone rises 6px and its shadow deepens a
 the individual `translate` and `filter` so the glide's transform and its `transitionend` are
 untouched); the movers of one play leave 60ms apart (`STAGGER_MS`, `flightDelays`) and a hit's
 flight to the bar 80ms after the mover that landed on it (`HIT_DELAY_MS`); the chip tray fades in
-over 160ms; the tumble 560ms of face cycling inside `TUMBLE_MS` 700 (§4.7); `hitFlash` 420ms; `glow`
-1.6s loop. `@media (prefers-reduced-motion: reduce)` disables `tumble` and `tumble-faces` (the
+over 160ms; the tumble 560ms of face cycling inside `TUMBLE_MS` 700 (§4.7), each die starting
+0..3 faces in (`--tumble-shift`, a negative `animation-delay` the die's markup writes from its
+face and its place in the roll, so no two rolls open on the same faces and the dice settle one
+after the other, 350..560ms in); `hitFlash` 420ms; `glow` 1.6s loop. `@media (prefers-reduced-motion: reduce)` disables `tumble` and `tumble-faces` (the
 real faces show at once: the tumble is one frame, the beat stays), `glow`, `hitFlash`, `shake` and the pulses and
 sets the flyer's and the checker's `transition-duration` to 1ms (and `fly-lift` off) so the
 fallback timer is the only delay.
@@ -253,12 +255,22 @@ in `toContainer`, marks it `arriving` (unless it is the coin that was already on
 visible; a count badge the landing brings hides under `settling` until the clone lands), clones the
 source into `doc.body` as a fixed `.flyer`
 (`--checker-d` set to the rect's width, as gin's ghost sets `--card-w`), forces a layout read, sets
-the translate (`scale(.35, 1)` toward a slab, class `flyer-slab`) and on `afterTransition(flyer,
-…, FLY_MS + 60)` removes the flyer and `arriving`. Zero rects (the page fake): repaint and return.
+the translate (`scale(.35, 1)` toward a slab, class `flyer-slab`; the transform is a translate
+between the two rects' top-left corners then the scale, so `.flyer` has `transform-origin: 0 0`,
+or a coin shrinking into a slab lands half the size difference off it) and on
+`afterTransition(flyer, …, FLY_MS + 60)` removes the flyer and `arriving`. Zero rects (the page
+fake): repaint and return.
 Flights come from the pure `flightsBetween(prev, next)` (`ui/board.ts`): the new `played` moves
-(plus hit → the opponent's bar), an undo reversed, a finished turn's `lastPlay` beyond what was
-already shown; more than eight flights (`MAX_FLIGHTS`: a double's four moves, each a hit) or a
-new roll repaint cold. `fly.ts` may not
+(plus hit → the opponent's bar), an undo reversed (the blot's return is `hit` too: it is not the
+mover), a finished turn's `lastPlay` beyond what was already shown; a paint that changes the
+seat shown (pass-and-play's turn end: the board flips to the next player's frame in the same
+repaint, so a destination measured after it is the mirrored point) flies nothing; more than
+eight flights (`MAX_FLIGHTS`: a double's four moves, each a hit) or a new roll repaint cold.
+`foldChains` (`ui/board.ts`) joins one checker's legs through a repaint into one flight: a mover
+that leaves the container an earlier mover of the batch landed in (a combined move's waypoint,
+13/11/9 with 2-2; a double played on through one point; an undo of either) extends that flight to
+its own destination, since the waypoint is often empty before and after the repaint and neither
+leg could be measured alone; a `hit` flight is neither extended nor joined. `fly.ts` may not
 import `ui/state.ts`; it takes rects and ids only. The points a hit flight lifts from flash `hit`.
 More than `MAX_LIVE_FLYERS` (12) clones in the air is a scripted burst (a policy through the hook
 playing a game in one task; a whole match is thousands of clones no timer can remove before the
@@ -430,10 +442,11 @@ restarts when the host's faces arrive; `tumble/elapsed` clears it. While `rollin
 null (no tap, roll, undo or double answers; `#board.inert`), the modal's button is disabled, and
 the status line reads "Rolling…" (`ROLLING_STATUS`; the dice in words wait too, so nothing names
 the roll before the faces settle), and the painter puts `rolling` on `#dice`, `#diceMini` and
-`#rollModalDice` (§3.7: the faces run
-through a fixed pseudo-random list every 70 ms for 560 ms, then the real faces show for the last
-140 ms), with `#board[data-rolling]` for the specs to wait on and `#board[data-rolled]` once the
-faces stand still. The roll cue plays at the click as before (`cuesBetween`); when the settled
+`#rollModalDice` (§3.8: the faces run
+through a fixed pseudo-random list every 70 ms for up to 560 ms, each die starting 0..3 faces in
+from `--tumble-shift`, then the real faces show for the rest of the beat), with
+`#board[data-rolling]` for the specs to wait on and `#board[data-rolled]` once the faces stand
+still. The roll cue plays at the click as before (`cuesBetween`); when the settled
 roll is a double, `tumble/elapsed` raises `doubles` (§5.1) after it, for whichever seat is
 watching; a refusal (`refuse`) drops `rolling` with the taps. Tapping `#dice` is still `roll/click`. Under reduced motion the
 cycling is off (one frame) and the 700 ms beat stays.

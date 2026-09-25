@@ -295,7 +295,9 @@ describe('the table', () => {
     expect(p.get('rollOverlay').hidden()).toBe(false);
     expect(p.get('rollModalBtn').disabled()).toBe(true);
     expect(p.get('rollModalDice').hasClass('rolling')).toBe(true);
-    expect(p.get('rollModalDice').text()).toMatch(/^<span class="die die-[1-6]" data-die="[1-6]"/);
+    expect(p.get('rollModalDice').text()).toMatch(
+      /^<span class="die die-[1-6]" style="--tumble-shift: -\d+ms" data-die="[1-6]"/,
+    );
     expect(p.get('dice').hasClass('rolling')).toBe(true);
     expect(p.get('diceMini').hasClass('rolling')).toBe(true);
     expect(p.get('board').attr('data-rolling')).toBe('1');
@@ -315,7 +317,7 @@ describe('the table', () => {
     expect(p.get('diceMini').hidden()).toBe(false);
     expect(p.get('diceMini').text()).toBe(p.get('dice').text());
     expect(p.get('dice').text()).toMatch(
-      /^<span class="die die-[1-6]" data-die="[1-6]" aria-label="die [1-6]"><\/span>/,
+      /^<span class="die die-[1-6]" style="--tumble-shift: -\d+ms" data-die="[1-6]" aria-label="die [1-6]"><\/span>/,
     );
     expect(p.get('statusDice').text()).toMatch(
       /^(one|two|three|four|five|six) and (one|two|three|four|five|six)$/,

@@ -211,8 +211,18 @@ export const diceFor = (v: View, picked: Die | null = null, noMoveShown = false)
   return { faces: model, theirs: roller !== v.me.idx, key };
 };
 
-const dieHtml = (f: DieFace, theirs: boolean): string => {
+/** The tumble's face list holds one face this long (theme.css `tumble-faces-a|b`, 8 faces in 560ms). */
+const TUMBLE_FACE_MS = 70;
+
+/**
+ * A die's markup. `--tumble-shift` starts its tumble 0..3 faces in (a negative `animation-delay`,
+ * theme.css `.rolling .die`), from the face and the die's place in the roll: two rolls seldom open
+ * on the same faces and the dice of one roll settle one after the other. Written into the markup
+ * (the dice are keyed on the roll) so the painter toggles `rolling` alone.
+ */
+const dieHtml = (f: DieFace, theirs: boolean, index: number): string => {
   const d = String(f.die);
+  const shift = `--tumble-shift: -${String(((f.die + index) % 4) * TUMBLE_FACE_MS)}ms`;
   const classes = [
     'die',
     `die-${d}`,
@@ -229,7 +239,7 @@ const dieHtml = (f: DieFace, theirs: boolean): string => {
         ? `die ${d}, cannot be played`
         : `die ${d}`;
   const disabled = f.state === 'live' ? '' : ' aria-disabled="true"';
-  return `<span class="${classes}" data-die="${d}" aria-label="${label}"${disabled}></span>`;
+  return `<span class="${classes}" style="${shift}" data-die="${d}" aria-label="${label}"${disabled}></span>`;
 };
 
 const BLANK_DIE = '<span class="die blank" aria-hidden="true"></span>';
@@ -238,7 +248,7 @@ const BLANK_DIE = '<span class="die blank" aria-hidden="true"></span>';
 export const diceHtml = (model: DiceModel): string =>
   model.faces.length === 0
     ? `${BLANK_DIE}${BLANK_DIE}`
-    : model.faces.map((f) => dieHtml(f, model.theirs)).join('');
+    : model.faces.map((f, i) => dieHtml(f, model.theirs, i)).join('');
 
 const DIE_WORDS: ReadonlyArray<string> = ['one', 'two', 'three', 'four', 'five', 'six'];
 
@@ -625,7 +635,10 @@ export const placeAria = (v: View, id: PlaceId, hl: Highlight = NO_HIGHLIGHT): s
 
 // ---- flights (design §3.9 `flightsBetween`) -------------------------------------------------------
 
-/** A checker's trip between two containers; `slab` when it lands as a slab, `hit` for a blot sent to the bar. */
+/**
+ * A checker's trip between two containers; `slab` when it lands as a slab, `hit` for a blot's
+ * trip to the bar (or back from it, undone): never the mover, so `foldChains` leaves it alone.
+ */
 export type Flight = Readonly<{
   fromContainer: PlaceId;
   toContainer: PlaceId;
@@ -663,25 +676,65 @@ const forward = (v: View, seat: Seat, m: PlayedMove): ReadonlyArray<Flight> => [
       ]
     : []),
 ];
-/** A move undone: the blot comes back from the bar, the checker returns to where it stood. */
+/**
+ * A move undone: the checker returns to where it stood and the blot comes back from the bar
+ * (`hit`, so fly.ts lets the mover leave first, and `foldChains` never joins it to the mover).
+ */
 const backward = (v: View, seat: Seat, m: PlayedMove): ReadonlyArray<Flight> => [
   ...(m.hit && m.to !== 'off'
-    ? [{ fromContainer: barIdFor(v, otherSeat(seat)), toContainer: pointId(m.to) }]
+    ? [
+        {
+          fromContainer: barIdFor(v, otherSeat(seat)),
+          toContainer: pointId(m.to),
+          hit: true,
+        } as const,
+      ]
     : []),
   { fromContainer: placeIdOf(v, seat, m.to), toContainer: placeIdOf(v, seat, m.from) },
 ];
 
-const capped = (flights: ReadonlyArray<Flight>): ReadonlyArray<Flight> =>
-  flights.length > MAX_FLIGHTS ? [] : flights;
+/**
+ * One checker's legs through one repaint become one flight: a mover that leaves the container an
+ * earlier mover of the batch landed in (a combined move's waypoint, a double played on through one
+ * point, an undo of either) extends that flight to its own destination. The waypoint is often
+ * empty both before and after the repaint, so neither leg could be measured on its own and the
+ * checker would simply appear (the review, 2026-09-25); folded, it flies from where it stood to
+ * where it ended. A blot's trip (`hit`) is neither extended nor joined: it is not the mover.
+ */
+export const foldChains = (flights: ReadonlyArray<Flight>): ReadonlyArray<Flight> =>
+  flights.reduce<ReadonlyArray<Flight>>((acc, f) => {
+    const i =
+      f.hit === true
+        ? -1
+        : acc.findIndex(
+            (g) => g.hit !== true && g.slab !== true && g.toContainer === f.fromContainer,
+          );
+    return i === -1
+      ? [...acc, f]
+      : acc.map((g, j) => (j === i ? { ...f, fromContainer: g.fromContainer } : g));
+  }, []);
+
+const capped = (flights: ReadonlyArray<Flight>): ReadonlyArray<Flight> => {
+  const folded = foldChains(flights);
+  return folded.length > MAX_FLIGHTS ? [] : folded;
+};
 
 /**
  * What moved between two paints of the same game: the moves added to this turn (mine as I tap,
  * the opponent's as frames arrive), an undo's removed tail reversed, or, once the turn (or the
  * game) has ended, the previous mover's finished play beyond what was already shown. Anything
- * else (a new game, a roll, a cube action, a frame that skipped a turn) animates nothing.
+ * else (a new game, a roll, a cube action, a frame that skipped a turn) animates nothing, and
+ * neither does a paint that changes the seat shown (pass-and-play's turn end): the board flips to
+ * the next player's frame in the same repaint, so a destination measured after it is the mirrored
+ * point (the review, 2026-09-25); the last move of a turn paints cold under the curtain.
  */
 export const flightsBetween = (prev: View, next: View): ReadonlyArray<Flight> => {
-  if (prev.gameNo !== next.gameNo || prev.startedAt !== next.startedAt) return [];
+  if (
+    prev.gameNo !== next.gameNo ||
+    prev.startedAt !== next.startedAt ||
+    prev.me.idx !== next.me.idx
+  )
+    return [];
   const sameTurn = prev.turn === next.turn;
   if (
     sameTurn &&

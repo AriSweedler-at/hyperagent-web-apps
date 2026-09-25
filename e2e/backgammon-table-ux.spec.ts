@@ -2,7 +2,9 @@
 // §3.8, §3.9, §4.2, §4.7, §5.1), on the served page at a phone and a laptop: a legal destination
 // lights its whole cell with the die badge at its centre and the triangle breathing; a second tap
 // on the selected checker, or a tap on the felt, lets it go and darkens the targets; a move is a
-// `.flyer` that leaves the source coin's rect and lands on the destination's; a stack of five takes
+// `.flyer` that leaves the source coin's rect and lands on the destination's (a combined move
+// through an empty waypoint as one flight, a bear-off shrunk onto the newest slab, and none at
+// all for the last move of a pass-and-play turn, which flips the board); a stack of five takes
 // a sixth without rebuilding its coins (the top one keeps its element and takes the count badge,
 // nothing flashes); and a double, forced through the page's `window.__rng` hook, plays the
 // `doubles` cue after `roll` once the dice have settled. The roll modal itself (up for the seat to
@@ -51,6 +53,46 @@ const styleOf = (
   page.evaluate<Readonly<Record<string, string>>>(
     `(() => { const s = getComputedStyle(document.querySelector(${JSON.stringify(selector)}), ${JSON.stringify(pseudo)}); return Object.fromEntries(${JSON.stringify(props)}.map((p) => [p, s.getPropertyValue(p)])); })()`,
   );
+
+type Box = Readonly<{ left: number; top: number; width: number; height: number }>;
+/** One `.flyer` as the page recorded it: its first rect, a rect per frame, and when it went. */
+type Flight = Readonly<{ start: Box; samples: ReadonlyArray<Box>; removedAt: number | null }>;
+
+/**
+ * Record every `.flyer` the page adds from now on (`window.__flights`): where it starts, where it
+ * is each frame until it is removed, and how long it lived.
+ */
+const trackFlights = (page: Page): Promise<void> =>
+  page.evaluate(`(() => {
+    window.__flights = [];
+    const track = (el) => {
+      const rec = { start: el.getBoundingClientRect().toJSON(), samples: [], removedAt: null, t0: performance.now() };
+      window.__flights.push(rec);
+      const tick = () => {
+        if (!el.isConnected) { rec.removedAt = performance.now() - rec.t0; return; }
+        rec.samples.push(el.getBoundingClientRect().toJSON());
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    };
+    new MutationObserver((muts) => muts.forEach((m) => m.addedNodes.forEach((n) => {
+      if (n.nodeType === 1 && n.classList.contains('flyer')) track(n);
+    }))).observe(document.body, { childList: true });
+  })()`);
+const flightsOf = (page: Page): Promise<ReadonlyArray<Flight>> =>
+  page.evaluate<ReadonlyArray<Flight>>('window.__flights');
+const landedFlights = (page: Page): Promise<number> =>
+  page.evaluate<number>('window.__flights.filter((f) => f.removedAt !== null).length');
+/** The one flight recorded, its start and its last frame; throws when there is not exactly one. */
+const theFlight = async (page: Page): Promise<Readonly<{ flight: Flight; last: Box }>> => {
+  const flights = await flightsOf(page);
+  const [flight] = flights;
+  if (flight === undefined || flights.length !== 1)
+    throw new Error(`${String(flights.length)} flights were recorded, not one`);
+  const last = flight.samples.at(-1);
+  if (last === undefined) throw new Error('the flight was never sampled');
+  return { flight, last };
+};
 
 /**
  * Light to play 3-1 from the start for `seat`'s perspective: own 8 and own 6 can move (two sources,
@@ -154,42 +196,11 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator(`#${ownPointId(v, 8)}`)).toHaveClass(/\bselected\b/);
       await page.waitForTimeout(200);
       const from = await rectOf(page, `#${ownPointId(v, 8)} .checker.top`);
-      // Record every `.flyer` the page adds: where it starts and where it is each frame until it goes.
-      await page.evaluate(`(() => {
-        window.__flights = [];
-        const track = (el) => {
-          const rec = { start: el.getBoundingClientRect().toJSON(), samples: [], removedAt: null, t0: performance.now() };
-          window.__flights.push(rec);
-          const tick = () => {
-            if (!el.isConnected) { rec.removedAt = performance.now() - rec.t0; return; }
-            rec.samples.push(el.getBoundingClientRect().toJSON());
-            requestAnimationFrame(tick);
-          };
-          requestAnimationFrame(tick);
-        };
-        new MutationObserver((muts) => muts.forEach((m) => m.addedNodes.forEach((n) => {
-          if (n.nodeType === 1 && n.classList.contains('flyer')) track(n);
-        }))).observe(document.body, { childList: true });
-      })()`);
+      await trackFlights(page);
       await bgMove(page, 8, 5);
-      await expect
-        .poll(() =>
-          page.evaluate<number>('window.__flights.filter((f) => f.removedAt !== null).length'),
-        )
-        .toBe(1);
+      await expect.poll(() => landedFlights(page)).toBe(1);
       const to = await rectOf(page, `#${ownPointId(v, 5)} .checker.top`);
-      const [flight] = await page.evaluate<
-        ReadonlyArray<
-          Readonly<{
-            start: Rect & Readonly<{ left: number; top: number; width: number; height: number }>;
-            samples: ReadonlyArray<
-              Readonly<{ left: number; top: number; width: number; height: number }>
-            >;
-            removedAt: number;
-          }>
-        >
-      >('window.__flights');
-      if (flight === undefined) throw new Error('no flight was recorded');
+      const { flight, last } = await theFlight(page);
       // It starts over the source coin, its last frame is over the destination coin, and it is
       // gone within FLY_MS plus the fallback slack (design §3.8: 200ms, not the 260ms it was).
       expect(
@@ -200,8 +211,6 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         near(flight.start.top, from.y, 2),
         `start y ${String(flight.start.top)} vs source ${String(from.y)}`,
       ).toBe(true);
-      const last = flight.samples.at(-1);
-      if (last === undefined) throw new Error('the flight was never sampled');
       expect(near(last.left, to.x, 8), `landed x ${String(last.left)} vs ${String(to.x)}`).toBe(
         true,
       );
@@ -210,6 +219,113 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       expect(flight.removedAt).toBeLessThan(700);
       // The destination's own coin is back in view, no clone left over.
       await expect(page.locator('.flyer, .checker.arriving')).toHaveCount(0);
+    });
+
+    test('a combined move through an empty waypoint flies once, from the source coin to the final point', async ({
+      player,
+      project,
+    }) => {
+      const { page } = player;
+      await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
+      await bgReveal(page);
+      // 2-2 from the start: own 13 to own 9 in one tap on the `target-2`, through own 11, which
+      // is empty before and after (design §3.9: the legs fold into one flight).
+      const v = await bgSetup(page, bgPosition({ text: START, turn: 0, dice: [2, 2] }));
+      const thirteen = `#${ownPointId(v, 13)}`;
+      const nine = page.locator(`#${ownPointId(v, 9)}`);
+      await expect(page.locator(`#${ownPointId(v, 11)} .checker`)).toHaveCount(0);
+      await bgTap(page, 13);
+      await expect(page.locator(thirteen)).toHaveClass(/\bselected\b/);
+      await expect(nine).toHaveClass(/\btarget-2\b/);
+      await page.waitForTimeout(200);
+      const from = await rectOf(page, `${thirteen} .checker.top`);
+      await trackFlights(page);
+      await nine.click();
+      await expect.poll(async () => (await requireBoard(page)).played.length).toBe(2);
+      await expect.poll(() => landedFlights(page)).toBe(1);
+      const to = await rectOf(page, `#${ownPointId(v, 9)} .checker.top`);
+      const { flight, last } = await theFlight(page);
+      expect(near(flight.start.left, from.x, 2), `start x ${String(flight.start.left)}`).toBe(true);
+      expect(near(flight.start.top, from.y, 2), `start y ${String(flight.start.top)}`).toBe(true);
+      expect(near(last.left, to.x, 8), `landed x ${String(last.left)} vs ${String(to.x)}`).toBe(
+        true,
+      );
+      expect(near(last.top, to.y, 8), `landed y ${String(last.top)} vs ${String(to.y)}`).toBe(true);
+      await expect(page.locator(`#${ownPointId(v, 11)} .checker`)).toHaveCount(0);
+      await expect(page.locator('.flyer, .checker.arriving')).toHaveCount(0);
+    });
+
+    test('a bear-off flies to the newest slab and lands on it, shrunk about its corner', async ({
+      player,
+      project,
+    }) => {
+      const { page } = player;
+      await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
+      await bgReveal(page);
+      // Light bearing off with 6-5: the 6 takes the coin on own 6 to the tray (T10).
+      const v = await bgSetup(
+        page,
+        bgPosition({
+          text: 'L: 6:2 5:2 4:2 3:2 2:2 1:2 | D: 13:15 | bar 0/0 | off 3/0',
+          turn: 0,
+          dice: [6, 5],
+        }),
+      );
+      await expect(page.locator('#offLight .slab')).toHaveCount(3);
+      await bgTap(page, 6);
+      await expect(page.locator(`#${ownPointId(v, 6)}`)).toHaveClass(/\bselected\b/);
+      await page.waitForTimeout(200);
+      await trackFlights(page);
+      await bgMove(page, 6, 'off');
+      await expect(page.locator('#offLight .slab')).toHaveCount(4);
+      await expect.poll(() => landedFlights(page)).toBe(1);
+      const slab = await rectOf(page, '#offLight .slab:last-child');
+      const { last } = await theFlight(page);
+      // The clone's last frame is the slab: same centre, same size (the transform scales about
+      // the top-left corner the translate was computed from, design §3.9; about the centre it
+      // would sit half the coin-to-slab difference off, 17px on a phone).
+      const cx = last.left + last.width / 2;
+      const cy = last.top + last.height / 2;
+      expect(
+        near(cx, slab.x + slab.w / 2, 4),
+        `centre x ${String(cx)} vs slab ${String(slab.x + slab.w / 2)}`,
+      ).toBe(true);
+      expect(
+        near(cy, slab.y + slab.h / 2, 4),
+        `centre y ${String(cy)} vs slab ${String(slab.y + slab.h / 2)}`,
+      ).toBe(true);
+      expect(near(last.width, slab.w, 3), `width ${String(last.width)} vs ${String(slab.w)}`).toBe(
+        true,
+      );
+      expect(
+        near(last.height, slab.h, 3),
+        `height ${String(last.height)} vs ${String(slab.h)}`,
+      ).toBe(true);
+      await expect(page.locator('.flyer, .arriving')).toHaveCount(0);
+    });
+
+    test('pass-and-play: the last move of a turn paints cold, since the board flips to the next seat', async ({
+      player,
+      project,
+    }) => {
+      const { page } = player;
+      await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
+      await bgReveal(page);
+      const v = await seated(page, 0);
+      await bgMove(page, 8, 5);
+      await trackFlights(page);
+      // The 1: 6/5 ends the turn; the curtain rises for Dark and the board is Dark's frame.
+      const next = await bgMove(page, 6, 5);
+      expect(next.turn).toBe(1);
+      expect(next.me.idx).toBe(1);
+      await expect(page.locator('#curtainOverlay')).toBeVisible();
+      await expect(page.locator('#board')).toHaveAttribute('data-seat', '1');
+      await page.waitForTimeout(300);
+      // No clone crossed the flipped board (it would have landed on the mirrored point, design
+      // §3.9); the moved coins simply stand on Light's 5-point, none hidden.
+      expect(await flightsOf(page)).toEqual([]);
+      await expect(page.locator(`#${ownPointId(v, 5)} .checker`)).toHaveCount(2);
+      await expect(page.locator('.flyer, .checker.arriving, .checker.settling')).toHaveCount(0);
     });
 
     test('a stack of five takes a sixth in place: the coins keep their elements, the top one takes the badge, nothing flashes', async ({

@@ -464,7 +464,7 @@ export type Intent =
   | Readonly<{ type: 'chip/cancel' }>
   /** A tap on the board's own surface (the felt between the places): the tray closes and the tapped source is let go (design §4.2 rule 2b). */
   | Readonly<{ type: 'board/tap' }>
-  /** `#rollBtn`, `#dice` before the roll, and the curtain button when it promised a roll. */
+  /** `#rollModalBtn` (design §4.7) and `#dice` before the roll. */
   | Readonly<{ type: 'roll/click' }>
   | Readonly<{ type: 'undo/click' }>
   /** `#doneBtn` is reserved (R13: the turn ends by itself); the intent is accepted and ignored. */
