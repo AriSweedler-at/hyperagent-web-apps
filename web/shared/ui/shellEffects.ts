@@ -22,13 +22,18 @@ import {
 } from './shell.ts';
 import type { RulesSlot } from './glossary.ts';
 import type { SoundFontName } from '../lib/sound/fonts.ts';
+import type { Phrase } from '../lib/sound/phrase.ts';
 
 /** The adapters a shell effect reaches; a game's `EffectDeps` is this plus its own. */
 export type ShellEffectDeps<G extends ShellTypes> = Readonly<{
   store: G['Store'];
   toast: (message: string, ms: number | null) => void;
-  /** A cue in the App's font: the reducer's state is the source of truth for both. */
-  fx: (cue: Cue<G>, font: SoundFontName) => void;
+  /**
+   * A cue of the game's table, or phrases already chosen (`eventEffects`), in the App's font: the
+   * reducer's state is the source of truth for both. One dep for both so a game's deps never
+   * miss the second path (boot.ts wires it to the cue player's `play` and `playPhrases`).
+   */
+  fx: (what: Cue<G> | ReadonlyArray<Phrase>, font: SoundFontName) => void;
   wakeLock: (hold: boolean) => void;
   net: Readonly<{
     startHost: (code: string, attempt: number, resume: boolean) => void;
@@ -98,6 +103,9 @@ export const runShellEffect = <G extends ShellTypes>(
       return;
     case 'fx':
       deps.fx(effect.cue, shell.soundFont);
+      return;
+    case 'phrases':
+      deps.fx(effect.phrases, shell.soundFont);
       return;
     case 'wakeLock':
       deps.wakeLock(effect.hold);

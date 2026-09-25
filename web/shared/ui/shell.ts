@@ -33,6 +33,7 @@ import type { Result } from '../lib/result.ts';
 import type { Rng } from '../lib/rng.ts';
 import { randomCode, sanitiseCode, validateCode, type Game } from '../lib/roomCode.ts';
 import { DEFAULT_SOUND_FONT, type SoundFontName } from '../lib/sound/fonts.ts';
+import type { Phrase } from '../lib/sound/phrase.ts';
 import type { RulesSlot } from './glossary.ts';
 
 // ---- the game's types, in one bag --------------------------------------------------------------
@@ -376,6 +377,12 @@ export type ShellEffect<G extends ShellTypes> =
   /** To the current session's channel, if open. */
   | Readonly<{ type: 'send'; frame: HostFrameOf<G> | GuestFrameOf<G> }>
   | Readonly<{ type: 'fx'; cue: Cue<G> }>
+  /**
+   * Phrases the game's event binding chose (web/shared/ui/eventEffects.ts, sound-history.md
+   * §3.5): played back to back in the App's font with one buzz, so a trick and the result it
+   * ends the game with never sound under each other.
+   */
+  | Readonly<{ type: 'phrases'; phrases: ReadonlyArray<Phrase> }>
   | Readonly<{ type: 'wakeLock'; hold: boolean }>
   | Readonly<{ type: 'startHost'; code: string; attempt: number; resume: boolean }>
   | Readonly<{ type: 'startGuest'; code: string; attempt: number }>
@@ -416,6 +423,7 @@ export const SHELL_EFFECT_TYPES = [
   'toast',
   'send',
   'fx',
+  'phrases',
   'wakeLock',
   'startHost',
   'startGuest',

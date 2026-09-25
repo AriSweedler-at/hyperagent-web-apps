@@ -449,8 +449,9 @@ export const bootShell = <
   const deps: ShellEffectDeps<G> & Ex = {
     store,
     toast,
-    fx: (cue, font) => {
-      fx.play(cue, font);
+    fx: (what, font) => {
+      if (typeof what === 'string') fx.play(what, font);
+      else fx.playPhrases(what, font);
     },
     wakeLock: (hold) => {
       if (hold) void wakeLock.hold();
@@ -542,12 +543,13 @@ export const bootShell = <
   });
   cfg.hooks?.bind?.(ctx);
   cfg.paint.paintSound(doc, fx.enabled());
-  // Browsers only let audio start after a user gesture: warm the context on the first tap.
+  // Browsers only let audio start after a user gesture: warm the context on the first tap, and
+  // the table's samples in the App's font with it (cuePlayer.ts `warm`), so no phrase waits.
   ['pointerdown', 'touchstart', 'keydown'].forEach((event) => {
     doc.addEventListener(
       event,
       () => {
-        fx.warm();
+        fx.warm(app.shell.soundFont);
       },
       { passive: true },
     );
