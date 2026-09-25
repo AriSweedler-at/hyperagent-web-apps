@@ -17,12 +17,20 @@ export type GameEvent<K extends string, D> = Readonly<{
 }>;
 
 /**
- * How a game spells an event for the history panel: one short `summary` line, and the
- * `detail` rows (label, value) shown when the row is opened. `ctx` is the game's (names, me).
+ * How a game spells an event for the history panel (web/shared/ui/history.ts, §6): one short
+ * `summary` line, and the `detail` rows (label, value) shown when the row is opened; an event
+ * whose kind the copy does not know gives no rows, and its row is the summary alone. `ctx` is the
+ * game's (names, me). The three optional members are the panel's chrome: `who` is the actor the
+ * row leads with (the `.who` span; null for the table: a deal, a result), `value` the row's
+ * weight for the theme's accent (`data-value`; the shell colours `big` and `huge`, any other word
+ * is the game's own for its theme), `empty` the note an empty stream shows.
  */
 export type EventCopy<E, C = unknown> = Readonly<{
   summary: (e: E, ctx: C) => string;
   detail: (e: E, ctx: C) => ReadonlyArray<readonly [label: string, value: string]>;
+  who?: (e: E, ctx: C) => string | null;
+  value?: (e: E, ctx: C) => string | null;
+  empty?: string;
 }>;
 
 /**

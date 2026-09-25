@@ -246,6 +246,68 @@ body.fixed-screen #app {
 .rule-flash {
   animation: rule-flash 1.2s ease-out;
 }
+/* ---------- the history panel (web/shared/ui/history.ts) ---------- */
+/* One <details> per event, newest last (docs/design/briscola-sound-history.md §6): the summary
+   line is the row, a small marker its only chrome, and a click unfolds the detail as a two-column
+   list. Every selector here needs the details element, so gin's and backgammon's own rows (a div
+   per line, each theme's rule) are untouched until they adopt the panel. data-value is the shell's
+   weight word for a row (`big`, `huge`; a game maps its own classes onto them, briscola's value
+   classes first): the accent is the theme's --emphasis and nothing louder (the owner, 2026-09-23:
+   recognisable at a glance, otherwise quiet). The .who span keeps --muted whatever the weight. */
+details.history-row {
+  border-bottom: 1px solid var(--fill);
+}
+details.history-row:last-of-type {
+  border-bottom: none;
+}
+details.history-row > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 2px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+details.history-row > summary::-webkit-details-marker {
+  display: none;
+}
+details.history-row > summary::before {
+  content: '\25B8';
+  color: var(--muted);
+  font-size: 0.8em;
+  flex-shrink: 0;
+  transition: transform 0.12s ease;
+}
+details.history-row[open] > summary::before {
+  transform: rotate(90deg);
+}
+details.history-row > summary .who {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+details.history-row[data-value='big'] > summary,
+details.history-row[data-value='huge'] > summary {
+  color: var(--emphasis);
+}
+details.history-row[data-value='huge'] > summary {
+  font-weight: 700;
+}
+details.history-row > .history-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0 0 10px 22px;
+  font-size: 0.85rem;
+}
+details.history-row > .history-detail dt {
+  color: var(--muted);
+  font-weight: 700;
+}
+details.history-row > .history-detail dd {
+  margin: 0;
+}
 /* The About tab's prose (each game's about.ts). */
 .card-box.prose p {
   margin: 0 0 12px;
