@@ -23,6 +23,8 @@ import {
   type Decoder,
 } from '../lib/json.ts';
 import { err, ok, type Result } from '../lib/result.ts';
+import { packsFor, type CardPackFor } from '../lib/cards/packs.ts';
+import type { DeckKind } from '../lib/cards/decks.ts';
 import { ROOM_CODE, isWellFormedCode, type Game } from '../lib/roomCode.ts';
 import { SOUND_FONTS, type SoundFontName } from '../lib/sound/fonts.ts';
 import type { StorageError, Store } from './storage.ts';
@@ -39,6 +41,12 @@ export const decodeName: Decoder<string> = refine(string, (s) => s !== '', 'a no
 export const decodePlayMode: Decoder<PlayMode> = literal(...PLAY_MODES);
 export const decodeSoundState: Decoder<SoundState> = literal(...SOUND_STATES);
 export const decodeSoundFont: Decoder<SoundFontName> = literal(...SOUND_FONTS);
+/**
+ * The card pack a game with this deck kind may store (docs/design/card-packs.md §2): one of
+ * `packsFor(kind)`, so a stored `linea` is refused under gin's key and accepted under briscola's.
+ */
+export const decodeCardPackFor = <K extends DeckKind>(kind: K): Decoder<CardPackFor<K>> =>
+  literal(...packsFor(kind));
 
 const invalid = (key: string, error: Parameters<typeof formatError>[0]): StorageError => ({
   kind: 'invalid',
@@ -77,6 +85,10 @@ export const namePref = (key: string): TextPref<string> => ({
   write: (store, name) =>
     name === '' ? store.remove(key) : store.writeText(key, name.slice(0, NAME_MAX)),
 });
+
+/** A game's card-pack preference under its own key, validated for its deck kind like the sound font. */
+export const cardPackPref = <K extends DeckKind>(key: string, kind: K): TextPref<CardPackFor<K>> =>
+  textPref(key, decodeCardPackFor(kind));
 
 export type SoundPref = TextPref<SoundState> &
   Readonly<{
