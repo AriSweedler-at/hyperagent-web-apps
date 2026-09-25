@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { integer, object } from '../lib/json.ts';
+import { integer, literal, object } from '../lib/json.ts';
 import {
   NAME_MAX,
   PLAY_MODES,
@@ -12,6 +12,7 @@ import {
   namePref,
   readTextWith,
   shellSave,
+  shellStore,
   soundPref,
   textPref,
 } from './prefs.ts';
@@ -270,5 +271,70 @@ describe('shellSave', () => {
       ok: false,
       error: { path: ['code'], expected: 'a 5-letter room code' },
     });
+  });
+});
+
+describe('shellStore', () => {
+  test('groups the seven preferences and the save over one game`s keys, each under its own key, for the shell config to carry', () => {
+    const storage = fakeStorage();
+    const store = createStore(storage);
+    const keys = {
+      save: 'g_save',
+      name: 'g_name',
+      p2Name: 'g_p2Name',
+      homeTab: 'g_homeTab',
+      playMode: 'g_playMode',
+      sound: 'g_sound',
+      soundFont: 'g_soundFont',
+      extra: 'g_extra',
+    } as const;
+    const shell = shellStore<
+      Readonly<{ n: number }>,
+      Readonly<{ level: number }>,
+      'play' | 'rules'
+    >(keys, {
+      game: 'gin-rummy',
+      decodeGame: object({ n: integer() }),
+      hostExtra: {
+        decode: object({ level: integer(1) }),
+        literal: (save) => ({ level: save.level }),
+      },
+      decodeHomeTab: literal('play', 'rules'),
+    });
+    shell.name.write(store, 'Ann');
+    shell.p2Name.write(store, 'Bob');
+    shell.homeTab.write(store, 'rules');
+    shell.playMode.write(store, 'local');
+    shell.sound.write(store, 'off');
+    shell.soundFont.write(store, 'felt');
+    shell.save.writeSave(store, {
+      role: 'host',
+      code: 'ABCD',
+      myName: 'Ann',
+      level: 3,
+      game: { n: 1 },
+      oppName: null,
+    });
+    expect([...storage.map.entries()]).toEqual([
+      ['g_name', 'Ann'],
+      ['g_p2Name', 'Bob'],
+      ['g_homeTab', 'rules'],
+      ['g_playMode', 'local'],
+      ['g_sound', 'off'],
+      ['g_soundFont', 'felt'],
+      [
+        'g_save',
+        '{"role":"host","code":"ABCD","myName":"Ann","level":3,"game":{"n":1},"oppName":null}',
+      ],
+    ]);
+    expect(shell.name.read(store)).toEqual({ ok: true, value: 'Ann' });
+    expect(shell.homeTab.read(store)).toEqual({ ok: true, value: 'rules' });
+    expect(shell.sound.enabled(store)).toBe(false);
+    expect(shell.save.readSave(store)).toMatchObject({
+      ok: true,
+      value: { role: 'host', level: 3 },
+    });
+    shell.save.clearSave(store);
+    expect(storage.map.has('g_save')).toBe(false);
   });
 });

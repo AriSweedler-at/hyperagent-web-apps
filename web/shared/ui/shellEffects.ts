@@ -1,0 +1,151 @@
+// The shell's effect runner (docs/design/shared-shell.md §4.2 `runShellEffect`, moved out of both
+// games' `ui/state.ts` in §5 C2): one `ShellEffect` against the adapters main.ts constructs and
+// the tests record. Beside shell.ts rather than in it because it calls the adapters, statements
+// the pure lint profile refuses (eslint.config.js `PURE` carves this file out as it does the
+// painters); it is still DOM-free, so tsconfig.pure.json and tsconfig.node.json compile it. The
+// storage writes go through the game's `cfg.prefs` (web/shared/edge/prefs.ts `shellStore` over its
+// keys), the store itself being the game's type (`G['Store']`): this zone never names the edge. A
+// game's `runEffect` handles its own effects first (`isShellEffect` is the partition) and hands
+// the rest here with its shell, whose `soundFont` every cue plays in.
+import {
+  readHome,
+  saveFor,
+  type Cue,
+  type GuestFrameOf,
+  type HostFrameOf,
+  type Intent,
+  type ShellConfig,
+  type ShellEffect,
+  type ShellState,
+  type ShellTypes,
+  type TimerId,
+} from './shell.ts';
+import type { RulesSlot } from './glossary.ts';
+import type { SoundFontName } from '../lib/sound/fonts.ts';
+
+/** The adapters a shell effect reaches; a game's `EffectDeps` is this plus its own. */
+export type ShellEffectDeps<G extends ShellTypes> = Readonly<{
+  store: G['Store'];
+  toast: (message: string, ms: number | null) => void;
+  /** A cue in the App's font: the reducer's state is the source of truth for both. */
+  fx: (cue: Cue<G>, font: SoundFontName) => void;
+  wakeLock: (hold: boolean) => void;
+  net: Readonly<{
+    startHost: (code: string, attempt: number, resume: boolean) => void;
+    startGuest: (code: string, attempt: number) => void;
+    send: (frame: HostFrameOf<G> | GuestFrameOf<G>) => void;
+    close: () => void;
+  }>;
+  confirm: (message: string) => boolean;
+  scrollTop: () => void;
+  timers: Readonly<{
+    start: (id: TimerId<G>, ms: number, then: Intent<G>) => void;
+    cancel: (id: TimerId<G>) => void;
+  }>;
+  toggleSound: () => void;
+  /** The invite for the room `code`: its link, through the share sheet or the clipboard. */
+  share: (code: string) => void;
+  /** `revealRule(document, slot, rule)` (web/shared/edge/glossary.ts): scroll to the rule and flash it. */
+  revealRule: (slot: RulesSlot, rule: string) => void;
+  /** The three input writes the paint does not own (they would fight the player's typing). */
+  page: Readonly<{
+    fillName: (name: string) => void;
+    fillP2Name: (name: string) => void;
+    setCode: (value: string) => void;
+  }>;
+  dispatch: (intent: Intent<G>) => void;
+}>;
+
+/** One shell effect against the adapters; `shell` is the state after the step that produced it. */
+export const runShellEffect = <G extends ShellTypes>(
+  shell: ShellState<G>,
+  effect: ShellEffect<G>,
+  deps: ShellEffectDeps<G>,
+  cfg: ShellConfig<G>,
+): void => {
+  switch (effect.type) {
+    case 'persist': {
+      const save = saveFor(shell);
+      if (save !== null) cfg.prefs.save.writeSave(deps.store, save);
+      return;
+    }
+    case 'clearSave':
+      cfg.prefs.save.clearSave(deps.store);
+      return;
+    case 'saveLocal':
+      cfg.prefs.save.writeSave(deps.store, { role: 'local', game: effect.game });
+      return;
+    case 'rememberName':
+      cfg.prefs.name.write(deps.store, effect.name);
+      return;
+    case 'rememberP2Name':
+      cfg.prefs.p2Name.write(deps.store, effect.name);
+      return;
+    case 'writeHomeTab':
+      cfg.prefs.homeTab.write(deps.store, effect.tab);
+      return;
+    case 'writePlayMode':
+      cfg.prefs.playMode.write(deps.store, effect.mode);
+      return;
+    case 'writeSoundFont':
+      cfg.prefs.soundFont.write(deps.store, effect.font);
+      return;
+    case 'toast':
+      deps.toast(effect.message, effect.ms);
+      return;
+    case 'send':
+      deps.net.send(effect.frame);
+      return;
+    case 'fx':
+      deps.fx(effect.cue, shell.soundFont);
+      return;
+    case 'wakeLock':
+      deps.wakeLock(effect.hold);
+      return;
+    case 'startHost':
+      deps.net.startHost(effect.code, effect.attempt, effect.resume);
+      return;
+    case 'startGuest':
+      deps.net.startGuest(effect.code, effect.attempt);
+      return;
+    case 'closeNet':
+      deps.net.close();
+      return;
+    case 'confirm':
+      if (deps.confirm(effect.message)) deps.dispatch(effect.then);
+      return;
+    case 'then':
+      deps.dispatch(effect.intent);
+      return;
+    case 'initHome':
+      deps.dispatch({ type: 'home/init', home: readHome(deps.store, cfg) });
+      return;
+    case 'scrollTop':
+      deps.scrollTop();
+      return;
+    case 'startTimer':
+      deps.timers.start(effect.id, effect.ms, effect.then);
+      return;
+    case 'cancelTimer':
+      deps.timers.cancel(effect.id);
+      return;
+    case 'toggleSound':
+      deps.toggleSound();
+      return;
+    case 'share':
+      deps.share(effect.code);
+      return;
+    case 'revealRule':
+      deps.revealRule(effect.slot, effect.rule);
+      return;
+    case 'fillName':
+      deps.page.fillName(effect.name);
+      return;
+    case 'fillP2Name':
+      deps.page.fillP2Name(effect.name);
+      return;
+    case 'setCode':
+      deps.page.setCode(effect.value);
+      return;
+  }
+};

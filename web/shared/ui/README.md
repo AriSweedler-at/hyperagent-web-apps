@@ -14,11 +14,12 @@ landed with the glossary links (docs/design/glossary-links.md):
 | `ids.ts`        | `SHELL_GAMES` and `SHELL_IDS`, the ids every shell page carries; `test/dist/shell-ids.test.ts` asserts them on the built pages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `home.ts`       | The home shell both games' `ui/home.ts` compose (docs/design/shared-shell.md §4.4, moved in §5 B2): `HomeView`, `fillInputs`, `setCodeInput`, `tabButtonId`, `blocksCodeInput`, `paintTabs`, `paintPlayMode`, `paintSubmenu`, `paintResume`, `paintHomeShell(doc, view, { tabs, modes })`, `bindHomeShell(doc, dispatch, { tabs, startOptions, intents })` over the game's `ShellIntentBuilders`, `bindLongPress`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
-The helpers (`glossary.ts`, `ids.ts`) are lint-pure like `web/shared/lib` (eslint.config.js
-`PURE`, tsconfig.pure.json); the painters and binders write the document and are carved out of the
-pure profile the way `scorer/main.ts` is (`web/shared/ui/!(shellPaint|curtain|toast|home|keyed).ts`,
-the same five excluded from tsconfig.pure.json and tsconfig.node.json, so tsconfig.web.json alone
-compiles them). The whole folder is held at 100% coverage (tools/ci/suites.ts, the `shared`
+The helpers (`glossary.ts`, `ids.ts`) and the reducer (`shell.ts`) are lint-pure like
+`web/shared/lib` (eslint.config.js `PURE`, tsconfig.pure.json); the painters and binders write the
+document and are carved out of the pure profile the way `scorer/main.ts` is
+(`web/shared/ui/!(shellPaint|curtain|toast|home|keyed|shellEffects).ts`, the five DOM modules
+excluded from tsconfig.pure.json and tsconfig.node.json, so tsconfig.web.json alone compiles them;
+`shellEffects.ts` is carved out of the lint profile alone, being DOM-free). The whole folder is held at 100% coverage (tools/ci/suites.ts, the `shared`
 suite: every module has its test beside it, the painters' over `web/shared/edge/page.fake.ts`);
 the edge that scrolls and flashes a rule is `web/shared/edge/glossary.ts`. Its import zone is a
 game's `ui/` zone: `web/shared/lib` and the DOM edge (`dom.ts` and its fakes), plus the clock fake
