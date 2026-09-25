@@ -43,7 +43,7 @@ and tests that prove it land before the code they protect.
 │   ├── public/.nojekyll
 │   ├── shared/                  the only code both games may import (alias @shared/*)
 │   │   ├── lib/                 PURE: result, rng, json (decoders), roomCode (alphabets, prefixes, sanitiser),
-│   │   │                        algorithms (the loop escape hatch), clock (types)
+│   │   │                        name (normaliseName), algorithms (the loop escape hatch), clock (types)
 │   │   ├── edge/                EFFECTS: ice, transport (only importer of 'peerjs'; ?peer= override),
 │   │   │                        transport.fake, clock, storage, prefs (the shell's readers/writers over a
 │   │   │                        Store: name, play mode, sound, sound font, shellSave), dom, fx
@@ -87,7 +87,7 @@ DOM, so `window`, `document` and `HTMLElement` are unnameable there by the compi
 
 | Layer | May import | Contract |
 |---|---|---|
-| `web/shared/lib` | itself | Leaf modules. `Result<T,E>` (`ok/err/map/andThen`), `Rng = () => number`, `mulberry32`, JSON decoders (`json.ts`, with `pair` and `taggedUnion` for the seat pairs and the tag-switched shapes every codec has), `roomCode` constants (`'ginrummy-ari-'`, `'fidice-'`, alphabets), and `game.ts`: the two-seat primitives both engines re-export (`Seat`, `Pair`, `Player`, `Now`, `RuleError`; `SEATS`, `otherSeat`, `setAt`; the `seat`/`count`/`timestamp` decoders) and the `TwoSeatEngine<S, V, A, Opts>` contract. |
+| `web/shared/lib` | itself | Leaf modules. `Result<T,E>` (`ok/err/map/andThen`), `Rng = () => number`, `mulberry32`, JSON decoders (`json.ts`, with `pair` and `taggedUnion` for the seat pairs and the tag-switched shapes every codec has), `roomCode` constants (`'ginrummy-ari-'`, `'fidice-'`, alphabets), and `game.ts`: the two-seat primitives both engines re-export (`Seat`, `Pair`, `Player`, `Now`, `RuleError`; `SEATS`, `otherSeat`, `setAt`; the `seat`/`count`/`timestamp` decoders) and the `TwoSeatEngine<S, V, A, Opts>` contract, `normaliseName(raw, { max, fallback })` (`name.ts`). |
 | `web/shared/lib/invite.ts` | itself | The invite link: `inviteUrl(code, pageUrl)` is `<pageUrl>?join=<code>` (pure). |
 | `web/shared/edge/invite.ts` | itself | `joinCodeFrom(search)` and `withoutJoin(search)`: a boot reads the code and drops it from the address bar through the platform's `URLSearchParams`. |
 | `web/shared/ui` | shared/lib, `@shared/edge/dom` (and its fakes); the clock fake for `toast.ts`'s test | The shared shell's helpers and painters, held at 100%. `glossary.ts` (docs/design/glossary-links.md): `RuleItem`, `Glossary`, `ruleAnchor(id)`, `linkJargon(html, glossary, { except })`, `rulesListHtml(items, glossary)`, `ruleFromHash(hash)`; `ids.ts` (`SHELL_IDS`): both lint-pure like shared/lib. `shellPaint.ts`, `curtain.ts` and `toast.ts` (docs/design/shared-shell.md §4.4, moved out of both games in B1) and `keyed.ts` (the keyed slot `ensureKeyed`, docs/design/dry-round-2.md D1; D2 added `bindButtons` and the press-as-function `bindLongPress` to `shellPaint.ts`) write through `@shared/edge/dom` and are carved out of the pure profile like `scorer/main.ts`; each game's `ui/render.ts`, `ui/local.ts` and `main.ts` compose them under the old names. |
