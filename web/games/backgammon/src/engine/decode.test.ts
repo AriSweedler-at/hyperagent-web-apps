@@ -17,7 +17,7 @@ import {
   pair,
 } from './decode.ts';
 import { createGame } from './setup.ts';
-import type { State } from './types.ts';
+import { ACTION_TYPES, type State } from './types.ts';
 import { legalActions, viewFor } from './view.ts';
 
 const PLAYERS = [
@@ -147,6 +147,13 @@ describe('rejections', () => {
   });
 
   test('actions: the type decides the keys; nothing else is accepted', () => {
+    // The taggedUnion table has one case per ACTION_TYPES entry, in its order (D5): every entry
+    // decodes, and a refused type names all seven in that order.
+    ACTION_TYPES.forEach((type) => {
+      const input = type === 'move' ? { type, from: 7, to: 4, die: 3 } : { type };
+      const r = decodeAction({ ...input, extra: 1 });
+      expect(r.ok && JSON.stringify(r.value)).toBe(JSON.stringify(input));
+    });
     expect(decodeAction({ type: 'roll', extra: 1 })).toEqual({ ok: true, value: { type: 'roll' } });
     expect(decodeAction({ type: 'move', from: 'bar', to: 18, die: 6 })).toEqual({
       ok: true,
@@ -160,8 +167,8 @@ describe('rejections', () => {
     expect(failureOf(decodeAction({ type: 'move', from: 7, to: 4 }))).toBe(
       '$.die: expected one of 1 | 2 | 3 | 4 | 5 | 6',
     );
-    expect(failureOf(decodeAction({ type: 'resign', level: 2 }))).toContain(
-      '$.type: expected one of',
+    expect(failureOf(decodeAction({ type: 'resign', level: 2 }))).toBe(
+      '$.type: expected one of "roll" | "move" | "undo" | "double" | "take" | "pass" | "next"',
     );
     expect(failureOf(decodeAction('roll'))).toBe('$: expected object');
   });

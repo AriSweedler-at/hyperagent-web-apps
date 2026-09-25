@@ -14,14 +14,15 @@ import {
   nullable,
   object,
   oneOf,
+  pair,
   refine,
   string,
+  taggedUnion,
   type Decoder,
 } from '../../../../shared/lib/json.ts';
-import { err, ok } from '../../../../shared/lib/result.ts';
+import { count, seat as decodeSeat, timestamp } from '../../../../shared/lib/game.ts';
 import { isHomogeneous, isWellFormed } from './board.ts';
 import {
-  ACTION_TYPES,
   POINTS,
   type Action,
   type Board,
@@ -38,33 +39,22 @@ import {
   type MatchOptions,
   type Move,
   type Multiplier,
-  type Pair,
   type Phase,
   type Play,
   type PlayedMove,
   type Player,
   type PointIndex,
   type ResultReason,
-  type Seat,
   type ShippedVariant,
   type State,
   type To,
   type View,
 } from './types.ts';
 
-/** Exactly two items, as a tuple. */
-export const pair =
-  <T>(item: Decoder<T>): Decoder<Pair<T>> =>
-  (input) => {
-    const items = arrayOf(item)(input);
-    if (!items.ok) return items;
-    const [a, b] = items.value;
-    return items.value.length === 2 && a !== undefined && b !== undefined
-      ? ok([a, b])
-      : err({ path: [], expected: 'array of 2' });
-  };
+// `pair` and `decodeSeat` (the shared `seat`) are web/shared/lib's since DRY round 2 (F1, F2),
+// re-exported because index.ts and the engine tests import them from here.
+export { decodeSeat, pair };
 
-export const decodeSeat: Decoder<Seat> = literal(0, 1);
 export const decodeDie: Decoder<Die> = literal(1, 2, 3, 4, 5, 6);
 export const decodePointIndex: Decoder<PointIndex> = literal(
   0,
@@ -110,9 +100,6 @@ const logKind: Decoder<LogKind> = literal(
   'pass',
   'result',
 );
-const count = integer(0);
-/** Wall-clock milliseconds as the engine's `Now` reports them. */
-const timestamp = integer(0);
 
 const from: Decoder<From> = oneOf<From>(decodePointIndex, literal('bar'));
 const to: Decoder<To> = oneOf<To>(decodePointIndex, literal('off'));
@@ -262,23 +249,19 @@ export const decodeView: Decoder<View> = refine(
   'a phase that agrees with dice, played and result',
 );
 
-const actionHead = object({ type: literal(...ACTION_TYPES) });
 const plainAction = object({ type: literal('roll', 'undo', 'double', 'take', 'pass', 'next') });
 const moveAction = object({ type: literal('move'), from, to, die: decodeDie });
 
-/** A player's action as the wire `action` frame carries it: the type decides which keys follow. */
-export const decodeAction: Decoder<Action> = (input) => {
-  const head = actionHead(input);
-  if (!head.ok) return head;
-  switch (head.value.type) {
-    case 'move':
-      return moveAction(input);
-    case 'roll':
-    case 'undo':
-    case 'double':
-    case 'take':
-    case 'pass':
-    case 'next':
-      return plainAction(input);
-  }
-};
+/**
+ * A player's action as the wire `action` frame carries it: the type decides which keys follow, one
+ * case per ACTION_TYPES entry in its order (so a refused type names them as before).
+ */
+export const decodeAction: Decoder<Action> = taggedUnion('type', {
+  roll: plainAction,
+  move: moveAction,
+  undo: plainAction,
+  double: plainAction,
+  take: plainAction,
+  pass: plainAction,
+  next: plainAction,
+});

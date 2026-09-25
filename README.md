@@ -218,7 +218,10 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
 4. `web/games/<g>/src/`: the layers `eslint.config.js` and `tsconfig.pure.json` recognise by path.
    `engine/` or `domain/` and `bots/` are pure (no DOM lib, no loops, no `let`, no throw, no
    classes; a reducer such as gin's `applyAction(state, seat, action, rng)` returns a new state
-   as a `Result` and never mutates). `protocol.ts` (at `src/` or `src/net/`) is pure and the trust
+   as a `Result` and never mutates; a two-seat engine takes `Seat`, `Pair`, `Player`, `Now` and
+   `RuleError` from `web/shared/lib/game.ts` and publishes `ENGINE: TwoSeatEngine<…>` from its
+   `engine/index.ts`, the one surface the shared shell types against). `protocol.ts` (at `src/`
+   or `src/net/`) is pure and the trust
    boundary: every inbound frame through a `Result` decoder. `net/{host,guest}.ts` are edges that
    take a `Transport` and never import `peerjs`. `ui/` or `view/` render to strings or VNodes with
    DOM writes in one module. `storage.ts` (or `app/effects.ts`, fidice's shape; both are the eslint

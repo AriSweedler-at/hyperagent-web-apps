@@ -18,6 +18,7 @@ import {
   object,
   refine,
   string,
+  taggedUnion,
   type DecodeError,
   type Decoder,
   type Shape,
@@ -91,7 +92,6 @@ const msg = refine(
   `a message of at most ${String(TOAST_MAX)} characters`,
 );
 
-const head = object({ t: literal(...WIRE_TAGS) });
 const joinFrame = object({ t: literal('join'), name });
 const fullFrame = object({ t: literal('full') });
 const toastFrame = object({ t: literal('toast'), msg });
@@ -135,26 +135,18 @@ export const twoSeatProtocol = <A, V, RF extends RoomFields>(
     StateFrame<V>
   >;
 
-  const decodeFrame = (input: unknown): Result<Frame<A, V, R>, DecodeFailure> => {
-    const tag = head(input);
-    if (!tag.ok) return failure(tag);
-    switch (tag.value.t) {
-      case 'join':
-        return failure(joinFrame(input));
-      case 'action':
-        return failure(actionFrame(input));
-      case 'welcome':
-        return failure(welcomeFrame(input));
-      case 'lobby':
-        return failure(lobbyFrame(input));
-      case 'full':
-        return failure(fullFrame(input));
-      case 'toast':
-        return failure(toastFrame(input));
-      case 'state':
-        return failure(stateFrame(input));
-    }
-  };
+  // One case per tag in WIRE_TAGS order, so a refused tag names the seven as before (F2).
+  const frame: Decoder<Frame<A, V, R>> = taggedUnion('t', {
+    join: joinFrame,
+    action: actionFrame,
+    welcome: welcomeFrame,
+    lobby: lobbyFrame,
+    full: fullFrame,
+    toast: toastFrame,
+    state: stateFrame,
+  });
+  const decodeFrame = (input: unknown): Result<Frame<A, V, R>, DecodeFailure> =>
+    failure(frame(input));
 
   const decodeGuestFrame = (input: unknown): Result<GuestFrame<A>, DecodeFailure> => {
     const frame = decodeFrame(input);

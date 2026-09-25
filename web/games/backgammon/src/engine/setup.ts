@@ -5,6 +5,7 @@
 // here as well as in `nextGame`. The winner of the opening roll acts first: in Western play the
 // opening dice are the first turn's roll (`phase 'moving'`), in tavli the winner rolls afresh
 // (`phase 'toRoll'`); `phase 'opening'` is reserved and never emitted.
+import { SEATS } from '../../../../shared/lib/game.ts';
 import type { Rng } from '../../../../shared/lib/rng.ts';
 import { emptyBoard } from './board.ts';
 import { diceText } from './notation.ts';
@@ -27,8 +28,6 @@ import {
   type VariantRules,
 } from './types.ts';
 import { rulesOf } from './variants.ts';
-
-const SEATS: ReadonlyArray<Seat> = [0, 1];
 
 type Placement = Readonly<{ seat: Seat; abs: number; count: number }>;
 

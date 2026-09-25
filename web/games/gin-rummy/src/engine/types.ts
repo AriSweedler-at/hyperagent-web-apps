@@ -3,7 +3,14 @@
 // engine builds has the legacy keys in the legacy order, so the parity replay can compare the two
 // engines' states and views as JSON text. The values live in the modules that build them (cards.ts
 // the deck, melds.ts and melds.algorithms.ts the meldings, game.ts the reducer, view.ts the
-// redaction); this file holds the types and the scoring constants.
+// redaction); this file holds the types and the scoring constants. The seat, the pair, the
+// player, the clock and the refusal text are web/shared/lib/game.ts's (DRY round 2, F1),
+// re-exported here under the names every gin module imports (`PlayerInfo` is gin's name for the
+// shared `Player`), so no import path changed.
+import type { Pair, Player as PlayerInfo, Seat } from '../../../../shared/lib/game.ts';
+
+export type { Now, Pair, RuleError, Seat } from '../../../../shared/lib/game.ts';
+export type { Player as PlayerInfo } from '../../../../shared/lib/game.ts';
 
 export type Suit = 'S' | 'H' | 'D' | 'C';
 /** Ace low only: 1 is the ace, 11..13 the jack, queen and king. */
@@ -13,10 +20,6 @@ export type Card = Readonly<{ id: string; r: Rank; s: Suit }>;
 export type Cards = ReadonlyArray<Card>;
 /** Three or four of a rank, or three or more of a suit in sequence. */
 export type Meld = ReadonlyArray<Card>;
-
-/** An index into `State.players`, `hands`, `ready` and `meldPref`. */
-export type Seat = 0 | 1;
-export type Pair<T> = readonly [T, T];
 
 export type Phase = 'upcard' | 'draw' | 'discard' | 'layoff' | 'roundOver' | 'gameOver';
 export type UpcardStage = 'nonDealer' | 'dealer';
@@ -76,7 +79,6 @@ export type LayoffView = Readonly<{
   knockerValue: number;
 }>;
 
-export type PlayerInfo = Readonly<{ id: string; name: string }>;
 export type PlayerState = Readonly<{ id: string; name: string; total: number }>;
 
 /** What a draw changed, so `undoDraw` can put it back. */
@@ -177,9 +179,6 @@ export type Action =
   | Readonly<{ type: 'layOff'; cardId: string; onto: number }>
   | Readonly<{ type: 'setMelds'; melds: MeldGroups }>;
 
-/** A refused move, worded for the player who tried it; `applyAction` returns `Result<State, RuleError>`. */
-export type RuleError = string;
-
 export type CreateGameOptions = Readonly<{
   players: Pair<PlayerInfo>;
   /** Points to win; 100 when absent (or 0, as the legacy `||` read it). */
@@ -187,9 +186,6 @@ export type CreateGameOptions = Readonly<{
   /** Drawn from the rng when absent. */
   dealer?: Seat;
 }>;
-
-/** Milliseconds since the epoch, injected (`Date.now` in main.ts, a constant in tests). */
-export type Now = () => number;
 
 /** What discarding a card would leave; `locked` marks the card just taken from the discard pile. */
 export type DiscardOption =

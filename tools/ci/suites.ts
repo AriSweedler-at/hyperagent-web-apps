@@ -114,7 +114,12 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // 99.4/98.8/98.9/94.4 (re-measured with prefs.ts (A3), cuePlayer.ts and netDeps.ts (A4), the
       // three at 100/100/100/100; again with boot.ts (shared-shell.md §5 B3: the invite link, the
       // share chain and the session adapters out of both main.ts, 100/100/100/100 over boot.test.ts),
-      // the folder at 99.72/99.36/99.75/96.6).
+      // the folder at 99.72/99.36/99.75/96.6). Re-measured when DRY round 2's D5 added lib/game.ts
+      // (the two-seat primitives and the TwoSeatEngine contract) and json.ts's pair and taggedUnion,
+      // and prefs.ts's decodeSave became a taggedUnion table: shared/lib still 100/100/100/100
+      // (game.ts, json.ts and protocol.ts each 100 on every metric), the edge folder
+      // 99.72/99.35/99.75/96.59 before, 99.72/99.35/99.75/96.56 after (prefs.ts still 100 on every
+      // metric; the same lines uncovered elsewhere, fewer branches in the folder).
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The shared shell's helpers and painters (docs/design/glossary-links.md §3;
@@ -195,6 +200,11 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // Re-measured when D1 (docs/design/dry-round-2.md) keyed the piles, the table melds and the
       // result body through web/shared/ui/keyed.ts: ui 98.09/97.09/97.06/94.03 before,
       // 98.08/97.13/97.05/94.16 after (the same 24 lines uncovered in a smaller folder; the row stands).
+      // Re-measured when DRY round 2's D5 moved SEATS/otherPlayer/setAt, the seat/count/timestamp
+      // decoders and `pair` out of the engine into web/shared/lib, made decodeAction a taggedUnion
+      // table and added ENGINE (index.ts) and actorOf: engine 99.80/99.45/98.30/94.98 before,
+      // 99.79/99.44/98.25/94.72 after (the same lines uncovered, a smaller folder; decode.ts and
+      // index.ts measure 100 on every metric); the row stands.
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -352,6 +362,11 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // folder; the wrapper itself measures 100 on every metric).
       // Re-measured when B3 moved INVITE_COPIED_MSG and SHARE_FALLBACK_MS (two constants, no
       // function) out of ui/state.ts into web/shared/edge/boot.ts: still ui 99.6/100/98.6/92.0.
+      // Re-measured when DRY round 2's D5 moved otherSeat/setAt/SEATS, the seat/count/timestamp
+      // decoders and `pair` out of the engine into web/shared/lib, made decodeAction a taggedUnion
+      // table and added ENGINE (index.ts): engine 99.17/99.46/98.94/97.14 before,
+      // 99.14/99.45/98.90/97.00 after (the same lines uncovered, a smaller folder; decode.ts and
+      // index.ts measure 100 on every metric); the row stands.
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
