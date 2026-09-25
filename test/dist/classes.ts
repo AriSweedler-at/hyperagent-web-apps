@@ -3,11 +3,13 @@
 // carries and the ones its built stylesheets style. The extraction is a handful of documented
 // regular expressions over source text, not a parser: a name a helper builds (`cardClass`,
 // `abs-${sym}`) is invisible here on purpose and is listed in web/shared/styles/CONTRACT.md
-// instead, which test/dist/class-contract.test.ts reads through `parseContract`.
+// instead, which test/dist/class-contract.test.ts reads through `parseContract`. The row scoping
+// (`OWNERS`, `ownersOf`) and the stylesheet link-order policy (`OWN_SHEET`, `SHEETS_MAX`) that both
+// dist guards apply live here too (docs/design/dry-round-2.md G3, G4).
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { posix, resolve, sep } from 'node:path';
 
-import { GAMES, type Game } from '../../tools/games.ts';
+import { GAMES, SHELL_GAMES, type Game } from '../../tools/games.ts';
 import { REPO_ROOT, readDist, referencesIn, type DistRoot } from './dist.ts';
 
 export { GAMES, type Game };
@@ -161,6 +163,32 @@ export const parseContract = (markdown: string): ReadonlyArray<Row> =>
 export const readContract = (): ReadonlyArray<Row> =>
   parseContract(readFileSync(CONTRACT_PATH, 'utf8'));
 
-/** The `class` rows that apply to a game: its own and `shared`'s. */
+/**
+ * The owners a row may name: a game, `shared` (every page) or `shell` (the pages with the shared
+ * shell, tools/games.ts SHELL_GAMES). `shared` cannot carry a shell class: it is checked against
+ * fidice's stylesheet too, which has no shell rules until the Fidice restyle (dry-round-2.md G3).
+ */
+export const OWNERS: ReadonlyArray<string> = [...GAMES, 'shared', 'shell'];
+
+export const isShellGame = (game: Game): boolean =>
+  (SHELL_GAMES as ReadonlyArray<Game>).includes(game);
+
+/**
+ * A game's own theme under shared/assets/ (`<game>-<hash>.css`); every other sheet there is shared.
+ * A page links the common chunk's sheet (web/shared/styles/{tokens,base}.css), then, on a shell
+ * page once Wave F1 lands shell.css, the shell games' sheet, then its theme: the dist guards allow
+ * that middle sheet without requiring it (dry-round-2.md G4), and fidice never links it (risk 7).
+ */
+export const OWN_SHEET = new RegExp(`shared/assets/(${GAMES.join('|')})-[\\w-]+\\.css$`);
+export const SHEETS_MAX = (game: Game): number => (isShellGame(game) ? 3 : 2);
+
+/** The owners whose `class` rows apply to a game: itself, `shared` and, for a shell game, `shell`. */
+export const ownersOf = (game: Game): ReadonlyArray<string> => [
+  game,
+  'shared',
+  ...(isShellGame(game) ? ['shell'] : []),
+];
+
+/** The `class` rows that apply to a game (`ownersOf`). */
 export const rowsFor = (rows: ReadonlyArray<Row>, game: Game): ReadonlyArray<Row> =>
-  rows.filter((row) => row.kind === 'class' && (row.owner === game || row.owner === 'shared'));
+  rows.filter((row) => row.kind === 'class' && ownersOf(game).includes(row.owner));

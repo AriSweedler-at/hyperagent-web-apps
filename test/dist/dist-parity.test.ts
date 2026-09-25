@@ -14,7 +14,8 @@ import { resolve } from 'node:path';
 
 import { expect, test } from 'vitest';
 
-import { ALIASES, GAMES, LEGACY_GAMES, REGISTRY } from '../../tools/games.ts';
+import { ALIASES, GAMES, LEGACY_GAMES, REGISTRY, SHELL_GAMES } from '../../tools/games.ts';
+import { OWN_SHEET, SHEETS_MAX, isShellGame } from './classes.ts';
 import {
   ALIAS_PAGES,
   REPO_ROOT,
@@ -82,8 +83,9 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     test(`every relative asset the ${game} page references is a file in the tree`, () => {
       // Its bundle, the shared chunk(s) it preloads (what both module pages import: PeerJS and the
       // shared edges, split out since the gin page joined the build in docs/MIGRATION.md step 12),
-      // the shared chunk's CSS (web/shared/styles, step 14) and its own CSS, in that order: the
-      // shared sheets cascade before the game's theme, as the source page links them.
+      // the shared chunk's CSS (web/shared/styles, step 14), a shell-games-only sheet when one is
+      // linked (allowed, not required: OWN_SHEET) and its own CSS, in that order: the shared sheets
+      // cascade before the game's theme, as the source page links them.
       const page = `games/${game}/index.html`;
       const references = referencesIn(page, readDist(root, page))
         .map(({ value }) => value)
@@ -93,11 +95,18 @@ describeDist('dist parity with legacy/ and web/', (root) => {
       expect(icons).toEqual(['../../shared/favicon.svg', '../../shared/favicon.ico']);
       const relative = references.filter((value) => !icons.includes(value));
       expect(relative[0]).toMatch(/^\.\/app-[\w-]+\.js$/);
-      expect(relative.at(-1)).toMatch(
+      const sheets = relative.filter((value) => value.endsWith('.css'));
+      expect(relative.slice(-sheets.length)).toEqual(sheets);
+      expect(sheets.length).toBeGreaterThanOrEqual(2);
+      expect(sheets.length).toBeLessThanOrEqual(SHEETS_MAX(game));
+      expect(sheets.at(-1)).toMatch(
         new RegExp(`^\\.\\./\\.\\./shared/assets/${game}-[\\w-]+\\.css$`),
       );
-      expect(relative.at(-2)).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.css$/);
-      const chunks = relative.slice(1, -2);
+      sheets.slice(0, -1).forEach((value) => {
+        expect(value).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.css$/);
+        expect(value).not.toMatch(OWN_SHEET);
+      });
+      const chunks = relative.slice(1, -sheets.length);
       expect(chunks.length).toBeGreaterThanOrEqual(1);
       chunks.forEach((value) => {
         expect(value).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.js$/);
@@ -130,7 +139,7 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     });
   });
 
-  test('every module page preloads the chunk all of them share and links the one shared stylesheet; a chunk under shared/assets/ is preloaded by two pages at least', () => {
+  test('every module page preloads the chunk all of them share and links the stylesheet all of them share; a chunk under shared/assets/ is preloaded by two pages at least', () => {
     // A game's own CSS is `<game>-[hash].css`; everything else under shared/assets/ is shared.
     const own = GAMES.map((game) => `/${game}-`);
     const shared = (game: string, ext: string): ReadonlyArray<string> =>
@@ -154,10 +163,22 @@ describeDist('dist parity with legacy/ and web/', (root) => {
       expect(preloadedBy(chunk).length, chunk).toBeGreaterThanOrEqual(2);
     });
     // web/shared/styles/{tokens,base}.css, linked by every page, are emitted once (step 14).
+    // Fidice links no other shared sheet; a shell page may link one more after it, the same file on
+    // every shell page (allowed, not required: OWN_SHEET in test/dist/classes.ts).
     const sharedCss = shared('fidice', 'css');
     expect(sharedCss).toHaveLength(1);
+    const [shellCss = [], ...otherShellCss] = SHELL_GAMES.map((game) =>
+      shared(game, 'css').slice(1),
+    );
+    expect(shellCss.length).toBeLessThanOrEqual(1);
+    otherShellCss.forEach((extra) => {
+      expect(extra).toEqual(shellCss);
+    });
     GAMES.forEach((game) => {
-      expect(shared(game, 'css'), game).toEqual(sharedCss);
+      expect(shared(game, 'css'), game).toEqual([
+        ...sharedCss,
+        ...(isShellGame(game) ? shellCss : []),
+      ]);
       expect(readDist(root, `games/${game}/index.html`), game).toContain(
         '<link rel="modulepreload" crossorigin href="../../shared/assets/',
       );

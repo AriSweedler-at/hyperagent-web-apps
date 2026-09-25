@@ -9,6 +9,9 @@ import { expect, test } from 'vitest';
 import { REGISTRY } from '../../tools/games.ts';
 import {
   GAMES,
+  OWNERS,
+  OWN_SHEET,
+  SHEETS_MAX,
   cssClasses,
   markupClasses,
   readContract,
@@ -39,7 +42,7 @@ describeDist('CSS <-> TS class contract', (root) => {
   test('CONTRACT.md has rows, each with an owner the tree knows and one or more names', () => {
     expect(contract.length).toBeGreaterThan(0);
     contract.forEach((row) => {
-      expect([...GAMES, 'shared']).toContain(row.owner);
+      expect(OWNERS).toContain(row.owner);
       expect(row.kind).toBe('class');
       expect(row.names.length).toBeGreaterThan(0);
       expect(row.toggledBy !== '' || row.styledIn !== '', `${row.names.join(' ')}: empty row`).toBe(
@@ -56,11 +59,17 @@ describeDist('CSS <-> TS class contract', (root) => {
     const markup = markupClasses(root, game);
     const css = cssClasses(root, game);
 
-    test(`${game}: the page links the shared stylesheet then its own, and the three sources are non-empty`, () => {
-      expect(stylesheets(root, game)).toEqual([
-        expect.stringMatching(/^shared\/assets\/[\w-]+\.css$/) as string,
-        expect.stringMatching(new RegExp(`^shared/assets/${game}-[\\w-]+\\.css$`)) as string,
-      ]);
+    test(`${game}: the page links the shared stylesheet(s) then its own, and the three sources are non-empty`, () => {
+      // The common sheet, a shell-games-only sheet when one is linked (allowed, not required:
+      // OWN_SHEET), then the theme, whose rules cascade last.
+      const sheets = stylesheets(root, game);
+      expect(sheets.length).toBeGreaterThanOrEqual(2);
+      expect(sheets.length).toBeLessThanOrEqual(SHEETS_MAX(game));
+      expect(sheets.at(-1)).toMatch(new RegExp(`^shared/assets/${game}-[\\w-]+\\.css$`));
+      sheets.slice(0, -1).forEach((sheet) => {
+        expect(sheet).toMatch(/^shared\/assets\/[\w-]+\.css$/);
+        expect(sheet).not.toMatch(OWN_SHEET);
+      });
       expect(tsNames.length).toBeGreaterThan(floors.ts);
       expect(css.length).toBeGreaterThan(CSS_FLOOR);
       expect(markup.length).toBeGreaterThan(floors.markup);

@@ -57,8 +57,6 @@
   .row + .row { margin-top: 10px; }
   .grow { flex: 1; }
   .icon-btn { background: var(--card-2); border: none; color: var(--text); border-radius: 12px; width: 44px; height: 44px; font-size: 1.1rem; flex-shrink: 0; }
-  .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.8rem; margin: 6px 0; }
-  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,0.1); }
   .code-input { text-align: center; letter-spacing: 0.4em; font-size: 1.5rem !important; text-transform: uppercase; font-family: ui-monospace, Menlo, monospace; }
   .room-code { font-family: ui-monospace, Menlo, monospace; font-size: 3rem; letter-spacing: 0.35em; text-align: center; color: var(--gold); font-weight: 800; padding-left: 0.35em; }
   .empty-note { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 8px 0; }

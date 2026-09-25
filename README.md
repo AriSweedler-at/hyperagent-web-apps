@@ -116,7 +116,8 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
 3. **Dist guards** (`npm run test:site`, which builds first; `test/dist/`, the `site` suite): every URL in dist HTML and
    CSS is relative and resolves on both origins through the Worker's real `mapPath()`; every game
    page is a Vite module page that preloads the shared chunks (one common to all; the DOM edge is
-   a second one gin and backgammon share) and links the one shared stylesheet;
+   a second one gin and backgammon share) and links the shared stylesheet, then its theme (a
+   shell-games-only sheet between them is allowed, not yet linked: docs/design/dry-round-2.md G4);
    `dist/index.html` is byte-identical to `web/index.html`; the backgammon board's two
    `grid-template-areas` strings agree with their pure twin (`backgammon-grid.test.ts`). The **class contract**
    (`class-contract.test.ts`): every class the game's TypeScript names has a rule in a stylesheet

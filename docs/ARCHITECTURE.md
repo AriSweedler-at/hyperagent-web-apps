@@ -1109,7 +1109,9 @@ Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage r
   TOAST_MS, instead of restarting one timer, drops a repeat of the toast showing or last queued,
   and drops the queue (not the toast showing) when a table is torn down; `controller.test.ts` pins
   each and now names only `ladder.showBid` as a legacy defect. The dead `.ha-img-placeholder` block
-  is gone from both themes and from `CONTRACT.md`; the computed-style goldens did not move.
+  is gone from both themes and from `CONTRACT.md`; the computed-style goldens did not move. Gin's dead
+  `.divider` rules (two legacy lines no element ever carried) and their row went the same way
+  (docs/design/dry-round-2.md D10), goldens again unmoved.
 - docs/design/shared-shell.md A1 (the shared shell's first PR): gin's `net/{host,guest}.ts`
   moved to `web/shared/net/{host,guest}.ts` as `HostSession<G, H, X>` / `GuestSession<G, H>` with
   a codec (`decode`, `welcome(ctx)`, `full`; `decode`, `join`) and `game` injected; gin's and
