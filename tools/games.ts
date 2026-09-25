@@ -2,7 +2,8 @@
 // docs/design/shared-shell.md §6.1): one row per game holding what the e2e fixtures, the dist
 // guards and the computed-style oracle used to spell each in a list of their own, so a fact about
 // a game (its title, its hook, its storage keys, the shape of its page, the class-contract floors,
-// the PeerJS debug level) is written once; GAMES, PAGE_TITLES and HOOKS are read off the rows.
+// the PeerJS debug level, its test suite and its own specs) is written once; GAMES, PAGE_TITLES and
+// HOOKS are read off the rows, and tools/ci/suites.ts derives each game suite's rows from them.
 // `Game` itself is web/shared/lib/roomCode.ts's closed union, so a game the harness names must
 // have a room-code row, and a game the union gains shows up here as a type error until it has a
 // row. tools/games.test.ts pins every value. The `shell` block of §6.1 (the heading, the tabs, the
@@ -11,6 +12,14 @@
 import type { Game } from '../web/shared/lib/roomCode.ts';
 
 export type { Game };
+
+/**
+ * The game suites' names (tools/ci/suites.ts): `npm run test:<suite>`, the value of CI's two matrix
+ * jobs, and the prefix of the game's parity oracles (`test/parity/<suite>.*`) and, by convention,
+ * of its own e2e specs. A game's row names its suite (dry-round-2.md I6), and a name here without
+ * a suites.ts row is a type error there.
+ */
+export type GameSuite = 'gin' | 'fidice' | 'backgammon';
 
 /** The pages smoke opens: every game and the landing page. */
 export type PageName = Game | 'landing';
@@ -21,6 +30,15 @@ export type GameSpec = Readonly<{
   title: string;
   /** The documented test hook the page exposes once its boot finished (docs/ARCHITECTURE.md "Documented test hooks"). */
   hook: string;
+  /** The game's test suite: gin's is `gin`, the others' their folder name (GameSuite). */
+  suite: GameSuite;
+  /**
+   * The game's own e2e specs, as Playwright globs (`**\/<suite>-*.spec.ts`): the table flows and
+   * geometry a shared spec cannot carry. The shared specs are not listed: tools/ci/suites.ts adds
+   * the shell specs to a row with `shell` and the two online ones (a describe per game) to every
+   * row. Empty for fidice since its online pair folded into those (dry-round-2.md H1).
+   */
+  specs: ReadonlyArray<string>;
   /**
    * The shell's localStorage keys (shared-shell.md §6.1): the save of the game in progress and the
    * prefix every preference key carries (`<prefix>homeTab`, `<prefix>playMode`, ...), as the game's
@@ -133,6 +151,8 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
   'gin-rummy': {
     title: 'Gin Rummy',
     hook: 'window.__gin',
+    suite: 'gin',
+    specs: ['**/gin-*.spec.ts'],
     storage: { saveKey: 'ginRummyMP_v1', prefix: 'ginRummy_' },
     debug: 0,
     // The legacy ids, kept by web/games/gin-rummy/index.html, with the two rules slots empty.
@@ -146,6 +166,8 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
   fidice: {
     title: "Fidice — one-cup liar's dice",
     hook: 'window.__fidice',
+    suite: 'fidice',
+    specs: [],
     debug: 1,
     pageShape: { ids: ['app'], rulesSlots: false },
     contractFloors: { ts: 50, markup: -1 },
@@ -153,6 +175,8 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
   backgammon: {
     title: 'Sheshbesh — backgammon',
     hook: 'window.__backgammon',
+    suite: 'backgammon',
+    specs: ['**/backgammon-*.spec.ts'],
     storage: { saveKey: 'backgammonMP_v1', prefix: 'backgammon_' },
     debug: 0,
     // Gin-shaped: static screens, the 24 points (the seat mapping is an attribute, so the markup
