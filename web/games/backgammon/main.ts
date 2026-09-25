@@ -53,14 +53,14 @@ bootShell<Backgammon, App>({
   deps: {},
   hooks: {
     // `act` through the reducer; `view` my view; `setup` seats a position for e2e and stories
-    // (pass-and-play only, ui/state.ts `sandbox/load`).
+    // (pass-and-play only: the shell's `position/load`, web/shared/ui/shell.ts).
     hook: ({ app, dispatch }) => ({
       act: (action: Action) => {
         dispatch({ type: 'act', action });
       },
       view: (): View | null => app().shell.view,
       setup: (state: unknown) => {
-        dispatch({ type: 'sandbox/load', state });
+        dispatch({ type: 'position/load', state });
       },
     }),
   },

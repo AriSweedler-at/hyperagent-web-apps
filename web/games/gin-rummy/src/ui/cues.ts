@@ -3,6 +3,7 @@
 // pinned in test/fixtures/legacy/gin-ui.cjs). Everything here is a pure function of the view and
 // the player's selection; test/parity/gin.ui.test.ts runs each beside the legacy cut over seeded
 // views. The cue machine's mutable `cueState` becomes a value threaded through `nextCue`.
+import { fresh, type CueMemory } from '../../../../shared/ui/shell.ts';
 import type { View } from '../engine/types.ts';
 
 export type Status = Readonly<{ main: string; sub: string }>;
@@ -104,8 +105,12 @@ export type Cue =
   'yourTurn' | 'knockGood' | 'gin' | 'bad' | 'neutral' | 'win' | 'lose' | 'oppStock' | 'oppDiscard';
 /** `local` is pass-and-play on one phone; `online` a host or a guest. */
 export type CueRole = 'local' | 'online';
-/** What `playCuesFor` remembered between renders so each event chimes once. */
-export type CueState = Readonly<{ key: string | null; turnKey: string | null }>;
+/**
+ * What `playCuesFor` remembered between renders so each event chimes once: the shared memory
+ * (`key`, the result or game-over last chimed for; docs/design/dry-round-2.md F6) and gin's own
+ * `turnKey`, the turn last seen, for the turn chime.
+ */
+export type CueState = CueMemory & Readonly<{ turnKey: string | null }>;
 export const INITIAL_CUES: CueState = { key: null, turnKey: null };
 export type Cued = Readonly<{ state: CueState; cue: Cue | null }>;
 
@@ -130,10 +135,11 @@ export const oppDrawCue = (prev: View | null, next: View): Cue | null => {
 /** The cue a freshly rendered view fires, if any, and the state to carry to the next render. */
 export const nextCue = (prev: CueState, view: View, role: CueRole): Cued => {
   const me = view.me.idx;
-  const once = (key: string, cue: Cue, turnKey: string | null = prev.turnKey): Cued =>
-    prev.key === key
-      ? { state: { key: prev.key, turnKey }, cue: null }
-      : { state: { key, turnKey }, cue };
+  // The once-per-key rule is the shared `fresh` (F6); what it keys and what it plays stay gin's.
+  const once = (key: string, cue: Cue, turnKey: string | null = prev.turnKey): Cued => {
+    const seen = fresh(prev, key);
+    return { state: { ...seen.mem, turnKey }, cue: seen.fresh ? cue : null };
+  };
   if (role === 'local') {
     // One phone: turn chimes come from the curtain; results are shared, so the cues are neutral-positive.
     if (view.phase === 'roundOver' && view.result !== null) {

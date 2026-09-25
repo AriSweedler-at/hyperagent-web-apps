@@ -133,7 +133,7 @@ const revealed = (app: App): App => run(app, { type: 'curtain/reveal' }).app;
 const at = (text: string, turn: Seat, dice: Dice | null, app: App = local()): App =>
   revealed(
     run(app, {
-      type: 'sandbox/load',
+      type: 'position/load',
       state: withPosition(game(app), pos(text), turn, dice),
     }).app,
   );
@@ -853,10 +853,10 @@ const BOTH_SUFFICE = 'L: 4:1 2:1 | D: 24:2 1:13 | bar 0/0 | off 13/0';
 const SHUT_OUT = 'L: 13:14 | D: 1:2 2:2 3:2 4:2 5:2 6:2 7:3 | bar 1/0 | off 0/0';
 
 describe('the table', () => {
-  test('sandbox/load replaces the pass-and-play position, curtain down for the actor; refused elsewhere and for junk', () => {
+  test('position/load replaces the pass-and-play position, curtain down for the actor; refused elsewhere and for junk', () => {
     const start = local();
     const { app, effects } = run(start, {
-      type: 'sandbox/load',
+      type: 'position/load',
       state: withPosition(game(start), pos(TWO_ORDERS), 0, [6, 3]),
     });
     expect(game(app).board).toEqual(pos(TWO_ORDERS));
@@ -864,12 +864,12 @@ describe('the table', () => {
     expect(app.shell).toMatchObject({ revealed: 0, view: viewFor(game(app), 0) });
     expect(app.table.curtain).toBeNull();
     expect(kinds(effects)).toEqual(['persist', 'scrollTop']);
-    const junk = run(start, { type: 'sandbox/load', state: { nope: true } });
+    const junk = run(start, { type: 'position/load', state: { nope: true } });
     expect(junk.app).toBe(start);
     expect(toasts(junk.effects)).toEqual([[badPositionMsg('$.players: expected array'), null]]);
-    const online = run(hosting(), { type: 'sandbox/load', state: game(start) });
+    const online = run(hosting(), { type: 'position/load', state: game(start) });
     expect(toasts(online.effects)).toEqual([[SANDBOX_LOCAL_ONLY_MSG, null]]);
-    expect(toasts(run(initialApp, { type: 'sandbox/load', state: game(start) }).effects)).toEqual([
+    expect(toasts(run(initialApp, { type: 'position/load', state: game(start) }).effects)).toEqual([
       [SANDBOX_LOCAL_ONLY_MSG, null],
     ]);
   });

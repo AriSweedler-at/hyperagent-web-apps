@@ -5,6 +5,7 @@
 // edge with the App's font. The buzz stays here because a vibration is not part of a font (§1
 // "Haptics"). Nothing else in the game names a sound.
 import { SHELL_CUES, type CueSpec } from '../../../../shared/lib/sound/cues.ts';
+import type { CueMemory } from '../../../../shared/ui/shell.ts';
 
 /** The events of the table (design §5.1): the reducer derives them from the change between two views, and `doubles` from the settled roll (§4.7). */
 export type Cue =
@@ -30,8 +31,10 @@ export const CUES: Readonly<Record<Cue | 'tap', CueSpec>> = {
 
 /**
  * The cue machine's memory (ui/state.ts `rendered`): the view the last cues were played for, so a
- * re-sent frame plays none. Here rather than in state.ts because the shell config (shellConfig.ts)
- * starts the shell with it, and state.ts imports that config.
+ * re-sent frame plays none. The shared `CueMemory` as it is (docs/design/dry-round-2.md F6: the
+ * once-per-key rule is web/shared/ui/shell.ts `fresh`; the cues themselves stay `cuesBetween`'s).
+ * Here rather than in state.ts because the shell config (shellConfig.ts) starts the shell with it,
+ * and state.ts imports that config.
  */
-export type CueState = Readonly<{ key: string | null }>;
+export type CueState = CueMemory;
 export const INITIAL_CUES: CueState = { key: null };

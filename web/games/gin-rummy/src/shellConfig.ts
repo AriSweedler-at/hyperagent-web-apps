@@ -10,7 +10,7 @@
 // use its own helpers, and a value import both ways would be a cycle. Every literal here was
 // ui/state.ts's before the move; the constants and helpers the tests import are re-exported there.
 import type { ShellGameData } from '../../../shared/ui/shell.ts';
-import { applyAction, createGame, viewFor } from './engine/index.ts';
+import { applyAction, createGame, decodeState, viewFor } from './engine/index.ts';
 import { connectingMsg } from './net/guest.ts';
 import { OPENING_MSG, handoffMsg } from './net/host.ts';
 import { action, lobby, state, toast } from './protocol.ts';
@@ -84,6 +84,8 @@ export const GIN_SHELL: ShellGameData<Gin> = {
       ...game,
       players: [game.players[0], { ...game.players[1], name }],
     }),
+    // The shell's `position/load` decodes with the save's decoder; gin's sandbox deals a map instead (`sandbox/start`), so no hook sends it.
+    decodeState,
   },
   frames: { lobby, state, toast, action },
   cues: { initial: INITIAL_CUES },

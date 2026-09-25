@@ -28,6 +28,7 @@ import {
   type GuestFrame,
   type HostFrame,
 } from '../lib/protocol.ts';
+import { formatError, type Decoder } from '../lib/json.ts';
 import type { Result } from '../lib/result.ts';
 import type { Rng } from '../lib/rng.ts';
 import { randomCode, sanitiseCode, validateCode, type Game } from '../lib/roomCode.ts';
@@ -64,7 +65,7 @@ export type ShellTypes = Readonly<{
   Screen: string;
   Timer: string;
   Cue: string;
-  /** The cue machine's memory (`nextCue`'s), shell state because it keys on the view. */
+  /** The cue machine's memory (`CueMemory`, or a record extending it: gin adds `turnKey`), shell state because it keys on the view. */
   Cues: unknown;
   /** Resume offers beyond the three save roles: gin's Score Counter session; `never` elsewhere. */
   Resume: Readonly<{ kind: string }>;
@@ -279,6 +280,12 @@ export type ShellIntent<G extends ShellTypes> =
   // ---- the table's shell half: the curtain, the leave flow, the paint (C1 left them on the table side; C2 moves them here through the hooks) ----
   /** `#curtainBtn`. */
   | Readonly<{ type: 'curtain/reveal' }>
+  /**
+   * The game's setup hook (e2e and stories; docs/design/dry-round-2.md F5): the pass-and-play
+   * game's engine state is replaced by `state`, decoded by `cfg.engine.decodeState` so a hand-made
+   * object is checked; refused with a toast outside a local game.
+   */
+  | Readonly<{ type: 'position/load'; state: unknown }>
   | Readonly<{ type: 'leave/request' }>
   | Readonly<{ type: 'leave/confirmed' }>
   | Readonly<{ type: 'leave/finish' }>
@@ -290,9 +297,10 @@ export type ShellIntent<G extends ShellTypes> =
   | Readonly<{ type: 'persist' }>;
 
 /**
- * The shell's half of a game's `Intent` union: 43 types, backgammon's 38 less its two option
+ * The shell's half of a game's `Intent` union: 44 types, backgammon's 38 less its two option
  * selects (`variant/set`, `matchLength/set`, its own) plus the seven both games kept on the table
- * side after C1 (the curtain reveal, the leave flow, `visible`, `render`, `persist`).
+ * side after C1 (the curtain reveal, the leave flow, `visible`, `render`, `persist`), plus
+ * `position/load`, backgammon's `sandbox/load` generalised (dry-round-2.md F5).
  */
 export const SHELL_INTENT_TYPES = [
   'home/init',
@@ -332,6 +340,7 @@ export const SHELL_INTENT_TYPES = [
   'guest/frame',
   'guest/lost',
   'curtain/reveal',
+  'position/load',
   'leave/request',
   'leave/confirmed',
   'leave/finish',
@@ -443,8 +452,10 @@ export type Ctx = Readonly<{ rng: Rng; now: () => number }>;
  * Where a shared flow resets the table, so each game spells the reset it made at that site before
  * the move (agreed in C2, replacing the design's `cleared`/`handedOff`/`newView` sketch: gin's
  * sites clear different sets, and the spread at each site moves into the game's switch as it was):
- * a pass-and-play start, a deal, the handoff, a leave, the host lost, a new view (`broadcast`,
- * `localBroadcast`), an applied action (`hostDispatch`) and a guest's `state` frame.
+ * a pass-and-play start (a position loaded into one resets as a start does: backgammon's
+ * `tableCleared` at that site, dry-round-2.md F5), a deal, the handoff, a leave, the host lost, a
+ * new view (`broadcast`, `localBroadcast`), an applied action (`hostDispatch`) and a guest's
+ * `state` frame.
  */
 export type TableReset =
   'startLocal' | 'deal' | 'handoff' | 'leave' | 'lost' | 'view' | 'applied' | 'frame';
@@ -531,6 +542,8 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     names: (game: G['State']) => Readonly<[string, string]>;
     /** `game.players[1].name = name` on a rejoin. */
     renameGuest: (game: G['State'], name: string) => G['State'];
+    /** The engine state off `position/load`'s hand-made object (the save's decoder); its error names the path. */
+    decodeState: Decoder<G['State']>;
   }>;
   /** The game's protocol.ts builders the shell sends. */
   frames: Readonly<{
@@ -604,6 +617,9 @@ export const guestGoneMsg = (oppName: string | null, code: string | null): strin
   `${oppName ?? 'Opponent'} disconnected — they can rejoin with code ${String(code)}.`;
 /** `onGuestGone`'s toast lasts this long, as does `LOST_HOST_MSG`. */
 export const GONE_TOAST_MS = 4000;
+/** `position/load` outside pass-and-play, and a position the decoder refuses (backgammon's copy before dry-round-2.md F5; gin showed none: its sandbox deals, never loads). */
+export const SANDBOX_LOCAL_ONLY_MSG = 'Positions can only be set up in pass-and-play.';
+export const badPositionMsg = (error: string): string => `That position is not valid: ${error}`;
 
 // ---- steps and the small helpers every case uses; the games import them for their table cases ----
 
@@ -675,6 +691,23 @@ const withGuestStatus = <G extends ShellTypes>(
   withShell(app, {
     guestStatus: { text, pulse: stopPulse ? false : app.shell.guestStatus.pulse },
   });
+
+// ---- the cue memory (docs/design/dry-round-2.md F6) ---------------------------------------------
+
+/**
+ * What a game's cue machine remembers between paints so each event chimes once: the key of the
+ * position it last played for (gin: a result's timestamp or the totals; backgammon: game, phase,
+ * turn, log and play lengths). The shell's `cues` field holds the game's memory (`G['Cues']`: this
+ * record, or one extending it, gin's adds `turnKey`); the cues themselves stay each game's
+ * derivation (`cfg.table.rendered`, gin's `nextCue`), the two machines being 5/62 lines alike
+ * (dry-round-2.md §2E) and sharing only this rule.
+ */
+export type CueMemory = Readonly<{ key: string | null }>;
+/** `key` against the memory: `fresh` when it names a new position; the memory keyed on it either way. */
+export const fresh = (
+  mem: CueMemory,
+  key: string,
+): Readonly<{ mem: CueMemory; fresh: boolean }> => ({ mem: { key }, fresh: mem.key !== key });
 
 // ---- flows -------------------------------------------------------------------------------------
 
@@ -769,6 +802,36 @@ export const startLocal = <G extends ShellTypes>(
   andThen(step(localSeated(app, game, cfg), { type: 'wakeLock', hold: true }), (a) =>
     localBroadcast(a, true, ctx, cfg),
   );
+
+/**
+ * `position/load` (docs/design/dry-round-2.md F5; backgammon's `sandboxLoad` as it stood, over the
+ * config): the pass-and-play game's engine state replaced by the decoded one, the table reset as
+ * a start resets it, and the phone left with whoever must act, the seat the curtain would lift for
+ * (`cfg.local.revealer`, so no curtain comes up and no adapter is added for the one seat). Refused
+ * with a toast in any other role, and for a state the decoder refuses (`formatError` names the
+ * path). What sends the intent is the game's hook (`__backgammon.setup`); nothing here knows it.
+ */
+const loadPosition = <G extends ShellTypes>(
+  app: ShellApp<G>,
+  raw: unknown,
+  ctx: Ctx,
+  cfg: ShellConfig<G>,
+): Step<G> => {
+  if (app.shell.role !== 'local' || app.shell.game === null)
+    return step(app, toast(SANDBOX_LOCAL_ONLY_MSG));
+  const decoded = cfg.engine.decodeState(raw);
+  if (!decoded.ok) return step(app, toast(badPositionMsg(formatError(decoded.error))));
+  const game = decoded.value;
+  return localBroadcast(
+    {
+      shell: { ...app.shell, game, revealed: cfg.local.revealer(game).seat },
+      table: cfg.table.reset(app.table, 'startLocal'),
+    },
+    true,
+    ctx,
+    cfg,
+  );
+};
 
 /** `startHost(resumeCode)` up to the network: the session is the `startHost` effect. */
 const startHost = <G extends ShellTypes>(
@@ -1296,6 +1359,8 @@ export const reduceShell = <G extends ShellTypes>(
         (a) => localBroadcast(a, true, ctx, cfg),
       );
     }
+    case 'position/load':
+      return loadPosition(app, intent.state, ctx, cfg);
     case 'leave/request':
       return step(app, {
         type: 'confirm',

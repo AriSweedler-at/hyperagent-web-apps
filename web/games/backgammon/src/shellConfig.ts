@@ -17,6 +17,7 @@ import {
   DEFAULT_MATCH_LENGTH,
   DEFAULT_VARIANT,
   MATCH_LENGTHS,
+  decodeState,
   isShippedVariant,
   matchOver,
   viewFor,
@@ -97,6 +98,8 @@ export const BACKGAMMON_SHELL: ShellGameData<Backgammon> = {
       ...game,
       players: [game.players[0], { ...game.players[1], name }],
     }),
+    // `position/load` (`__backgammon.setup(state)`): the save's decoder checks the hand-made state.
+    decodeState,
   },
   frames: { lobby, state, toast, action },
   cues: { initial: INITIAL_CUES },

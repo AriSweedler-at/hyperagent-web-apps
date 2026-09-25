@@ -35,6 +35,7 @@ import {
   NOT_CONNECTED_MSG,
   andThen as then,
   broadcast,
+  fresh,
   guestContextOf as shellGuestContextOf,
   hostContextOf as shellHostContextOf,
   initialShell as shellInitial,
@@ -65,13 +66,11 @@ import {
   type TimerId as SharedTimerId,
 } from '../../../../shared/ui/shell.ts';
 import { runShellEffect, type ShellEffectDeps } from '../../../../shared/ui/shellEffects.ts';
-import { formatError } from '../../../../shared/lib/json.ts';
 import { ok, type Result } from '../../../../shared/lib/result.ts';
 import {
   actorOf,
   applyAction,
   createGame,
-  decodeState,
   isShippedVariant,
   moveTo,
   otherSeat,
@@ -130,8 +129,10 @@ export {
   NOT_CONNECTED_MSG,
   OPPONENT_LEFT_MSG,
   ROOM_FULL_MSG,
+  SANDBOX_LOCAL_ONLY_MSG,
   SHELL_INTENT_TYPES,
   WAITING_FOR_GUEST_MSG,
+  badPositionMsg,
   guestGoneMsg,
   joinedMsg,
   type Role,
@@ -172,7 +173,7 @@ export type ScreenId = (typeof SCREENS)[number];
 /** What the home screen's resume box offers (`resumeFor`), one per save role (web/shared/ui/shell.ts `ShellResume`; backgammon adds none). */
 export type Resume = SharedResume<Backgammon>;
 
-// The cue memory (`CueState`, `INITIAL_CUES`) lives in ui/sound.ts since C2: the shell config reads it too.
+// The cue memory (`CueState`, the shared `CueMemory` since dry-round-2.md F6; `INITIAL_CUES`) lives in ui/sound.ts since C2: the shell config reads it too.
 export { INITIAL_CUES, type CueState };
 
 /**
@@ -273,9 +274,6 @@ export const NO_MOVE_MS = 1200;
  * then the roll modal goes and the board answers taps. A cosmetic beat: the engine rolled at once.
  */
 export const TUMBLE_MS = 700;
-/** `sandbox/load` outside pass-and-play, and a position the decoder refuses. */
-export const SANDBOX_LOCAL_ONLY_MSG = 'Positions can only be set up in pass-and-play.';
-export const badPositionMsg = (error: string): string => `That position is not valid: ${error}`;
 /** `guest/lost` once the match is over: the host closed the room, there is nothing to rejoin. */
 export const hostLeftMsg = (hostName: string): string => `${hostName} left the table.`;
 /**
@@ -298,7 +296,8 @@ export type HomeSnapshot = SharedHomeSnapshot<Backgammon>;
 
 /**
  * The table's half of `Intent` (design §4.1), and the two option selects: backgammon's own, after
- * the shell's 43 (web/shared/ui/shell.ts `ShellIntent`).
+ * the shell's 44 (web/shared/ui/shell.ts `ShellIntent`; `setup(state)` is its `position/load`
+ * since dry-round-2.md F5).
  */
 export type TableIntent =
   /** `#variantSel` / `#localVariantSel`: a shipped variant is remembered; anything else is ignored. */
@@ -348,12 +347,7 @@ export type TableIntent =
   /** The `shake` timer fired. */
   | Readonly<{ type: 'shake/elapsed' }>
   /** The `tumble` timer fired: the dice have settled (design §4.7). */
-  | Readonly<{ type: 'tumble/elapsed' }>
-  /**
-   * `window.__backgammon.setup(state)` (e2e and stories): the pass-and-play game's engine state is
-   * replaced by `state` (decoded, so a hand-made object is checked); refused outside a local game.
-   */
-  | Readonly<{ type: 'sandbox/load'; state: unknown }>;
+  | Readonly<{ type: 'tumble/elapsed' }>;
 
 /** Every handler and every network event: the shell's intents (gin's names) and the table's. */
 export type Intent = SharedIntent<Backgammon>;
@@ -510,20 +504,21 @@ const TUMBLE_TIMER: Effect = {
 const rendered = (app: App, prev: View | null, ctx: Context): Step => {
   const view = app.shell.view;
   if (view === null) return pure(app);
-  const key = viewKey(view);
-  const fresh = key !== app.shell.cues.key && prev !== null;
-  const cues = fresh ? cuesBetween(prev, view, app.shell.role) : [];
+  // Once per position (the shared `fresh`, dry-round-2.md F6): a re-sent frame plays nothing.
+  const { mem, fresh: changed } = fresh(app.shell.cues, viewKey(view));
+  const since = changed && prev !== null;
+  const cues = since ? cuesBetween(prev, view, app.shell.role) : [];
   // A roll that just arrived (mine, or the other seat's) tumbles for TUMBLE_MS (design §4.7); a
   // tumble already running (the guest's, started at the click) restarts with the faces.
-  const rolled = fresh && rolledBetween(prev, view);
+  const rolled = since && rolledBetween(prev, view);
   // Pass-and-play toasts the player hit when the phone reaches them (`handedHits`), not here.
-  const hitToasts = fresh && app.shell.role !== 'local' ? hitToastsBetween(prev, view) : [];
-  const beat = key !== app.shell.cues.key && freshNoMove(prev, view);
+  const hitToasts = since && app.shell.role !== 'local' ? hitToastsBetween(prev, view) : [];
+  const beat = changed && freshNoMove(prev, view);
   const screen: ScreenId = view.matchOver ? 'endgameScreen' : 'tableScreen';
   const resultOpen = view.phase === 'over' ? prev?.phase !== 'over' || app.table.resultOpen : false;
   return step(
     {
-      shell: { ...app.shell, cues: { key }, screen },
+      shell: { ...app.shell, cues: mem, screen },
       table: {
         ...settled(app.table, view),
         resultOpen,
@@ -772,22 +767,6 @@ const dragEnd = (app: App, ctx: Context): Step => {
   return target === undefined ? pure(dropped) : commit(dropped, target.chains[0]?.moves ?? [], ctx);
 };
 
-/** `window.__backgammon.setup(state)`: the pass-and-play game's position, curtain down for the actor. */
-const sandboxLoad = (app: App, raw: unknown, ctx: Context): Step => {
-  if (app.shell.role !== 'local' || app.shell.game === null)
-    return step(app, toast(SANDBOX_LOCAL_ONLY_MSG));
-  const decoded = decodeState(raw);
-  if (!decoded.ok) return step(app, toast(badPositionMsg(formatError(decoded.error))));
-  const game = decoded.value;
-  return localBroadcast(
-    withTable(withShell(app, { game, revealed: actorOf(game) ?? game.turn }), {
-      ...tableCleared(app.table),
-    }),
-    true,
-    ctx,
-    BACKGAMMON,
-  );
-};
 // ---- the table's reducer ---------------------------------------------------------------------
 const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
   const v = liveView(app);
@@ -910,8 +889,6 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
         ...(doubles ? [{ type: 'fx', cue: 'doubles' } as const] : []),
       );
     }
-    case 'sandbox/load':
-      return sandboxLoad(app, intent.state, ctx);
   }
 };
 
