@@ -122,9 +122,10 @@ Each shared, site or harness job is `needs: changes` + `if: needs.changes.output
 'true'`. The game suites are two matrix jobs (dry-round-2 I1): `game` and `e2e-game` take
 `strategy.matrix.suite` from `fromJSON(needs.changes.outputs.games)` / `e2e-games`, the JSON
 lists `tools/ci/affected.ts --github` prints beside the booleans (`GAME_SUITES` in job order,
-filtered to the selected jobs), with `fail-fast: false` (one game's failure cancels no other),
-`name: <suite>` / `e2e-<suite>` (the check names the six jobs had) and `if: ... != '[]'` (GitHub
-refuses an empty matrix, so an empty list skips the job whole). A fourth game registers in
+filtered to the selected jobs), with `fail-fast: false` (one game's failure cancels no other) and
+`if: ... != '[]'` (GitHub refuses an empty matrix, so an empty list skips the job whole; the checks
+read `game (gin)` and `e2e-game (gin)`, with no `name:` override, since a job skipped before its
+matrix expands would show the raw expression as its name). A fourth game registers in
 `suites.ts` alone. The unit suites run once, instrumented, against their own rows. `site` builds
 and uploads `dist/`, which `deploy` downloads. The game e2e matrix installs Chromium and coturn
 (every game has a relay spec); `e2e-site` runs with `E2E_TURN=off`. A push to main or a

@@ -649,17 +649,19 @@ describe('ci.yml carries the graph the table describes', () => {
   );
 
   test.each([
-    ['game', 'games', 'test:', '${{ matrix.suite }}'],
-    ['e2e-game', 'e2e-games', 'test:e2e:', 'e2e-${{ matrix.suite }}'],
+    ['game', 'games', 'test:'],
+    ['e2e-game', 'e2e-games', 'test:e2e:'],
   ] as const)(
     '%s is a matrix job over the %s list the changes job emits, skipped whole on [], and ci-ok needs it',
-    (job, list, script, name) => {
+    (job, list, script) => {
       // The guard comes first: GitHub refuses an empty matrix, so `[]` must skip the job instead.
+      // No `name:` override: the checks read "game (gin)", and a job skipped before its matrix
+      // expands would show the raw expression as its name.
       expect(CI_YML).toContain(
         `\n  ${job}:\n    needs: changes\n    if: needs.changes.outputs.${list} != '[]'\n` +
           `    strategy:\n      fail-fast: false\n      matrix:\n` +
           `        suite: \${{ fromJSON(needs.changes.outputs.${list}) }}\n` +
-          `    name: ${name}\n`,
+          `    runs-on: ubuntu-latest\n`,
       );
       expect(CI_YML).toContain(`      ${list}: \${{ steps.affected.outputs.${list} }}\n`);
       expect(CI_YML).toContain(`run: npm run ${script}\${{ matrix.suite }}`);
