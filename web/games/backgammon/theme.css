@@ -1,7 +1,10 @@
 /* Sheshbesh's theme (docs/design/backgammon-board.md §3, §5; the owner: "subtle but recognizable").
-   The page links web/shared/styles/tokens.css and base.css before this file, and :root below
-   redeclares every one of the thirteen shared names (a partial override would inherit gin's green
-   felt; test/tokens.test.ts holds it). The palette is restrained: a parchment page
+   The page links web/shared/styles/tokens.css, base.css and shell.css (the shell's rules, since
+   docs/design/dry-round-2.md G1) before this file, and :root below redeclares every one of the
+   thirteen shared names and the fourteen shell tokens (a partial override would inherit gin's
+   green felt; test/tokens.test.ts holds it); what stays here under a shell selector is this
+   theme's own: the type scale, the panel's hairline and shadow, `font-family: inherit` on every
+   control (gin's controls keep the UA font), the parchment. The palette is restrained: a parchment page
    (§3.11: a CC0 photo of real medieval parchment, mirror-tiled, under a cream multiply), the home
    shell in a rich aegean blue with nacre text and fills and a gold hairline round it, an olive-wood
    board, gold elsewhere only as a hairline. The board is one
@@ -27,6 +30,24 @@
   --go-text: #1f2a12;
   --radius: 12px;
   --felt: linear-gradient(160deg, #a67c52 0%, #8e6740 55%, #6e4b2a 100%);
+  /* The shell's fourteen roles (web/shared/styles/shell.css; dry-round-2.md G1), on this palette:
+     Cardo for the body and GFS Didot for the code, the panel behind every shell box and bar,
+     nacre fills with the accent for their text and a dimmed nacre for the resting tab, the accent
+     for emphasis, the panel's hairline-and-shadow, --radius on every control and 9px on a tab. */
+  --font-body: var(--serif-text);
+  --font-display: var(--serif-display);
+  --surface-shell: var(--panel);
+  --surface-bar: var(--panel);
+  --fill: var(--nacre);
+  --fill-hover: rgba(243, 236, 223, 0.12);
+  --ink-on-fill: var(--accent);
+  --ink-on-bar: var(--nacre-dim);
+  --ink-hover: var(--nacre);
+  --emphasis: var(--accent);
+  --shadow-shell: inset 0 0 0 1px var(--hair), 0 8px 22px rgba(6, 37, 61, 0.28);
+  --radius-control: var(--radius);
+  --radius-inner: var(--radius);
+  --radius-tab: 9px;
   /* The game's own tokens: only the ones a rule below reads. */
   --olivewood-dark: #6e4b2a;
   --stone: #d9cbad;
@@ -49,13 +70,8 @@
   --checker-d: 28px;
   --die-s: 36px;
 }
-* {
-  -webkit-tap-highlight-color: transparent;
-}
 html,
 body {
-  padding: 0;
-  min-height: 100%;
   /* The parchment (§3.11; the owner: "Pergament.2 flesh"): a CC0 photo of the smooth flesh side
      of a medieval parchment (Wikimedia Commons File:Pergament.2.jpg, Membeth 2012, CC0 1.0),
      mirror-tiled 2x2 into one 2048px tile so every edge meets its own reflection, repeated at
@@ -72,17 +88,9 @@ body {
     2048px 2048px;
   background-repeat: repeat;
   background-blend-mode: multiply, normal;
-  color: var(--text);
-  font-family: var(--serif-text);
-  overscroll-behavior-y: contain;
 }
 #app {
-  max-width: 480px;
-  margin: 0 auto;
-  min-height: 100dvh;
   padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
 }
 /* The trim (the owner: "green style trim in the background at the border of the window"): a quiet
    olive band along the viewport's edge with a gold hairline on its inner side, fixed and inert.
@@ -115,7 +123,6 @@ h1 {
   font-size: 2rem;
   line-height: 1.1;
   margin: 10px 0 0;
-  text-align: center;
   letter-spacing: 0.02em;
   color: var(--accent);
 }
@@ -123,8 +130,6 @@ h1 {
   margin: 4px 0 14px;
 }
 .subtitle {
-  text-align: center;
-  color: var(--muted);
   font-size: 0.95rem;
   line-height: 1.4;
   margin: 4px 0 14px;
@@ -136,17 +141,10 @@ h1 {
 }
 /* The panel (§3.11; the owner: "I much prefer the rich blue"): every box of the shell (the Play
    panel's cards, the resume box, the waiting rooms, the match-over screen) in the rich-blue
-   gradient with a gold hairline inset and nacre text; the tab bar and the mode switch below wear
-   the same. */
+   gradient with a gold hairline inset (--surface-shell and --shadow-shell above, read by
+   shell.css's .card-box) and nacre text; the tab bar and the mode switch below wear the same. */
 .card-box {
-  background: var(--panel);
   color: var(--nacre);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 12px;
-  box-shadow:
-    inset 0 0 0 1px var(--hair),
-    0 8px 22px rgba(6, 37, 61, 0.28);
 }
 /* On the panel: labels and notes in a dimmed nacre, the room code in nacre, fills nacre with a
    gold-tinted edge and the accent for the chevron, the score rows nacre with the page's ink. */
@@ -188,48 +186,17 @@ h1 {
   margin-top: 8px;
 }
 .card-box.prose p {
-  margin: 0 0 12px;
-  line-height: 1.5;
   font-size: 0.98rem;
 }
-.card-box.prose p:last-child {
-  margin-bottom: 0;
-}
+/* Every control in Cardo (the UA would set its own button font; shell.css leaves that to the theme). */
 .btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: none;
-  border-radius: var(--radius);
   font-family: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 14px 18px;
-  min-height: 54px;
-  transition:
-    transform 0.08s ease,
-    filter 0.15s ease;
-  user-select: none;
-  color: var(--text);
-}
-.btn:active {
-  transform: scale(0.96);
-  filter: brightness(0.95);
-}
-.btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none;
 }
 /* The primary button a step lighter than the panel, with the same hairline; on hover a shade
    lighter still (the press keeps .btn:active's dim). */
 .btn-primary {
   background: linear-gradient(180deg, #155a86 0%, #0f4a70 100%);
   color: var(--nacre);
-  width: 100%;
-  font-size: 1.1rem;
   box-shadow:
     inset 0 0 0 1px var(--hair),
     0 6px 16px rgba(6, 37, 61, 0.28);
@@ -240,13 +207,10 @@ h1 {
 /* The call to action (docs/ARCHITECTURE.md "Calls to action"; the owner: "all the 'start game'
    buttons should be green and should stand out well"): Open a table, Sit down, Start, Start the
    match, Next game and Rematch in the shared --go, a light olive a step up from the move cue's
-   olive leaf, the page's ink for the label. On the panel it is the one green thing; on the
-   parchment and the sheet an olive hairline and the primary's shadow give it its edge. The focus
-   ring is .btn's (gold on the panel). */
+   olive leaf, the page's ink for the label (shell.css's .btn-go). On the panel it is the one green
+   thing; on the parchment and the sheet an olive hairline and the primary's shadow give it its
+   edge. The focus ring is .btn's (gold on the panel). */
 .btn-go {
-  background: var(--go);
-  color: var(--go-text);
-  font-size: 1.1rem;
   box-shadow:
     inset 0 0 0 1px rgba(95, 113, 51, 0.6),
     0 6px 16px rgba(6, 37, 61, 0.28);
@@ -254,31 +218,20 @@ h1 {
 .btn-go:hover:not(:active) {
   filter: brightness(1.06);
 }
-/* Secondary buttons are nacre: a step lighter than the parchment, a fill on the panel. In a sheet
-   (already the card colour) they keep the darker card tone they had. */
-.btn-secondary {
-  background: var(--nacre);
-}
+/* Secondary buttons are nacre (--fill above): a step lighter than the parchment, a fill on the
+   panel. In a sheet (already the card colour) they keep the darker card tone they had. */
 .sheet .btn-secondary {
   background: var(--card-2);
 }
 .btn-ghost {
-  background: transparent;
-  color: var(--muted);
   border: 1px solid rgba(42, 26, 18, 0.18);
 }
-.btn-block {
-  width: 100%;
-}
 .btn-sm {
-  padding: 10px 12px;
-  min-height: 44px;
   font-size: 0.9rem;
 }
 .btn small {
   font-weight: 400;
   font-style: italic;
-  opacity: 0.8;
 }
 .row .btn {
   white-space: nowrap;
@@ -291,15 +244,11 @@ input[type='text'],
 input[type='number'],
 select,
 textarea {
-  width: 100%;
   padding: 13px 14px;
-  border-radius: var(--radius);
   background: var(--nacre);
-  color: var(--text);
   font-family: inherit;
   font-size: 1.05rem;
   font-weight: 400;
-  outline: none;
   border: 1px solid rgba(42, 26, 18, 0.14);
   min-height: 48px;
 }
@@ -318,16 +267,8 @@ select {
   background-repeat: no-repeat;
   padding-right: 34px;
 }
-input::placeholder {
-  color: var(--muted);
-  font-weight: 400;
-}
 label {
   display: block;
-  font-size: 0.78rem;
-  color: var(--muted);
-  font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 .field {
@@ -341,12 +282,6 @@ label {
   color: var(--muted);
   padding-left: 2px;
 }
-.row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.row + .row,
 .row + .btn {
   margin-top: 10px;
 }
@@ -356,42 +291,18 @@ label {
 .row.between {
   justify-content: space-between;
 }
-.grow {
-  flex: 1;
-}
 .icon-btn {
-  background: var(--nacre);
-  border: none;
-  color: var(--text);
-  border-radius: var(--radius);
-  width: 44px;
-  height: 44px;
-  font-size: 1.1rem;
   font-family: inherit;
-  flex-shrink: 0;
   cursor: pointer;
 }
-.code-input {
-  text-align: center;
-  letter-spacing: 0.4em;
-  font-size: 1.5rem !important;
-  text-transform: uppercase;
-  font-family: var(--serif-display);
-}
 .room-code {
-  font-family: var(--serif-display);
-  font-size: 3rem;
   letter-spacing: 0.3em;
-  text-align: center;
-  color: var(--accent);
   font-weight: 400;
   padding-left: 0.3em;
   margin: 6px 0 10px;
 }
 .empty-note {
-  color: var(--muted);
   font-size: 0.88rem;
-  text-align: center;
   padding: 8px 0 0;
   line-height: 1.4;
 }
@@ -401,18 +312,6 @@ label {
 }
 .muted {
   color: var(--muted);
-}
-.pulse {
-  animation: pulse 1.6s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.45;
-  }
 }
 .badge {
   background: var(--nacre);
@@ -456,124 +355,35 @@ label {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
-::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
 
-/* ---------- top tabs and the mode switch (gin's shapes, restyled; the panel look of §3.11) ---------- */
+/* ---------- top tabs and the mode switch (shell.css's shapes; the panel look of §3.11, Cardo, the type scale) ---------- */
 .tabbar {
-  display: flex;
-  gap: 6px;
-  margin: 4px 0 16px;
-  background: var(--panel);
   color: var(--nacre);
-  border-radius: var(--radius);
-  padding: 4px;
   box-shadow:
     inset 0 0 0 1px var(--hair),
     0 8px 22px rgba(6, 37, 61, 0.28);
 }
-.tab-wrap {
-  position: relative;
-  flex: 1.2;
-  display: flex;
-}
 .tab-btn {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--nacre-dim);
   font-family: inherit;
-  font-weight: 700;
   font-size: 0.95rem;
-  padding: 11px 6px;
   min-height: 44px;
-  border-radius: 9px;
-  white-space: nowrap;
   cursor: pointer;
 }
-/* The open tab: nacre with the gold underline. */
+/* The open tab: nacre (--fill) with the gold underline. */
 .tab-btn.active {
-  background: var(--nacre);
-  color: var(--accent);
   box-shadow: inset 0 -2px 0 var(--gold);
 }
-.tab-wrap .tab-btn::after {
-  content: ' \25BE';
-  opacity: 0.55;
-  font-size: 0.8em;
-}
-.tab-panel.hidden {
-  display: none !important;
-}
 .tab-submenu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  min-width: 180px;
-  z-index: 30;
-  background: var(--panel);
   color: var(--nacre);
   border: none;
-  border-radius: var(--radius);
-  padding: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   box-shadow:
     inset 0 0 0 1px var(--hair),
     0 10px 26px rgba(6, 37, 61, 0.35);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateY(-4px);
-  transition:
-    opacity 0.12s,
-    transform 0.12s;
-}
-.tab-submenu::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -8px;
-  height: 8px;
-}
-.tab-submenu.force-open {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-@media (hover: hover) {
-  .tab-wrap:hover .tab-btn:not(.active) + .tab-submenu {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-    transform: translateY(0);
-  }
-  .tab-submenu button:hover {
-    background: rgba(243, 236, 223, 0.12);
-    color: var(--nacre);
-  }
 }
 .tab-submenu button {
-  background: transparent;
-  border: none;
-  color: var(--nacre-dim);
   font-family: inherit;
-  text-align: left;
-  padding: 11px 12px;
-  border-radius: 9px;
-  font-weight: 700;
   font-size: 0.9rem;
-  white-space: nowrap;
   cursor: pointer;
-}
-.tab-submenu button.active {
-  background: var(--nacre);
-  color: var(--accent);
 }
 /* With the Play panel open and its mode switch shown the tab bar flows into the switch: no bottom
    hairline, no bottom radii. Gated on the switch so a hidden one leaves the bar its own bottom edge. */
@@ -587,123 +397,62 @@ label {
     0 8px 22px rgba(6, 37, 61, 0.28);
 }
 .mode-switch {
-  display: flex;
-  gap: 6px;
-  margin: 0 0 16px;
-  padding: 4px;
-  background: var(--panel);
   color: var(--nacre);
   border-top: 1px solid rgba(201, 162, 39, 0.35);
-  border-radius: 0 0 var(--radius) var(--radius);
   box-shadow:
     inset 0 0 0 1px var(--hair),
     0 8px 22px rgba(6, 37, 61, 0.28);
 }
 .mode-btn {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--nacre-dim);
   font-family: inherit;
-  font-weight: 700;
-  padding: 9px 6px;
   min-height: 44px;
-  border-radius: 9px;
   font-size: 0.85rem;
-  white-space: nowrap;
   cursor: pointer;
-}
-.mode-btn.active {
-  background: var(--nacre);
-  color: var(--accent);
-}
-.rules-list {
-  list-style: none;
-  padding: 0;
-  margin: 12px 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 .rules-list li {
   font-size: 0.92rem;
   line-height: 1.45;
   background: var(--card);
-  border-radius: var(--radius);
   padding: 10px 12px;
 }
 #rulesOverlay .rules-list li {
   background: var(--card-2);
 }
-.rules-list li strong {
-  color: var(--accent);
-}
-/* Glossary links (docs/design/glossary-links.md; web/shared/ui/glossary.ts writes them): jargon in
-   the About copy and in a rule that names another rule is a link to that rule, a dotted hairline
-   in the accent and nothing louder. The rule it lands on flashes once: its background fades from a
-   wash of the accent back to its own (web/shared/edge/glossary.ts holds the class for 1.2 s). */
-.jargon {
-  color: var(--accent);
-  text-decoration: underline dotted;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-}
-/* On the panel (§3.11, the About copy) the accent is the panel's own blue and a link in it vanishes,
+/* Glossary links (shell.css's .jargon and .rule-flash; docs/design/glossary-links.md). On the panel (§3.11, the About copy) the accent is the panel's own blue and a link in it vanishes,
    so there a link is nacre like the prose round it, its hairline gold (9.0:1 at the lightest stop). */
 .card-box .jargon {
   color: var(--nacre);
   text-decoration-color: var(--gold);
 }
-.rule-flash {
-  animation: rule-flash 1.2s ease-out;
-}
+/* The flash: a wash of the accent fading back to the rule's own background. */
 @keyframes rule-flash {
   from {
     background-color: rgba(11, 60, 93, 0.18);
   }
 }
 
-/* ---------- overlays and sheets ---------- */
+/* ---------- overlays and sheets (shell.css's shapes; here the ink scrim, the sheet's shadow and radius, the type scale) ---------- */
 .overlay {
-  position: fixed;
-  inset: 0;
   background: rgba(42, 26, 18, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  padding: 16px;
 }
 /* The curtain (design §4.9): aegean-deep at 78%, the position readable beneath. */
 .overlay.curtain {
   background: rgba(6, 37, 61, 0.78);
 }
 .sheet {
-  background: var(--card);
   border-radius: 20px;
-  padding: 22px 18px;
-  max-width: 420px;
-  width: 100%;
-  max-height: 88dvh;
-  overflow-y: auto;
   box-shadow: 0 18px 48px rgba(6, 37, 61, 0.35);
 }
 .sheet-title {
-  font-size: 1.35rem;
   font-weight: 700;
-  text-align: center;
-  margin: 4px 0 2px;
 }
 .row .sheet-title {
   margin: 0;
   text-align: left;
 }
 .sheet-sub {
-  color: var(--muted);
-  text-align: center;
   font-size: 0.95rem;
   line-height: 1.4;
-  margin-bottom: 12px;
 }
 .sheet .btn-block + .btn-block {
   margin-top: 8px;
@@ -775,27 +524,12 @@ label {
   height: 20px;
   accent-color: var(--accent);
 }
+/* The toast in the deep aegean (its place and motion are shell.css's). */
 #toast {
-  position: fixed;
-  left: 50%;
-  bottom: calc(24px + env(safe-area-inset-bottom));
-  transform: translateX(-50%) translateY(20px);
   background: var(--accent-dark);
   color: var(--nacre);
-  font-weight: 700;
-  padding: 12px 16px;
-  border-radius: var(--radius);
   box-shadow: 0 8px 24px rgba(6, 37, 61, 0.35);
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.2s;
-  z-index: 100;
   max-width: calc(100vw - 32px);
-  text-align: center;
-}
-#toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
 }
 /* The hit toast ("Kapará.") wears the one warm edge in the theme. */
 #toast.hit {
@@ -809,13 +543,6 @@ label {
    viewport, every row above and below it has one height in every phase, and the fallback under
    `@media (max-height: 805px)` at the end of this section lets a short viewport scroll instead of
    clipping the controls. */
-body.fixed-screen,
-body.fixed-screen #app {
-  height: 100dvh;
-  max-height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-}
 #tableScreen {
   /* Phone: the board stands on end. Everything that is not the board measures 172px: #app padding
      24, topbar 44, status line 22, controls 56, three 8px gaps, and 2px of slack for rounding.

@@ -1,0 +1,408 @@
+/*
+ * The shell's stylesheet (docs/design/dry-round-2.md G1; docs/design/shared-shell.md P13): the
+ * rules gin's and backgammon's theme.css carried twice for the screens the shared shell paints
+ * (the page, the home screen's boxes, buttons, fields and tabs, the waiting rooms, the overlays and
+ * sheets, the curtain, the toast), moved here once. A shell page links tokens.css, base.css, this
+ * file, then its theme.css, so a theme rule of equal specificity still wins; fidice does not link
+ * it before its restyle (its theme reuses thirty of these names with its own values).
+ *
+ * Token-only, by construction: a declaration is here because both themes computed the same value
+ * from it, or because the two values differ by a role a token names (tokens.css declares the shell
+ * tokens with gin's values, backgammon's :root redeclares every one; CONTRACT.md "Shell tokens").
+ * The declarations where the two type scales differ (font sizes and weights, letter-spacing, a
+ * padding or a margin) stay in each theme under the same selector, as does what one game alone
+ * declares (gin's .card-box hairline and .sheet border, backgammon's `font-family: inherit` on every
+ * control and its panel shadows), so every computed value on every selector of the four shell
+ * goldens (test/fixtures/styles/{gin-rummy,backgammon}.*.json) is what it was before the move;
+ * one type scale is G5, with the Fidice restyle. The rules keep the themes' order, and a rule a
+ * theme keeps under one of these selectors follows all of them, so a later rule of equal
+ * specificity still wins where it did (the submenu's hovered entry against its active one).
+ */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+html,
+body {
+  padding: 0;
+  min-height: 100%;
+  color: var(--text);
+  font-family: var(--font-body);
+  overscroll-behavior-y: contain;
+}
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+h1 {
+  text-align: center;
+}
+.subtitle {
+  text-align: center;
+  color: var(--muted);
+}
+/* Every box of the shell: the Play panel's cards, the resume box, the waiting rooms, the endgame. */
+.card-box {
+  background: var(--surface-shell);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-shell);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--radius-control);
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 14px 18px;
+  min-height: 54px;
+  transition:
+    transform 0.08s ease,
+    filter 0.15s ease;
+  user-select: none;
+  color: var(--text);
+}
+.btn:active {
+  transform: scale(0.96);
+  filter: brightness(0.95);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+/* Each theme paints the primary's fill and label; the size is the shell's. */
+.btn-primary {
+  width: 100%;
+  font-size: 1.1rem;
+}
+/* The call to action (docs/ARCHITECTURE.md "Calls to action"; the owner, 2026-09-24: "all the
+   'start game' buttons should be green and should stand out well"): every button that opens,
+   joins or starts a game, and only those, in the shared --go and --go-text at .btn-primary's type
+   size. Each theme adds its own hover, ring or edge. */
+.btn-go {
+  background: var(--go);
+  color: var(--go-text);
+  font-size: 1.1rem;
+}
+.btn-secondary {
+  background: var(--fill);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+}
+.btn-block {
+  width: 100%;
+}
+.btn-sm {
+  padding: 10px 12px;
+  min-height: 44px;
+}
+.btn small {
+  opacity: 0.8;
+}
+input[type='text'],
+input[type='number'],
+select,
+textarea {
+  width: 100%;
+  border-radius: var(--radius-control);
+  color: var(--text);
+  outline: none;
+}
+input::placeholder {
+  color: var(--muted);
+  font-weight: 400;
+}
+label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.row + .row {
+  margin-top: 10px;
+}
+.grow {
+  flex: 1;
+}
+.icon-btn {
+  background: var(--fill);
+  border: none;
+  color: var(--text);
+  border-radius: var(--radius-inner);
+  width: 44px;
+  height: 44px;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.code-input {
+  text-align: center;
+  letter-spacing: 0.4em;
+  font-size: 1.5rem !important;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+}
+.room-code {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  text-align: center;
+  color: var(--emphasis);
+}
+.empty-note {
+  color: var(--muted);
+  text-align: center;
+}
+/* The waiting rooms' status line (shellPaint.ts `paintWaiting` toggles it). */
+.pulse {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+/* At the table the page never scrolls (shellPaint.ts `paintScreen` sets `fixed-screen`); each
+   theme's short-viewport fallback lifts it, after this file, where its floor sizes cannot fit. */
+body.fixed-screen,
+body.fixed-screen #app {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---------- overlays and sheets ---------- */
+/* Each theme paints the overlay's scrim and the sheet's edge (gin a gold border, backgammon a shadow) and radius. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+.sheet {
+  background: var(--card);
+  padding: 22px 18px;
+  max-width: 420px;
+  width: 100%;
+  max-height: 88dvh;
+  overflow-y: auto;
+}
+.sheet-title {
+  font-size: 1.35rem;
+  text-align: center;
+  margin: 4px 0 2px;
+}
+.sheet-sub {
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 12px;
+}
+.rules-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rules-list li {
+  border-radius: var(--radius-inner);
+}
+.rules-list li strong {
+  color: var(--emphasis);
+}
+/* Glossary links (docs/design/glossary-links.md; web/shared/ui/glossary.ts writes them): jargon in
+   the About copy and in a rule that names another rule is a link to that rule, a dotted hairline
+   in the accent and nothing louder. The rule it lands on flashes once (web/shared/edge/glossary.ts
+   holds the class for 1.2 s): the `rule-flash` keyframes are each theme's, a wash of its accent. */
+.jargon {
+  color: var(--accent);
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.rule-flash {
+  animation: rule-flash 1.2s ease-out;
+}
+/* The About tab's prose (each game's about.ts). */
+.card-box.prose p {
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+.card-box.prose p:last-child {
+  margin-bottom: 0;
+}
+/* The toast (shellPaint.ts `showToast`): fixed over the page's foot; each theme paints its fill, label, shadow and width. */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(20px);
+  font-weight: 700;
+  padding: 12px 16px;
+  border-radius: var(--radius-control);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s;
+  z-index: 100;
+  text-align: center;
+}
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ---------- top tabs and the mode switch (home.ts) ---------- */
+.tabbar {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 16px;
+  background: var(--surface-bar);
+  border-radius: var(--radius-control);
+  padding: 4px;
+}
+.tab-wrap {
+  position: relative;
+  flex: 1.2;
+  display: flex;
+}
+.tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--ink-on-bar);
+  font-weight: 700;
+  padding: 11px 6px;
+  border-radius: var(--radius-tab);
+  white-space: nowrap;
+}
+.tab-btn.active {
+  background: var(--fill);
+  color: var(--ink-on-fill);
+}
+/* The Play tab has a submenu; the caret says so (hover on a desktop, a long press on a phone). */
+.tab-wrap .tab-btn::after {
+  content: ' \25BE';
+  opacity: 0.55;
+  font-size: 0.8em;
+}
+.tab-panel.hidden {
+  display: none !important;
+}
+/* The submenu is a fold of the tab bar under the Play tab: the shell's box surface, its buttons as
+   tab buttons. Its ::before bridges the 6px gap up to the tab, so a pointer crossing the gap keeps
+   `.tab-wrap:hover` (without it the menu hid, and its pointer-events: none then kept it hidden,
+   the moment the pointer left the tab). On the Play tab itself the mode row below is the menu,
+   so a hover shows nothing. */
+.tab-submenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  z-index: 30;
+  background: var(--surface-shell);
+  border-radius: var(--radius-inner);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.12s,
+    transform 0.12s;
+}
+.tab-submenu::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 8px;
+}
+.tab-submenu.force-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+/* The hovered entry precedes the active one below, as in both themes, so an active entry under the
+   pointer keeps its fill. */
+@media (hover: hover) {
+  .tab-wrap:hover .tab-btn:not(.active) + .tab-submenu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+  .tab-submenu button:hover {
+    background: var(--fill-hover);
+    color: var(--ink-hover);
+  }
+}
+.tab-submenu button {
+  background: transparent;
+  border: none;
+  color: var(--ink-on-bar);
+  text-align: left;
+  padding: 11px 12px;
+  border-radius: var(--radius-tab);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tab-submenu button.active {
+  background: var(--fill);
+  color: var(--ink-on-fill);
+}
+/* The play mode is the tab bar's second row, on the bar's surface, its two modes as smaller tab
+   buttons; each theme squares the bar's bottom off above it and draws the hairline between. */
+.mode-switch {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 4px;
+  background: var(--surface-bar);
+  border-radius: 0 0 var(--radius-control) var(--radius-control);
+}
+.mode-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--ink-on-bar);
+  font-weight: 700;
+  padding: 9px 6px;
+  border-radius: var(--radius-tab);
+  white-space: nowrap;
+}
+.mode-btn.active {
+  background: var(--fill);
+  color: var(--ink-on-fill);
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}

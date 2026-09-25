@@ -4,9 +4,12 @@
 // theme.css, linked last, redeclares every one so the shared names resolve to its own palette until
 // the Fidice restyle drops the overrides. Backgammon's theme.css does the same on purpose (its
 // parchment-and-aegean palette is not a restyle target; docs/design/backgammon-board.md §3): a
-// partial override would inherit gin's green felt for the names it forgot. The computed-style
-// goldens pin the resolved values; this test pins where each name is declared, which the goldens
-// cannot see.
+// partial override would inherit gin's green felt for the names it forgot. The shell tokens
+// (docs/design/dry-round-2.md G1; CONTRACT.md "Shell tokens") follow the same rule for the two shell
+// games: tokens.css declares them with gin's values, backgammon redeclares every one, and only
+// web/shared/styles/shell.css reads them; fidice links no shell.css and declares none of them (the
+// restyle decides). The computed-style goldens pin the resolved values; this test pins where each
+// name is declared, which the goldens cannot see.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -17,9 +20,10 @@ const TOKENS = resolve(WEB, 'shared', 'styles', 'tokens.css');
 const GIN_THEME = resolve(WEB, 'games', 'gin-rummy', 'theme.css');
 const FIDICE_THEME = resolve(WEB, 'games', 'fidice', 'theme.css');
 const BACKGAMMON_THEME = resolve(WEB, 'games', 'backgammon', 'theme.css');
+const SHELL_CSS = resolve(WEB, 'shared', 'styles', 'shell.css');
 
-/** The shared vocabulary: gin's palette names, in tokens.css order. */
-const SHARED: ReadonlyArray<string> = [
+/** The palette: gin's names, in tokens.css order; every theme resolves them. */
+const PALETTE: ReadonlyArray<string> = [
   '--bg',
   '--card',
   '--card-2',
@@ -34,6 +38,27 @@ const SHARED: ReadonlyArray<string> = [
   '--radius',
   '--felt',
 ];
+
+/** The shell's roles (shell.css reads them; the shell games declare them), in tokens.css order. */
+const SHELL_TOKENS: ReadonlyArray<string> = [
+  '--font-body',
+  '--font-display',
+  '--surface-shell',
+  '--surface-bar',
+  '--fill',
+  '--fill-hover',
+  '--ink-on-fill',
+  '--ink-on-bar',
+  '--ink-hover',
+  '--emphasis',
+  '--shadow-shell',
+  '--radius-control',
+  '--radius-inner',
+  '--radius-tab',
+];
+
+/** The shared vocabulary: everything tokens.css declares. */
+const SHARED: ReadonlyArray<string> = [...PALETTE, ...SHELL_TOKENS];
 
 const stripComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, '');
 
@@ -83,12 +108,26 @@ test('gin theme.css redeclares no shared name: tokens.css is the single source o
   ]);
 });
 
-test('fidice theme.css redeclares every shared name: its look holds until the restyle', () => {
+test('fidice theme.css redeclares every palette name and no shell token: its look holds until the restyle', () => {
   const fidice = new Set(rootNames(FIDICE_THEME));
-  expect(SHARED.filter((name) => !fidice.has(name))).toEqual([]);
+  expect(PALETTE.filter((name) => !fidice.has(name))).toEqual([]);
+  expect(
+    SHELL_TOKENS.filter((name) => fidice.has(name)),
+    'fidice links no shell.css',
+  ).toEqual([]);
 });
 
 test('backgammon theme.css redeclares every shared name: its palette never inherits gin felt', () => {
   const backgammon = new Set(rootNames(BACKGAMMON_THEME));
   expect(SHARED.filter((name) => !backgammon.has(name))).toEqual([]);
+});
+
+test('shell.css reads every shell token and declares no custom property of its own', () => {
+  const css = stripComments(readFileSync(SHELL_CSS, 'utf8'));
+  expect(
+    SHELL_TOKENS.filter((name) => !css.includes(`var(${name})`)),
+    'unread',
+  ).toEqual([]);
+  expect(rootBlocks(css), 'no :root').toEqual([]);
+  expect(css.match(/--[\w-]+\s*:/g) ?? [], 'declarations').toEqual([]);
 });

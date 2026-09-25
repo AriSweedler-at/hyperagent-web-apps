@@ -1,7 +1,12 @@
 /* The legacy page's first <style> block (legacy/gin-rummy/index.html; docs/MIGRATION.md step 12),
    hand-owned since step 14, which moved the primitives both games share (the box-sizing reset,
    html/body margin, .hidden) into web/shared/styles/base.css and its palette into
-   web/shared/styles/tokens.css; the page links tokens.css and base.css before this file.
+   web/shared/styles/tokens.css; the page links tokens.css and base.css before this file. Since
+   docs/design/dry-round-2.md G1 the shell's rules (the page, the home screen's boxes, buttons,
+   fields and tabs, the overlays, sheets and toast) are web/shared/styles/shell.css's, linked
+   between base.css and this file, with the fourteen shell tokens (tokens.css) at this theme's
+   values; what stays here under a shell selector is this theme's own (its type scale, the felt,
+   the gold sheet border, the toast's cream).
    Everything else is verbatim except the table (docs/design/gin-draw-ghost-slot.md §5): the
    `.hand` is a grid of eleven fixed `.slot` cells (six columns on a phone, eleven from 900px) with
    the ghost draw slot, the `.actions` row has a fixed height so the undo button never moves the
@@ -16,59 +21,43 @@
    the page scrolls instead of clipping the hand and the actions row. */
   :root {
     /* The palette (--bg --card --card-2 --accent --accent-dark --gold --text --muted --danger
-       --radius --felt) is the shared vocabulary in web/shared/styles/tokens.css, with these values. */
+       --radius --felt) and the shell tokens (--font-body --font-display --surface-shell
+       --surface-bar --fill --fill-hover --ink-on-fill --ink-on-bar --ink-hover --emphasis
+       --shadow-shell --radius-control --radius-inner --radius-tab) are the shared vocabulary in
+       web/shared/styles/tokens.css, with these values. */
     /* default (off-table) card sizes: the result sheet and the meld chooser; #tableScreen sets its own --card-w and --pile-w */
     --card-w: 50px; --mini-w: 34px; --pile-w: 84px; --tiny-w: 22px;
   }
-  * { -webkit-tap-highlight-color: transparent; }
-  html, body { padding: 0; min-height: 100%; background: var(--felt); color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overscroll-behavior-y: contain; }
-  #app { max-width: 480px; margin: 0 auto; min-height: 100dvh; padding: 12px 12px calc(16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
-  h1 { font-size: 1.35rem; margin: 6px 0 2px; text-align: center; letter-spacing: 0.4px; }
-  .subtitle { text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 14px; }
-  .card-box { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.05); }
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: none; border-radius: 14px; font-weight: 700; cursor: pointer;
-    font-size: 1rem; padding: 14px 18px; min-height: 54px; transition: transform 0.08s ease, filter 0.15s ease; user-select: none; color: var(--text); }
-  .btn:active { transform: scale(0.96); filter: brightness(0.95); }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #08260f; width: 100%; font-size: 1.1rem; }
+  html, body { background: var(--felt); }
+  #app { padding: 12px 12px calc(16px + env(safe-area-inset-bottom)); }
+  h1 { font-size: 1.35rem; margin: 6px 0 2px; letter-spacing: 0.4px; }
+  .subtitle { font-size: 0.85rem; margin-bottom: 14px; }
+  .card-box { border: 1px solid rgba(255,255,255,0.05); }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #08260f; }
   .btn-gold { background: linear-gradient(135deg, #fde68a, var(--gold)); color: #3a2a00; }
-  /* The call to action (docs/ARCHITECTURE.md "Calls to action"; the owner: "all the 'start game'
-     buttons should be green and should stand out well"): Host, Join, Start pass & play, Deal the
-     first hand, Next hand and Rematch in the shared --go, a light olive-lime apart from the accent
-     green of Take and Discard, at .btn-primary's type size; the width comes from .btn-block or the
-     row. The hover lifts a shade, the press keeps .btn:active's dim, the ring sits off the button. */
-  .btn-go { background: var(--go); color: var(--go-text); font-size: 1.1rem; }
+  /* The call to action (docs/ARCHITECTURE.md "Calls to action"; shell.css's .btn-go: Host, Join,
+     Start pass & play, Deal the first hand, Next hand and Rematch in the shared --go, a light
+     olive-lime apart from the accent green of Take and Discard). Here its manners: the hover lifts
+     a shade, the press keeps .btn:active's dim, the ring sits off the button. */
   .btn-go:hover:not(:active):not(:disabled) { filter: brightness(1.06); }
   .btn-go:focus-visible { outline: 3px solid var(--go); outline-offset: 3px; }
-  .btn-secondary { background: var(--card-2); }
-  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.15); }
-  .btn-block { width: 100%; }
-  .btn-sm { padding: 10px 12px; min-height: 44px; font-size: 0.85rem; }
-  .btn small { font-weight: 600; opacity: 0.8; }
-  input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 14px 16px; border-radius: 14px; background: #0d2418; color: var(--text); font-size: 1.1rem; font-weight: 600; outline: none; border: 1px solid rgba(255,255,255,0.08); }
-  input::placeholder { color: var(--muted); font-weight: 400; }
+  .btn-ghost { border: 1px solid rgba(255,255,255,0.15); }
+  .btn-sm { font-size: 0.85rem; }
+  .btn small { font-weight: 600; }
+  input[type="text"], input[type="number"], select, textarea { padding: 14px 16px; background: #0d2418; font-size: 1.1rem; font-weight: 600; border: 1px solid rgba(255,255,255,0.08); }
   /* The sandbox's map editor and its help: a map is columns of card ids, so both are monospaced. */
   #sbMap, .sb-help { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.82rem; font-weight: 500; line-height: 1.45; }
   #sbMap { resize: vertical; min-height: 120px; padding: 10px 12px; }
   .sb-help { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: #0d2418; color: var(--text); white-space: pre; overflow-x: auto; text-align: left; }
-  label { font-size: 0.78rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-  .row { display: flex; gap: 10px; align-items: center; }
-  .row + .row { margin-top: 10px; }
-  .grow { flex: 1; }
-  .icon-btn { background: var(--card-2); border: none; color: var(--text); border-radius: 12px; width: 44px; height: 44px; font-size: 1.1rem; flex-shrink: 0; }
-  .code-input { text-align: center; letter-spacing: 0.4em; font-size: 1.5rem !important; text-transform: uppercase; font-family: ui-monospace, Menlo, monospace; }
-  .room-code { font-family: ui-monospace, Menlo, monospace; font-size: 3rem; letter-spacing: 0.35em; text-align: center; color: var(--gold); font-weight: 800; padding-left: 0.35em; }
-  .empty-note { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 8px 0; }
-  .pulse { animation: pulse 1.6s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.45 } }
+  label { letter-spacing: 0.5px; }
+  .room-code { letter-spacing: 0.35em; font-weight: 800; padding-left: 0.35em; }
+  .empty-note { font-size: 0.85rem; padding: 8px 0; }
 
   /* ---------- table ---------- */
-  /* While at the table the page never scrolls: the card sizes are bounded by the viewport below, and
-     every row above the hand has one height in every phase, so nothing is measured after a paint.
-     The fallback under `@media (max-height: 661px)` at the end of this section lets it scroll
-     where the floor sizes cannot fit. */
-  body.fixed-screen, body.fixed-screen #app { height: 100dvh; max-height: 100dvh; min-height: 0; overflow: hidden; }
+  /* While at the table the page never scrolls (shell.css's `body.fixed-screen` rule): the card sizes
+     are bounded by the viewport below, and every row above the hand has one height in every phase,
+     so nothing is measured after a paint. The fallback under `@media (max-height: 661px)` at the
+     end of this section lets it scroll where the floor sizes cannot fit. */
   #tableScreen {
     /* Width: six columns fill a phone, (100vw - 24 #app padding - 20 .hand-area padding) / 6 cells of
        card + 6px slot padding. Height: everything that is not a card measures 451px (28 #app padding,
@@ -277,24 +266,17 @@
   .drag-ghost { position: fixed; margin: 0; z-index: 60; pointer-events: none; will-change: transform; box-shadow: 0 14px 28px rgba(0,0,0,0.55); transition: none; }
   .drag-ghost.landing { transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 
-  /* ---------- overlays ---------- */
-  .overlay { position: fixed; inset: 0; background: rgba(6,20,12,0.9); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
-  .sheet { background: var(--card); border-radius: 24px; padding: 22px 18px; max-width: 420px; width: 100%; max-height: 88dvh; overflow-y: auto; border: 2px solid var(--gold); }
-  .sheet-title { font-size: 1.35rem; font-weight: 800; text-align: center; margin: 4px 0 2px; }
-  .sheet-sub { color: var(--muted); text-align: center; font-size: 0.88rem; margin-bottom: 12px; }
-  .rules-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
-  .rules-list li { font-size: 0.86rem; line-height: 1.4; background: var(--card-2); border-radius: 12px; padding: 9px 12px; }
-  .rules-list li strong { color: var(--gold); }
-  /* Glossary links (docs/design/glossary-links.md; web/shared/ui/glossary.ts writes them): jargon in
-     the About copy and in a rule that names another rule is a link to that rule, a dotted hairline
-     in the accent and nothing louder. The rule it lands on flashes once: its background fades from
-     a wash of the accent back to its own (web/shared/edge/glossary.ts holds the class for 1.2 s). */
-  .jargon { color: var(--accent); text-decoration: underline dotted; text-decoration-thickness: 1px; text-underline-offset: 2px; }
-  .rule-flash { animation: rule-flash 1.2s ease-out; }
+  /* ---------- overlays (their shapes are shell.css's; here the felt's dark scrim, the gold edge) ---------- */
+  .overlay { background: rgba(6,20,12,0.9); }
+  .sheet { border-radius: 24px; border: 2px solid var(--gold); }
+  .sheet-title { font-weight: 800; }
+  .sheet-sub { font-size: 0.88rem; }
+  .rules-list li { font-size: 0.86rem; line-height: 1.4; background: var(--card-2); padding: 9px 12px; }
+  /* The glossary link's flash (shell.css's .jargon and .rule-flash; docs/design/glossary-links.md):
+     the rule it lands on fades from a wash of the accent back to its own background. */
   @keyframes rule-flash { from { background-color: rgba(74, 222, 128, 0.35); } }
   /* The About tab's prose (about.ts). */
-  .card-box.prose p { margin: 0 0 12px; line-height: 1.5; font-size: 0.92rem; }
-  .card-box.prose p:last-child { margin-bottom: 0; }
+  .card-box.prose p { font-size: 0.92rem; }
   .rr-panel { background: var(--card-2); border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; border: 2px solid transparent; }
   .rr-panel.scored { border-color: var(--gold); }
   .rr-head { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; font-size: 1rem; margin-bottom: 4px; }
@@ -350,8 +332,8 @@
   .standing-rank { color: var(--muted); font-weight: 700; width: 28px; }
   .standing-name { flex: 1; font-weight: 700; }
   .standing-total { font-weight: 800; color: var(--accent); font-size: 1.1rem; }
-  #toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); background: #fef3c7; color: #3a2a00; font-weight: 700; padding: 12px 16px; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); opacity: 0; pointer-events: none; transition: all 0.2s; z-index: 100; max-width: 92vw; text-align: center; font-size: 0.92rem; }
-  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  /* The toast's cream (its place and motion are shell.css's). */
+  #toast { background: #fef3c7; color: #3a2a00; box-shadow: 0 8px 24px rgba(0,0,0,0.4); max-width: 92vw; font-size: 0.92rem; }
   /* ---------- scorer ---------- */
   .setup-players { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
   .player-input-row { display: flex; gap: 8px; align-items: center; }
@@ -371,41 +353,16 @@
   #submitRoundBar { position: sticky; bottom: 0; padding-top: 10px; margin-top: 10px; background: linear-gradient(to top, rgba(11,36,24,0.95) 60%, transparent); }
   .history-actions { display: flex; gap: 6px; flex-shrink: 0; }
   .history-actions button { background: rgba(255,255,255,0.08); border: none; color: var(--text); border-radius: 10px; width: 40px; height: 40px; font-size: 0.95rem; }
-  /* ---------- top tabs ---------- */
-  .tabbar { display: flex; gap: 6px; margin: 4px 0 16px; background: rgba(0,0,0,0.22); border-radius: 14px; padding: 4px; }
-  .tab-wrap { position: relative; flex: 1.2; display: flex; }
-  .tab-btn { flex: 1; background: transparent; border: none; color: var(--muted); font-weight: 700; font-size: 0.85rem; padding: 11px 6px; border-radius: 10px; white-space: nowrap; }
-  .tab-btn.active { background: var(--card-2); color: var(--text); }
-  /* The Play tab has a submenu; the caret says so (hover on a desktop, a long press on a phone). */
-  .tab-wrap .tab-btn::after { content: " \25BE"; opacity: 0.55; font-size: 0.8em; }
-  .tab-panel.hidden { display: none !important; }
-  /* The submenu is a fold of the tab bar under the Play tab: its dark surface, its buttons as tab
-     buttons. Its ::before bridges the 6px gap up to the tab, so a pointer crossing the gap keeps
-     `.tab-wrap:hover` (without it the menu hid, and its pointer-events: none then kept it hidden,
-     the moment the pointer left the tab). On the Play tab itself the mode row below is the menu,
-     so a hover shows nothing. */
-  .tab-submenu {
-    position: absolute; top: calc(100% + 6px); left: 0; min-width: 180px; z-index: 30;
-    background: var(--card); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 4px;
-    display: flex; flex-direction: column; gap: 2px; box-shadow: 0 10px 26px rgba(0,0,0,0.45);
-    opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(-4px); transition: opacity 0.12s, transform 0.12s;
-  }
-  .tab-submenu::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
-  .tab-submenu.force-open { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
-  @media (hover: hover) {
-    .tab-wrap:hover .tab-btn:not(.active) + .tab-submenu { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
-    .tab-submenu button:hover { background: rgba(255,255,255,0.07); color: var(--text); }
-  }
-  .tab-submenu button { background: transparent; border: none; color: var(--muted); text-align: left; padding: 11px 12px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; white-space: nowrap; }
-  .tab-submenu button.active { background: var(--card-2); color: var(--text); }
+  /* ---------- top tabs (shell.css's shapes and surfaces; here this theme's type size and the submenu's hairline and shadow) ---------- */
+  .tab-btn { font-size: 0.85rem; }
+  .tab-submenu { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 10px 26px rgba(0,0,0,0.45); }
+  .tab-submenu button { font-size: 0.85rem; }
   .tab-submenu button:active { filter: brightness(0.9); }
-  /* The play mode is the tab bar's second row: while the Play panel is up the bar squares its
-     bottom off and the switch continues its surface beneath a hairline, its two modes as smaller
-     tab buttons. */
+  /* The play mode is the tab bar's second row (shell.css's .mode-switch): while the Play panel is up
+     the bar squares its bottom off and the switch continues its surface beneath a hairline. */
   .tabbar:has(+ #playPanel:not(.hidden)) { margin-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-  .mode-switch { display: flex; gap: 6px; margin: 0 0 16px; padding: 4px; background: rgba(0,0,0,0.22); border-top: 1px solid rgba(255,255,255,0.07); border-radius: 0 0 14px 14px; }
-  .mode-btn { flex: 1; background: transparent; border: none; color: var(--muted); font-weight: 700; padding: 9px 6px; border-radius: 10px; font-size: 0.8rem; white-space: nowrap; }
-  .mode-btn.active { background: var(--card-2); color: var(--text); }
+  .mode-switch { border-top: 1px solid rgba(255,255,255,0.07); }
+  .mode-btn { font-size: 0.8rem; }
 
   /* ---------- voice input FAB ---------- */
   .voice-fab {
@@ -417,5 +374,3 @@
   .voice-fab:active { transform: scale(0.94); }
   .voice-fab.listening { background: linear-gradient(135deg, #f87171, #dc2626); color: #fff; animation: voicePulse 1s ease-in-out infinite; }
   @keyframes voicePulse { 0%,100% { box-shadow: 0 6px 18px rgba(220,38,38,0.5); } 50% { box-shadow: 0 6px 26px rgba(220,38,38,0.9); } }
-
-  ::-webkit-scrollbar { width: 0; height: 0; }
