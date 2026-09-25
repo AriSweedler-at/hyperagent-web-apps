@@ -8,7 +8,16 @@
 // shell-home.spec.ts).
 import { SHELL_GAMES } from '../tools/games.ts';
 import { DESKTOP, PHONE, type Viewport } from './fixtures/geometry.ts';
-import { DEFAULT_NAMES, curtainTitle, readSave, reveal, startLocal } from './fixtures/shell.ts';
+import {
+  DEFAULT_MARK,
+  DEFAULT_NAMES,
+  curtainTitle,
+  localNames,
+  readPref,
+  readSave,
+  reveal,
+  startLocal,
+} from './fixtures/shell.ts';
 import { SHELL_DRIVERS } from './fixtures/online-games.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
@@ -45,6 +54,72 @@ SHELL_GAMES.forEach((game) => {
             .toMatchObject({ role: 'local', ...driver.localSave });
         });
       });
+    });
+
+    // The seats' defaults are the game's (tools/games.ts SHELL `localNames`; the owner, 2026-09-25:
+    // gin's Ari and Lavi, backgammon's Ari and Ethan) and a prefilled default clears on its first
+    // tap ("when you click on a pre-filled name for the first time it will clear it"). At the phone
+    // alone: the seats are the same inputs at both widths (shell-home.spec.ts shows them at both).
+    test('pass and play untouched: Start seats the game`s default names', async ({
+      player,
+      project,
+    }) => {
+      const { page } = player;
+      const names = localNames(game);
+      await page.setViewportSize({ width: PHONE.width, height: PHONE.height });
+      await page.goto(pagePath(project, game));
+      await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
+      await expect(page.locator('#p1NameInput')).toHaveValue(names[0]);
+      await expect(page.locator('#p2NameInput')).toHaveValue(names[1]);
+      await page.locator('#localBtn').click();
+      const title = page.locator('#curtainTitle');
+      await expect(title).toHaveText(curtainTitle(names));
+      const first = (await title.innerText()).replace('Pass the phone to ', '');
+      await reveal(page);
+      await expect(page.locator('#myName')).toContainText(first);
+      await expect(page.locator('#oppName')).toHaveText(first === names[0] ? names[1] : names[0]);
+    });
+
+    test('a prefilled seat clears on its first tap, once; a typed name is seated and remembered, and a remembered name never clears', async ({
+      player,
+      project,
+    }) => {
+      const { page } = player;
+      const names = localNames(game);
+      await page.setViewportSize({ width: PHONE.width, height: PHONE.height });
+      await page.goto(pagePath(project, game));
+      await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
+      const p1 = page.locator('#p1NameInput');
+      const p2 = page.locator('#p2NameInput');
+      // Prefilled and marked (web/shared/ui/home.ts `fillInputs`); a tap empties the seat and takes
+      // the mark, the other seat keeps its default until its own.
+      await expect(p1).toHaveValue(names[0]);
+      await expect(p1).toHaveAttribute(DEFAULT_MARK, '1');
+      await p1.click();
+      await expect(p1).toHaveValue('');
+      expect(await p1.getAttribute(DEFAULT_MARK)).toBeNull();
+      await expect(p2).toHaveValue(names[1]);
+      await p1.pressSequentially('Zoë');
+      // A second tap leaves what was typed.
+      await p2.focus();
+      await expect(p2).toHaveValue('');
+      await p1.click();
+      await expect(p1).toHaveValue('Zoë');
+      await p2.pressSequentially('Max');
+      // Start seats the typed names, which were remembered as typed.
+      await page.locator('#localBtn').click();
+      await expect(page.locator('#curtainTitle')).toHaveText(curtainTitle(['Zoë', 'Max']));
+      await expect.poll(() => readPref(page, game, 'name')).toBe('Zoë');
+      await expect.poll(() => readPref(page, game, 'p2Name')).toBe('Max');
+      // Back on the home screen the remembered names show unmarked, and a tap leaves them.
+      await page.goto(pagePath(project, game));
+      await expect(page.locator('#localModeContent')).toBeVisible();
+      await expect(p1).toHaveValue('Zoë');
+      expect(await p1.getAttribute(DEFAULT_MARK)).toBeNull();
+      await p1.click();
+      await expect(p1).toHaveValue('Zoë');
+      await p2.focus();
+      await expect(p2).toHaveValue('Max');
     });
   });
 });

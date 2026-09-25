@@ -41,6 +41,8 @@ import {
   isShellIntent,
   joinedMsg,
   localBroadcast,
+  localNameFor,
+  localNamesOf,
   localPlayers,
   localSeated,
   localSeats,
@@ -451,20 +453,38 @@ describe('home', () => {
       homeTab: 'play',
     });
     expect(DEFAULT_LOCAL_NAMES).toEqual(['Ari', 'Lavi']);
+    // A default fill is marked, so the page clears it on its first tap (the owner, 2026-09-25).
     expect(plain.effects).toEqual([
       { type: 'scrollTop' },
-      { type: 'fillName', name: 'Ari' },
-      { type: 'fillP2Name', name: 'Lavi' },
+      { type: 'fillName', name: 'Ari', default: true },
+      { type: 'fillP2Name', name: 'Lavi', default: true },
     ]);
-    // A saved second name wins over its default; the first seat still shows its default.
-    expect(run(initialApp, { type: 'home/init', home: { ...home, p2Name: 'Bob' } })).toMatchObject({
-      app: { shell: { nameTouched: false, savedName: null, p2Name: 'Bob' } },
-      effects: [
-        { type: 'scrollTop' },
-        { type: 'fillName', name: 'Ari' },
-        { type: 'fillP2Name', name: 'Bob' },
-      ],
-    });
+    // A saved second name wins over its default and carries no mark; the first seat still shows its default.
+    const savedP2 = run(initialApp, { type: 'home/init', home: { ...home, p2Name: 'Bob' } });
+    expect(savedP2.app.shell).toMatchObject({ nameTouched: false, savedName: null, p2Name: 'Bob' });
+    expect(savedP2.effects).toEqual([
+      { type: 'scrollTop' },
+      { type: 'fillName', name: 'Ari', default: true },
+      { type: 'fillP2Name', name: 'Bob' },
+    ]);
+    // A game naming its own seats (backgammon's "Ari and Ethan") fills those; a seat past its
+    // list is `Player N`; without a list the shell's two stand.
+    const named = { ...FAKE, localNames: ['Eve', 'Ron'] };
+    expect(reduceShell(initialApp, { type: 'home/init', home }, ctx, named).effects).toEqual([
+      { type: 'scrollTop' },
+      { type: 'fillName', name: 'Eve', default: true },
+      { type: 'fillP2Name', name: 'Ron', default: true },
+    ]);
+    const short = { ...FAKE, localNames: ['Eve'] };
+    expect(reduceShell(initialApp, { type: 'home/init', home }, ctx, short).effects).toEqual([
+      { type: 'scrollTop' },
+      { type: 'fillName', name: 'Eve', default: true },
+      { type: 'fillP2Name', name: 'Player 2', default: true },
+    ]);
+    expect(localNamesOf(FAKE)).toBe(DEFAULT_LOCAL_NAMES);
+    expect(localNamesOf(named)).toEqual(['Eve', 'Ron']);
+    expect(localNameFor(['Eve', 'Ron', 'Sal', 'Gus'], 3)).toBe('Gus');
+    expect(localNameFor(['Eve', 'Ron'], 2)).toBe('Player 3');
     // The offer: the shell's three from the save, the game's own first.
     expect(
       run(initialApp, {
@@ -984,14 +1004,22 @@ describe('pass and play', () => {
       { type: 'ownFx' },
       { type: 'scrollTop' },
     ]);
-    // Empty inputs seat the shell's defaults (the owner's names, 2026-09-25), on the table too.
-    expect(localPlayers('', '')).toEqual([
+    // Empty inputs seat the game's defaults (the owner's names, 2026-09-25), on the table too.
+    expect(localPlayers('', '', DEFAULT_LOCAL_NAMES)).toEqual([
       { id: 'p1', name: 'Ari' },
       { id: 'p2', name: 'Lavi' },
     ]);
-    expect(localPlayers(' ', 'lavi')).toEqual([
+    expect(localPlayers(' ', 'lavi', DEFAULT_LOCAL_NAMES)).toEqual([
       { id: 'p1', name: 'Ari' },
       { id: 'p2', name: 'lavi' },
+    ]);
+    expect(localPlayers('', '', ['Eve', 'Ron'])).toEqual([
+      { id: 'p1', name: 'Eve' },
+      { id: 'p2', name: 'Ron' },
+    ]);
+    expect(localPlayers('', '', [])).toEqual([
+      { id: 'p1', name: 'Player 1' },
+      { id: 'p2', name: 'Player 2' },
     ]);
     const empty = run(initialApp, { type: 'local/click', p1: '', p2: '', level: '1' });
     expect(game(empty.app).players).toEqual([
@@ -999,7 +1027,15 @@ describe('pass and play', () => {
       { id: 'p2', name: 'Lavi' },
     ]);
     expect(empty.app.shell.screen).toBe('tableScreen');
-    expect(localPlayers('A'.repeat(25), 'b')[0].name).toBe('A'.repeat(20));
+    // A game's own seats reach the table the same way.
+    const namedStart = reduceShell(
+      initialApp,
+      { type: 'local/click', p1: '', p2: '', level: '1' },
+      ctx,
+      { ...FAKE, localNames: ['Eve', 'Ron'] },
+    );
+    expect(game(namedStart.app).players.map((p) => p.name)).toEqual(['Eve', 'Ron']);
+    expect(localPlayers('A'.repeat(25), 'b', DEFAULT_LOCAL_NAMES)[0].name).toBe('A'.repeat(20));
     // The two halves the sandbox composes: the seat and the broadcast.
     expect(localSeated(initialApp, dealt, FAKE)).toEqual({
       shell: {
@@ -1035,22 +1071,39 @@ describe('pass and play', () => {
       ['A'.repeat(25), 'b'],
       ['Player 2', ''],
     ].forEach(([p1, p2]) => {
-      expect(localSeats([p1 ?? '', p2 ?? ''])).toEqual(localPlayers(p1 ?? '', p2 ?? ''));
+      expect(localSeats([p1 ?? '', p2 ?? ''], DEFAULT_LOCAL_NAMES)).toEqual(
+        localPlayers(p1 ?? '', p2 ?? '', DEFAULT_LOCAL_NAMES),
+      );
     });
-    // Three and four: the owner's names default the first two seats, `Player N` the rest, ids by
-    // seat, a clash with any earlier seat suffixed by its number.
-    expect(localSeats(['Ann', '', 'Cara'])).toEqual([
+    // Three and four: the game's names default the empty seats as far as they go (the owner's
+    // "briscola is Ari and Lavi (with p3 Sandro and p4 Grant)"), `Player N` beyond, ids by seat, a
+    // clash with any earlier seat suffixed by its number.
+    expect(localSeats(['Ann', '', 'Cara'], DEFAULT_LOCAL_NAMES)).toEqual([
       { id: 'p1', name: 'Ann' },
       { id: 'p2', name: DEFAULT_LOCAL_NAMES[1] },
       { id: 'p3', name: 'Cara' },
     ]);
-    expect(localSeats(['Ann', 'ann', 'Bob', 'ANN'])).toEqual([
+    expect(localSeats(['', '', '', ''], ['Ari', 'Lavi', 'Sandro', 'Grant'])).toEqual([
+      { id: 'p1', name: 'Ari' },
+      { id: 'p2', name: 'Lavi' },
+      { id: 'p3', name: 'Sandro' },
+      { id: 'p4', name: 'Grant' },
+    ]);
+    expect(
+      localSeats(['Ann', '', '', 'sandro'], ['Ari', 'Lavi', 'Sandro']).map((p) => p.name),
+    ).toEqual(['Ann', 'Lavi', 'Sandro', 'sandro 4']);
+    expect(localSeats(['Ann', 'ann', 'Bob', 'ANN'], DEFAULT_LOCAL_NAMES)).toEqual([
       { id: 'p1', name: 'Ann' },
       { id: 'p2', name: 'ann 2' },
       { id: 'p3', name: 'Bob' },
       { id: 'p4', name: 'ANN 4' },
     ]);
-    expect(localSeats([])).toEqual([]);
+    expect(localSeats(['', '', ''], DEFAULT_LOCAL_NAMES).map((p) => p.name)).toEqual([
+      'Ari',
+      'Lavi',
+      'Player 3',
+    ]);
+    expect(localSeats([], DEFAULT_LOCAL_NAMES)).toEqual([]);
   });
 
   test('SeatOf: the two seats for a bag that names none, the game`s own added for one that does', () => {
@@ -1517,6 +1570,9 @@ describe('runShellEffect', () => {
       { type: 'revealRule', slot: 'rulesList', rule: 'knock' },
       { type: 'fillName', name: 'Ann' },
       { type: 'fillP2Name', name: 'Bob' },
+      // The default mark travels to the page as a flag (home.ts paints it as `data-default`).
+      { type: 'fillName', name: 'Ari', default: true },
+      { type: 'fillP2Name', name: 'Lavi', default: true },
       { type: 'setCode', value: 'AB' },
       { type: 'initHome' },
     ];
@@ -1542,8 +1598,10 @@ describe('runShellEffect', () => {
       ['toggleSound'],
       ['share', 'ABCD'],
       ['revealRule', 'rulesList', 'knock'],
-      ['page.fillName', 'Ann'],
-      ['page.fillP2Name', 'Bob'],
+      ['page.fillName', 'Ann', false],
+      ['page.fillP2Name', 'Bob', false],
+      ['page.fillName', 'Ari', true],
+      ['page.fillP2Name', 'Lavi', true],
       ['page.setCode', 'AB'],
       ['dispatch', { type: 'home/init', home: readHome(store, FAKE) }],
     ]);

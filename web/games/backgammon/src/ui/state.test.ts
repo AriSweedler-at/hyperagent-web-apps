@@ -19,7 +19,7 @@ import {
   toast as toastFrame,
 } from '../protocol.ts';
 import { pos, scripted } from '../engine/test-helpers.ts';
-import { DEFAULT_NAME } from '../shellConfig.ts';
+import { DEFAULT_NAME, LOCAL_NAMES } from '../shellConfig.ts';
 import { STORAGE_KEYS } from '../storage.ts';
 import { effectiveSelection, sourcesOf, targetsOf } from './board.ts';
 import { CUES } from './sound.ts';
@@ -297,17 +297,21 @@ describe('home', () => {
       { type: 'fillName', name: 'Ann' },
       { type: 'fillP2Name', name: 'Bob' },
     ]);
-    // Nothing saved: the shell's defaults go into the inputs (shell.ts DEFAULT_LOCAL_NAMES) and the
-    // state keeps none of them; the defaults, an unknown tab falls back to play. `fillName` reaches
-    // `#nameInput` too, so the first must be what that input's markup already holds (DEFAULT_NAME).
+    // Nothing saved: this game's own seats go into the inputs (shellConfig.ts LOCAL_NAMES; the
+    // owner, 2026-09-25: "backgammon is Ari and Ethan"), marked so the page clears each on its
+    // first tap, and the state keeps none of them; an unknown tab falls back to play. `fillName`
+    // reaches `#nameInput` too, so the first must be what that input's markup already holds
+    // (DEFAULT_NAME), which is the shell's first too; the pair is what the e2e reads off the registry.
     const bare = run(initialApp, { type: 'home/init', home: { ...home, homeTab: 'play' } });
     expect(bare.effects).toEqual([
       { type: 'scrollTop' },
-      { type: 'fillName', name: DEFAULT_LOCAL_NAMES[0] },
-      { type: 'fillP2Name', name: DEFAULT_LOCAL_NAMES[1] },
+      { type: 'fillName', name: LOCAL_NAMES[0], default: true },
+      { type: 'fillP2Name', name: LOCAL_NAMES[1], default: true },
     ]);
     expect(bare.app.shell).toMatchObject({ resume: null, p1Name: '', p2Name: '', savedName: null });
-    expect(DEFAULT_NAME).toBe(DEFAULT_LOCAL_NAMES[0]);
+    expect(LOCAL_NAMES).toEqual(['Ari', 'Ethan']);
+    expect(DEFAULT_NAME).toBe(LOCAL_NAMES[0]);
+    expect(DEFAULT_LOCAL_NAMES[0]).toBe(LOCAL_NAMES[0]);
   });
 
   test('names typed are remembered trimmed and echoed to the other inputs', () => {
@@ -777,8 +781,9 @@ describe('pass and play', () => {
       'scrollTop',
     ]);
     expect(effects[3]).toEqual({ type: 'wakeLock', hold: true });
+    // Empty seats start as this game's own pair (the owner's "Ari and Ethan"), not the shell's.
     const defaults = run(initialApp, { type: 'local/click', p1: '', p2: '' }).app;
-    expect(game(defaults).players.map((p) => p.name)).toEqual(['Ari', 'Lavi']);
+    expect(game(defaults).players.map((p) => p.name)).toEqual(['Ari', 'Ethan']);
     expect(game(defaults).options.matchLength).toBe(5);
     expect(game(defaults).phase).toBe('toRoll');
   });
@@ -1803,8 +1808,8 @@ describe('runEffect', () => {
       ['toggleSound'],
       ['share', 'ABCD'],
       ['revealRule', 'rulesList', 'blocks'],
-      ['page.fillName', 'Ann'],
-      ['page.fillP2Name', 'Bob'],
+      ['page.fillName', 'Ann', false],
+      ['page.fillP2Name', 'Bob', false],
       ['page.setCode', 'ABC'],
     ]);
     // A declined confirm dispatches nothing; initHome re-reads the store into home/init.

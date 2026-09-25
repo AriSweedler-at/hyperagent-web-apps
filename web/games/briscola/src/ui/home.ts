@@ -14,10 +14,13 @@
 // the table's memory (`extraNames`), which their own keystrokes keep current, so the paint never
 // overwrites what is being typed.
 import {
+  dataOf,
+  listen,
   listenId,
   readChecked,
   readValue,
   requireId,
+  setAttr,
   setChecked,
   setValue,
   toggleClass,
@@ -25,12 +28,16 @@ import {
   type PageLike,
 } from '../../../../shared/edge/dom.ts';
 import {
+  DEFAULT_MARK,
   bindHomeShell,
+  clearDefault,
   fillInputs,
   paintHomeShell,
   type HomeView,
   type ShellIntentBuilders,
 } from '../../../../shared/ui/home.ts';
+import { localNameFor } from '../../../../shared/ui/shell.ts';
+import { LOCAL_NAMES } from '../shellConfig.ts';
 import {
   HOME_TABS,
   resumeLabel,
@@ -42,14 +49,18 @@ import {
   type Raw,
 } from './state.ts';
 
-/** The first player's name into every input that shows it: the online name and pass-and-play's first seat (one name, `briscola_name`). */
-export const fillNameInputs = (doc: DocumentLike, name: string): void => {
-  fillInputs(doc, ['nameInput', 'p1NameInput'], name);
+/**
+ * The first player's name into every input that shows it: the online name and pass-and-play's
+ * first seat (one name, `briscola_name`); `isDefault` marks the shell's prefill for the first-tap
+ * clear (shared home.ts `fillInputs`).
+ */
+export const fillNameInputs = (doc: DocumentLike, name: string, isDefault = false): void => {
+  fillInputs(doc, ['nameInput', 'p1NameInput'], name, isDefault);
 };
 
 /** The second player's name into pass-and-play's second seat. */
-export const fillP2NameInput = (doc: DocumentLike, name: string): void => {
-  fillInputs(doc, ['p2NameInput'], name);
+export const fillP2NameInput = (doc: DocumentLike, name: string, isDefault = false): void => {
+  fillInputs(doc, ['p2NameInput'], name, isDefault);
 };
 
 /** The shell's helpers, kept under their gin names for main.ts and the tests. */
@@ -146,11 +157,17 @@ const paintOptions = (doc: DocumentLike, app: App): void => {
     setChecked(requireId(doc, ONLINE[control]), on);
     setChecked(requireId(doc, LOCAL[control]), on);
   });
-  // The third and fourth seats' inputs show with the count, holding the names as last read or typed.
+  // The third and fourth seats' inputs show with the count, holding the names as last read or
+  // typed, or the seat's default marked for the first-tap clear (shellConfig.ts LOCAL_NAMES: the
+  // owner's Sandro and Grant), as the shared fill marks the first two seats.
   toggleClass(requireId(doc, 'moreNames'), 'hidden', o.seatCount < 3);
   toggleClass(requireId(doc, EXTRA_NAME_INPUTS[3]), 'hidden', o.seatCount < 4);
-  setValue(requireId(doc, EXTRA_NAME_INPUTS[2]), app.table.extraNames[2]);
-  setValue(requireId(doc, EXTRA_NAME_INPUTS[3]), app.table.extraNames[3]);
+  ([2, 3] as const).forEach((seat) => {
+    const input = requireId(doc, EXTRA_NAME_INPUTS[seat]);
+    const name = app.table.extraNames[seat];
+    setValue(input, name ?? localNameFor(LOCAL_NAMES, seat));
+    setAttr(input, DEFAULT_MARK, name === null ? '1' : null);
+  });
 };
 
 /** What the shared shell paints, read off the App's shell slice. */
@@ -203,6 +220,16 @@ const bindOptions = (doc: PageLike, dispatch: (intent: Intent) => void): void =>
     const input = requireId(doc, EXTRA_NAME_INPUTS[seat]);
     listenId(doc, EXTRA_NAME_INPUTS[seat], 'input', () => {
       dispatch({ type: 'pname/typed', seat, value: readValue(input) });
+    });
+    // A prefilled default clears on its first tap (the owner, 2026-09-25), as the shared binder
+    // clears the first two seats; these two are painted from the table's memory, so the reducer
+    // is told the seat is now empty (its key is dropped) and the paint follows instead of refilling.
+    ['focus', 'pointerdown'].forEach((type) => {
+      listen(input, type, () => {
+        if (dataOf(input, 'default') === null) return;
+        clearDefault(input);
+        dispatch({ type: 'pname/typed', seat, value: '' });
+      });
     });
   });
 };

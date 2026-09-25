@@ -19,6 +19,7 @@ import {
   state as stateFrame,
   toast as toastFrame,
 } from '../protocol.ts';
+import { LOCAL_NAMES } from '../shellConfig.ts';
 import { DEFAULT_CARD_PACK, STORAGE_KEYS } from '../storage.ts';
 import { CUES } from './sound.ts';
 import {
@@ -206,7 +207,7 @@ describe('the initial app', () => {
       curtain: null,
       lastPainted: null,
       cardPack: DEFAULT_CARD_PACK,
-      extraNames: { 2: '', 3: '' },
+      extraNames: { 2: null, 3: null },
     });
     expect(SCREENS).toEqual([
       'homeScreen',
@@ -233,7 +234,8 @@ describe('home', () => {
     const { app, effects } = run(initialApp, { type: 'home/init', home: snapshot });
     expect(app.shell.opts).toEqual({ ...DEFAULT_OPTS, seatCount: 3, removedTwo: 'D' });
     expect(app.table.cardPack).toBe('default');
-    expect(app.table.extraNames).toEqual({ 2: 'Cara', 3: '' });
+    // A seat with nothing remembered is null: the paint shows its default, marked for the first-tap clear.
+    expect(app.table.extraNames).toEqual({ 2: 'Cara', 3: null });
     expect(app.shell.resume).toBeNull();
     expect(kinds(effects)).toEqual(['scrollTop', 'fillName', 'fillP2Name']);
   });
@@ -331,8 +333,17 @@ describe('pass and play: seating two, three and four', () => {
     expect(view(remembered).stockCount).toBe(28);
     expect(view(remembered).sides).toHaveLength(2);
 
+    // An empty seat is this game's default (shellConfig.ts LOCAL_NAMES: the owner's "Ari and Lavi
+    // (with p3 Sandro and p4 Grant)"); a clash with an earlier seat is suffixed by its number.
     const defaults = local({ localPlayers: '4', p3: '', p4: 'ann' });
-    expect(game(defaults).players.map((p) => p.name)).toEqual(['Ann', 'Bob', 'Player 3', 'ann 4']);
+    expect(game(defaults).players.map((p) => p.name)).toEqual(['Ann', 'Bob', 'Sandro', 'ann 4']);
+    expect(LOCAL_NAMES).toEqual(['Ari', 'Lavi', 'Sandro', 'Grant']);
+    const untouched = run(
+      initialApp,
+      { type: 'home/init', home },
+      { type: 'local/click', p1: '', p2: '', localPlayers: '4', p3: '', p4: '' },
+    ).app;
+    expect(game(untouched).players.map((p) => p.name)).toEqual(LOCAL_NAMES);
     // A fourth name typed into the input but not carried by the click is not used: the click is the truth.
     const typed = run(local({ localPlayers: '3' }), {
       type: 'pname/typed',
@@ -970,7 +981,7 @@ describe('resume, storage and what the sessions read back', () => {
     expect(left.table).toEqual({
       ...initialTable,
       cardPack: 'default',
-      extraNames: { 2: 'Cara', 3: '' },
+      extraNames: { 2: 'Cara', 3: null },
     });
   });
 });

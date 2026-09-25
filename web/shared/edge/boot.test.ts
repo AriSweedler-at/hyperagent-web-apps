@@ -626,8 +626,9 @@ const bootPage = (options: Options = {}) => {
     else if (effect.type === 'startGuest') deps.net.startGuest(effect.code, effect.attempt);
     else if (effect.type === 'send') deps.net.send(effect.frame);
     else if (effect.type === 'closeNet') deps.net.close();
-    else if (effect.type === 'fillName') deps.page.fillName(effect.name);
-    else if (effect.type === 'fillP2Name') deps.page.fillP2Name(effect.name);
+    else if (effect.type === 'fillName') deps.page.fillName(effect.name, effect.default === true);
+    else if (effect.type === 'fillP2Name')
+      deps.page.fillP2Name(effect.name, effect.default === true);
     else if (effect.type === 'setCode') deps.page.setCode(effect.value);
     else if (effect.type === 'revealRule') deps.revealRule(effect.slot, effect.rule);
     else if (effect.type === 'own') deps.own(effect.tag);
@@ -695,11 +696,12 @@ const bootPage = (options: Options = {}) => {
         log.sounds.push(enabled);
       },
       toastMarks: (message) => ({ hit: message.startsWith('Hit') }),
-      fillName: (_doc, name) => {
-        log.inputs.push(['name', name]);
+      // The default mark (shell.ts `fillName.default`) arrives as the flag; logged as `:default`.
+      fillName: (_doc, name, isDefault) => {
+        log.inputs.push([isDefault ? 'name:default' : 'name', name]);
       },
-      fillP2Name: (_doc, name) => {
-        log.inputs.push(['p2', name]);
+      fillP2Name: (_doc, name, isDefault) => {
+        log.inputs.push([isDefault ? 'p2:default' : 'p2', name]);
       },
       setCode: (_doc, value) => {
         log.inputs.push(['code', value]);
@@ -916,6 +918,8 @@ describe('bootShell', () => {
       { type: 'scrollTop' },
       { type: 'fillName', name: 'Ari' },
       { type: 'fillP2Name', name: 'Jeff' },
+      { type: 'fillName', name: 'Ari', default: true },
+      { type: 'fillP2Name', name: 'Ethan', default: true },
       { type: 'setCode', value: 'ABCD' },
       { type: 'revealRule', slot: 'rulesList', rule: 'knock' },
     ]);
@@ -923,6 +927,8 @@ describe('bootShell', () => {
     expect(b.log.inputs).toEqual([
       ['name', 'Ari'],
       ['p2', 'Jeff'],
+      ['name:default', 'Ari'],
+      ['p2:default', 'Ethan'],
       ['code', 'ABCD'],
     ]);
     // The reveal (web/shared/edge/glossary.ts) scrolled the rule inside the slot into view and flashed it.

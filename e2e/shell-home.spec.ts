@@ -17,7 +17,7 @@ import type { Page } from '@playwright/test';
 
 import { REGISTRY, SHELL, SHELL_GAMES } from '../tools/games.ts';
 import { DESKTOP, PHONE, type Viewport } from './fixtures/geometry.ts';
-import { DEFAULT_LOCAL_NAMES, DEFAULT_NAME, readPref } from './fixtures/shell.ts';
+import { DEFAULT_NAME, readPref } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -87,10 +87,11 @@ SHELL_GAMES.forEach((game) => {
             /\bactive\b/,
           );
           await expect.poll(() => readPref(page, game, 'playMode')).toBe('local');
-          // Nothing remembered: the two seats show the shell's defaults (shell.ts
-          // DEFAULT_LOCAL_NAMES, the owner's names), and the panel's own fields theirs.
-          await expect(page.locator('#p1NameInput')).toHaveValue(DEFAULT_LOCAL_NAMES[0]);
-          await expect(page.locator('#p2NameInput')).toHaveValue(DEFAULT_LOCAL_NAMES[1]);
+          // Nothing remembered: the two seats show the game's defaults (the registry's `localNames`:
+          // the owner's names, gin's Ari and Lavi, backgammon's Ari and Ethan), and the panel's own
+          // fields theirs. The first-tap clear and the start are shell-local.spec.ts's.
+          await expect(page.locator('#p1NameInput')).toHaveValue(shell.localNames[0]);
+          await expect(page.locator('#p2NameInput')).toHaveValue(shell.localNames[1]);
           await Promise.all(
             shell.localFields.map(([id, value]) =>
               expect(page.locator(`#${id}`)).toHaveValue(value),

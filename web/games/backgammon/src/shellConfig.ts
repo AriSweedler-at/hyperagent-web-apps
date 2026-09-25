@@ -41,6 +41,12 @@ import { INITIAL_CUES } from './ui/sound.ts';
 import type { Backgammon } from './ui/state.ts';
 
 export const DEFAULT_NAME = 'Ari';
+/**
+ * The pass-and-play seats when nothing is remembered or typed (the owner, 2026-09-25:
+ * "backgammon is Ari and Ethan"); the first is `#nameInput`'s markup value (DEFAULT_NAME) too,
+ * since the shell's `fillName` reaches that input. tools/games.ts SHELL pins the pair for the e2e.
+ */
+export const LOCAL_NAMES: readonly [string, string] = ['Ari', 'Ethan'];
 export const LEAVE_LOCAL_MSG = 'End this match? The score will be cleared.';
 export const LEAVE_ONLINE_MSG = 'Leave this match? The room will close.';
 export const hostRoomMsg = (hostName: string): string =>
@@ -59,6 +65,7 @@ export const parseVariant = (raw: string | undefined, fallback: ShippedVariant):
 export const BACKGAMMON_SHELL: ShellGameData<Backgammon> = {
   id: 'backgammon',
   names: { default: DEFAULT_NAME },
+  localNames: LOCAL_NAMES,
   tabs: { list: HOME_TABS, default: DEFAULT_HOME_TAB },
   modes: {
     default: DEFAULT_PLAY_MODE,

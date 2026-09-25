@@ -43,6 +43,15 @@ describe('the input writes the reducer raises as effects', () => {
     expect(p.get('p1NameInput').value()).toBe('Ann');
     setCodeInput(p.doc, 'AB');
     expect(p.get('codeInput').value()).toBe('AB');
+    // The shell's default fill marks every input it reaches for the first-tap clear; a plain fill unmarks.
+    fillNameInputs(p.doc, 'Ari', true);
+    fillP2NameInput(p.doc, 'Lavi', true);
+    ['nameInput', 'p1NameInput', 'scP1NameInput', 'p2NameInput', 'scP2NameInput'].forEach((id) => {
+      expect(p.get(id).attr('data-default'), id).toBe('1');
+    });
+    fillNameInputs(p.doc, 'Ann');
+    expect(p.get('scP1NameInput').attr('data-default')).toBeNull();
+    expect(p.get('scP2NameInput').attr('data-default')).toBe('1');
   });
 });
 
@@ -186,6 +195,20 @@ describe('bindHome', () => {
     });
     return { p, intents };
   };
+
+  test('the Score Counter names clear a prefilled default on the first tap, as the pass-and-play seats do', () => {
+    const { p, intents } = wired();
+    fillNameInputs(p.doc, 'Ari', true);
+    fillP2NameInput(p.doc, 'Lavi', true);
+    p.get('scP1NameInput').fire('focus');
+    p.get('scP2NameInput').fire('pointerdown');
+    expect(p.get('scP1NameInput').value()).toBe('');
+    expect(p.get('scP2NameInput').value()).toBe('');
+    // Its siblings keep their default until their own first tap; the clear dispatches nothing.
+    expect(p.get('p1NameInput').value()).toBe('Ari');
+    expect(p.get('p2NameInput').value()).toBe('Lavi');
+    expect(intents).toEqual([]);
+  });
 
   test('the inputs and buttons dispatch with the raw input values', () => {
     const { p, intents } = wired();

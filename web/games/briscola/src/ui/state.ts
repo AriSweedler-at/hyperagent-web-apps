@@ -48,6 +48,7 @@ import {
   isShellEffect,
   isShellIntent,
   localBroadcast,
+  localNamesOf,
   localSeats,
   pure,
   readHome as shellReadHome,
@@ -251,8 +252,12 @@ export type Table = Readonly<{
   lastPainted: View | null;
   /** `briscola_cardPack`: the pack the faces and backs are drawn from (`body[data-card-pack]`, `--aspect`). */
   cardPack: CardPack;
-  /** The third and fourth pass-and-play names as last read from their keys or typed into their inputs. */
-  extraNames: Readonly<Record<ExtraSeat, string>>;
+  /**
+   * The third and fourth pass-and-play names as last read from their keys or typed into their
+   * inputs; null when neither (the input shows the seat's default, shellConfig.ts LOCAL_NAMES,
+   * marked for the first-tap clear, and the seat starts as it).
+   */
+  extraNames: Readonly<Record<ExtraSeat, string | null>>;
 }>;
 
 export type App = ShellApp<Briscola>;
@@ -273,7 +278,7 @@ export const initialTable: Table = {
   curtain: null,
   lastPainted: null,
   cardPack: DEFAULT_CARD_PACK,
-  extraNames: { 2: '', 3: '' },
+  extraNames: { 2: null, 3: null },
 };
 // ---- the strings and beats the app (not the sessions) writes ---------------------------------
 
@@ -875,7 +880,7 @@ export const BRISCOLA: ShellConfig<Briscola> = {
       table: {
         ...app.table,
         cardPack: home.cardPack,
-        extraNames: { 2: home.p3Name ?? '', 3: home.p4Name ?? '' },
+        extraNames: { 2: home.p3Name, 3: home.p4Name },
       },
     }),
     resume: (home) => resumeFor(home.save),
@@ -907,8 +912,10 @@ const hostLeft = (app: App, v: View): Step => {
 /**
  * `local/click` for two, three or four seats (D1, D17): the room's options off the raw inputs,
  * the names off the first `seatCount` inputs (the third and fourth carried in `Raw`, else as last
- * remembered) through the shared `localSeats` rule, the game dealt and handed to the shared
- * `startLocal`, then the options remembered. The shell's own case seats a pair; this replaces it.
+ * remembered, else empty) through the shared `localSeats` rule with this game's defaults
+ * (shellConfig.ts LOCAL_NAMES: the owner's "Ari and Lavi (with p3 Sandro and p4 Grant)"), the game
+ * dealt and handed to the shared `startLocal`, then the options remembered. The shell's own case
+ * seats a pair; this replaces it.
  */
 const localStart = (
   app: App,
@@ -919,10 +926,11 @@ const localStart = (
   const raws = [
     intent.p1,
     intent.p2,
-    intent.p3 ?? app.table.extraNames[2],
-    intent.p4 ?? app.table.extraNames[3],
+    intent.p3 ?? app.table.extraNames[2] ?? '',
+    intent.p4 ?? app.table.extraNames[3] ?? '',
   ].slice(0, opts.seatCount);
-  const game = createGame(seatPlayers(opts.seatCount, localSeats(raws)), opts, ctx.rng, ctx.now);
+  const seats = localSeats(raws, localNamesOf(BRISCOLA_SHELL));
+  const game = createGame(seatPlayers(opts.seatCount, seats), opts, ctx.rng, ctx.now);
   return then(startLocal(withShell(app, { opts }), game, ctx, BRISCOLA), (a) =>
     step(a, { type: 'writeOpts', opts }),
   );

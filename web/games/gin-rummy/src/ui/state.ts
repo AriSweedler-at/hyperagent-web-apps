@@ -39,6 +39,7 @@ import {
   isShellEffect,
   isShellIntent,
   localBroadcast,
+  localNamesOf,
   localPlayers,
   localSeated,
   pure,
@@ -571,7 +572,11 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
     case 'sandbox/start': {
       const parsed = parseMap(intent.map);
       if (!parsed.ok) return pure(withSandbox(app, { map: intent.map, error: parsed.error }));
-      const game = dealMap(parsed.value, localPlayers(intent.p1 ?? '', intent.p2 ?? ''), ctx.now);
+      const game = dealMap(
+        parsed.value,
+        localPlayers(intent.p1 ?? '', intent.p2 ?? '', localNamesOf(GIN_SHELL)),
+        ctx.now,
+      );
       const human: HumanMelds | null =
         parsed.value.melds.length === 0
           ? null

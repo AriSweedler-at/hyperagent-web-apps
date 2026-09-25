@@ -414,10 +414,15 @@ export type ShellEffect<G extends ShellTypes> =
   | Readonly<{ type: 'toggleSound' }>
   /** The invite for `code` (its link) through the share sheet or the clipboard. */
   | Readonly<{ type: 'share'; code: string }>
-  /** The first player's name into every input that shows it (`initHome`, and after a keystroke). */
-  | Readonly<{ type: 'fillName'; name: string }>
-  /** The second player's name into every input that shows it. */
-  | Readonly<{ type: 'fillP2Name'; name: string }>
+  /**
+   * The first player's name into every input that shows it (`initHome`, and after a keystroke).
+   * `default` marks the shell's prefill (nothing remembered, `localNamesOf`): the page clears it on
+   * the first tap, as the Score Counter clears its 0 (the owner, 2026-09-25: "when you click on a
+   * pre-filled name for the first time it will clear it"); a remembered or typed name carries none.
+   */
+  | Readonly<{ type: 'fillName'; name: string; default?: true }>
+  /** The second player's name into every input that shows it; `default` as `fillName`'s. */
+  | Readonly<{ type: 'fillP2Name'; name: string; default?: true }>
   /** `#codeInput`'s value after sanitising. */
   | Readonly<{ type: 'setCode'; value: string }>;
 
@@ -507,6 +512,13 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     /** The host name an empty input means (the wire's guest default is `DEFAULT_GUEST_NAME`). */
     default: string;
   }>;
+  /**
+   * The pass-and-play seats' defaults, first seat first: shown in the inputs when nothing is
+   * remembered and seated when they are left empty (the owner, 2026-09-25: "backgammon is Ari and
+   * Ethan", "briscola is Ari and Lavi (with p3 Sandro and p4 Grant)"). Absent, the shell's
+   * `DEFAULT_LOCAL_NAMES` (gin); a seat past the list is `Player N` (`localNameFor`).
+   */
+  localNames?: ReadonlyArray<string>;
   tabs: Readonly<{ list: ReadonlyArray<Tab<G>>; default: Tab<G> }>;
   modes: Readonly<{
     default: PlayMode;
@@ -692,16 +704,30 @@ const nameOr = (raw: string, fallback: string): string => {
 /**
  * The two pass-and-play seats when their inputs are empty, and what `initHome` fills the inputs
  * with when nothing is remembered (the owner, 2026-09-25: "Make the default p1 ari and p2 lavi",
- * spelled as the proper names). The first is also the online name input's markup default (each
- * game's shellConfig.ts DEFAULT_NAME, pinned there), since `fillName` reaches that input too and
- * must find the name it already shows. A game with more seats keeps `Player N` from the third on.
+ * spelled as the proper names), unless the game names its own (`ShellConfig.localNames`: the
+ * owner, later that day, "backgammon is Ari and Ethan"). The first is also the online name input's
+ * markup default (each game's shellConfig.ts DEFAULT_NAME, pinned there), since `fillName` reaches
+ * that input too and must find the name it already shows. A seat past the list is `Player N`.
  */
 export const DEFAULT_LOCAL_NAMES: readonly [string, string] = ['Ari', 'Lavi'];
 
-/** Two players from the pass-and-play inputs: the defaults, and " 2" on a clash (gin's sandbox deals them too). */
-export const localPlayers = (p1raw: string, p2raw: string): Readonly<[Player, Player]> => {
-  const p1 = nameOr(p1raw, DEFAULT_LOCAL_NAMES[0]);
-  const p2 = nameOr(p2raw, DEFAULT_LOCAL_NAMES[1]);
+/** The game's pass-and-play defaults (`localNames`), or the shell's two. */
+export const localNamesOf = (
+  cfg: Readonly<{ localNames?: ReadonlyArray<string> }>,
+): ReadonlyArray<string> => cfg.localNames ?? DEFAULT_LOCAL_NAMES;
+
+/** The default for seat `seat` (0-based): the list's name, else `Player N`. */
+export const localNameFor = (names: ReadonlyArray<string>, seat: number): string =>
+  names[seat] ?? `Player ${String(seat + 1)}`;
+
+/** Two players from the pass-and-play inputs: the game's defaults (`localNamesOf`), and " 2" on a clash (gin's sandbox deals them too). */
+export const localPlayers = (
+  p1raw: string,
+  p2raw: string,
+  names: ReadonlyArray<string>,
+): Readonly<[Player, Player]> => {
+  const p1 = nameOr(p1raw, localNameFor(names, 0));
+  const p2 = nameOr(p2raw, localNameFor(names, 1));
   return [
     { id: 'p1', name: p1 },
     { id: 'p2', name: p2.toLowerCase() === p1.toLowerCase() ? `${p2} 2` : p2 },
@@ -710,16 +736,19 @@ export const localPlayers = (p1raw: string, p2raw: string): Readonly<[Player, Pl
 
 /**
  * The seats of a pass-and-play table with any number of players, from its name inputs in seat
- * order: `localPlayers`'s rule at every seat (the owner's two names for the first two empty ones,
- * `Player N` for an empty seat beyond, ` N` appended to a name an earlier seat already has,
- * case-insensitively), so a game with more than two seats names them as the two-seat games do and
- * `localSeats([p1, p2])` is `localPlayers(p1, p2)`. The game with the extra seats creates its own
- * engine state from these and hands it to `startLocal`.
+ * order: `localPlayers`'s rule at every seat (the game's default for an empty seat, `localNameFor`:
+ * its `localNames` as far as they go, `Player N` beyond; ` N` appended to a name an earlier seat
+ * already has, case-insensitively), so a game with more than two seats names them as the two-seat
+ * games do and `localSeats([p1, p2], names)` is `localPlayers(p1, p2, names)`. The game with the
+ * extra seats creates its own engine state from these and hands it to `startLocal`.
  */
-export const localSeats = (raws: ReadonlyArray<string>): ReadonlyArray<Player> =>
+export const localSeats = (
+  raws: ReadonlyArray<string>,
+  names: ReadonlyArray<string>,
+): ReadonlyArray<Player> =>
   raws.reduce<ReadonlyArray<Player>>((seated, raw, i) => {
     const n = String(i + 1);
-    const name = nameOr(raw, DEFAULT_LOCAL_NAMES[i] ?? `Player ${n}`);
+    const name = nameOr(raw, localNameFor(names, i));
     const taken = seated.some((p) => p.name.toLowerCase() === name.toLowerCase());
     return [...seated, { id: `p${n}`, name: taken ? `${name} ${n}` : name }];
   }, []);
@@ -1056,10 +1085,11 @@ const setHomeTab = <G extends ShellTypes>(
 };
 
 /**
- * `initHome()` over a storage snapshot: the saved names, or the defaults where none is saved, go
- * into the name inputs (effects, so the paint never fights the player's typing; the shell's state
- * keeps only what was saved or typed), the game's own part into the App (`cfg.home.apply`), the
- * tab applied without persisting, then the resume offer.
+ * `initHome()` over a storage snapshot: the saved names, or the game's defaults where none is
+ * saved (`localNamesOf`, marked `default` so the page clears them on the first tap), go into the
+ * name inputs (effects, so the paint never fights the player's typing; the shell's state keeps
+ * only what was saved or typed), the game's own part into the App (`cfg.home.apply`), the tab
+ * applied without persisting, then the resume offer.
  */
 const initHome = <G extends ShellTypes>(
   app: ShellApp<G>,
@@ -1082,8 +1112,12 @@ const initHome = <G extends ShellTypes>(
             }),
             home,
           ),
-          { type: 'fillName', name: home.name ?? DEFAULT_LOCAL_NAMES[0] },
-          { type: 'fillP2Name', name: home.p2Name ?? DEFAULT_LOCAL_NAMES[1] },
+          home.name === null
+            ? { type: 'fillName', name: localNameFor(localNamesOf(cfg), 0), default: true }
+            : { type: 'fillName', name: home.name },
+          home.p2Name === null
+            ? { type: 'fillP2Name', name: localNameFor(localNamesOf(cfg), 1), default: true }
+            : { type: 'fillP2Name', name: home.p2Name },
         ),
         (b) => setHomeTab(b, home.homeTab, false, cfg),
       ),
@@ -1278,7 +1312,12 @@ export const reduceShell = <G extends ShellTypes>(
     }
     case 'local/click': {
       const opts = cfg.opts.parse(intent, s.opts);
-      const game = cfg.engine.create(localPlayers(intent.p1, intent.p2), opts, ctx.rng, ctx.now);
+      const game = cfg.engine.create(
+        localPlayers(intent.p1, intent.p2, localNamesOf(cfg)),
+        opts,
+        ctx.rng,
+        ctx.now,
+      );
       return startLocal(withShell(app, { opts }), game, ctx, cfg);
     }
     case 'resume/click':

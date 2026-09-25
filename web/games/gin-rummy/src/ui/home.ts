@@ -28,6 +28,7 @@ import {
   type PageLike,
 } from '../../../../shared/edge/dom.ts';
 import {
+  bindClearDefault,
   bindHomeShell,
   fillInputs,
   homeView,
@@ -48,15 +49,16 @@ import {
 /**
  * The first player's name into every input that shows it: the online name, pass-and-play's first
  * seat and the Score Counter's first player (one name, `ginRummy_name`). `setValue` leaves the
- * input being typed in alone, so the fill after a keystroke moves only the other inputs.
+ * input being typed in alone, so the fill after a keystroke moves only the other inputs;
+ * `isDefault` marks the shell's prefill for the first-tap clear (shared home.ts `fillInputs`).
  */
-export const fillNameInputs = (doc: DocumentLike, name: string): void => {
-  fillInputs(doc, ['nameInput', 'p1NameInput', 'scP1NameInput'], name);
+export const fillNameInputs = (doc: DocumentLike, name: string, isDefault = false): void => {
+  fillInputs(doc, ['nameInput', 'p1NameInput', 'scP1NameInput'], name, isDefault);
 };
 
 /** The second player's name into pass-and-play's second seat and the Score Counter's second player. */
-export const fillP2NameInput = (doc: DocumentLike, name: string): void => {
-  fillInputs(doc, ['p2NameInput', 'scP2NameInput'], name);
+export const fillP2NameInput = (doc: DocumentLike, name: string, isDefault = false): void => {
+  fillInputs(doc, ['p2NameInput', 'scP2NameInput'], name, isDefault);
 };
 
 /** The shell's helpers, kept under their gin names for main.ts and the tests. */
@@ -107,7 +109,10 @@ export const paintHome = (doc: DocumentLike, app: App): void => {
   paintSandbox(doc, app);
 };
 
-/** The Score Counter's two players are the pass-and-play players: the same intents, the same keys. */
+/**
+ * The Score Counter's two players are the pass-and-play players: the same intents, the same keys,
+ * and the same first-tap clear of a prefilled default (the owner, 2026-09-25).
+ */
 const bindScorerNames = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
   const scP1NameInput = requireId(doc, 'scP1NameInput');
   listen(scP1NameInput, 'input', () => {
@@ -116,6 +121,9 @@ const bindScorerNames = (doc: PageLike, dispatch: (intent: Intent) => void): voi
   const scP2NameInput = requireId(doc, 'scP2NameInput');
   listen(scP2NameInput, 'input', () => {
     dispatch({ type: 'p2name/typed', value: readValue(scP2NameInput) });
+  });
+  [scP1NameInput, scP2NameInput].forEach((input) => {
+    bindClearDefault(input);
   });
 };
 

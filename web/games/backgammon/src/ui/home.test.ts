@@ -41,6 +41,15 @@ describe('the input writes the reducer raises as effects', () => {
     expect(p.get('p1NameInput').value()).toBe('Ann');
     setCodeInput(p.doc, 'AB');
     expect(p.get('codeInput').value()).toBe('AB');
+    // The shell's default fill marks its inputs for the first-tap clear; a plain fill unmarks.
+    fillNameInputs(p.doc, 'Ari', true);
+    fillP2NameInput(p.doc, 'Ethan', true);
+    ['nameInput', 'p1NameInput', 'p2NameInput'].forEach((id) => {
+      expect(p.get(id).attr('data-default'), id).toBe('1');
+    });
+    fillP2NameInput(p.doc, 'Bob');
+    expect(p.get('p2NameInput').attr('data-default')).toBeNull();
+    expect(p.get('p1NameInput').attr('data-default')).toBe('1');
   });
 });
 

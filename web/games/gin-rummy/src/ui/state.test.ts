@@ -193,17 +193,20 @@ describe('home', () => {
       { type: 'fillName', name: 'Ann' },
       { type: 'fillP2Name', name: 'Bob' },
     ]);
-    // Nothing saved: the shell's defaults go into the inputs (shell.ts DEFAULT_LOCAL_NAMES), the
-    // state keeps none of them. `fillName` reaches `#nameInput` too, so the first must be what that
-    // input's markup already holds (shellConfig.ts DEFAULT_NAME).
+    // Nothing saved: the shell's defaults go into the inputs (shell.ts DEFAULT_LOCAL_NAMES: gin
+    // names no seats of its own), marked so the page clears each on its first tap; the state keeps
+    // none of them. `fillName` reaches `#nameInput` too, so the first must be what that input's
+    // markup already holds (shellConfig.ts DEFAULT_NAME).
     const plain = run(initialApp, { type: 'home/init', home });
     expect(plain.app.shell).toMatchObject({ nameTouched: false, savedName: null, p1Name: '' });
     expect(plain.effects).toEqual([
       { type: 'scrollTop' },
-      { type: 'fillName', name: DEFAULT_LOCAL_NAMES[0] },
-      { type: 'fillP2Name', name: DEFAULT_LOCAL_NAMES[1] },
+      { type: 'fillName', name: DEFAULT_LOCAL_NAMES[0], default: true },
+      { type: 'fillP2Name', name: DEFAULT_LOCAL_NAMES[1], default: true },
     ]);
     expect(DEFAULT_NAME).toBe(DEFAULT_LOCAL_NAMES[0]);
+    // Gin keeps the shell's pair (the owner's "Make the default p1 ari and p2 lavi"); the registry
+    // row the e2e reads (tools/games.ts SHELL `localNames`) is checked against the live page there.
   });
 
   test('tab/set persists a known tab, maps an unknown one to play, wakes the scorer on score', () => {
@@ -276,15 +279,14 @@ describe('home', () => {
         { type: 'fillP2Name', name: '' },
       ],
     });
-    // A saved second name wins over its default; the first seat still shows its default.
-    expect(run(initialApp, { type: 'home/init', home: { ...home, p2Name: 'Bob' } })).toMatchObject({
-      app: { shell: { nameTouched: false, savedName: null } },
-      effects: [
-        { type: 'scrollTop' },
-        { type: 'fillName', name: DEFAULT_LOCAL_NAMES[0] },
-        { type: 'fillP2Name', name: 'Bob' },
-      ],
-    });
+    // A saved second name wins over its default and carries no mark; the first seat still shows its default.
+    const savedP2 = run(initialApp, { type: 'home/init', home: { ...home, p2Name: 'Bob' } });
+    expect(savedP2.app.shell).toMatchObject({ nameTouched: false, savedName: null });
+    expect(savedP2.effects).toEqual([
+      { type: 'scrollTop' },
+      { type: 'fillName', name: DEFAULT_LOCAL_NAMES[0], default: true },
+      { type: 'fillP2Name', name: 'Bob' },
+    ]);
   });
 
   test('parseTarget: a positive integer, else 100', () => {
@@ -1630,8 +1632,8 @@ describe('runEffect', () => {
       ['timers.cancel', 'longPress'],
       ['toggleSound'],
       ['share', 'ABCD'],
-      ['page.fillName', 'Ann'],
-      ['page.fillP2Name', 'Bob'],
+      ['page.fillName', 'Ann', false],
+      ['page.fillP2Name', 'Bob', false],
       ['page.setCode', 'AB'],
       ['copy', 'x'],
       ['revealRule', 'rulesList', 'knock'],
