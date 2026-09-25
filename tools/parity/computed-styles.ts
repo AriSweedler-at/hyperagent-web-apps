@@ -11,7 +11,10 @@
 // the mouse is parked in the top-left corner so no `:hover` rule applies, and `font-family` is
 // normalised across platforms
 // (FONT_ALIASES), so the values are a function of the CSS alone and a golden recorded on macOS
-// agrees with the Linux runner. e2e/computed-styles.spec.ts (the `pages` project) replays the capture against the
+// agrees with the Linux runner. The shell the shell games share (the home tabs, hosting, pass and
+// play up to the curtain; docs/design/shared-shell.md §6.4 D2, dry-round-2.md I2) is one driver,
+// `driveShell`, and its 43 selectors one list, `SHELL_SELECTORS`, spliced first into each shell
+// game's own; the goldens sort their keys, so the splice moved no byte of them. e2e/computed-styles.spec.ts (the `pages` project) replays the capture against the
 // served dist/ and deep-equals it with test/fixtures/styles/<game>.<viewport>.json; a CSS move that
 // changes any computed value shows up as a selector/property diff.
 //
@@ -39,9 +42,10 @@ import { DESKTOP, PHONE, type Viewport } from '../../e2e/fixtures/geometry.ts';
 import { routeOffline } from '../../e2e/fixtures/offline.ts';
 import { seedScript } from '../../e2e/fixtures/seed.ts';
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
-import { GAMES, type Game } from '../games.ts';
+import { GAMES, REGISTRY, SHELL, type Game, type ShellGame } from '../games.ts';
 import { REPO_ROOT, isMain } from '../legacy/extract.ts';
 import { startServer } from '../serve-dist.ts';
+import { tabButtonId } from '../../web/shared/ui/ids.ts';
 import {
   EPOCH,
   SEED,
@@ -95,47 +99,74 @@ export const PROPERTIES: ReadonlyArray<string> = [
 const LONG_VALUE = 200;
 
 /**
+ * The shell's selectors, the 43 both shell games' lists carried (dry-round-2.md I2): `:root`, the
+ * page, the home shell's boxes, buttons, fields and tabs, the overlays, the sheets and the toast (the
+ * rules web/shared/styles/shell.css holds since G1), and the table chrome both games name alike
+ * (`#tableScreen .topbar .badge .opp-strip .conn-dot .chip`), which each theme keeps. Gin's order.
+ */
+export const SHELL_SELECTORS: ReadonlyArray<string> = [
+  ':root',
+  'body',
+  '#app',
+  'h1',
+  '.card-box',
+  '.btn',
+  '.btn-primary',
+  '.btn-go',
+  '.btn-secondary',
+  '.btn-ghost',
+  '.btn-sm',
+  '.btn:disabled',
+  'input[type="text"]',
+  'label',
+  '.row',
+  '.icon-btn',
+  '.code-input',
+  '.room-code',
+  '.empty-note',
+  '.pulse',
+  '#tableScreen',
+  '.topbar',
+  '.badge',
+  '.badge.dim',
+  '.opp-strip',
+  '.conn-dot',
+  '.conn-dot.on',
+  '.overlay',
+  '.sheet',
+  '.sheet-title',
+  '.sheet-sub',
+  '.rules-list',
+  '.rules-list li',
+  '.rules-list li strong',
+  '#toast',
+  '.chip',
+  '.tabbar',
+  '.tab-btn',
+  '.tab-btn.active',
+  '.tab-submenu',
+  '.mode-switch',
+  '.mode-btn',
+  '.mode-btn.active',
+];
+
+/**
  * What is read on each page: `:root`, `body`, the ids the markup gives the screens and the
  * class names the TypeScript toggles (theme.css rules named after them), with the state classes
  * combined as the rules combine them (`.card.selected`), and the few pseudo-elements the rules
- * draw. A selector that matches nothing on a screen records `null` there.
+ * draw. A selector that matches nothing on a screen records `null` there. The shell games' lists
+ * start with SHELL_SELECTORS and go on with what each page alone has.
  */
 export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
   'gin-rummy': [
-    ':root',
-    'body',
-    '#app',
-    'h1',
+    ...SHELL_SELECTORS,
     '.subtitle',
-    '.card-box',
-    '.btn',
-    '.btn-primary',
-    '.btn-go',
     '.btn-gold',
-    '.btn-secondary',
-    '.btn-ghost',
-    '.btn-sm',
-    '.btn:disabled',
-    'input[type="text"]',
     'input[type="number"]',
-    'label',
-    '.row',
-    '.icon-btn',
-    '.code-input',
-    '.room-code',
-    '.empty-note',
-    '.pulse',
-    '#tableScreen',
-    '.topbar',
-    '.badge',
-    '.badge.dim',
-    '.opp-strip',
     '.opp-name',
     '.opp-score',
     '.opp-cards .card.tiny',
     '.opp-count',
-    '.conn-dot',
-    '.conn-dot.on',
     '.table-center',
     '.pile-peek',
     '.pile-peek:disabled',
@@ -190,13 +221,6 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.card.fresh::after',
     '.card.locked',
     '.card.locked::before',
-    '.overlay',
-    '.sheet',
-    '.sheet-title',
-    '.sheet-sub',
-    '.rules-list',
-    '.rules-list li',
-    '.rules-list li strong',
     '.rr-panel',
     '.rr-panel.scored',
     '.rr-head',
@@ -224,7 +248,6 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.standing-rank',
     '.standing-name',
     '.standing-total',
-    '#toast',
     '.setup-players',
     '.player-input-row',
     '.player-card',
@@ -237,20 +260,12 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.stepper input',
     '.stepper input:disabled',
     '.bonus-row',
-    '.chip',
     '.chip.active',
     '#submitRoundBar',
     '.history-actions',
     '.history-actions button',
-    '.tabbar',
     '.tab-wrap',
-    '.tab-btn',
-    '.tab-btn.active',
-    '.tab-submenu',
     '.tab-submenu button',
-    '.mode-switch',
-    '.mode-btn',
-    '.mode-btn.active',
     '#sbPreset',
     '#sbMap',
     '.sb-help',
@@ -437,56 +452,24 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.rules .steps li::before',
     '.rules .ex',
   ],
-  // Sheshbesh (docs/design/backgammon-board.md §3, §5): the shell in its restyled shapes, then the
+  // Sheshbesh (docs/design/backgammon-board.md §3, §5): after the shell's 43, the shapes gin lacks
+  // (`.btn-block`, `.btn small`, `select`, `.toggle-row`), then the
   // table: the board frame and its meander, a point with its triangle and label (the phone's
   // sideways triangles differ from the desktop's by design, so `.point*::before/::after` differ
   // between the two goldens), the two checkers, the highlight states as the rules combine them,
   // the dice faces and their state words, the trays, the controls row and the die-chip tray, the
   // sheets. `#toast.show`/`.hit` are timed (2.6 s) and left out; `.flyer` is transient.
   backgammon: [
-    ':root',
-    'body',
-    '#app',
-    'h1',
+    ...SHELL_SELECTORS,
     '.masthead .subtitle',
-    '.card-box',
     '.card-box.prose p',
     '.field-label',
-    '.btn',
-    '.btn-primary',
-    '.btn-go',
-    '.btn-secondary',
-    '.btn-ghost',
-    '.btn-sm',
     '.btn-block',
-    '.btn:disabled',
     '.btn small',
-    'input[type="text"]',
     'select',
-    'label',
-    '.row',
-    '.icon-btn',
-    '.code-input',
-    '.room-code',
-    '.empty-note',
-    '.pulse',
-    '.tabbar',
-    '.tab-btn',
-    '.tab-btn.active',
-    '.tab-submenu',
-    '.mode-switch',
-    '.mode-btn',
-    '.mode-btn.active',
     '.toggle-row',
-    '#tableScreen',
-    '.topbar',
-    '.badge',
-    '.badge.dim',
-    '.opp-strip',
     '.opp-strip .name',
     '.opp-strip .pips',
-    '.conn-dot',
-    '.conn-dot.on',
     '.conn-dot.off',
     '.status-line',
     '#board',
@@ -542,22 +525,13 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.dice-mini .die',
     '.wait-note',
     '.chips',
-    '.chip',
     '.chip .faces',
     '.chip .via',
-    '.overlay',
     '.overlay.curtain',
-    '.sheet',
-    '.sheet-title',
-    '.sheet-sub',
-    '.rules-list',
-    '.rules-list li',
-    '.rules-list li strong',
     '.menu-list',
     '.history-row',
     '.history-row .who',
     '.score-line',
-    '#toast',
   ],
 };
 
@@ -875,22 +849,66 @@ const visible = async (page: Page, selector: string): Promise<void> => {
 };
 
 /**
- * Gin: the home tabs, hosting on the broker, a pass-and-play hand to a knock (the driver reads the
- * hook `window.__gin.app` (its `shell.view` since C1) for its choices as gin-dom-parity does, a one-point target so
- * the first scored hand ends the game), the overlays, the endgame and a Score Counter session. A
- * draw is shot twice: the drawn card in the ghost slot, then accepted into the hand
- * (docs/design/gin-draw-ghost-slot.md §9).
+ * What the two shell drivers spelled differently while their flow was one (dry-round-2.md I2): the
+ * screen names the goldens key on (backgammon says "pass the phone" and "match started" where gin
+ * says "pass & play" and "dealt"), gin's extra shot of the Play tab with its submenu held open, and
+ * the value each pass-and-play field takes (gin's one-point target ends the game on the first
+ * scored hand; a 3-point portes match). Data, so the driver below is one function.
  */
-const driveGin = async (page: Page, shot: Shot): Promise<void> => {
-  await page.waitForFunction('typeof window.__gin === "object"');
+type ShellDrive = Readonly<{
+  /** Shot after the tab tour returns to Play; null where the page has no submenu to show. */
+  submenuShot: string | null;
+  localModeShot: string;
+  curtainShot: string;
+  /** By id: SHELL[game].localFields names the fields, this gives each its value. */
+  localValues: Readonly<Record<string, string>>;
+}>;
+
+const SHELL_DRIVE: Readonly<Record<ShellGame, ShellDrive>> = {
+  'gin-rummy': {
+    submenuShot: 'home: play tab with the submenu',
+    localModeShot: 'home: pass & play mode',
+    curtainShot: 'local: dealt, curtain up',
+    localValues: { localTargetInput: '1' },
+  },
+  backgammon: {
+    submenuShot: null,
+    localModeShot: 'home: play tab, pass the phone',
+    curtainShot: 'local: match started, curtain up',
+    localValues: { localMatchLengthSel: '3', localVariantSel: 'portes' },
+  },
+};
+
+/** An input is filled; a select has its option chosen. */
+const setField = async (page: Page, id: string, value: string): Promise<void> => {
+  const field = page.locator(`#${id}`);
+  // A string expression, as READ_SCRIPT is: this file is node-side and has no DOM types.
+  const tag = await page.evaluate<string>(`document.getElementById(${JSON.stringify(id)}).tagName`);
+  if (tag === 'SELECT') await field.selectOption(value);
+  else await field.fill(value);
+};
+
+/**
+ * The shell, driven the same way on every shell game (docs/design/shared-shell.md §6.4 D2,
+ * dry-round-2.md I2): the home tabs in SHELL[game].tabs order and back to Play, a room opened on
+ * the local broker and cancelled, the pass-and-play mode with both names and the game's own fields,
+ * the start under the curtain. Returns with the curtain up; the game's driver plays on from there.
+ * `shot` is the game's (backgammon's waits the flights out first), so the two per-game drivers keep
+ * their wrappers.
+ */
+const driveShell = async (page: Page, shot: Shot, game: ShellGame): Promise<void> => {
+  const { tabs, localFields } = SHELL[game];
+  const drive = SHELL_DRIVE[game];
+  await page.waitForFunction(`typeof ${REGISTRY[game].hook} === "object"`);
   await visible(page, '#homeScreen');
   await shot('home: play tab, online');
-  await click(page, '#tabRulesBtn');
-  await shot('home: rules tab');
-  await click(page, '#tabScoreBtn');
-  await shot('home: score tab');
-  await click(page, '#tabPlayBtn');
-  await shot('home: play tab with the submenu');
+  await tabs.slice(1).reduce(async (done, tab) => {
+    await done;
+    await click(page, `#${tabButtonId(tab)}`);
+    await shot(`home: ${tab.toLowerCase()} tab`);
+  }, Promise.resolve());
+  await click(page, `#${tabButtonId(tabs[0] ?? 'Play')}`);
+  if (drive.submenuShot !== null) await shot(drive.submenuShot);
 
   // ---- hosting: the room opens on the local broker ----
   await fill(page, '#nameInput', 'Ann');
@@ -904,15 +922,34 @@ const driveGin = async (page: Page, shot: Shot): Promise<void> => {
   await click(page, '#cancelHostBtn');
   await visible(page, '#homeScreen');
 
-  // ---- pass and play ----
+  // ---- pass and play, up to the curtain ----
   await click(page, '#playModeSwitch .mode-btn[data-mode="local"]');
-  await shot('home: pass & play mode');
+  await shot(drive.localModeShot);
   await fill(page, '#p1NameInput', 'Ann');
   await fill(page, '#p2NameInput', 'Bob');
-  await fill(page, '#localTargetInput', '1');
+  await localFields.reduce(async (done, [id]) => {
+    await done;
+    const value = drive.localValues[id];
+    if (value === undefined)
+      throw new Error(`${game}: no value for the pass-and-play field #${id}`);
+    await setField(page, id, value);
+  }, Promise.resolve());
   await click(page, '#localBtn');
   await visible(page, '#curtainOverlay');
-  await shot('local: dealt, curtain up');
+  await shot(drive.curtainShot);
+};
+
+/**
+ * Gin, after the shell (driveShell): the pass-and-play hand to a knock (the driver reads the
+ * hook `window.__gin.app` (its `shell.view` since C1) for its choices as gin-dom-parity does; the one-point target the
+ * shell driver set ends the game on the first scored hand), the overlays, the endgame and a Score Counter session. A
+ * draw is shot twice: the drawn card in the ghost slot, then accepted into the hand
+ * (docs/design/gin-draw-ghost-slot.md §9).
+ */
+const driveGin = async (page: Page, shot: Shot): Promise<void> => {
+  await driveShell(page, shot, 'gin-rummy');
+
+  // ---- pass and play: the first hand ----
   await click(page, '#curtainBtn');
   await shot('local: upcard decision');
   await click(page, '#actions [data-act="passUpcard"]');
@@ -1217,9 +1254,8 @@ const settleBg = async (page: Page): Promise<void> => {
 };
 
 /**
- * Sheshbesh (docs/design/backgammon-board.md §7): the home tabs, a room opened on the local broker
- * (the wait screen with its code, gin's step), then pass the phone: a 3-point portes match with its
- * first turn played by hand (the roll modal, rolled, a
+ * Sheshbesh (docs/design/backgammon-board.md §7), after the shell (driveShell, which started the
+ * 3-point portes match under the curtain): its first turn played by hand (the roll modal, rolled, a
  * source selected with its targets, a move, the undo, the turn over under the curtain), the menu,
  * history and rules sheets, then the seeded policy through the hook to the states the CSS draws
  * apart: a checker on the bar, a roll with a dead die, bearing off into the tray, the result sheet
@@ -1234,37 +1270,9 @@ const driveBackgammon = async (page: Page, shot: Shot): Promise<void> => {
   const reveal = async (): Promise<void> => {
     if (await page.locator('#curtainOverlay').isVisible()) await click(page, '#curtainBtn');
   };
-  await page.waitForFunction('typeof window.__backgammon === "object"');
-  await visible(page, '#homeScreen');
-  await snap('home: play tab, online');
-  await click(page, '#tabRulesBtn');
-  await snap('home: rules tab');
-  await click(page, '#tabAboutBtn');
-  await snap('home: about tab');
-  await click(page, '#tabPlayBtn');
-
-  // ---- hosting: the room opens on the local broker ----
-  await fill(page, '#nameInput', 'Ann');
-  await click(page, '#hostBtn');
-  await visible(page, '#hostWaitScreen');
-  await page
-    .locator('#hostWaitStatus')
-    .filter({ hasText: 'Waiting for your opponent to join' })
-    .waitFor();
-  await snap('host: waiting for the opponent');
-  await click(page, '#cancelHostBtn');
-  await visible(page, '#homeScreen');
+  await driveShell(page, snap, 'backgammon');
 
   // ---- a 3-point portes match: the first turn by hand ----
-  await click(page, '#playModeSwitch .mode-btn[data-mode="local"]');
-  await snap('home: play tab, pass the phone');
-  await fill(page, '#p1NameInput', 'Ann');
-  await fill(page, '#p2NameInput', 'Bob');
-  await page.locator('#localMatchLengthSel').selectOption('3');
-  await page.locator('#localVariantSel').selectOption('portes');
-  await click(page, '#localBtn');
-  await visible(page, '#curtainOverlay');
-  await snap('local: match started, curtain up');
   // The reveal brings the roll modal (design §4.7); its button rolls and the dice tumble.
   await click(page, '#curtainBtn');
   await visible(page, '#rollOverlay');

@@ -93,6 +93,7 @@ const blocks: ShellBlocks = {
     />
     <link rel="stylesheet" href="../../shared/styles/tokens.css" />
     <link rel="stylesheet" href="../../shared/styles/base.css" />
+    <link rel="stylesheet" href="../../shared/styles/shell.css" />
     <link rel="stylesheet" href="./theme.css" />
   </head>`,
   masthead: `        <div class="masthead">

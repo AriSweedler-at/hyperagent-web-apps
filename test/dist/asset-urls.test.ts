@@ -6,6 +6,7 @@ import { expect, test } from 'vitest';
 
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
 import { GAMES } from '../../tools/games.ts';
+import { OWN_SHEET, SHEETS_MAX } from './classes.ts';
 import {
   ALIAS_PAGES,
   allReferences,
@@ -87,16 +88,22 @@ describeDist('dist asset URLs', (root) => {
         .forEach(({ value }) => {
           expect(value).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.js$/);
         });
-      // Two stylesheets, both under ../../shared/assets/: the web/shared/styles sheets both pages
-      // link ride the shared chunk (docs/MIGRATION.md step 14), then the game's own CSS.
-      expect(
-        references.filter(({ value }) => value.endsWith('.css')).map(({ value }) => value),
-      ).toEqual([
-        expect.stringMatching(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.css$/) as string,
-        expect.stringMatching(
-          new RegExp(`^\\.\\./\\.\\./shared/assets/${game}-[\\w-]+\\.css$`),
-        ) as string,
-      ]);
+      // The stylesheets, all under ../../shared/assets/: the web/shared/styles sheets every page
+      // links ride the shared chunk (docs/MIGRATION.md step 14), a shell page's shell.css rides the
+      // chunk the shell games share (allowed, not required: OWN_SHEET, SHEETS_MAX in classes.ts;
+      // dry-round-2.md G4), then the game's own CSS.
+      const sheets = references
+        .filter(({ value }) => value.endsWith('.css'))
+        .map(({ value }) => value);
+      expect(sheets.length).toBeGreaterThanOrEqual(2);
+      expect(sheets.length).toBeLessThanOrEqual(SHEETS_MAX(game));
+      expect(sheets.at(-1)).toMatch(
+        new RegExp(`^\\.\\./\\.\\./shared/assets/${game}-[\\w-]+\\.css$`),
+      );
+      sheets.slice(0, -1).forEach((value) => {
+        expect(value).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.css$/);
+        expect(value).not.toMatch(OWN_SHEET);
+      });
     });
   });
 });

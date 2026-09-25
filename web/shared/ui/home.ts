@@ -34,6 +34,10 @@ import {
   type Element,
   type PageLike,
 } from '../edge/dom.ts';
+import { tabButtonId } from './ids.ts';
+
+// The tab ids moved to ids.ts (pure) for the computed-style oracle; the import path holds.
+export { tabButtonId };
 
 /** What the shell paints from: the game's tab, mode, submenu flag and the resume button's label (null: nothing to resume). */
 export type HomeView<Tab extends string> = Readonly<{
@@ -64,10 +68,6 @@ export const fillInputs = (doc: DocumentLike, ids: ReadonlyArray<string>, value:
 export const setCodeInput = (doc: DocumentLike, value: string): void => {
   setValue(requireId(doc, 'codeInput'), value);
 };
-
-/** `tabPlayBtn`, `tabRulesBtn`, `tabScoreBtn`, `tabAboutBtn`. */
-export const tabButtonId = (tab: string): string =>
-  `tab${tab.charAt(0).toUpperCase()}${tab.slice(1)}Btn`;
 
 /**
  * The code input's `beforeinput` guard: keyboard suggestions arrive as replacement text or as a

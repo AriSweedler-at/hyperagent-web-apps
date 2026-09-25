@@ -73,3 +73,12 @@ export const SHELL_IDS: ReadonlyArray<string> = [
   // The toast (shellPaint.ts `showToast`, toast.ts).
   'toast',
 ];
+
+/**
+ * The tab buttons' ids from the tab names: `tabPlayBtn`, `tabRulesBtn`, `tabScoreBtn`, `tabAboutBtn`.
+ * Here rather than in home.ts (which re-exports it) because the computed-style oracle
+ * (tools/parity/computed-styles.ts `driveShell`, docs/design/dry-round-2.md I2) tours the tabs by
+ * it from node, where home.ts's DOM edge is out of reach.
+ */
+export const tabButtonId = (tab: string): string =>
+  `tab${tab.charAt(0).toUpperCase()}${tab.slice(1)}Btn`;
