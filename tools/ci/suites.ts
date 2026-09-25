@@ -186,6 +186,12 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // and cuePlayer.ts's phrases each 100 on every metric; the games' fx.test.ts pins and suites
       // ran unchanged, a CueSpec row being a one-step phrase). Measured on main at 60c50d6 (#102)
       // and this branch rebased onto it.
+      // Re-measured when E2 (dry-round-2.md §5 Wave E) added the motion kernel edge/motion.ts (glide
+      // for gin's hand/flip.ts, launchClone for backgammon's board/fly.ts, reducedMotionOf read once;
+      // 100/100/100/100 over motion.test.ts's six cases on page.fake elements with a logging style
+      // and rect, fake timers and a fake matchMedia host): shared/lib still 100/100/100/100; the edge
+      // folder 99.77/99.45/99.80/97.09 before, 99.78/99.46/99.80/97.13 after (the same three lines
+      // uncovered elsewhere, 1305 → 1349 lines). Measured on main at 25cb36c (#108) and this branch.
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The shared shell's helpers and painters (docs/design/glossary-links.md §3;
@@ -333,6 +339,11 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // shellIntents: ui 98.81/97.95/98.12/95.06 before, 98.79/97.86/98.10/95.13 after (the same 11
       // lines uncovered, 921 → 906 lines; home.ts and the shared modules measure 100 on every
       // metric; the row stands). Measured on this branch rebased onto main at 77776e8 (#106).
+      // Re-measured when E2 (dry-round-2.md §5 Wave E) moved the glide (the inverted transform, the
+      // layout read, the release and the fallback) out of ui/hand/flip.ts into web/shared/edge/
+      // motion.ts (the residue measures the cells and keeps the dead zone): ui 98.79/97.86/98.10/95.13
+      // before, 98.78/97.86/98.08/95.13 after (the same 11 lines uncovered, 906 → 898 lines; the row
+      // stands). Measured on main at 25cb36c (#108) and this branch.
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -528,6 +539,11 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // shellIntents: ui 99.47/100/98.70/92.09 before, 99.46/100/98.68/92.12 after (the same 6
       // lines uncovered, 1131 → 1116 lines; home.ts and the shared modules measure 100 on every
       // metric; the row stands). Measured on this branch rebased onto main at 77776e8 (#106).
+      // Re-measured when E2 (dry-round-2.md §5 Wave E) moved the flight's clone (fixed over the page,
+      // sized, delayed, laid out, sent by translate and scale, removed) out of ui/board/fly.ts into
+      // web/shared/edge/motion.ts (the residue measures departures and arrivals, staggers and culls):
+      // ui 99.46/100/98.68/92.12 before, 99.45/100/98.66/92.19 after (the same 6 lines uncovered,
+      // 1116 → 1096 lines; the row stands). Measured on main at 25cb36c (#108) and this branch.
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
