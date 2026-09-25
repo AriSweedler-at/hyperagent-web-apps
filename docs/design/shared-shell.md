@@ -151,7 +151,7 @@ web/shared/
   edge/prefs.ts               readTextWith, decodeName/PlayMode/SoundState/SoundFont, textPref, namePref, soundPref, shellSave<S, X>
   edge/cuePlayer.ts           createCuePlayer<E>: fx.ts's body with the cue table injected
   edge/netDeps.ts             browserNetDeps({search, debug, onWake})
-  edge/page.fake.ts           + pageFromMarkup(markup, declared, extra), modeButtons(prefix, modes, hidden)
+  edge/page.fake.ts           + pageFromMarkup(markup, declared, extra), modeButtons(prefix, modes, hidden), shellPage(markup, {modes, hiddenModes, activeSwitchMode}, declared, extra, more)
 web/games/<g>/src/
   shellConfig.ts              the ShellGame object (~150-200 lines): ids, copy, keys, tabs, opts codec, engine adapters, frames, table hooks
   net/host.ts, net/guest.ts   ~20 + ~15 line wrappers fixing G, H, X and the codec
