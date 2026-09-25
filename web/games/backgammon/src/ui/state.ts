@@ -1,14 +1,23 @@
 // The Sheshbesh app as a reducer over intents (docs/design/backgammon-board.md §4 "The interaction
 // model", §5 "The shell"; docs/ARCHITECTURE.md "Module boundaries": imported only by main.ts, the
-// painters and tests). `App` is gin's shape split in two so the shell can be lifted into a shared
-// reducer later (design §5.3): `shell` is the home screen, the waiting rooms, the session
-// (role, code, names, the engine `State` for the host and pass-and-play, my `View` for every role)
-// and the resume offer, field for field as gin names them; `table` is the board's interaction
-// memory (the tapped source, the forced die, the die-chip tray, a drag, the overlays, the curtain
-// and the R14 beat), which no other game has. `Intent` is every handler and every network event,
-// and `reduce` returns the next App with a list of `Effect`s: what to persist, toast, send, play
-// or arm, as data. main.ts runs the effects through the real adapters (`runEffect`) and paints the
-// App (ui/render.ts); the tests run the reducer alone.
+// painters and tests). `App` is gin's shape split in two (design §5.3): `shell` is the home screen,
+// the waiting rooms, the session (role, code, names, the engine `State` for the host and
+// pass-and-play, my `View` for every role) and the resume offer, the record the shared shell
+// reducer owns since docs/design/shared-shell.md §5 C2 (web/shared/ui/shell.ts `reduceShell`,
+// over the config `BACKGAMMON` below: shellConfig.ts's half, the id, names, tabs, copy, option
+// codec, engine adapters, frames and store, completed here with the table hooks the shared flows
+// call: `reset` per site, `rendered`, `refuse`, pass-and-play's `viewer`/`revealer`, and the home
+// snapshot's own part); `table` is the board's interaction memory (the tapped source, the forced
+// die, the die-chip tray, a drag, the overlays, the curtain and the R14 beat), which no other game
+// has. `Intent` is every handler and every network event, and `reduce` returns the next App with
+// a list of `Effect`s: what to persist, toast, send, play or arm, as data. main.ts runs the
+// effects through the real adapters (`runEffect`: backgammon's three, then the shared runner) and
+// paints the App (ui/render.ts); the tests run the reducer alone.
+//
+// Backgammon's residue on the shell (shared-shell.md §4.3): the two option selects
+// (`variant/set`, `matchLength/set`, its own intents), `curtainMode` and its effect, and a guest
+// whose match is over when the host drops (`hostLeft`, taken in `reduce` before the shell's
+// `guest/lost`, which knows no ending but the wait screen).
 //
 // Turn authority is gin's (design §5.3): the host applies `applyAction` for both seats and
 // broadcasts `viewFor(game, 1)` as a `state` frame, a refusal to the guest is a `toast` frame; the
@@ -21,21 +30,49 @@
 // consequence opens the die-chip tray (`pending`) instead of committing. The helpers that decide
 // this (`sourcesOf`, `effectiveSelection`, `targetsOf`) live in ui/board.ts, so the discs on the
 // board and the reducer's commits come from one computation.
+import {
+  GONE_TOAST_MS,
+  NOT_CONNECTED_MSG,
+  andThen as then,
+  broadcast,
+  guestContextOf as shellGuestContextOf,
+  hostContextOf as shellHostContextOf,
+  initialShell as shellInitial,
+  isShellEffect,
+  isShellIntent,
+  localBroadcast,
+  pure,
+  readHome as shellReadHome,
+  reduceShell,
+  resumeFor as shellResumeFor,
+  saveFor as shellSaveFor,
+  step,
+  toast,
+  withShell,
+  withTable,
+  type Ctx,
+  type Effect as SharedEffect,
+  type HomeSnapshot as SharedHomeSnapshot,
+  type Intent as SharedIntent,
+  type Resume as SharedResume,
+  type ShellApp,
+  type ShellConfig,
+  type ShellIntent as SharedShellIntent,
+  type Role,
+  type ShellState,
+  type Step as SharedStep,
+  type TableReset,
+  type TimerId as SharedTimerId,
+} from '../../../../shared/ui/shell.ts';
+import { runShellEffect, type ShellEffectDeps } from '../../../../shared/ui/shellEffects.ts';
 import { formatError } from '../../../../shared/lib/json.ts';
 import { ok, type Result } from '../../../../shared/lib/result.ts';
-import { randomCode, sanitiseCode, validateCode } from '../../../../shared/lib/roomCode.ts';
-import type { Rng } from '../../../../shared/lib/rng.ts';
-import { DEFAULT_SOUND_FONT, type SoundFontName } from '../../../../shared/lib/sound/fonts.ts';
 import {
   actorOf,
   applyAction,
   createGame,
   decodeState,
   isShippedVariant,
-  MATCH_LENGTHS,
-  DEFAULT_MATCH_LENGTH,
-  DEFAULT_VARIANT,
-  matchOver,
   moveTo,
   otherSeat,
   rulesOf,
@@ -46,10 +83,7 @@ import type {
   Die,
   LogEntry,
   Move,
-  Now,
-  Pair,
   PlayedMove,
-  Player,
   PointIndex,
   Seat,
   ShippedVariant,
@@ -58,42 +92,18 @@ import type {
   View,
 } from '../engine/types.ts';
 import type { GuestContext } from '../net/guest.ts';
-import { connectingMsg } from '../net/guest.ts';
 import type { HostContext } from '../net/host.ts';
-import { OPENING_MSG, handoffMsg } from '../net/host.ts';
-import {
-  action as actionFrame,
-  guestNameFor,
-  lobby as lobbyFrame,
-  state as stateFrame,
-  toast as toastFrame,
-  type GuestFrame,
-  type HostFrame,
-} from '../protocol.ts';
+import { action as actionFrame } from '../protocol.ts';
+import { BACKGAMMON_SHELL, parseMatchLength } from '../shellConfig.ts';
 import {
   DEFAULT_PLAY_MODE,
   HOME_TABS,
-  clearSave,
-  readCurtainMode,
-  readHomeTab,
-  readMatchLength,
-  readName,
-  readP2Name,
-  readPlayMode,
-  readSave,
-  readSoundFont,
-  readVariant,
   writeCurtainMode,
-  writeHomeTab,
   writeMatchLength,
-  writeName,
-  writeP2Name,
-  writePlayMode,
-  writeSave,
-  writeSoundFont,
   writeVariant,
   type CurtainMode,
   type HomeTab,
+  type HostExtra,
   type PlayMode,
   type Save,
   type Store,
@@ -109,9 +119,32 @@ import {
   type Place,
   type Target,
 } from './board.ts';
-import type { Cue } from './sound.ts';
-import type { RulesSlot } from './rules.ts';
+import { INITIAL_CUES, type Cue, type CueState } from './sound.ts';
 
+// The shell's strings and helpers the tests and painters import from here, as before C2.
+export {
+  DISCONNECTED_MSG,
+  GONE_TOAST_MS,
+  LONG_PRESS_MS,
+  LOST_HOST_MSG,
+  NOT_CONNECTED_MSG,
+  OPPONENT_LEFT_MSG,
+  ROOM_FULL_MSG,
+  SHELL_INTENT_TYPES,
+  WAITING_FOR_GUEST_MSG,
+  guestGoneMsg,
+  joinedMsg,
+  type Role,
+  type WaitStatus,
+} from '../../../../shared/ui/shell.ts';
+export {
+  DEFAULT_NAME,
+  LEAVE_LOCAL_MSG,
+  LEAVE_ONLINE_MSG,
+  hostRoomMsg,
+  parseMatchLength,
+  parseVariant,
+} from '../shellConfig.ts';
 // ---- the state ---------------------------------------------------------------------------------
 
 // ui/home.ts paints the tabs and modes from the lists storage.ts decodes; ui/ may not import storage.ts.
@@ -126,9 +159,6 @@ export {
   type Place,
   type Target,
 };
-
-export type Role = 'host' | 'guest' | 'local';
-
 /** The five top-level screens `showScreen` toggles between (design §4 `SCREENS`). */
 export const SCREENS = [
   'homeScreen',
@@ -139,85 +169,47 @@ export const SCREENS = [
 ] as const;
 export type ScreenId = (typeof SCREENS)[number];
 
-/** `#hostWaitStatus` / `#guestWaitStatus`: the text and whether it still pulses. */
-export type WaitStatus = Readonly<{ text: string; pulse: boolean }>;
+/** What the home screen's resume box offers (`resumeFor`), one per save role (web/shared/ui/shell.ts `ShellResume`; backgammon adds none). */
+export type Resume = SharedResume<Backgammon>;
 
-/** What the home screen's resume box offers (`resumeFor`), one per save role. */
-export type Resume =
-  | Readonly<{ kind: 'local'; game: State }>
-  | Readonly<{
-      kind: 'host';
-      code: string;
-      myName: string;
-      matchLength: number;
-      variant: ShippedVariant;
-      game: State;
-      oppName: string | null;
-      /** The save's `handoff` mark: the offer reads as the handoff, and the room resumes as one. */
-      handoff: boolean;
-    }>
-  | Readonly<{ kind: 'guest'; code: string; myName: string }>;
+// The cue memory (`CueState`, `INITIAL_CUES`) lives in ui/sound.ts since C2: the shell config reads it too.
+export { INITIAL_CUES, type CueState };
 
-/** `nextCue`'s memory: the view the last cues were played for, so a re-sent frame plays none. */
-export type CueState = Readonly<{ key: string | null }>;
-export const INITIAL_CUES: CueState = { key: null };
+/**
+ * Backgammon's types for the shared shell (web/shared/ui/shell.ts `ShellTypes`): the room's terms
+ * are the match length and the variant (the host save's own fields, storage.ts `HostExtra`, and
+ * the welcome frame's `Room`), the raw options off the inputs are the two selects' values when the
+ * binder passes them, the modes are the two stored ones, no resume offer beyond the three roles,
+ * `initHome` also reads the options and the curtain mode, and the table's own intents and effects
+ * are the unions below.
+ */
+export type Backgammon = Readonly<{
+  Opts: HostExtra;
+  Raw: Readonly<{ matchLength?: string; variant?: string }>;
+  State: State;
+  View: View;
+  Action: Action;
+  Table: Table;
+  Tab: HomeTab;
+  Mode: PlayMode;
+  Screen: ScreenId;
+  Timer: 'shake' | 'noMove' | 'tumble';
+  Cue: Cue;
+  Cues: CueState;
+  Resume: never;
+  Home: Readonly<{ variant: ShippedVariant; matchLength: number; curtainMode: CurtainMode }>;
+  Intent: TableIntent;
+  Effect: TableEffect;
+  Store: Store;
+}>;
 
 /**
  * Everything but the board's own interaction: gin's `App` fields under gin's names (design §4),
- * with `matchLength` and `variant` where gin has `target`. `game` and `view` sit here too: the
- * shell owns the session (who plays, from which device), the table only remembers taps.
+ * with `opts: { matchLength, variant }` where gin has `{ target }`. `game` and `view` sit here
+ * too: the shell owns the session (who plays, from which device), the table only remembers taps.
+ * Since C2 the record is the shared shell reducer's (`ShellState`).
  */
-export type Shell = Readonly<{
-  role: Role | null;
-  code: string | null;
-  myName: string;
-  /** Points to win, from `#matchLengthSel`/`#localMatchLengthSel` (`backgammon_matchLength`). */
-  matchLength: number;
-  /** The rules of the next match, from `#variantSel`/`#localVariantSel` (`backgammon_variant`). */
-  variant: ShippedVariant;
-  /** The engine state: host and pass-and-play only. */
-  game: State | null;
-  /** My view: every role (the guest's arrives in `state` frames). */
-  view: View | null;
-  oppName: string | null;
-  oppConnected: boolean;
-  nameTouched: boolean;
-  /** Pass-and-play: the seat that lifted the curtain this turn (Q4). */
-  revealed: Seat | null;
-  homeTab: HomeTab;
-  playMode: PlayMode;
-  /** The first player's name as last read from `backgammon_name` or typed into any of its inputs. */
-  p1Name: string;
-  /** The second player's name as last read from `backgammon_p2Name` or typed. */
-  p2Name: string;
-  screen: ScreenId;
-  /** The `netAttempt` ticket: bumped by every start, cancel and leave. */
-  netAttempt: number;
-  hostStatus: WaitStatus;
-  guestStatus: WaitStatus;
-  /** `#startGameBtn` shown (a guest is in the lobby). */
-  startGameVisible: boolean;
-  /**
-   * The hosted game came from pass-and-play (`#handoffBtn` / `#curtainHandoffBtn`) and its remote
-   * seat has not joined yet: saved with the host save, cleared by the guest's join and by every
-   * leave and cancel (gin's flow).
-   */
-  handoff: boolean;
-  /** `backgammon_name`, as `initHome` put it in the inputs. */
-  savedName: string | null;
-  resume: Resume | null;
-  /** `#rulesOverlay` open (the in-game rules sheet; the home tab is `homeTab`). */
-  rulesOpen: boolean;
-  cues: CueState;
-  /** `#playSubmenu` held open by a long press on the Play tab. */
-  submenuOpen: boolean;
-  /** A long press just opened the submenu, so the click that follows must not switch tabs. */
-  longPressed: boolean;
-  /** `#codeInput` as last sanitised. */
-  codeDraft: string;
-  /** The font every cue plays in (`backgammon_soundFont`, docs/design/sound-fonts.md §6). */
-  soundFont: SoundFontName;
-}>;
+export type Shell = ShellState<Backgammon>;
 
 /** The board's interaction memory (design §4.1 `Table`). Session only: never saved, never on the wire. */
 export type Table = Readonly<{
@@ -250,45 +242,12 @@ export type Table = Readonly<{
   rolling: boolean;
 }>;
 
-export type App = Readonly<{ shell: Shell; table: Table }>;
+export type App = ShellApp<Backgammon>;
 
-export const DEFAULT_NAME = 'Ari';
 export const DEFAULT_GUEST_NAME = 'Jeff';
 export const DEFAULT_HOME_TAB: HomeTab = 'play';
 export const DEFAULT_CURTAIN_MODE: CurtainMode = 'always';
 export const NAME_MAX = 20;
-
-export const initialShell: Shell = {
-  role: null,
-  code: null,
-  myName: DEFAULT_NAME,
-  matchLength: DEFAULT_MATCH_LENGTH,
-  variant: DEFAULT_VARIANT,
-  game: null,
-  view: null,
-  oppName: null,
-  oppConnected: false,
-  nameTouched: false,
-  revealed: null,
-  homeTab: DEFAULT_HOME_TAB,
-  playMode: DEFAULT_PLAY_MODE,
-  p1Name: '',
-  p2Name: '',
-  screen: 'homeScreen',
-  netAttempt: 0,
-  hostStatus: { text: OPENING_MSG, pulse: true },
-  guestStatus: { text: 'Connecting…', pulse: true },
-  startGameVisible: false,
-  handoff: false,
-  savedName: null,
-  resume: null,
-  rulesOpen: false,
-  cues: INITIAL_CUES,
-  submenuOpen: false,
-  longPressed: false,
-  codeDraft: '',
-  soundFont: DEFAULT_SOUND_FONT,
-};
 
 export const initialTable: Table = {
   selected: null,
@@ -305,13 +264,8 @@ export const initialTable: Table = {
   lastPainted: null,
   rolling: false,
 };
-
-export const initialApp: App = { shell: initialShell, table: initialTable };
-
 // ---- the strings the app (not the sessions) writes ---------------------------------------------
 
-/** The Play tab opens its submenu after this long a press. */
-export const LONG_PRESS_MS = 450;
 /** A tapped point that is neither source nor target shakes for this long (design §4.2 rule 1). */
 export const SHAKE_MS = 120;
 /** R14: a forfeited roll stays on the table this long before the curtain rises (design §4.5). */
@@ -323,25 +277,11 @@ export const NO_MOVE_MS = 1200;
  */
 export const TUMBLE_MS = 700;
 /** `onGuestGone`'s toast lasts this long, as does `LOST_HOST_MSG`. */
-export const GONE_TOAST_MS = 4000;
-export const NOT_CONNECTED_MSG = 'Not connected to the host.';
-export const WAITING_FOR_GUEST_MSG = 'Waiting for your opponent to join.';
-export const OPPONENT_LEFT_MSG = 'Opponent left. Waiting for someone to join…';
-export const ROOM_FULL_MSG = 'That room already has two players.';
-export const LOST_HOST_MSG = 'Lost connection to the host — reconnecting…';
-export const DISCONNECTED_MSG = 'Disconnected from the host — reconnecting…';
-export const LEAVE_LOCAL_MSG = 'End this match? The score will be cleared.';
-export const LEAVE_ONLINE_MSG = 'Leave this match? The room will close.';
 /** `sandbox/load` outside pass-and-play, and a position the decoder refuses. */
 export const SANDBOX_LOCAL_ONLY_MSG = 'Positions can only be set up in pass-and-play.';
 export const badPositionMsg = (error: string): string => `That position is not valid: ${error}`;
-export const joinedMsg = (name: string): string => `${name} joined! Ready when you are.`;
-export const hostRoomMsg = (hostName: string): string =>
-  `Connected — waiting for ${hostName} to start`;
 /** `guest/lost` once the match is over: the host closed the room, there is nothing to rejoin. */
 export const hostLeftMsg = (hostName: string): string => `${hostName} left the table.`;
-export const guestGoneMsg = (oppName: string | null, code: string | null): string =>
-  `${oppName ?? 'Opponent'} disconnected — they can rejoin with code ${String(code)}.`;
 /**
  * The hit toast, for the player hit, in their own numbering, from the moves and never from log
  * text: `Kapará. Ari hit you on your 20-point.`; two hits in one turn share the toast (there is
@@ -355,98 +295,20 @@ export const hitMsg = (byName: string, ownPoints: ReadonlyArray<number>): string
       : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1] ?? ''}`;
   return `Kapará. ${byName} hit you on ${where}.`;
 };
-
 // ---- intents -----------------------------------------------------------------------------------
 
-/** What `initHome` reads from storage, in one snapshot (`readHome`). */
-export type HomeSnapshot = Readonly<{
-  name: string | null;
-  p2Name: string | null;
-  homeTab: HomeTab;
-  playMode: PlayMode;
-  variant: ShippedVariant;
-  matchLength: number;
-  curtainMode: CurtainMode;
-  /** A bad value read as the default (main.ts logs it). */
-  soundFont: SoundFontName;
-  save: Save | null;
-}>;
+/** What `initHome` reads from storage, in one snapshot (`readHome`): the shell's keys and backgammon's (`Backgammon['Home']`: the options and the curtain mode). */
+export type HomeSnapshot = SharedHomeSnapshot<Backgammon>;
 
-export type Intent =
-  // ---- home (gin's names) ----
-  | Readonly<{ type: 'home/init'; home: HomeSnapshot }>
-  | Readonly<{ type: 'name/typed'; value: string }>
-  | Readonly<{ type: 'p1name/typed'; value: string }>
-  | Readonly<{ type: 'p2name/typed'; value: string }>
-  /** `setHomeTab(tab, { persist })`: an unknown tab is `play`. */
-  | Readonly<{ type: 'tab/set'; tab: string; persist?: boolean }>
-  /**
-   * A glossary link (docs/design/glossary-links.md) or a `#rule-<id>` deep link at boot: the Rules
-   * tab on the home screen, the rules overlay anywhere else, then the rule scrolled to and flashed.
-   */
-  | Readonly<{ type: 'rules/show'; rule: string }>
-  /** `setPlayMode(mode)`: `local`, else `online`. */
-  | Readonly<{ type: 'mode/set'; mode: string }>
+/**
+ * The table's half of `Intent` (design §4.1), and the two option selects: backgammon's own, after
+ * the shell's 43 (web/shared/ui/shell.ts `ShellIntent`).
+ */
+export type TableIntent =
   /** `#variantSel` / `#localVariantSel`: a shipped variant is remembered; anything else is ignored. */
   | Readonly<{ type: 'variant/set'; variant: string }>
   /** `#matchLengthSel` / `#localMatchLengthSel`: one of MATCH_LENGTHS is remembered; anything else is ignored. */
   | Readonly<{ type: 'matchLength/set'; length: number | string }>
-  /**
-   * `#hostBtn`: the raw name; the match length and variant are the shell's (set by the selects'
-   * `variant/set`/`matchLength/set`), unless the binder passes the raw select values along.
-   */
-  | Readonly<{ type: 'host/click'; name: string; matchLength?: string; variant?: string }>
-  /** `#joinBtn`: the raw input values. */
-  | Readonly<{ type: 'join/click'; name: string; code: string }>
-  /** `#localBtn`: the raw names; the options as for `host/click`. */
-  | Readonly<{
-      type: 'local/click';
-      p1: string;
-      p2: string;
-      matchLength?: string;
-      variant?: string;
-    }>
-  /** `#resumeBtn`: whatever `shell.resume` offers. */
-  | Readonly<{ type: 'resume/click' }>
-  /** `#handoffBtn` / `#curtainHandoffBtn` (pass-and-play alone): the game goes on as a hosted room. */
-  | Readonly<{ type: 'handoff/click' }>
-  /** `#cancelHostBtn` / `#cancelGuestBtn`. */
-  | Readonly<{ type: 'cancel' }>
-  | Readonly<{ type: 'cancel/finish' }>
-  /** The hook's `showScreen(id)`. */
-  | Readonly<{ type: 'screen/show'; screen: ScreenId }>
-  /** `#tabPlayBtn` pointerdown: the long-press timer starts. */
-  | Readonly<{ type: 'submenu/press' }>
-  | Readonly<{ type: 'submenu/release' }>
-  | Readonly<{ type: 'submenu/longPress' }>
-  /** `#tabPlayBtn` click: the Play tab, unless a long press just opened the submenu. */
-  | Readonly<{ type: 'tab/playClick' }>
-  | Readonly<{ type: 'submenu/pick'; mode: string }>
-  | Readonly<{ type: 'submenu/dismiss' }>
-  /** `#codeInput` input: the raw value and the InputEvent's type. */
-  | Readonly<{ type: 'code/typed'; value: string; inputType: string }>
-  /** `?join=<code>` at boot (an invite link): the code into `#codeInput`, the Play tab, online mode. */
-  | Readonly<{ type: 'join/link'; code: string }>
-  /** `#soundBtn`. */
-  | Readonly<{ type: 'sound/toggle' }>
-  /** `__backgammon.soundFont(name)` (the console, for now): a valid font plays from now on and is remembered. */
-  | Readonly<{ type: 'soundFont/set'; font: SoundFontName }>
-  /** `#shareCodeBtn`. */
-  | Readonly<{ type: 'share/click' }>
-  // ---- net: host ----
-  /** `startHost(resumeCode)`: null draws a fresh code. */
-  | Readonly<{ type: 'host/start'; code: string | null }>
-  | Readonly<{ type: 'host/status'; text: string; stopPulse: boolean }>
-  | Readonly<{ type: 'host/frame'; frame: GuestFrame }>
-  | Readonly<{ type: 'host/guestGone'; iceFailed: string | null }>
-  /** `#startGameBtn` "Start the match" (gin's name, so the shell extraction stays mechanical). */
-  | Readonly<{ type: 'host/deal' }>
-  // ---- net: guest ----
-  | Readonly<{ type: 'guest/start'; code: string }>
-  | Readonly<{ type: 'guest/status'; text: string; stopPulse: boolean }>
-  | Readonly<{ type: 'guest/connected' }>
-  | Readonly<{ type: 'guest/frame'; frame: HostFrame }>
-  | Readonly<{ type: 'guest/lost' }>
   // ---- the table (design §4.1) ----
   /** `act(action)`: every role (the hook, and the buttons below resolve to it). */
   | Readonly<{ type: 'act'; action: Action }>
@@ -485,8 +347,6 @@ export type Intent =
   | Readonly<{ type: 'rules/toggle' }>
   /** `#menuCurtainToggle`: remembered under `backgammon_curtain`. */
   | Readonly<{ type: 'curtain/mode'; mode: CurtainMode }>
-  /** `#curtainBtn`. */
-  | Readonly<{ type: 'curtain/reveal' }>
   /** The `noMove` timer fired: the forfeited roll has been seen. */
   | Readonly<{ type: 'noMove/elapsed' }>
   /** The `shake` timer fired. */
@@ -497,147 +357,34 @@ export type Intent =
    * `window.__backgammon.setup(state)` (e2e and stories): the pass-and-play game's engine state is
    * replaced by `state` (decoded, so a hand-made object is checked); refused outside a local game.
    */
-  | Readonly<{ type: 'sandbox/load'; state: unknown }>
-  | Readonly<{ type: 'leave/request' }>
-  | Readonly<{ type: 'leave/confirmed' }>
-  | Readonly<{ type: 'leave/finish' }>
-  /** The page became visible: the wake lock is taken again while in a game. */
-  | Readonly<{ type: 'visible' }>
-  /** The hook's `render()`. */
-  | Readonly<{ type: 'render' }>
-  /** A session asked the app to persist. */
-  | Readonly<{ type: 'persist' }>;
+  | Readonly<{ type: 'sandbox/load'; state: unknown }>;
 
-/**
- * The shell's half of `Intent` (design §4): what a shared shell reducer would own once both games
- * are green (design §5.3). Everything else is the table's.
- */
-export const SHELL_INTENT_TYPES = [
-  'home/init',
-  'name/typed',
-  'p1name/typed',
-  'p2name/typed',
-  'tab/set',
-  'rules/show',
-  'mode/set',
-  'variant/set',
-  'matchLength/set',
-  'host/click',
-  'join/click',
-  'local/click',
-  'resume/click',
-  'handoff/click',
-  'cancel',
-  'cancel/finish',
-  'screen/show',
-  'submenu/press',
-  'submenu/release',
-  'submenu/longPress',
-  'tab/playClick',
-  'submenu/pick',
-  'submenu/dismiss',
-  'code/typed',
-  'join/link',
-  'sound/toggle',
-  'soundFont/set',
-  'share/click',
-  'host/start',
-  'host/status',
-  'host/frame',
-  'host/guestGone',
-  'host/deal',
-  'guest/start',
-  'guest/status',
-  'guest/connected',
-  'guest/frame',
-  'guest/lost',
-] as const satisfies ReadonlyArray<Intent['type']>;
-export type ShellIntent = Extract<Intent, { type: (typeof SHELL_INTENT_TYPES)[number] }>;
-export type TableIntent = Exclude<Intent, ShellIntent>;
-const isShellIntent = (intent: Intent): intent is ShellIntent =>
-  (SHELL_INTENT_TYPES as ReadonlyArray<string>).includes(intent.type);
+/** Every handler and every network event: the shell's intents (gin's names) and the table's. */
+export type Intent = SharedIntent<Backgammon>;
+export type ShellIntent = SharedShellIntent<Backgammon>;
 
 // ---- effects -----------------------------------------------------------------------------------
 
-export type TimerId = 'longPress' | 'shake' | 'noMove' | 'tumble';
+export type TimerId = SharedTimerId<Backgammon>;
 
-export type Effect =
-  | Readonly<{ type: 'persist' }>
-  | Readonly<{ type: 'clearSave' }>
-  /** A handed-off game given back to pass-and-play: the room was cancelled before anyone joined. */
-  | Readonly<{ type: 'saveLocal'; game: State }>
-  | Readonly<{ type: 'rememberName'; name: string }>
-  | Readonly<{ type: 'rememberP2Name'; name: string }>
-  | Readonly<{ type: 'writeHomeTab'; tab: HomeTab }>
-  | Readonly<{ type: 'writePlayMode'; mode: PlayMode }>
+/** Backgammon's own effects, handled by `runEffect` before the shared runner: the three preferences the home screen and the menu remember. */
+export type TableEffect =
   | Readonly<{ type: 'writeVariant'; variant: ShippedVariant }>
   | Readonly<{ type: 'writeMatchLength'; length: number }>
-  | Readonly<{ type: 'writeCurtainMode'; mode: CurtainMode }>
-  | Readonly<{ type: 'writeSoundFont'; font: SoundFontName }>
-  /** Scroll `rule` into view inside the rules `slot` that is on screen and flash it (web/shared/edge/glossary.ts). */
-  | Readonly<{ type: 'revealRule'; slot: RulesSlot; rule: string }>
-  /** `ms` null is the default duration. */
-  | Readonly<{ type: 'toast'; message: string; ms: number | null }>
-  /** To the current session's channel, if open. */
-  | Readonly<{ type: 'send'; frame: HostFrame | GuestFrame }>
-  | Readonly<{ type: 'fx'; cue: Cue | 'tap' }>
-  | Readonly<{ type: 'wakeLock'; hold: boolean }>
-  | Readonly<{ type: 'startHost'; code: string; attempt: number; resume: boolean }>
-  | Readonly<{ type: 'startGuest'; code: string; attempt: number }>
-  /** Close the current session's channel and destroy its Peer. */
-  | Readonly<{ type: 'closeNet' }>
-  /** `confirm(message)`: dispatch `then` when the player agrees. */
-  | Readonly<{ type: 'confirm'; message: string; then: Intent }>
-  /** Dispatch `intent` next, after the effects before it ran. */
-  | Readonly<{ type: 'then'; intent: Intent }>
-  /** Re-read storage and dispatch `home/init`. */
-  | Readonly<{ type: 'initHome' }>
-  /** `showScreen`'s `window.scrollTo(0, 0)`. */
-  | Readonly<{ type: 'scrollTop' }>
-  /** Arm a named timer that dispatches `then` after `ms`; arming again restarts it. */
-  | Readonly<{ type: 'startTimer'; id: TimerId; ms: number; then: Intent }>
-  | Readonly<{ type: 'cancelTimer'; id: TimerId }>
-  /** `fx.toggle()`. */
-  | Readonly<{ type: 'toggleSound' }>
-  /** The invite for `code` (its link) through the share sheet or the clipboard. */
-  | Readonly<{ type: 'share'; code: string }>
-  /** The first player's name into every input that shows it (`initHome`, and after a keystroke). */
-  | Readonly<{ type: 'fillName'; name: string }>
-  | Readonly<{ type: 'fillP2Name'; name: string }>
-  /** `#codeInput`'s value after sanitising. */
-  | Readonly<{ type: 'setCode'; value: string }>;
+  | Readonly<{ type: 'writeCurtainMode'; mode: CurtainMode }>;
 
-export type Step = Readonly<{ app: App; effects: ReadonlyArray<Effect> }>;
+export type Effect = SharedEffect<Backgammon>;
 
-export type Context = Readonly<{ rng: Rng; now: Now }>;
+export type Step = SharedStep<Backgammon>;
 
-const pure = (app: App): Step => ({ app, effects: [] });
-const step = (app: App, ...effects: ReadonlyArray<Effect>): Step => ({ app, effects });
-/** Run `f` after `s`, keeping `s`'s effects first. */
-const then = (s: Step, f: (app: App) => Step): Step => {
-  const next = f(s.app);
-  return { app: next.app, effects: [...s.effects, ...next.effects] };
-};
-const toast = (message: string, ms: number | null = null): Effect => ({
-  type: 'toast',
-  message,
-  ms,
-});
-const withShell = (app: App, over: Partial<Shell>): App => ({
-  ...app,
-  shell: { ...app.shell, ...over },
-});
-const withTable = (app: App, over: Partial<Table>): App => ({
-  ...app,
-  table: { ...app.table, ...over },
-});
+export type Context = Ctx;
+
 /** A refused action: the toast; the tray, the tapped source and a tumble are dropped so the board matches the state. */
 const refuse = (app: App, message: string): Step =>
   step(
     withTable(app, { selected: null, picked: null, pending: null, rolling: false }),
     toast(message),
   );
-
 // ---- the table against a new view -------------------------------------------------------------
 
 /** The table's memory against a new view: a source that can still move, a forced die still in hand; the tray never survives a change. */
@@ -747,28 +494,7 @@ const handedHits = (game: State, seat: Seat): ReadonlyArray<Effect> => {
 /** The view a cue memory keys on: the same game position paints the same for either seat. */
 const viewKey = (v: View): string =>
   `${String(v.gameNo)}:${v.phase}:${String(v.turn)}:${String(v.log.length)}:${String(v.played.length)}`;
-
 // ---- flows -------------------------------------------------------------------------------------
-
-/** `nameOr`: `(value.trim() || fallback).slice(0, 20)`. */
-const nameOr = (raw: string, fallback: string): string => {
-  const trimmed = raw.trim();
-  return (trimmed === '' ? fallback : trimmed).slice(0, NAME_MAX);
-};
-
-/** A match length from a select's raw value: one of MATCH_LENGTHS, else `fallback`. */
-export const parseMatchLength = (raw: string | number | undefined, fallback: number): number => {
-  const n = typeof raw === 'number' ? raw : parseInt(raw ?? '', 10);
-  return MATCH_LENGTHS.includes(n) ? n : fallback;
-};
-
-/** A variant from a select's raw value: a shipped one, else `fallback` (plakoto and fevga are typed, not playable). */
-export const parseVariant = (raw: string | undefined, fallback: ShippedVariant): ShippedVariant =>
-  raw !== undefined && isShippedVariant(raw) ? raw : fallback;
-
-const showScreen = (app: App, screen: ScreenId): Step =>
-  step(withShell(app, { screen }), { type: 'scrollTop' });
-
 /** What a game leaves behind when it is left, lost or handed off: the table's taps and overlays; the curtain setting stays. */
 const tableCleared = (table: Table): Table => ({ ...initialTable, curtainMode: table.curtainMode });
 
@@ -785,8 +511,7 @@ const TUMBLE_TIMER: Effect = {
   ms: TUMBLE_MS,
   then: { type: 'tumble/elapsed' },
 };
-
-const rendered = (app: App, prev: View | null, now: number): Step => {
+const rendered = (app: App, prev: View | null, ctx: Context): Step => {
   const view = app.shell.view;
   if (view === null) return pure(app);
   const key = viewKey(view);
@@ -807,7 +532,7 @@ const rendered = (app: App, prev: View | null, now: number): Step => {
         ...settled(app.table, view),
         resultOpen,
         lastPainted: prev,
-        noMoveUntil: beat ? now + NO_MOVE_MS : app.table.noMoveUntil,
+        noMoveUntil: beat ? ctx.now() + NO_MOVE_MS : app.table.noMoveUntil,
         rolling: rolled || app.table.rolling,
       },
     },
@@ -829,75 +554,6 @@ const rendered = (app: App, prev: View | null, now: number): Step => {
 };
 
 /** `broadcast()`: my view, the guest's view on the wire, the taps cleared, saved, rendered. */
-const broadcast = (app: App, now: number): Step => {
-  const game = app.shell.game;
-  if (game === null) return pure(app);
-  return then(
-    step(
-      withTable(withShell(app, { view: viewFor(game, 0) }), {
-        selected: null,
-        picked: null,
-        pending: null,
-      }),
-      { type: 'send', frame: stateFrame(viewFor(game, 1)) },
-      { type: 'persist' },
-    ),
-    (a) => rendered(a, app.shell.view, now),
-  );
-};
-
-/** `dispatch(seat, action)`, host only: apply, or refuse to the mover (a toast frame to the guest); then broadcast. */
-const hostDispatch = (app: App, seat: Seat, action: Action, ctx: Context): Step => {
-  const game = app.shell.game;
-  if (game === null) return pure(app);
-  const res = applyAction(game, seat, action, ctx.rng, ctx.now);
-  if (!res.ok)
-    return seat === 0
-      ? refuse(app, res.error)
-      : step(app, { type: 'send', frame: toastFrame(res.error) });
-  return broadcast(withShell(app, { game: res.value }), ctx.now());
-};
-
-/**
- * `localBroadcast(initial)` (design §4.9): the actor's view (the mover, or the seat answering a
- * double) while the game is on, the revealed seat's (or seat 0's) once it is over; the curtain
- * comes up when the phone must change hands, chiming unless this is the start or a reveal. R14:
- * a forfeited roll keeps the roller's view and the curtain down until `noMove/elapsed`.
- */
-const localBroadcast = (app: App, initial: boolean, now: number): Step => {
-  const game = app.shell.game;
-  if (game === null) return pure(app);
-  const prev = app.shell.view;
-  const actor = actorOf(game);
-  const holding = freshNoMove(prev, viewFor(game, game.turn)) && app.table.noMoveUntil === null;
-  const viewIdx: Seat = holding ? otherSeat(game.turn) : (actor ?? app.shell.revealed ?? 0);
-  const curtain =
-    actor !== null &&
-    !holding &&
-    app.table.curtainMode === 'always' &&
-    app.shell.revealed !== viewIdx
-      ? viewIdx
-      : null;
-  // With the curtain off the phone changes hands unannounced: the seat now looking is told of
-  // the hits against them here; with it on, `curtain/reveal` tells them once they have it.
-  const handed =
-    curtain === null && prev !== null && prev.me.idx !== viewIdx ? handedHits(game, viewIdx) : [];
-  return then(
-    step(
-      withTable(withShell(app, { view: viewFor(game, viewIdx) }), {
-        selected: null,
-        picked: null,
-        pending: null,
-        curtain,
-      }),
-      { type: 'persist' },
-      ...(curtain !== null && !initial ? [{ type: 'fx', cue: 'yourTurn' } as const] : []),
-      ...handed,
-    ),
-    (a) => rendered(a, prev, now),
-  );
-};
-
 /** Apply `actions` in order for `seat`, stopping at the first refusal. */
 const applyAll = (
   game: State,
@@ -921,7 +577,8 @@ const localAct = (app: App, actions: ReadonlyArray<Action>, ctx: Context): Step 
   return localBroadcast(
     withShell(app, { game: res.value, revealed: fresh ? null : app.shell.revealed }),
     false,
-    ctx.now(),
+    ctx,
+    BACKGAMMON,
   );
 };
 
@@ -939,7 +596,7 @@ const act = (app: App, actions: ReadonlyArray<Action>, ctx: Context): Step => {
       if (game === null) return pure(app);
       const res = applyAll(game, 0, actions, ctx);
       if (!res.ok) return refuse(app, res.error);
-      return broadcast(withShell(app, { game: res.value }), ctx.now());
+      return broadcast(withShell(app, { game: res.value }), ctx, BACKGAMMON);
     }
     case 'guest':
     case null:
@@ -957,144 +614,6 @@ const commit = (app: App, moves: ReadonlyArray<Move>, ctx: Context): Step =>
     moves.map((m): Action => ({ type: 'move', from: m.from, to: m.to, die: m.die })),
     ctx,
   );
-
-/** `startLocal(game)`: pass-and-play, no Peer; the wake lock is held; the curtain names the starter. */
-const startLocal = (app: App, game: State, now: number): Step =>
-  then(
-    step(
-      {
-        shell: {
-          ...app.shell,
-          role: 'local',
-          code: null,
-          oppConnected: true,
-          game,
-          revealed: null,
-        },
-        table: tableCleared(app.table),
-      },
-      { type: 'wakeLock', hold: true },
-    ),
-    (a) => localBroadcast(a, true, now),
-  );
-
-const withHostStatus = (app: App, text: string, stopPulse = false): App =>
-  withShell(app, { hostStatus: { text, pulse: stopPulse ? false : app.shell.hostStatus.pulse } });
-const withGuestStatus = (app: App, text: string, stopPulse = false): App =>
-  withShell(app, {
-    guestStatus: { text, pulse: stopPulse ? false : app.shell.guestStatus.pulse },
-  });
-
-/** `startHost(resumeCode)` up to the network: the session is the `startHost` effect. */
-const startHost = (app: App, resumeCode: string | null, ctx: Context): Step => {
-  const code = resumeCode ?? randomCode('backgammon', ctx.rng);
-  const attempt = app.shell.netAttempt + 1;
-  return then(
-    showScreen(
-      withHostStatus(
-        withShell(app, { role: 'host', code, netAttempt: attempt, startGameVisible: false }),
-        OPENING_MSG,
-      ),
-      'hostWaitScreen',
-    ),
-    (a) => step(a, { type: 'startHost', code, attempt, resume: resumeCode !== null }),
-  );
-};
-
-/** `startGuest(code)` up to the network: the session is the `startGuest` effect. */
-const startGuest = (app: App, code: string): Step => {
-  const attempt = app.shell.netAttempt + 1;
-  return then(
-    showScreen(
-      withGuestStatus(
-        withShell(app, { role: 'guest', code, netAttempt: attempt }),
-        connectingMsg(code),
-      ),
-      'guestWaitScreen',
-    ),
-    (a) => step(a, { type: 'startGuest', code, attempt }),
-  );
-};
-
-/** `game.players[1].name = name` on a rejoin. */
-const renameGuest = (game: State, name: string): State => ({
-  ...game,
-  players: [game.players[0], { ...game.players[1], name }],
-});
-
-/**
- * `onGuestGone()` after `oppConnected` was cleared. During a handoff nobody has joined yet, so a
- * channel that closed before its join leaves the wait screen saying to send the invite, no toast.
- */
-const guestGone = (app: App, now: number): Step => {
-  const s = app.shell;
-  if (s.handoff) return pure(withHostStatus(app, handoffMsg(s.code ?? '', s.oppName)));
-  if (s.game !== null && s.view !== null && !s.view.matchOver)
-    return then(rendered(app, s.view, now), (a) =>
-      step(a, toast(guestGoneMsg(a.shell.oppName, a.shell.code), GONE_TOAST_MS)),
-    );
-  if (s.game === null)
-    return pure(withShell(withHostStatus(app, OPPONENT_LEFT_MSG), { startGameVisible: false }));
-  return pure(app);
-};
-
-/** `onGuestMsg(conn, msg)` for a decoded frame. */
-const hostFrame = (app: App, frame: GuestFrame, ctx: Context): Step => {
-  switch (frame.t) {
-    case 'join': {
-      const name = guestNameFor(frame.name, app.shell.myName);
-      const connected = withShell(app, { oppConnected: true, oppName: name, handoff: false });
-      if (app.shell.game !== null) {
-        // Rejoin: keep the seat, refresh the name.
-        return broadcast(
-          withShell(connected, { game: renameGuest(app.shell.game, name) }),
-          ctx.now(),
-        );
-      }
-      return step(
-        withShell(withHostStatus(connected, joinedMsg(name)), { startGameVisible: true }),
-        {
-          type: 'send',
-          frame: lobbyFrame(app.shell.myName, {
-            matchLength: app.shell.matchLength,
-            variant: app.shell.variant,
-          }),
-        },
-      );
-    }
-    case 'action':
-      return app.shell.game === null ? pure(app) : hostDispatch(app, 1, frame.action, ctx);
-  }
-};
-
-/** `onHostMsg(msg)` for a decoded frame. */
-const guestFrame = (app: App, frame: HostFrame, now: number): Step => {
-  switch (frame.t) {
-    case 'welcome':
-    case 'lobby':
-      return pure(
-        withGuestStatus(
-          withShell(app, {
-            oppName: frame.hostName,
-            matchLength: frame.matchLength,
-            variant: frame.variant,
-          }),
-          hostRoomMsg(frame.hostName),
-        ),
-      );
-    case 'full':
-      return pure(withGuestStatus(app, ROOM_FULL_MSG));
-    case 'toast':
-      return refuse(app, frame.msg);
-    case 'state':
-      return rendered(
-        withShell(app, { view: frame.view, oppConnected: true }),
-        app.shell.view,
-        now,
-      );
-  }
-};
-
 /** A new match with the same players and options (`#nextGameBtn` "Rematch"); the guest waits for the host's. */
 const rematch = (app: App, game: State, ctx: Context): Step => {
   const fresh = createGame(
@@ -1105,41 +624,20 @@ const rematch = (app: App, game: State, ctx: Context): Step => {
   );
   switch (app.shell.role) {
     case 'local':
-      return localBroadcast(withShell(app, { game: fresh, revealed: null }), false, ctx.now());
+      return localBroadcast(
+        withShell(app, { game: fresh, revealed: null }),
+        false,
+        ctx,
+        BACKGAMMON,
+      );
     case 'host':
-      return broadcast(withShell(app, { game: fresh }), ctx.now());
+      return broadcast(withShell(app, { game: fresh }), ctx, BACKGAMMON);
     case 'guest':
     case null:
       return pure(app);
   }
 };
-
 // ---- home, resume, leave ---------------------------------------------------------------------
-
-/** The resume box `initHome` shows, or null (a finished match is not offered). */
-export const resumeFor = (save: Save | null): Resume | null => {
-  if (save === null) return null;
-  switch (save.role) {
-    case 'local':
-      return matchOver(save.game.match) ? null : { kind: 'local', game: save.game };
-    case 'host':
-      return save.game !== null && !matchOver(save.game.match)
-        ? {
-            kind: 'host',
-            code: save.code,
-            myName: save.myName,
-            matchLength: save.matchLength,
-            variant: save.variant,
-            game: save.game,
-            oppName: save.oppName,
-            handoff: save.handoff === true,
-          }
-        : null;
-    case 'guest':
-      return { kind: 'guest', code: save.code, myName: save.myName };
-  }
-};
-
 /** `#resumeBtn`'s label for a resume offer (design §4 "Resume labels"). */
 export const resumeLabel = (resume: Resume): string => {
   switch (resume.kind) {
@@ -1155,128 +653,6 @@ export const resumeLabel = (resume: Resume): string => {
 /** `#handoffBtn`'s tooltip, and a handed-off room's resume offer: seat 0 keeps this device and hosts; seat 1 joins through the invite. */
 export const handoffLabel = (game: State): string =>
   `Continue online: ${game.players[0].name} hosts, ${game.players[1].name} joins by invite`;
-
-/** `setHomeTab(tab, opts)`. */
-const setHomeTab = (app: App, tab: string, persist: boolean): Step => {
-  const known = HOME_TABS.find((t) => t === tab) ?? DEFAULT_HOME_TAB;
-  return step(
-    withShell(app, { homeTab: known }),
-    ...(persist ? [{ type: 'writeHomeTab', tab: known } as const] : []),
-  );
-};
-
-/** `initHome()` over a storage snapshot: the saved names go into the name inputs, the options into the shell. */
-const initHome = (app: App, home: HomeSnapshot): Step =>
-  then(showScreen(app, 'homeScreen'), (a) =>
-    then(
-      step(
-        {
-          shell: {
-            ...a.shell,
-            savedName: home.name,
-            p1Name: home.name ?? '',
-            p2Name: home.p2Name ?? '',
-            nameTouched: home.name !== null ? true : a.shell.nameTouched,
-            homeTab: home.homeTab,
-            playMode: home.playMode,
-            variant: home.variant,
-            matchLength: home.matchLength,
-            soundFont: home.soundFont,
-            resume: resumeFor(home.save),
-          },
-          table: { ...a.table, curtainMode: home.curtainMode },
-        },
-        ...(home.name === null ? [] : [{ type: 'fillName', name: home.name } as const]),
-        ...(home.p2Name === null ? [] : [{ type: 'fillP2Name', name: home.p2Name } as const]),
-      ),
-      (b) => setHomeTab(b, home.homeTab, false),
-    ),
-  );
-
-/** `#resumeBtn` for each offer. */
-const resume = (app: App, offer: Resume, ctx: Context): Step => {
-  switch (offer.kind) {
-    case 'local':
-      return startLocal(app, offer.game, ctx.now());
-    case 'host':
-      return startHost(
-        withShell(app, {
-          myName: offer.myName,
-          matchLength: offer.matchLength,
-          variant: offer.variant,
-          game: offer.game,
-          oppName: offer.oppName,
-          view: viewFor(offer.game, 0),
-          // A handoff nobody joined resumes as one, under the code the invite already carries.
-          handoff: offer.handoff,
-        }),
-        offer.code,
-        ctx,
-      );
-    case 'guest':
-      return startGuest(withShell(app, { myName: offer.myName }), offer.code);
-  }
-};
-
-/**
- * `#handoffBtn` / `#curtainHandoffBtn`: the pass-and-play game goes on as a hosted room with a
- * fresh code. Seat 0 keeps this device as the host; seat 1 joins from its own through the
- * invite, and the host's join handler takes it as a rejoin. The pass-and-play marks (the curtain,
- * the revealed seat, the taps) are cleared as a leave clears them.
- */
-const handoff = (app: App, game: State, ctx: Context): Step =>
-  startHost(
-    {
-      shell: {
-        ...app.shell,
-        myName: game.players[0].name,
-        matchLength: game.options.matchLength,
-        variant: game.variant,
-        game,
-        oppName: game.players[1].name,
-        oppConnected: false,
-        view: viewFor(game, 0),
-        revealed: null,
-        handoff: true,
-      },
-      table: tableCleared(app.table),
-    },
-    null,
-    ctx,
-  );
-
-/** `leaveGame()` after the confirm and the network close: the reset, then home. */
-const leaveFinish = (app: App): Step =>
-  step(
-    {
-      shell: {
-        ...app.shell,
-        netAttempt: app.shell.netAttempt + 1,
-        role: null,
-        game: null,
-        view: null,
-        oppConnected: false,
-        code: null,
-        revealed: null,
-        handoff: false,
-        cues: INITIAL_CUES,
-      },
-      table: tableCleared(app.table),
-    },
-    { type: 'clearSave' },
-    { type: 'initHome' },
-  );
-
-/** `#cancelHostBtn` / `#cancelGuestBtn` after the Peer is destroyed. A handed-off game nobody joined goes back to pass-and-play. */
-const cancelFinish = (app: App): Step =>
-  step(
-    withShell(app, { role: null, netAttempt: app.shell.netAttempt + 1, handoff: false }),
-    app.shell.handoff && app.shell.game !== null
-      ? { type: 'saveLocal', game: app.shell.game }
-      : { type: 'clearSave' },
-    { type: 'initHome' },
-  );
-
 // ---- the table: taps, the tray, the dice, a drag (design §4.2-§4.4) -----------------------
 
 /** My view while I may act and the board is live; null under the curtain, while the dice tumble, or on the other seat's turn. */
@@ -1413,71 +789,19 @@ const sandboxLoad = (app: App, raw: unknown, ctx: Context): Step => {
       ...tableCleared(app.table),
     }),
     true,
-    ctx.now(),
+    ctx,
+    BACKGAMMON,
   );
 };
-
-// ---- the reducer -------------------------------------------------------------------------------
-
-/** Two players from the pass-and-play inputs: defaults, and " 2" on a clash (gin's rule). */
-const localPlayers = (p1raw: string, p2raw: string): Pair<Player> => {
-  const p1 = nameOr(p1raw, 'Player 1');
-  const p2 = nameOr(p2raw, 'Player 2');
-  return [
-    { id: 'p1', name: p1 },
-    { id: 'p2', name: p2.toLowerCase() === p1.toLowerCase() ? `${p2} 2` : p2 },
-  ];
-};
-
-const shellIntent = (app: App, intent: ShellIntent, ctx: Context): Step => {
-  const s = app.shell;
+// ---- the table's reducer ---------------------------------------------------------------------
+const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
+  const v = liveView(app);
+  const t = app.table;
   switch (intent.type) {
-    case 'home/init':
-      return initHome(app, intent.home);
-    // A name typed into any of its inputs is remembered trimmed and shown, as typed, in the
-    // others; the fill writes only inputs whose value differs, so the one being typed in is left alone.
-    case 'name/typed':
-      return step(
-        withShell(app, { nameTouched: true, p1Name: intent.value }),
-        { type: 'rememberName', name: intent.value.trim() },
-        { type: 'fillName', name: intent.value },
-      );
-    case 'p1name/typed':
-      return step(
-        withShell(app, { p1Name: intent.value }),
-        { type: 'rememberName', name: intent.value.trim() },
-        { type: 'fillName', name: intent.value },
-      );
-    case 'p2name/typed':
-      return step(
-        withShell(app, { p2Name: intent.value }),
-        { type: 'rememberP2Name', name: intent.value.trim() },
-        { type: 'fillP2Name', name: intent.value },
-      );
-    case 'tab/set':
-      return setHomeTab(app, intent.tab, intent.persist !== false);
-    case 'rules/show': {
-      // On the home screen the Rules tab is the rules; anywhere else (the table, a waiting room,
-      // the end screen) the overlay is, and its own copy of the list is the one to scroll.
-      const home = app.shell.screen === 'homeScreen';
-      const shown = home
-        ? setHomeTab(app, 'rules', true)
-        : pure(withShell(app, { rulesOpen: true }));
-      return then(shown, (a) =>
-        step(a, {
-          type: 'revealRule',
-          slot: home ? 'rulesList' : 'rulesOverlayList',
-          rule: intent.rule,
-        }),
-      );
-    }
-    case 'mode/set': {
-      const mode: PlayMode = intent.mode === 'local' ? 'local' : 'online';
-      return step(withShell(app, { playMode: mode }), { type: 'writePlayMode', mode });
-    }
+    // ---- the two option selects: backgammon's own, into the shell's `opts` ----
     case 'variant/set':
       return isShippedVariant(intent.variant)
-        ? step(withShell(app, { variant: intent.variant }), {
+        ? step(withShell(app, { opts: { ...app.shell.opts, variant: intent.variant } }), {
             type: 'writeVariant',
             variant: intent.variant,
           })
@@ -1486,163 +810,11 @@ const shellIntent = (app: App, intent: ShellIntent, ctx: Context): Step => {
       const length = parseMatchLength(intent.length, 0);
       return length === 0
         ? pure(app)
-        : step(withShell(app, { matchLength: length }), { type: 'writeMatchLength', length });
+        : step(withShell(app, { opts: { ...app.shell.opts, matchLength: length } }), {
+            type: 'writeMatchLength',
+            length,
+          });
     }
-    case 'host/click':
-      return startHost(
-        withShell(app, {
-          myName: nameOr(intent.name, DEFAULT_NAME),
-          matchLength: parseMatchLength(intent.matchLength, s.matchLength),
-          variant: parseVariant(intent.variant, s.variant),
-          game: null,
-          view: null,
-          oppName: null,
-          oppConnected: false,
-        }),
-        null,
-        ctx,
-      );
-    case 'join/click': {
-      const code = validateCode('backgammon', intent.code);
-      if (!code.ok) return step(app, toast(code.error));
-      const typed = intent.name.trim();
-      const myName = (
-        typed !== '' && (s.nameTouched || typed !== DEFAULT_NAME) ? typed : DEFAULT_GUEST_NAME
-      ).slice(0, NAME_MAX);
-      return startGuest(withShell(app, { myName }), code.value);
-    }
-    case 'local/click': {
-      const matchLength = parseMatchLength(intent.matchLength, s.matchLength);
-      const variant = parseVariant(intent.variant, s.variant);
-      const game = createGame(
-        localPlayers(intent.p1, intent.p2),
-        { matchLength, rotation: [variant] },
-        ctx.rng,
-        ctx.now,
-      );
-      return startLocal(withShell(app, { matchLength, variant }), game, ctx.now());
-    }
-    case 'resume/click':
-      return s.resume === null ? pure(app) : resume(app, s.resume, ctx);
-    case 'handoff/click':
-      // The home screen's offer, or the game in play on the pass-and-play curtain.
-      if (s.role === 'local' && s.game !== null) return handoff(app, s.game, ctx);
-      return s.resume?.kind === 'local' ? handoff(app, s.resume.game, ctx) : pure(app);
-    case 'cancel':
-      return step(app, { type: 'closeNet' }, { type: 'then', intent: { type: 'cancel/finish' } });
-    case 'cancel/finish':
-      return cancelFinish(app);
-    case 'screen/show':
-      return showScreen(app, intent.screen);
-    case 'submenu/press':
-      return step(withShell(app, { longPressed: false }), {
-        type: 'startTimer',
-        id: 'longPress',
-        ms: LONG_PRESS_MS,
-        then: { type: 'submenu/longPress' },
-      });
-    case 'submenu/release':
-      return step(app, { type: 'cancelTimer', id: 'longPress' });
-    case 'submenu/longPress':
-      return step(withShell(app, { longPressed: true, submenuOpen: true }), tap);
-    case 'tab/playClick':
-      // The long press already opened the submenu; the click that follows must not switch tabs.
-      return s.longPressed
-        ? pure(withShell(app, { longPressed: false }))
-        : setHomeTab(withShell(app, { submenuOpen: false }), 'play', true);
-    case 'submenu/pick':
-      return then(reduce(app, { type: 'mode/set', mode: intent.mode }, ctx), (a) =>
-        setHomeTab(withShell(a, { submenuOpen: false }), 'play', true),
-      );
-    case 'submenu/dismiss':
-      return pure(withShell(app, { submenuOpen: false }));
-    case 'code/typed': {
-      // A keyboard suggestion that swapped earlier letters arrives as a replacement: keep the last good code.
-      const value =
-        intent.inputType === 'insertReplacementText'
-          ? s.codeDraft
-          : sanitiseCode('backgammon', intent.value);
-      return step(withShell(app, { codeDraft: value }), { type: 'setCode', value });
-    }
-    case 'join/link': {
-      // The invite link: the code is in the form; the mode is shown, not stored.
-      const code = sanitiseCode('backgammon', intent.code);
-      return then(
-        setHomeTab(withShell(app, { playMode: 'online', codeDraft: code }), 'play', false),
-        (a) => step(a, { type: 'setCode', value: code }),
-      );
-    }
-    case 'sound/toggle':
-      return step(app, { type: 'toggleSound' });
-    case 'soundFont/set':
-      return step(withShell(app, { soundFont: intent.font }), {
-        type: 'writeSoundFont',
-        font: intent.font,
-      });
-    case 'share/click':
-      return s.code === null ? pure(app) : step(app, { type: 'share', code: s.code });
-    // ---- net: host ----
-    case 'host/start':
-      return startHost(app, intent.code, ctx);
-    case 'host/status':
-      return pure(withHostStatus(app, intent.text, intent.stopPulse));
-    case 'host/frame':
-      return hostFrame(app, intent.frame, ctx);
-    case 'host/guestGone': {
-      const gone = withShell(app, { oppConnected: false });
-      return intent.iceFailed === null
-        ? guestGone(gone, ctx.now())
-        : pure(withHostStatus(gone, intent.iceFailed));
-    }
-    case 'host/deal': {
-      if (!s.oppConnected) return step(app, toast(WAITING_FOR_GUEST_MSG));
-      const game = createGame(
-        [
-          { id: 'host', name: s.myName },
-          // A connected opponent has a name; the fallback only satisfies the type.
-          { id: 'guest', name: s.oppName ?? DEFAULT_GUEST_NAME },
-        ],
-        { matchLength: s.matchLength, rotation: [s.variant] },
-        ctx.rng,
-        ctx.now,
-      );
-      return broadcast(withShell(app, { game }), ctx.now());
-    }
-    // ---- net: guest ----
-    case 'guest/start':
-      return startGuest(app, intent.code);
-    case 'guest/status':
-      return pure(withGuestStatus(app, intent.text, intent.stopPulse));
-    case 'guest/connected':
-      return pure(withShell(app, { oppConnected: true }));
-    case 'guest/frame':
-      return guestFrame(app, intent.frame, ctx.now());
-    case 'guest/lost': {
-      const lost = { shell: { ...s, oppConnected: false }, table: tableCleared(app.table) };
-      const v = lost.shell.view;
-      if (v === null) return showScreen(withGuestStatus(lost, DISCONNECTED_MSG), 'guestWaitScreen');
-      // Over: the result stays up; the session's rejoin finds a destroyed Peer and the save would
-      // only offer a dead room. Mid-match the session reconnects by itself.
-      if (v.matchOver)
-        return then(rendered(lost, v, ctx.now()), (a) =>
-          step(
-            a,
-            { type: 'closeNet' },
-            { type: 'clearSave' },
-            toast(hostLeftMsg(v.opp.name), GONE_TOAST_MS),
-          ),
-        );
-      return then(rendered(lost, v, ctx.now()), (a) =>
-        step(a, toast(LOST_HOST_MSG, GONE_TOAST_MS)),
-      );
-    }
-  }
-};
-
-const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
-  const v = liveView(app);
-  const t = app.table;
-  switch (intent.type) {
     case 'act':
       return act(app, [intent.action], ctx);
     case 'point/tap':
@@ -1719,23 +891,10 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
         ...(dropped !== null && app.shell.game !== null ? handedHits(app.shell.game, dropped) : []),
       );
     }
-    case 'curtain/reveal': {
-      const game = app.shell.game;
-      if (game === null) return pure(app);
-      const seat = actorOf(game) ?? game.turn;
-      return then(
-        step(
-          withTable(withShell(app, { revealed: seat }), { curtain: null }),
-          tap,
-          ...handedHits(game, seat),
-        ),
-        (a) => localBroadcast(a, true, ctx.now()),
-      );
-    }
     case 'noMove/elapsed': {
       const seen = withTable(app, { noMoveUntil: null });
       // Pass-and-play: the curtain now rises for the new mover; online the paint just re-reads.
-      return app.shell.role === 'local' ? localBroadcast(seen, false, ctx.now()) : pure(seen);
+      return app.shell.role === 'local' ? localBroadcast(seen, false, ctx, BACKGAMMON) : pure(seen);
     }
     case 'shake/elapsed':
       return pure(withTable(app, { shake: null }));
@@ -1758,168 +917,136 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
     }
     case 'sandbox/load':
       return sandboxLoad(app, intent.state, ctx);
-    case 'leave/request':
-      return step(app, {
-        type: 'confirm',
-        message: app.shell.role === 'local' ? LEAVE_LOCAL_MSG : LEAVE_ONLINE_MSG,
-        then: { type: 'leave/confirmed' },
-      });
-    case 'leave/confirmed':
-      // The network closes before the reset, so the session's own close still toasts; then `leave/finish` resets.
-      return step(
-        app,
-        { type: 'wakeLock', hold: false },
-        { type: 'closeNet' },
-        { type: 'then', intent: { type: 'leave/finish' } },
-      );
-    case 'leave/finish':
-      return leaveFinish(app);
-    case 'visible':
-      return app.shell.role === null ? pure(app) : step(app, { type: 'wakeLock', hold: true });
-    case 'render':
-      return rendered(app, app.shell.view, ctx.now());
-    case 'persist':
-      return step(app, { type: 'persist' });
   }
 };
 
-export const reduce = (app: App, intent: Intent, ctx: Context): Step =>
-  isShellIntent(intent) ? shellIntent(app, intent, ctx) : tableIntent(app, intent, ctx);
+// ---- the shell's hooks into the table, and the config (docs/design/shared-shell.md §4.3) ---------
+
+/**
+ * What the table drops where a shared flow resets it, site by site as before the move (§4.3.2): a
+ * pass-and-play start, the handoff, a leave and the host lost clear everything but the curtain
+ * setting (`tableCleared`); a new view (`broadcast`, `localBroadcast`) drops the taps and the tray;
+ * a deal, an applied action and a guest's `state` frame touch nothing (`settled` runs in
+ * `rendered`).
+ */
+const reset = (table: Table, at: TableReset): Table => {
+  switch (at) {
+    case 'startLocal':
+    case 'handoff':
+    case 'leave':
+    case 'lost':
+      return tableCleared(table);
+    case 'view':
+      return { ...table, selected: null, picked: null, pending: null };
+    case 'deal':
+    case 'applied':
+    case 'frame':
+      return table;
+  }
+};
+
+/**
+ * `localBroadcast`'s seat (design §4.9): the actor's view (the mover, or the seat answering a
+ * double) while the game is on, the revealed seat's (or seat 0's) once it is over; the curtain
+ * comes up when the phone must change hands. R14: a forfeited roll keeps the roller's view and the
+ * curtain down until `noMove/elapsed`. With the curtain off the phone changes hands unannounced:
+ * the seat now looking is told of the hits against them here; with it on, `curtain/reveal` tells
+ * them once they have it.
+ */
+const viewer: ShellConfig<Backgammon>['local']['viewer'] = (app, game) => {
+  const prev = app.shell.view;
+  const actor = actorOf(game);
+  const holding = freshNoMove(prev, viewFor(game, game.turn)) && app.table.noMoveUntil === null;
+  const seat: Seat = holding ? otherSeat(game.turn) : (actor ?? app.shell.revealed ?? 0);
+  const curtain =
+    actor !== null && !holding && app.table.curtainMode === 'always' && app.shell.revealed !== seat
+      ? seat
+      : null;
+  const effects =
+    curtain === null && prev !== null && prev.me.idx !== seat ? handedHits(game, seat) : [];
+  return { seat, curtain, effects };
+};
+
+/** `curtain/reveal`: whoever must act lifts the curtain and is told of the hits against them. */
+const revealer: ShellConfig<Backgammon>['local']['revealer'] = (game) => {
+  const seat = actorOf(game) ?? game.turn;
+  return { seat, effects: handedHits(game, seat) };
+};
+
+/** Backgammon's shell config: shellConfig.ts's half completed with the table hooks and the home snapshot's own part (the options into the shell, the curtain mode onto the table). */
+export const BACKGAMMON: ShellConfig<Backgammon> = {
+  ...BACKGAMMON_SHELL,
+  table: { initial: initialTable, reset, rendered, refuse },
+  local: { viewer, revealer },
+  home: {
+    ...BACKGAMMON_SHELL.home,
+    apply: (app, home) => ({
+      shell: { ...app.shell, opts: { matchLength: home.matchLength, variant: home.variant } },
+      table: { ...app.table, curtainMode: home.curtainMode },
+    }),
+    resume: (home) => resumeFor(home.save),
+    resumeExtra: pure,
+  },
+};
+
+export const initialShell: Shell = shellInitial(BACKGAMMON);
+
+export const initialApp: App = { shell: initialShell, table: initialTable };
+
+/**
+ * `guest/lost` once the match is over: the result stays up; the session's rejoin finds a
+ * destroyed Peer and the save would only offer a dead room, so both go. Backgammon's alone (the
+ * shell's `guest/lost` knows the table mid-match and the wait screen), taken in `reduce` first.
+ */
+const hostLeft = (app: App, v: View, ctx: Context): Step => {
+  const lost = { shell: { ...app.shell, oppConnected: false }, table: tableCleared(app.table) };
+  return then(rendered(lost, v, ctx), (a) =>
+    step(
+      a,
+      { type: 'closeNet' },
+      { type: 'clearSave' },
+      toast(hostLeftMsg(v.opp.name), GONE_TOAST_MS),
+    ),
+  );
+};
+
+export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
+  const v = app.shell.view;
+  if (intent.type === 'guest/lost' && v?.matchOver === true) return hostLeft(app, v, ctx);
+  return isShellIntent(intent)
+    ? reduceShell(app, intent, ctx, BACKGAMMON)
+    : tableIntent(app, intent, ctx);
+};
 
 // ---- storage: persist and resume -------------------------------------------------------------
 
+/** The resume box `initHome` shows, or null (a finished match is not offered). */
+export const resumeFor = (save: Save | null): Resume | null => shellResumeFor(save, BACKGAMMON);
+
 /** `persist()`: the save for the current role, or null when there is nothing to save. */
-export const saveFor = (app: App): Save | null => {
-  const s = app.shell;
-  switch (s.role) {
-    case 'local':
-      return s.game === null ? null : { role: 'local', game: s.game };
-    case 'host':
-      return {
-        role: 'host',
-        code: s.code ?? '',
-        myName: s.myName,
-        matchLength: s.matchLength,
-        variant: s.variant,
-        game: s.game,
-        oppName: s.oppName,
-        ...(s.handoff ? { handoff: true } : {}),
-      };
-    case 'guest':
-      return { role: 'guest', code: s.code ?? '', myName: s.myName };
-    case null:
-      return null;
-  }
-};
+export const saveFor = (app: App): Save | null => shellSaveFor(app.shell);
 
 /** `initHome`'s reads: the names, the tab, mode and options (defaults when unreadable), the save. */
-export const readHome = (store: Store): HomeSnapshot => {
-  const name = readName(store);
-  const p2Name = readP2Name(store);
-  const tab = readHomeTab(store);
-  const mode = readPlayMode(store);
-  const variant = readVariant(store);
-  const length = readMatchLength(store);
-  const curtain = readCurtainMode(store);
-  const font = readSoundFont(store);
-  const save = readSave(store);
-  return {
-    name: name.ok ? name.value : null,
-    p2Name: p2Name.ok ? p2Name.value : null,
-    homeTab: tab.ok ? tab.value : DEFAULT_HOME_TAB,
-    playMode: mode.ok ? mode.value : DEFAULT_PLAY_MODE,
-    variant: variant.ok ? variant.value : DEFAULT_VARIANT,
-    matchLength: length.ok ? length.value : DEFAULT_MATCH_LENGTH,
-    curtainMode: curtain.ok ? curtain.value : DEFAULT_CURTAIN_MODE,
-    soundFont: font.ok ? font.value : DEFAULT_SOUND_FONT,
-    save: save.ok ? save.value : null,
-  };
-};
+export const readHome = (store: Store): HomeSnapshot => shellReadHome(store, BACKGAMMON);
 
 // ---- what the sessions read back ---------------------------------------------------------------
 
-export const hostContextOf = (app: App): HostContext => ({
-  attempt: app.shell.netAttempt,
-  role: app.shell.role,
-  code: app.shell.code,
-  myName: app.shell.myName,
-  matchLength: app.shell.matchLength,
-  variant: app.shell.variant,
-  hasGame: app.shell.game !== null,
-  handoff: app.shell.handoff,
-  oppName: app.shell.oppName,
-  oppConnected: app.shell.oppConnected,
-});
+export const hostContextOf = (app: App): HostContext => shellHostContextOf(app.shell);
 
-export const guestContextOf = (app: App): GuestContext => ({
-  attempt: app.shell.netAttempt,
-  role: app.shell.role,
-  code: app.shell.code,
-  myName: app.shell.myName,
-  oppConnected: app.shell.oppConnected,
-});
+export const guestContextOf = (app: App): GuestContext => shellGuestContextOf(app.shell);
 
 // ---- running the effects -----------------------------------------------------------------------
 
-/** The adapters an effect reaches; main.ts constructs the real ones, tests record. */
-export type EffectDeps = Readonly<{
-  store: Store;
-  toast: (message: string, ms: number | null) => void;
-  /** A cue in the App's font: the reducer's state is the source of truth for both. */
-  fx: (cue: Cue | 'tap', font: SoundFontName) => void;
-  wakeLock: (hold: boolean) => void;
-  net: Readonly<{
-    startHost: (code: string, attempt: number, resume: boolean) => void;
-    startGuest: (code: string, attempt: number) => void;
-    send: (frame: HostFrame | GuestFrame) => void;
-    close: () => void;
-  }>;
-  confirm: (message: string) => boolean;
-  scrollTop: () => void;
-  timers: Readonly<{
-    start: (id: TimerId, ms: number, then: Intent) => void;
-    cancel: (id: TimerId) => void;
-  }>;
-  toggleSound: () => void;
-  /** The invite for the room `code`: its link, through the share sheet or the clipboard. */
-  share: (code: string) => void;
-  /** `revealRule(document, slot, rule)` (web/shared/edge/glossary.ts): scroll to the rule and flash it. */
-  revealRule: (slot: RulesSlot, rule: string) => void;
-  /** The three input writes the paint does not own (they would fight the player's typing). */
-  page: Readonly<{
-    fillName: (name: string) => void;
-    fillP2Name: (name: string) => void;
-    setCode: (value: string) => void;
-  }>;
-  dispatch: (intent: Intent) => void;
-}>;
+/** The adapters an effect reaches: the shell's (web/shared/ui/shellEffects.ts); backgammon adds none. main.ts constructs the real ones, tests record. */
+export type EffectDeps = ShellEffectDeps<Backgammon>;
 
-/** One effect against the adapters; `app` is the state after the step that produced it. */
+/** One effect against the adapters; `app` is the state after the step that produced it. Backgammon's three first, then the shell's runner. */
 export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
+  if (isShellEffect(effect)) {
+    runShellEffect(app.shell, effect, deps, BACKGAMMON);
+    return;
+  }
   switch (effect.type) {
-    case 'persist': {
-      const save = saveFor(app);
-      if (save !== null) writeSave(deps.store, save);
-      return;
-    }
-    case 'clearSave':
-      clearSave(deps.store);
-      return;
-    case 'saveLocal':
-      writeSave(deps.store, { role: 'local', game: effect.game });
-      return;
-    case 'rememberName':
-      writeName(deps.store, effect.name);
-      return;
-    case 'rememberP2Name':
-      writeP2Name(deps.store, effect.name);
-      return;
-    case 'writeHomeTab':
-      writeHomeTab(deps.store, effect.tab);
-      return;
-    case 'writePlayMode':
-      writePlayMode(deps.store, effect.mode);
-      return;
     case 'writeVariant':
       writeVariant(deps.store, effect.variant);
       return;
@@ -1928,66 +1055,6 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'writeCurtainMode':
       writeCurtainMode(deps.store, effect.mode);
-      return;
-    case 'writeSoundFont':
-      writeSoundFont(deps.store, effect.font);
-      return;
-    case 'toast':
-      deps.toast(effect.message, effect.ms);
-      return;
-    case 'send':
-      deps.net.send(effect.frame);
-      return;
-    case 'fx':
-      deps.fx(effect.cue, app.shell.soundFont);
-      return;
-    case 'wakeLock':
-      deps.wakeLock(effect.hold);
-      return;
-    case 'startHost':
-      deps.net.startHost(effect.code, effect.attempt, effect.resume);
-      return;
-    case 'startGuest':
-      deps.net.startGuest(effect.code, effect.attempt);
-      return;
-    case 'closeNet':
-      deps.net.close();
-      return;
-    case 'confirm':
-      if (deps.confirm(effect.message)) deps.dispatch(effect.then);
-      return;
-    case 'then':
-      deps.dispatch(effect.intent);
-      return;
-    case 'initHome':
-      deps.dispatch({ type: 'home/init', home: readHome(deps.store) });
-      return;
-    case 'scrollTop':
-      deps.scrollTop();
-      return;
-    case 'startTimer':
-      deps.timers.start(effect.id, effect.ms, effect.then);
-      return;
-    case 'cancelTimer':
-      deps.timers.cancel(effect.id);
-      return;
-    case 'toggleSound':
-      deps.toggleSound();
-      return;
-    case 'share':
-      deps.share(effect.code);
-      return;
-    case 'revealRule':
-      deps.revealRule(effect.slot, effect.rule);
-      return;
-    case 'fillName':
-      deps.page.fillName(effect.name);
-      return;
-    case 'fillP2Name':
-      deps.page.fillP2Name(effect.name);
-      return;
-    case 'setCode':
-      deps.page.setCode(effect.value);
       return;
   }
 };

@@ -9,8 +9,8 @@
 // `backgammon_variant`, `backgammon_matchLength`, `backgammon_curtain`), as gin's are. The readers
 // and writers both shells share (the name rule, the bare-string preferences, the save's three
 // roles) are built by web/shared/edge/prefs.ts (docs/design/shared-shell.md §5 A3) over the keys,
-// the engine decoder and the host save's own fields spelled here; the keys and the literals did
-// not move.
+// the engine decoder and the host save's own fields spelled here, grouped as the `SHELL_STORE` the
+// shell config carries (§5 C2 `shellStore`); the keys and the literals did not move.
 import type { Store, StorageError } from '../../../shared/edge/storage.ts';
 import {
   NAME_MAX,
@@ -20,10 +20,8 @@ import {
   decodePlayMode,
   decodeSoundFont,
   decodeSoundState,
-  namePref,
   readTextWith,
-  shellSave,
-  soundPref,
+  shellStore,
   textPref,
   type GuestSave as ShellGuestSave,
   type HostSave as ShellHostSave,
@@ -138,40 +136,32 @@ export const decodeMatchLength: Decoder<number> = map(
 );
 export const decodeCurtainMode: Decoder<CurtainMode> = literal(...CURTAIN_MODES);
 
-// ---- the game save ---------------------------------------------------------------------------
+// ---- the shell's store: the game save and the bare-string preferences every shell keeps -----
 
-export const { decodeSave, readSave, writeSave, clearSave } = shellSave<State, HostExtra>({
-  key: STORAGE_KEYS.save,
+export const SHELL_STORE = shellStore<State, HostExtra, HomeTab>(STORAGE_KEYS, {
   game: 'backgammon',
   decodeGame: decodeState,
   hostExtra: {
     decode: hostExtra,
     literal: (save) => ({ matchLength: save.matchLength, variant: save.variant }),
   },
-});
-
-// ---- the bare-string preferences -----------------------------------------------------------
-
-export const { read: readName, write: writeName } = namePref(STORAGE_KEYS.name);
-/** The pass-and-play second name, under the same rule. */
-export const { read: readP2Name, write: writeP2Name } = namePref(STORAGE_KEYS.p2Name);
-export const { read: readHomeTab, write: writeHomeTab } = textPref(
-  STORAGE_KEYS.homeTab,
   decodeHomeTab,
-);
-export const { read: readPlayMode, write: writePlayMode } = textPref(
-  STORAGE_KEYS.playMode,
-  decodePlayMode,
-);
+});
+export const { decodeSave, readSave, writeSave, clearSave } = SHELL_STORE.save;
+export const { read: readName, write: writeName } = SHELL_STORE.name;
+/** The pass-and-play second name, under the same rule. */
+export const { read: readP2Name, write: writeP2Name } = SHELL_STORE.p2Name;
+export const { read: readHomeTab, write: writeHomeTab } = SHELL_STORE.homeTab;
+export const { read: readPlayMode, write: writePlayMode } = SHELL_STORE.playMode;
 export const {
   read: readSoundState,
   write: writeSoundState,
   enabled: soundEnabled,
-} = soundPref(STORAGE_KEYS.sound);
-export const { read: readSoundFont, write: writeSoundFont } = textPref(
-  STORAGE_KEYS.soundFont,
-  decodeSoundFont,
-);
+} = SHELL_STORE.sound;
+export const { read: readSoundFont, write: writeSoundFont } = SHELL_STORE.soundFont;
+
+// ---- this page's own preferences -----------------------------------------------------------
+
 export const { read: readVariant, write: writeVariant } = textPref(
   STORAGE_KEYS.variant,
   decodeVariant,

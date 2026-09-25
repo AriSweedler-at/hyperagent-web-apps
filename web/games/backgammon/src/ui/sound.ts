@@ -27,3 +27,11 @@ export const CUES: Readonly<Record<Cue | 'tap', CueSpec>> = {
   bearOff: { cue: 'score', buzz: 25 },
   double: { cue: 'challenge', buzz: [50, 50, 90] },
 };
+
+/**
+ * The cue machine's memory (ui/state.ts `rendered`): the view the last cues were played for, so a
+ * re-sent frame plays none. Here rather than in state.ts because the shell config (shellConfig.ts)
+ * starts the shell with it, and state.ts imports that config.
+ */
+export type CueState = Readonly<{ key: string | null }>;
+export const INITIAL_CUES: CueState = { key: null };
