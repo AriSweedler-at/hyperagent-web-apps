@@ -270,9 +270,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // gained the press-and-release case; the row stands).
       // Re-measured when C2 moved the shell reducer out of ui/state.ts into web/shared/ui/shell.ts
       // (docs/design/shared-shell.md §4.3.2) and the game's half of its config into
-      // src/shellConfig.ts, a new row below: ui 98.07/97.10/97.04/94.14 before, 97.73/96.76/96.75/93.81
-      // after (the same lines uncovered in a folder ~900 fully covered lines smaller; the row
-      // stands); shellConfig.ts measures 100/100/100/100 through state.test.ts and the parity suites.
+      // src/shellConfig.ts, a new row below: ui 98.07/97.10/97.04/94.14 before, 97.71/96.73/96.74/93.78
+      // after (23 lines uncovered, 1246 → 1006 lines: the rows moved out were fully covered, so the
+      // ratios dip while the row stands); shellConfig.ts measures 100/100/100/100 through
+      // state.test.ts and the parity suites. Measured on this branch rebased onto main at da40200.
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -443,9 +444,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // after (the same 6 lines uncovered, 1471 → 1467 lines; the wrapper measures 100 on every metric).
       // Re-measured when C2 moved the shell reducer out of ui/state.ts into web/shared/ui/shell.ts
       // (docs/design/shared-shell.md §4.3.2) and the game's half of its config into
-      // src/shellConfig.ts, a new row below: ui 99.59/100/98.68/92.52 before, 99.51/100/98.65/92.09
-      // after (the same lines uncovered in a smaller folder; the row stands); shellConfig.ts
-      // measures 100/100/100/100 through state.test.ts.
+      // src/shellConfig.ts, a new row below: ui 99.59/100/98.68/92.52 before, 99.51/100/98.65/92.08
+      // after (the same 6 lines uncovered, 1467 → 1218 lines; the row stands); shellConfig.ts
+      // measures 100/100/100/100 through state.test.ts. Measured on this branch rebased onto main
+      // at da40200.
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
