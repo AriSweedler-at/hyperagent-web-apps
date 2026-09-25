@@ -522,7 +522,11 @@ export const SHELL_GAMES = GAMES.filter((g) => REGISTRY[g].shell !== undefined);
 
 Consumers: `e2e/fixtures/shell.ts`, `two-players.ts` (`shellDriver('gin-rummy')` one line each; fidice keeps its row), class-contract floors, dist-parity page shape, `computed-styles.ts` `driveShell`, the `shell-*.spec.ts` files: 8 of the 22 per-game lists go. Must stay outside: the `Game` union and `ROOM_CODE` (lib may not import tools), `eslint.config.js` (JS), `tsconfig` (JSON), vitest thresholds (measured ratchets by design), `web/index.html` cards (verified by `check-dist-paths`), the Worker's `ALIASES` (deployed alone, pinned equal by its test).
 
-As landed (D1): the registry row is data only, so `tools/games.test.ts` pins it with `toEqual`: `ShellSpec` = `heading`, `shareTitle`, `tabs`, `modes`, `hostAnswered`, `connDot`, `localFields`, `curtainButtons`, held in `SHELL` (keyed by `ShellGame`, listed by `SHELL_GAMES`) and spread into `REGISTRY[g].shell`. The Page-taking parts sketched above (`curtainSub`, and `afterConnect`, which became `start`/`expectOpening`/`agree`/`snapshot`, plus the save shapes and the curtain offer) are `SHELL_DRIVERS[game]` in `e2e/fixtures/online-games.ts` (`shell-games.ts` until H1), its own file because `gin.ts`/`backgammon.ts` import `shell.ts` (import-x/no-cycle). The fixtures take `game: ShellGame`, not `spec`.
+As landed (D1): the registry row is data only, so `tools/games.test.ts` pins it with `toEqual`: `ShellSpec` = `heading`, `shareTitle`, `tabs`, `modes`, `hostAnswered`, `connDot`, `localFields`, `curtainButtons`, held in `SHELL` (keyed by `ShellGame`, listed by `SHELL_GAMES`) and spread into `REGISTRY[g].shell`. The Page-taking parts sketched above (`curtainSub`, and `afterConnect`, which became `start`/`expectOpening`/`agree`/`snapshot`, plus the save shapes and the curtain offer) are `SHELL_DRIVERS[game]` in `e2e/fixtures/online-games.ts` (`shell-games.ts` until H1), its own file because `gin.ts`/`backgammon.ts` import `shell.ts` (import-x/no-cycle). The fixtures take `game: ShellGame`, not `spec`. Since dry-round-2.md D11 (I6)
+the row also names the game's test suite (`suite`: `gin`, `fidice`, `backgammon`) and its own spec
+globs (`specs`), and `tools/ci/suites.ts` reads its game rows off the registry: `gameE2e(suite)`
+lists `specs` plus the shell specs for a row with `shell` (the two online ones for a row without),
+with the `@<game>` tag and the other games' tags; `gameRules(suite)` names the folder.
 
 ### 6.2 Shared shell fixtures (`e2e/fixtures/shell.ts`, D1)
 

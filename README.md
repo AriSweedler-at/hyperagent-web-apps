@@ -235,8 +235,10 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
 5. Tests beside each module, and a suite row for the game in `tools/ci/suites.ts`: its `unit`
    globs (`web/games/<g>/**/*.test.ts` and any `test/parity/<g>.*` oracles), its `coverage.include`
    folders with one threshold row per group (measured minus a margin; nothing existing goes down),
-   its e2e glob (`**/<g>-*.spec.ts`) and a `gameRules('<g>')` entry so a change under
-   `web/games/<g>/**` runs `<g>`, `e2e-<g>`, `site`, `e2e-site` and `harness`. `tools/ci/suites.test.ts`
+   its e2e half `gameE2e('<g>')` and a `gameRules('<g>')` entry, both read off the game's `REGISTRY`
+   row (step 7: `suite` names the `test/parity/<g>.*` prefix and the folder, `specs` its own e2e
+   globs, `shell` adds the shell specs with the tag), so a change under `web/games/<g>/**` runs `<g>`,
+   `e2e-<g>`, `site`, `e2e-site` and `harness`. `tools/ci/suites.test.ts`
    fails until every new test file is claimed by exactly one suite; `npm run test:<g>` is then the
    game's own loop and CI's two matrix jobs (`game`, `e2e-game`) pick `<g>` up from `GAME_SUITES`
    through `tools/ci/affected.ts`: `.github/workflows/ci.yml` is not edited (the same test pins
@@ -246,9 +248,10 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    build.
 7. Join the registry the harness enumerates: add the game to the `Game` union in
    `web/shared/lib/roomCode.ts` (with its room-code row), then a row to `REGISTRY` in
-   `tools/games.ts` (title, hook, storage keys, PeerJS debug level, page shape, class-contract
-   floors; `LEGACY_GAMES` only if it has a frozen `legacy/<g>/index.html`); `GAMES`, `PAGE_TITLES`
-   and `HOOKS` are read off the rows, and the e2e fixtures, the dist guards and
+   `tools/games.ts` (title, hook, its suite name and own spec globs for step 5, storage keys, PeerJS
+   debug level, page shape, class-contract floors; `LEGACY_GAMES` only if it has a frozen
+   `legacy/<g>/index.html`); `GAMES`, `PAGE_TITLES` and `HOOKS` are read off the rows, and the e2e
+   fixtures, the dist guards and
    `tools/parity/computed-styles.ts` enumerate from them (then record the game's two goldens). Add a
    card to `web/index.html`.
 8. One e2e spec per mode: `e2e/<g>-local.spec.ts` and `e2e/<g>-online.spec.ts` tagged `@online`
@@ -257,10 +260,11 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    and the online one against the deployed page in nightly, for free. A game built on the shared
    shell (the home screen, the waiting rooms, the curtain: `docs/design/shared-shell.md` §3.1) joins
    `SHELL_GAMES` and `SHELL` in `tools/games.ts` and gets a `ShellDriver` row in
-   `e2e/fixtures/online-games.ts` instead: `e2e/shell-*.spec.ts` then drive its shell, and its suite
-   row lists them with the tag. A game with its own lobby (fidice today) gets an `OnlineDriver` row
-   there instead of an online spec of its own: `e2e/shell-online.spec.ts` and `shell-relay.spec.ts`
-   loop over every game, and its suite row lists those two with the tag.
+   `e2e/fixtures/online-games.ts` instead: `e2e/shell-*.spec.ts` then drive its shell, and `gameE2e`
+   lists them on its suite row with the tag, off the `shell` row. A game with its own lobby (fidice
+   today) gets an `OnlineDriver` row there instead of an online spec of its own:
+   `e2e/shell-online.spec.ts` and `shell-relay.spec.ts` loop over every game, and `gameE2e` lists
+   those two on a row without `shell`; the game's own specs are its row's `specs`.
 9. The proxy needs nothing: the Worker's catch-all maps `games.sweedler.com/<g>/` to
    `/hyperagent-web-apps/games/<g>/`.
 
