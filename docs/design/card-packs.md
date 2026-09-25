@@ -33,9 +33,10 @@ boxes; swords and batons are parallel verticals, an honest simplification of the
 ## 2. Packs (`web/shared/lib/cards/packs.ts` + `packs/<name>.ts`)
 
 ```ts
-CARD_PACKS = ['default', 'blue-stripe', 'yu-gi-oh', 'empty', 'linea', 'napoletane']
+CARD_PACKS = ['default', 'blue-stripe', 'yu-gi-oh', 'empty', 'linea', 'napoletane', 'american']
 Back  = svg { url, aspect, colour } | image { urls: {ratio, url}[], aspect, colour } | css { colour } | none
-Faces = glyph | files { dir, ext, widths, ids, aspect, inset, indices } | sprite { sheets, cell, cells, aspect, inset, indices }
+Faces = glyph { relabel?: Relabel } | files { dir, ext, widths, ids, aspect, inset, indices } | sprite { sheets, cell, cells, aspect, inset, indices }
+Relabel = { deck: DeckKind, suits: Record<suit id, suit id>, ranks: Record<rank id, rank id> }   // §3: another deck kind's glyphs
 CardPack = { name, label, back, decks: Partial<Record<DeckKind, Faces>>, attribution: Attribution | null }
 packByName, isCardPack, packsFor(kind), isCardPackFor(kind, v), DEFAULT_CARD_PACKS, defaultPackFor(kind)
 badCardPackMsg(key, kind, value)   // `<key>: "<value>" is not a card pack for this deck; kept the current one. One of: …`
@@ -46,11 +47,13 @@ badCardPackMsg(key, kind, value)   // `<key>: "<value>" is not a card pack for t
 | `default`, `blue-stripe`, `yu-gi-oh`, `empty` | gin's four, as pack data pointing at `../../shared/cards/backs/` | glyph | glyph | none (drawn; the owner's own picture) |
 | `linea` | `svg`, a terracotta lattice with a four-suit medallion | — | `files`, 40 svg, `widths: [0]`, aspect 100/193 (0.518), `indices: 'printed'` | none (generated) |
 | `napoletane` | `none` (the default's is painted) | — | `files`, 40 jpg, `widths: [120, 240]`, aspect 0.577, `indices: 'overlay'` | Florixc (Wikimedia Commons), Public domain: the sheet the owner supplied (§7.1) |
+| `american` | gin's `default` back, the same data (no new picture) | — | `glyph` with a `relabel` onto `french52` (§3): gin's cards at an Italian table, aspect 100/144 | none (drawn; §7.2) |
 
 Each pack file is `as const satisfies CardPack`, so `CardPackFor<K>` is read off the table's literal
 types: `packsFor('french52')` is typed and pinned as gin's legacy literal `['default', 'blue-stripe',
-'yu-gi-oh', 'empty']` in order, and `packsFor('italian40')` adds `linea` and `napoletane` (a glyph
-pack draws every deck kind; a pictures-only pack draws its own). `DEFAULT_CARD_PACKS` is per deck
+'yu-gi-oh', 'empty']` in order, and `packsFor('italian40')` adds `linea`, `napoletane` and `american`
+(a glyph pack draws every deck kind; a pictures-only pack, or a relabelled one, draws its own).
+`DEFAULT_CARD_PACKS` is per deck
 kind: `default` for `french52`, `napoletane` for `italian40` (the owner's sheet, §7.1; `linea` stays
 the drawn fallback every clone has and the stories' pack), the first per-game default
 sound-fonts.md §11 deferred.
@@ -80,6 +83,29 @@ carries the two `rank` spans for the stylesheet to place. `backHtml(cls)` is gin
 `backImageCss(back)` / `backFallbackImageCss(back)` are the `background-image` values a painter
 writes for a resolved back. `SUIT_SPRITE_SVG` is the zero-sized `<svg>` of the four `<symbol>`s a
 page that shows Italian glyph cards inlines once.
+
+**Relabelled glyphs.** A `glyph` face may carry a `relabel` (`{ deck, suits, ranks }`): the pack
+draws this deck kind's cards in another deck kind's vocabulary. `american` is the one shipped, the
+owner's "regular cards that you use for gin rummy" at an Italian table (§7.2). `resolveFace` maps
+the card's suit through `suits` and its rank through `ranks` (a rank not in the table keeps its id:
+A and 2 … 7 are ranks of both decks), splits the mapped id in the target deck (`relabelledId`:
+`FC` → `JH`) and returns a `glyph` spec with the target's `RankSpec` and `SuitSpec` under **this
+card's id**, so `faceHtml` prints gin's `cardHtml` markup for the mapped card and `data-card` stays
+what the briscola engine deals: a pack changes the picture, never the identity a table looks a
+click up by. `test/card-packs.test.ts` pins the forty against gin's `cardHtml`, `data-card` apart,
+and `cardFace.test.ts` against the default pack's French glyphs; `cardFace.ts` itself did not
+change. `resolveAspect` gives the printed deck's nominal (gin's 100 × 144), not the Italian cut. A
+card the table maps onto nothing (a suit missing, a rank sent to a stranger) draws this deck's own
+glyph, silently, like a missing picture; two cards on one target id would show one glyph twice; the
+tool's `check` (`relabelProblems`) names all three faults card by card, and `checkPack(american)`
+runs in the manifest test.
+
+| `italian40` suit | `french52` suit | | `italian40` rank | `french52` rank |
+| --- | --- | --- | --- | --- |
+| `C` coppe | `H` hearts ♥ red | | `A`, `2` … `7` | the same |
+| `D` denari | `D` diamonds ♦ red | | `F` fante | `J` |
+| `S` spade | `S` spades ♠ black | | `C` cavallo | `Q` |
+| `B` bastoni | `C` clubs ♣ black | | `R` re | `K` |
 
 Class names are spelled through constants, never a `class="…"` literal, so the class-contract
 extraction (test/dist/classes.ts) does not read them into every game's list; the names no
@@ -227,10 +253,29 @@ cells, aspect 0.577, at 120 and 240 px (a 338 px cell serves no 3x without upsca
 1.12 MB, `indices: 'overlay'` (the pattern prints none; the corners are clean at 120 px), no back
 (the sheet has none; the default's is painted). It is the `italian40` default; `linea` stays the
 fallback and the stories' pack. The Trocche100 per-card scans in the table above remain unshipped:
-the owner's supply covers this file, not that maker's redraw. The owner's `american` pack ("the
-regular cards that you use for gin rummy … just hearts clubs diamonds spades") and the `tuscany`
-pack (its scan to come; a sheet with printed borders and gutters takes the ink cutter, one laid edge
-to edge `--grid`) are the next two entries of this section.
+the owner's supply covers this file, not that maker's redraw. The owner's `american` pack is §7.2;
+the Tuscan pack, its scan to come, is expected there too.
+
+### 7.2 The `american` pack, and the Tuscan pack the owner will scan
+
+`american` is the owner's second ask in the same message: "One card pack can just be the regular
+cards that you use for gin rummy (you don't even need to use briscola suits, just hearts clubs
+diamonds spades. Instead of cups clubs swords & plates). And when you configure to use the american
+card pack you can do that." No pictures and no licence question: gin's glyphs relabelled (§3, the
+table there), gin's `default` back as its own (the navy lattice with a spade medallion, French-
+suited like the faces; the same data as `DEFAULT_PACK.back`, so one file serves both), `attribution:
+null`, an `italian40` pack only, so `packsFor('french52')` stays gin's four and gin's 52 pins do
+not move. Nothing is served for it under web/public/shared/cards/.
+
+The third, the Tuscan pattern (`toscane`: "eventually a tuscany card pack (but I will share the
+tuscany scan(s) later, so just implement what you can for now and remember this for later)"), is
+expected from the owner's own scan(s) and is a data-only PR through the tool, no code: `add toscane
+--deck italian40 --sheet <file> --rows … --cols …` in the sheet's own order (a sheet with printed
+borders and white gutters takes the ink cutter; one laid edge to edge, like the Napoletane, takes
+`--grid <inset>`), or `--faces <dir>` for per-card scans, with `--back` if a back is scanned; then
+the two lines in packs.ts, `check`, `preview` read at 60/120/240, the source under
+`assets/cards/toscane/` with its `SOURCES.txt`, the derived files committed, and the facts recorded
+here as §7.3. Nothing in the code waits on it.
 
 ## 8. Module map, boundaries, tests
 
@@ -239,8 +284,8 @@ to edge `--grid`) are the next two entries of this section.
 | `web/shared/lib/cards/decks.ts` | pure | `DECK_KINDS`, `DeckSpec`, `DECKS`, `cardIds`, `isCardId`, `splitId`, `cardName` |
 | `web/shared/lib/cards/suits.ts` | pure | `ITALIAN_SUIT_SYMBOLS`, `suitSymbol`, `suitSymbolId`, `placedSymbol`, `fmt` |
 | `web/shared/lib/cards/packs.ts` | pure | `CARD_PACKS`, the types, `FACE_WIDTH`, `packByName`, `isCardPack`, `packsFor`, `isCardPackFor`, `CardPackFor<K>`, `DEFAULT_CARD_PACKS`, `defaultPackFor`, `badCardPackMsg` |
-| `web/shared/lib/cards/packs/<name>.ts` | pure data | gin's four, hand-written; `linea` and `napoletane`, generated (in .prettierignore) |
-| `web/shared/lib/cards/resolve.ts` | pure | `FaceSpec`, `PaintedBack`, `resolveFace`, `resolveBack`, `resolveAspect`, `attributionLine` |
+| `web/shared/lib/cards/packs/<name>.ts` | pure data | gin's four and `american` (gin's glyphs relabelled, §3), hand-written; `linea` and `napoletane`, generated (in .prettierignore) |
+| `web/shared/lib/cards/resolve.ts` | pure | `FaceSpec`, `PaintedBack`, `relabelledId`, `resolveFace`, `resolveBack`, `resolveAspect`, `attributionLine` |
 | `web/shared/ui/cardFace.ts` | ui, lint-pure | `faceHtml`, `backHtml`, `backImageCss`, `backFallbackImageCss`, `SUIT_SPRITE_SVG` |
 | `web/shared/edge/prefs.ts` | edge | `decodeCardPackFor(kind)`, `cardPackPref(key, kind)` |
 | `web/public/shared/cards/backs/` | served | copies of gin's five back files with a `SOURCES.txt` (a Vite build serves only `public/` as files, so the pack data cannot point into the gin folder; gin's own copies stay for its theme) |
@@ -248,7 +293,7 @@ to edge `--grid`) are the next two entries of this section.
 | `assets/cards/napoletane/` | source | the owner's sheet as supplied (`sheet.jpg`) and its `SOURCES.txt` (§7.1) |
 | `web/public/shared/cards/napoletane/` | served | the eighty derived faces under `italian40/` and a `SOURCES.txt` naming the tool run |
 | `tools/card-packs.ts`, `tools/linea.ts` | tools | §5, §6 |
-| `test/card-packs.test.ts` | `shared` suite | the manifest test and the two engine pins (under `test/`: the pure tsconfig compiling `web/shared/lib` has no node types) |
+| `test/card-packs.test.ts` | `shared` suite | the manifest test and the three engine pins, the third the `american` faces against gin's `cardHtml` (under `test/`: the pure tsconfig compiling `web/shared/lib` has no node types) |
 
 Lint: `web/shared/lib/cards/**` imports nothing outside `web/shared/lib`; `cardFace.ts` imports
 lib only and no DOM; `web/shared/lib/**` and `web/shared/ui/**` measure 100/100/100/100 with these
@@ -286,3 +331,10 @@ parser),
 - One sourced deck ships after all, because the owner supplied it (§7.1): `PACK_SOURCES` holds
   `napoletane` and its test pins that one entry; the `italian40` default is `napoletane`, not
   `linea`.
+- The `american` pack is a relabelled glyph, not a fourth face kind: `Faces`'s `glyph` variant took
+  an optional `relabel`, so `resolveFace`, `resolveAspect` and the tool's `checkPack` grew one branch
+  each and `cardFace.ts` did not change. The brief asked for the face to equal gin's `cardHtml` byte
+  for byte; it does save `data-card`, which keeps the Italian id: the table looks a click up by it
+  and the engine deals `FC`, not `JH`.
+- A relabelled glyph's aspect is the printed deck's (gin's 100 × 144), not its own deck kind's
+  nominal: the card is gin's card, and the long thin Italian box would stretch it.
