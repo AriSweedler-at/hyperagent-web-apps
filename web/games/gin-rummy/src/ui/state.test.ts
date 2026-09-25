@@ -160,11 +160,11 @@ describe('the initial app', () => {
     ]);
   });
 
-  test('the shell`s intents are listed once, the shared shell reducer`s 44 (C2 took the curtain, the leave flow, visible, render and persist from the table side)', () => {
+  test('the shell`s intents are listed once, the shared shell reducer`s 45 (C2 took the curtain, the leave flow, visible, render and persist from the table side)', () => {
     expect(SHELL_INTENT_TYPES).toContain('home/init');
     expect(SHELL_INTENT_TYPES).toContain('guest/lost');
     expect(SHELL_INTENT_TYPES).not.toContain('card/tap');
-    expect(SHELL_INTENT_TYPES).toHaveLength(44);
+    expect(SHELL_INTENT_TYPES).toHaveLength(45);
     expect(new Set(SHELL_INTENT_TYPES).size).toBe(SHELL_INTENT_TYPES.length);
   });
 });
@@ -1323,9 +1323,14 @@ describe('resume', () => {
       game: drawn,
       oppName: 'Jeff',
       handoff: false,
+      at: null,
     });
     expect(resumeFor({ ...hostSave, handoff: true }, null)).toMatchObject({ handoff: true });
-    expect(resumeFor({ ...hostSave, game: null }, null)).toBeNull();
+    // A room still waiting for its first guest is offered too (docs/design/lobby-resume.md D3).
+    expect(resumeFor({ ...hostSave, game: null }, null)).toMatchObject({
+      kind: 'host',
+      game: null,
+    });
     expect(resumeFor({ ...hostSave, game: over }, null)).toBeNull();
     expect(resumeFor({ role: 'guest', code: 'KQZM', myName: 'Jeff' }, null)).toEqual({
       kind: 'guest',
@@ -1337,10 +1342,10 @@ describe('resume', () => {
   test('resumeLabel is the legacy button text', () => {
     expect(resumeLabel({ kind: 'scorer', state: scorer })).toBe('Resume scoring: Ann vs Bo');
     expect(resumeLabel({ kind: 'local', game: drawn })).toBe('Resume pass & play: Ann vs Jeff');
-    expect(resumeLabel({ kind: 'host', ...hostSave, handoff: false })).toBe(
+    expect(resumeLabel({ kind: 'host', ...hostSave, handoff: false, at: null })).toBe(
       'Resume hosting room LRZL',
     );
-    expect(resumeLabel({ kind: 'host', ...hostSave, handoff: true })).toBe(
+    expect(resumeLabel({ kind: 'host', ...hostSave, handoff: true, at: null })).toBe(
       'Continue online: Ann hosts, Jeff joins by invite',
     );
     expect(resumeLabel({ kind: 'guest', code: 'KQZM', myName: 'Jeff' })).toBe('Rejoin room KQZM');
@@ -1792,6 +1797,7 @@ describe('the remote handoff of a pass-and-play game', () => {
       game: drawn,
       oppName: 'Jeff',
       handoff: true,
+      at: null,
     });
     if (reloaded.app.shell.resume === null) throw new Error('no offer');
     expect(resumeLabel(reloaded.app.shell.resume)).toBe(

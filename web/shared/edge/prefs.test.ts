@@ -261,6 +261,42 @@ describe('shellSave', () => {
     });
   });
 
+  test('the waiting room`s stamp is written last and only when the caller has one, and read back; a save from before it decodes without one; a stamp that is not a number is refused', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    const waiting = {
+      role: 'host',
+      code: 'ABCD',
+      myName: 'Ann',
+      target: 100,
+      game: null,
+      oppName: null,
+      at: 1_700_000_000_000,
+    } as const;
+    expect(writeSave(store, waiting).ok).toBe(true);
+    expect(s.map.get('toyMP_v1')).toBe(
+      '{"role":"host","code":"ABCD","myName":"Ann","target":100,"game":null,"oppName":null,"at":1700000000000}',
+    );
+    expect(readSave(store)).toEqual({ ok: true, value: waiting });
+    // The literal every page wrote before the stamp: read as before, no stamp.
+    s.setItem(
+      'toyMP_v1',
+      '{"role":"host","code":"ABCD","myName":"Ann","target":100,"game":null,"oppName":null}',
+    );
+    expect(readSave(store)).toEqual({
+      ok: true,
+      value: { role: 'host', code: 'ABCD', myName: 'Ann', target: 100, game: null, oppName: null },
+    });
+    s.setItem(
+      'toyMP_v1',
+      '{"role":"host","code":"ABCD","myName":"Ann","target":100,"game":null,"oppName":null,"at":"now"}',
+    );
+    expect(readSave(store)).toEqual({
+      ok: false,
+      error: { kind: 'invalid', key: 'toyMP_v1', reason: '$.at: expected finite number' },
+    });
+  });
+
   test.each<[string, string, string]>([
     [
       'an unknown role',

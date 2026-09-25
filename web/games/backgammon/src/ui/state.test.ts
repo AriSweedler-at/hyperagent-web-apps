@@ -1520,10 +1520,12 @@ describe('resume', () => {
       game: g,
       oppName: 'Jeff',
       handoff: false,
+      at: null,
     });
     if (hostOffer === null) throw new Error('no offer');
     expect(resumeLabel(hostOffer)).toBe('Resume hosting room ABCD');
-    expect(resumeFor({ ...hostSave, game: null })).toBeNull();
+    // A room still waiting for its first guest is offered too (docs/design/lobby-resume.md D3).
+    expect(resumeFor({ ...hostSave, game: null })).toMatchObject({ kind: 'host', game: null });
     expect(resumeFor({ ...hostSave, game: over })).toBeNull();
     const handed = resumeFor({ ...hostSave, handoff: true });
     if (handed === null) throw new Error('no offer');

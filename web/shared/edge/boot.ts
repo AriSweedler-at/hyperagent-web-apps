@@ -654,6 +654,10 @@ export const bootShell = <
   applyInviteLink(win, (code) => {
     dispatch({ type: 'join/link', code });
   });
+  // A waiting room this device opened a moment ago (a refresh, a tab the phone discarded) comes
+  // back by itself (shell.ts `resume/auto`; docs/design/lobby-resume.md D4): after the invite
+  // link, so a link to another room wins and a link to this room has already resumed hosting.
+  dispatch({ type: 'resume/auto' });
   // A rule deep link (`#rule-<id>`, docs/design/glossary-links.md §1): the Rules tab, scrolled to
   // that rule. The hash stays, so the link can be copied from the address bar.
   const rule = ruleFromHash(win.location.hash);

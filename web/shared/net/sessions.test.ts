@@ -298,6 +298,33 @@ describe('HostSession', () => {
     expect(connected.log.at(-1)).toEqual(['status', reconnectingMsg(2)]);
   });
 
+  test('a waiting room resumed after the host`s page went away: the open status is the waiting one and the save is written again; the guest that was in the lobby comes back through its own retry and is seated again', () => {
+    const w = world();
+    const first = startHost(w, cell(hostCtx()));
+    w.broker.flush();
+    const guest = startGuest(w, cell(guestCtx()));
+    w.broker.flush();
+    expect(w.log).toContainEqual(['frame', { t: 'join', name: 'Jeff' }]);
+    // The host's page unloads: its Peer is destroyed and the guest's channel closes with it; the
+    // guest reports the loss and arms its rejoin (REJOIN_MS).
+    first.close();
+    w.broker.flush();
+    expect(w.log.map((e) => e[0])).toContain('lost');
+    const mark = w.log.length;
+    // The page is back: the same code, `resume: true`, no hand dealt. The broker freed the id when
+    // the socket closed, so the room registers at once with the waiting status and persists.
+    const second = startHost(w, cell(hostCtx()), { resume: true });
+    w.broker.flush();
+    expect(w.since(mark)).toEqual([['holdWakeLock'], ['status', WAITING_MSG], ['persist']]);
+    // The guest's rejoin lands on the resumed room: welcomed, its join reported on the new session.
+    pass(w, REJOIN_MS);
+    const after = w.since(mark);
+    expect(after).toContainEqual(['connected']);
+    expect(after).toContainEqual(['frame', { t: 'join', name: 'Jeff' }]);
+    second.close();
+    guest.close();
+  });
+
   test('unavailable-id: a fresh room restarts with a new code at once; a resumed one toasts and retries after 1.5 s', () => {
     const w = world();
     w.broker.transport().open(ROOM); // the code is taken

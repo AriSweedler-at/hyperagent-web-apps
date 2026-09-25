@@ -30,6 +30,7 @@ import {
   SHELL_EFFECT_TYPES,
   SHELL_INTENT_TYPES,
   WAITING_FOR_GUEST_MSG,
+  WAITING_RESUME_MS,
   badPositionMsg,
   broadcast,
   fresh,
@@ -416,6 +417,7 @@ describe('the initial shell and the partitions', () => {
       handoff: false,
       savedName: null,
       resume: null,
+      openedAt: null,
       rulesOpen: false,
       cues: { seen: null },
       submenuOpen: false,
@@ -427,9 +429,10 @@ describe('the initial shell and the partitions', () => {
     });
   });
 
-  test('the 44 shell intents and 29 shell effects are listed once; the guards partition a game`s unions', () => {
-    expect(SHELL_INTENT_TYPES).toHaveLength(44);
-    expect(new Set(SHELL_INTENT_TYPES).size).toBe(44);
+  test('the 45 shell intents and 29 shell effects are listed once; the guards partition a game`s unions', () => {
+    expect(SHELL_INTENT_TYPES).toHaveLength(45);
+    expect(new Set(SHELL_INTENT_TYPES).size).toBe(45);
+    expect(SHELL_INTENT_TYPES).toContain('resume/auto');
     expect(SHELL_INTENT_TYPES).toContain('curtain/reveal');
     expect(SHELL_INTENT_TYPES).toContain('position/load');
     expect(SHELL_INTENT_TYPES).toContain('persist');
@@ -1467,9 +1470,25 @@ describe('resume and the handoff', () => {
       game: dealt,
       oppName: 'Jeff',
       handoff: false,
+      at: null,
     });
     expect(resumeFor({ ...hostSave, handoff: true }, FAKE)).toMatchObject({ handoff: true });
-    expect(resumeFor({ ...hostSave, game: null }, FAKE)).toBeNull();
+    // A room still waiting for its first guest is offered too (lobby-resume.md D3), with its stamp
+    // when the save carries one, so the boot can tell a moment ago from last week.
+    expect(resumeFor({ ...hostSave, game: null }, FAKE)).toEqual({
+      kind: 'host',
+      code: 'LRZL',
+      myName: 'Ann',
+      level: 3,
+      game: null,
+      oppName: 'Jeff',
+      handoff: false,
+      at: null,
+    });
+    expect(resumeFor({ ...hostSave, game: null, at: NOW - 5 }, FAKE)).toMatchObject({
+      game: null,
+      at: NOW - 5,
+    });
     expect(resumeFor({ ...hostSave, game: over }, FAKE)).toBeNull();
     expect(resumeFor({ role: 'guest', code: 'KQZM', myName: 'Jeff' }, FAKE)).toEqual({
       kind: 'guest',
@@ -1540,6 +1559,8 @@ describe('resume and the handoff', () => {
   const offered = (): App =>
     run(initialApp, { type: 'home/init', home: { ...home, save: { role: 'local', game: dealt } } })
       .app;
+  /** The pass-and-play offer, for the tests below where `offered` is a step. */
+  const offered_ = offered;
 
   test('handoff/click: nothing without a pass-and-play offer or game; seat 0 hosts the game as it stands under a fresh code, its terms and the table reset for the handoff', () => {
     expect(run(initialApp, { type: 'handoff/click' })).toEqual({ app: initialApp, effects: [] });
@@ -1589,6 +1610,114 @@ describe('resume and the handoff', () => {
       opts: { level: 2 },
     });
     expect(marks(fromTable.app).at(-1)).toBe('handoff');
+  });
+  const waitingSave = { ...hostSave, game: null, oppName: null, at: NOW - 60_000 } as const;
+
+  test('a waiting room comes back: resume/click reopens its code with no game and no view; the boot`s resume/auto does so by itself within WAITING_RESUME_MS and leaves an older, unstamped, mid-game, local or guest offer for the tap; nothing while seated', () => {
+    const offered = run(initialApp, { type: 'home/init', home: { ...home, save: waitingSave } });
+    expect(offered.app.shell.resume).toEqual({
+      kind: 'host',
+      code: 'LRZL',
+      myName: 'Ann',
+      level: 3,
+      game: null,
+      oppName: null,
+      handoff: false,
+      at: NOW - 60_000,
+    });
+    const clicked = run(offered.app, { type: 'resume/click' });
+    expect(clicked.app.shell).toMatchObject({
+      role: 'host',
+      code: 'LRZL',
+      myName: 'Ann',
+      opts: { level: 3 },
+      game: null,
+      view: null,
+      oppName: null,
+      handoff: false,
+      openedAt: NOW,
+      screen: 'hostWaitScreen',
+    });
+    expect(clicked.effects).toEqual([
+      { type: 'scrollTop' },
+      { type: 'startHost', code: 'LRZL', attempt: 1, resume: true },
+    ]);
+    // The boot's own resume is the tap, with nobody tapping (the owner, 2026-09-25).
+    expect(run(offered.app, { type: 'resume/auto' })).toEqual(clicked);
+    expect(WAITING_RESUME_MS).toBe(30 * 60_000);
+    const edge = run(
+      initialApp,
+      {
+        type: 'home/init',
+        home: { ...home, save: { ...waitingSave, at: NOW - WAITING_RESUME_MS } },
+      },
+      { type: 'resume/auto' },
+    );
+    expect(edge.app.shell.role).toBe('host');
+    // Older: the offer stands and nothing else happens.
+    const stale = run(initialApp, {
+      type: 'home/init',
+      home: { ...home, save: { ...waitingSave, at: NOW - WAITING_RESUME_MS - 1 } },
+    }).app;
+    expect(run(stale, { type: 'resume/auto' })).toEqual({ app: stale, effects: [] });
+    expect(stale.shell.resume).toMatchObject({ kind: 'host', game: null });
+    // A save from before the stamp, a game in play, a pass-and-play game, a guest room: the tap's.
+    const unstamped = run(initialApp, {
+      type: 'home/init',
+      home: { ...home, save: { ...hostSave, game: null, oppName: null } },
+    }).app;
+    expect(unstamped.shell.resume).toMatchObject({ kind: 'host', game: null, at: null });
+    expect(run(unstamped, { type: 'resume/auto' })).toEqual({ app: unstamped, effects: [] });
+    const midGame = run(initialApp, { type: 'home/init', home: { ...home, save: hostSave } }).app;
+    expect(run(midGame, { type: 'resume/auto' })).toEqual({ app: midGame, effects: [] });
+    expect(run(offered_(), { type: 'resume/auto' })).toEqual({ app: offered_(), effects: [] });
+    const guestOffer = run(initialApp, {
+      type: 'home/init',
+      home: { ...home, save: { role: 'guest', code: 'KQZM', myName: 'Jo' } },
+    }).app;
+    expect(run(guestOffer, { type: 'resume/auto' })).toEqual({ app: guestOffer, effects: [] });
+    // Seated already (an invite link took the device into another room first): nothing.
+    const joined = run(offered.app, { type: 'join/link', code: 'KQZM' }).app;
+    expect(joined.shell).toMatchObject({ role: 'guest', code: 'KQZM' });
+    expect(run(joined, { type: 'resume/auto' })).toEqual({ app: joined, effects: [] });
+    expect(run(initialApp, { type: 'resume/auto' })).toEqual({ app: initialApp, effects: [] });
+  });
+
+  test('the device`s own invite link resumes hosting instead of joining: the waiting room at any age, the game in play too; another code, or a guest save under this one, joins as before', () => {
+    const stale = run(initialApp, {
+      type: 'home/init',
+      home: { ...home, save: { ...waitingSave, at: NOW - 3 * WAITING_RESUME_MS } },
+    }).app;
+    const own = run(stale, { type: 'join/link', code: 'lrzl' });
+    expect(own.app).toEqual(run(stale, { type: 'resume/click' }).app);
+    expect(own.app.shell).toMatchObject({
+      role: 'host',
+      code: 'LRZL',
+      game: null,
+      screen: 'hostWaitScreen',
+      codeDraft: '',
+    });
+    expect(own.effects).toEqual([
+      { type: 'scrollTop' },
+      { type: 'startHost', code: 'LRZL', attempt: 1, resume: true },
+    ]);
+    const midGame = run(initialApp, { type: 'home/init', home: { ...home, save: hostSave } }).app;
+    expect(run(midGame, { type: 'join/link', code: 'LRZL' }).app.shell).toMatchObject({
+      role: 'host',
+      code: 'LRZL',
+      game: dealt,
+      view: viewFor(dealt, 0),
+    });
+    // Another room's link: the guest's path, the code in the form.
+    const other = run(stale, { type: 'join/link', code: 'KQZM' });
+    expect(other.app.shell).toMatchObject({ role: 'guest', code: 'KQZM', codeDraft: 'KQZM' });
+    expect(other.effects.at(-1)).toEqual({ type: 'startGuest', code: 'KQZM', attempt: 1 });
+    // A guest save under the same code is not a room this device hosts: the link joins.
+    const guestSaved = run(initialApp, {
+      type: 'home/init',
+      home: { ...home, save: { role: 'guest', code: 'LRZL', myName: 'Jo' } },
+    }).app;
+    expect(run(guestSaved, { type: 'join/link', code: 'LRZL' }).app.shell.role).toBe('guest');
   });
 });
 
@@ -1675,6 +1804,22 @@ describe('storage and what the sessions read back', () => {
       oppName: 'Jeff',
     });
     expect(saveFor(withShell(h, { code: null }).shell)).toMatchObject({ code: '' });
+    // The waiting room's save carries the stamp of its opening (`openedAt`, the clock at
+    // `startHost`); a game's save never does (docs/design/lobby-resume.md D1).
+    const waiting = run(initialApp, { type: 'host/click', name: 'Ann', level: '3' }).app;
+    expect(waiting.shell.openedAt).toBe(NOW);
+    expect(saveFor(waiting.shell)).toEqual({
+      role: 'host',
+      code: waiting.shell.code,
+      myName: 'Ann',
+      level: 3,
+      game: null,
+      oppName: null,
+      at: NOW,
+    });
+    expect(saveFor(withShell(waiting, { openedAt: null }).shell)).not.toHaveProperty('at');
+    expect(h.shell.openedAt).toBe(NOW);
+    expect(saveFor(h.shell)).not.toHaveProperty('at');
     const guest = run(initialApp, { type: 'join/click', name: 'Jeff', code: 'KQZM' }).app;
     expect(saveFor(guest.shell)).toEqual({ role: 'guest', code: 'KQZM', myName: 'Jeff' });
     expect(saveFor(withShell(guest, { code: null }).shell)).toMatchObject({ code: '' });

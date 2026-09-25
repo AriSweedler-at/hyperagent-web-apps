@@ -7,10 +7,11 @@
 // 13). Tagged per game (see shell-home.spec.ts); the two-peer case @online.
 import { SHELL, SHELL_GAMES } from '../tools/games.ts';
 import { PHONE } from './fixtures/geometry.ts';
-import { gameQuery } from './fixtures/player.ts';
+import { gameQuery, invitePath } from './fixtures/player.ts';
 import {
   DEFAULT_NAMES,
   ONLINE_NAMES,
+  joinedMsg,
   readSave,
   reopenedMsg,
   resumeLabel,
@@ -74,6 +75,43 @@ SHELL_GAMES.forEach((game) => {
         expect(await driver.agree(host.page, guest.page)).toBe(started);
         await expect(host.page.locator(shell.connDot)).toHaveClass(/\bon\b/);
         await expect(guest.page.locator(shell.connDot)).toHaveClass(/\bon\b/);
+      },
+    );
+
+    test(
+      'the host refreshes in the waiting room: the room is back by itself with the same code and the guest reconnects; the host`s own invite link resumes hosting too',
+      { tag: '@online' },
+      async ({ players, project }) => {
+        const { host, guest } = players;
+        const code = await connect(players, project, game);
+        // The save was written as the room opened (docs/design/lobby-resume.md D1): the waiting
+        // room, stamped with its opening.
+        const saved = (await readSave(host.page, game)) as Readonly<{ at?: unknown }>;
+        expect(saved).toMatchObject({ role: 'host', code, myName: HOST, game: null });
+        expect(typeof saved.at).toBe('number');
+        // The host reloads: no home screen and no tap; the same code, and the guest's own retries
+        // land in the lobby again (the owner, 2026-09-25: "it shouldn't drop the lobby").
+        await host.page.reload();
+        await expect(host.page.locator('#hostWaitScreen')).toBeVisible();
+        await expect(host.page.locator('#homeScreen')).toBeHidden();
+        await expect(host.page.locator('#roomCode')).toHaveText(code);
+        await expect(host.page.locator('#hostWaitStatus')).toContainText(joinedMsg(GUEST), {
+          timeout: WEBRTC_TIMEOUT,
+        });
+        await expect(guest.page.locator('#guestWaitStatus')).toHaveText(shell.hostAnswered, {
+          timeout: WEBRTC_TIMEOUT,
+        });
+        // The host follows its own invite: hosting resumes, nobody joins (D5).
+        await host.page.goto(invitePath(project, game, code));
+        await expect(host.page.locator('#hostWaitScreen')).toBeVisible();
+        await expect(host.page.locator('#guestWaitScreen')).toBeHidden();
+        await expect(host.page.locator('#roomCode')).toHaveText(code);
+        await expect(host.page.locator('#hostWaitStatus')).toContainText(joinedMsg(GUEST), {
+          timeout: WEBRTC_TIMEOUT,
+        });
+        // The game starts as if nothing had happened.
+        await driver.start(host.page, guest.page);
+        await driver.agree(host.page, guest.page);
       },
     );
 

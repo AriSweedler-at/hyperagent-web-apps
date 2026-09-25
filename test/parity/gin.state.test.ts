@@ -96,8 +96,14 @@ describe('the captured saves through the reducer', () => {
       rt.dispatch({ type: 'home/init', home: readHome(createStore(storage)) });
       const offer = rt.app().shell.resume;
       if (variant === 'host.lobby') {
-        // A room with no hand dealt is not offered (the legacy needed `saved.game`).
-        expect(offer).toBeNull();
+        // A room with no hand dealt is offered since docs/design/lobby-resume.md D3 (the legacy
+        // needed `saved.game`); resumed, it persists the captured bytes plus the stamp of its
+        // reopening, the one key the waiting-room save gained.
+        expect(offer).toMatchObject({ kind: 'host', code: 'LRZL', game: null, at: null });
+        storage.removeItem(c.key);
+        rt.dispatch({ type: 'resume/click' });
+        rt.dispatch({ type: 'persist' });
+        expect(storage.map.get(c.key)).toBe(`${c.raw.slice(0, -1)},"at":${String(ctx.now())}}`);
         return;
       }
       expect(offer).not.toBeNull();
@@ -126,7 +132,8 @@ describe('the captured saves through the reducer', () => {
     // The legacy drew its code from Math.random; the capture's is LRZL.
     rt.dispatch({ type: 'host/start', code: 'LRZL' });
     rt.dispatch({ type: 'persist' });
-    expect(storage.map.get(c.key)).toBe(c.raw);
+    // The captured bytes, plus the waiting room's stamp (lobby-resume.md D1): the one key added.
+    expect(storage.map.get(c.key)).toBe(`${c.raw.slice(0, -1)},"at":${String(ctx.now())}}`);
     expect(saveFor(rt.app())).toEqual({
       role: 'host',
       code: 'LRZL',
@@ -134,6 +141,7 @@ describe('the captured saves through the reducer', () => {
       target: 75,
       game: null,
       oppName: null,
+      at: ctx.now(),
     });
   });
 

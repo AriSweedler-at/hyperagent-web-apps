@@ -203,7 +203,7 @@ describe('the initial app', () => {
       'tableScreen',
       'endgameScreen',
     ]);
-    expect(SHELL_INTENT_TYPES).toHaveLength(44);
+    expect(SHELL_INTENT_TYPES).toHaveLength(45);
     expect(EMPTY_SLOTS).toEqual([null, null, null]);
   });
 });
@@ -856,6 +856,7 @@ describe('resume, storage and what the sessions read back', () => {
       game: two,
       oppName: 'Jeff',
       handoff: false,
+      at: null,
     });
     expect(
       resumeLabel({
@@ -866,6 +867,7 @@ describe('resume, storage and what the sessions read back', () => {
         game: two,
         oppName: 'Jeff',
         handoff: false,
+        at: null,
       }),
     ).toBe('Resume hosting room ABCD');
     expect(
@@ -877,6 +879,7 @@ describe('resume, storage and what the sessions read back', () => {
         game: two,
         oppName: 'Bob',
         handoff: true,
+        at: null,
       }),
     ).toBe(handoffLabel(two));
     expect(resumeLabel({ kind: 'guest', code: 'ABCD', myName: 'Jeff' })).toBe('Rejoin room ABCD');
@@ -889,7 +892,8 @@ describe('resume, storage and what the sessions read back', () => {
         game: null,
         oppName: null,
       }),
-    ).toBeNull();
+      // A room still waiting for its first guest is offered too (docs/design/lobby-resume.md D3).
+    ).toMatchObject({ kind: 'host', game: null, at: null });
     const over = game(playUntil(local({ localMatch: '1' }), (app) => view(app).matchOver));
     expect(resumeFor({ role: 'local', game: over })).toBeNull();
     // A three-seat pass-and-play save resumes with its curtain for the actor.
@@ -921,6 +925,8 @@ describe('resume, storage and what the sessions read back', () => {
       gamesToWin: 3,
       game: null,
       oppName: null,
+      // The waiting room's stamp (docs/design/lobby-resume.md D1): the clock at `host/click`.
+      at: NOW,
     });
     expect(hostContextOf(h)).toEqual({
       attempt: 1,

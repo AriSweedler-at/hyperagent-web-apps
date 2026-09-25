@@ -15,6 +15,7 @@ import {
   formatError,
   literal,
   nullable,
+  number,
   object,
   optional,
   refine,
@@ -162,6 +163,13 @@ export type HostSave<S, X extends object> = Readonly<{
      * Written only when true, so every other host save keeps the legacy literal byte for byte.
      */
     handoff?: true;
+    /**
+     * When this device opened (or reopened) the room, ms since the epoch: written only while the
+     * room waits for its first guest (`game` null; docs/design/lobby-resume.md D1), so a reload
+     * within WAITING_RESUME_MS resumes the lobby by itself and an older one is offered. A save
+     * with a game never carries it, so every mid-game literal is the legacy one byte for byte.
+     */
+    at?: number;
   }>;
 export type GuestSave = Readonly<{ role: 'guest'; code: string; myName: string }>;
 export type Save<S, X extends object> = LocalSave<S> | HostSave<S, X> | GuestSave;
@@ -210,7 +218,8 @@ export const shellSave = <S, X extends object>(
     game: nullable(cfg.decodeGame),
     oppName: nullable(string),
     handoff: optional(literal(true)),
-  }) as Decoder<Readonly<{ game: S | null; oppName: string | null; handoff?: true }>>;
+    at: optional(number),
+  }) as Decoder<Readonly<{ game: S | null; oppName: string | null; handoff?: true; at?: number }>>;
   const hostSave: Decoder<HostSave<S, X>> = (input) => {
     const head = hostHead(input);
     if (!head.ok) return head;
@@ -247,6 +256,7 @@ export const shellSave = <S, X extends object>(
           game: save.game,
           oppName: save.oppName,
           ...(save.handoff === true ? { handoff: true } : {}),
+          ...(save.at === undefined ? {} : { at: save.at }),
         };
       case 'guest':
         return { role: 'guest', code: save.code, myName: save.myName };
