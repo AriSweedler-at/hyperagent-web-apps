@@ -160,7 +160,9 @@ describe('the fonts', () => {
     expect(resolveVoice(layered, 'voice.trick')).toEqual({ sound: STEAL, ms: 100 });
     expect(resolveVoice(layered, 'voice.result')).toEqual({ sound: SILENCE, ms: 0 });
     expect(resolveVoice(partial, 'voice.trick')).toEqual({ sound: SILENCE, ms: 0 });
-    // A base's voices are reached too.
+    // The `voice` root answers any line in the font's own table. A hit in a BASE font's voices
+    // cannot be pinned yet: `rungs` resolves `base` through the real registry and no shipped
+    // font carries `voices` (the base rung is still walked: `layered` above reaches arcade).
     const voicedBase: SoundFont = { ...partial, voices: { voice: GOOD } };
     expect(resolveVoice(layered, 'voice.result').sound).toBe(SILENCE);
     const bare: SoundFont = { name: 'felt', label: 'Bare', sounds: {} };

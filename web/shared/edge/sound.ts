@@ -45,11 +45,12 @@ const decodeInto = (c: AudioContextLike, bytes: ArrayBuffer): Promise<AudioBuffe
 /**
  * How far past its slot a sample may still start (briscola-sound-history.md §3.4, risk 2): a
  * sample not decoded when its slot arrives is skipped, never late, so the steps after it keep
- * their places. The grace exists because `currentTime` advances per render quantum and the
- * decoded buffer arrives a microtask after the slot was booked: without it a CACHED sample at
- * offset 0 would read as late by a hair and never play.
+ * their places. The grace exists because `currentTime` advances per render quantum (about 3 ms)
+ * and the decoded buffer arrives a microtask after the slot was booked: without it a CACHED
+ * sample at offset 0 would read as late by a hair and never play. It stays well under
+ * `PHRASE_GAP_MS` (120) so a sample that does start late never lands under the next step.
  */
-export const SAMPLE_LATE_MS = 120;
+export const SAMPLE_LATE_MS = 30;
 
 const startSource = (
   c: AudioContextLike,

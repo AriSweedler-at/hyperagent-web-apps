@@ -43,7 +43,10 @@ export const lastEventId = (events: ReadonlyArray<Readonly<{ id: number }>>): nu
  * The events `next` carries beyond `prev`, by id. `prev` null is a first paint (a reload, a
  * resume, a fresh join): nothing is new, so history is never replayed as sound. Ids after the
  * last of `prev` count; a re-sent frame (the same ids) yields none, so the cue memory is the
- * stream itself.
+ * stream itself. That makes the numbering a precondition ACROSS games one view shows: a game that
+ * starts a new stream while the view stays mounted (a rematch) either continues the ids from the
+ * old game or hands `prev` as null for that paint, else it is silent until its ids pass the old
+ * game's last.
  */
 export const newEvents = <E extends Readonly<{ id: number }>>(
   prev: ReadonlyArray<E> | null,

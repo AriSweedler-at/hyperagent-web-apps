@@ -255,7 +255,7 @@ describe('slots and phrases', () => {
     grace.tick(0.1 + SAMPLE_LATE_MS / 1000 - 0.01);
     await grace.flush();
     expect(grace.calls.filter(([n]) => n === 'source.start')).toEqual([['source.start', 10.1]]);
-    expect(SAMPLE_LATE_MS).toBe(120);
+    expect(SAMPLE_LATE_MS).toBe(30);
   });
 
   test('warmSamples fetches and decodes every sample once, plays nothing, and needs a context but not a running one', async () => {
