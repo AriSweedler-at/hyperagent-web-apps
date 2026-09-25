@@ -332,8 +332,9 @@ projects pages + proxy, the page-only specs on pages alone: `PAGE_ONLY_SPECS`; P
 long-term credential, loopback only, no TLS, its relay ports right above (`e2e/fixtures/site.ts`
 `turnServerCommand`), reached through an ICE list the config writes under
 `e2e/fixtures/.generated/`; retries 1; trace on first retry; report uploaded per job). The
-`@relay` specs (`e2e/shell-relay.spec.ts` for gin and backgammon, `e2e/fidice-relay.spec.ts`)
-play the games with `?ice-policy=relay` through that relay and read the selected candidate pair
+`@relay` spec (`e2e/shell-relay.spec.ts`, one describe per game, fidice through its row in
+`e2e/fixtures/online-games.ts`)
+plays the games with `?ice-policy=relay` through that relay and read the selected candidate pair
 off every `RTCPeerConnection` the page built (`e2e/browser/record-pc.js` keeps them;
 `selected-pairs.js` reads `getStats()` as `ice.ts` `describe()` does); without `turnserver` on
 PATH they skip with the install line, and under `CI` the config refuses to start instead, so a
