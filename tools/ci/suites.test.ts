@@ -116,6 +116,7 @@ describe('every test file belongs to exactly one suite', () => {
   test('the shell specs: one describe per game, tagged by game, the game suites claiming them', () => {
     const shellSpecs = SPEC_FILES.filter((f) => f.startsWith('e2e/shell-'));
     expect(shellSpecs).toEqual([
+      'e2e/shell-glossary.spec.ts',
       'e2e/shell-handoff.spec.ts',
       'e2e/shell-home.spec.ts',
       'e2e/shell-liveness.spec.ts',
