@@ -5,7 +5,8 @@
 // choice is read from the hook. e2e/gin-geometry.spec.ts and e2e/gin-local.spec.ts share it.
 import { expect, type Page } from '@playwright/test';
 
-import { ginAcceptDraw, ginReveal } from './gin.ts';
+import { ginAcceptDraw } from './gin.ts';
+import { reveal } from './shell.ts';
 
 export type HookView = Readonly<{
   phase: string;
@@ -85,7 +86,7 @@ export const layOffAll = async (page: Page): Promise<void> => {
  */
 export const playToRoundOver = async (page: Page, turn = 1): Promise<void> => {
   if (turn > 40) throw new Error('no round end within 40 turns');
-  if (await page.locator('#curtainOverlay').isVisible()) await ginReveal(page);
+  if (await page.locator('#curtainOverlay').isVisible()) await reveal(page);
   const before = await readView(page);
   if (before?.phase === 'layoff') {
     await layOffAll(page);

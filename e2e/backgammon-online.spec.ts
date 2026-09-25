@@ -11,7 +11,6 @@ import type { Page } from '@playwright/test';
 import { MESSAGES, type Action } from '../web/games/backgammon/src/engine/index.ts';
 import {
   bgBoardsAgree,
-  bgHostStarts,
   bgMove,
   bgRoll,
   boardKey,
@@ -19,7 +18,7 @@ import {
   readBoard,
   requireBoard,
 } from './fixtures/backgammon.ts';
-import { connect } from './fixtures/online-games.ts';
+import { SHELL_DRIVERS, connect } from './fixtures/online-games.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 /** An action through the documented hook, as the sandbox and the style driver play (docs/ARCHITECTURE.md). */
@@ -55,7 +54,8 @@ test(
   async ({ players, project }) => {
     const { host, guest } = players;
     await connect(players, project, 'backgammon');
-    await bgHostStarts(host.page, guest.page);
+    // The shell's start plus backgammon's no-curtain asserts: its SHELL_DRIVERS row (dry-round-2.md I5).
+    await SHELL_DRIVERS.backgammon.start(host.page, guest.page);
     // The opening both boards agree on; whose turn it is decides which seat is refused below.
     const opening = await bgBoardsAgree(host.page, guest.page);
 

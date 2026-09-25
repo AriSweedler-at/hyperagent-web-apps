@@ -8,19 +8,20 @@
 import { expect, type Page } from '@playwright/test';
 
 import type { Game, ShellGame } from '../../tools/games.ts';
-import {
-  bgBoardsAgree,
-  bgHostStarts,
-  bgStartLocal,
-  boardKey,
-  readBoard,
-  requireBoard,
-} from './backgammon.ts';
+import { bgBoardsAgree, bgStartLocal, boardKey, readBoard, requireBoard } from './backgammon.ts';
 import { fidiceHostStarts, fidiceSameRound, fidiceSeatName, fidiceSeats } from './fidice.ts';
 import type { Viewport } from './geometry.ts';
-import { ginHostDeals, ginPassUpcard, ginStartLocal, readTable } from './gin.ts';
+import { ginPassUpcard, ginStartLocal, readTable } from './gin.ts';
 import { openGame, type GameHooks } from './player.ts';
-import { DEFAULT_NAMES, ONLINE_NAMES, joinedMsg, reveal, roomOpen, takeOffer } from './shell.ts';
+import {
+  DEFAULT_NAMES,
+  ONLINE_NAMES,
+  hostStarts,
+  joinedMsg,
+  reveal,
+  roomOpen,
+  takeOffer,
+} from './shell.ts';
 import type { Project } from './site.ts';
 import { hostRoom, joinByCode, type Players } from './two-players.ts';
 
@@ -120,7 +121,7 @@ const ginSnapshot = async (page: Page): Promise<string> => JSON.stringify(await 
 const gin: ShellDriver = {
   ...shellOnline,
   curtainSub: (_first, other) => `${other}, look away`,
-  start: ginHostDeals,
+  start: hostStarts,
   snapshot: ginSnapshot,
   agree: async (host, guest) => {
     const table = await ginSnapshot(host);
@@ -174,7 +175,13 @@ const bgSnapshot = async (page: Page): Promise<string> => boardKey(await readBoa
 const backgammon: ShellDriver = {
   ...shellOnline,
   curtainSub: () => 'Your turn. Roll when you have the phone.',
-  start: bgHostStarts,
+  // The shell's start, then what backgammon's online table adds: no curtain on either side (pass
+  // and play alone has one). The two asserts came here from `bgHostStarts` (dry-round-2.md I5).
+  start: async (host, guest) => {
+    await hostStarts(host, guest);
+    await expect(host.locator('#curtainOverlay')).toBeHidden();
+    await expect(guest.locator('#curtainOverlay')).toBeHidden();
+  },
   snapshot: bgSnapshot,
   agree: async (host, guest) => boardKey(await bgBoardsAgree(host, guest)),
   expectOpening: async (host, guest) => {

@@ -1,21 +1,13 @@
 // Drives the Gin Rummy table through its DOM (the legacy ids, kept by web/games/gin-rummy/index.html).
-// The shell around it (the room, the join, the curtain's reveal, the pass-and-play start) is
-// e2e/fixtures/shell.ts, driven once for both shell games; `ginReveal` and `ginStartLocal` stay
-// exported here so the gin specs keep their names. Nothing here reads `window.__gin`: whose turn
-// it is, what may be tapped and what was discarded are all read from the same elements a player sees.
+// The shell around it (the room, the join, the host's start, the curtain's reveal, the pass-and-play
+// start) is e2e/fixtures/shell.ts, driven once for both shell games and imported by the gin specs
+// directly (dry-round-2.md I5); `ginStartLocal` here composes `startLocal` with the upcard decision.
+// Nothing here reads `window.__gin`: whose turn it is, what may be tapped and what was discarded are
+// all read from the same elements a player sees.
 import { expect, type Page } from '@playwright/test';
 
 import type { Viewport } from './geometry.ts';
 import { DEFAULT_NAMES, reveal, startLocal, type Names } from './shell.ts';
-import { WEBRTC_TIMEOUT } from './timeouts.ts';
-
-/** The host deals; both tables appear. */
-export const ginHostDeals = async (host: Page, guest: Page): Promise<void> => {
-  await expect(host.locator('#startGameBtn')).toBeVisible({ timeout: WEBRTC_TIMEOUT });
-  await host.locator('#startGameBtn').click();
-  await expect(host.locator('#tableScreen')).toBeVisible();
-  await expect(guest.locator('#tableScreen')).toBeVisible();
-};
 
 export type TableView = Readonly<{
   discardTop: string | null;
@@ -39,9 +31,6 @@ export const readTable = async (page: Page): Promise<TableView> => ({
 export const isMyTurn = async (page: Page): Promise<boolean> =>
   (await page.locator('#statusMain').innerText()) === 'Your turn';
 
-/** Hand the phone over: the pass-and-play curtain is up, the seat behind it taps to reveal (the shell's). */
-export const ginReveal = reveal;
-
 /**
  * Start pass-and-play (the shell's `startLocal`: Ann and Bob unless `names` says otherwise, at
  * `viewport` on the page at `url`) and reveal the first seat: the upcard decision.
@@ -53,7 +42,7 @@ export const ginStartLocal = async (
   names: Names = DEFAULT_NAMES,
 ): Promise<void> => {
   await startLocal(page, url, viewport, names);
-  await ginReveal(page);
+  await reveal(page);
   await expect(page.locator('#statusSub')).toHaveText('Take the upcard or pass');
 };
 

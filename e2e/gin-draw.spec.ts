@@ -18,13 +18,8 @@ import {
   heldBoxes,
   omit,
 } from './fixtures/boxes.ts';
-import {
-  expectHandRows,
-  ginAcceptDraw,
-  ginPassUpcard,
-  ginReveal,
-  ginStartLocal,
-} from './fixtures/gin.ts';
+import { expectHandRows, ginAcceptDraw, ginPassUpcard, ginStartLocal } from './fixtures/gin.ts';
+import { reveal } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -54,9 +49,9 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await ginStartLocal(page, pagePath(project, 'gin-rummy'), vp);
       // Both pass the upcard, so the first player draws (from the stock only).
       await ginPassUpcard(page);
-      await ginReveal(page);
+      await reveal(page);
       await ginPassUpcard(page);
-      await ginReveal(page);
+      await reveal(page);
       await expect(page.locator('#statusSub')).toHaveText('Both passed — tap the stock to draw');
       await expect(page.locator('#stockPile')).toHaveClass(/tappable/);
       await expect(page.locator('#hand .slot.ghost.open')).toHaveCount(1);

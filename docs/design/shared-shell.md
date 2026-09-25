@@ -544,7 +544,7 @@ export const REGISTRY: Readonly<Record<Game, Readonly<{
     curtainSub: (first: string, other: string) => string;   // gin `${other}, look away 👀`; bg 'Your turn.'
     connDot: string;                   // '#connDot' | '#oppDot'
     localFields: ReadonlyArray<readonly [id: string, value: string]>;   // gin [['localTargetInput','100']]; bg the two selects
-    afterConnect?: (host: Page, guest: Page) => Promise<void>;          // gin ginHostDeals + readTable; bg start + both boards show the seeded opening
+    afterConnect?: (host: Page, guest: Page) => Promise<void>;          // gin hostStarts + readTable; bg start + both boards show the seeded opening
   }>;
 }>>>;
 export const GAMES = Object.keys(REGISTRY) as ReadonlyArray<Game>;
@@ -561,7 +561,7 @@ with the `@<game>` tag and the other games' tags; `gameRules(suite)` names the f
 
 ### 6.2 Shared shell fixtures (`e2e/fixtures/shell.ts`, D1)
 
-`roomCode(page, game)`, `hostRoom(page, game, name)` (asserts `#onlineModeContent`, fills `#nameInput`, clicks `#hostBtn`, waits for `#hostWaitStatus` 'Waiting for your opponent to join' with BROKER_TIMEOUT), `join(page, game, name, code)` (pressSequentially into `#codeInput`, `#joinBtn`, `#guestWaitScreen`, `#guestWaitStatus` toHaveText `SHELL[game].hostAnswered` with WEBRTC_TIMEOUT), `reveal(page)` (`ginReveal` and `bgReveal` are the same 3 statements today), `startLocal(page, url, viewport, names, beforeStart?)` (5 of 8 statements shared; bg passes its selects in `beforeStart`), `resumeLabel(kind, …)`, `readSave(page, game)`. `gin.ts` and `backgammon.ts` keep their table helpers and `export const ginReveal = reveal` so the 20 importing specs do not move in that PR. Land after bg-online so the backgammon `join` has a real guest-answered string to assert.
+`roomCode(page, game)`, `hostRoom(page, game, name)` (asserts `#onlineModeContent`, fills `#nameInput`, clicks `#hostBtn`, waits for `#hostWaitStatus` 'Waiting for your opponent to join' with BROKER_TIMEOUT), `join(page, game, name, code)` (pressSequentially into `#codeInput`, `#joinBtn`, `#guestWaitScreen`, `#guestWaitStatus` toHaveText `SHELL[game].hostAnswered` with WEBRTC_TIMEOUT), `reveal(page)`, `hostStarts(host, guest)` (the four statements gin and backgammon opened their online tables with; dry-round-2.md I5), `startLocal(page, url, viewport, names, beforeStart?)` (5 of 8 statements shared; bg passes its selects in `beforeStart`), `resumeLabel(kind, …)`, `readSave(page, game)`. `gin.ts` and `backgammon.ts` keep their table helpers; the `export const ginReveal = reveal` aliases that spared the 13 importers (9 specs, 4 fixtures) in that PR went with dry-round-2.md I5 (the specs import `reveal` and `hostStarts` from here; backgammon's two online no-curtain asserts sit on its `SHELL_DRIVERS` row's `start`). Land after bg-online so the backgammon `join` has a real guest-answered string to assert.
 
 ### 6.3 `describe.each` shell specs
 
