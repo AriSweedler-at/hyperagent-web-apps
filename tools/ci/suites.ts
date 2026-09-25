@@ -164,7 +164,12 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // into lib/sound/cues.ts with cuePlayer.ts re-exporting the type: shared/lib still
       // 100/100/100/100 and the edge folder unchanged at 99.72/99.36/99.75/96.61 as the table prints
       // it (a type and data move; the coverage table before and after is byte-identical, measured on
-      // main at da40200 and this branch rebased onto it).
+      // main at da40200 and this branch rebased onto it). Re-measured when C3 (shared-shell.md §5)
+      // moved the boot itself (`bootShell`, the ~290 lines both main.ts files spelled around the B3
+      // helpers) into boot.ts: boot.test.ts drives the whole boot over the page fake, so the file
+      // stays at 100/100/100/100 (lines/functions/statements/branches) and the edge folder measures
+      // 99.72/99.36/99.75/96.61 before, 99.74/99.42/99.77/96.78 after as the table prints it
+      // (main.ts itself was never in a coverage row: it has no unit test; the game rows are untouched).
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The shared shell's helpers and painters (docs/design/glossary-links.md §3;

@@ -176,8 +176,9 @@ Exactly the card back's flow (docs/design/gin-card-backs.md §3):
   unreadable); intent `soundFont/set {font}` → effect `writeSoundFont`. The `fx` effect runner passes
   `app.soundFont` with the cue, so the reducer stays the source of truth and a settings panel later
   only dispatches the intent.
-- **Boot.** The one home read (`homeSnapshot()` in main.ts) logs a stored value that names no font
-  with `badSoundFontMsg(key, value)` and removes it, so the default stands and a reload is quiet.
+- **Boot.** The one home read (`homeSnapshot()` in `bootShell`, web/shared/edge/boot.ts, since C3;
+  each main.ts passes its key as `cfg.sound.fontKey`) logs a stored value that names no font with
+  `badSoundFontMsg(key, value)` and removes it, so the default stands and a reload is quiet.
 - **For now, the console.** `localStorage.setItem('ginRummy_soundFont', 'felt')` then a reload, or
   `__gin.soundFont('felt')`, which applies at once and remembers it; `__gin.soundFontName()` reads
   it back. A bad name (`__gin.soundFont('plaid')`) logs
@@ -216,7 +217,7 @@ that already exists.
 | `web/games/<game>/src/fx.ts` | game | plays a table entry through the edge with the App's font; the sound toggle |
 | `web/games/<game>/src/storage.ts` | game | the key, decoder, reader, writer |
 | `web/games/<game>/src/ui/state.ts` | game reducer | `App.soundFont`, `soundFont/set`, `writeSoundFont`, the `fx` effect carries the font |
-| `web/games/<game>/main.ts` | boot | the boot drop, `__<game>.soundFont(name)` and `soundFontName()` |
+| `web/shared/edge/boot.ts` | boot | `bootShell`: the boot drop before every home read, `__<game>.soundFont(name)` and `soundFontName()`; each `web/games/<game>/main.ts` passes `STORAGE_KEYS.soundFont` as `cfg.sound.fontKey` (C3) |
 
 Lint: `ui/` may import `web/shared/lib` (pure) and `web/shared/edge/dom.ts` only, so the table
 imports `SoundCue` from lib; the player is reached from `fx.ts` (no zone restricts it) and
@@ -238,8 +239,8 @@ at 100% coverage; `web/shared/edge/**` at its ratchet.
   the sample cache fetches once per URL.
 - **game**: storage round trip and the refusal of unknown names (the legacy-capture parity suite,
   test/parity/gin.storage.test.ts, lists the key as this page's own); `soundFont/set` writes and
-  the `fx` effect carries the font; `homeSnapshot()` drops a bad value (main.ts is boot, so the
-  e2e spec is its oracle); the e2e page-only spec
+  the `fx` effect carries the font; `homeSnapshot()` drops a bad value (in `bootShell` since C3:
+  web/shared/edge/boot.test.ts pins the drop, the e2e spec is the page's oracle); the e2e page-only spec
   (`e2e/gin-sound-font.spec.ts`, modelled on `gin-card-back.spec.ts`): a stored `arcade` shows after a
   reload through `__gin.soundFontName()`, `__gin.soundFont('felt')` applies and stores,
   `__gin.soundFont('plaid')` logs and refuses, a stored `tartan` is logged at boot and dropped.
