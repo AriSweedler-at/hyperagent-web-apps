@@ -1,0 +1,11 @@
+# Gin's four card backs, served to every game (docs/design/card-packs.md §2.2).
+# Copies of web/games/gin-rummy/backs/ (the gin page keeps its own through theme.css, so gin's
+# computed styles did not move); a Vite build serves only web/public/ as files, which is why the
+# pack data cannot point into the gin folder. The two SVGs are drawn (docs/design/gin-card-backs.md
+# §2); the three JPEGs are tools/card-backs.ts's derivation of web/games/gin-rummy/assets/yu-gi-oh-back.jpg,
+# the picture the owner supplied on 2026-09-22.
+default.svg       drawn     a navy lattice with a spade medallion
+blue-stripe.svg   drawn     the diagonal stripes the page opened with
+yu-gi-oh-112.jpg  owner     112 x 161, device-pixel ratio 1
+yu-gi-oh-224.jpg  owner     224 x 323, device-pixel ratio 2
+yu-gi-oh-336.jpg  owner     336 x 484, device-pixel ratio 3
