@@ -13,8 +13,10 @@ build) enforces both directions on dist/ for each game, reading three sources th
   tests).
 - Markup: the `class="..."` attributes of the served `games/<g>/index.html`.
 - CSS: every `.name` in the stylesheets the page links (the shared chunk's
-  `dist/shared/assets/<chunk>-<hash>.css`, which is `web/shared/styles/{tokens,base}.css`, then
-  `dist/shared/assets/<g>-<hash>.css`, its theme), with comments and strings blanked first.
+  `dist/shared/assets/<chunk>-<hash>.css`, which is `web/shared/styles/{tokens,base}.css`; on a
+  shell page, once docs/design/dry-round-2.md G1 lands `shell.css`, the shell games' sheet, which
+  fidice never links before its restyle; then `dist/shared/assets/<g>-<hash>.css`, its theme), with
+  comments and strings blanked first.
 
 The extraction is a few documented regular expressions, not a parser. Everything it cannot see is a
 row below, and the test checks each row against the tree so a row cannot go stale (a class whose

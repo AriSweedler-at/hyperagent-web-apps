@@ -168,7 +168,17 @@ export const readContract = (): ReadonlyArray<Row> =>
  */
 export const OWNERS: ReadonlyArray<string> = [...GAMES, 'shared', 'shell'];
 
-const isShellGame = (game: Game): boolean => (SHELL_GAMES as ReadonlyArray<Game>).includes(game);
+export const isShellGame = (game: Game): boolean =>
+  (SHELL_GAMES as ReadonlyArray<Game>).includes(game);
+
+/**
+ * A game's own theme under shared/assets/ (`<game>-<hash>.css`); every other sheet there is shared.
+ * A page links the common chunk's sheet (web/shared/styles/{tokens,base}.css), then, on a shell
+ * page once Wave F1 lands shell.css, the shell games' sheet, then its theme: the dist guards allow
+ * that middle sheet without requiring it (dry-round-2.md G4), and fidice never links it (risk 7).
+ */
+export const OWN_SHEET = new RegExp(`shared/assets/(${GAMES.join('|')})-[\\w-]+\\.css$`);
+export const SHEETS_MAX = (game: Game): number => (isShellGame(game) ? 3 : 2);
 
 /** The owners whose `class` rows apply to a game: itself, `shared` and, for a shell game, `shell`. */
 export const ownersOf = (game: Game): ReadonlyArray<string> => [
