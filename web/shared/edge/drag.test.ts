@@ -241,7 +241,7 @@ describe('bindDrag', () => {
     expect(t.released).toEqual([['a', 1]]);
   });
 
-  test('released over nothing: the ghost glides to the landing rect, moves and presses are ignored meanwhile, and the end follows the transition once', () => {
+  test('released over nothing: the ghost glides to the landing rect, moves, presses and releases are ignored meanwhile, and the end follows the transition once', () => {
     const t = table({ land: rect(160, 230, 40, 40) });
     t.a.fire('pointerdown', on(t.coin, 100, 100));
     t.a.fire('pointermove', on(t.coin, 200, 100));
@@ -253,13 +253,17 @@ describe('bindDrag', () => {
     t.a.fire('pointermove', on(t.coin, 350, 350));
     t.a.fire('pointerdown', on(t.coin, 350, 350, 2));
     t.a.fire('pointermove', on(t.coin, 550, 350, 2));
+    t.a.fire('pointerup', on(t.coin, 550, 350, 2));
     expect(t.intents).toHaveLength(2);
+    expect(t.ghost.removed()).toBe(false);
     t.ghost.fire('transitionend');
     expect(t.intents.at(-1)).toEqual({ type: 'end', over: null });
     expect(t.ghost.removed()).toBe(true);
     t.ghost.fire('transitionend');
     expect(t.intents).toHaveLength(3);
-    // The session is over: a new press starts afresh.
+    // The session is over: a stray release is nothing, and a new press starts afresh.
+    t.a.fire('pointerup', on(t.coin, 550, 350));
+    expect(t.intents).toHaveLength(3);
     t.a.fire('pointerdown', on(t.coin, 100, 100));
     t.a.fire('pointermove', on(t.coin, 200, 100));
     expect(t.intents.at(-1)).toEqual({ type: 'start', key: 'a:coin again' });

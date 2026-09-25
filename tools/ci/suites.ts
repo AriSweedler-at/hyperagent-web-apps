@@ -171,6 +171,13 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // stays at 100/100/100/100 (lines/functions/statements/branches) and the edge folder measures
       // 99.72/99.36/99.75/96.61 before, 99.74/99.42/99.77/96.78 after as the table prints it
       // (main.ts itself was never in a coverage row: it has no unit test; the game rows are untouched).
+      // Re-measured when E1 (dry-round-2.md §5 Wave E) added the pointer-drag kernel edge/drag.ts
+      // (both games' draggers configure it; 100/100/100/100 over drag.test.ts's eight cases on the
+      // page fake with fake rects, a queued rAF stub and fake timers) and lib/drag.ts (the pure
+      // gesture: Point, Rect, DRAG_THRESHOLD, startedDrag, inside; 100/100/100/100 over
+      // lib/drag.test.ts): shared/lib still 100/100/100/100; the edge folder 99.73/99.37/99.76/96.62
+      // before, 99.75/99.39/99.78/96.88 after (the same three lines uncovered elsewhere, 1094 → 1177
+      // lines). Measured on main at 8b50ce9 and this branch rebased onto it.
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The shared shell's helpers and painters (docs/design/glossary-links.md §3;
@@ -291,6 +298,12 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // after (17 lines uncovered of 977: the lines moved out were fully covered, so the ratios dip
       // while the row stands); shellConfig.ts measures 100/100/100/100 through state.test.ts and
       // the parity suites. Measured on this branch rebased onto main at 75dc0bd (#89).
+      // Re-measured when E1 (dry-round-2.md §5 Wave E) moved the drag's pointer events, ghost,
+      // capture, frames and landing out of ui/hand/dragger.ts into web/shared/edge/drag.ts (the
+      // residue configures the kernel; ui/hand/drag.ts keeps the momentum and re-exports the gesture
+      // from web/shared/lib/drag.ts): ui 98.26/97.93/97.35/94.33 before, 98.80/97.95/98.12/95.06
+      // after (11 lines uncovered of 920, 977 → 920 lines; the row stands). Measured on main at
+      // 8b50ce9 and this branch rebased onto it.
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -469,6 +482,11 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // its sixteen calls with one shellPaint `bindButtons` table and keyed the match score and the
       // history list through web/shared/ui/keyed.ts: ui 99.51/100/98.65/92.08 before,
       // 99.50/100/98.62/92.12 after (the same 6 lines uncovered, 1218 → 1195 lines; the row stands).
+      // Re-measured when E1 (dry-round-2.md §5 Wave E) moved the drag's pointer events, ghost,
+      // capture and landing out of ui/board/dragger.ts into web/shared/edge/drag.ts (the residue
+      // configures the kernel): ui 99.50/100/98.62/92.12 before, 99.47/100/98.71/92.06 after (the
+      // same 6 lines uncovered, 1195 → 1141 lines; the row stands). Measured on main at 8b50ce9 and
+      // this branch rebased onto it.
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
