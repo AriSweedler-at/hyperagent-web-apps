@@ -5,21 +5,20 @@
 // under these cue names; fx.test.ts pins that the default font still plays them number for
 // number. The buzz stays here because a vibration is not part of a font (§1 "Haptics"). Nothing
 // else in the game names a sound: fx.ts plays a row through the shared edge with the App's font.
-import type { SoundCue } from '../../../../shared/lib/sound/cues.ts';
+import { SHELL_CUES, type CueSpec } from '../../../../shared/lib/sound/cues.ts';
 import type { Cue } from './cues.ts';
 
-/** What one event plays: the cue the font voices, and a vibration pattern. */
-export type CueSpec = Readonly<{ cue: SoundCue; buzz: number | ReadonlyArray<number> }>;
+// `CueSpec` (one row: the cue the font voices, and a vibration pattern) is web/shared/lib's since
+// DRY round 2 (dry-round-2.md E9); re-exported so this module's import path holds.
+export type { CueSpec };
 
 export const CUES: Readonly<Record<Cue | 'tap', CueSpec>> = {
-  tap: { cue: 'tap', buzz: 12 },
-  yourTurn: { cue: 'turn', buzz: [40, 60, 40] },
+  // The shell's four rows (tap, yourTurn, win, lose), the same in every game (E9).
+  ...SHELL_CUES,
   knockGood: { cue: 'good', buzz: [30, 40, 30, 40, 60] },
   gin: { cue: 'great', buzz: [50, 50, 50, 50, 120] },
   bad: { cue: 'bad', buzz: [120] },
   neutral: { cue: 'neutral', buzz: 30 },
-  win: { cue: 'victory', buzz: [80, 50, 80, 50, 200] },
-  lose: { cue: 'loss', buzz: [200] },
   // The opponent's pickup (ui/cues.ts `oppDrawCue`): the stock is face down, the discard pile face up.
   oppStock: { cue: 'draw', buzz: 15 },
   oppDiscard: { cue: 'pickup', buzz: 15 },

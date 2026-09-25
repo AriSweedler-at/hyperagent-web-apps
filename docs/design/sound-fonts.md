@@ -117,20 +117,25 @@ each to a cue and a buzz pattern. Nothing else in the game names a sound.
 
 ```ts
 // web/games/gin-rummy/src/ui/sound.ts (the table; the numbers moved into the default font)
-export type CueSpec = Readonly<{ cue: SoundCue; buzz: number | ReadonlyArray<number> }>;
+import { SHELL_CUES, type CueSpec } from '../../../../shared/lib/sound/cues.ts';
 export const CUES: Readonly<Record<Cue | 'tap', CueSpec>> = {
-  tap: { cue: 'tap', buzz: 12 },
-  yourTurn: { cue: 'turn', buzz: [40, 60, 40] },
+  ...SHELL_CUES, // tap, yourTurn, win, lose: the shell's four rows, the same in every game
   knockGood: { cue: 'good', buzz: [30, 40, 30, 40, 60] },
   gin: { cue: 'great', buzz: [50, 50, 50, 50, 120] },
   bad: { cue: 'bad', buzz: [120] },
   neutral: { cue: 'neutral', buzz: 30 },
-  win: { cue: 'victory', buzz: [80, 50, 80, 50, 200] },
-  lose: { cue: 'loss', buzz: [200] },
   oppStock: { cue: 'draw', buzz: 15 },
   oppDiscard: { cue: 'pickup', buzz: 15 },
 };
 ```
+
+The shell's four rows. `CueSpec` (one row: the cue and the buzz) and `SHELL_CUES` (`tap → tap`
+12, `yourTurn → turn` [40, 60, 40], `win → victory` [80, 50, 80, 50, 200], `lose → loss` [200])
+live in `web/shared/lib/sound/cues.ts` since DRY round 2 (dry-round-2.md E9): the rows the shell
+asks of every table (shared-shell.md §5 `cues`) were the two games' byte for byte, so each table
+spreads them and writes only the game's own events, the shell sounds the same in every game, and
+a fourth game's table is its own rows alone. The games' `ui/sound.ts` and
+`web/shared/edge/cuePlayer.ts` re-export `CueSpec`, so their import paths hold.
 
 Backgammon's table (its `src/ui/sound.ts`, written with the page): `select → tap`, `move → move`,
 `roll → roll`, `hit → capture` (the hitter) and `wasHit → bad` (the player hit: two events, one
@@ -202,7 +207,7 @@ that already exists.
 
 | Module | Zone | Holds |
 | --- | --- | --- |
-| `web/shared/lib/sound/cues.ts` | pure | `SOUND_CUES`, `SoundCue`, one comment per cue (section 2) |
+| `web/shared/lib/sound/cues.ts` | pure | `SOUND_CUES`, `SoundCue`, one comment per cue (section 2); `CueSpec` and `SHELL_CUES`, the shell's four rows every table spreads (section 5) |
 | `web/shared/lib/sound/sound.ts` | pure | `Sound`, `Note`, `OscillatorType` (moved here from `web/shared/edge/fx.ts`, which imports them) |
 | `web/shared/lib/sound/fonts.ts` | pure | `SOUND_FONTS`, `SoundFontName`, `DEFAULT_SOUND_FONT`, `isSoundFont`, `badSoundFontMsg`, `fontByName`, `resolveSound` |
 | `web/shared/lib/sound/fonts/{default,felt,arcade}.ts` | pure | the fonts as data |
@@ -226,6 +231,9 @@ at 100% coverage; `web/shared/edge/**` at its ratchet.
 - **legacy pin**: for every gin event, `resolveSound(default, CUES[event].cue)` equals the legacy
   table's notes, voice and gain number for number, and the buzz is unchanged
   (`web/games/gin-rummy/src/fx.test.ts`, against the frozen legacy numbers).
+- **the shell's rows**: `SHELL_CUES` is four rows in order, each on a generic cue with a buzz
+  (`cues.test.ts`); each game's fx.test.ts pins the four against its frozen copy and that its
+  table's rows are those objects; cuePlayer.test.ts compiles a row by both `CueSpec` paths.
 - **edge**: `playSound` for each kind over fakes; a failing fetch and a failing decode are silent;
   the sample cache fetches once per URL.
 - **game**: storage round trip and the refusal of unknown names (the legacy-capture parity suite,

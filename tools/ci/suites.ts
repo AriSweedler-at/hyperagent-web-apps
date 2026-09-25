@@ -125,6 +125,11 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // (dry-round-2 E7) moved the two games' page-fake assembly into page.fake.ts `shellPage`, every
       // new branch under page.fake.test.ts: the folder 99.72/99.36/99.75/96.57 before,
       // 99.72/99.37/99.76/96.62 after (measured on main at 0b1bec3 and this branch rebased onto it).
+      // Re-measured when D4 (dry-round-2 E9) moved `CueSpec` and the shell's four rows (`SHELL_CUES`)
+      // into lib/sound/cues.ts with cuePlayer.ts re-exporting the type: shared/lib still
+      // 100/100/100/100 and the edge folder unchanged at 99.72/99.36/99.75/96.61 as the table prints
+      // it (a type and data move; the coverage table before and after is byte-identical, measured on
+      // main at da40200 and this branch rebased onto it).
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The shared shell's helpers and painters (docs/design/glossary-links.md §3;

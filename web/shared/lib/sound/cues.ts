@@ -1,9 +1,10 @@
 // The cue vocabulary every game speaks (docs/design/sound-fonts.md §2): what happened, in words
 // no game owns. A game keeps its own event names and maps each onto one of these in a single
-// table (gin: src/ui/sound.ts); a font (fonts.ts) composes one sound per cue, so a new font
-// re-voices every game at once and a game never names a sound. Adding a cue is a shared change:
-// the `default` font must gain a sound for it (fonts.test.ts pins that it is total). Pure: a cue
-// is a name.
+// table (gin: src/ui/sound.ts) whose rows are `CueSpec`s and whose first four rows are the shell's
+// (`SHELL_CUES`, below); a font (fonts.ts) composes one sound per cue, so a new font re-voices
+// every game at once and a game never names a sound. Adding a cue is a shared change: the
+// `default` font must gain a sound for it (fonts.test.ts pins that it is total). Pure: a cue is a
+// name.
 export const SOUND_CUES = [
   /** A touch acknowledged: a card or checker selected, a menu opened, a toggle flipped. */
   'tap',
@@ -47,3 +48,17 @@ export const SOUND_CUES = [
   'invite',
 ] as const;
 export type SoundCue = (typeof SOUND_CUES)[number];
+
+/** What one event plays: the cue the font voices, and a vibration pattern. */
+export type CueSpec = Readonly<{ cue: SoundCue; buzz: number | ReadonlyArray<number> }>;
+
+// The four rows every game's table carries (docs/design/shared-shell.md §5 `cues`: the shell taps
+// on a touch, chimes the turn, plays the win and the loss), spelt once so a table spreads them
+// (`...SHELL_CUES`) and writes only its own events (docs/design/dry-round-2.md E9). They were the
+// two tables' byte for byte, and each game's fx.test.ts still pins them against its frozen copy.
+export const SHELL_CUES: Readonly<Record<'tap' | 'yourTurn' | 'win' | 'lose', CueSpec>> = {
+  tap: { cue: 'tap', buzz: 12 },
+  yourTurn: { cue: 'turn', buzz: [40, 60, 40] },
+  win: { cue: 'victory', buzz: [80, 50, 80, 50, 200] },
+  lose: { cue: 'loss', buzz: [200] },
+};

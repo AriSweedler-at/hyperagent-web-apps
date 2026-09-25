@@ -6,7 +6,7 @@
 // and the wiring of its key beside its fx.ts.
 import { describe, expect, test } from 'vitest';
 
-import type { SoundCue } from '../lib/sound/cues.ts';
+import type { CueSpec as LibCueSpec, SoundCue } from '../lib/sound/cues.ts';
 import { fontByName, resolveSound, type SoundFontName } from '../lib/sound/fonts.ts';
 import { createCuePlayer, type CueSpec, type SoundState } from './cuePlayer.ts';
 import type { AudioCues, Note, OscillatorType } from './fx.ts';
@@ -78,6 +78,13 @@ const seqOf = (font: SoundFontName, cue: SoundCue): Call => {
 };
 
 describe('createCuePlayer', () => {
+  test("CueSpec is web/shared/lib/sound/cues.ts's, re-exported (dry-round-2.md E9): one type, both paths", () => {
+    // A compile check: a row typed by either path is a row by the other.
+    const fromLib: LibCueSpec = CUES.tap;
+    const fromEdge: CueSpec = fromLib;
+    expect(fromEdge).toBe(CUES.tap);
+  });
+
   test('play: every event is one sequence from the font and its buzz', () => {
     const { player, calls, buzzes } = world();
     EVENTS.forEach((event) => {
