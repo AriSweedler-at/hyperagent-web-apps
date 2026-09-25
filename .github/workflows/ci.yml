@@ -136,8 +136,8 @@ jobs:
       - name: Transport integration (real PeerJS through a local PeerServer)
         run: npm run test:shared-integration
 
-  # The game suites (tools/ci/suites.ts GAME_SUITES: gin, fidice, backgammon), one matrix entry
-  # each: its unit tests, parity oracles, fixture pins and seeded replays, with coverage.
+  # The game suites (tools/ci/suites.ts GAME_SUITES), one matrix entry each: its unit tests,
+  # parity oracles, fixture pins and seeded replays, with coverage.
   game:
     needs: changes
     if: needs.changes.outputs.games != '[]'
@@ -204,8 +204,8 @@ jobs:
 
   # ---- the Playwright runs: one matrix job over the game suites, one job for the site ------------
   # `npm run test:e2e:<suite>` builds dist/ first (deterministic, under a second), then plays that
-  # suite's specs on both emulated origins with four workers. The @relay specs (gin, fidice,
-  # backgammon) play through a TURN relay of the harness's own: playwright.config.ts starts
+  # suite's specs on both emulated origins with four workers. The @relay specs (every game has
+  # one) play through a TURN relay of the harness's own: playwright.config.ts starts
   # `turnserver` on :3478 once the coturn action has stopped the system one. The site suite has no
   # relay spec, so it runs with E2E_TURN=off and installs no coturn.
   e2e-game:

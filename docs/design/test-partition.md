@@ -137,10 +137,10 @@ replays go through `npm run test:gin -- test/parity/gin.replay` and `npm run tes
 web/games/backgammon/src/engine/replay` (the file filter applies inside a project); the baselines
 job keeps `npm run test:e2e -- e2e/gin-stories.spec.ts --project pages --update-snapshots=all`.
 
-Critical paths: docs-only ~ `check`; a backgammon- or fidice-only PR ~ `changes` -> `e2e-<g>`;
-a gin or shared PR ~ `changes` -> `e2e-gin` (the stories spec at three viewports is the long
-pole; `--shard` on `e2e-gin` is the lever if it ever needs one); main runs everything, then
-`ci-ok`, then `deploy`.
+Critical paths: docs-only ~ `check`; a backgammon- or fidice-only PR ~ `changes` ->
+`e2e-game (<g>)`; a gin or shared PR ~ `changes` -> `e2e-game (gin)` (the stories spec at three
+viewports is the long pole; `--shard` on the matrix job's gin entry is the lever if it ever needs
+one); main runs everything, then `ci-ok`, then `deploy`.
 
 ## Coverage, measured per suite
 
