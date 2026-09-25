@@ -122,6 +122,9 @@ const listNames = (players: ReadonlyArray<Player>, seats: ReadonlyArray<Seat>): 
 /** The trump suit a trick's detail can name: a trump was played iff a trump won (E7). */
 const trumpOf = (trick: TrickData): string | null => (trick.briscola ? trick.winningCard.s : null);
 
+/** The suit to follow, the first card's; a resolved trick is never empty. */
+const ledSuit = (trick: TrickData): string | undefined => trick.cards.map((p) => p.card.s)[0];
+
 /** "Ari · asso di coppe", "Jeff · due di bastoni (briscola)". */
 const playLine = (players: ReadonlyArray<Player>, trick: TrickData, p: Played): string =>
   `${nameOf(players, p.seat)} · ${cardName(p.card)}${p.card.s === trumpOf(trick) ? ' (briscola)' : ''}`;
@@ -131,20 +134,21 @@ const playLine = (players: ReadonlyArray<Player>, trick: TrickData, p: Played): 
  * by STRENGTH); null when none of them contended (every other card was of a third suit).
  */
 const runnerUp = (trick: TrickData): Card | null => {
-  const led = trick.cards[0]?.card.s;
+  const led = ledSuit(trick);
   const trump = trumpOf(trick);
   const power = (c: Card): number =>
     c.s === trump ? 20 + STRENGTH[c.r] : c.s === led ? STRENGTH[c.r] : 0;
-  const best = trick.cards
+  const contenders = trick.cards
     .map((p) => p.card)
-    .filter((c) => c.id !== trick.winningCard.id)
-    .reduce<Card | null>((b, c) => (b === null || power(c) > power(b) ? c : b), null);
-  return best !== null && power(best) > 0 ? best : null;
+    .filter((c) => c.id !== trick.winningCard.id && power(c) > 0);
+  return contenders.length === 0
+    ? null
+    : contenders.reduce((b, c) => (power(c) > power(b) ? c : b));
 };
 
 /** E8's expanded row: every card in play order, who beat what, the points, the carichi that changed sides, the draw. */
 const trickDetail = (players: ReadonlyArray<Player>, n: SeatCount, trick: TrickData): Detail => {
-  const led = trick.cards[0]?.card.s;
+  const led = ledSuit(trick);
   const beaten = runnerUp(trick);
   const stolenFrom = trick.cards
     .filter((p) => p.card.s === led && isCarico(p.card) && sideOf(n, p.seat) !== trick.winnerSide)
@@ -202,12 +206,12 @@ export const detailOf = (
     case 'result':
       return [
         ...sideList(n).map(
-          (side) => [sideName(players, n, side), String(event.data.totals[side] ?? 0)] as const,
+          (side) => [sideName(players, n, side), String(event.data.totals[side])] as const,
         ),
         [
           'Match',
           sideList(n)
-            .map((side) => `${sideName(players, n, side)} ${String(event.data.wins[side] ?? 0)}`)
+            .map((side) => `${sideName(players, n, side)} ${String(event.data.wins[side])}`)
             .join(' · '),
         ],
       ];
