@@ -20,6 +20,7 @@ import {
   decodeState,
   isShippedVariant,
   matchOver,
+  matchWinner,
   viewFor,
   type ShippedVariant,
 } from './engine/index.ts';
@@ -100,6 +101,13 @@ export const BACKGAMMON_SHELL: ShellGameData<Backgammon> = {
     }),
     // `position/load` (`__backgammon.setup(state)`): the save's decoder checks the hand-made state.
     decodeState,
+  },
+  // The finished match's record (the owner, 2026-09-25): a match is its opening's clock (a
+  // rematch opens under a new one), its score the match score, its victor `matchWinner`.
+  result: {
+    keyOf: (view) => String(view.startedAt),
+    scoreOf: (view) => `${String(view.match.score[0])}–${String(view.match.score[1])}`,
+    winnerOf: (view) => matchWinner(view.match),
   },
   frames: { lobby, state, toast, action },
   cues: { initial: INITIAL_CUES },

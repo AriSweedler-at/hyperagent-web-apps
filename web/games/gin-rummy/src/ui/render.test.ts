@@ -6,7 +6,9 @@
 import { describe, expect, test } from 'vitest';
 
 import { fakeEl, fakeTarget } from '../../../../shared/edge/page.fake.ts';
+import type { RecentGame } from '../../../../shared/lib/recentGames.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
+import { recentGamesHtml } from '../../../../shared/ui/recentGames.ts';
 import {
   applyAction,
   createGame,
@@ -726,6 +728,28 @@ describe('the table', () => {
     paintAll(p.doc, local(knocked, 0, { table: { history: 'scorer' } }));
     expect(p.get('historyOverlay').hidden()).toBe(false);
     expect(p.get('historyList').text()).toBe(historyHtml(v).markup);
+    // The finished games under the hands (web/shared/ui/recentGames.ts): none yet, so the slot is
+    // empty; with records, one line each under the game's history, none under the Score Counter's.
+    expect(p.get('recentGames').text()).toBe('');
+    const record: RecentGame = {
+      at: NOW,
+      mode: 'local',
+      players: ['Ann', 'Bob'],
+      score: '104–87',
+      winner: 0,
+      outcome: 'win',
+    };
+    paintAll(
+      p.doc,
+      local(knocked, 0, { shell: { recentGames: [record] }, table: { history: 'game' } }),
+    );
+    expect(p.get('recentGames').text()).toBe(recentGamesHtml([record]).markup);
+    expect(p.get('recentGames').text()).toContain('<span class="recent-game-score">104–87</span>');
+    paintAll(
+      p.doc,
+      local(knocked, 0, { shell: { recentGames: [record] }, table: { history: 'scorer' } }),
+    );
+    expect(p.get('recentGames').text()).toBe('');
     paintAll(p.doc, local(knocked, 0));
     expect(p.get('rulesOverlay').hidden()).toBe(true);
     expect(p.get('historyOverlay').hidden()).toBe(true);

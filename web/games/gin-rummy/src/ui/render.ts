@@ -69,6 +69,7 @@ import {
   type Sheet,
 } from '../../../../shared/ui/shellPaint.ts';
 import { ensureKeyed } from '../../../../shared/ui/keyed.ts';
+import { paintRecentGames } from '../../../../shared/ui/recentGames.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { aboutHtml } from './about.ts';
@@ -636,6 +637,9 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
   paintSheet(doc, 'historyOverlay', app.table.history !== null);
   if (app.table.history === 'game')
     setHtml(requireId(doc, 'historyList'), historyHtml(app.shell.view));
+  // The finished games under the game's hands (web/shared/ui/recentGames.ts); the Score Counter's
+  // sheet lists its own rounds alone.
+  paintRecentGames(doc, app.table.history === 'game' ? app.shell.recentGames : []);
 };
 
 // ---- the whole paint -----------------------------------------------------------------------------

@@ -99,6 +99,11 @@ export const STORAGE_KEYS = {
    */
   soundFont: 'ginRummy_soundFont',
   /**
+   * The finished games this device remembers (web/shared/lib/recentGames.ts, JSON, newest first,
+   * at most 20; the owner's game history of 2026-09-25). This page's own key, like the sound font.
+   */
+  recentGames: 'ginRummy_recentGames',
+  /**
    * The Score Counter's session. Its players' names are `name` and `p2Name` above (the legacy
    * `ginRummy_scorerNames` list is retired: the Score Counter scores the two pass-and-play players).
    */
@@ -175,6 +180,12 @@ export const {
   enabled: soundEnabled,
 } = SHELL_STORE.sound;
 export const { read: readSoundFont, write: writeSoundFont } = SHELL_STORE.soundFont;
+/** The finished games: the stored list or [], and one game put first under the cap. */
+export const {
+  read: readRecentGames,
+  write: writeRecentGames,
+  append: appendRecentGame,
+} = SHELL_STORE.recentGames;
 
 // ---- this page's own preferences -----------------------------------------------------------
 

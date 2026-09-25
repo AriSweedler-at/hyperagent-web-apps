@@ -95,6 +95,9 @@ export const runShellEffect = <G extends ShellTypes>(
     case 'writeSoundFont':
       cfg.prefs.soundFont.write(deps.store, effect.font);
       return;
+    case 'recordGame':
+      cfg.prefs.recentGames.append(deps.store, effect.game);
+      return;
     case 'toast':
       deps.toast(effect.message, effect.ms);
       return;

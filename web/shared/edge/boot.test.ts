@@ -46,6 +46,7 @@ import { GUEST_WATCHDOG_MSG, GuestSession, type GuestCodec } from '../net/guest.
 import { HostSession, WAITING_MSG, type HostCodec } from '../net/host.ts';
 import { CODE, cell, guestCtx, hostCtxFor, settle, world } from '../net/sessions.harness.ts';
 import { WATCHDOG_MS } from './peer.ts';
+import type { RecentGame } from '../lib/recentGames.ts';
 import type { Ctx, Effect, GuestFrameOf, HomeSnapshot, HostFrameOf, Intent } from '../ui/shell.ts';
 import { SHELL_CUES } from '../lib/sound/cues.ts';
 import type { Phrase } from '../lib/sound/phrase.ts';
@@ -385,7 +386,11 @@ type HostFrame2 = HostFrameOf<Fake>;
 type GuestFrame2 = GuestFrameOf<Fake>;
 /** The App the boot reads two fields of; `home` and `steps` show the reducer ran. */
 type App = Readonly<{
-  shell: Readonly<{ soundFont: SoundFontName; view: View | null }>;
+  shell: Readonly<{
+    soundFont: SoundFontName;
+    view: View | null;
+    recentGames: ReadonlyArray<RecentGame>;
+  }>;
   home: HomeSnapshot<Fake> | null;
   steps: number;
 }>;
@@ -401,6 +406,7 @@ const HOME: HomeSnapshot<Fake> = {
   playMode: 'online',
   soundFont: 'default',
   save: null,
+  recentGames: [],
   extra: 'x',
 };
 const VIEW: View = { seat: 1 };
@@ -582,7 +588,11 @@ const bootPage = (options: Options = {}) => {
       },
     },
   };
-  const initialApp: App = { shell: { soundFont: 'default', view: null }, home: null, steps: 0 };
+  const initialApp: App = {
+    shell: { soundFont: 'default', view: null, recentGames: [] },
+    home: null,
+    steps: 0,
+  };
   const reduce = (
     app: App,
     intent: FakeIntent,
@@ -814,9 +824,12 @@ describe('bootShell', () => {
       'legal',
       'soundFont',
       'soundFontName',
+      'recentGames',
       'act',
       'view',
     ]);
+    // The finished games, as the shell state holds them (the history sheet's list).
+    expect((hook['recentGames'] as () => unknown)()).toEqual([]);
     // `app` is live: a step that changes the App is seen through it.
     expect(hook['app']).toBe(b.boot.app());
     (hook['act'] as (a: Action) => void)({ move: 1 });

@@ -62,6 +62,7 @@ import {
   rollModalOpen,
   runEffect,
   saveFor,
+  BACKGAMMON,
   type App,
   type Effect,
   type EffectDeps,
@@ -104,6 +105,7 @@ const home: HomeSnapshot = {
   curtainMode: 'always',
   soundFont: 'default',
   save: null,
+  recentGames: [],
 };
 
 const fakeStorage = (): StorageLike & Readonly<{ map: Map<string, string> }> => {
@@ -1593,6 +1595,51 @@ describe('resume', () => {
   });
 });
 
+describe('the finished match`s record (the owner, 2026-09-25)', () => {
+  const records = (effects: ReadonlyArray<Effect>): ReadonlyArray<unknown> =>
+    effects.flatMap((e) => (e.type === 'recordGame' ? [e.game] : []));
+
+  test('the adapters: the opening`s clock is the key, the match score the score, `matchWinner` the victor', () => {
+    const l = local();
+    const v = view(l);
+    expect(BACKGAMMON.result.keyOf(v)).toBe(String(game(l).startedAt));
+    expect(BACKGAMMON.result.scoreOf(v)).toBe('0–0');
+    expect(BACKGAMMON.result.winnerOf(v)).toBeNull();
+    const won: View = { ...v, match: { ...v.match, score: [2, 5] }, matchOver: true };
+    expect(BACKGAMMON.result.scoreOf(won)).toBe('2–5');
+    expect(BACKGAMMON.result.winnerOf(won)).toBe(1);
+  });
+
+  test('pass and play: the bear-off that takes the match records it once, a win for the first name; the end screen`s repaints record nothing more', () => {
+    // Light's last checker on its 1-point at 4–0 in a match to 5 (Dark's fifteen well away from
+    // it: its own 24 is Light's own 1): the bear-off is a gammon, and the match.
+    const l = local();
+    const seated = {
+      ...withPosition(game(l), pos('L: 1:1 | D: 1:13 6:2 | bar 0/0 | off 14/0'), 0, [2, 1]),
+      match: { ...game(l).match, score: [4, 0] as const },
+    };
+    const before = run(revealed(l), { type: 'position/load', state: seated });
+    expect(records(before.effects)).toEqual([]);
+    const done = playOut(before, 20);
+    expect(view(done.app).matchOver).toBe(true);
+    expect(records(done.effects)).toEqual([
+      {
+        at: NOW,
+        mode: 'local',
+        players: ['Ann', 'Bob'],
+        score: '6–0',
+        winner: 0,
+        outcome: 'win',
+      },
+    ]);
+    expect(done.app.shell.recentGames).toHaveLength(1);
+    expect(done.app.shell.screen).toBe('endgameScreen');
+    expect(records(run(done.app, { type: 'render' }, { type: 'history/toggle' }).effects)).toEqual(
+      [],
+    );
+  });
+});
+
 describe('storage', () => {
   test('saveFor: one shape per role, handoff written only when true, nothing for no role', () => {
     expect(saveFor(initialApp)).toBeNull();
@@ -1637,6 +1684,7 @@ describe('storage', () => {
       curtainMode: 'never',
       soundFont: 'felt',
       save: null,
+      recentGames: [],
     });
     storage.map.set(STORAGE_KEYS.variant, 'plakoto');
     storage.map.set(STORAGE_KEYS.matchLength, '4');

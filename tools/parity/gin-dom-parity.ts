@@ -10,6 +10,7 @@
 // table opens (the sheets, the overlays, the toast) still compares at every checkpoint. Only
 // whitespace, the two rules slots' ids, the `#handoffBtn` button and the row that holds it, the
 // sandbox (its two mode buttons and `#sandboxModeContent`; the new page's markup additions), the
+// finished games under the history list (`#recentGames`, the owner's game history), the
 // result body's key, the hidden curtain's stale text (the knock's layoff phase, §7b, shows a
 // curtain the legacy never did), the glossary (docs/design/glossary-links.md: the About tab and
 // its panel, the rule ids and the jargon links, the shorter Score tab label) and the Lay off
@@ -75,6 +76,10 @@ export const normalise = (html: string): string =>
     // (`#rrBody`'s `data-key`, the shared keyed slot since docs/design/dry-round-2.md D1; the
     // legacy page carries no data-key anywhere the oracle snapshots).
     .replace(/ data-key="[^"]*"/g, '')
+    // The finished games under the history list (web/shared/ui/recentGames.ts, the owner's game
+    // history of 2026-09-25): the slot and whatever it lists are new, so the block is dropped
+    // (its rows spell no `</div>`, so the first one closes the slot).
+    .replace(/<div class="recent-games" id="recentGames">[\s\S]*?<\/div>/g, '')
     // A hidden curtain keeps the text of its last showing, and the new page shows one the legacy
     // never had: a knock hands the phone to the defender to lay off (§7b). Unseen, it is blanked.
     .replace(

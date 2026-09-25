@@ -110,6 +110,7 @@ import {
   type ToastMarks,
 } from '../../../../shared/ui/shellPaint.ts';
 import { ensureKeyed } from '../../../../shared/ui/keyed.ts';
+import { paintRecentGames } from '../../../../shared/ui/recentGames.ts';
 import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { aboutHtml } from './about.ts';
@@ -633,6 +634,8 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
     const v = app.shell.view;
     const key = v === null ? '-' : `${String(v.gameNo)}:${String(v.log.length)}`;
     ensureKeyed(list, key, () => historyHtml(v).markup);
+    // The finished matches under this game's log (web/shared/ui/recentGames.ts).
+    paintRecentGames(doc, app.shell.recentGames);
   }
   paintSheet(doc, 'menuOverlay', app.table.menuOpen);
   // The binder has no App: the mode a change switches to is painted onto the checkbox.

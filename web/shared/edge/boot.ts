@@ -12,6 +12,7 @@
 // two main.ts files read it: the harness's `window.__rng` when installed, else the real one.
 import type { Clock } from '../lib/clock.ts';
 import { inviteUrl } from '../lib/invite.ts';
+import type { RecentGame } from '../lib/recentGames.ts';
 import type { Rng } from '../lib/rng.ts';
 import { badSoundFontMsg, isSoundFont, type SoundFontName } from '../lib/sound/fonts.ts';
 import type { GuestEvents } from '../net/guest.ts';
@@ -199,9 +200,13 @@ export const sessionEvents = <G, H>(deps: SessionEventDeps<G, H>): SessionEvents
 /** A game's type bag with the store the edge builds (web/shared/edge/storage.ts): what `bootShell` reads of it. */
 export type BootTypes = ShellTypes & Readonly<{ Store: Store }>;
 
-/** What the boot reads of an App: the font every cue plays in and my view (the hook's `legal()`). */
+/** What the boot reads of an App: the font every cue plays in, my view (the hook's `legal()`) and the finished games (the hook's `recentGames()`). */
 export type BootApp<G extends BootTypes> = Readonly<{
-  shell: Readonly<{ soundFont: SoundFontName; view: G['View'] | null }>;
+  shell: Readonly<{
+    soundFont: SoundFontName;
+    view: G['View'] | null;
+    recentGames: ReadonlyArray<RecentGame>;
+  }>;
 }>;
 
 /** The page's `document` as the boot reads it: the paint's and the binders' view, plus its visibility. */
@@ -588,6 +593,8 @@ export const bootShell = <
       dispatch({ type: 'soundFont/set', font: name });
     },
     soundFontName: (): string => app.shell.soundFont,
+    /** The finished games this device remembers, newest first (web/shared/lib/recentGames.ts): what the history sheet lists. */
+    recentGames: (): ReadonlyArray<RecentGame> => app.shell.recentGames,
     ...cfg.hooks?.hook?.(ctx),
   };
   // `window.__gin = { … }` as the legacy page wrote it: the one write the boot makes on the window.

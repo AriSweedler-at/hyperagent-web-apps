@@ -87,6 +87,13 @@ export const GIN_SHELL: ShellGameData<Gin> = {
     // The shell's `position/load` decodes with the save's decoder; gin's sandbox deals a map instead (`sandbox/start`), so no hook sends it.
     decodeState,
   },
+  // The finished game's record (the owner, 2026-09-25): a game is its deal's clock (a rematch
+  // deals under a new one), its score the two totals, its victor the seat `readyAfterRound` named.
+  result: {
+    keyOf: (view) => String(view.startedAt),
+    scoreOf: (view) => `${String(view.players[0].total)}–${String(view.players[1].total)}`,
+    winnerOf: (view) => view.winner,
+  },
   frames: { lobby, state, toast, action },
   cues: { initial: INITIAL_CUES },
   home: {

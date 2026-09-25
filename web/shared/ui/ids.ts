@@ -58,12 +58,14 @@ export const SHELL_IDS: ReadonlyArray<string> = [
   'rulesBtnGame',
   'historyBtn',
   // The sheets both games open from the table (shellPaint.ts `paintSheet`, `bindSheets`); the
-  // history sheet's four are HISTORY_IDS below (web/shared/ui/history.ts paints its list).
+  // history sheet's five are HISTORY_IDS below (web/shared/ui/history.ts paints its list,
+  // web/shared/ui/recentGames.ts the finished games under it).
   'rulesOverlay',
   'rulesOverlayList',
   'closeRulesBtn',
   'historyOverlay',
   'historyList',
+  'recentGames',
   'closeHistoryBtn',
   // The pass-and-play curtain (curtain.ts).
   'curtainOverlay',
@@ -77,14 +79,17 @@ export const SHELL_IDS: ReadonlyArray<string> = [
 
 /**
  * The history sheet (docs/design/briscola-sound-history.md §6): the table button that opens it,
- * its overlay, the list web/shared/ui/history.ts paints and its close button, every one in
- * SHELL_IDS above (so every shell page carries them; briscola's will). Backgammon's menu entry
- * `menuHistoryBtn` is its menu sheet's, which gin has no twin of, so it is not the shell's.
+ * its overlay, the list web/shared/ui/history.ts paints, the finished games under it
+ * (web/shared/ui/recentGames.ts, the owner's game history of 2026-09-25) and its close button,
+ * every one in SHELL_IDS above (so every shell page carries them; briscola's will). Backgammon's
+ * menu entry `menuHistoryBtn` is its menu sheet's, which gin has no twin of, so it is not the
+ * shell's.
  */
 export const HISTORY_IDS = {
   button: 'historyBtn',
   overlay: 'historyOverlay',
   list: 'historyList',
+  recent: 'recentGames',
   close: 'closeHistoryBtn',
 } as const;
 
