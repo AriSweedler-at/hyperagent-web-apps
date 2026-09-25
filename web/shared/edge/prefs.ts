@@ -17,6 +17,7 @@ import {
   optional,
   refine,
   string,
+  taggedUnion,
   type Decoder,
 } from '../lib/json.ts';
 import { err, ok, type Result } from '../lib/result.ts';
@@ -147,7 +148,6 @@ export const shellSave = <S, X extends object>(
     (code) => isWellFormedCode(cfg.game, code),
     `a ${String(ROOM_CODE[cfg.game].length)}-letter room code`,
   );
-  const saveHead = object({ role: literal('local', 'host', 'guest') });
   // `object`'s Shape cannot be resolved over a type parameter (whether `undefined extends S` is
   // deferred), so the two decoders holding the game state are asserted to the shapes they spell.
   const localSave = object({
@@ -177,18 +177,12 @@ export const shellSave = <S, X extends object>(
     myName: string,
   });
 
-  const decodeSave: Decoder<Save<S, X>> = (input) => {
-    const head = saveHead(input);
-    if (!head.ok) return head;
-    switch (head.value.role) {
-      case 'local':
-        return localSave(input);
-      case 'host':
-        return hostSave(input);
-      case 'guest':
-        return guestSave(input);
-    }
-  };
+  // The three shapes by role in the legacy literals' order, so a refused role names them as before.
+  const decodeSave: Decoder<Save<S, X>> = taggedUnion('role', {
+    local: localSave,
+    host: hostSave,
+    guest: guestSave,
+  });
 
   /** The `persist()` literal for a save, key for key, whatever order the caller's object had. */
   const saveLiteral = (save: Save<S, X>): Save<S, X> => {
