@@ -16,8 +16,9 @@ one suite and every `e2e/*.spec.ts` by exactly one, or by the suites of the game
 drives (the shell specs, below), every glob names a file, every coverage row sits under its own
 suite's `coverage.include` (vitest passes an empty row silently), the 28 rows of the former flat
 config are present at or above their figures, the scripts spell the same names as the table, and
-`ci.yml` carries one gated job per entry. A new test file no row claims fails there, which is how
-a fourth game learns it must register.
+`ci.yml` carries one gated job per shared entry and the two matrix jobs the game entries expand
+into (dry-round-2 I1). A new test file no row claims fails there, which is how a fourth game learns
+it must register.
 
 | Suite | vitest `unit` (in `npm test`) | `standalone` (only `test:<suite>`) | Coverage rows | e2e specs |
 |---|---|---|---|---|
@@ -107,27 +108,30 @@ the win is in what a game-only or docs-only change leaves out.
 ## The CI graph
 
 ```
-changes ──┬── shared ────────────────┐
-(15 s,    ├── shared-integration ────┤
- diff ->  ├── gin ───────────────────┤
- jobs)    ├── fidice ────────────────┤
-          ├── backgammon ────────────┤
-          ├── site (build, dist ↑) ──┼── ci-ok ── deploy (push to main)
-          ├── harness ───────────────┤   always(); needs changes too; green on
-          ├── e2e-gin ───────────────┤   success or skipped, red on failure or cancelled
-          ├── e2e-fidice ────────────┤
-          ├── e2e-backgammon ────────┤
-          └── e2e-site ──────────────┤
-check (typecheck, lint, hooks) ──────┘        broker (advisory, outside ci-ok)
+changes ──┬── shared ─────────────────────────────┐
+(15 s,    ├── shared-integration ─────────────────┤
+ diff ->  ├── game [gin | fidice | backgammon] ───┤   matrix over `games`
+ jobs +   ├── site (build, dist ↑) ───────────────┼── ci-ok ── deploy (push to main)
+ lists)   ├── harness ────────────────────────────┤   always(); needs changes too; green on
+          ├── e2e-game [gin | fidice | backgammon]┤   success or skipped, red on failure or cancelled
+          └── e2e-site ───────────────────────────┤   matrix over `e2e-games`
+check (typecheck, lint, hooks) ───────────────────┘        broker (advisory, outside ci-ok)
 ```
 
-Each suite job is `needs: changes` + `if: needs.changes.outputs.<job> == 'true'`. The unit suites
-run once, instrumented, against their own rows. `site` builds and uploads `dist/`, which `deploy`
-downloads. The three game e2e jobs install Chromium and coturn (every game has a relay spec);
-`e2e-site` runs with `E2E_TURN=off`. A push to main or a `workflow_dispatch` selects everything.
-GitHub skips a job whose `needs` were skipped unless it says `always()`, so `deploy` needs `ci-ok`
-alone. `ci-ok` needs `changes` as well: skipped is green there, so a crash in the selector must
-show as a failed need, not as eleven skips. `nightly.yml` and `stories-baselines.yml` do not use `changes`: the nightly's two 1000-game
+Each shared, site or harness job is `needs: changes` + `if: needs.changes.outputs.<job> ==
+'true'`. The game suites are two matrix jobs (dry-round-2 I1): `game` and `e2e-game` take
+`strategy.matrix.suite` from `fromJSON(needs.changes.outputs.games)` / `e2e-games`, the JSON
+lists `tools/ci/affected.ts --github` prints beside the booleans (`GAME_SUITES` in job order,
+filtered to the selected jobs), with `fail-fast: false` (one game's failure cancels no other),
+`name: <suite>` / `e2e-<suite>` (the check names the six jobs had) and `if: ... != '[]'` (GitHub
+refuses an empty matrix, so an empty list skips the job whole). A fourth game registers in
+`suites.ts` alone. The unit suites run once, instrumented, against their own rows. `site` builds
+and uploads `dist/`, which `deploy` downloads. The game e2e matrix installs Chromium and coturn
+(every game has a relay spec); `e2e-site` runs with `E2E_TURN=off`. A push to main or a
+`workflow_dispatch` selects everything. GitHub skips a job whose `needs` were skipped unless it
+says `always()`, so `deploy` needs `ci-ok` alone. `ci-ok` needs `changes` as well: skipped is
+green there, so a crash in the selector must show as a failed need, not as a row of skips; a
+matrix job reports one aggregate result, so the two stand for six. `nightly.yml` and `stories-baselines.yml` do not use `changes`: the nightly's two 1000-game
 replays go through `npm run test:gin -- test/parity/gin.replay` and `npm run test:backgammon --
 web/games/backgammon/src/engine/replay` (the file filter applies inside a project); the baselines
 job keeps `npm run test:e2e -- e2e/gin-stories.spec.ts --project pages --update-snapshots=all`.

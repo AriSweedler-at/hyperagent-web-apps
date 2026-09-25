@@ -315,18 +315,25 @@ scripts themselves (`sh -n`).
 `ci.yml` on `push` to main, `pull_request` and `workflow_dispatch` is the job graph of
 `docs/design/test-partition.md`. Job `changes` (fetch-depth 0, no `npm ci`) runs
 `tools/ci/affected.ts` over the PR's diff against its base through the change -> jobs table in
-`tools/ci/suites.ts` and emits one boolean output per job; a push to main or a dispatch selects
-everything. Job `check` always runs beside it: `setup-node@v4 {node-version-file: .nvmrc, cache:
-npm}`, `npm ci`, `npm run typecheck` (`tsc -b`), `npm run lint` (eslint + prettier --check),
-`npm run hooks:verify`. Every other job `needs: changes` and carries `if:
-needs.changes.outputs.<job> == 'true'`: one job per vitest suite, run once under v8 coverage
-against that suite's own threshold rows (`npm run test:<suite> -- --coverage`; `harness` has no
-rows; `shared-integration` is the transport contract, so it installs Chromium first), `site`
-building `dist/` and uploading it after its guards, and one Playwright job per suite with specs
-(`npm run test:e2e:<suite>`, its own build: Chromium from `.github/actions/playwright-chromium`
-(actions/cache by Playwright version; the OS packages every run, the download only on a miss),
-coturn from `.github/actions/coturn` for the three game jobs (apt; the system service it starts is
-stopped; `e2e-site` has no relay spec and runs with `E2E_TURN=off`); four workers under CI;
+`tools/ci/suites.ts` and emits one boolean output per job plus two JSON lists, `games` and
+`e2e-games`, the game suites selected on each side (`GAME_SUITES` in job order); a push to main or
+a dispatch selects everything. Job `check` always runs beside it: `setup-node@v4
+{node-version-file: .nvmrc, cache: npm}`, `npm ci`, `npm run typecheck` (`tsc -b`), `npm run lint`
+(eslint + prettier --check), `npm run hooks:verify`. Every other job `needs: changes` and is gated
+on its output. The shared, site and harness suites carry `if: needs.changes.outputs.<job> ==
+'true'`, one job each; the game suites are ONE matrix job `game` with `strategy.matrix.suite:
+${{ fromJSON(needs.changes.outputs.games) }}` (`fail-fast: false`; `name: ${{ matrix.suite }}`
+keeps the check names `gin`, `fidice`, `backgammon`; `if: needs.changes.outputs.games != '[]'`
+skips it whole, since GitHub refuses an empty matrix), so a fourth game edits `ci.yml` nowhere
+(dry-round-2 I1). Each suite runs once under v8 coverage against its own threshold rows (`npm run
+test:<suite> -- --coverage`; `harness` has no rows; `shared-integration` is the transport contract,
+so it installs Chromium first), `site` building `dist/` and uploading it after its guards. The
+Playwright runs are the matrix job `e2e-game` over `e2e-games` (`name: e2e-${{ matrix.suite }}`,
+artifact `playwright-report-<suite>`) and the job `e2e-site` (`npm run test:e2e:<suite>`, its own
+build: Chromium from `.github/actions/playwright-chromium` (actions/cache by Playwright version;
+the OS packages every run, the download only on a miss), coturn from `.github/actions/coturn` for
+the game matrix (apt; the system service it starts is stopped; `e2e-site` has no relay spec and
+runs with `E2E_TURN=off`); four workers under CI;
 projects pages + proxy, the page-only specs on pages alone: `PAGE_ONLY_SPECS`; PeerServer from the
 `peer` package on :9000; coturn on :3478 started by `playwright.config.ts` with one static
 long-term credential, loopback only, no TLS, its relay ports right above (`e2e/fixtures/site.ts`
@@ -337,12 +344,13 @@ play the games with `?ice-policy=relay` through that relay and read the selected
 off every `RTCPeerConnection` the page built (`e2e/browser/record-pc.js` keeps them;
 `selected-pairs.js` reads `getStats()` as `ice.ts` `describe()` does); without `turnserver` on
 PATH they skip with the install line, and under `CI` the config refuses to start instead, so a
-broken install cannot pass as a skip. Job `broker` (gated on any game's e2e job,
+broken install cannot pass as a skip. Job `broker` (gated on `e2e-games != '[]'`,
 `continue-on-error: true`): the two-peer and relay-forced specs without `?peer=` through
 0.peerjs.com (the relay stays local), so signalling regressions surface at review without blocking
 on a third party. Job `ci-ok` needs `changes` and every gate (not `broker`) with `if: always()` and is green
 when each needed job succeeded or was skipped by `changes`, red on a failure or a cancellation
-(`changes` is needed so a crash in the selector is a failed need, not eleven green skips): GitHub
+(`changes` is needed so a crash in the selector is a failed need, not a row of green skips; a
+matrix job reports one result for all its entries, so `game` and `e2e-game` stand for six): GitHub
 skips a job whose `needs` were skipped unless it says `always()`, so `deploy` needs `ci-ok` alone
 and runs on a push to main (as above). `ci-ok` is the one check a branch rule or a human watches.
 Which change runs what: a game's folder runs that game's unit and e2e jobs, `site`, `e2e-site` and
