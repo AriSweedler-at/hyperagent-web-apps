@@ -35,7 +35,7 @@ import {
   NOT_CONNECTED_MSG,
   andThen as then,
   broadcast,
-  fresh,
+  fresh as freshKey,
   guestContextOf as shellGuestContextOf,
   hostContextOf as shellHostContextOf,
   initialShell as shellInitial,
@@ -505,7 +505,7 @@ const rendered = (app: App, prev: View | null, ctx: Context): Step => {
   const view = app.shell.view;
   if (view === null) return pure(app);
   // Once per position (the shared `fresh`, dry-round-2.md F6): a re-sent frame plays nothing.
-  const { mem, fresh: changed } = fresh(app.shell.cues, viewKey(view));
+  const { mem, fresh: changed } = freshKey(app.shell.cues, viewKey(view));
   const since = changed && prev !== null;
   const cues = since ? cuesBetween(prev, view, app.shell.role) : [];
   // A roll that just arrived (mine, or the other seat's) tumbles for TUMBLE_MS (design §4.7); a
