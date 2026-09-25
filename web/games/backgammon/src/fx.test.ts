@@ -7,7 +7,7 @@ import { describe, expect, test } from 'vitest';
 import type { AudioCues, Note, OscillatorType } from '../../../shared/edge/fx.ts';
 import { createSampleCache } from '../../../shared/edge/sound.ts';
 import { createStore, type StorageLike } from '../../../shared/edge/storage.ts';
-import { SOUND_CUES, type SoundCue } from '../../../shared/lib/sound/cues.ts';
+import { SHELL_CUES, SOUND_CUES, type SoundCue } from '../../../shared/lib/sound/cues.ts';
 import { fontByName, resolveSound, type SoundFontName } from '../../../shared/lib/sound/fonts.ts';
 import { createFx } from './fx.ts';
 import { STORAGE_KEYS } from './storage.ts';
@@ -45,6 +45,19 @@ describe('the table', () => {
 
   test('no two events share a cue, so a font re-voices each one apart', () => {
     expect(new Set(EVENTS.map((e) => CUES[e].cue)).size).toBe(EVENTS.length);
+  });
+
+  test("the shell's four rows are the shared SHELL_CUES, byte for byte (dry-round-2.md E9)", () => {
+    // The frozen copy of what this table spelt before the rows moved to web/shared/lib.
+    expect(SHELL_CUES).toStrictEqual({
+      tap: { cue: 'tap', buzz: 12 },
+      yourTurn: { cue: 'turn', buzz: [40, 60, 40] },
+      win: { cue: 'victory', buzz: [80, 50, 80, 50, 200] },
+      lose: { cue: 'loss', buzz: [200] },
+    });
+    (Object.keys(SHELL_CUES) as ReadonlyArray<keyof typeof SHELL_CUES>).forEach((event) => {
+      expect(CUES[event]).toBe(SHELL_CUES[event]);
+    });
   });
 });
 

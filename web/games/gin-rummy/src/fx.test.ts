@@ -9,6 +9,7 @@ import { describe, expect, test } from 'vitest';
 import type { AudioCues, Note, OscillatorType } from '../../../shared/edge/fx.ts';
 import { createSampleCache } from '../../../shared/edge/sound.ts';
 import { createStore, type StorageLike } from '../../../shared/edge/storage.ts';
+import { SHELL_CUES } from '../../../shared/lib/sound/cues.ts';
 import { fontByName, resolveSound } from '../../../shared/lib/sound/fonts.ts';
 import { createFx } from './fx.ts';
 import { STORAGE_KEYS } from './storage.ts';
@@ -88,6 +89,16 @@ describe('the table on the default font', () => {
   test('ten events onto ten distinct generic cues', () => {
     expect(EVENTS).toHaveLength(10);
     expect(new Set(Object.values(CUES).map((s) => s.cue)).size).toBe(10);
+  });
+
+  test("the shell's four rows are the shared SHELL_CUES, byte for byte (dry-round-2.md E9)", () => {
+    const shell = ['tap', 'yourTurn', 'win', 'lose'] as const;
+    expect(Object.keys(SHELL_CUES)).toEqual(shell);
+    expect(shell.map((event) => SHELL_CUES[event].cue)).toEqual(['tap', 'turn', 'victory', 'loss']);
+    shell.forEach((event) => {
+      expect(SHELL_CUES[event].buzz).toEqual(LEGACY[event].buzz);
+      expect(CUES[event]).toBe(SHELL_CUES[event]);
+    });
   });
 });
 
