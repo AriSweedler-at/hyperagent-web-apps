@@ -1,7 +1,12 @@
-/* Briscola's theme (docs/design/briscola.md §5.3, D22; the owner: "subtle but recognizable", the
-   cards as ornate as the pack). The page links web/shared/styles/tokens.css and base.css before this
-   file, and :root below redeclares every one of the thirteen shared names (a partial override would
-   inherit gin's green felt; test/tokens.test.ts holds it). An Italian café: a cream page with a
+/* Briscola's theme (docs/design/briscola-board.md §3, D22; the owner: "subtle but recognizable", the
+   cards as ornate as the pack). The page links web/shared/styles/tokens.css, base.css and the shell
+   games' shell.css before this file (dry-round-2.md G1: the shell's boxes, buttons, fields, tabs,
+   sheets, history rows and toast are rules there, token-only), and :root below redeclares every one
+   of the thirteen shared palette names and the fourteen shell tokens (a partial override would
+   inherit gin's green felt; test/tokens.test.ts holds both). What follows under a shell selector is
+   what this theme alone declares: its type (Lora and Bodoni through the font tokens; `font-family:
+   inherit` on every control), its hairlines and shadows, the gold underline of the open tab, the
+   curtain's terracotta scrim. An Italian café: a cream page with a
    CSS-only linen weave, one espresso panel for the home shell, quiet bottle-green baize for the two
    table surfaces (the centre band and the hand), terracotta as the one accent (never ink on the
    felt: 1.3:1), gold as a hairline; Bodoni Moda for the title, the room code and the points, Lora
@@ -25,6 +30,23 @@
   --go-text: #1f2a12;
   --radius: 12px;
   --felt: radial-gradient(ellipse at 50% 35%, #3a6b4f 0%, #2f5842 60%, #244634 100%);
+  /* The fourteen shell tokens (web/shared/styles/shell.css reads them; CONTRACT.md "Shell tokens"):
+     the espresso panel is every shell surface and bar, cream its fill, the panel's dimmed cream its
+     ink on a bar, the accent its emphasis, this theme's hairline-and-shadow its shadow, one radius. */
+  --font-body: var(--serif-text);
+  --font-display: var(--serif-display);
+  --surface-shell: var(--panel);
+  --surface-bar: var(--panel);
+  --fill: var(--cream);
+  --fill-hover: rgba(247, 241, 230, 0.12);
+  --ink-on-fill: var(--text);
+  --ink-on-bar: var(--cream-dim);
+  --ink-hover: var(--cream);
+  --emphasis: var(--accent);
+  --shadow-shell: inset 0 0 0 1px var(--hair), 0 8px 22px rgba(44, 30, 23, 0.28);
+  --radius-control: var(--radius);
+  --radius-inner: var(--radius);
+  --radius-tab: 9px;
   /* The game's own tokens: only the ones a rule below reads. */
   --baize: #2f5842;
   --baize-edge: #1d3a2b;
@@ -54,30 +76,17 @@
   --back: none;
   --back-colour: var(--baize-edge);
 }
-* {
-  -webkit-tap-highlight-color: transparent;
-}
 html,
 body {
-  padding: 0;
-  min-height: 100%;
   /* The linen (design §5.3): the cream with a faint weave drawn by two repeating gradients at 3%
      alpha, a 4px period each way; CSS only, so smoke's request check sees only the fonts. */
   background-color: var(--bg);
   background-image:
     repeating-linear-gradient(0deg, rgba(43, 29, 20, 0.03) 0 1px, transparent 1px 4px),
     repeating-linear-gradient(90deg, rgba(43, 29, 20, 0.03) 0 1px, transparent 1px 4px);
-  color: var(--text);
-  font-family: var(--serif-text);
-  overscroll-behavior-y: contain;
 }
 #app {
-  max-width: 480px;
-  margin: 0 auto;
-  min-height: 100dvh;
   padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
 }
 /* The trim (backgammon's rule in this palette): a quiet baize-edge band along the viewport's edge
    with a gold hairline on its inner side, fixed and inert, at z-index 0 under every positioned
@@ -106,7 +115,6 @@ h1 {
   font-size: 2.1rem;
   line-height: 1.1;
   margin: 10px 0 0;
-  text-align: center;
   letter-spacing: 0.02em;
   color: var(--accent);
 }
@@ -114,8 +122,6 @@ h1 {
   margin: 4px 0 14px;
 }
 .subtitle {
-  text-align: center;
-  color: var(--muted);
   font-size: 0.95rem;
   line-height: 1.4;
   margin: 4px 0 14px;
@@ -128,14 +134,7 @@ h1 {
    waiting rooms, the match-over screen) in espresso with a gold hairline inset and cream text; the
    tab bar and the mode switch below wear the same. */
 .card-box {
-  background: var(--panel);
   color: var(--cream);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 12px;
-  box-shadow:
-    inset 0 0 0 1px var(--hair),
-    0 8px 22px rgba(44, 30, 23, 0.28);
 }
 .card-box label,
 .card-box .field-label,
@@ -186,12 +185,7 @@ h1 {
   margin-top: 10px;
 }
 .card-box.prose p {
-  margin: 0 0 12px;
-  line-height: 1.5;
   font-size: 0.98rem;
-}
-.card-box.prose p:last-child {
-  margin-bottom: 0;
 }
 /* House rules (design D3): the four switches folded under a native <details>, no TS state. */
 .house-rules {
@@ -233,41 +227,14 @@ h1 {
   flex-shrink: 0;
   accent-color: var(--go);
 }
-/* ---------- buttons, inputs, small chrome ---------- */
+/* ---------- buttons, inputs, small chrome (the shapes are shell.css's; the faces this theme's) ---------- */
 .btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: none;
-  border-radius: var(--radius);
   font-family: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 14px 18px;
-  min-height: 54px;
-  transition:
-    transform 0.08s ease,
-    filter 0.15s ease;
-  user-select: none;
-  color: var(--text);
-}
-.btn:active {
-  transform: scale(0.96);
-  filter: brightness(0.95);
-}
-.btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none;
 }
 /* The primary button a step lighter than the panel, with the same hairline, cream text (10.2:1). */
 .btn-primary {
   background: var(--panel-2);
   color: var(--cream);
-  width: 100%;
-  font-size: 1.1rem;
   box-shadow:
     inset 0 0 0 1px var(--hair),
     0 6px 16px rgba(44, 30, 23, 0.28);
@@ -279,9 +246,6 @@ h1 {
    game and Rematch in the shared --go with the page's ink; on the cream (1.8:1) an olive hairline and
    the primary's shadow give it its edge, backgammon's answer. */
 .btn-go {
-  background: var(--go);
-  color: var(--go-text);
-  font-size: 1.1rem;
   box-shadow:
     inset 0 0 0 1px rgba(95, 113, 51, 0.6),
     0 6px 16px rgba(44, 30, 23, 0.28);
@@ -292,7 +256,6 @@ h1 {
 /* Secondary buttons are cream: a step lighter than the linen, a fill on the panel and the baize. In
    a sheet (already the card colour) they take the darker card tone. */
 .btn-secondary {
-  background: var(--cream);
   box-shadow: inset 0 0 0 1px var(--card-edge);
 }
 .sheet .btn-secondary {
@@ -300,8 +263,6 @@ h1 {
   box-shadow: none;
 }
 .btn-ghost {
-  background: transparent;
-  color: var(--muted);
   border: 1px solid rgba(43, 29, 20, 0.18);
 }
 .card-box .btn-ghost,
@@ -309,12 +270,7 @@ h1 {
   color: var(--cream-dim);
   border-color: rgba(247, 241, 230, 0.3);
 }
-.btn-block {
-  width: 100%;
-}
 .btn-sm {
-  padding: 10px 12px;
-  min-height: 44px;
   font-size: 0.9rem;
 }
 .row .btn {
@@ -328,15 +284,11 @@ input[type='text'],
 input[type='number'],
 select,
 textarea {
-  width: 100%;
   padding: 13px 14px;
-  border-radius: var(--radius);
   background: var(--cream);
-  color: var(--text);
   font-family: inherit;
   font-size: 1.05rem;
   font-weight: 400;
-  outline: none;
   border: 1px solid rgba(43, 29, 20, 0.14);
   min-height: 48px;
 }
@@ -355,16 +307,8 @@ select {
   background-repeat: no-repeat;
   padding-right: 34px;
 }
-input::placeholder {
-  color: var(--muted);
-  font-weight: 400;
-}
 label {
   display: block;
-  font-size: 0.78rem;
-  color: var(--muted);
-  font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 .field {
@@ -378,12 +322,6 @@ label {
   color: var(--muted);
   padding-left: 2px;
 }
-.row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.row + .row,
 .row + .btn {
   margin-top: 10px;
 }
@@ -393,43 +331,19 @@ label {
 .row.between {
   justify-content: space-between;
 }
-.grow {
-  flex: 1;
-}
 .icon-btn {
-  background: var(--cream);
-  border: none;
-  color: var(--text);
-  border-radius: var(--radius);
-  width: 44px;
-  height: 44px;
-  font-size: 1.1rem;
   font-family: inherit;
-  flex-shrink: 0;
   cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--card-edge);
 }
-.code-input {
-  text-align: center;
-  letter-spacing: 0.4em;
-  font-size: 1.5rem !important;
-  text-transform: uppercase;
-  font-family: var(--serif-display);
-}
 .room-code {
-  font-family: var(--serif-display);
-  font-size: 3rem;
   letter-spacing: 0.3em;
-  text-align: center;
-  color: var(--accent);
   font-weight: 400;
   padding-left: 0.3em;
   margin: 6px 0 10px;
 }
 .empty-note {
-  color: var(--muted);
   font-size: 0.88rem;
-  text-align: center;
   padding: 8px 0 0;
   line-height: 1.4;
 }
@@ -439,18 +353,6 @@ label {
 }
 .muted {
   color: var(--muted);
-}
-.pulse {
-  animation: pulse 1.6s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.45;
-  }
 }
 .badge {
   display: inline-flex;
@@ -522,124 +424,33 @@ label {
 :is(.table-center, .hand-area) :is(.card, .slot, .btn, .pile-peek):focus-visible {
   outline-color: var(--cream);
 }
-::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
 
-/* ---------- top tabs and the mode switch (gin's shapes on the espresso panel) ---------- */
+/* ---------- top tabs and the mode switch (shell.css's shapes on the espresso panel) ---------- */
 .tabbar {
-  display: flex;
-  gap: 6px;
-  margin: 4px 0 16px;
-  background: var(--panel);
   color: var(--cream);
-  border-radius: var(--radius);
-  padding: 4px;
-  box-shadow:
-    inset 0 0 0 1px var(--hair),
-    0 8px 22px rgba(44, 30, 23, 0.28);
-}
-.tab-wrap {
-  position: relative;
-  flex: 1.2;
-  display: flex;
+  box-shadow: var(--shadow-shell);
 }
 .tab-btn {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--cream-dim);
   font-family: inherit;
-  font-weight: 700;
   font-size: 0.95rem;
-  padding: 11px 6px;
   min-height: 44px;
-  border-radius: 9px;
-  white-space: nowrap;
   cursor: pointer;
 }
-/* The open tab: cream with the gold underline. */
+/* The open tab: cream (the fill) with the gold underline. */
 .tab-btn.active {
-  background: var(--cream);
-  color: var(--text);
   box-shadow: inset 0 -2px 0 var(--gold);
 }
-.tab-wrap .tab-btn::after {
-  content: ' \25BE';
-  opacity: 0.55;
-  font-size: 0.8em;
-}
-.tab-panel.hidden {
-  display: none !important;
-}
 .tab-submenu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  min-width: 180px;
-  z-index: 30;
-  background: var(--panel);
   color: var(--cream);
   border: none;
-  border-radius: var(--radius);
-  padding: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   box-shadow:
     inset 0 0 0 1px var(--hair),
     0 10px 26px rgba(44, 30, 23, 0.35);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateY(-4px);
-  transition:
-    opacity 0.12s,
-    transform 0.12s;
-}
-.tab-submenu::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -8px;
-  height: 8px;
-}
-.tab-submenu.force-open {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-@media (hover: hover) {
-  .tab-wrap:hover .tab-btn:not(.active) + .tab-submenu {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-    transform: translateY(0);
-  }
-  .tab-submenu button:hover {
-    background: rgba(247, 241, 230, 0.12);
-    color: var(--cream);
-  }
 }
 .tab-submenu button {
-  background: transparent;
-  border: none;
-  color: var(--cream-dim);
   font-family: inherit;
-  text-align: left;
-  padding: 11px 12px;
-  border-radius: 9px;
-  font-weight: 700;
   font-size: 0.9rem;
-  white-space: nowrap;
   cursor: pointer;
-}
-.tab-submenu button.active {
-  background: var(--cream);
-  color: var(--text);
 }
 /* With the Play panel open and its mode switch shown the tab bar flows into the switch. */
 .tabbar:has(+ #playPanel:not(.hidden) > .mode-switch:not(.hidden)) {
@@ -652,49 +463,20 @@ label {
     0 8px 22px rgba(44, 30, 23, 0.28);
 }
 .mode-switch {
-  display: flex;
-  gap: 6px;
-  margin: 0 0 16px;
-  padding: 4px;
-  background: var(--panel);
   color: var(--cream);
   border-top: 1px solid rgba(201, 162, 39, 0.35);
-  border-radius: 0 0 var(--radius) var(--radius);
-  box-shadow:
-    inset 0 0 0 1px var(--hair),
-    0 8px 22px rgba(44, 30, 23, 0.28);
+  box-shadow: var(--shadow-shell);
 }
 .mode-btn {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--cream-dim);
   font-family: inherit;
-  font-weight: 700;
-  padding: 9px 6px;
   min-height: 44px;
-  border-radius: 9px;
   font-size: 0.85rem;
-  white-space: nowrap;
   cursor: pointer;
-}
-.mode-btn.active {
-  background: var(--cream);
-  color: var(--text);
-}
-.rules-list {
-  list-style: none;
-  padding: 0;
-  margin: 12px 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 .rules-list li {
   font-size: 0.92rem;
   line-height: 1.45;
   background: var(--card);
-  border-radius: var(--radius);
   padding: 10px 12px;
   box-shadow: inset 0 0 0 1px var(--card-edge);
 }
@@ -702,24 +484,12 @@ label {
   background: var(--card-2);
   box-shadow: none;
 }
-.rules-list li strong {
-  color: var(--accent);
-}
-/* Glossary links (docs/design/glossary-links.md; web/shared/ui/glossary.ts writes them): jargon is a
-   link to its rule, a dotted hairline in the accent; the rule it lands on flashes once. */
-.jargon {
-  color: var(--accent);
-  text-decoration: underline dotted;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-}
-/* On the espresso panel (the About copy) the accent is lost, so a link there is cream with a gold hairline. */
+/* Glossary links are shell.css's (a dotted hairline in the accent); on the espresso panel (the About
+   copy) the accent is lost, so a link there is cream with a gold hairline. The flash a landed-on
+   rule wears is this theme's wash of its accent. */
 .card-box .jargon {
   color: var(--cream);
   text-decoration-color: var(--gold);
-}
-.rule-flash {
-  animation: rule-flash 1.2s ease-out;
 }
 @keyframes rule-flash {
   from {
@@ -727,16 +497,9 @@ label {
   }
 }
 
-/* ---------- overlays and sheets ---------- */
+/* ---------- overlays and sheets (shell.css's shapes; the scrim, the edge and the radius this theme's) ---------- */
 .overlay {
-  position: fixed;
-  inset: 0;
   background: rgba(43, 29, 20, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  padding: 16px;
 }
 /* The curtain (design §5.4): the terracotta dark at 78%, the table readable beneath, the hand face down. */
 .overlay.curtain {
@@ -754,31 +517,19 @@ label {
   color: var(--cream-dim);
 }
 .sheet {
-  background: var(--card);
   border-radius: 20px;
-  padding: 22px 18px;
-  max-width: 420px;
-  width: 100%;
-  max-height: 88dvh;
-  overflow-y: auto;
   box-shadow: 0 18px 48px rgba(44, 30, 23, 0.35);
 }
 .sheet-title {
-  font-size: 1.35rem;
   font-weight: 700;
-  text-align: center;
-  margin: 4px 0 2px;
 }
 .row .sheet-title {
   margin: 0;
   text-align: left;
 }
 .sheet-sub {
-  color: var(--muted);
-  text-align: center;
   font-size: 0.95rem;
   line-height: 1.4;
-  margin-bottom: 12px;
 }
 .sheet .btn-block + .btn-block {
   margin-top: 8px;
@@ -817,11 +568,11 @@ label {
   min-height: calc(var(--mid-w) / var(--aspect) + 30px);
   margin: 10px 0 4px;
 }
-/* The history (docs/design/briscola-sound-history.md §6): one native <details> per event, newest
-   last; the summary is the event's sentence with the actor as `.who`, the detail a <dl> of the
-   cards played, the winner and the points. `data-kind` names the event, `data-value` the trick's
-   value class, so the theme colours a row without any TS toggling a class. Until the shared
-   web/shared/ui/history.ts lands briscola paints these rows itself (src/ui/history.ts). */
+/* The history (docs/design/briscola-sound-history.md §6; the rows are shell.css's, painted by the
+   shared web/shared/ui/history.ts over src/ui/history.ts's copy): the list scrolls inside the
+   sheet; a deal or a game's opening reads as an aside, a result as the line that matters, a
+   pointless trick as quiet (`data-kind`, `data-value`, no class toggled); the detail is a cream
+   card of small capitals. */
 .history {
   margin-top: 10px;
   display: flex;
@@ -831,110 +582,51 @@ label {
   overflow-y: auto;
 }
 details.history-row {
-  border-bottom: 1px solid rgba(43, 29, 20, 0.08);
-  font-size: 0.92rem;
-  line-height: 1.4;
+  border-bottom-color: rgba(43, 29, 20, 0.08);
 }
-.history-row > summary {
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
+details.history-row > summary {
   padding: 8px 4px;
-  cursor: pointer;
-  list-style: none;
+  line-height: 1.4;
   border-radius: 8px;
 }
-.history-row > summary::-webkit-details-marker {
-  display: none;
-}
-.history-row > summary::before {
-  content: '\25B8';
-  color: var(--muted);
-  font-size: 0.8em;
-  flex-shrink: 0;
-  transition: transform 0.12s;
-}
-.history-row[open] > summary::before {
-  transform: rotate(90deg);
-}
-.history-row .who {
-  color: var(--muted);
+details.history-row > summary .who {
   font-weight: 700;
-  flex-shrink: 0;
 }
-.history-row[data-kind='deal'] > summary,
-.history-row[data-kind='game'] > summary {
+details.history-row[data-kind='deal'] > summary,
+details.history-row[data-kind='game'] > summary {
   color: var(--muted);
   font-style: italic;
 }
-.history-row[data-kind='result'] > summary {
+details.history-row[data-kind='result'] > summary {
   font-weight: 700;
 }
-.history-row[data-value='pointless'] > summary {
+details.history-row[data-value='pointless'] > summary {
   color: var(--muted);
 }
-.history-row[data-value='big'] > summary,
-.history-row[data-value='huge'] > summary {
-  color: var(--accent);
-}
-.history-row[data-value='huge'] > summary {
-  font-weight: 700;
-}
-dl.history-detail {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 4px 12px;
+details.history-row > .history-detail {
   margin: 0 0 10px;
   padding: 8px 10px;
   border-radius: 9px;
   background: var(--card-2);
   font-size: 0.88rem;
 }
-.history-detail dt {
-  color: var(--muted);
-  font-weight: 700;
+details.history-row > .history-detail dt {
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding-top: 2px;
 }
-.history-detail dd {
-  margin: 0;
-}
 #toast {
-  position: fixed;
-  left: 50%;
-  bottom: calc(24px + env(safe-area-inset-bottom));
-  transform: translateX(-50%) translateY(20px);
   background: var(--accent-dark);
   color: var(--cream);
-  font-weight: 700;
-  padding: 12px 16px;
-  border-radius: var(--radius);
   box-shadow: 0 8px 24px rgba(44, 30, 23, 0.35);
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.2s;
-  z-index: 100;
   max-width: calc(100vw - 32px);
-  text-align: center;
-}
-#toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
 }
 
 /* ---------- the table: geometry (design §5.3; src/ui/layout.ts is the twin) ---------- */
-/* At the table the page never scrolls (gin's rule): the card width is a clamp() of the viewport,
-   every row above the hand keeps one height in every phase, and the fallbacks at the end of this
-   file let a short viewport scroll instead of clipping the actions row. */
-body.fixed-screen,
-body.fixed-screen #app {
-  height: 100dvh;
-  max-height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-}
+/* At the table the page never scrolls (shell.css `body.fixed-screen`): the card width is a clamp()
+   of the viewport, every row above the hand keeps one height in every phase, and the fallbacks at
+   the end of this file let a short viewport scroll instead of clipping the actions row. */
 #tableScreen {
   /* Phone: everything that is not a card measures 398px (#app padding 24, topbar 44, seats 86, the
      centre band's 30px of label and chips, score strip 44, status 22, hand header 24, hand padding
@@ -1356,6 +1048,9 @@ body.fixed-screen #app {
 }
 .sc-points {
   font-family: var(--serif-display);
+  /* The variable face with its optical-size axis (the page requests opsz 6..96): at 20px the text
+     cut keeps a 0's hairlines, where the display cut lost them. */
+  font-optical-sizing: auto;
   font-size: 1.25rem;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;

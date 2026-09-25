@@ -40,7 +40,7 @@ const copy: ShellCopy = {
 const notes: ShellNotes = {
   homeNote: ` (docs/design/briscola.md §5.8; "design §N" below is that document):
            Online (the default) or Pass the phone for 2, 3 or 4 players.`,
-  rulesTabNote: ': rules.ts fills the list for the chosen options.',
+  rulesTabNote: ': ui/rules.ts fills both slots at boot (render.ts renderRules).',
   glossaryDoc: 'glossary-links.md',
   aboutClose: '',
   curtainNote: ' (design §5.4): a terracotta wash, the table readable beneath, the hand face down.',
@@ -90,11 +90,12 @@ const blocks: ShellBlocks = {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,700&family=Lora:ital,wght@0,400;0,700;1,400&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="../../shared/styles/tokens.css" />
     <link rel="stylesheet" href="../../shared/styles/base.css" />
+    <link rel="stylesheet" href="../../shared/styles/shell.css" />
     <link rel="stylesheet" href="./theme.css" />
   </head>`,
   masthead: `        <div class="masthead">
@@ -254,7 +255,7 @@ const blocks: ShellBlocks = {
           <div class="row tight badges">
             <div class="badge dim" id="gameBadge">Game 1 · 0–0 · best of 3</div>
             <div class="badge trump s-coppe" id="trumpBadge" title="Briscola: cups">
-              <svg class="suit" aria-hidden="true"><use href="#suit-C" /></svg>
+              <svg class="suit" aria-hidden="true"><use /></svg>
               <span id="trumpName">coppe</span>
             </div>
           </div>
@@ -285,7 +286,7 @@ const blocks: ShellBlocks = {
             <span class="seat-taken" data-count="0"></span>
           </div>
           <div class="seat" id="seatR2" data-pos="top" data-seat="1">
-            <span class="seat-name">Opponent</span>
+            <span class="seat-name" id="oppName">Opponent</span>
             <span class="conn-dot" id="oppDot"></span>
             <span class="seat-cards"></span>
             <span class="seat-taken" data-count="0"></span>

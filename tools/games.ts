@@ -228,7 +228,7 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
       ],
       rulesSlots: true,
     },
-    contractFloors: { ts: 40, markup: 40 },
+    contractFloors: { ts: 35, markup: 40 },
     shell: SHELL.briscola,
   },
 };
