@@ -175,9 +175,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // (both games' draggers configure it; 100/100/100/100 over drag.test.ts's eight cases on the
       // page fake with fake rects, a queued rAF stub and fake timers) and lib/drag.ts (the pure
       // gesture: Point, Rect, DRAG_THRESHOLD, startedDrag, inside; 100/100/100/100 over
-      // lib/drag.test.ts): shared/lib still 100/100/100/100; the edge folder 99.73/99.37/99.76/96.62
-      // before, 99.75/99.39/99.78/96.88 after (the same three lines uncovered elsewhere, 1094 → 1177
-      // lines). Measured on main at 8b50ce9 and this branch rebased onto it.
+      // lib/drag.test.ts): shared/lib still 100/100/100/100; the edge folder 99.75/99.42/99.78/96.78
+      // before, 99.76/99.44/99.79/97.03 after (the same three lines uncovered elsewhere, 1188 → 1273
+      // lines). Measured on main at 569d04d (#96) and this branch rebased onto it.
       thresholds: {
         'web/shared/lib/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         // The shared shell's helpers and painters (docs/design/glossary-links.md §3;
@@ -303,7 +303,7 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // residue configures the kernel; ui/hand/drag.ts keeps the momentum and re-exports the gesture
       // from web/shared/lib/drag.ts): ui 98.26/97.93/97.35/94.33 before, 98.80/97.95/98.12/95.06
       // after (11 lines uncovered of 920, 977 → 920 lines; the row stands). Measured on main at
-      // 8b50ce9 and this branch rebased onto it.
+      // 8b50ce9 and this branch rebased onto it (#96 touched neither folder).
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
           lines: 94,
@@ -486,7 +486,7 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // capture and landing out of ui/board/dragger.ts into web/shared/edge/drag.ts (the residue
       // configures the kernel): ui 99.50/100/98.62/92.12 before, 99.47/100/98.71/92.06 after (the
       // same 6 lines uncovered, 1195 → 1141 lines; the row stands). Measured on main at 8b50ce9 and
-      // this branch rebased onto it.
+      // this branch rebased onto it (#96 touched neither folder).
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
