@@ -63,7 +63,7 @@ export type StoriesSpec<S extends StoryLike, V extends StoryViewport, F> = Reado
 const near = (a: number, b: number): boolean => Math.abs(a - b) <= 0.5;
 
 /** Every card of `then` sits in `now` at the same rectangle, to half a pixel. */
-export const expectSameRects = (now: Rects, then: Rects, id: string): void => {
+const expectSameRects = (now: Rects, then: Rects, id: string): void => {
   expect(Object.keys(now).sort(), `${id}: the first ten cards`).toEqual(Object.keys(then).sort());
   Object.entries(then).forEach(([card, rect]) => {
     const here = now[card];

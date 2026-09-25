@@ -48,7 +48,10 @@ jobs:
         uses: ./.github/actions/playwright-chromium
       # Builds dist/ first (test:e2e), starts the pages server, records or rewrites every baseline.
       - name: Record the linux baselines of every story at both screenshot viewports
-        run: npm run test:e2e -- "${{ inputs.spec }}" --project pages --update-snapshots=all
+        # The input reaches the shell through the environment, never by interpolation into the script.
+        env:
+          SPEC: ${{ inputs.spec }}
+        run: npm run test:e2e -- "$SPEC" --project pages --update-snapshots=all
       - name: Upload the baselines
         uses: actions/upload-artifact@v4
         with:

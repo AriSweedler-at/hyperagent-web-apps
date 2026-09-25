@@ -28,7 +28,11 @@ import {
 } from '../edge/dom.ts';
 import type { Ctx } from './shell.ts';
 
-/** The query key that names a story and the two flags, as every game's main.ts reads them. */
+/**
+ * The query key that names a story and its two flags, as gin's main.ts spells them before its
+ * dynamic `import()` (it cannot import them from here: a static import would pull this module into
+ * the entry chunk that import keeps it out of); exported so the next game's main.ts matches them.
+ */
 export const STORY_QUERY = { story: 'story', nav: 'nav', live: 'live' } as const;
 /** The container the index is written into (every shell page carries it) and the bar's id. */
 export const STORIES_IDS = { app: 'app', nav: 'storyNav' } as const;

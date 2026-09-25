@@ -13,7 +13,9 @@
 // three-row hand on a phone too short for it scrolls the document to a reachable actions row
 // instead); the first ten slots' rectangles for `sameHandAs`; and the slot count the table is
 // settled at. Re-recording: `npm run test:e2e -- e2e/gin-stories.spec.ts --project pages
-// --update-snapshots` on macOS, and the `stories-baselines.yml` workflow for linux.
+// --update-snapshots` on macOS, and the `stories-baselines.yml` workflow for linux. Filter by title
+// (`--grep "phone upcard-mine"`): the reporter locates every story test at the fixture's
+// `test(...)`, not at a line of this file, so `gin-stories.spec.ts:<line>` selects nothing.
 import { expect, type Page } from '@playwright/test';
 
 import {
