@@ -11,7 +11,9 @@ build) enforces both directions on dist/ for each game, reading three sources th
   `cls(...)`, and the words of every `class="..."` attribute in a template string (plus the quoted
   words of a `${...}` ternary inside it), over `web/games/<g>/**` and `web/shared/**` (`.ts`, not
   tests).
-- Markup: the `class="..."` attributes of the served `games/<g>/index.html`.
+- Markup: the `class="..."` attributes of the served `games/<g>/index.html` (for a shell game the
+  file `tools/shell-markup.ts` composes from `web/shared/markup/shell/*.html` and the game's
+  `page.ts`, docs/design/dry-round-2.md G2; the committed, served bytes are what is read).
 - CSS: every `.name` in the stylesheets the page links (the shared chunk's
   `dist/shared/assets/<chunk>-<hash>.css`, which is `web/shared/styles/{tokens,base}.css`; on a
   shell page, once docs/design/dry-round-2.md G1 lands `shell.css`, the shell games' sheet, which

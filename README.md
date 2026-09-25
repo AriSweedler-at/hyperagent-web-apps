@@ -211,6 +211,17 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    and `<script type="module" src="./main.ts">`. Vite's input glob (`web/**/index.html`) picks the
    folder up and builds `dist/games/<g>/index.html` with `app-[hash].js` beside it; the shared chunk
    and every CSS file land under `dist/shared/assets/`. Never a `/`-rooted URL: guard 1 fails.
+   A game on the shared shell does not write the shell's markup (`docs/design/dry-round-2.md` G2):
+   `web/games/<g>/page.ts` declares its `ShellPage` (`web/shared/markup/shell.ts`: the copy the
+   pages spell differently, the comment notes, how the page spells each shell look, and its own
+   blocks, verbatim: the head, the table, the endgame, its sheets, its options with `#hostBtn` and
+   the two name inputs), `tools/shell-markup.ts` lists it in `PAGES`, and
+   `node --experimental-strip-types tools/shell-markup.ts --write` composes `index.html` from
+   `web/shared/markup/shell/*.html`, formatted with Prettier when `.prettierignore` leaves the page
+   to it. The composed page is committed, and `test/dist/shell-markup.test.ts` pins it to the render
+   (and the partials' ids plus `BLOCK_IDS`/`SCREEN_IDS` to `SHELL_IDS`), so the tool is re-run after
+   every edit to a partial or a `page.ts`; a shell id the page renames fails there and in
+   `shell-ids.test.ts` before a painter fails at boot.
 2. `web/games/<g>/theme.css`: the game's rules over the thirteen tokens `tokens.css` declares (to use
    another palette, override them on `:root` as fidice does; `CONTRACT.md` "Tokens").
 3. `web/games/<g>/main.ts`: the boot and no logic. Construct the adapters (`realTransport`,
