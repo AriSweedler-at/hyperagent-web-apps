@@ -1146,8 +1146,9 @@ Step 15, part A (tighten: `allowJs` out, the lint story as it stands, coverage r
   whose trimmed, case-folded name matches the last name seated at a gone or silent seat back to
   that seat before it is reported, so a guest whose tab died lands in its own seat with the name
   its shell saves. At capacity 2 there is one slot and every path is the two-seat code it
-  replaced: `sessions.test.ts`, both games' `net/sessions.test.ts`, the gin wire corpus and
-  `boot.test.ts` are unchanged; gin's and backgammon's wrappers are byte-identical (one-parameter
+  replaced: `sessions.test.ts`, both games' `net/sessions.test.ts` and the gin wire corpus are
+  unchanged, and `boot.test.ts` keeps its intent pins (its three direct calls of the events pass
+  seat 1); gin's and backgammon's wrappers are byte-identical (one-parameter
   `welcome`, no `joinName`, `Omit<HostOptions, 'game'>` gaining the two optional fields). The
   harness logs one argument by default and the seat with `world({ seats: true })`;
   `sessions.seats.test.ts` runs 13 N-seat scenarios. Found on the way and fixed: a channel

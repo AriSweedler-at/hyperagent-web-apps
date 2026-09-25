@@ -83,7 +83,7 @@ report), frees the seat it left, and hands that seat to a held join if one waits
 | Welcome on open, lobby after the join, `full` after the first guest's next frame, a refused frame dropped | gin/bg `src/net/sessions.test.ts` | `welcome(ctx, 1)` with one-parameter codecs; one slot is the two-seat `accept`/`hold`/`refuse` order; the harness logs `['frame', frame]` by default |
 | The 13-file corpus in order | `test/parity/gin.sessions.test.ts` | its recorder is `frame: (frame) => hostGot.push(frame)` |
 | Statuses, toasts, timers, the ticket, liveness (30 scenarios) | `web/shared/net/sessions.test.ts` | file unchanged; `send(frame)` writes the one open channel; `guestGone(null, 1)` is logged `['guestGone', null]` |
-| `{type: 'host/frame', frame}` intents | `web/shared/edge/boot.test.ts` | the adapter keeps one parameter (the seated form is the shell-surface PR's, §7) |
+| `{type: 'host/frame', frame}` intents | `web/shared/edge/boot.test.ts` | the adapter keeps one parameter (the seated form is the shell-surface PR's, §7); the pins hold as they were, though the file's three direct calls of the events now pass seat 1 (§6.10) |
 | `{type: 'send', frame}` effects | gin/bg `state.test.ts`, `test/parity/gin.state.test.ts` | untouched: a 2-seat `broadcast` emits no `seat` |
 | `WAITING_MSG`, reopened and handoff statuses | e2e `shell-online/resume/handoff` | `opts.waiting` is undefined for gin/bg |
 | Liveness e2e (3 cases × 2 games) | `e2e/shell-liveness.spec.ts` | the held/replace/gone paths at one slot are the two-seat ones |
@@ -129,6 +129,12 @@ report), frees the seat it left, and hands that seat to a held join if one waits
    and its types): `sessionEvents(deps, {seats})` in `web/shared/edge/boot.ts` and its test, which
    land with the shell's N-seat surface (§7); `e2e/fixtures/table.ts`, which needs briscola's page;
    briscola's own session pins. `docs/design/shared-shell.md` §4.5 carries the note.
+10. **`boot.test.ts` is edited at three lines.** The proof table called it unchanged, and its
+    `toEqual` pins are; but the test *calls* `host.frame({t: 'join'})` and `host.guestGone(...)`
+    directly, and `tsc -b` refuses a one-argument call once the event types name the seat. The
+    three calls pass seat 1. An optional `seat` on the event types would have kept the file
+    untouched at the price of every N-seat adapter reading `Seat | undefined` from a session that
+    always knows the seat; the truthful type won.
 
 ## 7. What the shell asks next (C2/C3, or the PR after; every item is today's shape at capacity 2)
 
