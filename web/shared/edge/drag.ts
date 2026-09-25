@@ -62,6 +62,14 @@ export const FALLBACK_MS = 60;
 
 const px = (n: number): string => `${String(Math.round(n * 100) / 100)}px`;
 
+/**
+ * The ghost's classes, held in constants as glossary.ts holds its own: the class contract
+ * (test/dist/classes.ts) reads a shared file's `addClass('…')` literals for every page, and fidice
+ * has no drag, so these two are listed in web/shared/styles/CONTRACT.md as a `shell` row instead.
+ */
+const GHOST_CLASS = 'drag-ghost';
+const LANDING_CLASS = 'landing';
+
 /** The ghost's motion with its state closed over: the transform to write now, and one step on. */
 export type Mover = Readonly<{
   /** The ghost's transform: its offset from `origin`, where the drag began, plus what the motion adds (a lean). */
@@ -168,7 +176,7 @@ export const bindDrag = <Src, Over, Intent>(
     const base = rectOf(el);
     const ghost = cloneInto(doc.body, el);
     if (ghost === null) return { ...s, moving: true, grab: p, base };
-    addClass(ghost, 'drag-ghost');
+    addClass(ghost, GHOST_CLASS);
     removeClass(ghost, ...cfg.ghost.strip);
     // The ghost sits on the body, outside the table's size variable: it takes the source's measured
     // width as its own, so every em of its face is the source's.
@@ -203,7 +211,7 @@ export const bindDrag = <Src, Over, Intent>(
       finish();
       return;
     }
-    addClass(ghost, 'landing');
+    addClass(ghost, LANDING_CLASS);
     // At rest at the cell, from the ghost's base: the direct translate, or a lean of zero.
     const rest = motion.at({ x: cell.left, y: cell.top });
     setStyle(ghost, 'transform', rest.transform({ x: s.base.left, y: s.base.top }));
