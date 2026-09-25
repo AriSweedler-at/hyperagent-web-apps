@@ -244,10 +244,7 @@ export type Table = Readonly<{
 
 export type App = ShellApp<Backgammon>;
 
-export const DEFAULT_GUEST_NAME = 'Jeff';
-export const DEFAULT_HOME_TAB: HomeTab = 'play';
 export const DEFAULT_CURTAIN_MODE: CurtainMode = 'always';
-export const NAME_MAX = 20;
 
 export const initialTable: Table = {
   selected: null,
@@ -276,7 +273,6 @@ export const NO_MOVE_MS = 1200;
  * then the roll modal goes and the board answers taps. A cosmetic beat: the engine rolled at once.
  */
 export const TUMBLE_MS = 700;
-/** `onGuestGone`'s toast lasts this long, as does `LOST_HOST_MSG`. */
 /** `sandbox/load` outside pass-and-play, and a position the decoder refuses. */
 export const SANDBOX_LOCAL_ONLY_MSG = 'Positions can only be set up in pass-and-play.';
 export const badPositionMsg = (error: string): string => `That position is not valid: ${error}`;
@@ -553,7 +549,6 @@ const rendered = (app: App, prev: View | null, ctx: Context): Step => {
   );
 };
 
-/** `broadcast()`: my view, the guest's view on the wire, the taps cleared, saved, rendered. */
 /** Apply `actions` in order for `seat`, stopping at the first refusal. */
 const applyAll = (
   game: State,
