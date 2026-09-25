@@ -25,12 +25,6 @@ import { PLAYERS } from './test-helpers.ts';
 
 /** A random match of 3 runs a few hundred steps; the cap only turns a hang into a failure. */
 const STEP_CAP = 20_000;
-const engine = {
-  apply: bg.applyAction,
-  viewFor: bg.viewFor,
-  legalActions: bg.legalActions,
-  actorOf: bg.actorOf,
-};
 
 /** Doubles at 15%, undoes at 5%, passes at 25%, otherwise a uniformly random legal move. */
 const choose = (view: View, pick: () => number): Action => {
@@ -61,16 +55,7 @@ const ensure = (ok: boolean, label: string, what: string): void => {
 };
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
-const checkStep = ({
-  before,
-  after,
-  view,
-  actor,
-  action,
-  rngCalls,
-  step,
-  cov,
-}: Step): readonly [View, View] => {
+const checkStep = ({ before, after, view, actor, action, rngCalls, step, cov }: Step): void => {
   const rules = bg.rulesOf(before.variant);
   const label = `step ${String(step)} ${action.type}`;
   const opp = bg.otherSeat(actor);
@@ -210,7 +195,7 @@ const checkStep = ({
   if (after.phase === 'over' && before.phase !== 'over') {
     const r = after.result;
     ensure(r !== null, label, 'no result');
-    if (r === null) return [v0, v1];
+    if (r === null) return;
     ensure(r.multiplier <= rules.maxMultiplier, label, 'multiplier above the cap');
     ensure(r.points === r.multiplier * r.cube, label, 'points');
     ensure(after.match.score[r.winner] === before.match.score[r.winner] + r.points, label, 'score');
@@ -237,7 +222,6 @@ const checkStep = ({
       label,
       'not byte-stable',
     );
-  return [v0, v1];
 };
 
 /**
@@ -250,7 +234,7 @@ const playMatch = (
   matchLength: number,
   cov: Set<string>,
 ): number => {
-  const run = driveGame(engine, {
+  const run = driveGame(bg.ENGINE, {
     seed,
     now,
     start: (dice, clock) => bg.createGame(PLAYERS, { matchLength, rotation }, dice, clock),

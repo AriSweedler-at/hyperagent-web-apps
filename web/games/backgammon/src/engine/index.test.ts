@@ -2,6 +2,7 @@
 // the engine's own function under the contract's name, and `over` is the shell's end-screen test.
 import { describe, expect, test } from 'vitest';
 
+import { epoch as now } from '../../../../../test/shared/engine-helpers.ts';
 import {
   ENGINE,
   actorOf,
@@ -13,16 +14,7 @@ import {
   legalActions,
   viewFor,
 } from './index.ts';
-
-const PLAYERS = [
-  { id: 'a', name: 'Ari' },
-  { id: 'b', name: 'Jeff' },
-] as const;
-const now = (): number => 0;
-const scripted = (...dice: ReadonlyArray<number>): (() => number) => {
-  let i = 0;
-  return () => ((dice[i++] ?? 1) - 0.5) / 6;
-};
+import { PLAYERS, scripted } from './test-helpers.ts';
 
 describe('ENGINE', () => {
   test("the members are the engine's functions; over is the won match, not the finished game", () => {

@@ -3,7 +3,8 @@
 // from `mulberry32(seed)` and the picks from `mulberry32(seed * 7919)`, calls the policy once per
 // step before `apply` (the order gin's legacy leg and backgammon's invariant #10 depend on), counts
 // one rng read per flip and none per pass, and the seeds, shards, env knob, byte stability and
-// round trips behave; then the coin's own rules and decoders, every branch, for its 100% row.
+// round trips behave; then the coin's own rules and decoders, every branch, for its 100% row, and
+// its `ENGINE` on the two-seat contract, which is what the driver is handed.
 import { describe, expect, test } from 'vitest';
 
 import {
@@ -26,6 +27,7 @@ import {
   shard,
   type Step,
 } from '../../../../test/shared/replay.ts';
+import { otherSeat } from '../../lib/game.ts';
 import { mulberry32 } from '../../lib/rng.ts';
 import * as coin from './coin.ts';
 import type { Action, State, View } from './coin.ts';
@@ -38,13 +40,15 @@ const policy = (_view: View, pick: () => number, legal: ReadonlyArray<Action>): 
   if (action === undefined) throw new Error('no legal action');
   return action;
 };
+/** The drive's `over` reads the state; the contract's (`coin.over`) reads a view. */
+const over = (s: State): boolean => coin.over(coin.viewFor(s, 0));
 const heads = (): number => 0.1;
 const tails = (): number => 0.9;
 
 describe('driveGame', () => {
   test('plays the seed to `over` under the cap; every step chains; the policy runs before apply', () => {
     const order: string[] = [];
-    const run = driveGame(coin, {
+    const run = driveGame(coin.ENGINE, {
       seed: 7,
       now,
       start,
@@ -53,13 +57,13 @@ describe('driveGame', () => {
         return policy(view, pick, legal);
       },
       stepCap: 500,
-      over: coin.over,
+      over,
       onStep: ({ before, after, view, actor, step }) => {
         order.push('apply');
         expect(step).toBe(order.length / 2 - 1);
         expect(view).toEqual(coin.viewFor(before, actor));
         expect(actor).toBe(before.turn);
-        expect(after.turn).toBe(coin.otherSeat(actor));
+        expect(after.turn).toBe(otherSeat(actor));
       },
     });
     expect(run.done).toBe(true);
@@ -72,7 +76,7 @@ describe('driveGame', () => {
   test('the dice are mulberry32(seed), the picks mulberry32(seed * 7919); one read per flip, none per pass', () => {
     const steps: Step<State, View, Action>[] = [];
     const firstPicks: number[] = [];
-    const run = driveGame(coin, {
+    const run = driveGame(coin.ENGINE, {
       seed: 11,
       now: epoch,
       start,
@@ -82,7 +86,7 @@ describe('driveGame', () => {
         return policy(view, () => p, legal);
       },
       stepCap: 500,
-      over: coin.over,
+      over,
       onStep: (step) => steps.push(step),
     });
     expect(run.start.turn).toBe(mulberry32(11)() < 0.5 ? 0 : 1);
@@ -96,29 +100,29 @@ describe('driveGame', () => {
     // The returned rng is the dice where the game left them: `create` read once, each flip once.
     expect((run.rng as ReturnType<typeof countingRng>).calls()).toBe(1 + flips);
     // Same seed, same game, byte for byte.
-    const again = driveGame(coin, {
+    const again = driveGame(coin.ENGINE, {
       seed: 11,
       now: epoch,
       start,
       policy,
       stepCap: 500,
-      over: coin.over,
+      over,
     });
     expect(JSON.stringify(again.state)).toBe(JSON.stringify(run.state));
     expect(again.steps).toBe(run.steps);
   });
 
   test('the cap turns a hang into `done: false`; a game over at the start takes no step', () => {
-    const passing = driveGame(coin, {
+    const passing = driveGame(coin.ENGINE, {
       seed: 1,
       now,
       start,
       policy: () => ({ type: 'pass' as const }),
       stepCap: 5,
-      over: coin.over,
+      over,
     });
     expect(passing).toMatchObject({ steps: 5, done: false });
-    const finished = driveGame(coin, {
+    const finished = driveGame(coin.ENGINE, {
       seed: 1,
       now,
       start: (rng, clock) => coin.create(PLAYERS, { target: 0 }, rng, clock),
@@ -132,14 +136,14 @@ describe('driveGame', () => {
   test('a refused action fails with the seed, the step and the action', () => {
     expect(() =>
       driveGame(
-        { ...coin, actorOf: (s) => coin.otherSeat(s.turn) },
+        { ...coin.ENGINE, actorOf: (s: State) => otherSeat(s.turn) },
         {
           seed: 3,
           now,
           start,
           policy: () => ({ type: 'flip' as const }),
           stepCap: 5,
-          over: coin.over,
+          over,
         },
       ),
     ).toThrow('seed 3 step 0 {"type":"flip"}: refused: Not your turn');
@@ -179,13 +183,13 @@ describe('seeds, shards and the env knob', () => {
 
 describe('byteStable and roundTrips', () => {
   test('every state and both views of a driven game re-encode byte for byte', () => {
-    driveGame(coin, {
+    driveGame(coin.ENGINE, {
       seed: 5,
       now,
       start,
       policy,
       stepCap: 500,
-      over: coin.over,
+      over,
       onStep: ({ after, step }) => {
         expect(byteStable(after, coin.decodeState)).toBe(true);
         roundTrips(`step ${String(step)} state`, coin.decodeState, after);
@@ -223,6 +227,19 @@ describe('the coin rules', () => {
     });
   });
 
+  test('ENGINE publishes the functions under the contract’s names; over reads the view', () => {
+    expect(coin.ENGINE.create).toBe(coin.create);
+    expect(coin.ENGINE.apply).toBe(coin.apply);
+    expect(coin.ENGINE.viewFor).toBe(coin.viewFor);
+    expect(coin.ENGINE.legalActions).toBe(coin.legalActions);
+    expect(coin.ENGINE.actorOf).toBe(coin.actorOf);
+    expect(coin.ENGINE.over).toBe(coin.over);
+    expect(coin.ENGINE.decodeState).toBe(coin.decodeState);
+    expect(coin.ENGINE.decodeView).toBe(coin.decodeView);
+    expect(coin.ENGINE.decodeAction).toBe(coin.decodeAction);
+    expect(coin.over(coin.viewFor(s0, 0))).toBe(false);
+  });
+
   test('a pass changes the turn and reads nothing; the wrong seat is refused', () => {
     const rng = countingRng(heads);
     const passed = must(coin.apply(s0, 0, { type: 'pass' }, rng, now));
@@ -246,7 +263,7 @@ describe('the coin rules', () => {
     );
     expect(won).toMatchObject({ heads: [3, 1], phase: 'over', endedAt: NOW });
     expect(coin.actorOf(won)).toBeNull();
-    expect(coin.over(won)).toBe(true);
+    expect(coin.over(coin.viewFor(won, 0))).toBe(true);
     expect(failureOf(coin.apply(won, 0, { type: 'flip' }, heads, now))).toBe(
       coin.MESSAGES.GAME_OVER,
     );

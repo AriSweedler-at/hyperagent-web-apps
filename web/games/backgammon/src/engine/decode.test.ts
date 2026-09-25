@@ -5,7 +5,6 @@ import { describe, expect, test } from 'vitest';
 import { failureOf, now, viaJson } from '../../../../../test/shared/engine-helpers.ts';
 import { driveGame } from '../../../../../test/shared/replay.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
-import { actorOf, applyAction } from './apply.ts';
 import {
   decodeAction,
   decodeBoard,
@@ -17,39 +16,37 @@ import {
   decodeView,
   pair,
 } from './decode.ts';
+import { ENGINE } from './index.ts';
 import { createGame } from './setup.ts';
 import { PLAYERS } from './test-helpers.ts';
 import { ACTION_TYPES, type State } from './types.ts';
-import { legalActions, viewFor } from './view.ts';
+import { viewFor } from './view.ts';
 
 const seats = [0, 1] as const;
 
 /** One seeded Western match to 3 played by a random policy: the state after every action. */
 const trace = (seed: number): ReadonlyArray<State> => {
   const states: State[] = [];
-  const run = driveGame(
-    { apply: applyAction, viewFor, legalActions, actorOf },
-    {
-      seed,
-      now,
-      start: (dice, clock) =>
-        createGame(PLAYERS, { matchLength: 3, rotation: ['backgammon'] }, dice, clock),
-      // Doubling and passing are rare, as at a real table, or every game ends in a few steps.
-      policy: (_view, pick, legal) => {
-        const actions = legal.filter(
-          (a) => (a.type !== 'double' || pick() < 0.1) && (a.type !== 'pass' || pick() < 0.2),
-        );
-        const action = actions[Math.floor(pick() * actions.length)];
-        if (action === undefined) throw new Error(`no action at step ${String(states.length)}`);
-        return action;
-      },
-      stepCap: 20_000,
-      over: (s) => s.phase === 'over' && viewFor(s, 0).matchOver,
-      onStep: ({ after }) => {
-        states.push(after);
-      },
+  const run = driveGame(ENGINE, {
+    seed,
+    now,
+    start: (dice, clock) =>
+      createGame(PLAYERS, { matchLength: 3, rotation: ['backgammon'] }, dice, clock),
+    // Doubling and passing are rare, as at a real table, or every game ends in a few steps.
+    policy: (_view, pick, legal) => {
+      const actions = legal.filter(
+        (a) => (a.type !== 'double' || pick() < 0.1) && (a.type !== 'pass' || pick() < 0.2),
+      );
+      const action = actions[Math.floor(pick() * actions.length)];
+      if (action === undefined) throw new Error(`no action at step ${String(states.length)}`);
+      return action;
     },
-  );
+    stepCap: 20_000,
+    over: (s) => s.phase === 'over' && viewFor(s, 0).matchOver,
+    onStep: ({ after }) => {
+      states.push(after);
+    },
+  });
   return [run.start, ...states];
 };
 

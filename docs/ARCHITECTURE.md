@@ -385,7 +385,7 @@ uploads the report and comments the run URL on the open issue labelled `nightly`
 Suites first (`docs/design/test-partition.md`). Every test belongs to exactly one of seven suites,
 decided by path alone in `tools/ci/suites.ts`: `shared` (`web/shared/**` unit tests, the two
 legacy oracles that read only shared code and the coin game under `web/shared/example/coin`, the
-two-seat engine the shared replay driver is proved on), `shared-integration` (the transport
+`TwoSeatEngine` the shared replay driver is proved on), `shared-integration` (the transport
 contract in Chromium; the coin game's integration tests through the shared shell join it), `gin`,
 `fidice`, `backgammon`
 (each game's colocated tests, its `test/parity/<g>.*` oracles and its fixture pins), `site` (the

@@ -53,16 +53,16 @@ export const countingRng = (inner: Rng): Rng & Readonly<{ calls: () => number }>
 };
 
 /** One reduce step's result: the App after the intents and every effect they emitted, in order. */
-export type Step<App, Effect> = Readonly<{ app: App; effects: ReadonlyArray<Effect> }>;
+export type IntentStep<App, Effect> = Readonly<{ app: App; effects: ReadonlyArray<Effect> }>;
 
 /** Dispatch intents in turn, collecting every effect: `run` of both games' ui/state.test.ts. */
 export const runIntents =
   <App, Intent, Effect, Ctx>(
-    reduce: (app: App, intent: Intent, ctx: Ctx) => Step<App, Effect>,
+    reduce: (app: App, intent: Intent, ctx: Ctx) => IntentStep<App, Effect>,
     ctx: Ctx,
   ) =>
-  (app: App, ...intents: ReadonlyArray<Intent>): Step<App, Effect> =>
-    intents.reduce<Step<App, Effect>>(
+  (app: App, ...intents: ReadonlyArray<Intent>): IntentStep<App, Effect> =>
+    intents.reduce<IntentStep<App, Effect>>(
       (s, intent) => {
         const next = reduce(s.app, intent, ctx);
         return { app: next.app, effects: [...s.effects, ...next.effects] };

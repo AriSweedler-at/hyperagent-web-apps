@@ -1,30 +1,36 @@
 // The coin game (dry-round-2.md F3; the folder docs/design/test-partition.md reserves): the
-// smallest two-seat engine with the shape of gin's and backgammon's, `create`, `apply`, `viewFor`,
-// `legalActions`, `actorOf`, `over` and byte-stable decoders, so the shared replay driver
-// (test/shared/replay.ts) is proved on a game whose every rng read and every branch can be
+// smallest engine on the two-seat contract (web/shared/lib/game.ts `TwoSeatEngine`, D5), `create`,
+// `apply`, `viewFor`, `legalActions`, `actorOf`, `over` and byte-stable decoders published as
+// `ENGINE` the way gin's and backgammon's engine/index.ts publish theirs, so the shared replay
+// driver (test/shared/replay.ts) is proved on a game whose every rng read and every branch can be
 // counted, and so the shared-shell integration suite has a real game to boot that is nobody's
 // product. Two seats flip a coin in turn: a flip reads the rng once, a pass reads nothing, and the
 // first seat to `target` heads wins. The view hides the other seat's last flip, as gin's hides
-// the other hand. `otherSeat`, `setAt` and `pair` are the lines both engines spell (D5 and F2
-// fold the three copies into web/shared/lib).
+// the other hand. The seat primitives and the `pair` decoder are web/shared/lib's (F1, F2).
 import {
-  arrayOf,
+  otherSeat,
+  seat as decodeSeat,
+  setAt,
+  type Now,
+  type Pair,
+  type Player,
+  type Seat,
+  type TwoSeatEngine,
+} from '../../lib/game.ts';
+import {
   boolean,
   integer,
   literal,
   nullable,
   object,
   oneOf,
+  pair,
   string,
   type Decoder,
 } from '../../lib/json.ts';
 import { err, ok, type Result } from '../../lib/result.ts';
 import type { Rng } from '../../lib/rng.ts';
 
-export type Seat = 0 | 1;
-export type Pair<T> = readonly [T, T];
-export type Player = Readonly<{ id: string; name: string }>;
-export type Now = () => number;
 export type Face = 'heads' | 'tails';
 export type Phase = 'play' | 'over';
 export type Action = Readonly<{ type: 'flip' }> | Readonly<{ type: 'pass' }>;
@@ -63,11 +69,6 @@ export const MESSAGES = {
   NOT_YOUR_TURN: 'Not your turn',
   GAME_OVER: 'The game is over',
 } as const;
-
-export const otherSeat = (seat: Seat): Seat => (seat === 0 ? 1 : 0);
-
-export const setAt = <T>(pair: Pair<T>, seat: Seat, value: T): Pair<T> =>
-  seat === 0 ? [value, pair[1]] : [pair[0], value];
 
 /** The first seat is drawn from the rng, as a backgammon opening is: one read. */
 export const create = (players: Pair<Player>, opts: Options, rng: Rng, now: Now): State => ({
@@ -132,21 +133,9 @@ export const legalActions = (view: View): ReadonlyArray<Action> =>
 
 export const actorOf = (s: State): Seat | null => (s.phase === 'over' ? null : s.turn);
 
-export const over = (s: State): boolean => s.phase === 'over';
+/** The end screen shows: the contract's `over` reads a view, since the shell holds only views. */
+export const over = (view: View): boolean => view.phase === 'over';
 
-/** Exactly two items, as a tuple. */
-const pair =
-  <T>(item: Decoder<T>): Decoder<Pair<T>> =>
-  (input) => {
-    const items = arrayOf(item)(input);
-    if (!items.ok) return items;
-    const [a, b] = items.value;
-    return items.value.length === 2 && a !== undefined && b !== undefined
-      ? ok([a, b])
-      : err({ path: [], expected: 'array of 2' });
-  };
-
-const seat: Decoder<Seat> = literal(0, 1);
 const face: Decoder<Face> = literal('heads', 'tails');
 const phase: Decoder<Phase> = literal('play', 'over');
 const player: Decoder<Player> = object({ id: string, name: string });
@@ -162,19 +151,32 @@ export const decodeState: Decoder<State> = object({
   target: integer(1),
   heads: pair(integer(0)),
   lastFlip: pair(nullable(face)),
-  turn: seat,
+  turn: decodeSeat,
   phase,
   startedAt: integer(0),
   endedAt: nullable(integer(0)),
 });
 
 export const decodeView: Decoder<View> = object({
-  me: object({ idx: seat, name: string, heads: integer(0), lastFlip: nullable(face) }),
+  me: object({ idx: decodeSeat, name: string, heads: integer(0), lastFlip: nullable(face) }),
   opp: object({ name: string, heads: integer(0) }),
   target: integer(1),
   phase,
-  turn: seat,
+  turn: decodeSeat,
   isMyTurn: boolean,
-  result: nullable(seat),
+  result: nullable(decodeSeat),
   startedAt: integer(0),
 });
+
+/** The coin on the two-seat contract: what the shared shell boots and the replay driver drives. */
+export const ENGINE: TwoSeatEngine<State, View, Action, Options> = {
+  create,
+  apply,
+  viewFor,
+  legalActions,
+  actorOf,
+  over,
+  decodeState,
+  decodeView,
+  decodeAction,
+};

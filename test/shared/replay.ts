@@ -10,24 +10,19 @@
 // compiles it with no node types.
 import { expect } from 'vitest';
 
-import type { Result } from '../../web/shared/lib/result.ts';
+import type { Now, Seat, TwoSeatEngine } from '../../web/shared/lib/game.ts';
 import { mulberry32, type Rng } from '../../web/shared/lib/rng.ts';
 import { countingRng } from './engine-helpers.ts';
 
-export type Seat = 0 | 1;
-export type Now = () => number;
-
 /**
- * What the driver needs of an engine: the four members every two-seat engine has. D5's
- * `TwoSeatEngine` (web/shared/lib/game.ts) satisfies it; until it lands each driver spells the
- * four, gin's `actorOf` being test/parity/gin.policy.ts's `actor`.
+ * What the driver needs of an engine: four members of the two-seat contract (web/shared/lib/game.ts
+ * `TwoSeatEngine`, D5), so each engine's `ENGINE` passes as it is and the one legacy leg
+ * (test/parity/gin.codecs.test.ts) spells only these four.
  */
-export type ReplayEngine<S, V, A> = Readonly<{
-  apply: (s: S, seat: Seat, action: A, rng: Rng, now: Now) => Result<S, string>;
-  viewFor: (s: S, seat: Seat) => V;
-  legalActions: (view: V) => ReadonlyArray<A>;
-  actorOf: (s: S) => Seat | null;
-}>;
+export type ReplayEngine<S, V, A> = Pick<
+  TwoSeatEngine<S, V, A, unknown>,
+  'apply' | 'viewFor' | 'legalActions' | 'actorOf'
+>;
 
 /** One applied step, for a driver's per-step invariants: `step` counts the steps before it. */
 export type Step<S, V, A> = Readonly<{
@@ -51,6 +46,7 @@ export type Drive<S, V, A> = Readonly<{
   policy: (view: V, pick: Rng, legal: ReadonlyArray<A>) => A;
   /** Turns a hang into a failure; a driver asserts `done` afterwards. */
   stepCap: number;
+  /** The finished game, read off the state (the contract's `over` reads a view). */
   over: (s: S) => boolean;
   onStep?: (step: Step<S, V, A>) => void;
 }>;

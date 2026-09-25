@@ -1,5 +1,5 @@
-// The backgammon-only test scaffolding its engine and reducer tests redeclared (dry-round-2.md
-// F4: `scripted` in four files, `pos` in nine, `mv` in four, `START` in six, `PLAYERS` in four).
+// The backgammon-only test scaffolding its engine and ui tests redeclared (dry-round-2.md F4:
+// `pos` in nine files, `PLAYERS` in six, `scripted` in five, `START` in five, `mv` in four).
 // Test code by name: eslint.config.js lists `**/test-helpers.ts` with the tests (a counter and a
 // throw are fine here) and vitest.config.ts keeps it out of the coverage denominator, so it can
 // sit beside the engine without falling under the pure profile or the engine's rows. The shared

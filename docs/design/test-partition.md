@@ -169,9 +169,10 @@ scripts, stopping at the first failure and listing what CI adds (the browser sui
 ## Not yet
 
 - The coin game (`web/shared/example/coin`) landed with the second DRY round (F3): a real
-  two-seat engine with byte-stable decoders, claimed by `shared`'s `web/shared/**/*.test.ts` glob
-  and held at 100/100/100/100 as the replay driver's self-test. Its integration tests through the
-  shared shell join `shared-integration.unit` when the shell boots it (the design's §4 and P3);
+  `TwoSeatEngine` (`web/shared/lib/game.ts`) with byte-stable decoders, published as `ENGINE` as
+  the games' engines publish theirs, claimed by `shared`'s `web/shared/**/*.test.ts` glob and held
+  at 100/100/100/100 as the replay driver's self-test. Its integration tests through the shared
+  shell join `shared-integration.unit` when the shell boots it (the design's §4 and P3);
   `test:shared` then runs both projects so shared's rows see a real consumer.
 - `test/shared/**` (the replay driver and the engine-test scaffolding, F3/F4) has a RULES row
   (shared, gin, backgammon: the suites whose tests import it) and no coverage row: test code.

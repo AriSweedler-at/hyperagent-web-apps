@@ -32,27 +32,19 @@ const roundTripsStep = <S>(
 
 /** One seeded game on the current engine, every state and view round-tripped. */
 const currentGame = (seed: number): Counted => {
-  const run = driveGame(
-    {
-      apply: current.applyAction,
-      viewFor: current.viewFor,
-      legalActions: current.legalActions,
-      actorOf: (s) => actor(s as unknown as GinState) as Seat,
+  const run = driveGame(current.ENGINE, {
+    seed,
+    now,
+    start: (rng, clock) =>
+      current.createGame({ players: PLAYERS, target: 100, dealer: 0 }, rng, clock),
+    policy: (view, pick, legal) =>
+      policy(pick, viaJson(view) as Parameters<typeof policy>[1], viaJson(legal) as never),
+    stepCap: STEP_CAP,
+    over: (s) => s.phase === 'gameOver',
+    onStep: ({ after, step }) => {
+      roundTripsStep(`seed ${String(seed)} step ${String(step + 1)}`, after, current.viewFor);
     },
-    {
-      seed,
-      now,
-      start: (rng, clock) =>
-        current.createGame({ players: PLAYERS, target: 100, dealer: 0 }, rng, clock),
-      policy: (view, pick, legal) =>
-        policy(pick, viaJson(view) as Parameters<typeof policy>[1], viaJson(legal) as never),
-      stepCap: STEP_CAP,
-      over: (s) => s.phase === 'gameOver',
-      onStep: ({ after, step }) => {
-        roundTripsStep(`seed ${String(seed)} step ${String(step + 1)}`, after, current.viewFor);
-      },
-    },
-  );
+  });
   expect(run.state.phase).toBe('gameOver');
   return { states: run.steps, views: run.steps * 2 };
 };
