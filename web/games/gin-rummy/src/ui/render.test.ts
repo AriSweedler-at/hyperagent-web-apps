@@ -814,6 +814,23 @@ describe('bindAll', () => {
       { type: 'history/close' },
     ]);
   });
+
+  test('a press on a card and its release; a press between the cards is nothing', () => {
+    const { p, intents } = wired();
+    const card = fakeEl('card', { attrs: { 'data-card': 'AS' } });
+    p.get('hand').fire('pointerdown');
+    expect(intents).toEqual([]);
+    p.get('hand').fire('pointerdown', { target: fakeTarget({ closest: { '.card': card } }) });
+    p.get('hand').fire('pointerup');
+    p.get('hand').fire('pointerleave');
+    p.get('hand').fire('pointercancel');
+    expect(intents).toEqual([
+      { type: 'card/press', cardId: 'AS' },
+      { type: 'card/release' },
+      { type: 'card/release' },
+      { type: 'card/release' },
+    ]);
+  });
 });
 
 describe('discardsHtml', () => {
