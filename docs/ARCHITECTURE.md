@@ -322,13 +322,13 @@ a dispatch selects everything. Job `check` always runs beside it: `setup-node@v4
 (eslint + prettier --check), `npm run hooks:verify`. Every other job `needs: changes` and is gated
 on its output. The shared, site and harness suites carry `if: needs.changes.outputs.<job> ==
 'true'`, one job each; the game suites are ONE matrix job `game` with `strategy.matrix.suite:
-${{ fromJSON(needs.changes.outputs.games) }}` (`fail-fast: false`; `name: ${{ matrix.suite }}`
-keeps the check names `gin`, `fidice`, `backgammon`; `if: needs.changes.outputs.games != '[]'`
-skips it whole, since GitHub refuses an empty matrix), so a fourth game edits `ci.yml` nowhere
+${{ fromJSON(needs.changes.outputs.games) }}` (`fail-fast: false`; the checks read `game (gin)`,
+`game (fidice)`, `game (backgammon)`; `if: needs.changes.outputs.games != '[]'` skips it whole,
+since GitHub refuses an empty matrix), so a fourth game edits `ci.yml` nowhere
 (dry-round-2 I1). Each suite runs once under v8 coverage against its own threshold rows (`npm run
 test:<suite> -- --coverage`; `harness` has no rows; `shared-integration` is the transport contract,
 so it installs Chromium first), `site` building `dist/` and uploading it after its guards. The
-Playwright runs are the matrix job `e2e-game` over `e2e-games` (`name: e2e-${{ matrix.suite }}`,
+Playwright runs are the matrix job `e2e-game` over `e2e-games` (checks `e2e-game (<suite>)`,
 artifact `playwright-report-<suite>`) and the job `e2e-site` (`npm run test:e2e:<suite>`, its own
 build: Chromium from `.github/actions/playwright-chromium` (actions/cache by Playwright version;
 the OS packages every run, the download only on a miss), coturn from `.github/actions/coturn` for
