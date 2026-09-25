@@ -15,13 +15,15 @@
 // web/shared/edge/prefs.ts (docs/design/shared-shell.md §5 A3) over the keys, the engine decoder
 // and the host save's own field spelled here, grouped as the `SHELL_STORE` the shell config carries
 // (§5 C2 `shellStore`); the keys and the literals did not move.
-import { CARD_BACKS, type CardBack } from './cardBack.ts';
+import { isCardBack, type CardBack } from './cardBack.ts';
 import { SORT_MODES, type SortMode } from './sort.ts';
 import type { Store, StorageError } from '../../../shared/edge/storage.ts';
 import {
   NAME_MAX,
   PLAY_MODES,
   SOUND_STATES,
+  cardPackPref,
+  decodeCardPackFor,
   decodeName,
   decodePlayMode,
   decodeSoundFont,
@@ -84,8 +86,13 @@ export const STORAGE_KEYS = {
   sound: 'ginRummy_sound',
   /** How the hand is arranged: `suit`, `rank` or `manual` (bare string). This page's own key. */
   sort: 'ginRummy_sort',
-  /** The card back (src/cardBack.ts, bare string). This page's own key; set from the console for now. */
-  cardBack: 'ginRummy_cardBack',
+  /**
+   * The card back (src/cardBack.ts, bare string): the shared card pack drawn (docs/design/card-packs.md
+   * §2.2, `<game>_cardPack` like `<game>_soundFont`). This page's own key; set from the console for
+   * now. Was `ginRummy_cardBack` until the packs landed: `migrateCardBack` moves a stored value over
+   * once at boot (RETIRED_KEYS).
+   */
+  cardPack: 'ginRummy_cardPack',
   /**
    * The sound font (web/shared/lib/sound/fonts.ts, bare string). This page's own key, so another
    * game on the origin keeps its own choice (docs/design/sound-fonts.md §6); set from the console for now.
@@ -98,6 +105,12 @@ export const STORAGE_KEYS = {
   scorerState: 'ginRummyScorerState_v2',
 } as const;
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
+
+/** Keys this page wrote once and reads only to migrate: nothing writes them, and `migrateCardBack` removes the one it finds. */
+export const RETIRED_KEYS = {
+  /** The card back before the shared packs (docs/design/card-packs.md §2.2); its value moves to `cardPack`. */
+  cardBack: 'ginRummy_cardBack',
+} as const;
 
 /** Play, Rules, the Score Counter and, since the glossary links, About (docs/design/glossary-links.md). */
 export const HOME_TABS = ['play', 'rules', 'score', 'about'] as const;
@@ -124,7 +137,7 @@ const hostExtra: Decoder<HostExtra> = object({ target: integer(1) });
 
 export const decodeHomeTab: Decoder<HomeTab> = literal(...HOME_TABS);
 export const decodeSort: Decoder<SortMode> = literal(...SORT_MODES);
-export const decodeCardBack: Decoder<CardBack> = literal(...CARD_BACKS);
+export const decodeCardBack: Decoder<CardBack> = decodeCardPackFor('french52');
 
 const scorerPlayer = object({ id: string, name: string });
 const scorerRound = object({
@@ -166,10 +179,26 @@ export const { read: readSoundFont, write: writeSoundFont } = SHELL_STORE.soundF
 // ---- this page's own preferences -----------------------------------------------------------
 
 export const { read: readSort, write: writeSort } = textPref(STORAGE_KEYS.sort, decodeSort);
-export const { read: readCardBack, write: writeCardBack } = textPref(
-  STORAGE_KEYS.cardBack,
-  decodeCardBack,
+export const { read: readCardBack, write: writeCardBack } = cardPackPref(
+  STORAGE_KEYS.cardPack,
+  'french52',
 );
+
+/**
+ * The one-time key rename (docs/design/card-packs.md §2.2): a value under the retired
+ * `ginRummy_cardBack` moves to `ginRummy_cardPack` when the new key is empty and the value names a
+ * pack; the retired key is removed either way. Returns the value that named no pack so the boot
+ * can log it under the new key's message, else null. Nothing to do when the retired key is absent.
+ */
+export const migrateCardBack = (store: Store): string | null => {
+  const old = store.readText(RETIRED_KEYS.cardBack);
+  if (!old.ok) return null;
+  const current = store.readText(STORAGE_KEYS.cardPack);
+  const valid = isCardBack(old.value);
+  if (valid && !current.ok) store.writeText(STORAGE_KEYS.cardPack, old.value);
+  store.remove(RETIRED_KEYS.cardBack);
+  return valid ? null : old.value;
+};
 
 // ---- the Score Counter -----------------------------------------------------------------------
 

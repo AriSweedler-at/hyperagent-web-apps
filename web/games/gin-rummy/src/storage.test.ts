@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import { createStore, type StorageLike } from '../../../shared/edge/storage.ts';
 import { mulberry32 } from '../../../shared/lib/rng.ts';
+import { badCardBackMsg } from './cardBack.ts';
 import { createGame } from './engine/index.ts';
 import {
   ALL_KEYS,
@@ -15,10 +16,13 @@ import {
   HOME_TABS,
   NAME_MAX,
   PLAY_MODES,
+  RETIRED_KEYS,
   SORT_MODES,
   SOUND_STATES,
   STORAGE_KEYS,
   clearSave,
+  migrateCardBack,
+  readCardBack,
   readHomeTab,
   readName,
   readP2Name,
@@ -28,6 +32,7 @@ import {
   readSoundFont,
   readSoundState,
   soundEnabled,
+  writeCardBack,
   writeHomeTab,
   writeName,
   writeP2Name,
@@ -67,7 +72,7 @@ const game = createGame(
 );
 
 describe('frozen constants', () => {
-  test('the six kept legacy keys, the second name, the sort, the card back and the sound font, the tabs, modes, sound states and the name cap', () => {
+  test('the six kept legacy keys, the second name, the sort, the card pack and the sound font, the tabs, modes, sound states and the name cap', () => {
     expect(ALL_KEYS).toEqual([
       'ginRummyMP_v1',
       'ginRummy_name',
@@ -76,7 +81,7 @@ describe('frozen constants', () => {
       'ginRummy_playMode',
       'ginRummy_sound',
       'ginRummy_sort',
-      'ginRummy_cardBack',
+      'ginRummy_cardPack',
       'ginRummy_soundFont',
       'ginRummyScorerState_v2',
     ]);
@@ -105,6 +110,64 @@ describe('the sort preference', () => {
     expect(readSort(store)).toEqual({ ok: true, value: 'suit' });
     s.setItem(STORAGE_KEYS.sort, 'colour');
     expect(readSort(store).ok).toBe(false);
+  });
+});
+
+describe('the card pack preference and the retired card-back key', () => {
+  test('round trip as a bare string under ginRummy_cardPack; a missing, an unknown and an Italian-only pack read as errors', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    expect(readCardBack(store)).toEqual({
+      ok: false,
+      error: { kind: 'missing', key: STORAGE_KEYS.cardPack },
+    });
+    CARD_BACKS.forEach((back) => {
+      expect(writeCardBack(store, back).ok).toBe(true);
+      expect(s.map.get(STORAGE_KEYS.cardPack)).toBe(back);
+      expect(readCardBack(store)).toEqual({ ok: true, value: back });
+    });
+    ['plaid', 'linea'].forEach((v) => {
+      s.setItem(STORAGE_KEYS.cardPack, v);
+      expect(readCardBack(store)).toEqual({
+        ok: false,
+        error: {
+          kind: 'invalid',
+          key: STORAGE_KEYS.cardPack,
+          reason: '$: expected one of "default" | "blue-stripe" | "yu-gi-oh" | "empty"',
+        },
+      });
+    });
+    // The refusal line names this key (src/cardBack.ts spells it, the lint zones keeping it out of here).
+    expect(badCardBackMsg('plaid').startsWith(`${STORAGE_KEYS.cardPack}: `)).toBe(true);
+  });
+
+  test('migrateCardBack: a preset under the retired key moves to the new key once; the retired key goes either way', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    // Nothing stored: nothing to do.
+    expect(migrateCardBack(store)).toBeNull();
+    expect(s.map.size).toBe(0);
+    // A valid value moves.
+    s.setItem(RETIRED_KEYS.cardBack, 'yu-gi-oh');
+    expect(migrateCardBack(store)).toBeNull();
+    expect(s.map.get(STORAGE_KEYS.cardPack)).toBe('yu-gi-oh');
+    expect(s.map.has(RETIRED_KEYS.cardBack)).toBe(false);
+    // The new key already holds a choice: the old one is dropped, not copied over it.
+    s.setItem(RETIRED_KEYS.cardBack, 'blue-stripe');
+    expect(migrateCardBack(store)).toBeNull();
+    expect(s.map.get(STORAGE_KEYS.cardPack)).toBe('yu-gi-oh');
+    expect(s.map.has(RETIRED_KEYS.cardBack)).toBe(false);
+    // A stranger is returned for the boot to log, and dropped; the new key is untouched.
+    s.setItem(RETIRED_KEYS.cardBack, 'tartan');
+    expect(migrateCardBack(store)).toBe('tartan');
+    expect(s.map.get(STORAGE_KEYS.cardPack)).toBe('yu-gi-oh');
+    expect(s.map.has(RETIRED_KEYS.cardBack)).toBe(false);
+    // The new key absent and the old one a stranger: nothing is written.
+    s.map.clear();
+    s.setItem(RETIRED_KEYS.cardBack, 'tartan');
+    expect(migrateCardBack(store)).toBe('tartan');
+    expect(s.map.size).toBe(0);
+    expect(RETIRED_KEYS).toEqual({ cardBack: 'ginRummy_cardBack' });
   });
 });
 

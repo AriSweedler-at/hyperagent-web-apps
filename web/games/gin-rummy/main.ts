@@ -32,8 +32,8 @@ import { HostSession } from './src/net/host.ts';
 import type { NetDeps } from '../../shared/edge/peer.ts';
 import { isGuestFrame, type GuestFrame, type HostFrame } from './src/protocol.ts';
 import { createScorer, type SpeechRecognizerLike } from './src/scorer/main.ts';
-import { STORAGE_KEYS, soundEnabled } from './src/storage.ts';
-import { badCardBackMsg, isCardBack } from './src/cardBack.ts';
+import { STORAGE_KEYS, migrateCardBack, soundEnabled } from './src/storage.ts';
+import { badCardBackMsg, isCardBack, type CardBack } from './src/cardBack.ts';
 import { badSoundFontMsg, isSoundFont } from '../../shared/lib/sound/fonts.ts';
 import { formatMap, mapOf } from './src/sandbox.ts';
 import { slotHandView } from './src/ui/hand/SlotHandView.ts';
@@ -88,14 +88,19 @@ const boot = (): void => {
   // (src/scorer/main.ts) registering itself as the legacy `window.__scorer` did.
   const page = window as Window & { __rng?: Rng; __gin?: unknown; __scorer?: Scorer };
   const store = browserStore();
+  // The card back's key was renamed when the shared card packs landed (docs/design/card-packs.md
+  // §2.2): a value left under the old key moves over once, and one that names no preset is logged
+  // under the new key's message and dropped.
+  const strayBack = migrateCardBack(store);
+  if (strayBack !== null) console.error(badCardBackMsg(strayBack));
   // The card back (src/cardBack.ts) and the sound font (docs/design/sound-fonts.md §6): a value
   // the console left in storage that names no preset is logged and dropped before every home
   // read, so the default stands and a reload logs it once.
   const homeSnapshot = (): HomeSnapshot => {
-    const storedBack = store.readText(STORAGE_KEYS.cardBack);
+    const storedBack = store.readText(STORAGE_KEYS.cardPack);
     if (storedBack.ok && !isCardBack(storedBack.value)) {
       console.error(badCardBackMsg(storedBack.value));
-      store.remove(STORAGE_KEYS.cardBack);
+      store.remove(STORAGE_KEYS.cardPack);
     }
     const storedFont = store.readText(STORAGE_KEYS.soundFont);
     if (storedFont.ok && !isSoundFont(storedFont.value)) {
@@ -372,7 +377,19 @@ const boot = (): void => {
     },
     sandboxMap: (): string | null =>
       app.shell.game === null ? null : formatMap(mapOf(app.shell.game)),
-    /** The card back, from the console for now: a preset is shown and remembered; anything else is logged and refused. */
+    /**
+     * The card pack, from the console for now (docs/design/card-packs.md §2.2): a pack that draws
+     * a French deck is shown and remembered; anything else is logged and refused. `cardBack` is
+     * the documented older name of the same hook, kept as an alias for one release.
+     */
+    cardPack: (name: string): void => {
+      if (!isCardBack(name)) {
+        console.error(badCardBackMsg(name));
+        return;
+      }
+      dispatch({ type: 'cardBack/set', back: name });
+    },
+    cardPackName: (): CardBack => app.table.cardBack,
     cardBack: (name: string): void => {
       if (!isCardBack(name)) {
         console.error(badCardBackMsg(name));

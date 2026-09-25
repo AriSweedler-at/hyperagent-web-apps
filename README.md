@@ -367,7 +367,8 @@ writing) that is ample for text-only game traffic.
 ```
 web/index.html               landing page, the first Vite entry (no scripts); dist/index.html is byte-identical
 web/public/.nojekyll         copied to dist/ so Pages serves dotfiles and folders untouched
-web/shared/lib/              shared pure TypeScript: result, rng, json decoders, roomCode, name, clock types
+web/public/shared/cards/     the served card-pack files: backs/ (gin's five, copied) and linea/ (generated); docs/design/card-packs.md
+web/shared/lib/              shared pure TypeScript: result, rng, json decoders, roomCode, name, clock types, sound fonts, card packs (cards/)
 web/shared/edge/             shared effects: ice, transport (the only importer of peerjs) + fake, clock, storage, dom, fx, share
 web/shared/styles/           tokens.css (the shared palette, :root only), base.css (shared primitives), CONTRACT.md
 web/shared/ui/               reserved for the roadmap's shared screen builders (README only)
@@ -386,7 +387,8 @@ test/dist/                   the dist guards and the class contract (the site su
 test/integration/            the real transport through a local PeerServer in Chromium (npm run test:shared-integration)
 test/tools/                  tests of the tools below
 e2e/                         Playwright specs; fixtures/ (site, player, two-players, offline, seed); browser/ init scripts
-tools/                       serve-dist, proxy-dev, hooks-verify; legacy/ extractors and recorders; parity/ drivers;
+tools/                       serve-dist, proxy-dev, hooks-verify; legacy/ extractors and recorders; parity/ drivers; card-backs,
+                             card-packs (derive, cut, mask, check, preview a pack) and linea (the drawn Italian deck);
 tools/ci/                    suites.ts (the one table: suite -> tests, coverage rows, specs, and change -> jobs), affected.ts, run-affected.ts
 infra/games-proxy/           Cloudflare Worker (TypeScript) serving the site at games.sweedler.com
 infra/turn-worker/           Cloudflare Worker (plain JS) minting TURN credentials at turn.sweedler.com

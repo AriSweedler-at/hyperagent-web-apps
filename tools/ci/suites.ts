@@ -128,6 +128,11 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // the room-code literals grepped out of the legacy pages.
       'test/parity/ice.legacy.test.ts',
       'test/parity/roomCode.legacy.test.ts',
+      // The card-pack manifest test (docs/design/card-packs.md §7): reads web/shared/lib/cards and
+      // the derived files under web/public/shared/cards/ back through the tool's checkPack, and pins
+      // the shared vocabulary against gin's engine; under test/ because it reads the disk (the pure
+      // tsconfig that compiles web/shared/lib has no node types).
+      'test/card-packs.test.ts',
     ],
     standalone: [],
     browser: false,
@@ -761,6 +766,18 @@ export const RULES: ReadonlyArray<Rule> = [
     globs: ['test/parity/ice.legacy.test.ts', 'test/parity/roomCode.legacy.test.ts'],
     runs: ['shared'],
     why: 'the two legacy oracles over shared code',
+  },
+  {
+    globs: ['test/card-packs.test.ts'],
+    runs: ['shared'],
+    why: 'the card-pack manifest test itself',
+  },
+  {
+    // The derived card-pack files (docs/design/card-packs.md §4): the manifest test reads them and
+    // the site serves them, so the dist guards and the smoke see a moved or missing file.
+    globs: ['web/public/shared/cards/**'],
+    runs: ['shared', 'site', 'e2e-site'],
+    why: 'the served card-pack files: the manifest test reads them, the dist guards and the smoke serve them',
   },
   {
     globs: ['test/integration/**'],

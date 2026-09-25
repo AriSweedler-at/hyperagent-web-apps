@@ -1403,7 +1403,7 @@ describe('storage', () => {
     storage.setItem(STORAGE_KEYS.homeTab, 'rules');
     storage.setItem(STORAGE_KEYS.playMode, 'local');
     storage.setItem(STORAGE_KEYS.sort, 'rank');
-    storage.setItem(STORAGE_KEYS.cardBack, 'yu-gi-oh');
+    storage.setItem(STORAGE_KEYS.cardPack, 'yu-gi-oh');
     storage.setItem(STORAGE_KEYS.soundFont, 'arcade');
     storage.setItem(STORAGE_KEYS.save, '{"role":"guest","code":"KQZM","myName":"Jeff"}');
     storage.setItem(
@@ -1547,7 +1547,7 @@ describe('runEffect', () => {
       [STORAGE_KEYS.p2Name, 'Bob'],
       [STORAGE_KEYS.homeTab, 'score'],
       [STORAGE_KEYS.playMode, 'local'],
-      [STORAGE_KEYS.cardBack, 'empty'],
+      [STORAGE_KEYS.cardPack, 'empty'],
       [STORAGE_KEYS.soundFont, 'felt'],
     ]);
     runEffect(initialApp, { type: 'rememberName', name: '' }, deps);

@@ -5,6 +5,8 @@ import {
   NAME_MAX,
   PLAY_MODES,
   SOUND_STATES,
+  cardPackPref,
+  decodeCardPackFor,
   decodeName,
   decodePlayMode,
   decodeSoundFont,
@@ -53,6 +55,40 @@ describe('the shared literals', () => {
     expect(decodeSoundFont('plaid')).toEqual({
       ok: false,
       error: { path: [], expected: 'one of "default" | "felt" | "arcade"' },
+    });
+  });
+
+  test("the card-pack decoder is per deck kind: gin's four under french52, linea only for an Italian deck", () => {
+    expect(decodeCardPackFor('french52')('yu-gi-oh')).toEqual({ ok: true, value: 'yu-gi-oh' });
+    expect(decodeCardPackFor('french52')('linea')).toEqual({
+      ok: false,
+      error: { path: [], expected: 'one of "default" | "blue-stripe" | "yu-gi-oh" | "empty"' },
+    });
+    expect(decodeCardPackFor('italian40')('linea')).toEqual({ ok: true, value: 'linea' });
+    expect(decodeCardPackFor('italian40')('plaid').ok).toBe(false);
+  });
+});
+
+describe('cardPackPref', () => {
+  test('round-trips a pack name as a bare string under the key and refuses a stranger to the deck kind', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    const pref = cardPackPref('briscola_cardPack', 'italian40');
+    expect(pref.read(store)).toEqual({
+      ok: false,
+      error: { kind: 'missing', key: 'briscola_cardPack' },
+    });
+    expect(pref.write(store, 'linea')).toEqual({ ok: true, value: null });
+    expect(s.map.get('briscola_cardPack')).toBe('linea');
+    expect(pref.read(store)).toEqual({ ok: true, value: 'linea' });
+    s.setItem('briscola_cardPack', 'tartan');
+    expect(pref.read(store)).toEqual({
+      ok: false,
+      error: {
+        kind: 'invalid',
+        key: 'briscola_cardPack',
+        reason: '$: expected one of "default" | "blue-stripe" | "yu-gi-oh" | "empty" | "linea"',
+      },
     });
   });
 });

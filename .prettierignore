@@ -10,6 +10,9 @@ test/fixtures/legacy/*.cjs
 # Written by tools/legacy/record-gin-wire.ts as JSON.stringify(frames, null, 2); gin-wire.test.ts
 # pins values and key order, so the recorder's output is the committed bytes.
 test/fixtures/legacy/gin-wire/
+# Written by tools/linea.ts in one line per field (the forty ids on one line); tools/linea.test.ts
+# compares the committed file to the tool's output, so the tool's text is the committed bytes.
+web/shared/lib/cards/packs/linea.ts
 # Written by tools/parity/computed-styles.ts in its own compact layout (one screen per line, the
 # value table inline) so a golden diff reads as a selector/property change; the tool's output is
 # the committed bytes (docs/MIGRATION.md step 14).

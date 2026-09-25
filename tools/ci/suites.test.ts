@@ -555,6 +555,12 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   ['a backgammon style golden', ['test/fixtures/styles/backgammon.390x844.json'], ['e2e-site']],
   ['a gin style golden', ['test/fixtures/styles/gin-rummy.1280x800.json'], ['e2e-site']],
   ['the card-back rasters guard', ['test/card-backs.test.ts'], ['gin']],
+  ['the card-pack manifest test', ['test/card-packs.test.ts'], ['shared']],
+  [
+    'a derived card-pack file',
+    ['web/public/shared/cards/linea/italian40/AD.svg'],
+    ['shared', 'site', 'e2e-site'],
+  ],
   [
     'the stories baselines',
     ['e2e/__screenshots__/gin-stories.spec.ts/x--390x844-linux.png'],

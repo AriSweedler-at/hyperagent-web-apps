@@ -1,0 +1,1 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 144" shape-rendering="crispEdges"><defs><pattern id="stripes" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="12" fill="#1d4ed8"/><rect x="6" width="6" height="12" fill="#1e40af"/></pattern></defs><rect width="100" height="144" fill="url(#stripes)"/></svg>
