@@ -87,6 +87,21 @@ export const arrayOf =
     }, ok([]));
   };
 
+/**
+ * Exactly two items, as a tuple: the `Pair<T>` both engines index by seat (`hands`, `ready`,
+ * `score`, `dice`). Both decode.ts files spelled it (DRY round 2, F2); the error text is theirs.
+ */
+export const pair =
+  <T>(item: Decoder<T>): Decoder<readonly [T, T]> =>
+  (input) => {
+    const items = arrayOf(item)(input);
+    if (!items.ok) return items;
+    const [a, b] = items.value;
+    return items.value.length === 2 && a !== undefined && b !== undefined
+      ? ok([a, b])
+      : err(fail('array of 2'));
+  };
+
 /** Accepts `undefined` (a missing field) in addition to whatever `inner` accepts. */
 export const optional =
   <T>(inner: Decoder<T>): Decoder<T | undefined> =>
@@ -189,6 +204,34 @@ export const oneOf =
       .join(' or ');
     return err(fail(expected === '' ? 'nothing (no alternatives)' : expected));
   };
+
+/**
+ * A discriminated union: `field` names the tag, `cases` one decoder per tag in declaration order.
+ * The tag is checked first, over the input's own property, and a miss is reported as `object`
+ * over `literal` would report it (`$.type: expected one of "a" | "b"`), so an undeclared tag such
+ * as `constructor` never reaches the cases. The case decoder then runs over the SAME input and
+ * its result is returned unchanged: nothing is merged or re-spread, so the decoded value keeps
+ * the case's key order and the wire goldens and storage captures re-encode byte for byte. Both
+ * engines' `decodeAction`, the protocol's `decodeFrame` and the save's `decodeSave` spelled this
+ * head-then-switch by hand (DRY round 2, F2). The output type is the union of the cases' outputs.
+ */
+export const taggedUnion = <C extends Readonly<Record<string, Decoder<unknown>>>>(
+  field: string,
+  cases: C,
+): Decoder<Decoded<C[keyof C]>> => {
+  const entries: ReadonlyArray<readonly [string, Decoder<unknown>]> = Object.entries(
+    cases as Readonly<Record<string, Decoder<unknown>>>,
+  );
+  const expected = `one of ${entries.map(([tag]) => show(tag)).join(' | ')}`;
+  return (input) => {
+    if (!isRecord(input)) return err(fail('object'));
+    const tag = own(input, field);
+    const hit = entries.find(([t]) => t === tag);
+    return hit === undefined
+      ? err(fail(expected, [field]))
+      : (hit[1](input) as Result<Decoded<C[keyof C]>, DecodeError>);
+  };
+};
 
 /** `$.players[2].name: expected string`, for logs and toasts. */
 export const formatError = (error: DecodeError): string => {

@@ -12,9 +12,11 @@ import {
   object,
   oneOf,
   optional,
+  pair,
   record,
   refine,
   string,
+  taggedUnion,
   type DecodeError,
   type Decoder,
 } from './json.ts';
@@ -353,6 +355,73 @@ describe('map / refine / oneOf', () => {
     expect(d(5)).toEqual(ok(5));
     expect(d(true)).toEqual(failure([], 'string or integer in [0, 9]'));
     expect(oneOf()(1)).toEqual(failure([], 'nothing (no alternatives)'));
+  });
+});
+
+describe('pair', () => {
+  test('exactly two items, typed as a tuple', () => {
+    const d = pair(integer(0, 9));
+    expect(d([1, 2])).toEqual(ok([1, 2]));
+    expectTypeOf(d).returns.toEqualTypeOf<Result<readonly [number, number], DecodeError>>();
+  });
+
+  test('one or three items is not a pair; a non-array and a bad item report as arrayOf does', () => {
+    const d = pair(integer(0, 9));
+    expect(d([1])).toEqual(failure([], 'array of 2'));
+    expect(d([1, 2, 3])).toEqual(failure([], 'array of 2'));
+    expect(d([])).toEqual(failure([], 'array of 2'));
+    expect(d('12')).toEqual(failure([], 'array'));
+    expect(d([1, 'x'])).toEqual(failure([1], 'integer in [0, 9]'));
+    expect(d([1, 12])).toEqual(failure([1], 'integer in [0, 9]'));
+  });
+});
+
+describe('taggedUnion', () => {
+  type Shape =
+    | Readonly<{ kind: 'dot' }>
+    | Readonly<{ kind: 'line'; length: number }>
+    | Readonly<{ kind: 'box'; w: number; h: number }>;
+  const shape: Decoder<Shape> = taggedUnion('kind', {
+    dot: object({ kind: literal('dot') }),
+    line: object({ kind: literal('line'), length: integer(0) }),
+    box: object({ kind: literal('box'), w: integer(0), h: integer(0) }),
+  });
+
+  test('the tag picks the case decoder, which runs over the whole input', () => {
+    expect(shape({ kind: 'dot' })).toEqual(ok({ kind: 'dot' }));
+    expect(shape({ kind: 'line', length: 3 })).toEqual(ok({ kind: 'line', length: 3 }));
+    expect(shape({ kind: 'box', w: 1, h: 2 })).toEqual(ok({ kind: 'box', w: 1, h: 2 }));
+    expect(shape({ kind: 'line' })).toEqual(
+      failure(['length'], 'integer in [0, 9007199254740991]'),
+    );
+  });
+
+  test("the case's result is returned unchanged: its key order, not the tag first", () => {
+    const d = taggedUnion('t', { a: object({ x: integer(), t: literal('a'), y: string }) });
+    const r = d({ y: 'y', t: 'a', x: 1, extra: true });
+    expect(r.ok && JSON.stringify(r.value)).toBe('{"x":1,"t":"a","y":"y"}');
+  });
+
+  test('an unknown or missing tag names every case in declaration order, at the tag field', () => {
+    const expected = 'one of "dot" | "line" | "box"';
+    expect(shape({ kind: 'blob' })).toEqual(failure(['kind'], expected));
+    expect(shape({})).toEqual(failure(['kind'], expected));
+    expect(shape({ kind: 1 })).toEqual(failure(['kind'], expected));
+    expect(formatError({ path: ['kind'], expected })).toBe(`$.kind: expected ${expected}`);
+  });
+
+  test('a prototype member as the tag is an unknown tag, never a case', () => {
+    ['constructor', '__proto__', 'toString'].forEach((tag) => {
+      expect(shape({ kind: tag })).toEqual(failure(['kind'], 'one of "dot" | "line" | "box"'));
+    });
+    const inherited = Object.create({ kind: 'dot' }) as unknown;
+    expect(shape(inherited)).toEqual(failure(['kind'], 'one of "dot" | "line" | "box"'));
+  });
+
+  test('rejects non-objects like object does', () => {
+    expect(shape(null)).toEqual(failure([], 'object'));
+    expect(shape(['dot'])).toEqual(failure([], 'object'));
+    expect(shape('dot')).toEqual(failure([], 'object'));
   });
 });
 
