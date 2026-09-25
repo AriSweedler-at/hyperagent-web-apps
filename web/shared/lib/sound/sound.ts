@@ -32,3 +32,25 @@ export const SILENCE: Sound = { kind: 'silence' };
 
 /** Gains stay in this range: the legacy tables peaked at 0.22, and a square wave at 0.3 is already loud. */
 export const MAX_GAIN = 0.3;
+
+/**
+ * How long a sound plays, in whole milliseconds, when the data says: a synth ends where its last
+ * note does (`AudioCues.seq` starts each note `gap ?? dur` after the one before), silence takes no
+ * time, and a sample's length is not in its URL, so `null`: the font declares it
+ * (`SoundFont.durationsMs`, docs/design/sound-fonts.md §4) or the scheduler assumes one.
+ */
+export const soundMs = (sound: Sound): number | null => {
+  switch (sound.kind) {
+    case 'synth': {
+      const ends = sound.notes.reduce<Readonly<{ at: number; end: number }>>(
+        (acc, n) => ({ at: acc.at + (n.gap ?? n.dur), end: Math.max(acc.end, acc.at + n.dur) }),
+        { at: 0, end: 0 },
+      );
+      return Math.round(ends.end * 1000);
+    }
+    case 'sample':
+      return null;
+    case 'silence':
+      return 0;
+  }
+};
