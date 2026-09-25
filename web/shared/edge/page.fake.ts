@@ -359,3 +359,91 @@ export const pageFromMarkup = (
     .map((id) => withChildren(id, { ...declared[id], ...extra[id] }));
   return fakePage([...plainEls.values(), ...composed, ...more]);
 };
+
+// ---- the shell page -------------------------------------------------------------------------------
+// Both shell games' fixtures (web/games/<g>/src/ui/page.fake.ts) declared the same two elements the
+// home paint reaches through queries, built the same mode buttons under them and assembled the page
+// the same way, differing only in the modes, which of them ship hidden and which the switch ships
+// `active` (dry-round-2 E7: 26 of 38 lines identical). The assembly lives here once; a game's
+// fixture passes its modes and declares only its table's own queries (gin's pile labels,
+// backgammon's opponent strip).
+
+/** A shell page's play modes and how their buttons ship in the markup. */
+export type ShellModes = Readonly<{
+  /**
+   * The play modes, in the switch's order: each button's `data-mode`, and the ids
+   * `modeSwitch-<mode>` and `submenu-<mode>`.
+   */
+  modes: ReadonlyArray<string>;
+  /**
+   * Modes whose buttons ship `hidden` in the switch and the submenu both (gin's `sandbox`,
+   * docs/design/gin-sandbox.md). Each also answers the per-mode selectors
+   * `.mode-btn[data-mode="<mode>"]` and `button[data-mode="<mode>"]` that the paint revealing it
+   * queries (gin's ui/home.ts `paintSandbox`).
+   */
+  hiddenModes?: ReadonlyArray<string>;
+  /** The mode the switch ships `active` (backgammon's `online`; gin's switch ships none). */
+  activeSwitchMode?: string;
+}>;
+
+/** The page, plus the mode buttons the markup gives no ids. */
+export type ShellPage = FakePage &
+  Readonly<{
+    /** The switch's mode buttons, in `modes` order. */
+    modeButtons: ReadonlyArray<FakeEl>;
+    /** The Play tab submenu's mode buttons, same order. */
+    submenuButtons: ReadonlyArray<FakeEl>;
+  }>;
+
+/**
+ * Every element of a shell page, from its markup, with the mode buttons under `#playModeSwitch`
+ * (`.mode-btn`) and `#playSubmenu` (`button`, `button[data-mode]`); `declared`, `extra` and `more`
+ * as `pageFromMarkup` takes them. A game's `declared` for one of those two ids replaces the shell's
+ * whole entry, the way `extra` replaces `declared` there.
+ */
+export const shellPage = (
+  markup: string,
+  shell: ShellModes,
+  declared: Readonly<Record<string, FakeElOptions>> = {},
+  extra: Readonly<Record<string, FakeElOptions>> = {},
+  more: ReadonlyArray<FakeEl> = [],
+): ShellPage => {
+  const hidden = shell.hiddenModes ?? [];
+  const hiddenClass = (mode: string): ReadonlyArray<string> =>
+    hidden.includes(mode) ? ['hidden'] : [];
+  const switchButtons = modeButtons('modeSwitch', shell.modes, (mode) => [
+    'mode-btn',
+    ...(mode === shell.activeSwitchMode ? ['active'] : []),
+    ...hiddenClass(mode),
+  ]);
+  const submenuButtons = modeButtons('submenu', shell.modes, hiddenClass);
+  /** The per-mode selectors of the hidden modes, each answering that mode's button alone. */
+  const perMode = (
+    selector: (mode: string) => string,
+    buttons: ReadonlyArray<FakeEl>,
+  ): Readonly<Record<string, ReadonlyArray<FakeEl>>> =>
+    Object.fromEntries(
+      hidden.map((mode) => [selector(mode), buttons.filter((b) => b.attr('data-mode') === mode)]),
+    );
+  const shellDeclared: Readonly<Record<string, FakeElOptions>> = {
+    playModeSwitch: {
+      queries: {
+        '.mode-btn': switchButtons,
+        ...perMode((mode) => `.mode-btn[data-mode="${mode}"]`, switchButtons),
+      },
+    },
+    playSubmenu: {
+      queries: {
+        button: submenuButtons,
+        'button[data-mode]': submenuButtons,
+        ...perMode((mode) => `button[data-mode="${mode}"]`, submenuButtons),
+      },
+    },
+  };
+  const page = pageFromMarkup(markup, { ...shellDeclared, ...declared }, extra, [
+    ...switchButtons,
+    ...submenuButtons,
+    ...more,
+  ]);
+  return { ...page, modeButtons: switchButtons, submenuButtons };
+};

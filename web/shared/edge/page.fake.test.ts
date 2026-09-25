@@ -7,6 +7,7 @@ import {
   modeButtons,
   optionsFromMarkup,
   pageFromMarkup,
+  shellPage,
 } from './page.fake.ts';
 
 describe('page.fake', () => {
@@ -228,5 +229,107 @@ describe('pageFromMarkup', () => {
     const bare = pageFromMarkup(MARKUP, {});
     expect(bare.get('toast').el.contains(child.el)).toBe(false);
     expect(() => bare.get('modeSwitch-local')).toThrow();
+  });
+});
+
+describe('shellPage', () => {
+  // The two shell ids the mode buttons live under, and a few the markup reads as pageFromMarkup does.
+  const MARKUP = `
+<div id="homeScreen" class="screen">
+  <div id="playModeSwitch"></div>
+  <div id="playSubmenu" class="hidden"></div>
+  <button id="hostBtn" class="btn" disabled>Host</button>
+  <input id="p1" value="Ann">
+  <div id="tableScreen"></div>
+</div>`;
+  const MODES = ['online', 'local', 'sandbox'] as const;
+
+  test('the switch and the submenu hold one button per mode, in order, found by id and by the paints’ queries; the rest of the page still comes from the markup', () => {
+    const page = shellPage(MARKUP, { modes: MODES });
+    expect(page.modeButtons.map((b) => b.id)).toEqual([
+      'modeSwitch-online',
+      'modeSwitch-local',
+      'modeSwitch-sandbox',
+    ]);
+    expect(page.submenuButtons.map((b) => b.id)).toEqual([
+      'submenu-online',
+      'submenu-local',
+      'submenu-sandbox',
+    ]);
+    expect(page.modeButtons.map((b) => b.classes())).toEqual([
+      ['mode-btn'],
+      ['mode-btn'],
+      ['mode-btn'],
+    ]);
+    expect(page.submenuButtons.map((b) => b.classes())).toEqual([[], [], []]);
+    expect(page.submenuButtons.map((b) => b.attr('data-mode'))).toEqual([...MODES]);
+    const els = (buttons: ReadonlyArray<{ el: HTMLElement }>): ReadonlyArray<HTMLElement> =>
+      buttons.map((b) => b.el);
+    const modeSwitch = page.get('playModeSwitch').el;
+    const submenu = page.get('playSubmenu').el;
+    expect(modeSwitch.querySelectorAll('.mode-btn')).toEqual(els(page.modeButtons));
+    expect(submenu.querySelectorAll('button')).toEqual(els(page.submenuButtons));
+    expect(submenu.querySelectorAll('button[data-mode]')).toEqual(els(page.submenuButtons));
+    // Without a hidden mode there is no per-mode selector.
+    expect(modeSwitch.querySelector('.mode-btn[data-mode="sandbox"]')).toBeNull();
+    expect(submenu.querySelector('button[data-mode="sandbox"]')).toBeNull();
+    expect(page.get('modeSwitch-local')).toBe(page.modeButtons[1]);
+    expect(page.get('submenu-local')).toBe(page.submenuButtons[1]);
+    // pageFromMarkup's own reading of the markup holds on the composed page.
+    expect(page.get('playSubmenu').hidden()).toBe(true);
+    expect(page.get('hostBtn').disabled()).toBe(true);
+    expect(page.get('p1').value()).toBe('Ann');
+    expect(() => page.get('nope')).toThrow('fake page has no #nope');
+  });
+
+  test('a hidden mode ships hidden in both and answers its per-mode selectors alone; the active switch mode wears active in the switch only', () => {
+    const page = shellPage(MARKUP, {
+      modes: MODES,
+      hiddenModes: ['sandbox'],
+      activeSwitchMode: 'online',
+    });
+    expect(page.modeButtons.map((b) => b.classes())).toEqual([
+      ['mode-btn', 'active'],
+      ['mode-btn'],
+      ['mode-btn', 'hidden'],
+    ]);
+    expect(page.submenuButtons.map((b) => b.classes())).toEqual([[], [], ['hidden']]);
+    const modeSwitch = page.get('playModeSwitch').el;
+    const submenu = page.get('playSubmenu').el;
+    expect(modeSwitch.querySelectorAll('.mode-btn[data-mode="sandbox"]')).toEqual([
+      page.modeButtons[2]?.el,
+    ]);
+    expect(submenu.querySelectorAll('button[data-mode="sandbox"]')).toEqual([
+      page.submenuButtons[2]?.el,
+    ]);
+    expect(modeSwitch.querySelector('.mode-btn[data-mode="online"]')).toBeNull();
+    expect(submenu.querySelector('button[data-mode="online"]')).toBeNull();
+  });
+
+  test('declared, extra and more join the shell’s own; a game’s declared for a shell id replaces the shell’s entry', () => {
+    const strip = fakeEl('oppStrip', { classes: ['opp-strip'] });
+    const child = fakeEl('child');
+    const page = shellPage(
+      MARKUP,
+      { modes: MODES },
+      { tableScreen: { queries: { '.opp-strip': [strip] } } },
+      { homeScreen: { children: [child] } },
+      [strip, child],
+    );
+    expect(page.get('tableScreen').el.querySelector('.opp-strip')).toBe(strip.el);
+    expect(page.get('homeScreen').el.contains(child.el)).toBe(true);
+    expect(page.get('homeScreen').hasClass('screen')).toBe(true);
+    expect(page.get('oppStrip')).toBe(strip);
+    expect(page.get('child')).toBe(child);
+    expect(page.get('playModeSwitch').el.querySelectorAll('.mode-btn')).toHaveLength(3);
+    const own = fakeEl('own');
+    const replaced = shellPage(
+      MARKUP,
+      { modes: MODES },
+      { playSubmenu: { queries: { button: [own] } } },
+    );
+    expect(replaced.get('playSubmenu').el.querySelectorAll('button')).toEqual([own.el]);
+    expect(replaced.get('playSubmenu').el.querySelector('button[data-mode]')).toBeNull();
+    expect(replaced.submenuButtons).toHaveLength(3);
   });
 });
