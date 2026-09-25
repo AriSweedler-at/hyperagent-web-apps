@@ -95,6 +95,7 @@ export const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/backgammon-table-ux.spec.ts',
   '**/briscola-geometry.spec.ts',
   '**/briscola-local.spec.ts',
+  '**/briscola-stories.spec.ts',
   '**/computed-styles.spec.ts',
   '**/gin-drag-discard.spec.ts',
   '**/gin-arrange.spec.ts',

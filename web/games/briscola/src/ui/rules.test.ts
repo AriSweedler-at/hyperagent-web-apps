@@ -56,8 +56,8 @@ describe('the About copy', () => {
     const links = [
       ...html.matchAll(/<a class="jargon"[^>]*data-rule="([a-z-]+)"[^>]*>([^<]+)<\/a>/g),
     ];
-    const word = links.find((m) => m[2] === 'briscola');
-    expect(word?.[1]).toBe('briscola');
+    // Once across the copy (the shell glossary spec locates the one link with that text).
+    expect(links.filter((m) => m[2] === 'briscola').map((m) => m[1])).toEqual(['briscola']);
     expect(linkedRules(html)).toEqual(expect.arrayContaining(['trick', 'goal', 'online']));
   });
 });

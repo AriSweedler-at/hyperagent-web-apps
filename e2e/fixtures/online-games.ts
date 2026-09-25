@@ -340,15 +340,15 @@ const briscola: ShellDriver = {
       return roomOpen(page, 'briscola');
     },
   },
-  // The Rules and About copy (ui/rules.ts, ui/glossary.ts) land with their own stage; the pairs
-  // below follow docs/design/briscola.md §5.8's rule ids and are unverified until they do.
+  // The Rules and About copy (ui/rules.ts, ui/glossary.ts, ui/about.ts): "briscola" in the About
+  // copy lands on the briscola rule; the trick rule names the draw, as the last tricks do.
   glossary: {
     aboutTerm: 'briscola',
-    aboutRule: 'trick',
+    aboutRule: 'briscola',
     innerFrom: 'trick',
     innerTo: 'draw',
     deepLink: 'scoring',
-    overlayFrom: 'last-trick',
+    overlayFrom: 'last-tricks',
     overlayTo: 'draw',
     openRulesOverTable: async (page, url, viewport) => {
       await briscolaStartLocal(page, url, viewport);

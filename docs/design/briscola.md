@@ -47,3 +47,16 @@ menu (`#menuBtn`, the rules and history buttons desktop-only) because two badges
 buttons do not fit 390 px; the card classes are `web/shared/ui/cardFace.ts`'s (`face glyph rank br
 suit suit-C…`), not §5.7's `idx`/`suit-coppe`; the four-player fan overlaps 0.45, not 0.6; 375 × 667
 fits without a scroll (the floors are 622 px on the phone and 611 px on the desktop).
+
+Corrected at the ship step (the review of the page, 2026-09-25): the page links `shell.css` and its
+theme redeclares the fourteen shell tokens (the espresso panel as every shell surface) instead of
+carrying the shell's rules; the history rows are the shared panel's (`web/shared/ui/history.ts` over
+`src/ui/history.ts`'s `EventCopy`; the panel now appends a new event's row under a named stream, so
+an expanded row survives the next trick), the sounds go through the shared `eventEffects` (with
+`continuedEvents` saying which stream a view continues, so a rematch chimes and a hand-made position
+paints cold), the flights through the shared `launchClone` (which gained `turn` for the briscola
+lying across the stock), and `window.__briscola.setup` is the shell's `position/load` over
+`engine.decodeState`; the two-player cell across carries `#oppName` (the shell specs' name for the
+other seat); the drag from the hand to the trick is `src/ui/dragger.ts` over the shared kernel; the
+Rules and About tabs are `src/ui/{rules,glossary,about}.ts`; the score strip's Bodoni is the variable
+face with its optical-size axis, so a `0` at 20 px keeps its hairlines.

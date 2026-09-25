@@ -283,7 +283,6 @@ const stockEmpty2 = chain((c) =>
   run(c, revealed(c, localStart(c, 2)), [{ type: 'position/load', state: position(LAST_THREE) }]),
 );
 const result2 = chain((c) => playedOut(c, LAST_THREE));
-const matchOver2 = chain((c) => playedOut(c, { ...LAST_THREE, wins: [1, 0] }));
 
 export const STORIES: ReadonlyArray<Story> = [
   story({
@@ -364,7 +363,6 @@ export const STORIES: ReadonlyArray<Story> = [
     app: result2,
     screenshot: true,
   }),
-  story({ id: 'match-over-2p', title: 'The match decided: the end screen', app: matchOver2 }),
 ];
 
 export const storyById = (id: string): Story | null => STORIES.find((s) => s.id === id) ?? null;

@@ -10,6 +10,10 @@ export const ABOUT_PARAGRAPHS: ReadonlyArray<string> = [
   'This page plays plain briscola for two, three or four (the four in partners, sitting opposite). Pass one phone around the table, or open a table online and share its code. The score runs on the table as you play, every trick is written down in the history, and the packs of cards are the regional Italian ones.',
 ];
 
-/** The panel's markup: one `<p>` per paragraph, the jargon linked to the rules. */
+/**
+ * The panel's markup: one `<p>` per paragraph, the jargon linked to the rules across the whole
+ * copy at once (a word's first occurrence alone, so "briscola" in the second paragraph stays
+ * plain; `linkJargon` never links inside a tag, so the `<p>`s are safe).
+ */
 export const aboutHtml = (): string =>
-  ABOUT_PARAGRAPHS.map((p) => `<p>${linkJargon(p, GLOSSARY)}</p>`).join('\n');
+  linkJargon(ABOUT_PARAGRAPHS.map((p) => `<p>${p}</p>`).join('\n'), GLOSSARY);

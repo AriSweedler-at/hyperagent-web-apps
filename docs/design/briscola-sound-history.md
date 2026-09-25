@@ -172,6 +172,21 @@ Losing small or pointless: no buzz (silence is the phrase).
 `victory.match` + `great` (+ `voice.match.win`), `matchLost` -> `loss.match`, refused tap -> `bad.refused`,
 `guestJoined`/`guestGone`/`shared` -> the shell's `connection`/`disconnect`/`invite`.
 
+### 4.3 Corrected at implementation (`sound.ts`, pinned by `sound.test.ts`'s 75 reachable cells)
+
+Three quiet deviations from the grid above, so a reader of the table and a reader of the file agree:
+
+- The loser's carico is a **leaf, not a layer**: `bad.trick.big.carico`, `bad.trick.huge.carico` and
+  `bad.trick.stolen.<big|huge>.carico` (the grid's `& bad.trick.carico`). A font that voices
+  `bad.trick.carico` would not be reached by these ids; a font voices `bad.trick.big.carico` or lets it
+  fall to `bad.trick.big` and `bad`. The winner's leaves are as the grid says (`.figure.<fante|cavallo|re>`,
+  `.carico.<asso|tre>`), and the briscola column's win is `<cell>.briscola` under `move.briscola`.
+- Two cells are **unreachable**, not rare: `good.trick.small.carico` (an asso or tre in a small trick
+  scores 10 or 11, so the trick is big) and `good.trick.briscola.steal.small` (a steal needs a carico of
+  the led suit on the table, so the trick is big or huge); the code plays the value's plain leaf.
+- `voice.trick.huge` is **layered on every huge trick** the winner takes, not the steal alone; every
+  shipped font leaves it silent, as §4 says of every `voice.*`.
+
 ## 5. Briscola's event stream (`web/games/briscola/src/engine/`), BEFORE the wire corpus is pinned
 
 The engine already resolves every trick in `apply` and writes `LogEntry {seat, kind, text, at}` +

@@ -54,7 +54,7 @@ describe('the copy', () => {
       'best of 5',
     ]);
     expect(hostRoomMsg('Ann')).toBe('Connected — waiting for Ann to deal');
-    expect(BRISCOLA_SHELL.copy.hostRoom('Bob')).toBe(hostRoomMsg('Bob'));
+    expect(BRISCOLA_SHELL.copy.hostRoom('Bob', DEFAULT_OPTS)).toBe(hostRoomMsg('Bob'));
     expect(BRISCOLA_SHELL.copy.leaveLocal).toBe(LEAVE_LOCAL_MSG);
     expect(BRISCOLA_SHELL.copy.leaveOnline).toBe(LEAVE_ONLINE_MSG);
     expect(BRISCOLA_SHELL.names.default).toBe(DEFAULT_NAME);
@@ -63,9 +63,18 @@ describe('the copy', () => {
   });
 
   test('the play mode: local or online, anything else online', () => {
-    expect(BRISCOLA_SHELL.modes.parse('local')).toEqual({ shown: 'local', stored: 'local' });
-    expect(BRISCOLA_SHELL.modes.parse('online')).toEqual({ shown: 'online', stored: 'online' });
-    expect(BRISCOLA_SHELL.modes.parse('sandbox')).toEqual({ shown: 'online', stored: 'online' });
+    expect(BRISCOLA_SHELL.modes.parse('local', 'online')).toEqual({
+      shown: 'local',
+      stored: 'local',
+    });
+    expect(BRISCOLA_SHELL.modes.parse('online', 'local')).toEqual({
+      shown: 'online',
+      stored: 'online',
+    });
+    expect(BRISCOLA_SHELL.modes.parse('sandbox', 'local')).toEqual({
+      shown: 'online',
+      stored: 'online',
+    });
   });
 });
 

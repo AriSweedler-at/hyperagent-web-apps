@@ -443,14 +443,12 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await closeHistory(page);
     });
 
-    test('history: the open row survives the next trick (a new event rebuilds the keyed list and drops the expanded state)', async ({
+    test("history: the open row survives the next trick (the shared panel appends the new event's row after the ones there)", async ({
       player,
       project,
     }) => {
-      // The list is one keyed slot on its last event id (ui/history.ts `paintHistory`), so the
-      // trick after an expansion rebuilds every row closed. Expected to fail until the rows are
-      // appended (or each row keyed) rather than rebuilt; this test turns red when that lands.
-      test.fail();
+      // web/shared/ui/history.ts `paintHistory`: under one stream name a new event is appended, so
+      // the `<details>` the player opened before the trick is still open when its row arrives.
       const { page } = player;
       await briscolaStartLocal(page, pagePath(project, 'briscola'), vp);
       const v = await requireView(page);
