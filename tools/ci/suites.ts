@@ -2,7 +2,7 @@
 // vitest.config.ts (one project per suite, the coverage block computed from VITEST_SUITE),
 // playwright.config.ts (E2E_SUITE -> testMatch), tools/ci/affected.ts (which CI jobs a diff
 // selects) and the pre-push hook through tools/ci/run-affected.ts; nothing else spells a path list.
-// Seven suites, decided by path alone: `shared` (web/shared unit tests, the two legacy oracles
+// Eight suites, decided by path alone: `shared` (web/shared unit tests, the two legacy oracles
 // that read only shared code and the coin game the replay driver is proved on),
 // `shared-integration` (the transport contract in Chromium; the coin game's integration tests
 // through the shared shell join it), one per game (its colocated tests, its parity
@@ -21,7 +21,9 @@ import { matchesAny } from './glob.ts';
 
 export type { GameSuite };
 
-export type Suite = 'shared' | 'shared-integration' | GameSuite | 'site' | 'harness';
+// Briscola has a suite but no page yet (docs/design/briscola.md, PR-4), so it is named here beside
+// the REGISTRY's GameSuites until tools/games.ts lists it.
+export type Suite = 'shared' | 'shared-integration' | GameSuite | 'briscola' | 'site' | 'harness';
 
 /** One coverage row: vitest's `coverage.thresholds[glob]` shape. */
 export type Thresholds = Readonly<{
@@ -473,6 +475,38 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
     // Backgammon's own specs and its describes of the shell specs (`@backgammon`; the others' left out).
     e2e: gameE2e('backgammon'),
   },
+  briscola: {
+    // The engine alone so far (docs/design/briscola-rules.md, the plan's PR-2): colocated tests,
+    // the seeded replay as its oracle like backgammon's. The page, its wire goldens and its e2e
+    // half land with PR-4, which adds the e2e row and the `@briscola` tag to the shell specs.
+    unit: ['web/games/briscola/**/*.test.ts'],
+    standalone: [],
+    browser: false,
+    needsBuild: false,
+    coverage: {
+      include: ['web/games/briscola/src/engine/**/*.ts'],
+      // The engine (docs/design/briscola-rules.md §2): the 63 table positions, the view and decoder
+      // suites and the seeded replay beside it. Measured at the PR (lines/functions/statements/
+      // branches) 100/100/100/96.5 over 121 tests; the row is measured minus 5/5/5/3, above gin's
+      // engine floor of 94/94/93/92 that the design set as the least it may be. The *.algorithms.ts
+      // row is a forward row: no such file yet (every rule fits map/filter/reduce), it binds the
+      // first one to 100% lines.
+      thresholds: {
+        'web/games/briscola/src/engine/**': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 93,
+        },
+        'web/games/briscola/src/engine/*.algorithms.ts': {
+          lines: 100,
+          functions: 100,
+          statements: 100,
+          branches: 92,
+        },
+      },
+    },
+  },
   site: {
     unit: [
       // Which theme.css declares which token, across all three games.
@@ -682,6 +716,13 @@ export const RULES: ReadonlyArray<Rule> = [
     why: 'pins web/games/fidice to the legacy bundle',
   },
   ...gameRules('backgammon'),
+  {
+    // Briscola's engine-only folder (no page yet: the plan's PR-4 gives it gameRules): its own
+    // suite, `site` for the ratchet over web/ and `harness` for the suite accounting.
+    globs: ['web/games/briscola/**'],
+    runs: ['briscola', 'site', 'harness'],
+    why: 'the briscola engine: its suite, the no-.js ratchet over web/ and the suite accounting; no page is built yet',
+  },
   {
     globs: ['test/fixtures/backgammon-wire/**'],
     runs: ['backgammon'],

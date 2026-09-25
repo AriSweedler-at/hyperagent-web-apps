@@ -177,6 +177,7 @@ describe('every test file belongs to exactly one suite', () => {
       'gin',
       'fidice',
       'backgammon',
+      'briscola',
       'site',
       'harness',
     ]);
@@ -228,6 +229,8 @@ describe('every test file belongs to exactly one suite', () => {
     expect(counts['gin']).toBeGreaterThanOrEqual(44);
     expect(counts['fidice']).toBeGreaterThanOrEqual(17);
     expect(counts['backgammon']).toBeGreaterThanOrEqual(21);
+    // The engine's five suites (docs/design/briscola-rules.md §2.2-2.4), added with PR-2.
+    expect(counts['briscola']).toBeGreaterThanOrEqual(5);
     expect(counts['site']).toBeGreaterThanOrEqual(8);
     expect(counts['harness']).toBeGreaterThanOrEqual(6);
   });
@@ -302,6 +305,18 @@ const ROWS_BEFORE: ReadonlyArray<readonly [string, Suite, Thresholds]> = [
   [
     'web/games/backgammon/src/engine/*.algorithms.ts',
     'backgammon',
+    { lines: 100, functions: 100, statements: 100, branches: 92 },
+  ],
+  // Added with the briscola engine (docs/design/briscola-rules.md, the plan's PR-2): the engine
+  // row at measured 100/100/100/96.5 minus 5/5/5/3, and the forward algorithms row, as backgammon's.
+  [
+    'web/games/briscola/src/engine/**',
+    'briscola',
+    { lines: 95, functions: 95, statements: 95, branches: 93 },
+  ],
+  [
+    'web/games/briscola/src/engine/*.algorithms.ts',
+    'briscola',
     { lines: 100, functions: 100, statements: 100, branches: 92 },
   ],
   [
@@ -391,6 +406,8 @@ const INCLUDE_BEFORE: ReadonlyArray<string> = [
   'web/games/fidice/src/view/**/*.ts',
   'web/games/gin-rummy/src/engine/**/*.ts',
   'web/games/backgammon/src/engine/**/*.ts',
+  // Added with the briscola engine (PR-2).
+  'web/games/briscola/src/engine/**/*.ts',
   'web/games/backgammon/src/protocol.ts',
   'web/games/backgammon/src/storage.ts',
   'web/games/backgammon/src/ui/**/*.ts',
@@ -434,7 +451,10 @@ describe('the coverage rows moved, not renumbered', () => {
    * coverage map summarises to 100%). Listed here so the assertion below still catches a row that
    * drifts out of its suite's include by accident; a forward row must at least sit under one.
    */
-  const FORWARD_ROWS: ReadonlyArray<string> = ['web/games/backgammon/src/engine/*.algorithms.ts'];
+  const FORWARD_ROWS: ReadonlyArray<string> = [
+    'web/games/backgammon/src/engine/*.algorithms.ts',
+    'web/games/briscola/src/engine/*.algorithms.ts',
+  ];
 
   test('every row names sources its own suite measures (vitest passes an empty row silently)', () => {
     SUITE_NAMES.forEach((s) => {
@@ -509,6 +529,17 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
     ['harness'],
   ],
   ['the backgammon wire goldens', ['test/fixtures/backgammon-wire/state.json'], ['backgammon']],
+  // Engine only until PR-4: its suite, the ratchet and the accounting; no page, so no e2e-site.
+  [
+    'a briscola engine file',
+    ['web/games/briscola/src/engine/apply.ts'],
+    ['briscola', 'site', 'harness'],
+  ],
+  [
+    'a briscola test alone',
+    ['web/games/briscola/src/engine/replay.test.ts'],
+    ['briscola', 'site', 'harness'],
+  ],
   ['a backgammon style golden', ['test/fixtures/styles/backgammon.390x844.json'], ['e2e-site']],
   ['a gin style golden', ['test/fixtures/styles/gin-rummy.1280x800.json'], ['e2e-site']],
   ['the card-back rasters guard', ['test/card-backs.test.ts'], ['gin']],
