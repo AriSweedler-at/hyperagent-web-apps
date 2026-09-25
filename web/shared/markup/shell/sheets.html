@@ -1,0 +1,20 @@
+<!-- RULES -->
+<div id="rulesOverlay" class="overlay hidden">
+  <div class="sheet">
+{{rulesIcon}}
+    <div class="sheet-title">{{rulesTitle}}</div>
+    <ul class="rules-list" id="rulesOverlayList"></ul>
+    <button class="btn btn-primary btn-block" id="closeRulesBtn"{{mt14}}>Got it</button>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div id="historyOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div {{betweenRow}}>
+      <div class="sheet-title"{{m0}}>{{historyTitle}}</div>
+      <button class="btn btn-ghost btn-sm" id="closeHistoryBtn">Close</button>
+    </div>
+    <div{{historyClass}} id="historyList"{{mt10}}></div>
+  </div>
+</div>

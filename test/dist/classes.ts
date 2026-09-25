@@ -70,11 +70,17 @@ const filesUnder = (dir: string): ReadonlyArray<string> =>
     .map((path) => resolve(dir, path))
     .filter((path) => statSync(path).isFile());
 
-/** The `.ts` sources a game ships, its own tree plus web/shared, without the tests beside them. */
+/**
+ * The `.ts` sources a game ships, its own tree plus web/shared, without the tests beside them and
+ * without web/games/<g>/page.ts: that file is the page's markup (the slot values and the residue
+ * blocks tools/shell-markup.ts composes the committed index.html from, docs/design/dry-round-2.md
+ * G2), read here as markup already through the served page, not TypeScript that names a class.
+ */
 export const sourceFiles = (game: Game): ReadonlyArray<string> =>
   [resolve(REPO_ROOT, 'web', 'games', game), resolve(REPO_ROOT, 'web', 'shared')]
     .flatMap(filesUnder)
     .filter((path) => path.endsWith('.ts') && !path.endsWith('.test.ts'))
+    .filter((path) => !path.endsWith(`${sep}page.ts`))
     .map((path) => path.split(sep).join('/'))
     .sort();
 

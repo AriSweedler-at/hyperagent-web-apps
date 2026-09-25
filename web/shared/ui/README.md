@@ -31,6 +31,19 @@ mechanical: a game's `ui/render.ts`, `ui/local.ts` and `main.ts` compose the sha
 the old names, so their tests run unchanged. The two-seat host/guest sessions landed first as
 `web/shared/net/` (shared-shell.md A1).
 
+The shell's markup itself is spelled once beside this folder, in `web/shared/markup/`
+(docs/design/dry-round-2.md G2, Wave F F2): `shell/{page,home,waiting,curtain,sheets,toast}.html`
+are the partials, with `{{slot}}` holes for the copy the pages spell differently, the comment notes
+and each page's way of spelling a shell look (gin's legacy inline styles, backgammon's theme
+classes), and `{{block}}` lines for a game's own markup (head, table, endgame, its sheets, its
+options); `shell.ts` (`renderShell`, pure, held at 100%) fills them from a game's
+`web/games/<g>/page.ts`, and `tools/shell-markup.ts --write` composes the committed
+`web/games/<g>/index.html`, through Prettier where `.prettierignore` leaves the page to it.
+`test/dist/shell-markup.test.ts` pins each committed page to the render and the partials' ids, plus
+the ones `BLOCK_IDS` and `SCREEN_IDS` say the options, table and endgame blocks place, to
+`SHELL_IDS` here. The painters above reach the document by those ids, so the markup they expect and
+the markup the pages ship are one file.
+
 What lands here later, and where it comes from (docs/design/shared-shell.md §5):
 
 | Module            | Contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Source                              |

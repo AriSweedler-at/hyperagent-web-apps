@@ -1,0 +1,69 @@
+  <!-- HOME / LOBBY{{homeNote}} -->
+  <div id="homeScreen">
+{{masthead}}
+
+    <div id="resumeBox" class="card-box{{resumeClass}} hidden"{{resumeStyle}}>
+      <label>Game in progress</label>
+      <button class="btn {{resumeBtnKind}} btn-block" id="resumeBtn"{{mt8}}>Resume</button>
+    </div>
+
+    <div class="tabbar" id="topTabbar">
+      <div class="tab-wrap" id="tabPlayWrap">
+        <button type="button" class="tab-btn" id="tabPlayBtn" data-tab="play">Play</button>
+        <div class="tab-submenu" id="playSubmenu">
+          <button type="button" data-mode="online">{{modeOnline}}</button>
+          <button type="button" data-mode="local">{{modeLocal}}</button>
+{{submenuExtra}}
+        </div>
+      </div>
+      <button type="button" class="tab-btn" id="tabRulesBtn" data-tab="rules">Rules</button>
+{{extraTabs}}
+      <button type="button" class="tab-btn" id="tabAboutBtn" data-tab="about">About</button>
+    </div>
+
+    <!-- PLAY TAB -->
+    <div id="playPanel" class="tab-panel">
+      <div class="mode-switch" id="playModeSwitch">
+        <button type="button" class="mode-btn{{onlineActive}}" data-mode="online">{{modeOnline}}</button>
+        <button type="button" class="mode-btn" data-mode="local">{{modeLocal}}</button>
+{{switchExtra}}
+      </div>
+
+      <div id="onlineModeContent">
+        <div class="card-box">
+          <label>Your name</label>
+          <input type="text" id="nameInput" value="Ari" maxlength="20" autocomplete="off"{{mt8}}>
+        </div>
+        <div class="card-box">
+          <label>{{hostLabel}}</label>
+{{hostFields}}
+          <div {{noteLeft}}>You'll get a 4-letter room code to share.</div>
+        </div>
+        <div class="card-box">
+          <label>{{joinLabel}}</label>
+          <div class="row"{{mt8}}>
+            <input type="text" id="codeInput" class="code-input grow" placeholder="CODE" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="go" data-lpignore="true" name="room-code-no-ac">
+            <button class="btn btn-go" id="joinBtn"{{joinBtnWidth}}>{{joinBtnLabel}}</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="localModeContent" class="hidden">
+{{localFields}}
+        <button class="btn btn-go btn-block" id="localBtn">{{localBtnLabel}}</button>
+        <div {{noteLeft}}>{{localNote}}</div>
+      </div>
+{{playExtra}}
+    </div>
+
+    <!-- RULES TAB{{rulesTabNote}} -->
+    <div id="rulesPanel" class="tab-panel hidden">
+      <ul class="rules-list" id="rulesList"></ul>
+    </div>
+{{extraPanels}}
+
+    <!-- ABOUT TAB: about.ts fills the copy, its jargon linked to the rules ({{glossaryDoc}}). -->
+    <div id="aboutPanel" class="tab-panel hidden">
+      <div class="card-box prose" id="aboutCopy"></div>
+    </div>{{aboutClose}}
+  </div>
