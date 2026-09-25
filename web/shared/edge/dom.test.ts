@@ -45,6 +45,7 @@ import {
   closestIn,
   nextFrame,
   pointerOf,
+  readChecked,
   rectOf,
   releasePointer,
   setChecked,
@@ -317,13 +318,16 @@ describe('geometry, styles, clones, frames and pointers (over page.fake.ts and b
     vi.useRealTimers();
   });
 
-  test('setChecked writes the property, not the attribute', () => {
+  test('setChecked writes the property, not the attribute; readChecked reads it back', () => {
     const box = fakeEl('soundToggle');
+    expect(readChecked(box.el)).toBe(false);
     setChecked(box.el, true);
     expect(box.checked()).toBe(true);
+    expect(readChecked(box.el)).toBe(true);
     expect(box.attr('checked')).toBeNull();
     setChecked(box.el, false);
     expect(box.checked()).toBe(false);
+    expect(readChecked(box.el)).toBe(false);
   });
 
   test('rectOf reads getBoundingClientRect and is all zeros where the element cannot be measured', () => {
