@@ -132,7 +132,7 @@ Identical share = identical lines / lines of the smaller file (difflib), whole f
 web/shared/
   ui/                         new zone: may import shared/lib, shared/edge/dom.ts, shared/edge/clock.ts; never a game
     shell.ts                  reduceShell, ShellState, ShellIntent, ShellEffect, runShellEffect, hostContextOf, guestContextOf, saveFor, readHome
-    shellPaint.ts             paintScreen, paintWaiting, showToast/hideToast, paintSound, paintHandoff, paintSheet, bindSheets, bindButtons + bindLongPress (dry-round-2.md D2) (re-exports ensureKeyed)
+    shellPaint.ts             paintScreen, paintWaiting, showToast/hideToast, paintSound, paintHandoff, paintSheet, bindSheets, bindButtons + bindLongPress (dry-round-2.md D2)
     keyed.ts                  ensureKeyed, the keyed slot both table halves repaint through (out of shellPaint.ts in dry-round-2.md D1)
     home.ts                   paintTabs, paintPlayMode, paintSubmenu, paintResume, bindHomeShell, bindLongPress, fillInputs, setCodeInput, blocksCodeInput, tabButtonId
     curtain.ts                CurtainText, paintCurtain, bindCurtain
