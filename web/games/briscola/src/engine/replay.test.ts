@@ -6,7 +6,9 @@
 // card, the winner drawing first and leading; the running score read off the piles and never
 // falling; the trump suit fixed and the trump card under the stock; the wrong seat, a card not
 // held and an exchange not allowed refused; every view agreeing on the public fields and carrying
-// no foreign hand outside scoperta and the partner peek; the log growing by the expected lines;
+// no foreign hand outside scoperta and the partner peek; the event stream growing by exactly one
+// per resolved trick, exchange, deal and result (numbered by index, the trick event agreeing with
+// `lastTrick` and `trickFacts`);
 // the rng read by the deal alone; byte-stable re-encoding; and every game ending after exactly
 // deckSize / n tricks. Each suite also asserts outcome coverage. Loops and mutation are fine in a
 // test; the driver has to live here because a helper module under engine/ would fall under the
@@ -288,7 +290,7 @@ const checkStep = ({
           v.sides,
           v.lastTrick,
           v.match,
-          v.log,
+          v.events,
           v.exchanges,
           v.result,
         ],
@@ -300,7 +302,7 @@ const checkStep = ({
           v0.sides,
           v0.lastTrick,
           v0.match,
-          v0.log,
+          v0.events,
           v0.exchanges,
           v0.result,
         ],
@@ -342,46 +344,115 @@ const checkStep = ({
       }
     });
   });
-  // 8. Log growth.
-  const grew = sameGame ? after.log.length - before.log.length : after.log.length;
+  // 8. The event stream: one event per resolved trick, exchange, deal and result, numbered by index.
+  const grew = after.events.length - before.events.length;
+  const kinds = after.events.slice(before.events.length).map((e) => e.kind);
+  ensure(
+    after.events.every((e, i) => e.id === i) && after.events.length >= before.events.length,
+    label,
+    'events numbered by index',
+  );
+  ensure(
+    same(after.events.slice(0, before.events.length), before.events),
+    label,
+    'an earlier event changed',
+  );
   switch (action.type) {
     case 'play':
-      if (after.trick.length > 0) ensure(grew === 0, label, 'a play mid-trick logged');
+      if (after.trick.length > 0) ensure(grew === 0, label, 'a play mid-trick made an event');
       else if (after.phase === 'over')
-        ensure(
-          grew === 2 && after.log.at(-1)?.kind === 'result',
-          label,
-          'the last trick logs the trick and the result',
-        );
-      else
-        ensure(
-          grew === 1 && after.log.at(-1)?.kind === 'trick',
-          label,
-          'a resolved trick logs one line',
-        );
-      ensure(
-        after.lastAction !== null &&
-          (after.trick.length > 0
-            ? after.lastAction.kind === 'play'
-            : after.lastAction.kind !== 'play'),
-        label,
-        'lastAction',
-      );
+        ensure(same(kinds, ['trick', 'result']), label, 'the last trick: trick then result');
+      else ensure(same(kinds, ['trick']), label, 'a resolved trick makes one event');
       break;
     case 'exchange':
-      ensure(
-        grew === 1 && after.log.at(-1)?.kind === 'exchange',
-        label,
-        'an exchange logs one line',
-      );
+      ensure(same(kinds, ['exchange']), label, 'an exchange makes one event');
       break;
     case 'next':
-      ensure(
-        grew === 2 && after.log[0]?.kind === 'game' && after.log[1]?.kind === 'deal',
-        label,
-        'a new game opens with game then deal',
-      );
+      ensure(same(kinds, ['game', 'deal']), label, 'a new game opens with game then deal');
       break;
+  }
+  const trickEvent = after.events.findLast((e) => e.kind === 'trick');
+  const t = after.lastTrick;
+  if (action.type === 'play' && after.trick.length === 0 && t !== null) {
+    ensure(trickEvent !== undefined, label, 'a resolved trick with no trick event');
+    if (trickEvent?.kind === 'trick') {
+      const d = trickEvent.data;
+      const trump = after.trumpCard.s;
+      const facts = B.trickFacts(trump, t.cards);
+      ensure(
+        trickEvent.seat === t.winner &&
+          d.no === t.no &&
+          d.leader === t.leader &&
+          d.winner === t.winner &&
+          d.winnerSide === B.sideOf(n, t.winner) &&
+          d.points === t.points &&
+          same(d.cards, t.cards) &&
+          same(d.drew, t.drew) &&
+          d.trumpTaken === (t.trumpTaken ? (t.drew.at(-1) ?? null) : null),
+        label,
+        'the trick event disagrees with lastTrick',
+      );
+      ensure(
+        same(
+          [d.winningCard, d.winningClass, d.briscola, d.steal, d.overtrump, d.valueClass],
+          [
+            facts.winningCard,
+            facts.winningClass,
+            facts.briscola,
+            facts.steal,
+            facts.overtrump,
+            facts.valueClass,
+          ],
+        ),
+        label,
+        'the trick event disagrees with trickFacts',
+      );
+      ensure(
+        d.winningCard.id === t.cards.find((p) => p.seat === t.winner)?.card.id &&
+          d.briscola === (d.winningCard.s === trump) &&
+          (!d.steal || d.briscola) &&
+          (!d.overtrump || d.briscola) &&
+          d.valueClass === B.valueClassOf(d.points) &&
+          d.carichiLost.every(
+            (seat) =>
+              B.sideOf(n, seat) !== d.winnerSide &&
+              t.cards.some((p) => p.seat === seat && B.isCarico(p.card)),
+          ),
+        label,
+        'the trick facts are not the facts',
+      );
+      if (d.steal) cov.add('steal');
+      if (d.overtrump) cov.add('overtrump');
+      if (d.carichiLost.length > 0) cov.add('carico');
+      cov.add(`value:${d.valueClass}`);
+    }
+  }
+  if (after.phase === 'over' && before.phase !== 'over') {
+    const r = after.events.at(-1);
+    ensure(
+      r?.kind === 'result' &&
+        r.seat === null &&
+        same({ winner: r.data.winner, totals: r.data.totals, draw: r.data.draw }, after.result) &&
+        r.data.decided === B.matchOver(after.match) &&
+        same(r.data.wins, after.match.wins),
+      label,
+      'the result event',
+    );
+  }
+  if (action.type === 'next') {
+    const [g, dl] = after.events.slice(-2);
+    ensure(
+      g?.kind === 'game' &&
+        g.seat === null &&
+        g.data.gameNo === after.gameNo &&
+        g.data.dealer === after.dealer &&
+        dl?.kind === 'deal' &&
+        dl.seat === after.dealer &&
+        dl.data.dealer === after.dealer &&
+        dl.data.trumpCard.id === after.trumpCard.id,
+      label,
+      'the opening events',
+    );
   }
   // 9. Rng: the deal alone reads it.
   ensure(rngCalls === (action.type === 'next' ? deck.length - 1 : 0), label, 'rng reads');
@@ -521,6 +592,13 @@ describe('seeded random play to the end (§2.4)', () => {
         'trumpTaken:1',
         'zeroTrick',
         'offSuitTrump',
+        'steal',
+        'overtrump',
+        'carico',
+        'value:pointless',
+        'value:small',
+        'value:big',
+        'value:huge',
       ]);
       expect(cov.has('exchange')).toBe(false);
       expect(cov.has('peek')).toBe(false);

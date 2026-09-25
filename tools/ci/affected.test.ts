@@ -63,6 +63,7 @@ describe('the three formats over a table of diffs', () => {
       'e2e-gin=true',
       'e2e-fidice=false',
       'e2e-backgammon=false',
+      'e2e-briscola=false',
       'e2e-site=true',
       'games=["gin"]',
       'e2e-games=["gin"]',
@@ -70,8 +71,8 @@ describe('the three formats over a table of diffs', () => {
     ]);
     expect(formatGithub(everything).split('\n')).toEqual([
       ...JOBS.map((job) => `${job}=true`),
-      'games=["gin","fidice","backgammon"]',
-      'e2e-games=["gin","fidice","backgammon"]',
+      'games=["gin","fidice","backgammon","briscola"]',
+      'e2e-games=["gin","fidice","backgammon","briscola"]',
       'everything=true',
     ]);
     expect(formatGithub(docsOnly).split('\n')).toEqual([
@@ -133,6 +134,7 @@ describe('the three formats over a table of diffs', () => {
         'e2e-gin': true,
         'e2e-fidice': false,
         'e2e-backgammon': false,
+        'e2e-briscola': false,
         'e2e-site': true,
       },
       games: ['gin'],

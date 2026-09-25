@@ -135,6 +135,9 @@ export const setChecked = (el: Element, checked: boolean): void => {
   input.checked = checked;
 };
 
+/** A checkbox's `checked` property, as a start button reads a house-rule switch (its `value` is `on` whether ticked or not). */
+export const readChecked = (el: Element): boolean => (el as HTMLInputElement).checked;
+
 export const setAttr = (el: Element, name: string, value: string | null): void => {
   if (value === null) el.removeAttribute(name);
   else el.setAttribute(name, value);

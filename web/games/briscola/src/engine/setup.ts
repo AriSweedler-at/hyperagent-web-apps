@@ -8,7 +8,6 @@
 import type { Rng } from '../../../../shared/lib/rng.ts';
 import { shuffle } from '../../../../shared/lib/shuffle.ts';
 import { deckFor, makeCard } from './cards.ts';
-import { dealText, entry, gameText, nameOf } from './log.ts';
 import { freshMatch } from './score.ts';
 import { nextSeat, seatsFrom } from './seats.ts';
 import {
@@ -18,8 +17,8 @@ import {
   type Card,
   type Cards,
   type CreateGameOptions,
+  type GameEvent,
   type GameOptions,
-  type LogEntry,
   type Match,
   type Now,
   type Player,
@@ -66,6 +65,30 @@ const deal = (deck: Cards, n: SeatCount, dealer: Seat): Deal => {
   };
 };
 
+/**
+ * The events a game opens with (E4, D6): its deal, announced by a `game` event from the second
+ * game on; ids continue the match's stream.
+ */
+const opening = (
+  events: ReadonlyArray<GameEvent>,
+  gameNo: number,
+  dealer: Seat,
+  trumpCard: Card,
+  at: number,
+): ReadonlyArray<GameEvent> => {
+  const id = events.length;
+  const dealt: GameEvent = {
+    id: id + 1,
+    kind: 'deal',
+    seat: dealer,
+    at,
+    data: { dealer, trumpCard },
+  };
+  return gameNo === 1
+    ? [...events, { ...dealt, id }]
+    : [...events, { id, kind: 'game', seat: null, at, data: { gameNo, dealer } }, dealt];
+};
+
 /** Game `gameNo` of a match: the literal in the wire order, every key present (E20). */
 const startGame = (
   players: ReadonlyArray<Player>,
@@ -74,6 +97,7 @@ const startGame = (
   dealer: Seat,
   match: Match,
   games: State['games'],
+  events: ReadonlyArray<GameEvent>,
   rng: Rng,
   now: Now,
 ): State => {
@@ -81,12 +105,6 @@ const startGame = (
   const dealt = deal(shuffle(deckFor(options), rng), n, dealer);
   const leader = nextSeat(n, dealer);
   const startedAt = now();
-  const dealEntry: LogEntry = entry(
-    dealer,
-    'deal',
-    dealText(nameOf(players, dealer), dealt.trumpCard),
-    startedAt,
-  );
   return {
     players,
     options,
@@ -106,9 +124,7 @@ const startGame = (
     match,
     result: null,
     games,
-    // Game 1 opens the match with its deal; later games announce themselves first (D6).
-    log: gameNo === 1 ? [dealEntry] : [entry(null, 'game', gameText(gameNo), startedAt), dealEntry],
-    lastAction: dealEntry,
+    events: opening(events, gameNo, dealer, dealt.trumpCard, startedAt),
     startedAt,
     endedAt: null,
   };
@@ -126,7 +142,7 @@ export const createGame = (
 ): State => {
   const options = normaliseOptions(players.length, opts);
   const dealer = drawDealer(options.seatCount, rng);
-  return startGame(players, options, 1, dealer, freshMatch(options), [], rng, now);
+  return startGame(players, options, 1, dealer, freshMatch(options), [], [], rng, now);
 };
 
 /** E13: the following game of the same match: the dealer rotates, the record of the finished game is already in `games`. */
@@ -138,6 +154,7 @@ export const nextGame = (state: State, rng: Rng, now: Now): State =>
     nextSeat(state.options.seatCount, state.dealer),
     state.match,
     state.games,
+    state.events,
     rng,
     now,
   );
@@ -145,7 +162,7 @@ export const nextGame = (state: State, rng: Rng, now: Now): State =>
 /**
  * E22: `state` at a given position, `leader` to lead an empty trick: `stock` as the state holds
  * it (top first, the trump card last while it is on the table), `trumpCard` naming the trump suit
- * even once the stock is out. Piles, the tally and the log are the caller's (spread them in).
+ * even once the stock is out. Piles, the tally and the events are the caller's (spread them in).
  */
 export const withPosition = (
   state: State,

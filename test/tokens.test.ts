@@ -17,6 +17,8 @@ import { expect, test } from 'vitest';
 
 const WEB = resolve(import.meta.dirname, '..', 'web');
 const TOKENS = resolve(WEB, 'shared', 'styles', 'tokens.css');
+// Briscola's café palette (docs/design/briscola-board.md §3): the fourth theme, backgammon's rule.
+const BRISCOLA_THEME = resolve(WEB, 'games', 'briscola', 'theme.css');
 const GIN_THEME = resolve(WEB, 'games', 'gin-rummy', 'theme.css');
 const FIDICE_THEME = resolve(WEB, 'games', 'fidice', 'theme.css');
 const BACKGAMMON_THEME = resolve(WEB, 'games', 'backgammon', 'theme.css');
@@ -115,6 +117,11 @@ test('fidice theme.css redeclares every palette name and no shell token: its loo
     SHELL_TOKENS.filter((name) => fidice.has(name)),
     'fidice links no shell.css',
   ).toEqual([]);
+});
+
+test('briscola theme.css redeclares every shared name: its café palette never inherits gin felt', () => {
+  const briscola = new Set(rootNames(BRISCOLA_THEME));
+  expect(SHARED.filter((name) => !briscola.has(name))).toEqual([]);
 });
 
 test('backgammon theme.css redeclares every shared name: its palette never inherits gin felt', () => {

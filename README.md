@@ -1,8 +1,8 @@
 # hyperagent-web-apps
 
-Three browser games, Gin Rummy, Fidice (one-cup liar's dice) and Sheshbesh (backgammon: portes
-or Western rules), written in strict functional
-TypeScript, built by Vite into static pages and served from two origins: GitHub Pages and a
+Four browser games, Gin Rummy, Fidice (one-cup liar's dice), Sheshbesh (backgammon: portes or
+Western rules) and Briscola (the Italian trick-taking game for two, three or four), written in
+strict functional TypeScript, built by Vite into static pages and served from two origins: GitHub Pages and a
 Cloudflare Worker in front of it. Online play is peer-to-peer over WebRTC (PeerJS brokers the
 handshake; a Cloudflare TURN relay carries the game when NAT blocks a direct path). Every push to
 `main` and every PR is gated by typecheck, lint, unit and parity tests, dist guards and a two-peer
@@ -17,9 +17,10 @@ pages got here.
 | Gin Rummy                    | https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/  | https://games.sweedler.com/gin-rummy/                                            | `web/games/gin-rummy/`  |
 | Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/     | https://games.sweedler.com/fidice/                                               | `web/games/fidice/`     |
 | Sheshbesh (backgammon)       | https://arisweedler-at.github.io/hyperagent-web-apps/games/backgammon/ | https://games.sweedler.com/backgammon/ and https://games.sweedler.com/sheshbesh/ | `web/games/backgammon/` |
+| Briscola                     | https://arisweedler-at.github.io/hyperagent-web-apps/games/briscola/   | https://games.sweedler.com/briscola/                                             | `web/games/briscola/`   |
 
 Both origins serve the same `dist/`. `games.sweedler.com` is the Cloudflare Worker in
-`infra/games-proxy/`: `/gin-rummy/`, `/fidice/` and `/backgammon/` are the short URLs, `/games/<name>/`
+`infra/games-proxy/`: `/gin-rummy/`, `/fidice/`, `/backgammon/` and `/briscola/` are the short URLs, `/games/<name>/`
 redirects to them and `/shared/...` maps to the site's `shared/` directory. Sheshbesh answers to two
 names: `/sheshbesh/` is the backgammon page served in place by the Worker, and on GitHub Pages
 `games/sheshbesh/` forwards to `games/backgammon/`; only `/backgammon/` is linked from the landing
@@ -29,6 +30,15 @@ Sheshbesh plays portes (the Greek set's first game: no doubling cube, a gammon d
 backgammon (the cube, the triple game, the Crawford rule) as a match to 1, 3, 5 or 7 points, on one
 phone passed between two players or online, host-authoritative over the same peer sessions as gin
 (`docs/design/backgammon-rules.md`, `docs/design/backgammon-board.md`).
+
+Briscola plays plain briscola (40 Italian cards, no obligation to follow suit, the trump card under
+the stock and drawn last) for two, three or four players, as one game of 120 points or a match to
+two or three wins, with the running score always on the table, on one phone passed around the
+table or online for two (three and four online follow with the N-seat rooms). The cards are card
+packs chosen the way sound fonts are (`docs/design/card-packs.md`); every trick's outcome is one
+engine event that is both its sound and its history row (`docs/design/briscola-sound-history.md`).
+It is the first game booted through the shared shell alone (`docs/design/briscola.md`,
+`docs/design/briscola-rules.md`, `docs/design/briscola-board.md`).
 
 Online play works on one network, or behind friendly NATs, with STUN alone. Two devices both behind
 NAT (a phone on cellular and a laptop on office Wi-Fi) need the TURN relay: the pages fetch
@@ -63,7 +73,7 @@ npm run test:gin        # one suite (shared, shared-integration, gin, fidice, ba
 | `npm run test:site`                                  | build, then the guards on `dist/` (see "Tests"), the token and ratchet pins and the Worker's tests; `test:dist` is its alias for one release                                                            |
 | `npm run test:shared-integration`                    | the real PeerJS transport through a local PeerServer in Chromium; skips where loopback WebRTC is blocked; `test:integration` is its alias for one release                                               |
 | `npm run test:e2e`                                   | build, then Playwright: every spec in `e2e/` on both emulated origins                                                                                                                                   |
-| `npm run test:e2e:<suite>`                           | one suite's specs (`gin`, `fidice`, `backgammon`, `site`), both origins; extra arguments pass through                                                                                                   |
+| `npm run test:e2e:<suite>`                           | one suite's specs (`gin`, `fidice`, `backgammon`, `briscola`, `site`), both origins; extra arguments pass through                                                                                       |
 | `npm run test:deployed`                              | the `@online` and `@relay` specs with the deployed Pages page as the subject, every server local; nightly                                                                                               |
 | `npm run serve`                                      | GitHub Pages emulation: `dist/` at http://127.0.0.1:4173/hyperagent-web-apps/                                                                                                                           |
 | `npm run preview`                                    | build, then serve                                                                                                                                                                                       |
@@ -108,11 +118,14 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    12 seeded fidice bot games (`SEEDS` in `test/parity/fidice.legacy.test.ts`) replay through both
    legs with states deep-equal; recorded wire frames and localStorage captures decode and re-encode
    byte for byte. Known legacy defects the port fixes are named and pinned on the legacy leg only.
-   Test hooks on the pages: `window.__gin`, `window.__fidice`, `window.__backgammon`, and
-   `window.__rng` as the rng when installed before boot. The backgammon engine has no legacy twin:
-   its oracle is the seeded replay beside it (`web/games/backgammon/src/engine/replay.test.ts`, 91
-   matches per push and `BG_REPLAY_GAMES=1000` nightly) asserting every invariant on every step,
-   with the enumeration of maximal plays as the oracle of the legal-move list.
+   Test hooks on the pages: `window.__gin`, `window.__fidice`, `window.__backgammon`,
+   `window.__briscola`, and `window.__rng` as the rng when installed before boot. The backgammon
+   engine has no legacy twin: its oracle is the seeded replay beside it
+   (`web/games/backgammon/src/engine/replay.test.ts`, 91 matches per push and
+   `BG_REPLAY_GAMES=1000` nightly) asserting every invariant on every step, with the enumeration
+   of maximal plays as the oracle of the legal-move list; briscola's is the same shape
+   (`web/games/briscola/src/engine/replay.test.ts`, `BRISCOLA_REPLAY_GAMES=1000` nightly), its wire
+   goldens under `test/fixtures/briscola-wire/` self-recorded like backgammon's.
 3. **Dist guards** (`npm run test:site`, which builds first; `test/dist/`, the `site` suite): every URL in dist HTML and
    CSS is relative and resolves on both origins through the Worker's real `mapPath()`; every game
    page is a Vite module page that preloads the shared chunks (one common to all; the DOM edge is
@@ -136,10 +149,11 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    Worker over :4173), a PeerServer (:9000) and, when `turnserver` is on PATH, a coturn TURN relay
    (:3478, static credentials, loopback only), then runs every spec in `e2e/` on projects `pages`
    and `proxy`: smoke on every page (zero uncaught exceptions, zero failed requests outside an
-   allowlist), gin local and scorer, backgammon pass-and-play and its board geometry, the shared
-   shell once for both (`e2e/shell-*.spec.ts`: the home screen, the pass-and-play start, the room,
+   allowlist), gin local and scorer, backgammon pass-and-play and its board geometry, briscola
+   pass-and-play for two, three and four and its table geometry, the shared shell once for the
+   three shell games (`e2e/shell-*.spec.ts`: the home screen, the pass-and-play start, the room,
    host reload and guest rejoin, the handoff; `docs/design/shared-shell.md` D1), and the `@online`
-   specs (gin's deal and turns, fidice lobby/start, backgammon roll/move) in a host and a guest context that meet through `?peer=` and
+   specs (gin's deal and turns, fidice lobby/start, backgammon roll/move, briscola's deal) in a host and a guest context that meet through `?peer=` and
    take a STUN-only ICE list through `?ice=`; fonts and CDNs are answered from local copies and
    `Math.random` is seeded. The `@relay` spec (`e2e/shell-relay.spec.ts`, one describe per game,
    fidice included)
@@ -436,8 +450,8 @@ web/shared/example/coin/     the coin game: the two-seat engine the shared repla
 web/games/gin-rummy/         index.html, theme.css, main.ts, src/{engine,protocol.ts,storage.ts,net,ui,scorer}
 web/games/fidice/            index.html, theme.css, main.ts, MANIFEST.json, src/{assets,domain,bots,net,view,app}
 web/games/backgammon/        index.html, theme.css, main.ts, src/{engine,protocol.ts,storage.ts,fx.ts,net,ui,ui/board}
-web/games/briscola/          src/engine only so far (docs/design/briscola-rules.md): the N-seat engine for 2, 3 and 4
-                             players, its tests and the seeded replay; the page follows (docs/design/briscola.md)
+web/games/briscola/          index.html (composed from page.ts), theme.css, main.ts (bootShell alone), src/{engine,protocol.ts,
+                             storage.ts,shellConfig.ts,fx.ts,net,ui} (docs/design/briscola.md, briscola-rules.md, briscola-board.md)
 assets/cards/<pack>/         a sourced card pack's pictures as supplied, with SOURCES.txt (napoletane: the owner's sheet); tools/card-packs.ts
                              cuts them into web/public/shared/cards/<pack>/ (docs/design/card-packs.md §5, §7)
 legacy/                      the pre-migration pages and shared/ice.js, verbatim; never served, never edited (legacy/README.md)

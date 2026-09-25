@@ -27,7 +27,7 @@ and tests that prove it land before the code they protect.
 .
 ├── package.json / .nvmrc        scripts: build, preview, serve, proxy:dev, typecheck, lint, lint:fix, format,
 │                                test, test:watch, test:<suite> (shared, shared-integration, gin, fidice,
-│                                backgammon, site, harness), test:e2e, test:e2e:<suite>, test:deployed,
+│                                backgammon, briscola, site, harness), test:e2e, test:e2e:<suite>, test:deployed,
 │                                check (= typecheck+lint+test+test:site), check:affected, affected,
 │                                fixtures:*, debundle:fidice, hooks, hooks:verify (README "Develop" has the table)
 ├── tsconfig.json                solution -> tsconfig.{base,web,pure,node}.json
@@ -80,9 +80,13 @@ and tests that prove it land before the code they protect.
 │       │                        index; the seeded replay beside it), protocol.ts, storage.ts, fx.ts,
 │       │                        net/{host,guest}.ts (wrappers over shared/net), ui/{state,render,board,
 │       │                        home,local,rules,sound,page.fake}.ts, ui/board/{layout,fly,dragger}.ts
-│       ├── briscola/            Briscola (docs/design/briscola-rules.md; the page is docs/design/briscola.md's PR-4):
-│       │   └── src/engine/      the N-seat engine for 2, 3 and 4 players (types, seats, cards, score, log, setup,
-│       │                        apply, view, decode, index; the 63 table positions and the seeded replay beside it)
+│       ├── briscola/            Briscola (docs/design/briscola-{rules,board}.md, briscola.md): index.html (composed
+│       │   └── src/             from page.ts by tools/shell-markup.ts), main.ts (bootShell alone: D18), theme.css
+│       │                        (the café palette; redeclares the shared tokens), engine/ (the N-seat engine for
+│       │                        2, 3 and 4: types, seats, cards, score, log, setup, apply, view, decode, index; the
+│       │                        63 table positions, the event stream and the seeded replay beside it), protocol.ts,
+│       │                        storage.ts, shellConfig.ts, fx.ts, net/{host,guest}.ts, ui/{state,render,table,
+│       │                        history,motion,layout,home,local,sound,page.fake}.ts
 │       └── sheshbesh/           index.html only: the alias stub forwarding to ../backgammon/ ("Two origins", Aliases)
 ├── assets/cards/<pack>/         a sourced card pack as supplied + SOURCES.txt (napoletane: the owner's sheet, 2026-09-25)
 ├── legacy/                      MIGRATION ONLY: verbatim pages + shared/ice.js, copied into dist by the plugin
@@ -161,6 +165,12 @@ docs/design/sound-fonts.md),
 table for e2e and stories (the shell's `position/load`; refused with a toast in any other role), and
 `soundFont(name)` / `soundFontName()` under the page's own `backgammon_soundFont` key:
 docs/design/backgammon-board.md §4, §7),
+`window.__briscola` (the shared members as backgammon's: `app`, `dispatch`, `render`, `showScreen`,
+`initHome`, `fx`, `legal()`, `soundFont` / `soundFontName` under `briscola_soundFont`; then its own:
+`act(action)`, `view()` my view, `events()` the view's event stream (the one source of the sounds and
+the history rows, docs/design/briscola-sound-history.md), `setup(state)` a pass-and-play position,
+`cardPack(name)` / `cardPackName()` a pack of the Italian deck under `briscola_cardPack`:
+docs/design/briscola.md D19, docs/design/briscola-board.md §7),
 `window.__rng` (a seeded rng installed before boot), `#rule-<id>` (gin and backgammon: a rule deep
 link, docs/design/glossary-links.md; `main.ts` dispatches `rules/show` after `home/init`, so the
 page opens on the Rules tab scrolled to that rule, and the hash stays), `?peer=host:port` (PeerServer override),
@@ -421,20 +431,20 @@ decided by path alone in `tools/ci/suites.ts`: `shared` (`web/shared/**` unit te
 legacy oracles that read only shared code and the coin game under `web/shared/example/coin`, the
 `TwoSeatEngine` the shared replay driver is proved on), `shared-integration` (the transport
 contract in Chromium; the coin game's integration tests through the shared shell join it), `gin`,
-`fidice`, `backgammon`
+`fidice`, `backgammon`, `briscola`
 (each game's colocated tests, its `test/parity/<g>.*` oracles and its fixture pins), `site` (the
 guards over the built site or over every page at once: `test/dist/**`, tokens, ratchet, the
 Worker) and `harness` (the harness testing itself: the two origins, the legacy pins, the registry,
 the suite table). `npm run test:<suite>` runs one (`VITEST_SUITE=<suite> vitest run --project
 <suite>`; `-- --coverage` measures that suite's threshold rows alone), `npm run
-test:e2e:<gin|fidice|backgammon|site>` its Playwright half (`E2E_SUITE`), and `npm test` every
+test:e2e:<gin|fidice|backgammon|briscola|site>` its Playwright half (`E2E_SUITE`), and `npm test` every
 project as one run. `tools/ci/suites.test.ts` fails on a test file no suite claims. CI gates one
 job per suite on `tools/ci/affected.ts` (below, "GitHub Actions"): `web/shared/**` runs every
 game, since every game imports shared; a game's folder runs that game, the site and the harness;
 docs run only `check`. The levels below say which suite holds them.
 
-1. Unit (vitest, colocated `*.test.ts`; suites `shared`, `gin`, `fidice`, `backgammon`, with the
-   Worker's table tests in `site`): engine/domain table tests (the 22-deadwood two-arrangement
+1. Unit (vitest, colocated `*.test.ts`; suites `shared`, `gin`, `fidice`, `backgammon`, `briscola`,
+   with the Worker's table tests in `site`): engine/domain table tests (the 22-deadwood two-arrangement
    hand, chained 6S/10S/QS layoff, every `applyAction` branch, tie-at-target -> seat 0; the 252-row
    ladder, `apply` phase gates, `redactFor`, `survivalFor` spot values, every strategy's `decide()`
    over seeded views), property tests via `legalActions` (300 seeded games: 52-card conservation,
@@ -445,7 +455,11 @@ docs run only `check`. The levels below say which suite holds them.
    every step and the enumeration of maximal plays as the oracle of `legalMoves`), its board
    builders and status strings as strings, its reducer over the shell and the table, its painters
    on the page fake built from `index.html?raw`, its wire goldens under
-   `test/fixtures/backgammon-wire/` (self-recorded: no legacy page exists). Coverage (the threshold rows of `tools/ci/suites.ts`, one block per suite and each measured by its suite alone, ratcheted in step 15 from the measured
+   `test/fixtures/backgammon-wire/` (self-recorded: no legacy page exists); the briscola engine's 63
+   table positions, its event stream (one `GameEvent` per deal, trick, exchange and result: the
+   sounds' and the history's one source) and its seeded replay (`BRISCOLA_REPLAY_GAMES=1000`
+   nightly), its reducer through whole games for 2, 3 and 4 seats, its painters on the page fake,
+   its wire goldens under `test/fixtures/briscola-wire/` (self-recorded). Coverage (the threshold rows of `tools/ci/suites.ts`, one block per suite and each measured by its suite alone, ratcheted in step 15 from the measured
    numbers: lines, functions and statements 5 points under measured wherever that beat the former
    90% floor by 8 or more, branches 3 points under, nothing lowered): 100% on `web/shared/lib` and
    on both `*.algorithms.ts` (with direct tests of the 300k node cap and the 400-entry cache
@@ -622,6 +636,24 @@ docs run only `check`. The levels below say which suite holds them.
   pass-and-play game into a hosted room under a fresh code, the invite joining as the second seat
   (`e2e/backgammon-online.spec.ts` for the play over the wire; the room, the relay, resume and the
   handoff are the shared shell's `e2e/shell-*.spec.ts`, one describe per shell game).
+- Briscola, the fourth game (docs/design/briscola.md), is the first booted through the shared shell
+  alone: `main.ts` is one `bootShell(cfg)` call, `src/shellConfig.ts` the half of the config spelled
+  from its engine, protocol and storage and `ui/state.ts` the table hooks that complete it; it
+  writes no shell markup (`page.ts` declares its `ShellPage`, `tools/shell-markup.ts` composes
+  `index.html`). What the shell lacked for it was added to the shared module with a test rather
+  than forked: seats beyond two (`ShellTypes.Seat`, `SeatOf<G>`, `localSeats`) in
+  `web/shared/ui/shell.ts`, `readChecked` in `web/shared/edge/dom.ts`. Its engine is N-seat from
+  the first day (2, 3 and 4 players; `applyAction(state, seat, action, rng, now)`) and records an
+  event stream in place of a text log: the reducer's `rendered` plays `phraseOf(event)` for every
+  new event and the history panel paints the same events as `<details>` rows
+  (docs/design/briscola-sound-history.md). Online ships two-seat on the shared sessions; three and
+  four online follow on the N-seat rooms (its PR-5). Its cards come from the shared card packs
+  (`web/shared/lib/cards`, `web/shared/ui/cardFace.ts`) and never from its own markup or CSS; the
+  computed-style driver pins the `linea` pack through the hook so the goldens survive a change of
+  the deck's default pack. Registered as the other games are: the `Game` literal and room-code row,
+  the `REGISTRY`/`SHELL` rows, `SHELL_GAMES` in `tools/games.ts` and `web/shared/ui/ids.ts`, the
+  suite row, the driver rows, the two goldens, the landing card, and `GameSuite` gained it, which
+  moved its CI job out of `ci.yml` and into the two game matrices.
 
 Step 1 (toolchain scaffold), against the versions on the registry at the time:
 

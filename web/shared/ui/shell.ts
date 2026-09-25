@@ -38,6 +38,7 @@ import type { RulesSlot } from './glossary.ts';
 
 // ---- the game's types, in one bag --------------------------------------------------------------
 
+/** The two seats every shell flow names: the host and its guest, pass-and-play's two players. A game with more adds them through its bag (`ShellTypes.Seat`) and the flows type on `SeatOf<G>`. */
 export type Seat = 0 | 1;
 export type Role = 'host' | 'guest' | 'local';
 /** The stored modes (web/shared/edge/prefs.ts `PLAY_MODES`); a game may show more (`G['Mode']`). */
@@ -59,8 +60,13 @@ export type ShellTypes = Readonly<{
   State: unknown;
   View: unknown;
   Action: unknown;
-  /** The table slice; the shell reads and writes only its pass-and-play `curtain` (agreed in C1). */
-  Table: Readonly<{ curtain: Seat | null }>;
+  /**
+   * The seats beyond the shell's two, for a game whose table seats three or four (`2 | 3`); a
+   * two-seat game leaves it out, and every flow types on `0 | 1` as before (`SeatOf<G>`).
+   */
+  Seat?: number;
+  /** The table slice; the shell reads and writes only its pass-and-play `curtain` (agreed in C1), a seat of the game's (`SeatOf<G>`). */
+  Table: Readonly<{ curtain: number | null }>;
   Tab: string;
   Mode: string;
   Screen: string;
@@ -78,6 +84,11 @@ export type ShellTypes = Readonly<{
   Store: unknown;
 }>;
 
+/** The game's seats beyond the shell's own two: what its bag's `Seat` names, `never` when it names none. */
+type ExtraSeats<G extends ShellTypes> =
+  G extends Readonly<{ Seat: infer S extends number }> ? S : never;
+/** A seat at the game's table: the shell's two and the game's own; `0 | 1` for the two-seat games. */
+export type SeatOf<G extends ShellTypes> = Seat | ExtraSeats<G>;
 export type Tab<G extends ShellTypes> = 'play' | 'rules' | G['Tab'];
 export type Mode<G extends ShellTypes> = PlayMode | G['Mode'];
 /** The five screens every shell page carries, and the game's own. */
@@ -169,7 +180,7 @@ export type ShellState<G extends ShellTypes> = Readonly<{
   oppConnected: boolean;
   nameTouched: boolean;
   /** Pass-and-play: the seat that lifted the curtain this turn. */
-  revealed: Seat | null;
+  revealed: SeatOf<G> | null;
   homeTab: Tab<G>;
   playMode: Mode<G>;
   /** The first player's name as last read from the name key or typed into any of its inputs. */
@@ -536,12 +547,12 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     ) => G['State'];
     apply: (
       game: G['State'],
-      seat: Seat,
+      seat: SeatOf<G>,
       action: G['Action'],
       rng: Rng,
       now: () => number,
     ) => Result<G['State'], string>;
-    viewFor: (game: G['State'], seat: Seat) => G['View'];
+    viewFor: (game: G['State'], seat: SeatOf<G>) => G['View'];
     /** The view shows the game over: nothing to rejoin, nobody to toast for. */
     over: (view: G['View']) => boolean;
     /** The saved game is over: not offered to resume. */
@@ -583,9 +594,15 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     viewer: (
       app: ShellApp<G>,
       game: G['State'],
-    ) => Readonly<{ seat: Seat; curtain: Seat | null; effects: ReadonlyArray<Effect<G>> }>;
+    ) => Readonly<{
+      seat: SeatOf<G>;
+      curtain: SeatOf<G> | null;
+      effects: ReadonlyArray<Effect<G>>;
+    }>;
     /** `curtain/reveal`: the seat that lifts the curtain and what it is told (backgammon's hits against it). */
-    revealer: (game: G['State']) => Readonly<{ seat: Seat; effects: ReadonlyArray<Effect<G>> }>;
+    revealer: (
+      game: G['State'],
+    ) => Readonly<{ seat: SeatOf<G>; effects: ReadonlyArray<Effect<G>> }>;
   }>;
   home: Readonly<{
     /** The game's own keys for the snapshot (`G['Home']`). */
@@ -691,6 +708,22 @@ export const localPlayers = (p1raw: string, p2raw: string): Readonly<[Player, Pl
   ];
 };
 
+/**
+ * The seats of a pass-and-play table with any number of players, from its name inputs in seat
+ * order: `localPlayers`'s rule at every seat (the owner's two names for the first two empty ones,
+ * `Player N` for an empty seat beyond, ` N` appended to a name an earlier seat already has,
+ * case-insensitively), so a game with more than two seats names them as the two-seat games do and
+ * `localSeats([p1, p2])` is `localPlayers(p1, p2)`. The game with the extra seats creates its own
+ * engine state from these and hands it to `startLocal`.
+ */
+export const localSeats = (raws: ReadonlyArray<string>): ReadonlyArray<Player> =>
+  raws.reduce<ReadonlyArray<Player>>((seated, raw, i) => {
+    const n = String(i + 1);
+    const name = nameOr(raw, DEFAULT_LOCAL_NAMES[i] ?? `Player ${n}`);
+    const taken = seated.some((p) => p.name.toLowerCase() === name.toLowerCase());
+    return [...seated, { id: `p${n}`, name: taken ? `${name} ${n}` : name }];
+  }, []);
+
 const showScreen = <G extends ShellTypes>(app: ShellApp<G>, screen: ScreenId<G>): Step<G> =>
   step(withShell(app, { screen }), { type: 'scrollTop' });
 
@@ -752,7 +785,7 @@ export const broadcast = <G extends ShellTypes>(
 /** `dispatch(seat, action)`, host only: apply, or refuse to the mover (a toast frame to the guest); then broadcast. */
 export const hostDispatch = <G extends ShellTypes>(
   app: ShellApp<G>,
-  seat: Seat,
+  seat: SeatOf<G>,
   action: G['Action'],
   ctx: Ctx,
   cfg: ShellConfig<G>,

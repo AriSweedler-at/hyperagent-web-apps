@@ -2,7 +2,7 @@
   "name": "hyperagent-web-apps",
   "private": true,
   "type": "module",
-  "description": "Ari's browser games (Gin Rummy, Fidice, Sheshbesh backgammon) with their Cloudflare Workers, served by GitHub Pages",
+  "description": "Ari's browser games (Gin Rummy, Fidice, Sheshbesh backgammon, Briscola) with their Cloudflare Workers, served by GitHub Pages",
   "scripts": {
     "build": "vite build",
     "preview": "npm run build && npm run serve",
@@ -26,6 +26,7 @@
     "test:e2e:gin": "E2E_SUITE=gin npm run test:e2e",
     "test:e2e:fidice": "E2E_SUITE=fidice npm run test:e2e",
     "test:e2e:backgammon": "E2E_SUITE=backgammon npm run test:e2e",
+    "test:e2e:briscola": "E2E_SUITE=briscola npm run test:e2e",
     "test:e2e:site": "E2E_SUITE=site npm run test:e2e",
     "test:deployed": "E2E_TARGET=deployed npm run test:e2e -- --grep \"@online|@relay\"",
     "check": "npm run typecheck && npm run lint && npm test && npm run test:site",

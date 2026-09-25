@@ -6,17 +6,31 @@ import { describe, expect, test } from 'vitest';
 import {
   cardById,
   cardName,
+  carichiLost,
   deckFor,
   exchangeCardFor,
   idsOf,
   isCardId,
+  isCarico,
   makeCard,
   makeDeck,
   pointsOf,
+  trickFacts,
   trickWinner,
+  valueClassOf,
+  winningClassOf,
 } from './cards.ts';
 import { nextSeat, seatsFrom, seatsOf, seatsOfSide, sideList, sideOf, sidesOf } from './seats.ts';
-import { DECK_POINTS, POINTS, RANKS, STRENGTH, SUITS, type Card, type Played } from './types.ts';
+import {
+  DECK_POINTS,
+  POINTS,
+  RANKS,
+  STRENGTH,
+  SUITS,
+  type Card,
+  type Played,
+  type TrickFacts,
+} from './types.ts';
 
 const c = (id: string): Card => {
   const card = cardById(id);
@@ -140,5 +154,143 @@ describe('exchangeCardFor (E14)', () => {
       expect(exchangeCardFor(c(id)), id).toEqual(c('2D'));
     });
     expect(exchangeCardFor(c('2S'))).toBeNull();
+  });
+});
+
+describe('trickFacts and carichiLost (design §4): the facts of a resolved trick', () => {
+  const facts = (trump: 'C' | 'D' | 'S' | 'B', text: string): TrickFacts =>
+    trickFacts(trump, trick(text));
+
+  test('F1 steal: the led asso di coppe taken by the 2 di bastoni, bastoni trump', () => {
+    expect(facts('B', 's0:AC s1:2B')).toEqual({
+      winningCard: c('2B'),
+      winningClass: 'pip',
+      briscola: true,
+      steal: true,
+      overtrump: false,
+      valueClass: 'big',
+    });
+    expect(carichiLost(1, trick('s0:AC s1:2B'))).toEqual([0]);
+  });
+
+  test('F2 overtrump: two briscole, the asso over the 4; the led suit is the trump suit so nothing is stolen', () => {
+    expect(facts('B', 's0:4B s1:AB')).toMatchObject({
+      winningCard: c('AB'),
+      winningClass: 'asso',
+      briscola: true,
+      steal: false,
+      overtrump: true,
+      valueClass: 'big',
+    });
+    // The asso went to its own player: nobody lost a carico.
+    expect(carichiLost(1, trick('s0:4B s1:AB'))).toEqual([]);
+    // Led off-suit, both followers trump: the tre of trumps over the 2, an overtrump without a steal.
+    expect(facts('B', 's0:5D s1:2B s2:3B')).toMatchObject({
+      winningClass: 'tre',
+      steal: false,
+      overtrump: true,
+      valueClass: 'big',
+    });
+  });
+
+  test('F3 carico lost without a briscola: the asso over the tre in the led suit, and an off-suit asso gifted', () => {
+    expect(facts('C', 's0:3D s1:AD')).toEqual({
+      winningCard: c('AD'),
+      winningClass: 'asso',
+      briscola: false,
+      steal: false,
+      overtrump: false,
+      valueClass: 'huge',
+    });
+    expect(carichiLost(1, trick('s0:3D s1:AD'))).toEqual([0]);
+    // An off-suit asso never contends (E7); its owner lost it all the same.
+    expect(facts('C', 's0:4D s1:AS')).toMatchObject({
+      winningCard: c('4D'),
+      winningClass: 'pip',
+      briscola: false,
+      steal: false,
+      valueClass: 'big',
+    });
+    expect(carichiLost(0, trick('s0:4D s1:AS'))).toEqual([1]);
+  });
+
+  test('F4 the pointless trick of four pips: the highest of the led suit, no flags, nothing lost', () => {
+    expect(facts('C', 's0:2D s1:4D s2:5D s3:6D')).toEqual({
+      winningCard: c('6D'),
+      winningClass: 'pip',
+      briscola: false,
+      steal: false,
+      overtrump: false,
+      valueClass: 'pointless',
+    });
+    expect(carichiLost(3, trick('s0:2D s1:4D s2:5D s3:6D'))).toEqual([]);
+  });
+
+  test('F5 the 22-point trick (T10): a steal and an overtrump at once; two assi at two players', () => {
+    const t10 = trick('s2:AS s0:2B s1:AB');
+    expect(trickFacts('B', t10)).toEqual({
+      winningCard: c('AB'),
+      winningClass: 'asso',
+      briscola: true,
+      steal: true,
+      overtrump: true,
+      valueClass: 'huge',
+    });
+    expect(carichiLost(1, t10)).toEqual([2]);
+    expect(facts('C', 's0:AS s1:AC')).toMatchObject({ steal: true, valueClass: 'huge' });
+    expect(carichiLost(1, trick('s0:AS s1:AC'))).toEqual([0]);
+  });
+
+  test("F6 steal at three and at four: a partner's asso is not stolen, the opponents' carichi are lost", () => {
+    expect(facts('B', 's0:AC s1:5C s2:2B')).toMatchObject({ steal: true, valueClass: 'big' });
+    expect(carichiLost(2, trick('s0:AC s1:5C s2:2B'))).toEqual([0]);
+    // Seat 2 trumps over seat 1's tre: a steal; seat 0 is seat 2's partner, so its asso is not lost.
+    const four = trick('s0:AC s1:3C s2:2B s3:5D');
+    expect(trickFacts('B', four)).toMatchObject({
+      steal: true,
+      overtrump: false,
+      valueClass: 'huge',
+    });
+    expect(carichiLost(2, four)).toEqual([1]);
+    // The partner led the asso and the opponents threw pips: the trump took nothing from anyone.
+    const own = trick('s0:AC s1:5D s2:2B s3:6D');
+    expect(trickFacts('B', own)).toMatchObject({ briscola: true, steal: false, valueClass: 'big' });
+    expect(carichiLost(2, own)).toEqual([]);
+  });
+
+  test('the classes: every rank names its winning class; the value classes at their edges', () => {
+    expect(RANKS.map((r) => winningClassOf(makeCard(r, 'C')))).toEqual([
+      'asso',
+      'pip',
+      'tre',
+      'pip',
+      'pip',
+      'pip',
+      'pip',
+      'fante',
+      'cavallo',
+      're',
+    ]);
+    expect([0, 1, 9, 10, 19, 20, 22].map(valueClassOf)).toEqual([
+      'pointless',
+      'small',
+      'small',
+      'big',
+      'big',
+      'huge',
+      'huge',
+    ]);
+    expect(RANKS.map((r) => isCarico(makeCard(r, 'D')))).toEqual([
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 });

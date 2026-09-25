@@ -54,9 +54,6 @@ jobs:
       shared-integration: ${{ steps.affected.outputs.shared-integration }}
       site: ${{ steps.affected.outputs.site }}
       harness: ${{ steps.affected.outputs.harness }}
-      # Briscola is a plain suite job until its page and e2e half land (docs/design/briscola.md
-      # PR-4), when it joins GAME_SUITES and the two matrix jobs pick it up instead.
-      briscola: ${{ steps.affected.outputs.briscola }}
       e2e-site: ${{ steps.affected.outputs.e2e-site }}
       # The game suites selected, unit side and e2e side, as JSON lists for the two matrix jobs.
       games: ${{ steps.affected.outputs.games }}
@@ -160,24 +157,6 @@ jobs:
         uses: ./.github/actions/npm-ci
       - name: Unit tests, parity oracles and fixture pins of the suite, with coverage
         run: npm run test:${{ matrix.suite }} -- --coverage
-
-  # The briscola engine (docs/design/briscola-rules.md): a suite with no e2e half yet, so a plain
-  # job like shared's rather than an entry of the game matrix (a GameSuite needs both halves).
-  briscola:
-    needs: changes
-    if: needs.changes.outputs.briscola == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
-      - name: Briscola engine tests and the seeded replay, with coverage
-        run: npm run test:briscola -- --coverage
 
   # Builds dist/, then the guards over it (relative asset URLs, paths on both origins, module
   # pages, the landing page's parity with web/, the class contract), the token and ratchet pins and
@@ -335,7 +314,6 @@ jobs:
       - game
       - site
       - harness
-      - briscola
       - e2e-game
       - e2e-site
     if: always()

@@ -21,9 +21,7 @@ import { matchesAny } from './glob.ts';
 
 export type { GameSuite };
 
-// Briscola has a suite but no page yet (docs/design/briscola.md, PR-4), so it is named here beside
-// the REGISTRY's GameSuites until tools/games.ts lists it.
-export type Suite = 'shared' | 'shared-integration' | GameSuite | 'briscola' | 'site' | 'harness';
+export type Suite = 'shared' | 'shared-integration' | GameSuite | 'site' | 'harness';
 
 /** One coverage row: vitest's `coverage.thresholds[glob]` shape. */
 export type Thresholds = Readonly<{
@@ -607,21 +605,36 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
     e2e: gameE2e('backgammon'),
   },
   briscola: {
-    // The engine alone so far (docs/design/briscola-rules.md, the plan's PR-2): colocated tests,
-    // the seeded replay as its oracle like backgammon's. The page, its wire goldens and its e2e
-    // half land with PR-4, which adds the e2e row and the `@briscola` tag to the shell specs.
+    // The fourth game, the first booted through the shared shell alone (docs/design/briscola.md
+    // D18; the page's PR-4): its colocated tests, the seeded replay as the engine's oracle like
+    // backgammon's, the reducer over the shell and the table, the painters over the page fake, the
+    // codec pins against test/fixtures/briscola-wire/ (self-recorded: no legacy page exists).
     unit: ['web/games/briscola/**/*.test.ts'],
     standalone: [],
     browser: false,
     needsBuild: false,
     coverage: {
-      include: ['web/games/briscola/src/engine/**/*.ts'],
+      include: [
+        'web/games/briscola/src/engine/**/*.ts',
+        'web/games/briscola/src/protocol.ts',
+        'web/games/briscola/src/storage.ts',
+        'web/games/briscola/src/shellConfig.ts',
+        'web/games/briscola/src/ui/**/*.ts',
+        'web/games/briscola/src/net/**/*.ts',
+        'web/games/briscola/src/fx.ts',
+      ],
       // The engine (docs/design/briscola-rules.md §2): the 63 table positions, the view and decoder
       // suites and the seeded replay beside it. Measured at the PR (lines/functions/statements/
       // branches) 100/100/100/96.6 over 127 tests; the row is measured minus 5/5/5/3, above gin's
       // engine floor of 94/94/93/92 that the design set as the least it may be. The *.algorithms.ts
       // row is a forward row: no such file yet (every rule fits map/filter/reduce), it binds the
       // first one to 100% lines.
+      // The page's rows (PR-4, backgammon's shape): protocol.ts, storage.ts, shellConfig.ts, fx.ts
+      // and net/ each through the test beside them and state.test.ts; ui/ through state.test.ts
+      // (whole games for 2, 3 and 4 seats through a tap policy, the settle beat, the curtain, the
+      // match tally), table/history/motion/layout/home/local/render.test.ts over the page fake.
+      // Measured on the page's branch at the registration (lines/functions/statements/branches):
+      // BRISCOLA_MEASURED; each row is measured minus 5/5/5/3, never under backgammon's.
       thresholds: {
         'web/games/briscola/src/engine/**': {
           lines: 95,
@@ -635,8 +648,46 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
           statements: 100,
           branches: 92,
         },
+        'web/games/briscola/src/protocol.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 97,
+        },
+        'web/games/briscola/src/storage.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 97,
+        },
+        'web/games/briscola/src/shellConfig.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 97,
+        },
+        'web/games/briscola/src/ui/**': {
+          lines: 94,
+          functions: 95,
+          statements: 93,
+          branches: 88,
+        },
+        'web/games/briscola/src/net/**': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 97,
+        },
+        'web/games/briscola/src/fx.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 97,
+        },
       },
     },
+    // Briscola's own specs and its describes of the shell specs (`@briscola`; the others' left out).
+    e2e: gameE2e('briscola'),
   },
   site: {
     unit: [
@@ -815,16 +866,16 @@ export const RULES: ReadonlyArray<Rule> = [
     // job playing its own game's describes through its tag. Above the shell rule, which would claim
     // them for the two shell games alone.
     globs: ONLINE_SPEC_NAMES.map((name) => `e2e/${name}`),
-    runs: [e2eJob('gin'), e2eJob('fidice'), e2eJob('backgammon')],
+    runs: [e2eJob('gin'), e2eJob('fidice'), e2eJob('backgammon'), e2eJob('briscola')],
     why: "the online specs: a describe per game, fidice included, each run by that game's e2e job through its tag",
   },
   {
-    // One describe per shell game, each played by that game's e2e job through its tag (the gin and
-    // backgammon rows claim the files, each inverting the other's tag): a spec change runs both
-    // jobs, a change under web/games/<g>/** runs e2e-<g> with its describes (gameRules), and
-    // web/shared/** runs everything (above). Neither game-e2e job runs the other game's describes.
+    // One describe per shell game, each played by that game's e2e job through its tag (the gin,
+    // backgammon and briscola rows claim the files, each inverting the others' tags): a spec change
+    // runs the three jobs, a change under web/games/<g>/** runs e2e-<g> with its describes
+    // (gameRules), and web/shared/** runs everything (above). No game-e2e job runs another game's describes.
     globs: ['e2e/shell-*.spec.ts'],
-    runs: [e2eJob('gin'), e2eJob('backgammon')],
+    runs: [e2eJob('gin'), e2eJob('backgammon'), e2eJob('briscola')],
     why: "the shared shell specs: a describe per shell game, each run by that game's e2e job through its tag",
   },
   ...gameRules('gin'),
@@ -848,16 +899,15 @@ export const RULES: ReadonlyArray<Rule> = [
   },
   ...gameRules('backgammon'),
   {
-    // Briscola's engine-only folder (no page yet: the plan's PR-4 gives it gameRules): its own
-    // suite, `site` for the ratchet over web/ and `harness` for the suite accounting.
-    globs: ['web/games/briscola/**'],
-    runs: ['briscola', 'site', 'harness'],
-    why: 'the briscola engine: its suite, the no-.js ratchet over web/ and the suite accounting; no page is built yet',
-  },
-  {
     globs: ['test/fixtures/backgammon-wire/**'],
     runs: ['backgammon'],
     why: 'the backgammon wire goldens',
+  },
+  ...gameRules('briscola'),
+  {
+    globs: ['test/fixtures/briscola-wire/**'],
+    runs: ['briscola'],
+    why: 'the briscola wire goldens (self-recorded: protocol.test.ts pins them)',
   },
   {
     globs: ['test/parity/ice.legacy.test.ts', 'test/parity/roomCode.legacy.test.ts'],

@@ -1,0 +1,235 @@
+// The settle beat's motion (docs/design/briscola-board.md §2, §4.2): a resolved trick is held with
+// the taking card lifted, then its cards fly to the winner's cell, then a back flies from the stock
+// to each drawer in draw order (the winner first), the last one from the briscola when the trump
+// card was taken, and the view is painted cold. The stages and their timers are the reducer's
+// (`settle: {stage: 'hold' | 'fly' | 'draw'}`, effects as data); this module gives it the durations
+// (`settleTimeline`) and the painter the flights (`trickFlights`, `drawFlights`, pure plans over
+// element ids) and the one DOM step that runs them (`flyCards`): each flight is the shared motion
+// kernel's `launchClone` (web/shared/edge/motion.ts, dry-round-2.md E2: the clone fixed where the
+// card stood, sent by one transform, gone when its transition ends or the fallback fires), given
+// the card's own box (the briscola lies across the stock, so its box is the bounding rect swapped
+// and it starts `turn`ed 90°, righting itself on the way) and an arrival box of the card's shape
+// scaled to fit, centred on the target, so the kernel's translate is centre to centre and its
+// scale uniform; the arrival hides under `arriving` until the clone lands. Nothing measurable (the
+// page fake, a hidden tab) means the repaint alone. The flight's length goes on the clone as
+// `--fly-ms` (theme.css `.flyer` reads it; the clone sits on the body, outside `#tableScreen`'s
+// scope), and `prefers-reduced-motion` is the shared `reducedMotion` read: `durationsFor(true)`
+// makes every glide 1 ms and the hold 300 ms, and the theme's media query agrees. Only the DOM
+// edge is reached (dom.ts); never ui/state.ts.
+import {
+  addClass,
+  byId,
+  queryAllIn,
+  queryIn,
+  rectOf,
+  removeClass,
+  removeElement,
+  setStyle,
+  type Element,
+  type PageLike,
+  type Rect,
+} from '../../../../shared/edge/dom.ts';
+import { launchClone } from '../../../../shared/edge/motion.ts';
+import type { Seat, TrickRecord } from '../engine/index.ts';
+import { seatCellId, type RelativeCell } from './table.ts';
+
+// ---- durations (§5.3) ---------------------------------------------------------------------------------
+
+export type Durations = Readonly<{
+  /** The trick shown resolved, the taking card lifted, before anything flies. */
+  holdMs: number;
+  /** The trick's cards to the winner's cell. */
+  flyMs: number;
+  /** One back from the stock to a seat. */
+  drawMs: number;
+  /** Between one draw's start and the next. */
+  drawGapMs: number;
+}>;
+
+export const DURATIONS: Durations = { holdMs: 900, flyMs: 320, drawMs: 260, drawGapMs: 160 };
+/** `prefers-reduced-motion`: every glide 1 ms, the hold 300 ms (long enough to read the trick). */
+export const REDUCED_DURATIONS: Durations = { holdMs: 300, flyMs: 1, drawMs: 1, drawGapMs: 1 };
+
+/** The durations for the page's preference (web/shared/edge/motion.ts `reducedMotion`). */
+export const durationsFor = (reducedMotion: boolean): Durations =>
+  reducedMotion ? REDUCED_DURATIONS : DURATIONS;
+
+// ---- flights: the pure plans (§5.6 `flightsBetween`'s twin) -------------------------------------------
+
+/** An element by id, or one inside it by selector. */
+export type Target = Readonly<{ id: string; within?: string }>;
+
+export type Flight = Readonly<{
+  from: Target;
+  to: Target;
+  /** The glide's length. */
+  ms: number;
+  /** How long after the repaint it leaves. */
+  delayMs: number;
+  /** The source lies across (the briscola): the clone starts turned and rights itself. */
+  rotated?: true;
+  /** The arrival hides under `arriving` until the clone lands (a drawn card). */
+  hideArrival?: true;
+}>;
+
+/** The back on top of the stock. */
+export const STOCK: Target = { id: 'stock', within: '.card' };
+/** The trump card under the stock. */
+export const BRISCOLA: Target = { id: 'briscola', within: '.card' };
+/** My taken count in the hand header, where my won trick lands. */
+export const MY_TAKEN: Target = { id: 'myTaken' };
+/** A seat's card in the fan. */
+export const fanCard = (seat: Seat): Target => ({
+  id: 'trick',
+  within: `.card[data-seat="${String(seat)}"]`,
+});
+/** A card of my hand by id (the one a draw brought). */
+export const handCard = (id: string): Target => ({
+  id: 'hand',
+  within: `.card[data-card="${id}"]`,
+});
+/** A relative cell's newest held card (a drawn back lands on it). */
+export const seatCards = (cell: RelativeCell): Target => ({
+  id: seatCellId(cell),
+  within: '.seat-cards .card:last-child',
+});
+/** A relative cell's taken stack (a won trick lands on it). */
+export const seatTaken = (cell: RelativeCell): Target => ({
+  id: seatCellId(cell),
+  within: '.seat-taken',
+});
+
+/** Every card of the trick, in play order, to the winner's cell, together. */
+export const trickFlights = (
+  trick: Pick<TrickRecord, 'cards'>,
+  to: Target,
+  d: Durations,
+): ReadonlyArray<Flight> =>
+  trick.cards.map((p) => ({ from: fanCard(p.seat), to, ms: d.flyMs, delayMs: 0 }));
+
+/**
+ * One back per drawer in `drew` order (the winner first), leaving `drawGapMs` apart; the last from
+ * the briscola, turned, when the last drawer took the trump card. `cellOf` says where a seat's
+ * card lands (`handCard` for me, `seatCards` for the others).
+ */
+export const drawFlights = (
+  trick: Pick<TrickRecord, 'drew' | 'trumpTaken'>,
+  cellOf: (seat: Seat) => Target,
+  d: Durations,
+): ReadonlyArray<Flight> =>
+  trick.drew.map((seat, i) => {
+    const last = trick.trumpTaken && i === trick.drew.length - 1;
+    return {
+      from: last ? BRISCOLA : STOCK,
+      to: cellOf(seat),
+      ms: d.drawMs,
+      delayMs: i * d.drawGapMs,
+      ...(last ? { rotated: true as const } : {}),
+      hideArrival: true as const,
+    };
+  });
+
+/** When the last flight has landed, in ms after the repaint; 0 for none. */
+export const totalMs = (flights: ReadonlyArray<Flight>): number =>
+  flights.reduce((max, f) => Math.max(max, f.delayMs + f.ms), 0);
+
+/** The three timers of the beat, for the reducer: hold, fly, then the draws (0 once the stock is out). */
+export type Timeline = Readonly<{ holdMs: number; flyMs: number; drawMs: number }>;
+
+export const settleTimeline = (trick: Pick<TrickRecord, 'drew'>, d: Durations): Timeline => ({
+  holdMs: d.holdMs,
+  flyMs: d.flyMs,
+  drawMs: trick.drew.length === 0 ? 0 : (trick.drew.length - 1) * d.drawGapMs + d.drawMs,
+});
+
+// ---- the DOM step -------------------------------------------------------------------------------------
+
+/**
+ * More clones than this in the air is a scripted burst (a policy playing a game through the hook,
+ * a reconnect replaying frames), not play: they are culled before new ones launch.
+ */
+export const MAX_LIVE_FLYERS = 12;
+/** The smallest a clone shrinks to (a landing on a count chip), so it never vanishes mid-flight. */
+const MIN_SCALE = 0.05;
+/** The source's state classes, which must not fly with its clone. */
+const STRIP: ReadonlyArray<string> = ['taking', 'selected', 'playable', 'arriving', 'dragging'];
+
+const measurable = (r: Rect): boolean => r.width > 0 || r.height > 0;
+
+const find = (doc: PageLike, t: Target): Element | null => {
+  const root = byId(doc, t.id);
+  return root === null || t.within === undefined ? root : queryIn(root, t.within);
+};
+
+/** A card's own box from its bounding rect: the rect's, or the swapped one for a card lying across. */
+const boxOf = (r: Rect, rotated: boolean): Rect => {
+  const w = rotated ? r.height : r.width;
+  const h = rotated ? r.width : r.height;
+  return {
+    left: r.left + r.width / 2 - w / 2,
+    top: r.top + r.height / 2 - h / 2,
+    width: w,
+    height: h,
+  };
+};
+
+/** The uniform scale that fits the card inside the arrival's box, never below MIN_SCALE. */
+const fit = (from: Rect, to: Rect): number =>
+  Math.max(MIN_SCALE, Math.min(to.width / from.width, to.height / from.height));
+
+/** The card's shape scaled to fit, centred on the arrival: the kernel's translate is then centre to centre and its scale uniform. */
+const arrivalBox = (from: Rect, to: Rect): Rect => {
+  const s = fit(from, to);
+  return {
+    left: to.left + to.width / 2 - from.width / 2,
+    top: to.top + to.height / 2 - from.height / 2,
+    width: from.width * s,
+    height: from.height * s,
+  };
+};
+
+/**
+ * One flight: measure both ends, launch the card's clone from its own box to the arrival box
+ * (`launchClone`: fixed where the card stood, sized as `--card-w`, laid out, sent by one transform,
+ * removed when the transition ends or the fallback fires), its length on it as `--fly-ms`. False
+ * when an end is missing, unmeasurable or the card cannot be cloned: the repaint alone has placed it.
+ */
+const launch = (doc: PageLike, f: Flight): boolean => {
+  const source = find(doc, f.from);
+  const target = find(doc, f.to);
+  if (source === null || target === null) return false;
+  const fromRect = rectOf(source);
+  const to = rectOf(target);
+  if (!measurable(fromRect) || !measurable(to)) return false;
+  const rotated = f.rotated === true;
+  const from = boxOf(fromRect, rotated);
+  const clone = launchClone(doc, source, from, arrivalBox(from, to), {
+    classes: ['flyer'],
+    strip: STRIP,
+    sizeVar: '--card-w',
+    ms: f.ms,
+    delay: f.delayMs,
+    scale: true,
+    ...(rotated ? { turn: 90 } : {}),
+    onDone: () => {
+      removeClass(target, 'arriving');
+    },
+  });
+  if (clone === null) return false;
+  if (f.hideArrival === true) addClass(target, 'arriving');
+  // Read by theme.css `.flyer`'s transition: set before the style flush that starts it.
+  setStyle(clone, '--fly-ms', `${String(f.ms)}ms`);
+  return true;
+};
+
+/**
+ * Run every flight after the repaint that placed the arrivals (the painter paints, then calls
+ * this): stale clones beyond MAX_LIVE_FLYERS are culled first. Returns how many flights left the
+ * ground; the rest were placed by the repaint alone.
+ */
+export const flyCards = (doc: PageLike, flights: ReadonlyArray<Flight>): number => {
+  if (flights.length === 0) return 0;
+  const live = queryAllIn(doc.body, '.flyer');
+  if (live.length > MAX_LIVE_FLYERS) live.forEach(removeElement);
+  return flights.filter((f) => launch(doc, f)).length;
+};

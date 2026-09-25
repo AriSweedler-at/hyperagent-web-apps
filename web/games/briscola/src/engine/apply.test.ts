@@ -8,6 +8,7 @@ import { mulberry32, type Rng } from '../../../../shared/lib/rng.ts';
 import { shuffle } from '../../../../shared/lib/shuffle.ts';
 import { actorOf, applyAction, canExchange, MESSAGES } from './apply.ts';
 import { cardById, deckFor, idsOf, pointsOf } from './cards.ts';
+import { playText, summaryOf } from './log.ts';
 import { matchOver, matchWinner } from './score.ts';
 import { nextSeat, seatsOf } from './seats.ts';
 import { createGame, drawDealer, nextGame, normaliseOptions, withPosition } from './setup.ts';
@@ -20,8 +21,9 @@ import type {
   Seat,
   SeatCount,
   State,
+  TrickData,
 } from './types.ts';
-import { legalActions, viewFor } from './view.ts';
+import { lastPlayed, legalActions, viewFor } from './view.ts';
 
 const P = {
   a: { id: 'a', name: 'Ari' },
@@ -103,7 +105,17 @@ const trick = (n: SeatCount, trump: 'C' | 'D' | 'S' | 'B', text: string): State 
   const leader = moves[0]?.[0] ?? 0;
   return plays(at(n, { hands, stock, trump: `4${trump}`, leader }), moves);
 };
-const texts = (s: State): ReadonlyArray<string> => s.log.map((e) => e.text);
+/** Every event's history line (E18): the sentences are derived, never stored. */
+const texts = (s: State): ReadonlyArray<string> =>
+  s.events.map((e) => summaryOf(e, s.players, s.options.seatCount));
+/** The last event's kind. */
+const lastKind = (s: State): string | undefined => s.events.at(-1)?.kind;
+/** The data of the last trick event, which the position must have made. */
+const trickData = (s: State): TrickData => {
+  const e = s.events.at(-1);
+  if (e?.kind !== 'trick') throw new Error(`no trick event: ${String(e?.kind)}`);
+  return e.data;
+};
 /** The dealt deck the engine saw: the dealer draw, then the shuffle from the same stream. */
 const dealtDeck = (n: SeatCount, seed: number, opts: CreateGameOptions = {}): Cards => {
   const rng = mulberry32(seed);
@@ -137,7 +149,8 @@ describe('tricks (T1-T12): the winner takes, draws first and leads', () => {
     expect(s.piles.filter((_, seat) => seat !== winner).every((pile) => pile.length === 0)).toBe(
       true,
     );
-    expect(s.log.at(-1)?.kind).toBe('trick');
+    expect(lastKind(s)).toBe('trick');
+    expect(trickData(s)).toMatchObject({ no: 1, winner, points, trumpTaken: null });
   });
 
   test('T7: the 21 points sit in piles[2] and side 0 reads 21 in every view', () => {
@@ -160,13 +173,15 @@ describe('tricks (T1-T12): the winner takes, draws first and leads', () => {
     expect(s.lastTrick?.drew).toEqual([1, 2, 0]);
   });
 
-  test('T11: after T1 seat 1 leads an empty trick; the trick line reads Jeff took the trick · 11 points', () => {
+  test('T11: after T1 seat 1 leads an empty trick; the trick line reads Jeff took the trick · 11 points · stolen with a briscola', () => {
     const s = trick(2, 'C', 's0:AS s1:2C');
     expect([s.leader, s.turn]).toEqual([1, 1]);
     expect(s.trick).toEqual([]);
     expect(s.lastTrick?.no).toBe(1);
-    expect(texts(s).at(-1)).toBe('Jeff took the trick · 11 points');
-    expect(s.lastAction?.text).toBe('Jeff took the trick · 11 points');
+    // The 2 of trumps took the led asso: a steal, and the summary says so (design §4, §6).
+    expect(texts(s).at(-1)).toBe('Jeff took the trick · 11 points · stolen with a briscola');
+    expect(texts(trick(2, 'C', 's0:4S s1:2C')).at(-1)).toBe('Jeff took the trick · 0 points');
+    expect(lastPlayed(s)).toEqual({ seat: 1, card: c('2C') });
   });
 
   test('T12: no obligation to follow suit: legal is the whole hand (E6)', () => {
@@ -180,22 +195,158 @@ describe('tricks (T1-T12): the winner takes, draws first and leads', () => {
       { type: 'play', cardId: '3D' },
       { type: 'play', cardId: '7S' },
     ]);
-    // Mid-trick nothing is logged; lastAction says who led what (E6).
-    expect(s.log).toHaveLength(1);
-    expect(s.lastAction?.text).toBe('Ari led the asso di spade');
+    // Mid-trick nothing is recorded; the card led is on the table, `lastPlayed` names it (E6).
+    expect(s.events).toHaveLength(1);
+    expect(lastPlayed(s)).toEqual({ seat: 0, card: c('AS') });
     expect(s.trick).toEqual([{ seat: 0, card: c('AS') }]);
     expect(s.turn).toBe(1);
     const t = must(play(s, 1, '3D'));
-    expect(t.lastAction?.kind).toBe('trick');
+    expect(lastKind(t)).toBe('trick');
+    expect(t.events).toHaveLength(2);
   });
 
-  test('a follower\'s lastAction reads "played", the leader\'s "led"', () => {
+  test('a follower\'s status reads "played", the leader\'s "led" (playText over lastPlayed)', () => {
     const s = at(3, { hands: ['AS 2D', '2C 3D', '7S FB'], stock: '5D 6D 7D 4C', trump: '4C' });
     const s1 = must(play(s, 0, '2D'));
-    expect(s1.lastAction?.text).toBe('Ari led the due di denari');
+    const led = lastPlayed(s1);
+    expect(led).toEqual({ seat: 0, card: c('2D') });
+    expect(playText('Ari', c('2D'), s1.trick.length === 1)).toBe('Ari led the due di denari');
     const s2 = must(play(s1, 1, '3D'));
-    expect(s2.lastAction?.text).toBe('Jeff played the tre di denari');
+    expect(lastPlayed(s2)).toEqual({ seat: 1, card: c('3D') });
+    expect(playText('Jeff', c('3D'), s2.trick.length === 1)).toBe('Jeff played the tre di denari');
     expect(s2.turn).toBe(2);
+    expect(s2.events).toHaveLength(1);
+  });
+});
+
+describe('trick events (F1-F6): the facts of the trick, once, on the event', () => {
+  const NO_FLAGS = { briscola: false, steal: false, overtrump: false, carichiLost: [] };
+
+  test('F1 steal: the led asso di coppe taken by the 2 di bastoni, bastoni trump; Ari lost his asso', () => {
+    const s = trick(2, 'B', 's0:AC s1:2B');
+    expect(s.events.at(-1)).toEqual({
+      id: 1,
+      kind: 'trick',
+      seat: 1,
+      at: NOW,
+      data: {
+        no: 1,
+        leader: 0,
+        cards: [
+          { seat: 0, card: c('AC') },
+          { seat: 1, card: c('2B') },
+        ],
+        winner: 1,
+        winnerSide: 1,
+        points: 11,
+        valueClass: 'big',
+        winningCard: c('2B'),
+        winningClass: 'pip',
+        briscola: true,
+        steal: true,
+        overtrump: false,
+        carichiLost: [0],
+        drew: [1, 0],
+        trumpTaken: null,
+      },
+    });
+    expect(texts(s).at(-1)).toBe('Jeff took the trick · 11 points · stolen with a briscola');
+  });
+
+  test('F2 overtrump: the asso di bastoni over the 4 di bastoni; no steal in the trump suit, no carico lost', () => {
+    expect(trickData(trick(2, 'B', 's0:4B s1:AB'))).toMatchObject({
+      winner: 1,
+      points: 11,
+      valueClass: 'big',
+      winningCard: c('AB'),
+      winningClass: 'asso',
+      briscola: true,
+      steal: false,
+      overtrump: true,
+      carichiLost: [],
+    });
+  });
+
+  test('F3 carico lost without a briscola: the asso over the tre in the led suit, 21 points, huge', () => {
+    expect(trickData(trick(2, 'C', 's0:3D s1:AD'))).toMatchObject({
+      ...NO_FLAGS,
+      winner: 1,
+      points: 21,
+      valueClass: 'huge',
+      winningCard: c('AD'),
+      winningClass: 'asso',
+      carichiLost: [0],
+    });
+  });
+
+  test('F4 the pointless trick of four pips: the sei di denari takes nothing, and the line says 0 points', () => {
+    const s = trick(4, 'C', 's0:2D s1:4D s2:5D s3:6D');
+    expect(trickData(s)).toMatchObject({
+      ...NO_FLAGS,
+      winner: 3,
+      winnerSide: 1,
+      points: 0,
+      valueClass: 'pointless',
+      winningCard: c('6D'),
+      winningClass: 'pip',
+    });
+    expect(texts(s).at(-1)).toBe('Dan took the trick · 0 points');
+  });
+
+  test('F5 the 22-point trick (T10): a steal and an overtrump at once, huge, Kim lost the asso di spade', () => {
+    const s = trick(3, 'B', 's2:AS s0:2B s1:AB');
+    expect(trickData(s)).toMatchObject({
+      leader: 2,
+      winner: 1,
+      points: 22,
+      valueClass: 'huge',
+      winningCard: c('AB'),
+      winningClass: 'asso',
+      briscola: true,
+      steal: true,
+      overtrump: true,
+      carichiLost: [2],
+      drew: [1, 2, 0],
+    });
+    expect(texts(s).at(-1)).toBe('Jeff took the trick · 22 points · stolen with a briscola');
+  });
+
+  test("F6 steal at three and at four: the opponents' carichi are lost, a partner's asso is not stolen", () => {
+    expect(trickData(trick(3, 'B', 's0:AC s1:5C s2:2B'))).toMatchObject({
+      winner: 2,
+      steal: true,
+      carichiLost: [0],
+      valueClass: 'big',
+    });
+    // Seat 2 (side 0) trumps: Jeff's tre is stolen, partner Ari's asso went to the side.
+    const four = trick(4, 'B', 's0:AC s1:3C s2:2B s3:5D');
+    expect(trickData(four)).toMatchObject({
+      winner: 2,
+      winnerSide: 0,
+      points: 21,
+      valueClass: 'huge',
+      steal: true,
+      overtrump: false,
+      carichiLost: [1],
+    });
+    expect(texts(four).at(-1)).toBe('Kim took the trick · 21 points · stolen with a briscola');
+    // A trump over the partner's asso and two pips: no steal, nothing lost.
+    expect(trickData(trick(4, 'B', 's0:AC s1:5D s2:2B s3:6D'))).toMatchObject({
+      briscola: true,
+      steal: false,
+      carichiLost: [],
+    });
+  });
+
+  test('the trump card taken at the last draw sits on the event as the seat that took it', () => {
+    const s0 = at(3, { hands: ['2D', '3D', 'AD'], stock: '5S 6S 4C', trump: '4C' });
+    const s = plays(s0, [
+      [0, '2D'],
+      [1, '3D'],
+      [2, 'AD'],
+    ]);
+    expect(trickData(s)).toMatchObject({ winner: 2, drew: [2, 0, 1], trumpTaken: 1 });
+    expect(texts(s).at(-1)).toBe('Kim took the trick · 21 points · briscola taken');
   });
 });
 
@@ -224,10 +375,16 @@ describe('the deal (D1-D7)', () => {
     expect(s.games).toEqual([]);
     expect(s.startedAt).toBe(NOW);
     expect(s.endedAt).toBeNull();
-    expect(s.log).toHaveLength(1);
-    expect(s.log[0]).toMatchObject({ seat: s.dealer, kind: 'deal', at: NOW });
-    expect(s.log[0]?.text).toMatch(/^(Ari|Jeff) dealt · the briscola is the /);
-    expect(s.lastAction).toEqual(s.log[0]);
+    expect(s.events).toEqual([
+      {
+        id: 0,
+        kind: 'deal',
+        seat: s.dealer,
+        at: NOW,
+        data: { dealer: s.dealer, trumpCard: s.trumpCard },
+      },
+    ]);
+    expect(texts(s)[0]).toMatch(/^(Ari|Jeff) dealt · the briscola is the /);
   });
 
   test('D2: n3 removedTwo C: 39 cards, no 2C anywhere, a stock of 30, 120 points', () => {
@@ -304,9 +461,19 @@ describe('the deal (D1-D7)', () => {
     expect([s.leader, s.turn]).toEqual([0, 0]);
     expect(s.gameNo).toBe(2);
     expect(s.match).toEqual({ gamesToWin: 2, wins: [1, 0, 0], draws: 0 });
-    expect(s.log.map((e) => e.kind)).toEqual(['game', 'deal']);
-    expect(texts(s)[0]).toBe('Game 2 begins');
-    expect(texts(s)[1]).toMatch(/^Kim dealt · the briscola is the /);
+    // The stream runs across the match: game 1's deal, then game 2 announces itself and deals.
+    expect(s.events.map((e) => e.kind)).toEqual(['deal', 'game', 'deal']);
+    expect(s.events.map((e) => e.id)).toEqual([0, 1, 2]);
+    expect(s.events[1]).toEqual({
+      id: 1,
+      kind: 'game',
+      seat: null,
+      at: NOW,
+      data: { gameNo: 2, dealer: 2 },
+    });
+    expect(s.events[2]).toMatchObject({ kind: 'deal', seat: 2, data: { dealer: 2 } });
+    expect(texts(s)[1]).toBe('Game 2 begins');
+    expect(texts(s)[2]).toMatch(/^Kim dealt · the briscola is the /);
     expect(s.phase).toBe('trick');
     expect(s.result).toBeNull();
     expect(s.trickNo).toBe(0);
@@ -362,6 +529,7 @@ describe('the draw (W1-W6)', () => {
     expect(s.lastTrick?.trumpTaken).toBe(true);
     expect(s.lastTrick?.drew).toEqual([0, 1]);
     expect(texts(s).at(-1)).toBe('Ari took the trick · 11 points · briscola taken');
+    expect(trickData(s)).toMatchObject({ trumpTaken: 1, drew: [0, 1] });
     const v = viewFor(s, 1);
     expect(v.trumpOnTable).toBe(false);
     expect(v.stockCount).toBe(0);
@@ -466,6 +634,14 @@ describe('results (S1-S7)', () => {
     expect(s.result).toEqual({ winner: 0, totals: [61, 59], draw: false });
     expect(s.match).toEqual({ gamesToWin: 2, wins: [1, 0], draws: 0 });
     expect(texts(s).at(-1)).toBe('Ari wins 61–59');
+    expect(s.events.slice(-2).map((e) => e.kind)).toEqual(['trick', 'result']);
+    expect(s.events.at(-1)).toEqual({
+      id: 2,
+      kind: 'result',
+      seat: null,
+      at: NOW,
+      data: { winner: 0, totals: [61, 59], draw: false, decided: false, wins: [1, 0] },
+    });
     expect(s.games).toEqual([
       { gameNo: 1, dealer: s.dealer, trump: 'C', winner: 0, totals: [61, 59], endedAt: NOW },
     ]);
@@ -546,6 +722,10 @@ describe('the match (M1-M5)', () => {
     expect(matchOver(s.match)).toBe(true);
     expect(matchWinner(s.match)).toBe(0);
     expect(texts(s).at(-1)).toBe('Ari wins 61–59 and takes the match 2–0');
+    expect(s.events.at(-1)).toMatchObject({
+      kind: 'result',
+      data: { decided: true, wins: [2, 0] },
+    });
     expect(viewFor(s, 0).matchOver).toBe(true);
     expect(legalActions(viewFor(s, 0))).toEqual([]);
     expect(fail(apply(s, 0, { type: 'next' }))).toBe(MESSAGES.MATCH_OVER);
@@ -652,7 +832,13 @@ describe('the exchange (X1-X11)', () => {
     expect(s.leader).toBe(0);
     expect(s.trick).toEqual([]);
     expect(texts(s).at(-1)).toBe('Ari exchanged the sette di coppe for the asso di coppe');
-    expect(s.lastAction).toMatchObject({ seat: 0, kind: 'exchange' });
+    expect(s.events.at(-1)).toEqual({
+      id: 1,
+      kind: 'exchange',
+      seat: 0,
+      at: NOW,
+      data: { seat: 0, gave: c('7C'), took: c('AC') },
+    });
     // No rng is read by an exchange (E19).
     const rng = counting(() => 0);
     must(apply(s0, 0, { type: 'exchange' }, rng));

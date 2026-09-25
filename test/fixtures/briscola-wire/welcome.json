@@ -1,0 +1,22 @@
+[
+  {
+    "t": "welcome",
+    "hostName": "Ann",
+    "seatCount": 2,
+    "gamesToWin": 2,
+    "removedTwo": "C",
+    "exchange": false,
+    "scoperta": false,
+    "partnerPeek": false
+  },
+  {
+    "t": "welcome",
+    "hostName": "Ann",
+    "seatCount": 2,
+    "gamesToWin": 3,
+    "removedTwo": "C",
+    "exchange": true,
+    "scoperta": true,
+    "partnerPeek": false
+  }
+]

@@ -1,8 +1,8 @@
 // The shared history panel over a FAKE page (web/shared/edge/page.fake.ts; the markup is kept as
 // a string, so the rows are asserted as the markup a paint wrote): rows equal events, the summary
-// and detail text from the copy, the key that survives a repaint, an unknown kind as the summary
-// alone, the empty note, and the scroll to the newest row (docs/design/briscola-sound-history.md
-// §6, PR S3).
+// and detail text from the copy, the key that survives a repaint, the new row appended under a
+// named stream (an open row survives the next event), an unknown kind as the summary alone, the
+// empty note, and the scroll to the newest row (docs/design/briscola-sound-history.md §6, PR S3).
 import { describe, expect, test } from 'vitest';
 
 import { setAttr } from '../edge/dom.ts';
@@ -129,6 +129,72 @@ describe('paintHistory', () => {
     expect(list.attr('data-key')).toBe('3');
     expect(rowsIn(list.text())).toHaveLength(4);
     expect(list.text()).toContain('<summary>Game over</summary>');
+  });
+
+  test('a new event of the same named stream is appended after the rows there, so an open row survives it; another name, restarted ids or a foreign last row rebuild the list', () => {
+    const lastRow = fakeEl('lastRow', { attrs: { 'data-id': '2' } });
+    const p = fakePage([
+      fakeEl(HISTORY_IDS.list, { queries: { 'details.history-row:last-of-type': [lastRow] } }),
+    ]);
+    paintHistory(p.doc, HISTORY_IDS.list, STREAM, COPY, CTX, 'match-1');
+    const list = p.get(HISTORY_IDS.list);
+    expect(list.attr('data-key')).toBe('match-1:2');
+    const painted = list.text();
+    // The browser holds an opened <details>; the fake shows the content untouched, plus a mark.
+    list.el.insertAdjacentHTML('beforeend', '<!--open-->');
+    const next = ev(3, 'result', null);
+    paintHistory(p.doc, HISTORY_IDS.list, [...STREAM, next], COPY, CTX, 'match-1');
+    expect(list.attr('data-key')).toBe('match-1:3');
+    expect(list.text()).toBe(`${painted}<!--open-->${historyRowHtml(next, COPY, CTX).markup}`);
+    // The ids restarted under the same name: rebuilt whole.
+    paintHistory(p.doc, HISTORY_IDS.list, STREAM.slice(0, 2), COPY, CTX, 'match-1');
+    expect(list.attr('data-key')).toBe('match-1:1');
+    expect(rowsIn(list.text())).toHaveLength(2);
+    expect(list.text()).not.toContain('<!--open-->');
+    // Another stream's name: rebuilt whole.
+    paintHistory(p.doc, HISTORY_IDS.list, STREAM, COPY, CTX, 'match-2');
+    expect(list.attr('data-key')).toBe('match-2:2');
+    expect(rowsIn(list.text())).toHaveLength(3);
+    // A stream that no longer carries the id the key names (the ids ran on without it): rebuilt
+    // whole; so is a list painted empty (`-` is no id) once the stream has events.
+    const gap = fakePage([
+      fakeEl(HISTORY_IDS.list, {
+        queries: {
+          'details.history-row:last-of-type': [fakeEl('y', { attrs: { 'data-id': '2' } })],
+        },
+      }),
+    ]);
+    paintHistory(gap.doc, HISTORY_IDS.list, STREAM, COPY, CTX, 'g');
+    gap.get(HISTORY_IDS.list).el.insertAdjacentHTML('beforeend', '<!--open-->');
+    paintHistory(
+      gap.doc,
+      HISTORY_IDS.list,
+      [ev(3, 'trick', 0, 4), ev(4, 'result', null)],
+      COPY,
+      CTX,
+      'g',
+    );
+    expect(gap.get(HISTORY_IDS.list).text()).not.toContain('<!--open-->');
+    expect(rowsIn(gap.get(HISTORY_IDS.list).text())).toHaveLength(2);
+    const fromEmpty = page();
+    paintHistory(fromEmpty.doc, HISTORY_IDS.list, [], COPY, CTX, 'g');
+    expect(fromEmpty.get(HISTORY_IDS.list).attr('data-key')).toBe('g:-');
+    paintHistory(fromEmpty.doc, HISTORY_IDS.list, STREAM, COPY, CTX, 'g');
+    expect(fromEmpty.get(HISTORY_IDS.list).attr('data-key')).toBe('g:2');
+    expect(rowsIn(fromEmpty.get(HISTORY_IDS.list).text())).toHaveLength(3);
+    // The last row is not the one the key names (something else rewrote the list): rebuilt whole.
+    const foreign = fakePage([
+      fakeEl(HISTORY_IDS.list, {
+        queries: {
+          'details.history-row:last-of-type': [fakeEl('x', { attrs: { 'data-id': '1' } })],
+        },
+      }),
+    ]);
+    paintHistory(foreign.doc, HISTORY_IDS.list, STREAM, COPY, CTX, 'm');
+    foreign.get(HISTORY_IDS.list).el.insertAdjacentHTML('beforeend', '<!--open-->');
+    paintHistory(foreign.doc, HISTORY_IDS.list, [...STREAM, next], COPY, CTX, 'm');
+    expect(foreign.get(HISTORY_IDS.list).text()).not.toContain('<!--open-->');
+    expect(rowsIn(foreign.get(HISTORY_IDS.list).text())).toHaveLength(4);
   });
 
   test('an empty stream paints the note under the - key', () => {

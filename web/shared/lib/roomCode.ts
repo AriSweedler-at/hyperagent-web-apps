@@ -6,7 +6,7 @@
 import { err, ok, type Result } from './result.ts';
 import type { Rng } from './rng.ts';
 
-export type Game = 'gin-rummy' | 'fidice' | 'backgammon';
+export type Game = 'gin-rummy' | 'fidice' | 'backgammon' | 'briscola';
 
 export type RoomCodeSpec = Readonly<{
   /** Characters a generated code is drawn from. */
@@ -38,6 +38,12 @@ export const BACKGAMMON_CODE_ALPHABET = GIN_CODE_ALPHABET;
 export const BACKGAMMON_CODE_LENGTH = GIN_CODE_LENGTH;
 export const BACKGAMMON_CODE_LENGTH_ERROR = GIN_CODE_LENGTH_ERROR;
 
+// Briscola (docs/design/briscola.md D19): gin's alphabet and length again, under its own prefix.
+export const BRISCOLA_PEER_PREFIX = 'briscola-';
+export const BRISCOLA_CODE_ALPHABET = GIN_CODE_ALPHABET;
+export const BRISCOLA_CODE_LENGTH = GIN_CODE_LENGTH;
+export const BRISCOLA_CODE_LENGTH_ERROR = GIN_CODE_LENGTH_ERROR;
+
 export const ROOM_CODE: Readonly<Record<Game, RoomCodeSpec>> = {
   'gin-rummy': {
     alphabet: GIN_CODE_ALPHABET,
@@ -59,6 +65,13 @@ export const ROOM_CODE: Readonly<Record<Game, RoomCodeSpec>> = {
     peerPrefix: BACKGAMMON_PEER_PREFIX,
     peerCase: 'upper',
     lengthError: BACKGAMMON_CODE_LENGTH_ERROR,
+  },
+  briscola: {
+    alphabet: BRISCOLA_CODE_ALPHABET,
+    length: BRISCOLA_CODE_LENGTH,
+    peerPrefix: BRISCOLA_PEER_PREFIX,
+    peerCase: 'upper',
+    lengthError: BRISCOLA_CODE_LENGTH_ERROR,
   },
 };
 
@@ -88,6 +101,11 @@ const TYPED_CODE: Readonly<Record<Game, (raw: string) => string>> = {
       .toUpperCase()
       .replace(/[^A-Z]/g, '')
       .slice(0, BACKGAMMON_CODE_LENGTH),
+  briscola: (raw) =>
+    raw
+      .toUpperCase()
+      .replace(/[^A-Z]/g, '')
+      .slice(0, BRISCOLA_CODE_LENGTH),
 };
 
 export const sanitiseCode = (game: Game, raw: string): string => TYPED_CODE[game](raw);

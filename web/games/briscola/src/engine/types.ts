@@ -6,6 +6,7 @@
 // web/shared/lib/game.ts's (the two-seat contract, DRY round 2 F1), re-exported under the names the
 // modules import; `Seat` is this engine's own, four wide, so `game.ts`'s `Seat`, `Pair`, `SEATS`,
 // `otherSeat` and `setAt` do not apply (index.ts says what of `TwoSeatEngine` fits).
+import type { GameEvent as SharedGameEvent } from '../../../../shared/lib/events.ts';
 import type { Now, Player, RuleError } from '../../../../shared/lib/game.ts';
 
 export type { Now, Player, RuleError };
@@ -117,6 +118,22 @@ export type TrickRecord = Readonly<{
 }>;
 /** E14, public. */
 export type Exchange = Readonly<{ seat: Seat; gave: Card; took: Card }>;
+/** The trick's points by class (design §4): 0, 1–9, 10–19, 20 and up (22 is the most a trick holds). */
+export type ValueClass = 'pointless' | 'small' | 'big' | 'huge';
+/** The class of the card that took a trick (design §4); `pip` is the 7, 6, 5, 4 or 2. */
+export type WinningClass = 'asso' | 'tre' | 're' | 'cavallo' | 'fante' | 'pip';
+/** What `trickFacts` reads off a complete trick (design §4, §5), stored on the `trick` event. */
+export type TrickFacts = Readonly<{
+  winningCard: Card;
+  winningClass: WinningClass;
+  /** The winning card is a trump. */
+  briscola: boolean;
+  /** A trump took an opponent's asso or tre of the led suit, a card that would otherwise have won. */
+  steal: boolean;
+  /** A trump won over another trump. */
+  overtrump: boolean;
+  valueClass: ValueClass;
+}>;
 /** `wins` per side (E13). */
 export type Match = Readonly<{
   gamesToWin: GamesToWin;
@@ -137,8 +154,63 @@ export type GameRecord = Readonly<{
   totals: ReadonlyArray<number>;
   endedAt: number;
 }>;
-export type LogKind = 'game' | 'deal' | 'play' | 'trick' | 'exchange' | 'result';
-export type LogEntry = Readonly<{ seat: Seat | null; kind: LogKind; text: string; at: number }>;
+export const EVENT_KINDS = ['game', 'deal', 'trick', 'exchange', 'result'] as const;
+/** What the engine records (E18): a play mid-trick is not an event, the trick that resolves it is. */
+export type EventKind = (typeof EVENT_KINDS)[number];
+/**
+ * One event of the match's stream (design/briscola-sound-history §3.5, §5): the shared
+ * `GameEvent` (web/shared/lib/events.ts, what the sound binding and the history panel read) with
+ * the seat narrowed to this engine's. `id` is its index in `events`, so a painter keys a row and a
+ * cue memory on it; `seat` is who it is about (the dealer, the winner, the exchanger; null for a
+ * game's opening and its result); `data` is the kind's own. The sentence is not stored: log.ts's
+ * `summaryOf` and `detailOf` derive it, so sound and history read the same event.
+ */
+type Event<K extends EventKind, D> = SharedGameEvent<K, D> & Readonly<{ seat: Seat | null }>;
+/** D6: a later game of the match announces itself before its deal. */
+export type GameData = Readonly<{ gameNo: number; dealer: Seat }>;
+/** E4: the deal, and the card turned. */
+export type DealData = Readonly<{ dealer: Seat; trumpCard: Card }>;
+/**
+ * E8 with design §4's facts: `TrickRecord` (`lastTrick`, what the settle beat animates) plus the
+ * winner's side, the facts `trickFacts` reads and the seats whose carico went to another side.
+ * `trumpTaken` here is the seat that took the trump card off the table, null when nobody did
+ * (`TrickRecord.trumpTaken` is the flag).
+ */
+export type TrickData = Readonly<{
+  no: number;
+  leader: Seat;
+  cards: ReadonlyArray<Played>;
+  winner: Seat;
+  winnerSide: Side;
+  points: number;
+  valueClass: ValueClass;
+  winningCard: Card;
+  winningClass: WinningClass;
+  briscola: boolean;
+  steal: boolean;
+  overtrump: boolean;
+  carichiLost: ReadonlyArray<Seat>;
+  drew: ReadonlyArray<Seat>;
+  trumpTaken: Seat | null;
+}>;
+/** E14: the exchange as `exchanges` records it. */
+export type ExchangeData = Exchange;
+/** E12/E13: the game's result, whether it decided the match, and the match's wins after it. */
+export type ResultData = Readonly<{
+  winner: Side | null;
+  totals: ReadonlyArray<number>;
+  draw: boolean;
+  decided: boolean;
+  wins: ReadonlyArray<number>;
+}>;
+export type GameEvent =
+  | Event<'game', GameData>
+  | Event<'deal', DealData>
+  | Event<'trick', TrickData>
+  | Event<'exchange', ExchangeData>
+  | Event<'result', ResultData>;
+/** The event of one kind, for a decoder or a copy function per kind. */
+export type EventOf<K extends EventKind> = Extract<GameEvent, Readonly<{ kind: K }>>;
 
 /** The host's full state (E4); `viewFor` redacts (E17). Derived, never stored: taken, tricks, the trump suit. */
 export type State = Readonly<{
@@ -172,9 +244,8 @@ export type State = Readonly<{
   result: GameResult | null;
   /** Finished games, this one included once over. */
   games: ReadonlyArray<GameRecord>;
-  /** This game's entries. */
-  log: ReadonlyArray<LogEntry>;
-  lastAction: LogEntry | null;
+  /** The match's events in order, `events[i].id === i`; a game after the first opens with a `game` event. */
+  events: ReadonlyArray<GameEvent>;
   startedAt: number;
   endedAt: number | null;
 }>;
@@ -233,8 +304,8 @@ export type View = Readonly<{
   matchOver: boolean;
   result: GameResult | null;
   games: ReadonlyArray<GameRecord>;
-  log: ReadonlyArray<LogEntry>;
-  lastAction: LogEntry | null;
+  /** `State.events`: every event is public (the cards played, the deal's card, the exchange). */
+  events: ReadonlyArray<GameEvent>;
   startedAt: number;
   endedAt: number | null;
 }>;

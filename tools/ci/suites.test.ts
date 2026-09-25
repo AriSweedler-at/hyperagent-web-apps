@@ -182,11 +182,18 @@ describe('every test file belongs to exactly one suite', () => {
       'site',
       'harness',
     ]);
-    expect(E2E_SUITES).toEqual(['gin', 'fidice', 'backgammon', 'site']);
-    expect(JOBS).toEqual([...SUITE_NAMES, 'e2e-gin', 'e2e-fidice', 'e2e-backgammon', 'e2e-site']);
+    expect(E2E_SUITES).toEqual(['gin', 'fidice', 'backgammon', 'briscola', 'site']);
+    expect(JOBS).toEqual([
+      ...SUITE_NAMES,
+      'e2e-gin',
+      'e2e-fidice',
+      'e2e-backgammon',
+      'e2e-briscola',
+      'e2e-site',
+    ]);
     // The game suites are the matrix jobs' values: each has both halves (the unit script and the
     // e2e script the two jobs run), in job order.
-    expect(GAME_SUITES).toEqual(['gin', 'fidice', 'backgammon']);
+    expect(GAME_SUITES).toEqual(['gin', 'fidice', 'backgammon', 'briscola']);
     expect(SUITE_NAMES.filter(isGameSuite)).toEqual(GAME_SUITES);
     GAME_SUITES.forEach((game) => {
       expect(E2E_SUITES, game).toContain(game);
@@ -203,17 +210,22 @@ describe('every test file belongs to exactly one suite', () => {
     expect(SUITES.gin.e2e).toStrictEqual({
       files: ['**/gin-*.spec.ts', '**/shell-*.spec.ts'],
       tag: '@gin-rummy',
-      otherTags: ['@fidice', '@backgammon'],
+      otherTags: ['@fidice', '@backgammon', '@briscola'],
     });
     expect(SUITES.fidice.e2e).toStrictEqual({
       files: ['**/shell-online.spec.ts', '**/shell-relay.spec.ts'],
       tag: '@fidice',
-      otherTags: ['@gin-rummy', '@backgammon'],
+      otherTags: ['@gin-rummy', '@backgammon', '@briscola'],
     });
     expect(SUITES.backgammon.e2e).toStrictEqual({
       files: ['**/backgammon-*.spec.ts', '**/shell-*.spec.ts'],
       tag: '@backgammon',
-      otherTags: ['@gin-rummy', '@fidice'],
+      otherTags: ['@gin-rummy', '@fidice', '@briscola'],
+    });
+    expect(SUITES.briscola.e2e).toStrictEqual({
+      files: ['**/briscola-*.spec.ts', '**/shell-*.spec.ts'],
+      tag: '@briscola',
+      otherTags: ['@gin-rummy', '@fidice', '@backgammon'],
     });
     // Every game names a suite of its own (two rows naming one suite would drop a game from the
     // reverse map silently), and every game suite is some game's.
@@ -231,7 +243,7 @@ describe('every test file belongs to exactly one suite', () => {
     expect(counts['fidice']).toBeGreaterThanOrEqual(17);
     expect(counts['backgammon']).toBeGreaterThanOrEqual(21);
     // The engine's six files (docs/design/briscola-rules.md §5), added with PR-2.
-    expect(counts['briscola']).toBeGreaterThanOrEqual(6);
+    expect(counts['briscola']).toBeGreaterThanOrEqual(18);
     expect(counts['site']).toBeGreaterThanOrEqual(8);
     expect(counts['harness']).toBeGreaterThanOrEqual(6);
   });
@@ -325,6 +337,37 @@ const ROWS_BEFORE: ReadonlyArray<readonly [string, Suite, Thresholds]> = [
     'web/games/briscola/src/engine/*.algorithms.ts',
     'briscola',
     { lines: 100, functions: 100, statements: 100, branches: 92 },
+  ],
+  // Added by the briscola page (docs/design/briscola.md PR-4): backgammon's rows under its folder.
+  [
+    'web/games/briscola/src/protocol.ts',
+    'briscola',
+    { lines: 95, functions: 95, statements: 95, branches: 97 },
+  ],
+  [
+    'web/games/briscola/src/storage.ts',
+    'briscola',
+    { lines: 95, functions: 95, statements: 95, branches: 97 },
+  ],
+  [
+    'web/games/briscola/src/shellConfig.ts',
+    'briscola',
+    { lines: 95, functions: 95, statements: 95, branches: 97 },
+  ],
+  [
+    'web/games/briscola/src/ui/**',
+    'briscola',
+    { lines: 94, functions: 95, statements: 93, branches: 88 },
+  ],
+  [
+    'web/games/briscola/src/net/**',
+    'briscola',
+    { lines: 95, functions: 95, statements: 95, branches: 97 },
+  ],
+  [
+    'web/games/briscola/src/fx.ts',
+    'briscola',
+    { lines: 95, functions: 95, statements: 95, branches: 97 },
   ],
   [
     'web/games/backgammon/src/protocol.ts',
@@ -427,6 +470,13 @@ const INCLUDE_BEFORE: ReadonlyArray<string> = [
   'web/games/backgammon/src/engine/**/*.ts',
   // Added with the briscola engine (PR-2).
   'web/games/briscola/src/engine/**/*.ts',
+  // Added by the briscola page (PR-4).
+  'web/games/briscola/src/protocol.ts',
+  'web/games/briscola/src/storage.ts',
+  'web/games/briscola/src/shellConfig.ts',
+  'web/games/briscola/src/ui/**/*.ts',
+  'web/games/briscola/src/net/**/*.ts',
+  'web/games/briscola/src/fx.ts',
   'web/games/backgammon/src/protocol.ts',
   'web/games/backgammon/src/storage.ts',
   'web/games/backgammon/src/shellConfig.ts',
@@ -554,13 +604,21 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   [
     'a briscola engine file',
     ['web/games/briscola/src/engine/apply.ts'],
-    ['briscola', 'site', 'harness'],
+    ['briscola', 'e2e-briscola', 'site', 'e2e-site', 'harness'],
   ],
   [
     'a briscola test alone',
     ['web/games/briscola/src/engine/replay.test.ts'],
-    ['briscola', 'site', 'harness'],
+    ['briscola', 'e2e-briscola', 'site', 'e2e-site', 'harness'],
   ],
+  [
+    'the briscola page',
+    ['web/games/briscola/index.html', 'web/games/briscola/theme.css'],
+    ['briscola', 'e2e-briscola', 'site', 'e2e-site', 'harness'],
+  ],
+  ['the briscola wire goldens', ['test/fixtures/briscola-wire/state.json'], ['briscola']],
+  ['a briscola spec', ['e2e/briscola-local.spec.ts'], ['e2e-briscola']],
+  ['a briscola style golden', ['test/fixtures/styles/briscola.390x844.json'], ['e2e-site']],
   ['a backgammon style golden', ['test/fixtures/styles/backgammon.390x844.json'], ['e2e-site']],
   ['a gin style golden', ['test/fixtures/styles/gin-rummy.1280x800.json'], ['e2e-site']],
   ['the card-back rasters guard', ['test/card-backs.test.ts'], ['gin']],
@@ -577,18 +635,22 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   ],
   ['a gin spec', ['e2e/gin-online.spec.ts'], ['e2e-gin']],
   ['a backgammon spec', ['e2e/backgammon-online.spec.ts'], ['e2e-backgammon']],
-  ['a shell spec', ['e2e/shell-home.spec.ts'], ['e2e-gin', 'e2e-backgammon']],
-  ['an online spec', ['e2e/shell-relay.spec.ts'], ['e2e-gin', 'e2e-fidice', 'e2e-backgammon']],
+  ['a shell spec', ['e2e/shell-home.spec.ts'], ['e2e-gin', 'e2e-backgammon', 'e2e-briscola']],
+  [
+    'an online spec',
+    ['e2e/shell-relay.spec.ts'],
+    ['e2e-gin', 'e2e-fidice', 'e2e-backgammon', 'e2e-briscola'],
+  ],
   [
     'a shell spec beside a backgammon change',
     ['e2e/shell-handoff.spec.ts', 'web/games/backgammon/src/ui/state.ts'],
-    ['e2e-gin', 'backgammon', 'e2e-backgammon', 'site', 'e2e-site', 'harness'],
+    ['e2e-gin', 'backgammon', 'e2e-backgammon', 'e2e-briscola', 'site', 'e2e-site', 'harness'],
   ],
   ['the smoke and style specs', ['e2e/smoke.spec.ts', 'e2e/computed-styles.spec.ts'], ['e2e-site']],
   [
     "the shared shell's liveness spec",
     ['e2e/shell-liveness.spec.ts'],
-    ['e2e-gin', 'e2e-backgammon'],
+    ['e2e-gin', 'e2e-backgammon', 'e2e-briscola'],
   ],
   ['the landing page', ['web/index.html'], ['site', 'e2e-site']],
   ['the alias stub', ['web/games/sheshbesh/index.html'], ['site', 'e2e-site']],

@@ -1,0 +1,28 @@
+[
+  {
+    "t": "action",
+    "action": {
+      "type": "play",
+      "cardId": "AC"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "play",
+      "cardId": "RB"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "exchange"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "next"
+    }
+  }
+]

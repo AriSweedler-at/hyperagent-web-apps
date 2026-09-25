@@ -43,6 +43,7 @@ import {
   localBroadcast,
   localPlayers,
   localSeated,
+  localSeats,
   readHome,
   reduceShell,
   resumeFor,
@@ -59,6 +60,7 @@ import {
   type Player,
   type Save,
   type Seat,
+  type SeatOf,
   type ShellApp,
   type ShellConfig,
   type ShellState,
@@ -1022,6 +1024,43 @@ describe('pass and play', () => {
       shell: initialApp.shell,
       table: { curtain: 1, marks: [] },
     });
+  });
+
+  test('localSeats: the same names as localPlayers at two seats, and the rule carried to three and four', () => {
+    // The two-seat pairs, by both helpers.
+    [
+      ['ann', 'bob'],
+      [' ann ', 'ANN'],
+      ['', ''],
+      ['A'.repeat(25), 'b'],
+      ['Player 2', ''],
+    ].forEach(([p1, p2]) => {
+      expect(localSeats([p1 ?? '', p2 ?? ''])).toEqual(localPlayers(p1 ?? '', p2 ?? ''));
+    });
+    // Three and four: the owner's names default the first two seats, `Player N` the rest, ids by
+    // seat, a clash with any earlier seat suffixed by its number.
+    expect(localSeats(['Ann', '', 'Cara'])).toEqual([
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: DEFAULT_LOCAL_NAMES[1] },
+      { id: 'p3', name: 'Cara' },
+    ]);
+    expect(localSeats(['Ann', 'ann', 'Bob', 'ANN'])).toEqual([
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'ann 2' },
+      { id: 'p3', name: 'Bob' },
+      { id: 'p4', name: 'ANN 4' },
+    ]);
+    expect(localSeats([])).toEqual([]);
+  });
+
+  test('SeatOf: the two seats for a bag that names none, the game`s own added for one that does', () => {
+    // Compile-time: `Fake` names no extra seat, so its seats are 0 | 1; a bag with `Seat: 2 | 3` seats four.
+    type Wide = Fake & Readonly<{ Seat: 2 | 3 }>;
+    const two: ReadonlyArray<SeatOf<Fake>> = [0, 1];
+    const four: ReadonlyArray<SeatOf<Wide>> = [0, 1, 2, 3];
+    // @ts-expect-error a third seat is not one of the two-seat game's
+    const third: SeatOf<Fake> = 2;
+    expect([two, four, third]).toEqual([[0, 1], [0, 1, 2, 3], 2]);
   });
 
   test('the curtain reveal shows the mover and hides the curtain, telling them what the revealer says; a move hands the phone over with the chime', () => {

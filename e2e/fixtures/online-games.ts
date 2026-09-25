@@ -9,6 +9,12 @@ import { expect, type Page } from '@playwright/test';
 
 import type { Game, ShellGame } from '../../tools/games.ts';
 import { bgBoardsAgree, bgStartLocal, boardKey, readBoard, requireBoard } from './backgammon.ts';
+import {
+  briscolaReveal,
+  briscolaStartLocal,
+  readView as readBriscola,
+  requireView as requireBriscola,
+} from './briscola.ts';
 import { fidiceHostStarts, fidiceSameRound, fidiceSeatName, fidiceSeats } from './fidice.ts';
 import type { Viewport } from './geometry.ts';
 import { ginPassUpcard, ginStartLocal, readTable } from './gin.ts';
@@ -23,6 +29,7 @@ import {
   takeOffer,
 } from './shell.ts';
 import type { Project } from './site.ts';
+import { WEBRTC_TIMEOUT } from './timeouts.ts';
 import { hostRoom, joinByCode, type Players } from './two-players.ts';
 
 /** What the online specs ask of any game once host and guest have opened their pages. */
@@ -255,9 +262,111 @@ const fidice: OnlineDriver = {
   relayToasts: ['guest'],
 };
 
+/** What both briscola tables must agree on: the deal, whose turn, the fan, the tally and the events so far. */
+const briscolaKey = (v: Awaited<ReturnType<typeof readBriscola>>): string =>
+  v === null
+    ? 'none'
+    : JSON.stringify([
+        v.gameNo,
+        v.phase,
+        v.turn,
+        v.trumpCard.id,
+        v.stockCount,
+        v.trick,
+        v.taken,
+        v.events.length,
+      ]);
+const briscolaSnapshot = async (page: Page): Promise<string> =>
+  briscolaKey(await readBriscola(page));
+
+/** The deal both briscola tables show: three cards each, the trump card included in a stock of 34. */
+const BRISCOLA_DEALT = { gameNo: 1, phase: 'trick', stockCount: 34, trickNo: 0 } as const;
+
+const briscola: ShellDriver = {
+  ...shellOnline,
+  curtainSub: (_first, other) => `${other}, look away`,
+  // The host deals from the waiting room; both tables come up with no curtain (online).
+  start: async (host, guest) => {
+    await expect(host.locator('#startGameBtn')).toBeVisible({ timeout: WEBRTC_TIMEOUT });
+    await host.locator('#startGameBtn').click();
+    await expect(host.locator('#tableScreen')).toBeVisible();
+    await expect(guest.locator('#tableScreen')).toBeVisible();
+    await expect(host.locator('#curtainOverlay')).toBeHidden();
+    await expect(guest.locator('#curtainOverlay')).toBeHidden();
+  },
+  snapshot: briscolaSnapshot,
+  agree: async (host, guest) => {
+    const table = briscolaKey(await requireBriscola(host));
+    await expect.poll(() => briscolaSnapshot(guest)).toBe(table);
+    return table;
+  },
+  expectOpening: async (host, guest) => {
+    // Both tables agree on the deal: the host is seat 0 and the guest seat 1, the same briscola,
+    // three cards each, 34 in the stock, game 1 of a best of three.
+    const opening = await requireBriscola(host);
+    expect(opening).toMatchObject({ ...BRISCOLA_DEALT, me: { idx: 0 } });
+    expect(opening.me.hand).toHaveLength(3);
+    await expect.poll(() => briscolaSnapshot(guest)).toBe(briscolaKey(opening));
+    const theirs = await requireBriscola(guest);
+    expect(theirs).toMatchObject({ ...BRISCOLA_DEALT, me: { idx: 1 }, turn: opening.turn });
+    expect(theirs.trumpCard).toEqual(opening.trumpCard);
+    expect(theirs.me.hand).toHaveLength(3);
+    await expect(host.locator('#stockCount')).toHaveText('Stock · 34');
+    await expect(guest.locator('#stockCount')).toHaveText('Stock · 34');
+    await expect(host.locator('#briscola .card')).toHaveAttribute(
+      'data-card',
+      opening.trumpCard.id,
+    );
+    await expect(guest.locator('#briscola .card')).toHaveAttribute(
+      'data-card',
+      opening.trumpCard.id,
+    );
+    await expect(host.locator('#gameBadge')).toHaveText('Game 1 · 0–0 · best of 3');
+    await expect(guest.locator('#gameBadge')).toHaveText('Game 1 · 0–0 · best of 3');
+    await expect(host.locator('#hand .card')).toHaveCount(3);
+    await expect(guest.locator('#hand .card')).toHaveCount(3);
+  },
+  // The host's save carries the room's six terms (protocol.ts's order) and the game at its first deal.
+  hostSave: { seatCount: 2, gamesToWin: 2, game: { gameNo: 1 } },
+  localSave: { game: { gameNo: 1, trickNo: 0 } },
+  table: '#hand .card',
+  curtainOffer: {
+    title:
+      "the curtain's Continue online takes the offer too, with the phone about to change hands",
+    // The leader's curtain is up as the game starts: it offers the reveal and, at two seats, the handoff.
+    toCurtain: () => Promise.resolve(),
+    take: async (page) => {
+      await page.locator('#curtainHandoffBtn').click();
+      return roomOpen(page, 'briscola');
+    },
+  },
+  // The Rules and About copy (ui/rules.ts, ui/glossary.ts, ui/about.ts): "briscola" in the About
+  // copy lands on the briscola rule; the trick rule names the draw, as the last tricks do.
+  glossary: {
+    aboutTerm: 'briscola',
+    aboutRule: 'briscola',
+    innerFrom: 'trick',
+    innerTo: 'draw',
+    deepLink: 'scoring',
+    overlayFrom: 'last-tricks',
+    overlayTo: 'draw',
+    openRulesOverTable: async (page, url, viewport) => {
+      await briscolaStartLocal(page, url, viewport);
+      await briscolaReveal(page);
+      if (await page.locator('#rulesBtnGame').isVisible())
+        await page.locator('#rulesBtnGame').click();
+      else {
+        await page.locator('#menuBtn').click();
+        await page.locator('#menuRulesBtn').click();
+      }
+    },
+  },
+};
+
 export const SHELL_DRIVERS: Readonly<Record<ShellGame, ShellDriver>> = {
   'gin-rummy': gin,
   backgammon,
+  briscola,
 };
 
 /** Every game's online row: the shell games' drivers and fidice's. */

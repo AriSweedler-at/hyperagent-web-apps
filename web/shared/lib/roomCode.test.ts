@@ -22,9 +22,13 @@ import {
   BACKGAMMON_CODE_LENGTH,
   BACKGAMMON_CODE_LENGTH_ERROR,
   BACKGAMMON_PEER_PREFIX,
+  BRISCOLA_CODE_ALPHABET,
+  BRISCOLA_CODE_LENGTH,
+  BRISCOLA_CODE_LENGTH_ERROR,
+  BRISCOLA_PEER_PREFIX,
 } from './roomCode.ts';
 
-const GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice', 'backgammon'];
+const GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice', 'backgammon', 'briscola'];
 
 describe('frozen literals (byte for byte what the legacy pages hold)', () => {
   test('gin', () => {
@@ -53,6 +57,26 @@ describe('frozen literals (byte for byte what the legacy pages hold)', () => {
       peerCase: 'lower',
       lengthError: 'Codes are 5 characters',
     });
+  });
+
+  test("briscola: gin's alphabet and length under its own broker prefix (briscola.md D19)", () => {
+    expect(BRISCOLA_PEER_PREFIX).toBe('briscola-');
+    expect(BRISCOLA_CODE_ALPHABET).toBe('ABCDEFGHJKLMNPQRSTUVWXYZ');
+    expect(BRISCOLA_CODE_LENGTH).toBe(4);
+    expect(BRISCOLA_CODE_LENGTH_ERROR).toBe('Enter the 4-letter room code.');
+    expect(ROOM_CODE.briscola).toEqual({
+      alphabet: 'ABCDEFGHJKLMNPQRSTUVWXYZ',
+      length: 4,
+      peerPrefix: 'briscola-',
+      peerCase: 'upper',
+      lengthError: 'Enter the 4-letter room code.',
+    });
+    expect(sanitiseCode('briscola', 'ab1c-d io')).toBe('ABCD');
+    expect(validateCode('briscola', 'abcd')).toEqual(ok('ABCD'));
+    expect(validateCode('briscola', 'abc')).toEqual(err('Enter the 4-letter room code.'));
+    expect(peerIdFor('briscola', 'KQZM')).toBe('briscola-KQZM');
+    expect(isWellFormedCode('briscola', 'KQZM')).toBe(true);
+    expect(isWellFormedCode('briscola', 'KQZ1')).toBe(false);
   });
 
   test("backgammon: gin's alphabet and length under its own broker prefix", () => {

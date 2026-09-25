@@ -5,8 +5,8 @@
 // text byte for byte. Structural checks plus the invariants the engine leans on (as many hands
 // and piles as seats, the deck's multiset exactly once across hands, stock, trick and piles, the
 // trump card under the stock, whole tricks in the piles and whole draws in the stock, a result
-// iff the game is over), since a save that disagrees would wedge the game; play legality stays
-// with `applyAction`. Hand sizes are checked too (three each while the stock lasts, equal after,
+// iff the game is over, the events numbered by their index), since a save that disagrees would
+// wedge the game; play legality stays with `applyAction`. Hand sizes are checked too (three each while the stock lasts, equal after,
 // a card in the trick counting as held) and the leader on turn while the trick is empty: the
 // first disagreement leaves a seat to play from an empty hand, the second misrecords the next
 // trick's leader. Every card id is refused outside the `LABEL + suit` grammar, every flag outside
@@ -34,11 +34,10 @@ import {
   type Action,
   type Card,
   type Exchange,
+  type GameEvent,
   type GameOptions,
   type GameRecord,
   type GameResult,
-  type LogEntry,
-  type LogKind,
   type Match,
   type Phase,
   type Played,
@@ -50,7 +49,9 @@ import {
   type State,
   type Suit,
   type TrickRecord,
+  type ValueClass,
   type View,
+  type WinningClass,
 } from './types.ts';
 
 /** E21: every seat a table could have; `applyAction` refuses one the table does not (BAD_SEAT). */
@@ -61,7 +62,8 @@ const rank: Decoder<Rank> = literal(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 const seatCount = literal(2, 3, 4);
 const gamesToWin = literal(1, 2, 3);
 const phase: Decoder<Phase> = literal('deal', 'trick', 'draw', 'over');
-const logKind: Decoder<LogKind> = literal('game', 'deal', 'play', 'trick', 'exchange', 'result');
+const valueClass: Decoder<ValueClass> = literal('pointless', 'small', 'big', 'huge');
+const winningClass: Decoder<WinningClass> = literal('asso', 'tre', 're', 'cavallo', 'fante', 'pip');
 
 /** A card whose `id` is `LABEL[r] + s` (D10): the three fields agree or the card is refused. */
 export const decodeCard: Decoder<Card> = refine(
@@ -116,12 +118,63 @@ const gameRecord: Decoder<GameRecord> = object({
   totals: arrayOf(count),
   endedAt: timestamp,
 });
-const logEntry: Decoder<LogEntry> = object({
-  seat: nullable(decodeSeat),
-  kind: logKind,
-  text: string,
-  at: timestamp,
+/** An event's head after its kind, in types.ts's order (id, kind, seat, at, data). */
+const stamp = { seat: nullable(decodeSeat), at: timestamp };
+
+const trickData = object({
+  no: integer(1),
+  leader: decodeSeat,
+  cards: arrayOf(played),
+  winner: decodeSeat,
+  winnerSide: side,
+  points: count,
+  valueClass,
+  winningCard: decodeCard,
+  winningClass,
+  briscola: boolean,
+  steal: boolean,
+  overtrump: boolean,
+  carichiLost: arrayOf(decodeSeat),
+  drew: arrayOf(decodeSeat),
+  trumpTaken: nullable(decodeSeat),
 });
+
+/**
+ * An event of the stream, the kind deciding its data (E18), one case per EVENT_KINDS entry in its
+ * order; the decoded value keeps the engine's key order, so a stream re-encodes byte for byte.
+ */
+export const decodeEvent: Decoder<GameEvent> = taggedUnion('kind', {
+  game: object({
+    id: count,
+    kind: literal('game'),
+    ...stamp,
+    data: object({ gameNo: integer(1), dealer: decodeSeat }),
+  }),
+  deal: object({
+    id: count,
+    kind: literal('deal'),
+    ...stamp,
+    data: object({ dealer: decodeSeat, trumpCard: decodeCard }),
+  }),
+  trick: object({ id: count, kind: literal('trick'), ...stamp, data: trickData }),
+  exchange: object({ id: count, kind: literal('exchange'), ...stamp, data: exchange }),
+  result: object({
+    id: count,
+    kind: literal('result'),
+    ...stamp,
+    data: object({
+      winner: nullable(side),
+      totals: arrayOf(count),
+      draw: boolean,
+      decided: boolean,
+      wins: arrayOf(count),
+    }),
+  }),
+});
+const events = arrayOf(decodeEvent);
+
+/** `events[i].id === i`: a painter keys its rows and a cue memory its last id on the index. */
+const numbered = (list: ReadonlyArray<GameEvent>): boolean => list.every((e, i) => e.id === i);
 
 type Check<T> = readonly [predicate: (value: T) => boolean, expected: string];
 
@@ -193,6 +246,7 @@ const STATE_CHECKS: ReadonlyArray<Check<State>> = [
     'a trick led by the leader, the turn after its last card',
   ],
   [(s) => s.trick.length > 0 || s.turn === s.leader, 'the leader on turn while the trick is empty'],
+  [(s) => numbered(s.events), 'events numbered by their index'],
 ];
 
 /** The host's full state, as the save holds it (setup.ts's key order). */
@@ -216,8 +270,7 @@ export const decodeState: Decoder<State> = checked(
     match,
     result: nullable(gameResult),
     games: arrayOf(gameRecord),
-    log: arrayOf(logEntry),
-    lastAction: nullable(logEntry),
+    events,
     startedAt: timestamp,
     endedAt: nullable(timestamp),
   }),
@@ -256,6 +309,7 @@ const VIEW_CHECKS: ReadonlyArray<Check<View>> = [
       v.match.wins.length === sidesOf(v.options.seatCount),
     'a score per seat and per side',
   ],
+  [(v) => numbered(v.events), 'events numbered by their index'],
 ];
 
 /** A per-seat view, as a wire `state` frame carries it (view.ts's key order). */
@@ -289,8 +343,7 @@ export const decodeView: Decoder<View> = checked(
     matchOver: boolean,
     result: nullable(gameResult),
     games: arrayOf(gameRecord),
-    log: arrayOf(logEntry),
-    lastAction: nullable(logEntry),
+    events,
     startedAt: timestamp,
     endedAt: nullable(timestamp),
   }),

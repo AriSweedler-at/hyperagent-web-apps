@@ -28,6 +28,7 @@
 // Locally (Chromium from `npx playwright install`; `npm run build` first):
 //   node --experimental-strip-types tools/parity/computed-styles.ts            # rewrite the goldens
 //   node --experimental-strip-types tools/parity/computed-styles.ts --check    # compare, exit 1 on a diff
+//   node --experimental-strip-types tools/parity/computed-styles.ts --game briscola   # one game's two alone
 // It serves dist/ through tools/serve-dist.ts and a local PeerServer (`peer`) on free ports; the
 // pages reach the broker through their `?peer=` hook and the STUN-only ICE fixture through `?ice=`.
 import { createHash } from 'node:crypto';
@@ -533,6 +534,112 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.history-row .who',
     '.score-line',
   ],
+  // Briscola (docs/design/briscola-board.md §3, §6): after the shell's 43, the home panel's own
+  // shapes (the selects, the house-rules disclosure, the switches), then the table: the trump badge
+  // with its suit, the seats row in its three cells and the turn mark, the stock with the trump card
+  // under it, the fan with its chips and the taking card, the score strip (per player or per team,
+  // the leader), the hand's three slots and the card in each of its states, the cards' pack faces
+  // (a picture pack paints no glyph, so the `.glyph` rows record null under `linea`), the sheets
+  // (the curtain, the menu, the history's `<details>` rows, the result's score rows, the last trick).
+  // `#toast.show` is timed and left out; `.flyer` and `.drag-ghost` are transient.
+  briscola: [
+    ...SHELL_SELECTORS,
+    '.masthead .subtitle',
+    '.card-box.prose p',
+    '.card-box.resume',
+    '.field',
+    '.field-label',
+    'select',
+    '.btn-block',
+    '.check-row',
+    '.house-rules',
+    '.house-rules summary',
+    '.empty-note.left',
+    '.topbar .badges',
+    '.badge.trump',
+    '.badge.trump .suit',
+    '.badge.trump::before',
+    '.seats',
+    '.seat',
+    '.seat[data-pos="top"]',
+    '.seat[data-pos="left"]',
+    '.seat[data-pos="right"]',
+    '.seat-name',
+    '.seat.to-move .seat-name::before',
+    '.seat-cards',
+    '.seat-taken',
+    '.seat .conn-dot',
+    '.conn-dot.off',
+    '.table-center',
+    '.stock-area',
+    '.stock',
+    '.stock.empty',
+    '.stock .card.back',
+    '.briscola',
+    '.briscola.gone',
+    '.pile-label',
+    '.pile-peek',
+    '.pile-peek:disabled',
+    '.desk-only',
+    '.trick',
+    '.trick:empty::before',
+    '.play',
+    '.play .card',
+    '.play .card.taking',
+    '.play .who',
+    '.trick.drop-ready',
+    '.trick.drop',
+    '.score-strip',
+    '.score-cell',
+    '.score-cell.mine',
+    '.score-cell.leading .sc-points',
+    '.sc-name',
+    '.sc-points',
+    '.sc-tricks',
+    '.status-line',
+    '.hand-area',
+    '.hand-header',
+    '.my-taken',
+    '.hand',
+    '.hand.inert',
+    '.hand.active .card',
+    '.hand.hidden-cards .card',
+    '.slot',
+    '.slot.empty::before',
+    '.card',
+    '.card.face',
+    '.card.back',
+    '.card.mid',
+    '.card.tiny',
+    '.card.selected',
+    '.card.playable',
+    '.card.arriving',
+    '.card .rank',
+    '.card .rank.br',
+    '.card.glyph .suit',
+    '.card.glyph.suit-C .rank',
+    '.card.glyph.suit-D .rank',
+    '.card.glyph.suit-S .rank',
+    '.card.glyph.suit-B .rank',
+    '.actions',
+    '.actions .btn-primary',
+    '.waiting-note',
+    '.overlay.curtain',
+    '.overlay.curtain .sheet',
+    '.overlay.curtain .btn-ghost',
+    '.menu-list',
+    '.history',
+    '.history-row > summary',
+    '.history-row .who',
+    '.history-detail dt',
+    '.history-detail dd',
+    '.score-list',
+    '.score-row',
+    '.score-row .who',
+    '.trick-cards',
+    '.trick-cards .who',
+    '#endgameScreen h1',
+  ],
 };
 
 // ---- the golden --------------------------------------------------------------------------------------
@@ -876,6 +983,13 @@ const SHELL_DRIVE: Readonly<Record<ShellGame, ShellDrive>> = {
     localModeShot: 'home: play tab, pass the phone',
     curtainShot: 'local: match started, curtain up',
     localValues: { localMatchLengthSel: '3', localVariantSel: 'portes' },
+  },
+  briscola: {
+    submenuShot: null,
+    localModeShot: 'home: play tab, pass the phone',
+    curtainShot: 'local: dealt, curtain up',
+    // Two players, best of three (so the match reaches a second game).
+    localValues: { localPlayersSel: '2', localMatchSel: '2' },
   },
 };
 
@@ -1376,10 +1490,159 @@ const driveBackgammon = async (page: Page, shot: Shot): Promise<void> => {
   await snap('home: after the matches');
 };
 
+/**
+ * Plays the seeded policy through briscola's hook (`__briscola.legal()` -> `__briscola.act(a)`, the
+ * page's own seeded Math.random picking uniformly) until `stop`, a JS predicate over the actor's
+ * view, holds; a game's end stops it too unless `nextGames` lets it play `next` on to the match end.
+ * In-page, so a whole game costs no round trips; pass and play applies the actor's action whoever
+ * holds the phone, so the curtain names the actor afterwards and the driver reveals it before a
+ * shot. Every resolved trick starts the settle beat (docs/design/briscola-board.md §4.2), during
+ * which the hook's `legal()` is empty (the live view is held back) and whose timers fire only once
+ * this loop returns: the loop walks the beat itself with its own timer intent (`settle/elapsed`,
+ * as backgammon's loop ends a forfeited roll), `settleBr` waits the real timers out afterwards,
+ * and the flying clones a paint launched inside one task are swept here with the `arriving` mark
+ * their landing would have cleared. Returns the phase it stopped in.
+ */
+const fastForwardBr = (page: Page, stop: string, nextGames = false): Promise<string> =>
+  page.evaluate<string>(`(() => {
+    const br = window.__briscola;
+    const stop = (v) => (${stop});
+    for (let n = 0; n < 20000; n += 1) {
+      const v = br.view();
+      if (v === null || v.matchOver || stop(v)) break;
+      if (v.phase === 'over' && !${String(nextGames)}) break;
+      const acts = br.legal();
+      if (acts.length === 0) {
+        if (br.app.table.settle === null) break;
+        br.dispatch({ type: 'settle/elapsed' });
+        continue;
+      }
+      br.act(acts[Math.floor(Math.random() * acts.length)]);
+    }
+    document.querySelectorAll('.flyer').forEach((f) => f.remove());
+    document.querySelectorAll('.card.arriving').forEach((c) => c.classList.remove('arriving'));
+    const last = br.view();
+    return last === null ? 'none' : last.phase;
+  })()`);
+
+/**
+ * The settle beat (hold, fly, draw), the flights and the toast are timed; a shot waits them out. The
+ * `arriving` mark is read on the shown table alone: a match that ends mid-beat leaves the fan's
+ * cards marked under the endgame screen, where no paint clears them.
+ */
+const settleBr = async (page: Page): Promise<void> => {
+  await page.waitForFunction(
+    `window.__briscola.app.table.settle === null && document.querySelectorAll('.flyer, .drag-ghost, #tableScreen:not(.hidden) .card.arriving').length === 0 && !document.getElementById('toast').classList.contains('show')`,
+  );
+};
+
+/** Lift the first card of the hand and play it (`card/tap`, then `#playBtn`). */
+const playFirstCard = async (page: Page): Promise<void> => {
+  await click(page, '#hand .slot .card');
+  await click(page, '#playBtn');
+};
+
+/**
+ * Briscola (docs/design/briscola-board.md §6), after the shell (driveShell, which dealt a two-player
+ * best of three under the curtain): the pack pinned to `linea` first through the hook (the drawn
+ * deck, so the golden records no picture pack's aspect or back and the deck's default may change
+ * under it), the first trick by hand (my hand, a card lifted, a card played and the curtain for the
+ * other seat, the second seat's play, the trick taken with the settle beat waited out, the table
+ * after it), the menu, history, rules and last-trick sheets, then the seeded policy through the
+ * hook to the game's end (the result sheet and the table behind it), the second game's curtain
+ * with the badge counting, the match end on the endgame screen; last a three-seat and a four-seat
+ * table dealt, for the seats row, the fan and the score strip in their other two shapes.
+ */
+const driveBriscola = async (page: Page, shot: Shot): Promise<void> => {
+  const snap = async (name: string): Promise<void> => {
+    await settleBr(page);
+    await shot(name);
+  };
+  const reveal = async (): Promise<void> => {
+    if (await page.locator('#curtainOverlay').isVisible()) await click(page, '#curtainBtn');
+  };
+  const leaveTable = async (): Promise<void> => {
+    await click(page, '#menuBtn');
+    await click(page, '#menuLeaveBtn');
+    await visible(page, '#homeScreen');
+  };
+  await page.waitForFunction('typeof window.__briscola === "object"');
+  await page.evaluate('window.__briscola.cardPack("linea")');
+  await driveShell(page, snap, 'briscola');
+
+  // ---- the first trick by hand ----
+  await click(page, '#curtainBtn');
+  await snap('local: dealt, my hand');
+  await click(page, '#hand .slot .card');
+  await snap('local: a card lifted');
+  await click(page, '#playBtn');
+  await visible(page, '#curtainOverlay');
+  await snap('local: a card played, curtain for the other seat');
+  await click(page, '#curtainBtn');
+  await snap('local: the second seat to play');
+  await playFirstCard(page);
+  await visible(page, '#curtainOverlay');
+  await snap('local: trick taken, curtain for the winner');
+  await reveal();
+  await snap('local: after the first trick');
+
+  // ---- the sheets over the table ----
+  await click(page, '#menuBtn');
+  await snap('table: menu sheet');
+  await click(page, '#menuHistoryBtn');
+  await snap('table: history sheet');
+  await page.keyboard.press('Escape');
+  await click(page, '#menuBtn');
+  await click(page, '#menuRulesBtn');
+  await snap('table: rules sheet');
+  await page.keyboard.press('Escape');
+  const peek = (await page.locator('#lastTrickBtn').isVisible())
+    ? '#lastTrickBtn'
+    : '#lastTrickSheetBtn';
+  await click(page, peek);
+  await snap('table: last trick sheet');
+  await page.keyboard.press('Escape');
+
+  // ---- the game over: the result sheet, the table behind it, the next game, the match end ----
+  await fastForwardBr(page, "v.phase === 'over'");
+  await visible(page, '#resultOverlay');
+  await snap('game over: result sheet');
+  await click(page, '#rsPeekBtn');
+  await snap('game over: table behind the sheet');
+  await click(page, '#resultChipBtn');
+  await click(page, '#rsNextBtn');
+  await visible(page, '#curtainOverlay');
+  await snap('game 2: curtain up, the badge counts');
+  await fastForwardBr(page, 'false', true);
+  await visible(page, '#endgameScreen');
+  await snap('match over: endgame screen');
+  await click(page, '#leaveBtn');
+  await visible(page, '#homeScreen');
+
+  // ---- three and four seats: the seats row, the fan and the score strip in their other shapes ----
+  await page.locator('#localPlayersSel').selectOption('3');
+  await fill(page, '#p3NameInput', 'Cara');
+  await click(page, '#localBtn');
+  await visible(page, '#curtainOverlay');
+  await snap('local 3p: curtain up');
+  await reveal();
+  await snap('local 3p: dealt');
+  await leaveTable();
+  await page.locator('#localPlayersSel').selectOption('4');
+  await fill(page, '#p4NameInput', 'Dan');
+  await click(page, '#localBtn');
+  await visible(page, '#curtainOverlay');
+  await reveal();
+  await snap('local 4p: dealt, the team score');
+  await leaveTable();
+  await snap('home: after the games');
+};
+
 const DRIVERS: Readonly<Record<Game, (page: Page, shot: Shot) => Promise<void>>> = {
   'gin-rummy': driveGin,
   fidice: driveFidice,
   backgammon: driveBackgammon,
+  briscola: driveBriscola,
 };
 
 // ---- the harness -------------------------------------------------------------------------------------
@@ -1603,15 +1866,23 @@ export const diffGoldens = (expected: Golden, actual: Golden): GoldenDiff => {
 
 if (isMain(import.meta.url)) {
   const check = process.argv.includes('--check');
+  // `--game <g>`: that game's two goldens alone (a new game's first recording); every game otherwise.
+  const onlyArg = process.argv[process.argv.indexOf('--game') + 1];
+  const only = process.argv.includes('--game') ? GAMES.find((game) => game === onlyArg) : undefined;
+  if (process.argv.includes('--game') && only === undefined) {
+    console.error(`--game names no game: one of ${GAMES.join(', ')}`);
+    process.exit(1);
+  }
+  const games = only === undefined ? GAMES : [only];
   const dist = resolve(REPO_ROOT, 'dist');
-  if (!GAMES.every((game) => existsSync(resolve(dist, 'games', game, 'index.html')))) {
+  if (!games.every((game) => existsSync(resolve(dist, 'games', game, 'index.html')))) {
     console.error('dist/ lacks a game page: run `npm run build` first');
     process.exit(1);
   }
   const harness = await startHarness(dist);
   const browser = await chromium.launch({ args: ['--no-first-run'] });
   try {
-    const runs = GAMES.flatMap((game) => VIEWPORTS.map((viewport) => ({ game, viewport })));
+    const runs = games.flatMap((game) => VIEWPORTS.map((viewport) => ({ game, viewport })));
     const results = await runs.reduce<Promise<ReadonlyArray<boolean>>>(
       async (previous, { game, viewport }) => {
         const done = await previous;
