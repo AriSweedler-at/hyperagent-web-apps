@@ -19,6 +19,7 @@ import {
   nameOf,
   withPosition,
   type Card,
+  type Seat,
   type State,
   type View,
 } from '../engine/index.ts';
@@ -282,8 +283,12 @@ describe('the two-player table', () => {
     expect(statusText(app, v)).toBe('Your turn — play a card');
     expect(p.get('playBtn').disabled()).toBe(true);
     expect(p.get('waitNote').hidden()).toBe(true);
-    expect(p.get('lastTrickSheetBtn').disabled()).toBe(true);
-    expect(p.get('lastTrickBtn').disabled()).toBe(true);
+    // No trick taken: every strip is empty, its count 0.
+    expect(p.get('myTricks').attr('data-count')).toBe('0');
+    expect(p.get('myTricks').text()).toBe('');
+    expect(p.get('seatR2').text()).toContain(
+      '<span class="seat-taken" data-count="0" style="--n:0"></span>',
+    );
     expect(p.get('resultOverlay').hidden()).toBe(true);
     expect(p.get('tableScreen').attr('data-beat')).toBeNull();
   });
@@ -405,12 +410,34 @@ describe('the two-player table', () => {
     expect(p.get('tableScreen').attr('data-beat')).toBe(`${String(start)}:1:1:hold`);
     expect(p.get('hand').hasClass('inert')).toBe(true);
     expect(p.get('seatR2').hasClass('to-move')).toBe(false);
-    // Fly: the same picture, the beat marked; the seats still hold two cards.
+    // Held: no chip anywhere yet (the strips read as before the trick). A seat's strip is
+    // `#myTricks` while the phone is in its hands, else the one cell across (`meNow` says whose).
+    const chipsOf = (text: string): number => (text.match(/class="card back chip"/g) ?? []).length;
+    const stripOf = (whose: Seat, meNow: Seat): string =>
+      whose === meNow ? p.get('myTricks').text() : p.get('seatR2').text();
+    const loser = ((trick.winner + 1) % 2) as Seat;
+    const winnerStrip = (meNow: Seat = me): string => stripOf(trick.winner, meNow);
+    const loserStrip = (meNow: Seat = me): string => stripOf(loser, meNow);
+    expect(chipsOf(winnerStrip())).toBe(0);
+    expect(chipsOf(loserStrip())).toBe(0);
+    // Fly: the same picture, the beat marked; the seats still hold two cards; the winner's strip
+    // lays the one chip the cards fly to (its count 1, the loser's still 0).
     const fly = elapsed(two);
     paint(p.doc, fly);
     expect(fly.table.settle?.stage).toBe('fly');
     expect(p.get('tableScreen').attr('data-beat')).toBe(`${String(start)}:1:1:fly`);
     expect(p.get('statusText').text()).toBe(takesText(v.players, me, trick));
+    expect(chipsOf(winnerStrip())).toBe(1);
+    expect(chipsOf(loserStrip())).toBe(0);
+    if (trick.winner === me) {
+      expect(p.get('myTricks').attr('data-count')).toBe('1');
+      expect(p.get('myTricks').style('--n')).toBe('1');
+      expect(p.get('myTricks').attr('data-key')).toBe('1|linea');
+    } else {
+      expect(p.get('seatR2').text()).toContain(
+        '<span class="seat-taken" data-count="1" style="--n:1">',
+      );
+    }
     expect(
       (
         p
@@ -438,6 +465,9 @@ describe('the two-player table', () => {
     expect(p.get('scoreStrip').attr('data-key')).toContain(
       winnerSide === me ? `${String(trick.points)}:1,0:0` : `0:0,${String(trick.points)}:1`,
     );
+    // The chip stays: the trick scored, the strip shows it (the same key as the flight laid).
+    expect(chipsOf(winnerStrip())).toBe(1);
+    expect(chipsOf(loserStrip())).toBe(0);
     // Cold: the stock thinned, the trick cleared for the winner's lead, the beat forgotten.
     const cold = elapsed(draw);
     expect(cold.table.settle).toBeNull();
@@ -446,14 +476,11 @@ describe('the two-player table', () => {
     expect(p.get('stockCount').text()).toBe('Stock · 32');
     expect(p.get('trick').text()).toBe('');
     expect(p.get('tableScreen').attr('data-beat')).toBeNull();
-    expect(p.get('lastTrickSheetBtn').disabled()).toBe(false);
-    // The last-trick sheet shows it with the winner's card taking.
-    const peek = run(cold, { type: 'lastTrick/open' }).app;
-    paint(p.doc, peek);
-    expect(p.get('lastTrickOverlay').hidden()).toBe(false);
-    expect(p.get('ltTitle').text()).toBe('Trick 1');
-    expect(p.get('ltCards').text()).toContain(' taking"');
-    expect(p.get('ltSub').text()).toMatch(/ took it · \d+ points$/);
+    // The phone has passed to the winner (or stayed): its strip keeps the chip wherever it paints.
+    const meCold = view(cold).me.idx;
+    expect(meCold).toBe(trick.winner);
+    expect(chipsOf(winnerStrip(meCold))).toBe(1);
+    expect(chipsOf(loserStrip(meCold))).toBe(0);
   });
 
   test('four players: three cells with their seats, the strip per team, the handoff not offered', () => {
@@ -664,7 +691,6 @@ describe('bindAll', () => {
     expect(handIntentOf({ target: fakeTarget({}) } as unknown as Event)).toBeNull();
     // Disabled controls dispatch nothing; enabled ones their constant.
     p.get('playBtn').fire('click');
-    p.get('lastTrickSheetBtn').fire('click');
     expect(r.intents).toHaveLength(4);
     p.get('rsNextBtn').fire('click');
     p.get('nextGameBtn').fire('click');
@@ -685,14 +711,12 @@ describe('bindAll', () => {
       { type: 'result/open' },
     ]);
     // The sheets: a close button and a backdrop tap dispatch the sheet's intent; a tap inside does not.
-    p.get('closeLastTrickBtn').fire('click');
     p.get('rsPeekBtn').fire('click');
     p.get('resultOverlay').fire('click', { target: fakeTarget({ id: 'resultOverlay' }) });
     p.get('resultOverlay').fire('click', { target: fakeTarget({ id: 'rsTitle' }) });
     p.get('closeHistoryBtn').fire('click');
     p.get('closeRulesBtn').fire('click');
     expect(r.intents.slice(12)).toEqual([
-      { type: 'lastTrick/close' },
       { type: 'result/peek' },
       { type: 'result/peek' },
       { type: 'history/close' },

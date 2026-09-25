@@ -68,8 +68,8 @@
   --suit-B: #2f7d32;
   --serif-display: 'Bodoni Moda', 'GFS Didot', 'Didot', 'Bodoni MT', Georgia, serif;
   --serif-text: 'Lora', 'Cardo', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
-  /* Off the table (the last-trick sheet, the history rows) cards draw at these; #tableScreen sets
-     its own from the viewport. --back and --back-colour are the pack's, written by the pack painter
+  /* Off the table (the history rows) cards draw at these; #tableScreen sets its own from the
+     viewport. --back and --back-colour are the pack's, written by the pack painter
      (web/shared/ui/cardFace.ts backImageCss); until then a back is a plain baize-edge field. */
   --aspect: 0.518;
   --card-w: 72px;
@@ -442,12 +442,12 @@ label {
 .conn-dot.off {
   background: var(--danger);
 }
-:is(.btn, .icon-btn, .tab-btn, .mode-btn, .pile-peek, .card, .slot, summary):focus-visible {
+:is(.btn, .icon-btn, .tab-btn, .mode-btn, .card, .slot, summary):focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 /* On the baize the accent is 1.3:1, so the ring there is cream. */
-:is(.table-center, .hand-area) :is(.card, .slot, .btn, .pile-peek):focus-visible {
+:is(.table-center, .hand-area) :is(.card, .slot, .btn):focus-visible {
   outline-color: var(--cream);
 }
 
@@ -585,15 +585,6 @@ label {
   color: var(--muted);
   flex-shrink: 0;
 }
-/* The last trick's cards (design §5.1): the fan's rules at the sheet's card size. */
-.trick-cards {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 8px;
-  min-height: calc(var(--mid-w) / var(--aspect) + 30px);
-  margin: 10px 0 4px;
-}
 /* The history (docs/design/briscola-sound-history.md §6; the rows are shell.css's, painted by the
    shared web/shared/ui/history.ts over src/ui/history.ts's copy): the list scrolls inside the
    sheet; a deal or a game's opening reads as an aside, a result as the line that matters, a
@@ -669,6 +660,9 @@ details.history-row > .history-detail dt {
   );
   --mid-w: calc(var(--card-w) * 0.62);
   --tiny-w: 26px;
+  /* A taken trick's chip (layout.ts CHIP_H): the hand header's row tall, the pack's aspect wide. */
+  --chip-h: 24px;
+  --chip-w: calc(var(--chip-h) * var(--aspect));
   --fan-overlap: 0;
   --fly-ms: 320ms;
   display: grid;
@@ -822,18 +816,25 @@ details.history-row > .history-detail dt {
 .seat-cards .card + .card {
   margin-left: -10px;
 }
-/* The tricks taken ("2 tricks", table.ts tricksText) beside the backs; nothing to say at 0. */
+/* The tricks taken (design briscola-battle.md §7 G; the owner: "the tricks should stack up and
+   make a row and get larger as you take more"): a row of face-down chips beside the backs, one per
+   trick (table.ts chipsHtml), the newest on top, each stepping 6px right of the one before until
+   the strip is as wide as its cell allows (--strip-w), when the step shrinks so twenty still fit
+   (layout.ts chipStep; `--n` is the count, written inline). The first chip's room is kept at 0 so
+   nothing shifts when it lands. `#myTricks` in the hand header is the same strip, wider. */
 .seat-taken {
+  --n: 1;
+  --strip-w: 48px;
+  --chip-step: min(6px, (var(--strip-w) - var(--chip-w)) / max(var(--n) - 1, 1));
   grid-area: taken;
   align-self: end;
-  color: var(--muted);
-  font-size: 0.75rem;
-  line-height: 16px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: flex-end;
+  min-width: var(--chip-w);
+  min-height: var(--chip-h);
 }
-.seat-taken[data-count='0'] {
-  visibility: hidden;
+.seat-taken .chip + .chip {
+  margin-left: calc(var(--chip-step) - var(--chip-w));
 }
 
 /* ---------- the centre band: the stock with the briscola under it, the trick fan ---------- */
@@ -944,17 +945,16 @@ details.history-row > .history-detail dt {
   border-radius: var(--radius);
   position: relative;
 }
-.trick,
-.trick-cards {
+.trick {
   --n: 1;
 }
-:is(.trick, .trick-cards):has(> .play:nth-child(2):last-child) {
+.trick:has(> .play:nth-child(2):last-child) {
   --n: 2;
 }
-:is(.trick, .trick-cards):has(> .play:nth-child(3):last-child) {
+.trick:has(> .play:nth-child(3):last-child) {
   --n: 3;
 }
-:is(.trick, .trick-cards):has(> .play:nth-child(4):last-child) {
+.trick:has(> .play:nth-child(4):last-child) {
   --n: 4;
 }
 .trick:empty::before {
@@ -977,9 +977,6 @@ details.history-row > .history-detail dt {
 }
 .play + .play {
   margin-left: calc(var(--mid-w) * var(--fan-overlap) * -1);
-}
-.trick-cards .play + .play {
-  margin-left: 0;
 }
 .play .who {
   position: absolute;
@@ -1004,10 +1001,6 @@ details.history-row > .history-detail dt {
   left: calc(var(--mid-w) * (1 - var(--fan-overlap)) / 2);
   max-width: min(9ch, calc(var(--mid-w) * (1 - var(--fan-overlap)) - 2px));
 }
-.trick-cards .who {
-  background: var(--card-2);
-  color: var(--text);
-}
 /* The hold beat: the winning card lifts with a cream outline, the others dim. */
 .play .card.taking {
   transform: translateY(-6px) rotate(calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * 4deg));
@@ -1015,7 +1008,7 @@ details.history-row > .history-detail dt {
     0 0 0 3px var(--cream),
     0 8px 16px rgba(0, 0, 0, 0.35);
 }
-:is(.trick, .trick-cards):has(.taking) .card:not(.taking) {
+.trick:has(.taking) .card:not(.taking) {
   opacity: 0.8;
 }
 /* A hand card in the air over the band (design §5.4): a dashed cream outline, brighter when it may drop. */
@@ -1026,23 +1019,6 @@ details.history-row > .history-detail dt {
 .trick.drop {
   outline-color: var(--cream);
   outline-style: solid;
-}
-/* The desktop's round peek at the band's right (the phone has #lastTrickSheetBtn in the actions). */
-.pile-peek {
-  align-self: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(247, 241, 230, 0.16);
-  color: var(--cream);
-  font-size: 1.1rem;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.pile-peek:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
 }
 
 /* ---------- the score strip (design D9, §5.3): live and public, a cell per player or per team ---------- */
@@ -1133,20 +1109,31 @@ details.history-row > .history-detail dt {
     inset 0 0 24px rgba(0, 0, 0, 0.18);
   color: var(--cream);
 }
+/* My name, my strip of chips growing rightward beside it, my points at the far right. */
 .hand-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 10px;
   height: 24px;
   font-size: 0.9rem;
   font-weight: 700;
   padding: 0 8px;
   flex-shrink: 0;
 }
+.hand-header #myName {
+  flex-shrink: 0;
+}
+.my-tricks {
+  --strip-w: 132px;
+  align-self: center;
+  min-width: 0;
+}
 .my-taken {
+  margin-left: auto;
   color: var(--cream-dim);
   font-weight: 400;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 /* Exactly three slots (design §5.4): a played card's slot stays where it was and the other two never
    move; the slack of a tall phone gathers around the cards. */
@@ -1289,6 +1276,10 @@ details.history-row > .history-detail dt {
 .card.tiny {
   --card-w: var(--tiny-w);
 }
+/* A taken trick: a back --chip-h tall (the width follows the pack's aspect through .card's rule). */
+.card.chip {
+  --card-w: var(--chip-w);
+}
 .card.playable {
   cursor: pointer;
 }
@@ -1377,6 +1368,12 @@ details.history-row > .history-detail dt {
   }
   .seat-name {
     max-width: 18ch;
+  }
+  .seat-taken {
+    --strip-w: 96px;
+  }
+  .my-tricks {
+    --strip-w: 240px;
   }
   .table-center {
     padding: 0 16px;

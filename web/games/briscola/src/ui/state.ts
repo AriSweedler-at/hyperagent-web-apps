@@ -240,8 +240,6 @@ export type Table = Readonly<{
   selected: string | null;
   settle: Settle | null;
   drag: Drag | null;
-  /** `#lastTrickOverlay` shown. */
-  lastTrickOpen: boolean;
   /** `#resultOverlay` put away with "Look at the table" (`resultOpen` derives the sheet from this and the view). */
   resultDismissed: boolean;
   /** `#historyOverlay` shown. */
@@ -272,7 +270,6 @@ export const initialTable: Table = {
   selected: null,
   settle: null,
   drag: null,
-  lastTrickOpen: false,
   resultDismissed: false,
   historyOpen: false,
   curtain: null,
@@ -321,9 +318,6 @@ export type TableIntent =
   /** `#rsPeekBtn` "Look at the table" / `#resultChipBtn` "Result". */
   | Readonly<{ type: 'result/peek' }>
   | Readonly<{ type: 'result/open' }>
-  /** Both peek controls (`#lastTrickBtn`, `#lastTrickSheetBtn`) and the sheet's close. */
-  | Readonly<{ type: 'lastTrick/open' }>
-  | Readonly<{ type: 'lastTrick/close' }>
   | Readonly<{ type: 'history/open' }>
   | Readonly<{ type: 'history/close' }>
   | Readonly<{ type: 'rules/open' }>
@@ -729,12 +723,11 @@ const tableCleared = (table: Table): Table => ({
   extraNames: table.extraNames,
 });
 
-/** Escape (§5.5): what is up goes, one thing per press: a drag, a lift, the last-trick sheet, the history, the rules. */
+/** Escape (§5.5): what is up goes, one thing per press: a drag, a lift, the history, the rules. */
 const escape = (app: App): Step => {
   const t = app.table;
   if (t.drag !== null) return pure(withTable(app, { drag: null, selected: null }));
   if (t.selected !== null) return pure(withTable(app, { selected: null }));
-  if (t.lastTrickOpen) return pure(withTable(app, { lastTrickOpen: false }));
   if (t.historyOpen) return pure(withTable(app, { historyOpen: false }));
   if (app.shell.rulesOpen) return pure(withShell(app, { rulesOpen: false }));
   return pure(app);
@@ -807,12 +800,6 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
       return pure(withTable(app, { resultDismissed: true }));
     case 'result/open':
       return pure(withTable(app, { resultDismissed: false }));
-    case 'lastTrick/open':
-      return app.shell.view?.lastTrick == null
-        ? pure(app)
-        : pure(withTable(app, { lastTrickOpen: true }));
-    case 'lastTrick/close':
-      return pure(withTable(app, { lastTrickOpen: false }));
     case 'history/open':
       return pure(withTable(app, { historyOpen: true }));
     case 'history/close':

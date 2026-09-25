@@ -11,9 +11,10 @@
 // rebuilds the hand and a play changes exactly two keys; `selected`, `playable`, `taking`,
 // `arriving`, `to-move`, `gone`, `empty`, `tappable`, `inert`, `active` and `hidden-cards` toggle
 // outside the key on every paint. The settle beat (§5.4, ui/state.ts `settle`) is paint-driven:
-// while a trick is held or in flight the seats, the score strip and my taken count read as before
-// the trick was scored, and the stock and the briscola as before the draw through every stage, so
-// the counters visibly tick after the cards land; the flights themselves (ui/motion.ts) leave once
+// while a trick is held or in flight the seats, the score strip, my taken count and the strips of
+// chips read as before the trick was scored (the chip the cards fly to is laid hidden for the
+// flight), and the stock and the briscola as before the draw through every stage, so the counters
+// visibly tick after the cards land; the flights themselves (ui/motion.ts) leave once
 // per stage, which `#tableScreen[data-beat]` remembers. `bindAll` turns the table's and the
 // overlays' controls into intents (one delegated click on `#hand`; Enter/Space on a focused slot is
 // the same tap, §5.5); the input wiring of the home screen and the curtain is beside their paints.
@@ -82,7 +83,7 @@ import {
 } from '../engine/index.ts';
 import { HISTORY_COPY } from './history.ts';
 import {
-  MY_TAKEN,
+  MY_TRICKS,
   drawFlights,
   durationsFor,
   flyCards,
@@ -98,12 +99,11 @@ import {
   briscolaHtml,
   cardLabelEn,
   cellOfSeat,
+  chipCount,
+  chipsHtml,
   gameBadgeText,
   handHtml,
   handKey,
-  lastTrickHtml,
-  lastTrickText,
-  lastTrickTitle,
   leadCue,
   matchLabel,
   scoreCells,
@@ -118,6 +118,7 @@ import {
   stockHtml,
   stockKey,
   stockLabel,
+  stripKey,
   trickHtml,
   trickKey,
   trumpBadge,
@@ -215,10 +216,11 @@ export const paintPack = (doc: PageLike, packName: CardPack['name']): void => {
 
 /**
  * What the settle beat changes in the picture this paint shows: the trick's cards stay on the table
- * with their taker marked while held (`hold`) and in flight (`fly`), the taken counts, the scores and
- * the other hands read as BEFORE the trick was scored through those two stages (`before`), and the
- * stock and the briscola read as before the draw through every stage (`undrawn`), so the counters
- * tick and the stock thins as the cards land, not before.
+ * with their taker marked while held (`hold`) and in flight (`fly`), the taken counts, the chips,
+ * the scores and the other hands read as BEFORE the trick was scored through those two stages
+ * (`before`), and the stock and the briscola read as before the draw through every stage
+ * (`undrawn`), so the counters tick and the stock thins as the cards land, not before. Through
+ * `fly` the winner's strip carries one more chip, hidden, for the cards to land on (`arriving`).
  */
 type Beat = Readonly<{
   stage: SettleStage | null;
@@ -237,6 +239,9 @@ const beatOf = (settle: Settle | null): Beat =>
 /** A seat's tricks, less the one just taken while it is held or in flight. */
 const tricksShown = (v: View, b: Beat, seat: Seat): number =>
   (v.tricks[seat] ?? 0) - (b.before && b.trick?.winner === seat ? 1 : 0);
+/** The trick is flying to this seat: its strip lays the chip the cards land on. */
+const chipArriving = (b: Beat, seat: Seat): boolean =>
+  b.stage === 'fly' && b.trick?.winner === seat;
 /** A seat's points, less the trick's while it is held or in flight. */
 const takenShown = (v: View, b: Beat, seat: Seat): number =>
   (v.taken[seat] ?? 0) - (b.before && b.trick?.winner === seat ? b.trick.points : 0);
@@ -303,7 +308,7 @@ const cellFor = (n: SeatCount, me: Seat, seat: Seat): RelativeCell =>
 
 /**
  * The three relative cells: `#seats[data-players]`, each cell's `hidden` and `data-seat`, its inside
- * keyed on what it shows (the name, the cards held or their count, the tricks, the dot, the pack),
+ * keyed on what it shows (the name, the cards held or their count, the chips, the dot, the pack),
  * `to-move` on the actor's cell between beats and `gone` on a disconnected online seat. At two
  * players the one cell across carries `#oppDot` (tools/games.ts `SHELL.briscola.connDot`) and
  * `#oppName` (the two-seat shell's name for the other seat, which the shell specs read).
@@ -326,6 +331,7 @@ export const paintSeats = (doc: DocumentLike, app: App, v: View, b: Beat, pack: 
       handCount: handCountShown(b, seat, other?.handCount ?? 0),
       hand: other?.hand ?? null,
       tricks: tricksShown(v, b, seat),
+      arriving: chipArriving(b, seat),
       connected: online ? app.shell.oppConnected : null,
       ...(n === 2 && cell === 'R2' ? { dotId: 'oppDot', nameId: 'oppName' } : {}),
     };
@@ -485,7 +491,8 @@ const paintSlot = (
 /**
  * `#hand`: three slots keyed on the kept picture (`table.slots`), the pack and whether the cards are
  * down (`hidden-cards`, under the curtain); `active` while I may play, `inert` otherwise; each held
- * slot's marks refreshed outside the key. `#myName` and `#myTaken` beside it.
+ * slot's marks refreshed outside the key. `#myName`, my strip of chips (`#myTricks`: one per trick
+ * taken, `data-count` and `--n`, the arriving one laid through the flight) and `#myTaken` above it.
  */
 export const paintHand = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPack): void => {
   const hand = requireId(doc, 'hand');
@@ -506,14 +513,21 @@ export const paintHand = (doc: DocumentLike, app: App, v: View, b: Beat, pack: C
     paintSlot(slot, { selected, playable, dragging, drawn, faceDown });
   });
   setText(requireId(doc, 'myName'), v.me.name);
-  setText(requireId(doc, 'myTaken'), `You: ${String(takenShown(v, b, v.me.idx))}`);
+  const me = v.me.idx;
+  const strip = { tricks: tricksShown(v, b, me), arriving: chipArriving(b, me) };
+  const tricks = requireId(doc, 'myTricks');
+  const chips = chipCount(strip);
+  setAttr(tricks, 'data-count', String(chips));
+  setStyle(tricks, '--n', String(chips));
+  ensureKeyed(tricks, stripKey(strip, pack.name), () => chipsHtml(strip.tricks, strip.arriving));
+  setText(requireId(doc, 'myTaken'), `You: ${String(takenShown(v, b, me))}`);
 };
 
 /** `#waitNote`: whose card the table waits for. */
 export const waitNoteText = (v: View): string =>
   `Waiting for ${nameOf(v.players, v.actor ?? v.turn)}…`;
 
-/** `#playBtn` live for a lifted legal card; `#waitNote` on another seat's turn; the result chip once the sheet is put away; the two peeks while there is a last trick. */
+/** `#playBtn` live for a lifted legal card; `#waitNote` on another seat's turn; the result chip once the sheet is put away. */
 const paintActions = (doc: DocumentLike, app: App, v: View, b: Beat): void => {
   const live = liveView(app) !== null;
   const selected = app.table.selected;
@@ -531,9 +545,6 @@ const paintActions = (doc: DocumentLike, app: App, v: View, b: Beat): void => {
     'hidden',
     !(v.phase === 'over' && app.table.resultDismissed && b.stage === null),
   );
-  const noLast = v.lastTrick === null;
-  setDisabled(requireId(doc, 'lastTrickSheetBtn'), noLast);
-  setDisabled(requireId(doc, 'lastTrickBtn'), noLast);
 };
 
 // ---- the result sheet, the endgame (§5.1) ----------------------------------------------------------------
@@ -658,9 +669,9 @@ const paintEndgame = (doc: DocumentLike, app: App, v: View): void => {
   setDisabled(next, nextWaits(app));
 };
 
-// ---- the sheets: rules, history, the last trick ------------------------------------------------------------
+// ---- the sheets: rules, history ------------------------------------------------------------------------------
 
-const paintOverlays = (doc: DocumentLike, app: App, pack: CardPack): void => {
+const paintOverlays = (doc: DocumentLike, app: App): void => {
   const v = app.shell.view;
   paintSheet(doc, 'rulesOverlay', app.shell.rulesOpen);
   paintSheet(doc, 'historyOverlay', app.table.historyOpen);
@@ -679,17 +690,6 @@ const paintOverlays = (doc: DocumentLike, app: App, pack: CardPack): void => {
     // The finished matches under this match's events (web/shared/ui/recentGames.ts).
     paintRecentGames(doc, app.shell.recentGames);
   }
-  const last = v?.lastTrick ?? null;
-  const open = app.table.lastTrickOpen && v !== null && last !== null;
-  paintSheet(doc, 'lastTrickOverlay', open);
-  if (!open) return;
-  setText(requireId(doc, 'ltTitle'), lastTrickTitle(last));
-  ensureKeyed(
-    requireId(doc, 'ltCards'),
-    `${trickKey(last.cards)}|${String(last.winner)}|${pack.name}`,
-    () => lastTrickHtml(last, { players: v.players, me: v.me.idx, pack }),
-  );
-  setText(requireId(doc, 'ltSub'), lastTrickText(v.players, v.me.idx, last));
 };
 
 // ---- the whole table, the beat's flights and the whole paint ------------------------------------------------
@@ -706,7 +706,7 @@ const paintTable = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPac
   paintActions(doc, app, v, b);
 };
 
-/** Where a seat's won trick lands and where its drawn card lands: my header count and my hand, or the seat's cell. */
+/** Where a seat's won trick lands and where its drawn card lands: the newest chip of my strip and my hand, or the seat's cell. */
 const landings = (
   v: View,
   drawn: string | null,
@@ -714,7 +714,7 @@ const landings = (
   const n = v.options.seatCount;
   const me = v.me.idx;
   return {
-    taken: (seat) => (seat === me ? MY_TAKEN : seatTaken(cellFor(n, me, seat))),
+    taken: (seat) => (seat === me ? MY_TRICKS : seatTaken(cellFor(n, me, seat))),
     card: (seat) => (seat === me ? handCard(drawn ?? '') : seatCards(cellFor(n, me, seat))),
   };
 };
@@ -776,7 +776,7 @@ export const paint = (doc: PageLike, app: App): void => {
   paintCurtain(doc, app);
   paintHandoff(doc, app);
   paintGame(doc, app, pack);
-  paintOverlays(doc, app, pack);
+  paintOverlays(doc, app);
 };
 
 // ---- input wiring (§5.4, §5.5) ------------------------------------------------------------------------------
@@ -787,7 +787,6 @@ export const paint = (doc: PageLike, app: App): void => {
 const SHEETS: ReadonlyArray<Sheet<Intent>> = [
   { overlay: 'rulesOverlay', close: 'closeRulesBtn', intent: { type: 'rules/close' } },
   { overlay: 'historyOverlay', close: 'closeHistoryBtn', intent: { type: 'history/close' } },
-  { overlay: 'lastTrickOverlay', close: 'closeLastTrickBtn', intent: { type: 'lastTrick/close' } },
   { overlay: 'resultOverlay', close: 'rsPeekBtn', intent: { type: 'result/peek' } },
 ];
 
@@ -861,14 +860,12 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
     dispatch({ type: 'exchange/click' });
   });
   // The controls whose click is one constant; `skipDisabled`: a click on a control carrying
-  // `disabled` dispatches nothing (the paint disables the play button, the peeks and Next).
+  // `disabled` dispatches nothing (the paint disables the play button and Next).
   bindButtons(
     doc,
     dispatch,
     [
       ['playBtn', { type: 'play/click' }],
-      ['lastTrickBtn', { type: 'lastTrick/open' }],
-      ['lastTrickSheetBtn', { type: 'lastTrick/open' }],
       ['resultChipBtn', { type: 'result/open' }],
       ['rsNextBtn', { type: 'next/click' }],
       ['nextGameBtn', { type: 'next/click' }],

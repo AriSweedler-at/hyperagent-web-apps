@@ -6,13 +6,17 @@ import {
   BRISCOLA_SHIFT,
   CELLS,
   CELL_POS,
+  CHIP_H,
+  CHIP_STEP,
   DEFAULT_ASPECT,
   DESKTOP_GEOMETRY,
   DESKTOP_TEMPLATE,
   FAN_OVERLAP,
+  MAX_TRICKS,
   PHONE_GEOMETRY,
   PHONE_TEMPLATE,
   ROW_HEIGHTS,
+  STRIP_WIDTHS,
   areaOrder,
   bandHeight,
   briscolaBox,
@@ -20,6 +24,8 @@ import {
   cardWidth,
   cellId,
   cellOf,
+  chipStep,
+  chipWidth,
   columnHeight,
   coveredFraction,
   fanAngle,
@@ -32,6 +38,7 @@ import {
   sameAspect,
   seatCells,
   stockAreaWidth,
+  stripWidth,
   templateFor,
   tinyWidth,
 } from './layout.ts';
@@ -193,5 +200,52 @@ describe('the grid', () => {
     expect(templateFor('phone')).toBe(PHONE_TEMPLATE);
     expect(areaOrder('phone')).toEqual(AREAS);
     expect(areaOrder('desktop')).toEqual(AREAS);
+  });
+});
+
+describe('the taken strips (theme.css .seat-taken, .card.chip)', () => {
+  test('a chip is the hand header row tall and the pack aspect wide; the design figures', () => {
+    expect(CHIP_H).toBe(ROW_HEIGHTS.handHeader);
+    expect(chipWidth()).toBeCloseTo(24 * 0.518, 6);
+    expect(chipWidth(0.62)).toBeCloseTo(14.88, 6);
+    expect(CHIP_STEP).toBe(6);
+    expect(STRIP_WIDTHS).toEqual({
+      phone: { seat: 48, mine: 132 },
+      desktop: { seat: 96, mine: 240 },
+    });
+    expect(MAX_TRICKS).toEqual({ 2: 20, 3: 13, 4: 10 });
+  });
+
+  test('the row: nothing at 0, one chip at 1, a step more per chip, the step shrinking so the strip never overflows', () => {
+    const seat = STRIP_WIDTHS.phone.seat;
+    expect(stripWidth(0, seat)).toBe(0);
+    expect(stripWidth(1, seat)).toBeCloseTo(chipWidth(), 6);
+    expect(stripWidth(2, seat)).toBeCloseTo(chipWidth() + 6, 6);
+    // Seven chips just fill a phone's seat strip at the full step (12.43 + 6 x 5.93 = 48).
+    expect(chipStep(7, seat)).toBeCloseTo((48 - chipWidth()) / 6, 6);
+    expect(stripWidth(7, seat)).toBeCloseTo(48, 6);
+    // Twenty press together at under 2px a step and still fit.
+    expect(chipStep(20, seat)).toBeCloseTo((48 - chipWidth()) / 19, 6);
+    expect(stripWidth(20, seat)).toBeCloseTo(48, 6);
+    // My header strip grows a full step for every trick of a two-player game.
+    expect(chipStep(20, STRIP_WIDTHS.phone.mine)).toBe(6);
+    expect(stripWidth(20, STRIP_WIDTHS.phone.mine)).toBeCloseTo(chipWidth() + 19 * 6, 6);
+  });
+
+  test('the row never shrinks as tricks are taken and fits its strip at every count a seat can reach, on both layouts', () => {
+    (['phone', 'desktop'] as const).forEach((layout) => {
+      const widths = STRIP_WIDTHS[layout];
+      ([2, 3, 4] as const).forEach((n) => {
+        [widths.seat, widths.mine].forEach((stripW) => {
+          const rows = Array.from({ length: MAX_TRICKS[n] + 1 }, (_, k) => stripWidth(k, stripW));
+          rows.forEach((w, k) => {
+            expect(w, `${layout} ${String(stripW)} at ${String(k)}`).toBeLessThanOrEqual(
+              stripW + 1e-9,
+            );
+            if (k > 0) expect(w).toBeGreaterThanOrEqual((rows[k - 1] ?? 0) - 1e-9);
+          });
+        });
+      });
+    });
   });
 });

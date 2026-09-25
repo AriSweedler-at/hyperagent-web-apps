@@ -39,14 +39,13 @@ import {
   briscolaStartLocal,
   clearCues,
   closeHistory,
-  closeLastTrick,
   cuesOf,
+  expectChips,
   firstLegalPlays,
   heldCards,
   historyDetail,
   historyRows,
   openHistory,
-  openLastTrick,
   playCard,
   playTrick,
   playedCues,
@@ -236,7 +235,8 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         await expect(page.locator('#statusText')).toHaveText('Your turn — play a card');
         await expect(page.locator('#trick')).toHaveAttribute('data-lead', 'You lead');
         await expect(page.locator('#playBtn')).toBeDisabled();
-        await expect(page.locator('#lastTrickSheetBtn')).toBeDisabled();
+        // No trick taken yet: every strip of chips is empty.
+        await expectChips(page, v);
 
         // The leader plays: the fan shows the card with its chip; the phone passes to the next seat.
         const first = FIRST_LEGAL(v);
@@ -282,6 +282,10 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         const shown = await requireView(page);
         expect(shown.me.idx).toBe(trick.winner);
         await expect(page.locator('#myTaken')).toHaveText(`You: ${String(trick.points)}`);
+        // The trick stays on the table as one face-down chip in the winner's strip (mine, here),
+        // nothing in the others'.
+        await expectChips(page, shown);
+        await expect(page.locator('#myTricks .chip')).toHaveCount(1);
         await expect(page.locator('#statusText')).toHaveText('Your turn — play a card');
         await Promise.all(
           shown.others.map(async (o) => {
@@ -293,22 +297,6 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
             );
           }),
         );
-
-        // The last-trick peek: the fan as it was, the winner's card taking, the points.
-        const sheet = await openLastTrick(page);
-        expect(sheet.title).toBe('Trick 1');
-        expect(sheet.sub).toBe(`You took it · ${String(trick.points)} points`);
-        await expect(page.locator('#ltCards .play .card')).toHaveCount(n);
-        expect(
-          await page.evaluate<ReadonlyArray<string | null>>(
-            `Array.from(document.querySelectorAll('#ltCards .play .card')).map((c) => c.getAttribute('data-card'))`,
-          ),
-        ).toEqual(trick.cards.map((p) => p.card.id));
-        await expect(page.locator('#ltCards .card.taking')).toHaveAttribute(
-          'data-seat',
-          String(trick.winner),
-        );
-        await closeLastTrick(page);
       });
     });
 
@@ -394,19 +382,33 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       expect(after.phase).toBe('over');
       expect(after.result).toEqual({ winner: 0, totals: [96, 24], draw: false });
 
+      // The seated piles are seventeen tricks already, nine Ann's and eight Bob's, and the strips
+      // show every one of them: ten and more chips in a row, the step pressed under 6px in Bob's cell.
+      expect(v.tricks).toEqual([9, 8]);
+      await expectChips(page, v);
       const one = await playTrick(page);
       expect(one.lastTrick?.cards.map((p) => p.card.id)).toEqual(plays.slice(0, 2));
       await expectStrip(page, one);
+      // Ann (me, the winner of every trick here) stacks a chip per trick on her nine: ten, then
+      // eleven, then twelve; Bob's eight stay.
+      expect(one.tricks).toEqual([10, 8]);
+      await expectChips(page, one);
+      await expect(page.locator('#myTricks .chip')).toHaveCount(10);
       // "Last three tricks" is said once, with the hands full; two cards left is an ordinary turn.
       await expect(page.locator('#statusText')).toHaveText('Your turn — play a card');
       const two = await playTrick(page);
       expect(two.lastTrick?.winner).toBe(0);
       await expectStrip(page, two);
+      expect(two.tricks).toEqual([11, 8]);
+      await expectChips(page, two);
+      await expect(page.locator('#myTricks .chip')).toHaveCount(11);
       const over = await playTrick(page);
       expect(over.phase).toBe('over');
       expect(over.result).toEqual(after.result);
       expect(over.sides).toEqual([96, 24]);
       await expectStrip(page, over);
+      expect(over.tricks).toEqual([12, 8]);
+      await expectChips(page, over);
       // The result sheet, the badge, the status line all read the result.
       await expect(page.locator('#resultOverlay')).toBeVisible();
       await expect(page.locator('#rsTitle')).toHaveText('Ann wins the game');

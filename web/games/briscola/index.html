@@ -341,9 +341,6 @@
             <div class="pile-label" id="stockCount">Stock · 34</div>
           </div>
           <div class="trick" id="trick" data-players="2" data-lead="" aria-live="off"></div>
-          <button class="pile-peek desk-only" id="lastTrickBtn" aria-label="Last trick" disabled>
-            🔍
-          </button>
         </div>
 
         <div class="score-strip" id="scoreStrip" data-mode="players"></div>
@@ -354,6 +351,7 @@
         <div class="hand-area">
           <div class="hand-header">
             <span id="myName">You</span>
+            <span class="seat-taken my-tricks" id="myTricks" data-count="0"></span>
             <span class="my-taken" id="myTaken">You: 0</span>
           </div>
           <div class="hand" id="hand" data-slots="3">
@@ -365,9 +363,6 @@
             <button class="btn btn-primary grow" id="playBtn" disabled>Play</button>
             <div class="waiting-note hidden" id="waitNote">Waiting…</div>
             <button class="btn btn-secondary btn-sm hidden" id="resultChipBtn">Result</button>
-            <button class="btn btn-secondary btn-sm" id="lastTrickSheetBtn" disabled>
-              Last trick
-            </button>
           </div>
         </div>
       </div>
@@ -400,16 +395,6 @@
         <button class="btn btn-ghost btn-block btn-sm" id="curtainHandoffBtn">
           Continue online
         </button>
-      </div>
-    </div>
-
-    <!-- LAST TRICK (design §5.1): the previous trick as mid cards with their chips. -->
-    <div id="lastTrickOverlay" class="overlay hidden">
-      <div class="sheet centered">
-        <div class="sheet-title" id="ltTitle">Last trick</div>
-        <div class="trick-cards" id="ltCards"></div>
-        <div class="sheet-sub" id="ltSub"></div>
-        <button class="btn btn-primary btn-block" id="closeLastTrickBtn">Close</button>
       </div>
     </div>
 

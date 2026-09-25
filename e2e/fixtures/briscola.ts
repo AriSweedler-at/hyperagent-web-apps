@@ -1,7 +1,7 @@
 // Drives the briscola table through its DOM (docs/design/briscola.md §5.6 "Testability"): the
 // pass-and-play start for two, three or four seats over the shell's `startLocal`
 // (e2e/fixtures/shell.ts), the curtain's words, a card played by its id (the lift, then Play),
-// the wait for the settle beat, the history and last-trick sheets, and a position seated through
+// the wait for the settle beat, the history sheet, and a position seated through
 // `window.__briscola.setup`. The one thing read from the documented hook (`window.__briscola`,
 // docs/ARCHITECTURE.md) is the engine's `View` (`readView`) and its event stream (`readEvents`),
 // which the specs use as the oracle for what the DOM must show; positions are built here in node
@@ -28,12 +28,15 @@ import {
   type View,
 } from '../../web/games/briscola/src/engine/index.ts';
 import {
+  CHIP_H,
+  STRIP_WIDTHS,
   briscolaBox,
   cardWidth,
   coveredFraction,
   fits,
   layoutFor,
   sameAspect,
+  stripWidth,
 } from '../../web/games/briscola/src/ui/layout.ts';
 import { mulberry32 } from '../../web/shared/lib/rng.ts';
 import type { Box } from './boxes.ts';
@@ -262,24 +265,35 @@ export const historyDetail = (
   return dts.map((dt, i) => [dt.textContent.trim(), dds[i].textContent.trim()]); })()`,
   );
 
-/** Open the last-trick sheet by the hand's button (phone) or the fan's 🔍 (desktop); resolves with its words. */
-export const openLastTrick = async (
-  page: Page,
-): Promise<Readonly<{ title: string; sub: string }>> => {
-  const desk = page.locator('#lastTrickBtn');
-  const btn = (await desk.isVisible()) ? desk : page.locator('#lastTrickSheetBtn');
-  await expect(btn).toBeEnabled();
-  await btn.click();
-  await expect(page.locator('#lastTrickOverlay')).toBeVisible();
-  return {
-    title: await page.locator('#ltTitle').innerText(),
-    sub: await page.locator('#ltSub').innerText(),
-  };
-};
-
-export const closeLastTrick = async (page: Page): Promise<void> => {
-  await page.locator('#closeLastTrickBtn').click();
-  await expect(page.locator('#lastTrickOverlay')).toBeHidden();
+/**
+ * The taken strips show the view's tricks (docs/design/briscola-battle.md §7 G): my `#myTricks`
+ * and every other seat's `.seat-taken` carry one face-down `.chip` per trick that seat has taken
+ * and say so in `data-count`; nothing is still in flight.
+ */
+export const expectChips = async (page: Page, v: View): Promise<void> => {
+  const mine = v.tricks[v.me.idx] ?? 0;
+  await expect(page.locator('#myTricks')).toHaveAttribute('data-count', String(mine));
+  await expect(page.locator('#myTricks .chip')).toHaveCount(mine);
+  await Promise.all(
+    v.others.map(async (o) => {
+      const strip = page.locator(
+        `#seats .seat[data-seat="${String(o.idx)}"]:not([hidden]) .seat-taken`,
+      );
+      await expect(strip).toHaveAttribute('data-count', String(v.tricks[o.idx] ?? 0));
+      await expect(strip.locator('.chip')).toHaveCount(v.tricks[o.idx] ?? 0);
+    }),
+  );
+  await expect(page.locator('.chip.arriving')).toHaveCount(0);
+  // The row is as wide as the twin says for that many chips: one chip, then a step more per chip
+  // (the CSS's min()/max() over `--n` agrees with layout.ts chipStep).
+  const measured = await page.evaluate<Readonly<{ w: number; width: number; aspect: number }>>(
+    `(() => ({ w: document.getElementById('myTricks').getBoundingClientRect().width, width: window.innerWidth, aspect: Number(getComputedStyle(document.getElementById('tableScreen')).getPropertyValue('--aspect')) }))()`,
+  );
+  const predicted = stripWidth(mine, STRIP_WIDTHS[layoutFor(measured.width)].mine, measured.aspect);
+  expect(
+    Math.abs(measured.w - predicted),
+    `#myTricks is ${String(measured.w)} wide for ${String(mine)} chips, the twin says ${String(predicted)}`,
+  ).toBeLessThanOrEqual(1);
 };
 
 // ---- the sounds -------------------------------------------------------------------------------------
@@ -451,6 +465,13 @@ export type CardBox = Readonly<{
   lifted: boolean;
 }>;
 export type SeatBox = Readonly<{ id: string; box: Rect; cards: ReadonlyArray<Rect> }>;
+/** A taken strip: its element, its box, its count and its chips' boxes in DOM order (the newest last). */
+export type StripBox = Readonly<{
+  id: string;
+  box: Rect;
+  count: number;
+  chips: ReadonlyArray<Rect>;
+}>;
 export type Target = Readonly<{ sel: string; w: number; h: number }>;
 export type Fits = Readonly<{
   document: boolean;
@@ -475,6 +496,8 @@ export type TableGeometry = Readonly<{
   stockCard: Rect | null;
   briscola: Rect | null;
   seats: ReadonlyArray<SeatBox>;
+  /** Every shown seat's `.seat-taken` and my `#myTricks`. */
+  strips: ReadonlyArray<StripBox>;
   targets: ReadonlyArray<Target>;
   fits: Fits;
   frame: Frame;
@@ -492,7 +515,7 @@ export const FRAME_SELECTORS: ReadonlyArray<string> = [
 ];
 /** What a finger may land on at the table: every button shown, and a held card's slot. */
 const TARGET_SELECTOR =
-  '#tableScreen button, #hand .slot:not(.empty), #curtainOverlay .btn, #lastTrickOverlay .btn, #resultOverlay .btn, #menuOverlay .btn';
+  '#tableScreen button, #hand .slot:not(.empty), #curtainOverlay .btn, #resultOverlay .btn, #menuOverlay .btn';
 
 /**
  * The page-side read. A lift and a flight are transitions: by default it measures once the running
@@ -528,6 +551,7 @@ const geometryScript = (quick: boolean): string => `(async () => {
     stockCard: one('#stock .card'),
     briscola: shown(document.getElementById('briscola')) ? one('#briscola .card') : null,
     seats: Array.from(document.querySelectorAll('#seats .seat')).filter(shown).map((s) => ({ id: s.id, box: rect(s), cards: Array.from(s.querySelectorAll('.seat-cards .card')).filter(shown).map(rect) })),
+    strips: [...Array.from(document.querySelectorAll('#seats .seat')).filter(shown).map((s) => s.querySelector('.seat-taken')), document.getElementById('myTricks')].map((el) => ({ id: el.parentElement.id === 'seats' ? el.id : el.id || el.parentElement.id, box: rect(el), count: Number(el.getAttribute('data-count')), chips: Array.from(el.querySelectorAll('.chip')).map(rect) })),
     targets: Array.from(document.querySelectorAll(${JSON.stringify(TARGET_SELECTOR)})).filter(shown).map((el) => {
       const r = rect(el);
       const name = el.id !== '' ? '#' + el.id : el.tagName.toLowerCase() + '.' + Array.from(el.classList).join('.');
@@ -660,6 +684,54 @@ export const expectSeats = (g: TableGeometry, when: string): void => {
   });
 };
 
+/**
+ * The taken strips (docs/design/briscola-battle.md §7 G; layout.ts is the twin): as many chips as
+ * the count says, each a chip tall and the pack's aspect wide, inside its strip, left to right
+ * and never past the strip's width for that layout; every strip inside the table, the seats' in
+ * their cells and mine in the hand area.
+ */
+export const expectStrips = (g: TableGeometry, when: string): void => {
+  const layout = layoutFor(g.width);
+  expect(g.strips, `${when}: a strip per other seat and mine`).toHaveLength(g.players);
+  g.strips.forEach((s) => {
+    const mine = s.id === 'myTricks';
+    const cell = mine ? g.handArea : g.seats.find((seat) => seat.id === s.id)?.box;
+    expect(cell, `${when}: ${s.id} belongs to no cell`).toBeDefined();
+    if (cell !== undefined)
+      expect(inside(s.box, cell, 1), `${when}: strip ${s.id} outside its cell`).toBe(true);
+    expect(s.chips, `${when}: ${s.id} shows ${String(s.count)} tricks`).toHaveLength(s.count);
+    const stripW = STRIP_WIDTHS[layout][mine ? 'mine' : 'seat'];
+    expect(
+      s.box.w,
+      `${when}: strip ${s.id} is ${String(s.box.w)} wide, more than ${String(stripW)}`,
+    ).toBeLessThanOrEqual(stripW + TOL);
+    if (s.count > 0)
+      expect(
+        same(s.box.w, stripWidth(s.count, stripW, g.aspect), 1),
+        `${when}: strip ${s.id} is ${String(s.box.w)} wide for ${String(s.count)} chips, the twin says ${String(stripWidth(s.count, stripW, g.aspect))}`,
+      ).toBe(true);
+    s.chips.forEach((chip, i) => {
+      expect(
+        inside(chip, s.box, 1),
+        `${when}: chip ${String(i)} of ${s.id} outside its strip`,
+      ).toBe(true);
+      expect(
+        same(chip.h, CHIP_H, 1),
+        `${when}: chip ${String(i)} of ${s.id} is ${String(chip.h)} tall`,
+      ).toBe(true);
+      expect(
+        sameAspect(chip, g.aspect, 0.05),
+        `${when}: chip ${String(i)} of ${s.id} is not the pack's shape`,
+      ).toBe(true);
+      if (i > 0)
+        expect(
+          chip.x,
+          `${when}: chip ${String(i)} of ${s.id} is not right of the one before`,
+        ).toBeGreaterThan((s.chips[i - 1]?.x ?? 0) + 1);
+    });
+  });
+};
+
 /** On a phone every visible tap target is at least 44px on its short side (design §5.5). */
 export const expectTargets = (g: TableGeometry, when: string): void => {
   if (layoutFor(g.width) !== 'phone') return;
@@ -685,6 +757,7 @@ export const expectTableGeometry = (g: TableGeometry, when: string): void => {
   expectBriscolaUnderStock(g, when);
   expectFan(g, when);
   expectSeats(g, when);
+  expectStrips(g, when);
   expectTargets(g, when);
   expectFits(g, when);
 };

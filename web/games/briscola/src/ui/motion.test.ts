@@ -1,5 +1,6 @@
 // The settle beat's plans and its one DOM step (docs/design/briscola.md §5.3, §5.4): the durations
-// and their reduced-motion twins, the trick's cards to the winner's cell together, the draws
+// and their reduced-motion twins, the trick's cards to the newest chip of the winner's strip
+// together (the chip hidden until they land), the draws
 // winner-first `DRAW_GAP_MS` apart with the briscola last and turned, the reducer's timeline; and,
 // over the page fake, the shared kernel's clone (web/shared/edge/motion.ts `launchClone`) fixed
 // where the card stood and sent to the arrival's centre at the scale that fits, the briscola
@@ -13,7 +14,7 @@ import {
   BRISCOLA,
   DURATIONS,
   MAX_LIVE_FLYERS,
-  MY_TAKEN,
+  MY_TRICKS,
   REDUCED_DURATIONS,
   STOCK,
   drawFlights,
@@ -52,23 +53,27 @@ describe('the plans', () => {
   test('targets by id and selector', () => {
     expect(STOCK).toEqual({ id: 'stock', within: '.card' });
     expect(BRISCOLA).toEqual({ id: 'briscola', within: '.card' });
-    expect(MY_TAKEN).toEqual({ id: 'myTaken' });
+    expect(MY_TRICKS).toEqual({ id: 'myTricks', within: '.chip:last-child' });
     expect(fanCard(2)).toEqual({ id: 'trick', within: '.card[data-seat="2"]' });
     expect(handCard('AC')).toEqual({ id: 'hand', within: '.card[data-card="AC"]' });
     expect(seatCards('R1')).toEqual({ id: 'seatR1', within: '.seat-cards .card:last-child' });
-    expect(seatTaken('R3')).toEqual({ id: 'seatR3', within: '.seat-taken' });
+    expect(seatTaken('R3')).toEqual({ id: 'seatR3', within: '.seat-taken .chip:last-child' });
   });
 
-  test('the trick: every fan card to the winner, together, over FLY_MS', () => {
+  test('the trick: every fan card to the newest chip of the winner, together, over FLY_MS, the chip hidden till they land', () => {
     const cards = [
       { seat: 1 as const, card: { id: 'AC', r: 1 as const, s: 'C' as const } },
       { seat: 0 as const, card: { id: '2B', r: 2 as const, s: 'B' as const } },
     ];
     expect(trickFlights({ cards }, seatTaken('R2'), DURATIONS)).toEqual([
-      { from: fanCard(1), to: seatTaken('R2'), ms: 320, delayMs: 0 },
-      { from: fanCard(0), to: seatTaken('R2'), ms: 320, delayMs: 0 },
+      { from: fanCard(1), to: seatTaken('R2'), ms: 320, delayMs: 0, hideArrival: true },
+      { from: fanCard(0), to: seatTaken('R2'), ms: 320, delayMs: 0, hideArrival: true },
     ]);
-    expect(trickFlights({ cards: [] }, MY_TAKEN, DURATIONS)).toEqual([]);
+    expect(trickFlights({ cards }, MY_TRICKS, DURATIONS).map((f) => f.to)).toEqual([
+      MY_TRICKS,
+      MY_TRICKS,
+    ]);
+    expect(trickFlights({ cards: [] }, MY_TRICKS, DURATIONS)).toEqual([]);
   });
 
   test('the draws: winner first, DRAW_GAP_MS apart, arrivals hidden; the briscola last and turned when taken', () => {
@@ -138,7 +143,7 @@ const piece = (
 
 type Options = Readonly<{ fromAt?: Rect; toAt?: Rect; cloneable?: boolean; noTarget?: boolean }>;
 
-/** A fan card in `#trick` and the taken stack of `#seatR2`; a stock back and a hand card for the draws. */
+/** A fan card in `#trick` and the newest chip of `#seatR2`'s taken strip; a stock back and a hand card for the draws. */
 const table = (o: Options = {}) => {
   const clone = fakeEl('clone', { classes: ['card', 'face', 'mid', 'taking'] });
   const source = piece(
@@ -147,12 +152,12 @@ const table = (o: Options = {}) => {
     o.fromAt ?? rect(100, 200, 69, 133),
     o.cloneable === false ? null : clone,
   );
-  const landed = piece('dst', ['seat-taken'], o.toAt ?? rect(300, 600, 40, 20), null);
+  const landed = piece('dst', ['card', 'back', 'chip'], o.toAt ?? rect(300, 600, 40, 20), null);
   const trick = fakeEl('trick', {
     queries: { '.card[data-seat="1"]': [source], '.card': [source] },
   });
   const seat = fakeEl('seatR2', {
-    queries: { '.seat-taken': o.noTarget === true ? [] : [landed] },
+    queries: { '.seat-taken .chip:last-child': o.noTarget === true ? [] : [landed] },
   });
   const page = fakePage([trick, seat]);
   const flight: Flight = { from: fanCard(1), to: seatTaken('R2'), ms: 320, delayMs: 0 };
@@ -170,6 +175,19 @@ describe('flyCards', () => {
     expect(t.clone.hasClass('flyer')).toBe(true);
     expect(t.clone.hasClass('taking')).toBe(false);
     expect(t.landed.hasClass('arriving')).toBe(false);
+    // The trick's flights hide the chip they land on until they do.
+    const chip = table();
+    flyCards(
+      chip.page.doc,
+      trickFlights(
+        { cards: [{ seat: 1, card: { id: 'AC', r: 1, s: 'C' } }] },
+        seatTaken('R2'),
+        DURATIONS,
+      ),
+    );
+    expect(chip.landed.hasClass('arriving')).toBe(true);
+    chip.clone.fire('transitionend');
+    expect(chip.landed.hasClass('arriving')).toBe(false);
     expect([
       t.clone.style('left'),
       t.clone.style('top'),
@@ -244,7 +262,7 @@ describe('flyCards', () => {
     expect(flyCards(uncloneable.page.doc, [{ ...uncloneable.flight, hideArrival: true }])).toBe(0);
     expect(uncloneable.landed.hasClass('arriving')).toBe(false);
     const missing = table();
-    expect(flyCards(missing.page.doc, [{ ...missing.flight, to: MY_TAKEN }])).toBe(0);
+    expect(flyCards(missing.page.doc, [{ ...missing.flight, to: MY_TRICKS }])).toBe(0);
   });
 
   test('a burst: more clones in the air than MAX_LIVE_FLYERS are culled before the next launch; at the cap none', () => {

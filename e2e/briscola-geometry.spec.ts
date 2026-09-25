@@ -1,12 +1,13 @@
 // The table's geometry as a real-click test (docs/design/briscola.md §5.6 "Geometry oracle"):
 // pass-and-play on one page at a phone and a laptop for two, three and four seats. At every state
 // of a trick (under the first curtain, revealed, a card lifted, one card played with the next
-// curtain up, the whole trick held and settled, the last-trick sheet open) every hand card sits in
-// its slot and the three slots are one size, disjoint and left to right inside `#hand`; every
+// curtain up, the whole trick held and settled) every hand card sits in its slot and the three
+// slots are one size, disjoint and left to right inside `#hand`; every
 // unrotated card has the pack's aspect (`--aspect` on `#tableScreen`) to 2% and a hand card is as
 // wide as ui/layout.ts (the CSS's pure twin) predicts for the viewport; the briscola lies across
 // under the stock, its box the stock's swapped, 40-60% hidden; the fan's cards sit inside `#trick`
-// left to right and rising in z; every tap target is at least 44px on a phone; nothing scrolls
+// left to right and rising in z; the taken strips hold a chip per trick inside their cells, the
+// winner's one chip after the first trick; every tap target is at least 44px on a phone; nothing scrolls
 // where the twin says the column fits; and the frame around the cards (topbar, seats, centre band,
 // strip, status line, hand area, actions) keeps the boxes it had at the start.
 import {
@@ -15,8 +16,6 @@ import {
   briscolaReveal,
   briscolaStartLocal,
   expectTableGeometry,
-  closeLastTrick,
-  openLastTrick,
   playCard,
   playTrick,
   requireView,
@@ -89,14 +88,21 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         expect(settled.trickNo).toBe(1);
         await expect(page.locator('#trick .play')).toHaveCount(0);
         if (await page.locator('#curtainOverlay').isVisible()) await briscolaReveal(page);
-        await check('winner revealed');
-
-        // The last-trick sheet over the table: the frame beneath holds.
-        await openLastTrick(page);
-        await expect(page.locator('#ltCards .play .card')).toHaveCount(n);
-        await check('last trick open');
-        await closeLastTrick(page);
-        await check('sheet closed');
+        const after = await tableGeometry(page);
+        expectTableGeometry(after, 'winner revealed');
+        expectSameFrame(after.frame, start.frame, 'winner revealed');
+        // The taken trick is one chip in the winner's strip (the phone is in the winner's hands
+        // now, so the strip is mine) and none anywhere else; the frame did not move for it.
+        const winner = await requireView(page);
+        expect(winner.me.idx).toBe(settled.lastTrick?.winner);
+        const mine = after.strips.find((s) => s.id === 'myTricks');
+        expect(mine?.count).toBe(1);
+        expect(mine?.chips).toHaveLength(1);
+        after.strips
+          .filter((s) => s.id !== 'myTricks')
+          .forEach((s) => {
+            expect(s.count, `${s.id} took nothing`).toBe(0);
+          });
       });
     });
 

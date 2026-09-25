@@ -538,9 +538,10 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
   // shapes (the selects, the house-rules disclosure, the switches), then the table: the trump badge
   // with its suit, the seats row in its three cells and the turn mark, the stock with the trump card
   // under it, the fan with its chips and the taking card, the score strip (per player or per team,
-  // the leader), the hand's three slots and the card in each of its states, the cards' pack faces
-  // (a picture pack paints no glyph, so the `.glyph` rows record null under `linea`), the sheets
-  // (the curtain, the menu, the history's `<details>` rows, the result's score rows, the last trick).
+  // the leader), the taken strips and their chips, the hand's three slots and the card in each of
+  // its states, the cards' pack faces (a picture pack paints no glyph, so the `.glyph` rows record
+  // null under `linea`), the sheets (the curtain, the menu, the history's `<details>` rows, the
+  // result's score rows).
   // `#toast.show` is timed and left out; `.flyer` and `.drag-ghost` are transient.
   briscola: [
     ...SHELL_SELECTORS,
@@ -568,6 +569,7 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.seat.to-move .seat-name::before',
     '.seat-cards',
     '.seat-taken',
+    '.seat-taken .card.chip',
     '.seat .conn-dot',
     '.conn-dot.off',
     '.table-center',
@@ -578,8 +580,6 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.briscola',
     '.briscola.gone',
     '.pile-label',
-    '.pile-peek',
-    '.pile-peek:disabled',
     '.desk-only',
     '.trick',
     '.trick:empty::before',
@@ -599,6 +599,8 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.status-line',
     '.hand-area',
     '.hand-header',
+    '.my-tricks',
+    '.my-tricks .card.chip',
     '.my-taken',
     '.hand',
     '.hand.inert',
@@ -1548,7 +1550,7 @@ const playFirstCard = async (page: Page): Promise<void> => {
  * deck, so the golden records no picture pack's aspect or back and the deck's default may change
  * under it), the first trick by hand (my hand, a card lifted, a card played and the curtain for the
  * other seat, the second seat's play, the trick taken with the settle beat waited out, the table
- * after it), the menu, history, rules and last-trick sheets, then the seeded policy through the
+ * after it with the winner's one chip), the menu, history and rules sheets, then the seeded policy through the
  * hook to the game's end (the result sheet and the table behind it), the second game's curtain
  * with the badge counting, the match end on the endgame screen; last a three-seat and a four-seat
  * table dealt, for the seats row, the fan and the score strip in their other two shapes.
@@ -1595,12 +1597,6 @@ const driveBriscola = async (page: Page, shot: Shot): Promise<void> => {
   await click(page, '#menuBtn');
   await click(page, '#menuRulesBtn');
   await snap('table: rules sheet');
-  await page.keyboard.press('Escape');
-  const peek = (await page.locator('#lastTrickBtn').isVisible())
-    ? '#lastTrickBtn'
-    : '#lastTrickSheetBtn';
-  await click(page, peek);
-  await snap('table: last trick sheet');
   await page.keyboard.press('Escape');
 
   // ---- the game over: the result sheet, the table behind it, the next game, the match end ----
