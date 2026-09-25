@@ -91,7 +91,6 @@ export const baseUrl = (project: Project): string =>
  */
 export const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/backgammon-geometry.spec.ts',
-  '**/backgammon-glossary.spec.ts',
   '**/backgammon-local.spec.ts',
   '**/backgammon-table-ux.spec.ts',
   '**/computed-styles.spec.ts',
@@ -102,13 +101,13 @@ export const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/gin-dom-parity.spec.ts',
   '**/gin-draw.spec.ts',
   '**/gin-geometry.spec.ts',
-  '**/gin-glossary.spec.ts',
   '**/gin-layoff.spec.ts',
   '**/gin-local.spec.ts',
   '**/gin-sandbox.spec.ts',
   '**/gin-scorer.spec.ts',
   '**/gin-sound-font.spec.ts',
   '**/gin-stories.spec.ts',
+  '**/shell-glossary.spec.ts',
   '**/shell-home.spec.ts',
   // The sessions' silence watch is a timer, the same on either origin.
   '**/shell-liveness.spec.ts',

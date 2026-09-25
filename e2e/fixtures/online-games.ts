@@ -8,11 +8,19 @@
 import { expect, type Page } from '@playwright/test';
 
 import type { Game, ShellGame } from '../../tools/games.ts';
-import { bgBoardsAgree, bgHostStarts, boardKey, readBoard, requireBoard } from './backgammon.ts';
+import {
+  bgBoardsAgree,
+  bgHostStarts,
+  bgStartLocal,
+  boardKey,
+  readBoard,
+  requireBoard,
+} from './backgammon.ts';
 import { fidiceHostStarts, fidiceSameRound, fidiceSeatName, fidiceSeats } from './fidice.ts';
-import { ginHostDeals, ginPassUpcard, readTable } from './gin.ts';
+import type { Viewport } from './geometry.ts';
+import { ginHostDeals, ginPassUpcard, ginStartLocal, readTable } from './gin.ts';
 import { openGame, type GameHooks } from './player.ts';
-import { ONLINE_NAMES, joinedMsg, reveal, roomOpen, takeOffer } from './shell.ts';
+import { DEFAULT_NAMES, ONLINE_NAMES, joinedMsg, reveal, roomOpen, takeOffer } from './shell.ts';
 import type { Project } from './site.ts';
 import { hostRoom, joinByCode, type Players } from './two-players.ts';
 
@@ -59,6 +67,30 @@ export type ShellDriver = OnlineDriver &
       toCurtain: (page: Page) => Promise<void>;
       /** Take the offer from under that curtain; resolves with the room's confirmed code. */
       take: (page: Page) => Promise<string>;
+    }>;
+    /**
+     * The glossary links (docs/design/glossary-links.md §4; e2e/shell-glossary.spec.ts, dry-round-2.md
+     * I4): the words and the `#rule-<id>` ids the spec taps on this game's page (its ui/glossary.ts
+     * and ui/rules.ts), and the way to a table with the rules overlay up.
+     */
+    glossary: Readonly<{
+      /** A word of the About copy, linked: exactly this text (a plain word), and the rule it names. */
+      aboutTerm: string;
+      aboutRule: string;
+      /** In the home Rules list: a rule whose body links `innerTo`; the tap moves there. */
+      innerFrom: string;
+      innerTo: string;
+      /** The rule a `#rule-<id>` deep link at boot opens. */
+      deepLink: string;
+      /**
+       * In the rules overlay over a table: a rule whose body links `overlayTo`. Its own pair, not
+       * `innerFrom`/`innerTo`: backgammon's is Western-only (Crawford names the cube), which the home
+       * list under Portes has not, so the two lists are tried on different rules.
+       */
+      overlayFrom: string;
+      overlayTo: string;
+      /** From the game's `url` at `viewport` to a pass-and-play table with the rules overlay opening. */
+      openRulesOverTable: (page: Page, url: string, viewport: Viewport) => Promise<void>;
     }>;
   }>;
 
@@ -119,6 +151,22 @@ const gin: ShellDriver = {
       return takeOffer(page, 'gin-rummy');
     },
   },
+  glossary: {
+    aboutTerm: 'knocks',
+    aboutRule: 'knock',
+    // Knock names deadwood.
+    innerFrom: 'knock',
+    innerTo: 'deadwood',
+    deepLink: 'undercut',
+    // Gin names the layoff.
+    overlayFrom: 'gin',
+    overlayTo: 'layoff',
+    // The table's own Rules button (the header's) opens the overlay.
+    openRulesOverTable: async (page, url, viewport) => {
+      await ginStartLocal(page, url, viewport);
+      await page.locator('#rulesBtnGame').click();
+    },
+  },
 };
 
 const bgSnapshot = async (page: Page): Promise<string> => boardKey(await readBoard(page));
@@ -150,6 +198,29 @@ const backgammon: ShellDriver = {
     take: async (page) => {
       await page.locator('#curtainHandoffBtn').click();
       return roomOpen(page, 'backgammon');
+    },
+  },
+  glossary: {
+    aboutTerm: 'gammon',
+    aboutRule: 'scoring',
+    // Goal names bearing off twice ("bear them off", "bear off"): the spec taps the first.
+    innerFrom: 'goal',
+    innerTo: 'bearing-off',
+    deepLink: 'blocks',
+    // Western backgammon: "cube" and "doubling" both point at the cube rule; the first is the word itself.
+    overlayFrom: 'crawford',
+    overlayTo: 'cube',
+    // A Western game, so the overlay carries the cube and Crawford rules. The curtain is up for the
+    // starter and its button lifts it; under Western the opening winner plays the opening dice
+    // (backgammon-local.spec.ts "Western rules"), so the reveal lands on the moving phase with no
+    // roll modal between it and the menu (dry-round-2.md I4 sketched the roll step: that is Portes,
+    // where the winner rolls again); the menu opens the rules.
+    openRulesOverTable: async (page, url, viewport) => {
+      await bgStartLocal(page, url, viewport, DEFAULT_NAMES, { variant: 'backgammon' });
+      await reveal(page);
+      await expect(page.locator('#rollOverlay')).toBeHidden();
+      await page.locator('#menuBtn').click();
+      await page.locator('#menuRulesBtn').click();
     },
   },
 };
