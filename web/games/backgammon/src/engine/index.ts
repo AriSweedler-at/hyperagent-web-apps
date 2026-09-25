@@ -1,7 +1,28 @@
 // The backgammon engine as one module (docs/design/backgammon-rules.md): the UI, protocol
 // and storage import only from here. Pure: no DOM, no clock, no randomness of its own; `rng` and
 // `now` are injected into `createGame`, `nextGame` and `applyAction` (docs/ARCHITECTURE.md
-// "Module boundaries").
+// "Module boundaries"). `ENGINE` is the engine on the two-seat contract of web/shared/lib/game.ts
+// (DRY round 2, F1): the functions below under the contract's names, with `over` the shell's
+// end-screen test (ui/state.ts reads `view.matchOver`).
+import type { TwoSeatEngine } from '../../../../shared/lib/game.ts';
+import { actorOf, applyAction } from './apply.ts';
+import { decodeAction, decodeState, decodeView } from './decode.ts';
+import { createGame } from './setup.ts';
+import type { Action, CreateGameOptions, State, View } from './types.ts';
+import { legalActions, viewFor } from './view.ts';
+
+export const ENGINE: TwoSeatEngine<State, View, Action, CreateGameOptions> = {
+  create: createGame,
+  apply: applyAction,
+  viewFor,
+  legalActions,
+  actorOf,
+  over: (view) => view.matchOver,
+  decodeState,
+  decodeView,
+  decodeAction,
+};
+
 export { actorOf, applyAction, canDouble, MESSAGES } from './apply.ts';
 export {
   afterMove,

@@ -1,7 +1,9 @@
 // Board primitives every other engine module shares (rules R2, R8, R10, R11,
 // R15): the frame helpers routed through the variant's `ownOf`/`absOf`, open/blocked
 // with the single-opponent hook (hit, pin, illegal), the one function that moves a checker, and
-// the structural checks the decoder and the replay lean on. All O(24), all pure.
+// the structural checks the decoder and the replay lean on. All O(24), all pure. `otherSeat` and
+// `setAt` are web/shared/lib/game.ts's (DRY round 2, F1), re-exported under the same names.
+import { otherSeat, setAt } from '../../../../shared/lib/game.ts';
 import {
   BAR_PIPS,
   CHECKERS,
@@ -10,7 +12,6 @@ import {
   type Board,
   type Die,
   type Move,
-  type Pair,
   type PointIndex,
   type Seat,
   type Stack,
@@ -22,10 +23,7 @@ export const POINT_INDICES: ReadonlyArray<PointIndex> = [
   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
 ];
 
-export const otherSeat = (seat: Seat): Seat => (seat === 0 ? 1 : 0);
-
-export const setAt = <T>(pair: Pair<T>, seat: Seat, value: T): Pair<T> =>
-  seat === 0 ? [value, pair[1]] : [pair[0], value];
+export { otherSeat, setAt };
 
 export const emptyBoard = (): Board => ({
   points: Array.from({ length: POINTS }, (): Stack => []),

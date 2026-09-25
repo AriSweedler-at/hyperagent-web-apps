@@ -3,10 +3,13 @@
 // bar/off pairs: homogeneous in portes and Western backgammon, ordered so plakoto's pinning fits
 // without a second representation. Every rule speaks the mover's own 1..24 numbering through the
 // variant's `ownOf`/`absOf`. Key order here is the wire/save order: setup.ts builds every literal
-// in it and decode.ts declares the fields in it, so a decoded value re-encodes byte for byte.
+// in it and decode.ts declares the fields in it, so a decoded value re-encodes byte for byte. The
+// seat, the pair, the player and the clock are web/shared/lib/game.ts's (DRY round 2, F1),
+// re-exported here under the names every backgammon module imports, so no import path changed.
+import type { Pair, Player, Seat } from '../../../../shared/lib/game.ts';
 
-export type Seat = 0 | 1;
-export type Pair<T> = readonly [T, T];
+export type { Now, Pair, Player, Seat } from '../../../../shared/lib/game.ts';
+
 export type Die = 1 | 2 | 3 | 4 | 5 | 6;
 /** A roll as rolled (Western opening: [hi, lo]); `null` before the first roll of a tavli game. */
 export type Dice = Pair<Die>;
@@ -90,8 +93,6 @@ export type MatchOptions = Readonly<{
   beavers: boolean;
   automaticDoubles: boolean;
 }>;
-
-export type Player = Readonly<{ id: string; name: string }>;
 
 /** `kind` lets the UI cue sounds and toasts without parsing `text`. */
 export type LogKind =
@@ -239,8 +240,6 @@ export type VariantRules = Readonly<{
   >;
 }>;
 
-/** Milliseconds since the epoch, injected (`Date.now` in main.ts, a constant in tests). */
-export type Now = () => number;
 export type CreateGameOptions = Readonly<{
   /** DEFAULT_MATCH_LENGTH when absent. */
   matchLength?: number;
