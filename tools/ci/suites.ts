@@ -208,8 +208,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // 99.79/99.44/98.25/94.72 after (the same lines uncovered, a smaller folder; decode.ts and
       // index.ts measure 100 on every metric); the row stands.
       // Re-measured when D3 (dry-round-2 E7) moved the page-fake assembly out of ui/page.fake.ts into
-      // web/shared/edge/page.fake.ts `shellPage`: ui 98.09/97.09/97.06/94.03 before,
-      // 98.08/97.07/97.05/94.01 after (the same 24 lines uncovered, a smaller folder; the wrapper
+      // web/shared/edge/page.fake.ts `shellPage`, on top of D1: ui 98.08/97.13/97.05/94.16 before,
+      // 98.07/97.10/97.04/94.14 after (the same 24 lines uncovered, 1252 → 1246 lines; the wrapper
       // measures 100 on every metric).
       thresholds: {
         'web/games/gin-rummy/src/engine/**': {
@@ -374,8 +374,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       // 99.14/99.45/98.90/97.00 after (the same lines uncovered, a smaller folder; decode.ts and
       // index.ts measure 100 on every metric); the row stands.
       // Re-measured when D3 (dry-round-2 E7) moved the page-fake assembly out of ui/page.fake.ts into
-      // web/shared/edge/page.fake.ts `shellPage`: ui 99.57/100/98.61/92.0 before, 99.57/100/98.60/91.98
-      // after (the same 6 lines uncovered, a smaller folder; the wrapper measures 100 on every metric).
+      // web/shared/edge/page.fake.ts `shellPage`: ui 99.59/100/98.68/92.53 before, 99.59/100/98.68/92.52
+      // after (the same 6 lines uncovered, 1471 → 1467 lines; the wrapper measures 100 on every metric).
       thresholds: {
         'web/games/backgammon/src/engine/**': {
           lines: 94,
