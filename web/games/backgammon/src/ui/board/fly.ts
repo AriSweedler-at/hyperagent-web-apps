@@ -2,24 +2,24 @@
 // gin's ghost joined to a FLIP. A move changes the key of two containers (three with a hit), so
 // the painter rebuilds them and the moved checker would simply appear at its destination. Before
 // the repaint the top checker (or newest slab) of every departure container is measured; after it
-// the arrival (the destination's top checker or newest slab) is hidden under `arriving`, a clone
-// of the departed checker is fixed over where it stood, laid out, then sent to the arrival's rect
-// by one transform (translate plus the scale that turns a checker into a slab, whichever way the
-// tray lies) over FLY_MS with a small lift on the way (`fly-lift`: a rise of a few pixels and a
-// deeper shadow at mid-flight, a keyframe animation beside the transition, so the glide's own
-// end event still ends the flight), and the clone goes when its transition ends or the fallback
-// timer fires. Several flights in one repaint leave STAGGER_MS apart (`flightDelays`). A stack
-// already five tall keeps its top coin through the repaint (render.ts `ensureStack`: the sixth
-// is hidden under it and only the count badge changes), so that coin is not hidden: the clone
-// lands on it, and a badge the landing brings waits under `settling` until it does. A hit blot
-// waits `HIT_DELAY_MS` before it leaves for the bar, so the mover lands on it first. The
-// transition itself is `.flyer`'s in theme.css, so `prefers-reduced-motion` can shorten it; only
-// the delay is written inline. Nothing measurable (the page fake) means the repaint alone. The
-// module takes ids and rects only: never ui/state.ts, the DOM only through the shared edge.
+// the arrival (the destination's top checker or newest slab) is hidden under `arriving` and a
+// clone of the departed checker flies from where it stood to the arrival's rect through the shared
+// motion kernel (web/shared/edge/motion.ts `launchClone`, dry-round-2.md E2: the clone fixed over
+// the page, its `--checker-d`, the delay on both the transition and the lift, the layout read, the
+// translate plus the scale that turns a checker into a slab whichever way the tray lies, and its
+// removal when the transition ends or the fallback timer fires). The transition itself is
+// `.flyer`'s in theme.css (FLY_MS, `transform-origin: 0 0` so the scale is about the corner the
+// translate lands, and `fly-lift`: a rise of a few pixels and a deeper shadow at mid-flight, a
+// keyframe animation beside the transition so the glide's own end event still ends the flight), so
+// `prefers-reduced-motion` can shorten it; only the delay is written inline. Several flights in one
+// repaint leave STAGGER_MS apart (`flightDelays`). A stack already five tall keeps its top coin
+// through the repaint (render.ts `ensureStack`: the sixth is hidden under it and only the count
+// badge changes), so that coin is not hidden: the clone lands on it, and a badge the landing brings
+// waits under `settling` until it does. A hit blot waits `HIT_DELAY_MS` before it leaves for the
+// bar, so the mover lands on it first. Nothing measurable (the page fake) means the repaint alone.
+// The module takes ids and rects only: never ui/state.ts, the DOM only through the shared edge.
 import {
   addClass,
-  afterTransition,
-  cloneInto,
   dataOf,
   queryAllIn,
   queryIn,
@@ -27,11 +27,11 @@ import {
   removeClass,
   removeElement,
   requireId,
-  setStyle,
   type Element,
   type PageLike,
   type Rect,
 } from '../../../../../shared/edge/dom.ts';
+import { launchClone } from '../../../../../shared/edge/motion.ts';
 import type { Flight } from '../board.ts';
 
 /** The flight's duration (theme.css `.flyer { transition: transform 200ms … }` and its `fly-lift`). */
@@ -40,8 +40,6 @@ export const FLY_MS = 200;
 export const HIT_DELAY_MS = 80;
 /** The movers of one play leave this far apart, in order (design §3.8: "zippy", staggered). */
 export const STAGGER_MS = 60;
-/** Slack past the transition before the fallback timer clears a flight that never ended. */
-const FALLBACK_SLACK_MS = 60;
 /**
  * More clones than this in the air is a scripted burst (a policy through the hook playing a game
  * in one task, a reconnect replaying frames), not play: they are culled before new ones launch,
@@ -50,9 +48,6 @@ const FALLBACK_SLACK_MS = 60;
 export const MAX_LIVE_FLYERS = 12;
 
 const measurable = (r: Rect): boolean => r.width > 0 || r.height > 0;
-const px = (n: number): string => `${String(Math.round(n * 100) / 100)}px`;
-const ratio = (to: number, from: number): string =>
-  String(from === 0 ? 1 : Math.round((to / from) * 1000) / 1000);
 
 /** What leaves a container: its top checker, else its newest slab (a bear-off undone). */
 const departure = (container: Element): Element | null =>
@@ -111,50 +106,30 @@ const measure = (doc: PageLike, flight: Flight, delay: number): Departed | null 
 };
 
 /**
- * After the repaint: hide the arrival (unless it is the coin that was already on top: then only
- * a badge the landing brings hides, under `settling`), fix the clone where the checker stood, send it over.
+ * After the repaint: send a clone from where the checker stood to the arrival's rect (`flyer`,
+ * `flyer-slab` toward a tray; the source's `top` and `arriving` stripped), then hide the arrival
+ * (unless it is the coin that was already on top: then only a badge the landing brings hides,
+ * under `settling`) until the clone is gone. Nothing to clone means nothing hides.
  */
 const launch = (doc: PageLike, { flight, source, from, before, badged, delay }: Departed): void => {
   const target = arrival(requireId(doc, flight.toContainer), flight.slab === true);
   if (target === null) return;
   const to = rectOf(target);
   if (!measurable(to)) return;
-  const flyer = cloneInto(doc.body, source);
+  const flyer = launchClone(doc, source, from, to, {
+    classes: flight.slab === true ? ['flyer', 'flyer-slab'] : ['flyer'],
+    strip: ['top', 'arriving'],
+    sizeVar: '--checker-d',
+    ms: FLY_MS,
+    delay,
+    scale: true,
+    onDone: () => {
+      removeClass(target, 'arriving', 'settling');
+    },
+  });
   if (flyer === null) return;
   if (target !== before) addClass(target, 'arriving');
   else if (!badged && dataOf(target, 'count') !== null) addClass(target, 'settling');
-  addClass(flyer, 'flyer');
-  if (flight.slab === true) addClass(flyer, 'flyer-slab');
-  removeClass(flyer, 'top', 'arriving');
-  // The clone sits on the body, where the board's `--checker-d` is out of scope: its own size is
-  // the measured one (gin's ghost does the same with `--card-w`).
-  setStyle(flyer, '--checker-d', px(from.width));
-  setStyle(flyer, 'left', px(from.left));
-  setStyle(flyer, 'top', px(from.top));
-  setStyle(flyer, 'width', px(from.width));
-  setStyle(flyer, 'height', px(from.height));
-  setStyle(flyer, 'transform', 'none');
-  // The glide and its lift (theme.css `fly-lift`, a keyframe animation beside the transition)
-  // wait the same delay, so a staggered flight neither moves nor rises before its turn.
-  if (delay > 0) {
-    setStyle(flyer, 'transition-delay', `${String(delay)}ms`);
-    setStyle(flyer, 'animation-delay', `${String(delay)}ms`);
-  }
-  // A layout read: the clone is laid out at its start before the transform below transitions.
-  rectOf(flyer);
-  setStyle(
-    flyer,
-    'transform',
-    `translate(${px(to.left - from.left)}, ${px(to.top - from.top)}) scale(${ratio(to.width, from.width)}, ${ratio(to.height, from.height)})`,
-  );
-  afterTransition(
-    flyer,
-    () => {
-      removeElement(flyer);
-      removeClass(target, 'arriving', 'settling');
-    },
-    FLY_MS + delay + FALLBACK_SLACK_MS,
-  );
 };
 
 /**
