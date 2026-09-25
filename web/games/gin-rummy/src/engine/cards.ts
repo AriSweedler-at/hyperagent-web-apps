@@ -2,8 +2,11 @@
 // (test/fixtures/legacy/gin-engine.cjs); behaviour is unchanged, test/parity/gin.legacy.test.ts
 // and gin.melds.test.ts are the oracle. Randomness is injected: `shuffle` takes the seeded `Rng` of
 // web/shared/lib and draws from it exactly as the legacy Fisher-Yates did, so the same stream deals
-// the same hands on both engines.
+// the same hands on both engines. Since briscola (docs/design/briscola-rules.md E4) the Fisher-Yates
+// body lives in web/shared/lib/shuffle.ts, generic over the item; this module re-exports it at the
+// legacy signature and the parity suites pin the permutation unchanged.
 import type { Rng } from '../../../../shared/lib/rng.ts';
+import { shuffle as shuffleItems } from '../../../../shared/lib/shuffle.ts';
 import type { Card, Cards, Meld, Rank, Suit } from './types.ts';
 
 const SUITS: ReadonlyArray<Suit> = ['S', 'H', 'D', 'C'];
@@ -22,18 +25,12 @@ const pretty = (c: Card): string => rankLabel(c.r) + SUIT_SYMBOL[c.s];
 /** The 52 cards, suit-major in SUITS order, ace to king within a suit. */
 const makeDeck = (): Cards => SUITS.flatMap((s) => RANKS.map((r) => makeCard(r, s)));
 
-const swapped = (cards: Cards, i: number, j: number): Cards =>
-  cards.map((c, k) => (k === i ? (cards[j] ?? c) : k === j ? (cards[i] ?? c) : c));
-
 /**
  * Fisher-Yates from the top: for i = n-1 down to 1, swap `i` with a draw in [0, i]. One rng call
- * per step, in this order, so a seeded stream reproduces the legacy permutation exactly.
+ * per step, in this order, so a seeded stream reproduces the legacy permutation exactly
+ * (web/shared/lib/shuffle.ts holds the body).
  */
-const shuffle = (cards: Cards, rng: Rng): Cards =>
-  Array.from({ length: cards.length - 1 }, (_, k) => cards.length - 1 - k).reduce<Cards>(
-    (a, i) => swapped(a, i, Math.floor(rng() * (i + 1))),
-    cards,
-  );
+const shuffle = (cards: Cards, rng: Rng): Cards => shuffleItems(cards, rng);
 
 const suitIndex = (s: Suit): number => SUITS.indexOf(s);
 

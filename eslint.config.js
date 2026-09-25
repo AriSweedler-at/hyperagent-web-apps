@@ -173,7 +173,7 @@ const GAME_SRC = './web/games/*/src';
 const PROTOCOL = [`${GAME_SRC}/protocol.ts`, `${GAME_SRC}/net/protocol.ts`];
 // The games, spelled here too because this file is plain JavaScript (tools/games.ts is the typed
 // registry): one zone per ordered pair keeps every game out of every other.
-const GAMES = ['gin-rummy', 'fidice', 'backgammon'];
+const GAMES = ['gin-rummy', 'fidice', 'backgammon', 'briscola'];
 const gamePairZones = GAMES.flatMap((target) =>
   GAMES.filter((from) => from !== target).map((from) => ({
     target: `./web/games/${target}`,

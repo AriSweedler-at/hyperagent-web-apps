@@ -17,6 +17,7 @@
     "test:gin": "VITEST_SUITE=gin vitest run --project gin",
     "test:fidice": "VITEST_SUITE=fidice vitest run --project fidice",
     "test:backgammon": "VITEST_SUITE=backgammon vitest run --project backgammon",
+    "test:briscola": "VITEST_SUITE=briscola vitest run --project briscola",
     "test:site": "npm run build && VITEST_SUITE=site vitest run --project site",
     "test:harness": "VITEST_SUITE=harness vitest run --project harness",
     "test:dist": "npm run test:site",
