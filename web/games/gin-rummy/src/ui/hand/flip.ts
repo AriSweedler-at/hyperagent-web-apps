@@ -1,22 +1,25 @@
 // FLIP for the hand (docs/design/gin-arrangement-and-discards.md §5d): when a repaint moves cards
 // to other cells (a sort, a chooser pick, a long press, a drag over another cell) they glide there
 // instead of snapping. Each card's cell (its `.slot`, which no transform ever moves) is measured
-// before the repaint and again after; a card whose cell moved is first put back where it was with
-// an inverted transform (a layout read lands it), then released to its cell under a short
-// transition. Measuring the cell rather than the card keeps a lift out of it: a selected card sits
-// 12px up by its own transform, and gliding that would push it below the hand for a frame (the
-// geometry spec's "overflow at selected"). Cards new to the hand and cards whose cell stayed put
-// are untouched, and a hand with no measurable rects (the page fake) repaints as is.
+// before the repaint and again after; a card whose cell moved glides from its old rect to its new
+// one through the shared motion kernel (web/shared/edge/motion.ts `glide`, dry-round-2.md E2: the
+// inverted transform, the layout read and the release under FLIP_MS are its). Measuring the cell
+// rather than the card keeps a lift out of it: a selected card sits 12px up by its own transform,
+// and gliding that would push it below the hand for a frame (the geometry spec's "overflow at
+// selected"). Cards new to the hand, cards whose cell stayed put (within half a pixel) and a hand
+// with no measurable rects (the page fake) are untouched: the repaint alone places them. The glide
+// is FLIP_MS whatever the page's `prefers-reduced-motion`, as it was before the kernel: gin's hand
+// never consulted the query (only `#rrBody .meld-group` in theme.css does), and a behaviour-
+// preserving move keeps it so; the kernel's `reducedMotion` waits for a change of its own.
 import {
-  afterTransition,
   closestIn,
   dataOf,
   queryAllIn,
   rectOf,
-  setStyle,
   type Element,
   type Rect,
 } from '../../../../../shared/edge/dom.ts';
+import { glide } from '../../../../../shared/edge/motion.ts';
 
 export const FLIP_MS = 200;
 const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
@@ -38,21 +41,7 @@ export const flipCards = (hand: Element, repaint: () => void): void => {
     const was = before.get(dataOf(c, 'card') ?? '');
     if (was === undefined || !measurable(was)) return;
     const now = cellRect(c);
-    const dx = was.left - now.left;
-    const dy = was.top - now.top;
-    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-    setStyle(c, 'transition', 'none');
-    setStyle(c, 'transform', `translate(${String(dx)}px, ${String(dy)}px)`);
-    // A layout read: the inverted transform is laid out before the release below transitions.
-    rectOf(c);
-    setStyle(c, 'transition', `transform ${String(FLIP_MS)}ms ${EASE}`);
-    setStyle(c, 'transform', '');
-    afterTransition(
-      c,
-      () => {
-        setStyle(c, 'transition', '');
-      },
-      FLIP_MS + 50,
-    );
+    if (Math.abs(was.left - now.left) < 0.5 && Math.abs(was.top - now.top) < 0.5) return;
+    glide(c, was, now, { ms: FLIP_MS, ease: EASE });
   });
 };

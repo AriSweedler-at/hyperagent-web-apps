@@ -2,7 +2,8 @@
 // inverted transform and released under the transition, then its inline transition is cleared
 // when the transition ends (or the fallback timer fires); a card that stayed, a card new to the
 // hand, a card with no measurable rect, and a card lifted by its own transform inside an unmoved
-// cell are left alone.
+// cell are left alone. The last case pins that `prefers-reduced-motion` leaves the glide alone, as
+// it did before the glide moved to web/shared/edge/motion.ts (dry-round-2.md E2, §7 risk 5).
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import type { Element, Rect } from '../../../../../shared/edge/dom.ts';
@@ -57,6 +58,7 @@ const hand = (cards: () => ReadonlyArray<Card>): Element =>
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('flipCards', () => {
@@ -128,5 +130,25 @@ describe('flipCards', () => {
       },
     );
     expect(fresh.log).toEqual([]);
+  });
+
+  test('the glide is FLIP_MS under `prefers-reduced-motion: reduce` too: the hand never consulted the query, and the move onto the kernel keeps it so (dry-round-2 E2)', async () => {
+    // The kernel's `reducedMotion` remembers its first matchMedia read, so the stub has to be in
+    // place before flip.ts (and motion.ts under it) loads: a fresh module, or the cases above would
+    // have cached `false` for this one and the pin would bite nothing.
+    vi.resetModules();
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    const { flipCards: flip } = await import('./flip.ts');
+    const moved = card('7H', rect(200, 0));
+    const shown = { cards: [moved] };
+    flip(
+      hand(() => shown.cards),
+      () => {
+        moved.place(rect(0, 0));
+      },
+    );
+    expect(moved.log[2]).toBe(
+      `transition=transform ${String(FLIP_MS)}ms cubic-bezier(0.2, 0.8, 0.2, 1)`,
+    );
   });
 });
