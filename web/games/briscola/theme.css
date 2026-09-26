@@ -1386,6 +1386,11 @@ details.history-row > .history-detail dt {
 .hand.hidden-cards .card .suit {
   visibility: hidden;
 }
+/* The pack's faces fetched ahead (src/ui/render.ts `paintFacePreload`): a block the layout never sees;
+   its <img>s still load (an image element fetches whatever its display). */
+.face-preload {
+  display: none;
+}
 /* Flights (src/ui/table/fly.ts) and the drag's ghost (web/shared/edge/drag.ts): fixed, inert, over everything but the toast. */
 .flyer {
   position: fixed;

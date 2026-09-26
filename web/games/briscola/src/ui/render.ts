@@ -26,6 +26,7 @@
 // `table.tip`; `bindTip` turns the hand's pointer events into its intents) and the card view's
 // line (`paintCardView`, from `table.cardView`).
 import {
+  appendHtml,
   closestFrom,
   dataOf,
   escapeHtml,
@@ -119,6 +120,7 @@ import {
   scoreCells,
   scoreKey,
   scoreMode,
+  facePreloadHtml,
   scoreStripHtml,
   seatCellId,
   seatCells,
@@ -221,6 +223,25 @@ export const paintPack = (doc: PageLike, packName: CardPack['name']): void => {
     setStyle(el, '--back', backImageCss(back));
     setStyle(el, '--back-colour', back.colour);
   });
+};
+
+/**
+ * The pack's faces fetched once the table is up, not on a card's first appearance (the page
+ * review: a just-drawn card showed blank for a round trip): one hidden `.face-preload` block of
+ * `<img>`s appended to the body per pack (`body[data-faces]` is the key; a switch appends another,
+ * the pictures cached, the block inert), only while `#tableScreen` is the screen. Never at home or
+ * in the join flow: under the e2e proxy forty requests at boot starved the guest's join (CI run
+ * 36210397787, `shell-handoff.spec.ts` on the proxy project).
+ */
+export const paintFacePreload = (doc: PageLike, app: App, pack: CardPack): void => {
+  if (app.shell.screen !== 'tableScreen' || dataOf(doc.body, 'faces') === pack.name) return;
+  setAttr(doc.body, 'data-faces', pack.name);
+  appendHtml(
+    doc.body,
+    trustedHtml(
+      `<div class="face-preload" hidden aria-hidden="true">${facePreloadHtml(pack)}</div>`,
+    ),
+  );
 };
 
 // ---- the settle beat's picture (§5.4) -----------------------------------------------------------------
@@ -838,6 +859,7 @@ export const paint = (doc: PageLike, app: App): void => {
   paintCurtain(doc, app);
   paintHandoff(doc, app);
   paintGame(doc, app, pack, lang);
+  paintFacePreload(doc, app, pack);
   paintOverlays(doc, app);
   paintTip(doc, app, lang);
   paintCardView(doc, app, pack, lang);

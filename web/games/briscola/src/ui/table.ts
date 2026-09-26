@@ -18,9 +18,9 @@
 // language-packs.md): the face's `aria-label` wherever a `lang` is passed, and a `.card-name`
 // caption under each play of the trick (the owner: the suits are unfamiliar, so the table says
 // what was played) and under the stock for the briscola.
-import { DECKS } from '../../../../shared/lib/cards/decks.ts';
+import { DECKS, cardIds } from '../../../../shared/lib/cards/decks.ts';
 import type { CardPack } from '../../../../shared/lib/cards/packs.ts';
-import { resolveFace } from '../../../../shared/lib/cards/resolve.ts';
+import { resolveFace, type RatioUrl } from '../../../../shared/lib/cards/resolve.ts';
 import { cardName, type LanguagePack } from '../../../../shared/lib/lang/packs.ts';
 import { escapeHtml } from '../../../../shared/edge/dom.ts';
 import { backHtml, faceHtml } from '../../../../shared/ui/cardFace.ts';
@@ -47,6 +47,33 @@ export const DECK_KIND = 'italian40' as const;
 // ---- cards -----------------------------------------------------------------------------------------
 
 const ITALIAN = DECKS[DECK_KIND];
+
+/** The file a browser without `image-set()` fetches (cardFace.ts's plain fallback, the 2x where the pack has one): the one worth fetching ahead. */
+const preloadUrl = (urls: ReadonlyArray<RatioUrl>): string | null =>
+  (urls.find((u) => u.ratio === 2) ?? urls[0])?.url ?? null;
+
+/**
+ * The pack's pictures to fetch at table boot (the page review: a just-drawn card showed blank for
+ * one round trip on its first appearance): one `<img>` per picture the pack's faces name, each
+ * once (a sprite pack has one sheet for many cards), nothing for glyph faces (the renderer draws
+ * them), at low fetch priority so play's own requests go first. Painted hidden onto the body once
+ * per pack while the table is up (render.ts `paintFacePreload`).
+ */
+export const facePreloadHtml = (pack: CardPack): string => {
+  const urls = cardIds(DECK_KIND).flatMap((id) => {
+    const spec = resolveFace(pack, DECK_KIND, id);
+    const url =
+      spec?.kind === 'image'
+        ? preloadUrl(spec.urls)
+        : spec?.kind === 'sprite'
+          ? preloadUrl(spec.sheets)
+          : null;
+    return url === null ? [] : [url];
+  });
+  return [...new Set(urls)]
+    .map((url) => `<img src="${escapeHtml(url)}" alt="" decoding="async" fetchpriority="low">`)
+    .join('');
+};
 
 /** The English rank for an accessible label (§5.5): the figures keep their Italian names. */
 const RANK_EN: Readonly<Record<number, string>> = {
@@ -378,7 +405,9 @@ type ScoreSource = Pick<View, 'players' | 'options' | 'taken' | 'tricks' | 'side
 /**
  * The cells in side order: "Ann (you)" / "Bob" with `taken` and `tricks` per seat (a side is one
  * seat; a team's "Ann & Cara" is kept for the day teams return); `mine` marks my cell, `leading`
- * the one strictly ahead (nobody at a tie, so nobody at 0–0).
+ * the one strictly ahead (nobody at a tie, so nobody at 0–0). At four seats the "(you)" suffix goes
+ * (four cells across a phone ellipsised it to "Bob (y…", the live check of 2026-09-25): the `mine`
+ * hairline alone marks my cell.
  */
 export const scoreCells = (v: ScoreSource): ReadonlyArray<ScoreCell> => {
   const n = v.options.seatCount;
@@ -388,7 +417,7 @@ export const scoreCells = (v: ScoreSource): ReadonlyArray<ScoreCell> => {
     const name =
       seats.length > 1
         ? seats.map((seat) => nameOf(v.players, seat)).join(' & ')
-        : `${nameOf(v.players, seats[0] ?? 0)}${mine ? ' (you)' : ''}`;
+        : `${nameOf(v.players, seats[0] ?? 0)}${mine && n < 4 ? ' (you)' : ''}`;
     return {
       name,
       points: v.sides[side] ?? 0,
