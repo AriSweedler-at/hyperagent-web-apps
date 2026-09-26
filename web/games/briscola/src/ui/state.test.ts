@@ -23,12 +23,16 @@ import {
   withPosition,
 } from '../engine/index.ts';
 import type { Card, GameEvent, Seat, State, TrickRecord, View } from '../engine/index.ts';
+import { EMPTY_SEAT } from '../../../../shared/ui/shell.ts';
+import { WAITING_MSG } from '../../../../shared/net/host.ts';
 import {
   action as actionFrame,
+  full as fullFrame,
   intent as intentWire,
   lobby,
   state as stateFrame,
   toast as toastFrame,
+  welcome,
 } from '../protocol.ts';
 import { LOCAL_NAMES } from '../shellConfig.ts';
 import { DEFAULT_CARD_PACK, STORAGE_KEYS } from '../storage.ts';
@@ -50,6 +54,7 @@ import {
   SANDBOX_LOCAL_ONLY_MSG,
   SCREENS,
   SHELL_INTENT_TYPES,
+  TABLE_FULL_MSG,
   TIP_HOVER_MS,
   TIP_PRESS_MS,
   WAITING_FOR_GUEST_MSG,
@@ -57,6 +62,7 @@ import {
   cueKey,
   cuesBetween,
   guestContextOf,
+  guestGoneMsg,
   handoffLabel,
   hostContextOf,
   hostLeftMsg,
@@ -65,7 +71,10 @@ import {
   initialTable,
   continuedEvents,
   intentOf,
+  joinedMsg,
+  listNames,
   liveView,
+  pausedMsg,
   nextStage,
   phrasesBetween,
   playedBetween,
@@ -76,17 +85,21 @@ import {
   resumeLabel,
   runEffect,
   saveFor,
+  seatGoneMsg,
   seatNames,
   seatPlayers,
   awaitingDraw,
+  seatsDown,
   settleMs,
   settleSlots,
   trickResolvedBetween,
+  waitingMsg,
   waitingToDealMsg,
   type App,
   type Effect,
   type EffectDeps,
   type HomeSnapshot,
+  type Intent,
   type Raw,
   type Settle,
   type SettleStage,
@@ -895,7 +908,7 @@ describe('hosting and joining (two seats)', () => {
       [WAITING_FOR_GUEST_MSG, null],
     ]);
     const joined = run(room, { type: 'host/frame', frame: { t: 'join', name: 'Jeff' } });
-    expect(sends(joined.effects)).toEqual([lobby('Ann', DEFAULT_OPTS)]);
+    expect(sends(joined.effects)).toEqual([lobby('Ann', DEFAULT_OPTS, joined.app.shell.seats, 1)]);
     const dealt = run(joined.app, { type: 'host/deal' });
     const g = game(dealt.app);
     expect(g.players.map((p) => p.name)).toEqual(['Ann', 'Jeff']);
@@ -973,7 +986,7 @@ describe('hosting and joining (two seats)', () => {
     });
     const named = run(joining, {
       type: 'guest/frame',
-      frame: lobby('Ann', { ...DEFAULT_OPTS, scoperta: true }),
+      frame: lobby('Ann', { ...DEFAULT_OPTS, scoperta: true }, [], 1),
     }).app;
     expect(named.shell.guestStatus.text).toBe(hostRoomMsg('Ann'));
     expect(named.shell.opts).toEqual({ ...DEFAULT_OPTS, scoperta: true });
@@ -981,7 +994,7 @@ describe('hosting and joining (two seats)', () => {
     expect(
       run(joining, {
         type: 'guest/frame',
-        frame: lobby('Ann', { ...DEFAULT_OPTS, seatCount: 3, scoperta: true }),
+        frame: lobby('Ann', { ...DEFAULT_OPTS, seatCount: 3, scoperta: true }, [], 1),
       }).app.shell.opts,
     ).toEqual({ ...DEFAULT_OPTS, seatCount: 3 });
     const g = createGame(
@@ -1187,6 +1200,7 @@ describe('resume, storage and what the sessions read back', () => {
       handoff: false,
       oppName: null,
       oppConnected: false,
+      seats: [EMPTY_SEAT],
     });
     const gst = run(initialApp, { type: 'join/click', name: 'Jeff', code: 'ABCD' }).app;
     expect(saveFor(gst)).toEqual({ role: 'guest', code: 'ABCD', myName: 'Jeff' });
@@ -1649,7 +1663,7 @@ describe('the live intent mirror (docs/design/briscola-battle.md §4)', () => {
     const joined = run(
       initialApp,
       { type: 'join/click', name: 'Jeff', code: 'ABCD' },
-      { type: 'guest/frame', frame: lobby('Ann', DEFAULT_OPTS) },
+      { type: 'guest/frame', frame: lobby('Ann', DEFAULT_OPTS, [], 1) },
       { type: 'guest/connected' },
       { type: 'guest/frame', frame: stateFrame(v1) },
     ).app;
@@ -1680,5 +1694,285 @@ describe('the live intent mirror (docs/design/briscola-battle.md §4)', () => {
     const resent = run(back.app, { type: 'intent/flush' });
     expect(sends(resent.effects)).toEqual([raised]);
     expect(sends(run(resent.app, { type: 'intent/flush' }).effects)).toEqual([]);
+  });
+});
+
+describe('hosting and joining three and four seats (docs/design/n-seat-sessions.md §7)', () => {
+  const opts3 = { ...DEFAULT_OPTS, seatCount: 3 as const };
+  const opts4 = { ...DEFAULT_OPTS, seatCount: 4 as const };
+  const opened = (players: '3' | '4'): Step =>
+    run(
+      initialApp,
+      { type: 'home/init', home: { ...home, playMode: 'online' } },
+      { type: 'host/click', name: 'Ann', players },
+    );
+  const join = (name: string, seat: 1 | 2 | 3): Intent => ({
+    type: 'host/frame',
+    frame: { t: 'join', name },
+    seat,
+  });
+  /** Ann's table of three, Bob at seat 1 and Cara at seat 2. */
+  const seated3 = (): App => run(opened('3').app, join('Bob', 1), join('Cara', 2)).app;
+  const dealt3 = (): App => run(seated3(), { type: 'host/deal' }).app;
+  type Send = Extract<Effect, Readonly<{ type: 'send' }>>;
+  const sent = (effects: ReadonlyArray<Effect>): ReadonlyArray<Send> =>
+    effects.flatMap((e) => (e.type === 'send' ? [e] : []));
+
+  test('host/click at three: two empty seats, the session told the capacity and the waiting copy, the context carrying the seats, the options remembered', () => {
+    const { app, effects } = opened('3');
+    expect(app.shell).toMatchObject({
+      role: 'host',
+      mySeat: 0,
+      opts: opts3,
+      seats: [EMPTY_SEAT, EMPTY_SEAT],
+      startGameVisible: false,
+      screen: 'hostWaitScreen',
+    });
+    expect(effects.find((e) => e.type === 'startHost')).toEqual({
+      type: 'startHost',
+      code: app.shell.code,
+      attempt: 1,
+      resume: false,
+      capacity: 3,
+      waiting: 'Waiting for 2 players to join',
+    });
+    expect(waitingMsg(3)).toBe('Waiting for 2 players to join');
+    expect(waitingMsg(2)).toBe(WAITING_MSG);
+    expect(effects.at(-1)).toEqual({ type: 'writeOpts', opts: opts3 });
+    expect(hostContextOf(app)).toMatchObject({ seatCount: 3, seats: [EMPTY_SEAT, EMPTY_SEAT] });
+    expect(opened('4').app.shell.seats).toEqual([EMPTY_SEAT, EMPTY_SEAT, EMPTY_SEAT]);
+  });
+
+  test('joins fill the seats the session names, each connected seat sent the lobby with the table and its own `you`; Start waits for the full table (fixed), the deal refused with the count until then', () => {
+    const one = run(opened('3').app, join('Bob', 1));
+    expect(one.app.shell.seats).toEqual([{ name: 'Bob', connected: true }, EMPTY_SEAT]);
+    expect(one.app.shell).toMatchObject({
+      oppName: 'Bob',
+      oppConnected: true,
+      startGameVisible: false,
+      hostStatus: { text: 'Bob joined! Waiting for 1 more.' },
+    });
+    expect(sent(one.effects)).toEqual([
+      { type: 'send', frame: lobby('Ann', opts3, one.app.shell.seats, 1), seat: 1 },
+    ]);
+    expect(sent(one.effects)[0]?.frame).toMatchObject({
+      t: 'lobby',
+      seats: one.app.shell.seats,
+      you: 1,
+    });
+    expect(toasts(run(one.app, { type: 'host/deal' }).effects)).toEqual([
+      ['2 of 3 seated — waiting for 1 more.', null],
+    ]);
+    const two = run(one.app, join('Cara', 2));
+    expect(two.app.shell.seats).toEqual([
+      { name: 'Bob', connected: true },
+      { name: 'Cara', connected: true },
+    ]);
+    expect(two.app.shell).toMatchObject({
+      startGameVisible: true,
+      hostStatus: { text: joinedMsg('Cara') },
+    });
+    expect(sent(two.effects).map((e) => e.seat)).toEqual([1, 2]);
+    expect(sent(two.effects)[1]?.frame).toEqual(lobby('Ann', opts3, two.app.shell.seats, 2));
+    // A name is deduped against the host and every seat.
+    const same = run(one.app, join('bob', 2));
+    expect(same.app.shell.seats[1]?.name).toBe('bob 2');
+  });
+
+  test('host/deal at three: the host and both seats in order (ids host, guest, guest2), one state frame per seat with that seat`s view; an action is applied as the seat it came in on, a refusal is a toast frame to that seat alone', () => {
+    const { app, effects } = run(seated3(), { type: 'host/deal' });
+    const g = game(app);
+    expect(g.players).toEqual([
+      { id: 'host', name: 'Ann' },
+      { id: 'guest', name: 'Bob' },
+      { id: 'guest2', name: 'Cara' },
+    ]);
+    expect(g.options).toEqual(opts3);
+    expect(g.hands).toHaveLength(3);
+    expect(view(app)).toEqual(viewFor(g, 0));
+    expect(app.shell.screen).toBe('tableScreen');
+    expect(sent(effects)).toEqual([
+      { type: 'send', frame: stateFrame(viewFor(g, 1)), seat: 1 },
+      { type: 'send', frame: stateFrame(viewFor(g, 2)), seat: 2 },
+    ]);
+    const actor = actorOf(g) ?? 0;
+    const other = ([1, 2] as const).find((seat) => seat !== actor) ?? 1;
+    const wrong = run(app, {
+      type: 'host/frame',
+      frame: actionFrame({ type: 'play', cardId: g.hands[other]?.[0]?.id ?? '' }),
+      seat: other,
+    });
+    expect(wrong.app.shell.game).toBe(g);
+    expect(sent(wrong.effects)).toEqual([
+      { type: 'send', frame: toastFrame(MESSAGES.NOT_YOUR_TURN), seat: other },
+    ]);
+    if (actor !== 0) {
+      const played = run(app, {
+        type: 'host/frame',
+        frame: actionFrame({ type: 'play', cardId: g.hands[actor]?.[0]?.id ?? '' }),
+        seat: actor,
+      });
+      expect(game(played.app).trick).toEqual([{ seat: actor, card: g.hands[actor]?.[0] }]);
+      expect(sent(played.effects).map((e) => e.seat)).toEqual([1, 2]);
+    }
+  });
+
+  test('a seat down mid-game pauses the trick: the toast names its player, the host`s hand is inert, a guest`s play is refused with who is missing; back by name (the session`s seat) the seat is renamed and everyone connected gets the view', () => {
+    const app = dealt3();
+    const gone = run(app, { type: 'host/guestGone', iceFailed: null, seat: 2 });
+    expect(gone.app.shell.seats).toEqual([
+      { name: 'Bob', connected: true },
+      { name: 'Cara', connected: false },
+    ]);
+    expect(toasts(gone.effects)).toEqual([[guestGoneMsg('Cara', app.shell.code), GONE_TOAST_MS]]);
+    expect(seatsDown(gone.app)).toEqual(['Cara']);
+    expect(liveView(gone.app)).toBeNull();
+    expect(pausedMsg(['Cara'])).toBe('Waiting for Cara to reconnect…');
+    expect(pausedMsg(['Bob', 'Cara'])).toBe('Waiting for Bob and Cara to reconnect…');
+    expect(listNames(['Ann', 'Bob', 'Cara'])).toBe('Ann, Bob and Cara');
+    const g = game(app);
+    const refused = run(gone.app, {
+      type: 'host/frame',
+      frame: actionFrame({ type: 'play', cardId: g.hands[1]?.[0]?.id ?? '' }),
+      seat: 1,
+    });
+    expect(refused.app).toBe(gone.app);
+    expect(refused.effects).toEqual([
+      { type: 'send', frame: toastFrame('Waiting for Cara to reconnect…'), seat: 1 },
+    ]);
+    // Seat 1 is still up: nothing is paused for the guest's own view, and the host is not toasted twice.
+    expect(seatsDown({ ...gone.app, shell: { ...gone.app.shell, role: 'guest' } })).toEqual([]);
+    // Back: a join on seat 2 (the session reseated the name, D6) renames the seat and broadcasts.
+    const back = run(gone.app, join('Cara', 2));
+    expect(back.app.shell.seats[1]).toEqual({ name: 'Cara', connected: true });
+    expect(game(back.app).players[2]?.name).toBe('Cara');
+    expect(sent(back.effects).map((e) => e.seat)).toEqual([1, 2]);
+    expect(seatsDown(back.app)).toEqual([]);
+    expect(liveView(back.app)).toEqual(view(back.app).isMyTurn ? view(back.app) : null);
+    // A seat never named is its number; ICE failed is the status alone, the seat kept as down.
+    expect(seatGoneMsg(null, 'ABCD', 2)).toBe(guestGoneMsg('Seat 3', 'ABCD'));
+    const iced = run(app, { type: 'host/guestGone', iceFailed: 'ICE failed', seat: 1 }).app;
+    expect(iced.shell.hostStatus.text).toBe('ICE failed');
+    expect(seatsDown(iced)).toEqual(['Bob']);
+  });
+
+  test('a seat leaving the lobby reads empty again with the count, Start hidden, the others told the new lobby', () => {
+    const left = run(seated3(), { type: 'host/guestGone', iceFailed: null, seat: 1 });
+    expect(left.app.shell.seats).toEqual([EMPTY_SEAT, { name: 'Cara', connected: true }]);
+    expect(left.app.shell.hostStatus.text).toBe('Bob left. 2 of 3 seated.');
+    expect(left.app.shell.startGameVisible).toBe(false);
+    expect(sent(left.effects)).toEqual([
+      { type: 'send', frame: lobby('Ann', opts3, left.app.shell.seats, 2), seat: 2 },
+    ]);
+  });
+
+  test('the save carries the seat names; resume reopens the table at three with every seat named and down (the trick paused until they are back)', () => {
+    const app = dealt3();
+    const save = saveFor(app);
+    expect(save).toMatchObject({ role: 'host', seatCount: 3, seatNames: ['Bob', 'Cara'] });
+    const offer = resumeFor(save);
+    expect(offer).toMatchObject({ kind: 'host', seatNames: ['Bob', 'Cara'] });
+    const resumed = run(
+      initialApp,
+      { type: 'home/init', home: { ...home, playMode: 'online', save } },
+      { type: 'resume/click' },
+    );
+    expect(resumed.app.shell).toMatchObject({
+      role: 'host',
+      code: app.shell.code,
+      opts: opts3,
+      seats: [
+        { name: 'Bob', connected: false },
+        { name: 'Cara', connected: false },
+      ],
+      game: game(app),
+      screen: 'hostWaitScreen',
+    });
+    expect(resumed.effects.find((e) => e.type === 'startHost')).toMatchObject({
+      code: app.shell.code,
+      resume: true,
+      capacity: 3,
+      waiting: waitingMsg(3),
+    });
+    expect(seatsDown(resumed.app)).toEqual(['Bob', 'Cara']);
+    expect(liveView(resumed.app)).toBeNull();
+    // A two-seat save stays the legacy literal: no seat names.
+    const two = run(
+      initialApp,
+      { type: 'home/init', home: { ...home, playMode: 'online' } },
+      { type: 'host/click', name: 'Ann', players: '2' },
+      { type: 'host/frame', frame: { t: 'join', name: 'Jeff' } },
+      { type: 'host/deal' },
+    ).app;
+    expect(saveFor(two)).not.toHaveProperty('seatNames');
+  });
+
+  test('the guest at a table of four: welcome and lobby name my seat and list the table, the status counts the seated; full is the table`s copy; a state frame is my seat`s view', () => {
+    const joining = run(
+      initialApp,
+      { type: 'home/init', home },
+      { type: 'join/click', name: 'Cara', code: 'ABCD' },
+    ).app;
+    const seats = [{ name: 'Bob', connected: true }, { name: null, connected: true }, EMPTY_SEAT];
+    const welcomed = run(joining, {
+      type: 'guest/frame',
+      frame: welcome('Ann', opts4, seats, 2),
+    }).app;
+    expect(welcomed.shell).toMatchObject({ mySeat: 2, seats, opts: opts4, oppName: 'Ann' });
+    expect(welcomed.shell.guestStatus.text).toBe(
+      'Connected — 3 of 4 seated · waiting for Ann to deal',
+    );
+    const table = [
+      seats[0] ?? EMPTY_SEAT,
+      { name: 'Cara', connected: true },
+      { name: 'Dan', connected: true },
+    ];
+    const named = run(welcomed, { type: 'guest/frame', frame: lobby('Ann', opts4, table, 2) }).app;
+    expect(named.shell).toMatchObject({ mySeat: 2, seats: table });
+    expect(named.shell.guestStatus.text).toBe(
+      'Connected — 4 of 4 seated · waiting for Ann to deal',
+    );
+    expect(
+      run(joining, { type: 'guest/frame', frame: fullFrame() }).app.shell.guestStatus.text,
+    ).toBe(TABLE_FULL_MSG);
+    const g = createGame(
+      [
+        { id: 'host', name: 'Ann' },
+        { id: 'guest', name: 'Bob' },
+        { id: 'guest2', name: 'Cara' },
+        { id: 'guest3', name: 'Dan' },
+      ],
+      { gamesToWin: 1 },
+      mulberry32(3),
+      () => NOW,
+    );
+    const shown = run(
+      named,
+      { type: 'guest/connected' },
+      { type: 'guest/frame', frame: stateFrame(viewFor(g, 2)) },
+    ).app;
+    expect(shown.shell.screen).toBe('tableScreen');
+    expect(view(shown).me.idx).toBe(2);
+    expect(view(shown).players.map((p) => p.name)).toEqual(['Ann', 'Bob', 'Cara', 'Dan']);
+    // A guest's own seat never reads as down: the pause is the host's.
+    expect(seatsDown(shown)).toEqual([]);
+  });
+
+  test('the intent lane at three: the host relays a seat`s frame to every other connected seat and never back, not to a seat that is down; the mirror cleared is the seat that went', () => {
+    const app = dealt3();
+    const hover = intentWire(1, 0, 'hover');
+    const relayed = run(app, { type: 'host/frame', frame: hover, seat: 1 });
+    expect(relayed.app.table.mirror[1]).toEqual({ slot: 0, mode: 'hover' });
+    expect(relayed.effects).toEqual([{ type: 'send', frame: hover, seat: 2 }]);
+    const fromTwo = run(relayed.app, {
+      type: 'host/frame',
+      frame: intentWire(2, 1, 'raised'),
+      seat: 2,
+    });
+    expect(fromTwo.effects).toEqual([{ type: 'send', frame: intentWire(2, 1, 'raised'), seat: 1 }]);
+    const gone = run(fromTwo.app, { type: 'host/guestGone', iceFailed: null, seat: 2 }).app;
+    expect(gone.table.mirror[1]).toEqual({ slot: 0, mode: 'hover' });
+    expect(gone.table.mirror[2]).toBeNull();
+    expect(run(gone, { type: 'host/frame', frame: hover, seat: 1 }).effects).toEqual([]);
   });
 });

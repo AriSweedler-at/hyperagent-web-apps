@@ -114,8 +114,12 @@ describe('paintHome', () => {
     // Two seats: the third and fourth name inputs are put away.
     expect(p.get('moreNames').hidden()).toBe(true);
     expect(p.get(EXTRA_NAME_INPUTS[3]).hidden()).toBe(true);
-    // The Online seat count is left as the page ships it (three and four are disabled there, D16).
-    expect(p.get('playersSel').value()).toBe('');
+    // One count for both panels: the Online select follows the room's too, and its three and four
+    // open a table online (docs/design/n-seat-sessions.md §7; the page no longer disables them).
+    expect(p.get('playersSel').value()).toBe('2');
+    expect(MARKUP).not.toContain('online soon');
+    paintHome(p.doc, withOpts({ seatCount: 4 }));
+    expect(p.get('playersSel').value()).toBe('4');
   });
 
   test('three and four seats show the extra names, painted from the table`s memory', () => {

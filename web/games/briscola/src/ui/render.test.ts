@@ -20,6 +20,7 @@ import {
   cardById,
   deckFor,
   nameOf,
+  viewFor,
   withPosition,
   type Card,
   type Seat,
@@ -45,6 +46,8 @@ import {
   replayLabel,
   resultLine,
   resultSheetText,
+  seatConnected,
+  sideRowsHtml,
   statusText,
   takesText,
   IMPACT_SUIT,
@@ -62,6 +65,7 @@ import {
   type Raw,
 } from './state.ts';
 import { cardNameOf, handKey, trickKey } from './table.ts';
+import { welcome } from '../protocol.ts';
 
 import MARKUP from '../../index.html?raw';
 
@@ -192,9 +196,11 @@ describe('the shell painters and the pack', () => {
     expect(p.get('soundBtn').attr('aria-pressed')).toBe('false');
   });
 
-  test('connDotClass: on/off, hidden in pass-and-play', () => {
+  test('connDotClass: on/off (the legacy pair`s, or the seat`s when told), hidden in pass-and-play', () => {
     expect(connDotClass(initialApp)).toBe('conn-dot off');
+    expect(connDotClass(initialApp, true)).toBe('conn-dot on');
     expect(connDotClass(local())).toBe('conn-dot on hidden');
+    expect(connDotClass(local(), false)).toBe('conn-dot off hidden');
   });
 
   test('paint at home: the pack`s tokens written once, the table untouched, the sheets down', () => {
@@ -1306,5 +1312,131 @@ describe('the impact frame markup (docs/design/briscola-battle.md §3.5)', () =>
     expect(scatter.sparkle).toBe('scatter');
     expect((clashFxHtml(scatter).match(/class="sparkle"/g) ?? []).length).toBe(8);
     expect(clashFxHtml(scatter)).toContain('href="#sparkle"');
+  });
+});
+
+describe('three and four seats online (docs/design/n-seat-sessions.md §7)', () => {
+  const opts3 = { ...DEFAULT_OPTS, seatCount: 3 as const };
+  const online: HomeSnapshot = { ...home, playMode: 'online' };
+  const join = (name: string, seat: 1 | 2 | 3): Intent => ({
+    type: 'host/frame',
+    frame: { t: 'join', name },
+    seat,
+  });
+  /** Ann's table of three, Bob at seat 1 and Cara at seat 2, dealt. */
+  const dealt3 = (): App =>
+    run(
+      initialApp,
+      { type: 'home/init', home: online },
+      { type: 'host/click', name: 'Ann', players: '3' },
+      join('Bob', 1),
+      join('Cara', 2),
+      { type: 'host/deal' },
+    ).app;
+
+  test('the waiting rooms list the seats: the host first, each guest seat by name or number, the viewer`s own marked; the guest`s list comes off the welcome', () => {
+    const p = page();
+    const room = run(
+      initialApp,
+      { type: 'home/init', home: online },
+      { type: 'host/click', name: 'Ann', players: '3' },
+      join('Bob', 1),
+    ).app;
+    paint(p.doc, room);
+    expect(shown(p)).toEqual(['hostWaitScreen']);
+    expect(p.get('seatList').text()).toBe(
+      '<li data-seat="0" data-connected="true" data-you="">Ann · host · you</li><li data-seat="1" data-connected="true">Bob</li><li data-seat="2" data-connected="false">Seat 3 · empty</li>',
+    );
+    expect(p.get('hostWaitStatus').text()).toBe('Bob joined! Waiting for 1 more.');
+    expect(p.get('startGameBtn').hidden()).toBe(true);
+    // Every seat taken: Start shows; the list is rebuilt only when a seat changes (the keyed slot).
+    const full = run(room, join('Cara', 2)).app;
+    paint(p.doc, full);
+    expect(p.get('startGameBtn').hidden()).toBe(false);
+    expect(p.get('seatList').text()).toContain('<li data-seat="2" data-connected="true">Cara</li>');
+    const key = p.get('seatList').attr('data-key');
+    paint(p.doc, full);
+    expect(p.get('seatList').attr('data-key')).toBe(key);
+    // The guest at seat 2, its join not yet heard: the table off the welcome, its own row marked.
+    const guest = run(
+      initialApp,
+      { type: 'home/init', home: online },
+      { type: 'join/click', name: 'Cara', code: 'ABCD' },
+      {
+        type: 'guest/frame',
+        frame: welcome(
+          'Ann',
+          opts3,
+          [
+            { name: 'Bob', connected: true },
+            { name: null, connected: true },
+          ],
+          2,
+        ),
+      },
+    ).app;
+    paint(p.doc, guest);
+    expect(shown(p)).toEqual(['guestWaitScreen']);
+    expect(p.get('guestSeatList').text()).toBe(
+      '<li data-seat="0" data-connected="true">Ann · host</li><li data-seat="1" data-connected="true">Bob</li><li data-seat="2" data-connected="true" data-you="">Seat 3 · you · empty</li>',
+    );
+    expect(p.get('guestWaitStatus').text()).toBe(
+      'Connected — 3 of 3 seated · waiting for Ann to deal',
+    );
+  });
+
+  test('at the table each seat`s dot and `gone` follow its own channel; a seat down pauses the trick (the hand inert, the status naming who is to reconnect); back, it resumes; a guest reads the host off the pair and the other seats as up', () => {
+    const p = page();
+    const app = dealt3();
+    paint(p.doc, app);
+    expect(p.get('seats').attr('data-players')).toBe('3');
+    expect(p.get('seatR1').attr('data-seat')).toBe('1');
+    expect(p.get('seatR3').attr('data-seat')).toBe('2');
+    expect(p.get('seatR1').text()).toContain('conn-dot on');
+    expect(p.get('seatR3').text()).toContain('conn-dot on');
+    expect(p.get('seatR3').hasClass('gone')).toBe(false);
+    const gone = run(app, { type: 'host/guestGone', iceFailed: null, seat: 2 }).app;
+    paint(p.doc, gone);
+    expect(p.get('seatR3').hasClass('gone')).toBe(true);
+    expect(p.get('seatR3').text()).toContain('conn-dot off');
+    expect(p.get('seatR1').hasClass('gone')).toBe(false);
+    expect(p.get('seatR1').text()).toContain('conn-dot on');
+    expect(p.get('statusText').text()).toBe('Waiting for Cara to reconnect…');
+    expect(p.get('hand').hasClass('inert')).toBe(true);
+    expect(seatConnected(gone, 1)).toBe(true);
+    expect(seatConnected(gone, 2)).toBe(false);
+    const back = run(gone, join('Cara', 2)).app;
+    paint(p.doc, back);
+    expect(p.get('seatR3').hasClass('gone')).toBe(false);
+    expect(p.get('statusText').text()).not.toContain('reconnect');
+    // A guest: the host's dot is the pair's, the other guests' channels are unknown to it, so up.
+    const asGuest: App = {
+      ...app,
+      shell: { ...app.shell, role: 'guest', oppConnected: false, view: viewFor(game(app), 1) },
+    };
+    expect(seatConnected(asGuest, 0)).toBe(false);
+    expect(seatConnected(asGuest, 2)).toBe(true);
+    paint(p.doc, asGuest);
+    expect(p.get('statusText').text()).not.toContain('reconnect');
+  });
+
+  test('the result sheet at four lists every seat by points, the winner first (a free-for-all, no teams); one row per seat', () => {
+    const app = local({ localPlayers: '4', p3: 'Cara', p4: 'Dan' });
+    const v = view(app);
+    const totals = [30, 20, 50, 20];
+    const over: View = {
+      ...v,
+      phase: 'over',
+      sides: totals,
+      result: { winner: 2, totals, draw: false },
+    };
+    expect(resultSheetText(over)).toEqual({
+      title: 'Cara wins the game',
+      sub: 'Cara 50 · Ann 30 · Bob 20 · Dan 20',
+    });
+    expect(sideRowsHtml(over)).toBe(
+      '<div class="score-row"><span class="who">Ann</span><span>30</span></div><div class="score-row"><span class="who">Bob</span><span>20</span></div><div class="score-row"><span class="who">Cara</span><span>50</span></div><div class="score-row"><span class="who">Dan</span><span>20</span></div>',
+    );
+    expect(resultLine(over)).toBe('Cara wins 50–30–20–20');
   });
 });

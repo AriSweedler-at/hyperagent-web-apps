@@ -70,9 +70,9 @@ import {
   type HomeSnapshot as SharedHomeSnapshot,
   type HostContextOf,
   type Intent as SharedIntent,
-  type Player,
   type Resume as SharedResume,
   type Role,
+  type SeatState,
   type ShellApp,
   type ShellConfig,
   type ShellIntent as SharedShellIntent,
@@ -101,7 +101,6 @@ import type {
   GameEvent,
   GameOptions,
   Played,
-  Players,
   Seat,
   SeatCount,
   State,
@@ -111,11 +110,12 @@ import type {
 import {
   action as actionFrame,
   intent as intentFrame,
+  toast as toastFrame,
   type IntentFrame,
   type IntentMode,
   type IntentSlot,
 } from '../protocol.ts';
-import { BRISCOLA_SHELL, parseOpts } from '../shellConfig.ts';
+import { BRISCOLA_SHELL, emptySeatName, parseOpts, seatPlayers } from '../shellConfig.ts';
 import { DURATIONS, drawRunMs, drawSpan, durationsFor, freezeMsFor, stageMs } from './beat.ts';
 import { TEMPO_SCALE, variantOf, type Variant } from './variant.ts';
 import {
@@ -163,11 +163,19 @@ export {
   LEAVE_LOCAL_MSG,
   LEAVE_ONLINE_MSG,
   ONE_GAME,
+  TABLE_FULL_MSG,
   TABLE_TERMS,
+  emptySeatName,
   hostRoomMsg,
+  joinedText,
+  notEnoughMsg,
   parseOpts,
   parseSeatCount,
   pickOpts,
+  seatGoneMsg,
+  seatLeftMsg,
+  seatPlayers,
+  waitingMsg,
 } from '../shellConfig.ts';
 // ui/home.ts paints the tabs and modes from the lists storage.ts decodes; ui/ may not import storage.ts.
 export {
@@ -699,13 +707,38 @@ const settled = (table: Table, v: View): Table => {
 export const resultOpen = (app: App): boolean =>
   app.shell.view?.phase === 'over' && app.table.settle === null && !app.table.resultDismissed;
 
-/** My view while I may play and the hand is live; null under the curtain, while a trick settles, or on another seat's turn (`#hand.inert`). */
+/**
+ * The seats whose channel is down mid-game, by name (a seat never named by its number), as the
+ * host knows them (`shell.seats`, n-seat-sessions.md §7); [] for a guest, whose view carries no
+ * channel state, in pass-and-play and before the deal. While one is down the trick is paused: the
+ * host's hand is inert (`liveView`), a guest's action is refused with `pausedMsg` (`reduce`), and
+ * the status line names who is to reconnect (render.ts `statusText`).
+ */
+export const seatsDown = (app: App): ReadonlyArray<string> =>
+  app.shell.role === 'host' && app.shell.game !== null
+    ? app.shell.seats.flatMap((seat, i) =>
+        seat.connected ? [] : [seat.name ?? emptySeatName(i + 1)],
+      )
+    : [];
+
+/** "Ann", "Ann and Cara", "Ann, Cara and Dan" (the curtain's and the pause's lists). */
+export const listNames = (names: ReadonlyArray<string>): string =>
+  names.length <= 1
+    ? (names[0] ?? '')
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1] ?? ''}`;
+
+/** The status line and the toast frame while a seat is down: "Waiting for Bob to reconnect…". */
+export const pausedMsg = (names: ReadonlyArray<string>): string =>
+  `Waiting for ${listNames(names)} to reconnect…`;
+
+/** My view while I may play and the hand is live; null under the curtain, while a trick settles, on another seat's turn, or while a seat is down (`#hand.inert`). */
 export const liveView = (app: App): View | null => {
   const v = app.shell.view;
   return v?.isMyTurn === true &&
     v.phase === 'trick' &&
     app.table.curtain === null &&
-    app.table.settle === null
+    app.table.settle === null &&
+    seatsDown(app).length === 0
     ? v
     : null;
 };
@@ -880,20 +913,6 @@ const replayDecided = (app: App, game: State, ctx: Context): Step => {
 };
 
 // ---- seats, names and labels -------------------------------------------------------------------
-
-/** The engine's `Players` tuple for `n` seats from a list (a missing seat is `Player N`, which `localSeats` never leaves). */
-export const seatPlayers = (n: SeatCount, seats: ReadonlyArray<Player>): Players => {
-  const at = (i: number): Player =>
-    seats[i] ?? { id: `p${String(i + 1)}`, name: `Player ${String(i + 1)}` };
-  switch (n) {
-    case 2:
-      return [at(0), at(1)];
-    case 3:
-      return [at(0), at(1), at(2)];
-    case 4:
-      return [at(0), at(1), at(2), at(3)];
-  }
-};
 
 /** "Ann vs Bob" for two (the shared shell specs' shape), "Ann, Bob and Cara" for more. */
 export const seatNames = (names: ReadonlyArray<string>): string =>
@@ -1223,9 +1242,9 @@ const spendBudget = (
 /**
  * A frame off the lane (`cfg.table.ephemeral`, §4.3, §4.4). The host is authoritative: a frame
  * whose seat is not its channel's is dropped, one over the seat's budget is dropped in silence, the
- * rest replaces that seat's mirror (last write wins; the relay to other seats is PR-5's, at two
- * seats there is no one to relay to). A guest takes the host's frame (and, after PR-5, a relayed
- * one) for any seat but its own.
+ * rest replaces that seat's mirror (last write wins) and goes on to every other connected seat as
+ * it came (one `send` per seat; at two seats there is no one to relay to, so no effect). A guest
+ * takes the host's frame, or a relayed one, for any seat but its own.
  */
 const ephemeral: NonNullable<ShellConfig<Briscola>['table']['ephemeral']> = (
   app,
@@ -1237,7 +1256,10 @@ const ephemeral: NonNullable<ShellConfig<Briscola>['table']['ephemeral']> = (
     if (frame.seat !== seat) return pure(app);
     const budget = spendBudget(app.table.budget, seat, ctx.now());
     if (budget === null) return pure(app);
-    return pure(withTable(app, { mirror: setMirror(app.table.mirror, frame), budget }));
+    const relayed: ReadonlyArray<Effect> = app.shell.seats.flatMap((s, i) =>
+      s.connected && i + 1 !== seat ? [{ type: 'send', frame, seat: (i + 1) as Seat }] : [],
+    );
+    return step(withTable(app, { mirror: setMirror(app.table.mirror, frame), budget }), ...relayed);
   }
   if (frame.seat === app.shell.view?.me.idx) return pure(app);
   return pure(withTable(app, { mirror: setMirror(app.table.mirror, frame) }));
@@ -1358,11 +1380,15 @@ const localStart = (
 /**
  * The rejoin paths (§4.2): a `join` while a game is on (the host re-broadcasts the state) and the
  * guest's `connected` reset `sent`, so a HELD lift reaches a peer that came back mid-hand; the host
- * losing its guest clears that seat's mirror (§4.4; seat 1 until PR-5 names the channel).
+ * losing a guest clears that seat's mirror (§4.4; the channel's seat, 1 for a two-seat adapter).
  */
 const forIntent = (app: App, intent: Intent): App => {
-  if (intent.type === 'host/guestGone')
-    return withTable(app, { mirror: setMirror(app.table.mirror, intentFrame(1, null, 'hover')) });
+  if (intent.type === 'host/guestGone') {
+    const seat = intent.seat ?? 1;
+    return withTable(app, {
+      mirror: setMirror(app.table.mirror, intentFrame(seat, null, 'hover')),
+    });
+  }
   const rejoined =
     (intent.type === 'host/frame' && intent.frame.t === 'join' && app.shell.game !== null) ||
     intent.type === 'guest/connected';
@@ -1375,6 +1401,16 @@ const reduceInner = (app: App, intent: Intent, ctx: Context): Step => {
   if (intent.type === 'local/click') return localStart(app, intent, ctx);
   // The handoff is a two-seat room (D17): offered at two players only.
   if (intent.type === 'handoff/click' && seatCountOf(app) !== 2) return pure(app);
+  // A seat is down mid-game: the trick waits for it, so a guest's play is refused with who is missing.
+  if (intent.type === 'host/frame' && intent.frame.t === 'action') {
+    const down = seatsDown(app);
+    if (down.length > 0)
+      return step(app, {
+        type: 'send',
+        frame: toastFrame(pausedMsg(down)),
+        seat: intent.seat ?? 1,
+      });
+  }
   if (!isShellIntent(intent)) return tableIntent(app, intent, ctx);
   const shell = reduceShell(app, intent, ctx, BRISCOLA);
   // The room's options are remembered as the table opens.
@@ -1400,11 +1436,16 @@ export const readHome = (store: Store): HomeSnapshot => shellReadHome(store, BRI
 
 // ---- what the sessions read back ---------------------------------------------------------------
 
-/** The host session's context: the shell's fields and the room's six options (web/shared/net/host.ts `HostContext<Room>`). */
-export type HostContext = HostContextOf<Briscola> & HostExtra;
+/** The host session's context: the shell's fields, the room's six options and the guest seats as the shell holds them, which the codec's welcome lists past two seats (net/host.ts `HostContext`). */
+export type HostContext = HostContextOf<Briscola> &
+  HostExtra &
+  Readonly<{ seats: ReadonlyArray<SeatState> }>;
 export type GuestContext = GuestContextOf;
 
-export const hostContextOf = (app: App): HostContext => shellHostContextOf(app.shell);
+export const hostContextOf = (app: App): HostContext => ({
+  ...shellHostContextOf(app.shell),
+  seats: app.shell.seats,
+});
 
 export const guestContextOf = (app: App): GuestContext => shellGuestContextOf(app.shell);
 

@@ -96,13 +96,13 @@ export const readLocalOptions = (doc: DocumentLike): Raw => ({
 });
 
 /**
- * The room's seat count into the pass-and-play select (written only when it differs, so an open
- * select is left alone). The Online seat count stays as the page ships it: three and four are
- * disabled there until the N-seat lobby lands (D16), and the shell's count may be a pass-and-play
- * choice.
+ * The room's seat count into both panels' selects (written only when it differs, so an open
+ * select is left alone): one count, the Online table's and pass-and-play's alike (D3; the N-seat
+ * lobby lands with docs/design/n-seat-sessions.md §7, so three and four open online too).
  */
 const paintOptions = (doc: DocumentLike, app: App): void => {
   const o = app.shell.opts;
+  setValue(requireId(doc, ONLINE.players), String(o.seatCount));
   setValue(requireId(doc, LOCAL.players), String(o.seatCount));
   // The third and fourth seats' inputs show with the count, holding the names as last read or
   // typed, or the seat's default marked for the first-tap clear (shellConfig.ts LOCAL_NAMES: the
