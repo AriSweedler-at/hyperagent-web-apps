@@ -34,7 +34,7 @@ import {
 import { launchClone } from '../../../../shared/edge/motion.ts';
 import type { Speed } from '../../../../shared/lib/speed.ts';
 import type { Played, Seat, TrickRecord } from '../engine/index.ts';
-import { drawSpan, stageMs } from './beat.ts';
+import { DEAL_ROUNDS, drawSpan, stageMs } from './beat.ts';
 import { seatCellId, type RelativeCell } from './table.ts';
 
 // ---- durations (§5.3): the pure clock is ui/beat.ts's, named through this module for the painter ------
@@ -94,6 +94,16 @@ export const handCard = (id: string): Target => ({
 export const seatCards = (cell: RelativeCell): Target => ({
   id: seatCellId(cell),
   within: '.seat-cards .card:last-child',
+});
+/** A relative cell's `k`-th held card, 1-based (a dealt back lands on it). */
+export const seatCardAt = (cell: RelativeCell, k: number): Target => ({
+  id: seatCellId(cell),
+  within: `.seat-cards .card:nth-child(${String(k)})`,
+});
+/** My `k`-th hand slot's card, 1-based (a dealt card lands on it, face up or down under the curtain). */
+export const handSlot = (k: number): Target => ({
+  id: 'hand',
+  within: `.slot:nth-child(${String(k)}) .card`,
 });
 /** The newest chip of a relative cell's taken strip (a won trick lands on it). */
 export const seatTaken = (cell: RelativeCell): Target => ({
@@ -236,6 +246,35 @@ export const newPlays = (
   prev: ReadonlyArray<Played>,
   shown: ReadonlyArray<Played>,
 ): ReadonlyArray<Played> => shown.filter((p) => !prev.some((q) => q.card.id === p.card.id));
+
+// ---- the deal (docs/design/briscola-battle.md §7 PR-H, §2.2 A3) ---------------------------------------------
+
+/**
+ * The deal, one card at a time: a back from the stock per card, `order`'s seats (the leader first,
+ * on round the table) once a round for `DEAL_ROUNDS` rounds, each leaving `dealGap` after the one
+ * before at `deal`'s pace on this device (ui/beat.ts, so the speed switch and reduced motion
+ * apply), landing on `to(seat, round)` (1-based: my slot, a seat's back), hidden until it does.
+ * Cosmetic: the engine dealt three at once and the view already holds every card; the paint alone
+ * shows them arriving the way Loodens' rules deal ("una alla volta").
+ */
+export const dealFlights = (
+  order: ReadonlyArray<Seat>,
+  to: (seat: Seat, round: number) => Target,
+  speed: Speed,
+  reduced: boolean,
+): ReadonlyArray<Flight> => {
+  const ms = stageMs('deal', speed, reduced);
+  const gap = stageMs('dealGap', speed, reduced);
+  return Array.from({ length: DEAL_ROUNDS }, (_, r) => r).flatMap((r) =>
+    order.map((seat, j) => ({
+      from: STOCK,
+      to: to(seat, r + 1),
+      ms,
+      delayMs: (r * order.length + j) * gap,
+      hideArrival: true as const,
+    })),
+  );
+};
 
 /** When the last flight has landed, in ms after the repaint; 0 for none. */
 export const totalMs = (flights: ReadonlyArray<Flight>): number =>

@@ -85,6 +85,7 @@ import {
   exchangeCardFor,
   nameOf,
   resultText,
+  seatsFrom,
   seatsOfSide,
   sideList,
   sideOf,
@@ -102,6 +103,7 @@ import { isClashStage } from './state.ts';
 import { TEMPO_SCALE, sparkleOffsets, type Variant } from './variant.ts';
 import {
   MY_TRICKS,
+  dealFlights,
   drawFlights,
   drawsAfter,
   drawsBefore,
@@ -109,8 +111,10 @@ import {
   durationsFor,
   flyCards,
   handCard,
+  handSlot,
   newPlays,
   playFlight,
+  seatCardAt,
   seatCards,
   seatTaken,
   trickFlights,
@@ -739,7 +743,8 @@ const paintSlot = (
   toggleClass(card, 'dragging', o.dragging === id);
   // The drawn card hides until its flight lands: through the wait outright, in `drawMine` while
   // its clone is in the air (`data-flying`, ui/motion.ts; the launch marks it before any frame).
-  toggleClass(card, 'arriving', drawn && (!o.flipping || dataOf(card, 'flying') !== null));
+  // A card under its clone (a draw or the deal in flight) stays hidden through a repaint.
+  toggleClass(card, 'arriving', dataOf(card, 'flying') !== null || (drawn && !o.flipping));
   // Tap to draw (§3.1 DRAW): the slot my card will fill pulses; after the tap the card turns over.
   toggleClass(slot, 'awaiting', drawn && o.awaiting);
   toggleClass(card, 'flipping', drawn && o.flipping);
@@ -1072,6 +1077,29 @@ const playFlights = (doc: PageLike, app: App): ReadonlyArray<Flight> => {
 };
 
 /**
+ * The deal's flights (docs/design/briscola-battle.md §7 PR-H): at a freshly dealt table (no trick
+ * yet, my hand full), one back from the stock per card, the leader first and on round the table,
+ * three rounds, to my slots left to right and the seats' backs in order (ui/motion.ts
+ * `dealFlights`). `#tableScreen[data-dealt]` remembers the game last dealt, so the repaints that
+ * follow (the curtain, a lift) launch nothing; a game resumed past its first play deals nothing.
+ */
+const dealt = (doc: PageLike, v: View, speed: Speed): ReadonlyArray<Flight> => {
+  if (v.trickNo !== 0 || v.trick.length !== 0 || v.me.hand.length !== HAND_SIZE) return [];
+  const screen = requireId(doc, 'tableScreen');
+  const key = `${String(v.startedAt)}:${String(v.gameNo)}`;
+  if (dataOf(screen, 'dealt') === key) return [];
+  setAttr(screen, 'data-dealt', key);
+  const n = v.options.seatCount;
+  const me = v.me.idx;
+  return dealFlights(
+    seatsFrom(n, v.leader),
+    (seat, k) => (seat === me ? handSlot(k) : seatCardAt(cellFor(n, me, seat), k)),
+    speed,
+    reducedMotion(),
+  );
+};
+
+/**
  * The game screens from a view: the table, its result sheet and the beat's flights, launched once
  * per stage (`#tableScreen[data-beat]` remembers the stage last flown, so a repaint mid-flight
  * launches nothing), after the plays measured before the repaint (`plays`).
@@ -1104,7 +1132,7 @@ const paintGame = (
       ? []
       : flightsFor(v, b, drawnCardId(app, v, b), app.table.speed);
   setAttr(screen, 'data-beat', beat);
-  flyCards(doc, [...plays, ...staged]);
+  flyCards(doc, [...plays, ...staged, ...dealt(doc, v, app.table.speed)]);
 };
 
 // ---- the card names: the tip over a hand card and the card view (docs/design/language-packs.md §5) ----

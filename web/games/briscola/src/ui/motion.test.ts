@@ -18,9 +18,12 @@ import {
   MY_TRICKS,
   REDUCED_DURATIONS,
   STOCK,
+  dealFlights,
   drawFlights,
   durationsFor,
   fanCard,
+  handSlot,
+  seatCardAt,
   fanTilt,
   flyCards,
   handCard,
@@ -301,6 +304,43 @@ describe('the play and follow flights (docs/design/briscola-battle.md §3.1, PR-
     expect(newPlays([], [a, b])).toEqual([a, b]);
     expect(newPlays([a, b], [a, b])).toEqual([]);
     expect(newPlays([a, b], [])).toEqual([]);
+  });
+});
+
+describe('the deal (docs/design/briscola-battle.md §7 PR-H)', () => {
+  const to = (seat: Seat, k: number) => ({ id: `s${String(seat)}`, within: `k${String(k)}` });
+  test('one back from the stock per card, the leader first and round the table, three rounds, a gap apart, each arrival hidden till it lands', () => {
+    const f = dealFlights([1, 0], to, 'normal', false);
+    expect(f).toHaveLength(6);
+    expect(f.map((x) => x.from)).toEqual(Array.from({ length: 6 }, () => STOCK));
+    expect(f.map((x) => `${x.to.id}/${x.to.within ?? ''}`)).toEqual([
+      's1/k1',
+      's0/k1',
+      's1/k2',
+      's0/k2',
+      's1/k3',
+      's0/k3',
+    ]);
+    expect(f.map((x) => x.delayMs)).toEqual([0, 110, 220, 330, 440, 550]);
+    expect(f.every((x) => x.ms === 220 && x.hideArrival === true && x.rotated === undefined)).toBe(
+      true,
+    );
+    expect(totalMs(f)).toBe(770);
+  });
+  test('the speed switch and reduced motion time it: quick 130 ms flights 70 apart; off or reduced motion a 1 ms glide a card; four seats stay under the budget', () => {
+    const four: ReadonlyArray<Seat> = [2, 3, 0, 1];
+    expect(totalMs(dealFlights(four, to, 'normal', false))).toBe(11 * 110 + 220);
+    const quick = dealFlights(four, to, 'quick', false);
+    expect(quick).toHaveLength(12);
+    expect(quick.map((x) => x.delayMs)).toEqual(Array.from({ length: 12 }, (_, k) => k * 70));
+    expect(quick.every((x) => x.ms === 130)).toBe(true);
+    expect(totalMs(dealFlights(four, to, 'off', false))).toBe(12);
+    expect(totalMs(dealFlights(four, to, 'normal', true))).toBe(12);
+    expect(dealFlights([], to, 'normal', false)).toEqual([]);
+  });
+  test('the landings: a seat`s k-th back, my k-th slot`s card (face up or down)', () => {
+    expect(seatCardAt('R2', 2)).toEqual({ id: 'seatR2', within: '.seat-cards .card:nth-child(2)' });
+    expect(handSlot(3)).toEqual({ id: 'hand', within: '.slot:nth-child(3) .card' });
   });
 });
 
