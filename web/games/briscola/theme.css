@@ -724,6 +724,21 @@ details.history-row > .history-detail dt {
   box-shadow: 0 8px 24px rgba(44, 30, 23, 0.35);
   max-width: calc(100vw - 32px);
 }
+/* On a phone the shell's toast (shell.css: fixed over the page's foot) lands on the actions row,
+   Play and the deck button, the very things "Connected via relay" arrives over (the four-device
+   live game, 2026-09-25). At the table (`body.fixed-screen`, shellPaint.ts `paintScreen`) it rises
+   to the top instead, over the topbar's band, and slides down into place rather than up. Every
+   other screen, and the desktop table, keep the foot. */
+@media (max-width: 899px) {
+  body.fixed-screen #toast {
+    top: calc(12px + env(safe-area-inset-top));
+    bottom: auto;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  body.fixed-screen #toast.show {
+    transform: translateX(-50%) translateY(0);
+  }
+}
 
 /* ---------- the table: geometry (design §5.3; src/ui/layout.ts is the twin) ---------- */
 /* At the table the page never scrolls (shell.css `body.fixed-screen`): the card width is a clamp()
