@@ -1,0 +1,27 @@
+[
+  {
+    "t": "action",
+    "action": {
+      "type": "peek"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "bid",
+      "rank": 40
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "call"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "next"
+    }
+  }
+]

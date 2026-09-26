@@ -1,0 +1,66 @@
+[
+  {
+    "t": "welcome",
+    "hostName": "Ann",
+    "lives": 3,
+    "seatCount": 6,
+    "bots": 2,
+    "botChoice": "gambler",
+    "watch": false,
+    "seats": [
+      {
+        "name": null,
+        "connected": false
+      },
+      {
+        "name": null,
+        "connected": false
+      },
+      {
+        "name": null,
+        "connected": false
+      },
+      {
+        "name": null,
+        "connected": false
+      },
+      {
+        "name": null,
+        "connected": false
+      }
+    ],
+    "you": 1
+  },
+  {
+    "t": "welcome",
+    "hostName": "Ann",
+    "lives": 3,
+    "seatCount": 6,
+    "bots": 2,
+    "botChoice": "gambler",
+    "watch": false,
+    "seats": [
+      {
+        "name": "Bo",
+        "connected": true
+      },
+      {
+        "name": null,
+        "connected": false
+      },
+      {
+        "name": "Dee",
+        "connected": true
+      },
+      {
+        "name": null,
+        "connected": false
+      },
+      {
+        "name": null,
+        "connected": false
+      }
+    ],
+    "you": 5
+  }
+]

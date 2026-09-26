@@ -1,0 +1,750 @@
+[
+  {
+    "t": "state",
+    "view": {
+      "code": "ABCDE",
+      "lives": 3,
+      "phase": "playing",
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest",
+          "name": "Bo",
+          "lives": 2,
+          "losses": 1,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest3",
+          "name": "Dee",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest5",
+          "name": "Fay",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "bot0",
+          "name": "Loon",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": {
+            "strategy": "gambler",
+            "random": false
+          }
+        },
+        {
+          "id": "bot1",
+          "name": "Moose",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": {
+            "strategy": "gambler",
+            "random": false
+          }
+        }
+      ],
+      "spectators": 0,
+      "roundNo": 1,
+      "round": {
+        "holder": 1,
+        "bid": 30,
+        "bidder": 0,
+        "rolled": false,
+        "touched": false,
+        "history": [
+          {
+            "seat": 0,
+            "rank": 30
+          }
+        ],
+        "dice": [
+          {
+            "inCup": true,
+            "value": 4
+          },
+          {
+            "inCup": true,
+            "value": 1
+          },
+          {
+            "inCup": true,
+            "value": 4
+          },
+          {
+            "inCup": true,
+            "value": 2
+          },
+          {
+            "inCup": true,
+            "value": 4
+          }
+        ]
+      },
+      "reveal": {
+        "dice": [4, 1, 4, 2, 4],
+        "real": 154,
+        "bid": 30,
+        "holds": true,
+        "caller": 1,
+        "bidder": 0,
+        "loser": 1
+      },
+      "winner": null,
+      "log": [
+        {
+          "text": "Ann sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Bo sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Dee sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Fay sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Loon (a computer) sits down.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Moose (a computer) sits down.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Game on! 6 players, 3 lives each.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Round 1: Ann shakes the cup.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Ann accepts the cup and peeks.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Ann bids Pair of 3s with 6, 4, 2.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Bo calls liar! Under the cup: Three 4s with 2, 1. The bid holds — Bo loses a life.",
+          "big": true,
+          "at": 1700000000000
+        }
+      ],
+      "records": [
+        {
+          "roundNo": 1,
+          "bids": [
+            {
+              "seat": 0,
+              "rank": 30
+            }
+          ],
+          "bidder": 0,
+          "caller": 1,
+          "bid": 30,
+          "real": 154,
+          "holds": true,
+          "loser": 1
+        }
+      ],
+      "hostSeat": 0,
+      "autoNextAt": null
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "code": "ABCDE",
+      "lives": 3,
+      "phase": "playing",
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest",
+          "name": "Bo",
+          "lives": 2,
+          "losses": 1,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest3",
+          "name": "Dee",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest5",
+          "name": "Fay",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "bot0",
+          "name": "Loon",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": {
+            "strategy": "gambler",
+            "random": false
+          }
+        },
+        {
+          "id": "bot1",
+          "name": "Moose",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": {
+            "strategy": "gambler",
+            "random": false
+          }
+        }
+      ],
+      "spectators": 0,
+      "roundNo": 1,
+      "round": {
+        "holder": 1,
+        "bid": 30,
+        "bidder": 0,
+        "rolled": false,
+        "touched": false,
+        "history": [
+          {
+            "seat": 0,
+            "rank": 30
+          }
+        ],
+        "dice": [
+          {
+            "inCup": true,
+            "value": 4
+          },
+          {
+            "inCup": true,
+            "value": 1
+          },
+          {
+            "inCup": true,
+            "value": 4
+          },
+          {
+            "inCup": true,
+            "value": 2
+          },
+          {
+            "inCup": true,
+            "value": 4
+          }
+        ]
+      },
+      "reveal": {
+        "dice": [4, 1, 4, 2, 4],
+        "real": 154,
+        "bid": 30,
+        "holds": true,
+        "caller": 1,
+        "bidder": 0,
+        "loser": 1
+      },
+      "winner": null,
+      "log": [
+        {
+          "text": "Ann sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Bo sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Dee sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Fay sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Loon (a computer) sits down.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Moose (a computer) sits down.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Game on! 6 players, 3 lives each.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Round 1: Ann shakes the cup.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Ann accepts the cup and peeks.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Ann bids Pair of 3s with 6, 4, 2.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Bo calls liar! Under the cup: Three 4s with 2, 1. The bid holds — Bo loses a life.",
+          "big": true,
+          "at": 1700000000000
+        }
+      ],
+      "records": [
+        {
+          "roundNo": 1,
+          "bids": [
+            {
+              "seat": 0,
+              "rank": 30
+            }
+          ],
+          "bidder": 0,
+          "caller": 1,
+          "bid": 30,
+          "real": 154,
+          "holds": true,
+          "loser": 1
+        }
+      ],
+      "hostSeat": 0,
+      "autoNextAt": null
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "code": "ABCDE",
+      "lives": 3,
+      "phase": "playing",
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest",
+          "name": "Bo",
+          "lives": 2,
+          "losses": 1,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest3",
+          "name": "Dee",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest5",
+          "name": "Fay",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "bot0",
+          "name": "Loon",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": {
+            "strategy": "gambler",
+            "random": false
+          }
+        },
+        {
+          "id": "bot1",
+          "name": "Moose",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": {
+            "strategy": "gambler",
+            "random": false
+          }
+        }
+      ],
+      "spectators": 0,
+      "roundNo": 1,
+      "round": {
+        "holder": 1,
+        "bid": 30,
+        "bidder": 0,
+        "rolled": false,
+        "touched": false,
+        "history": [
+          {
+            "seat": 0,
+            "rank": 30
+          }
+        ],
+        "dice": [
+          {
+            "inCup": true,
+            "value": 4
+          },
+          {
+            "inCup": true,
+            "value": 1
+          },
+          {
+            "inCup": true,
+            "value": 4
+          },
+          {
+            "inCup": true,
+            "value": 2
+          },
+          {
+            "inCup": true,
+            "value": 4
+          }
+        ]
+      },
+      "reveal": {
+        "dice": [4, 1, 4, 2, 4],
+        "real": 154,
+        "bid": 30,
+        "holds": true,
+        "caller": 1,
+        "bidder": 0,
+        "loser": 1
+      },
+      "winner": null,
+      "log": [
+        {
+          "text": "Ann sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Bo sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Dee sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Fay sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Loon (a computer) sits down.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Moose (a computer) sits down.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Game on! 6 players, 3 lives each.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Round 1: Ann shakes the cup.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Ann accepts the cup and peeks.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Ann bids Pair of 3s with 6, 4, 2.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Bo calls liar! Under the cup: Three 4s with 2, 1. The bid holds — Bo loses a life.",
+          "big": true,
+          "at": 1700000000000
+        }
+      ],
+      "records": [
+        {
+          "roundNo": 1,
+          "bids": [
+            {
+              "seat": 0,
+              "rank": 30
+            }
+          ],
+          "bidder": 0,
+          "caller": 1,
+          "bid": 30,
+          "real": 154,
+          "holds": true,
+          "loser": 1
+        }
+      ],
+      "hostSeat": 0,
+      "autoNextAt": null
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "code": "ABCDE",
+      "lives": 3,
+      "phase": "playing",
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest",
+          "name": "Bo",
+          "lives": 2,
+          "losses": 1,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest3",
+          "name": "Dee",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest5",
+          "name": "Fay",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "bot0",
+          "name": "Loon",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": {
+            "strategy": "gambler",
+            "random": false
+          }
+        },
+        {
+          "id": "bot1",
+          "name": "Moose",
+          "lives": 3,
+          "losses": 0,
+          "connected": true,
+          "bot": {
+            "strategy": "gambler",
+            "random": false
+          }
+        }
+      ],
+      "spectators": 0,
+      "roundNo": 1,
+      "round": {
+        "holder": 1,
+        "bid": 30,
+        "bidder": 0,
+        "rolled": false,
+        "touched": false,
+        "history": [
+          {
+            "seat": 0,
+            "rank": 30
+          }
+        ],
+        "dice": [
+          {
+            "inCup": true,
+            "value": 4
+          },
+          {
+            "inCup": true,
+            "value": 1
+          },
+          {
+            "inCup": true,
+            "value": 4
+          },
+          {
+            "inCup": true,
+            "value": 2
+          },
+          {
+            "inCup": true,
+            "value": 4
+          }
+        ]
+      },
+      "reveal": {
+        "dice": [4, 1, 4, 2, 4],
+        "real": 154,
+        "bid": 30,
+        "holds": true,
+        "caller": 1,
+        "bidder": 0,
+        "loser": 1
+      },
+      "winner": null,
+      "log": [
+        {
+          "text": "Ann sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Bo sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Dee sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Fay sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Loon (a computer) sits down.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Moose (a computer) sits down.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Game on! 6 players, 3 lives each.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Round 1: Ann shakes the cup.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Ann accepts the cup and peeks.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Ann bids Pair of 3s with 6, 4, 2.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Bo calls liar! Under the cup: Three 4s with 2, 1. The bid holds — Bo loses a life.",
+          "big": true,
+          "at": 1700000000000
+        }
+      ],
+      "records": [
+        {
+          "roundNo": 1,
+          "bids": [
+            {
+              "seat": 0,
+              "rank": 30
+            }
+          ],
+          "bidder": 0,
+          "caller": 1,
+          "bid": 30,
+          "real": 154,
+          "holds": true,
+          "loser": 1
+        }
+      ],
+      "hostSeat": 0,
+      "autoNextAt": null
+    }
+  }
+]

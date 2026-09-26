@@ -1,0 +1,172 @@
+[
+  {
+    "t": "state",
+    "view": {
+      "code": "ABCDE",
+      "lives": 0,
+      "phase": "playing",
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann",
+          "lives": 0,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest",
+          "name": "Jeff",
+          "lives": 0,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        }
+      ],
+      "spectators": 0,
+      "roundNo": 1,
+      "round": {
+        "holder": 0,
+        "bid": null,
+        "bidder": null,
+        "rolled": false,
+        "touched": false,
+        "history": [],
+        "dice": [
+          {
+            "inCup": true,
+            "value": null
+          },
+          {
+            "inCup": true,
+            "value": null
+          },
+          {
+            "inCup": true,
+            "value": null
+          },
+          {
+            "inCup": true,
+            "value": null
+          },
+          {
+            "inCup": true,
+            "value": null
+          }
+        ]
+      },
+      "reveal": null,
+      "winner": null,
+      "log": [
+        {
+          "text": "Ann sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Jeff sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Game on! 2 players, keeping score.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Round 1: Ann shakes the cup.",
+          "big": true,
+          "at": 1700000000000
+        }
+      ],
+      "records": [],
+      "hostSeat": 0,
+      "autoNextAt": null
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "code": "ABCDE",
+      "lives": 0,
+      "phase": "playing",
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann",
+          "lives": 0,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        },
+        {
+          "id": "guest",
+          "name": "Jeff",
+          "lives": 0,
+          "losses": 0,
+          "connected": true,
+          "bot": null
+        }
+      ],
+      "spectators": 0,
+      "roundNo": 1,
+      "round": {
+        "holder": 0,
+        "bid": null,
+        "bidder": null,
+        "rolled": false,
+        "touched": false,
+        "history": [],
+        "dice": [
+          {
+            "inCup": true,
+            "value": 4
+          },
+          {
+            "inCup": true,
+            "value": 1
+          },
+          {
+            "inCup": true,
+            "value": 4
+          },
+          {
+            "inCup": true,
+            "value": 6
+          },
+          {
+            "inCup": true,
+            "value": 6
+          }
+        ]
+      },
+      "reveal": null,
+      "winner": null,
+      "log": [
+        {
+          "text": "Ann sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Jeff sits down at the table.",
+          "big": false,
+          "at": 1700000000000
+        },
+        {
+          "text": "Game on! 2 players, keeping score.",
+          "big": true,
+          "at": 1700000000000
+        },
+        {
+          "text": "Round 1: Ann shakes the cup.",
+          "big": true,
+          "at": 1700000000000
+        }
+      ],
+      "records": [],
+      "hostSeat": 0,
+      "autoNextAt": null
+    }
+  }
+]

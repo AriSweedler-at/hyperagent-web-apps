@@ -306,6 +306,19 @@ const ROWS_BEFORE: ReadonlyArray<readonly [string, Suite, Thresholds]> = [
     'fidice',
     { lines: 100, functions: 100, statements: 100, branches: 84 },
   ],
+  // Added by the fidice shell adoption's M3 (docs/design/fidice-shell-adoption.md §4): the shell
+  // path's modules beside the legacy ones, dark until M4, at measured 97.6/94.9/97.8/92.2 and
+  // 96.9/94.0/94.4/80.9 minus a hair.
+  [
+    'web/games/fidice/src/*.ts',
+    'fidice',
+    { lines: 97, functions: 94, statements: 97, branches: 92 },
+  ],
+  [
+    'web/games/fidice/src/ui/**',
+    'fidice',
+    { lines: 96, functions: 94, statements: 94, branches: 80 },
+  ],
   [
     'web/games/gin-rummy/src/engine/**',
     'gin',
@@ -466,6 +479,9 @@ const INCLUDE_BEFORE: ReadonlyArray<string> = [
   'web/games/fidice/src/net/**/*.ts',
   'web/games/fidice/src/app/**/*.ts',
   'web/games/fidice/src/view/**/*.ts',
+  // Added by the fidice shell adoption's M3: codec, protocol, storage, shellConfig, fx, ui/.
+  'web/games/fidice/src/*.ts',
+  'web/games/fidice/src/ui/**/*.ts',
   'web/games/gin-rummy/src/engine/**/*.ts',
   'web/games/backgammon/src/engine/**/*.ts',
   // Added with the briscola engine (PR-2).
