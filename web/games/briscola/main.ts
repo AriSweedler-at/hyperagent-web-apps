@@ -15,6 +15,7 @@ import { browserStore, type Store } from '../../shared/edge/storage.ts';
 import { badCardPackMsg, isCardPackFor } from '../../shared/lib/cards/packs.ts';
 import { badLanguageMsg, isLanguagePack } from '../../shared/lib/lang/packs.ts';
 import { SUIT_SPRITE_SVG } from '../../shared/ui/cardFace.ts';
+import IMPACT_SPRITE_SVG from './impact/impact-sprite.svg?raw';
 import { legalActions, type Action, type GameEvent, type View } from './src/engine/index.ts';
 import { createFx } from './src/fx.ts';
 import { GuestSession } from './src/net/guest.ts';
@@ -92,10 +93,13 @@ const boot = (): void => {
         dropBadCardPack(store);
         dropBadLang(store);
       },
-      // The four Italian suit symbols the glyph faces and the trump badge `<use>`, once, before any
-      // paint; then the rules into both slots and the About copy (ui/rules.ts, ui/about.ts).
+      // The four Italian suit symbols the glyph faces and the trump badge `<use>`, and the clash's
+      // impact frames (impact/impact-sprite.svg, docs/design/briscola-battle.md §3.5), once, before
+      // any paint, so nothing is fetched during play; then the rules into both slots and the About
+      // copy (ui/rules.ts, ui/about.ts).
       render: () => {
         document.body.insertAdjacentHTML('afterbegin', SUIT_SPRITE_SVG);
+        document.body.insertAdjacentHTML('afterbegin', IMPACT_SPRITE_SVG);
         renderRules(document);
         renderAbout(document);
       },

@@ -163,3 +163,32 @@ export const variantOf = (
     trickFacts(trump, trick.cards),
     lastTrick,
   );
+
+// ---- the sparkles' places (§3.5: a ring of 6 or a scatter of 8, the hard cap) ------------------------------
+
+export const SPARKLE_COUNT: Readonly<Record<SparkleShape, number>> = { ring: 6, scatter: 8 };
+
+/** Fixed offsets in percent of the frame's half-width, so every device lays the same sparkles. */
+const SCATTER: ReadonlyArray<readonly [number, number]> = [
+  [-38, -30],
+  [34, -36],
+  [-22, 30],
+  [40, 22],
+  [-44, 4],
+  [8, -44],
+  [18, 40],
+  [46, -8],
+];
+
+/** Where each sparkle sits round the contact point: the ring's evenly spaced, the scatter's from the table; none without a briscola. */
+export const sparkleOffsets = (
+  sparkle: Rules['sparkle'],
+): ReadonlyArray<readonly [number, number]> => {
+  if (sparkle === 'none') return [];
+  if (sparkle === 'scatter') return SCATTER;
+  const n = SPARKLE_COUNT.ring;
+  return Array.from({ length: n }, (_, k) => {
+    const t = (k / n) * 2 * Math.PI;
+    return [Math.round(Math.cos(t) * 36), Math.round(Math.sin(t) * 36)] as const;
+  });
+};

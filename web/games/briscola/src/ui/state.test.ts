@@ -32,7 +32,8 @@ import {
 } from '../protocol.ts';
 import { LOCAL_NAMES } from '../shellConfig.ts';
 import { DEFAULT_CARD_PACK, STORAGE_KEYS } from '../storage.ts';
-import { DURATIONS, drawSpan } from './beat.ts';
+import { BEAT_MS, DURATIONS, drawSpan } from './beat.ts';
+import { TEMPO_SCALE } from './variant.ts';
 import { CUES } from './sound.ts';
 import {
   DEFAULT_OPTS,
@@ -41,7 +42,6 @@ import {
   EMPTY_SLOTS,
   FLY_MS,
   GONE_TOAST_MS,
-  HOLD_MS,
   INTENT_BUDGET,
   INTENT_MS,
   INTENT_WINDOW_MS,
@@ -88,6 +88,7 @@ import {
   type EffectDeps,
   type HomeSnapshot,
   type Raw,
+  type Settle,
   type SettleStage,
   type Step,
 } from './state.ts';
@@ -443,7 +444,7 @@ describe('pass and play: the lift, the play, the settle beat and the curtain', (
     expect(after.every((s) => s !== null)).toBe(true);
   });
 
-  test('a completed trick settles: hold, fly, draw with their timers, the phone holder kept, the cue for the trick, then the curtain for the winner', () => {
+  test('a completed trick settles: the clash, the pack, the draw with their timers, the phone holder kept, the cue for the trick, then the curtain for the winner', () => {
     const start = local();
     const first = playFirst(revealed(start)).app;
     const second = playFirst(revealed(first));
@@ -453,19 +454,25 @@ describe('pass and play: the lift, the play, the settle beat and the curtain', (
     if (trick === null) throw new Error('no trick');
     // Hold: the trick painted from the record, the view still the last player's (whose draw will wait), no curtain yet.
     const me = view(second.app).me.idx;
-    expect(second.app.table.settle).toEqual({ stage: 'hold', trick, me });
+    expect(second.app.table.settle).toMatchObject({ stage: 'follow', trick, me });
+    expect(second.app.table.settle?.since).toBe(view(second.app));
     expect(view(second.app).me.idx).toBe(first.shell.view?.me.idx);
     expect(second.app.table.curtain).toBeNull();
-    expect(timers(second.effects)).toEqual([['settle', HOLD_MS, 'settle/elapsed']]);
-    // The card laid, then the trick's phrase for the winner (pass-and-play plays the winner's):
-    // ONE `phrases` effect carrying the trick event's phrase, its leaf a trick row of the table.
-    const played = cues(second.effects);
-    expect(played.slice(0, 2)).toEqual(['tap', 'move.play']);
-    expect(played.length).toBeGreaterThan(2);
-    played.slice(2).forEach((cue) => {
+    expect(timers(second.effects)).toEqual([
+      ['settle', BEAT_MS.followLast.normal, 'settle/elapsed'],
+    ]);
+    // The card laid; the trick's phrase for the winner (pass-and-play plays the winner's) is HELD
+    // on the settle until the impact (docs/design/briscola-sound-history.md §3.5): ONE `phrases`
+    // effect carrying the trick event's phrase, its leaf a trick row of the table, none at the paint.
+    expect(cues(second.effects)).toEqual(['tap', 'move.play']);
+    expect(phrasesOf(second.effects)).toHaveLength(0);
+    const held = second.app.table.settle?.phrases ?? [];
+    const heldCues = cues(held);
+    expect(heldCues.length).toBeGreaterThan(0);
+    heldCues.forEach((cue) => {
       expect(Object.keys(CUES)).toContain(cue);
     });
-    const phrased = phrasesOf(second.effects);
+    const phrased = phrasesOf(held);
     expect(phrased).toHaveLength(1);
     const prevView = first.shell.view;
     if (prevView === null) throw new Error('no view before the trick');
@@ -479,10 +486,48 @@ describe('pass and play: the lift, the play, the settle beat and the curtain', (
       cardId: view(second.app).me.hand[0]?.id ?? '',
     });
     expect(dropped.app).toBe(second.app);
-    // Fly, then draw (two seats drew: one draw and one gap), the draw chiming.
-    const fly = run(second.app, { type: 'settle/elapsed' });
+    // The clash: charge, strike, then the impact, where the held phrases play (the BOOM) and the
+    // hit-stop is the variant's by the trick's value; the aftermath; then the pack (`fly`), then
+    // draw (two seats drew: one draw and one gap), the draw chiming.
+    const variant = second.app.table.settle?.variant;
+    if (variant === undefined) throw new Error('no variant');
+    const tempo = TEMPO_SCALE[variant.tempo];
+    const charge = run(second.app, { type: 'settle/elapsed' });
+    expect(charge.app.table.settle?.stage).toBe('charge');
+    expect(phrasesOf(charge.effects)).toHaveLength(0);
+    expect(timers(charge.effects)).toEqual([
+      ['settle', Math.round(BEAT_MS.charge.normal * tempo), 'settle/elapsed'],
+    ]);
+    const strike = run(charge.app, { type: 'settle/elapsed' });
+    expect(strike.app.table.settle?.stage).toBe('strike');
+    expect(timers(strike.effects)).toEqual([
+      ['settle', Math.round(BEAT_MS.strike.normal * tempo), 'settle/elapsed'],
+    ]);
+    const impact = run(strike.app, { type: 'settle/elapsed' });
+    expect(impact.app.table.settle?.stage).toBe('impact');
+    expect(phrasesOf(impact.effects)).toEqual(phrased);
+    expect(timers(impact.effects)).toEqual([['settle', variant.freezeMs, 'settle/elapsed']]);
+    const aftermath = run(impact.app, { type: 'settle/elapsed' });
+    expect(aftermath.app.table.settle?.stage).toBe('aftermath');
+    expect(phrasesOf(aftermath.effects)).toHaveLength(0);
+    expect(timers(aftermath.effects)).toEqual([
+      ['settle', Math.round(BEAT_MS.aftermath.normal * tempo), 'settle/elapsed'],
+    ]);
+    const fly = run(aftermath.app, { type: 'settle/elapsed' });
     expect(fly.app.table.settle?.stage).toBe('fly');
     expect(timers(fly.effects)).toEqual([['settle', FLY_MS, 'settle/elapsed']]);
+    // Reduced motion (or the switch at `off`): charge, strike and the aftermath hold nothing and
+    // are stepped over; the impact is the 300 ms still, the phrases still its.
+    const still = runIntents(reduce, { ...ctx, reducedMotion: true })(second.app, {
+      type: 'settle/elapsed',
+    });
+    expect(still.app.table.settle?.stage).toBe('impact');
+    expect(phrasesOf(still.effects)).toEqual(phrased);
+    expect(timers(still.effects)).toEqual([['settle', 300, 'settle/elapsed']]);
+    const packed = runIntents(reduce, { ...ctx, reducedMotion: true })(still.app, {
+      type: 'settle/elapsed',
+    });
+    expect(packed.app.table.settle?.stage).toBe('fly');
     const draw = run(fly.app, { type: 'settle/elapsed' });
     expect(draw.app.table.settle?.stage).toBe('draw');
     // The seats before me in the draw order (the winner first) draw now, chiming; none when I won.
@@ -528,7 +573,7 @@ describe('pass and play: the lift, the play, the settle beat and the curtain', (
     expect(run(done.app, { type: 'settle/elapsed' }).app).toBe(done.app);
   });
 
-  test('settleMs and nextStage: the hold, the flight, one draw per seat with the gaps; no draw once the stock is out', () => {
+  test('settleMs and nextStage: the clash, the pack, one draw per seat with the gaps; no draw once the stock is out', () => {
     const drew: TrickRecord = {
       no: 5,
       leader: 0,
@@ -539,9 +584,38 @@ describe('pass and play: the lift, the play, the settle beat and the curtain', (
       trumpTaken: false,
     };
     const none: TrickRecord = { ...drew, drew: [] };
+    // A real trick's settle for its variant (the clash's clock reads it); the stage, trick and seat
+    // overridden. Dealt through its own rng, so the file's shared stream (the whole-game rows below
+    // read their deals from it) is not moved.
+    const own = runIntents(reduce, { rng: mulberry32(11), now: () => NOW });
+    const seated = own(
+      initialApp,
+      { type: 'home/init', home },
+      { type: 'local/click', p1: 'Ann', p2: 'Bob' },
+    ).app;
+    const base = playFirst(revealed(playFirst(revealed(seated)).app)).app.table.settle;
+    if (base === null) throw new Error('no settle');
     // Me = seat 0, second in the order: one seat before my tap, one after.
-    const at = (stage: SettleStage, trick: TrickRecord, me: Seat = 0) => ({ stage, trick, me });
-    expect(settleMs(at('hold', drew))).toBe(HOLD_MS);
+    const at = (stage: SettleStage, trick: TrickRecord, me: Seat = 0): Settle => ({
+      ...base,
+      stage,
+      trick,
+      me,
+    });
+    const tempo = TEMPO_SCALE[base.variant.tempo];
+    expect(settleMs(at('follow', drew))).toBe(BEAT_MS.followLast.normal);
+    expect(settleMs(at('charge', drew))).toBe(Math.round(BEAT_MS.charge.normal * tempo));
+    expect(settleMs(at('strike', drew))).toBe(Math.round(BEAT_MS.strike.normal * tempo));
+    expect(settleMs(at('impact', drew))).toBe(base.variant.freezeMs);
+    expect(settleMs(at('aftermath', drew))).toBe(Math.round(BEAT_MS.aftermath.normal * tempo));
+    // Quick: the tempo stages from the quick column; the hit-stop ×0.6, never under 80. Reduced or off: the still.
+    expect(settleMs(at('charge', drew), 'quick')).toBe(Math.round(BEAT_MS.charge.quick * tempo));
+    expect(settleMs(at('impact', drew), 'quick')).toBe(
+      Math.max(80, Math.round(base.variant.freezeMs * 0.6)),
+    );
+    expect(settleMs(at('charge', drew), 'normal', true)).toBe(0);
+    expect(settleMs(at('impact', drew), 'normal', true)).toBe(300);
+    expect(settleMs(at('impact', drew), 'off')).toBe(300);
     expect(settleMs(at('fly', drew))).toBe(FLY_MS);
     expect(settleMs(at('draw', drew))).toBe(DRAW_MS);
     expect(settleMs(at('drawMine', drew))).toBe(DRAW_MS + DURATIONS.flipMs);
@@ -552,7 +626,11 @@ describe('pass and play: the lift, the play, the settle beat and the curtain', (
     expect(settleMs(at('drawRest', drew, 2))).toBe(0);
     // A device whose seat is not drawing runs every draw at `draw`.
     expect(settleMs(at('draw', drew, 3))).toBe(DRAW_MS + 2 * DRAW_GAP_MS);
-    expect(nextStage(at('hold', drew))).toEqual(at('fly', drew));
+    expect(nextStage(at('follow', drew))).toEqual(at('charge', drew));
+    expect(nextStage(at('charge', drew))).toEqual(at('strike', drew));
+    expect(nextStage(at('strike', drew))).toEqual(at('impact', drew));
+    expect(nextStage(at('impact', drew))).toEqual(at('aftermath', drew));
+    expect(nextStage(at('aftermath', drew))).toEqual(at('fly', drew));
     expect(nextStage(at('fly', drew))).toEqual(at('draw', drew));
     expect(nextStage(at('fly', none))).toBeNull();
     // `draw` ends in the wait for my tap (the same settle), or in nothing when I do not draw.

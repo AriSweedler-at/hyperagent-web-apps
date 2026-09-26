@@ -115,6 +115,15 @@ key on `last event id`. The shell's `rendered` helper (`web/shared/ui/shell.ts`,
 `eventEffects(prev, next, cfg.table.events)` = for each new event, `fx` with `phraseOf(event)` when
 not null. Gin and backgammon keep their own `cuesBetween` until they adopt events (optional, later).
 
+**One `phrases` effect per beat** (docs/design/briscola-battle.md §3.1 IMPACT, PR-F). A resolved trick's
+phrases are not played at the paint that shows it: `ui/state.ts rendered` holds them on the settle
+(`Settle.phrases`) and `stageEffects` emits them on entering `impact`, so the phrase's first note is
+the BOOM of the clash and the impact frame and the sound are one event. `cues.key` still advances at
+the paint, so a re-sent frame re-holds nothing; a newer trick that supersedes a beat before its
+impact drops the superseded beat's phrases (two BOOMs 300 ms apart are noise); after the impact
+they have already played. Everything else's phrases (the deal, the result outside a beat) still
+play at the paint.
+
 ## 4. Briscola's trick-outcome table (`web/games/briscola/src/ui/sound.ts`, `phraseOf(event, me, role)`)
 
 Definitions, all derived once in the engine at trick resolution and stored on the `trick` event (§5):

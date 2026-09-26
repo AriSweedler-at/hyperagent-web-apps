@@ -1604,11 +1604,333 @@ details.history-row > .history-detail dt {
   }
 }
 
+/* ---------- the clash (docs/design/briscola-battle.md §3.1 CHARGE → AFTERMATH, §3.3, §3.5, §3.6; PR-F) ----------
+   The reducer's stages reach the fan as `#trick[data-stage]` and the variant's slots as data
+   attributes and custom properties (src/ui/render.ts `paintClash`): `--ux --uy` the axis between
+   the fighters, `--gap` their centre distance, `--charge-dist` (× --mid-w) how far they back away,
+   `--lean` the winner's tilt (the loser leans −0.6 of it), `--tempo` the pace of charge, strike and
+   poses. The `.play` box carries the translate (a transition per stage); the poses and the winner's
+   recoil animate the individual `rotate`/`scale`/`translate` properties on top, so none of them
+   fights the strike's transform. The arena never moves: the winner alone vibrates. The clock:
+   `--beat-*` on #tableScreen, the quick column under [data-speed='quick'], zero under 'off' and
+   reduced motion (a 300 ms still with the end poses applied). */
+#tableScreen {
+  --beat-charge: 120ms;
+  --beat-strike: 80ms;
+  --beat-vibrate: 90ms;
+  --beat-aftermath: 300ms;
+  --beat-fx-out: 200ms;
+  --beat-sparkle: 320ms;
+}
+#tableScreen[data-speed='quick'] {
+  --beat-charge: 80ms;
+  --beat-strike: 50ms;
+  --beat-vibrate: 60ms;
+  --beat-aftermath: 180ms;
+  --beat-fx-out: 120ms;
+  --beat-sparkle: 190ms;
+}
+#tableScreen[data-speed='off'] {
+  --beat-charge: 0ms;
+  --beat-strike: 0ms;
+  --beat-vibrate: 0ms;
+  --beat-aftermath: 1ms;
+  --beat-fx-out: 1ms;
+  --beat-sparkle: 1ms;
+}
+#trick {
+  --ux: 1;
+  --uy: 0;
+  --gap: var(--mid-w);
+  --charge-dist: 0.24;
+  --lean: 10deg;
+  --tempo: 1;
+}
+.play.winner,
+.play.loser {
+  will-change: transform;
+}
+.play.bystander {
+  opacity: 0.6;
+  translate: 0 4px;
+}
+/* CHARGE: away from each other along the axis, the winner leaning in, the loser back. */
+#trick[data-stage='charge'] .play.winner {
+  transform: translate(
+      calc(var(--ux) * var(--charge-dist) * var(--mid-w) * -1),
+      calc(var(--uy) * var(--charge-dist) * var(--mid-w) * -1)
+    )
+    rotate(var(--lean));
+  transition: transform calc(var(--beat-charge) * var(--tempo)) ease-out;
+}
+#trick[data-stage='charge'] .play.loser {
+  transform: translate(
+      calc(var(--ux) * var(--charge-dist) * var(--mid-w)),
+      calc(var(--uy) * var(--charge-dist) * var(--mid-w))
+    )
+    rotate(calc(var(--lean) * -0.6));
+  transition: transform calc(var(--beat-charge) * var(--tempo)) ease-out;
+}
+/* STRIKE: both toward the contact point (the midpoint), overshooting 8% of a card, meeting on the last frame; frozen there through the impact and the aftermath. */
+#trick[data-stage='strike'] .play.winner,
+#trick[data-stage='impact'] .play.winner,
+#trick[data-stage='aftermath'] .play.winner {
+  transform: translate(
+      calc(var(--ux) * (var(--gap) / 2 + 0.08 * var(--mid-w))),
+      calc(var(--uy) * (var(--gap) / 2 + 0.08 * var(--mid-w)))
+    )
+    rotate(var(--lean));
+  transition: transform calc(var(--beat-strike) * var(--tempo)) cubic-bezier(0.6, 0, 1, 1);
+}
+#trick[data-stage='strike'] .play.loser,
+#trick[data-stage='impact'] .play.loser,
+#trick[data-stage='aftermath'] .play.loser {
+  transform: translate(
+      calc(var(--ux) * (var(--gap) / 2 + 0.08 * var(--mid-w)) * -1),
+      calc(var(--uy) * (var(--gap) / 2 + 0.08 * var(--mid-w)) * -1)
+    )
+    rotate(calc(var(--lean) * -0.6));
+  transition: transform calc(var(--beat-strike) * var(--tempo)) cubic-bezier(0.6, 0, 1, 1);
+}
+/* IMPACT (hit-stop): the winner trembles 1 or 2 px by the trick's value (never the arena). */
+#trick[data-stage='impact'][data-shake='1'] .play.winner .card {
+  animation: vibrate-1 var(--beat-vibrate) steps(8) both;
+}
+#trick[data-stage='impact'][data-shake='2'] .play.winner .card {
+  animation: vibrate-2 var(--beat-vibrate) steps(8) both;
+}
+@keyframes vibrate-1 {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  25% {
+    translate: 1px -1px;
+  }
+  50% {
+    translate: -1px 1px;
+  }
+  75% {
+    translate: 1px 1px;
+  }
+}
+@keyframes vibrate-2 {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  25% {
+    translate: 2px -2px;
+  }
+  50% {
+    translate: -2px 2px;
+  }
+  75% {
+    translate: 2px 2px;
+  }
+}
+/* AFTERMATH: the loser's pose (§3.6, `forwards`: every pose ends where the pack begins), the winner's recoil. */
+#trick[data-stage='aftermath'] .play.loser {
+  animation-duration: calc(var(--beat-aftermath) * var(--tempo));
+  animation-fill-mode: forwards;
+  animation-timing-function: ease-out;
+}
+#trick[data-stage='aftermath'][data-pose='wilt'] .play.loser {
+  animation-name: pose-wilt;
+}
+#trick[data-stage='aftermath'][data-pose='tear'] .play.loser {
+  animation-name: pose-tear;
+}
+#trick[data-stage='aftermath'][data-pose='fade'] .play.loser {
+  animation-name: pose-fade;
+}
+#trick[data-stage='aftermath'][data-pose='spin-out'] .play.loser {
+  animation-name: pose-spin-out;
+}
+#trick[data-stage='aftermath'][data-pose='flutter'] .play.loser {
+  animation-name: pose-flutter;
+  animation-timing-function: ease-in-out;
+}
+@keyframes pose-wilt {
+  to {
+    rotate: -18deg;
+    translate: 0 6%;
+    scale: 0.96;
+    filter: saturate(0.6);
+  }
+}
+@keyframes pose-tear {
+  40% {
+    translate: -2% 0;
+  }
+  to {
+    translate: 3% 4%;
+    rotate: 4deg;
+    opacity: 0.9;
+    filter: contrast(0.85);
+  }
+}
+@keyframes pose-fade {
+  to {
+    opacity: 0.45;
+    translate: 0 2%;
+    filter: grayscale(0.7);
+  }
+}
+@keyframes pose-spin-out {
+  to {
+    rotate: -32deg;
+    translate: -6% 5%;
+    opacity: 0.8;
+  }
+}
+@keyframes pose-flutter {
+  20% {
+    rotate: 4deg;
+  }
+  40% {
+    rotate: -3deg;
+  }
+  60% {
+    rotate: 2deg;
+  }
+  80% {
+    rotate: -1deg;
+  }
+  to {
+    rotate: 0deg;
+    translate: 0 4%;
+    opacity: 0.85;
+  }
+}
+#trick[data-stage='aftermath'] .play.winner {
+  animation-duration: calc(var(--beat-aftermath) * var(--tempo));
+  animation-fill-mode: forwards;
+  animation-timing-function: ease-out;
+}
+#trick[data-stage='aftermath'][data-after='hold-high'] .play.winner {
+  animation-name: after-hold-high;
+}
+#trick[data-stage='aftermath'][data-after='slam-down'] .play.winner {
+  animation-name: after-slam-down;
+}
+#trick[data-stage='aftermath'][data-after='shimmy'] .play.winner {
+  animation-name: after-shimmy;
+}
+@keyframes after-hold-high {
+  to {
+    translate: 0 -8%;
+  }
+}
+@keyframes after-slam-down {
+  30% {
+    translate: 0 -10%;
+  }
+  to {
+    translate: 0 2%;
+  }
+}
+@keyframes after-shimmy {
+  25% {
+    rotate: 3deg;
+  }
+  50% {
+    rotate: -3deg;
+  }
+  75% {
+    rotate: 2deg;
+  }
+  to {
+    rotate: 0deg;
+  }
+}
+/* The impact frame (§3.5): a hard cut in at the contact point, 1.4 cards wide, the winning suit's
+   symbol in cream with its gold hairline; a fade over the aftermath; gone when the pack begins
+   (the painter removes it). Under the cards' z but over the felt; a sheet at z 50 covers it. */
+.clash-fx {
+  position: absolute;
+  left: var(--cx, 50%);
+  top: var(--cy, 50%);
+  width: calc(var(--mid-w) * 1.4);
+  height: calc(var(--mid-w) * 1.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 10;
+  color: var(--cream);
+  animation: fx-in 1ms steps(1, end) both;
+}
+.clash-fx .fx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+#trick[data-stage='aftermath'] .clash-fx {
+  animation: fx-out var(--beat-fx-out) ease-out forwards;
+}
+@keyframes fx-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fx-out {
+  to {
+    opacity: 0;
+  }
+}
+/* Sparkles for a briscola's win: 4-point stars at fixed offsets (`--sx --sy`, percent of the frame), rising over the aftermath; a steal pulses them twice. */
+.clash-fx .sparkle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16%;
+  height: 16%;
+  margin: -8% 0 0 -8%;
+  color: #e6cf8a;
+  translate: calc(var(--sx, 0) * 1%) calc(var(--sy, 0) * 1%);
+  opacity: 0.9;
+}
+#trick[data-stage='aftermath'] .clash-fx .sparkle {
+  animation: sparkle var(--beat-sparkle) ease-out both;
+  animation-delay: calc(var(--k, 0) * 18ms);
+}
+#trick[data-stage='aftermath'] .clash-fx[data-steal='true'] .sparkle {
+  animation-iteration-count: 2;
+  animation-duration: calc(var(--beat-sparkle) / 2);
+}
+@keyframes sparkle {
+  from {
+    opacity: 0;
+    scale: 0.3;
+  }
+  40% {
+    opacity: 1;
+    scale: 1.1;
+  }
+  to {
+    opacity: 0;
+    scale: 0.6;
+    rotate: 90deg;
+  }
+}
+
 /* ---------- motion (design §5.3) ---------- */
 @media (prefers-reduced-motion: reduce) {
   .card.flipping,
   .slot.awaiting::before {
     animation: none;
+  }
+  /* The clash is a still: no charge or strike, the poses at their end, the frame cut in and held. */
+  #tableScreen {
+    --beat-charge: 0ms;
+    --beat-strike: 0ms;
+    --beat-vibrate: 0ms;
+    --beat-aftermath: 1ms;
+    --beat-fx-out: 1ms;
+    --beat-sparkle: 1ms;
   }
   #tableScreen {
     --fly-ms: 1ms;

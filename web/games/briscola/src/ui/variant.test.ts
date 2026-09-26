@@ -16,6 +16,8 @@ import {
   variantIndex,
   variantOf,
   variantSeed,
+  SPARKLE_COUNT,
+  sparkleOffsets,
 } from './variant.ts';
 
 const card = (id: string, r: Card['r'], s: Card['s']): Card => ({ id, r, s });
@@ -118,5 +120,24 @@ describe('the rules', () => {
     const t = trick(20, [play(0, F7S), play(1, RB)], 1);
     expect(variantOf('C', t, 0, 1, true).freezeMs).toBe(200);
     expect(variantOf('C', t, 0, 1, true).valueClass).toBe('huge');
+  });
+});
+
+describe('the sparkles (docs/design/briscola-battle.md §3.5)', () => {
+  test('none without a briscola; a ring of 6 on one radius; a scatter of 8 from the table, all inside the frame', () => {
+    expect(sparkleOffsets('none')).toEqual([]);
+    const ring = sparkleOffsets('ring');
+    expect(ring).toHaveLength(SPARKLE_COUNT.ring);
+    ring.forEach(([x, y]) => {
+      expect(Math.hypot(x, y)).toBeGreaterThan(34);
+      expect(Math.hypot(x, y)).toBeLessThan(38);
+    });
+    expect(new Set(ring.map(([x, y]) => `${String(x)},${String(y)}`)).size).toBe(6);
+    const scatter = sparkleOffsets('scatter');
+    expect(scatter).toHaveLength(SPARKLE_COUNT.scatter);
+    scatter.forEach(([x, y]) => {
+      expect(Math.abs(x)).toBeLessThanOrEqual(48);
+      expect(Math.abs(y)).toBeLessThanOrEqual(48);
+    });
   });
 });

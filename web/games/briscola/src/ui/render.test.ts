@@ -5,6 +5,8 @@
 // seated through `sandbox/load`), so what the painter sees is what main.ts hands it. The fake keeps
 // a container's markup as a string and knows no children unless a test declares them, so the keyed
 // rebuilds are read off `data-key` and the markup, and the toggles outside a key off declared cards.
+import { trickFacts } from '../engine/index.ts';
+import { variantFrom } from './variant.ts';
 import { describe, expect, test } from 'vitest';
 
 import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
@@ -45,6 +47,8 @@ import {
   resultSheetText,
   statusText,
   takesText,
+  IMPACT_SUIT,
+  clashFxHtml,
 } from './render.ts';
 import {
   DEFAULT_OPTS,
@@ -107,9 +111,9 @@ const playFirst = (app: App): App => {
 const elapsed = (app: App): App => run(app, { type: 'settle/elapsed' }).app;
 /** The draw's tap while the beat waits for it. */
 const tapped = (app: App): App => run(app, { type: 'draw/tap' }).app;
-/** The settle beat run to its end (at most the five stages), the draw's tap taken where it waits. */
+/** The settle beat run to its end (at most the ten stages), the draw's tap taken where it waits. */
 const settled = (app: App): App =>
-  Array.from({ length: 5 }).reduce<App>(
+  Array.from({ length: 12 }).reduce<App>(
     (a) => (a.table.settle === null ? a : awaitingDraw(a.table.settle) ? tapped(a) : elapsed(a)),
     app,
   );
@@ -480,16 +484,21 @@ describe('the two-player table', () => {
     const two = playFirst(revealed(one));
     const settle = two.table.settle;
     if (settle === null) throw new Error('no settle');
-    expect(settle.stage).toBe('hold');
+    expect(settle.stage).toBe('follow');
     const trick = settle.trick;
     const v = view(two);
     expect(v.me.idx).toBe(holder.me.idx);
     const me = v.me.idx;
     const start = game(two).startedAt;
     paint(p.doc, two);
-    // Hold: both cards on the table, the winner's `taking`; the tallies as before the trick.
-    expect(p.get('trick').attr('data-key')).toBe(`${trickKey(trick.cards)}|linea|it`);
-    expect(p.get('trick').text()).toContain(' taking"');
+    // Follow: both cards on the table, nobody `taking` yet (the winner lifts at the impact), no fighters marked; the tallies as before the trick.
+    expect(p.get('trick').attr('data-key')).toBe(`${trickKey(trick.cards)}|linea|it|fight`);
+    expect(p.get('trick').text()).not.toContain(' taking"');
+    expect(p.get('trick').text()).toContain('class="play winner"');
+    expect(p.get('trick').text()).toContain('class="play loser"');
+    expect(p.get('trick').attr('data-stage')).toBe('follow');
+    expect(p.get('trick').attr('data-pose')).toBeNull();
+    expect(p.get('trick').text()).not.toContain('clash-fx');
     expect(p.get('trick').text()).toContain(`data-seat="${String(trick.winner)}"`);
     expect(p.get('statusText').text()).toBe(takesText(v.players, me, trick));
     expect(p.get('scoreStrip').attr('data-key')).toMatch(/^players\|0:0,0:0\|/);
@@ -497,7 +506,7 @@ describe('the two-player table', () => {
     expect(p.get('stock').attr('data-count')).toBe('34');
     expect(p.get('stockCount').text()).toBe('Stock · 34');
     expect(v.stockCount).toBe(32);
-    expect(p.get('tableScreen').attr('data-beat')).toBe(`${String(start)}:1:1:hold`);
+    expect(p.get('tableScreen').attr('data-beat')).toBe(`${String(start)}:1:1:follow`);
     expect(p.get('hand').hasClass('inert')).toBe(true);
     expect(p.get('seatR2').hasClass('to-move')).toBe(false);
     // Held: no chip anywhere yet (the strips read as before the trick). A seat's strip is
@@ -510,11 +519,80 @@ describe('the two-player table', () => {
     const loserStrip = (meNow: Seat = me): string => stripOf(loser, meNow);
     expect(chipsOf(winnerStrip())).toBe(0);
     expect(chipsOf(loserStrip())).toBe(0);
-    // Fly: the same picture, the beat marked; the seats still hold two cards; the winner's strip
-    // lays the one chip the cards fly to (its count 1, the loser's still 0).
-    const fly = elapsed(two);
+    // Charge: the fighters marked and the variant's slots on the fan (the CSS animates from them);
+    // the axis measured once as the charge opens (the fake measures nothing: the defaults).
+    const charge = elapsed(two);
+    paint(p.doc, charge);
+    expect(charge.table.settle?.stage).toBe('charge');
+    const c = charge.table.settle?.variant;
+    if (c === undefined) throw new Error('no variant');
+    expect(p.get('trick').attr('data-stage')).toBe('charge');
+    expect(p.get('trick').attr('data-charge')).toBe(String(c.chargeDist));
+    expect(p.get('trick').attr('data-angle')).toBe(String(c.chargeAngle));
+    expect(p.get('trick').attr('data-sign')).toBe(c.chargeSign > 0 ? '+' : '-');
+    expect(p.get('trick').attr('data-tempo')).toBe(c.tempo);
+    expect(p.get('trick').attr('data-pose')).toBe(c.pose);
+    expect(p.get('trick').attr('data-after')).toBe(c.after);
+    expect(p.get('trick').attr('data-side')).toBe(c.side);
+    expect(p.get('trick').attr('data-value')).toBe(c.valueClass);
+    expect(p.get('trick').attr('data-shake')).toBe(String(c.shakePx));
+    expect(p.get('trick').style('--charge-dist')).toBe(String(c.chargeDist));
+    expect(p.get('trick').style('--lean')).toBe(`${String(c.chargeAngle * c.chargeSign)}deg`);
+    expect(p.get('trick').style('--ux')).toBe('1');
+    expect(p.get('trick').style('--cx')).toBe('50%');
+    expect(p.get('trick').attr('data-key')).toBe(`${trickKey(trick.cards)}|linea|it|fight`);
+    expect(p.get('trick').text()).not.toContain('bystander');
+    expect(p.get('trick').text()).not.toContain(' taking"');
+    // Impact: the winner `taking`, the frame of its suit at the contact point with its sparkles (a briscola's) or none.
+    const impact = elapsed(elapsed(charge));
+    paint(p.doc, impact);
+    expect(impact.table.settle?.stage).toBe('impact');
+    expect(p.get('trick').attr('data-key')).toBe(`${trickKey(trick.cards)}|linea|it|hit`);
+    expect(p.get('trick').text()).toContain(' taking"');
+    expect(p.get('trick').text()).toContain('class="play winner"');
+    expect(p.get('trick').text()).toContain(
+      `<div class="clash-fx" data-suit="${IMPACT_SUIT[c.suit]}" data-frame="${c.frame}" data-sparkle="${c.sparkle}" data-steal="${String(c.steal)}">`,
+    );
+    expect(p.get('trick').text()).toContain(`#impact-${IMPACT_SUIT[c.suit]}-${c.frame}`);
+    expect(
+      (
+        p
+          .get('trick')
+          .text()
+          .match(/class="sparkle"/g) ?? []
+      ).length,
+    ).toBe(c.sparkle === 'none' ? 0 : c.sparkle === 'ring' ? 6 : 8);
+    // A repaint at the impact appends no second frame; the aftermath keeps it.
+    paint(p.doc, impact);
+    expect(
+      (
+        p
+          .get('trick')
+          .text()
+          .match(/class="clash-fx"/g) ?? []
+      ).length,
+    ).toBe(1);
+    const aftermath = elapsed(impact);
+    paint(p.doc, aftermath);
+    expect(aftermath.table.settle?.stage).toBe('aftermath');
+    expect(
+      (
+        p
+          .get('trick')
+          .text()
+          .match(/class="clash-fx"/g) ?? []
+      ).length,
+    ).toBe(1);
+    // Fly (the pack): the frame gone, the fighters unmarked, the beat marked; the seats still hold
+    // two cards; the winner's strip lays the one chip the cards fly to (its count 1, the loser's still 0).
+    const fly = elapsed(aftermath);
     paint(p.doc, fly);
     expect(fly.table.settle?.stage).toBe('fly');
+    expect(p.get('trick').attr('data-key')).toBe(`${trickKey(trick.cards)}|linea|it|pack`);
+    expect(p.get('trick').text()).not.toContain('clash-fx');
+    expect(p.get('trick').text()).not.toContain('winner');
+    expect(p.get('trick').attr('data-pose')).toBeNull();
+    expect(p.get('trick').text()).toContain(' taking"');
     expect(p.get('tableScreen').attr('data-beat')).toBe(`${String(start)}:1:1:fly`);
     expect(p.get('statusText').text()).toBe(takesText(v.players, me, trick));
     expect(chipsOf(winnerStrip())).toBe(1);
@@ -1129,5 +1207,31 @@ describe('the live intent mirror (docs/design/briscola-battle.md §4.4): the pai
       { type: 'hover/set', slot: null },
       { type: 'hover/set', slot: null },
     ]);
+  });
+});
+
+describe('the impact frame markup (docs/design/briscola-battle.md §3.5)', () => {
+  test('the winning suit and A/B pick the symbol; a briscola brings its ring or scatter of sparkles at their offsets, none otherwise', () => {
+    const asso = cardById('AS');
+    const due = cardById('2C');
+    if (asso === null || due === null) throw new Error('cards');
+    const cards = [
+      { seat: 0 as Seat, card: asso },
+      { seat: 1 as Seat, card: due },
+    ];
+    // Spade led, the asso di spade wins, trump denari: no briscola, no sparkle.
+    const plain = variantFrom(0, trickFacts('D', cards));
+    expect(clashFxHtml(plain)).toBe(
+      '<svg class="fx" viewBox="0 0 100 100" aria-hidden="true"><use href="#impact-spade-a"/></svg>',
+    );
+    // The same cards with spade as trump: a briscola win; digit d5 = 0 is the ring (6), 1 the scatter (8).
+    const ring = variantFrom(0, trickFacts('S', cards));
+    expect(ring.sparkle).toBe('ring');
+    expect((clashFxHtml(ring).match(/class="sparkle"/g) ?? []).length).toBe(6);
+    expect(clashFxHtml(ring)).toContain('style="--k:0;--sx:36;--sy:0"');
+    const scatter = variantFrom(3 * 3 * 2 * 3 * 2, trickFacts('S', cards));
+    expect(scatter.sparkle).toBe('scatter');
+    expect((clashFxHtml(scatter).match(/class="sparkle"/g) ?? []).length).toBe(8);
+    expect(clashFxHtml(scatter)).toContain('href="#sparkle"');
   });
 });

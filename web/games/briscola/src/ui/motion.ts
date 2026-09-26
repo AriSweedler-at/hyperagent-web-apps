@@ -349,3 +349,36 @@ export const flyCards = (doc: PageLike, flights: ReadonlyArray<Flight>): number 
   if (live.length > MAX_LIVE_FLYERS) live.forEach(removeElement);
   return flights.filter((f) => launch(doc, f)).length;
 };
+
+// ---- the clash's geometry (docs/design/briscola-battle.md §3.1 CHARGE, STRIKE; §7 PR-F) ------------------
+
+/**
+ * The axis between two fighters' centres and their contact point: `ux`/`uy` the unit vector from
+ * `a`'s centre to `b`'s (the winner charges away along −u and strikes along +u, the loser the
+ * reverse), `gap` the distance between the centres, `cx`/`cy` the midpoint where the impact frame
+ * lands. Two boxes on one spot (a fake, a hidden tab) read as side by side.
+ */
+export type ClashGeometry = Readonly<{
+  ux: number;
+  uy: number;
+  gap: number;
+  cx: number;
+  cy: number;
+}>;
+
+export const clashGeometry = (a: Rect, b: Rect): ClashGeometry => {
+  const ax = a.left + a.width / 2;
+  const ay = a.top + a.height / 2;
+  const bx = b.left + b.width / 2;
+  const by = b.top + b.height / 2;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const gap = Math.hypot(dx, dy);
+  return {
+    ux: gap < 1e-6 ? 1 : dx / gap,
+    uy: gap < 1e-6 ? 0 : dy / gap,
+    gap,
+    cx: (ax + bx) / 2,
+    cy: (ay + by) / 2,
+  };
+};

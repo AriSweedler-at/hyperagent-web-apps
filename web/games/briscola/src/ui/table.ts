@@ -231,6 +231,12 @@ export type TrickOptions = Readonly<{
   taking: Seat | null;
   /** The language of the faces' labels and the `.card-name` caption under each play; absent, neither. */
   lang?: LanguagePack;
+  /**
+   * The clash's fighters (docs/design/briscola-battle.md §3.1 CHARGE → AFTERMATH): the winner's
+   * play wears `winner`, the runner-up's `loser`, every other `bystander`; absent outside a beat
+   * (the fan's markup is then the goldens').
+   */
+  fighters?: Readonly<{ winner: Seat; loser: Seat | null }> | null;
 }>;
 
 /** "You" for my seat, else the seat's name. */
@@ -252,7 +258,10 @@ const captionHtml = (lang: LanguagePack | undefined, id: string): string =>
 const playHtml = (o: TrickOptions, p: Played, i: number): string => {
   const who = whoName(o.players, o.me, p.seat);
   const label = `${cardLabelEn(p.card)}, played by ${p.seat === o.me ? 'you' : who}`;
-  return `<div class="play" role="group" aria-label="${escapeHtml(label)}" style="--i:${String(i)}">${withDataSeat(
+  const f = o.fighters ?? null;
+  const role =
+    f === null ? '' : p.seat === f.winner ? 'winner' : p.seat === f.loser ? 'loser' : 'bystander';
+  return `<div class="${classes('play', role)}" role="group" aria-label="${escapeHtml(label)}" style="--i:${String(i)}">${withDataSeat(
     cardHtml(o.pack, p.card.id, classes('mid', p.seat === o.taking ? 'taking' : ''), o.lang),
     p.seat,
   )}<span class="who">${escapeHtml(who)}</span>${captionHtml(o.lang, p.card.id)}</div>`;

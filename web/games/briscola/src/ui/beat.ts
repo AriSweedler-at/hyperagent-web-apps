@@ -136,3 +136,35 @@ export const stageMs = (
   const base = speed === 'quick' ? row.quick : row.normal;
   return TEMPO_STAGES.has(stage) ? Math.round(base * tempo) : base;
 };
+
+// ---- the hit-stop (§3.2 IMPACT) --------------------------------------------------------------------------
+
+/** The still's length under reduced motion and `off`: long enough to read the trick. */
+export const STILL_MS = 300;
+/** `quick`'s floor for the hit-stop. */
+export const IMPACT_FLOOR_MS = 80;
+
+/**
+ * IMPACT's length on this device: the trick's value picks `freezeMs` (120/160/200, never × tempo,
+ * ui/variant.ts); `quick` scales it ×0.6 floored at 80; reduced motion and `off` show the 300 ms still.
+ */
+export const freezeMsFor = (freezeMs: number, speed: Speed, reducedMotion: boolean): number =>
+  reducedMotion || speed === 'off'
+    ? STILL_MS
+    : speed === 'quick'
+      ? Math.max(IMPACT_FLOOR_MS, Math.round(freezeMs * 0.6))
+      : freezeMs;
+
+/**
+ * §3.2's budget: from the completing paint to the chip's landing, the clash's stages at `tempo`
+ * plus the hit-stop and the pack (`flyMs`); the §6 invariant keeps every (tempo, value class)
+ * under `BUDGET_MS`.
+ */
+export const BUDGET_MS = 1650;
+export const clashBudgetMs = (tempo: number, freezeMs: number, speed: Speed = 'normal'): number =>
+  stageMs('followLast', speed, false) +
+  stageMs('charge', speed, false, tempo) +
+  stageMs('strike', speed, false, tempo) +
+  freezeMsFor(freezeMs, speed, false) +
+  stageMs('aftermath', speed, false, tempo) +
+  durationsFor(speed, false).flyMs;
