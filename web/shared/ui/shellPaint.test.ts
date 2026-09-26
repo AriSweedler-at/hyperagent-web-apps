@@ -184,6 +184,20 @@ describe('paintWaiting', () => {
     );
     // No room open: no rows, an empty list; a host whose name is unknown reads as an empty host seat.
     expect(seatRows({ seats: [], mySeat: 0, role: 'host', myName: 'Ann' })).toEqual([]);
+    // A view with none of the optional fields: no rows; with seats alone, the host is seat 0 unnamed and the viewer.
+    expect(seatRows({})).toEqual([]);
+    expect(seatRows({ seats: [{ name: 'Bo', connected: true }], role: 'host' })).toEqual([
+      { seat: 0, name: null, connected: true, you: true },
+      { seat: 1, name: 'Bo', connected: true, you: false },
+    ]);
+    expect(
+      seatRows({ seats: [{ name: 'Bo', connected: true }], role: 'guest', mySeat: 1 })[0],
+    ).toEqual({
+      seat: 0,
+      name: null,
+      connected: true,
+      you: false,
+    });
     paintWaiting(p.doc, { ...waiting, seats: [] });
     expect(p.get('seatList').text()).toBe('');
     expect(seatLabel({ seat: 0, name: null, connected: true, you: false })).toBe(

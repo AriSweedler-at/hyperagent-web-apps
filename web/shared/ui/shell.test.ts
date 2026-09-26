@@ -810,6 +810,55 @@ describe('a table of four (FAKE4: cfg.seats)', () => {
     expect(ice.effects).toEqual([]);
   });
 
+  test('a bare N-seat config takes the defaults: the capacity is `max` without `opts.capacity`, no waiting copy rides, a lobby leave says OPPONENT_LEFT_MSG, a mid-game drop uses the two-seat toast; a seat beyond the list has no name', () => {
+    const bare: ShellConfig<Fake4> = {
+      ...FAKE4,
+      seats: { min: 2, max: 3 },
+      opts: { ...FAKE.opts, ofGame: (game) => ({ level: game.level }) },
+      copy: { ...FAKE.copy, hostRoom: FAKE4.copy.hostRoom },
+    };
+    const runBare = (app: App4, ...intents: ReadonlyArray<Intent<Fake4>>): Step<Fake4> =>
+      intents.reduce<Step<Fake4>>(
+        (st, intent) => {
+          if (!isShellIntent(intent)) throw new Error(`not a shell intent: ${intent.type}`);
+          const next = reduceShell(st.app, intent, ctx, bare);
+          return { app: next.app, effects: [...st.effects, ...next.effects] };
+        },
+        { app, effects: [] },
+      );
+    const opened = runBare(
+      initialApp4,
+      { type: 'home/init', home },
+      { type: 'host/click', name: 'Ann', level: '4' },
+    );
+    expect(opened.app.shell.seats).toEqual([EMPTY_SEAT, EMPTY_SEAT]);
+    expect(opened.effects.at(-1)).toEqual({
+      type: 'startHost',
+      code: opened.app.shell.code,
+      attempt: 1,
+      resume: false,
+      capacity: 3,
+    });
+    // A leave from a seat the list never held reads as no name, and the copy is the two-seat line.
+    const left = runBare(opened.app, join4('Bo', 1), {
+      type: 'host/guestGone',
+      iceFailed: null,
+      seat: 3,
+    });
+    expect(left.app.shell.hostStatus.text).toBe(OPPONENT_LEFT_MSG);
+    expect(left.app.shell.seats[2]).toEqual(EMPTY_SEAT);
+    // Dealt at two of three (`min` gates without `fixed`): a drop from a seat beyond the list toasts the two-seat message for nobody.
+    const dealt = runBare(left.app, join4('Cy', 2), { type: 'host/deal' });
+    expect(dealt.app.shell.game).not.toBeNull();
+    const down = runBare(dealt.app, { type: 'host/guestGone', iceFailed: null, seat: 3 });
+    expect(down.effects[0]).toEqual({
+      type: 'toast',
+      message: guestGoneMsg(null, dealt.app.shell.code),
+      ms: GONE_TOAST_MS,
+    });
+    expect(down.app.shell.seats[2]).toEqual(EMPTY_SEAT);
+  });
+
   test('the save carries the seat names; the offer keeps them; resume reopens the table at its capacity with every seat named and down, and each guest lands back in its seat by name', () => {
     const h = dealt4();
     const save = saveFor(h.shell);
@@ -2594,6 +2643,8 @@ describe('runShellEffect', () => {
     const effects: ReadonlyArray<FakeEffect> = [
       { type: 'toast', message: 'hi', ms: 4000 },
       { type: 'send', frame: { t: 'full' } },
+      // A seat on the effect reaches the adapter as its second argument (an N-seat game's send).
+      { type: 'send', frame: { t: 'full' }, seat: 1 },
       { type: 'fx', cue: 'ding' },
       { type: 'phrases', phrases: [SHELL_CUES.win, { steps: [{ cue: 'good.trick' }], buzz: 9 }] },
       { type: 'wakeLock', hold: true },
@@ -2633,6 +2684,7 @@ describe('runShellEffect', () => {
     expect(log).toEqual([
       ['toast', 'hi', 4000],
       ['send', { t: 'full' }],
+      ['send', { t: 'full' }, 1],
       ['fx', 'ding', 'felt'],
       ['fx', [SHELL_CUES.win, { steps: [{ cue: 'good.trick' }], buzz: 9 }], 'felt'],
       ['wakeLock', true],
