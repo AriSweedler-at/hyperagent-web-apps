@@ -12,7 +12,8 @@
 // opens each channel before the next connection arrives: joins that negotiate at once take
 // distinct seats at four and a failed negotiation's retry takes its seat back, a same-named join
 // is moved into a failed seat, and at two the one slot goes to the later join while the earlier
-// is closed when it opens (the stale-open guard).
+// is closed when it opens (the stale-open guard), and the hold's deadline over a seat whose watch
+// an error stopped.
 import { describe, expect, test } from 'vitest';
 
 import { ICE_FAILED_MSG, NO_RELAY_HINT } from '../edge/peer.ts';
@@ -678,6 +679,64 @@ describe('HostSession over four seats', () => {
       ['guestGone', null, 2],
       ['guestGone', ICE_FAILED_MSG, 2],
     ]);
+  });
+
+  test('a hold has a deadline: a seated channel that errors while open during the hold stops its watch and its probe with it (no verdict), so HB_MISSED_MS after the knock the knocker takes that seat if it is silent by then, or is told full if it spoke again', () => {
+    const table = (): Readonly<{
+      w: World;
+      wire: ScriptedTransport;
+      seats: ReadonlyArray<Scripted>;
+      knock: Scripted;
+    }> => {
+      const w = world({ seats: true });
+      const wire = scriptedTransport();
+      startHost(over(w, wire), cell(hostCtx({ hasGame: true })));
+      wire.up();
+      const seats = ['Bo', 'Cal', 'Dee'].map((name) => {
+        const c = wire.arrive();
+        c.open();
+        c.say(join(name));
+        return c;
+      });
+      pass(w, 3000);
+      // Every seat quiet: the knocker is held, one probe per seat.
+      const knock = wire.arrive();
+      knock.open();
+      knock.say(join('Kim'));
+      // Cal's channel errors while open: seat 2 is reported gone, its watch stopped, its probe cleared; the channel stays in its seat.
+      seats[1]?.fail({ type: 'socket-error', message: '' });
+      expect(w.log.at(-1)).toEqual(['guestGone', null, 2]);
+      // Bo and Dee beat: two verdicts of three, and the third never comes.
+      seats[0]?.say(HEARTBEAT);
+      seats[2]?.say(HEARTBEAT);
+      return { w, wire, seats, knock };
+    };
+    /** Bo and Dee keep their cadence: a beat each `HB_MS`, so neither reads as silent. */
+    const beating = (t: ReturnType<typeof table>, ms: number): void => {
+      pass(t.w, ms - 1);
+      t.seats[0]?.say(HEARTBEAT);
+      t.seats[2]?.say(HEARTBEAT);
+      pass(t.w, 1);
+    };
+    const a = table();
+    const mark = a.w.log.length;
+    beating(a, HB_MS);
+    pass(a.w, HB_MISSED_MS - HB_MS - 1);
+    expect(a.knock.sent).toEqual([]);
+    // The deadline: seat 2 has been silent since its join, longer than HB_MISSED_MS, so the knocker is its, its join replayed.
+    beating(a, 1);
+    expect(a.knock.sent).toEqual([welcome(2)]);
+    expect(a.seats[1]?.closed()).toBe(true);
+    expect(a.w.since(mark)).toEqual([['frame', join('Kim'), 2]]);
+    // The same, but Cal speaks again before the deadline: its seat is lively, and the knocker is a spare peer.
+    const b = table();
+    beating(b, HB_MS);
+    b.seats[1]?.say(HEARTBEAT);
+    beating(b, HB_MISSED_MS - HB_MS);
+    expect(b.knock.sent).toEqual([FULL]);
+    pass(b.w, FULL_CLOSE_MS);
+    expect(b.knock.closed()).toBe(true);
+    expect(b.seats.map((c) => c.closed())).toEqual([false, false, false]);
   });
 
   test('rejoin by name into a seat whose channel failed before it opened: the same name on a lower empty seat is moved there, the dead channel closed without a guestGone', () => {

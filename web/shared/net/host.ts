@@ -83,6 +83,7 @@ import {
   type NetRole,
 } from '../edge/peer.ts';
 import type { Connection, PeerHandle } from '../edge/transport.ts';
+import type { Timer } from '../lib/clock.ts';
 import type { Result } from '../lib/result.ts';
 import { peerIdFor, type Game } from '../lib/roomCode.ts';
 import { HB_MISSED_MS, isHeartbeat, liveness, type Liveness } from './liveness.ts';
@@ -524,15 +525,26 @@ export class HostSession<G, H, X> {
    * silence is the knocker's (the other probes cancelled), every seat beating first makes it a
    * spare peer, and a knocker that closes its channel meanwhile (its tab, or its own watch giving
    * up on a host that says nothing) wants no answer. At one slot: today's hold, seat written down.
+   *
+   * The deadline: HB_MISSED_MS after the knock every probe has answered, unless a watched channel's
+   * watch was stopped meanwhile (an error on a seated channel stops it and leaves the channel in
+   * its seat), which clears its probe with no verdict and would leave the knocker waiting for good
+   * on a status that reads as connected (the online review's four-seat spare, 30 s and counting).
+   * At the deadline the knocker is answered as `accept` would answer it now: a watched seat silent
+   * for HB_MISSED_MS is its, else it is a spare peer.
    */
   private hold(conn: Connection, ice: IceResult | null): void {
     const frames: unknown[] = [];
     const watched = this.channels();
     const probes: (() => void)[] = [];
+    const deadline = cell<Timer | null>(null);
     const cancel = (): void => {
       probes.forEach((c) => {
         c();
       });
+      const timer = deadline.get();
+      if (timer !== null) this.deps.clock.clearTimeout(timer);
+      deadline.set(null);
     };
     let alive = 0;
     watched.forEach((channel) => {
@@ -555,6 +567,19 @@ export class HostSession<G, H, X> {
     });
     this.held = { conn, frames, cancel };
     const waiting = (): boolean => this.held?.conn === conn;
+    deadline.set(
+      this.deps.clock.setTimeout(() => {
+        if (!waiting()) return;
+        this.held = null;
+        cancel();
+        const silent = watched.find(
+          (channel) =>
+            channel.slot.get().channel.get() === channel && channel.live.silence() >= HB_MISSED_MS,
+        );
+        if (silent !== undefined) this.replace(conn, silent, ice, frames);
+        else this.refuse(conn);
+      }, HB_MISSED_MS),
+    );
     conn.onMessage((raw) => {
       if (waiting() && !isHeartbeat(raw)) frames.push(raw);
     });
