@@ -42,8 +42,16 @@ describe('durations', () => {
   test('the design figures, and 1 ms glides with a 300 ms hold under reduced motion', () => {
     expect(DURATIONS).toEqual({ holdMs: 900, flyMs: 320, drawMs: 260, drawGapMs: 160 });
     expect(REDUCED_DURATIONS).toEqual({ holdMs: 300, flyMs: 1, drawMs: 1, drawGapMs: 1 });
-    expect(durationsFor(false)).toBe(DURATIONS);
-    expect(durationsFor(true)).toBe(REDUCED_DURATIONS);
+    expect(durationsFor('normal', false)).toBe(DURATIONS);
+    expect(durationsFor('normal', true)).toBe(REDUCED_DURATIONS);
+    expect(durationsFor('off', false)).toBe(REDUCED_DURATIONS);
+    expect(durationsFor('quick', true)).toBe(REDUCED_DURATIONS);
+    expect(durationsFor('quick', false)).toEqual({
+      holdMs: 540,
+      flyMs: 200,
+      drawMs: 160,
+      drawGapMs: 100,
+    });
   });
 });
 

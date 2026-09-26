@@ -49,6 +49,7 @@ import {
 } from './fx.ts';
 import { bindJargon, revealRule } from './glossary.ts';
 import { joinCodeFrom, withoutJoin } from './invite.ts';
+import { reducedMotion } from './motion.ts';
 import { browserNetDeps } from './netDeps.ts';
 import type { NetDeps } from './peer.ts';
 import { shareText, type ShareNavigatorLike } from './share.ts';
@@ -478,7 +479,7 @@ export const bootShell = <
   };
 
   const dispatch = (intent: Intent<G>): void => {
-    const step = cfg.reducer.reduce(app, intent, { rng, now });
+    const step = cfg.reducer.reduce(app, intent, { rng, now, reducedMotion: reducedMotion() });
     // The paint is a function of the App, so an unchanged App needs none. This matters on a
     // card's or a checker's pointerdown: a repaint would replace the element under the pointer,
     // and the browser would then drop the click that was to follow.

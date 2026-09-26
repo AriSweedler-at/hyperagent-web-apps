@@ -129,6 +129,14 @@ const blocks: ShellBlocks = {
                   <option value="4" disabled>4 players · online soon</option>
                 </select>
               </div>
+              <div class="field">
+                <span class="field-label">Battle animations</span>
+                <select id="speedSel">
+                  <option value="normal" selected>Normal</option>
+                  <option value="quick">Quick</option>
+                  <option value="off">Off</option>
+                </select>
+              </div>
               <button class="btn btn-go btn-block" id="hostBtn">Open a table</button>`,
   localFields: `            <div class="card-box">
               <div class="row">
@@ -138,6 +146,16 @@ const blocks: ShellBlocks = {
                     <option value="2" selected>2 players</option>
                     <option value="3">3 players</option>
                     <option value="4">4 players</option>
+                  </select>
+                </div>
+              </div>
+              <div class="row">
+                <label class="grow">Battle animations</label>
+                <div class="field">
+                  <select id="localSpeedSel">
+                    <option value="normal" selected>Normal</option>
+                    <option value="quick">Quick</option>
+                    <option value="off">Off</option>
                   </select>
                 </div>
               </div>

@@ -1,0 +1,97 @@
+// The beat's clock, pure (docs/design/briscola-battle.md §3.2, §3.7): how long each stage of the
+// settle beat holds the table, by the device's speed preference (`briscola_speed`: `normal`, the
+// design; `quick`, ×0.6 with floors, an impact never under 80 ms nor a glide under 90; `off`, the
+// reduced tables) and its `prefers-reduced-motion` (every glide 1 ms, the hold a 300 ms still, the
+// clash skipped to a still). ui/state.ts arms its timers from these and ui/render.ts times its
+// flights from the same table, so the two agree; theme.css carries the same numbers as `--beat-*`
+// on `#tableScreen`, overridden by `[data-speed]` and the reduced-motion block. The battle stages
+// (`play` … `packGlide`) are here for the beat that grows over them (PRs D to F); today's settle
+// reads `holdMs`/`flyMs`/`drawMs`/`drawGapMs`. No DOM, no engine.
+import type { Speed } from '../../../../shared/lib/speed.ts';
+
+// ---- today's settle (§5.3) ----------------------------------------------------------------------------
+
+export type Durations = Readonly<{
+  /** The trick shown resolved, the taking card lifted, before anything flies. */
+  holdMs: number;
+  /** The trick's cards to the winner's cell. */
+  flyMs: number;
+  /** One back from the stock to a seat. */
+  drawMs: number;
+  /** Between one draw's start and the next. */
+  drawGapMs: number;
+}>;
+
+export const DURATIONS: Durations = { holdMs: 900, flyMs: 320, drawMs: 260, drawGapMs: 160 };
+/** `quick`: ×0.6, the glides floored at 90 ms. */
+export const QUICK_DURATIONS: Durations = { holdMs: 540, flyMs: 200, drawMs: 160, drawGapMs: 100 };
+/** `prefers-reduced-motion` and `off`: every glide 1 ms, the hold 300 ms (long enough to read the trick). */
+export const REDUCED_DURATIONS: Durations = { holdMs: 300, flyMs: 1, drawMs: 1, drawGapMs: 1 };
+
+/** The settle's durations for a device: reduced motion wins over the switch; `off` reads the reduced tables. */
+export const durationsFor = (speed: Speed, reducedMotion: boolean): Durations =>
+  reducedMotion || speed === 'off'
+    ? REDUCED_DURATIONS
+    : speed === 'quick'
+      ? QUICK_DURATIONS
+      : DURATIONS;
+
+// ---- the battle beat's stages (§3.2) -----------------------------------------------------------------
+
+export type BeatStage =
+  | 'drawFlight'
+  | 'drawFlip'
+  | 'drawAuto'
+  | 'drawAutoGap'
+  | 'play'
+  | 'follow'
+  | 'followLast'
+  | 'charge'
+  | 'strike'
+  | 'impact'
+  | 'vibrate'
+  | 'aftermath'
+  | 'sparkles'
+  | 'packStack'
+  | 'packGlide';
+
+type StageRow = Readonly<{ normal: number; quick: number; reduced: number }>;
+
+/** §3.2's table: `normal` the design, `quick` the ×0.6 column with its floors, `reduced` the still (the impact is the 300 ms still; charge, strike, vibrate and aftermath vanish). */
+export const BEAT_MS: Readonly<Record<BeatStage, StageRow>> = {
+  drawFlight: { normal: 240, quick: 150, reduced: 1 },
+  drawFlip: { normal: 220, quick: 140, reduced: 1 },
+  drawAuto: { normal: 220, quick: 130, reduced: 1 },
+  drawAutoGap: { normal: 110, quick: 70, reduced: 1 },
+  play: { normal: 320, quick: 200, reduced: 1 },
+  follow: { normal: 240, quick: 150, reduced: 1 },
+  followLast: { normal: 200, quick: 120, reduced: 1 },
+  charge: { normal: 120, quick: 80, reduced: 0 },
+  strike: { normal: 80, quick: 50, reduced: 0 },
+  impact: { normal: 160, quick: 100, reduced: 300 },
+  vibrate: { normal: 90, quick: 60, reduced: 0 },
+  aftermath: { normal: 300, quick: 180, reduced: 0 },
+  sparkles: { normal: 320, quick: 190, reduced: 0 },
+  packStack: { normal: 140, quick: 90, reduced: 1 },
+  packGlide: { normal: 240, quick: 150, reduced: 1 },
+};
+
+/** The stages a variant's `tempo` scales (§3.3): the anticipation, the strike and the poses; never the impact. */
+export const TEMPO_STAGES: ReadonlySet<BeatStage> = new Set(['charge', 'strike', 'aftermath']);
+
+/**
+ * How long `stage` holds at this device's speed, `tempo` (×0.85 snappy, ×1 even, ×1.15 heavy)
+ * applied to the tempo stages alone; the impact's length is the caller's (`freezeMs`, by the
+ * trick's value), so `impact` here is the design's middle row for a stage table that needs one.
+ */
+export const stageMs = (
+  stage: BeatStage,
+  speed: Speed,
+  reducedMotion: boolean,
+  tempo = 1,
+): number => {
+  const row = BEAT_MS[stage];
+  if (reducedMotion || speed === 'off') return row.reduced;
+  const base = speed === 'quick' ? row.quick : row.normal;
+  return TEMPO_STAGES.has(stage) ? Math.round(base * tempo) : base;
+};

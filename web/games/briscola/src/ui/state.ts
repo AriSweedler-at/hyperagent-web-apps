@@ -116,17 +116,22 @@ import {
   type IntentSlot,
 } from '../protocol.ts';
 import { BRISCOLA_SHELL, parseOpts } from '../shellConfig.ts';
+import { DURATIONS, durationsFor, type Durations } from './beat.ts';
 import {
   DECK_KIND,
   DEFAULT_CARD_PACK,
   DEFAULT_LANG,
   DEFAULT_PLAY_MODE,
+  DEFAULT_SPEED,
   EXTRA_NAME_PREFS,
   HOME_TABS,
+  isSpeed,
   writeCardPack,
   writeLang,
   writeOpts,
+  writeSpeed,
   type CardPack,
+  type Speed,
   type HomeTab,
   type HostExtra,
   type PlayMode,
@@ -210,6 +215,8 @@ export type Home = Readonly<{
   opts: GameOptions;
   cardPack: CardPack;
   lang: LanguagePackName;
+  /** `briscola_speed`: the battle beat's speed. */
+  speed: Speed;
   p3Name: string | null;
   p4Name: string | null;
 }>;
@@ -284,6 +291,8 @@ export type Table = Readonly<{
   cardPack: CardPack;
   /** `briscola_lang`: the language pack the cards are named in (the captions, the tip, the aria labels). */
   lang: LanguagePackName;
+  /** `briscola_speed` (docs/design/briscola-battle.md §3.7): the beat's clock, `normal` | `quick` | `off`; `#tableScreen[data-speed]` and the timers read it. */
+  speed: Speed;
   /** The card-name tip over a hand card, armed or shown; null when none. */
   tip: Tip | null;
   /** A touch long-press showed the tip: the click its release fires must not lift this card (cleared by that tap). */
@@ -328,6 +337,7 @@ export const initialTable: Table = {
   lastPainted: null,
   cardPack: DEFAULT_CARD_PACK,
   lang: DEFAULT_LANG,
+  speed: DEFAULT_SPEED,
   tip: null,
   swallowTap: null,
   cardView: null,
@@ -340,11 +350,11 @@ export const initialTable: Table = {
 };
 // ---- the strings and beats the app (not the sessions) writes ---------------------------------
 
-/** The settle beat (§5.3 "Motion"): the resolved trick shown, the cards' flight to the winner, one draw and the gap to the next. */
-export const HOLD_MS = 900;
-export const FLY_MS = 320;
-export const DRAW_MS = 260;
-export const DRAW_GAP_MS = 160;
+/** The settle beat (§5.3 "Motion") at `normal`: the resolved trick shown, the cards' flight to the winner, one draw and the gap to the next (ui/beat.ts holds the quick and reduced tables). */
+export const HOLD_MS = DURATIONS.holdMs;
+export const FLY_MS = DURATIONS.flyMs;
+export const DRAW_MS = DURATIONS.drawMs;
+export const DRAW_GAP_MS = DURATIONS.drawGapMs;
 /** The card-name tip (docs/design/language-packs.md §5): a hover shows it after this long, a touch press after a little longer. */
 export const TIP_HOVER_MS = 400;
 export const TIP_PRESS_MS = 450;
@@ -406,6 +416,8 @@ export type TableIntent =
   | Readonly<{ type: 'cardPack/set'; pack: string }>
   /** The hook's `lang(name)`: a language pack names the cards from now on and is remembered; anything else is ignored. */
   | Readonly<{ type: 'lang/set'; name: string }>
+  /** The home screen's "Battle animations" switch (and the hook's `speed(name)`): `normal` | `quick` | `off`, remembered; anything else is ignored. */
+  | Readonly<{ type: 'speed/set'; speed: string }>
   /** A pointer over a hand card (a hover) or a touch pressing one: the tip's timer starts for that card. */
   | Readonly<{ type: 'tip/arm'; card: string; press: boolean }>
   /** The `tip` timer fired: the name shows. */
@@ -433,7 +445,8 @@ export type TableEffect =
   | Readonly<{ type: 'writeOpts'; opts: GameOptions }>
   | Readonly<{ type: 'rememberPName'; seat: ExtraSeat; name: string }>
   | Readonly<{ type: 'writeCardPack'; pack: CardPack }>
-  | Readonly<{ type: 'writeLang'; name: LanguagePackName }>;
+  | Readonly<{ type: 'writeLang'; name: LanguagePackName }>
+  | Readonly<{ type: 'writeSpeed'; speed: Speed }>;
 
 export type Effect = SharedEffect<Briscola>;
 
@@ -565,17 +578,21 @@ export const phrasesBetween = (
 
 // ---- the settle beat ----------------------------------------------------------------------------
 
-/** How long a stage holds the table: the hold, the flight, then one draw per seat with the gaps between. */
-export const settleMs = (settle: Settle): number => {
+/** How long a stage holds the table at these durations (the device's speed and motion preference, ui/beat.ts): the hold, the flight, then one draw per seat with the gaps between. */
+export const settleMs = (settle: Settle, d: Durations = DURATIONS): number => {
   switch (settle.stage) {
     case 'hold':
-      return HOLD_MS;
+      return d.holdMs;
     case 'fly':
-      return FLY_MS;
+      return d.flyMs;
     case 'draw':
-      return DRAW_MS + DRAW_GAP_MS * Math.max(0, settle.trick.drew.length - 1);
+      return d.drawMs + d.drawGapMs * Math.max(0, settle.trick.drew.length - 1);
   }
 };
+
+/** The durations this device's table runs at: its speed switch, and `prefers-reduced-motion` when the context carries it. */
+const beatDurations = (app: App, ctx: Context): Durations =>
+  durationsFor(app.table.speed, ctx.reducedMotion === true);
 
 /** The stage after this one, or null when the beat is done (no draw once the stock is out). */
 export const nextStage = (settle: Settle): Settle | null => {
@@ -626,7 +643,7 @@ export const liveView = (app: App): View | null => {
  * nothing. A view with no `prev` (a resume, a reconnect, `setup`) paints cold: no beat, no sound,
  * the memory primed. The paint itself is main.ts's after every intent.
  */
-const rendered = (app: App, prev: View | null): Step => {
+const rendered = (app: App, prev: View | null, ctx: Context): Step => {
   const view = app.shell.view;
   if (view === null) return pure(app);
   const key = cueKey(view);
@@ -650,7 +667,7 @@ const rendered = (app: App, prev: View | null): Step => {
     },
     ...cues.map(fx),
     ...phrases,
-    ...(settle !== null && starts ? [settleTimer(settleMs(settle))] : []),
+    ...(settle !== null && starts ? [settleTimer(settleMs(settle, beatDurations(app, ctx)))] : []),
     { type: 'scrollTop' },
   );
 };
@@ -664,12 +681,12 @@ const settleElapsed = (app: App, ctx: Context): Step => {
     return step(
       withTable(app, { settle: next }),
       ...(next.stage === 'draw' ? [fx('draw.stock')] : []),
-      settleTimer(settleMs(next)),
+      settleTimer(settleMs(next, beatDurations(app, ctx))),
     );
   const done = withTable(app, { settle: null });
   return app.shell.role === 'local'
     ? localBroadcast(done, false, ctx, BRISCOLA)
-    : rendered(done, done.shell.view);
+    : rendered(done, done.shell.view, ctx);
 };
 
 // ---- acting -----------------------------------------------------------------------------------
@@ -811,6 +828,7 @@ const tableCleared = (table: Table): Table => ({
   ...initialTable,
   cardPack: table.cardPack,
   lang: table.lang,
+  speed: table.speed,
   extraNames: table.extraNames,
 });
 
@@ -946,6 +964,10 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
     case 'lang/set':
       return isLanguagePack(intent.name)
         ? step(withTable(app, { lang: intent.name }), { type: 'writeLang', name: intent.name })
+        : pure(app);
+    case 'speed/set':
+      return isSpeed(intent.speed)
+        ? step(withTable(app, { speed: intent.speed }), { type: 'writeSpeed', speed: intent.speed })
         : pure(app);
     case 'tip/arm': {
       // A hand card of mine, face up: under the curtain and over a stranger nothing arms.
@@ -1141,6 +1163,7 @@ export const BRISCOLA: ShellConfig<Briscola> = {
         ...app.table,
         cardPack: home.cardPack,
         lang: home.lang,
+        speed: home.speed,
         extraNames: { 2: home.p3Name, 3: home.p4Name },
       },
     }),
@@ -1158,9 +1181,9 @@ export const initialApp: App = { shell: initialShell, table: initialTable };
  * finds a destroyed Peer and the save would only offer a dead table, so both go. Taken in `reduce`
  * before the shell's case, which knows the table mid-game and the wait screen only.
  */
-const hostLeft = (app: App, v: View): Step => {
+const hostLeft = (app: App, v: View, ctx: Context): Step => {
   const lost = { shell: { ...app.shell, oppConnected: false }, table: tableCleared(app.table) };
-  return then(rendered(lost, v), (a) =>
+  return then(rendered(lost, v, ctx), (a) =>
     step(
       a,
       { type: 'closeNet' },
@@ -1213,7 +1236,7 @@ const forIntent = (app: App, intent: Intent): App => {
 
 const reduceInner = (app: App, intent: Intent, ctx: Context): Step => {
   const v = app.shell.view;
-  if (intent.type === 'guest/lost' && v?.phase === 'over') return hostLeft(app, v);
+  if (intent.type === 'guest/lost' && v?.phase === 'over') return hostLeft(app, v, ctx);
   if (intent.type === 'local/click') return localStart(app, intent, ctx);
   // The handoff is a two-seat room (D17): offered at two players only.
   if (intent.type === 'handoff/click' && seatCountOf(app) !== 2) return pure(app);
@@ -1270,6 +1293,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'writeCardPack':
       writeCardPack(deps.store, effect.pack);
+      return;
+    case 'writeSpeed':
+      writeSpeed(deps.store, effect.speed);
       return;
     case 'writeLang':
       writeLang(deps.store, effect.name);
