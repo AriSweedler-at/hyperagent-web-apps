@@ -483,6 +483,11 @@ The shell's N-seat surface (landed with the briscola program's PR-5, `briscola-o
 
 ### 4.6 How fidice joins later
 
+Superseded 2026-09-25 by the owner's ask and docs/design/fidice-shell-adoption.md: fidice adopts the
+shell in full (home, waiting rooms, rules, result, history, the N-seat sessions) and keeps its own
+look through the shell tokens. The list below is the DRY pass's record; that plan's M6 rewrites this
+section as landed.
+
 Not by adopting this shell: its architecture (vdom, N seats, bots, spectators, reconnect tokens, `#join=`/`#watch=`, 5-char codes, name max 16, toast queue, cover-then-confirm handoff over a Peer) is a second model the map keeps separate (understand.md P12). What the shared shell keeps fidice-ready is the pure, DOM-free layer it can adopt piecemeal after its restyle:
 
 1. The room-code form logic, already shared (`lib/roomCode.ts` `sanitiseCode`/`validateCode`/`ROOM_CODE['fidice']`; `FIDICE_CODE_LENGTH_ERROR` replaces the literal at `controller.ts:420`), plus `blocksCodeInput`.
