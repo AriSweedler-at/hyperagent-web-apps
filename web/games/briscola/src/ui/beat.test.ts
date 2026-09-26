@@ -19,6 +19,8 @@ import {
   IMPACT_FLOOR_MS,
   STILL_MS,
   clashBudgetMs,
+  DEAL_ROUNDS,
+  dealMs,
   freezeMsFor,
 } from './beat.ts';
 import { FREEZE_MS, TEMPO_SCALE } from './variant.ts';
@@ -104,6 +106,7 @@ describe('stageMs', () => {
         'followLast',
         'packStack',
         'packGlide',
+        'deal',
       ] as const
     ).forEach((stage) => {
       expect(BEAT_MS[stage].quick).toBeGreaterThanOrEqual(90);
@@ -136,5 +139,25 @@ describe('the hit-stop and the budget (docs/design/briscola-battle.md §3.2, §6
     expect(clashBudgetMs(TEMPO_SCALE.snappy, FREEZE_MS.pointless)).toBe(
       200 + 102 + 68 + 120 + 255 + 320,
     );
+  });
+});
+
+describe('the deal (docs/design/briscola-battle.md §7 H): three rounds, one card at a time', () => {
+  test('dealMs: a gap per further card and the last flight; every seat count under the budget at normal, shorter at quick, a millisecond a card under reduced motion and off; 0 for no cards', () => {
+    expect(DEAL_ROUNDS).toBe(3);
+    ([2, 3, 4] as const).forEach((seats) => {
+      const cards = seats * DEAL_ROUNDS;
+      const normal = dealMs(cards, 'normal', false);
+      expect(normal).toBe((cards - 1) * 110 + 220);
+      expect(normal).toBeLessThanOrEqual(BUDGET_MS);
+      expect(dealMs(cards, 'quick', false)).toBe((cards - 1) * 70 + 130);
+      expect(dealMs(cards, 'quick', false)).toBeLessThan(normal);
+      expect(dealMs(cards, 'off', false)).toBe(cards);
+      expect(dealMs(cards, 'normal', true)).toBe(cards);
+      expect(dealMs(cards, 'quick', true)).toBe(cards);
+    });
+    expect(dealMs(12, 'normal', false)).toBe(1430);
+    expect(dealMs(0, 'normal', false)).toBe(0);
+    expect(dealMs(-1, 'quick', false)).toBe(0);
   });
 });

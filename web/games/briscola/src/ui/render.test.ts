@@ -413,6 +413,76 @@ describe('the two-player table', () => {
     expect(p.get('statusText').text()).toBe('Your turn — play a card');
   });
 
+  test('the deal flies (PR-H): six backs leave the stock for my three slots and the seat`s three backs, hidden till they land; the same table repainted deals nothing, nor does the first play', () => {
+    // Dealt through its own rng: the file's shared stream stays where the rows after this expect it.
+    const own = runIntents(reduce, { rng: mulberry32(11), now: () => NOW });
+    const app = own(
+      initialApp,
+      { type: 'home/init', home },
+      { type: 'local/click', p1: 'Ann', p2: 'Bob' },
+    ).app;
+    const v = view(app);
+    const clone = fakeEl('clone', { classes: ['card', 'back'] });
+    const stockCard = fakeEl('stockTop', { classes: ['card', 'back'] });
+    Object.assign(stockCard.el, {
+      getBoundingClientRect: () => ({ left: 400, top: 200, width: 56, height: 91 }),
+      cloneNode: () => clone.el,
+    });
+    const measured = (id: string, left: number): FakeEl => {
+      const f = fakeEl(id, { classes: ['card', 'back'] });
+      Object.assign(f.el, {
+        getBoundingClientRect: () => ({ left, top: 600, width: 80, height: 130 }),
+      });
+      return f;
+    };
+    const mine = [1, 2, 3].map((k) => measured(`mine${String(k)}`, k * 100));
+    const theirs = [1, 2, 3].map((k) => measured(`theirs${String(k)}`, k * 30));
+    const p = briscolaPage(MARKUP, {
+      stock: { queries: { '.card': [stockCard] } },
+      hand: {
+        queries: Object.fromEntries(
+          mine.map((f, i) => [`.slot:nth-child(${String(i + 1)}) .card`, [f]]),
+        ),
+      },
+      seatR2: {
+        queries: Object.fromEntries(
+          theirs.map((f, i) => [`.seat-cards .card:nth-child(${String(i + 1)})`, [f]]),
+        ),
+      },
+    });
+    paint(p.doc, app);
+    expect(p.get('tableScreen').attr('data-dealt')).toBe(`${String(v.startedAt)}:1`);
+    expect(clone.hasClass('flyer')).toBe(true);
+    expect(clone.style('--fly-ms')).toBe('220ms');
+    [...mine, ...theirs].forEach((f) => {
+      expect(f.hasClass('arriving')).toBe(true);
+      expect(f.attr('data-flying')).toBe('');
+    });
+    // A repaint of the dealt table (the curtain, a lift) launches nothing and keeps the cards under their clones.
+    const flown = clone.style('transform');
+    paint(p.doc, app);
+    expect(clone.style('transform')).toBe(flown);
+    expect(mine.every((f) => f.hasClass('arriving'))).toBe(true);
+    clone.fire('transitionend');
+    [...mine, ...theirs].forEach((f) => {
+      expect(f.hasClass('arriving')).toBe(false);
+      expect(f.attr('data-flying')).toBe(null);
+    });
+    // The first play: a trick is open, the deal is over; the latch stays on this game.
+    const id = v.legal[0];
+    if (id === undefined) throw new Error('nothing legal');
+    const played = own(
+      app,
+      { type: 'curtain/reveal' },
+      { type: 'card/tap', cardId: id },
+      { type: 'card/tap', cardId: id },
+    ).app;
+    paint(p.doc, played);
+    expect(view(played).trick).toHaveLength(1);
+    expect(p.get('tableScreen').attr('data-dealt')).toBe(`${String(v.startedAt)}:1`);
+    expect(mine.some((f) => f.hasClass('arriving'))).toBe(false);
+  });
+
   test('a play flies (PR-D): the fan card`s clone leaves from the hand slot measured before the repaint and lands at its tilt; the same fan repainted flies nothing; a dragged card lands by its ghost', () => {
     const app = revealed(local());
     const v = view(app);

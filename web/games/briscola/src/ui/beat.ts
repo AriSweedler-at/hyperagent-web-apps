@@ -94,7 +94,9 @@ export type BeatStage =
   | 'aftermath'
   | 'sparkles'
   | 'packStack'
-  | 'packGlide';
+  | 'packGlide'
+  | 'deal'
+  | 'dealGap';
 
 type StageRow = Readonly<{ normal: number; quick: number; reduced: number }>;
 
@@ -115,6 +117,9 @@ export const BEAT_MS: Readonly<Record<BeatStage, StageRow>> = {
   sparkles: { normal: 320, quick: 190, reduced: 0 },
   packStack: { normal: 140, quick: 90, reduced: 1 },
   packGlide: { normal: 240, quick: 150, reduced: 1 },
+  // The deal (§7 H): one back from the stock per card at DRAW-auto's pace, `dealGap` apart.
+  deal: { normal: 220, quick: 130, reduced: 1 },
+  dealGap: { normal: 110, quick: 70, reduced: 1 },
 };
 
 /** The stages a variant's `tempo` scales (§3.3): the anticipation, the strike and the poses; never the impact. */
@@ -161,6 +166,22 @@ export const freezeMsFor = (freezeMs: number, speed: Speed, reducedMotion: boole
  * under `BUDGET_MS`.
  */
 export const BUDGET_MS = 1650;
+
+// ---- the deal (§7 H, §2.2 A3: "3 carte … una alla volta") ------------------------------------------------
+
+/** The deal's rounds: one card per seat a round, the leader first. */
+export const DEAL_ROUNDS = 3;
+
+/**
+ * How long the deal of `cards` cards holds at this device's speed: each leaves `dealGap` after the
+ * one before and the last lands `deal` later; 0 for no cards. Every seat count (6, 9 or 12 cards)
+ * stays under `BUDGET_MS` at normal, shorter at quick; under reduced motion a millisecond a card.
+ */
+export const dealMs = (cards: number, speed: Speed, reducedMotion: boolean): number =>
+  cards <= 0
+    ? 0
+    : (cards - 1) * stageMs('dealGap', speed, reducedMotion) +
+      stageMs('deal', speed, reducedMotion);
 export const clashBudgetMs = (tempo: number, freezeMs: number, speed: Speed = 'normal'): number =>
   stageMs('followLast', speed, false) +
   stageMs('charge', speed, false, tempo) +
