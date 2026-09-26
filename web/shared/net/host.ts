@@ -57,7 +57,13 @@
 // keeps its turn order and partnerships. A seat merely quiet is presumed alive: a same-named
 // newcomer sits where it connected and the reducer's `guestNameFor` dedupes the display name.
 // Only the session can move a channel between seats, which is why this lives here and not in the
-// reducer; tokens (a per-seat secret in the lobby) are the upgrade for two same-named players.
+// reducer; tokens (a per-seat secret in the lobby) are the upgrade for two same-named players. A
+// resumed room starts with every seat's key seeded from the host save (`HostOptions.names`): with
+// the host back after a reload, its guests reconnect in whatever order their rejoin timers fire,
+// and each is moved to the seat its name held before its join is reported, so nobody is renamed
+// and no hand changes hands. The save holds the display names the reducer deduped, so a name it
+// suffixed (" 2") is not matched by the raw name its guest sends again: that guest sits where it
+// connected and is deduped once more, the two-same-names case the tokens are for.
 //
 // The netAttempt ticket: `whenTransportReady` waits on a network fetch, so its callback can land
 // after the player has cancelled and started over, possibly with the same role and code. Each
@@ -203,6 +209,13 @@ export type HostOptions = Readonly<{
   capacity?: number;
   /** The status when the Peer opens with no hand dealt; WAITING_MSG when absent. */
   waiting?: string;
+  /**
+   * A resumed room: the last name seated at each guest seat 1..capacity-1 (the host save's, null
+   * for a seat never named), seeding the seats' rejoin keys so each returning guest is moved back
+   * to its own seat by name before its join is reported (the header's "Rejoin by name"), whatever
+   * order they reconnect in. Absent for a fresh room, and for the two-seat games.
+   */
+  names?: ReadonlyArray<string | null>;
 }>;
 
 /** A value the session rewrites: readonly records of closures are the shape this zone's lint keeps. */
@@ -250,6 +263,10 @@ const isChannel = (channel: Channel | null): channel is Channel => channel !== n
 /** The rejoin key of a join name: what the reseat compares (the codec's decoder bounds its length). */
 const rejoinKey = (name: string): string => name.trim().toLowerCase();
 
+/** A seat's key off `HostOptions.names`: the saved name's, none for a seat never named or named blank. */
+const seededKey = (name: string | null | undefined): string | null =>
+  name === undefined || name === null || name.trim() === '' ? null : rejoinKey(name);
+
 /** A seat with no claim on it: no channel, or one that failed before it opened. */
 const empty = (slot: Slot): boolean => {
   const channel = slot.channel.get();
@@ -283,10 +300,12 @@ export class HostSession<G, H, X> {
     // A table has the host and at least one guest seat: a smaller capacity is a programming error
     // read as the default rather than a room that refuses everyone.
     const guests = Math.max(DEFAULT_CAPACITY, opts.capacity ?? DEFAULT_CAPACITY) - 1;
+    // A resumed room's seats start with the keys of the names that sat in them (`names`), so the
+    // first join back is moved to its own seat and not merely to the lowest free one.
     this.slots = Array.from({ length: guests }, (_, i) => ({
       seat: i + 1,
       channel: cell<Channel | null>(null),
-      name: cell<string | null>(null),
+      name: cell<string | null>(seededKey(opts.names?.[i])),
     }));
     whenTransportReady(deps, (ice) => {
       const ctx = deps.read();

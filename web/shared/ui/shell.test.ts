@@ -835,7 +835,16 @@ describe('a table of four (FAKE4: cfg.seats)', () => {
       oppConnected: false,
       game: game4(h),
     });
-    expect(resumed.effects.at(-1)).toMatchObject({ type: 'startHost', resume: true, capacity: 4 });
+    // The session is told the names its seats held, so it moves each returning guest to its own seat before the join is reported (D6).
+    expect(resumed.effects.at(-1)).toEqual({
+      type: 'startHost',
+      code: h.shell.code,
+      attempt: 1,
+      resume: true,
+      capacity: 4,
+      waiting: 'Waiting for 3 players to join…',
+      names: ['Bo', 'Cy', 'Di'],
+    });
     // Cy is back (the session reseated the name at 2): the seat keeps its name, no ` 2` suffix, and the table is re-sent to Cy alone.
     const back = run4(resumed.app, join4('Cy', 2));
     expect(back.app.shell.seats[1]).toEqual({ name: 'Cy', connected: true });
@@ -2580,6 +2589,16 @@ describe('runShellEffect', () => {
       { type: 'phrases', phrases: [SHELL_CUES.win, { steps: [{ cue: 'good.trick' }], buzz: 9 }] },
       { type: 'wakeLock', hold: true },
       { type: 'startHost', code: 'ABCD', attempt: 2, resume: false },
+      // An N-seat room's terms travel as the adapter's fourth argument, the names only when the effect carries them.
+      { type: 'startHost', code: 'ABCD', attempt: 2, resume: true, capacity: 4, waiting: 'w' },
+      {
+        type: 'startHost',
+        code: 'ABCD',
+        attempt: 2,
+        resume: true,
+        capacity: 3,
+        names: ['Bo', null],
+      },
       { type: 'startGuest', code: 'ABCD', attempt: 3 },
       { type: 'closeNet' },
       { type: 'confirm', message: 'sure?', then: { type: 'leave/confirmed' } },
@@ -2609,6 +2628,8 @@ describe('runShellEffect', () => {
       ['fx', [SHELL_CUES.win, { steps: [{ cue: 'good.trick' }], buzz: 9 }], 'felt'],
       ['wakeLock', true],
       ['startHost', 'ABCD', 2, false],
+      ['startHost', 'ABCD', 2, true, { capacity: 4, waiting: 'w' }],
+      ['startHost', 'ABCD', 2, true, { capacity: 3, names: ['Bo', null] }],
       ['startGuest', 'ABCD', 3],
       ['close'],
       ['confirm', 'sure?'],

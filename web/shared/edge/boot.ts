@@ -299,13 +299,14 @@ export type HostDepsOf<
 > = NetDeps & Readonly<{ read: () => HC; events: HostEvents<GuestFrameOf<G>> }>;
 export type GuestDepsOf<G extends BootTypes> = NetDeps &
   Readonly<{ read: () => GuestContextOf; events: GuestEvents<HostFrameOf<G>> }>;
-/** The host session's options less the game: `capacity` and `waiting` ride only for an N-seat room (shell.ts `startHost` effect). */
+/** The host session's options less the game: `capacity`, `waiting` and `names` ride only for an N-seat room (shell.ts `startHost` effect). */
 export type HostOptionsOf = Readonly<{
   code: string;
   attempt: number;
   resume: boolean;
   capacity?: number;
   waiting?: string;
+  names?: ReadonlyArray<string | null>;
 }>;
 export type GuestOptionsOf = Readonly<{ code: string; attempt: number }>;
 

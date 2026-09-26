@@ -500,7 +500,7 @@ export type ShellEffect<G extends ShellTypes> =
    */
   | Readonly<{ type: 'phrases'; phrases: ReadonlyArray<Phrase> }>
   | Readonly<{ type: 'wakeLock'; hold: boolean }>
-  /** Open the room; `capacity` (seats, the host's included) and `waiting` (the open status) ride only for an N-seat game (`HostOptions.capacity`/`waiting`), so a two-seat effect is the literal it was. */
+  /** Open the room; `capacity` (seats, the host's included), `waiting` (the open status) and `names` (a resumed room's seat names, seeding the session's rejoin keys) ride only for an N-seat game (`HostOptions.capacity`/`waiting`/`names`), so a two-seat effect is the literal it was. */
   | Readonly<{
       type: 'startHost';
       code: string;
@@ -508,6 +508,7 @@ export type ShellEffect<G extends ShellTypes> =
       resume: boolean;
       capacity?: number;
       waiting?: string;
+      names?: ReadonlyArray<string | null>;
     }>
   | Readonly<{ type: 'startGuest'; code: string; attempt: number }>
   /** Close the current session's channel and destroy its Peer. */
@@ -1348,12 +1349,17 @@ const startHost = <G extends ShellTypes>(
         code,
         attempt,
         resume: resumeCode !== null,
-        // An N-seat room tells the session its capacity and its own open status (D8); a two-seat game's effect is the literal it was.
+        // An N-seat room tells the session its capacity and its own open status (D8), and a resumed
+        // or handed-off room the names its seats held, so the session seats each guest back by name
+        // whatever order they return in (D6); a two-seat game's effect is the literal it was.
         ...(cfg.seats === undefined
           ? {}
           : {
               capacity,
               ...(cfg.copy.waiting === undefined ? {} : { waiting: cfg.copy.waiting(capacity) }),
+              ...(seats.some((seat) => seat.name !== null)
+                ? { names: seats.map((seat) => seat.name) }
+                : {}),
             }),
       }),
   );

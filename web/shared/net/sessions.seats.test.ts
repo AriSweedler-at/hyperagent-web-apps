@@ -5,7 +5,8 @@
 // recorder logs the seat (`world({ seats: true })`). Scenarios: seating in order and a spare peer
 // at capacity; `send` to one seat and to all (each seat its own view); per-seat liveness; the hold
 // over every seat (the first silence wins, every beat refuses); a held join taking a leaver's seat;
-// rejoin by name into a gone seat, into a silent one, and not into a quiet one; `close`; the
+// rejoin by name into a gone seat, into a silent one, and not into a quiet one; a resumed room's
+// seats seeded from `HostOptions.names`, the guests back in reverse order; `close`; the
 // two-seat shape at capacity 2 with the one-argument log, the failed negotiation's retry; the
 // `waiting` status. Three scenarios run over a scripted transport instead of the broker, which
 // opens each channel before the next connection arrives: joins that negotiate at once take
@@ -557,6 +558,67 @@ describe('HostSession over four seats', () => {
     cO.send({ t: 'action', action: { type: 'play' } });
     w.broker.flush();
     expect(w.log.at(-1)).toEqual(['frame', { t: 'action', action: { type: 'play' } }, 1]);
+  });
+
+  test('a resumed room seeds each seat`s rejoin key from `names`: the guests back in reverse order are each moved to their own seat before their join is reported, and a state sent to a seat reaches the guest who held it; a seat named null or blank is free for any name', () => {
+    const w = world({ seats: true });
+    const session = startHost(w, cell(hostCtx({ hasGame: true, oppName: 'Bo' })), {
+      resume: true,
+      names: ['Bo', 'Cal', 'Dee'],
+    });
+    w.broker.flush();
+    const mark = w.log.length;
+    // Dee's rejoin timer fires first: the lowest free seat at connection, its own the moment the join says Dee.
+    const back = ['Dee', 'cal', ' BO '].map((name) => {
+      const p = party(w, undefined);
+      w.broker.flush();
+      const conn = connectFrom(p, ROOM);
+      w.broker.flush();
+      expect(heard(p)).toEqual([welcome(1)]);
+      conn.send(join(name));
+      w.broker.flush();
+      return { party: p, conn };
+    });
+    expect(w.since(mark)).toEqual([
+      ['frame', join('Dee'), 3],
+      ['frame', join('cal'), 2],
+      ['frame', join(' BO '), 1],
+    ]);
+    [1, 2, 3].forEach((seat) => {
+      session.send(state(seat), seat);
+    });
+    w.broker.flush();
+    expect(back.map((g) => heard(g.party))).toEqual([
+      [welcome(1), state(3)],
+      [welcome(1), state(2)],
+      [welcome(1), state(1)],
+    ]);
+    expect(gone(w)).toEqual([]);
+    // A seat saved without a name, or with a blank one, is nobody's: a newcomer takes it as the lowest free seat; Cal connects to the next, which its key names, and stays.
+    const partial = world({ seats: true });
+    startHost(partial, cell(hostCtx({ hasGame: true })), {
+      resume: true,
+      names: [null, 'Cal', '  '],
+    });
+    partial.broker.flush();
+    const at = partial.log.length;
+    const eve = party(partial, undefined);
+    partial.broker.flush();
+    const cE = connectFrom(eve, ROOM);
+    partial.broker.flush();
+    cE.send(join('Eve'));
+    partial.broker.flush();
+    const cal = party(partial, undefined);
+    partial.broker.flush();
+    const cC = connectFrom(cal, ROOM);
+    partial.broker.flush();
+    cC.send(join('Cal'));
+    partial.broker.flush();
+    expect(partial.since(at)).toEqual([
+      ['frame', join('Eve'), 1],
+      ['frame', join('Cal'), 2],
+    ]);
+    expect(heard(cal)).toEqual([welcome(2)]);
   });
 
   test('close() closes every seated channel and destroys the Peer; an empty seat raises nothing', () => {

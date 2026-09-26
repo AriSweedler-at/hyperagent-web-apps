@@ -25,8 +25,12 @@ import type { RulesSlot } from './glossary.ts';
 import type { SoundFontName } from '../lib/sound/fonts.ts';
 import type { Phrase } from '../lib/sound/phrase.ts';
 
-/** An N-seat room's terms for the host session (`HostOptions.capacity`/`waiting`), off the `startHost` effect. */
-export type HostRoom = Readonly<{ capacity: number; waiting?: string }>;
+/** An N-seat room's terms for the host session (`HostOptions.capacity`/`waiting`/`names`), off the `startHost` effect. */
+export type HostRoom = Readonly<{
+  capacity: number;
+  waiting?: string;
+  names?: ReadonlyArray<string | null>;
+}>;
 
 /** The adapters a shell effect reaches; a game's `EffectDeps` is this plus its own. */
 export type ShellEffectDeps<G extends ShellTypes> = Readonly<{
@@ -132,6 +136,7 @@ export const runShellEffect = <G extends ShellTypes>(
         deps.net.startHost(effect.code, effect.attempt, effect.resume, {
           capacity: effect.capacity,
           ...(effect.waiting === undefined ? {} : { waiting: effect.waiting }),
+          ...(effect.names === undefined ? {} : { names: effect.names }),
         });
       return;
     case 'startGuest':
