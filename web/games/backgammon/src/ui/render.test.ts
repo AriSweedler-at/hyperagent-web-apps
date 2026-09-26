@@ -575,13 +575,13 @@ describe('the table', () => {
     expect(p.get('point-1').hasClass('pt-near')).toBe(true);
   });
 
-  test('whose turn (the owner, 2026-09-25): the arrow and the lit tray follow the actor in their checker colours; the other seat sees the arrow turned; a finished game or no game shows neither', () => {
+  test('whose turn (the owner, 2026-09-25): the route arrow and the lit tray follow the actor in their checker colours; the other seat sees the route mirrored; a finished game or no game shows neither', () => {
     const p = page();
     const start = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';
     const arrow = p.get('turnArrow');
     expect(arrow.hidden()).toBe(true);
-    // Light to move, in Light's own view: the arrow points at the near side in Light's colours
-    // (`data-seat="0"` picks them in theme.css) and Light's tray is lit; nothing on Dark's.
+    // Light to move, in Light's own view: the arrow draws the near route in Light's colour
+    // (`data-seat="0"` picks it in theme.css) and Light's tray is lit; nothing on Dark's.
     const light = at(start, 0, [3, 1]);
     paint(p.doc, light);
     expect(arrow.hidden()).toBe(false);
@@ -589,14 +589,14 @@ describe('the table', () => {
     expect(arrow.attr('data-side')).toBe('near');
     expect(p.get('offLight').hasClass('to-move')).toBe(true);
     expect(p.get('offDark').hasClass('to-move')).toBe(false);
-    // Dark to move (the phone handed across: the view is Dark's): the colours and the lit tray
-    // switch; the arrow still points near, since the mover is the viewer.
+    // Dark to move (the phone handed across: the view is Dark's): the colour and the lit tray
+    // switch; the arrow still draws the near route, since the mover is the viewer.
     paint(p.doc, at(start, 1, [3, 1], light));
     expect(arrow.attr('data-seat')).toBe('1');
     expect(arrow.attr('data-side')).toBe('near');
     expect(p.get('offLight').hasClass('to-move')).toBe(false);
     expect(p.get('offDark').hasClass('to-move')).toBe(true);
-    // Light's turn seen from Dark's seat (online, the opponent moving): the arrow turns round.
+    // Light's turn seen from Dark's seat (online, the opponent moving): the route mirrors.
     paint(p.doc, withView(light, viewFor(game(light), 1)));
     expect(arrow.attr('data-seat')).toBe('0');
     expect(arrow.attr('data-side')).toBe('far');

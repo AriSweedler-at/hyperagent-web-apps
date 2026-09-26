@@ -654,12 +654,14 @@ const turnOf = (v: View | null): Turn | null =>
     : { actor: v.actor, side: v.actor === v.me.idx ? 'near' : 'far' };
 
 /**
- * Whose turn, at a glance (the owner, 2026-09-25: "add a small indicator like an arrow that turns
- * around and/or highlights the active user's end state that is colorized like the chips they are
- * playing with"; the board does not flip when the phone is handed across): the actor's tray wears
- * `to-move` (theme.css: a wash and a hairline in that checker's colours) and `#turnArrow` takes the
- * actor's seat (`data-seat`, the same colours) and side (`data-side`: `near` when the actor is the
- * viewer, `far` when the opponent, so the arrow turns round while they move online). Both follow
+ * Whose turn, at a glance (the owner, 2026-09-25: "a swooping arrow so if it were scaled up and
+ * superimposed on the board it would start from top right go to top left then bottom left and
+ * head ends at bottom right (off)", "about the size of a checker and off to the left of the
+ * board"; the board does not flip when the phone is handed across): the actor's tray wears
+ * `to-move` (theme.css: a wash and a hairline in that checker's colours) and `#turnArrow`, the
+ * route drawn off the board's left edge, takes the actor's seat (`data-seat`: the stroke in that
+ * checker's ring colour) and side (`data-side`: `near` when the actor is the viewer, `far` when
+ * the opponent, so the swoop mirrors into their route while they move online). Both follow
  * `View.actor`: no game, the match over, or a finished game shows neither.
  */
 export const paintTurn = (doc: DocumentLike, v: View | null): void => {
