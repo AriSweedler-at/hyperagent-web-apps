@@ -14,7 +14,7 @@
 // the built site: `npm run test:e2e` is `npm run build && playwright test`, so dist/ is fresh; a
 // bare `playwright test` reuses it. Online specs meet on a local PeerServer (`peer` package) on
 // :9000, which the pages reach through their `?peer=` hook; `E2E_BROKER=cloud` leaves it out so
-// the advisory CI job `broker` plays through 0.peerjs.com instead. `E2E_TARGET=deployed`
+// nightly.yml's job `broker` plays through 0.peerjs.com instead. `E2E_TARGET=deployed`
 // (.github/workflows/nightly.yml) makes the deployed GitHub Pages page the subject: `pages` is the
 // deployed origin (e2e/fixtures/site.ts DEPLOYED_PAGES_ORIGIN), there is no `proxy` project (that
 // origin is a Cloudflare Worker, and no test depends on Cloudflare: issue #19), proxy-dev is not
@@ -27,7 +27,7 @@
 // scripts; CI's one job per suite) narrows the run to that suite's spec files as tools/ci/suites.ts
 // lists them, both projects as ever; unset, every spec runs as before. The suite is a `testMatch`
 // rather than a positional file filter so the rule is spelled once, in the table, and composes
-// with a CLI `--grep` (the broker job's `"@online|@relay"`, `test:deployed`); a spec file shared
+// with a CLI `--grep` (nightly's `"@online|@relay"`, `test:deployed`); a spec file shared
 // by two games (the shell specs, e2e/shell-*.spec.ts: one describe per shell game tagged `@<game>`,
 // docs/design/shared-shell.md §6.3) is claimed by both games' suites and the other game's tag goes
 // into `grepInvert` (`e2e.otherTags`), which a CLI `--grep` also composes with.

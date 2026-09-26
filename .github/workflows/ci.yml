@@ -2,8 +2,9 @@
 # §6; docs/ARCHITECTURE.md "GitHub Actions"): job "changes" diffs the PR against its base through
 # tools/ci/affected.ts and emits one boolean per job plus the two JSON lists of game suites the
 # matrix jobs expand; on a push to main or a workflow_dispatch it selects everything, since main
-# must prove everything before it deploys. Job "check" (typecheck, lint, the hook shims) always
-# runs, beside "changes", so the diff's fifteen seconds hide behind it. Every other job needs
+# must prove everything before it deploys. Job "check" always runs, beside "changes", so the
+# diff's fifteen seconds hide behind it: tsc, eslint and prettier side by side in one step (all
+# three waited on, any failure fails the step), then the hook shims. Every other job needs
 # "changes" and is gated on its output: one job per shared, site and harness vitest suite of
 # tools/ci/suites.ts (`if: needs.changes.outputs.<job> == 'true'`), and the game suites as ONE
 # matrix job "game" over `fromJSON(needs.changes.outputs.games)` (a fourth game edits this file
@@ -20,18 +21,23 @@
 # override, since a job skipped before its matrix expands would show the raw expression. Which
 # change runs what is the table in tools/ci/suites.ts: a game's folder runs that game, the site and
 # the harness; web/shared/** and anything that configures, builds or drives the tests runs
-# everything; docs run only "check". Job "broker" repeats the online specs through the real
-# 0.peerjs.com and is advisory (continue-on-error, outside ci-ok). Job "ci-ok" is the one gate a
-# human or a branch rule watches: `if: always()`, green when every needed job succeeded or was
-# skipped, red on a failure or a cancellation, "changes" itself among the needed so a crash in the
-# selector cannot pass as a run with no suites (GitHub skips a job whose `needs` were skipped unless
-# it says always(), so "deploy" cannot need the suite jobs directly). Job "deploy" publishes the
+# everything; docs run only "check". The online specs through the real 0.peerjs.com are
+# nightly.yml's job "broker" (until 2026-09-25 an advisory job here: never in ci-ok, red 18 of 23
+# runs on the public broker's timeouts, and the one job that kept every run "in progress" some six
+# minutes after the gate was green). Job "ci-ok" is the one gate a human or a branch rule watches:
+# `if: always()`, green when every needed job succeeded or was skipped, red on a failure or a
+# cancellation, "changes" itself among the needed so a crash in the selector cannot pass as a run
+# with no suites (GitHub skips a job whose `needs` were skipped unless it says always(), so
+# "deploy" cannot need the suite jobs directly). Job "deploy" publishes the
 # checked dist/ to GitHub Pages on a push to main once ci-ok is green; Settings > Pages > Source
 # must be "GitHub Actions" (README "Deploy"). Chromium is restored from actions/cache by Playwright
 # version (.github/actions/playwright-chromium); dependency installs go through
 # .github/actions/npm-ci, which points the runner's copy of the lockfile at the public registry
 # (the committed one names Airtable's Socket Firewall) and scans the install. nightly.yml plays the
-# online and relay-forced specs against the deployed page every night and reports on a pinned issue.
+# online and relay-forced specs against the deployed page, and through the public broker, every
+# night and reports each on its own pinned issue. A pull request's runs share one concurrency
+# group, so a push cancels the run of the head it replaces; a push to main or a dispatch is grouped
+# by its own SHA and is never cancelled.
 name: CI
 
 on:
@@ -42,6 +48,15 @@ on:
 
 permissions:
   contents: read
+
+# One group per pull request (github.ref is refs/pull/<n>/merge there), so a push cancels the run
+# of the head it supersedes and the PR's checks show the new head alone; a push to main or a
+# dispatch is grouped by its own SHA: never cancelled, never queued behind another run. A watcher
+# pinned to a run id sees "cancelled" on the old head and must re-resolve the run from the new one.
+# deploy keeps its own `pages` group below.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Which jobs this change selects (tools/ci/affected.ts over tools/ci/suites.ts). Node builtins
@@ -79,7 +94,13 @@ jobs:
             node --experimental-strip-types tools/ci/affected.ts --all --github | tee -a "$GITHUB_OUTPUT"
           fi
 
-  # Always: the static gate, and the hook shims parse.
+  # Always: the static gate, and the hook shims parse. tsc, eslint and prettier are three
+  # independent reads of the tree, so they run side by side: eslint's typed pass (strictTypeChecked
+  # over a projectService: about a minute, and nothing for --cache to skip) is the floor, the other
+  # two hide behind it. Each writes its own log, every exit code is collected (the waits are never
+  # chained with &&: a second failure must show too), the logs print in groups, and any non-zero
+  # fails the step. The commands are the halves of the `typecheck` and `lint` scripts, which
+  # the hooks still run as they are (tools/ci/suites.test.ts pins the two spellings together).
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -91,10 +112,26 @@ jobs:
           cache: npm
       - name: Install dependencies
         uses: ./.github/actions/npm-ci
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Lint and format check
-        run: npm run lint
+      - name: Typecheck, lint and format check, side by side
+        run: |
+          logs="$RUNNER_TEMP/check"
+          mkdir -p "$logs"
+          npm run typecheck > "$logs/typecheck.log" 2>&1 & typecheck=$!
+          npx eslint . --max-warnings 0 > "$logs/eslint.log" 2>&1 & eslint=$!
+          npx prettier --check . > "$logs/prettier.log" 2>&1 & prettier=$!
+          failed=""
+          wait "$typecheck" || failed="$failed typecheck"
+          wait "$eslint" || failed="$failed eslint"
+          wait "$prettier" || failed="$failed prettier"
+          for tool in typecheck eslint prettier; do
+            echo "::group::$tool"
+            cat "$logs/$tool.log"
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::check failed:$failed"
+            exit 1
+          fi
       - name: Verify git hook wiring
         run: npm run hooks:verify
 
@@ -263,39 +300,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-site
-          path: playwright-report
-          retention-days: 7
-
-  # Advisory: the online and relay-forced specs of every game through the real 0.peerjs.com (the
-  # TURN relay stays the local coturn), so a signalling regression is visible at review without a
-  # third party blocking a merge. Not in ci-ok's list.
-  broker:
-    needs: changes
-    if: needs.changes.outputs.e2e-games != '[]'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    continue-on-error: true
-    env:
-      E2E_BROKER: cloud
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
-      - name: Install Chromium
-        uses: ./.github/actions/playwright-chromium
-      - name: Install coturn for the relay-forced games
-        uses: ./.github/actions/coturn
-      - name: Online and relay-forced specs through 0.peerjs.com (advisory)
-        run: npm run test:e2e -- --grep "@online|@relay"
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-broker
           path: playwright-report
           retention-days: 7
 

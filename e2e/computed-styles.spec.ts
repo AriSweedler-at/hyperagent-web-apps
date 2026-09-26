@@ -20,6 +20,12 @@ import {
   type Harness,
 } from '../tools/parity/computed-styles.ts';
 
+// The eight goldens take 14-16 s each and Playwright runs one file's tests in order in one worker
+// by default, which made this file the merge gate's long pole (~100 s serial inside e2e-site's
+// 2m27s). Each test takes the worker's `browser` and drives pages of its own, sharing nothing but
+// the servers, so they spread over the four CI workers; the game suites keep the default.
+test.describe.configure({ mode: 'parallel' });
+
 /** The servers playwright.config.ts already started, in the shape the capture drives. */
 const HARNESS: Harness = {
   pagesUrl: `${PAGES_ORIGIN}${PAGES_BASE_PATH}`,

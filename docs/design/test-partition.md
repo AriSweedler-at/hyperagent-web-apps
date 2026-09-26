@@ -120,7 +120,7 @@ changes ──┬── shared ────────────────�
  lists)   ├── harness ────────────────────────────┤   always(); needs changes too; green on
           ├── e2e-game [gin | fidice | backgammon]┤   success or skipped, red on failure or cancelled
           └── e2e-site ───────────────────────────┤   matrix over `e2e-games`
-check (typecheck, lint, hooks) ───────────────────┘        broker (advisory, outside ci-ok)
+check (typecheck, lint, hooks) ───────────────────┘        (public-broker replay: nightly.yml `broker`)
 ```
 
 Each shared, site or harness job is `needs: changes` + `if: needs.changes.outputs.<job> ==

@@ -16,6 +16,11 @@ import {
 } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
+// Every test here owns its `player` (one context, closed after) and touches no other's state, so
+// the file's tests spread over the CI workers instead of queueing in one worker (the reasoning is
+// in computed-styles.spec.ts).
+test.describe.configure({ mode: 'parallel' });
+
 PAGES.forEach((name) => {
   test(`${name}: loads cleanly`, async ({ player, project }) => {
     const { page, watched } = player;

@@ -47,7 +47,7 @@ export type Player = Readonly<{
   peerCalls: () => Promise<ReadonlyArray<PeerCall>>;
 }>;
 
-/** `E2E_BROKER=cloud` drops `?peer=` so the pages use 0.peerjs.com (the advisory CI job `broker`). */
+/** `E2E_BROKER=cloud` drops `?peer=` so the pages use 0.peerjs.com (nightly.yml's job `broker`). */
 export const usesLocalBroker = (): boolean => process.env['E2E_BROKER'] !== 'cloud';
 
 /**

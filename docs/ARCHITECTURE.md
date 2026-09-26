@@ -15,9 +15,9 @@ and tests that prove it land before the code they protect.
    run on every push and PR, and the same typecheck+lint+unit run before every push locally.
 3. Online play never regresses: the merge gate plays a real host/guest game in two browser
    contexts through a local PeerServer on both emulated origins, and a relay-forced one through a
-   local TURN relay; a real-broker game runs on every PR (advisory), and nightly the same online
-   and relay-forced games play with the deployed GitHub Pages page as the subject and every server
-   local. No test depends on a Cloudflare service.
+   local TURN relay; nightly the same online and relay-forced games play with the deployed GitHub
+   Pages page as the subject and every server local, and once more through the real public broker.
+   No test depends on a Cloudflare service.
 4. Engine and domain code is pure, immutable, loop-free and exception-free by tooling, not
    convention.
 
@@ -33,7 +33,7 @@ and tests that prove it land before the code they protect.
 ├── tsconfig.json                solution -> tsconfig.{base,web,pure,node}.json
 ├── vite.config.ts               root web/, base './', input = glob web/**/index.html, legacyPassthrough plugin
 ├── vitest.config.ts             one project per suite of tools/ci/suites.ts; the v8 coverage block computed from VITEST_SUITE
-├── playwright.config.ts         projects: pages, proxy (hermetic); E2E_BROKER=cloud (real 0.peerjs.com, advisory);
+├── playwright.config.ts         projects: pages, proxy (hermetic); E2E_BROKER=cloud (real 0.peerjs.com; nightly);
 │                                E2E_TARGET=deployed (the deployed page, pages only; nightly)
 ├── eslint.config.js             flat config (below)
 ├── .githooks/{pre-commit,pre-push}   shim chaining the owner's template hook; npm run check
@@ -366,8 +366,11 @@ scripts themselves (`sh -n`).
 `tools/ci/suites.ts` and emits one boolean output per job plus two JSON lists, `games` and
 `e2e-games`, the game suites selected on each side (`GAME_SUITES` in job order); a push to main or
 a dispatch selects everything. Job `check` always runs beside it: `setup-node@v4
-{node-version-file: .nvmrc, cache: npm}`, `npm ci`, `npm run typecheck` (`tsc -b`), `npm run lint`
-(eslint + prettier --check), `npm run hooks:verify`. Every other job `needs: changes` and is gated
+{node-version-file: .nvmrc, cache: npm}`, `npm ci`, then `tsc -b`, `eslint . --max-warnings 0` and
+`prettier --check .` side by side in one step (the halves of the `typecheck` and `lint` scripts the
+hooks run; each to its own log, all three waited on, any failure fails the step: eslint's typed
+pass is the floor at about a minute, so the job is ~1m15s rather than the sum), `npm run
+hooks:verify`. Every other job `needs: changes` and is gated
 on its output. The shared, site and harness suites carry `if: needs.changes.outputs.<job> ==
 'true'`, one job each; the game suites are ONE matrix job `game` with `strategy.matrix.suite:
 ${{ fromJSON(needs.changes.outputs.games) }}` (`fail-fast: false`; the checks read `game (gin)`,
@@ -394,15 +397,21 @@ plays the games with `?ice-policy=relay` through that relay and reads the select
 off every `RTCPeerConnection` the page built (`e2e/browser/record-pc.js` keeps them;
 `selected-pairs.js` reads `getStats()` as `ice.ts` `describe()` does); without `turnserver` on
 PATH they skip with the install line, and under `CI` the config refuses to start instead, so a
-broken install cannot pass as a skip. Job `broker` (gated on `e2e-games != '[]'`,
-`continue-on-error: true`): the two-peer and relay-forced specs without `?peer=` through
-0.peerjs.com (the relay stays local), so signalling regressions surface at review without blocking
-on a third party. Job `ci-ok` needs `changes` and every gate (not `broker`) with `if: always()` and is green
+broken install cannot pass as a skip. The site suite's two spec files run their tests in
+`parallel` mode (a file's tests share one worker by default, and the eight computed-style goldens
+at 14-16 s each made `e2e-site` the gate's long pole). Job `ci-ok` needs `changes` and every
+gate with `if: always()` and is green
 when each needed job succeeded or was skipped by `changes`, red on a failure or a cancellation
 (`changes` is needed so a crash in the selector is a failed need, not a row of green skips; a
 matrix job reports one result for all its entries, so `game` and `e2e-game` stand for six): GitHub
 skips a job whose `needs` were skipped unless it says `always()`, so `deploy` needs `ci-ok` alone
 and runs on a push to main (as above). `ci-ok` is the one check a branch rule or a human watches.
+The workflow's `concurrency` group is the PR's ref on a `pull_request` (`cancel-in-progress`
+there, so a push cancels the run of the head it supersedes) and the commit's own SHA on a push to
+main or a dispatch (never cancelled, never queued behind another run); `deploy` keeps its `pages`
+group. Until 2026-09-25 an advisory job `broker` replayed the online specs through the public
+0.peerjs.com on every PR: never in `ci-ok`, red 18 of 23 runs, and the one job that kept the run
+open some six minutes after the gate; it is nightly.yml's now (below).
 Which change runs what: a game's folder runs that game's unit and e2e jobs, `site`, `e2e-site` and
 `harness`; `web/shared/**`, `tools/**`, `e2e/fixtures/**`, `legacy/**`, `.github/**` and the
 build, lint and test configs run everything; docs run only `check` (the table in
@@ -427,7 +436,11 @@ the runner. Chromium's Local Network Access asks before a public https page reac
 receives are the fixtures byte for byte, as everywhere. Nothing Cloudflare is in the loop
 (games.sweedler.com, turn.sweedler.com, the zone's bot protection: issue #19). On failure it
 uploads the report and comments the run URL on the open issue labelled `nightly`, creating
-"Nightly deployed run failed" when none is open; a green run closes it.
+"Nightly deployed run failed" when none is open; a green run closes it. Its second job, `broker`,
+plays the same `@online` and `@relay` specs on the checkout's build through the public
+0.peerjs.com (`E2E_BROKER=cloud` drops `?peer=` and leaves the PeerServer out; the relay stays the
+local coturn) and reports the same way on the issue labelled `broker`, its own label so a red
+there cannot keep the `nightly` issue open over a deployed-page failure.
 
 ## Testing pyramid
 
@@ -733,7 +746,8 @@ Step 3 (two-peer e2e against the legacy pages):
 
 - Playwright is 1.63.0 and the PeerServer is `peer` 1.0.2, both exact. The PeerServer runs from
   the package's `peerjs` CLI as a `webServer` entry (`--host 127.0.0.1 --port 9000 --path /`);
-  `E2E_BROKER=cloud` leaves it out and drops `?peer=` so the `broker` job meets on 0.peerjs.com.
+  `E2E_BROKER=cloud` leaves it out and drops `?peer=` so nightly.yml's `broker` job meets on
+  0.peerjs.com.
 - `tools/serve-dist.ts` takes `--base` and `--alias` on the command line instead of hard-coding
   `/hyperagent-web-apps/`: the lint ban on absolute site paths applies to tools too, and the one
   place the harness names the mount point is `e2e/fixtures/site.ts`.
@@ -766,8 +780,9 @@ Step 4 (Vite build in passthrough mode; Pages deployed by Actions):
   outside `public/` (node 22's `fs.globSync` prints an experimental warning on every build).
 - `legacyPassthrough` copies `legacy/shared/ice.js` only while `LEGACY_PAGES` is non-empty; the
   loader exists for the legacy pages alone.
-- `npm run test:e2e` builds first (`npm run build && playwright test`), so the four `e2e-<suite>`
-  jobs and `broker` rebuild dist rather than download it; the build is deterministic. `deploy`
+- `npm run test:e2e` builds first (`npm run build && playwright test`), so the `e2e-game` rows,
+  `e2e-site` and nightly's `broker` rebuild dist rather than download it; the build is
+  deterministic and under half a second, an artifact round trip would cost more. `deploy`
   downloads the `dist` artifact `site` uploaded (with `include-hidden-files: true`, or `.nojekyll`
   would be dropped) and installs nothing.
 - `test/dist/**` is excluded from a plain `npm test` and run after `npm run build`; a missing dist/
