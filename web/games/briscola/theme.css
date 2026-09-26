@@ -1709,6 +1709,24 @@ details.history-row > .history-detail dt {
   opacity: 0.6;
   translate: 0 4px;
 }
+/* The fighters' captions (the `.who` chip, the `.card-name` line) hang under their `.play`, so the
+   charge and the strike carry them to the contact point, where the two sets would print on top of
+   each other. They fade out over the charge (a keyframe, not a transition: the charge rebuilds the
+   fan, so the chips are new elements) and stay clear through the aftermath; the pack rebuilds the
+   fan at rest with the captions back. The bystanders never leave their columns and keep theirs. */
+#trick[data-stage='charge'] :is(.play.winner, .play.loser) :is(.who, .card-name) {
+  animation: caption-out calc(var(--beat-charge) * var(--tempo)) ease-out both;
+}
+#trick:is([data-stage='strike'], [data-stage='impact'], [data-stage='aftermath'])
+  :is(.play.winner, .play.loser)
+  :is(.who, .card-name) {
+  opacity: 0;
+}
+@keyframes caption-out {
+  to {
+    opacity: 0;
+  }
+}
 /* CHARGE: away from each other along the axis, the winner leaning in, the loser back. */
 #trick[data-stage='charge'] .play.winner {
   transform: translate(
