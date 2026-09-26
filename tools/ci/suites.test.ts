@@ -212,8 +212,10 @@ describe('every test file belongs to exactly one suite', () => {
       tag: '@gin-rummy',
       otherTags: ['@fidice', '@backgammon', '@briscola'],
     });
+    // Fidice's own shell-path spec (docs/design/fidice-shell-adoption.md §4 M4) beside the two
+    // online specs it shares until M5 registers it as a shell game.
     expect(SUITES.fidice.e2e).toStrictEqual({
-      files: ['**/shell-online.spec.ts', '**/shell-relay.spec.ts'],
+      files: ['**/fidice-*.spec.ts', '**/shell-online.spec.ts', '**/shell-relay.spec.ts'],
       tag: '@fidice',
       otherTags: ['@gin-rummy', '@backgammon', '@briscola'],
     });

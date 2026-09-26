@@ -65,7 +65,9 @@
     "web/games/fidice/src/bots/**/*.ts",
     "web/games/fidice/src/net/**/*.ts",
     // The shell path's DOM-free modules (docs/design/fidice-shell-adoption.md §4 M3): codec, protocol,
-    // storage, shellConfig, fx and the reducer with its tests; the painters (M4) follow the globs below out.
+    // storage, shellConfig, fx, flag, legal and the reducer with its sound table and tests; the
+    // painters (M4: render, home, local, waiting, the page fake) follow the globs below out, and
+    // ui/rules.ts and ui/about.ts (strings over web/shared/ui/glossary.ts) stay in, as briscola's do.
     "web/games/fidice/src/*.ts",
     "web/games/fidice/src/ui/**/*.ts",
     "web/games/fidice/src/view/types.ts",
@@ -86,8 +88,8 @@
   // under ui/hand or ui/board; step 12, backgammon-board.md §6) are written against the DOM edge
   // and stay out with their tests, as do gin's scorer/main.ts, the hand's flip, the board's flight
   // and the stories page (stories/boot.ts paints; its catalogue is DOM-free and stays in,
-  // e2e/gin-stories.spec.ts imports it). One glob per module name the games share: fidice has no
-  // src/ui, so the globs reach only the two. The shared shell's painters and binders
+  // e2e/gin-stories.spec.ts imports it). One glob per module name the games share (fidice's
+  // waiting room painter, ui/waiting.ts, is its own name). The shared shell's painters and binders
   // (web/shared/ui/{shellPaint,curtain,toast,home}.ts, docs/design/shared-shell.md §4.4; keyed.ts,
   // dry-round-2.md D1; stories.ts, the stories page, dry-round-2.md I3; history.ts, the history
   // panel, briscola-sound-history.md §6; recentGames.ts, the finished games under it) are DOM
@@ -107,6 +109,7 @@
     "web/games/*/src/ui/home*.ts",
     "web/games/*/src/ui/local*.ts",
     "web/games/*/src/ui/page.fake.ts",
+    "web/games/*/src/ui/waiting*.ts",
     "web/games/*/src/ui/*/dragger*.ts",
     "web/games/*/src/ui/dragger*.ts",
     "web/games/*/src/ui/table*.ts",
