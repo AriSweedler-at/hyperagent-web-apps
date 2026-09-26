@@ -1,4 +1,80 @@
-<!DOCTYPE html>
+// Fidice's shell page (docs/design/fidice-shell-adoption.md §4 M2; "plan §N" below is that
+// document): what tools/shell-markup.ts fills web/shared/markup/shell/*.html with to compose
+// ./index.html, which test/dist/shell-markup.test.ts pins byte for byte. The page is hand-owned in
+// its layout (.prettierignore, as gin's is), so the render is the committed bytes as the partials
+// spell them and the residue here (`blocks`: today's head with its three fonts, the dice masthead,
+// the Solo and Watch modes, the Ladder tab and its sheet, the host card's five fields, the six
+// pass-the-phone names, the seat lists with the bot and watch controls, the bot config screen, the
+// table with the shell's five controls and the `#fidiceTable` mount, the endgame) carries the
+// partials' indentation. The looks (`look`) are the shell's classes, as backgammon's are, with
+// fidice's own button kinds where a kind is chosen. Dark until M6: the legacy app's `mount`
+// (src/view/vdom.ts) replaces `#app`'s children with `#app-root`, and main.ts removes the nodes the
+// page puts outside `#app` before it, so nothing here shows on the old path.
+import type {
+  ShellBlocks,
+  ShellCopy,
+  ShellLook,
+  ShellNotes,
+  ShellPage,
+} from '../../shared/markup/shell.ts';
+
+const copy: ShellCopy = {
+  modeOnline: 'Online',
+  modeLocal: 'Pass the phone',
+  hostLabel: 'Host a table',
+  joinLabel: 'Join a table',
+  joinBtnLabel: 'Sit down',
+  localBtnLabel: 'Start',
+  localNote:
+    'One phone, no internet needed. When the cup reaches someone new, the screen covers itself until they confirm it is them.',
+  hostWaitTitle: 'Your table',
+  hostWaitSubtitle: 'Have the others open this same page and enter the code',
+  openingMsg: 'Opening the table…',
+  keepOpenNote:
+    'Keep this screen open while the others sit down. If you switch apps, come straight back and the table reconnects on its own.',
+  startLabel: 'Start',
+  curtainSub: '',
+  revealLabel: 'Lift the cup',
+  rulesTitle: 'Rules',
+  historyTitle: 'History',
+};
+
+const notes: ShellNotes = {
+  homeNote: ` (docs/design/fidice-shell-adoption.md §4 M2; "plan §N" below is that document):
+       Online (the default), Pass the phone, Solo or Watch (plan §7 D9).`,
+  rulesTabNote: ': the shell fills both lists at boot from M4 (plan §7 D12).',
+  glossaryDoc: 'glossary-links.md',
+  aboutClose: '',
+  curtainNote:
+    ' (plan §7 D9): a translucent wash; the cup stays down until the next player confirms it is them.',
+};
+
+const look: ShellLook = {
+  resumeClass: ' resume',
+  resumeStyle: '',
+  resumeBtnKind: 'btn-primary',
+  onlineActive: ' active',
+  mt8: '',
+  mt10: '',
+  mt14: '',
+  mb8: '',
+  pt10: '',
+  m0: '',
+  noteLeft: 'class="empty-note left"',
+  centeredBox: 'class="card-box centered"',
+  pulseMuted: 'class="pulse muted"',
+  joinBtnWidth: '',
+  curtainClass: ' curtain',
+  curtainStyle: '',
+  curtainSheet: 'class="sheet centered"',
+  betweenRow: 'class="row between"',
+  historyClass: ' class="history"',
+  toastAttrs: ' role="status"',
+};
+
+const blocks: ShellBlocks = {
+  // Today's head, byte for byte (M1 linked shell.css; the sheets' order is the cascade's).
+  head: `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta property="og:title" content="Fidice — one-cup liar's dice (Kezar Lake)">
@@ -18,55 +94,22 @@
 <link rel="stylesheet" href="../../shared/styles/base.css">
 <link rel="stylesheet" href="../../shared/styles/shell.css">
 <link rel="stylesheet" href="./theme.css">
-</head>
-<body>
-<div id="app">
-
-  <!-- HOME / LOBBY (docs/design/fidice-shell-adoption.md §4 M2; "plan §N" below is that document):
-       Online (the default), Pass the phone, Solo or Watch (plan §7 D9). -->
-  <div id="homeScreen">
-    <div class="masthead">
+</head>`,
+  masthead: `    <div class="masthead">
       <h1 class="brand"><span class="cup" aria-hidden="true">🥤</span>Fidice</h1>
       <div class="subtitle">One cup. Five dice. Don't get caught.</div>
-    </div>
-
-    <div id="resumeBox" class="card-box resume hidden">
-      <label>Game in progress</label>
-      <button class="btn btn-primary btn-block" id="resumeBtn">Resume</button>
-    </div>
-
-    <div class="tabbar" id="topTabbar">
-      <div class="tab-wrap" id="tabPlayWrap">
-        <button type="button" class="tab-btn" id="tabPlayBtn" data-tab="play">Play</button>
-        <div class="tab-submenu" id="playSubmenu">
-          <button type="button" data-mode="online">Online</button>
-          <button type="button" data-mode="local">Pass the phone</button>
-          <button type="button" data-mode="solo">Solo</button>
-          <button type="button" data-mode="watch">Watch</button>
-        </div>
-      </div>
-      <button type="button" class="tab-btn" id="tabRulesBtn" data-tab="rules">Rules</button>
-      <button type="button" class="tab-btn" id="tabLadderBtn" data-tab="ladder">Ladder</button>
-      <button type="button" class="tab-btn" id="tabAboutBtn" data-tab="about">About</button>
-    </div>
-
-    <!-- PLAY TAB -->
-    <div id="playPanel" class="tab-panel">
-      <div class="mode-switch" id="playModeSwitch">
-        <button type="button" class="mode-btn active" data-mode="online">Online</button>
-        <button type="button" class="mode-btn" data-mode="local">Pass the phone</button>
-        <button type="button" class="mode-btn" data-mode="solo">Solo</button>
-        <button type="button" class="mode-btn" data-mode="watch">Watch</button>
-      </div>
-
-      <div id="onlineModeContent">
-        <div class="card-box">
-          <label>Your name</label>
-          <input type="text" id="nameInput" value="Ari" maxlength="20" autocomplete="off">
-        </div>
-        <div class="card-box">
-          <label>Host a table</label>
-          <div class="row">
+    </div>`,
+  // Solo and Watch (plan §7 D9): two more modes beside Online and Pass the phone, shown (gin's
+  // Sandbox is the hidden twin); both start from the home card once M4 binds them.
+  submenuExtra: `          <button type="button" data-mode="solo">Solo</button>
+          <button type="button" data-mode="watch">Watch</button>`,
+  // The Ladder tab (plan §7 D12) sits where the partial places an extra tab, between Rules and About.
+  extraTabs: `      <button type="button" class="tab-btn" id="tabLadderBtn" data-tab="ladder">Ladder</button>`,
+  switchExtra: `        <button type="button" class="mode-btn" data-mode="solo">Solo</button>
+        <button type="button" class="mode-btn" data-mode="watch">Watch</button>`,
+  // The host card's fields (plan §7 D7): the scoring, the seats, the computers and how good they
+  // are, the strategy settings button; the ids are the legacy name form's (src/view/screens/menu.ts).
+  hostFields: `          <div class="row">
             <div class="field grow">
               <span class="field-label">Scoring</span>
               <select id="livesSel">
@@ -111,20 +154,9 @@
             </div>
             <button class="btn btn-secondary btn-sm" id="btnConfigSolo" title="Pick an exact strategy, or the self-taught computer and how long it trained" aria-label="Computer settings">⚙</button>
           </div>
-          <button class="btn btn-go btn-block" id="hostBtn">Host a table</button>
-          <div class="empty-note left">You'll get a 4-letter room code to share.</div>
-        </div>
-        <div class="card-box">
-          <label>Join a table</label>
-          <div class="row">
-            <input type="text" id="codeInput" class="code-input grow" placeholder="CODE" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="go" data-lpignore="true" name="room-code-no-ac">
-            <button class="btn btn-go" id="joinBtn">Sit down</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="localModeContent" class="hidden">
-        <div class="card-box">
+          <button class="btn btn-go btn-block" id="hostBtn">Host a table</button>`,
+  // Two to six at one phone: the first two names always, the next four behind the add button.
+  localFields: `        <div class="card-box">
           <label>Players</label>
           <div class="row">
             <input type="text" id="p1NameInput" class="grow" placeholder="Player 1" maxlength="16" autocomplete="off">
@@ -138,62 +170,23 @@
             <button type="button" class="btn btn-ghost btn-sm" id="addLocalBtn">+ Add a player</button>
             <button type="button" class="btn btn-ghost btn-sm hidden" id="removeLocalBtn">− Remove a player</button>
           </div>
-        </div>
-        <button class="btn btn-go btn-block" id="localBtn">Start</button>
-        <div class="empty-note left">One phone, no internet needed. When the cup reaches someone new, the screen covers itself until they confirm it is them.</div>
-      </div>
-    </div>
-
-    <!-- RULES TAB: the shell fills both lists at boot from M4 (plan §7 D12). -->
-    <div id="rulesPanel" class="tab-panel hidden">
-      <ul class="rules-list" id="rulesList"></ul>
-    </div>
-    <!-- LADDER TAB (plan §7 D12): the bid ladder, painted from M4. -->
+        </div>`,
+  playExtra: '',
+  extraPanels: `    <!-- LADDER TAB (plan §7 D12): the bid ladder, painted from M4. -->
     <div id="ladderPanel" class="tab-panel hidden">
       <div class="card-box ladder" id="ladderList"></div>
-    </div>
-
-    <!-- ABOUT TAB: about.ts fills the copy, its jargon linked to the rules (glossary-links.md). -->
-    <div id="aboutPanel" class="tab-panel hidden">
-      <div class="card-box prose" id="aboutCopy"></div>
-    </div>
-  </div>
-  <!-- BOT CONFIG (plan §7 D7): the computer strategies screen, painted from M4. -->
-  <div id="configScreen" class="hidden"></div>
-
-  <!-- HOST WAITING -->
-  <div id="hostWaitScreen" class="hidden">
-    <h1>Your table</h1>
-    <div class="subtitle">Have the others open this same page and enter the code</div>
-    <div class="card-box centered">
-      <label>Room code</label>
-      <div class="room-code" id="roomCode">----</div>
-      <button class="btn btn-secondary btn-sm" id="shareCodeBtn">Share invite</button>
-    </div>
-    <div class="card-box centered">
-      <div id="hostWaitStatus" class="pulse muted">Opening the table…</div>
-      <ul class="seat-list" id="seatList" aria-label="Seats"></ul>
+    </div>`,
+  extraScreens: `  <!-- BOT CONFIG (plan §7 D7): the computer strategies screen, painted from M4. -->
+  <div id="configScreen" class="hidden"></div>`,
+  // The seats as they fill (web/shared/ui/shellPaint.ts `paintWaiting`; docs/design/n-seat-sessions.md
+  // §7), then the host's lobby controls the legacy lobby had (src/view/screens/lobby.ts).
+  hostWaitList: `      <ul class="seat-list" id="seatList" aria-label="Seats"></ul>
       <div class="row">
         <button class="btn btn-secondary btn-sm" id="btnAddBot">🤖 Add a computer</button>
         <label class="toggle" id="watchWrap"><input type="checkbox" id="watchCb"> I'll just watch</label>
-      </div>
-      <div class="empty-note">Keep this screen open while the others sit down. If you switch apps, come straight back and the table reconnects on its own.</div>
-    </div>
-    <button class="btn btn-go btn-block hidden" id="startGameBtn">Start</button>
-    <button class="btn btn-ghost btn-block" id="cancelHostBtn">Cancel</button>
-  </div>
-
-  <!-- GUEST WAITING -->
-  <div id="guestWaitScreen" class="hidden">
-    <h1>Joining…</h1>
-    <div class="card-box centered">
-      <div id="guestWaitStatus" class="pulse muted">Connecting…</div>
-      <ul class="seat-list" id="guestSeatList" aria-label="Seats"></ul>
-    </div>
-    <button class="btn btn-ghost btn-block" id="cancelGuestBtn">Back</button>
-  </div>
-
-  <!-- TABLE (plan §4 M2): the shell's five controls, the ladder button and the connection dot in
+      </div>`,
+  guestWaitList: `      <ul class="seat-list" id="guestSeatList" aria-label="Seats"></ul>`,
+  table: `  <!-- TABLE (plan §4 M2): the shell's five controls, the ladder button and the connection dot in
        the topbar; the cup, the bid card, the seats and the bid picker paint into #fidiceTable from
        M4. Dark until M6: the legacy mount replaces #app's children with #app-root. -->
   <div id="tableScreen" class="hidden">
@@ -211,9 +204,8 @@
       </div>
     </div>
     <div id="fidiceTable"></div>
-  </div>
-
-  <!-- ENDGAME: the shell's fifth screen (web/shared/markup/shell.ts BLOCK_IDS); the leave
+  </div>`,
+  endgame: `  <!-- ENDGAME: the shell's fifth screen (web/shared/markup/shell.ts BLOCK_IDS); the leave
        button is the table's, as gin's is. -->
   <div id="endgameScreen" class="hidden">
     <h1>Game over</h1>
@@ -222,41 +214,12 @@
       <div class="sheet-sub" id="resultSub"></div>
     </div>
     <button class="btn btn-go btn-block" id="playAgainBtn">Play again</button>
-  </div>
-
-</div>
-
-<!-- PASS-AND-PLAY CURTAIN (plan §7 D9): a translucent wash; the cup stays down until the next player confirms it is them. -->
-<div id="curtainOverlay" class="overlay curtain hidden">
-  <div class="sheet centered">
-    <div class="sheet-title" id="curtainTitle">Pass the phone</div>
-    <div class="sheet-sub" id="curtainSub"></div>
-    <div id="curtainLast" class="empty-note"></div>
-    <button class="btn btn-primary btn-block" id="curtainBtn">Lift the cup</button>
-  </div>
-</div>
-
-<!-- RULES -->
-<div id="rulesOverlay" class="overlay hidden">
-  <div class="sheet">
-    <div class="sheet-title">Rules</div>
-    <ul class="rules-list" id="rulesOverlayList"></ul>
-    <button class="btn btn-primary btn-block" id="closeRulesBtn">Got it</button>
-  </div>
-</div>
-
-<!-- HISTORY -->
-<div id="historyOverlay" class="overlay hidden">
-  <div class="sheet">
-    <div class="row between">
-      <div class="sheet-title">History</div>
-      <button class="btn btn-ghost btn-sm" id="closeHistoryBtn">Close</button>
-    </div>
-    <div class="history" id="historyList"></div>
-    <div class="recent-games" id="recentGames"></div>
-  </div>
-</div>
-
+  </div>`,
+  curtainIcon: '',
+  curtainExtra: '',
+  sheetsBefore: '',
+  // The ladder in game (plan §7 D12): the same ladder as a sheet over the table, the bid marked.
+  sheetsAfter: `
 <!-- LADDER (plan §7 D12): the bid ladder as a sheet over the table, the current bid marked. -->
 <div id="ladderOverlay" class="overlay hidden">
   <div class="sheet">
@@ -266,9 +229,8 @@
     </div>
     <div class="ladder" id="ladderSheet"></div>
   </div>
-</div>
+</div>`,
+  rulesIcon: '',
+};
 
-<div id="toast" role="status"></div>
-<script type="module" src="./main.ts"></script>
-</body>
-</html>
+export const FIDICE_PAGE: ShellPage = { copy, notes, look, blocks };
