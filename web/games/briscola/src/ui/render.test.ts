@@ -199,8 +199,10 @@ describe('the shell painters and the pack', () => {
   test('connDotClass: on/off (the legacy pair`s, or the seat`s when told), hidden in pass-and-play', () => {
     expect(connDotClass(initialApp)).toBe('conn-dot off');
     expect(connDotClass(initialApp, true)).toBe('conn-dot on');
-    expect(connDotClass(local())).toBe('conn-dot on hidden');
-    expect(connDotClass(local(), false)).toBe('conn-dot off hidden');
+    // One pass-and-play app for both reads: every `local()` deals off the file's seeded stream, which the settle-beat test below depends on.
+    const l = local();
+    expect(connDotClass(l)).toBe('conn-dot on hidden');
+    expect(connDotClass(l, false)).toBe('conn-dot off hidden');
   });
 
   test('paint at home: the pack`s tokens written once, the table untouched, the sheets down', () => {
