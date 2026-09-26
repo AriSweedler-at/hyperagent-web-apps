@@ -379,7 +379,10 @@ type Fake = Readonly<{
   Intent: OwnIntent;
   Effect: OwnEffect;
   Store: Store;
+  /** The lane's frame (protocol.ts `EPHEMERAL_TAG`), routed by `net.isEphemeral` when the config has it. */
+  Ephemeral: IntentFrame2;
 }>;
+type IntentFrame2 = Readonly<{ t: 'intent'; slot: number | null }>;
 type FakeIntent = Intent<Fake>;
 type FakeEffect = Effect<Fake>;
 type HostFrame2 = HostFrameOf<Fake>;
@@ -412,8 +415,11 @@ const HOME: HomeSnapshot<Fake> = {
 const VIEW: View = { seat: 1 };
 const FULL: HostFrame2 = { t: 'full' };
 const JOIN: GuestFrame2 = { t: 'join', name: 'Jeff' };
+const INTENT: IntentFrame2 = { t: 'intent', slot: 1 };
 const isGuestFrame = (frame: HostFrame2 | GuestFrame2): frame is GuestFrame2 =>
   frame.t === 'join' || frame.t === 'action';
+const isEphemeral = (frame: HostFrame2 | GuestFrame2): frame is IntentFrame2 =>
+  frame.t === 'intent';
 
 /** A `Store` over a Map, as the page's localStorage would be. */
 const mapStore = (initial: Readonly<Record<string, string>> = {}): Store => {
@@ -482,6 +488,8 @@ type Options = Readonly<{
   confirm?: boolean;
   /** No `window.__rng` installed: the boot falls back to `Math.random`. */
   unseeded?: boolean;
+  /** The config names `net.isEphemeral`: a game with the lane (briscola); absent, as gin and backgammon leave it. */
+  lane?: boolean;
   /** The game's own hooks, as gin passes them, over the log so a test can see the order they ran in. */
   hooks?: (log: Log) => NonNullable<BootConfig<Fake, App, Extra>['hooks']>;
 }>;
@@ -763,6 +771,7 @@ const bootPage = (options: Options = {}) => {
         }
       },
       isGuestFrame,
+      ...(options.lane === true ? { isEphemeral } : {}),
     },
     legal: (view) => [{ move: view.seat }],
     deps: {
@@ -1170,6 +1179,33 @@ describe('bootShell', () => {
     const idle = bootPage();
     idle.run([{ type: 'send', frame: FULL }, { type: 'closeNet' }]);
     expect(idle.log.hosts).toEqual([]);
+  });
+
+  test('the ephemeral lane: with isEphemeral the frame goes out on whichever session is open; without, the routing is as it was', () => {
+    const b = bootPage({ lane: true });
+    b.run([{ type: 'startHost', code: 'ABCD', attempt: 1, resume: false }]);
+    const host = b.log.hosts[0];
+    b.run([
+      { type: 'send', frame: INTENT },
+      { type: 'send', frame: JOIN },
+    ]);
+    expect(host?.sent).toEqual([INTENT]);
+    b.run([{ type: 'startGuest', code: 'ABCD', attempt: 1 }]);
+    const guest = b.log.guests[0];
+    b.run([
+      { type: 'send', frame: INTENT },
+      { type: 'send', frame: FULL },
+    ]);
+    expect(guest?.sent).toEqual([INTENT]);
+    expect(host?.sent).toEqual([INTENT]);
+    // Without the lane the frame is no side's: a host sends what is not a guest frame, a guest drops it.
+    const bare = bootPage();
+    bare.run([{ type: 'startHost', code: 'ABCD', attempt: 1, resume: false }]);
+    bare.run([{ type: 'send', frame: INTENT }]);
+    expect(bare.log.hosts[0]?.sent).toEqual([INTENT]);
+    bare.run([{ type: 'startGuest', code: 'ABCD', attempt: 1 }]);
+    bare.run([{ type: 'send', frame: INTENT }]);
+    expect(bare.log.guests[0]?.sent).toEqual([]);
   });
 
   test('what the boot returns is what the hooks were given', () => {

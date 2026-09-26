@@ -841,6 +841,8 @@ describe('card names (docs/design/language-packs.md §5): the captions, the tip 
     const p = briscolaPage(MARKUP, {}, [card]);
     const r = recorder();
     bindAll(p.doc, r.dispatch);
+    // The live intent's hover half rides the same events (`bindHover`): this test reads the tip's alone.
+    const tips = (): ReadonlyArray<unknown> => r.intents.filter((i) => i.type !== 'hover/set');
     const over = { target: fakeTarget({ closest: { '.card[data-card]': card } }) };
     p.get('hand').fire('pointerover', { ...over, pointerType: 'mouse' });
     p.get('hand').fire('pointerover', { ...over, pointerType: 'touch' });
@@ -851,7 +853,7 @@ describe('card names (docs/design/language-packs.md §5): the captions, the tip 
     p.get('hand').fire('pointerup', { ...over, pointerType: 'touch' });
     p.get('hand').fire('pointerup', { ...over, pointerType: 'mouse' });
     p.get('hand').fire('pointercancel', { pointerType: 'touch' });
-    expect(r.intents).toEqual([
+    expect(tips()).toEqual([
       { type: 'tip/arm', card: '7D', press: false },
       { type: 'tip/hide' },
       { type: 'tip/hide' },
@@ -864,12 +866,12 @@ describe('card names (docs/design/language-packs.md §5): the captions, the tip 
     p.get('hand').el.classList.add('hidden-cards');
     p.get('hand').fire('pointerover', { ...over, pointerType: 'mouse' });
     p.get('hand').fire('pointerdown', { ...over, pointerType: 'touch' });
-    expect(r.intents.slice(7)).toEqual([{ type: 'tip/hide' }]);
+    expect(tips().slice(7)).toEqual([{ type: 'tip/hide' }]);
     // The card view's close button and backdrop.
     p.get('closeCardViewBtn').fire('click');
     p.get('cardViewOverlay').fire('click', { target: fakeTarget({ id: 'cardViewOverlay' }) });
     p.get('cardViewOverlay').fire('click', { target: fakeTarget({ id: 'cardViewName' }) });
-    expect(r.intents.slice(8)).toEqual([{ type: 'cardView/close' }, { type: 'cardView/close' }]);
+    expect(tips().slice(8)).toEqual([{ type: 'cardView/close' }, { type: 'cardView/close' }]);
   });
 });
 
@@ -947,5 +949,64 @@ describe('the deck sheet', () => {
     p.get('deckOverlay').el.classList.remove('hidden');
     p.fire('keydown', { key: 'Escape' });
     expect(r.intents.at(-1)).toEqual({ type: 'deck/close' });
+  });
+});
+
+describe('the live intent mirror (docs/design/briscola-battle.md §4.4): the painter and the hover binding', () => {
+  test('paintSeats lifts the slot-th back of the seat by class, outside the cell`s key; a clear drops it', () => {
+    const backs = [0, 1, 2].map((i) => fakeEl(`back-${String(i)}`));
+    const p = briscolaPage(
+      MARKUP,
+      { seatR2: { queries: { '.seat-cards > .card': backs } } },
+      backs,
+    );
+    const app = local();
+    const other = view(app).others[0];
+    if (other === undefined) throw new Error('no opponent');
+    const mirrored = (mode: 'hover' | 'raised' | null, slot: 0 | 1 | 2 = 1): App => ({
+      ...app,
+      table: {
+        ...app.table,
+        mirror: [0, 1, 2, 3].map((s) => (s === other.idx && mode !== null ? { slot, mode } : null)),
+      },
+    });
+    paint(p.doc, app);
+    const key = p.get('seatR2').attr('data-key');
+    expect(backs.map((b) => b.classes())).toEqual([[], [], []]);
+    paint(p.doc, mirrored('hover'));
+    expect(backs.map((b) => b.hasClass('intent-hover'))).toEqual([false, true, false]);
+    expect(backs.map((b) => b.hasClass('intent-raised'))).toEqual([false, false, false]);
+    paint(p.doc, mirrored('raised', 2));
+    expect(backs.map((b) => b.hasClass('intent-hover'))).toEqual([false, false, false]);
+    expect(backs.map((b) => b.hasClass('intent-raised'))).toEqual([false, false, true]);
+    paint(p.doc, mirrored(null));
+    expect(backs.map((b) => b.classes())).toEqual([[], [], []]);
+    expect(p.get('seatR2').attr('data-key')).toBe(key);
+  });
+
+  test('bindHover: a fine pointer over a slot names its index and off the slots null, a touch names nothing, focus counts as a hover, a stray slot is off the three', () => {
+    const { page: p, slots } = declareHand(['AC', '3C', 'RB']);
+    const r = recorder();
+    bindAll(p.doc, r.dispatch);
+    const hovers = (): ReadonlyArray<unknown> => r.intents.filter((i) => i.type === 'hover/set');
+    const at = (slot: FakeEl | undefined): Readonly<{ target: unknown }> => ({
+      target: fakeTarget(slot === undefined ? { id: 'hand' } : { closest: { '.slot': slot } }),
+    });
+    p.get('hand').fire('pointerover', { ...at(slots[1]), pointerType: 'mouse' });
+    p.get('hand').fire('pointerover', { ...at(slots[2]), pointerType: 'touch' });
+    p.get('hand').fire('pointerover', { ...at(undefined), pointerType: 'pen' });
+    p.get('hand').fire('pointerout', { ...at(slots[1]), pointerType: 'mouse' });
+    p.get('hand').fire('pointerout', { ...at(slots[1]), pointerType: 'touch' });
+    p.get('hand').fire('focusin', at(slots[2]));
+    p.get('hand').fire('focusout', at(slots[2]));
+    p.get('hand').fire('focusin', at(fakeEl('stray')));
+    expect(hovers()).toEqual([
+      { type: 'hover/set', slot: 1 },
+      { type: 'hover/set', slot: null },
+      { type: 'hover/set', slot: null },
+      { type: 'hover/set', slot: 2 },
+      { type: 'hover/set', slot: null },
+      { type: 'hover/set', slot: null },
+    ]);
   });
 });

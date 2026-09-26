@@ -108,7 +108,13 @@ import type {
   TrickRecord,
   View,
 } from '../engine/index.ts';
-import { action as actionFrame } from '../protocol.ts';
+import {
+  action as actionFrame,
+  intent as intentFrame,
+  type IntentFrame,
+  type IntentMode,
+  type IntentSlot,
+} from '../protocol.ts';
 import { BRISCOLA_SHELL, parseOpts } from '../shellConfig.ts';
 import {
   DECK_KIND,
@@ -225,7 +231,7 @@ export type Briscola = Readonly<{
   Tab: HomeTab;
   Mode: PlayMode;
   Screen: ScreenId;
-  Timer: 'settle' | 'tip';
+  Timer: 'settle' | 'tip' | 'intent';
   Cue: Cue;
   Cues: CueState;
   Resume: never;
@@ -234,6 +240,8 @@ export type Briscola = Readonly<{
   Effect: TableEffect;
   Store: Store;
   Seat: ExtraSeat;
+  /** The live intent mirror's frame over the shared ephemeral lane (docs/design/briscola-battle.md §4). */
+  Ephemeral: IntentFrame;
 }>;
 
 export type Shell = ShellState<Briscola>;
@@ -248,6 +256,10 @@ export type Drag = Readonly<{ card: string; over: boolean }>;
  * touch press (`shown` false while the `tip` timer runs), shown when the timer fires.
  */
 export type Tip = Readonly<{ card: string; shown: boolean }>;
+/** What a peer shows of its hand right now (§4.4): the engine-order slot and whether it is hovered or lifted. */
+export type Mirror = Readonly<{ slot: IntentSlot; mode: IntentMode }>;
+/** The host's per-seat count of intent frames in the current window (§4.3). */
+export type IntentBudget = Readonly<{ at: number; n: number }>;
 
 /** The table's interaction memory (§5.4 `Table`). Session only: never saved, never on the wire. */
 export type Table = Readonly<{
@@ -284,6 +296,16 @@ export type Table = Readonly<{
    * marked for the first-tap clear, and the seat starts as it).
    */
   extraNames: Readonly<Record<ExtraSeat, string | null>>;
+  /** The hand slot (an index into `slots`) under a fine pointer or holding focus (§4.2); null when none. */
+  hover: IntentSlot | null;
+  /** The last intent frame this device put on the lane; equality stops repeats; null after a rejoin so a held lift is re-sent. */
+  sent: IntentFrame | null;
+  /** The `intent` timer is armed: the next change waits for it (a 60 ms trailing throttle). */
+  intentArmed: boolean;
+  /** By engine seat, what that seat has hovered or lifted, as the lane last said; null where nothing. */
+  mirror: ReadonlyArray<Mirror | null>;
+  /** The host's per-seat frame budget window (§4.3); the guest never reads it. */
+  budget: ReadonlyArray<IntentBudget | null>;
 }>;
 
 export type App = ShellApp<Briscola>;
@@ -310,6 +332,11 @@ export const initialTable: Table = {
   swallowTap: null,
   cardView: null,
   extraNames: { 2: null, 3: null },
+  hover: null,
+  sent: null,
+  intentArmed: false,
+  mirror: [null, null, null, null],
+  budget: [null, null, null, null],
 };
 // ---- the strings and beats the app (not the sessions) writes ---------------------------------
 
@@ -321,6 +348,10 @@ export const DRAW_GAP_MS = 160;
 /** The card-name tip (docs/design/language-packs.md §5): a hover shows it after this long, a touch press after a little longer. */
 export const TIP_HOVER_MS = 400;
 export const TIP_PRESS_MS = 450;
+/** The live intent mirror (docs/design/briscola-battle.md §4.2, §4.3): the trailing throttle, and the host's per-seat budget per window. */
+export const INTENT_MS = 60;
+export const INTENT_BUDGET = 30;
+export const INTENT_WINDOW_MS = 1000;
 /** `position/load` (`window.__briscola.setup`) outside pass-and-play, and a position the decoder refuses: the shell's strings. */
 export { SANDBOX_LOCAL_ONLY_MSG, badPositionMsg };
 /** `guest/lost` once the game is over: the host closed the table, there is nothing to rejoin. */
@@ -383,7 +414,11 @@ export type TableIntent =
   | Readonly<{ type: 'tip/hide'; swallow?: boolean }>
   /** A face-up card tapped for a closer look (the briscola, D24 aside): `#cardViewOverlay` shows it large with its name. */
   | Readonly<{ type: 'cardView/open'; card: string }>
-  | Readonly<{ type: 'cardView/close' }>;
+  | Readonly<{ type: 'cardView/close' }>
+  /** A fine pointer over, or focus on, the slot-th hand slot (`render.ts bindHover`); null when it left. */
+  | Readonly<{ type: 'hover/set'; slot: IntentSlot | null }>
+  /** The `intent` timer fired: what my hand shows now goes on the lane if it changed. */
+  | Readonly<{ type: 'intent/flush' }>;
 
 /** Every handler and every network event: the shell's intents and the table's. */
 export type Intent = SharedIntent<Briscola>;
@@ -606,7 +641,12 @@ const rendered = (app: App, prev: View | null): Step => {
   return step(
     {
       shell: { ...app.shell, cues: { key }, screen: 'tableScreen' },
-      table: { ...settled(app.table, view), settle, lastPainted: prev },
+      table: {
+        ...settled(app.table, view),
+        settle,
+        lastPainted: prev,
+        mirror: mirrorAfter(app.table.mirror, prev, view),
+      },
     },
     ...cues.map(fx),
     ...phrases,
@@ -937,8 +977,131 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
         : pure(withTable(app, { cardView: intent.card }));
     case 'cardView/close':
       return pure(withTable(app, { cardView: null }));
+    case 'hover/set':
+      return t.hover === intent.slot ? pure(app) : pure(withTable(app, { hover: intent.slot }));
+    case 'intent/flush':
+      return flushIntent(app);
   }
 };
+
+// ---- the live intent mirror (docs/design/briscola-battle.md §4) ---------------------------------
+
+const online = (app: App): boolean => app.shell.role === 'host' || app.shell.role === 'guest';
+
+/** The engine-order slot of a card in my hand, or null when it is not there. */
+const engineSlotOf = (v: View, cardId: string | null): IntentSlot | null => {
+  const i = cardId === null ? -1 : v.me.hand.findIndex((c) => c.id === cardId);
+  return i === 0 || i === 1 || i === 2 ? i : null;
+};
+
+/**
+ * What my hand shows a peer right now (§4.2): `raised` for the lifted or dragged card, else `hover`
+ * for the hovered slot while my hand is live and the card is legal, else a clear (`slot: null`).
+ * Null offline or before a view: nothing to say.
+ */
+export const intentOf = (app: App): IntentFrame | null => {
+  const v = app.shell.view;
+  if (v === null || !online(app)) return null;
+  const seat = v.me.idx;
+  const lifted = engineSlotOf(v, app.table.drag?.card ?? app.table.selected);
+  if (lifted !== null) return intentFrame(seat, lifted, 'raised');
+  const live = liveView(app);
+  const hoveredId = app.table.hover === null ? null : (app.table.slots[app.table.hover] ?? null);
+  const hovered = live === null ? null : engineSlotOf(live, hoveredId);
+  return hovered !== null && hoveredId !== null && live?.legal.includes(hoveredId) === true
+    ? intentFrame(seat, hovered, 'hover')
+    : intentFrame(seat, null, 'hover');
+};
+
+const sameIntent = (a: IntentFrame | null, b: IntentFrame | null): boolean =>
+  a?.seat === b?.seat && a?.slot === b?.slot && (a?.slot === null || a?.mode === b?.mode);
+
+/** A frame worth sending: it differs from the last one, and a clear is not sent before anything was. */
+const intentDue = (app: App): IntentFrame | null => {
+  const wire = intentOf(app);
+  if (wire === null || sameIntent(wire, app.table.sent)) return null;
+  return app.table.sent === null && wire.slot === null ? null : wire;
+};
+
+/** After every step: a changed intent arms the throttle once; the flush sends what is current then. */
+const withIntent = (s: Step): Step => {
+  const a = s.app;
+  if (a.table.intentArmed || intentDue(a) === null) return s;
+  return step(withTable(a, { intentArmed: true }), ...s.effects, {
+    type: 'startTimer',
+    id: 'intent',
+    ms: INTENT_MS,
+    then: { type: 'intent/flush' },
+  });
+};
+
+const flushIntent = (app: App): Step => {
+  const disarmed = withTable(app, { intentArmed: false });
+  const wire = intentDue(app);
+  return wire === null
+    ? pure(disarmed)
+    : step(withTable(disarmed, { sent: wire }), { type: 'send', frame: wire });
+};
+
+const setMirror = (
+  mirror: ReadonlyArray<Mirror | null>,
+  frame: IntentFrame,
+): ReadonlyArray<Mirror | null> =>
+  mirror.map((m, i) =>
+    i === frame.seat ? (frame.slot === null ? null : { slot: frame.slot, mode: frame.mode }) : m,
+  );
+
+/** One frame against the seat's window (§4.3): the count in the current second, or null once it is spent. */
+const spendBudget = (
+  budget: ReadonlyArray<IntentBudget | null>,
+  seat: number,
+  now: number,
+): ReadonlyArray<IntentBudget | null> | null => {
+  const was = budget[seat] ?? null;
+  const window = was !== null && now - was.at < INTENT_WINDOW_MS ? was : { at: now, n: 0 };
+  if (window.n >= INTENT_BUDGET) return null;
+  return budget.map((b, i) => (i === seat ? { at: window.at, n: window.n + 1 } : b));
+};
+
+/**
+ * A frame off the lane (`cfg.table.ephemeral`, §4.3, §4.4). The host is authoritative: a frame
+ * whose seat is not its channel's is dropped, one over the seat's budget is dropped in silence, the
+ * rest replaces that seat's mirror (last write wins; the relay to other seats is PR-5's, at two
+ * seats there is no one to relay to). A guest takes the host's frame (and, after PR-5, a relayed
+ * one) for any seat but its own.
+ */
+const ephemeral: NonNullable<ShellConfig<Briscola>['table']['ephemeral']> = (
+  app,
+  frame,
+  seat,
+  ctx,
+) => {
+  if (app.shell.role === 'host') {
+    if (frame.seat !== seat) return pure(app);
+    const budget = spendBudget(app.table.budget, seat, ctx.now());
+    if (budget === null) return pure(app);
+    return pure(withTable(app, { mirror: setMirror(app.table.mirror, frame), budget }));
+  }
+  if (frame.seat === app.shell.view?.me.idx) return pure(app);
+  return pure(withTable(app, { mirror: setMirror(app.table.mirror, frame) }));
+};
+
+/** What a seat shows the table of its hand and its play: a change clears its mirror (§4.4). */
+const seatShown = (v: View, seat: number): string => {
+  const other = v.others.find((o) => o.idx === seat);
+  const played = v.trick.filter((p) => p.seat === seat).map((p) => p.card.id);
+  return `${String(other?.handCount ?? -1)}|${(other?.hand ?? []).map((c) => c.id).join(',')}|${played.join(',')}`;
+};
+
+/** The mirrors a new view keeps: every seat whose hand or play is as `prev` showed it; a cold paint keeps none. */
+const mirrorAfter = (
+  mirror: ReadonlyArray<Mirror | null>,
+  prev: View | null,
+  view: View,
+): ReadonlyArray<Mirror | null> =>
+  mirror.map((m, seat) =>
+    m !== null && prev !== null && seatShown(prev, seat) === seatShown(view, seat) ? m : null,
+  );
 
 // ---- the shell's hooks into the table, and the config (docs/design/shared-shell.md §4.3) ---------
 
@@ -958,6 +1121,7 @@ const reset = (table: Table, at: TableReset): Table => {
     case 'view':
       return { ...table, selected: null, drag: null };
     case 'deal':
+      return { ...table, mirror: initialTable.mirror, sent: null };
     case 'applied':
     case 'frame':
       return table;
@@ -967,7 +1131,7 @@ const reset = (table: Table, at: TableReset): Table => {
 /** Briscola's shell config: shellConfig.ts's half completed with the table hooks and the home snapshot's own part. */
 export const BRISCOLA: ShellConfig<Briscola> = {
   ...BRISCOLA_SHELL,
-  table: { initial: initialTable, reset, rendered, refuse },
+  table: { initial: initialTable, reset, rendered, refuse, ephemeral },
   local: { viewer, revealer },
   home: {
     ...BRISCOLA_SHELL.home,
@@ -1033,7 +1197,21 @@ const localStart = (
   );
 };
 
-export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
+/**
+ * The rejoin paths (§4.2): a `join` while a game is on (the host re-broadcasts the state) and the
+ * guest's `connected` reset `sent`, so a HELD lift reaches a peer that came back mid-hand; the host
+ * losing its guest clears that seat's mirror (§4.4; seat 1 until PR-5 names the channel).
+ */
+const forIntent = (app: App, intent: Intent): App => {
+  if (intent.type === 'host/guestGone')
+    return withTable(app, { mirror: setMirror(app.table.mirror, intentFrame(1, null, 'hover')) });
+  const rejoined =
+    (intent.type === 'host/frame' && intent.frame.t === 'join' && app.shell.game !== null) ||
+    intent.type === 'guest/connected';
+  return rejoined ? withTable(app, { sent: null }) : app;
+};
+
+const reduceInner = (app: App, intent: Intent, ctx: Context): Step => {
   const v = app.shell.view;
   if (intent.type === 'guest/lost' && v?.phase === 'over') return hostLeft(app, v);
   if (intent.type === 'local/click') return localStart(app, intent, ctx);
@@ -1046,6 +1224,10 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
     ? then(shell, (a) => step(a, { type: 'writeOpts', opts: a.shell.opts }))
     : shell;
 };
+
+/** Every intent, then the live intent mirror's sender over the result (§4.2). */
+export const reduce = (app: App, intent: Intent, ctx: Context): Step =>
+  withIntent(reduceInner(forIntent(app, intent), intent, ctx));
 
 // ---- storage: persist and resume -------------------------------------------------------------
 

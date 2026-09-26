@@ -1359,6 +1359,18 @@ details.history-row > .history-detail dt {
 .card.arriving {
   visibility: hidden;
 }
+/* The live intent mirror (docs/design/briscola-battle.md §4.4): a peer's hovered slot lifts its
+   back 4px; a lifted one 8px with a thin accent ring. The `.card` transition and the reduced-motion
+   rule cover both. */
+.seat-cards .card.intent-hover {
+  transform: translateY(-4px);
+}
+.seat-cards .card.intent-raised {
+  transform: translateY(-8px);
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 1px 2px rgba(0, 0, 0, 0.25);
+}
 .card.dragging {
   opacity: 0.35;
 }

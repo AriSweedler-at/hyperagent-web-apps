@@ -62,6 +62,7 @@ import { paintHistory } from '../../../../shared/ui/history.ts';
 import { HISTORY_IDS } from '../../../../shared/ui/ids.ts';
 import { paintRecentGames } from '../../../../shared/ui/recentGames.ts';
 import { reducedMotion } from '../../../../shared/edge/motion.ts';
+import type { IntentSlot } from '../protocol.ts';
 import { ensureKeyed } from '../../../../shared/ui/keyed.ts';
 import {
   bindButtons,
@@ -347,6 +348,14 @@ export const paintSeats = (doc: DocumentLike, app: App, v: View, b: Beat, pack: 
     ensureKeyed(el, seatKey(data, pack.name), () => seatHtml(pack, data));
     toggleClass(el, 'to-move', b.stage === null && v.phase === 'trick' && v.turn === seat);
     toggleClass(el, 'gone', online && !app.shell.oppConnected);
+    // The live intent mirror (docs/design/briscola-battle.md §4.4): the slot-th back of that seat
+    // lifts by class, outside the key (a hover never rebuilds the cell); nothing mid-beat; an
+    // out-of-range slot toggles nothing.
+    const mirror = b.stage === null ? (app.table.mirror[seat] ?? null) : null;
+    queryAllIn(el, '.seat-cards > .card').forEach((card, i) => {
+      toggleClass(card, 'intent-hover', mirror?.slot === i && mirror.mode === 'hover');
+      toggleClass(card, 'intent-raised', mirror?.slot === i && mirror.mode === 'raised');
+    });
     const dot = queryIn(el, '.conn-dot');
     if (online && dot !== null) {
       setAttr(dot, 'class', connDotClass(app));
@@ -923,6 +932,36 @@ export const bindTip = (doc: PageLike, dispatch: Dispatch): void => {
   });
 };
 
+/** A hand slot's index in the kept picture as `Table.hover` names it, or null off the three. */
+const slotIndexOf = (hand: Element, e: Readonly<Event>): IntentSlot | null => {
+  const slot = closestFrom(e, '.slot');
+  const i = slot === null ? -1 : queryAllIn(hand, '.slot').indexOf(slot);
+  return i === 0 || i === 1 || i === 2 ? i : null;
+};
+
+/**
+ * The live intent's hover half (docs/design/briscola-battle.md §4.2): a fine pointer over a hand
+ * slot, or focus on one (keyboard parity), names the slot for the reducer to mirror; a touch names
+ * nothing (its `pointerover` precedes every tap, W3C Pointer Events §3.3.3, so it would mirror a
+ * phantom hover). The lift itself is `Table.selected`, which the reducer already holds.
+ */
+export const bindHover = (doc: PageLike, dispatch: Dispatch): void => {
+  const hand = requireId(doc, 'hand');
+  const fine = (e: Readonly<Event>): boolean => pointerTypeOf(e) !== 'touch';
+  listen(hand, 'pointerover', (e) => {
+    if (fine(e)) dispatch({ type: 'hover/set', slot: slotIndexOf(hand, e) });
+  });
+  listen(hand, 'pointerout', (e) => {
+    if (fine(e)) dispatch({ type: 'hover/set', slot: null });
+  });
+  listen(hand, 'focusin', (e) => {
+    dispatch({ type: 'hover/set', slot: slotIndexOf(hand, e) });
+  });
+  listen(hand, 'focusout', () => {
+    dispatch({ type: 'hover/set', slot: null });
+  });
+};
+
 /** The table's and the sheets' controls, each an intent (the shell's leave button too, though the menu's row is the one reached). */
 export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   listenId(doc, 'hand', 'click', (e) => {
@@ -969,6 +1008,7 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   });
   bindMenu(doc, dispatch);
   bindTip(doc, dispatch);
+  bindHover(doc, dispatch);
 };
 
 /**

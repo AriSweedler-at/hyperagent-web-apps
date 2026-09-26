@@ -25,6 +25,7 @@ import {
 import type { Card, GameEvent, State, TrickRecord, View } from '../engine/index.ts';
 import {
   action as actionFrame,
+  intent as intentWire,
   lobby,
   state as stateFrame,
   toast as toastFrame,
@@ -40,6 +41,9 @@ import {
   FLY_MS,
   GONE_TOAST_MS,
   HOLD_MS,
+  INTENT_BUDGET,
+  INTENT_MS,
+  INTENT_WINDOW_MS,
   LEAVE_LOCAL_MSG,
   NOT_CONNECTED_MSG,
   SANDBOX_LOCAL_ONLY_MSG,
@@ -59,6 +63,7 @@ import {
   initialApp,
   initialTable,
   continuedEvents,
+  intentOf,
   liveView,
   nextStage,
   phrasesBetween,
@@ -220,6 +225,11 @@ describe('the initial app', () => {
       swallowTap: null,
       cardView: null,
       extraNames: { 2: null, 3: null },
+      hover: null,
+      sent: null,
+      intentArmed: false,
+      mirror: [null, null, null, null],
+      budget: [null, null, null, null],
     });
     expect(SCREENS).toEqual([
       'homeScreen',
@@ -1319,5 +1329,208 @@ describe('the deck sheet', () => {
     const once = run(lifted, { type: 'escape' }).app;
     expect(once.table).toMatchObject({ deckOpen: true, selected: null });
     expect(run(once, { type: 'escape' }).app.table.deckOpen).toBe(false);
+  });
+});
+
+describe('the live intent mirror (docs/design/briscola-battle.md §4)', () => {
+  const SLOTS = [0, 1, 2] as const;
+  /** A hosted table, the guest seated and the hand dealt (the host is seat 0, its channel seat 1). */
+  const hosted = (): App =>
+    run(
+      initialApp,
+      { type: 'home/init', home: { ...home, playMode: 'online' } },
+      { type: 'host/click', name: 'Ann', players: '2' },
+      { type: 'host/frame', frame: { t: 'join', name: 'Jeff' } },
+      { type: 'host/deal' },
+    ).app;
+  /** The same table with my hand live (my turn, every card legal), forced so the deal's leader does not decide a row. */
+  const live = (app: App): App => {
+    const v = view(app);
+    return withView(app, {
+      ...v,
+      isMyTurn: true,
+      turn: v.me.idx,
+      legal: v.me.hand.map((card) => card.id),
+    });
+  };
+  const inert = (app: App): App => {
+    const v = view(app);
+    return withView(app, { ...v, isMyTurn: false, turn: v.me.idx === 0 ? 1 : 0, legal: [] });
+  };
+  /** The engine-order slot of the card the kept picture holds at `i`: what the wire names. */
+  const slotOf = (app: App, i: number): 0 | 1 | 2 => {
+    const id = app.table.slots[i];
+    const k = view(app).me.hand.findIndex((card) => card.id === id);
+    if (k !== 0 && k !== 1 && k !== 2) throw new Error('not in hand');
+    return k;
+  };
+  const intentTimers = (effects: ReadonlyArray<Effect>): ReadonlyArray<unknown> =>
+    effects.filter((e) => e.type === 'startTimer' && e.id === 'intent');
+  const armedOnce = [
+    { type: 'startTimer', id: 'intent', ms: INTENT_MS, then: { type: 'intent/flush' } },
+  ];
+
+  test('sender: a hover arms the 60 ms timer once and coalesces, the flush sends the engine-order slot, equality stops a repeat, a lift is raised, escape falls back to the hover, leaving clears once', () => {
+    const app = live(hosted());
+    expect(intentOf(app)).toEqual(intentWire(0, null, 'hover'));
+    const armed = run(app, { type: 'hover/set', slot: 1 });
+    expect(armed.app.table).toMatchObject({ hover: 1, intentArmed: true, sent: null });
+    expect(intentTimers(armed.effects)).toEqual(armedOnce);
+    // A second hover before the flush moves the memory and arms nothing more; the same slot again is nothing.
+    const moved = run(armed.app, { type: 'hover/set', slot: 2 });
+    expect(moved.app.table.hover).toBe(2);
+    expect(intentTimers(moved.effects)).toEqual([]);
+    expect(run(moved.app, { type: 'hover/set', slot: 2 }).app).toBe(moved.app);
+    // The flush sends the latest as an index into the engine-order hand and remembers it; a second flush sends nothing.
+    const hover2 = intentWire(0, slotOf(moved.app, 2), 'hover');
+    const flushed = run(moved.app, { type: 'intent/flush' });
+    expect(sends(flushed.effects)).toEqual([hover2]);
+    expect(flushed.app.table).toMatchObject({ sent: hover2, intentArmed: false });
+    expect(run(flushed.app, { type: 'intent/flush' })).toEqual({ app: flushed.app, effects: [] });
+    // A lift is `raised` for that slot.
+    const id2 = moved.app.table.slots[2] ?? '';
+    const lifted = run(flushed.app, { type: 'card/tap', cardId: id2 });
+    expect(lifted.app.table.selected).toBe(id2);
+    expect(intentTimers(lifted.effects)).toEqual(armedOnce);
+    const raised = run(lifted.app, { type: 'intent/flush' });
+    expect(sends(raised.effects)).toEqual([intentWire(0, slotOf(moved.app, 2), 'raised')]);
+    // Escape drops the lift: the hover shows again. The pointer leaving is one clear, and a second leave is nothing.
+    const dropped = run(raised.app, { type: 'escape' }, { type: 'intent/flush' });
+    expect(sends(dropped.effects)).toEqual([hover2]);
+    const left = run(dropped.app, { type: 'hover/set', slot: null }, { type: 'intent/flush' });
+    expect(sends(left.effects)).toEqual([intentWire(0, null, 'hover')]);
+    expect(run(left.app, { type: 'hover/set', slot: null }).app).toBe(left.app);
+    // A guest rejoining mid-game forgets what was sent, so a held state is re-sent (§4.2).
+    const rejoin = run(dropped.app, { type: 'host/frame', frame: { t: 'join', name: 'Jeff' } });
+    expect(rejoin.app.table.sent).toBeNull();
+  });
+
+  test('nothing goes out for a hover while my hand is inert, over a card that is not legal or a slot that is empty, before anything was sent, in pass-and-play, or before a deal', () => {
+    const idle = run(inert(hosted()), { type: 'hover/set', slot: 1 }, { type: 'intent/flush' });
+    expect(idle.app.table.hover).toBe(1);
+    expect(sends(idle.effects)).toEqual([]);
+    expect(intentTimers(idle.effects)).toEqual([]);
+    const app = live(hosted());
+    const onlyFirst = withView(app, { ...view(app), legal: [app.table.slots[0] ?? ''] });
+    const overIllegal = run(onlyFirst, { type: 'hover/set', slot: 1 }, { type: 'intent/flush' });
+    expect(intentOf(overIllegal.app)).toEqual(intentWire(0, null, 'hover'));
+    expect(sends(overIllegal.effects)).toEqual([]);
+    const gap: App = {
+      ...app,
+      table: {
+        ...app.table,
+        slots: [app.table.slots[0] ?? null, null, app.table.slots[2] ?? null],
+      },
+    };
+    expect(intentOf(run(gap, { type: 'hover/set', slot: 1 }).app)).toEqual(
+      intentWire(0, null, 'hover'),
+    );
+    const phone = run(revealed(local()), { type: 'hover/set', slot: 0 });
+    expect(intentOf(phone.app)).toBeNull();
+    expect(intentTimers(phone.effects)).toEqual([]);
+    const room = run(
+      initialApp,
+      { type: 'home/init', home: { ...home, playMode: 'online' } },
+      { type: 'host/click', name: 'Ann', players: '2' },
+    ).app;
+    expect(intentOf(run(room, { type: 'hover/set', slot: 0 }).app)).toBeNull();
+  });
+
+  test('host: a guest`s frame fills its seat`s mirror (last write wins), one claiming another seat is dropped, the 31st in a second is dropped in silence and the window reopens, a clear or guestGone empties the seat, a deal empties every seat', () => {
+    const app = hosted();
+    const hover = intentWire(1, 2, 'hover');
+    const one = run(app, { type: 'host/frame', frame: hover });
+    expect(one.app.table.mirror).toEqual([null, { slot: 2, mode: 'hover' }, null, null]);
+    expect(one.app.table.budget[1]).toEqual({ at: NOW, n: 1 });
+    expect(one.effects).toEqual([]);
+    const two = run(one.app, { type: 'host/frame', frame: intentWire(1, 0, 'raised') });
+    expect(two.app.table.mirror[1]).toEqual({ slot: 0, mode: 'raised' });
+    expect(run(two.app, { type: 'host/frame', frame: intentWire(0, 1, 'hover') }).app).toBe(
+      two.app,
+    );
+    expect(run(two.app, { type: 'host/frame', frame: intentWire(3, 1, 'hover') }).app).toBe(
+      two.app,
+    );
+    expect(
+      run(two.app, { type: 'host/frame', frame: intentWire(1, null, 'raised') }).app.table
+        .mirror[1],
+    ).toBeNull();
+    // The budget over a moving clock: thirty in a second pass, the thirty-first is dropped, a second later the window is fresh.
+    const clock = { now: NOW };
+    const timed = runIntents(reduce, { rng: mulberry32(7), now: () => clock.now });
+    const frames = Array.from({ length: INTENT_BUDGET }, (_, i) => ({
+      type: 'host/frame' as const,
+      frame: intentWire(1, SLOTS[i % 3] ?? 0, 'hover'),
+    }));
+    const spent = timed(app, ...frames);
+    expect(spent.app.table.budget[1]).toEqual({ at: NOW, n: INTENT_BUDGET });
+    expect(spent.app.table.mirror[1]).toEqual({ slot: 2, mode: 'hover' });
+    const over = timed(spent.app, { type: 'host/frame', frame: intentWire(1, null, 'hover') });
+    expect(over.app).toBe(spent.app);
+    clock.now = NOW + INTENT_WINDOW_MS;
+    const fresh = timed(spent.app, { type: 'host/frame', frame: intentWire(1, null, 'hover') });
+    expect(fresh.app.table.mirror[1]).toBeNull();
+    expect(fresh.app.table.budget[1]).toEqual({ at: NOW + INTENT_WINDOW_MS, n: 1 });
+    // The guest gone: its seat's mirror goes with it.
+    expect(
+      run(two.app, { type: 'host/guestGone', iceFailed: null }).app.table.mirror[1],
+    ).toBeNull();
+    // A frame in the waiting room is kept until the deal, which empties every seat.
+    const room = run(
+      initialApp,
+      { type: 'home/init', home: { ...home, playMode: 'online' } },
+      { type: 'host/click', name: 'Ann', players: '2' },
+      { type: 'host/frame', frame: { t: 'join', name: 'Jeff' } },
+      { type: 'host/frame', frame: hover },
+    ).app;
+    expect(room.table.mirror[1]).toEqual({ slot: 2, mode: 'hover' });
+    expect(run(room, { type: 'host/deal' }).app.table.mirror).toEqual([null, null, null, null]);
+  });
+
+  test('guest: the host`s frame fills seat 0`s mirror, one naming my own seat is dropped, a re-sent view keeps it and that seat`s hand change clears it; a reconnect re-sends a held lift once', () => {
+    const g = createGame(
+      [
+        { id: 'host', name: 'Ann' },
+        { id: 'guest', name: 'Jeff' },
+      ],
+      { gamesToWin: 1 },
+      mulberry32(3),
+      () => NOW,
+    );
+    const v1 = viewFor(g, 1);
+    const joined = run(
+      initialApp,
+      { type: 'join/click', name: 'Jeff', code: 'ABCD' },
+      { type: 'guest/frame', frame: lobby('Ann', DEFAULT_OPTS) },
+      { type: 'guest/connected' },
+      { type: 'guest/frame', frame: stateFrame(v1) },
+    ).app;
+    const shown = run(joined, { type: 'guest/frame', frame: intentWire(0, 1, 'raised') });
+    expect(shown.app.table.mirror).toEqual([{ slot: 1, mode: 'raised' }, null, null, null]);
+    expect(shown.effects).toEqual([]);
+    expect(run(shown.app, { type: 'guest/frame', frame: intentWire(1, 0, 'hover') }).app).toBe(
+      shown.app,
+    );
+    const again = run(shown.app, { type: 'guest/frame', frame: stateFrame(v1) }).app;
+    expect(again.table.mirror[0]).toEqual({ slot: 1, mode: 'raised' });
+    const fewer = {
+      ...v1,
+      others: v1.others.map((o) => (o.idx === 0 ? { ...o, handCount: o.handCount - 1 } : o)),
+    };
+    expect(
+      run(again, { type: 'guest/frame', frame: stateFrame(fewer) }).app.table.mirror[0],
+    ).toBeNull();
+    // My own lift goes out as the guest's seat; the reconnect forgets it was sent, so the held lift is re-sent exactly once.
+    const mine = live(joined);
+    const id = mine.table.slots[0] ?? '';
+    const held = run(mine, { type: 'card/tap', cardId: id }, { type: 'intent/flush' });
+    const raised = intentWire(1, slotOf(mine, 0), 'raised');
+    expect(sends(held.effects)).toEqual([raised]);
+    const back = run(held.app, { type: 'guest/connected' });
+    expect(back.app.table.sent).toBeNull();
+    expect(intentTimers(back.effects)).toEqual(armedOnce);
+    const resent = run(back.app, { type: 'intent/flush' });
+    expect(sends(resent.effects)).toEqual([raised]);
+    expect(sends(run(resent.app, { type: 'intent/flush' }).effects)).toEqual([]);
   });
 });
