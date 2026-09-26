@@ -15,8 +15,7 @@
 // The second describe is the live intent mirror at two (docs/design/briscola-battle.md §4), each
 // way: one seat's hover, raise and play over its own hand, each shown on the other as the matching
 // back of `#seatR2` lifting, ringing and clearing; and a touch raising with no hover before it,
-// since a touch's `pointerover` is not a hover (§4.2). The guest's way and the touch case are fixmes
-// with the two gaps this spec found (GUEST_LANE_FIXME, TOUCH_FIXME).
+// since a touch's `pointerover` is not a hover (§4.2), nor the focus its tap puts on the slot.
 import type { Locator, Page } from '@playwright/test';
 
 import type { SeatCount, View } from '../web/games/briscola/src/engine/index.ts';
@@ -139,27 +138,6 @@ const liftsSeen = (page: Page): Promise<ReadonlyArray<string>> =>
 
 /** A frame reaches the receiver within the 60 ms trailing throttle (§4.2) plus the wire and a paint; this bounds it. */
 const INTENT_TIMEOUT = 3000;
-
-/**
- * Why the guest's way is a fixme (found by this spec, 2026-09-26): the guest's frame never leaves
- * its page. web/games/briscola/main.ts's `net` names no `isEphemeral`, so the boot's `send`
- * (web/shared/edge/boot.ts) routes by `isGuestFrame` alone, which an intent frame is not (`join`
- * and `action` only): a guest drops it, and the host sends its own only because it is not a guest
- * frame either. The fix is `isEphemeral` beside `isGuestFrame` in that `net`; then this comes off.
- */
-const GUEST_LANE_FIXME =
-  'the guest never sends its intent frame: web/games/briscola/main.ts `net` lacks `isEphemeral`, so the boot routes it by `isGuestFrame` and drops it (the host to the guest carries)';
-
-/**
- * Why the touch case is a fixme (found by this spec, 2026-09-26): a tap focuses the slot it lands
- * on (`tabindex="0"` while playable), and `bindHover` counts `focusin` as a hover for keyboard
- * parity, so the receiver paints `intent-hover` for a throttle window before `intent-raised`: the
- * phantom hover D13 gated `pointerover` against, back in through focus. The fix gates the focus
- * path on the pointer type of the press that focused it; then this comes off and the sequence
- * assertion stands as written.
- */
-const TOUCH_FIXME =
-  'a tap focuses the slot and `focusin` counts as a hover (render.ts bindHover), so the receiver paints `intent-hover` before `intent-raised`; D13 (touch sends no hover) needs the focus path gated too';
 
 const TABLES: ReadonlyArray<SeatCount> = [3, 4];
 
@@ -355,7 +333,8 @@ test.describe('briscola', { tag: '@briscola' }, () => {
   // The live intent mirror (docs/design/briscola-battle.md §4) at two, each way: the frame names
   // the engine-order slot (§4.1), so the back that lifts on the receiver is the card's index in the
   // sender's `me.hand`, whatever its place in the fan; the hover lift yields to the raise's ring
-  // (§4.4), and the play clears both. The guest's way is a fixme (GUEST_LANE_FIXME above).
+  // (§4.4), and the play clears both. The guest's way rides the same lane: main.ts's `net` names
+  // `isEphemeral`, so the boot sends the frame on whichever session is open.
   test.describe('live intent mirror', () => {
     (['host', 'guest'] as const).forEach((sender) => {
       const receiver = otherSide(sender);
@@ -363,7 +342,6 @@ test.describe('briscola', { tag: '@briscola' }, () => {
         `${sender} to ${receiver}: the ${sender} hovers a hand card and the ${receiver} lifts that back, raises it and the ${receiver} rings it, plays it and the ${receiver} clears both`,
         { tag: '@online' },
         async ({ players, project }) => {
-          test.fixme(sender === 'guest', GUEST_LANE_FIXME);
           const me = players[sender].page;
           const peer = players[receiver].page;
           const opening = await dealTwo(players, project);
@@ -396,14 +374,15 @@ test.describe('briscola', { tag: '@briscola' }, () => {
     });
 
     // A touch is no hover (§4.2): its `pointerover` precedes every tap (W3C Pointer Events §3.3.3),
-    // so the sender ignores it, and the first the receiver sees of a tap is the raise. The host
-    // holds the phone: the way that carries (GUEST_LANE_FIXME). A fixme until the focus path is
-    // gated too (TOUCH_FIXME): today the sequence seen is ['intent-hover', 'intent-raised'].
+    // so the sender ignores it, and so is the focus the tap puts on the slot (the reducer holds the
+    // press's kind, `hover/press`, until the tap's click): the first the receiver sees of a tap is
+    // the raise. The emulated phone keeps a mouse whose cursor rests where the host last clicked
+    // (`#startGameBtn`, where the hand then paints), and Chromium's fake mouse move after a layout
+    // change would hover the card under it; a phone has no cursor, so it is parked in the corner.
     test(
       'a touch raises with no hover before it: the host on a phone taps a hand card, the guest rings that back and never lifted one',
       { tag: '@online' },
       async ({ browser, project }, testInfo) => {
-        test.fixme(true, TOUCH_FIXME);
         const pair: Pair = {
           host: await newPlayer(browser, 'host', testInfo, { phone: true }),
           guest: await newPlayer(browser, 'guest', testInfo),
@@ -411,6 +390,7 @@ test.describe('briscola', { tag: '@briscola' }, () => {
         const peer = pair.guest.page;
         try {
           const opening = await dealTwo(pair, project);
+          await pair.host.page.mouse.move(1, 1);
           const { cardId, slot } = await senderToAct(pair, 'host', opening);
           const card = pair.host.page.locator(`#hand .card[data-card="${cardId}"]`);
           await expect(card).toHaveClass(/\bplayable\b/);

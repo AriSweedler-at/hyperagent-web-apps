@@ -956,10 +956,13 @@ describe('bindAll', () => {
     p.get('trick').fire('click');
     p.get('briscola').fire('click');
     p.get('stock').fire('click');
-    // The felt's tap (no card, no slot) and the stock's are the draw's tap (dropped by the reducer outside the wait).
+    // The felt's tap (no card, no slot) and the stock's are the draw's tap (dropped by the reducer
+    // outside the wait); a click on the hand also ends a press for the live intent (`hover/press`).
     expect(r.intents).toEqual([
       { type: 'card/tap', cardId: '7D' },
+      { type: 'hover/press', touch: false },
       { type: 'draw/tap' },
+      { type: 'hover/press', touch: false },
       { type: 'card/tap', cardId: '7D' },
       { type: 'table/tap' },
       { type: 'exchange/click' },
@@ -968,7 +971,7 @@ describe('bindAll', () => {
     expect(handIntentOf({ target: fakeTarget({}) } as unknown as Event)).toBeNull();
     // Disabled controls dispatch nothing; enabled ones their constant.
     p.get('playBtn').fire('click');
-    expect(r.intents).toHaveLength(6);
+    expect(r.intents).toHaveLength(8);
     p.get('rsReplayBtn').fire('click');
     p.get('leaveBtn').fire('click');
     p.get('historyBtn').fire('click');
@@ -976,7 +979,7 @@ describe('bindAll', () => {
     p.get('soundBtn').fire('click');
     p.get('handoffBtn').fire('click');
     p.get('resultChipBtn').fire('click');
-    expect(r.intents.slice(6)).toEqual([
+    expect(r.intents.slice(8)).toEqual([
       { type: 'replay/click' },
       { type: 'leave/request' },
       { type: 'history/open' },
@@ -991,7 +994,7 @@ describe('bindAll', () => {
     p.get('resultOverlay').fire('click', { target: fakeTarget({ id: 'rsTitle' }) });
     p.get('closeHistoryBtn').fire('click');
     p.get('closeRulesBtn').fire('click');
-    expect(r.intents.slice(13)).toEqual([
+    expect(r.intents.slice(15)).toEqual([
       { type: 'result/peek' },
       { type: 'result/peek' },
       { type: 'history/close' },
@@ -1122,7 +1125,8 @@ describe('card names (docs/design/language-packs.md §5): the captions, the tip 
     const r = recorder();
     bindAll(p.doc, r.dispatch);
     // The live intent's hover half rides the same events (`bindHover`): this test reads the tip's alone.
-    const tips = (): ReadonlyArray<unknown> => r.intents.filter((i) => i.type !== 'hover/set');
+    const tips = (): ReadonlyArray<unknown> =>
+      r.intents.filter((i) => i.type !== 'hover/set' && i.type !== 'hover/press');
     const over = { target: fakeTarget({ closest: { '.card[data-card]': card } }) };
     p.get('hand').fire('pointerover', { ...over, pointerType: 'mouse' });
     p.get('hand').fire('pointerover', { ...over, pointerType: 'touch' });
@@ -1264,7 +1268,107 @@ describe('the live intent mirror (docs/design/briscola-battle.md §4.4): the pai
     expect(p.get('seatR2').attr('data-key')).toBe(key);
   });
 
-  test('bindHover: a fine pointer over a slot names its index and off the slots null, a touch names nothing, focus counts as a hover, a stray slot is off the three', () => {
+  test('at three and four the lift lands in the cell of its seat (table.ts `cellOfSeat`): me+1 in #seatR1, me+3 in #seatR3, me+2 in #seatR2 at four and in #seatR3 at three, no other cell touched', () => {
+    const cells = ['seatR1', 'seatR2', 'seatR3'] as const;
+    type Cell = (typeof cells)[number];
+    /** A page whose three cells each hold three fake backs, and what lifts each cell shows. */
+    const pageOfCells = (): Readonly<{
+      doc: BriscolaPage['doc'];
+      lifts: () => ReadonlyArray<ReadonlyArray<string>>;
+    }> => {
+      const backs = (id: Cell): ReadonlyArray<FakeEl> =>
+        [0, 1, 2].map((i) => fakeEl(`${id}-back-${String(i)}`));
+      const backsOf: Readonly<Record<Cell, ReadonlyArray<FakeEl>>> = {
+        seatR1: backs('seatR1'),
+        seatR2: backs('seatR2'),
+        seatR3: backs('seatR3'),
+      };
+      const p = briscolaPage(
+        MARKUP,
+        Object.fromEntries(
+          cells.map((id) => [id, { queries: { '.seat-cards > .card': backsOf[id] } }]),
+        ),
+        cells.flatMap((id) => backsOf[id]),
+      );
+      const lifts = (): ReadonlyArray<ReadonlyArray<string>> =>
+        cells.map((id) =>
+          backsOf[id].flatMap((b, i) =>
+            b.hasClass('intent-hover')
+              ? [`hover@${String(i)}`]
+              : b.hasClass('intent-raised')
+                ? [`raised@${String(i)}`]
+                : [],
+          ),
+        );
+      return { doc: p.doc, lifts };
+    };
+    const mirrored = (
+      app: App,
+      at: ReadonlyArray<readonly [number, 0 | 1 | 2, 'hover' | 'raised']>,
+    ): App => ({
+      ...app,
+      table: {
+        ...app.table,
+        mirror: [0, 1, 2, 3].map((seat) => {
+          const m = at.find(([s]) => s === seat);
+          return m === undefined ? null : { slot: m[1], mode: m[2] };
+        }),
+      },
+    });
+    const p4 = pageOfCells();
+    const four = local({ localPlayers: '4', p3: 'Cara', p4: 'Dan' });
+    const me4 = view(four).me.idx;
+    paint(
+      p4.doc,
+      mirrored(four, [
+        [(me4 + 1) % 4, 0, 'hover'],
+        [(me4 + 2) % 4, 1, 'raised'],
+        [(me4 + 3) % 4, 2, 'raised'],
+      ]),
+    );
+    expect(p4.lifts()).toEqual([['hover@0'], ['raised@1'], ['raised@2']]);
+    paint(p4.doc, mirrored(four, [[(me4 + 2) % 4, 1, 'hover']]));
+    expect(p4.lifts()).toEqual([[], ['hover@1'], []]);
+    // Three: the second other seat sits in #seatR3; #seatR2 is hidden and its backs are never painted.
+    const p3 = pageOfCells();
+    const three = local({ localPlayers: '3', p3: 'Cara' });
+    const me3 = view(three).me.idx;
+    paint(p3.doc, mirrored(three, [[(me3 + 2) % 3, 1, 'hover']]));
+    expect(p3.lifts()).toEqual([[], [], ['hover@1']]);
+    paint(p3.doc, mirrored(three, [[(me3 + 1) % 3, 2, 'raised']]));
+    expect(p3.lifts()).toEqual([['raised@2'], [], []]);
+  });
+
+  test("bindHover: a press on the hand tells the reducer its kind (`hover/press`, a touch or not) and the tap`s click or its cancel ends it; a focus is a `hover/set` marked `via: 'focus'` for the reducer to weigh", () => {
+    const { page: p, slots } = declareHand(['AC', '3C', 'RB']);
+    const r = recorder();
+    bindAll(p.doc, r.dispatch);
+    const at = (slot: FakeEl | undefined): Readonly<{ target: unknown }> => ({
+      target: fakeTarget(slot === undefined ? { id: 'hand' } : { closest: { '.slot': slot } }),
+    });
+    const hand = p.get('hand');
+    // A tap on slot 1: down, up, the focus (with the compatibility mouse events), the click.
+    hand.fire('pointerdown', { ...at(slots[1]), pointerType: 'touch' });
+    hand.fire('pointerup', { ...at(slots[1]), pointerType: 'touch' });
+    hand.fire('focusin', at(slots[1]));
+    hand.fire('click', at(slots[1]));
+    // A mouse press; a touch that scrolled away; focus landing off the slots.
+    hand.fire('pointerdown', { ...at(slots[0]), pointerType: 'mouse' });
+    hand.fire('pointerdown', { ...at(slots[2]), pointerType: 'touch' });
+    hand.fire('pointercancel', { pointerType: 'touch' });
+    hand.fire('focusin', at(undefined));
+    expect(r.intents.filter((i) => i.type === 'hover/press' || i.type === 'hover/set')).toEqual([
+      { type: 'hover/press', touch: true },
+      { type: 'hover/set', slot: 1, via: 'focus' },
+      { type: 'hover/press', touch: false },
+      { type: 'hover/press', touch: false },
+      { type: 'hover/press', touch: true },
+      { type: 'hover/press', touch: false },
+      { type: 'hover/set', slot: null, via: 'focus' },
+    ]);
+  });
+
+  test('bindHover: a fine pointer over a slot names its index and off the slots null, a touch names nothing, focus counts as a hover (marked for the reducer), a stray slot is off the three', () => {
     const { page: p, slots } = declareHand(['AC', '3C', 'RB']);
     const r = recorder();
     bindAll(p.doc, r.dispatch);
@@ -1284,9 +1388,9 @@ describe('the live intent mirror (docs/design/briscola-battle.md §4.4): the pai
       { type: 'hover/set', slot: 1 },
       { type: 'hover/set', slot: null },
       { type: 'hover/set', slot: null },
-      { type: 'hover/set', slot: 2 },
+      { type: 'hover/set', slot: 2, via: 'focus' },
       { type: 'hover/set', slot: null },
-      { type: 'hover/set', slot: null },
+      { type: 'hover/set', slot: null, via: 'focus' },
     ]);
   });
 });

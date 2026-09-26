@@ -350,6 +350,8 @@ export type Table = Readonly<{
   sent: IntentFrame | null;
   /** The `intent` timer is armed: the next change waits for it (a 60 ms trailing throttle). */
   intentArmed: boolean;
+  /** A touch is pressing the hand (`hover/press`): the focus its tap puts on a slot is no hover (§4.2); off at the tap's click or cancel. */
+  touching: boolean;
   /** By engine seat, what that seat has hovered or lifted, as the lane last said; null where nothing. */
   mirror: ReadonlyArray<Mirror | null>;
   /** The host's per-seat frame budget window (§4.3); the guest never reads it. */
@@ -384,6 +386,7 @@ export const initialTable: Table = {
   hover: null,
   sent: null,
   intentArmed: false,
+  touching: false,
   mirror: [null, null, null, null],
   budget: [null, null, null, null],
 };
@@ -469,7 +472,10 @@ export type TableIntent =
   | Readonly<{ type: 'cardView/open'; card: string }>
   | Readonly<{ type: 'cardView/close' }>
   /** A fine pointer over, or focus on, the slot-th hand slot (`render.ts bindHover`); null when it left. */
-  | Readonly<{ type: 'hover/set'; slot: IntentSlot | null }>
+  /** The slot under the pointer, or under the focus (`via`), or none. */
+  | Readonly<{ type: 'hover/set'; slot: IntentSlot | null; via?: 'focus' }>
+  /** A press on `#hand` began (`touch`: its kind) or ended (false: the tap's click or its cancel). */
+  | Readonly<{ type: 'hover/press'; touch: boolean }>
   /** The `intent` timer fired: what my hand shows now goes on the lane if it changed. */
   | Readonly<{ type: 'intent/flush' }>;
 
@@ -1160,7 +1166,14 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
     case 'cardView/close':
       return pure(withTable(app, { cardView: null }));
     case 'hover/set':
+      // The focus a tap puts on a playable slot arrives with its compatibility mouse events, after
+      // `pointerup`: under a touch press it is no hover (§4.2), the keyboard's after the tap is.
+      if (intent.via === 'focus' && t.touching) return pure(app);
       return t.hover === intent.slot ? pure(app) : pure(withTable(app, { hover: intent.slot }));
+    case 'hover/press':
+      return t.touching === intent.touch
+        ? pure(app)
+        : pure(withTable(app, { touching: intent.touch }));
     case 'intent/flush':
       return flushIntent(app);
   }
@@ -1246,11 +1259,20 @@ const spendBudget = (
 };
 
 /**
+ * The host's relay (§4.3, §4.5): the frame to every connected seat but `from`, one `send` naming
+ * the seat each (web/shared/net/host.ts `send(frame, seat)`); at two seats there is no one else,
+ * so no effect and the effect shape is untouched.
+ */
+const relayFrom = (app: App, frame: IntentFrame, from: number): ReadonlyArray<Effect> =>
+  app.shell.seats.flatMap((s, i) =>
+    s.connected && i + 1 !== from ? [{ type: 'send', frame, seat: (i + 1) as Seat }] : [],
+  );
+
+/**
  * A frame off the lane (`cfg.table.ephemeral`, §4.3, §4.4). The host is authoritative: a frame
  * whose seat is not its channel's is dropped, one over the seat's budget is dropped in silence, the
  * rest replaces that seat's mirror (last write wins) and goes on to every other connected seat as
- * it came (one `send` per seat; at two seats there is no one to relay to, so no effect). A guest
- * takes the host's frame, or a relayed one, for any seat but its own.
+ * it came (`relayFrom`). A guest takes the host's frame, or a relayed one, for any seat but its own.
  */
 const ephemeral: NonNullable<ShellConfig<Briscola>['table']['ephemeral']> = (
   app,
@@ -1262,10 +1284,10 @@ const ephemeral: NonNullable<ShellConfig<Briscola>['table']['ephemeral']> = (
     if (frame.seat !== seat) return pure(app);
     const budget = spendBudget(app.table.budget, seat, ctx.now());
     if (budget === null) return pure(app);
-    const relayed: ReadonlyArray<Effect> = app.shell.seats.flatMap((s, i) =>
-      s.connected && i + 1 !== seat ? [{ type: 'send', frame, seat: (i + 1) as Seat }] : [],
+    return step(
+      withTable(app, { mirror: setMirror(app.table.mirror, frame), budget }),
+      ...relayFrom(app, frame, seat),
     );
-    return step(withTable(app, { mirror: setMirror(app.table.mirror, frame), budget }), ...relayed);
   }
   if (frame.seat === app.shell.view?.me.idx) return pure(app);
   return pure(withTable(app, { mirror: setMirror(app.table.mirror, frame) }));
@@ -1386,19 +1408,25 @@ const localStart = (
 /**
  * The rejoin paths (§4.2): a `join` while a game is on (the host re-broadcasts the state) and the
  * guest's `connected` reset `sent`, so a HELD lift reaches a peer that came back mid-hand; the host
- * losing a guest clears that seat's mirror (§4.4; the channel's seat, 1 for a two-seat adapter).
+ * losing a guest clears that seat's mirror (§4.4; the channel's seat, 1 for a two-seat adapter) and,
+ * when a lift was up there, relays one synthetic clear so every other seat drops it too (§4.3, the
+ * one frame the host builds rather than relays; the host's mirror is what the peers hold, the relay
+ * being as received and in order, so nothing was up on them either when it is empty here).
  */
-const forIntent = (app: App, intent: Intent): App => {
+const forIntent = (app: App, intent: Intent): Step => {
   if (intent.type === 'host/guestGone') {
     const seat = intent.seat ?? 1;
-    return withTable(app, {
-      mirror: setMirror(app.table.mirror, intentFrame(seat, null, 'hover')),
-    });
+    const clear = intentFrame(seat, null, 'hover');
+    const up = (app.table.mirror[seat] ?? null) !== null;
+    return step(
+      withTable(app, { mirror: setMirror(app.table.mirror, clear) }),
+      ...(up ? relayFrom(app, clear, seat) : []),
+    );
   }
   const rejoined =
     (intent.type === 'host/frame' && intent.frame.t === 'join' && app.shell.game !== null) ||
     intent.type === 'guest/connected';
-  return rejoined ? withTable(app, { sent: null }) : app;
+  return pure(rejoined ? withTable(app, { sent: null }) : app);
 };
 
 const reduceInner = (app: App, intent: Intent, ctx: Context): Step => {
@@ -1426,8 +1454,11 @@ const reduceInner = (app: App, intent: Intent, ctx: Context): Step => {
 };
 
 /** Every intent, then the live intent mirror's sender over the result (§4.2). */
-export const reduce = (app: App, intent: Intent, ctx: Context): Step =>
-  withIntent(reduceInner(forIntent(app, intent), intent, ctx));
+export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
+  const before = forIntent(app, intent);
+  const after = reduceInner(before.app, intent, ctx);
+  return withIntent(step(after.app, ...before.effects, ...after.effects));
+};
 
 // ---- storage: persist and resume -------------------------------------------------------------
 
