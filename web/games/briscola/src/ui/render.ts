@@ -1327,11 +1327,24 @@ const slotIndexOf = (hand: Element, e: Readonly<Event>): IntentSlot | null => {
  * The live intent's hover half (docs/design/briscola-battle.md §4.2): a fine pointer over a hand
  * slot, or focus on one (keyboard parity), names the slot for the reducer to mirror; a touch names
  * nothing (its `pointerover` precedes every tap, W3C Pointer Events §3.3.3, so it would mirror a
- * phantom hover). The lift itself is `Table.selected`, which the reducer already holds.
+ * phantom hover), and the focus its tap puts on a playable slot (`tabindex="0"`) must not either:
+ * that `focusin` arrives with the tap's compatibility mouse events, after `pointerup`, so the
+ * press's kind goes to the reducer (`hover/press` on `pointerdown`, off at the tap's `click` or its
+ * cancel; ui/ holds no state of its own) and a focus is marked `via: 'focus'` for it to weigh. The
+ * lift itself is `Table.selected`, which the reducer already holds.
  */
 export const bindHover = (doc: PageLike, dispatch: Dispatch): void => {
   const hand = requireId(doc, 'hand');
   const fine = (e: Readonly<Event>): boolean => pointerTypeOf(e) !== 'touch';
+  listen(hand, 'pointerdown', (e) => {
+    dispatch({ type: 'hover/press', touch: !fine(e) });
+  });
+  listen(hand, 'pointercancel', () => {
+    dispatch({ type: 'hover/press', touch: false });
+  });
+  listen(hand, 'click', () => {
+    dispatch({ type: 'hover/press', touch: false });
+  });
   listen(hand, 'pointerover', (e) => {
     if (fine(e)) dispatch({ type: 'hover/set', slot: slotIndexOf(hand, e) });
   });
@@ -1339,7 +1352,7 @@ export const bindHover = (doc: PageLike, dispatch: Dispatch): void => {
     if (fine(e)) dispatch({ type: 'hover/set', slot: null });
   });
   listen(hand, 'focusin', (e) => {
-    dispatch({ type: 'hover/set', slot: slotIndexOf(hand, e) });
+    dispatch({ type: 'hover/set', slot: slotIndexOf(hand, e), via: 'focus' });
   });
   listen(hand, 'focusout', () => {
     dispatch({ type: 'hover/set', slot: null });

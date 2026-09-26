@@ -9,7 +9,11 @@
 // each welcomed with the table as the host's context holds it and its own `you`, frames reported
 // as their seat, a spare peer told full once every seat is heard, one frame per seat on a
 // broadcast (each seat its own view), a guest silent for the grace losing its seat, and the real
-// `joinName` moving a same-named rejoin back to it.
+// `joinName` moving a same-named rejoin back to it. The last describe is the session's half of the
+// live intent's relay (docs/design/briscola-battle.md §4.3, §4.5): a guest's `intent` frame reported
+// as its channel's seat (what the reducer checks `frame.seat` against), malformed ones refused in
+// silence, and the reducer's per-seat sends (`send(frame, seat)`) reaching those seats alone; the
+// reducer's side, with the harness driving it, is ui/state.test.ts's.
 import { describe, expect, test } from 'vitest';
 
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
@@ -33,6 +37,7 @@ import {
 import { createGame, viewFor, type Players, type Seat } from '../engine/index.ts';
 import {
   decodeHostFrame,
+  intent as intentWire,
   join,
   lobby,
   state,
@@ -344,5 +349,53 @@ describe('briscola GuestSession', () => {
     expect(frames(w)).toHaveLength(3);
     expect(w.log.at(-1)).toEqual(['frame', toast('Dealt')]);
     session.close();
+  });
+});
+
+describe("the live intent over three and four seats, the session's half (docs/design/briscola-battle.md §4.3, §4.5)", () => {
+  ([3, 4] as const).forEach((n) => {
+    test(`capacity ${String(n)}: Cara's (seat 2) intent frame is reported as seat 2, the seat the reducer checks it against; four malformed ones log nothing; the reducer's relay, one send per other seat, reaches that seat alone and never seat 2; the host's own, seatless, reaches every seat; Cara's channel closing names seat 2`, () => {
+      const room = n === 3 ? THREE : FOUR;
+      const w = world({ seats: true });
+      const session = startHost(w, cell(hostCtx({ ...room, seats: emptyTable(room) })).read, {
+        capacity: n,
+      });
+      w.broker.flush();
+      const table = guests(w, ROOM, n - 1);
+      const [bo, cal] = table;
+      if (bo === undefined || cal === undefined) throw new Error('no guests');
+      const others = table.filter((g) => g !== cal);
+      table.forEach((g, i) => {
+        g.conn.send(join(PLAYERS[i + 1]?.name ?? ''));
+      });
+      w.broker.flush();
+      const mark = w.log.length;
+      const hover = intentWire(2, 1, 'hover');
+      cal.conn.send(hover);
+      cal.conn.send({ t: 'intent', seat: 4, slot: 1, mode: 'hover' }); // no fifth seat
+      cal.conn.send({ t: 'intent', seat: 2, slot: 3, mode: 'hover' }); // no fourth slot
+      cal.conn.send({ t: 'intent', seat: 2, slot: 1, mode: 'lifted' }); // no such mode
+      cal.conn.send({ t: 'intent', seat: 2, slot: 1 }); // no mode
+      w.broker.flush();
+      expect(w.since(mark)).toEqual([['frame', hover, 2]]);
+      // The reducer's relay (ui/state.ts `relayFrom`): `send(hover, s)` for every other seat s.
+      const calHeard = heard(cal.party).length;
+      others.forEach((_, i) => {
+        session.send(hover, i === 0 ? 1 : 3);
+      });
+      w.broker.flush();
+      others.forEach((g) => {
+        expect(heard(g.party).at(-1)).toEqual(hover);
+      });
+      expect(heard(cal.party)).toHaveLength(calHeard);
+      // The host's own hover goes out seatless: every seat, Cara's among them.
+      const mine = intentWire(0, 2, 'raised');
+      session.send(mine);
+      w.broker.flush();
+      expect(table.map((g) => heard(g.party).at(-1))).toEqual(table.map(() => mine));
+      cal.conn.close();
+      w.broker.flush();
+      expect(w.log.at(-1)).toEqual(['guestGone', null, 2]);
+    });
   });
 });

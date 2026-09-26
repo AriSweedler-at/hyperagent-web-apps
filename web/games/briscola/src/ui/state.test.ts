@@ -25,15 +25,24 @@ import {
 import type { Card, GameEvent, Seat, State, TrickRecord, View } from '../engine/index.ts';
 import { EMPTY_SEAT } from '../../../../shared/ui/shell.ts';
 import { WAITING_MSG } from '../../../../shared/net/host.ts';
+import { isHeartbeat } from '../../../../shared/net/liveness.ts';
+import { peerIdFor } from '../../../../shared/lib/roomCode.ts';
+import { guests, world, type Guest, type Party } from '../../../../shared/net/sessions.harness.ts';
 import {
   action as actionFrame,
+  decodeHostFrame,
   full as fullFrame,
   intent as intentWire,
+  isEphemeral,
+  isGuestFrame,
+  join as joinFrame,
   lobby,
   state as stateFrame,
   toast as toastFrame,
   welcome,
+  type IntentFrame,
 } from '../protocol.ts';
+import { HostSession, type HostEvents } from '../net/host.ts';
 import { LOCAL_NAMES } from '../shellConfig.ts';
 import { DEFAULT_CARD_PACK, STORAGE_KEYS } from '../storage.ts';
 import { BEAT_MS, DURATIONS, drawSpan } from './beat.ts';
@@ -250,6 +259,7 @@ describe('the initial app', () => {
       hover: null,
       sent: null,
       intentArmed: false,
+      touching: false,
       mirror: [null, null, null, null],
       budget: [null, null, null, null],
     });
@@ -1598,6 +1608,27 @@ describe('the live intent mirror (docs/design/briscola-battle.md §4)', () => {
     expect(intentOf(run(room, { type: 'hover/set', slot: 0 }).app)).toBeNull();
   });
 
+  test('a touch pressing the hand (`hover/press`): the focus its tap puts on a slot is no hover until the click or cancel ends the press; the keyboard`s focus after it, and a pointer`s hover, count; a press of the same kind again changes nothing', () => {
+    const app = live(hosted());
+    const pressed = run(
+      app,
+      { type: 'hover/press', touch: true },
+      { type: 'hover/set', slot: 1, via: 'focus' },
+    );
+    expect(pressed.app.table).toMatchObject({ touching: true, hover: null });
+    expect(intentTimers(pressed.effects)).toEqual([]);
+    expect(run(pressed.app, { type: 'hover/press', touch: true }).app).toBe(pressed.app);
+    const released = run(
+      pressed.app,
+      { type: 'hover/press', touch: false },
+      { type: 'hover/set', slot: 1, via: 'focus' },
+    );
+    expect(released.app.table).toMatchObject({ touching: false, hover: 1 });
+    expect(intentTimers(released.effects)).toEqual(armedOnce);
+    expect(run(app, { type: 'hover/press', touch: false }).app).toBe(app);
+    expect(run(app, { type: 'hover/set', slot: 2, via: 'focus' }).app.table.hover).toBe(2);
+  });
+
   test('host: a guest`s frame fills its seat`s mirror (last write wins), one claiming another seat is dropped, the 31st in a second is dropped in silence and the window reopens, a clear or guestGone empties the seat, a deal empties every seat', () => {
     const app = hosted();
     const hover = intentWire(1, 2, 'hover');
@@ -1717,6 +1748,47 @@ describe('hosting and joining three and four seats (docs/design/n-seat-sessions.
   type Send = Extract<Effect, Readonly<{ type: 'send' }>>;
   const sent = (effects: ReadonlyArray<Effect>): ReadonlyArray<Send> =>
     effects.flatMap((e) => (e.type === 'send' ? [e] : []));
+  /** Ann's table of four, Bob, Cara and Dan at seats 1..3, dealt. */
+  const dealt4 = (): App =>
+    run(opened('4').app, join('Bob', 1), join('Cara', 2), join('Dan', 3), { type: 'host/deal' })
+      .app;
+
+  test('the live intent at three and four (briscola-battle.md §4.3, §4.5): a seat`s frame fills its mirror and is relayed to every other connected seat, one send naming each, never its sender; one claiming another seat is dropped whole; a lost seat`s lift goes with one synthetic clear to the rest, none when nothing was up; a seat down is skipped', () => {
+    const hover = intentWire(2, 1, 'hover');
+    const one = run(dealt3(), { type: 'host/frame', frame: hover, seat: 2 });
+    expect(one.app.table.mirror).toEqual([null, null, { slot: 1, mode: 'hover' }, null]);
+    expect(sent(one.effects)).toEqual([{ type: 'send', frame: hover, seat: 1 }]);
+    // Cara's channel carrying Bob's seat: dropped, nothing relayed.
+    expect(
+      run(one.app, { type: 'host/frame', frame: intentWire(1, 0, 'raised'), seat: 2 }),
+    ).toEqual({ app: one.app, effects: [] });
+    // Cara gone with a lift up: her mirror empties and the clear reaches Bob before his lobby.
+    const gone = run(one.app, { type: 'host/guestGone', iceFailed: null, seat: 2 });
+    expect(gone.app.table.mirror[2]).toBeNull();
+    expect(sent(gone.effects).map((e) => [e.frame.t, e.seat])).toEqual([
+      ['intent', 1],
+      ['lobby', 1],
+    ]);
+    expect(sent(gone.effects)[0]?.frame).toEqual(intentWire(2, null, 'hover'));
+    // Nothing up there: the lobby rides alone (the row above pins it byte for byte).
+    expect(
+      sent(run(dealt3(), { type: 'host/guestGone', iceFailed: null, seat: 2 }).effects).map(
+        (e) => e.frame.t,
+      ),
+    ).toEqual(['lobby']);
+    // Four: Cara's raise to Bob and Dan, one send each, never back to her; Dan down, Bob alone hears the next.
+    const raised = intentWire(2, 0, 'raised');
+    const relayed = run(dealt4(), { type: 'host/frame', frame: raised, seat: 2 });
+    expect(relayed.app.table.mirror[2]).toEqual({ slot: 0, mode: 'raised' });
+    expect(sent(relayed.effects)).toEqual([
+      { type: 'send', frame: raised, seat: 1 },
+      { type: 'send', frame: raised, seat: 3 },
+    ]);
+    const danDown = run(relayed.app, { type: 'host/guestGone', iceFailed: null, seat: 3 }).app;
+    expect(sent(run(danDown, { type: 'host/frame', frame: hover, seat: 2 }).effects)).toEqual([
+      { type: 'send', frame: hover, seat: 1 },
+    ]);
+  });
 
   test('host/click at three: two empty seats, the session told the capacity and the waiting copy, the context carrying the seats, the options remembered', () => {
     const { app, effects } = opened('3');
@@ -1993,4 +2065,212 @@ describe('hosting and joining three and four seats (docs/design/n-seat-sessions.
     expect(gone.table.mirror[2]).toBeNull();
     expect(run(gone, { type: 'host/frame', frame: hover, seat: 1 }).effects).toEqual([]);
   });
+});
+
+describe('the live intent relayed over the sessions harness at three and four seats (docs/design/briscola-battle.md §4.3, §4.5)', () => {
+  const NAMES = ['Ann', 'Bo', 'Cal', 'Dee'] as const;
+  /** What a party received, heartbeats aside. */
+  const heard = (p: Party): ReadonlyArray<unknown> => p.received.filter((f) => !isHeartbeat(f));
+  /** The tag of a host frame a party received, through this game's decoder; null for anything else. */
+  const tagOf = (raw: unknown): string | null => {
+    const r = decodeHostFrame(raw);
+    return r.ok ? r.value.t : null;
+  };
+  const intents = (p: Party): ReadonlyArray<unknown> =>
+    heard(p).filter((f) => tagOf(f) === 'intent');
+  const asSeat = (seat: number): 1 | 2 | 3 => {
+    if (seat === 1 || seat === 2 || seat === 3) return seat;
+    throw new Error(`no seat ${String(seat)}`);
+  };
+  type Relay = Readonly<{ frame: IntentFrame; seat: number | undefined }>;
+
+  /**
+   * Ann's table at `players`, this reducer in the host's chair and the real session as its wire:
+   * every guest frame the session reports is `host/frame` with its seat, a lost seat is
+   * `host/guestGone`, and each `send` effect goes back through `session.send(frame, seat)` (the
+   * boot's routing for a host, the seat kept). `relayed` is every intent send the reducer asked
+   * for; `clock` is the reducer's, for the budget's window.
+   */
+  const table = (
+    players: '3' | '4',
+  ): Readonly<{
+    app: () => App;
+    /** The room's code, the reducer's own (the session opens only for the code its context names). */
+    code: string;
+    guests: ReadonlyArray<Guest>;
+    relayed: ReadonlyArray<Relay>;
+    clock: { now: number };
+    flush: () => void;
+    log: () => ReadonlyArray<unknown>;
+    close: (g: Guest) => void;
+  }> => {
+    const n = players === '3' ? 3 : 4;
+    const w = world({ seats: true });
+    const clock = { now: NOW };
+    const timed = runIntents(reduce, { rng: mulberry32(7), now: () => clock.now });
+    const held = {
+      app: timed(
+        initialApp,
+        { type: 'home/init', home: { ...home, playMode: 'online' } },
+        { type: 'host/click', name: 'Ann', players },
+      ).app,
+    };
+    const relayed: Relay[] = [];
+    // eslint-disable-next-line prefer-const -- assigned once the events below, which need it, exist.
+    let session: HostSession;
+    const dispatch = (intent: Intent): void => {
+      const s = timed(held.app, intent);
+      held.app = s.app;
+      s.effects.forEach((e) => {
+        if (e.type !== 'send') return;
+        if (isEphemeral(e.frame)) {
+          relayed.push({ frame: e.frame, seat: e.seat });
+          session.send(e.frame, e.seat);
+        } else if (!isGuestFrame(e.frame)) {
+          session.send(e.frame, e.seat);
+        }
+      });
+    };
+    const events: HostEvents = {
+      ...w.hostEvents,
+      frame: (frame, seat) => {
+        w.hostEvents.frame(frame, seat);
+        dispatch({ type: 'host/frame', frame, seat: asSeat(seat) });
+      },
+      guestGone: (iceFailed, seat) => {
+        w.hostEvents.guestGone(iceFailed, seat);
+        dispatch({ type: 'host/guestGone', iceFailed, seat: asSeat(seat) });
+      },
+    };
+    const code = held.app.shell.code;
+    if (code === null) throw new Error('no room code');
+    session = new HostSession(
+      { ...w.deps, read: () => hostContextOf(held.app), events },
+      { code, attempt: 1, resume: false, capacity: n },
+    );
+    w.broker.flush();
+    const seated = guests(w, peerIdFor('briscola', code), n - 1);
+    seated.forEach((g, i) => {
+      g.conn.send(joinFrame(NAMES[i + 1] ?? ''));
+    });
+    w.broker.flush();
+    dispatch({ type: 'host/deal' });
+    w.broker.flush();
+    return {
+      app: () => held.app,
+      code,
+      guests: seated,
+      relayed,
+      clock,
+      flush: () => {
+        w.broker.flush();
+      },
+      log: () => w.log,
+      close: (g) => {
+        g.conn.close();
+        w.broker.flush();
+      },
+    };
+  };
+
+  /** A guest's page as its party heard the table, `frames` in order after its connect: this reducer at that seat. */
+  const guestApp = (name: string, code: string, frames: ReadonlyArray<unknown>): App =>
+    run(
+      initialApp,
+      { type: 'home/init', home: { ...home, playMode: 'online' } },
+      { type: 'join/click', name, code },
+      { type: 'guest/connected' },
+      ...frames.flatMap((raw): Intent[] => {
+        const r = decodeHostFrame(raw);
+        return r.ok ? [{ type: 'guest/frame', frame: r.value }] : [];
+      }),
+    ).app;
+
+  (['3', '4'] as const).forEach((players) => {
+    test(`at ${players}: Cal's (seat 2) frame is reported as seat 2, fills the host's mirror and reaches every other seat once with that seat on the send, never Cal and never the host as a frame; one claiming Bo's seat is dropped whole; the 31st in a second is dropped and the next second passes; Cal gone, the lift is cleared on the host and, by one synthetic clear, on Bo's page`, () => {
+      const t = table(players);
+      const [bo, cal, dee] = t.guests;
+      if (bo === undefined || cal === undefined) throw new Error('no guests');
+      const others = dee === undefined ? [bo] : [bo, dee];
+      const otherSeats = players === '3' ? [1] : [1, 3];
+      expect(t.app().shell.view?.me.idx).toBe(0);
+      t.guests.forEach((g, i) => {
+        expect(tagOf(heard(g.party).at(-1))).toBe('state');
+        expect(t.app().shell.seats[i]).toEqual({ name: NAMES[i + 1], connected: true });
+      });
+      const hover = intentWire(2, 1, 'hover');
+      const mark = t.log().length;
+      const calHeard = heard(cal.party).length;
+      cal.conn.send(hover);
+      t.flush();
+      expect(t.log().slice(mark)).toEqual([['frame', hover, 2]]);
+      expect(t.app().table.mirror).toEqual([null, null, { slot: 1, mode: 'hover' }, null]);
+      expect(t.relayed).toEqual(otherSeats.map((seat) => ({ frame: hover, seat })));
+      others.forEach((g) => {
+        expect(intents(g.party)).toEqual([hover]);
+      });
+      expect(heard(cal.party)).toHaveLength(calHeard);
+      // Cal's channel carrying Bo's seat: reported as seat 2, dropped by the reducer, nothing out.
+      cal.conn.send(intentWire(1, 0, 'raised'));
+      t.flush();
+      expect(t.log().at(-1)).toEqual(['frame', intentWire(1, 0, 'raised'), 2]);
+      expect(t.app().table.mirror[1]).toBeNull();
+      expect(t.relayed).toHaveLength(otherSeats.length);
+      // The budget: thirty in the second pass (the first above among them), the thirty-first is dropped in silence, a second later the window is fresh.
+      Array.from({ length: INTENT_BUDGET - 1 }, (_, k): 0 | 2 => (k % 2 === 0 ? 0 : 2)).forEach(
+        (slot) => {
+          cal.conn.send(intentWire(2, slot, 'hover'));
+        },
+      );
+      t.flush();
+      others.forEach((g) => {
+        expect(intents(g.party)).toHaveLength(INTENT_BUDGET);
+      });
+      const last = intentWire(2, 0, 'raised');
+      cal.conn.send(last);
+      t.flush();
+      others.forEach((g) => {
+        expect(intents(g.party)).toHaveLength(INTENT_BUDGET);
+      });
+      expect(t.app().table.mirror[2]).toEqual({ slot: 0, mode: 'hover' });
+      t.clock.now = NOW + INTENT_WINDOW_MS;
+      cal.conn.send(last);
+      t.flush();
+      others.forEach((g) => {
+        expect(intents(g.party)).toHaveLength(INTENT_BUDGET + 1);
+        expect(intents(g.party).at(-1)).toEqual(last);
+      });
+      expect(t.app().table.mirror[2]).toEqual({ slot: 0, mode: 'raised' });
+      expect(heard(cal.party)).toHaveLength(calHeard);
+      // Bo's page, as his party heard it: Cal's raise on seat 2, nothing on his own or the host's.
+      const boUp = guestApp('Bo', t.code, heard(bo.party));
+      expect(boUp.shell.view?.me.idx).toBe(1);
+      expect(boUp.table.mirror).toEqual([null, null, { slot: 0, mode: 'raised' }, null]);
+      // Cal's tab dies: the host reports seat 2 gone, drops the lift and relays one clear, then the lobby; Bo's page drops it too.
+      const before = t.log().length;
+      t.close(cal);
+      expect(t.log().slice(before)).toEqual([['guestGone', null, 2]]);
+      expect(t.app().table.mirror[2]).toBeNull();
+      const clear = intentWire(2, null, 'hover');
+      expect(t.relayed.slice(-otherSeats.length)).toEqual(
+        otherSeats.map((seat) => ({ frame: clear, seat })),
+      );
+      others.forEach((g) => {
+        expect(heard(g.party).slice(-2).map(tagOf)).toEqual(['intent', 'lobby']);
+        expect(intents(g.party).at(-1)).toEqual(clear);
+      });
+      const boAfter = guestApp('Bo', t.code, heard(bo.party));
+      expect(boAfter.table.mirror).toEqual([null, null, null, null]);
+      expect(boAfter.shell.seats[1]).toEqual({ name: 'Cal', connected: false });
+    });
+  });
+
+  // The boot's `send` (web/shared/edge/boot.ts, the `isEphemeral` branch) writes an ephemeral frame
+  // with `session.send(frame)`, the effect's `seat` dropped, so on the wire the host's relay reaches
+  // every open channel, the sender's among them (each guest drops its own seat's frame, so the
+  // table is right, at the cost of one frame per seat per relay). The rows above call the session
+  // as the effect says; this row waits on the boot keeping the seat for a host session (shared edge).
+  test.todo(
+    'through the boot the relay keeps its seat: web/shared/edge/boot.ts `send`, the ephemeral branch, passes `seat` to a host session, so the sender never hears its own frame back',
+  );
 });

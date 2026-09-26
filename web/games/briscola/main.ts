@@ -20,7 +20,7 @@ import { legalActions, type Action, type GameEvent, type View } from './src/engi
 import { createFx } from './src/fx.ts';
 import { GuestSession } from './src/net/guest.ts';
 import { HostSession } from './src/net/host.ts';
-import { isGuestFrame } from './src/protocol.ts';
+import { isEphemeral, isGuestFrame } from './src/protocol.ts';
 import { DECK_KIND, STORAGE_KEYS, soundEnabled } from './src/storage.ts';
 import { fillNameInputs, fillP2NameInput, setCodeInput } from './src/ui/home.ts';
 import { bindAll, paint, paintSound, renderAbout, renderRules } from './src/ui/render.ts';
@@ -87,7 +87,8 @@ const boot = (): void => {
       setCode: setCodeInput,
     },
     fx: createFx,
-    net: { Host: HostSession, Guest: GuestSession, isGuestFrame, seats: true },
+    // `isEphemeral` names the live intent's lane, sent by both sides (briscola-battle.md §4.5).
+    net: { Host: HostSession, Guest: GuestSession, isGuestFrame, isEphemeral, seats: true },
     legal: legalActions,
     deps: {},
     hooks: {
