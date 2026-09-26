@@ -28,6 +28,7 @@ const copy: ShellCopy = {
   localNote:
     'One phone, no internet needed. A curtain names whose turn it is; everyone else looks away.',
   hostWaitTitle: 'Your table',
+  hostWaitSubtitle: 'Have the others open this same page and enter the code',
   openingMsg: 'Opening the table…',
   keepOpenNote:
     'Keep this screen open while the others sit down. If you switch apps, come straight back and the table reconnects on its own.',
@@ -125,8 +126,8 @@ const blocks: ShellBlocks = {
                 <span class="field-label">Players</span>
                 <select id="playersSel">
                   <option value="2" selected>2 players</option>
-                  <option value="3" disabled>3 players · online soon</option>
-                  <option value="4" disabled>4 players · online soon</option>
+                  <option value="3">3 players</option>
+                  <option value="4">4 players</option>
                 </select>
               </div>
               <div class="field">
@@ -199,6 +200,11 @@ const blocks: ShellBlocks = {
   playExtra: '',
   extraPanels: '',
   extraScreens: '',
+  // The table as it fills (web/shared/ui/shellPaint.ts `paintWaiting`; docs/design/n-seat-sessions.md
+  // §7): one row per seat, the host first, each carrying data-seat, data-connected and, on this
+  // device's own, data-you (theme.css `.seat-list`).
+  hostWaitList: `      <ul class="seat-list" id="seatList" aria-label="Seats"></ul>`,
+  guestWaitList: `      <ul class="seat-list" id="guestSeatList" aria-label="Seats"></ul>`,
   table: `      <!-- TABLE (design §5.2): one DOM for 2, 3 and 4 seats. I sit at the bottom; the other
            seats are relative cells (#seatR1 right, #seatR2 across, #seatR3 left) that seatCells
            (src/ui/layout.ts) maps to absolute seats; the static markup ships the 2-player shape.

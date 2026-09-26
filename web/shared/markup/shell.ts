@@ -40,6 +40,8 @@ export type ShellCopy = Readonly<{
   localNote: string;
   /** `#hostWaitScreen h1` ('Your room', 'Your table'). */
   hostWaitTitle: string;
+  /** The line under it: who is to open the page ('Have your opponent open…', briscola's 'Have the others open…'). */
+  hostWaitSubtitle: string;
   /** `#hostWaitStatus` as shipped, before the host's session writes it. */
   openingMsg: string;
   /** The waiting room's keep-this-screen-open note. */
@@ -140,6 +142,13 @@ export type ShellBlocks = Readonly<{
   localFields: string;
   /** `#playPanel` after `#localModeContent` (gin's sandbox panel). */
   playExtra: string;
+  /**
+   * The seat list under `#hostWaitStatus` (`#seatList`, shellPaint.ts SEAT_LIST_IDS: an N-seat
+   * page's, docs/design/n-seat-sessions.md §7; '' for a two-seat page, whose room has one seat to list).
+   */
+  hostWaitList: string;
+  /** The same under `#guestWaitStatus` (`#guestSeatList`), or ''. */
+  guestWaitList: string;
   /** `#homeScreen`'s panels between Rules and About (gin's score panel). */
   extraPanels: string;
   /** `#app`'s screens between the home and the waiting rooms (gin's scorer). */

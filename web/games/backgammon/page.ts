@@ -25,6 +25,7 @@ const copy: ShellCopy = {
   localNote:
     'One phone, no internet needed. The board stays in view; a curtain says whose turn it is.',
   hostWaitTitle: 'Your table',
+  hostWaitSubtitle: 'Have your opponent open this same page and enter the code',
   openingMsg: 'Opening the table…',
   keepOpenNote:
     'Keep this screen open while your opponent joins. If you switch apps, come straight back and the table reconnects on its own.',
@@ -181,6 +182,8 @@ const blocks: ShellBlocks = {
   playExtra: '',
   extraPanels: '',
   extraScreens: '',
+  hostWaitList: '',
+  guestWaitList: '',
   table: `      <!-- TABLE (design §2.1). The 24 points are direct children of #board in absolute order;
            the seat perspective is data-own on each point and data-seat on the board, written by
            paintSeat; the static markup ships seat 0's. -->
