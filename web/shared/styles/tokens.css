@@ -38,7 +38,7 @@
      shell themes gave one shell rule two values that differ by palette, radius or face, the rule
      reads one of these and each theme supplies its own. Gin's values here (its theme.css declares
      none of them: single source, as with the palette); backgammon's and fidice's :root redeclare
-     every one (fidice's on its own palette, read by no rule until its page links shell.css:
+     every one (fidice's on its own palette; its page links shell.css since
      docs/design/fidice-shell-adoption.md M1). CONTRACT.md "Shell tokens" tables the canonical value
      beside each override. */
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;

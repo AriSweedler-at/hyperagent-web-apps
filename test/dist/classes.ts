@@ -170,9 +170,9 @@ export const readContract = (): ReadonlyArray<Row> =>
   parseContract(readFileSync(CONTRACT_PATH, 'utf8'));
 
 /**
- * The owners a row may name: a game, `shared` (every page) or `shell` (the pages with the shared
- * shell, tools/games.ts SHELL_GAMES). `shared` cannot carry a shell class: it is checked against
- * fidice's stylesheet too, which has no shell rules until the Fidice restyle (dry-round-2.md G3).
+ * The owners a row may name: a game, `shared` (every page) or `shell` (the pages that link
+ * shell.css: the shell games, tools/games.ts SHELL_GAMES, and LINKS_SHELL_CSS). `shared` carries no
+ * shell class by policy: a class the shell sheet styles is a `shell` row (dry-round-2.md G3).
  */
 export const OWNERS: ReadonlyArray<string> = [...GAMES, 'shared', 'shell'];
 
@@ -180,21 +180,41 @@ export const isShellGame = (game: Game): boolean =>
   (SHELL_GAMES as ReadonlyArray<Game>).includes(game);
 
 /**
+ * Fidice links shell.css from M1 of docs/design/fidice-shell-adoption.md without being a shell game
+ * (its page is the vdom's until M2, its shell screens the shared markup's from M5): the shell
+ * sheet's rows apply to it and its page may link three sheets. Retired at M5, when fidice joins
+ * SHELL_GAMES.
+ */
+export const LINKS_SHELL_CSS: ReadonlyArray<Game> = ['fidice'];
+export const linksShellCss = (game: Game): boolean =>
+  isShellGame(game) || LINKS_SHELL_CSS.includes(game);
+
+/**
  * A game's own theme under shared/assets/ (`<game>-<hash>.css`); every other sheet there is shared.
- * A page links the common chunk's sheet (web/shared/styles/{tokens,base}.css), then, on a shell
- * page once Wave F1 lands shell.css, the shell games' sheet, then its theme: the dist guards allow
- * that middle sheet without requiring it (dry-round-2.md G4), and fidice never links it (risk 7).
+ * A page links the common chunk's sheet (web/shared/styles/{tokens,base}.css, and shell.css while
+ * every page links it: Vite splits a sheet out only where the pages that link it differ), then a
+ * second shared sheet where one is split out, then its theme: the dist guards allow that middle
+ * sheet without requiring it (dry-round-2.md G4).
  */
 export const OWN_SHEET = new RegExp(`shared/assets/(${GAMES.join('|')})-[\\w-]+\\.css$`);
-export const SHEETS_MAX = (game: Game): number => (isShellGame(game) ? 3 : 2);
+export const SHEETS_MAX = (game: Game): number => (linksShellCss(game) ? 3 : 2);
 
-/** The owners whose `class` rows apply to a game: itself, `shared` and, for a shell game, `shell`. */
+/** The owners whose `class` rows apply to a game: itself, `shared` and, where shell.css is linked, `shell`. */
 export const ownersOf = (game: Game): ReadonlyArray<string> => [
   game,
   'shared',
-  ...(isShellGame(game) ? ['shell'] : []),
+  ...(linksShellCss(game) ? ['shell'] : []),
 ];
 
-/** The `class` rows that apply to a game (`ownersOf`). */
+/**
+ * The `class` rows that apply to a game (`ownersOf`). A `shell` row styled in the shell games' own
+ * themes (the drag ghost, the connection dot) names a rule a LINKS_SHELL_CSS page does not link:
+ * only the rows the shell sheet styles reach it until it is a shell game.
+ */
 export const rowsFor = (rows: ReadonlyArray<Row>, game: Game): ReadonlyArray<Row> =>
-  rows.filter((row) => row.kind === 'class' && ownersOf(game).includes(row.owner));
+  rows.filter(
+    (row) =>
+      row.kind === 'class' &&
+      ownersOf(game).includes(row.owner) &&
+      (row.owner !== 'shell' || isShellGame(game) || row.styledIn.includes('shell.css')),
+  );

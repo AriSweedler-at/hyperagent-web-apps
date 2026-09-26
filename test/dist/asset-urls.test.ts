@@ -89,8 +89,9 @@ describeDist('dist asset URLs', (root) => {
           expect(value).toMatch(/^\.\.\/\.\.\/shared\/assets\/[\w-]+\.js$/);
         });
       // The stylesheets, all under ../../shared/assets/: the web/shared/styles sheets every page
-      // links ride the shared chunk (docs/MIGRATION.md step 14), a shell page's shell.css rides the
-      // chunk the shell games share (allowed, not required: OWN_SHEET, SHEETS_MAX in classes.ts;
+      // links ride the shared chunk (docs/MIGRATION.md step 14; shell.css among them since fidice's
+      // page links it too, M1 of docs/design/fidice-shell-adoption.md), a sheet only some pages link
+      // rides a chunk of its own (allowed, not required: OWN_SHEET, SHEETS_MAX in classes.ts;
       // dry-round-2.md G4), then the game's own CSS.
       const sheets = references
         .filter(({ value }) => value.endsWith('.css'))
