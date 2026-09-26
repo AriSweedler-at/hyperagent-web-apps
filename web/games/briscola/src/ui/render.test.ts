@@ -198,16 +198,9 @@ describe('the shell painters and the pack', () => {
     // The body carries the same tokens, for the cards a flight clones onto it.
     expect(p.body.style('--back')).toBe(p.get('tableScreen').style('--back'));
     expect(p.body.style('--aspect')).toBe(p.get('tableScreen').style('--aspect'));
-    // The pack's forty faces are fetched now, hidden on the body, so a drawn card never shows blank for a round trip.
-    const preload =
-      p.body.text().match(/<div class="face-preload" hidden aria-hidden="true">(.*?)<\/div>/g) ??
-      [];
-    expect(preload).toHaveLength(1);
-    expect(preload[0]?.match(/<img /g)).toHaveLength(40);
-    expect(preload[0]).toContain('src="../../shared/cards/linea/italian40/AC.svg"');
-    // A second paint of the same pack appends nothing more.
-    paint(p.doc, run(initialApp, { type: 'home/init', home }).app);
-    expect(p.body.text().match(/face-preload/g)).toHaveLength(1);
+    // The faces are not fetched at home (the join flow must not queue forty requests): only at the table.
+    expect(p.body.text()).not.toContain('face-preload');
+    expect(p.body.attr('data-faces')).toBeNull();
     expect(p.get('hand').attr('data-key')).toBeNull();
     expect(p.get('trick').text()).toBe('');
     expect(p.get('resultOverlay').hidden()).toBe(true);
@@ -238,6 +231,17 @@ describe('the two-player table', () => {
     expect(shown(p)).toEqual(['tableScreen']);
     expect(p.get('curtainOverlay').hidden()).toBe(false);
     expect(p.get('handoffBtn').hidden()).toBe(false);
+    // The pack's forty faces are fetched now the table is up, hidden on the body, so a drawn card never shows blank for a round trip.
+    const preload =
+      p.body.text().match(/<div class="face-preload" hidden aria-hidden="true">(.*?)<\/div>/g) ??
+      [];
+    expect(preload).toHaveLength(1);
+    expect(preload[0]?.match(/<img /g)).toHaveLength(40);
+    expect(preload[0]).toContain('src="../../shared/cards/linea/italian40/AC.svg"');
+    expect(p.body.attr('data-faces')).toBe('linea');
+    // A second paint of the same pack appends nothing more.
+    paint(p.doc, app);
+    expect(p.body.text().match(/face-preload/g)).toHaveLength(1);
     // The hand: the three dealt cards left to right, face down under the curtain, inert.
     const ids = v.me.hand.map((card) => card.id);
     expect(app.table.slots).toEqual(ids);

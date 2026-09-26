@@ -434,9 +434,9 @@ describe('card names through the language pack (docs/design/language-packs.md §
 describe('facePreloadHtml (the page review: no blank face on a card`s first appearance)', () => {
   test('a files pack: one hidden <img> per face, the plain-fallback file (the 2x where one exists)', () => {
     const html = facePreloadHtml(LINEA);
-    const srcs = [...html.matchAll(/<img src="([^"]+)" alt="" decoding="async">/g)].map(
-      (m) => m[1],
-    );
+    const srcs = [
+      ...html.matchAll(/<img src="([^"]+)" alt="" decoding="async" fetchpriority="low">/g),
+    ].map((m) => m[1]);
     expect(srcs).toHaveLength(40);
     expect(new Set(srcs).size).toBe(40);
     expect(srcs[0]).toBe('../../shared/cards/linea/italian40/AC.svg');
@@ -467,7 +467,7 @@ describe('facePreloadHtml (the page review: no blank face on a card`s first appe
       },
     };
     expect(facePreloadHtml(sprite)).toBe(
-      '<img src="../../shared/cards/sheet/2x.png" alt="" decoding="async">',
+      '<img src="../../shared/cards/sheet/2x.png" alt="" decoding="async" fetchpriority="low">',
     );
   });
 });

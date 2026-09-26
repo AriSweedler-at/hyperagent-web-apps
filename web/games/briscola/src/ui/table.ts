@@ -56,7 +56,8 @@ const preloadUrl = (urls: ReadonlyArray<RatioUrl>): string | null =>
  * The pack's pictures to fetch at table boot (the page review: a just-drawn card showed blank for
  * one round trip on its first appearance): one `<img>` per picture the pack's faces name, each
  * once (a sprite pack has one sheet for many cards), nothing for glyph faces (the renderer draws
- * them). Painted hidden onto the body once per pack (render.ts `paintPack`).
+ * them), at low fetch priority so play's own requests go first. Painted hidden onto the body once
+ * per pack while the table is up (render.ts `paintFacePreload`).
  */
 export const facePreloadHtml = (pack: CardPack): string => {
   const urls = cardIds(DECK_KIND).flatMap((id) => {
@@ -70,7 +71,7 @@ export const facePreloadHtml = (pack: CardPack): string => {
     return url === null ? [] : [url];
   });
   return [...new Set(urls)]
-    .map((url) => `<img src="${escapeHtml(url)}" alt="" decoding="async">`)
+    .map((url) => `<img src="${escapeHtml(url)}" alt="" decoding="async" fetchpriority="low">`)
     .join('');
 };
 
