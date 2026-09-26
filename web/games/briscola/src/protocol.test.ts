@@ -15,6 +15,7 @@ import { describe, expect, test } from 'vitest';
 
 import actionJson from '../../../../test/fixtures/briscola-wire/action.json?raw';
 import fullJson from '../../../../test/fixtures/briscola-wire/full.json?raw';
+import intentJson from '../../../../test/fixtures/briscola-wire/intent.json?raw';
 import joinJson from '../../../../test/fixtures/briscola-wire/join.json?raw';
 import lobbyJson from '../../../../test/fixtures/briscola-wire/lobby.json?raw';
 import stateJson from '../../../../test/fixtures/briscola-wire/state.json?raw';
@@ -44,6 +45,8 @@ import {
   decodeHostFrame,
   full,
   guestNameFor,
+  intent,
+  isEphemeral,
   isGuestFrame,
   join,
   lobby,
@@ -51,6 +54,7 @@ import {
   toast,
   welcome,
   type Frame,
+  type IntentFrame,
   type Room,
   type WireTag,
 } from './protocol.ts';
@@ -169,9 +173,67 @@ const GOLDENS: Readonly<Record<WireTag, ReadonlyArray<Frame>>> = {
   ],
 };
 
+/** The lane's golden (docs/design/briscola-battle.md §4.1): a hover, a lift, a clear, a fourth seat's hover. */
+const INTENT_GOLDENS: ReadonlyArray<IntentFrame> = [
+  intent(0, 1, 'hover'),
+  intent(1, 2, 'raised'),
+  intent(1, null, 'hover'),
+  intent(3, 0, 'hover'),
+];
+const INTENT_PATH = '../../../../test/fixtures/briscola-wire/intent.json';
+
 describe.runIf(RECORD)('recording the goldens (BRISCOLA_WIRE_RECORD=1, with -u)', () => {
   test.each(WIRE_TAGS)('%s.json', async (tag) => {
     await expect(`${JSON.stringify(GOLDENS[tag], null, 2)}\n`).toMatchFileSnapshot(goldenPath(tag));
+  });
+  test('intent.json', async () => {
+    await expect(`${JSON.stringify(INTENT_GOLDENS, null, 2)}\n`).toMatchFileSnapshot(INTENT_PATH);
+  });
+});
+
+describe('the intent frame (docs/design/briscola-battle.md §4.1): the lane`s golden and its refusals', () => {
+  test('intent.json is what the builder emits, key for key, and every frame re-encodes byte for byte on both sides', () => {
+    const onDisk = JSON.parse(intentJson) as ReadonlyArray<unknown>;
+    expect(onDisk).toEqual(INTENT_GOLDENS);
+    expect(JSON.stringify(onDisk), 'key order').toBe(JSON.stringify(INTENT_GOLDENS));
+    expect(JSON.stringify(intent(0, 1, 'hover'))).toBe(
+      '{"t":"intent","seat":0,"slot":1,"mode":"hover"}',
+    );
+    onDisk.forEach((raw) => {
+      expect(decodeFrame(raw)).toEqual({ ok: true, value: raw });
+      expect(decodeGuestFrame(raw)).toEqual({ ok: true, value: raw });
+      expect(decodeHostFrame(raw)).toEqual({ ok: true, value: raw });
+    });
+  });
+
+  test('a card id, a fourth slot, a fifth seat or a stranger mode is refused by its path; the seven tags still name the seven and the lane', () => {
+    expect(decodeFrame({ t: 'intent', seat: 0, slot: 'AC', mode: 'hover' })).toEqual({
+      ok: false,
+      error: '$.slot: expected one of 0 | 1 | 2',
+    });
+    expect(decodeFrame({ t: 'intent', seat: 0, slot: 3, mode: 'hover' })).toEqual({
+      ok: false,
+      error: '$.slot: expected one of 0 | 1 | 2',
+    });
+    expect(decodeFrame({ t: 'intent', seat: 4, slot: 0, mode: 'hover' })).toEqual({
+      ok: false,
+      error: '$.seat: expected one of 0 | 1 | 2 | 3',
+    });
+    expect(decodeFrame({ t: 'intent', seat: 0, slot: 0, mode: 'pushed' })).toEqual({
+      ok: false,
+      error: '$.mode: expected one of "hover" | "raised"',
+    });
+    expect(decodeFrame({ t: 'nope' })).toEqual({
+      ok: false,
+      error:
+        '$.t: expected one of "join" | "action" | "welcome" | "lobby" | "full" | "toast" | "state" | "intent"',
+    });
+  });
+
+  test('isEphemeral claims the lane`s frame alone and isGuestFrame never does', () => {
+    expect(INTENT_GOLDENS.map(isEphemeral)).toEqual([true, true, true, true]);
+    expect(INTENT_GOLDENS.map(isGuestFrame)).toEqual([false, false, false, false]);
+    expect(WIRE_TAGS.flatMap((tag) => GOLDENS[tag].map(isEphemeral)).some(Boolean)).toBe(false);
   });
 });
 
@@ -276,7 +338,7 @@ describe('decodeFrame', () => {
 
   test('refuses an unknown or missing tag and non-objects, naming the seven tags', () => {
     const expected =
-      '$.t: expected one of "join" | "action" | "welcome" | "lobby" | "full" | "toast" | "state"';
+      '$.t: expected one of "join" | "action" | "welcome" | "lobby" | "full" | "toast" | "state" | "intent"';
     expect(decodeFrame({ t: 'hello' })).toEqual({ ok: false, error: expected });
     expect(decodeFrame({})).toEqual({ ok: false, error: expected });
     expect(decodeFrame(null)).toEqual({ ok: false, error: '$: expected object' });

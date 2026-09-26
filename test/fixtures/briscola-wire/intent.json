@@ -1,0 +1,26 @@
+[
+  {
+    "t": "intent",
+    "seat": 0,
+    "slot": 1,
+    "mode": "hover"
+  },
+  {
+    "t": "intent",
+    "seat": 1,
+    "slot": 2,
+    "mode": "raised"
+  },
+  {
+    "t": "intent",
+    "seat": 1,
+    "slot": null,
+    "mode": "hover"
+  },
+  {
+    "t": "intent",
+    "seat": 3,
+    "slot": 0,
+    "mode": "hover"
+  }
+]

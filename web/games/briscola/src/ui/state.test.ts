@@ -220,6 +220,11 @@ describe('the initial app', () => {
       swallowTap: null,
       cardView: null,
       extraNames: { 2: null, 3: null },
+      hover: null,
+      sent: null,
+      intentArmed: false,
+      mirror: [null, null, null, null],
+      budget: [null, null, null, null],
     });
     expect(SCREENS).toEqual([
       'homeScreen',

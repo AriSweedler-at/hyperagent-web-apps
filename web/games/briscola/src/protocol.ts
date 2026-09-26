@@ -12,8 +12,15 @@
 // No legacy corpus exists for this game; protocol.test.ts records one JSON golden per frame under
 // test/fixtures/briscola-wire/ and holds the bytes there. A wire-visible change adds a version
 // field to the skeleton.
-import { boolean, literal, type Shape } from '../../../shared/lib/json.ts';
+//
+// The live intent mirror (docs/design/briscola-battle.md §4.1): one ephemeral frame, `intent`,
+// over the skeleton's lane (`extra.ephemeral`), sent by whichever device's hand is live and never
+// game state: `seat` the sender's engine seat, `slot` the index into its engine-order hand (an
+// index, never a card id: relayed at four it would leak a hidden card) or null to clear, `mode`
+// whether the card is hovered or lifted. Its golden is test/fixtures/briscola-wire/intent.json.
+import { boolean, literal, nullable, object, type Shape } from '../../../shared/lib/json.ts';
 import {
+  isEphemeral as sharedIsEphemeral,
   twoSeatProtocol,
   type ActionFrame as SharedActionFrame,
   type Frame as SharedFrame,
@@ -36,6 +43,7 @@ import {
 
 export {
   DEFAULT_GUEST_NAME,
+  EPHEMERAL_TAG,
   NAME_MAX,
   TOAST_MAX,
   WIRE_TAGS,
@@ -60,14 +68,51 @@ const room = {
 /** Structurally the engine's `GameOptions`. */
 export type Room = Shape<typeof room>;
 
+/** The engine's seats, the hand's slots (`HAND_SIZE` 3) and the two ways a card is shown, as wire literals. */
+export const INTENT_SEATS = [0, 1, 2, 3] as const;
+export const INTENT_SLOTS = [0, 1, 2] as const;
+export const INTENT_MODES = ['hover', 'raised'] as const;
+export type IntentSeat = (typeof INTENT_SEATS)[number];
+export type IntentSlot = (typeof INTENT_SLOTS)[number];
+export type IntentMode = (typeof INTENT_MODES)[number];
+/** The lane's frame, keys in wire order (`t`, `seat`, `slot`, `mode`) so the golden re-encodes byte for byte. */
+export type IntentFrame = Readonly<{
+  t: 'intent';
+  seat: IntentSeat;
+  slot: IntentSlot | null;
+  mode: IntentMode;
+}>;
+const intentFrame = object({
+  t: literal('intent'),
+  seat: literal(...INTENT_SEATS),
+  slot: nullable(literal(...INTENT_SLOTS)),
+  mode: literal(...INTENT_MODES),
+});
+/** The builder, keys in wire order. */
+export const intent = (
+  seat: IntentSeat,
+  slot: IntentSlot | null,
+  mode: IntentMode,
+): IntentFrame => ({
+  t: 'intent',
+  seat,
+  slot,
+  mode,
+});
+
 export type ActionFrame = SharedActionFrame<Action>;
-export type GuestFrame = SharedGuestFrame<Action>;
+/** What a host hears: the two guest frames and the lane's. */
+export type GuestFrame = SharedGuestFrame<Action> | IntentFrame;
 export type WelcomeFrame = SharedWelcomeFrame<Room>;
 export type LobbyFrame = SharedLobbyFrame<Room>;
 /** `viewFor(game, 1)`: the guest's seat, after every applied action and on (re)connect. */
 export type StateFrame = SharedStateFrame<View>;
-export type HostFrame = SharedHostFrame<View, Room>;
-export type Frame = SharedFrame<Action, View, Room>;
+/** What a guest hears: the five host frames and the lane's. */
+export type HostFrame = SharedHostFrame<View, Room> | IntentFrame;
+export type Frame = SharedFrame<Action, View, Room, IntentFrame>;
+
+/** The lane's frame, which the boot sends on whichever session is open (`BootConfig.net.isEphemeral`). */
+export const isEphemeral = (frame: Frame): frame is IntentFrame => sharedIsEphemeral(frame);
 
 export const {
   decodeFrame,
@@ -80,4 +125,4 @@ export const {
   full,
   toast,
   state,
-} = twoSeatProtocol({ decodeAction, decodeView, room });
+} = twoSeatProtocol({ decodeAction, decodeView, room }, { ephemeral: intentFrame });

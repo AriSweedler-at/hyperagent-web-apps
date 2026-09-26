@@ -841,6 +841,8 @@ describe('card names (docs/design/language-packs.md §5): the captions, the tip 
     const p = briscolaPage(MARKUP, {}, [card]);
     const r = recorder();
     bindAll(p.doc, r.dispatch);
+    // The live intent's hover half rides the same events (`bindHover`): this test reads the tip's alone.
+    const tips = (): ReadonlyArray<unknown> => r.intents.filter((i) => i.type !== 'hover/set');
     const over = { target: fakeTarget({ closest: { '.card[data-card]': card } }) };
     p.get('hand').fire('pointerover', { ...over, pointerType: 'mouse' });
     p.get('hand').fire('pointerover', { ...over, pointerType: 'touch' });
@@ -851,7 +853,7 @@ describe('card names (docs/design/language-packs.md §5): the captions, the tip 
     p.get('hand').fire('pointerup', { ...over, pointerType: 'touch' });
     p.get('hand').fire('pointerup', { ...over, pointerType: 'mouse' });
     p.get('hand').fire('pointercancel', { pointerType: 'touch' });
-    expect(r.intents).toEqual([
+    expect(tips()).toEqual([
       { type: 'tip/arm', card: '7D', press: false },
       { type: 'tip/hide' },
       { type: 'tip/hide' },
@@ -864,12 +866,12 @@ describe('card names (docs/design/language-packs.md §5): the captions, the tip 
     p.get('hand').el.classList.add('hidden-cards');
     p.get('hand').fire('pointerover', { ...over, pointerType: 'mouse' });
     p.get('hand').fire('pointerdown', { ...over, pointerType: 'touch' });
-    expect(r.intents.slice(7)).toEqual([{ type: 'tip/hide' }]);
+    expect(tips().slice(7)).toEqual([{ type: 'tip/hide' }]);
     // The card view's close button and backdrop.
     p.get('closeCardViewBtn').fire('click');
     p.get('cardViewOverlay').fire('click', { target: fakeTarget({ id: 'cardViewOverlay' }) });
     p.get('cardViewOverlay').fire('click', { target: fakeTarget({ id: 'cardViewName' }) });
-    expect(r.intents.slice(8)).toEqual([{ type: 'cardView/close' }, { type: 'cardView/close' }]);
+    expect(tips().slice(8)).toEqual([{ type: 'cardView/close' }, { type: 'cardView/close' }]);
   });
 });
 
