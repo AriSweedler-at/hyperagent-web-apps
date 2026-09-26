@@ -535,13 +535,18 @@ const TARGET_SELECTOR =
   '#tableScreen button, #hand .slot:not(.empty), #curtainOverlay .btn, #resultOverlay .btn, #menuOverlay .btn';
 
 /**
- * The page-side read. A lift and a flight are transitions: by default it measures once the running
- * ones have settled, as a finger would, and once the flyers and hidden arrivals (ui/motion.ts) have
- * landed, 2s at most; `quick` reads at once (the fan inside the 900ms hold of the settle beat).
+ * The page-side read. A lift and a flight are transitions, and the drawn card's turn to its face
+ * (`.card.flipping`, theme.css `draw-flip`: a finite animation whose first frame is edge-on, so a
+ * box read mid-turn has no width) is the one animation waited out; the pulses (`awaiting`,
+ * `tappable`, `to-move`) run forever and move no box, so they are not. By default it measures once
+ * the running ones have settled, as a finger would, and once the flyers and hidden arrivals
+ * (ui/motion.ts) have landed, 2s at most; `quick` reads at once (the fan inside the 900ms hold of
+ * the settle beat).
  */
 const geometryScript = (quick: boolean): string => `(async () => {
   if (!${String(quick)}) {
-    const settling = document.getAnimations().filter((a) => a instanceof CSSTransition).map((a) => a.finished.catch(() => null));
+    const waited = (a) => a instanceof CSSTransition || (a instanceof CSSAnimation && a.animationName === 'draw-flip');
+    const settling = document.getAnimations().filter(waited).map((a) => a.finished.catch(() => null));
     await Promise.race([Promise.all(settling), new Promise((done) => setTimeout(done, 1500))]);
     await new Promise((done) => {
       const t0 = performance.now();
