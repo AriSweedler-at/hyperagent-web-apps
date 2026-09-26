@@ -1,8 +1,8 @@
 // The briscola engine as one module (docs/design/briscola-rules.md): the UI, protocol and storage
 // import only from here. Pure: no DOM, no clock, no randomness of its own; `rng` and `now` are
-// injected into `createGame`, `nextGame` and `applyAction` (docs/ARCHITECTURE.md "Module
-// boundaries"). N-seat from day one: every entry takes a `Seat` 0..3 and the state's `seatCount`
-// says which of them are at the table.
+// injected into `createGame`, `nextGame`, `replayGame` and `applyAction` (docs/ARCHITECTURE.md
+// "Module boundaries"). N-seat from day one: every entry takes a `Seat` 0..3 and the state's
+// `seatCount` says which of them are at the table.
 //
 // `ENGINE` is the engine on web/shared/lib/game.ts's two-seat contract (DRY round 2 F1) as far as
 // it reaches four seats. What fits: `create` (a `Pair<Player>` is one of the `Players` tuples, so
@@ -87,7 +87,14 @@ export {
   tricksOf,
 } from './score.ts';
 export { nextSeat, seatsFrom, seatsOf, seatsOfSide, sideList, sideOf, sidesOf } from './seats.ts';
-export { createGame, drawDealer, nextGame, normaliseOptions, withPosition } from './setup.ts';
+export {
+  createGame,
+  drawDealer,
+  nextGame,
+  normaliseOptions,
+  replayGame,
+  withPosition,
+} from './setup.ts';
 export {
   ACTION_TYPES,
   DECK_POINTS,

@@ -650,7 +650,7 @@ describe('seeded random play to the end (§2.4)', () => {
   );
 
   test(
-    'four players, best of 3 with the exchange and the partner peek',
+    'four players, best of 3 with the exchange (the partner peek shows nothing: no partners)',
     () => {
       const cov = new Set<string>();
       seeds(3001, share(40)).forEach((seed) =>
@@ -660,7 +660,6 @@ describe('seeded random play to the end (§2.4)', () => {
         'win:0',
         'win:1',
         'exchange',
-        'peek',
         'trumpTaken:0',
         'trumpTaken:1',
         'trumpTaken:2',

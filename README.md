@@ -436,7 +436,7 @@ web/public/shared/cards/     the served card-pack files: backs/ (gin's five, cop
                              owner's sheet); docs/design/card-packs.md
 web/shared/lib/              shared pure TypeScript: result, rng, json decoders, roomCode, name, invite, shuffle, events, game (the
                              two-seat contract), protocol (the wire skeleton), drag (the drag numbers), clock types, sound (sound/:
-                             cues, fonts, phrases), card packs (cards/)
+                             cues, fonts, phrases), card packs (cards/), language packs (lang/: what a card is called)
 web/shared/edge/             shared effects: ice, transport (the only importer of peerjs) + fake, clock, storage, prefs, dom, fx, share,
                              peer, netDeps, sound, cuePlayer, glossary, invite, drag (the pointer-drag kernel), motion (glide,
                              launchClone, reducedMotion), boot (bootShell), page.fake (shellPage)

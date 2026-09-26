@@ -3,12 +3,13 @@
 // reads the App (ui/state.ts) and `bindHome` turns each control into an intent. The shell every
 // game's home screen shares (the tabs, the mode switch and its submenu, the code field, the resume
 // box, the start, join, share and cancel buttons) is web/shared/ui/home.ts; this file composes it
-// with what is briscola's alone: the room's terms in each mode panel (the seat count, the match,
-// the house rules: a select or a switch each, the pass-and-play panel a twin of the Online one)
-// and the third and fourth name inputs, shown by the seat count. The start buttons carry every raw
-// value along (`Raw`, the keys the reducer's `parseOpts` reads), and a change on any control
-// remembers it at once (`opts/set`), so a select changed without a `change` event (a test's fake)
-// still counts. The three input writes that are not a paint (the saved names at `initHome`, the
+// with what is briscola's alone: the seat count select in each mode panel (the pass-and-play
+// panel's a twin of the Online one; the match and the house rules have no controls since
+// 2026-09-25, the room's other terms being fixed) and the third and fourth name inputs, shown by
+// the seat count. The start buttons carry the raw value along (`Raw`, the keys the reducer's
+// `parseOpts` reads), and a change on the select remembers it at once (`opts/set`), so a select
+// changed without a `change` event (a test's fake) still counts. The three input writes that are
+// not a paint (the saved names at `initHome`, the
 // sanitised room code as it is typed) are effects the reducer raises and main.ts runs through
 // `fillNameInputs` / `fillP2NameInput` / `setCodeInput`; the third and fourth names are painted from
 // the table's memory (`extraNames`), which their own keystrokes keep current, so the paint never
@@ -17,11 +18,9 @@ import {
   dataOf,
   listen,
   listenId,
-  readChecked,
   readValue,
   requireId,
   setAttr,
-  setChecked,
   setValue,
   toggleClass,
   type DocumentLike,
@@ -70,93 +69,41 @@ export { inviteUrl } from '../../../../shared/lib/invite.ts';
 /** The two mode panels the page carries (`${mode}ModeContent`): Online · Pass the phone. */
 const PLAY_MODES: ReadonlyArray<PlayMode> = ['online', 'local'];
 
-/** The room's six controls in each panel, the same option values (design §5.8). */
-const ONLINE = {
-  players: 'playersSel',
-  match: 'matchSel',
-  removedTwo: 'removedTwoSel',
-  exchange: 'exchangeChk',
-  scoperta: 'scopertaChk',
-  partnerPeek: 'partnerPeekChk',
-} as const;
-const LOCAL = {
-  players: 'localPlayersSel',
-  match: 'localMatchSel',
-  removedTwo: 'localRemovedTwoSel',
-  exchange: 'localExchangeChk',
-  scoperta: 'localScopertaChk',
-  partnerPeek: 'localPartnerPeekChk',
-} as const;
-type Control = keyof typeof ONLINE;
-const CONTROLS: ReadonlyArray<Control> = [
-  'players',
-  'match',
-  'removedTwo',
-  'exchange',
-  'scoperta',
-  'partnerPeek',
-];
+/** The seat count select in each panel, the same option values (design §5.8). */
+const ONLINE = { players: 'playersSel' } as const;
+const LOCAL = { players: 'localPlayersSel' } as const;
 /** The third and fourth pass-and-play seats' inputs (`#moreNames` shows them from three players). */
 export const EXTRA_NAME_INPUTS: Readonly<Record<ExtraSeat, string>> = {
   2: 'p3NameInput',
   3: 'p4NameInput',
 };
 
-/** A switch as `Raw` spells it: `on` or `off` (its `value` is `on` whether ticked or not). */
-const flag = (doc: DocumentLike, id: string): string =>
-  readChecked(requireId(doc, id)) ? 'on' : 'off';
-
-/** The Online panel's raw values, the keys `host/click` carries (`Raw`). */
+/** The Online panel's raw value, the key `host/click` carries (`Raw`). */
 export const readHostOptions = (doc: DocumentLike): Raw => ({
   players: readValue(requireId(doc, ONLINE.players)),
-  match: readValue(requireId(doc, ONLINE.match)),
-  removedTwo: readValue(requireId(doc, ONLINE.removedTwo)),
-  exchange: flag(doc, ONLINE.exchange),
-  scoperta: flag(doc, ONLINE.scoperta),
-  partnerPeek: flag(doc, ONLINE.partnerPeek),
 });
 
-/** The pass-and-play panel's six terms under their `local*` keys. */
-export const readLocalRules = (doc: DocumentLike): Raw => ({
+/** The pass-and-play panel's seat count under its `local*` key. */
+export const readLocalSeats = (doc: DocumentLike): Raw => ({
   localPlayers: readValue(requireId(doc, LOCAL.players)),
-  localMatch: readValue(requireId(doc, LOCAL.match)),
-  localRemovedTwo: readValue(requireId(doc, LOCAL.removedTwo)),
-  localExchange: flag(doc, LOCAL.exchange),
-  localScoperta: flag(doc, LOCAL.scoperta),
-  localPartnerPeek: flag(doc, LOCAL.partnerPeek),
 });
 
-/** What `#localBtn` carries beside the first two names: the rules and the third and fourth names (the reducer seats the first `seatCount`). */
+/** What `#localBtn` carries beside the first two names: the seat count and the third and fourth names (the reducer seats the first `seatCount`). */
 export const readLocalOptions = (doc: DocumentLike): Raw => ({
-  ...readLocalRules(doc),
+  ...readLocalSeats(doc),
   p3: readValue(requireId(doc, EXTRA_NAME_INPUTS[2])),
   p4: readValue(requireId(doc, EXTRA_NAME_INPUTS[3])),
 });
 
 /**
- * The room's terms into both panels' controls (written only when they differ, so an open select is
- * left alone). The Online seat count stays as the page ships it: three and four are disabled there
- * until the N-seat lobby lands (D16), and the shell's count may be a pass-and-play choice.
+ * The room's seat count into the pass-and-play select (written only when it differs, so an open
+ * select is left alone). The Online seat count stays as the page ships it: three and four are
+ * disabled there until the N-seat lobby lands (D16), and the shell's count may be a pass-and-play
+ * choice.
  */
 const paintOptions = (doc: DocumentLike, app: App): void => {
   const o = app.shell.opts;
   setValue(requireId(doc, LOCAL.players), String(o.seatCount));
-  [ONLINE.match, LOCAL.match].forEach((id) => {
-    setValue(requireId(doc, id), String(o.gamesToWin));
-  });
-  [ONLINE.removedTwo, LOCAL.removedTwo].forEach((id) => {
-    setValue(requireId(doc, id), o.removedTwo);
-  });
-  (
-    [
-      ['exchange', o.exchange],
-      ['scoperta', o.scoperta],
-      ['partnerPeek', o.partnerPeek],
-    ] as const
-  ).forEach(([control, on]) => {
-    setChecked(requireId(doc, ONLINE[control]), on);
-    setChecked(requireId(doc, LOCAL[control]), on);
-  });
   // The third and fourth seats' inputs show with the count, holding the names as last read or
   // typed, or the seat's default marked for the first-tap clear (shellConfig.ts LOCAL_NAMES: the
   // owner's Sandro and Grant), as the shared fill marks the first two seats.
@@ -178,7 +125,7 @@ const homeView = (app: App): HomeView<HomeTab> => ({
   resumeLabel: app.shell.resume === null ? null : resumeLabel(app.shell.resume),
 });
 
-/** The tabs and panels, the play mode, the submenu's `force-open`, and the resume box; then the room's controls. */
+/** The tabs and panels, the play mode, the submenu's `force-open`, and the resume box; then the seat count and the extra names. */
 export const paintHome = (doc: DocumentLike, app: App): void => {
   paintHomeShell(doc, homeView(app), { tabs: HOME_TABS, modes: PLAY_MODES });
   paintOptions(doc, app);
@@ -206,15 +153,13 @@ const SHELL_INTENTS: ShellIntentBuilders<Intent, HomeTab, Raw> = {
   cancel: { type: 'cancel' },
 };
 
-/** Every control of a panel remembers the panel's terms as it changes; the third and fourth names are remembered as typed. */
+/** Each panel's seat count is remembered as it changes; the third and fourth names are remembered as typed. */
 const bindOptions = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
-  CONTROLS.forEach((control) => {
-    listenId(doc, ONLINE[control], 'change', () => {
-      dispatch({ type: 'opts/set', raw: readHostOptions(doc) });
-    });
-    listenId(doc, LOCAL[control], 'change', () => {
-      dispatch({ type: 'opts/set', raw: readLocalRules(doc) });
-    });
+  listenId(doc, ONLINE.players, 'change', () => {
+    dispatch({ type: 'opts/set', raw: readHostOptions(doc) });
+  });
+  listenId(doc, LOCAL.players, 'change', () => {
+    dispatch({ type: 'opts/set', raw: readLocalSeats(doc) });
   });
   ([2, 3] as const).forEach((seat) => {
     const input = requireId(doc, EXTRA_NAME_INPUTS[seat]);

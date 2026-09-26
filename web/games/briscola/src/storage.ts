@@ -11,7 +11,11 @@
 // `hostName`), between `myName` and `game` in the literal. This page's own keys beside the shell's:
 // the third and fourth pass-and-play names (the shell remembers two), the card pack (validated for
 // the Italian deck, docs/design/card-packs.md §2, so a pack that lands later is accepted the day it
-// does), and the six options the home screen last chose, one bare string each.
+// does), and the seat count the home screen last chose (one bare string). The rest of the room's
+// terms are fixed (`TABLE_TERMS`): one game per sitting and the engine's defaults for the house
+// rules, since the owner took the match and house-rule controls off the home screen (2026-09-25);
+// the keys those controls wrote (`briscola_match`, `briscola_removedTwo`, `briscola_exchange`,
+// `briscola_scoperta`, `briscola_partnerPeek`) are retired: never read, never written.
 import type { Store, StorageError } from '../../../shared/edge/storage.ts';
 import {
   NAME_MAX,
@@ -23,10 +27,10 @@ import {
   decodePlayMode,
   decodeSoundFont,
   decodeSoundState,
+  langPref,
   namePref,
   readTextWith,
   shellStore,
-  textPref,
   type GuestSave as ShellGuestSave,
   type HostSave as ShellHostSave,
   type LocalSave as ShellLocalSave,
@@ -36,20 +40,19 @@ import {
   type TextPref,
 } from '../../../shared/edge/prefs.ts';
 import { defaultPackFor, type CardPackFor } from '../../../shared/lib/cards/packs.ts';
+import type { LanguagePackName } from '../../../shared/lib/lang/packs.ts';
 import { literal, map, refine, string, type Decoder } from '../../../shared/lib/json.ts';
 import type { Result } from '../../../shared/lib/result.ts';
 import {
-  GAMES_TO_WIN,
   SEAT_COUNTS,
-  SUITS,
   decodeOptions,
   decodeState,
   normaliseOptions,
+  type CreateGameOptions,
   type GameOptions,
   type GamesToWin,
   type SeatCount,
   type State,
-  type Suit,
 } from './engine/index.ts';
 
 // ui/state.ts names the Store through this module: the reducer may import everything below it
@@ -72,6 +75,7 @@ export {
   SOUND_FONTS,
   type SoundFontName,
 } from '../../../shared/lib/sound/fonts.ts';
+export { LANGUAGE_PACKS, type LanguagePackName } from '../../../shared/lib/lang/packs.ts';
 
 export const STORAGE_KEYS = {
   /** The game in progress: pass-and-play, or the host's table and game, or the guest's table. */
@@ -98,13 +102,10 @@ export const STORAGE_KEYS = {
   recentGames: 'briscola_recentGames',
   /** The card pack (web/shared/lib/cards/packs.ts, bare string): one of the packs that draw the Italian deck (docs/design/card-packs.md §2). */
   cardPack: 'briscola_cardPack',
-  /** The room options the home screen last chose (D3), one bare string each: `2`|`3`|`4`, `1`|`2`|`3`, a suit letter, `on`|`off` ×3. */
+  /** The language pack the cards are named in (web/shared/lib/lang/packs.ts, bare string): the tooltip, the captions, the aria labels (docs/design/language-packs.md §3). */
+  lang: 'briscola_lang',
+  /** The seat count the home screen last chose (D3), a bare string: `2`|`3`|`4`. */
   players: 'briscola_players',
-  match: 'briscola_match',
-  removedTwo: 'briscola_removedTwo',
-  exchange: 'briscola_exchange',
-  scoperta: 'briscola_scoperta',
-  partnerPeek: 'briscola_partnerPeek',
 } as const;
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
@@ -117,9 +118,15 @@ export const DEFAULT_PLAY_MODE: PlayMode = 'online';
 export const DECK_KIND = 'italian40';
 export type CardPack = CardPackFor<typeof DECK_KIND>;
 export const DEFAULT_CARD_PACK: CardPack = defaultPackFor(DECK_KIND);
+/** The cards are named in Italian unless the console (or a settings panel later) says otherwise. */
+export const DEFAULT_LANG: LanguagePackName = 'it';
 
-/** The room's terms as the home screen starts (D3): two players, best of three, the 2 di coppe out at three, every house rule off. */
-export const DEFAULT_OPTS: GameOptions = normaliseOptions(2, {});
+/** One game per sitting (the owner, 2026-09-25: "It is always single game. Just 1 draw. With a replay button at the end"). */
+export const ONE_GAME: GamesToWin = 1;
+/** The room's fixed terms beside the seat count: one game, and the engine's defaults for the house rules (the 2 di coppe out at three, the exchange, scoperta and the partner peek off). */
+export const TABLE_TERMS: CreateGameOptions = { gamesToWin: ONE_GAME };
+/** The room's terms as the home screen starts (D3): two players on the fixed terms. */
+export const DEFAULT_OPTS: GameOptions = normaliseOptions(2, TABLE_TERMS);
 
 /** One of three shapes by role; the keys are in the order `writeSave` emits them. */
 export type LocalSave = ShellLocalSave<State>;
@@ -186,7 +193,11 @@ export const { read: readCardPack, write: writeCardPack } = cardPackPref(
   DECK_KIND,
 );
 
-/** A number stored as its digits (`"3"`), read back as one of `values` (the refine admits those alone, so the cast holds): the seat count and the games to win. */
+/** The language pack, one of the shared packs; `orDefault` is Italian when the key is missing or unreadable. */
+export const LANG_PREF = langPref(STORAGE_KEYS.lang, DEFAULT_LANG);
+export const { read: readLang, write: writeLang } = LANG_PREF;
+
+/** A number stored as its digits (`"3"`), read back as one of `values` (the refine admits those alone, so the cast holds): the seat count. */
 const digitsOf = <T extends number>(values: ReadonlyArray<T>): Decoder<T> =>
   map(
     refine(
@@ -198,10 +209,6 @@ const digitsOf = <T extends number>(values: ReadonlyArray<T>): Decoder<T> =>
   );
 
 export const decodeSeatCount: Decoder<SeatCount> = digitsOf(SEAT_COUNTS);
-export const decodeGamesToWin: Decoder<GamesToWin> = digitsOf(GAMES_TO_WIN);
-export const decodeSuit: Decoder<Suit> = literal(...SUITS);
-/** A house rule: `on` or `off`, as the sound preference spells a switch. */
-export const decodeFlag: Decoder<SoundState> = decodeSoundState;
 
 /** A number is its digits in the store, so it is not a `textPref` (backgammon's match length has the same shape). */
 const digitsPref = <T extends number>(key: string, decoder: Decoder<T>): TextPref<T> => ({
@@ -209,44 +216,19 @@ const digitsPref = <T extends number>(key: string, decoder: Decoder<T>): TextPre
   write: (store, value) => store.writeText(key, String(value)),
 });
 const seatCountPref = digitsPref(STORAGE_KEYS.players, decodeSeatCount);
-const gamesToWinPref = digitsPref(STORAGE_KEYS.match, decodeGamesToWin);
-const removedTwoPref = textPref(STORAGE_KEYS.removedTwo, decodeSuit);
-const flagPrefs: Readonly<Record<'exchange' | 'scoperta' | 'partnerPeek', TextPref<SoundState>>> = {
-  exchange: textPref(STORAGE_KEYS.exchange, decodeFlag),
-  scoperta: textPref(STORAGE_KEYS.scoperta, decodeFlag),
-  partnerPeek: textPref(STORAGE_KEYS.partnerPeek, decodeFlag),
-};
 
 const orDefault = <T>(r: Result<T, StorageError>, fallback: T): T => (r.ok ? r.value : fallback);
-const readFlag = (store: Store, name: keyof typeof flagPrefs, fallback: boolean): boolean => {
-  const r = flagPrefs[name].read(store);
-  return r.ok ? r.value === 'on' : fallback;
-};
 
 /**
- * The six options the home screen last chose, each falling back to `DEFAULT_OPTS` when its key is
- * missing or unreadable, then normalised as the engine normalises them (scoperta at two players
- * only, the partner peek at four only), so a stored pair that disagrees reads as a legal room.
+ * The room the home screen last chose: the seat count under its key (the default when missing or
+ * unreadable) on the fixed terms, normalised as the engine normalises a room.
  */
-export const readOpts = (store: Store): GameOptions => {
-  const d = DEFAULT_OPTS;
-  return normaliseOptions(orDefault(seatCountPref.read(store), d.seatCount), {
-    gamesToWin: orDefault(gamesToWinPref.read(store), d.gamesToWin),
-    removedTwo: orDefault(removedTwoPref.read(store), d.removedTwo),
-    exchange: readFlag(store, 'exchange', d.exchange),
-    scoperta: readFlag(store, 'scoperta', d.scoperta),
-    partnerPeek: readFlag(store, 'partnerPeek', d.partnerPeek),
-  });
-};
+export const readOpts = (store: Store): GameOptions =>
+  normaliseOptions(orDefault(seatCountPref.read(store), DEFAULT_OPTS.seatCount), TABLE_TERMS);
 
-/** The six keys written from a room's options: the digits, the suit letter and `on`/`off`. */
+/** The one key written from a room's options: the seat count's digits. */
 export const writeOpts = (store: Store, opts: GameOptions): void => {
   seatCountPref.write(store, opts.seatCount);
-  gamesToWinPref.write(store, opts.gamesToWin);
-  removedTwoPref.write(store, opts.removedTwo);
-  flagPrefs.exchange.write(store, opts.exchange ? 'on' : 'off');
-  flagPrefs.scoperta.write(store, opts.scoperta ? 'on' : 'off');
-  flagPrefs.partnerPeek.write(store, opts.partnerPeek ? 'on' : 'off');
 };
 
 export const ALL_KEYS: ReadonlyArray<StorageKey> = Object.values(STORAGE_KEYS);

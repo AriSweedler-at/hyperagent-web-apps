@@ -57,9 +57,6 @@ export const LOCAL_NAMES: Readonly<Record<SeatCount, LocalNames>> = {
   4: ['Ann', 'Bob', 'Cara', 'Dan'],
 };
 
-/** The pass-and-play panel's selects; absent = the page's defaults (best of 3, the 2 di coppe removed). */
-export type LocalOptions = Readonly<{ gamesToWin?: 1 | 2 | 3 }>;
-
 // ---- the hook -----------------------------------------------------------------------------------
 
 /** The view the page holds for the seat it shows, as `window.__briscola.view()` returns it. */
@@ -89,16 +86,15 @@ export const briscolaAct = (page: Page, action: Action): Promise<void> =>
 
 /**
  * Start pass and play for `names.length` seats (the shell's `startLocal`: the switch, the two
- * names, Start) with the panel's count select and the third and fourth names filled first, and
- * the match length as `options` says. Resolves with the table up and the first curtain over it,
- * naming the leader (the seat after the dealer).
+ * names, Start) with the panel's count select and the third and fourth names filled first; the
+ * room's other terms are fixed (one game per sitting, no house rules). Resolves with the table up
+ * and the first curtain over it, naming the leader (the seat after the dealer).
  */
 export const briscolaStartLocal = (
   page: Page,
   url: string,
   viewport: Viewport,
   names: LocalNames = LOCAL_NAMES[2],
-  options: LocalOptions = {},
 ): Promise<void> =>
   startLocal(page, url, viewport, [names[0], names[1]], async (p) => {
     const [, , p3, p4] = names;
@@ -111,8 +107,6 @@ export const briscolaStartLocal = (
         await p.locator('#p4NameInput').fill(p4);
       }
     }
-    if (options.gamesToWin !== undefined)
-      await p.locator('#localMatchSel').selectOption(String(options.gamesToWin));
   });
 
 /** What the curtain says (design §5.1, ui/local.ts `curtainText`). */
@@ -378,9 +372,6 @@ export type Position = Readonly<{
    * piles in deck order, seat 0 taking the first even half.
    */
   piles?: readonly [ReadonlyArray<string>, ReadonlyArray<string>];
-  gamesToWin?: 1 | 2 | 3;
-  /** Games already won per side. */
-  wins?: readonly [number, number];
 }>;
 
 /**
@@ -391,9 +382,10 @@ export type Position = Readonly<{
 const stamp = (): number => Date.now();
 
 /**
- * A `State` for `briscolaSetup`: a fresh two-seat match between `names` (seed 1 decides its deal,
- * which the position then replaces) with the stock out, `leader` to lead, and the deal event
- * rewritten to the position's trump card so the history's first row agrees with the badge.
+ * A `State` for `briscolaSetup`: a fresh two-seat game between `names` on the page's terms (one
+ * game per sitting; seed 1 decides its deal, which the position then replaces) with the stock out,
+ * `leader` to lead, and the deal event rewritten to the position's trump card so the history's
+ * first row agrees with the trump badge.
  */
 export const briscolaPosition = (p: Position): State => {
   const names = p.names ?? DEFAULT_NAMES;
@@ -401,7 +393,7 @@ export const briscolaPosition = (p: Position): State => {
     { id: 'p1', name: names[0] },
     { id: 'p2', name: names[1] },
   ];
-  const fresh = createGame(players, { gamesToWin: p.gamesToWin ?? 2 }, mulberry32(1), stamp);
+  const fresh = createGame(players, { gamesToWin: 1 }, mulberry32(1), stamp);
   const hands = p.hands.map((ids) => ids.map(card));
   const held = new Set(p.hands.flat());
   const rest = deckFor(fresh.options).filter((c) => !held.has(c.id));
@@ -417,7 +409,6 @@ export const briscolaPosition = (p: Position): State => {
     ...seated,
     piles,
     trickNo: piles.reduce((sum, pile) => sum + pile.length, 0) / 2,
-    match: { ...seated.match, wins: p.wins === undefined ? seated.match.wins : [...p.wins] },
     events:
       deal?.kind === 'deal'
         ? [{ ...deal, data: { dealer: deal.data.dealer, trumpCard } }]

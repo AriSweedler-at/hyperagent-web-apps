@@ -16,8 +16,10 @@ pointer: what has landed and where its register is.
 
 Words: *briscola* is the trump suit and the card turned up to name it (the docs say "the trump
 card" for the card); a *trick* is a *mano*; a *game* is one deal of 120 points; a *match* is games
-to a target. Seats are `0..n-1`, the host is seat 0, play runs to the next seat index; with four
-the even seats are one side.
+to a target (the engine's; the page plays one game per sitting since 2026-09-25, with Play again
+on the result sheet: the owner, "It is always single game. Just 1 draw. With a replay button at the
+end"). Seats are `0..n-1`, the host is seat 0, play runs to the next seat index; with four
+every seat is its own side (a free-for-all at four, "the Lavi way", 2026-09-25; teams are a future mode).
 
 ## The program, in one paragraph
 

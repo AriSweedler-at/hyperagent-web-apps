@@ -1,9 +1,10 @@
 // The reducer alone (docs/design/briscola.md §5.4, §5.6 "Pure twins" and the reducer tests;
 // backgammon's state.test.ts shape): every table intent once, the flows that matter (pass-and-play
 // for two, three and four seats driven through a tap policy with a seeded rng, the settle beat's
-// stages and timers, the curtain deferred to the beat, a hosted match against a fake guest frame
-// stream, the resume snapshot, the event-driven cues), the effects as data, and `runEffect`
-// against recorded adapters.
+// stages and timers, the curtain deferred to the beat, a hosted game against a fake guest frame
+// stream, Play again after a decided game and after a draw, an older save's match running on, the
+// resume snapshot, the event-driven cues), the effects as data, and `runEffect` against recorded
+// adapters.
 import { describe, expect, test } from 'vitest';
 
 import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
@@ -11,8 +12,17 @@ import { createStore, type StorageLike } from '../../../../shared/edge/storage.t
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { newEvents } from '../../../../shared/lib/events.ts';
 import { sequenceOf } from '../../../../shared/lib/sound/phrase.ts';
-import { MESSAGES, actorOf, applyAction, createGame, viewFor } from '../engine/index.ts';
-import type { GameEvent, State, TrickRecord, View } from '../engine/index.ts';
+import {
+  MESSAGES,
+  actorOf,
+  applyAction,
+  cardById,
+  createGame,
+  deckFor,
+  viewFor,
+  withPosition,
+} from '../engine/index.ts';
+import type { Card, GameEvent, State, TrickRecord, View } from '../engine/index.ts';
 import {
   action as actionFrame,
   lobby,
@@ -35,6 +45,8 @@ import {
   SANDBOX_LOCAL_ONLY_MSG,
   SCREENS,
   SHELL_INTENT_TYPES,
+  TIP_HOVER_MS,
+  TIP_PRESS_MS,
   WAITING_FOR_GUEST_MSG,
   badPositionMsg,
   cueKey,
@@ -120,6 +132,7 @@ const home: HomeSnapshot = {
   recentGames: [],
   opts: DEFAULT_OPTS,
   cardPack: DEFAULT_CARD_PACK,
+  lang: 'it',
   p3Name: null,
   p4Name: null,
 };
@@ -148,6 +161,12 @@ const local = (raw: Raw = {}, snapshot: HomeSnapshot = home): App =>
 
 /** The curtain lifted for whoever must act. */
 const revealed = (app: App): App => run(app, { type: 'curtain/reveal' }).app;
+/** A card of the deck by id; a typo is a test bug. */
+const c = (id: string): Card => {
+  const card = cardById(id);
+  if (card === null) throw new Error(`no card ${id}`);
+  return card;
+};
 
 /** The tap policy: the first legal card lifted, then played (two taps). */
 const playFirst = (app: App): Step => {
@@ -160,7 +179,7 @@ const playFirst = (app: App): Step => {
 const advance = (app: App): App => {
   if (app.table.curtain !== null) return revealed(app);
   if (app.table.settle !== null) return run(app, { type: 'settle/elapsed' }).app;
-  if (view(app).phase === 'over') return run(app, { type: 'next/click' }).app;
+  if (view(app).phase === 'over') return run(app, { type: 'replay/click' }).app;
   return playFirst(app).app;
 };
 const STEP_CAP = 400;
@@ -191,9 +210,15 @@ describe('the initial app', () => {
       drag: null,
       resultDismissed: false,
       historyOpen: false,
+      deckOpen: false,
+      deckWithHand: false,
       curtain: null,
       lastPainted: null,
       cardPack: DEFAULT_CARD_PACK,
+      lang: 'it',
+      tip: null,
+      swallowTap: null,
+      cardView: null,
       extraNames: { 2: null, 3: null },
     });
     expect(SCREENS).toEqual([
@@ -227,26 +252,26 @@ describe('home', () => {
     expect(kinds(effects)).toEqual(['scrollTop', 'fillName', 'fillP2Name']);
   });
 
-  test('opts/set parses the raw selects against the current room, normalises and remembers; the home switches read on/off', () => {
-    const { app, effects } = run(initialApp, {
-      type: 'opts/set',
-      raw: { players: '3', match: '3', removedTwo: 'S', exchange: 'on', scoperta: 'on' },
-    });
-    const opts = { ...DEFAULT_OPTS, seatCount: 3, gamesToWin: 3, removedTwo: 'S', exchange: true };
+  test('opts/set parses the raw seat count against the current room onto the fixed terms and remembers it', () => {
+    const { app, effects } = run(initialApp, { type: 'opts/set', raw: { players: '3' } });
+    const opts = { ...DEFAULT_OPTS, seatCount: 3 };
     expect(app.shell.opts).toEqual(opts);
     expect(effects).toEqual([{ type: 'writeOpts', opts }]);
     // A key not carried keeps the current value; a bad value too.
-    const again = run(app, { type: 'opts/set', raw: { players: '9', exchange: 'off' } });
-    expect(again.app.shell.opts).toEqual({ ...opts, exchange: false });
-    // The pass-and-play twins are read too.
+    expect(run(app, { type: 'opts/set', raw: {} }).app.shell.opts).toEqual(opts);
+    expect(run(app, { type: 'opts/set', raw: { players: '9' } }).app.shell.opts).toEqual(opts);
+    // The pass-and-play twin is read too.
     expect(
-      run(initialApp, { type: 'opts/set', raw: { localPlayers: '4', localPartnerPeek: 'on' } }).app
-        .shell.opts,
-    ).toEqual({
-      ...DEFAULT_OPTS,
-      seatCount: 4,
-      partnerPeek: true,
-    });
+      run(initialApp, { type: 'opts/set', raw: { localPlayers: '4' } }).app.shell.opts,
+    ).toEqual({ ...DEFAULT_OPTS, seatCount: 4 });
+    // A room that still carries a match or a house rule (an older save) is parsed onto the fixed terms.
+    const older: App = {
+      ...initialApp,
+      shell: { ...initialApp.shell, opts: { ...DEFAULT_OPTS, gamesToWin: 3, exchange: true } },
+    };
+    expect(run(older, { type: 'opts/set', raw: { players: '2' } }).app.shell.opts).toEqual(
+      DEFAULT_OPTS,
+    );
   });
 
   test('pname/typed keeps the third and fourth names and remembers them trimmed; cardPack/set takes a pack of the deck and refuses another', () => {
@@ -274,20 +299,21 @@ describe('pass and play: seating two, three and four', () => {
     const { app, effects } = run(
       initialApp,
       { type: 'home/init', home },
-      { type: 'local/click', p1: ' ann ', p2: 'ANN', localMatch: '1' },
+      { type: 'local/click', p1: ' ann ', p2: 'ANN' },
     );
     const g = game(app);
     expect(g.players).toEqual([
       { id: 'p1', name: 'ann' },
       { id: 'p2', name: 'ANN 2' },
     ]);
+    // One game per sitting: the engine's match is fixed at one game.
     expect(g.options).toEqual({ ...DEFAULT_OPTS, gamesToWin: 1 });
     expect(app.shell).toMatchObject({
       role: 'local',
       code: null,
       oppConnected: true,
       revealed: null,
-      opts: { ...DEFAULT_OPTS, gamesToWin: 1 },
+      opts: DEFAULT_OPTS,
       screen: 'tableScreen',
     });
     // The curtain names the leader (the seat after the dealer), whose view is shown.
@@ -318,7 +344,7 @@ describe('pass and play: seating two, three and four', () => {
     const remembered = local({ localPlayers: '4' }, { ...home, p3Name: 'Cara', p4Name: 'Dan' });
     expect(game(remembered).players.map((p) => p.name)).toEqual(['Ann', 'Bob', 'Cara', 'Dan']);
     expect(view(remembered).stockCount).toBe(28);
-    expect(view(remembered).sides).toHaveLength(2);
+    expect(view(remembered).sides).toHaveLength(4);
 
     // An empty seat is this game's default (shellConfig.ts LOCAL_NAMES: the owner's "Ari and Lavi
     // (with p3 Sandro and p4 Grant)"); a clash with an earlier seat is suffixed by its number.
@@ -388,7 +414,7 @@ describe('pass and play: the lift, the play, the settle beat and the curtain', (
   });
 
   test('a completed trick settles: hold, fly, draw with their timers, the phone holder kept, the cue for the trick, then the curtain for the winner', () => {
-    const start = local({ localMatch: '1' });
+    const start = local();
     const first = playFirst(revealed(start)).app;
     const second = playFirst(revealed(first));
     const g = game(second.app);
@@ -522,7 +548,7 @@ describe('pass and play: whole games through the tap policy', () => {
   test.each([2, 3, 4] as const)(
     'a game of %i seats plays to its end: every trick settles, the result sheet opens once the beat is done, the score sums to 120',
     (n) => {
-      const start = local({ localPlayers: String(n), localMatch: '1', p3: 'Cara', p4: 'Dan' });
+      const start = local({ localPlayers: String(n), p3: 'Cara', p4: 'Dan' });
       const over = playUntil(
         start,
         (app) => view(app).phase === 'over' && app.table.settle === null,
@@ -533,10 +559,10 @@ describe('pass and play: whole games through the tap policy', () => {
       expect(v.sides.reduce((a, b) => a + b, 0)).toBe(120);
       expect(v.tricks.reduce((a, b) => a + b, 0)).toBe(v.trickNo);
       expect(v.stockCount).toBe(0);
-      // The result is everyone's: no curtain, the sheet up, the end screen since the match was one game.
+      // The result is everyone's: no curtain, the sheet up over the table (never the shell's end screen).
       expect(over.table.curtain).toBeNull();
       expect(v.matchOver).toBe(true);
-      expect(over.shell.screen).toBe('endgameScreen');
+      expect(over.shell.screen).toBe('tableScreen');
       expect(resultOpen(over)).toBe(true);
       expect(run(over, { type: 'result/peek' }).app.table.resultDismissed).toBe(true);
       // The event stream: one deal, one trick per trick, one result.
@@ -548,34 +574,93 @@ describe('pass and play: whole games through the tap policy', () => {
     },
   );
 
-  test('a match of games: game one over opens the sheet on the table screen; Next game deals game two with the tally carried; the match end shows the end screen; Rematch starts afresh with the deal chiming', () => {
-    const start = local({ localMatch: '2' });
+  test('Play again after a decided game: a fresh deal for the same players on the same terms, the deal passed to the next seat, the tally and the stream fresh, the deal chiming after the curtain', () => {
+    const start = local();
     const one = playUntil(start, (app) => view(app).phase === 'over' && app.table.settle === null);
-    expect(view(one).matchOver).toBe(false);
+    const v1 = view(one);
+    expect(v1.matchOver).toBe(true);
     expect(one.shell.screen).toBe('tableScreen');
     expect(resultOpen(one)).toBe(true);
     // The result's phrase played once, at the end: the cue memory keys on the last event.
-    expect(one.shell.cues.key).toBe(cueKey(view(one)));
-    const two = run(one, { type: 'next/click' });
-    expect(view(two.app).gameNo).toBe(2);
-    expect(view(two.app).phase).toBe('trick');
-    expect(resultOpen(two.app)).toBe(false);
-    expect(two.app.shell.revealed).toBeNull();
-    expect(two.app.table.curtain).toBe(game(two.app).turn);
-    // Game two opens with its `game` and `deal` events: the deal chimes.
-    expect(cues(two.effects)).toContain('start.deal');
-    const wins = view(two.app).match.wins.reduce((a, b) => a + b, 0) + view(two.app).match.draws;
-    expect(wins).toBe(1);
-    const end = playUntil(two.app, (app) => view(app).matchOver && app.table.settle === null);
-    expect(end.shell.screen).toBe('endgameScreen');
-    const again = run(end, { type: 'next/click' });
-    expect(view(again.app).gameNo).toBe(1);
-    expect(view(again.app).match.wins).toEqual([0, 0]);
-    expect(again.app.shell.cues.key).toBe(cueKey(view(again.app)));
+    expect(one.shell.cues.key).toBe(cueKey(v1));
+    const again = run(one, { type: 'replay/click' });
+    const v2 = view(again.app);
+    expect(v2.gameNo).toBe(1);
+    expect(v2.phase).toBe('trick');
+    expect(v2.players).toEqual(v1.players);
+    expect(v2.options).toEqual(v1.options);
+    expect(v2.dealer).toBe((v1.dealer + 1) % 2);
+    expect(v2.match).toEqual({ gamesToWin: 1, wins: [0, 0], draws: 0 });
+    expect(v2.events.map((e) => e.kind)).toEqual(['deal']);
+    expect(v2.stockCount).toBe(34);
+    expect(v2.me.hand).toHaveLength(3);
+    expect(resultOpen(again.app)).toBe(false);
+    expect(again.app.table.resultDismissed).toBe(false);
+    expect(again.app.shell.revealed).toBeNull();
     // The curtain rises for the new leader (the shell's chime), then the deal.
+    expect(again.app.table.curtain).toBe(game(again.app).turn);
     expect(cues(again.effects)).toEqual(['yourTurn', 'start.deal']);
-    // Next before the game is over is nothing.
-    expect(run(again.app, { type: 'next/click' }).app).toBe(again.app);
+    expect(again.app.shell.cues.key).toBe(cueKey(v2));
+    // Play again before the game is over is nothing.
+    expect(run(again.app, { type: 'replay/click' }).app).toBe(again.app);
+  });
+
+  test('Play again after a draw is the engine`s next game: the deal rotates, the tally carries the draw, the stream runs on', () => {
+    const one = playUntil(
+      local(),
+      (app) => view(app).phase === 'over' && app.table.settle === null,
+    );
+    const g = game(one);
+    // The finished game re-read as a 60-60 draw (the engine's own literal, so `next` applies to it).
+    const drawn: State = {
+      ...g,
+      match: { ...g.match, wins: [0, 0], draws: 1 },
+      result: { winner: null, totals: [60, 60], draw: true },
+    };
+    const app: App = {
+      ...one,
+      shell: { ...one.shell, game: drawn, view: viewFor(drawn, view(one).me.idx) },
+    };
+    expect(view(app).matchOver).toBe(false);
+    expect(resultOpen(app)).toBe(true);
+    const two = run(app, { type: 'replay/click' });
+    const v = view(two.app);
+    expect(v.gameNo).toBe(2);
+    expect(v.dealer).toBe((g.dealer + 1) % 2);
+    expect(v.match).toEqual({ gamesToWin: 1, wins: [0, 0], draws: 1 });
+    expect(v.events.map((e) => e.kind).slice(-2)).toEqual(['game', 'deal']);
+    expect(cues(two.effects)).toContain('start.deal');
+    expect(two.app.table.curtain).toBe(game(two.app).turn);
+  });
+
+  test('an older save whose game holds a best-of-three loads and plays on: its first result is not decided, Play again deals game two of that match', () => {
+    const older = createGame(
+      [
+        { id: 'p1', name: 'Ann' },
+        { id: 'p2', name: 'Bob' },
+      ],
+      { gamesToWin: 2 },
+      mulberry32(11),
+      () => NOW,
+    );
+    const resumed = run(
+      initialApp,
+      { type: 'home/init', home: { ...home, save: { role: 'local', game: older } } },
+      { type: 'resume/click' },
+    ).app;
+    expect(game(resumed)).toEqual(older);
+    expect(resumed.shell.opts.gamesToWin).toBe(1);
+    const one = playUntil(
+      resumed,
+      (app) => view(app).phase === 'over' && app.table.settle === null,
+    );
+    expect(view(one).matchOver).toBe(false);
+    expect(one.shell.screen).toBe('tableScreen');
+    expect(resultOpen(one)).toBe(true);
+    const two = run(one, { type: 'replay/click' }).app;
+    expect(view(two).gameNo).toBe(2);
+    expect(view(two).match.gamesToWin).toBe(2);
+    expect(view(two).match.wins.reduce((a, b) => a + b, 0) + view(two).match.draws).toBe(1);
   });
 
   test('a refused action is toasted with the font`s bad and drops the lift; an act by the hook applies for the actor', () => {
@@ -587,8 +672,11 @@ describe('pass and play: whole games through the tap policy', () => {
     const legal = view(start).legal[0] ?? '';
     const ok = run(start, { type: 'act', action: { type: 'play', cardId: legal } });
     expect(game(ok.app).trick[0]?.card.id).toBe(legal);
-    // `exchange/click` is nothing while the table does not play the exchange.
-    expect(run(start, { type: 'exchange/click' }).app).toBe(start);
+    // `exchange/click` while the table does not play the exchange: a closer look at the trump card instead.
+    const looked = run(start, { type: 'exchange/click' });
+    expect(looked.app.table.cardView).toBe(game(start).trumpCard.id);
+    expect(looked.app.shell).toBe(start.shell);
+    expect(looked.effects).toEqual([]);
   });
 
   test("position/load (the shell's, over the engine decoder) replaces the pass-and-play position, curtain down for the actor; refused elsewhere and for junk", () => {
@@ -622,7 +710,7 @@ describe('hosting and joining (two seats)', () => {
     run(
       initialApp,
       { type: 'home/init', home: { ...home, playMode: 'online' } },
-      { type: 'host/click', name: 'Ann', match: '1' },
+      { type: 'host/click', name: 'Ann', players: '2' },
     );
 
   test('host/click: the name, the options, a fresh 4-letter code, the wait screen, the startHost effect, the options remembered', () => {
@@ -630,7 +718,7 @@ describe('hosting and joining (two seats)', () => {
     expect(app.shell).toMatchObject({
       role: 'host',
       myName: 'Ann',
-      opts: { ...DEFAULT_OPTS, gamesToWin: 1 },
+      opts: DEFAULT_OPTS,
       screen: 'hostWaitScreen',
       game: null,
     });
@@ -642,7 +730,7 @@ describe('hosting and joining (two seats)', () => {
       'startHost',
       'writeOpts',
     ]);
-    expect(effects.at(-1)).toEqual({ type: 'writeOpts', opts: { ...DEFAULT_OPTS, gamesToWin: 1 } });
+    expect(effects.at(-1)).toEqual({ type: 'writeOpts', opts: DEFAULT_OPTS });
   });
 
   test('a join answers with the lobby frame carrying the room; host/deal needs a guest, then deals and sends the guest`s view; the guest`s plays are applied and broadcast, a refusal is a toast frame', () => {
@@ -651,7 +739,7 @@ describe('hosting and joining (two seats)', () => {
       [WAITING_FOR_GUEST_MSG, null],
     ]);
     const joined = run(room, { type: 'host/frame', frame: { t: 'join', name: 'Jeff' } });
-    expect(sends(joined.effects)).toEqual([lobby('Ann', { ...DEFAULT_OPTS, gamesToWin: 1 })]);
+    expect(sends(joined.effects)).toEqual([lobby('Ann', DEFAULT_OPTS)]);
     const dealt = run(joined.app, { type: 'host/deal' });
     const g = game(dealt.app);
     expect(g.players.map((p) => p.name)).toEqual(['Ann', 'Jeff']);
@@ -683,7 +771,7 @@ describe('hosting and joining (two seats)', () => {
     }
   });
 
-  test('a hosted game against a fake guest: whoever must act acts, one state frame per applied action, the beat and the cues on the host, to the end of a match', () => {
+  test('a hosted game against a fake guest: whoever must act acts, one state frame per applied action, the beat and the cues on the host, to the end of the game; Play again deals afresh on the wire', () => {
     const dealt = run(
       opened().app,
       { type: 'host/frame', frame: { t: 'join', name: 'Jeff' } },
@@ -692,7 +780,7 @@ describe('hosting and joining (two seats)', () => {
     const step1 = (app: App): App => {
       if (app.table.settle !== null) return run(app, { type: 'settle/elapsed' }).app;
       const g = game(app);
-      if (g.phase === 'over') return run(app, { type: 'next/click' }).app;
+      if (g.phase === 'over') return run(app, { type: 'replay/click' }).app;
       const seat = actorOf(g) ?? 0;
       const card = g.hands[seat]?.[0]?.id ?? '';
       return seat === 0
@@ -704,15 +792,18 @@ describe('hosting and joining (two seats)', () => {
       dealt,
     );
     expect(view(end).matchOver).toBe(true);
-    expect(end.shell.screen).toBe('endgameScreen');
+    expect(end.shell.screen).toBe('tableScreen');
+    expect(resultOpen(end)).toBe(true);
     expect(view(end).events.filter((e) => e.kind === 'trick')).toHaveLength(20);
-    // The guest's Next is nothing after the match; the host's Rematch deals afresh.
-    const again = run(end, { type: 'next/click' });
+    // The host's Play again deals afresh, the deal passed to the guest's seat, one state frame out.
+    const again = run(end, { type: 'replay/click' });
     expect(view(again.app).gameNo).toBe(1);
+    expect(view(again.app).dealer).toBe((view(end).dealer + 1) % 2);
+    expect(view(again.app).players).toEqual(view(end).players);
     expect(sends(again.effects)).toHaveLength(1);
   });
 
-  test('joining: the host`s lobby names the room; a state frame is the view with the beat; the guest`s tap is an action frame; its Next is refused until the host deals; the host gone after the match closes the table', () => {
+  test('joining: the host`s lobby names the room; a state frame is the view with the beat; the guest`s tap is an action frame; its Play again is refused (the host deals); the host gone after the game closes the table', () => {
     const joining = run(
       initialApp,
       { type: 'home/init', home },
@@ -789,8 +880,8 @@ describe('hosting and joining (two seats)', () => {
     expect(
       cues(run(laid.app, { type: 'guest/frame', frame: stateFrame(viewFor(r1.value, 1)) }).effects),
     ).toEqual([]);
-    // Next while the game is on is nothing; once over, the guest is told the host deals.
-    expect(run(laid.app, { type: 'next/click' }).app).toBe(laid.app);
+    // Play again while the game is on is nothing; once over, the guest is told the host deals.
+    expect(run(laid.app, { type: 'replay/click' }).app).toBe(laid.app);
     const overGame = Array.from({ length: STEP_CAP }).reduce<State>((s) => {
       if (s.phase === 'over') return s;
       const seat = actorOf(s) ?? 0;
@@ -808,18 +899,21 @@ describe('hosting and joining (two seats)', () => {
       frame: stateFrame(viewFor(overGame, 1)),
     }).app;
     expect(view(done).matchOver).toBe(true);
-    // A frame that skipped the tricks paints cold: no beat.
+    // A frame that skipped the tricks paints cold: no beat; the result sheet over the table.
     expect(done.table.settle).toBeNull();
-    expect(done.shell.screen).toBe('endgameScreen');
-    expect(run(done, { type: 'next/click' }).app).toBe(done);
+    expect(done.shell.screen).toBe('tableScreen');
+    expect(resultOpen(done)).toBe(true);
+    expect(toasts(run(done, { type: 'replay/click' }).effects)).toEqual([
+      [waitingToDealMsg('Ann'), null],
+    ]);
     const midGame = { ...viewFor(overGame, 1), phase: 'over' as const, matchOver: false };
-    const waiting = run(withView(laid.app, midGame), { type: 'next/click' });
+    const waiting = run(withView(laid.app, midGame), { type: 'replay/click' });
     expect(toasts(waiting.effects)).toEqual([[waitingToDealMsg('Ann'), null]]);
-    // The host gone after the match: the result stays, the net closes, the save goes.
+    // The host gone after the game: the result stays, the net closes, the save goes.
     const gone = run(done, { type: 'guest/lost' });
     expect(kinds(gone.effects)).toEqual(['scrollTop', 'closeNet', 'clearSave', 'toast']);
     expect(toasts(gone.effects)).toEqual([[hostLeftMsg('Ann'), GONE_TOAST_MS]]);
-    expect(gone.app.shell.screen).toBe('endgameScreen');
+    expect(gone.app.shell.screen).toBe('tableScreen');
     // Not connected: a tap is refused.
     expect(toasts(run(joining, { type: 'act', action: { type: 'next' } }).effects)).toEqual([
       [NOT_CONNECTED_MSG, null],
@@ -831,8 +925,8 @@ describe('hosting and joining (two seats)', () => {
 const withView = (app: App, v: View): App => ({ ...app, shell: { ...app.shell, view: v } });
 
 describe('resume, storage and what the sessions read back', () => {
-  test('resumeFor offers each save role, not a finished match; the labels name the players (vs at two, a list at more) or the room', () => {
-    const two = game(local({ localMatch: '1' }));
+  test('resumeFor offers each save role, not a decided game; the labels name the players (vs at two, a list at more) or the room', () => {
+    const two = game(local());
     const three = game(local({ localPlayers: '3', p3: 'Cara' }));
     expect(resumeFor(null)).toBeNull();
     expect(resumeFor({ role: 'local', game: two })).toEqual({ kind: 'local', game: two });
@@ -894,7 +988,7 @@ describe('resume, storage and what the sessions read back', () => {
       }),
       // A room still waiting for its first guest is offered too (docs/design/lobby-resume.md D3).
     ).toMatchObject({ kind: 'host', game: null, at: null });
-    const over = game(playUntil(local({ localMatch: '1' }), (app) => view(app).matchOver));
+    const over = game(playUntil(local(), (app) => view(app).matchOver));
     expect(resumeFor({ role: 'local', game: over })).toBeNull();
     // A three-seat pass-and-play save resumes with its curtain for the actor.
     const resumed = run(
@@ -916,13 +1010,12 @@ describe('resume, storage and what the sessions read back', () => {
   test('saveFor: one shape per role with the six options on the host save; readHome the defaults on an empty store; the contexts mirror the shell', () => {
     const l = local();
     expect(saveFor(l)).toEqual({ role: 'local', game: game(l) });
-    const h = run(initialApp, { type: 'host/click', name: 'Ann', players: '2', match: '3' }).app;
+    const h = run(initialApp, { type: 'host/click', name: 'Ann', players: '2' }).app;
     expect(saveFor(h)).toEqual({
       role: 'host',
       code: h.shell.code,
       myName: 'Ann',
       ...DEFAULT_OPTS,
-      gamesToWin: 3,
       game: null,
       oppName: null,
       // The waiting room's stamp (docs/design/lobby-resume.md D1): the clock at `host/click`.
@@ -934,7 +1027,6 @@ describe('resume, storage and what the sessions read back', () => {
       code: h.shell.code,
       myName: 'Ann',
       ...DEFAULT_OPTS,
-      gamesToWin: 3,
       hasGame: false,
       handoff: false,
       oppName: null,
@@ -985,8 +1077,8 @@ describe('runEffect', () => {
       { type: 'writeOpts', opts: { ...DEFAULT_OPTS, seatCount: 4, partnerPeek: true } },
       deps,
     );
-    expect(s.map.get(STORAGE_KEYS.players)).toBe('4');
-    expect(s.map.get(STORAGE_KEYS.partnerPeek)).toBe('on');
+    // The seat count alone: the house rules have no key any more.
+    expect([...s.map.entries()]).toEqual([[STORAGE_KEYS.players, '4']]);
     runEffect(l, { type: 'rememberPName', seat: 2, name: 'Cara' }, deps);
     runEffect(l, { type: 'rememberPName', seat: 3, name: 'Dan' }, deps);
     expect(s.map.get(STORAGE_KEYS.p3Name)).toBe('Cara');
@@ -1013,7 +1105,7 @@ describe('the pure twins', () => {
   });
 
   test('trickResolvedBetween, playedBetween, continuedEvents and cueKey read the change between two views of one game', () => {
-    const start = revealed(local({ localMatch: '1' }));
+    const start = revealed(local());
     const v0 = view(start);
     const first = playFirst(start).app;
     const v1 = viewFor(game(first), v0.me.idx);
@@ -1055,5 +1147,177 @@ describe('the pure twins', () => {
     expect(cuesBetween(viewFor(game(start), 1), viewFor(game(first), 1), 'host')).toEqual(
       v1.trick[0]?.seat === 1 ? ['move.play'] : ['move.opp', 'yourTurn'],
     );
+  });
+});
+
+describe('card names: the language pack, the tip and the card view (docs/design/language-packs.md §5)', () => {
+  const first = (app: App): string => {
+    const id = view(app).legal[0];
+    if (id === undefined) throw new Error('nothing legal');
+    return id;
+  };
+
+  test('lang/set takes a language pack and remembers it, refuses a stranger; home/init reads it; a left table keeps it', () => {
+    const en = run(initialApp, { type: 'lang/set', name: 'en' });
+    expect(en.app.table.lang).toBe('en');
+    expect(en.effects).toEqual([{ type: 'writeLang', name: 'en' }]);
+    expect(run(en.app, { type: 'lang/set', name: 'fr' }).app).toBe(en.app);
+    const read = run(initialApp, { type: 'home/init', home: { ...home, lang: 'en-plates' } }).app;
+    expect(read.table.lang).toBe('en-plates');
+    const table = run(
+      local({}, { ...home, lang: 'en' }),
+      { type: 'leave/confirmed' },
+      { type: 'leave/finish' },
+    );
+    expect(table.app.table.lang).toBe('en');
+    expect(TIP_HOVER_MS).toBe(400);
+    expect(TIP_PRESS_MS).toBe(450);
+  });
+
+  test('tip/arm arms the tip timer for a hand card (a hover 400ms, a press 450ms); tip/show shows it; tip/hide drops it and the timer', () => {
+    const start = revealed(local());
+    const card = first(start);
+    const hover = run(start, { type: 'tip/arm', card, press: false });
+    expect(hover.app.table.tip).toEqual({ card, shown: false });
+    expect(hover.effects).toEqual([
+      { type: 'startTimer', id: 'tip', ms: TIP_HOVER_MS, then: { type: 'tip/show' } },
+    ]);
+    const press = run(start, { type: 'tip/arm', card, press: true });
+    expect(press.effects).toEqual([
+      { type: 'startTimer', id: 'tip', ms: TIP_PRESS_MS, then: { type: 'tip/show' } },
+    ]);
+    const shown = run(hover.app, { type: 'tip/show' });
+    expect(shown.app.table.tip).toEqual({ card, shown: true });
+    expect(shown.effects).toEqual([]);
+    // Over the same card while shown: nothing restarts.
+    expect(run(shown.app, { type: 'tip/arm', card, press: false }).app).toBe(shown.app);
+    const hidden = run(shown.app, { type: 'tip/hide' });
+    expect(hidden.app.table.tip).toBeNull();
+    expect(hidden.app.table.swallowTap).toBeNull();
+    expect(hidden.effects).toEqual([{ type: 'cancelTimer', id: 'tip' }]);
+    // Nothing armed: nothing to hide or show.
+    expect(run(hidden.app, { type: 'tip/hide' }).app).toBe(hidden.app);
+    expect(run(hidden.app, { type: 'tip/show' }).app).toBe(hidden.app);
+    // Another card takes over the tip.
+    const other = view(start).me.hand.find((c) => c.id !== card)?.id ?? '';
+    expect(run(shown.app, { type: 'tip/arm', card: other, press: false }).app.table.tip).toEqual({
+      card: other,
+      shown: false,
+    });
+  });
+
+  test('a touch lift after the tip showed swallows the click that follows: the card is not lifted once; an early lift swallows nothing', () => {
+    const start = revealed(local());
+    const card = first(start);
+    const long = run(
+      start,
+      { type: 'tip/arm', card, press: true },
+      { type: 'tip/show' },
+      { type: 'tip/hide', swallow: true },
+    ).app;
+    expect(long.table.tip).toBeNull();
+    expect(long.table.swallowTap).toBe(card);
+    const tapped = run(long, { type: 'card/tap', cardId: card });
+    expect(tapped.app.table.selected).toBeNull();
+    expect(tapped.app.table.swallowTap).toBeNull();
+    expect(tapped.effects).toEqual([]);
+    expect(run(tapped.app, { type: 'card/tap', cardId: card }).app.table.selected).toBe(card);
+    // A tap on another card is not swallowed; the marker stays for its card.
+    const other = view(start).me.hand.find((c) => c.id !== card)?.id ?? '';
+    expect(run(long, { type: 'card/tap', cardId: other }).app.table.swallowTap).toBe(card);
+    // Lifted before the timer fired: no swallow.
+    const early = run(
+      start,
+      { type: 'tip/arm', card, press: true },
+      { type: 'tip/hide', swallow: true },
+    ).app;
+    expect(early.table.swallowTap).toBeNull();
+    // A new press clears a stale marker.
+    expect(run(long, { type: 'tip/arm', card, press: true }).app.table.swallowTap).toBeNull();
+  });
+
+  test('the tip never arms under the curtain or for a card not in my hand; a drag drops it', () => {
+    const down = local();
+    expect(down.table.curtain).not.toBeNull();
+    const held = view(down).me.hand[0]?.id ?? '';
+    expect(run(down, { type: 'tip/arm', card: held, press: false }).app).toBe(down);
+    const start = revealed(down);
+    expect(run(start, { type: 'tip/arm', card: 'ZZ', press: false }).app).toBe(start);
+    const theirs = view(start).others[0]?.hand?.[0]?.id ?? 'RB';
+    expect(view(start).me.hand.some((c) => c.id === theirs)).toBe(false);
+    expect(run(start, { type: 'tip/arm', card: theirs, press: false }).app).toBe(start);
+    const card = first(start);
+    const dragged = run(
+      start,
+      { type: 'tip/arm', card, press: true },
+      { type: 'tip/show' },
+      { type: 'card/dragStart', cardId: card },
+    ).app;
+    expect(dragged.table.tip).toBeNull();
+    expect(dragged.table.drag).toEqual({ card, over: false });
+  });
+
+  test('the card view opens on a card of the deck and closes; Escape closes it before anything else; the trump card tapped opens it while it lies on the table', () => {
+    const start = revealed(local());
+    const open = run(start, { type: 'cardView/open', card: 'RD' });
+    expect(open.app.table.cardView).toBe('RD');
+    expect(open.effects).toEqual([]);
+    expect(run(start, { type: 'cardView/open', card: 'ZZ' }).app).toBe(start);
+    expect(run(open.app, { type: 'cardView/close' }).app.table.cardView).toBeNull();
+    const lifted = run(open.app, { type: 'card/tap', cardId: first(start) }).app;
+    const escaped = run(lifted, { type: 'escape' }).app;
+    expect(escaped.table.cardView).toBeNull();
+    expect(escaped.table.selected).toBe(first(start));
+    // The trump card: a look while it lies under the stock (the exchange is not offered here).
+    expect(view(start).canExchange).toBe(false);
+    expect(run(start, { type: 'exchange/click' }).app.table.cardView).toBe(
+      view(start).trumpCard.id,
+    );
+    // Drawn: nothing to look at.
+    const g = game(start);
+    const rest = deckFor(g.options).filter((card) => card.id !== 'AC' && card.id !== '3C');
+    const drawn: State = {
+      ...withPosition(g, [[c('AC')], [c('3C')]], [], c('RB'), 0),
+      piles: [rest, []],
+    };
+    const last = run(start, {
+      type: 'position/load',
+      state: JSON.parse(JSON.stringify(drawn)),
+    }).app;
+    expect(view(last).trumpOnTable).toBe(false);
+    expect(run(last, { type: 'exchange/click' }).app).toBe(last);
+    // A left table drops the view.
+    expect(
+      run(open.app, { type: 'leave/confirmed' }, { type: 'leave/finish' }).app.table.cardView,
+    ).toBeNull();
+  });
+});
+
+// The deck sheet (ui/deck.ts): last, since its deal would shift the seeded flows above.
+describe('the deck sheet', () => {
+  test('the deck sheet opens with a tap over a view, its toggle is remembered across openings, Escape and Close shut it', () => {
+    // No view, no sheet (the button is on the table, but the hook can ask).
+    expect(run(initialApp, { type: 'deck/open' }).app).toBe(initialApp);
+    const start = revealed(local());
+    expect(start.table).toMatchObject({ deckOpen: false, deckWithHand: false });
+    const open = run(start, { type: 'deck/open' });
+    expect(open.app.table.deckOpen).toBe(true);
+    expect(cues(open.effects)).toEqual(['tap']);
+    const toggled = run(open.app, { type: 'deck/toggleHand' }).app;
+    expect(toggled.table.deckWithHand).toBe(true);
+    expect(run(toggled, { type: 'deck/toggleHand' }).app.table.deckWithHand).toBe(false);
+    const closed = run(toggled, { type: 'deck/close' }).app;
+    expect(closed.table).toMatchObject({ deckOpen: false, deckWithHand: true });
+    expect(run(toggled, { type: 'escape' }).app.table).toMatchObject({
+      deckOpen: false,
+      deckWithHand: true,
+    });
+    // A lift survives the sheet; the reducer's Escape (the hook's: the binder closes an open sheet
+    // itself) drops the lift first, as for every sheet, and takes the sheet on the next press.
+    const lifted = run(toggled, { type: 'card/tap', cardId: view(toggled).legal[0] ?? '' }).app;
+    expect(lifted.table.selected).not.toBeNull();
+    const once = run(lifted, { type: 'escape' }).app;
+    expect(once.table).toMatchObject({ deckOpen: true, selected: null });
+    expect(run(once, { type: 'escape' }).app.table.deckOpen).toBe(false);
   });
 });

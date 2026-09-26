@@ -6,13 +6,14 @@
 // sessions (src/net) through their deps, and to the paint (src/ui/render.ts). This file passes the
 // page's objects and what is briscola's: its reducer, painters, sessions, cue table, sound keys, the
 // Italian suit sprite the glyph faces `<use>` (inlined once here, so it cannot drift from suits.ts),
-// the card-pack guard, the rules and About copy, the stories page's early return, and the members
-// of `window.__briscola` (the documented test hook, D19) beyond the shared ones: `act`, `view`,
-// `events`, `setup`, `cardPack`, `cardPackName`.
+// the card-pack and language-pack guards, the rules and About copy, the stories page's early
+// return, and the members of `window.__briscola` (the documented test hook, D19) beyond the shared
+// ones: `act`, `view`, `events`, `setup`, `cardPack`, `cardPackName`, `lang`, `langName`.
 import { bootShell } from '../../shared/edge/boot.ts';
 import { realClock } from '../../shared/edge/clock.ts';
 import { browserStore, type Store } from '../../shared/edge/storage.ts';
 import { badCardPackMsg, isCardPackFor } from '../../shared/lib/cards/packs.ts';
+import { badLanguageMsg, isLanguagePack } from '../../shared/lib/lang/packs.ts';
 import { SUIT_SPRITE_SVG } from '../../shared/ui/cardFace.ts';
 import { legalActions, type Action, type GameEvent, type View } from './src/engine/index.ts';
 import { createFx } from './src/fx.ts';
@@ -43,6 +44,15 @@ const dropBadCardPack = (store: Store): void => {
   if (stored.ok && !isCardPackFor(DECK_KIND, stored.value)) {
     console.error(badCardPackMsg(STORAGE_KEYS.cardPack, DECK_KIND, stored.value));
     store.remove(STORAGE_KEYS.cardPack);
+  }
+};
+
+/** The language pack (docs/design/language-packs.md §3): the same guard over `briscola_lang`, so Italian stands. */
+const dropBadLang = (store: Store): void => {
+  const stored = store.readText(STORAGE_KEYS.lang);
+  if (stored.ok && !isLanguagePack(stored.value)) {
+    console.error(badLanguageMsg(STORAGE_KEYS.lang, stored.value));
+    store.remove(STORAGE_KEYS.lang);
   }
 };
 
@@ -78,7 +88,10 @@ const boot = (): void => {
     legal: legalActions,
     deps: {},
     hooks: {
-      home: dropBadCardPack,
+      home: (store) => {
+        dropBadCardPack(store);
+        dropBadLang(store);
+      },
       // The four Italian suit symbols the glyph faces and the trump badge `<use>`, once, before any
       // paint; then the rules into both slots and the About copy (ui/rules.ts, ui/about.ts).
       render: () => {
@@ -89,7 +102,7 @@ const boot = (): void => {
       // `act` through the reducer; `view` my view; `events` its event stream (the sounds' and the
       // history's one source); `setup` seats a position for e2e and stories (pass-and-play only: the
       // shell's `position/load` over the engine's decoder); `cardPack` shows and remembers a pack of
-      // the Italian deck.
+      // the Italian deck; `lang` names the cards in a language pack and remembers it.
       hook: ({ app, dispatch }) => ({
         act: (action: Action) => {
           dispatch({ type: 'act', action });
@@ -107,6 +120,14 @@ const boot = (): void => {
           dispatch({ type: 'cardPack/set', pack: name });
         },
         cardPackName: (): string => app().table.cardPack,
+        lang: (name: string): void => {
+          if (!isLanguagePack(name)) {
+            console.error(badLanguageMsg(STORAGE_KEYS.lang, name));
+            return;
+          }
+          dispatch({ type: 'lang/set', name });
+        },
+        langName: (): string => app().table.lang,
       }),
     },
   });

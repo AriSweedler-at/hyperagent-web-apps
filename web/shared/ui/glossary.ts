@@ -46,13 +46,16 @@ const wordPattern = (term: string): RegExp => new RegExp(`\\b(${escapeRegExp(ter
  */
 const segments = (html: string): ReadonlyArray<string> => html.split(/(<[^>]*>)/);
 
-/** For each segment, whether it sits inside an `<a>` already open (its own text is never re-linked). */
-const insideAnchor = (parts: ReadonlyArray<string>): ReadonlyArray<boolean> =>
+/**
+ * For each segment, whether it sits inside an `<a>` already open (its own text is never re-linked)
+ * or inside a `<table>` (a rule's table of values is data, never prose: its cells are never linked).
+ */
+const insideProtected = (parts: ReadonlyArray<string>): ReadonlyArray<boolean> =>
   parts
     .reduce<ReadonlyArray<Readonly<{ depth: number; inside: boolean }>>>((acc, part) => {
       const depth = acc.at(-1)?.depth ?? 0;
-      const opens = /^<a[\s>]/i.test(part);
-      const closes = /^<\/a\s*>/i.test(part);
+      const opens = /^<(a|table)[\s>]/i.test(part);
+      const closes = /^<\/(a|table)\s*>/i.test(part);
       return [...acc, { depth: depth + (opens ? 1 : 0) - (closes ? 1 : 0), inside: depth > 0 }];
     }, [])
     .map((s) => s.inside);
@@ -61,12 +64,12 @@ const linkTag = (rule: string, word: string): string =>
   `<a class="${JARGON_CLASS}" href="#${ruleAnchor(rule)}" data-rule="${rule}">${word}</a>`;
 
 /**
- * `html` with the first occurrence of `term` (outside tags and existing links) wrapped as a link to
- * `rule`; `html` unchanged when the term is absent.
+ * `html` with the first occurrence of `term` (outside tags, existing links and tables) wrapped as a
+ * link to `rule`; `html` unchanged when the term is absent.
  */
 const linkOne = (html: string, { term, rule }: Term): string => {
   const parts = segments(html);
-  const inside = insideAnchor(parts);
+  const inside = insideProtected(parts);
   const pattern = wordPattern(term);
   const at = parts.findIndex(
     (part, i) => i % 2 === 0 && !(inside[i] ?? false) && pattern.test(part),
@@ -102,7 +105,7 @@ const insideLinkedTerm = (linked: ReadonlyArray<Term>, short: Term): boolean =>
 
 /**
  * `html` with its jargon linked: every term on its first occurrence (longest terms first), whole
- * words, any case, never inside a tag or an existing `<a>`. A word that is part of a longer term
+ * words, any case, never inside a tag, an existing `<a>` or a `<table>`. A word that is part of a longer term
  * already linked for the same rule is left alone, so "adds the doubling cube" after a linked
  * "doubling cube" does not grow a link on "cube" alone. `except` is the rule this text sits in, so
  * a rule never links to itself.

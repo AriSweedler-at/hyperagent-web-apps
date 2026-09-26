@@ -16,8 +16,12 @@
 // Briscola's residue on the shell: pass-and-play seats two, three or four (D1, D17), so `reduce`
 // takes `local/click` itself (the shell's case seats a pair) and creates the N-seat game before
 // handing it to the shared `startLocal`, drops the handoff at three and four seats (offered at two
-// only), and persists the room's options after a start; the guest whose match is over when the
-// host drops (`hostLeft`, backgammon's) is taken before the shell's `guest/lost` too.
+// only), and persists the room's options after a start; the guest whose game is over when the
+// host drops (`hostLeft`, backgammon's) is taken before the shell's `guest/lost` too. One game per
+// sitting (the owner, 2026-09-25): every game ends on the result sheet over the table, whose Play
+// again (`replay/click`) deals anew for the same players with the deal passed to the next seat; the
+// engine's match (a save may still hold one) runs on underneath with `gamesToWin` fixed at 1, so
+// the shell's fifth screen (`endgameScreen`) is never shown.
 //
 // Turn authority is gin's: the host applies `applyAction` for both seats and broadcasts
 // `viewFor(game, 1)` as a `state` frame, a refusal to the guest is a `toast` frame; the guest sends
@@ -80,7 +84,17 @@ import {
 import { runShellEffect, type ShellEffectDeps } from '../../../../shared/ui/shellEffects.ts';
 import { eventEffects } from '../../../../shared/ui/eventEffects.ts';
 import { isCardPackFor } from '../../../../shared/lib/cards/packs.ts';
-import { HAND_SIZE, actorOf, applyAction, createGame, nameOf, viewFor } from '../engine/index.ts';
+import { isLanguagePack, type LanguagePackName } from '../../../../shared/lib/lang/packs.ts';
+import {
+  HAND_SIZE,
+  actorOf,
+  applyAction,
+  cardById,
+  createGame,
+  nameOf,
+  replayGame,
+  viewFor,
+} from '../engine/index.ts';
 import type {
   Action,
   Cards,
@@ -99,10 +113,12 @@ import { BRISCOLA_SHELL, parseOpts } from '../shellConfig.ts';
 import {
   DECK_KIND,
   DEFAULT_CARD_PACK,
+  DEFAULT_LANG,
   DEFAULT_PLAY_MODE,
   EXTRA_NAME_PREFS,
   HOME_TABS,
   writeCardPack,
+  writeLang,
   writeOpts,
   type CardPack,
   type HomeTab,
@@ -134,17 +150,22 @@ export {
   DEFAULT_OPTS,
   LEAVE_LOCAL_MSG,
   LEAVE_ONLINE_MSG,
+  ONE_GAME,
+  TABLE_TERMS,
   hostRoomMsg,
-  matchLabel,
-  parseFlag,
-  parseGamesToWin,
   parseOpts,
   parseSeatCount,
-  parseSuit,
   pickOpts,
 } from '../shellConfig.ts';
 // ui/home.ts paints the tabs and modes from the lists storage.ts decodes; ui/ may not import storage.ts.
-export { DEFAULT_PLAY_MODE, HOME_TABS, type CardPack, type HomeTab, type PlayMode };
+export {
+  DEFAULT_PLAY_MODE,
+  HOME_TABS,
+  type CardPack,
+  type HomeTab,
+  type LanguagePackName,
+  type PlayMode,
+};
 export { INITIAL_CUES, type CueState };
 
 // ---- the state ---------------------------------------------------------------------------------
@@ -164,23 +185,13 @@ export type Resume = SharedResume<Briscola>;
 
 /**
  * The raw option values `host/click` and `local/click` carry off the inputs (design §5.8
- * `startOptions`): the Online selects and switches, their pass-and-play twins, and the third and
- * fourth pass-and-play names (the shared binder reads the first two). A switch reads `on`/`off`; a
- * key the click did not carry keeps the shell's current value.
+ * `startOptions`): the Online seat count select, its pass-and-play twin, and the third and fourth
+ * pass-and-play names (the shared binder reads the first two). A key the click did not carry keeps
+ * the shell's current value; the rest of the room's terms are fixed (`TABLE_TERMS`).
  */
 export type Raw = Readonly<{
   players?: string;
-  match?: string;
-  removedTwo?: string;
-  exchange?: string;
-  scoperta?: string;
-  partnerPeek?: string;
   localPlayers?: string;
-  localMatch?: string;
-  localRemovedTwo?: string;
-  localExchange?: string;
-  localScoperta?: string;
-  localPartnerPeek?: string;
   p3?: string;
   p4?: string;
 }>;
@@ -188,10 +199,11 @@ export type Raw = Readonly<{
 /** The seats beyond the shell's two: the third and fourth players (D1). */
 export type ExtraSeat = 2 | 3;
 
-/** What `initHome` reads beyond the shell's keys: the room options, the card pack, the third and fourth names. */
+/** What `initHome` reads beyond the shell's keys: the room options, the card pack, the language pack, the third and fourth names. */
 export type Home = Readonly<{
   opts: GameOptions;
   cardPack: CardPack;
+  lang: LanguagePackName;
   p3Name: string | null;
   p4Name: string | null;
 }>;
@@ -213,7 +225,7 @@ export type Briscola = Readonly<{
   Tab: HomeTab;
   Mode: PlayMode;
   Screen: ScreenId;
-  Timer: 'settle';
+  Timer: 'settle' | 'tip';
   Cue: Cue;
   Cues: CueState;
   Resume: never;
@@ -231,6 +243,11 @@ export type SettleStage = 'hold' | 'fly' | 'draw';
 export type Settle = Readonly<{ stage: SettleStage; trick: TrickRecord }>;
 /** A card dragged from the hand (ui/table/dragger.ts): its id and whether it is over the trick. */
 export type Drag = Readonly<{ card: string; over: boolean }>;
+/**
+ * The card-name tip over a hand card (docs/design/language-packs.md §5): armed by a hover or a
+ * touch press (`shown` false while the `tip` timer runs), shown when the timer fires.
+ */
+export type Tip = Readonly<{ card: string; shown: boolean }>;
 
 /** The table's interaction memory (§5.4 `Table`). Session only: never saved, never on the wire. */
 export type Table = Readonly<{
@@ -244,12 +261,23 @@ export type Table = Readonly<{
   resultDismissed: boolean;
   /** `#historyOverlay` shown. */
   historyOpen: boolean;
+  /** `#deckOverlay` (ui/deck.ts) shown, and whether it greys the cards in my hand too. Session only. */
+  deckOpen: boolean;
+  deckWithHand: boolean;
   /** Pass-and-play: the seat the phone is handed to, or null when the curtain is down. */
   curtain: Seat | null;
   /** The view the previous paint showed (main.ts paints after every intent): the flights' `prev`. */
   lastPainted: View | null;
   /** `briscola_cardPack`: the pack the faces and backs are drawn from (`body[data-card-pack]`, `--aspect`). */
   cardPack: CardPack;
+  /** `briscola_lang`: the language pack the cards are named in (the captions, the tip, the aria labels). */
+  lang: LanguagePackName;
+  /** The card-name tip over a hand card, armed or shown; null when none. */
+  tip: Tip | null;
+  /** A touch long-press showed the tip: the click its release fires must not lift this card (cleared by that tap). */
+  swallowTap: string | null;
+  /** `#cardViewOverlay`: the card shown large with its name (the briscola tapped), or none. */
+  cardView: string | null;
   /**
    * The third and fourth pass-and-play names as last read from their keys or typed into their
    * inputs; null when neither (the input shows the seat's default, shellConfig.ts LOCAL_NAMES,
@@ -272,9 +300,15 @@ export const initialTable: Table = {
   drag: null,
   resultDismissed: false,
   historyOpen: false,
+  deckOpen: false,
+  deckWithHand: false,
   curtain: null,
   lastPainted: null,
   cardPack: DEFAULT_CARD_PACK,
+  lang: DEFAULT_LANG,
+  tip: null,
+  swallowTap: null,
+  cardView: null,
   extraNames: { 2: null, 3: null },
 };
 // ---- the strings and beats the app (not the sessions) writes ---------------------------------
@@ -284,11 +318,14 @@ export const HOLD_MS = 900;
 export const FLY_MS = 320;
 export const DRAW_MS = 260;
 export const DRAW_GAP_MS = 160;
+/** The card-name tip (docs/design/language-packs.md §5): a hover shows it after this long, a touch press after a little longer. */
+export const TIP_HOVER_MS = 400;
+export const TIP_PRESS_MS = 450;
 /** `position/load` (`window.__briscola.setup`) outside pass-and-play, and a position the decoder refuses: the shell's strings. */
 export { SANDBOX_LOCAL_ONLY_MSG, badPositionMsg };
-/** `guest/lost` once the match is over: the host closed the table, there is nothing to rejoin. */
+/** `guest/lost` once the game is over: the host closed the table, there is nothing to rejoin. */
 export const hostLeftMsg = (hostName: string): string => `${hostName} left the table.`;
-/** A guest's "Next game": the host deals (D20). */
+/** A guest's Play again: the host deals (D20). */
 export const waitingToDealMsg = (hostName: string): string => `Waiting for ${hostName} to deal`;
 
 // ---- intents -----------------------------------------------------------------------------------
@@ -313,25 +350,40 @@ export type TableIntent =
   | Readonly<{ type: 'card/dragEnd' }>
   /** `#briscola.tappable` (D24): the 7 (or the 2) of trumps for the trump card. */
   | Readonly<{ type: 'exchange/click' }>
-  /** `#rsNextBtn` "Next game", and the end screen's "Rematch" once the match is over. */
-  | Readonly<{ type: 'next/click' }>
+  /** `#rsReplayBtn` "Play again": a new deal for the same players and terms, the deal passed on. */
+  | Readonly<{ type: 'replay/click' }>
   /** `#rsPeekBtn` "Look at the table" / `#resultChipBtn` "Result". */
   | Readonly<{ type: 'result/peek' }>
   | Readonly<{ type: 'result/open' }>
   | Readonly<{ type: 'history/open' }>
   | Readonly<{ type: 'history/close' }>
+  /** `#deckBtn` (the deck sheet, ui/deck.ts), `#closeDeckBtn` and `#deckIncludeHand`. */
+  | Readonly<{ type: 'deck/open' }>
+  | Readonly<{ type: 'deck/close' }>
+  | Readonly<{ type: 'deck/toggleHand' }>
   | Readonly<{ type: 'rules/open' }>
   | Readonly<{ type: 'rules/close' }>
   /** Escape (§5.5): cancels a drag, drops a lift, closes a sheet, in that order of what is up. */
   | Readonly<{ type: 'escape' }>
   /** The `settle` timer fired: the beat moves to its next stage or ends. */
   | Readonly<{ type: 'settle/elapsed' }>
-  /** A select or switch changed on the home screen: the raw values, parsed against the current room and remembered. */
+  /** The seat count changed on the home screen: the raw values, parsed against the current room and remembered. */
   | Readonly<{ type: 'opts/set'; raw: Raw }>
   /** `#p3NameInput` / `#p4NameInput` typed: remembered under its key. */
   | Readonly<{ type: 'pname/typed'; seat: ExtraSeat; value: string }>
   /** The hook's `cardPack(name)`: a pack that draws the Italian deck is shown from now on and remembered; anything else is ignored. */
-  | Readonly<{ type: 'cardPack/set'; pack: string }>;
+  | Readonly<{ type: 'cardPack/set'; pack: string }>
+  /** The hook's `lang(name)`: a language pack names the cards from now on and is remembered; anything else is ignored. */
+  | Readonly<{ type: 'lang/set'; name: string }>
+  /** A pointer over a hand card (a hover) or a touch pressing one: the tip's timer starts for that card. */
+  | Readonly<{ type: 'tip/arm'; card: string; press: boolean }>
+  /** The `tip` timer fired: the name shows. */
+  | Readonly<{ type: 'tip/show' }>
+  /** The pointer left, pressed, or lifted: the tip goes; `swallow` (a touch lift) keeps the click it fires from lifting the card. */
+  | Readonly<{ type: 'tip/hide'; swallow?: boolean }>
+  /** A face-up card tapped for a closer look (the briscola, D24 aside): `#cardViewOverlay` shows it large with its name. */
+  | Readonly<{ type: 'cardView/open'; card: string }>
+  | Readonly<{ type: 'cardView/close' }>;
 
 /** Every handler and every network event: the shell's intents and the table's. */
 export type Intent = SharedIntent<Briscola>;
@@ -341,11 +393,12 @@ export type ShellIntent = SharedShellIntent<Briscola>;
 
 export type TimerId = SharedTimerId<Briscola>;
 
-/** Briscola's own effects, handled by `runEffect` before the shared runner: the three preferences this page alone keeps. */
+/** Briscola's own effects, handled by `runEffect` before the shared runner: the four preferences this page alone keeps. */
 export type TableEffect =
   | Readonly<{ type: 'writeOpts'; opts: GameOptions }>
   | Readonly<{ type: 'rememberPName'; seat: ExtraSeat; name: string }>
-  | Readonly<{ type: 'writeCardPack'; pack: CardPack }>;
+  | Readonly<{ type: 'writeCardPack'; pack: CardPack }>
+  | Readonly<{ type: 'writeLang'; name: LanguagePackName }>;
 
 export type Effect = SharedEffect<Briscola>;
 
@@ -424,8 +477,8 @@ export const playedBetween = (prev: View, next: View): Played | null => {
  * The events of `prev` that `next` continues, for the shared `eventEffects` (web/shared/lib/
  * events.ts: an event is new when its id passes the last one seen, so a stream must run on): a
  * stream that carries `prev`'s last event at its index continues it (one match, its ids running on
- * across games), so `prev`'s events; a rematch opens a new stream after a finished match, so none
- * (its deal chimes); a stream `prev` never saw while no match ended (a hand-made position,
+ * across games), so `prev`'s events; a replay opens a new stream after a decided game, so none
+ * (its deal chimes); a stream `prev` never saw while no game was decided (a hand-made position,
  * `position/load`) is null: painted cold, nothing chimes.
  */
 export const continuedEvents = (prev: View, next: View): ReadonlyArray<GameEvent> | null => {
@@ -531,12 +584,12 @@ export const liveView = (app: App): View | null => {
 };
 
 /**
- * The state side of a paint: nothing without a view; else the screen is the table or, once the
- * match is over and settled, the end screen; the slots settle; a trick `prev` had not seen enters
- * the settle beat (`hold`, its timer armed) and the cues come from the change since `prev` (the
- * view this one replaces), once per position (`cues.key`), so a re-sent frame plays nothing. A view
- * with no `prev` (a resume, a reconnect, `setup`) paints cold: no beat, no sound, the memory primed.
- * The paint itself is main.ts's after every intent.
+ * The state side of a paint: nothing without a view; else the screen is the table (a game's end is
+ * the result sheet over it, never the shell's end screen); the slots settle; a trick `prev` had not
+ * seen enters the settle beat (`hold`, its timer armed) and the cues come from the change since
+ * `prev` (the view this one replaces), once per position (`cues.key`), so a re-sent frame plays
+ * nothing. A view with no `prev` (a resume, a reconnect, `setup`) paints cold: no beat, no sound,
+ * the memory primed. The paint itself is main.ts's after every intent.
  */
 const rendered = (app: App, prev: View | null): Step => {
   const view = app.shell.view;
@@ -550,10 +603,9 @@ const rendered = (app: App, prev: View | null): Step => {
   // A trick already settling is not restarted by a re-sent frame; a newer one takes its place.
   const starts = resolved !== null && running?.trick.no !== resolved.no;
   const settle: Settle | null = starts ? { stage: 'hold', trick: resolved } : running;
-  const screen: ScreenId = view.matchOver && settle === null ? 'endgameScreen' : 'tableScreen';
   return step(
     {
-      shell: { ...app.shell, cues: { key }, screen },
+      shell: { ...app.shell, cues: { key }, screen: 'tableScreen' },
       table: { ...settled(app.table, view), settle, lastPainted: prev },
     },
     ...cues.map(fx),
@@ -621,14 +673,9 @@ const act = (app: App, action: Action, ctx: Context): Step => {
 const commit = (app: App, cardId: string, ctx: Context): Step =>
   act(withTable(app, { selected: null, drag: null }), { type: 'play', cardId }, ctx);
 
-/** A new match with the same players and options ("Rematch"); the guest waits for the host's. */
-const rematch = (app: App, game: State, ctx: Context): Step => {
-  const fresh = createGame(
-    seatPlayers(game.options.seatCount, game.players),
-    game.options,
-    ctx.rng,
-    ctx.now,
-  );
+/** Play again after a decided game: a fresh deal for the same players and terms, the deal passed to the next seat (`replayGame`); the guest waits for the host's. */
+const replayDecided = (app: App, game: State, ctx: Context): Step => {
+  const fresh = replayGame(game, ctx.rng, ctx.now);
   const reset = withShell(app, { cues: INITIAL_CUES });
   switch (app.shell.role) {
     case 'local':
@@ -719,32 +766,39 @@ const revealer: ShellConfig<Briscola>['local']['revealer'] = (game) => ({
   effects: [],
 });
 
-/** What a game leaves behind when it is left, lost or handed off: the table's memory; the card pack and the names stay. */
+/** What a game leaves behind when it is left, lost or handed off: the table's memory; the card pack, the language and the names stay. */
 const tableCleared = (table: Table): Table => ({
   ...initialTable,
   cardPack: table.cardPack,
+  lang: table.lang,
   extraNames: table.extraNames,
 });
 
-/** Escape (§5.5): what is up goes, one thing per press: a drag, a lift, the history, the rules. */
+/** Escape (§5.5): what is up goes, one thing per press: the card view, a drag, a lift, the deck, the history, the rules. */
 const escape = (app: App): Step => {
   const t = app.table;
+  if (t.cardView !== null) return pure(withTable(app, { cardView: null }));
   if (t.drag !== null) return pure(withTable(app, { drag: null, selected: null }));
   if (t.selected !== null) return pure(withTable(app, { selected: null }));
+  if (t.deckOpen) return pure(withTable(app, { deckOpen: false }));
   if (t.historyOpen) return pure(withTable(app, { historyOpen: false }));
   if (app.shell.rulesOpen) return pure(withShell(app, { rulesOpen: false }));
   return pure(app);
 };
 
-/** `next/click`: the next game of the match from the host or the phone, the rematch once it is over; a guest waits for the host to deal (D20). */
-const nextClick = (app: App, ctx: Context): Step => {
+/**
+ * `replay/click` (Play again) from the host or the phone: after a draw the engine's next game of
+ * the same match (`next`: the deal rotates, the tally carries), after a decided game a fresh deal
+ * with the deal rotated too (`replayDecided`), so either way the next seat deals; a guest waits
+ * for the host to deal (D20). Nothing while a game is on.
+ */
+const replay = (app: App, ctx: Context): Step => {
   const over = app.shell.view;
   if (over?.phase !== 'over') return pure(app);
-  if (app.shell.role === 'guest')
-    return over.matchOver ? pure(app) : refuse(app, waitingToDealMsg(nameOf(over.players, 0)));
+  if (app.shell.role === 'guest') return refuse(app, waitingToDealMsg(nameOf(over.players, 0)));
   if (!over.matchOver) return act(app, { type: 'next' }, ctx);
   const game = app.shell.game;
-  return game === null ? pure(app) : rematch(app, game, ctx);
+  return game === null ? pure(app) : replayDecided(app, game, ctx);
 };
 
 // ---- the table's reducer ---------------------------------------------------------------------
@@ -761,6 +815,8 @@ const playSelected = (app: App, ctx: Context): Step => {
 const cardTap = (app: App, cardId: string, ctx: Context): Step => {
   // The click a drag's release fires reaches a card: a drag lifts nothing.
   if (app.table.drag !== null) return pure(app);
+  // The click a touch long-press's lift fires: the player was reading the card's name, not playing it.
+  if (app.table.swallowTap === cardId) return pure(withTable(app, { swallowTap: null }));
   const v = liveView(app);
   if (v?.legal.includes(cardId) !== true) return pure(app);
   if (app.table.selected === cardId) return commit(app, cardId, ctx);
@@ -782,7 +838,11 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
       return v?.legal.includes(intent.cardId) !== true
         ? pure(app)
         : pure(
-            withTable(app, { drag: { card: intent.cardId, over: false }, selected: intent.cardId }),
+            withTable(app, {
+              drag: { card: intent.cardId, over: false },
+              selected: intent.cardId,
+              tip: null,
+            }),
           );
     case 'card/dragOver':
       return t.drag === null || t.drag.over === intent.over
@@ -795,10 +855,16 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
         ? commit(dropped, t.drag.card, ctx)
         : pure(dropped);
     }
-    case 'exchange/click':
-      return v?.canExchange === true ? act(app, { type: 'exchange' }, ctx) : pure(app);
-    case 'next/click':
-      return nextClick(app, ctx);
+    case 'exchange/click': {
+      // The trump card tapped: the exchange while it is offered (D24); otherwise a closer look at it.
+      if (v?.canExchange === true) return act(app, { type: 'exchange' }, ctx);
+      const shown = app.shell.view;
+      return shown?.trumpOnTable !== true
+        ? pure(app)
+        : pure(withTable(app, { cardView: shown.trumpCard.id }));
+    }
+    case 'replay/click':
+      return replay(app, ctx);
     case 'result/peek':
       return pure(withTable(app, { resultDismissed: true }));
     case 'result/open':
@@ -807,6 +873,12 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
       return pure(withTable(app, { historyOpen: true }));
     case 'history/close':
       return pure(withTable(app, { historyOpen: false }));
+    case 'deck/open':
+      return app.shell.view === null ? pure(app) : step(withTable(app, { deckOpen: true }), tap);
+    case 'deck/close':
+      return pure(withTable(app, { deckOpen: false }));
+    case 'deck/toggleHand':
+      return pure(withTable(app, { deckWithHand: !t.deckWithHand }));
     case 'rules/open':
       return pure(withShell(app, { rulesOpen: true }));
     case 'rules/close':
@@ -831,6 +903,40 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
             pack: intent.pack,
           })
         : pure(app);
+    case 'lang/set':
+      return isLanguagePack(intent.name)
+        ? step(withTable(app, { lang: intent.name }), { type: 'writeLang', name: intent.name })
+        : pure(app);
+    case 'tip/arm': {
+      // A hand card of mine, face up: under the curtain and over a stranger nothing arms.
+      const held = app.shell.view?.me.hand.some((c) => c.id === intent.card) === true;
+      if (!held || t.curtain !== null) return pure(app);
+      if (t.tip?.card === intent.card && t.tip.shown) return pure(app);
+      return step(withTable(app, { tip: { card: intent.card, shown: false }, swallowTap: null }), {
+        type: 'startTimer',
+        id: 'tip',
+        ms: intent.press ? TIP_PRESS_MS : TIP_HOVER_MS,
+        then: { type: 'tip/show' },
+      });
+    }
+    case 'tip/show':
+      return t.tip === null ? pure(app) : pure(withTable(app, { tip: { ...t.tip, shown: true } }));
+    case 'tip/hide':
+      return t.tip === null
+        ? pure(app)
+        : step(
+            withTable(app, {
+              tip: null,
+              swallowTap: intent.swallow === true && t.tip.shown ? t.tip.card : t.swallowTap,
+            }),
+            { type: 'cancelTimer', id: 'tip' },
+          );
+    case 'cardView/open':
+      return cardById(intent.card) === null
+        ? pure(app)
+        : pure(withTable(app, { cardView: intent.card }));
+    case 'cardView/close':
+      return pure(withTable(app, { cardView: null }));
   }
 };
 
@@ -870,6 +976,7 @@ export const BRISCOLA: ShellConfig<Briscola> = {
       table: {
         ...app.table,
         cardPack: home.cardPack,
+        lang: home.lang,
         extraNames: { 2: home.p3Name, 3: home.p4Name },
       },
     }),
@@ -883,9 +990,9 @@ export const initialShell: Shell = shellInitial(BRISCOLA);
 export const initialApp: App = { shell: initialShell, table: initialTable };
 
 /**
- * `guest/lost` once the match is over: the result stays up; the session's rejoin finds a
- * destroyed Peer and the save would only offer a dead table, so both go. Taken in `reduce` before
- * the shell's case, which knows the table mid-match and the wait screen only.
+ * `guest/lost` once the game is over (decided or drawn): the result stays up; the session's rejoin
+ * finds a destroyed Peer and the save would only offer a dead table, so both go. Taken in `reduce`
+ * before the shell's case, which knows the table mid-game and the wait screen only.
  */
 const hostLeft = (app: App, v: View): Step => {
   const lost = { shell: { ...app.shell, oppConnected: false }, table: tableCleared(app.table) };
@@ -928,7 +1035,7 @@ const localStart = (
 
 export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
   const v = app.shell.view;
-  if (intent.type === 'guest/lost' && v?.matchOver === true) return hostLeft(app, v);
+  if (intent.type === 'guest/lost' && v?.phase === 'over') return hostLeft(app, v);
   if (intent.type === 'local/click') return localStart(app, intent, ctx);
   // The handoff is a two-seat room (D17): offered at two players only.
   if (intent.type === 'handoff/click' && seatCountOf(app) !== 2) return pure(app);
@@ -942,7 +1049,7 @@ export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
 
 // ---- storage: persist and resume -------------------------------------------------------------
 
-/** The resume box `initHome` shows, or null (a finished match is not offered). */
+/** The resume box `initHome` shows, or null (a decided game is not offered). */
 export const resumeFor = (save: Save | null): Resume | null => shellResumeFor(save, BRISCOLA);
 
 /** `persist()`: the save for the current role, or null when there is nothing to save. */
@@ -966,7 +1073,7 @@ export const guestContextOf = (app: App): GuestContext => shellGuestContextOf(ap
 /** The adapters an effect reaches: the shell's (web/shared/ui/shellEffects.ts); briscola adds none. main.ts constructs the real ones, tests record. */
 export type EffectDeps = ShellEffectDeps<Briscola>;
 
-/** One effect against the adapters; `app` is the state after the step that produced it. Briscola's three first, then the shell's runner. */
+/** One effect against the adapters; `app` is the state after the step that produced it. Briscola's four first, then the shell's runner. */
 export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
   if (isShellEffect(effect)) {
     runShellEffect(app.shell, effect, deps, BRISCOLA);
@@ -981,6 +1088,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'writeCardPack':
       writeCardPack(deps.store, effect.pack);
+      return;
+    case 'writeLang':
+      writeLang(deps.store, effect.name);
       return;
   }
 };

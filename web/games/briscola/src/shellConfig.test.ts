@@ -1,6 +1,6 @@
 // The half of the shell config spelled from the engine, the protocol and storage alone
-// (shellConfig.ts): the option parsers off raw inputs with their fallbacks and the engine's
-// normalisation, `pickOpts` over a hostile frame, the copy, the mode parser, the engine adapters
+// (shellConfig.ts): the seat count parser off raw inputs with its fallback and the fixed terms
+// under the engine's normalisation, `pickOpts` over a hostile frame, the copy, the mode parser, the engine adapters
 // over a pair (create, apply, viewFor, over, finished, names, renameGuest, decodeState) and the
 // home read over a store (defaults when unreadable, the pack and the extra names when set). The
 // table hooks that complete it are ui/state.test.ts's.
@@ -15,13 +15,11 @@ import {
   DEFAULT_OPTS,
   LEAVE_LOCAL_MSG,
   LEAVE_ONLINE_MSG,
+  ONE_GAME,
+  TABLE_TERMS,
   hostRoomMsg,
-  matchLabel,
-  parseFlag,
-  parseGamesToWin,
   parseOpts,
   parseSeatCount,
-  parseSuit,
   pickOpts,
 } from './shellConfig.ts';
 import { DEFAULT_CARD_PACK, SHELL_STORE, STORAGE_KEYS } from './storage.ts';
@@ -48,13 +46,10 @@ const fakeStorage = (): StorageLike & Readonly<{ map: Map<string, string> }> => 
 };
 
 describe('the copy', () => {
-  test('the match badge, the guest status, the leave confirms, the default name', () => {
-    expect([1, 2, 3].map((n) => matchLabel(n as 1 | 2 | 3))).toEqual([
-      'one game',
-      'best of 3',
-      'best of 5',
-    ]);
+  test('the guest status, the leave confirms (a game, never a match), the default name', () => {
     expect(hostRoomMsg('Ann')).toBe('Connected — waiting for Ann to deal');
+    expect(LEAVE_LOCAL_MSG).toBe('End this game? The score will be cleared.');
+    expect(LEAVE_ONLINE_MSG).toBe('Leave this game? The table will close.');
     expect(BRISCOLA_SHELL.copy.hostRoom('Bob', DEFAULT_OPTS)).toBe(hostRoomMsg('Bob'));
     expect(BRISCOLA_SHELL.copy.leaveLocal).toBe(LEAVE_LOCAL_MSG);
     expect(BRISCOLA_SHELL.copy.leaveOnline).toBe(LEAVE_ONLINE_MSG);
@@ -80,70 +75,43 @@ describe('the copy', () => {
 });
 
 describe('the option parsers', () => {
-  test("each raw value is one of the engine's, else the fallback; a flag is on for `on` or `true`, kept when absent", () => {
+  test("the seat count is one of the engine's, else the fallback; the fixed terms are one game on the engine's defaults", () => {
     expect(parseSeatCount('3', 2)).toBe(3);
     expect(parseSeatCount('9', 2)).toBe(2);
     expect(parseSeatCount(undefined, 4)).toBe(4);
-    expect(parseGamesToWin('2', 1)).toBe(2);
-    expect(parseGamesToWin('x', 3)).toBe(3);
-    expect(parseSuit('D', 'C')).toBe('D');
-    expect(parseSuit('Z', 'C')).toBe('C');
-    expect(parseSuit(undefined, 'B')).toBe('B');
-    expect(parseFlag(undefined, true)).toBe(true);
-    expect(parseFlag('on', false)).toBe(true);
-    expect(parseFlag('true', false)).toBe(true);
-    expect(parseFlag('off', true)).toBe(false);
-    expect(parseFlag('', true)).toBe(false);
+    expect(ONE_GAME).toBe(1);
+    expect(TABLE_TERMS).toEqual({ gamesToWin: 1 });
+    expect(DEFAULT_OPTS).toEqual({
+      seatCount: 2,
+      gamesToWin: 1,
+      removedTwo: 'C',
+      exchange: false,
+      scoperta: false,
+      partnerPeek: false,
+    });
   });
 
-  test('parseOpts reads the online selects or their pass-and-play twins, falls back to the current room, and normalises (scoperta two-player, the peek four-player)', () => {
+  test('parseOpts reads the online seat count or its pass-and-play twin, falls back to the current count, and puts it on the fixed terms whatever the current room carried', () => {
     expect(parseOpts({}, DEFAULT_OPTS)).toEqual(DEFAULT_OPTS);
-    expect(
-      parseOpts(
-        {
-          players: '2',
-          match: '3',
-          removedTwo: 'S',
-          exchange: 'on',
-          scoperta: 'on',
-          partnerPeek: 'on',
-        },
-        DEFAULT_OPTS,
-      ),
-    ).toEqual({
-      seatCount: 2,
+    expect(parseOpts({ players: '3' }, DEFAULT_OPTS)).toEqual({ ...DEFAULT_OPTS, seatCount: 3 });
+    expect(parseOpts({ localPlayers: '4' }, DEFAULT_OPTS)).toEqual({
+      ...DEFAULT_OPTS,
+      seatCount: 4,
+    });
+    // The online value wins over its twin when a click carries both; junk keeps the current count.
+    const current: GameOptions = {
+      ...DEFAULT_OPTS,
+      seatCount: 3,
       gamesToWin: 3,
       removedTwo: 'S',
       exchange: true,
-      scoperta: true,
-      partnerPeek: false,
-    });
-    expect(
-      parseOpts(
-        {
-          localPlayers: '4',
-          localMatch: '1',
-          localRemovedTwo: 'D',
-          localScoperta: 'on',
-          localPartnerPeek: 'on',
-        },
-        DEFAULT_OPTS,
-      ),
-    ).toEqual({
-      seatCount: 4,
-      gamesToWin: 1,
-      removedTwo: 'D',
-      exchange: false,
-      scoperta: false,
-      partnerPeek: true,
-    });
-    // The online value wins over its twin when a click carries both; junk keeps the current room.
-    const current: GameOptions = { ...DEFAULT_OPTS, seatCount: 3, exchange: true };
-    expect(parseOpts({ players: '2', localPlayers: '4', match: 'nope' }, current)).toMatchObject({
+    };
+    expect(parseOpts({ players: '2', localPlayers: '4' }, current)).toEqual({
+      ...DEFAULT_OPTS,
       seatCount: 2,
-      gamesToWin: current.gamesToWin,
-      exchange: true,
     });
+    // A resumed room may still hold a match and a house rule: a new room is dealt on the fixed terms.
+    expect(parseOpts({ players: 'nope' }, current)).toEqual({ ...DEFAULT_OPTS, seatCount: 3 });
   });
 
   test('pickOpts keeps the six terms of a frame and normalises a hostile one', () => {
@@ -176,6 +144,14 @@ describe('the engine adapters over a pair', () => {
     expect(engine.names(game)).toEqual(['Ann', 'Bob']);
     expect(engine.finished(game)).toBe(false);
     expect(engine.over(viewFor(game, 0))).toBe(false);
+    // Over when the last trick is played, decided or drawn (one game per sitting); the match beneath is the engine's.
+    const drawn = {
+      ...game,
+      phase: 'over' as const,
+      match: { ...game.match, wins: [0, 0], draws: 1 },
+    };
+    expect(engine.finished(drawn)).toBe(true);
+    expect(engine.over({ ...viewFor(game, 0), phase: 'over', matchOver: false })).toBe(true);
     expect(engine.apply).toBe(applyAction);
     expect(engine.viewFor).toBe(viewFor);
     const actor = engine.viewFor(game, game.turn);
@@ -192,16 +168,19 @@ describe('the engine adapters over a pair', () => {
     if (played.ok) expect(played.value.trick).toHaveLength(1);
   });
 
-  test('the finished match`s record: the deal`s clock, every name, the games won per side, the winning side', () => {
+  test('the finished game`s record: the deal`s clock, every name, the points per side, the winning side (null for a draw)', () => {
     const { result } = BRISCOLA_SHELL;
     const v = viewFor(game, 0);
     expect(result.keyOf(v)).toBe(String(game.startedAt));
     expect(result.playersOf(v)).toEqual(['Ann', 'Bob']);
     expect(result.scoreOf(v)).toBe('0–0');
     expect(result.winnerOf(v)).toBeNull();
-    const won = { ...v, match: { ...v.match, wins: [1, 2] }, matchOver: true };
-    expect(result.scoreOf(won)).toBe('1–2');
+    const won = { ...v, result: { winner: 1 as const, totals: [49, 71], draw: false } };
+    expect(result.scoreOf(won)).toBe('49–71');
     expect(result.winnerOf(won)).toBe(1);
+    const drawn = { ...v, result: { winner: null, totals: [60, 60], draw: true } };
+    expect(result.scoreOf(drawn)).toBe('60–60');
+    expect(result.winnerOf(drawn)).toBeNull();
   });
 
   test('renameGuest renames seat 1 alone; decodeState is the engine decoder', () => {
@@ -214,22 +193,25 @@ describe('the engine adapters over a pair', () => {
 });
 
 describe('home.read', () => {
-  test('defaults on an empty store; the pack and the third and fourth names when stored', () => {
+  test('defaults on an empty store; the pack, the language and the third and fourth names when stored', () => {
     const empty = createStore(fakeStorage());
     expect(BRISCOLA_SHELL.home.read(empty)).toEqual({
       opts: DEFAULT_OPTS,
       cardPack: DEFAULT_CARD_PACK,
+      lang: 'it',
       p3Name: null,
       p4Name: null,
     });
     const storage = fakeStorage();
     storage.setItem(STORAGE_KEYS.cardPack, 'linea');
+    storage.setItem(STORAGE_KEYS.lang, 'en');
     storage.setItem(STORAGE_KEYS.p3Name, 'Cara');
     storage.setItem(STORAGE_KEYS.p4Name, 'Dan');
     storage.setItem(STORAGE_KEYS.players, '4');
     expect(BRISCOLA_SHELL.home.read(createStore(storage))).toEqual({
       opts: { ...DEFAULT_OPTS, seatCount: 4 },
       cardPack: 'linea',
+      lang: 'en',
       p3Name: 'Cara',
       p4Name: 'Dan',
     });

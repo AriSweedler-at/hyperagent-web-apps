@@ -116,6 +116,7 @@ describe('page.fake, the members the painters and the drag helpers reach', () =>
       clientX: 1,
       clientY: 2,
       pointerId: 3,
+      pointerType: 'touch',
     });
     expect(full).toMatchObject({
       type: 'keydown',
@@ -125,10 +126,18 @@ describe('page.fake, the members the painters and the drag helpers reach', () =>
       clientX: 1,
       clientY: 2,
       pointerId: 3,
+      pointerType: 'touch',
     });
     expect(full.target).toBe(el.el);
     const bare = el.fire('click');
-    expect(bare).toMatchObject({ key: '', inputType: '', data: null, clientX: 0, clientY: 0 });
+    expect(bare).toMatchObject({
+      key: '',
+      inputType: '',
+      data: null,
+      clientX: 0,
+      clientY: 0,
+      pointerType: '',
+    });
     expect(bare.wasPrevented()).toBe(false);
     bare.preventDefault();
     expect(bare.wasPrevented()).toBe(true);

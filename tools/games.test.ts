@@ -125,10 +125,7 @@ describe('the games registry', () => {
           hostAnswered: /^Connected — waiting for .+ to deal$/,
           connDot: '#oppDot',
           localNames: ['Ari', 'Lavi'],
-          localFields: [
-            ['localPlayersSel', '2'],
-            ['localMatchSel', '2'],
-          ],
+          localFields: [['localPlayersSel', '2']],
           curtainButtons: 2,
         },
       },

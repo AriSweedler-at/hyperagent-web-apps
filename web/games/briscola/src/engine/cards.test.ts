@@ -106,16 +106,16 @@ describe('seats and sides (D1, D6, E12, E17)', () => {
     expect(seatsFrom(3, 1)).toEqual([1, 2, 0]);
   });
 
-  test('sides: the seat itself at 2 and 3, seat % 2 at four', () => {
+  test('sides: the seat itself at every count (no teams at four, the owner, 2026-09-25)', () => {
     expect(sidesOf(2)).toBe(2);
     expect(sidesOf(3)).toBe(3);
-    expect(sidesOf(4)).toBe(2);
+    expect(sidesOf(4)).toBe(4);
     expect(sideList(3)).toEqual([0, 1, 2]);
-    expect(sideList(4)).toEqual([0, 1]);
-    expect(seatsOf(4).map((s) => sideOf(4, s))).toEqual([0, 1, 0, 1]);
+    expect(sideList(4)).toEqual([0, 1, 2, 3]);
+    expect(seatsOf(4).map((s) => sideOf(4, s))).toEqual([0, 1, 2, 3]);
     expect(seatsOf(3).map((s) => sideOf(3, s))).toEqual([0, 1, 2]);
-    expect(seatsOfSide(4, 0)).toEqual([0, 2]);
-    expect(seatsOfSide(4, 1)).toEqual([1, 3]);
+    expect(seatsOfSide(4, 0)).toEqual([0]);
+    expect(seatsOfSide(4, 1)).toEqual([1]);
     expect(seatsOfSide(2, 1)).toEqual([1]);
   });
 });
@@ -241,21 +241,21 @@ describe('trickFacts and carichiLost (design §4): the facts of a resolved trick
     expect(carichiLost(1, trick('s0:AS s1:AC'))).toEqual([0]);
   });
 
-  test("F6 steal at three and at four: a partner's asso is not stolen, the opponents' carichi are lost", () => {
+  test("F6 steal at three and at four: every other seat's carichi are lost (no partners)", () => {
     expect(facts('B', 's0:AC s1:5C s2:2B')).toMatchObject({ steal: true, valueClass: 'big' });
     expect(carichiLost(2, trick('s0:AC s1:5C s2:2B'))).toEqual([0]);
-    // Seat 2 trumps over seat 1's tre: a steal; seat 0 is seat 2's partner, so its asso is not lost.
+    // Seat 2 trumps over seat 1's tre and seat 0's asso: a steal, both carichi lost (no partners).
     const four = trick('s0:AC s1:3C s2:2B s3:5D');
     expect(trickFacts('B', four)).toMatchObject({
       steal: true,
       overtrump: false,
       valueClass: 'huge',
     });
-    expect(carichiLost(2, four)).toEqual([1]);
-    // The partner led the asso and the opponents threw pips: the trump took nothing from anyone.
+    expect(carichiLost(2, four)).toEqual([0, 1]);
+    // Seat 0 led the asso and the others threw pips: the trump stole it all the same.
     const own = trick('s0:AC s1:5D s2:2B s3:6D');
-    expect(trickFacts('B', own)).toMatchObject({ briscola: true, steal: false, valueClass: 'big' });
-    expect(carichiLost(2, own)).toEqual([]);
+    expect(trickFacts('B', own)).toMatchObject({ briscola: true, steal: true, valueClass: 'big' });
+    expect(carichiLost(2, own)).toEqual([0]);
   });
 
   test('the classes: every rank names its winning class; the value classes at their edges', () => {

@@ -87,9 +87,9 @@ describe('decodeState / decodeView round-trip the engine text (V5)', () => {
         expect(JSON.stringify(dv.ok ? dv.value : null)).toBe(vtext);
       });
     });
-    // The optional `hand` on another seat appears somewhere in a scoperta or partner-peek match and never as `undefined`.
+    // The optional `hand` on another seat appears somewhere in a scoperta match (two players) and never as `undefined`; the partner peek shows nothing without partners.
     const revealed = states.some((s) => viewFor(s, 0).others.some((o) => 'hand' in o));
-    expect(revealed).toBe(n !== 3);
+    expect(revealed).toBe(n === 2);
   });
 });
 

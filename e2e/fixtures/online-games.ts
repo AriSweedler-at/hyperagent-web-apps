@@ -284,6 +284,19 @@ const briscolaSnapshot = async (page: Page): Promise<string> =>
 /** The deal both briscola tables show: three cards each, the trump card included in a stock of 34. */
 const BRISCOLA_DEALT = { gameNo: 1, phase: 'trick', stockCount: 34, trickNo: 0 } as const;
 
+/**
+ * The score strip at the deal, where the match badge stood before one game per sitting: one cell per
+ * player in seat order, "(you)" on the cell of the seat reading it, 0 points each and so nobody leading.
+ */
+const expectBriscolaStrip = async (page: Page, names: ReadonlyArray<string>): Promise<void> => {
+  await expect(page.locator('#scoreStrip')).toHaveAttribute('data-mode', 'players');
+  await expect(page.locator('#scoreStrip .score-cell .sc-name')).toHaveText([...names]);
+  await expect(page.locator('#scoreStrip .score-cell .sc-points')).toHaveText(names.map(() => '0'));
+  await expect(page.locator('#scoreStrip .score-cell.mine')).toHaveCount(1);
+  await expect(page.locator('#scoreStrip .score-cell.mine .sc-name')).toHaveText(/ \(you\)$/);
+  await expect(page.locator('#scoreStrip .score-cell.leading')).toHaveCount(0);
+};
+
 const briscola: ShellDriver = {
   ...shellOnline,
   curtainSub: (_first, other) => `${other}, look away`,
@@ -304,7 +317,7 @@ const briscola: ShellDriver = {
   },
   expectOpening: async (host, guest) => {
     // Both tables agree on the deal: the host is seat 0 and the guest seat 1, the same briscola,
-    // three cards each, 34 in the stock, game 1 of a best of three.
+    // three cards each, 34 in the stock, the one game of the sitting.
     const opening = await requireBriscola(host);
     expect(opening).toMatchObject({ ...BRISCOLA_DEALT, me: { idx: 0 } });
     expect(opening.me.hand).toHaveLength(3);
@@ -323,13 +336,13 @@ const briscola: ShellDriver = {
       'data-card',
       opening.trumpCard.id,
     );
-    await expect(host.locator('#gameBadge')).toHaveText('Game 1 · 0–0 · best of 3');
-    await expect(guest.locator('#gameBadge')).toHaveText('Game 1 · 0–0 · best of 3');
+    await expectBriscolaStrip(host, [`${ONLINE_NAMES[0]} (you)`, ONLINE_NAMES[1]]);
+    await expectBriscolaStrip(guest, [ONLINE_NAMES[0], `${ONLINE_NAMES[1]} (you)`]);
     await expect(host.locator('#hand .card')).toHaveCount(3);
     await expect(guest.locator('#hand .card')).toHaveCount(3);
   },
   // The host's save carries the room's six terms (protocol.ts's order) and the game at its first deal.
-  hostSave: { seatCount: 2, gamesToWin: 2, game: { gameNo: 1 } },
+  hostSave: { seatCount: 2, gamesToWin: 1, game: { gameNo: 1 } },
   localSave: { game: { gameNo: 1, trickNo: 0 } },
   table: '#hand .card',
   curtainOffer: {
@@ -343,15 +356,15 @@ const briscola: ShellDriver = {
     },
   },
   // The Rules and About copy (ui/rules.ts, ui/glossary.ts, ui/about.ts): "briscola" in the About
-  // copy lands on the briscola rule; the trick rule names the draw, as the last tricks do.
+  // copy lands on the briscola rule; the trick rule names the draw, the draw rule the trick.
   glossary: {
     aboutTerm: 'briscola',
     aboutRule: 'briscola',
     innerFrom: 'trick',
     innerTo: 'draw',
-    deepLink: 'scoring',
-    overlayFrom: 'last-tricks',
-    overlayTo: 'draw',
+    deepLink: 'goal',
+    overlayFrom: 'draw',
+    overlayTo: 'trick',
     openRulesOverTable: async (page, url, viewport) => {
       await briscolaStartLocal(page, url, viewport);
       await briscolaReveal(page);

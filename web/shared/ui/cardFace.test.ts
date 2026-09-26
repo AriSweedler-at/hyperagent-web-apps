@@ -22,6 +22,37 @@ const face = (pack: CardPack, kind: 'french52' | 'italian40', id: string): FaceS
 };
 
 describe('faceHtml', () => {
+  test('a name is written only when asked: role and aria-label on a glyph, the alt replaced on a picture, a title only with `title`', () => {
+    const glyph = face(packByName('default'), 'italian40', 'RD');
+    expect(faceHtml(glyph)).toBe(
+      '<div class="card face glyph suit-D" data-card="RD"><span class="rank">R</span><svg class="suit" aria-hidden="true"><use href="#suit-D"/></svg><span class="rank br">R</span></div>',
+    );
+    expect(faceHtml(glyph, { name: 're di denari' })).toBe(
+      '<div class="card face glyph suit-D" data-card="RD" role="img" aria-label="re di denari"><span class="rank">R</span><svg class="suit" aria-hidden="true"><use href="#suit-D"/></svg><span class="rank br">R</span></div>',
+    );
+    expect(faceHtml(glyph, { extra: 'mid', name: 'king of coins', title: true })).toBe(
+      '<div class="card face glyph suit-D mid" data-card="RD" role="img" aria-label="king of coins" title="king of coins"><span class="rank">R</span><svg class="suit" aria-hidden="true"><use href="#suit-D"/></svg><span class="rank br">R</span></div>',
+    );
+    // A French glyph named: gin's markup with the attributes after data-card; `title` alone adds nothing.
+    expect(faceHtml(face(packByName('default'), 'french52', 'AS'), { name: 'ace of spades' })).toBe(
+      '<div class="card black" data-card="AS" role="img" aria-label="ace of spades"><span class="rank">A</span><span class="suit">♠</span><span class="rank br">A</span></div>',
+    );
+    expect(faceHtml(face(packByName('default'), 'french52', 'AS'), { title: true })).toBe(
+      faceHtml(face(packByName('default'), 'french52', 'AS')),
+    );
+    // A picture: the deck's alt by default, the name when given, the title only with both.
+    const picture = face(packByName('linea'), 'italian40', 'RD');
+    expect(faceHtml(picture)).toContain(' role="img" aria-label="re di denari" style=');
+    expect(faceHtml(picture, { name: 'king of coins' })).toContain(
+      ' role="img" aria-label="king of coins" style=',
+    );
+    expect(faceHtml(picture, { name: 'king of coins' })).not.toContain('title=');
+    expect(faceHtml(picture, { name: 'king of coins', title: true })).toContain(
+      ' role="img" aria-label="king of coins" title="king of coins" style=',
+    );
+    expect(faceHtml(picture, { title: true })).toBe(faceHtml(picture));
+  });
+
   test("a French glyph is gin's card markup: colour by suit, the label twice, the text symbol", () => {
     expect(faceHtml(face(packByName('default'), 'french52', 'AS'))).toBe(
       '<div class="card black" data-card="AS"><span class="rank">A</span><span class="suit">♠</span><span class="rank br">A</span></div>',

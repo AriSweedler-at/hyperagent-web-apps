@@ -28,7 +28,21 @@ const SUIT = 'suit';
 export type FaceOptions = Readonly<{
   /** Classes appended after the shape's own, space-separated (a table's `selected`, `dim`). */
   extra?: string;
+  /**
+   * The card's name from a language pack (docs/design/language-packs.md §3), written as the box's
+   * `aria-label` (`role="img"` on a glyph; a picture's alt is replaced). Absent, the markup is byte
+   * for byte what it was, which gin's 52 pins (ui/cards.test.ts) hold.
+   */
+  name?: string;
+  /** With `name`, a `title` too (the browser's own tooltip), for a game with no tooltip of its own. */
+  title?: boolean;
 }>;
+
+/** ` role="img" aria-label="…"[ title="…"]` for a named glyph; nothing without a name. */
+const nameAttrs = (opts: FaceOptions): string =>
+  opts.name === undefined
+    ? ''
+    : ` role="img" aria-label="${opts.name}"${opts.title === true ? ` title="${opts.name}"` : ''}`;
 
 const classAttr = (own: ReadonlyArray<string>, extra: string | undefined): string =>
   [...own, extra ?? ''].filter((c) => c !== '').join(' ');
@@ -55,24 +69,27 @@ const overlay = (spec: Extract<FaceSpec, Readonly<{ kind: 'image' | 'sprite' }>>
 
 const glyphHtml = (
   spec: Extract<FaceSpec, Readonly<{ kind: 'glyph' }>>,
-  extra?: string,
+  opts: FaceOptions,
 ): string => {
+  const extra = opts.extra;
   if (spec.suit.symbol !== null) {
     // Gin's cardHtml, character for character: `card red|black [extra]`, the label, the symbol, the label.
     const classes = classAttr([CARD, spec.suit.colour], extra);
-    return `<div class="${classes}" data-card="${spec.id}"><span class="${RANK}">${spec.rank.index}</span><span class="${SUIT}">${spec.suit.symbol}</span><span class="${RANK_BR}">${spec.rank.index}</span></div>`;
+    return `<div class="${classes}" data-card="${spec.id}"${nameAttrs(opts)}><span class="${RANK}">${spec.rank.index}</span><span class="${SUIT}">${spec.suit.symbol}</span><span class="${RANK_BR}">${spec.rank.index}</span></div>`;
   }
   const classes = classAttr([CARD, FACE, GLYPH, suitSymbolId(spec.suit.id)], extra);
-  return `<div class="${classes}" data-card="${spec.id}"><span class="${RANK}">${spec.rank.index}</span><svg class="${SUIT}" aria-hidden="true"><use href="#${suitSymbolId(spec.suit.id)}"/></svg><span class="${RANK_BR}">${spec.rank.index}</span></div>`;
+  return `<div class="${classes}" data-card="${spec.id}"${nameAttrs(opts)}><span class="${RANK}">${spec.rank.index}</span><svg class="${SUIT}" aria-hidden="true"><use href="#${suitSymbolId(spec.suit.id)}"/></svg><span class="${RANK_BR}">${spec.rank.index}</span></div>`;
 };
 
 const pictureHtml = (
   spec: Extract<FaceSpec, Readonly<{ kind: 'image' | 'sprite' }>>,
   style: string,
-  extra?: string,
+  opts: FaceOptions,
 ): string => {
-  const classes = classAttr([CARD, FACE], extra);
-  return `<div class="${classes}" data-card="${spec.id}" role="img" aria-label="${spec.alt}" style="--face-inset:${String(spec.inset)};${style}">${overlay(spec)}</div>`;
+  const classes = classAttr([CARD, FACE], opts.extra);
+  const label = opts.name ?? spec.alt;
+  const title = opts.title === true && opts.name !== undefined ? ` title="${label}"` : '';
+  return `<div class="${classes}" data-card="${spec.id}" role="img" aria-label="${label}"${title} style="--face-inset:${String(spec.inset)};${style}">${overlay(spec)}</div>`;
 };
 
 /** `background-position` for one cell of a `columns × rows` sheet, as percentages. */
@@ -89,14 +106,14 @@ const cellPosition = (
 export const faceHtml = (spec: FaceSpec, opts: FaceOptions = {}): string => {
   switch (spec.kind) {
     case 'glyph':
-      return glyphHtml(spec, opts.extra);
+      return glyphHtml(spec, opts);
     case 'image':
-      return pictureHtml(spec, pictureCss(spec.urls), opts.extra);
+      return pictureHtml(spec, pictureCss(spec.urls), opts);
     case 'sprite':
       return pictureHtml(
         spec,
         `${pictureCss(spec.sheets)};background-size:${String(spec.columns * 100)}% ${String(spec.rows * 100)}%;background-position:${cellPosition(spec.cell, spec.columns, spec.rows)}`,
-        opts.extra,
+        opts,
       );
   }
 };
