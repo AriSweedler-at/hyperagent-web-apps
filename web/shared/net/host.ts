@@ -537,15 +537,24 @@ export class HostSession<G, H, X> {
     const frames: unknown[] = [];
     const watched = this.channels();
     const probes: (() => void)[] = [];
-    const deadline = cell<Timer | null>(null);
+    // Every way the hold resolves runs `cancel` first, so the deadline never fires afterwards
+    // (clearing a timer that has fired is nothing).
     const cancel = (): void => {
       probes.forEach((c) => {
         c();
       });
-      const timer = deadline.get();
-      if (timer !== null) this.deps.clock.clearTimeout(timer);
-      deadline.set(null);
+      this.deps.clock.clearTimeout(deadline);
     };
+    const deadline: Timer = this.deps.clock.setTimeout(() => {
+      this.held = null;
+      cancel();
+      const silent = watched.find(
+        (channel) =>
+          channel.slot.get().channel.get() === channel && channel.live.silence() >= HB_MISSED_MS,
+      );
+      if (silent !== undefined) this.replace(conn, silent, ice, frames);
+      else this.refuse(conn);
+    }, HB_MISSED_MS);
     let alive = 0;
     watched.forEach((channel) => {
       probes.push(
@@ -555,6 +564,7 @@ export class HostSession<G, H, X> {
             alive += 1;
             if (alive < watched.length) return;
             this.held = null;
+            cancel();
             this.refuse(conn);
           },
           () => {
@@ -567,19 +577,6 @@ export class HostSession<G, H, X> {
     });
     this.held = { conn, frames, cancel };
     const waiting = (): boolean => this.held?.conn === conn;
-    deadline.set(
-      this.deps.clock.setTimeout(() => {
-        if (!waiting()) return;
-        this.held = null;
-        cancel();
-        const silent = watched.find(
-          (channel) =>
-            channel.slot.get().channel.get() === channel && channel.live.silence() >= HB_MISSED_MS,
-        );
-        if (silent !== undefined) this.replace(conn, silent, ice, frames);
-        else this.refuse(conn);
-      }, HB_MISSED_MS),
-    );
     conn.onMessage((raw) => {
       if (waiting() && !isHeartbeat(raw)) frames.push(raw);
     });
