@@ -10,6 +10,8 @@ import {
   QUICK_DURATIONS,
   REDUCED_DURATIONS,
   TEMPO_STAGES,
+  drawRunMs,
+  drawSpan,
   durationsFor,
   stageMs,
   type BeatStage,
@@ -32,7 +34,30 @@ describe('durationsFor', () => {
     expect(QUICK_DURATIONS.drawMs).toBeGreaterThanOrEqual(90);
     expect(QUICK_DURATIONS.holdMs).toBeLessThan(DURATIONS.holdMs);
     expect(QUICK_DURATIONS.flyMs).toBeLessThan(DURATIONS.flyMs);
-    expect(REDUCED_DURATIONS).toEqual({ holdMs: 300, flyMs: 1, drawMs: 1, drawGapMs: 1 });
+    expect(REDUCED_DURATIONS).toEqual({
+      holdMs: 300,
+      flyMs: 1,
+      drawMs: 1,
+      drawGapMs: 1,
+      flipMs: 1,
+    });
+  });
+});
+
+describe('the draw order round my tap (docs/design/briscola-battle.md §3.1 DRAW)', () => {
+  test('drawSpan: the seats before me, whether I draw, the seats after; every seat before and none after when I am not drawing', () => {
+    expect(drawSpan([1, 0], 1)).toEqual({ before: 0, mine: true, after: 1 });
+    expect(drawSpan([1, 0], 0)).toEqual({ before: 1, mine: true, after: 0 });
+    expect(drawSpan([2, 3, 0, 1], 0)).toEqual({ before: 2, mine: true, after: 1 });
+    expect(drawSpan([1, 0], 2)).toEqual({ before: 2, mine: false, after: 0 });
+    expect(drawSpan([], 0)).toEqual({ before: 0, mine: false, after: 0 });
+  });
+
+  test('drawRunMs: one draw plus a gap per further seat; 0 for no seats', () => {
+    expect(drawRunMs(0, DURATIONS)).toBe(0);
+    expect(drawRunMs(1, DURATIONS)).toBe(260);
+    expect(drawRunMs(3, DURATIONS)).toBe(260 + 2 * 160);
+    expect(drawRunMs(2, REDUCED_DURATIONS)).toBe(2);
   });
 });
 

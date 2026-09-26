@@ -97,6 +97,9 @@ import { HISTORY_COPY } from './history.ts';
 import {
   MY_TRICKS,
   drawFlights,
+  drawsAfter,
+  drawsBefore,
+  myDrawFlight,
   durationsFor,
   flyCards,
   handCard,
@@ -150,6 +153,7 @@ import { bindLocal, paintCurtain } from './local.ts';
 import {
   SCREENS,
   handoffLabel,
+  awaitingDraw,
   liveView,
   resultOpen,
   waitingToDealMsg,
@@ -262,14 +266,32 @@ type Beat = Readonly<{
   trick: TrickRecord | null;
   before: boolean;
   undrawn: boolean;
+  /** My draw waits for a tap (docs/design/briscola-battle.md §3.1 DRAW): the slot pulses, the stock is tappable. */
+  awaiting: boolean;
+  /** My back is flying to its slot and turning over (`drawMine`). */
+  flipping: boolean;
 }>;
 
-const NO_BEAT: Beat = { stage: null, trick: null, before: false, undrawn: false };
+const NO_BEAT: Beat = {
+  stage: null,
+  trick: null,
+  before: false,
+  undrawn: false,
+  awaiting: false,
+  flipping: false,
+};
 
 const beatOf = (settle: Settle | null): Beat =>
   settle === null
     ? NO_BEAT
-    : { stage: settle.stage, trick: settle.trick, before: settle.stage !== 'draw', undrawn: true };
+    : {
+        stage: settle.stage,
+        trick: settle.trick,
+        before: settle.stage === 'hold' || settle.stage === 'fly',
+        undrawn: true,
+        awaiting: awaitingDraw(settle),
+        flipping: settle.stage === 'drawMine',
+      };
 
 /** A seat's tricks, less the one just taken while it is held or in flight. */
 const tricksShown = (v: View, b: Beat, seat: Seat): number =>
@@ -311,7 +333,8 @@ const scoreSource = (v: View, b: Beat): View => {
  */
 const drawnCardId = (app: App, v: View, b: Beat): string | null => {
   const prev = app.table.lastPainted;
-  if (b.stage === null || prev?.me.idx !== v.me.idx) return null;
+  // Through `drawRest` my card has landed and turned: it shows.
+  if (b.stage === null || b.stage === 'drawRest' || prev?.me.idx !== v.me.idx) return null;
   if (prev.gameNo !== v.gameNo || prev.startedAt !== v.startedAt) return null;
   return v.me.hand.find((c) => !prev.me.hand.some((p) => p.id === c.id))?.id ?? null;
 };
@@ -412,6 +435,8 @@ export const paintStock = (
     stockHtml(pack, count, v.stockTop, lang),
   );
   toggleClass(stock, 'empty', count <= 1);
+  // My draw waits (§3.1 DRAW): the stock is the tap's target; the briscola when only it is left for me.
+  toggleClass(stock, 'tappable', b.awaiting && count > 1);
   setText(requireId(doc, 'stockCount'), stockLabel(count));
   const briscola = requireId(doc, 'briscola');
   const onTable = trumpOnTableShown(v, b);
@@ -421,7 +446,11 @@ export const paintStock = (
   // The briscola's name under the stock's count (its own box is rotated), gone with the card.
   setText(requireId(doc, 'briscolaName'), onTable ? cardNameOf(lang, v.trumpCard.id) : '');
   toggleClass(briscola, 'gone', !onTable);
-  toggleClass(briscola, 'tappable', liveView(app) !== null && v.canExchange);
+  toggleClass(
+    briscola,
+    'tappable',
+    (liveView(app) !== null && v.canExchange) || (b.awaiting && count <= 1 && onTable),
+  );
 };
 
 // ---- the trick fan (§5.2 `#trick`, §5.3) ---------------------------------------------------------------
@@ -476,6 +505,8 @@ const paintScore = (doc: DocumentLike, v: View, b: Beat): void => {
 };
 
 export const DRAWING_STATUS = 'Drawing…';
+/** The status while my draw waits for the tap (§3.8): the stock, the slot or the felt all take it. */
+export const DRAW_TAP_STATUS = 'Drawing… tap the stock';
 
 /** "Bob takes the trick · 13 points" / "You take the trick · 13 points" (the hold and the flight). */
 export const takesText = (
@@ -512,7 +543,8 @@ const exchangeClause = (v: View): string => {
 export const statusText = (app: App, v: View): string => {
   const b = beatOf(app.table.settle);
   if (b.before && b.trick !== null) return takesText(v.players, v.me.idx, b.trick);
-  if (b.stage === 'draw') return DRAWING_STATUS;
+  if (b.awaiting) return DRAW_TAP_STATUS;
+  if (b.stage !== null) return DRAWING_STATUS;
   if (v.phase === 'over') return resultLine(v);
   const lastThree = v.stockCount === 0 && v.trick.length === 0 && v.me.hand.length === HAND_SIZE;
   if (v.isMyTurn)
@@ -531,6 +563,8 @@ const paintSlot = (
     dragging: string | null;
     drawn: string | null;
     faceDown: boolean;
+    awaiting: boolean;
+    flipping: boolean;
   }>,
 ): void => {
   const card = queryIn(slot, '.card');
@@ -538,10 +572,16 @@ const paintSlot = (
   const id = dataOf(card, 'card') ?? '';
   const lifted = o.selected === id;
   const canPlay = o.playable.includes(id);
+  const drawn = id === o.drawn;
   toggleClass(card, 'selected', lifted);
   toggleClass(card, 'playable', canPlay);
   toggleClass(card, 'dragging', o.dragging === id);
-  toggleClass(card, 'arriving', id === o.drawn);
+  // The drawn card hides until its flight lands: through the wait outright, in `drawMine` while
+  // its clone is in the air (`data-flying`, ui/motion.ts; the launch marks it before any frame).
+  toggleClass(card, 'arriving', drawn && (!o.flipping || dataOf(card, 'flying') !== null));
+  // Tap to draw (§3.1 DRAW): the slot my card will fill pulses; after the tap the card turns over.
+  toggleClass(slot, 'awaiting', drawn && o.awaiting);
+  toggleClass(card, 'flipping', drawn && o.flipping);
   const button = lifted || canPlay;
   setAttr(slot, 'role', button ? 'button' : null);
   setAttr(slot, 'tabindex', button ? '0' : null);
@@ -580,7 +620,15 @@ export const paintHand = (
   const drawn = drawnCardId(app, v, b);
   const dragging = app.table.drag?.card ?? null;
   queryAllIn(hand, '.slot').forEach((slot) => {
-    paintSlot(slot, { selected, playable, dragging, drawn, faceDown });
+    paintSlot(slot, {
+      selected,
+      playable,
+      dragging,
+      drawn,
+      faceDown,
+      awaiting: b.awaiting,
+      flipping: b.flipping,
+    });
   });
   setText(requireId(doc, 'myName'), v.me.name);
   const me = v.me.idx;
@@ -765,7 +813,11 @@ const landings = (
   };
 };
 
-/** The stage's flights (ui/motion.ts): the trick to its winner as the flight starts, a back to each drawer as the draws start; nothing while held. */
+/**
+ * The stage's flights (ui/motion.ts): the trick to its winner as the flight starts; the backs of
+ * the seats drawing before me as the draws start; mine after my tap; the seats after me once my
+ * card has landed (docs/design/briscola-battle.md §3.1 DRAW); nothing while held.
+ */
 const flightsFor = (
   v: View,
   b: Beat,
@@ -775,11 +827,18 @@ const flightsFor = (
   if (b.trick === null) return [];
   const to = landings(v, drawn);
   const d = durationsFor(speed, reducedMotion());
+  const me = v.me.idx;
   switch (b.stage) {
     case 'fly':
       return trickFlights(b.trick, to.taken(b.trick.winner), d);
     case 'draw':
-      return drawFlights(b.trick, to.card, d);
+      return drawFlights(b.trick, to.card, d, drawsBefore(b.trick.drew, me));
+    case 'drawMine': {
+      const mine = myDrawFlight(b.trick, me, to.card(me), d);
+      return mine === null ? [] : [mine];
+    }
+    case 'drawRest':
+      return drawFlights(b.trick, to.card, d, drawsAfter(b.trick.drew, me));
     case 'hold':
     case null:
       return [];
@@ -1069,9 +1128,9 @@ export const bindHover = (doc: PageLike, dispatch: Dispatch): void => {
 
 /** The table's and the sheets' controls, each an intent (the shell's leave button too, though the menu's row is the one reached). */
 export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
+  // A card's tap, or, on the felt and the empty slots, the draw's tap (the reducer drops it outside the wait).
   listenId(doc, 'hand', 'click', (e) => {
-    const intent = handIntentOf(e);
-    if (intent !== null) dispatch(intent);
+    dispatch(handIntentOf(e) ?? { type: 'draw/tap' });
   });
   // Enter/Space on a focused slot is its tap (§5.5); the page must not scroll on Space.
   listenId(doc, 'hand', 'keydown', (e) => {
@@ -1085,6 +1144,10 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   // A tap on the table plays the lifted card; a tap on the trump card offers the exchange (D24).
   listenId(doc, 'trick', 'click', () => {
     dispatch({ type: 'table/tap' });
+  });
+  // Tap to draw (docs/design/briscola-battle.md §3.1 DRAW): the stock while my draw waits; dropped otherwise.
+  listenId(doc, 'stock', 'click', () => {
+    dispatch({ type: 'draw/tap' });
   });
   listenId(doc, 'briscola', 'click', () => {
     dispatch({ type: 'exchange/click' });

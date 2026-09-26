@@ -25,6 +25,7 @@ import {
   type State,
 } from '../engine/index.ts';
 import {
+  awaitingDraw,
   initialApp,
   liveView,
   reduce,
@@ -127,9 +128,16 @@ const playFirst = (ctx: Context, app: App): App => {
 const revealed = (ctx: Context, app: App): App =>
   app.table.curtain === null ? app : run(ctx, app, [REVEAL]);
 
-/** The settle beat run to its end: `settle/elapsed` until no stage is left (at most the three stages). */
+/** The settle beat run to its end: `settle/elapsed` until no stage is left, the draw's tap taken where the beat waits for it. */
 const settled = (ctx: Context, app: App): App =>
-  app.table.settle === null ? app : settled(ctx, run(ctx, app, [{ type: 'settle/elapsed' }]));
+  app.table.settle === null
+    ? app
+    : settled(
+        ctx,
+        run(ctx, app, [
+          awaitingDraw(app.table.settle) ? { type: 'draw/tap' } : { type: 'settle/elapsed' },
+        ]),
+      );
 
 /** One whole trick from the table as it stands, each seat revealing and playing its first legal card, then the beat. */
 const trick = (ctx: Context, app: App): App => {
@@ -256,6 +264,21 @@ const hold2 = chain((c) => {
   const second = revealed(c, playFirst(c, revealed(c, localStart(c, 2))));
   return playFirst(c, second);
 });
+/** The trick held, flown, and the beat at `draw`: my draw waits for the tap (docs/design/briscola-battle.md §3.1). */
+const drawAwaiting2 = chain((c) => {
+  const held = playFirst(c, revealed(c, playFirst(c, revealed(c, localStart(c, 2)))));
+  return run(c, held, [{ type: 'settle/elapsed' }, { type: 'settle/elapsed' }]);
+});
+/** The tap taken: my back flies to its slot and turns over (`drawMine`). */
+const drawFlip2 = chain((c) => {
+  const held = playFirst(c, revealed(c, playFirst(c, revealed(c, localStart(c, 2)))));
+  return run(c, held, [
+    { type: 'settle/elapsed' },
+    { type: 'settle/elapsed' },
+    { type: 'settle/elapsed' },
+    { type: 'draw/tap' },
+  ]);
+});
 const settled2 = chain((c) => revealed(c, trick(c, localStart(c, 2))));
 const history2 = chain((c) =>
   run(c, revealed(c, trick(c, localStart(c, 2))), [{ type: 'history/open' }]),
@@ -303,6 +326,17 @@ export const STORIES: ReadonlyArray<Story> = [
     title: 'The trick held: both cards in the fan, the taking card marked, the stock still 34',
     app: hold2,
     screenshot: true,
+  }),
+  story({
+    id: 'draw-awaiting-2p',
+    title:
+      'The draw waits: the slot pulses for my card, the stock tappable, "Drawing… tap the stock"',
+    app: drawAwaiting2,
+  }),
+  story({
+    id: 'draw-flip-2p',
+    title: 'The stock tapped: my back flies to the slot and turns over',
+    app: drawFlip2,
   }),
   story({
     id: 'after-settle-2p',

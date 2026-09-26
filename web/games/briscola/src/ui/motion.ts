@@ -34,7 +34,7 @@ import {
 import { launchClone } from '../../../../shared/edge/motion.ts';
 import type { Speed } from '../../../../shared/lib/speed.ts';
 import type { Played, Seat, TrickRecord } from '../engine/index.ts';
-import { stageMs } from './beat.ts';
+import { drawSpan, stageMs } from './beat.ts';
 import { seatCellId, type RelativeCell } from './table.ts';
 
 // ---- durations (§5.3): the pure clock is ui/beat.ts's, named through this module for the painter ------
@@ -118,27 +118,71 @@ export const trickFlights = (
     hideArrival: true as const,
   }));
 
+/** A slice of the draw order, `start` inclusive to `end` exclusive (the seats before me, the seats after me). */
+export type DrawRange = Readonly<{ start: number; end: number }>;
+
 /**
  * One back per drawer in `drew` order (the winner first), leaving `drawGapMs` apart; the last from
  * the briscola, turned, when the last drawer took the trump card. `cellOf` says where a seat's
- * card lands (`handCard` for me, `seatCards` for the others).
+ * card lands (`handCard` for me, `seatCards` for the others). `range` takes a slice of the order
+ * (docs/design/briscola-battle.md §3.1 DRAW: the seats before my tap, then those after it), its
+ * first flight leaving at once.
  */
 export const drawFlights = (
   trick: Pick<TrickRecord, 'drew' | 'trumpTaken'>,
   cellOf: (seat: Seat) => Target,
   d: Durations,
+  range: DrawRange = { start: 0, end: trick.drew.length },
 ): ReadonlyArray<Flight> =>
-  trick.drew.map((seat, i) => {
-    const last = trick.trumpTaken && i === trick.drew.length - 1;
+  trick.drew.slice(range.start, range.end).map((seat, k) => {
+    const last = trick.trumpTaken && range.start + k === trick.drew.length - 1;
     return {
       from: last ? BRISCOLA : STOCK,
       to: cellOf(seat),
       ms: d.drawMs,
-      delayMs: i * d.drawGapMs,
+      delayMs: k * d.drawGapMs,
       ...(last ? { rotated: true as const } : {}),
       hideArrival: true as const,
     };
   });
+
+/** The seats drawing before my tap, as a range for `drawFlights`; every seat when I do not draw. */
+export const drawsBefore = (drew: ReadonlyArray<Seat>, me: Seat): DrawRange => ({
+  start: 0,
+  end: drawSpan(drew, me).before,
+});
+/** The seats drawing after my card has landed; empty when I do not draw. */
+export const drawsAfter = (drew: ReadonlyArray<Seat>, me: Seat): DrawRange => {
+  const span = drawSpan(drew, me);
+  return span.mine
+    ? { start: span.before + 1, end: drew.length }
+    : { start: drew.length, end: drew.length };
+};
+
+/**
+ * My draw after the tap (§3.1 DRAW): one back from the stock to my slot (`to`, the drawn card,
+ * hidden until it lands), or from the briscola, turned, when I am the last drawer and took the
+ * trump card; the flip that follows the landing is the CSS's (`.card.flipping`). Null when I am
+ * not among the drawers.
+ */
+export const myDrawFlight = (
+  trick: Pick<TrickRecord, 'drew' | 'trumpTaken'>,
+  me: Seat,
+  to: Target,
+  d: Durations,
+): Flight | null => {
+  const span = drawSpan(trick.drew, me);
+  if (!span.mine) return null;
+  const last = trick.trumpTaken && span.after === 0;
+  return {
+    from: last ? BRISCOLA : STOCK,
+    to,
+    ms: d.drawMs,
+    delayMs: 0,
+    ...(last ? { rotated: true as const } : {}),
+    hideArrival: true as const,
+  };
+};
 
 // ---- the play and follow flights (docs/design/briscola-battle.md §3.1 PLAY, FOLLOW; §7 PR-D) ------
 

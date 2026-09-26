@@ -20,13 +20,54 @@ export type Durations = Readonly<{
   drawMs: number;
   /** Between one draw's start and the next. */
   drawGapMs: number;
+  /** My drawn card's turn from its back to its face once its flight has landed (§3.1 DRAW, tap-gated). */
+  flipMs: number;
 }>;
 
-export const DURATIONS: Durations = { holdMs: 900, flyMs: 320, drawMs: 260, drawGapMs: 160 };
+export const DURATIONS: Durations = {
+  holdMs: 900,
+  flyMs: 320,
+  drawMs: 260,
+  drawGapMs: 160,
+  flipMs: 220,
+};
 /** `quick`: ×0.6, the glides floored at 90 ms. */
-export const QUICK_DURATIONS: Durations = { holdMs: 540, flyMs: 200, drawMs: 160, drawGapMs: 100 };
+export const QUICK_DURATIONS: Durations = {
+  holdMs: 540,
+  flyMs: 200,
+  drawMs: 160,
+  drawGapMs: 100,
+  flipMs: 140,
+};
 /** `prefers-reduced-motion` and `off`: every glide 1 ms, the hold 300 ms (long enough to read the trick). */
-export const REDUCED_DURATIONS: Durations = { holdMs: 300, flyMs: 1, drawMs: 1, drawGapMs: 1 };
+export const REDUCED_DURATIONS: Durations = {
+  holdMs: 300,
+  flyMs: 1,
+  drawMs: 1,
+  drawGapMs: 1,
+  flipMs: 1,
+};
+
+// ---- the draw order round my tap (§3.1 DRAW) ------------------------------------------------------------
+
+/**
+ * Where `me` stands in a trick's draw order (`drew`, the winner first): how many seats draw before
+ * my tap, whether I draw at all, and how many draw after my card has landed; every seat before
+ * and none after when I am not drawing (the engine draws everyone or nobody, so that is a device
+ * whose seat is not at the table).
+ */
+export type DrawSpan = Readonly<{ before: number; mine: boolean; after: number }>;
+
+export const drawSpan = (drew: ReadonlyArray<number>, me: number): DrawSpan => {
+  const i = drew.indexOf(me);
+  return i < 0
+    ? { before: drew.length, mine: false, after: 0 }
+    : { before: i, mine: true, after: drew.length - i - 1 };
+};
+
+/** A run of `n` auto draws with the gaps between them; 0 for none (the reducer arms no timer for 0). */
+export const drawRunMs = (n: number, d: Durations): number =>
+  n <= 0 ? 0 : d.drawMs + d.drawGapMs * (n - 1);
 
 /** The settle's durations for a device: reduced motion wins over the switch; `off` reads the reduced tables. */
 export const durationsFor = (speed: Speed, reducedMotion: boolean): Durations =>
