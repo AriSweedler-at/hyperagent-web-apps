@@ -12,6 +12,11 @@
 // (`String(msg.name || 'Jeff').slice(0, 20).trim() || 'Jeff'`); the decoder takes only a string of
 // at most NAME_MAX characters (what a legacy guest ever sends) and `guestNameFor` applies the
 // host's normalisation. A wire-visible change adds a version field here.
+//
+// The ephemeral lane (docs/design/briscola-battle.md §4.5): one more tag, `intent`, that a game
+// declares through `twoSeatProtocol`'s `extra.ephemeral` and that BOTH sides may send (briscola's
+// live hover mirror). It sits beside `WIRE_TAGS`, never in it, so a game that declares none refuses
+// the tag with the same words as before and its wire goldens and refusal strings are untouched.
 import {
   formatError,
   literal,
@@ -28,6 +33,15 @@ import { err, ok, type Result } from './result.ts';
 /** The `t` of every frame, guest-to-host first. */
 export const WIRE_TAGS = ['join', 'action', 'welcome', 'lobby', 'full', 'toast', 'state'] as const;
 export type WireTag = (typeof WIRE_TAGS)[number];
+
+/**
+ * The tag of the one frame either side may send and no game state ever sees (the ephemeral lane):
+ * declared per game through `twoSeatProtocol`'s `extra`, refused as an unknown tag when it is not.
+ */
+export const EPHEMERAL_TAG = 'intent' as const;
+export type EphemeralTag = typeof EPHEMERAL_TAG;
+/** What every ephemeral frame has: the tag; a game's own decoder spells the rest. */
+export type EphemeralFrame = Readonly<{ t: EphemeralTag }>;
 
 /** The name inputs are `maxlength="20"` and every name is `.slice(0, 20)`d before it is sent. */
 export const NAME_MAX = 20;
@@ -51,7 +65,8 @@ export type StateFrame<V> = Readonly<{ t: 'state'; view: V }>;
 export type HostFrame<V, R> =
   WelcomeFrame<R> | LobbyFrame<R> | FullFrame | ToastFrame | StateFrame<V>;
 
-export type Frame<A, V, R> = GuestFrame<A> | HostFrame<V, R>;
+/** The seven frames and, for a game that declares one, its ephemeral frame `E` (`never` otherwise). */
+export type Frame<A, V, R, E extends EphemeralFrame = never> = GuestFrame<A> | HostFrame<V, R> | E;
 
 /** Why a frame was refused, worded for the log: `$.name: expected a name of at most 20 characters`. */
 export type DecodeFailure = string;
@@ -64,14 +79,14 @@ export type FrameDecoder<T> = (input: unknown) => Result<T, DecodeFailure>;
  */
 export type RoomFields = Readonly<Record<string, Decoder<unknown>>>;
 
-/** The seven builders and the three decoders, specialised to a game's action `A`, view `V` and room `R`. */
-export type TwoSeatProtocol<A, V, R> = Readonly<{
-  /** Any of the seven frames; the tag decides the shape. */
-  decodeFrame: FrameDecoder<Frame<A, V, R>>;
-  /** What a host accepts from its guest: `join` and `action`; a host frame here is refused. */
-  decodeGuestFrame: FrameDecoder<GuestFrame<A>>;
-  /** What a guest accepts from its host: the other five; a guest frame here is refused. */
-  decodeHostFrame: FrameDecoder<HostFrame<V, R>>;
+/** The seven builders and the three decoders, specialised to a game's action `A`, view `V`, room `R` and ephemeral frame `E`. */
+export type TwoSeatProtocol<A, V, R, E extends EphemeralFrame = never> = Readonly<{
+  /** Any of the seven frames (and the ephemeral one when declared); the tag decides the shape. */
+  decodeFrame: FrameDecoder<Frame<A, V, R, E>>;
+  /** What a host accepts from its guest: `join` and `action` (and the ephemeral frame); a host frame here is refused. */
+  decodeGuestFrame: FrameDecoder<GuestFrame<A> | E>;
+  /** What a guest accepts from its host: the other five (and the ephemeral frame); a guest frame here is refused. */
+  decodeHostFrame: FrameDecoder<HostFrame<V, R> | E>;
   join: (guestName: string) => JoinFrame;
   action: (act: A) => ActionFrame<A>;
   welcome: (hostName: string, room: R) => WelcomeFrame<R>;
@@ -113,14 +128,25 @@ const withRoom =
     return r.ok ? ok({ ...h.value, ...r.value }) : r;
   };
 
-/** `join` and `action` come from a guest; the other five from a host (main.ts routes a send by it). */
-export const isGuestFrame = <A, V, R>(frame: Frame<A, V, R>): frame is GuestFrame<A> =>
-  frame.t === 'join' || frame.t === 'action';
+/** `join` and `action` come from a guest; the other five from a host (main.ts routes a send by it); an ephemeral frame is neither. */
+export const isGuestFrame = <A, V, R, E extends EphemeralFrame>(
+  frame: Frame<A, V, R, E>,
+): frame is GuestFrame<A> => frame.t === 'join' || frame.t === 'action';
 
-/** A game's protocol: its engine decoders guard `action` and `state`, its room the two lobby frames. */
-export const twoSeatProtocol = <A, V, RF extends RoomFields>(
+/** The ephemeral frame, which either side sends and the boot routes to whichever session is open. */
+export const isEphemeral = <A, V, R, E extends EphemeralFrame>(
+  frame: Frame<A, V, R, E>,
+): frame is E => frame.t === EPHEMERAL_TAG;
+
+/**
+ * A game's protocol: its engine decoders guard `action` and `state`, its room the two lobby frames,
+ * and `extra.ephemeral`, when given, an eighth `taggedUnion` case for the lane (absent, the seven
+ * cases and every refusal string are as they were).
+ */
+export const twoSeatProtocol = <A, V, RF extends RoomFields, E extends EphemeralFrame = never>(
   game: Readonly<{ decodeAction: Decoder<A>; decodeView: Decoder<V>; room: RF }>,
-): TwoSeatProtocol<A, V, Shape<RF>> => {
+  extra?: Readonly<{ ephemeral: Decoder<E> }>,
+): TwoSeatProtocol<A, V, Shape<RF>, E> => {
   type R = Shape<RF>;
   const room = object(game.room);
   const welcomeFrame = withRoom(object({ t: literal('welcome'), hostName: name }), room);
@@ -135,8 +161,9 @@ export const twoSeatProtocol = <A, V, RF extends RoomFields>(
     StateFrame<V>
   >;
 
-  // One case per tag in WIRE_TAGS order, so a refused tag names the seven as before (F2).
-  const frame: Decoder<Frame<A, V, R>> = taggedUnion('t', {
+  // One case per tag in WIRE_TAGS order, so a refused tag names the seven as before (F2); the
+  // ephemeral case comes eighth, and only for the game that declared it.
+  const seven = {
     join: joinFrame,
     action: actionFrame,
     welcome: welcomeFrame,
@@ -144,19 +171,24 @@ export const twoSeatProtocol = <A, V, RF extends RoomFields>(
     full: fullFrame,
     toast: toastFrame,
     state: stateFrame,
-  });
-  const decodeFrame = (input: unknown): Result<Frame<A, V, R>, DecodeFailure> =>
+  };
+  const frame = (
+    extra === undefined
+      ? taggedUnion('t', seven)
+      : taggedUnion('t', { ...seven, [EPHEMERAL_TAG]: extra.ephemeral })
+  ) as Decoder<Frame<A, V, R, E>>;
+  const decodeFrame = (input: unknown): Result<Frame<A, V, R, E>, DecodeFailure> =>
     failure(frame(input));
 
-  const decodeGuestFrame = (input: unknown): Result<GuestFrame<A>, DecodeFailure> => {
+  const decodeGuestFrame = (input: unknown): Result<GuestFrame<A> | E, DecodeFailure> => {
     const frame = decodeFrame(input);
     if (!frame.ok) return frame;
-    return isGuestFrame(frame.value)
+    return isGuestFrame(frame.value) || isEphemeral(frame.value)
       ? ok(frame.value)
       : err(`$.t: expected a guest frame (one of "join" | "action"), got "${frame.value.t}"`);
   };
 
-  const decodeHostFrame = (input: unknown): Result<HostFrame<V, R>, DecodeFailure> => {
+  const decodeHostFrame = (input: unknown): Result<HostFrame<V, R> | E, DecodeFailure> => {
     const frame = decodeFrame(input);
     if (!frame.ok) return frame;
     return isGuestFrame(frame.value)

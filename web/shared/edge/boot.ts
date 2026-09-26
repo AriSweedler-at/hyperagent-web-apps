@@ -22,6 +22,7 @@ import type {
   Ctx,
   Cue,
   Effect,
+  EphemeralOf,
   GuestContextOf,
   GuestFrameOf,
   HomeSnapshot,
@@ -355,6 +356,11 @@ export type BootConfig<G extends BootTypes, App extends BootApp<G>, Ex extends o
     ) => SessionLike<'guest', GuestFrameOf<G>>;
     /** The game's protocol.ts `isGuestFrame`: which side of the wire a `send` effect's frame belongs to. */
     isGuestFrame: (frame: HostFrameOf<G> | GuestFrameOf<G>) => frame is GuestFrameOf<G>;
+    /**
+     * The game's protocol.ts `isEphemeral`, for a game with an ephemeral lane (`ShellTypes.Ephemeral`):
+     * a `send` of that frame goes out on whichever session is open, host or guest. Absent, no frame is one.
+     */
+    isEphemeral?: (frame: HostFrameOf<G> | GuestFrameOf<G>) => frame is EphemeralOf<G>;
   }>;
   /** The engine's legal actions for a view (the hook's `legal()`). */
   legal: (view: G['View']) => ReadonlyArray<G['Action']>;
@@ -517,6 +523,10 @@ export const bootShell = <
       },
       send: (frame) => {
         if (session === null) return;
+        if (cfg.net.isEphemeral?.(frame) === true) {
+          session.send(frame);
+          return;
+        }
         if (session.kind === 'host') {
           if (!cfg.net.isGuestFrame(frame)) session.send(frame);
         } else if (cfg.net.isGuestFrame(frame)) session.send(frame);

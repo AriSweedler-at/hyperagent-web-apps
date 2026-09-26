@@ -23,8 +23,10 @@
 // is reset, so the session's own close still raises the "disconnected" toast the legacy raised.
 import {
   DEFAULT_GUEST_NAME,
+  EPHEMERAL_TAG,
   NAME_MAX,
   guestNameFor,
+  type EphemeralFrame,
   type GuestFrame,
   type HostFrame,
 } from '../lib/protocol.ts';
@@ -83,6 +85,13 @@ export type ShellTypes = Readonly<{
   Intent: Readonly<{ type: string }>;
   Effect: Readonly<{ type: string }>;
   Store: unknown;
+  /**
+   * The game's ephemeral frame (web/shared/lib/protocol.ts `EPHEMERAL_TAG`): what either side
+   * sends over the lane and `cfg.table.ephemeral` receives (briscola's live intent mirror,
+   * docs/design/briscola-battle.md §4.5); a game with none leaves it out and its frame unions are
+   * the seven frames as before.
+   */
+  Ephemeral?: EphemeralFrame;
 }>;
 
 /** The game's seats beyond the shell's own two: what its bag's `Seat` names, `never` when it names none. */
@@ -102,8 +111,13 @@ export type ScreenId<G extends ShellTypes> =
   | G['Screen'];
 export type TimerId<G extends ShellTypes> = 'longPress' | G['Timer'];
 export type Cue<G extends ShellTypes> = 'tap' | 'yourTurn' | G['Cue'];
-export type HostFrameOf<G extends ShellTypes> = HostFrame<G['View'], G['Opts']>;
-export type GuestFrameOf<G extends ShellTypes> = GuestFrame<G['Action']>;
+/** The game's ephemeral frame, `never` when its bag names none. */
+export type EphemeralOf<G extends ShellTypes> =
+  G extends Readonly<{ Ephemeral: infer E extends EphemeralFrame }> ? E : never;
+/** What arrives from, and goes to, a host: its five frames and the ephemeral one (either side sends that). */
+export type HostFrameOf<G extends ShellTypes> = HostFrame<G['View'], G['Opts']> | EphemeralOf<G>;
+/** What arrives from, and goes to, a guest: its two frames and the ephemeral one. */
+export type GuestFrameOf<G extends ShellTypes> = GuestFrame<G['Action']> | EphemeralOf<G>;
 
 /** `#hostWaitStatus` / `#guestWaitStatus`: the text and whether it still pulses. */
 export type WaitStatus = Readonly<{ text: string; pulse: boolean }>;
@@ -663,6 +677,12 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     rendered: (app: ShellApp<G>, prev: G['View'] | null, ctx: Ctx) => Step<G>;
     /** A refused action: the toast, and whatever the table drops (gin a waiting draw stage, backgammon its taps). */
     refuse: (app: ShellApp<G>, message: string) => Step<G>;
+    /**
+     * An ephemeral frame arrived (`host/frame` from the guest's channel, `guest/frame` from the
+     * host): `seat` is the sender's channel seat as the shell knows it (1 for the host's one guest,
+     * 0 for the host at a guest). Absent, the frame is dropped: nothing in the shell reads it.
+     */
+    ephemeral?: (app: ShellApp<G>, frame: EphemeralOf<G>, seat: SeatOf<G>, ctx: Ctx) => Step<G>;
   }>;
   /** Pass-and-play's two game-specific decisions (agreed in C2). */
   local: Readonly<{
@@ -1141,6 +1161,8 @@ const hostFrame = <G extends ShellTypes>(
     }
     case 'action':
       return s.game === null ? pure(app) : hostDispatch(app, 1, frame.action, ctx, cfg);
+    case EPHEMERAL_TAG:
+      return cfg.table.ephemeral?.(app, frame, 1, ctx) ?? pure(app);
   }
 };
 
@@ -1177,6 +1199,8 @@ const guestFrame = <G extends ShellTypes>(
         ctx,
         cfg,
       );
+    case EPHEMERAL_TAG:
+      return cfg.table.ephemeral?.(app, frame, 0, ctx) ?? pure(app);
   }
 };
 

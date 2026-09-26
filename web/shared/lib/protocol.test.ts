@@ -4,13 +4,15 @@
 // corpus, backgammon against its goldens) through the wrappers.
 import { describe, expect, test } from 'vitest';
 
-import { arrayOf, integer, literal, object, string, type Decoded } from './json.ts';
+import { arrayOf, integer, literal, nullable, object, string, type Decoded } from './json.ts';
 import {
   DEFAULT_GUEST_NAME,
+  EPHEMERAL_TAG,
   NAME_MAX,
   TOAST_MAX,
   WIRE_TAGS,
   guestNameFor,
+  isEphemeral,
   isGuestFrame,
   twoSeatProtocol,
   type Frame,
@@ -242,6 +244,60 @@ describe('decodeGuestFrame / decodeHostFrame keep each side to its own frames', 
 
   test('isGuestFrame routes a send: join and action to the host, the rest to the guest', () => {
     expect(SEVEN.map(isGuestFrame)).toEqual([true, true, false, false, false, false, false]);
+  });
+});
+
+describe('the ephemeral lane (docs/design/briscola-battle.md §4.5)', () => {
+  const decodeIntent = object({ t: literal('intent'), slot: nullable(literal(0, 1, 2)) });
+  type IntentFrame = Decoded<typeof decodeIntent>;
+  const lane = twoSeatProtocol({ decodeAction, decodeView, room }, { ephemeral: decodeIntent });
+  const intent: IntentFrame = { t: 'intent', slot: 2 };
+  const SEVEN_TAGS = '"join" | "action" | "welcome" | "lobby" | "full" | "toast" | "state"';
+
+  test('absent, the tag is refused with the seven-tag wording on every decoder and WIRE_TAGS stays seven', () => {
+    expect(EPHEMERAL_TAG).toBe('intent');
+    expect(WIRE_TAGS).not.toContain(EPHEMERAL_TAG);
+    const refused = { ok: false, error: `$.t: expected one of ${SEVEN_TAGS}` };
+    expect(decodeFrame(intent)).toEqual(refused);
+    expect(decodeGuestFrame(intent)).toEqual(refused);
+    expect(decodeHostFrame(intent)).toEqual(refused);
+  });
+
+  test('declared, both sides decode it, a bad field is refused by its path, an unknown tag names it eighth', () => {
+    expect(lane.decodeFrame(viaJson(intent))).toEqual({ ok: true, value: intent });
+    expect(lane.decodeGuestFrame(viaJson(intent))).toEqual({ ok: true, value: intent });
+    expect(lane.decodeHostFrame(viaJson(intent))).toEqual({ ok: true, value: intent });
+    expect(lane.decodeFrame({ t: 'intent', slot: 3 })).toEqual({
+      ok: false,
+      error: '$.slot: expected one of 0 | 1 | 2',
+    });
+    expect(lane.decodeFrame({ t: 'nope' })).toEqual({
+      ok: false,
+      error: `$.t: expected one of ${SEVEN_TAGS} | "intent"`,
+    });
+  });
+
+  test('declared, the seven frames and both sides` refusals are word for word what they were', () => {
+    SEVEN.forEach((frame) => {
+      expect(lane.decodeFrame(viaJson(frame))).toEqual({ ok: true, value: frame });
+    });
+    expect(lane.decodeGuestFrame({ t: 'full' })).toEqual({
+      ok: false,
+      error: '$.t: expected a guest frame (one of "join" | "action"), got "full"',
+    });
+    expect(lane.decodeHostFrame({ t: 'join', name: 'Jeff' })).toEqual({
+      ok: false,
+      error:
+        '$.t: expected a host frame (one of "welcome" | "lobby" | "full" | "toast" | "state"), got "join"',
+    });
+    expect(lane.join('Jeff')).toEqual(join('Jeff'));
+    expect(lane.state(view)).toEqual(state(view));
+  });
+
+  test('isEphemeral is true of the lane`s frame alone; isGuestFrame never claims it', () => {
+    const all: ReadonlyArray<Frame<Action, View, Room, IntentFrame>> = [...SEVEN, intent];
+    expect(all.map(isEphemeral)).toEqual([...SEVEN.map(() => false), true]);
+    expect(all.map(isGuestFrame)).toEqual([true, true, false, false, false, false, false, false]);
   });
 });
 

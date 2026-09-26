@@ -1295,6 +1295,85 @@ describe('pass and play', () => {
   });
 });
 
+describe('the ephemeral lane (docs/design/briscola-battle.md §4.5)', () => {
+  type IntentFrame = Readonly<{ t: 'intent'; slot: number | null }>;
+  /** The fake with a lane declared: the same game, one more member in its bag. */
+  type Lane = Fake & Readonly<{ Ephemeral: IntentFrame }>;
+  type LaneApp = ShellApp<Lane>;
+  const seen: (readonly [IntentFrame, SeatOf<Lane>, number])[] = [];
+  const LANE: ShellConfig<Lane> = {
+    ...FAKE,
+    table: {
+      ...FAKE.table,
+      ephemeral: (app, frame, seat, c) => {
+        seen.push([frame, seat, c.now()]);
+        return step(app, toast(`intent:${String(seat)}:${String(frame.slot)}`));
+      },
+    },
+  };
+  /** The same bag with no hook: what the shell does on its own with the frame. */
+  const BARE: ShellConfig<Lane> = {
+    ...FAKE,
+    table: {
+      initial: FAKE.table.initial,
+      reset: FAKE.table.reset,
+      rendered: FAKE.table.rendered,
+      refuse: FAKE.table.refuse,
+    },
+  };
+  const frame: IntentFrame = { t: 'intent', slot: 2 };
+  const hosting: LaneApp = withShell(initialApp, {
+    role: 'host',
+    game: dealt,
+    view: viewFor(dealt, 0),
+  });
+  const joined: LaneApp = withShell(initialApp, { role: 'guest', view: viewFor(dealt, 1) });
+
+  test('host/frame hands the guest`s frame to the hook as seat 1 with the clock; guest/frame the host`s as seat 0', () => {
+    seen.length = 0;
+    const atHost = reduceShell(hosting, { type: 'host/frame', frame }, ctx, LANE);
+    expect(atHost.app).toBe(hosting);
+    expect(atHost.effects).toEqual([{ type: 'toast', message: 'intent:1:2', ms: null }]);
+    const atGuest = reduceShell(joined, { type: 'guest/frame', frame }, ctx, LANE);
+    expect(atGuest.app).toBe(joined);
+    expect(atGuest.effects).toEqual([{ type: 'toast', message: 'intent:0:2', ms: null }]);
+    expect(seen).toEqual([
+      [frame, 1, NOW],
+      [frame, 0, NOW],
+    ]);
+  });
+
+  test('without the hook the frame is dropped on both sides: the App is the same record and nothing is emitted', () => {
+    expect(reduceShell(hosting, { type: 'host/frame', frame }, ctx, BARE)).toEqual({
+      app: hosting,
+      effects: [],
+    });
+    expect(reduceShell(joined, { type: 'guest/frame', frame }, ctx, BARE)).toEqual({
+      app: joined,
+      effects: [],
+    });
+  });
+
+  test('the seven frames still take their own routes beside the lane (a join is welcomed, a state is painted)', () => {
+    const welcomed = reduceShell(
+      withShell(initialApp, { role: 'host', myName: 'Ann' }),
+      { type: 'host/frame', frame: { t: 'join', name: 'Jeff' } },
+      ctx,
+      LANE,
+    );
+    expect(welcomed.app.shell).toMatchObject({ oppName: 'Jeff', oppConnected: true });
+    expect(welcomed.effects.map((e) => e.type)).toEqual(['send']);
+    const painted = reduceShell(
+      joined,
+      { type: 'guest/frame', frame: { t: 'state', view: viewFor(dealt, 1) } },
+      ctx,
+      LANE,
+    );
+    expect(marks(painted.app)).toEqual(['frame', `rendered:prev@${String(NOW)}`]);
+    expect(seen.length).toBe(2);
+  });
+});
+
 describe('the finished game`s record (the owner, 2026-09-25)', () => {
   const records = (effects: ReadonlyArray<FakeEffect>): ReadonlyArray<RecentGame> =>
     effects.flatMap((e) => (e.type === 'recordGame' ? [e.game] : []));
