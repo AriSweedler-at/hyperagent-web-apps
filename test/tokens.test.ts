@@ -5,11 +5,12 @@
 // the Fidice restyle drops the overrides. Backgammon's theme.css does the same on purpose (its
 // parchment-and-aegean palette is not a restyle target; docs/design/backgammon-board.md §3): a
 // partial override would inherit gin's green felt for the names it forgot. The shell tokens
-// (docs/design/dry-round-2.md G1; CONTRACT.md "Shell tokens") follow the same rule for the two shell
-// games: tokens.css declares them with gin's values, backgammon redeclares every one, and only
-// web/shared/styles/shell.css reads them; fidice links no shell.css and declares none of them (the
-// restyle decides). The computed-style goldens pin the resolved values; this test pins where each
-// name is declared, which the goldens cannot see.
+// (docs/design/dry-round-2.md G1; CONTRACT.md "Shell tokens") follow the same rule: tokens.css
+// declares them with gin's values, backgammon's and fidice's theme.css redeclare every one (fidice's
+// on its Kezar Lake palette, read by no rule until its page links shell.css at M1 of
+// docs/design/fidice-shell-adoption.md), and only web/shared/styles/shell.css reads them. The
+// computed-style goldens pin the resolved values; this test pins where each name is declared, which
+// the goldens cannot see.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -110,13 +111,9 @@ test('gin theme.css redeclares no shared name: tokens.css is the single source o
   ]);
 });
 
-test('fidice theme.css redeclares every palette name and no shell token: its look holds until the restyle', () => {
+test('fidice theme.css redeclares every shared name: its Kezar Lake palette never inherits gin felt', () => {
   const fidice = new Set(rootNames(FIDICE_THEME));
-  expect(PALETTE.filter((name) => !fidice.has(name))).toEqual([]);
-  expect(
-    SHELL_TOKENS.filter((name) => fidice.has(name)),
-    'fidice links no shell.css',
-  ).toEqual([]);
+  expect(SHARED.filter((name) => !fidice.has(name))).toEqual([]);
 });
 
 test('briscola theme.css redeclares every shared name: its café palette never inherits gin felt', () => {
