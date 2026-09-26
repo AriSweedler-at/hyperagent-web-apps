@@ -78,6 +78,23 @@ export const readEvents = (page: Page): Promise<ReadonlyArray<GameEvent>> =>
 export const readSettleStage = (page: Page): Promise<string | null> =>
   page.evaluate<string | null>('window.__briscola.app.table.settle?.stage ?? null');
 
+/**
+ * The beat waits for my tap to draw (ui/state.ts `awaitingDraw`, docs/design/briscola-battle.md
+ * §3.1 DRAW): the stage is `draw` and the seat this device shows is among the drawers. The wait
+ * has no timer, so a test that plays through a trick must tap (`tapToDraw`) or wait forever.
+ */
+export const readAwaitingDraw = (page: Page): Promise<boolean> =>
+  page.evaluate<boolean>(
+    `(() => { const s = window.__briscola.app.table.settle; return s !== null && s.stage === 'draw' && s.trick.drew.includes(s.me); })()`,
+  );
+
+/**
+ * Tap to draw as a finger does: `#stock` (its click is `draw/tap`; the reducer takes it while the
+ * beat waits and drops it otherwise, so a tap that lands after a collapse is harmless). The box
+ * stays when the stock is out (`.stock.empty`), so the last card's draw taps the same place.
+ */
+export const tapToDraw = (page: Page): Promise<void> => page.locator('#stock').click();
+
 /** An engine action through the reducer (`window.__briscola.act`), for every role. */
 export const briscolaAct = (page: Page, action: Action): Promise<void> =>
   page.evaluate(`window.__briscola.act(${JSON.stringify(action)})`);
@@ -173,7 +190,16 @@ export const waitForSettle = async (page: Page, no: number): Promise<View> => {
   await expect
     .poll(
       async () => {
-        const [view, stage] = await Promise.all([readView(page), readSettleStage(page)]);
+        const [view, stage, awaiting] = await Promise.all([
+          readView(page),
+          readSettleStage(page),
+          readAwaitingDraw(page),
+        ]);
+        // My draw waits for the tap (the phone holder's, D2 (a)): tap, then keep polling.
+        if (awaiting) {
+          await tapToDraw(page);
+          return 'draw (tapped)';
+        }
         return view?.lastTrick?.no === no && stage === null ? 'settled' : String(stage);
       },
       { timeout: 15_000 },
@@ -509,13 +535,18 @@ const TARGET_SELECTOR =
   '#tableScreen button, #hand .slot:not(.empty), #curtainOverlay .btn, #resultOverlay .btn, #menuOverlay .btn';
 
 /**
- * The page-side read. A lift and a flight are transitions: by default it measures once the running
- * ones have settled, as a finger would, and once the flyers and hidden arrivals (ui/motion.ts) have
- * landed, 2s at most; `quick` reads at once (the fan inside the 900ms hold of the settle beat).
+ * The page-side read. A lift and a flight are transitions, and the drawn card's turn to its face
+ * (`.card.flipping`, theme.css `draw-flip`: a finite animation whose first frame is edge-on, so a
+ * box read mid-turn has no width) is the one animation waited out; the pulses (`awaiting`,
+ * `tappable`, `to-move`) run forever and move no box, so they are not. By default it measures once
+ * the running ones have settled, as a finger would, and once the flyers and hidden arrivals
+ * (ui/motion.ts) have landed, 2s at most; `quick` reads at once (the fan inside the 900ms hold of
+ * the settle beat).
  */
 const geometryScript = (quick: boolean): string => `(async () => {
   if (!${String(quick)}) {
-    const settling = document.getAnimations().filter((a) => a instanceof CSSTransition).map((a) => a.finished.catch(() => null));
+    const waited = (a) => a instanceof CSSTransition || (a instanceof CSSAnimation && a.animationName === 'draw-flip');
+    const settling = document.getAnimations().filter(waited).map((a) => a.finished.catch(() => null));
     await Promise.race([Promise.all(settling), new Promise((done) => setTimeout(done, 1500))]);
     await new Promise((done) => {
       const t0 = performance.now();

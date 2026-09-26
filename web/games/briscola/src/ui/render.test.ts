@@ -31,6 +31,7 @@ import { deckKey, deckOf, deckSubText } from './deck.ts';
 import { briscolaPage, type BriscolaPage } from './page.fake.ts';
 import {
   DRAWING_STATUS,
+  DRAW_TAP_STATUS,
   PLAY_AGAIN_LABEL,
   bindAll,
   connDotClass,
@@ -48,6 +49,7 @@ import {
 import {
   DEFAULT_OPTS,
   SCREENS,
+  awaitingDraw,
   initialApp,
   reduce,
   type App,
@@ -103,9 +105,14 @@ const playFirst = (app: App): App => {
   return run(app, { type: 'card/tap', cardId: id }, { type: 'card/tap', cardId: id }).app;
 };
 const elapsed = (app: App): App => run(app, { type: 'settle/elapsed' }).app;
-/** The settle beat run to its end (at most the three stages). */
+/** The draw's tap while the beat waits for it. */
+const tapped = (app: App): App => run(app, { type: 'draw/tap' }).app;
+/** The settle beat run to its end (at most the five stages), the draw's tap taken where it waits. */
 const settled = (app: App): App =>
-  Array.from({ length: 3 }).reduce<App>((a) => (a.table.settle === null ? a : elapsed(a)), app);
+  Array.from({ length: 5 }).reduce<App>(
+    (a) => (a.table.settle === null ? a : awaitingDraw(a.table.settle) ? tapped(a) : elapsed(a)),
+    app,
+  );
 const shown = (p: BriscolaPage): ReadonlyArray<string> =>
   SCREENS.filter((id) => !p.get(id).hidden());
 const c = (id: string): Card => {
@@ -529,12 +536,43 @@ describe('the two-player table', () => {
           .match(/class="card back tiny"/g) ?? []
       ).length,
     ).toBe(2);
-    // Draw: "Drawing…", the tallies scored, the seats refilled, the stock still as before the draw.
+    // Draw: my draw waits for the tap ("Drawing… tap the stock", the stock tappable, my slot
+    // pulsing round the hidden card), the tallies scored, the seats refilled, the stock still as
+    // before the draw.
     const draw = elapsed(fly);
     paint(p.doc, draw);
     expect(draw.table.settle?.stage).toBe('draw');
-    expect(p.get('statusText').text()).toBe(DRAWING_STATUS);
+    expect(awaitingDraw(draw.table.settle)).toBe(true);
+    expect(p.get('statusText').text()).toBe(DRAW_TAP_STATUS);
     expect(p.get('tableScreen').attr('data-beat')).toBe(`${String(start)}:1:1:draw`);
+    expect(p.get('stock').hasClass('tappable')).toBe(true);
+    // Over declared slots: the drawn card's slot pulses (`awaiting`) round the hidden card; the others do not.
+    const ids = view(draw).me.hand.map((c) => c.id);
+    const drawnId = ids.find((id) => !holder.me.hand.some((h) => h.id === id));
+    if (drawnId === undefined) throw new Error('no drawn card');
+    const hp = declareHand(ids);
+    paint(hp.page.doc, draw);
+    hp.slots.forEach((slot, i) => {
+      expect(slot.hasClass('awaiting')).toBe(ids[i] === drawnId);
+    });
+    expect(hp.cards.get(drawnId)?.hasClass('arriving')).toBe(true);
+    expect(hp.cards.get(drawnId)?.hasClass('flipping')).toBe(false);
+    // The timer's end is the wait: nothing changes until the tap.
+    expect(elapsed(draw)).toBe(draw);
+    // The tap: my back flies and the card turns over (`flipping`); the slot stops pulsing; the
+    // card shows once its clone has landed (nothing flew over the fake, so at once).
+    const mine = tapped(draw);
+    paint(p.doc, mine);
+    expect(mine.table.settle?.stage).toBe('drawMine');
+    expect(p.get('statusText').text()).toBe(DRAWING_STATUS);
+    expect(p.get('tableScreen').attr('data-beat')).toBe(`${String(start)}:1:1:drawMine`);
+    expect(p.get('stock').hasClass('tappable')).toBe(false);
+    paint(hp.page.doc, mine);
+    hp.slots.forEach((slot) => {
+      expect(slot.hasClass('awaiting')).toBe(false);
+    });
+    expect(hp.cards.get(drawnId)?.hasClass('flipping')).toBe(true);
+    expect(hp.cards.get(drawnId)?.hasClass('arriving')).toBe(false);
     expect(
       (
         p
@@ -552,7 +590,7 @@ describe('the two-player table', () => {
     expect(chipsOf(winnerStrip())).toBe(1);
     expect(chipsOf(loserStrip())).toBe(0);
     // Cold: the stock thinned, the trick cleared for the winner's lead, the beat forgotten.
-    const cold = elapsed(draw);
+    const cold = settled(mine);
     expect(cold.table.settle).toBeNull();
     paint(p.doc, cold);
     expect(p.get('stock').attr('data-count')).toBe('32');
@@ -758,16 +796,20 @@ describe('bindAll', () => {
     p.get('hand').fire('keydown', { key: 'a', target: fakeTarget({ closest: { '.slot': slot } }) });
     p.get('trick').fire('click');
     p.get('briscola').fire('click');
+    p.get('stock').fire('click');
+    // The felt's tap (no card, no slot) and the stock's are the draw's tap (dropped by the reducer outside the wait).
     expect(r.intents).toEqual([
       { type: 'card/tap', cardId: '7D' },
+      { type: 'draw/tap' },
       { type: 'card/tap', cardId: '7D' },
       { type: 'table/tap' },
       { type: 'exchange/click' },
+      { type: 'draw/tap' },
     ]);
     expect(handIntentOf({ target: fakeTarget({}) } as unknown as Event)).toBeNull();
     // Disabled controls dispatch nothing; enabled ones their constant.
     p.get('playBtn').fire('click');
-    expect(r.intents).toHaveLength(4);
+    expect(r.intents).toHaveLength(6);
     p.get('rsReplayBtn').fire('click');
     p.get('leaveBtn').fire('click');
     p.get('historyBtn').fire('click');
@@ -775,7 +817,7 @@ describe('bindAll', () => {
     p.get('soundBtn').fire('click');
     p.get('handoffBtn').fire('click');
     p.get('resultChipBtn').fire('click');
-    expect(r.intents.slice(4)).toEqual([
+    expect(r.intents.slice(6)).toEqual([
       { type: 'replay/click' },
       { type: 'leave/request' },
       { type: 'history/open' },
@@ -790,7 +832,7 @@ describe('bindAll', () => {
     p.get('resultOverlay').fire('click', { target: fakeTarget({ id: 'rsTitle' }) });
     p.get('closeHistoryBtn').fire('click');
     p.get('closeRulesBtn').fire('click');
-    expect(r.intents.slice(11)).toEqual([
+    expect(r.intents.slice(13)).toEqual([
       { type: 'result/peek' },
       { type: 'result/peek' },
       { type: 'history/close' },

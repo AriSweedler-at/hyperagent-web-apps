@@ -116,7 +116,7 @@ import {
   type IntentSlot,
 } from '../protocol.ts';
 import { BRISCOLA_SHELL, parseOpts } from '../shellConfig.ts';
-import { DURATIONS, durationsFor, type Durations } from './beat.ts';
+import { DURATIONS, drawRunMs, drawSpan, durationsFor, type Durations } from './beat.ts';
 import {
   DECK_KIND,
   DEFAULT_CARD_PACK,
@@ -253,9 +253,15 @@ export type Briscola = Readonly<{
 
 export type Shell = ShellState<Briscola>;
 
-export type SettleStage = 'hold' | 'fly' | 'draw';
-/** A trick settling on the table (§5.4): the stage the beat is at and the record it paints from. */
-export type Settle = Readonly<{ stage: SettleStage; trick: TrickRecord }>;
+/**
+ * The beat's stages (§5.4; docs/design/briscola-battle.md §3.1 DRAW): the trick held, its flight
+ * to the winner, then the draws round MY tap: `draw` is the seats before me in `drew` drawing (and
+ * then the wait for my tap, the absence of a timer), `drawMine` my back's flight and flip after
+ * the tap, `drawRest` the seats after me.
+ */
+export type SettleStage = 'hold' | 'fly' | 'draw' | 'drawMine' | 'drawRest';
+/** A trick settling on the table (§5.4): the stage the beat is at, the record it paints from and whose device this is (the seat whose draw waits for a tap). */
+export type Settle = Readonly<{ stage: SettleStage; trick: TrickRecord; me: Seat }>;
 /** A card dragged from the hand (ui/table/dragger.ts): its id and whether it is over the trick. */
 export type Drag = Readonly<{ card: string; over: boolean }>;
 /**
@@ -408,6 +414,8 @@ export type TableIntent =
   | Readonly<{ type: 'escape' }>
   /** The `settle` timer fired: the beat moves to its next stage or ends. */
   | Readonly<{ type: 'settle/elapsed' }>
+  /** `#stock`, my awaiting slot or the felt tapped while my draw waits (§3.1 DRAW): my back flies and flips; dropped at any other moment. */
+  | Readonly<{ type: 'draw/tap' }>
   /** The seat count changed on the home screen: the raw values, parsed against the current room and remembered. */
   | Readonly<{ type: 'opts/set'; raw: Raw }>
   /** `#p3NameInput` / `#p4NameInput` typed: remembered under its key. */
@@ -578,30 +586,53 @@ export const phrasesBetween = (
 
 // ---- the settle beat ----------------------------------------------------------------------------
 
-/** How long a stage holds the table at these durations (the device's speed and motion preference, ui/beat.ts): the hold, the flight, then one draw per seat with the gaps between. */
+/**
+ * How long a stage holds the table at these durations (the device's speed and motion preference,
+ * ui/beat.ts): the hold, the flight, the draws of the seats before me (0 when none: the wait opens
+ * at once), my own flight and flip, the draws of the seats after me. 0 arms no timer.
+ */
 export const settleMs = (settle: Settle, d: Durations = DURATIONS): number => {
+  const span = drawSpan(settle.trick.drew, settle.me);
   switch (settle.stage) {
     case 'hold':
       return d.holdMs;
     case 'fly':
       return d.flyMs;
     case 'draw':
-      return d.drawMs + d.drawGapMs * Math.max(0, settle.trick.drew.length - 1);
+      return drawRunMs(span.before, d);
+    case 'drawMine':
+      return d.drawMs + d.flipMs;
+    case 'drawRest':
+      return drawRunMs(span.after, d);
   }
 };
+
+/** My draw waits for a tap: the beat is at `draw` and I am among the drawers (§3.1; the wait is the absence of a timer). */
+export const awaitingDraw = (settle: Settle | null): boolean =>
+  settle?.stage === 'draw' && drawSpan(settle.trick.drew, settle.me).mine;
 
 /** The durations this device's table runs at: its speed switch, and `prefers-reduced-motion` when the context carries it. */
 const beatDurations = (app: App, ctx: Context): Durations =>
   durationsFor(app.table.speed, ctx.reducedMotion === true);
 
-/** The stage after this one, or null when the beat is done (no draw once the stock is out). */
+/**
+ * The stage after this one when its timer fires, or null when the beat is done (no draw once the
+ * stock is out). At `draw` the seats before me have drawn: my draw now waits for the tap (the
+ * same stage, no timer) when I draw, else the beat is done; `drawMine` runs on to the seats after
+ * me, or ends when none.
+ */
 export const nextStage = (settle: Settle): Settle | null => {
+  const span = drawSpan(settle.trick.drew, settle.me);
   switch (settle.stage) {
     case 'hold':
       return { ...settle, stage: 'fly' };
     case 'fly':
       return settle.trick.drew.length === 0 ? null : { ...settle, stage: 'draw' };
     case 'draw':
+      return span.mine ? settle : null;
+    case 'drawMine':
+      return span.after > 0 ? { ...settle, stage: 'drawRest' } : null;
+    case 'drawRest':
       return null;
   }
 };
@@ -654,7 +685,14 @@ const rendered = (app: App, prev: View | null, ctx: Context): Step => {
   const running = app.table.settle;
   // A trick already settling is not restarted by a re-sent frame; a newer one takes its place.
   const starts = resolved !== null && running?.trick.no !== resolved.no;
-  const settle: Settle | null = starts ? { stage: 'hold', trick: resolved } : running;
+  // A NEWER view while my draw waits (the winner led while I dawdled): the wait collapses in this
+  // paint, the table painted whole (§3.7); a re-sent frame (the same key) keeps waiting.
+  const collapses = !starts && fresh && awaitingDraw(running) && view.trick.length > 0;
+  const settle: Settle | null = starts
+    ? { stage: 'hold', trick: resolved, me: view.me.idx }
+    : collapses
+      ? null
+      : running;
   return step(
     {
       shell: { ...app.shell, cues: { key }, screen: 'tableScreen' },
@@ -677,16 +715,32 @@ const settleElapsed = (app: App, ctx: Context): Step => {
   const running = app.table.settle;
   if (running === null) return pure(app);
   const next = nextStage(running);
-  if (next !== null)
-    return step(
-      withTable(app, { settle: next }),
-      ...(next.stage === 'draw' ? [fx('draw.stock')] : []),
-      settleTimer(settleMs(next, beatDurations(app, ctx))),
-    );
+  // The seats before me have drawn: my draw waits for the tap (no timer; `draw/tap` moves on).
+  if (next === running) return pure(app);
+  if (next !== null) return step(withTable(app, { settle: next }), ...stageEffects(next, app, ctx));
   const done = withTable(app, { settle: null });
   return app.shell.role === 'local'
     ? localBroadcast(done, false, ctx, BRISCOLA)
     : rendered(done, done.shell.view, ctx);
+};
+
+/**
+ * Entering a stage: the draw chime where backs leave the stock, and the stage's timer unless it
+ * holds nothing (0 ms: the wait for my tap, or a run of no seats, which `draw/tap` or the next
+ * stage moves past at once).
+ */
+const stageEffects = (next: Settle, app: App, ctx: Context): ReadonlyArray<Effect> => {
+  const ms = settleMs(next, beatDurations(app, ctx));
+  const chimes = next.stage === 'drawMine' || (next.stage === 'draw' && ms > 0);
+  return [...(chimes ? [fx('draw.stock')] : []), ...(ms > 0 ? [settleTimer(ms)] : [])];
+};
+
+/** `draw/tap` (§3.1 DRAW): while my draw waits, my back flies from the stock (or the briscola) and flips; at any other moment nothing. */
+const drawTap = (app: App, ctx: Context): Step => {
+  const running = app.table.settle;
+  if (running === null || !awaitingDraw(running)) return pure(app);
+  const next: Settle = { ...running, stage: 'drawMine' };
+  return step(withTable(app, { settle: next }), ...stageEffects(next, app, ctx));
 };
 
 // ---- acting -----------------------------------------------------------------------------------
@@ -871,6 +925,8 @@ const playSelected = (app: App, ctx: Context): Step => {
 };
 
 const cardTap = (app: App, cardId: string, ctx: Context): Step => {
+  // While my draw waits, a tap anywhere on the hand (the hidden drawn card included) is the draw's tap.
+  if (awaitingDraw(app.table.settle)) return drawTap(app, ctx);
   // The click a drag's release fires reaches a card: a drag lifts nothing.
   if (app.table.drag !== null) return pure(app);
   // The click a touch long-press's lift fires: the player was reading the card's name, not playing it.
@@ -914,6 +970,8 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
         : pure(dropped);
     }
     case 'exchange/click': {
+      // The trump card tapped while my draw waits for it (the last card, the trick's last drawer): the draw's tap.
+      if (awaitingDraw(t.settle)) return drawTap(app, ctx);
       // The trump card tapped: the exchange while it is offered (D24); otherwise a closer look at it.
       if (v?.canExchange === true) return act(app, { type: 'exchange' }, ctx);
       const shown = app.shell.view;
@@ -945,6 +1003,8 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
       return escape(app);
     case 'settle/elapsed':
       return settleElapsed(app, ctx);
+    case 'draw/tap':
+      return drawTap(app, ctx);
     case 'opts/set': {
       const opts = parseOpts(intent.raw, app.shell.opts);
       return step(withShell(app, { opts }), { type: 'writeOpts', opts });

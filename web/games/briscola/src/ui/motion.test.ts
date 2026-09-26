@@ -26,6 +26,9 @@ import {
   handCard,
   newPlays,
   playFlight,
+  drawsAfter,
+  drawsBefore,
+  myDrawFlight,
   seatCards,
   seatTaken,
   settleTimeline,
@@ -45,8 +48,20 @@ const ZERO = rect(0, 0, 0, 0);
 
 describe('durations', () => {
   test('the design figures, and 1 ms glides with a 300 ms hold under reduced motion', () => {
-    expect(DURATIONS).toEqual({ holdMs: 900, flyMs: 320, drawMs: 260, drawGapMs: 160 });
-    expect(REDUCED_DURATIONS).toEqual({ holdMs: 300, flyMs: 1, drawMs: 1, drawGapMs: 1 });
+    expect(DURATIONS).toEqual({
+      holdMs: 900,
+      flyMs: 320,
+      drawMs: 260,
+      drawGapMs: 160,
+      flipMs: 220,
+    });
+    expect(REDUCED_DURATIONS).toEqual({
+      holdMs: 300,
+      flyMs: 1,
+      drawMs: 1,
+      drawGapMs: 1,
+      flipMs: 1,
+    });
     expect(durationsFor('normal', false)).toBe(DURATIONS);
     expect(durationsFor('normal', true)).toBe(REDUCED_DURATIONS);
     expect(durationsFor('off', false)).toBe(REDUCED_DURATIONS);
@@ -56,6 +71,7 @@ describe('durations', () => {
       flyMs: 200,
       drawMs: 160,
       drawGapMs: 100,
+      flipMs: 140,
     });
   });
 });
@@ -111,6 +127,51 @@ describe('the plans', () => {
         (f) => f.delayMs,
       ),
     ).toEqual([0, 1, 2, 3]);
+  });
+
+  test('the draws round my tap (docs/design/briscola-battle.md §3.1): a range slices the order with its first flight leaving at once; the seats before me, the seats after me; my own from the stock, or the briscola when I took it last', () => {
+    const four = { drew: [2, 3, 0, 1] as const, trumpTaken: true };
+    // Me = seat 0: seats 2 and 3 draw before my tap, seat 1 after; the last (seat 1) took the briscola.
+    expect(drawsBefore(four.drew, 0)).toEqual({ start: 0, end: 2 });
+    expect(drawsAfter(four.drew, 0)).toEqual({ start: 3, end: 4 });
+    expect(drawFlights(four, cellOf, DURATIONS, drawsBefore(four.drew, 0))).toEqual([
+      { from: STOCK, to: seatCards('R2'), ms: 260, delayMs: 0, hideArrival: true },
+      { from: STOCK, to: seatCards('R2'), ms: 260, delayMs: 160, hideArrival: true },
+    ]);
+    expect(drawFlights(four, cellOf, DURATIONS, drawsAfter(four.drew, 0))).toEqual([
+      {
+        from: BRISCOLA,
+        to: seatCards('R2'),
+        ms: 260,
+        delayMs: 0,
+        rotated: true,
+        hideArrival: true,
+      },
+    ]);
+    expect(myDrawFlight(four, 0, handCard('3S'), DURATIONS)).toEqual({
+      from: STOCK,
+      to: handCard('3S'),
+      ms: 260,
+      delayMs: 0,
+      hideArrival: true,
+    });
+    // Me = seat 1, the last drawer, the briscola taken: mine comes turned from the briscola; nobody after.
+    expect(myDrawFlight(four, 1, handCard('3S'), DURATIONS)).toEqual({
+      from: BRISCOLA,
+      to: handCard('3S'),
+      ms: 260,
+      delayMs: 0,
+      rotated: true,
+      hideArrival: true,
+    });
+    expect(drawsAfter(four.drew, 1)).toEqual({ start: 4, end: 4 });
+    expect(drawFlights(four, cellOf, DURATIONS, drawsAfter(four.drew, 1))).toEqual([]);
+    // Not drawing (a seat not at the table): every seat before, none after, no flight of mine.
+    expect(drawsBefore([1, 0], 2)).toEqual({ start: 0, end: 2 });
+    expect(drawsAfter([1, 0], 2)).toEqual({ start: 2, end: 2 });
+    expect(
+      myDrawFlight({ drew: [1, 0], trumpTaken: false }, 2, handCard('3S'), DURATIONS),
+    ).toBeNull();
   });
 
   test('totalMs and the timeline the reducer arms', () => {

@@ -22,7 +22,7 @@ import {
   viewFor,
   withPosition,
 } from '../engine/index.ts';
-import type { Card, GameEvent, State, TrickRecord, View } from '../engine/index.ts';
+import type { Card, GameEvent, Seat, State, TrickRecord, View } from '../engine/index.ts';
 import {
   action as actionFrame,
   intent as intentWire,
@@ -32,6 +32,7 @@ import {
 } from '../protocol.ts';
 import { LOCAL_NAMES } from '../shellConfig.ts';
 import { DEFAULT_CARD_PACK, STORAGE_KEYS } from '../storage.ts';
+import { DURATIONS, drawSpan } from './beat.ts';
 import { CUES } from './sound.ts';
 import {
   DEFAULT_OPTS,
@@ -77,6 +78,7 @@ import {
   saveFor,
   seatNames,
   seatPlayers,
+  awaitingDraw,
   settleMs,
   settleSlots,
   trickResolvedBetween,
@@ -86,6 +88,7 @@ import {
   type EffectDeps,
   type HomeSnapshot,
   type Raw,
+  type SettleStage,
   type Step,
 } from './state.ts';
 
@@ -181,10 +184,13 @@ const playFirst = (app: App): Step => {
   return run(app, { type: 'card/tap', cardId: id }, { type: 'card/tap', cardId: id });
 };
 
+/** One step of the settle beat: the draw's tap where it waits for it, else the timer's end. */
+const beat = (app: App): App =>
+  run(app, awaitingDraw(app.table.settle) ? { type: 'draw/tap' } : { type: 'settle/elapsed' }).app;
 /** One step of a whole game: the curtain lifted, a trick settled, or the first legal card played. */
 const advance = (app: App): App => {
   if (app.table.curtain !== null) return revealed(app);
-  if (app.table.settle !== null) return run(app, { type: 'settle/elapsed' }).app;
+  if (app.table.settle !== null) return beat(app);
   if (view(app).phase === 'over') return run(app, { type: 'replay/click' }).app;
   return playFirst(app).app;
 };
@@ -445,8 +451,9 @@ describe('pass and play: the lift, the play, the settle beat and the curtain', (
     expect(g.trickNo).toBe(1);
     const trick = g.lastTrick;
     if (trick === null) throw new Error('no trick');
-    // Hold: the trick painted from the record, the view still the last player's, no curtain yet.
-    expect(second.app.table.settle).toEqual({ stage: 'hold', trick });
+    // Hold: the trick painted from the record, the view still the last player's (whose draw will wait), no curtain yet.
+    const me = view(second.app).me.idx;
+    expect(second.app.table.settle).toEqual({ stage: 'hold', trick, me });
     expect(view(second.app).me.idx).toBe(first.shell.view?.me.idx);
     expect(second.app.table.curtain).toBeNull();
     expect(timers(second.effects)).toEqual([['settle', HOLD_MS, 'settle/elapsed']]);
@@ -478,10 +485,38 @@ describe('pass and play: the lift, the play, the settle beat and the curtain', (
     expect(timers(fly.effects)).toEqual([['settle', FLY_MS, 'settle/elapsed']]);
     const draw = run(fly.app, { type: 'settle/elapsed' });
     expect(draw.app.table.settle?.stage).toBe('draw');
-    expect(cues(draw.effects)).toEqual(['draw.stock']);
-    expect(timers(draw.effects)).toEqual([['settle', DRAW_MS + DRAW_GAP_MS, 'settle/elapsed']]);
+    // The seats before me in the draw order (the winner first) draw now, chiming; none when I won.
+    const span = drawSpan(trick.drew, me);
+    expect(cues(draw.effects)).toEqual(span.before > 0 ? ['draw.stock'] : []);
+    expect(timers(draw.effects)).toEqual(
+      span.before > 0 ? [['settle', DRAW_MS, 'settle/elapsed']] : [],
+    );
+    // Then my draw waits for the tap: the timer's end (or none) changes nothing; a hand tap is the draw's.
+    expect(awaitingDraw(draw.app.table.settle)).toBe(true);
+    expect(run(draw.app, { type: 'settle/elapsed' }).app).toBe(draw.app);
+    const mine = run(draw.app, { type: 'draw/tap' });
+    expect(mine.app.table.settle?.stage).toBe('drawMine');
+    expect(cues(mine.effects)).toEqual(['draw.stock']);
+    expect(timers(mine.effects)).toEqual([
+      ['settle', DRAW_MS + DURATIONS.flipMs, 'settle/elapsed'],
+    ]);
+    const viaHand = run(draw.app, {
+      type: 'card/tap',
+      cardId: view(draw.app).me.hand[0]?.id ?? '',
+    });
+    expect(viaHand.app.table.settle?.stage).toBe('drawMine');
+    // A second tap, or a tap at any other stage, is nothing.
+    expect(run(mine.app, { type: 'draw/tap' }).app).toBe(mine.app);
+    expect(run(fly.app, { type: 'draw/tap' }).app).toBe(fly.app);
+    // My card landed: the seats after me draw, or the beat is done.
+    const rest = run(mine.app, { type: 'settle/elapsed' });
+    if (span.after > 0) {
+      expect(rest.app.table.settle?.stage).toBe('drawRest');
+      expect(cues(rest.effects)).toEqual([]);
+      expect(timers(rest.effects)).toEqual([['settle', DRAW_MS, 'settle/elapsed']]);
+    }
     // Done: the winner's view, the curtain for them unless they held the phone, nothing re-plays.
-    const done = run(draw.app, { type: 'settle/elapsed' });
+    const done = span.after > 0 ? run(rest.app, { type: 'settle/elapsed' }) : rest;
     expect(done.app.table.settle).toBeNull();
     expect(view(done.app).me.idx).toBe(trick.winner);
     expect(done.app.table.curtain).toBe(
@@ -504,13 +539,32 @@ describe('pass and play: the lift, the play, the settle beat and the curtain', (
       trumpTaken: false,
     };
     const none: TrickRecord = { ...drew, drew: [] };
-    expect(settleMs({ stage: 'hold', trick: drew })).toBe(HOLD_MS);
-    expect(settleMs({ stage: 'fly', trick: drew })).toBe(FLY_MS);
-    expect(settleMs({ stage: 'draw', trick: drew })).toBe(DRAW_MS + 2 * DRAW_GAP_MS);
-    expect(nextStage({ stage: 'hold', trick: drew })).toEqual({ stage: 'fly', trick: drew });
-    expect(nextStage({ stage: 'fly', trick: drew })).toEqual({ stage: 'draw', trick: drew });
-    expect(nextStage({ stage: 'fly', trick: none })).toBeNull();
-    expect(nextStage({ stage: 'draw', trick: drew })).toBeNull();
+    // Me = seat 0, second in the order: one seat before my tap, one after.
+    const at = (stage: SettleStage, trick: TrickRecord, me: Seat = 0) => ({ stage, trick, me });
+    expect(settleMs(at('hold', drew))).toBe(HOLD_MS);
+    expect(settleMs(at('fly', drew))).toBe(FLY_MS);
+    expect(settleMs(at('draw', drew))).toBe(DRAW_MS);
+    expect(settleMs(at('drawMine', drew))).toBe(DRAW_MS + DURATIONS.flipMs);
+    expect(settleMs(at('drawRest', drew))).toBe(DRAW_MS);
+    // The winner (first to draw) waits at once; the last drawer has everyone before and nobody after.
+    expect(settleMs(at('draw', drew, 1))).toBe(0);
+    expect(settleMs(at('draw', drew, 2))).toBe(DRAW_MS + DRAW_GAP_MS);
+    expect(settleMs(at('drawRest', drew, 2))).toBe(0);
+    // A device whose seat is not drawing runs every draw at `draw`.
+    expect(settleMs(at('draw', drew, 3))).toBe(DRAW_MS + 2 * DRAW_GAP_MS);
+    expect(nextStage(at('hold', drew))).toEqual(at('fly', drew));
+    expect(nextStage(at('fly', drew))).toEqual(at('draw', drew));
+    expect(nextStage(at('fly', none))).toBeNull();
+    // `draw` ends in the wait for my tap (the same settle), or in nothing when I do not draw.
+    const waiting = at('draw', drew);
+    expect(nextStage(waiting)).toBe(waiting);
+    expect(nextStage(at('draw', drew, 3))).toBeNull();
+    expect(nextStage(at('drawMine', drew))).toEqual(at('drawRest', drew));
+    expect(nextStage(at('drawMine', drew, 2))).toBeNull();
+    expect(nextStage(at('drawRest', drew))).toBeNull();
+    expect(awaitingDraw(null)).toBe(false);
+    expect(awaitingDraw(at('draw', drew, 3))).toBe(false);
+    expect(awaitingDraw(at('drawMine', drew))).toBe(false);
   });
 
   test('play/click and table/tap play the lifted card; a drag lights, follows and drops on the trick; released elsewhere it clears; Escape peels one thing at a time', () => {
@@ -802,7 +856,7 @@ describe('hosting and joining (two seats)', () => {
       { type: 'host/deal' },
     ).app;
     const step1 = (app: App): App => {
-      if (app.table.settle !== null) return run(app, { type: 'settle/elapsed' }).app;
+      if (app.table.settle !== null) return beat(app);
       const g = game(app);
       if (g.phase === 'over') return run(app, { type: 'replay/click' }).app;
       const seat = actorOf(g) ?? 0;
