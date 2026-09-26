@@ -184,6 +184,9 @@ report), frees the seat it left, and hands that seat to a held join if one waits
     `oppName`, so every two-seat save is the legacy literal; `ShellState.seats` is written for the
     two-seat games too (seat 1 mirroring `oppName`/`oppConnected`), which their pins, being
     `toMatchObject` or built from `run()`, do not see.
+    `cfg.seats.fixed` (briscola's reducer PR): a fixed table starts full, so Start and the deal
+    wait for the room's capacity rather than `min` (the three-seat deck cannot be dealt to two),
+    and `min` names the smallest table alone; without it `min` gates as §7 says.
 
 ## 7. What the shell asks next (C2/C3, or the PR after; every item is today's shape at capacity 2; landed as §6.12)
 

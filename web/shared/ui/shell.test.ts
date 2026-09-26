@@ -685,6 +685,51 @@ describe('a table of four (FAKE4: cfg.seats)', () => {
     ]);
   });
 
+  test('a fixed table (cfg.seats.fixed) starts full: Start and the deal wait for the room`s capacity, whatever `min` says; without it `min` gates', () => {
+    const at = (
+      seats: NonNullable<ShellConfig<Fake4>['seats']>,
+    ): ((app: App4, ...intents: ReadonlyArray<Intent<Fake4>>) => Step<Fake4>) => {
+      const cfg: ShellConfig<Fake4> = { ...FAKE4, seats };
+      return (app, ...intents) =>
+        intents.reduce<Step<Fake4>>(
+          (s, intent) => {
+            if (!isShellIntent(intent)) throw new Error(`not a shell intent: ${intent.type}`);
+            const next = reduceShell(s.app, intent, ctx, cfg);
+            return { app: next.app, effects: [...s.effects, ...next.effects] };
+          },
+          { app, effects: [] },
+        );
+    };
+    const fixed = at({ min: 2, max: 4, fixed: true });
+    // A table of three: `min` 2 would show Start after one join; fixed, it waits for the third seat.
+    const three = fixed(
+      initialApp4,
+      { type: 'home/init', home },
+      { type: 'host/click', name: 'Ann', level: '3' },
+    ).app;
+    expect(three.shell.seats).toEqual([EMPTY_SEAT, EMPTY_SEAT]);
+    const one = fixed(three, join4('Bo', 1));
+    expect(one.app.shell.startGameVisible).toBe(false);
+    expect(fixed(one.app, { type: 'host/deal' }).effects).toEqual([
+      { type: 'toast', message: '2 of 3 seated.', ms: null },
+    ]);
+    const two = fixed(one.app, join4('Cy', 2));
+    expect(two.app.shell.startGameVisible).toBe(true);
+    expect(game4(fixed(two.app, { type: 'host/deal' }).app).players.map((p) => p.name)).toEqual([
+      'Ann',
+      'Bo',
+      'Cy',
+    ]);
+    // A seat leaving the lobby hides Start again.
+    expect(
+      fixed(two.app, { type: 'host/guestGone', iceFailed: null, seat: 2 }).app.shell
+        .startGameVisible,
+    ).toBe(false);
+    // The same table without `fixed` starts at `min`.
+    const loose = at({ min: 2, max: 4 });
+    expect(loose(three, join4('Bo', 1)).app.shell.startGameVisible).toBe(true);
+  });
+
   test('an action is applied as the seat it came in on; a refusal is a toast frame to that seat alone; a seat that is down is not sent to', () => {
     const app = dealt4();
     const wrong = run4(app, {

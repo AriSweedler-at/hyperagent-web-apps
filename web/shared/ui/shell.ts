@@ -688,11 +688,13 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
    * A table of more than two seats (n-seat-sessions.md §7): the players a room may hold, the
    * host counted. Absent for the two-seat games, whose every flow is then the line it was. Set,
    * the room opens at `opts.capacity(opts)` seats (2..`max`; `max` when the game supplies no
-   * reader), Start enables at `min` seated, the host's `send`/`startHost` effects name seats and
-   * the capacity, and a guest reads its seat and the table off the room frames (`roomSeatingOf`:
-   * `you` and `seats` beside the options, D3), which the game's protocol puts there.
+   * reader), Start enables at `min` seated (or, with `fixed`, at the room's capacity: a fixed
+   * table starts full, since briscola's three-seat deck cannot be dealt to two; `min` is then the
+   * smallest table alone), the host's `send`/`startHost` effects name seats and the capacity, and
+   * a guest reads its seat and the table off the room frames (`roomSeatingOf`: `you` and `seats`
+   * beside the options, D3), which the game's protocol puts there.
    */
-  seats?: Readonly<{ min: number; max: number }>;
+  seats?: Readonly<{ min: number; max: number; fixed?: boolean }>;
   opts: Readonly<{
     initial: G['Opts'];
     /** The raw select/input values off `host/click`/`local/click`; `current` is the shell's for a missing value. */
@@ -1037,8 +1039,9 @@ export const roomSeatingOf = <G extends ShellTypes>(
   return you <= seats.length ? { you: you as SeatOf<G>, seats } : null;
 };
 
-/** Players at the table before the host may deal: the game's `min`, or two. */
-const minSeated = <G extends ShellTypes>(cfg: ShellConfig<G>): number => cfg.seats?.min ?? 2;
+/** Players at the table before the host may deal: every seat of a fixed table (`cfg.seats.fixed`: the room's capacity), else the game's `min`, or two. */
+const minSeated = <G extends ShellTypes>(s: ShellState<G>, cfg: ShellConfig<G>): number =>
+  cfg.seats === undefined ? 2 : cfg.seats.fixed === true ? capacityOf(s.opts, cfg) : cfg.seats.min;
 
 /** A `send` effect to one seat of an N-seat room; a two-seat game's is the literal it was, no `seat` key (its one channel is every open one). */
 const sendTo = <G extends ShellTypes>(
@@ -1411,7 +1414,9 @@ const guestGone = <G extends ShellTypes>(
         ? OPPONENT_LEFT_MSG
         : cfg.copy.seatLeft(name, seat, seated, capacity);
     return step(
-      withShell(withHostStatus(left, text), { startGameVisible: seated >= minSeated(cfg) }),
+      withShell(withHostStatus(left, text), {
+        startGameVisible: seated >= minSeated(left.shell, cfg),
+      }),
       ...lobbySends(left.shell, cfg),
     );
   }
@@ -1457,7 +1462,7 @@ const hostFrame = <G extends ShellTypes>(
           : cfg.copy.joined(name, names, capacity - seated);
       return step(
         withShell(withHostStatus(connected, text), {
-          startGameVisible: seated >= minSeated(cfg),
+          startGameVisible: seated >= minSeated(connected.shell, cfg),
         }),
         ...lobbySends(connected.shell, cfg),
       );
@@ -1936,13 +1941,13 @@ export const reduceShell = <G extends ShellTypes>(
     }
     case 'host/deal': {
       const seated = seatedCount(seatsOf(s, cfg));
-      if (seated < minSeated(cfg))
+      if (seated < minSeated(s, cfg))
         return step(
           app,
           toast(
             cfg.copy.notEnough === undefined
               ? WAITING_FOR_GUEST_MSG
-              : cfg.copy.notEnough(seated, minSeated(cfg)),
+              : cfg.copy.notEnough(seated, minSeated(s, cfg)),
           ),
         );
       // The host, then every guest seat in order (`guest`, `guest2`, `guest3`: seat 1 keeps the
