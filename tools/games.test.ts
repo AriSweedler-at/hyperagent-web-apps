@@ -56,7 +56,7 @@ describe('the games registry', () => {
         title: "Fidice — one-cup liar's dice",
         hook: 'window.__fidice',
         suite: 'fidice',
-        specs: [],
+        specs: ['**/fidice-*.spec.ts'],
         debug: 1,
         pageShape: {
           ids: [
@@ -71,7 +71,7 @@ describe('the games registry', () => {
             'fidiceTable',
             'toast',
           ],
-          rulesSlots: false,
+          rulesSlots: true,
         },
         contractFloors: { ts: 50, markup: 40 },
       },

@@ -193,11 +193,13 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
     title: "Fidice — one-cup liar's dice",
     hook: 'window.__fidice',
     suite: 'fidice',
-    specs: [],
+    // The shell path behind `?shell=1` (M4 of docs/design/fidice-shell-adoption.md): its own spec
+    // through the shell's raw ids, until M5 registers fidice as a shell game and the shell specs play it.
+    specs: ['**/fidice-*.spec.ts'],
     debug: 1,
     // The composed shell page's screens (M2 of docs/design/fidice-shell-adoption.md; page.ts): the
     // shell's five, the bot config screen, the Ladder tab's panel and the table's mount. The rules
-    // slots ship empty but nothing fills them until M4, so the row says false until then.
+    // slots ship empty and the shell path fills them at boot (M4, ui/rules.ts).
     pageShape: {
       ids: [
         'app',
@@ -211,7 +213,7 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
         'fidiceTable',
         'toast',
       ],
-      rulesSlots: false,
+      rulesSlots: true,
     },
     contractFloors: { ts: 50, markup: 40 },
   },

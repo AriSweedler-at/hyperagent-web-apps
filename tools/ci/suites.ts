@@ -435,9 +435,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         'web/games/fidice/src/net/**/*.ts',
         'web/games/fidice/src/app/**/*.ts',
         'web/games/fidice/src/view/**/*.ts',
-        // The shell path (docs/design/fidice-shell-adoption.md §4 M3), dark until M4: codec,
-        // protocol, storage, shellConfig, fx and the reducer with its sound table; net/shell/** is
-        // under net/** above.
+        // The shell path (docs/design/fidice-shell-adoption.md §4 M3, reachable behind `?shell=1`
+        // since M4): codec, protocol, storage, shellConfig, fx, flag, legal, the reducer with its
+        // sound table and the painters (ui/{render,home,local,waiting,rules,about}.ts); net/shell/**
+        // is under net/** above.
         'web/games/fidice/src/*.ts',
         'web/games/fidice/src/ui/**/*.ts',
       ],
@@ -473,17 +474,19 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
           statements: 100,
           branches: 84,
         },
-        // The shell path's modules (M3), each exercised by the test beside it, the replay oracle
+        // The shell path's modules (M3, M4), each exercised by the test beside it, the replay oracle
         // (ui/replay.test.ts) and the wire goldens; the sessions wrappers under net/shell/ by
-        // net/shell/sessions.test.ts over the shared harness. Measured at M3
-        // (lines/functions/statements/branches): src 97.6/94.9/97.8/92.2, ui 96.9/94.0/94.4/80.9
-        // (the reducer's painter-bound branches meet their DOM at M4's render tests; M7 lifts the row).
+        // net/shell/sessions.test.ts over the shared harness; the painters by their tests over the
+        // page fake (ui/page.fake.ts) and the vdom mounts over dom.fake.ts. Measured at M4
+        // (lines/functions/statements/branches): src 97.9/95.5/97.8/93.4, ui 98.7/97.9/97.2/87.7
+        // (M7 lifts the ui row once the vdom builders are painters).
         'web/games/fidice/src/*.ts': { lines: 97, functions: 94, statements: 97, branches: 92 },
         'web/games/fidice/src/ui/**': { lines: 96, functions: 94, statements: 94, branches: 80 },
       },
     },
     // Fidice's own online and relay specs folded into the two online shell specs (H1): its e2e job
-    // plays their fidice describes and nothing else, until the restyle brings it the shell (§4.6).
+    // plays their fidice describes, and since M4 its own shell-path spec (e2e/fidice-shell.spec.ts,
+    // REGISTRY.fidice.specs), until M5 registers it as a shell game and the shell specs play it.
     e2e: gameE2e('fidice'),
   },
   backgammon: {

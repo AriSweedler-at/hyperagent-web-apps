@@ -298,6 +298,8 @@ export type Table = Readonly<{
   ladders: Readonly<Record<LadderId, Ladder>>;
   /** `#ladderOverlay` shown over the table. */
   ladderOpen: boolean;
+  /** `#historyOverlay` shown over the table: the shell's history sheet, the finished games this device remembers (plan §7 D13). */
+  historyOpen: boolean;
   /** `#configScreen`'s target while it shows; null when it does not. */
   configTarget: ConfigTarget | null;
   /**
@@ -321,6 +323,7 @@ export const initialTable: Table = {
   showTruth: false,
   ladders: { main: EMPTY_LADDER, spec: EMPTY_LADDER },
   ladderOpen: false,
+  historyOpen: false,
   configTarget: null,
   extraNames: { 2: null, 3: null, 4: null, 5: null },
 };
@@ -369,6 +372,12 @@ export type TableIntent =
   | Readonly<{ type: 'ladder/close' }>
   | Readonly<{ type: 'ladder/toggle'; id: LadderId; key: string }>
   | Readonly<{ type: 'ladder/all'; id: LadderId; open: boolean }>
+  /** `#rulesBtnGame` and the rules sheet's close: the shell's `rulesOpen` (the in-game sheet; the home screen's Rules is a tab). */
+  | Readonly<{ type: 'rules/open' }>
+  | Readonly<{ type: 'rules/close' }>
+  /** `#historyBtn` and the history sheet's close. */
+  | Readonly<{ type: 'history/open' }>
+  | Readonly<{ type: 'history/close' }>
   | Readonly<{ type: 'config/open'; target: ConfigTarget }>
   | Readonly<{ type: 'config/close' }>
   | Readonly<{ type: 'config/pick'; choice: string }>
@@ -382,6 +391,8 @@ export type TableIntent =
   | Readonly<{ type: 'opts/set'; raw: Raw }>
   /** `#p3NameInput`..`#p6NameInput` typed: remembered under its key. */
   | Readonly<{ type: 'pname/typed'; seat: ExtraSeat; value: string }>
+  /** `#removeLocalBtn`: the seat's input goes and its key is forgotten (`#addLocalBtn` is a `pname/typed` of the empty string). */
+  | Readonly<{ type: 'pname/drop'; seat: ExtraSeat }>
   // ---- the game loop's timers (the legacy host session's) ----
   | Readonly<{ type: 'bot/step' }>
   | Readonly<{ type: 'autoNext' }>;
@@ -409,6 +420,10 @@ export const TABLE_INTENT_TYPES = [
   'ladder/close',
   'ladder/toggle',
   'ladder/all',
+  'rules/open',
+  'rules/close',
+  'history/open',
+  'history/close',
   'config/open',
   'config/close',
   'config/pick',
@@ -419,6 +434,7 @@ export const TABLE_INTENT_TYPES = [
   'watch/toggle',
   'opts/set',
   'pname/typed',
+  'pname/drop',
   'bot/step',
   'autoNext',
 ] as const satisfies ReadonlyArray<TableIntent['type']>;
@@ -440,10 +456,13 @@ export type TimerId = SharedTimerId<Fidice>;
 /** Fidice's own effects, handled by `runEffect` before the shared runner: the two preferences this page alone keeps. */
 export type TableEffect =
   | Readonly<{ type: 'writeOpts'; opts: Opts }>
-  | Readonly<{ type: 'rememberPName'; seat: ExtraSeat; name: string }>;
-export const TABLE_EFFECT_TYPES = ['writeOpts', 'rememberPName'] as const satisfies ReadonlyArray<
-  TableEffect['type']
->;
+  | Readonly<{ type: 'rememberPName'; seat: ExtraSeat; name: string }>
+  | Readonly<{ type: 'forgetPName'; seat: ExtraSeat }>;
+export const TABLE_EFFECT_TYPES = [
+  'writeOpts',
+  'rememberPName',
+  'forgetPName',
+] as const satisfies ReadonlyArray<TableEffect['type']>;
 
 export type Effect = SharedEffect<Fidice>;
 export type Step = SharedStep<Fidice>;
@@ -543,6 +562,18 @@ const viewer: ShellConfig<Fidice>['local']['viewer'] = (app, game) => {
   const seat = shellSeatOfChair(game, r.holder);
   const curtain = humansAt(game) > 1 && app.shell.revealed !== seat ? seat : null;
   return { seat, curtain, effects: [] };
+};
+
+/**
+ * The chair the table is painted for (ui/render.ts `uiOf`): my chair online; pass the phone, the
+ * chair of the seat the view was made for (`viewer`: the cup holder's while a human holds it, the
+ * last seat shown otherwise), which `shell.mySeat` (always 0 there) does not name.
+ */
+export const viewedChair = (app: App): EngineSeat | null => {
+  const s = app.shell;
+  if (s.view === null) return null;
+  const seat = s.role === 'local' && s.game !== null ? viewer(app, s.game).seat : s.mySeat;
+  return engineSeatOf(s.view, seat);
 };
 
 /** `curtain/reveal`: whoever holds the cup lifts the curtain. */
@@ -710,8 +741,8 @@ const hostDeal = (app: App, ctx: Context): Step => {
   );
 };
 
-/** The handoff (plan §7 D8) is the shell's two-seat room: offered for a pass-the-phone game of exactly two humans and no computer. */
-const handoffable = (app: App): boolean => {
+/** The handoff (plan §7 D8) is the shell's two-seat room: offered for a pass-the-phone game of exactly two humans and no computer (ui/render.ts paints `#handoffBtn` by it). */
+export const handoffable = (app: App): boolean => {
   const s = app.shell;
   const game =
     s.role === 'local' && s.game !== null
@@ -985,6 +1016,14 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
       return pure(
         withLadder(app, intent.id, () => ({ open: [], closed: [], allOpen: intent.open })),
       );
+    case 'rules/open':
+      return pure(withShell(app, { rulesOpen: true }));
+    case 'rules/close':
+      return pure(withShell(app, { rulesOpen: false }));
+    case 'history/open':
+      return pure(withTable(app, { historyOpen: true }));
+    case 'history/close':
+      return pure(withTable(app, { historyOpen: false }));
     case 'config/open':
       return step(
         withShell(withTable(app, { configTarget: intent.target }), { screen: 'configScreen' }),
@@ -1040,6 +1079,11 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
         withTable(app, { extraNames: { ...t.extraNames, [intent.seat]: intent.value } }),
         { type: 'rememberPName', seat: intent.seat, name: intent.value.trim() },
       );
+    case 'pname/drop':
+      return step(withTable(app, { extraNames: { ...t.extraNames, [intent.seat]: null } }), {
+        type: 'forgetPName',
+        seat: intent.seat,
+      });
     case 'bot/step':
       return botStep(app, ctx);
     case 'autoNext':
@@ -1107,6 +1151,9 @@ export const runEffect = (app: App, effect: Effect, deps: EffectDeps): void => {
       return;
     case 'rememberPName':
       EXTRA_NAME_PREFS[effect.seat].write(deps.store, effect.name);
+      return;
+    case 'forgetPName':
+      EXTRA_NAME_PREFS[effect.seat].write(deps.store, '');
       return;
   }
 };

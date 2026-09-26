@@ -45,6 +45,7 @@ import {
   runEffect,
   saveFor,
   suggestionsOf,
+  viewedChair,
   type App,
   type Effect,
   type EffectDeps,
@@ -749,5 +750,46 @@ describe('the table`s small intents (the picker, the dice, the ladders, the trut
       actionFrame({ type: 'peek' }),
       actionFrame({ type: 'finish' }),
     ]);
+  });
+});
+
+describe('the sheets, the extra seats and the viewed chair (M4)', () => {
+  test('rules/open and rules/close set the shell`s rulesOpen; history/open and history/close the table`s historyOpen', () => {
+    const opened = run(initialApp, { type: 'rules/open' }, { type: 'history/open' });
+    expect(opened.app.shell.rulesOpen).toBe(true);
+    expect(opened.app.table.historyOpen).toBe(true);
+    expect(opened.effects).toEqual([]);
+    const closed = run(opened.app, { type: 'rules/close' }, { type: 'history/close' });
+    expect(closed.app.shell.rulesOpen).toBe(false);
+    expect(closed.app.table.historyOpen).toBe(false);
+  });
+
+  test('pname/drop forgets an extra seat: its name goes null and its key is removed by forgetPName', () => {
+    const typed = run(initialApp, { type: 'pname/typed', seat: 2, value: 'Cara' });
+    expect(typed.app.table.extraNames[2]).toBe('Cara');
+    const { app, effects } = run(typed.app, { type: 'pname/drop', seat: 2 });
+    expect(app.table.extraNames[2]).toBeNull();
+    expect(effects).toEqual([{ type: 'forgetPName', seat: 2 }]);
+    const s = fakeStorage();
+    s.map.set(STORAGE_KEYS.p3Name, 'Cara');
+    const deps = fakeDeps(createStore(s)) as EffectDeps;
+    runEffect(app, { type: 'forgetPName', seat: 2 }, deps);
+    expect(s.map.has(STORAGE_KEYS.p3Name)).toBe(false);
+  });
+
+  test('viewedChair: null without a view; online my seat`s chair; pass the phone the chair the view was made for (the cup holder`s)', () => {
+    expect(viewedChair(initialApp)).toBeNull();
+    const dealt = run(hosting([{ name: 'Bob', connected: true }]), { type: 'host/deal' }).app;
+    expect(viewedChair(dealt)).toBe(0);
+    const local = run(
+      initialApp,
+      { type: 'home/init', home },
+      { type: 'mode/set', mode: 'local' },
+      { type: 'local/click', p1: 'Ann', p2: 'Bob' },
+    ).app;
+    const holder = local.shell.view?.round?.holder;
+    expect(holder).not.toBeUndefined();
+    expect(viewedChair(local)).toBe(holder);
+    expect(local.table.curtain).not.toBeNull();
   });
 });
