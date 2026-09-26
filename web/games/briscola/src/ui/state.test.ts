@@ -304,6 +304,18 @@ describe('home', () => {
     expect(bad.app).toBe(pack.app);
     expect(bad.effects).toEqual([]);
   });
+
+  test('speed/set takes one of the three speeds and remembers it, refuses a stranger', () => {
+    const quick = run(initialApp, { type: 'speed/set', speed: 'quick' });
+    expect(quick.app.table.speed).toBe('quick');
+    expect(quick.effects).toEqual([{ type: 'writeSpeed', speed: 'quick' }]);
+    const bad = run(quick.app, { type: 'speed/set', speed: 'fast' });
+    expect(bad.app).toBe(quick.app);
+    expect(bad.effects).toEqual([]);
+    const off = run(quick.app, { type: 'speed/set', speed: 'off' });
+    expect(off.app.table.speed).toBe('off');
+    expect(off.effects).toEqual([{ type: 'writeSpeed', speed: 'off' }]);
+  });
 });
 
 describe('pass and play: seating two, three and four', () => {
@@ -1097,6 +1109,8 @@ describe('runEffect', () => {
     expect(s.map.get(STORAGE_KEYS.p4Name)).toBe('Dan');
     runEffect(l, { type: 'writeCardPack', pack: 'default' }, deps);
     expect(s.map.get(STORAGE_KEYS.cardPack)).toBe('default');
+    runEffect(l, { type: 'writeSpeed', speed: 'quick' }, deps);
+    expect(s.map.get(STORAGE_KEYS.speed)).toBe('quick');
     runEffect(l, { type: 'persist' }, deps);
     expect(s.map.get(STORAGE_KEYS.save)).toBe(JSON.stringify({ role: 'local', game: game(l) }));
   });
