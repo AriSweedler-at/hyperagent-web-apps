@@ -147,6 +147,20 @@ describe('every pack is whole on disk', () => {
     expect(checkPack({ ...linea, attribution: null, decks: { italian40: italian } }, read)).toEqual(
       [],
     );
+    // A printed size (`card`) the picture sits far from would letterbox under `contain`: the tool
+    // says so. Napoletane's 51 × 83 is 0.037 from its scan, inside the tolerance.
+    const napoletane = packByName('napoletane');
+    const pictures = napoletane.decks.italian40;
+    if (pictures?.kind !== 'files') throw new Error('napoletane has files');
+    expect(pictures.card).toEqual({ w: 51, h: 83 });
+    expect(
+      checkPack(
+        { ...napoletane, decks: { italian40: { ...pictures, card: { w: 50, h: 100 } } } },
+        read,
+      ),
+    ).toEqual([
+      'napoletane/italian40: the picture aspect 0.577 is 0.077 off its printed box 0.5 (50 × 100): over 0.05, contain would letterbox it',
+    ]);
     expect(
       checkPack(
         {

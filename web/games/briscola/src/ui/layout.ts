@@ -20,9 +20,16 @@ export const DESKTOP_MIN_WIDTH = 900;
 export const layoutFor = (width: number): Layout =>
   width >= DESKTOP_MIN_WIDTH ? 'desktop' : 'phone';
 
-/** The deck's nominal aspect (linea, the Bergamo cut) and the range the layout is designed for (D13). */
+/**
+ * The deck's nominal aspect (linea, the Bergamo cut) and the range the layout is designed for
+ * (D13; docs/design/briscola-battle.md §2.1): linea 0.518, napoletane's printed box 51 × 83 =
+ * 0.614, a Tuscan pack 0.66, american (gin's card) 0.694. The floor is where the two clamps meet:
+ * below 0.50 the height budget still binds when the width cap arrives, so the column overtops the
+ * viewport by a few px at 1280×820 and 430×840 (a Trevigiane-shaped pack, 0.47 to 0.495, engages
+ * the short-viewport fallbacks; `fits` says so and layout.test.ts pins the corners).
+ */
 export const DEFAULT_ASPECT = 0.518;
-export const ASPECT_RANGE = { min: 0.5, max: 0.62 } as const;
+export const ASPECT_RANGE = { min: 0.5, max: 0.7 } as const;
 
 /**
  * theme.css `#tableScreen` on a phone: `--card-w: clamp(72px, min((100vw - 56px) / 3, (100dvh -

@@ -286,7 +286,8 @@ describe('resolveBack, resolveAspect, attributionLine', () => {
   test("the aspect is the pictures' own for a files or sprite pack, the printed deck's for a relabelled glyph, else the deck kind's nominal", () => {
     expect(resolveAspect(packByName('linea'), 'italian40')).toBe(100 / 193);
     expect(resolveAspect(packByName('linea'), 'french52')).toBe(DECKS.french52.aspect);
-    expect(resolveAspect(packByName('napoletane'), 'italian40')).toBe(0.577);
+    // Napoletane states its printed size (51 × 83): the box is that, the picture (0.577) is contained in it.
+    expect(resolveAspect(packByName('napoletane'), 'italian40')).toBeCloseTo(51 / 83, 6);
     expect(resolveAspect(packByName('yu-gi-oh'), 'italian40')).toBe(0.518);
     // Gin's card at an Italian table is gin's 100 × 144, not the long thin Italian cut.
     expect(resolveAspect(packByName('american'), 'italian40')).toBe(100 / 144);

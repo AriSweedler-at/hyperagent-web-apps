@@ -35,6 +35,7 @@ export const MESSAGES = {
   NO_EXCHANGE: 'This table does not play the exchange',
   TRUMP_GONE: 'The briscola has been drawn',
   NO_TRICK_YET: 'Take a trick before you exchange',
+  NOT_LEADING: 'Exchange as you lead the trick, before its first card',
   NO_SWAP_CARD:
     'Only the sette (or the due) of briscola can be exchanged, and only for a higher card',
   BAD_SEAT: 'No such seat at this table',
@@ -56,6 +57,18 @@ const sideHasTrick = (state: State, seat: Seat): boolean => {
   return state.piles.some((pile, s) => pile.length > 0 && sideOf(n, s as Seat) === sideOf(n, seat));
 };
 
+/**
+ * E14 / D12: the window the flag's value opens. `true` is D24's (the actor's own turn before
+ * playing, leader or follower, a trick of the side's); `'leader'` is the Loodens/BGA window
+ * ("appena vinto una presa, prima di pescare": under the automatic draw, as the seat leads the
+ * next trick), on a trick of the seat's own (`piles[seat]`; four is a free-for-all, so
+ * `sideHasTrick` is per seat too and the two values differ in the lead alone).
+ */
+const windowOpen = (state: State, seat: Seat): boolean =>
+  state.options.exchange === 'leader'
+    ? state.trick.length === 0 && (state.piles[seat] ?? []).length > 0
+    : sideHasTrick(state, seat);
+
 /** The card in the seat's hand the trump card calls for, if held (E14). */
 const swapCard = (state: State, seat: Seat): Cards[number] | undefined => {
   const wanted = exchangeCardFor(state.trumpCard);
@@ -63,15 +76,16 @@ const swapCard = (state: State, seat: Seat): Cards[number] | undefined => {
 };
 
 /**
- * E14: the flag, the trick phase, the actor's own turn, the trump card still on the table, a trick
- * taken by the side, and the called-for card in hand.
+ * E14: the flag, the trick phase, the actor's own turn, the trump card still on the table, the
+ * flag's window open (a trick taken by the side; under `'leader'`, the seat's own and the trick
+ * not yet opened), and the called-for card in hand.
  */
 export const canExchange = (state: State, seat: Seat): boolean =>
-  state.options.exchange &&
+  state.options.exchange !== false &&
   state.phase === 'trick' &&
   state.turn === seat &&
   state.stock.length > 0 &&
-  sideHasTrick(state, seat) &&
+  windowOpen(state, seat) &&
   swapCard(state, seat) !== undefined;
 
 /** Append one event; its id is its index in the stream (E18). */
@@ -80,11 +94,13 @@ const withEvent = (state: State, make: (id: number) => GameEvent): State => ({
   events: [...state.events, make(state.events.length)],
 });
 
-/** E14's refusals in order, then the swap: the held card goes under the stock, the trump card into the hand. */
+/** E14's refusals in order (`NOT_LEADING` between `TRUMP_GONE` and `NO_TRICK_YET` under `'leader'`), then the swap: the held card goes under the stock, the trump card into the hand. */
 const exchange = (state: State, seat: Seat, now: Now): Applied => {
-  if (!state.options.exchange) return err(MESSAGES.NO_EXCHANGE);
+  if (state.options.exchange === false) return err(MESSAGES.NO_EXCHANGE);
   if (state.stock.length === 0) return err(MESSAGES.TRUMP_GONE);
-  if (!sideHasTrick(state, seat)) return err(MESSAGES.NO_TRICK_YET);
+  if (state.options.exchange === 'leader' && state.trick.length > 0)
+    return err(MESSAGES.NOT_LEADING);
+  if (!windowOpen(state, seat)) return err(MESSAGES.NO_TRICK_YET);
   const gave = swapCard(state, seat);
   if (gave === undefined) return err(MESSAGES.NO_SWAP_CARD);
   const took = state.trumpCard;

@@ -40,7 +40,8 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         await briscolaStartLocal(page, pagePath(project, 'briscola'), vp, LOCAL_NAMES[n]);
         const start = await tableGeometry(page);
         expect(start.players).toBe(n);
-        expect(start.aspect).toBeGreaterThan(0);
+        // The default pack's box is the printed Napoletane card, 51 × 83 (briscola-battle.md §2.1).
+        expect(start.aspect).toBeCloseTo(51 / 83, 3);
         expectTableGeometry(start, 'curtain');
         const check = async (when: string): Promise<Frame> => {
           const g = await tableGeometry(page);
