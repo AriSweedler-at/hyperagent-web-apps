@@ -13,6 +13,7 @@
 import { appendHtml, requireId, trustedHtml, type PageLike } from '../../../../shared/edge/dom.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { SUIT_SPRITE_SVG } from '../../../../shared/ui/cardFace.ts';
+import IMPACT_SPRITE_SVG from '../../impact/impact-sprite.svg?raw';
 import { STORIES_IDS, bootStories, type StoriesDeps } from '../../../../shared/ui/stories.ts';
 import { bindAll, paint, showToast } from '../ui/render.ts';
 import { reduce, type App, type Effect, type Intent, type TimerId } from '../ui/state.ts';
@@ -63,5 +64,6 @@ export const bootStory = (doc: PageLike, id: string, nav: boolean, live = false)
   // paint: a `<symbol>` is found anywhere in the document, so the sprite sits inside `#app`, the one
   // element this module reaches by id (main.ts puts it first on the body).
   appendHtml(requireId(doc, STORIES_IDS.app), trustedHtml(SUIT_SPRITE_SVG));
+  appendHtml(requireId(doc, STORIES_IDS.app), trustedHtml(IMPACT_SPRITE_SVG));
   bootStories(doc, deps(doc), COPY).bootStory(id, nav, live);
 };

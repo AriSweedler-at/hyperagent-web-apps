@@ -36,6 +36,7 @@ import {
   trickFlights,
   unrotatedBox,
   type Flight,
+  clashGeometry,
 } from './motion.ts';
 
 const rect = (left: number, top: number, width: number, height: number): Rect => ({
@@ -454,5 +455,38 @@ describe('the landing scale', () => {
     const grown = table({ toAt: rect(300, 600, 138, 266) });
     flyCards(grown.page.doc, [grown.flight]);
     expect(grown.clone.style('transform')).toContain('scale(2, 2)');
+  });
+});
+
+describe('the clash geometry (docs/design/briscola-battle.md §3.1 CHARGE, STRIKE)', () => {
+  const box = (left: number, top: number, width = 40, height = 60): Rect => ({
+    left,
+    top,
+    width,
+    height,
+  });
+
+  test('side by side: the axis runs left to right, the contact point between the centres', () => {
+    const g = clashGeometry(box(0, 0), box(60, 0));
+    expect(g.ux).toBeCloseTo(1);
+    expect(g.uy).toBeCloseTo(0);
+    expect(g.gap).toBeCloseTo(60);
+    expect(g.cx).toBeCloseTo(50);
+    expect(g.cy).toBeCloseTo(30);
+  });
+
+  test('one above the other, and a diagonal pair: a unit axis in that direction', () => {
+    const down = clashGeometry(box(0, 0), box(0, 100));
+    expect(down.ux).toBeCloseTo(0);
+    expect(down.uy).toBeCloseTo(1);
+    expect(down.gap).toBeCloseTo(100);
+    const diag = clashGeometry(box(0, 0), box(30, 30));
+    expect(Math.hypot(diag.ux, diag.uy)).toBeCloseTo(1);
+    expect(diag.ux).toBeCloseTo(diag.uy);
+  });
+
+  test('two boxes on one spot (a fake, a hidden tab) read as side by side with no gap', () => {
+    const g = clashGeometry(box(10, 10), box(10, 10));
+    expect(g).toEqual({ ux: 1, uy: 0, gap: 0, cx: 30, cy: 40 });
   });
 });

@@ -509,6 +509,12 @@ export type TableGeometry = Readonly<{
   trick: Rect;
   /** The fan's cards in DOM (play) order, each with its column's z-index. */
   plays: ReadonlyArray<CardBox>;
+  /**
+   * The clash is on (`#trick[data-stage]` at charge, strike, impact or aftermath, docs/design/
+   * briscola-battle.md §3.1): the two fighters have left their columns by design, so the fan's
+   * containment and order are not checked; their z-order and everything else still is.
+   */
+  clash: boolean;
   stock: Rect;
   stockCard: Rect | null;
   briscola: Rect | null;
@@ -569,6 +575,7 @@ const geometryScript = (quick: boolean): string => `(async () => {
     handCards: Array.from(document.querySelectorAll('#hand .slot .card')).map((c) => cardOf(c, 0)),
     trick: rect(document.getElementById('trick')),
     plays: Array.from(document.querySelectorAll('#trick .play')).map((p) => cardOf(p.querySelector('.card'), Number(getComputedStyle(p).zIndex))),
+    clash: ['charge', 'strike', 'impact', 'aftermath'].includes(document.getElementById('trick').getAttribute('data-stage')),
     stock: rect(document.getElementById('stock')),
     stockCard: one('#stock .card'),
     briscola: shown(document.getElementById('briscola')) ? one('#briscola .card') : null,
@@ -674,19 +681,25 @@ export const expectBriscolaUnderStock = (g: TableGeometry, when: string): void =
 
 /**
  * The fan's cards inside `#trick` (a tilted card's box grows a few px past its column, and the
- * taking card lifts 6px through the hold), each right of the one before and above it in z.
+ * taking card lifts 6px through the beat), each right of the one before and above it in z. Through
+ * the clash (`g.clash`) the fighters charge away from and strike through their columns by design,
+ * so only their z-order is held to.
  */
 export const expectFan = (g: TableGeometry, when: string): void => {
   g.plays.forEach((p, i) => {
-    expect(inside(p.box, g.trick, 8), `${when}: fan card ${String(p.id)} outside #trick`).toBe(
-      true,
-    );
+    if (!g.clash) {
+      expect(inside(p.box, g.trick, 8), `${when}: fan card ${String(p.id)} outside #trick`).toBe(
+        true,
+      );
+    }
     if (i === 0) return;
     const prev = g.plays[i - 1] ?? p;
-    expect(
-      centreX(p.box),
-      `${when}: fan card ${String(p.id)} is not right of ${String(prev.id)}`,
-    ).toBeGreaterThan(centreX(prev.box));
+    if (!g.clash) {
+      expect(
+        centreX(p.box),
+        `${when}: fan card ${String(p.id)} is not right of ${String(prev.id)}`,
+      ).toBeGreaterThan(centreX(prev.box));
+    }
     expect(
       p.z,
       `${when}: fan card ${String(p.id)} is not above ${String(prev.id)}`,

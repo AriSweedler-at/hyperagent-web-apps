@@ -116,7 +116,8 @@ import {
   type IntentSlot,
 } from '../protocol.ts';
 import { BRISCOLA_SHELL, parseOpts } from '../shellConfig.ts';
-import { DURATIONS, drawRunMs, drawSpan, durationsFor, type Durations } from './beat.ts';
+import { DURATIONS, drawRunMs, drawSpan, durationsFor, freezeMsFor, stageMs } from './beat.ts';
+import { TEMPO_SCALE, variantOf, type Variant } from './variant.ts';
 import {
   DECK_KIND,
   DEFAULT_CARD_PACK,
@@ -259,9 +260,33 @@ export type Shell = ShellState<Briscola>;
  * then the wait for my tap, the absence of a timer), `drawMine` my back's flight and flip after
  * the tap, `drawRest` the seats after me.
  */
-export type SettleStage = 'hold' | 'fly' | 'draw' | 'drawMine' | 'drawRest';
-/** A trick settling on the table (§5.4): the stage the beat is at, the record it paints from and whose device this is (the seat whose draw waits for a tap). */
-export type Settle = Readonly<{ stage: SettleStage; trick: TrickRecord; me: Seat }>;
+export type ClashStage = 'follow' | 'charge' | 'strike' | 'impact' | 'aftermath';
+export type SettleStage = ClashStage | 'fly' | 'draw' | 'drawMine' | 'drawRest';
+/** The clash (docs/design/briscola-battle.md §3.1): the completing card's flight, the anticipation, the strike, the hit-stop, the poses; then `fly` packs the trick. */
+export const CLASH_STAGES: ReadonlyArray<SettleStage> = [
+  'follow',
+  'charge',
+  'strike',
+  'impact',
+  'aftermath',
+];
+export const isClashStage = (stage: SettleStage): stage is ClashStage =>
+  CLASH_STAGES.includes(stage);
+/**
+ * A trick settling on the table (§5.4): the stage the beat is at, the record it paints from, whose
+ * device this is (the seat whose draw waits for a tap), the clash's variant (§3.3, the same on
+ * every device), the trick's `phrases` held until `impact` (the BOOM is the phrase's first note,
+ * §3.5 of the sound history) and the view the beat started from (`since`, §3.7: a peer's play
+ * landing mid-beat flies in at the beat's end, diffed against it).
+ */
+export type Settle = Readonly<{
+  stage: SettleStage;
+  trick: TrickRecord;
+  me: Seat;
+  variant: Variant;
+  phrases: ReadonlyArray<Effect>;
+  since: View;
+}>;
 /** A card dragged from the hand (ui/table/dragger.ts): its id and whether it is over the trick. */
 export type Drag = Readonly<{ card: string; over: boolean }>;
 /**
@@ -591,11 +616,21 @@ export const phrasesBetween = (
  * ui/beat.ts): the hold, the flight, the draws of the seats before me (0 when none: the wait opens
  * at once), my own flight and flip, the draws of the seats after me. 0 arms no timer.
  */
-export const settleMs = (settle: Settle, d: Durations = DURATIONS): number => {
+export const settleMs = (settle: Settle, speed: Speed = 'normal', reduced = false): number => {
+  const d = durationsFor(speed, reduced);
   const span = drawSpan(settle.trick.drew, settle.me);
+  const tempo = TEMPO_SCALE[settle.variant.tempo];
   switch (settle.stage) {
-    case 'hold':
-      return d.holdMs;
+    case 'follow':
+      return stageMs('followLast', speed, reduced);
+    case 'charge':
+      return stageMs('charge', speed, reduced, tempo);
+    case 'strike':
+      return stageMs('strike', speed, reduced, tempo);
+    case 'impact':
+      return freezeMsFor(settle.variant.freezeMs, speed, reduced);
+    case 'aftermath':
+      return stageMs('aftermath', speed, reduced, tempo);
     case 'fly':
       return d.flyMs;
     case 'draw':
@@ -611,20 +646,29 @@ export const settleMs = (settle: Settle, d: Durations = DURATIONS): number => {
 export const awaitingDraw = (settle: Settle | null): boolean =>
   settle?.stage === 'draw' && drawSpan(settle.trick.drew, settle.me).mine;
 
-/** The durations this device's table runs at: its speed switch, and `prefers-reduced-motion` when the context carries it. */
-const beatDurations = (app: App, ctx: Context): Durations =>
-  durationsFor(app.table.speed, ctx.reducedMotion === true);
+/** How long a stage holds on this device: its speed switch, and `prefers-reduced-motion` when the context carries it. */
+const beatMs = (settle: Settle, app: App, ctx: Context): number =>
+  settleMs(settle, app.table.speed, ctx.reducedMotion === true);
 
 /**
  * The stage after this one when its timer fires, or null when the beat is done (no draw once the
- * stock is out). At `draw` the seats before me have drawn: my draw now waits for the tap (the
- * same stage, no timer) when I draw, else the beat is done; `drawMine` runs on to the seats after
- * me, or ends when none.
+ * stock is out): the clash runs follow → charge → strike → impact → aftermath, then `fly` packs the
+ * trick. At `draw` the seats before me have drawn: my draw now waits for the tap (the same stage,
+ * no timer) when I draw, else the beat is done; `drawMine` runs on to the seats after me, or ends
+ * when none.
  */
 export const nextStage = (settle: Settle): Settle | null => {
   const span = drawSpan(settle.trick.drew, settle.me);
   switch (settle.stage) {
-    case 'hold':
+    case 'follow':
+      return { ...settle, stage: 'charge' };
+    case 'charge':
+      return { ...settle, stage: 'strike' };
+    case 'strike':
+      return { ...settle, stage: 'impact' };
+    case 'impact':
+      return { ...settle, stage: 'aftermath' };
+    case 'aftermath':
       return { ...settle, stage: 'fly' };
     case 'fly':
       return settle.trick.drew.length === 0 ? null : { ...settle, stage: 'draw' };
@@ -688,51 +732,82 @@ const rendered = (app: App, prev: View | null, ctx: Context): Step => {
   // A NEWER view while my draw waits (the winner led while I dawdled): the wait collapses in this
   // paint, the table painted whole (§3.7); a re-sent frame (the same key) keeps waiting.
   const collapses = !starts && fresh && awaitingDraw(running) && view.trick.length > 0;
+  // A beat that starts holds the trick's phrases until `impact` (a newer trick superseding a beat
+  // before its impact drops them: one BOOM); everything else's phrases play at the paint.
   const settle: Settle | null = starts
-    ? { stage: 'hold', trick: resolved, me: view.me.idx }
+    ? {
+        stage: 'follow',
+        trick: resolved,
+        me: view.me.idx,
+        variant: variantOf(
+          view.trumpCard.s,
+          resolved,
+          view.startedAt,
+          view.gameNo,
+          view.phase === 'over',
+        ),
+        phrases,
+        since: view,
+      }
     : collapses
       ? null
       : running;
+  // A beat running on keeps the fan's `prev` (§3.7): the newer view is stored, its plays fly at the beat's end.
+  const keeps = settle !== null && settle === running;
   return step(
     {
       shell: { ...app.shell, cues: { key }, screen: 'tableScreen' },
       table: {
         ...settled(app.table, view),
         settle,
-        lastPainted: prev,
+        lastPainted: keeps ? app.table.lastPainted : prev,
         mirror: mirrorAfter(app.table.mirror, prev, view),
       },
     },
     ...cues.map(fx),
-    ...phrases,
-    ...(settle !== null && starts ? [settleTimer(settleMs(settle, beatDurations(app, ctx)))] : []),
+    ...(starts ? [] : phrases),
+    ...(settle !== null && starts ? [settleTimer(beatMs(settle, app, ctx))] : []),
     { type: 'scrollTop' },
   );
 };
 
-/** `settle/elapsed`: the beat's next stage with its timer (the draw chimes), or, done, the view painted cold and pass-and-play's phone handed on. */
+/** The next stage that holds any time: a clash stage of 0 ms (reduced motion skips charge, strike and the poses) is stepped over. */
+const nextTimed = (settle: Settle | null, app: App, ctx: Context): Settle | null =>
+  settle !== null && isClashStage(settle.stage) && beatMs(settle, app, ctx) === 0
+    ? nextTimed(nextStage(settle), app, ctx)
+    : settle;
+
+/**
+ * `settle/elapsed`: the beat's next stage with its timer (the phrases at `impact`, the draw
+ * chimes), or, done, the view painted against the one the beat started from (a peer's plays that
+ * landed mid-beat fly in now, §3.7) and pass-and-play's phone handed on.
+ */
 const settleElapsed = (app: App, ctx: Context): Step => {
   const running = app.table.settle;
   if (running === null) return pure(app);
-  const next = nextStage(running);
+  const next = nextTimed(nextStage(running), app, ctx);
   // The seats before me have drawn: my draw waits for the tap (no timer; `draw/tap` moves on).
   if (next === running) return pure(app);
   if (next !== null) return step(withTable(app, { settle: next }), ...stageEffects(next, app, ctx));
   const done = withTable(app, { settle: null });
   return app.shell.role === 'local'
     ? localBroadcast(done, false, ctx, BRISCOLA)
-    : rendered(done, done.shell.view, ctx);
+    : rendered(done, running.since, ctx);
 };
 
 /**
- * Entering a stage: the draw chime where backs leave the stock, and the stage's timer unless it
- * holds nothing (0 ms: the wait for my tap, or a run of no seats, which `draw/tap` or the next
- * stage moves past at once).
+ * Entering a stage: the held phrases at `impact` (the BOOM), the draw chime where backs leave the
+ * stock, and the stage's timer unless it holds nothing (0 ms: the wait for my tap, or a run of no
+ * seats, which `draw/tap` or the next stage moves past at once).
  */
 const stageEffects = (next: Settle, app: App, ctx: Context): ReadonlyArray<Effect> => {
-  const ms = settleMs(next, beatDurations(app, ctx));
+  const ms = beatMs(next, app, ctx);
   const chimes = next.stage === 'drawMine' || (next.stage === 'draw' && ms > 0);
-  return [...(chimes ? [fx('draw.stock')] : []), ...(ms > 0 ? [settleTimer(ms)] : [])];
+  return [
+    ...(next.stage === 'impact' ? next.phrases : []),
+    ...(chimes ? [fx('draw.stock')] : []),
+    ...(ms > 0 ? [settleTimer(ms)] : []),
+  ];
 };
 
 /** `draw/tap` (§3.1 DRAW): while my draw waits, my back flies from the stock (or the briscola) and flips; at any other moment nothing. */
