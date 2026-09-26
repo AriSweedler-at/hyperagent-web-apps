@@ -1,0 +1,20 @@
+[
+  {
+    "t": "welcome",
+    "hostName": "Ann",
+    "lives": 0,
+    "seatCount": 2,
+    "bots": 0,
+    "botChoice": "profiler",
+    "watch": false
+  },
+  {
+    "t": "welcome",
+    "hostName": "Ann",
+    "lives": 3,
+    "seatCount": 2,
+    "bots": 0,
+    "botChoice": "random",
+    "watch": false
+  }
+]

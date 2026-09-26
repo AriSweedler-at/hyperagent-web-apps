@@ -64,6 +64,10 @@
     "web/games/fidice/src/domain/**/*.ts",
     "web/games/fidice/src/bots/**/*.ts",
     "web/games/fidice/src/net/**/*.ts",
+    // The shell path's DOM-free modules (docs/design/fidice-shell-adoption.md §4 M3): codec, protocol,
+    // storage, shellConfig, fx and the reducer with its tests; the painters (M4) follow the globs below out.
+    "web/games/fidice/src/*.ts",
+    "web/games/fidice/src/ui/**/*.ts",
     "web/games/fidice/src/view/types.ts",
     "web/games/fidice/src/view/ui.ts",
     "web/games/fidice/src/view/scenarios.ts",

@@ -13,6 +13,8 @@
     "web/games/*/src/domain/**/*.ts",
     "web/games/*/src/bots/**/*.ts",
     "web/games/*/src/protocol.ts",
+    // fidice's decoders beside its protocol (docs/design/fidice-shell-adoption.md §4 M3): DOM-free, over the domain and web/shared/lib.
+    "web/games/*/src/codec.ts",
     "web/games/*/src/net/protocol.ts",
     "web/games/*/src/scorer/**/*.ts",
     // The coin game (dry-round-2.md F3): a pure two-seat engine like the games' engine/ folders,

@@ -1,0 +1,40 @@
+[
+  {
+    "t": "action",
+    "action": {
+      "type": "pull",
+      "die": 2
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "roll",
+      "cup": true,
+      "table": [0, 4],
+      "intoCup": []
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "roll",
+      "cup": false,
+      "table": [],
+      "intoCup": [1]
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "finish"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "pull",
+      "die": 3
+    }
+  }
+]
