@@ -126,7 +126,8 @@ describeDist('dist parity with legacy/ and web/', (root) => {
   });
 
   // The shape of each page as tools/games.ts REGISTRY spells it: the title, the ids of its static
-  // screens (fidice ships one mount point, `#app`, and paints the rest; gin keeps the legacy ids;
+  // screens (fidice's composed shell page's since M2 of docs/design/fidice-shell-adoption.md, dark
+  // while its legacy app paints into `#app`; gin keeps the legacy ids;
   // backgammon is gin-shaped with the 24 points), and, where the row says so, the two rules lists
   // empty (filled from ui/rules.ts at boot) with no rules prose baked into the markup.
   GAMES.forEach((game) => {

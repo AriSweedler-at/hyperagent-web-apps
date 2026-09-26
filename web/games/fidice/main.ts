@@ -23,12 +23,30 @@ const injectDiceStyles = (): void => {
   document.head.appendChild(style);
 };
 
+/**
+ * M2 of docs/design/fidice-shell-adoption.md: index.html is the composed shell page (./page.ts),
+ * dark on this path. The vdom's `mount` replaces `#app`'s children, so the shell screens inside it
+ * never show, but the nodes the page puts outside `#app` (the curtain, the rules, history and
+ * ladder sheets, the toast) would, and the composed `#toast` would double the vdom's own inside
+ * `#app-root`. Empty `#app` and remove every body node but it and the script before the mount,
+ * so the old boot sees the empty page it always had. M6 (the flip) deletes this with the old boot.
+ */
+const dropShellNodes = (root: Readonly<Element>): void => {
+  root.replaceChildren();
+  Array.from(document.body.children)
+    .filter((node: Readonly<Element>) => node !== root && node.tagName !== 'SCRIPT')
+    .forEach((node: Readonly<Element>) => {
+      node.remove();
+    });
+};
+
 const boot = (): void => {
   injectDiceStyles();
   // Lobby codes and ids draw from Math.random as on the legacy page (the e2e harness seeds it).
   const effects = browserEffects(Math.random);
   const root = document.getElementById('app');
   if (!root) throw new Error('Missing #app root');
+  dropShellNodes(root);
   const tokenKey = (code: string): string => `fidice-token-${code}`;
   // The documented test hooks on this page (docs/ARCHITECTURE.md "Module boundaries"): a seeded
   // rng a harness installs before boot, and the controller exposed after it.

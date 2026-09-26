@@ -50,8 +50,9 @@ export type GameSpec = Readonly<{
   debug: 0 | 1;
   /**
    * What the built page must carry (test/dist/dist-parity.test.ts): the ids of its static screens
-   * (fidice ships one mount point, `#app`, and paints the rest from TS) and whether the two rules
-   * lists ship empty, to be filled at boot from ui/rules.ts.
+   * (fidice's are the composed shell page's since M2 of docs/design/fidice-shell-adoption.md, dark
+   * while its legacy app paints into `#app`) and whether the two rules lists ship empty, to be
+   * filled at boot from ui/rules.ts.
    */
   pageShape: Readonly<{ ids: ReadonlyArray<string>; rulesSlots: boolean }>;
   /**
@@ -60,8 +61,9 @@ export type GameSpec = Readonly<{
    * nothing (a moved file, a changed helper name) fails there rather than passing the two orphan
    * tests vacuously. TypeScript: gin and fidice spell most names out; backgammon's board builders
    * make theirs by template (`die-${face}`, `ck-${owner}`, the `conn-dot` attribute), which the
-   * extraction cannot see (42 seen; the rest are CONTRACT.md rows). Markup: fidice paints its whole
-   * page from TS into `#app` (-1: any count passes), gin's and backgammon's pages carry their screens.
+   * extraction cannot see (42 seen; the rest are CONTRACT.md rows). Markup: every page carries its
+   * screens, fidice's since M2 of docs/design/fidice-shell-adoption.md composed its page (before
+   * it, the vdom painted the whole page into `#app` and -1 let any count pass).
    */
   contractFloors: Readonly<{ ts: number; markup: number }>;
   /** The shared shell's row (SHELL), present for the shell games alone. */
@@ -193,8 +195,25 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
     suite: 'fidice',
     specs: [],
     debug: 1,
-    pageShape: { ids: ['app'], rulesSlots: false },
-    contractFloors: { ts: 50, markup: -1 },
+    // The composed shell page's screens (M2 of docs/design/fidice-shell-adoption.md; page.ts): the
+    // shell's five, the bot config screen, the Ladder tab's panel and the table's mount. The rules
+    // slots ship empty but nothing fills them until M4, so the row says false until then.
+    pageShape: {
+      ids: [
+        'app',
+        'homeScreen',
+        'hostWaitScreen',
+        'guestWaitScreen',
+        'tableScreen',
+        'endgameScreen',
+        'configScreen',
+        'ladderPanel',
+        'fidiceTable',
+        'toast',
+      ],
+      rulesSlots: false,
+    },
+    contractFloors: { ts: 50, markup: 40 },
   },
   backgammon: {
     title: 'Sheshbesh — backgammon',

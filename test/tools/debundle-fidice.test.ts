@@ -10,8 +10,10 @@
 // its bundle lines; the tool stays runnable as an audit (`--dry-run` prints the recovered graph)
 // and these tests keep it honest. index.html and theme.css were the tool's last generated files
 // until docs/MIGRATION.md step 14 hoisted the shared primitives out of theme.css and linked
-// web/shared/styles from the page: both are hand-owned now, and the goldens, the class contract and
-// the e2e specs are their oracles, so the tool neither cuts nor pins them.
+// web/shared/styles from the page: theme.css is hand-owned now and index.html is composed from
+// page.ts (M2 of docs/design/fidice-shell-adoption.md; test/dist/shell-markup.test.ts pins it), and
+// the goldens, the class contract and the e2e specs are their oracles, so the tool neither cuts nor
+// pins them.
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
@@ -167,14 +169,16 @@ describe('the de-bundled fidice modules', () => {
     });
   });
 
-  test('the hand-owned page boots the typed entry as a module and links the shared stylesheets before its own', () => {
+  test('the page boots the typed entry as a module and links the shared stylesheets before its own', () => {
     // Step 9: PeerJS and the ICE loader are bundled through web/shared/edge (main.ts), so the page
     // defines neither `window.Peer` nor `window.HyperIce`. Step 14: the cascade is tokens, base,
     // then, since M1 of docs/design/fidice-shell-adoption.md, the shell sheet, then the game's theme
-    // (docs/ARCHITECTURE.md "Two origins": relative links only).
+    // (docs/ARCHITECTURE.md "Two origins": relative links only). M2: the page is composed from
+    // page.ts, so `#app` carries the shell's screens (dark: the vdom's mount replaces its children)
+    // rather than shipping empty; the mount point, the entry and the cascade are what this pins.
     const html = readRepoFile(`${FIDICE_DIR}/index.html`);
     expect(html).toContain("<title>Fidice — one-cup liar's dice</title>");
-    expect(html).toContain('<div id="app"></div>');
+    expect(html).toContain('<div id="app">');
     expect(html).toContain(`<script type="module" src="./${entryFile}"></script>`);
     expect(html).not.toContain('<style>');
     expect(html).not.toContain('"use strict"');
