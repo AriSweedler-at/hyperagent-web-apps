@@ -161,14 +161,16 @@ export const resolveBack = (pack: CardPack, fallback: CardPack): PaintedBack =>
   pack.back.kind !== 'none' ? pack.back : fallback.back.kind !== 'none' ? fallback.back : BARE_BACK;
 
 /**
- * The card box aspect a page should use: the pictures' own when the pack draws this kind with
- * pictures; the printed deck's nominal for a relabelled glyph (`american` is gin's 100 × 144 card,
- * not the long thin Italian one); else the deck kind's nominal.
+ * The card box aspect a page should use: the printed card's `w / h` when a `files`/`sprite` pack
+ * states its size (the picture is contained in the box, `FaceSpec.aspect` staying the picture's);
+ * else the pictures' own; the printed deck's nominal for a relabelled glyph (`american` is gin's
+ * 100 × 144 card, not the long thin Italian one); else the deck kind's nominal.
  */
 export const resolveAspect = (pack: CardPack, kind: DeckKind): number => {
   const faces = pack.decks[kind];
   if (faces === undefined) return DECKS[kind].aspect;
-  return faces.kind === 'glyph' ? DECKS[faces.relabel?.deck ?? kind].aspect : faces.aspect;
+  if (faces.kind === 'glyph') return DECKS[faces.relabel?.deck ?? kind].aspect;
+  return faces.card === undefined ? faces.aspect : faces.card.w / faces.card.h;
 };
 
 /** The About panel's line for a sourced pack ("Cards: Bergamasche — Luigi Chiesa (Wikimedia Commons), Public domain"); null for a drawn one. */

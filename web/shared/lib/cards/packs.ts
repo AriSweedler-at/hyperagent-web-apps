@@ -83,8 +83,15 @@ export type Faces =
       widths: ReadonlyArray<number>;
       /** The ids pictured; a card outside the list draws the glyph. A shipped pack lists every card (the test says so). */
       ids: ReadonlyArray<string>;
-      /** The picture's own aspect (a scan may keep the card's white border or not); the card box takes it. */
+      /** The picture's own aspect (a scan may keep the card's white border or not); the card box takes it unless `card` says otherwise. */
       aspect: number;
+      /**
+       * The printed card's size in mm, as its maker lists it (Dal Negro's Napoletane 51 × 83). The
+       * card box takes `w / h` and the picture is contained in it, so a scan cut inside the card's
+       * white border (an `aspect` narrower than the print) gets its margin back rather than a
+       * stretch. Absent: the box is the picture's `aspect` (docs/design/card-packs.md §2).
+       */
+      card?: Readonly<{ w: number; h: number }>;
       /** The fraction of the card width the picture is inset by, to give a trimmed scan its margin back. */
       inset: number;
       indices: FaceIndices;
@@ -97,6 +104,8 @@ export type Faces =
       /** id -> the cell's column and row. */
       cells: Readonly<Record<string, Readonly<{ x: number; y: number }>>>;
       aspect: number;
+      /** The printed card's size in mm, as for `files`: the box's aspect when present. */
+      card?: Readonly<{ w: number; h: number }>;
       inset: number;
       indices: FaceIndices;
     }>;

@@ -14,6 +14,7 @@ export const NAPOLETANE_PACK = {
       widths: [120, 240],
       ids: ['AC', '2C', '3C', '4C', '5C', '6C', '7C', 'FC', 'CC', 'RC', 'AD', '2D', '3D', '4D', '5D', '6D', '7D', 'FD', 'CD', 'RD', 'AS', '2S', '3S', '4S', '5S', '6S', '7S', 'FS', 'CS', 'RS', 'AB', '2B', '3B', '4B', '5B', '6B', '7B', 'FB', 'CB', 'RB'],
       aspect: 0.577,
+      card: { w: 51, h: 83 },
       inset: 0,
       indices: 'overlay',
     },

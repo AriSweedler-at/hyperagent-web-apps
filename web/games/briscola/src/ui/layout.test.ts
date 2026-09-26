@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'vitest';
 
+import { packByName, packsFor } from '../../../../shared/lib/cards/packs.ts';
+import { resolveAspect } from '../../../../shared/lib/cards/resolve.ts';
 import type { Seat, SeatCount } from '../engine/index.ts';
 import {
   AREAS,
+  ASPECT_RANGE,
   BRISCOLA_SHIFT,
   CELLS,
   CELL_POS,
@@ -46,8 +49,8 @@ import {
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE_SHORT = { width: 375, height: 667 };
-/** The deck's default (linea) and the tallest pack the layout is designed for (napoletane, D13). */
-const ASPECTS = [DEFAULT_ASPECT, 0.606];
+/** The shipped packs' boxes: linea (the default), napoletane's printed 51 × 83 and american (gin's 100 × 144). */
+const ASPECTS = [DEFAULT_ASPECT, 51 / 83, 100 / 144];
 const COUNTS: ReadonlyArray<SeatCount> = [2, 3, 4];
 
 describe('the card clamps (theme.css #tableScreen --card-w)', () => {
@@ -59,7 +62,7 @@ describe('the card clamps (theme.css #tableScreen --card-w)', () => {
     expect(tinyWidth('phone')).toBe(26);
   });
 
-  test('the desktop reaches the 132px ceiling at 1280x800; the tall pack the same', () => {
+  test('the desktop reaches the 132px ceiling at 1280x800 at every shipped aspect', () => {
     expect(layoutFor(DESKTOP.width)).toBe('desktop');
     ASPECTS.forEach((aspect) => {
       expect(cardWidth(DESKTOP, aspect)).toBe(DESKTOP_GEOMETRY.maxCardW);
@@ -72,7 +75,7 @@ describe('the card clamps (theme.css #tableScreen --card-w)', () => {
     expect(cardWidth({ width: 390, height: 720 })).toBeCloseTo(144 * DEFAULT_ASPECT, 3);
   });
 
-  test('the column fits both design viewports at both aspects, and the short phone at the floor', () => {
+  test('the column fits both design viewports at every shipped aspect, and the short phone at the floor', () => {
     ASPECTS.forEach((aspect) => {
       expect(columnHeight(PHONE, aspect)).toBeLessThanOrEqual(PHONE.height);
       expect(columnHeight(DESKTOP, aspect)).toBeLessThanOrEqual(DESKTOP.height);
@@ -87,16 +90,37 @@ describe('the card clamps (theme.css #tableScreen --card-w)', () => {
   test('the column never overflows a viewport above the floors, at any aspect in range', () => {
     const heights = Array.from({ length: 40 }, (_, i) => 700 + i * 10);
     const widths = [360, 390, 430, 600, 900, 1024, 1280, 1600];
-    [0.5, 0.518, 0.56, 0.606, 0.62].forEach((aspect) => {
-      widths.forEach((width) => {
-        heights.forEach((height) => {
-          expect(
-            fits({ width, height }, aspect),
-            `${String(width)}x${String(height)} @ ${String(aspect)}`,
-          ).toBe(true);
+    [ASPECT_RANGE.min, 0.518, 0.577, 51 / 83, 0.66, 100 / 144, ASPECT_RANGE.max].forEach(
+      (aspect) => {
+        widths.forEach((width) => {
+          heights.forEach((height) => {
+            expect(
+              fits({ width, height }, aspect),
+              `${String(width)}x${String(height)} @ ${String(aspect)}`,
+            ).toBe(true);
+          });
         });
-      });
+      },
+    );
+  });
+
+  test('ASPECT_RANGE is [0.50, 0.70]: every pack a briscola table can choose sits inside it, and the floor is where the two clamps meet', () => {
+    expect(ASPECT_RANGE).toEqual({ min: 0.5, max: 0.7 });
+    packsFor('italian40').forEach((name) => {
+      const aspect = resolveAspect(packByName(name), 'italian40');
+      expect(aspect, name).toBeGreaterThanOrEqual(ASPECT_RANGE.min);
+      expect(aspect, name).toBeLessThanOrEqual(ASPECT_RANGE.max);
     });
+    // The default pack's box is the printed Napoletane card, 51 × 83 (design §2.1), not its scan's 0.577.
+    expect(resolveAspect(packByName('napoletane'), 'italian40')).toBeCloseTo(0.6145, 4);
+    // Below the floor the height budget still binds as the width cap arrives: a Trevigiane-shaped
+    // card (0.47) overtops 1280×820 by 8px and 430×840 by 1px, where the floor itself fits.
+    [0.47, 0.48].forEach((aspect) => {
+      expect(fits({ width: 1280, height: 820 }, aspect), String(aspect)).toBe(false);
+    });
+    expect(fits({ width: 430, height: 840 }, 0.47)).toBe(false);
+    expect(fits({ width: 1280, height: 820 }, ASPECT_RANGE.min)).toBe(true);
+    expect(fits({ width: 430, height: 840 }, ASPECT_RANGE.min)).toBe(true);
   });
 
   test('the band is a mid card plus 46px; the fixed rows are the design heights', () => {
@@ -174,7 +198,7 @@ describe('the stock and the briscola (design §5.3, T3)', () => {
   });
 
   test('the stock hides 40-60% of it at any aspect in range, and the area is wide enough for both', () => {
-    [0.5, 0.518, 0.606, 0.62].forEach((aspect) => {
+    [ASPECT_RANGE.min, 0.518, 51 / 83, 0.62, 100 / 144, ASPECT_RANGE.max].forEach((aspect) => {
       const s = { x: 0, y: 0, w: 69, h: 69 / aspect };
       const covered = coveredFraction(s, briscolaBox(s));
       expect(covered).toBeGreaterThan(0.4);

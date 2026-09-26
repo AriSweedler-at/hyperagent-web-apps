@@ -35,7 +35,7 @@ boxes; swords and batons are parallel verticals, an honest simplification of the
 ```ts
 CARD_PACKS = ['default', 'blue-stripe', 'yu-gi-oh', 'empty', 'linea', 'napoletane', 'american']
 Back  = svg { url, aspect, colour } | image { urls: {ratio, url}[], aspect, colour } | css { colour } | none
-Faces = glyph { relabel?: Relabel } | files { dir, ext, widths, ids, aspect, inset, indices } | sprite { sheets, cell, cells, aspect, inset, indices }
+Faces = glyph { relabel?: Relabel } | files { dir, ext, widths, ids, aspect, card?, inset, indices } | sprite { sheets, cell, cells, aspect, card?, inset, indices }   // card = the printed size in mm: the box's aspect
 Relabel = { deck: DeckKind, suits: Record<suit id, suit id>, ranks: Record<rank id, rank id> }   // §3: another deck kind's glyphs
 CardPack = { name, label, back, decks: Partial<Record<DeckKind, Faces>>, attribution: Attribution | null }
 packByName, isCardPack, packsFor(kind), isCardPackFor(kind, v), DEFAULT_CARD_PACKS, defaultPackFor(kind)
@@ -46,7 +46,7 @@ badCardPackMsg(key, kind, value)   // `<key>: "<value>" is not a card pack for t
 | --- | --- | --- | --- | --- |
 | `default`, `blue-stripe`, `yu-gi-oh`, `empty` | gin's four, as pack data pointing at `../../shared/cards/backs/` | glyph | glyph | none (drawn; the owner's own picture) |
 | `linea` | `svg`, a terracotta lattice with a four-suit medallion | — | `files`, 40 svg, `widths: [0]`, aspect 100/193 (0.518), `indices: 'printed'` | none (generated) |
-| `napoletane` | `none` (the default's is painted) | — | `files`, 40 jpg, `widths: [120, 240]`, aspect 0.577, `indices: 'overlay'` | Florixc (Wikimedia Commons), Public domain: the sheet the owner supplied (§7.1) |
+| `napoletane` | `none` (the default's is painted) | — | `files`, 40 jpg, `widths: [120, 240]`, aspect 0.577 contained in a `card: 51 × 83` box (0.614), `indices: 'overlay'` | Florixc (Wikimedia Commons), Public domain: the sheet the owner supplied (§7.1) |
 | `american` | gin's `default` back, the same data (no new picture) | — | `glyph` with a `relabel` onto `french52` (§3): gin's cards at an Italian table, aspect 100/144 | none (drawn; §7.2) |
 
 Each pack file is `as const satisfies CardPack`, so `CardPackFor<K>` is read off the table's literal
@@ -62,8 +62,9 @@ sound-fonts.md §11 deferred.
 rank and suit specs; `image` with the URLs per device-pixel ratio, the alt, aspect, inset and
 indices; `sprite` with the sheets, grid and cell), or null for an id that names no card of the
 deck. `resolveBack(pack, fallback)` resolves `none` to the fallback pack's back (and a double
-`none` to a bare navy field, never shipped). `resolveAspect(pack, kind)` is the pictures' own
-aspect for a `files`/`sprite` pack, else the deck's nominal. `attributionLine(pack)` is the About
+`none` to a bare navy field, never shipped). `resolveAspect(pack, kind)` is the printed card's
+`w / h` when a `files`/`sprite` pack states its `card` size (the picture is contained in that box),
+else the pictures' own aspect, else the deck's nominal. `attributionLine(pack)` is the About
 panel's line for a sourced pack, null for a drawn one. Three silent fallbacks, card by card: a pack
 without the deck kind cannot be chosen at all (`packsFor`); a `files`/`sprite` pack missing an id
 draws the glyph for that id alone; a `none` back takes the default's.
@@ -188,7 +189,11 @@ node --experimental-strip-types tools/card-packs.ts preview <name> [--deck itali
 - `check`: the body of `test/card-packs.test.ts` (`checkPack`): every URL `../../shared/`-relative,
   every derived file present with its frame size (JPEG SOF, PNG IHDR, SVG viewBox within 1%) and
   aspect, `widths` multiples of `FACE_WIDTH`, a shipped `files` pack total, a raster or sprite pack
-  attributed, a face under 120 KB, a pack's tree under 6 MB.
+  attributed, a face under 120 KB, a pack's tree under 6 MB; a pack that states its printed size
+  (`card: {w, h}` in mm, `--card 51x83`) has its picture's aspect within `BOX_TOLERANCE` (0.05) of
+  `w / h` (the box paints the picture `contain`ed: the gap is the card's margin, further it is a
+  letterbox). Napoletane's 51 × 83 (Dal Negro 51 × 82, Modiano 51 × 83.5, it.wiki 50 × 83) makes a
+  0.614 box for its 0.577 cut, which lost the printed white border (briscola-battle.md §2.1).
 - Two manual lines: `add` prints the name to add to `CARD_PACKS` and the row for `PACKS`; `check`
   fails until both are done.
 - `preview` sketches the two corner indices on an `overlay` pack's faces at the size a table prints

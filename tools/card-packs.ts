@@ -10,7 +10,7 @@
 //   node --experimental-strip-types tools/card-packs.ts build
 //       every PACK_SOURCES entry, idempotent (today napoletane, the sheet the owner supplied on
 //       2026-09-25; docs/design/card-packs.md §7)
-//   node --experimental-strip-types tools/card-packs.ts add <name> --deck italian40 --faces <dir> [--back <img>] \
+//   node --experimental-strip-types tools/card-packs.ts add <name> --deck italian40 --faces <dir> [--back <img>] [--card <w>x<h>] \
 //       --label … --author … --source-url … --licence … [--licence-url …] [--note …] [--mask <id>:<x>,<y>,<w>,<h>]… [--map <file>]
 //   node --experimental-strip-types tools/card-packs.ts add <name> --deck italian40 --sheet <img> --rows C,D,S,B \
 //       --cols A,2,3,4,5,6,7,F,C,R [--grid <inset>] [--back <img>] … (the same pack options)
@@ -65,6 +65,13 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const RATIOS: ReadonlyArray<number> = [1, 2, 3];
 const JPEG_QUALITY = 0.86;
+/**
+ * How far a picture's aspect may sit from the pack's printed box (`Faces.card`) before `check`
+ * refuses it: the box paints the picture `contain`ed, so the gap is a margin of the card's field on
+ * two sides, and past this it reads as a letterbox. Napoletane's scan sits 0.037 from its 51 × 83
+ * (the white border the cut lost).
+ */
+export const BOX_TOLERANCE = 0.05;
 /** A column or row whose share of ink is under this is a gutter. */
 export const GUTTER_SHARE = 0.02;
 /** Two cell runs closer than this many pixels are one cell (a white column inside a card). */
@@ -88,6 +95,8 @@ export type Ext = 'jpg' | 'png' | 'svg';
 /** A committed source: a folder of faces or one sheet, an optional back, and the attribution. */
 export type SourceSpec = Readonly<{
   deck: DeckKind;
+  /** The printed card's size in mm as its maker lists it: the card box's aspect (`Faces.card`); the picture keeps its own. */
+  card?: Readonly<{ w: number; h: number }>;
   faces:
     | Readonly<{ kind: 'files'; dir: string }>
     | Readonly<{
@@ -117,6 +126,9 @@ export type SourceSpec = Readonly<{
 export const PACK_SOURCES: Readonly<Record<string, SourceSpec>> = {
   napoletane: {
     deck: 'italian40',
+    // Dal Negro lists 51 × 82, Modiano 51 × 83.5, it.wiki 50 × 83: a 0.614 box against the sheet's
+    // 0.577 cut, which lost the printed white border (docs/design/briscola-battle.md §2.1).
+    card: { w: 51, h: 83 },
     faces: {
       kind: 'sheet',
       file: 'assets/cards/napoletane/sheet.jpg',
@@ -466,6 +478,7 @@ export type Manifest = Readonly<{
   widths: ReadonlyArray<number>;
   ids: ReadonlyArray<string>;
   aspect: number;
+  card?: Readonly<{ w: number; h: number }>;
   inset: number;
   indices: 'printed' | 'overlay';
   back: Readonly<{
@@ -520,6 +533,9 @@ export const manifestSource = (m: Manifest): string =>
     `      widths: [${m.widths.map(String).join(', ')}],`,
     `      ids: [${m.ids.map(q).join(', ')}],`,
     `      aspect: ${num(m.aspect)},`,
+    ...(m.card === undefined
+      ? []
+      : [`      card: { w: ${String(m.card.w)}, h: ${String(m.card.h)} },`]),
     `      inset: ${num(m.inset)},`,
     `      indices: ${q(m.indices)},`,
     '    },',
@@ -639,10 +655,21 @@ export const checkPack = (pack: CardPack, read: ReadBytes): ReadonlyArray<string
     if (pack.attribution === null && (faces.kind === 'sprite' || faces.ext !== 'svg'))
       return [`${pack.name}: a ${faces.kind} pack needs an attribution`];
     const ids = cardIds(kind);
-    const aspectOk =
-      faces.aspect > 0.45 && faces.aspect < 0.8
+    const box = faces.card === undefined ? null : faces.card.w / faces.card.h;
+    const aspectOk = [
+      ...(faces.aspect > 0.45 && faces.aspect < 0.8
         ? []
-        : [`${pack.name}/${kind}: aspect ${num(faces.aspect)} outside [0.45, 0.8]`];
+        : [`${pack.name}/${kind}: aspect ${num(faces.aspect)} outside [0.45, 0.8]`]),
+      ...(box === null || (box > 0.45 && box < 0.8)
+        ? []
+        : [`${pack.name}/${kind}: printed box ${num(box)} outside [0.45, 0.8]`]),
+      // A picture far from its printed box would show as a letterbox under `contain`, not a margin.
+      ...(box === null || Math.abs(faces.aspect - box) < BOX_TOLERANCE
+        ? []
+        : [
+            `${pack.name}/${kind}: the picture aspect ${num(faces.aspect)} is ${num(Math.abs(faces.aspect - box))} off its printed box ${num(box)} (${String(faces.card?.w)} × ${String(faces.card?.h)}): over ${String(BOX_TOLERANCE)}, contain would letterbox it`,
+          ]),
+    ];
     if (faces.kind === 'sprite') {
       const strangers = Object.keys(faces.cells).filter((id) => !ids.includes(id));
       return [
@@ -1051,6 +1078,7 @@ const derive = async (page: Page, name: string, spec: SourceSpec): Promise<void>
     widths: ratios.map((r) => FACE_WIDTH * r),
     ids,
     aspect,
+    ...(spec.card === undefined ? {} : { card: spec.card }),
     inset: 0,
     indices: 'overlay',
     back,
@@ -1190,6 +1218,12 @@ const need = (flags: Flags, key: string): string => {
   return value;
 };
 
+/** `--card 51x83`: the printed card's width and height in mm. */
+const parseCardSize = (value: string): Readonly<{ w: number; h: number }> | null => {
+  const m = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/.exec(value);
+  return m?.[1] === undefined || m[2] === undefined ? null : { w: Number(m[1]), h: Number(m[2]) };
+};
+
 const specFromFlags = (flags: Flags): SourceSpec => {
   const deck = need(flags, 'deck');
   if (!isDeckKind(deck)) throw new Error(`--deck ${deck}: not a deck kind`);
@@ -1202,8 +1236,13 @@ const specFromFlags = (flags: Flags): SourceSpec => {
     if (mask === null) throw new Error(`--mask ${m}: expected <id>:<x>,<y>,<w>,<h>`);
     return mask;
   });
+  const cardFlag = one(flags, 'card');
+  const card = cardFlag === null ? null : parseCardSize(cardFlag);
+  if (cardFlag !== null && card === null)
+    throw new Error(`--card ${cardFlag}: expected <w>x<h>, the printed card in mm`);
   return {
     deck,
+    ...(card === null ? {} : { card }),
     faces:
       sheet !== null
         ? {

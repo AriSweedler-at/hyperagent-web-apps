@@ -1277,12 +1277,14 @@ details.history-row > .history-detail dt {
     transform 160ms ease,
     box-shadow 160ms ease;
 }
-/* A picture face: the pack's picture fills the content box; `--face-inset` (inline, the pack's) pads
-   a scan that was trimmed to its printed area so it gets a margin back. */
+/* A picture face: the pack's picture is contained in the content box, centred, never stretched: the
+   box is the printed card's shape (resolveAspect, `--aspect`) and a scan cut inside the card's white
+   border (napoletane 0.577 in a 51 × 83 box) shows the cream field as that border, 3% a side.
+   `--face-inset` (inline, the pack's) pads a scan trimmed to its printed area the same way. */
 .card.face {
   background-origin: content-box;
   background-clip: border-box;
-  background-size: 100% 100%;
+  background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
   padding: calc(var(--card-w) * var(--face-inset, 0));
