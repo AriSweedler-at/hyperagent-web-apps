@@ -18,6 +18,7 @@ import {
   intentOf,
   paint,
   paintHandoff,
+  paintNames,
   paintScreen,
   paintSound,
   paintTable,
@@ -200,6 +201,30 @@ describe('the shell painters over the App', () => {
     expect(p.get('handoffBtn').hidden()).toBe(true);
     paintHandoff(p.doc, hosted());
     expect(p.get('handoffBtn').hidden()).toBe(true);
+  });
+
+  test('paintNames: my chair and the other seats; the cup holder`s under pass the phone; Watching with no chair; empty off the table', () => {
+    const p = fidicePage(MARKUP);
+    /** The computers' names as the engine drew them (domain/lobby.ts), in chair order. */
+    const bots = (app: App): ReadonlyArray<string> =>
+      (app.shell.view?.players ?? []).filter((pl) => pl.bot !== null).map((pl) => pl.name);
+    const room = hosted();
+    paintNames(p.doc, room);
+    expect(p.get('myName').text()).toBe('Ann');
+    expect(p.get('oppName').text()).toBe(['Bob', ...bots(room)].join(' · '));
+    const app = local();
+    paintNames(p.doc, app);
+    const holder = app.shell.view?.round?.holder ?? 0;
+    expect(p.get('myName').text()).toBe(holder === 0 ? 'Ann' : 'Bob');
+    expect(p.get('oppName').text()).toBe(holder === 0 ? 'Bob' : 'Ann');
+    const watch = watching();
+    paintNames(p.doc, watch);
+    expect(p.get('myName').text()).toBe('Watching');
+    expect(bots(watch)).toHaveLength(4);
+    expect(p.get('oppName').text()).toBe(bots(watch).join(' · '));
+    paintNames(p.doc, initialApp);
+    expect(p.get('myName').text()).toBe('');
+    expect(p.get('oppName').text()).toBe('');
   });
 
   test('paint over the page fake (no constructors): every shell write lands and no mount is attempted', () => {

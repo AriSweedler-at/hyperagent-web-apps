@@ -1,6 +1,6 @@
 // The shell pages composed from the shared partials (docs/design/dry-round-2.md §3 row G2, §5 Wave
-// F row F2; README.md "Add a game" step 1). Each composed page (MARKUP_GAMES: the shell games'
-// and fidice's) is web/games/<g>/index.html =
+// F row F2; README.md "Add a game" step 1). Each composed page (one per shell game, SHELL_GAMES:
+// every game) is web/games/<g>/index.html =
 // web/shared/markup/shell/*.html filled with the game's web/games/<g>/page.ts (renderShell, pure)
 // and then, when Prettier owns the file, formatted with the repo's config: .prettierignore decides,
 // as it does for `npm run lint`, so gin's hand-owned legacy layout is emitted as the partials spell
@@ -32,21 +32,15 @@ import { REPO_ROOT, isMain } from './legacy/extract.ts';
 /** Where the partials live, one file per PARTIALS name. */
 export const PARTIAL_DIR = 'web/shared/markup/shell';
 
-/**
- * The games whose page this tool composes: the shell games and, from M2 of
- * docs/design/fidice-shell-adoption.md, fidice, whose composed page carries the shell's screens
- * dark while its legacy app still boots into `#app` (main.ts removes the nodes outside it). It is
- * not a shell game yet (no SHELL row, no shell specs), so it is not in SHELL_GAMES; MARKUP_GAMES
- * collapses to SHELL_GAMES at M5, when fidice joins them.
- */
-export type MarkupGame = ShellGame | 'fidice';
-export const MARKUP_GAMES: ReadonlyArray<MarkupGame> = [...SHELL_GAMES, 'fidice'];
+// Fidice's page has been composed since M2 of docs/design/fidice-shell-adoption.md (its shell
+// screens dark while the legacy app boots into `#app`, live behind `?shell=1` from M4); M5
+// registered it as a shell game, so the list here is SHELL_GAMES itself.
 
 /** The composed page's path, repo-relative. */
-export const pagePath = (game: MarkupGame): string => `web/games/${game}/index.html`;
+export const pagePath = (game: ShellGame): string => `web/games/${game}/index.html`;
 
-/** Each composed page's page.ts; a game in MARKUP_GAMES without one is a type error here. */
-export const PAGES: Readonly<Record<MarkupGame, ShellPage>> = {
+/** Each composed page's page.ts; a shell game without one is a type error here. */
+export const PAGES: Readonly<Record<ShellGame, ShellPage>> = {
   'gin-rummy': GIN_PAGE,
   backgammon: BACKGAMMON_PAGE,
   briscola: BRISCOLA_PAGE,
@@ -68,7 +62,7 @@ export const readTemplates = (): ShellTemplates =>
  * page's own path so the HTML parser and .prettierignore apply as in `npm run lint`).
  */
 export const composePage = async (
-  game: MarkupGame,
+  game: ShellGame,
   templates: ShellTemplates = readTemplates(),
 ): Promise<string> => {
   const rendered = renderShell(templates, PAGES[game]);
@@ -81,11 +75,11 @@ export const composePage = async (
 };
 
 /** The committed page. */
-export const committedPage = (game: MarkupGame): string =>
+export const committedPage = (game: ShellGame): string =>
   readFileSync(resolve(REPO_ROOT, pagePath(game)), 'utf8');
 
 /** One line per game: written, up to date, or the first line that drifts. */
-const report = (game: MarkupGame, composed: string, write: boolean): boolean => {
+const report = (game: ShellGame, composed: string, write: boolean): boolean => {
   const path = pagePath(game);
   const committed = committedPage(game);
   if (write) {
@@ -113,8 +107,8 @@ const report = (game: MarkupGame, composed: string, write: boolean): boolean => 
 const main = async (): Promise<void> => {
   const write = process.argv.includes('--write');
   const templates = readTemplates();
-  const composed = await Promise.all(MARKUP_GAMES.map((game) => composePage(game, templates)));
-  const fine = MARKUP_GAMES.map((game, i) => report(game, composed[i] ?? '', write));
+  const composed = await Promise.all(SHELL_GAMES.map((game) => composePage(game, templates)));
+  const fine = SHELL_GAMES.map((game, i) => report(game, composed[i] ?? '', write));
   if (!fine.every(Boolean)) {
     console.log(
       'put the change in web/games/<g>/page.ts or web/shared/markup/shell/*.html, then run',

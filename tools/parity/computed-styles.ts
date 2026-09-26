@@ -14,7 +14,11 @@
 // agrees with the Linux runner. The shell the shell games share (the home tabs, hosting, pass and
 // play up to the curtain; docs/design/shared-shell.md §6.4 D2, dry-round-2.md I2) is one driver,
 // `driveShell`, and its 43 selectors one list, `SHELL_SELECTORS`, spliced first into each shell
-// game's own; the goldens sort their keys, so the splice moved no byte of them. e2e/computed-styles.spec.ts (the `pages` project) replays the capture against the
+// game's own; the goldens sort their keys, so the splice moved no byte of them. Fidice's driver
+// walks its live legacy path first (the 20 screens recorded since step 14) and then reopens the
+// page on its shell path (`&shell=1`, e2e/fixtures/player.ts PAGE_QUERY; M5 of
+// docs/design/fidice-shell-adoption.md) for `driveShell` and the table: additive screens, so the
+// 20 old ones keep their values until M6 flips the page. e2e/computed-styles.spec.ts (the `pages` project) replays the capture against the
 // served dist/ and deep-equals it with test/fixtures/styles/<game>.<viewport>.json; a CSS move that
 // changes any computed value shows up as a selector/property diff.
 //
@@ -41,6 +45,7 @@ import { PeerServer } from 'peer';
 
 import { DESKTOP, PHONE, type Viewport } from '../../e2e/fixtures/geometry.ts';
 import { routeOffline } from '../../e2e/fixtures/offline.ts';
+import { PAGE_QUERY } from '../../e2e/fixtures/player.ts';
 import { seedScript } from '../../e2e/fixtures/seed.ts';
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
 import { GAMES, REGISTRY, SHELL, type Game, type ShellGame } from '../games.ts';
@@ -273,11 +278,11 @@ export const SELECTORS: Readonly<Record<Game, ReadonlyArray<string>>> = {
     '.voice-fab',
   ],
   fidice: [
-    ':root',
-    'body',
+    // The shell's list first (the 43 both pages of the shell path share), then the legacy page's
+    // own; a selector on both lists (`:root`, `body`, `.row`, the button kinds) reads once.
+    ...SHELL_SELECTORS,
     'body::before',
     'header',
-    '.badge',
     '.brand',
     '.brand .cup',
     'nav.tabs',
@@ -993,6 +998,13 @@ const SHELL_DRIVE: Readonly<Record<ShellGame, ShellDrive>> = {
     // Two players; one game per sitting, so Play again deals anew.
     localValues: { localPlayersSel: '2' },
   },
+  fidice: {
+    submenuShot: null,
+    localModeShot: 'shell home: play tab, pass the phone',
+    curtainShot: 'shell local: round 1, curtain up',
+    // No pass-the-phone field beyond the names (the host card's terms apply, D7).
+    localValues: {},
+  },
 };
 
 /** An input is filled; a select has its option chosen. */
@@ -1013,28 +1025,35 @@ const setField = async (page: Page, id: string, value: string): Promise<void> =>
  * their wrappers.
  */
 const driveShell = async (page: Page, shot: Shot, game: ShellGame): Promise<void> => {
-  const { tabs, localFields } = SHELL[game];
+  const { tabs, localFields, hostFields } = SHELL[game];
   const drive = SHELL_DRIVE[game];
+  // Fidice's shell screens are named apart from its legacy ones (`shell home: …`), which its
+  // driver shot first on the same page; the other games' names are the ones recorded before M5.
+  const prefix = game === 'fidice' ? 'shell ' : '';
   await page.waitForFunction(`typeof ${REGISTRY[game].hook} === "object"`);
   await visible(page, '#homeScreen');
-  await shot('home: play tab, online');
+  await shot(`${prefix}home: play tab, online`);
   await tabs.slice(1).reduce(async (done, tab) => {
     await done;
     await click(page, `#${tabButtonId(tab)}`);
-    await shot(`home: ${tab.toLowerCase()} tab`);
+    await shot(`${prefix}home: ${tab.toLowerCase()} tab`);
   }, Promise.resolve());
   await click(page, `#${tabButtonId(tabs[0] ?? 'Play')}`);
   if (drive.submenuShot !== null) await shot(drive.submenuShot);
 
-  // ---- hosting: the room opens on the local broker ----
+  // ---- hosting: the room opens on the local broker (the host card at the game's `hostFields`: fidice's two chairs) ----
   await fill(page, '#nameInput', 'Ann');
+  await hostFields.reduce(async (done, [id, value]) => {
+    await done;
+    await setField(page, id, value);
+  }, Promise.resolve());
   await click(page, '#hostBtn');
   await visible(page, '#hostWaitScreen');
   await page
     .locator('#hostWaitStatus')
     .filter({ hasText: 'Waiting for your opponent to join' })
     .waitFor();
-  await shot('host: waiting for the opponent');
+  await shot(`${prefix}host: waiting for the opponent`);
   await click(page, '#cancelHostBtn');
   await visible(page, '#homeScreen');
 
@@ -1198,13 +1217,17 @@ const driveGin = async (page: Page, shot: Shot): Promise<void> => {
 };
 
 /**
- * Fidice: the menu, the ladder (collapsed, a category, a group, all open), the rules, the name
- * forms (solo with the difficulty picker and the computer configuration, pass the phone, join),
- * hosting on the broker: the lobby alone, with two computers, the table until it is our turn, our
- * bid through the picker (or a minimum raise), the ladder with the bid marked, the reveal, and the
- * spectator screen of "Watch the computers".
+ * Fidice, its live legacy path first (the 20 screens recorded since docs/MIGRATION.md step 14):
+ * the menu, the ladder (collapsed, a category, a group, all open), the rules, the name forms (solo
+ * with the difficulty picker and the computer configuration, pass the phone, join), hosting on the
+ * broker: the lobby alone, with two computers, the table until it is our turn, our bid through the
+ * picker (or a minimum raise), the ladder with the bid marked, the reveal, and the spectator screen
+ * of "Watch the computers". Then the same page on its shell path (`url` with PAGE_QUERY's flag; M5
+ * of docs/design/fidice-shell-adoption.md): the shell (driveShell: the tabs, a room, pass the
+ * phone under the curtain), the cup holder's table, the ladder, rules and history sheets, and the
+ * home screen after the game. Additive: M6 makes the shell half the whole.
  */
-const driveFidice = async (page: Page, shot: Shot): Promise<void> => {
+const driveFidice = async (page: Page, shot: Shot, url: string): Promise<void> => {
   await page.waitForFunction('typeof window.__fidice === "object"');
   await visible(page, '#screen-menu');
   await shot('menu');
@@ -1298,6 +1321,28 @@ const driveFidice = async (page: Page, shot: Shot): Promise<void> => {
   await shot('spectator: the ladder with the cup and the bid');
   await click(page, '#btnLeaveSpec');
   await visible(page, '#screen-menu');
+
+  // ---- the shell path: the shell, then the table it mounts ----
+  await page.goto(`${url}&${PAGE_QUERY.fidice ?? ''}`);
+  await driveShell(page, shot, 'fidice');
+  await click(page, '#curtainBtn');
+  await visible(page, '#screen-game');
+  await shot('shell local: round 1, the cup holder');
+  await click(page, '#ladderBtn');
+  await visible(page, '#ladderOverlay');
+  await shot('shell table: ladder sheet');
+  await click(page, '#closeLadderBtn');
+  await click(page, '#rulesBtnGame');
+  await visible(page, '#rulesOverlay');
+  await shot('shell table: rules sheet');
+  await click(page, '#closeRulesBtn');
+  await click(page, '#historyBtn');
+  await visible(page, '#historyOverlay');
+  await shot('shell table: history sheet');
+  await click(page, '#closeHistoryBtn');
+  await click(page, '#leaveBtn');
+  await visible(page, '#homeScreen');
+  await shot('shell home: after the game');
 };
 
 /**
@@ -1644,7 +1689,10 @@ const driveBriscola = async (page: Page, shot: Shot): Promise<void> => {
   await snap('home: after the games');
 };
 
-const DRIVERS: Readonly<Record<Game, (page: Page, shot: Shot) => Promise<void>>> = {
+/** A game's walk; fidice's takes the page's URL to reopen it on its shell path. */
+type Driver = (page: Page, shot: Shot, url: string) => Promise<void>;
+
+const DRIVERS: Readonly<Record<Game, Driver>> = {
   'gin-rummy': driveGin,
   fidice: driveFidice,
   backgammon: driveBackgammon,
@@ -1737,10 +1785,11 @@ export const capture = async (
     void dialog.accept();
   });
   try {
-    await page.goto(pageUrl(harness, game));
+    const url = pageUrl(harness, game);
+    await page.goto(url);
     const recorder = new Recorder(game, viewport, page);
     try {
-      await DRIVERS[game](page, recorder.shot);
+      await DRIVERS[game](page, recorder.shot, url);
     } catch (e: unknown) {
       // A step that could not be applied: say where the page is and what was shot last.
       const screens = await page.evaluate<string>(

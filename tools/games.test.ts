@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 
 import { STORAGE_KEYS as BACKGAMMON_KEYS } from '../web/games/backgammon/src/storage.ts';
 import { STORAGE_KEYS as BRISCOLA_KEYS } from '../web/games/briscola/src/storage.ts';
+import { STORAGE_KEYS as FIDICE_KEYS } from '../web/games/fidice/src/storage.ts';
 import { STORAGE_KEYS as GIN_KEYS } from '../web/games/gin-rummy/src/storage.ts';
 import {
   ALIASES,
@@ -44,6 +45,7 @@ describe('the games registry', () => {
           shareTitle: 'Gin Rummy',
           tabs: ['Play', 'Rules', 'Score', 'About'],
           modes: ['🌐 Online', '📱 Pass & Play', '🧪 Sandbox'],
+          hostFields: [],
           hostAnswered:
             /^Connected to .+'s room \(playing to \d+\)\. Waiting for the host to start/,
           connDot: '#connDot',
@@ -57,6 +59,7 @@ describe('the games registry', () => {
         hook: 'window.__fidice',
         suite: 'fidice',
         specs: ['**/fidice-*.spec.ts'],
+        storage: { saveKey: 'fidiceMP_v1', prefix: 'fidice_' },
         debug: 1,
         pageShape: {
           ids: [
@@ -74,6 +77,18 @@ describe('the games registry', () => {
           rulesSlots: true,
         },
         contractFloors: { ts: 50, markup: 40 },
+        shell: {
+          heading: '🥤Fidice',
+          shareTitle: 'Fidice',
+          tabs: ['Play', 'Rules', 'Ladder', 'About'],
+          modes: ['Online', 'Pass the phone', 'Solo', 'Watch'],
+          hostFields: [['seatsSel', '2']],
+          hostAnswered: /^Connected — (\d+ of \d+ seated · )?waiting for .+ to start$/,
+          connDot: '#connDot',
+          localNames: ['Ari', 'Lavi'],
+          localFields: [],
+          curtainButtons: 1,
+        },
       },
       backgammon: {
         title: 'Sheshbesh — backgammon',
@@ -99,6 +114,7 @@ describe('the games registry', () => {
           shareTitle: 'Sheshbesh',
           tabs: ['Play', 'Rules', 'About'],
           modes: ['Online', 'Pass the phone'],
+          hostFields: [],
           hostAnswered: /^Connected — waiting for .+ to start$/,
           connDot: '#oppDot',
           localNames: ['Ari', 'Ethan'],
@@ -136,6 +152,7 @@ describe('the games registry', () => {
           shareTitle: 'Briscola',
           tabs: ['Play', 'Rules', 'About'],
           modes: ['Online', 'Pass the phone'],
+          hostFields: [],
           hostAnswered: /^Connected — waiting for .+ to deal$/,
           connDot: '#oppDot',
           localNames: ['Ari', 'Lavi'],
@@ -146,14 +163,13 @@ describe('the games registry', () => {
     });
   });
 
-  test('the shell games are the rows with a shell, each carrying its SHELL row and a storage row', () => {
+  test('every game is a shell game (M5 of docs/design/fidice-shell-adoption.md), each carrying its SHELL row, in GAMES order', () => {
     // The shell specs (e2e/shell-*.spec.ts) iterate SHELL_GAMES and read the save and the
-    // preference keys through the storage row, so a shell game must have both.
-    expect(SHELL_GAMES).toEqual(GAMES.filter((game) => REGISTRY[game].shell !== undefined));
-    expect(SHELL_GAMES).toEqual(['gin-rummy', 'backgammon', 'briscola']);
+    // preference keys through the storage row, so every row carries both.
+    expect(SHELL_GAMES).toEqual(GAMES);
+    expect(SHELL_GAMES).toEqual(['gin-rummy', 'fidice', 'backgammon', 'briscola']);
     SHELL_GAMES.forEach((game) => {
       expect(REGISTRY[game].shell).toBe(SHELL[game]);
-      expect(REGISTRY[game].storage, game).toBeDefined();
     });
     expect(Object.keys(SHELL)).toEqual(SHELL_GAMES);
   });
@@ -164,18 +180,18 @@ describe('the games registry', () => {
     // and match length) are its own and need not carry the prefix.
     const SHELL_PREFS = ['name', 'p2Name', 'homeTab', 'playMode', 'sound', 'soundFont'];
     const pin = (
-      storage: Readonly<{ saveKey: string; prefix: string }> | undefined,
+      storage: Readonly<{ saveKey: string; prefix: string }>,
       keys: Readonly<Record<string, string>>,
     ): void => {
-      expect(storage?.saveKey).toBe(keys['save']);
+      expect(storage.saveKey).toBe(keys['save']);
       SHELL_PREFS.forEach((name) => {
-        expect(keys[name], name).toBe(`${storage?.prefix ?? ''}${name}`);
+        expect(keys[name], name).toBe(`${storage.prefix}${name}`);
       });
     };
     pin(REGISTRY['gin-rummy'].storage, GIN_KEYS);
+    pin(REGISTRY.fidice.storage, FIDICE_KEYS);
     pin(REGISTRY.backgammon.storage, BACKGAMMON_KEYS);
     pin(REGISTRY.briscola.storage, BRISCOLA_KEYS);
-    expect(REGISTRY.fidice.storage).toBeUndefined();
   });
 
   test('pins every page title, read off the rows', () => {

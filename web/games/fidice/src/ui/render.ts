@@ -20,6 +20,7 @@ import {
   requireId,
   setAttr,
   setHtml,
+  setText,
   trustedHtml,
   type DocumentLike,
   type PageLike,
@@ -113,6 +114,21 @@ export const paintSound = (doc: DocumentLike, enabled: boolean): void => {
 export const paintHandoff = (doc: DocumentLike, app: App): void => {
   const game = app.shell.role === 'local' ? app.shell.game : null;
   paintShellHandoff(doc, game !== null && handoffable(app) ? handoffLabel(game) : null);
+};
+
+/**
+ * The table's names strip (page.ts `table`; M5): `#myName` the chair this page plays (the cup
+ * holder's under pass the phone, `viewedChair`; "Watching" for a page with no chair), `#oppName`
+ * the other seats in chair order, so the two-seat shell specs read the opponent's name there as
+ * on every shell table. Empty off the table.
+ */
+export const paintNames = (doc: DocumentLike, app: App): void => {
+  const v = app.shell.view;
+  const chair = viewedChair(app);
+  const names = v === null ? [] : v.players.map((p) => p.name);
+  const mine = chair === null ? (v === null ? '' : 'Watching') : (names[chair] ?? '');
+  setText(requireId(doc, 'myName'), mine);
+  setText(requireId(doc, 'oppName'), names.filter((_, i) => i !== chair).join(' · '));
 };
 
 /** The rules and history sheets (the shell's), the finished games under the history, the ladder sheet's flag (its ladder is a mount, `paintTable`). */
@@ -340,6 +356,7 @@ export const paint = (doc: PageLike, app: App): void => {
   paintHome(doc, app);
   paintCurtain(doc, app);
   paintHandoff(doc, app);
+  paintNames(doc, app);
   paintConnDot(doc, 'connDot', connDotView(app.shell));
   paintOverlays(doc, app);
   paintTable(doc, app, Date.now());

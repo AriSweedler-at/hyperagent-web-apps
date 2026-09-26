@@ -12,7 +12,7 @@ import type { Page } from '@playwright/test';
 import { SHELL_GAMES } from '../tools/games.ts';
 import { DESKTOP, PHONE, type Viewport } from './fixtures/geometry.ts';
 import { SHELL_DRIVERS } from './fixtures/online-games.ts';
-import { pagePath } from './fixtures/site.ts';
+import { gamePath } from './fixtures/player.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 const VIEWPORTS: Readonly<Record<string, Viewport>> = { phone: PHONE, desktop: DESKTOP };
@@ -44,7 +44,7 @@ SHELL_GAMES.forEach((game) => {
         }) => {
           const { page } = player;
           await page.setViewportSize({ width: vp.width, height: vp.height });
-          await page.goto(pagePath(project, game));
+          await page.goto(gamePath(project, game));
           await page.locator('#tabAboutBtn').click();
           await expect(page.locator('#aboutPanel')).toBeVisible();
           await expect(page.locator('#playPanel')).toBeHidden();
@@ -75,7 +75,7 @@ SHELL_GAMES.forEach((game) => {
         }) => {
           const { page } = player;
           await page.setViewportSize({ width: vp.width, height: vp.height });
-          await page.goto(`${pagePath(project, game)}#rule-${glossary.deepLink}`);
+          await page.goto(`${gamePath(project, game)}#rule-${glossary.deepLink}`);
           await expect(page.locator('#rulesPanel')).toBeVisible();
           await expect(page.locator('#tabRulesBtn')).toHaveClass(/\bactive\b/);
           await expect(page.locator(`#rulesList #rule-${glossary.deepLink}`)).toBeInViewport();
@@ -87,7 +87,7 @@ SHELL_GAMES.forEach((game) => {
           project,
         }) => {
           const { page } = player;
-          await glossary.openRulesOverTable(page, pagePath(project, game), vp);
+          await glossary.openRulesOverTable(page, gamePath(project, game), vp);
           await expect(page.locator('#rulesOverlay')).toBeVisible();
           await innerLink(
             page,

@@ -86,8 +86,8 @@ describe('every test file belongs to exactly one suite', () => {
     expect(orphans, 'unclaimed specs: add the glob to a suite e2e row').toEqual([]);
     // A shared spec file (the shell specs alone) is claimed by the suites of the games it drives,
     // each with its own tag, and a suite's otherTags are the tags of every suite it shares any
-    // file with (the shell games share the seven shell specs, and the two online ones with fidice
-    // too: dry-round-2.md H1), so every describe runs in exactly one job.
+    // file with (every game shares the eight shell specs since M5 of
+    // docs/design/fidice-shell-adoption.md), so every describe runs in exactly one job.
     const shared = SPEC_FILES.filter((f) => e2eClaimants(f).length > 1);
     expect(shared).toEqual(SPEC_FILES.filter((f) => f.startsWith('e2e/shell-')));
     shared.forEach((f) => {
@@ -132,11 +132,10 @@ describe('every test file belongs to exactly one suite', () => {
     expect([...tags].sort()).toEqual(GAMES.map((g) => `@${g}`).sort());
     shellSpecs.forEach((f) => {
       const source = readFileSync(resolve(REPO_ROOT, f), 'utf8');
-      // The repo idiom (docs/design/shared-shell.md §6.3): a forEach over the registry, the
-      // describe titled and tagged by the game, so --grep @<game> and the suites' grepInvert compose.
-      // The two online specs loop over every game (dry-round-2.md H1), the rest over the shell games.
-      const games = e2eClaimants(f).includes('fidice') ? 'GAMES' : 'SHELL_GAMES';
-      expect(source, f).toContain(`${games}.forEach((game) => {`);
+      // The repo idiom (docs/design/shared-shell.md §6.3): a forEach over the registry's shell
+      // games (every game since M5 of docs/design/fidice-shell-adoption.md), the describe titled and
+      // tagged by the game, so --grep @<game> and the suites' grepInvert compose.
+      expect(source, f).toContain('SHELL_GAMES.forEach((game) => {');
       expect(source, f).toContain('test.describe(game, { tag: `@${game}` }, () => {');
     });
     // The row for a shell spec runs the e2e jobs of exactly the suites that claim it.
@@ -212,10 +211,10 @@ describe('every test file belongs to exactly one suite', () => {
       tag: '@gin-rummy',
       otherTags: ['@fidice', '@backgammon', '@briscola'],
     });
-    // Fidice's own shell-path spec (docs/design/fidice-shell-adoption.md §4 M4) beside the two
-    // online specs it shares until M5 registers it as a shell game.
+    // Fidice's own spec (e2e/fidice-online.spec.ts, the N-seat table) beside the eight shell specs,
+    // a shell game since M5 of docs/design/fidice-shell-adoption.md.
     expect(SUITES.fidice.e2e).toStrictEqual({
-      files: ['**/fidice-*.spec.ts', '**/shell-online.spec.ts', '**/shell-relay.spec.ts'],
+      files: ['**/fidice-*.spec.ts', '**/shell-*.spec.ts'],
       tag: '@fidice',
       otherTags: ['@gin-rummy', '@backgammon', '@briscola'],
     });
@@ -653,7 +652,11 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   ],
   ['a gin spec', ['e2e/gin-online.spec.ts'], ['e2e-gin']],
   ['a backgammon spec', ['e2e/backgammon-online.spec.ts'], ['e2e-backgammon']],
-  ['a shell spec', ['e2e/shell-home.spec.ts'], ['e2e-gin', 'e2e-backgammon', 'e2e-briscola']],
+  [
+    'a shell spec',
+    ['e2e/shell-home.spec.ts'],
+    ['e2e-gin', 'e2e-fidice', 'e2e-backgammon', 'e2e-briscola'],
+  ],
   [
     'an online spec',
     ['e2e/shell-relay.spec.ts'],
@@ -662,13 +665,22 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   [
     'a shell spec beside a backgammon change',
     ['e2e/shell-handoff.spec.ts', 'web/games/backgammon/src/ui/state.ts'],
-    ['e2e-gin', 'backgammon', 'e2e-backgammon', 'e2e-briscola', 'site', 'e2e-site', 'harness'],
+    [
+      'e2e-gin',
+      'e2e-fidice',
+      'backgammon',
+      'e2e-backgammon',
+      'e2e-briscola',
+      'site',
+      'e2e-site',
+      'harness',
+    ],
   ],
   ['the smoke and style specs', ['e2e/smoke.spec.ts', 'e2e/computed-styles.spec.ts'], ['e2e-site']],
   [
     "the shared shell's liveness spec",
     ['e2e/shell-liveness.spec.ts'],
-    ['e2e-gin', 'e2e-backgammon', 'e2e-briscola'],
+    ['e2e-gin', 'e2e-fidice', 'e2e-backgammon', 'e2e-briscola'],
   ],
   ['the landing page', ['web/index.html'], ['site', 'e2e-site']],
   ['the alias stub', ['web/games/sheshbesh/index.html'], ['site', 'e2e-site']],

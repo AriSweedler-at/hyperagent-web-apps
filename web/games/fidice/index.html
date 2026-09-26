@@ -2,11 +2,17 @@
 <html lang="en">
 <head>
     <meta property="og:title" content="Fidice — one-cup liar's dice (Kezar Lake)">
+    <meta property="og:description" content="One cup, five dice, two to six players: bid a hand off the ladder or call liar. Pass one phone around, or open a table online and share the code.">
     <meta property="og:type" content="website">
-    <meta property="og:image:width" content="1024">
-    <meta property="og:image:height" content="1024">
-    <meta name="twitter:card" content="summary">
+    <meta property="og:url" content="https://games.sweedler.com/fidice/">
+    <meta property="og:image" content="https://games.sweedler.com/fidice/splash.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Five dice and a cup on a dock over Kezar Lake, with the word Fidice">
+    <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Fidice — one-cup liar's dice (Kezar Lake)">
+    <meta name="twitter:description" content="One cup, five dice, two to six players: bid a hand off the ladder or call liar. Pass one phone around, or open a table online and share the code.">
+    <meta name="twitter:image" content="https://games.sweedler.com/fidice/splash.png">
     <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fidice — one-cup liar's dice</title>
@@ -194,8 +200,10 @@
   </div>
 
   <!-- TABLE (plan §4 M2): the shell's five controls, the ladder button and the connection dot in
-       the topbar; the cup, the bid card, the seats and the bid picker paint into #fidiceTable from
-       M4. Dark until M6: the legacy mount replaces #app's children with #app-root. -->
+       the topbar; the names strip every shell table carries (#myName the chair this page plays,
+       #oppName the others: what the shell specs read, M5); the cup, the bid card, the seats and
+       the bid picker paint into #fidiceTable from M4. Dark until M6: the legacy mount replaces
+       #app's children with #app-root. -->
   <div id="tableScreen" class="hidden">
     <div class="topbar">
       <div class="row tight">
@@ -209,6 +217,10 @@
         <button class="icon-btn" id="historyBtn" title="History" aria-label="History">≡</button>
         <button class="icon-btn" id="soundBtn" title="Sound &amp; vibration" aria-label="Sound" aria-pressed="true">🔊</button>
       </div>
+    </div>
+    <div class="row between small" id="tableNames">
+      <span id="myName"></span>
+      <span class="muted" id="oppName"></span>
     </div>
     <div id="fidiceTable"></div>
   </div>

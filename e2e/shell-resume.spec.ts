@@ -7,7 +7,7 @@
 // 13). Tagged per game (see shell-home.spec.ts); the two-peer case @online.
 import { SHELL, SHELL_GAMES } from '../tools/games.ts';
 import { PHONE } from './fixtures/geometry.ts';
-import { gameQuery, invitePath } from './fixtures/player.ts';
+import { gamePath, invitePath } from './fixtures/player.ts';
 import {
   DEFAULT_NAMES,
   ONLINE_NAMES,
@@ -18,7 +18,6 @@ import {
   startLocal,
 } from './fixtures/shell.ts';
 import { SHELL_DRIVERS, connect } from './fixtures/online-games.ts';
-import { pagePath } from './fixtures/site.ts';
 import { BROKER_TIMEOUT, WEBRTC_TIMEOUT } from './fixtures/timeouts.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -120,7 +119,7 @@ SHELL_GAMES.forEach((game) => {
       project,
     }) => {
       const { page } = player;
-      await startLocal(page, `${pagePath(project, game)}${gameQuery()}`, PHONE);
+      await startLocal(page, gamePath(project, game), PHONE);
       const before = await driver.snapshot(page);
       await page.reload();
       await expect(page.locator('#homeScreen')).toBeVisible();

@@ -6,7 +6,6 @@
 import { test as base, expect, type Page } from '@playwright/test';
 
 import type { Game, ShellGame } from '../../tools/games.ts';
-import { fidiceHostLobby, fidiceJoin, fidiceLobbyCode } from './fidice.ts';
 import { newPlayer, type Player } from './player.ts';
 import { hostRoom as shellHostRoom, join as shellJoin, roomCode } from './shell.ts';
 import { asProject, type Project } from './site.ts';
@@ -32,10 +31,10 @@ const shellDriver = (game: ShellGame): Driver => ({
   joinByCode: (page, name, code) => shellJoin(page, game, name, code),
 });
 
-/** One driver per game: a game the registry knows without a driver is a type error here. */
+/** One driver per game: a game the registry knows without a driver is a type error here. Every game's is the shell's since M5 of docs/design/fidice-shell-adoption.md (fidice's legacy lobby driver retired with it). */
 const DRIVERS: Readonly<Record<OnlineGame, Driver>> = {
   'gin-rummy': shellDriver('gin-rummy'),
-  fidice: { hostRoom: fidiceHostLobby, readRoomCode: fidiceLobbyCode, joinByCode: fidiceJoin },
+  fidice: shellDriver('fidice'),
   backgammon: shellDriver('backgammon'),
   briscola: shellDriver('briscola'),
 };

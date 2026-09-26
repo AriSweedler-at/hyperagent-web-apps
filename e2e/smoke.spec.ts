@@ -19,6 +19,9 @@ import { expect, test } from './fixtures/two-players.ts';
 PAGES.forEach((name) => {
   test(`${name}: loads cleanly`, async ({ player, project }) => {
     const { page, watched } = player;
+    // The bare page, no query: the page as a visitor loads it. For fidice that is the live legacy
+    // path (the shell specs open its shell path through e2e/fixtures/player.ts PAGE_QUERY), so the
+    // live path keeps a load check until M6 of docs/design/fidice-shell-adoption.md flips it.
     await page.goto(pagePath(project, name));
     await expect(page).toHaveTitle(EXPECTED_TITLES[name]);
     await page.waitForLoadState('networkidle');

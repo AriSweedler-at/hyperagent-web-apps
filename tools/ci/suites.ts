@@ -46,20 +46,13 @@ export type E2eSpec = Readonly<{
 }>;
 
 /**
- * The shared shell specs (docs/design/shared-shell.md D1): the home screen, the pass-and-play start,
- * the room, the relay-forced game, resume, the handoff and the sessions' liveness, written once
- * over tools/games.ts SHELL_GAMES. Both shell games' suites claim them; the tags decide which
+ * The shared shell specs (docs/design/shared-shell.md D1): the home screen, the glossary, the
+ * pass-and-play start, the room, the relay-forced game, resume, the handoff and the sessions'
+ * liveness, written once over tools/games.ts SHELL_GAMES (every game since M5 of
+ * docs/design/fidice-shell-adoption.md). Every game suite claims them; the tags decide which
  * describes each job plays.
  */
 const SHELL_SPECS: ReadonlyArray<string> = ['**/shell-*.spec.ts'];
-
-/**
- * The two of them written over every game (dry-round-2.md H1): the room and the relay-forced game
- * loop over tools/games.ts GAMES, fidice's row in e2e/fixtures/online-games.ts driving its legacy
- * lobby, so fidice's suite claims these two alone and each game suite inverts the other two tags.
- */
-const ONLINE_SPEC_NAMES: ReadonlyArray<string> = ['shell-online.spec.ts', 'shell-relay.spec.ts'];
-const ONLINE_SPECS: ReadonlyArray<string> = ONLINE_SPEC_NAMES.map((name) => `**/${name}`);
 
 /**
  * The game each game suite tests: REGISTRY's `suite` column read backwards. It is the folder under
@@ -71,15 +64,15 @@ const GAME_OF: Readonly<Record<GameSuite, Game>> = Object.fromEntries(
 
 /**
  * A game suite's Playwright half, read off its registry row (dry-round-2.md I6): the game's own
- * specs (`specs`), then the shell specs for a row with `shell` or the two online specs for a row
- * without (every game has a describe in those two: H1), its `@<game>` tag and the other games'
- * tags, so each game's e2e job plays its own describes alone.
+ * specs (`specs`), then the shell specs (every game has a describe in each: every game is a shell
+ * game), its `@<game>` tag and the other games' tags, so each game's e2e job plays its own
+ * describes alone.
  */
 const gameE2e = (suite: GameSuite): E2eSpec => {
   const game = GAME_OF[suite];
   const row = REGISTRY[game];
   return {
-    files: [...row.specs, ...(row.shell === undefined ? ONLINE_SPECS : SHELL_SPECS)],
+    files: [...row.specs, ...SHELL_SPECS],
     tag: `@${game}`,
     otherTags: GAMES.filter((g) => g !== game).map((g) => `@${g}`),
   };
@@ -484,9 +477,9 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         'web/games/fidice/src/ui/**': { lines: 96, functions: 94, statements: 94, branches: 80 },
       },
     },
-    // Fidice's own online and relay specs folded into the two online shell specs (H1): its e2e job
-    // plays their fidice describes, and since M4 its own shell-path spec (e2e/fidice-shell.spec.ts,
-    // REGISTRY.fidice.specs), until M5 registers it as a shell game and the shell specs play it.
+    // A shell game since M5 of docs/design/fidice-shell-adoption.md: its e2e job plays the fidice
+    // describes of the eight shell specs on its shell path, and its own e2e/fidice-online.spec.ts
+    // (REGISTRY.fidice.specs: the N-seat table, Solo and Watch).
     e2e: gameE2e('fidice'),
   },
   backgammon: {
@@ -877,20 +870,13 @@ export const RULES: ReadonlyArray<Rule> = [
     why: 'the harness, the build and lint configuration, the frozen oracles and the shared code every game imports',
   },
   {
-    // The two online specs loop over every game (H1): a spec change runs fidice's e2e job too, each
-    // job playing its own game's describes through its tag. Above the shell rule, which would claim
-    // them for the two shell games alone.
-    globs: ONLINE_SPEC_NAMES.map((name) => `e2e/${name}`),
-    runs: [e2eJob('gin'), e2eJob('fidice'), e2eJob('backgammon'), e2eJob('briscola')],
-    why: "the online specs: a describe per game, fidice included, each run by that game's e2e job through its tag",
-  },
-  {
-    // One describe per shell game, each played by that game's e2e job through its tag (the gin,
-    // backgammon and briscola rows claim the files, each inverting the others' tags): a spec change
-    // runs the three jobs, a change under web/games/<g>/** runs e2e-<g> with its describes
-    // (gameRules), and web/shared/** runs everything (above). No game-e2e job runs another game's describes.
+    // One describe per shell game (every game since M5 of docs/design/fidice-shell-adoption.md),
+    // each played by that game's e2e job through its tag (every game row claims the files, each
+    // inverting the others' tags): a spec change runs the four jobs, a change under
+    // web/games/<g>/** runs e2e-<g> with its describes (gameRules), and web/shared/** runs
+    // everything (above). No game-e2e job runs another game's describes.
     globs: ['e2e/shell-*.spec.ts'],
-    runs: [e2eJob('gin'), e2eJob('backgammon'), e2eJob('briscola')],
+    runs: [e2eJob('gin'), e2eJob('fidice'), e2eJob('backgammon'), e2eJob('briscola')],
     why: "the shared shell specs: a describe per shell game, each run by that game's e2e job through its tag",
   },
   ...gameRules('gin'),

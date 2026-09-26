@@ -8,7 +8,7 @@
 // have a room-code row, and a game the union gains shows up here as a type error until it has a
 // row. tools/games.test.ts pins every value. The `shell` block of §6.1 (the heading, the tabs, the
 // guest-answered status, the connection dot, the local fields) is SHELL below, one row per shell
-// game, spread into the game's REGISTRY row; e2e/shell-*.spec.ts drive both shell games by it.
+// game, spread into the game's REGISTRY row; e2e/shell-*.spec.ts drive every shell game by it.
 import type { Game } from '../web/shared/lib/roomCode.ts';
 
 export type { Game };
@@ -35,17 +35,17 @@ export type GameSpec = Readonly<{
   /**
    * The game's own e2e specs, as Playwright globs (`**\/<suite>-*.spec.ts`): the table flows and
    * geometry a shared spec cannot carry. The shared specs are not listed: tools/ci/suites.ts adds
-   * the shell specs to a row with `shell` and the two online ones (a describe per game) to every
-   * row. Empty for fidice since its online pair folded into those (dry-round-2.md H1).
+   * the shell specs (a describe per game) to every row, since every game is a shell game.
    */
   specs: ReadonlyArray<string>;
   /**
    * The shell's localStorage keys (shared-shell.md §6.1): the save of the game in progress and the
    * prefix every preference key carries (`<prefix>homeTab`, `<prefix>playMode`, ...), as the game's
-   * storage.ts STORAGE_KEYS spells them (the test pins the two equal). Absent for fidice, whose one
-   * key (`fidice-name`) is neither; it gains the row with its restyle (§4.6).
+   * storage.ts STORAGE_KEYS spells them (the test pins the two equal). Fidice's are its shell
+   * path's (docs/design/fidice-shell-adoption.md §3 "Storage"; registered at M5): the legacy
+   * `fidice-name` is copied into `fidice_name` at boot and never read by the harness.
    */
-  storage?: Readonly<{ saveKey: string; prefix: string }>;
+  storage: Readonly<{ saveKey: string; prefix: string }>;
   /** The PeerJS `debug` level main.ts passes to `realTransport`, which `expectPeerOptions` asserts. */
   debug: 0 | 1;
   /**
@@ -66,8 +66,8 @@ export type GameSpec = Readonly<{
    * it, the vdom painted the whole page into `#app` and -1 let any count pass).
    */
   contractFloors: Readonly<{ ts: number; markup: number }>;
-  /** The shared shell's row (SHELL), present for the shell games alone. */
-  shell?: ShellSpec;
+  /** The shared shell's row (SHELL): every game is a shell game since M5 of docs/design/fidice-shell-adoption.md. */
+  shell: ShellSpec;
 }>;
 
 /**
@@ -89,6 +89,14 @@ export type ShellSpec = Readonly<{
    * included: a locator counts hidden buttons too.
    */
   modes: ReadonlyArray<string>;
+  /**
+   * The host card's fields the shell specs set before hosting, each with its value (`localFields`'
+   * twin): fidice's chairs to two, so its room is the two-seat room the shell specs are written
+   * for (the waiting-room copy the shell's, a returning guest's join held at the full room and
+   * moved back to its seat by name: web/shared/net/host.ts `accept`, plan §7 D5); the N-seat table
+   * is e2e/fidice-online.spec.ts's. Empty where the card has no field to set.
+   */
+  hostFields: ReadonlyArray<readonly [id: string, value: string]>;
   /**
    * `#guestWaitStatus` once the host has answered the join. The guest itself writes 'Connected.
    * Waiting for the host to start…' when the channel opens, before its join is sent; only the
@@ -114,11 +122,18 @@ export type ShellSpec = Readonly<{
 
 /**
  * The games with the shared shell (the home screen, the waiting rooms, the curtain, the toast:
- * docs/design/shared-shell.md §3.1); fidice joins with its restyle (§4.6). A game here without a
- * SHELL row, or a row in e2e/fixtures/online-games.ts, is a type error.
+ * docs/design/shared-shell.md §3.1): every game, since M5 of docs/design/fidice-shell-adoption.md
+ * registered fidice (its shell path, behind `?shell=1` until M6 flips the page: the harness opens
+ * it through e2e/fixtures/player.ts PAGE_QUERY). A game here without a SHELL row, or a row in
+ * e2e/fixtures/online-games.ts, is a type error. GAMES order.
  */
-export type ShellGame = 'gin-rummy' | 'backgammon' | 'briscola';
-export const SHELL_GAMES: ReadonlyArray<ShellGame> = ['gin-rummy', 'backgammon', 'briscola'];
+export type ShellGame = 'gin-rummy' | 'fidice' | 'backgammon' | 'briscola';
+export const SHELL_GAMES: ReadonlyArray<ShellGame> = [
+  'gin-rummy',
+  'fidice',
+  'backgammon',
+  'briscola',
+];
 
 /** One shell row per shell game; REGISTRY carries each as its `shell`. */
 export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
@@ -127,10 +142,32 @@ export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
     shareTitle: 'Gin Rummy',
     tabs: ['Play', 'Rules', 'Score', 'About'],
     modes: ['🌐 Online', '📱 Pass & Play', '🧪 Sandbox'],
+    hostFields: [],
     hostAnswered: /^Connected to .+'s room \(playing to \d+\)\. Waiting for the host to start/,
     connDot: '#connDot',
     localNames: ['Ari', 'Lavi'],
     localFields: [['localTargetInput', '100']],
+    curtainButtons: 1,
+  },
+  fidice: {
+    // The masthead's brand (page.ts `masthead`): the cup glyph, then the name.
+    heading: '🥤Fidice',
+    shareTitle: 'Fidice',
+    // Play / Rules / Ladder / About: the composed page's order (storage.ts HOME_TABS; plan §7 D12).
+    tabs: ['Play', 'Rules', 'Ladder', 'About'],
+    // Online and Pass the phone are stored; Solo and Watch are shown only (plan §7 D9).
+    modes: ['Online', 'Pass the phone', 'Solo', 'Watch'],
+    // The host card opens six chairs by default; the shell specs' tables seat two (see ShellSpec).
+    hostFields: [['seatsSel', '2']],
+    // shellConfig.ts `hostRoomMsg`: the host's welcome names the host; past a table of two the
+    // count of seats taken rides in front (fidice-online.spec.ts reads that form).
+    hostAnswered: /^Connected — (\d+ of \d+ seated · )?waiting for .+ to start$/,
+    connDot: '#connDot',
+    // shellConfig.ts LOCAL_NAMES: the shell's two proper names; the third to sixth seats are the page's own.
+    localNames: ['Ari', 'Lavi'],
+    // No field beyond the names: the host card's terms (the kayaks, the computers) apply to pass the phone too (D7).
+    localFields: [],
+    // The reveal alone ("Lift the cup", D8): the handoff is the table's 🌐, never the curtain's.
     curtainButtons: 1,
   },
   backgammon: {
@@ -138,6 +175,7 @@ export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
     shareTitle: 'Sheshbesh',
     tabs: ['Play', 'Rules', 'About'],
     modes: ['Online', 'Pass the phone'],
+    hostFields: [],
     // ui/state.ts `hostRoomMsg`: only the host's `lobby` reply carries the host's name.
     hostAnswered: /^Connected — waiting for .+ to start$/,
     connDot: '#oppDot',
@@ -153,6 +191,7 @@ export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
     shareTitle: 'Briscola',
     tabs: ['Play', 'Rules', 'About'],
     modes: ['Online', 'Pass the phone'],
+    hostFields: [],
     // shellConfig.ts `hostRoomMsg`: only the host's `lobby` reply carries the host's name.
     hostAnswered: /^Connected — waiting for .+ to deal$/,
     connDot: '#oppDot',
@@ -193,9 +232,12 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
     title: "Fidice — one-cup liar's dice",
     hook: 'window.__fidice',
     suite: 'fidice',
-    // The shell path behind `?shell=1` (M4 of docs/design/fidice-shell-adoption.md): its own spec
-    // through the shell's raw ids, until M5 registers fidice as a shell game and the shell specs play it.
+    // Its own spec (e2e/fidice-online.spec.ts: the N-seat table, three humans and a computer through
+    // the shared sessions; Solo and Watch); the eight shell specs play it as they play every shell
+    // game, on the shell path (M5 of docs/design/fidice-shell-adoption.md).
     specs: ['**/fidice-*.spec.ts'],
+    // src/storage.ts STORAGE_KEYS: the shell path's save and preference keys (plan §3 "Storage").
+    storage: { saveKey: 'fidiceMP_v1', prefix: 'fidice_' },
     debug: 1,
     // The composed shell page's screens (M2 of docs/design/fidice-shell-adoption.md; page.ts): the
     // shell's five, the bot config screen, the Ladder tab's panel and the table's mount. The rules
@@ -216,6 +258,7 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
       rulesSlots: true,
     },
     contractFloors: { ts: 50, markup: 40 },
+    shell: SHELL.fidice,
   },
   backgammon: {
     title: 'Sheshbesh — backgammon',
