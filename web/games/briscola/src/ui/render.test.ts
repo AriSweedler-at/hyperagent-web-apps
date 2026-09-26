@@ -491,11 +491,12 @@ describe('the two-player table', () => {
     const me = v.me.idx;
     const start = game(two).startedAt;
     paint(p.doc, two);
-    // Follow: both cards on the table, nobody `taking` yet (the winner lifts at the impact), no fighters marked; the tallies as before the trick.
-    expect(p.get('trick').attr('data-key')).toBe(`${trickKey(trick.cards)}|linea|it|fight`);
-    expect(p.get('trick').text()).not.toContain(' taking"');
-    expect(p.get('trick').text()).toContain('class="play winner"');
-    expect(p.get('trick').text()).toContain('class="play loser"');
+    // Follow: both cards on the table, the winner's `taking`, no fighters marked and the goldens' key
+    // (the frame the beat opens on is the pinned one); the tallies as before the trick.
+    expect(p.get('trick').attr('data-key')).toBe(`${trickKey(trick.cards)}|linea|it`);
+    expect(p.get('trick').text()).toContain(' taking"');
+    expect(p.get('trick').text()).not.toContain('winner');
+    expect(p.get('trick').text()).not.toContain('loser');
     expect(p.get('trick').attr('data-stage')).toBe('follow');
     expect(p.get('trick').attr('data-pose')).toBeNull();
     expect(p.get('trick').text()).not.toContain('clash-fx');
@@ -541,8 +542,10 @@ describe('the two-player table', () => {
     expect(p.get('trick').style('--ux')).toBe('1');
     expect(p.get('trick').style('--cx')).toBe('50%');
     expect(p.get('trick').attr('data-key')).toBe(`${trickKey(trick.cards)}|linea|it|fight`);
+    expect(p.get('trick').text()).toContain('class="play winner"');
+    expect(p.get('trick').text()).toContain('class="play loser"');
     expect(p.get('trick').text()).not.toContain('bystander');
-    expect(p.get('trick').text()).not.toContain(' taking"');
+    expect(p.get('trick').text()).toContain(' taking"');
     // Impact: the winner `taking`, the frame of its suit at the contact point with its sparkles (a briscola's) or none.
     const impact = elapsed(elapsed(charge));
     paint(p.doc, impact);

@@ -491,10 +491,13 @@ const paintTrick = (
   const me = v.me.idx;
   setAttr(trick, 'data-players', String(v.options.seatCount));
   const cards = fanShown(v, b);
-  // The winner lifts from the impact on (docs/design/briscola-battle.md §3.1 IMPACT) through the pack.
-  const taking = b.impacted || b.stage === 'fly' ? (b.trick?.winner ?? null) : null;
-  // The fan is rebuilt at the phase changes of the beat (follow → impact → the pack), so the marks the
-  // fighters wear are in its markup and element identity holds through the charge and the strike.
+  // The winner is marked (`taking`: the lift and the cream outline) through the whole beat, from the
+  // completing card's flight to the pack, so the frame the beat opens on is the one the goldens pin
+  // (the trick held, the taker marked); the clash's own marks start at the charge.
+  const taking = b.before ? (b.trick?.winner ?? null) : null;
+  // The fan is rebuilt at the phase changes of the beat (charge → impact → the pack), so the marks the
+  // fighters wear are in its markup and element identity holds through the charge and the strike; at
+  // `follow` (the completing card landing) the markup and the key are the goldens'.
   const phase = fanPhase(b);
   const fighters =
     phase === 'fight' || phase === 'hit'
@@ -522,7 +525,7 @@ const paintTrick = (
   toggleClass(trick, 'drop', app.table.drag?.over === true);
 };
 
-/** The fan's build phase through a beat: `fight` from the completing card's flight to the strike, `hit` the impact and the aftermath (the winner `taking`), `pack` the flight to the chip; null outside a beat and through the draws. */
+/** The fan's build phase through a beat: `fight` the charge and the strike (the fighters marked), `hit` the impact and the aftermath, `pack` the flight to the chip; null at `follow` (the fan as the goldens pin it), outside a beat and through the draws. */
 const fanPhase = (b: Beat): 'fight' | 'hit' | 'pack' | null =>
   b.stage === null
     ? null
@@ -530,7 +533,7 @@ const fanPhase = (b: Beat): 'fight' | 'hit' | 'pack' | null =>
       ? 'hit'
       : b.stage === 'fly'
         ? 'pack'
-        : isClashStage(b.stage)
+        : b.fighting
           ? 'fight'
           : null;
 
