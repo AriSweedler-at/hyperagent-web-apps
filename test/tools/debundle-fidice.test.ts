@@ -170,7 +170,8 @@ describe('the de-bundled fidice modules', () => {
   test('the hand-owned page boots the typed entry as a module and links the shared stylesheets before its own', () => {
     // Step 9: PeerJS and the ICE loader are bundled through web/shared/edge (main.ts), so the page
     // defines neither `window.Peer` nor `window.HyperIce`. Step 14: the cascade is tokens, base,
-    // then the game's theme (docs/ARCHITECTURE.md "Two origins": relative links only).
+    // then, since M1 of docs/design/fidice-shell-adoption.md, the shell sheet, then the game's theme
+    // (docs/ARCHITECTURE.md "Two origins": relative links only).
     const html = readRepoFile(`${FIDICE_DIR}/index.html`);
     expect(html).toContain("<title>Fidice — one-cup liar's dice</title>");
     expect(html).toContain('<div id="app"></div>');
@@ -182,6 +183,7 @@ describe('the de-bundled fidice modules', () => {
     expect(links).toEqual([
       '../../shared/styles/tokens.css',
       '../../shared/styles/base.css',
+      '../../shared/styles/shell.css',
       './theme.css',
     ]);
   });

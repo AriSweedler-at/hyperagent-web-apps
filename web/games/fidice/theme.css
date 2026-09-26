@@ -23,29 +23,37 @@
   /* The shell's fourteen roles (web/shared/styles/shell.css; docs/design/fidice-shell-adoption.md §5) on this
      palette, never gin's: Nunito for the body and Fredoka for the code, the birch panel and its shadow for the
      shell's boxes, the header's pine for its bars with the header's white on them, .btn-secondary's cream-2,
-     timber and hover for the fills, the accent for emphasis, the buttons' 12px and the tabs' 10px. Read by no
-     rule until the page links shell.css (M1 of that plan); declared first so no shell rule ever resolves to a
-     gin value. */
+     timber and hover for the fills, the accent for emphasis, the buttons' 12px and the tabs' 10px. Read by every
+     shell rule since the page links shell.css (M1 of that plan); declared here so no shell rule ever resolves to
+     a gin value. */
   --font-body:'Nunito',system-ui,sans-serif; --font-display:'Fredoka',sans-serif;
   --surface-shell:var(--card); --surface-bar:var(--pine); --shadow-shell:var(--shadow);
   --fill:var(--cream-2); --fill-hover:#e6d8bd; --ink-on-fill:var(--timber); --ink-on-bar:#fffc; --ink-hover:#fff;
   --emphasis:var(--accent); --radius-control:12px; --radius-inner:12px; --radius-tab:10px;
 }
 html,body{height:100%}
+/* The page links web/shared/styles/shell.css third since M1 of docs/design/fidice-shell-adoption.md. A theme rule of equal
+   specificity wins (this file links last), so each shell declaration that reached a fidice element without a fidice rule
+   pinning it is answered below, at the selector it hit, with the value the goldens recorded; the rest of the shell sheet
+   matches nothing on this page until M2. shell.css paints html in --text and --font-body: the root keeps the UA's. */
+html{color:initial;font-family:initial}
 body{font-family:'Nunito',system-ui,sans-serif;color:var(--ink);min-height:100%;display:flex;flex-direction:column;position:relative;
   background:linear-gradient(180deg,var(--mist) 0,#eef5f9 30%,#d9e9f2 60%,#bcd9ea 100%);background-attachment:fixed}
 body::before{content:"";position:fixed;left:0;right:0;bottom:0;height:32vh;pointer-events:none;z-index:0;opacity:.8;
   background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 420' preserveAspectRatio='none'><g fill='%238fb3a0' opacity='.55'><path d='M0 260 L40 180 L80 260 L110 150 L150 260 L190 200 L230 260 L270 120 L320 260 L350 190 L390 260 L430 140 L480 260 L520 200 L560 260 L600 110 L650 260 L690 190 L730 260 L770 150 L820 260 L860 210 L900 260 L940 130 L990 260 L1030 190 L1070 260 L1110 160 L1160 260 L1200 200 L1200 420 L0 420Z'/></g><g fill='%231f4d3a' opacity='.9'><path d='M0 300 L30 230 L60 300 L90 200 L125 300 L160 250 L195 300 L230 170 L275 300 L305 240 L340 300 L380 190 L425 300 L460 250 L500 300 L540 160 L590 300 L625 240 L660 300 L700 200 L745 300 L780 255 L815 300 L855 180 L905 300 L940 245 L975 300 L1015 210 L1060 300 L1095 250 L1130 300 L1170 190 L1200 260 L1200 420 L0 420Z'/></g><path fill='%232b6f9e' d='M0 300 L1200 300 L1200 420 L0 420Z'/><g stroke='%237fbde0' stroke-width='3' fill='none' opacity='.8' stroke-linecap='round'><path d='M60 330 q20 -8 40 0 t40 0'/><path d='M320 355 q20 -8 40 0 t40 0 t40 0'/><path d='M640 335 q20 -8 40 0 t40 0'/><path d='M900 365 q20 -8 40 0 t40 0 t40 0'/><path d='M180 390 q20 -8 40 0 t40 0'/><path d='M1040 395 q20 -8 40 0 t40 0'/><path d='M500 400 q20 -8 40 0 t40 0'/></g></svg>") center bottom / 100% 100% no-repeat}
 header,main{position:relative;z-index:1}
+/* shell.css caps #app at 480px as a 100dvh flex column; the vdom's mount stays a plain block so main keeps its 1200px. */
+#app{max-width:none;margin:0;min-height:auto;display:block}
 h1,h2,h3,.brand{font-family:'Fredoka',sans-serif;letter-spacing:.2px;margin:0}
 button{font-family:inherit;font-size:15px;font-weight:700;border:0;border-radius:12px;padding:10px 16px;cursor:pointer;transition:transform .08s,box-shadow .12s,background .12s}
 button:active{transform:translateY(1px)}
 button:disabled{opacity:.45;cursor:not-allowed;transform:none}
-.btn-primary{background:linear-gradient(180deg,#e2863d 0,var(--accent) 100%);color:#fff;box-shadow:0 3px 0 var(--accent-dark)}
+/* shell.css sizes .btn-primary (1.1rem, full width) and .btn-go (1.1rem); the button rule above is the size here. */
+.btn-primary{background:linear-gradient(180deg,#e2863d 0,var(--accent) 100%);color:#fff;box-shadow:0 3px 0 var(--accent-dark);font-size:15px;width:auto}
 .btn-primary:hover:not(:disabled){background:linear-gradient(180deg,#ee9550 0,#de8038 100%)}
 /* The call to action (docs/ARCHITECTURE.md "Calls to action"; the owner: "all the 'start game' buttons should be green
    and should stand out well"): the name form's Let's go and the lobby's Start game in the shared --go, with the buttons' hard shadow in a darker olive. */
-.btn-go{background:var(--go);color:var(--go-text);box-shadow:0 3px 0 #6f7d3a}
+.btn-go{background:var(--go);color:var(--go-text);box-shadow:0 3px 0 #6f7d3a;font-size:15px}
 .btn-go:hover:not(:disabled){background:#b4c56a}
 .btn-go:focus-visible{outline:3px solid var(--pine);outline-offset:2px}
 .btn-secondary{background:var(--cream-2);color:var(--timber);border:1.5px solid #cdbc9c;box-shadow:0 2px 0 #cdbc9c}
@@ -55,7 +63,11 @@ button:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .btn-big{font-size:18px;padding:14px 24px;border-radius:14px}
 input,select{font-family:inherit;font-size:15px;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);outline:none}
 input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px #e8843a33}
-label{font-size:13px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px}
+/* shell.css paints placeholders in --muted at 400; the UA grey and the field's own weight (the join code's 800) stay. It also
+   stretches every select to its box; the Scoring select keeps its own width. */
+input::placeholder{color:#757575;font-weight:inherit}
+select{width:auto}
+label{font-size:13px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;text-transform:none}
 a{color:var(--blue)}
 
 /* header */
@@ -72,6 +84,8 @@ nav.tabs button.active{background:var(--birch);color:var(--pine)}
 main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:22px 18px 40px}
 .panel{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px;border-top:4px solid var(--wood-light)}
 .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+/* shell.css spaces adjacent rows 10px apart; fidice's rows carry their own margins. */
+.row+.row{margin-top:0}
 .stack{display:flex;flex-direction:column;gap:12px}
 .muted{color:var(--muted)} .small{font-size:13px} .center{text-align:center}
 .spacer{flex:1}
@@ -287,8 +301,10 @@ main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:22px 18px 40px}
 .reveal .bigval{font-size:17px}
 .reveal .res{font-family:Fredoka;font-size:22px}
 .reveal .res.good{color:var(--felt)} .reveal .res.bad{color:var(--red)}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-weight:700;z-index:99;box-shadow:0 6px 20px #0005;opacity:0;transition:opacity .2s;pointer-events:none}
-.toast.show{opacity:1}
+/* The vdom's toast is #toast (view/app.ts), shell.css's toast too, and an id outranks .toast: scoped under the vdom's root
+   (#app-root) so fidice's toast keeps its 10px radius, its padding and its slide-free fade. */
+#app-root .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-weight:700;z-index:99;box-shadow:0 6px 20px #0005;opacity:0;transition:opacity .2s;pointer-events:none;text-align:inherit}
+#app-root .toast.show{opacity:1}
 .banner{background:#fdf1e6;border:1.5px solid #f4c9a5;border-radius:12px;padding:10px 14px;font-weight:700;font-size:14px}
 .banner.err{background:#fbe6e4;border-color:#eaa7a1}
 

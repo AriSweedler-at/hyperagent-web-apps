@@ -167,11 +167,17 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     [...new Set(Object.values(chunks).flat())].forEach((chunk) => {
       expect(preloadedBy(chunk).length, chunk).toBeGreaterThanOrEqual(2);
     });
-    // web/shared/styles/{tokens,base}.css, linked by every page, are emitted once (step 14).
-    // Fidice links no other shared sheet; a shell page may link one more after it, the same file on
-    // every shell page (allowed, not required: OWN_SHEET in test/dist/classes.ts).
+    // web/shared/styles/{tokens,base}.css, linked by every page, are emitted once (step 14), and so
+    // is shell.css since fidice's page links it too (M1 of docs/design/fidice-shell-adoption.md):
+    // Vite splits a sheet out only where the pages that link it differ, so the three ride the one
+    // common chunk, which carries the shell's rules. A page that stopped linking shell.css would
+    // split it back out as a second shared sheet on the others, the same file on each (allowed, not
+    // required: OWN_SHEET in test/dist/classes.ts).
     const sharedCss = shared('fidice', 'css');
     expect(sharedCss).toHaveLength(1);
+    expect(readDist(root, (sharedCss[0] ?? '').replace('../../', ''))).toContain(
+      'body.fixed-screen',
+    );
     const [shellCss = [], ...otherShellCss] = SHELL_GAMES.map((game) =>
       shared(game, 'css').slice(1),
     );

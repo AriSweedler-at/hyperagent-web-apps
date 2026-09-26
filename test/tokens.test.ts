@@ -7,7 +7,7 @@
 // partial override would inherit gin's green felt for the names it forgot. The shell tokens
 // (docs/design/dry-round-2.md G1; CONTRACT.md "Shell tokens") follow the same rule: tokens.css
 // declares them with gin's values, backgammon's and fidice's theme.css redeclare every one (fidice's
-// on its Kezar Lake palette, read by no rule until its page links shell.css at M1 of
+// on its Kezar Lake palette; its page links shell.css since M1 of
 // docs/design/fidice-shell-adoption.md), and only web/shared/styles/shell.css reads them. The
 // computed-style goldens pin the resolved values; this test pins where each name is declared, which
 // the goldens cannot see.
