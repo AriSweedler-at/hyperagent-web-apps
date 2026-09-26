@@ -801,6 +801,8 @@ describe('the affected scripts the hook runs', () => {
 
 /** ci.yml as the graph pin needs it: text, since no YAML parser is a dependency here. */
 const CI_YML = readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8');
+/** nightly.yml, for the job ci.yml no longer carries. */
+const NIGHTLY_YML = readFileSync(resolve(REPO_ROOT, '.github/workflows/nightly.yml'), 'utf8');
 
 describe('ci.yml carries the graph the table describes', () => {
   /** The six jobs the two matrix jobs replaced (dry-round-2.md I1): no longer spelled in ci.yml. */
@@ -848,9 +850,46 @@ describe('ci.yml carries the graph the table describes', () => {
       expect(CI_YML, job).not.toContain(`outputs.${job}`);
       expect(ciOk, job).not.toContain(`- ${job}\n`);
     });
-    const broker = CI_YML.slice(CI_YML.indexOf('\n  broker:'), CI_YML.indexOf('\n  ci-ok:'));
-    expect(broker).toContain("\n    if: needs.changes.outputs.e2e-games != '[]'\n");
     expect(CI_YML).toContain('name: playwright-report-${{ matrix.suite }}');
+  });
+
+  test('the public-broker replay is a job of nightly.yml, and ci.yml carries no broker job', () => {
+    // Until 2026-09-25 ci.yml had an advisory `broker` job: never in ci-ok, red 18 of 23 runs on
+    // the public broker's timeouts, and the one job that kept every run open some six minutes
+    // after the gate was green. The specs still gate every PR through the local PeerServer.
+    expect(CI_YML).not.toContain('\n  broker:\n');
+    expect(CI_YML).not.toContain('E2E_BROKER');
+    expect(CI_YML).not.toContain('continue-on-error');
+    const broker = NIGHTLY_YML.slice(NIGHTLY_YML.indexOf('\n  broker:\n'));
+    expect(NIGHTLY_YML).toContain('\n  broker:\n');
+    expect(broker).toContain('\n    env:\n      E2E_BROKER: cloud\n');
+    expect(broker).toContain('run: npm run test:e2e -- --grep "@online|@relay"');
+    // Its own label: a red broker must not keep the `nightly` issue open over a deployed failure.
+    expect(broker).toContain('gh issue list --label broker');
+    expect(broker).not.toContain('--label nightly');
+  });
+
+  test('a superseded pull-request run is cancelled; a main run or a dispatch never is', () => {
+    expect(CI_YML).toContain(
+      "\nconcurrency:\n  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}\n" +
+        "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}\n",
+    );
+  });
+
+  test('check runs the halves of the typecheck and lint scripts side by side, waiting on all three', () => {
+    // The step spells the scripts' halves, so the hook (`npm run lint`) and CI check the same
+    // commands.
+    const check = CI_YML.slice(CI_YML.indexOf('\n  check:'), CI_YML.indexOf('\n  shared:'));
+    expect(SCRIPTS['typecheck']).toBe('tsc -b');
+    expect(SCRIPTS['lint']).toBe('eslint . --max-warnings 0 && prettier --check .');
+    expect(check).toContain('npm run typecheck > "$logs/typecheck.log" 2>&1 & typecheck=$!');
+    expect(check).toContain('npx eslint . --max-warnings 0 > "$logs/eslint.log" 2>&1 & eslint=$!');
+    expect(check).toContain('npx prettier --check . > "$logs/prettier.log" 2>&1 & prettier=$!');
+    ['typecheck', 'eslint', 'prettier'].forEach((tool) => {
+      expect(check).toContain(`wait "$${tool}" || failed="$failed ${tool}"`);
+    });
+    expect(check).toContain('if [ -n "$failed" ]; then');
+    expect(check).toContain('npm run hooks:verify');
   });
 
   test('check is always on, ci-ok needs changes and is always(), deploy needs ci-ok alone and only on main', () => {

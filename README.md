@@ -187,10 +187,13 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    gh workflow run stories-baselines.yml --ref <branch> && gh run download -n stories-baselines-linux -D e2e/__screenshots__   # the -linux.png files
    ```
 
-8. **Advisory broker** (CI job `broker`, `continue-on-error`):
+8. **Public broker** (nightly.yml job `broker`, beside the deployed run):
    `E2E_BROKER=cloud npm run test:e2e -- --grep "@online|@relay"` plays the same specs through
-   0.peerjs.com (the TURN relay stays the local coturn), so a signalling regression is visible at
-   review without a third party blocking a merge.
+   0.peerjs.com (the TURN relay stays the local coturn), so a signalling regression against the
+   real broker shows the next morning on the issue labelled `broker`. It was an advisory CI job
+   until 2026-09-25: red 18 of 23 runs on the public broker's timeouts, and the one job that kept
+   every run open some six minutes after `ci-ok` was green; the local-PeerServer specs gate as
+   before. By hand: `gh workflow run nightly.yml`.
 9. **Nightly** (`.github/workflows/nightly.yml`, 09:23 UTC or `gh workflow run nightly.yml`):
    `npm run test:deployed` (`E2E_TARGET=deployed`) runs the same `@online` and `@relay` specs with
    the deployed page, https://arisweedler-at.github.io/hyperagent-web-apps/, as the subject: the
@@ -471,7 +474,7 @@ tools/ci/                    suites.ts (the one table: suite -> tests, coverage 
 infra/games-proxy/           Cloudflare Worker (TypeScript) serving the site at games.sweedler.com
 infra/turn-worker/           Cloudflare Worker (plain JS) minting TURN credentials at turn.sweedler.com
 docs/                        ARCHITECTURE.md (the layout and its rules), MIGRATION.md (the plan and its Deviations), design/ (per-feature designs)
-.github/workflows/           ci.yml (changes -> check + one job per shared suite and a matrix per game side -> ci-ok -> deploy), nightly.yml (the deployed page through local servers)
+.github/workflows/           ci.yml (changes -> check + one job per shared suite and a matrix per game side -> ci-ok -> deploy; a PR's superseded run is cancelled), nightly.yml (the deployed page through local servers; the public-broker replay)
 .github/actions/npm-ci/      the scanned install that rewrites the runner's lockfile copy (see "Develop")
 .githooks/                   pre-commit (chains the template hook), pre-push (npm run check:affected)
 vite.config.ts               root web/, base './', input = every web/**/index.html

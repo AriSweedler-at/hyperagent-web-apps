@@ -8,8 +8,9 @@
 // each game's own: e2e/gin-online.spec.ts (a draw and a discard over the wire, the discards sheet)
 // and e2e/backgammon-online.spec.ts (a roll out of turn refused, the guest's roll rolled by the
 // host, a move propagating). Both origins: a spec about the origin. Tagged per game (see
-// shell-home.spec.ts) and @online (ci.yml's broker job and the nightly grep for it). Fidice's row
-// in e2e/fixtures/online-games.ts replaced its own e2e/fidice-online.spec.ts (dry-round-2.md H1).
+// shell-home.spec.ts) and @online (nightly.yml's grep, for its deployed and broker jobs). Fidice's
+// row in e2e/fixtures/online-games.ts replaced its own e2e/fidice-online.spec.ts (dry-round-2.md
+// H1).
 import { GAMES, REGISTRY, SHELL_GAMES } from '../tools/games.ts';
 import { peerIdFor } from '../web/shared/lib/roomCode.ts';
 import { ONLINE_DRIVERS, SHELL_DRIVERS, connect, connectByLink } from './fixtures/online-games.ts';

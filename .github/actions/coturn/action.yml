@@ -3,8 +3,9 @@
 # on :3478 with static credentials (e2e/fixtures/site.ts turnServerCommand). The Debian package also
 # starts a system turnserver on :3478, which is stopped so the harness can bind its own; under CI the
 # config refuses to run with the binary missing rather than skip, so a broken install cannot pass as
-# a skip. ci.yml's e2e and broker jobs and nightly.yml install it this way (one spelling, docs/design/
-# shared-shell.md §5 A5); stories-baselines.yml plays no relay-forced game and sets E2E_TURN=off.
+# a skip. ci.yml's e2e-game job and both nightly.yml jobs install it this way (one spelling,
+# docs/design/shared-shell.md §5 A5); stories-baselines.yml plays no relay-forced game and sets
+# E2E_TURN=off.
 name: coturn
 description: Install coturn from apt for the relay-forced games and stop the system turnserver it starts
 runs:

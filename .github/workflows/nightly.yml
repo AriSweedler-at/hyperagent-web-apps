@@ -10,7 +10,14 @@
 # public broker; the zone's bot protection challenged this runner once (issue #19) and the owner
 # ruled that no test depends on Cloudflare. E2E_TARGET=deployed (e2e/fixtures/site.ts) is the
 # switch. On failure the Playwright report is uploaded and the open issue labelled `nightly` gets
-# a comment with the run URL (or the issue is created); a green run closes it. By hand:
+# a comment with the run URL (or the issue is created); a green run closes it. The second job,
+# `broker`, plays the same @online and @relay specs on this checkout's build through the public
+# 0.peerjs.com (E2E_BROKER=cloud drops `?peer=`; the TURN relay stays the local coturn): the
+# signalling path a real game takes. Until 2026-09-25 it was ci.yml's advisory job of the same
+# name: never in ci-ok, red 18 of 23 runs on the public broker's timeouts, and the one job that
+# kept every run "in progress" some six minutes after the gate was green. Here a regression shows
+# the next morning, on its own issue labelled `broker`, so its red cannot keep the `nightly`
+# issue open and hide a deployed-page failure. By hand:
 #   gh workflow run nightly.yml
 name: Nightly
 
@@ -90,4 +97,61 @@ jobs:
           numbers="$(gh issue list --label nightly --state open --json number --jq '.[].number')"
           for number in ${numbers}; do
             gh issue close "${number}" --comment "Nightly deployed run passed: ${RUN_URL}"
+          done
+
+  # The online and relay-forced specs of every game, both emulated origins, through the real
+  # 0.peerjs.com (see the header). The same install steps as `deployed`; the report is uploaded on
+  # failure and the `broker` issue is commented, opened or closed as the `nightly` one is above.
+  broker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      E2E_BROKER: cloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Install Chromium
+        uses: ./.github/actions/playwright-chromium
+      - name: Install coturn for the relay-forced games
+        uses: ./.github/actions/coturn
+      - name: Online and relay-forced specs through 0.peerjs.com
+        run: npm run test:e2e -- --grep "@online|@relay"
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-broker
+          path: playwright-report
+          retention-days: 14
+      - name: Report the failure on the pinned `broker` issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create broker --description "Opened by nightly.yml when the public-broker run fails" --color B60205 || true
+          open_issue="$(gh issue list --label broker --state open --limit 1 --json number --jq '.[0].number // empty')"
+          body="Nightly public-broker run failed: ${RUN_URL}"
+          if [ -n "${open_issue}" ]; then
+            gh issue comment "${open_issue}" --body "${body}"
+          else
+            gh issue create --title "Nightly public-broker run failed" --label broker --body "${body}"
+          fi
+      - name: Close the `broker` issue on a green run
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Assigned first so `set -e` sees a gh failure; a substitution inside `for` would exit 0.
+          numbers="$(gh issue list --label broker --state open --json number --jq '.[].number')"
+          for number in ${numbers}; do
+            gh issue close "${number}" --comment "Nightly public-broker run passed: ${RUN_URL}"
           done
