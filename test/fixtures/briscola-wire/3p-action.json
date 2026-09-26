@@ -1,0 +1,23 @@
+[
+  {
+    "t": "action",
+    "action": {
+      "type": "play",
+      "cardId": "5B"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "play",
+      "cardId": "AD"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "play",
+      "cardId": "5D"
+    }
+  }
+]

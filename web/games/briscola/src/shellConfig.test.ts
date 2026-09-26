@@ -22,6 +22,7 @@ import {
   parseSeatCount,
   pickOpts,
 } from './shellConfig.ts';
+import { lobby, welcome } from './protocol.ts';
 import { DEFAULT_CARD_PACK, SHELL_STORE, STORAGE_KEYS } from './storage.ts';
 import { initialShell } from './ui/state.ts';
 
@@ -70,6 +71,46 @@ describe('the copy', () => {
     expect(BRISCOLA_SHELL.modes.parse('sandbox', initialShell)).toEqual({
       shown: 'online',
       stored: 'online',
+    });
+  });
+});
+
+/**
+ * The three slots of docs/design/n-seat-sessions.md §7 the shell's config type gains in the
+ * reducer PR beside this one (`cfg.seats`, `opts.capacity`, `frames.welcome`), read off the config
+ * through this view until it lands; the cast goes when it has.
+ */
+type TableSlots = Readonly<{
+  seats: Readonly<{ min: number; max: number }>;
+  opts: Readonly<{ capacity: (opts: GameOptions) => number }>;
+  frames: Readonly<{ welcome: typeof welcome; lobby: typeof lobby }>;
+}>;
+const TABLE: TableSlots = BRISCOLA_SHELL as unknown as TableSlots;
+
+describe('the table (docs/design/n-seat-sessions.md §7)', () => {
+  test("seats two to four; the session's capacity is the room's seat count; the two room frames are protocol.ts's four-argument builders", () => {
+    expect(TABLE.seats).toEqual({ min: 2, max: 4 });
+    expect(TABLE.opts.capacity(DEFAULT_OPTS)).toBe(2);
+    expect(TABLE.opts.capacity({ ...DEFAULT_OPTS, seatCount: 3 })).toBe(3);
+    expect(TABLE.opts.capacity({ ...DEFAULT_OPTS, seatCount: 4 })).toBe(4);
+    expect(TABLE.frames.welcome).toBe(welcome);
+    expect(TABLE.frames.lobby).toBe(lobby);
+    // At two seats the frames are PR-4's, whatever table is passed; at three the table rides along.
+    const table = [{ name: 'Bo', connected: true }];
+    expect(TABLE.frames.lobby('Ann', DEFAULT_OPTS, table, 1)).toEqual({
+      t: 'lobby',
+      hostName: 'Ann',
+      ...DEFAULT_OPTS,
+    });
+    const three = { ...DEFAULT_OPTS, seatCount: 3 as const };
+    expect(
+      TABLE.frames.welcome('Ann', three, [...table, { name: null, connected: false }], 2),
+    ).toEqual({
+      t: 'welcome',
+      hostName: 'Ann',
+      ...three,
+      seats: [...table, { name: null, connected: false }],
+      you: 2,
     });
   });
 });

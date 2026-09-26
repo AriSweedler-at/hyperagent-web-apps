@@ -1,10 +1,17 @@
 // Briscola's host session: the shared session (web/shared/net/host.ts, docs/design/shared-shell.md
-// §4.5) with this game's protocol.ts as its codec and 'briscola' as the table's game, so the peer id
-// is `briscola-<CODE>` (web/shared/lib/roomCode.ts, D19) and the welcome carries the six options
-// (`Room`: seatCount, gamesToWin, removedTwo, exchange, scoperta, partnerPeek) in place of gin's
-// `target` (docs/design/briscola.md §4.3, §5.8; sessions.test.ts pins both). Two seats in this PR
-// (D16): the default capacity, a one-parameter `welcome`, no `joinName`; the N-seat lobby is PR-5's.
-// Every constant and message ui/state.ts, main.ts and the tests import is re-exported.
+// §4.5, docs/design/n-seat-sessions.md) with this game's protocol.ts as its codec and 'briscola' as
+// the table's game, so the peer id is `briscola-<CODE>` (web/shared/lib/roomCode.ts, D19). The
+// shared session hosts `capacity - 1` guest seats (the shell's `startHost` effect passes the
+// table's seat count as `capacity`, n-seat-sessions.md §7), and this codec is its N-seat form: the
+// welcome carries the six options (`Room`: seatCount, gamesToWin, removedTwo, exchange, scoperta,
+// partnerPeek) in place of gin's `target` and, past two seats, the table as the host knows it
+// (`seats`, read off the context) and the seat the channel took (`you`, the session's second
+// argument); `joinName` hands the session the name a join carries so a guest back from a dead tab
+// is reseated where that name last sat (D6). At two seats the welcome is PR-4's byte for byte
+// (protocol.ts `seated`) and the session runs its one-slot path, so the two-seat pins hold
+// (sessions.test.ts pins both forms). The context is the shell's host context plus `seats`
+// (`HostContext`): the reducer's `hostContextOf` supplies them from `ShellState.seats`. Every
+// constant and message ui/state.ts, main.ts and the tests import is re-exported.
 import {
   HostSession as SharedHostSession,
   type HostCodec,
@@ -16,10 +23,12 @@ import {
 import {
   decodeGuestFrame,
   full,
+  joinName,
   welcome,
   type GuestFrame,
   type HostFrame,
   type Room,
+  type TableSeat,
 } from '../protocol.ts';
 
 export {
@@ -27,36 +36,49 @@ export {
   CODE_BUSY_MSG,
   ERROR_TOAST_MS,
   FULL_CLOSE_MS,
+  HB_GRACE_MS,
+  HB_MISSED_MS,
+  HB_MS,
   HOST_WATCHDOG_MSG,
   OPENING_MSG,
   WAITING_MSG,
   handoffMsg,
   reconnectingMsg,
   reopenedMsg,
+  type Seat,
 } from '../../../../shared/net/host.ts';
-/** The room's payload beside the shell fields: protocol.ts's `Room`, the six options `welcome` tells the guest. */
-export type { Room } from '../protocol.ts';
+/** The room's payload beside the shell fields: protocol.ts's `Room`, the six options `welcome` tells the guest, and the wire's seat row. */
+export type { Room, TableSeat } from '../protocol.ts';
 
-export type HostContext = SharedHostContext<Room>;
+/**
+ * What this codec reads off the app beyond the shell's fields: the six options (the welcome's
+ * room) and the guest seats 1..N-1 as the shell holds them (`ShellState.seats`, n-seat-sessions.md
+ * §7), which the welcome lists past two seats. At two seats `seats` is not read.
+ */
+export type HostRoom = Room & Readonly<{ seats: ReadonlyArray<TableSeat> }>;
+export type HostContext = SharedHostContext<HostRoom>;
 export type HostEvents = SharedHostEvents<GuestFrame>;
-export type HostDeps = SharedHostDeps<GuestFrame, Room>;
+export type HostDeps = SharedHostDeps<GuestFrame, HostRoom>;
 export type HostOptions = Omit<SharedHostOptions, 'game'>;
 
-const codec: HostCodec<GuestFrame, HostFrame, Room> = {
+/** The six options alone off the context (the shell's fields and `seats` sit beside them). */
+const roomOf = (ctx: HostContext): Room => ({
+  seatCount: ctx.seatCount,
+  gamesToWin: ctx.gamesToWin,
+  removedTwo: ctx.removedTwo,
+  exchange: ctx.exchange,
+  scoperta: ctx.scoperta,
+  partnerPeek: ctx.partnerPeek,
+});
+
+const codec: HostCodec<GuestFrame, HostFrame, HostRoom> = {
   decode: decodeGuestFrame,
-  welcome: (ctx) =>
-    welcome(ctx.myName, {
-      seatCount: ctx.seatCount,
-      gamesToWin: ctx.gamesToWin,
-      removedTwo: ctx.removedTwo,
-      exchange: ctx.exchange,
-      scoperta: ctx.scoperta,
-      partnerPeek: ctx.partnerPeek,
-    }),
+  welcome: (ctx, seat) => welcome(ctx.myName, roomOf(ctx), ctx.seats, seat),
   full,
+  joinName,
 };
 
-export class HostSession extends SharedHostSession<GuestFrame, HostFrame, Room> {
+export class HostSession extends SharedHostSession<GuestFrame, HostFrame, HostRoom> {
   constructor(deps: HostDeps, opts: HostOptions) {
     super(deps, codec, { ...opts, game: 'briscola' });
   }

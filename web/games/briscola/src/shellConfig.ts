@@ -10,8 +10,10 @@
 // (`rendered` with the settle beat and the event-driven cues, `refuse`, the per-site `reset`,
 // pass-and-play's `viewer`/`revealer` over two, three or four seats) and the rest of `home` are the
 // reducer's (ui/state.ts `BRISCOLA`), which completes this record; a value import both ways would
-// be a cycle. Online is two-seat in this PR (D16): the shell's `host/deal` seats the host and its
-// one guest through `create` over a pair, and the N-seat lobby is PR-5's.
+// be a cycle. Online seats two, three or four (docs/design/n-seat-sessions.md §7): `seats` is the
+// table's range, `opts.capacity` reads the room's seat count as the session's capacity, and the two
+// room frames (`frames.welcome`, `frames.lobby`) take the table and the receiver's seat, which
+// protocol.ts puts on the wire past two seats and leaves off at two (PR-4's corpus).
 import type { ShellGameData } from '../../../shared/ui/shell.ts';
 import { connectingMsg } from '../../../shared/net/guest.ts';
 import { OPENING_MSG, handoffMsg } from '../../../shared/net/host.ts';
@@ -26,7 +28,7 @@ import {
   type GameOptions,
   type SeatCount,
 } from './engine/index.ts';
-import { action, lobby, state, toast } from './protocol.ts';
+import { action, lobby, state, toast, welcome } from './protocol.ts';
 import {
   DEFAULT_CARD_PACK,
   DEFAULT_SPEED,
@@ -109,11 +111,15 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
     handoff: handoffMsg,
     hostRoom: (hostName) => hostRoomMsg(hostName),
   },
+  /** Two, three or four at a table; the count is fixed when the room opens (`opts.capacity`, n-seat-sessions.md D2). */
+  seats: { min: 2, max: 4 },
   opts: {
     initial: DEFAULT_OPTS,
     parse: parseOpts,
     ofGame: (game) => game.options,
     pick: pickOpts,
+    /** The session hosts `seatCount - 1` guest channels. */
+    capacity: (opts: GameOptions) => opts.seatCount,
   },
   engine: {
     // A pair is one of the engine's `Players` tuples (D1): the two-seat shell deals as gin's does.
@@ -143,7 +149,7 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
     scoreOf: (view) => (view.result?.totals ?? view.sides).map(String).join('–'),
     winnerOf: (view) => view.result?.winner ?? null,
   },
-  frames: { lobby, state, toast, action },
+  frames: { lobby, welcome, state, toast, action },
   cues: { initial: INITIAL_CUES },
   home: {
     // This page's own keys: the seat count (the default when unreadable) on the fixed terms, the card pack, the language pack, the third and fourth names.
