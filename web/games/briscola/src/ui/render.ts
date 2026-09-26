@@ -26,6 +26,7 @@
 // `table.tip`; `bindTip` turns the hand's pointer events into its intents) and the card view's
 // line (`paintCardView`, from `table.cardView`).
 import {
+  appendHtml,
   closestFrom,
   dataOf,
   escapeHtml,
@@ -119,6 +120,7 @@ import {
   scoreCells,
   scoreKey,
   scoreMode,
+  facePreloadHtml,
   scoreStripHtml,
   seatCellId,
   seatCells,
@@ -221,6 +223,14 @@ export const paintPack = (doc: PageLike, packName: CardPack['name']): void => {
     setStyle(el, '--back', backImageCss(back));
     setStyle(el, '--back-colour', back.colour);
   });
+  // The pack's faces, fetched now rather than on a card's first appearance (a switch appends
+  // another hidden block; the pictures are cached, the block inert).
+  appendHtml(
+    doc.body,
+    trustedHtml(
+      `<div class="face-preload" hidden aria-hidden="true">${facePreloadHtml(pack)}</div>`,
+    ),
+  );
 };
 
 // ---- the settle beat's picture (§5.4) -----------------------------------------------------------------

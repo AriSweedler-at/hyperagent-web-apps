@@ -198,6 +198,16 @@ describe('the shell painters and the pack', () => {
     // The body carries the same tokens, for the cards a flight clones onto it.
     expect(p.body.style('--back')).toBe(p.get('tableScreen').style('--back'));
     expect(p.body.style('--aspect')).toBe(p.get('tableScreen').style('--aspect'));
+    // The pack's forty faces are fetched now, hidden on the body, so a drawn card never shows blank for a round trip.
+    const preload =
+      p.body.text().match(/<div class="face-preload" hidden aria-hidden="true">(.*?)<\/div>/g) ??
+      [];
+    expect(preload).toHaveLength(1);
+    expect(preload[0]?.match(/<img /g)).toHaveLength(40);
+    expect(preload[0]).toContain('src="../../shared/cards/linea/italian40/AC.svg"');
+    // A second paint of the same pack appends nothing more.
+    paint(p.doc, run(initialApp, { type: 'home/init', home }).app);
+    expect(p.body.text().match(/face-preload/g)).toHaveLength(1);
     expect(p.get('hand').attr('data-key')).toBeNull();
     expect(p.get('trick').text()).toBe('');
     expect(p.get('resultOverlay').hidden()).toBe(true);
