@@ -40,6 +40,7 @@ import {
   queryIn,
   rectOf,
   type Rect,
+  removeElement,
   requireId,
   setAttr,
   setChecked,
@@ -87,6 +88,8 @@ import {
   seatsOfSide,
   sideList,
   sideOf,
+  trickWinner,
+  type Played,
   type Seat,
   type SeatCount,
   type Side,
@@ -94,6 +97,9 @@ import {
   type View,
 } from '../engine/index.ts';
 import { HISTORY_COPY } from './history.ts';
+import { clashGeometry } from './motion.ts';
+import { isClashStage } from './state.ts';
+import { TEMPO_SCALE, sparkleOffsets, type Variant } from './variant.ts';
 import {
   MY_TRICKS,
   drawFlights,
@@ -270,6 +276,12 @@ type Beat = Readonly<{
   awaiting: boolean;
   /** My back is flying to its slot and turning over (`drawMine`). */
   flipping: boolean;
+  /** The clash's variant while the beat runs (§3.3): the fan's data attributes and the impact frame read it. */
+  clash: Variant | null;
+  /** The two fighters are charging, striking, frozen or posing (charge → aftermath): `winner`/`loser`/`bystander` on the plays. */
+  fighting: boolean;
+  /** The impact frame shows (`impact`, `aftermath`). */
+  impacted: boolean;
 }>;
 
 const NO_BEAT: Beat = {
@@ -279,6 +291,9 @@ const NO_BEAT: Beat = {
   undrawn: false,
   awaiting: false,
   flipping: false,
+  clash: null,
+  fighting: false,
+  impacted: false,
 };
 
 const beatOf = (settle: Settle | null): Beat =>
@@ -287,10 +302,13 @@ const beatOf = (settle: Settle | null): Beat =>
     : {
         stage: settle.stage,
         trick: settle.trick,
-        before: settle.stage === 'hold' || settle.stage === 'fly',
+        before: isClashStage(settle.stage) || settle.stage === 'fly',
         undrawn: true,
         awaiting: awaitingDraw(settle),
         flipping: settle.stage === 'drawMine',
+        clash: settle.variant,
+        fighting: isClashStage(settle.stage) && settle.stage !== 'follow',
+        impacted: settle.stage === 'impact' || settle.stage === 'aftermath',
       };
 
 /** A seat's tricks, less the one just taken while it is held or in flight. */
@@ -472,23 +490,163 @@ const paintTrick = (
   const trick = requireId(doc, 'trick');
   const me = v.me.idx;
   setAttr(trick, 'data-players', String(v.options.seatCount));
-  const cards = b.before && b.trick !== null ? b.trick.cards : v.trick;
-  const taking = b.before ? (b.trick?.winner ?? null) : null;
+  const cards = fanShown(v, b);
+  // The winner lifts from the impact on (docs/design/briscola-battle.md §3.1 IMPACT) through the pack.
+  const taking = b.impacted || b.stage === 'fly' ? (b.trick?.winner ?? null) : null;
+  // The fan is rebuilt at the phase changes of the beat (follow → impact → the pack), so the marks the
+  // fighters wear are in its markup and element identity holds through the charge and the strike.
+  const phase = fanPhase(b);
+  const fighters =
+    phase === 'fight' || phase === 'hit'
+      ? b.trick === null
+        ? null
+        : { winner: b.trick.winner, loser: runnerUp(v.trumpCard.s, b.trick) }
+      : null;
   setAttr(
     trick,
     'data-lead',
     cards.length === 0 && v.phase === 'trick' ? leadCue(v.players, me, v.leader) : '',
   );
-  ensureKeyed(trick, `${trickKey(cards)}|${pack.name}|${lang.name}`, () =>
-    trickHtml(cards, { players: v.players, me, pack, taking, lang }),
+  ensureKeyed(
+    trick,
+    `${trickKey(cards)}|${pack.name}|${lang.name}${phase === null ? '' : `|${phase}`}`,
+    () => trickHtml(cards, { players: v.players, me, pack, taking, lang, fighters }),
   );
   queryAllIn(trick, '.card').forEach((card) => {
     toggleClass(card, 'taking', taking !== null && dataOf(card, 'seat') === String(taking));
     // A play's clone still in the air keeps its card hidden through a repaint (`data-flying`, ui/motion.ts).
     toggleClass(card, 'arriving', b.stage === 'fly' || dataOf(card, 'flying') !== null);
   });
+  paintClash(trick, v, b);
   toggleClass(trick, 'drop-ready', app.table.drag !== null);
   toggleClass(trick, 'drop', app.table.drag?.over === true);
+};
+
+/** The fan's build phase through a beat: `fight` from the completing card's flight to the strike, `hit` the impact and the aftermath (the winner `taking`), `pack` the flight to the chip; null outside a beat and through the draws. */
+const fanPhase = (b: Beat): 'fight' | 'hit' | 'pack' | null =>
+  b.stage === null
+    ? null
+    : b.impacted
+      ? 'hit'
+      : b.stage === 'fly'
+        ? 'pack'
+        : isClashStage(b.stage)
+          ? 'fight'
+          : null;
+
+/** The cards the fan shows: the held trick through the clash and the pack, nothing through the draws (a peer's play mid-beat flies in at the beat's end, §3.7), the trick in play outside a beat. */
+const fanShown = (v: View, b: Beat): ReadonlyArray<Played> =>
+  b.stage === null ? v.trick : b.before && b.trick !== null ? b.trick.cards : [];
+
+// ---- the clash (docs/design/briscola-battle.md §3.1 CHARGE → AFTERMATH, §3.3, §3.5; §7 PR-F) ------------
+
+/** The runner-up: the card that would have taken the trick without the winner's (`trickWinner` over the rest). Null in a fan of one. */
+const runnerUp = (trump: View['trumpCard']['s'], trick: TrickRecord): Seat | null => {
+  const rest = trick.cards.filter((p) => p.seat !== trick.winner);
+  return rest.length === 0 ? null : trickWinner(trump, rest);
+};
+
+/** The seat whose card a play wrapper holds, as the card's `data-seat` spells it. */
+const seatOfPlay = (play: Element): string | null => {
+  const card = queryIn(play, '.card');
+  return card === null ? null : dataOf(card, 'seat');
+};
+
+/** The play wrapper of a seat's card in the fan. */
+const playOf = (trick: Element, seat: Seat): Element | null =>
+  queryAllIn(trick, '.play').find((p) => seatOfPlay(p) === String(seat)) ?? null;
+
+/** The impact frames' families by the winning suit (impact/impact-sprite.svg `impact-<family>-<a|b>`). */
+export const IMPACT_SUIT: Readonly<Record<Variant['suit'], string>> = {
+  C: 'coppe',
+  D: 'denari',
+  S: 'spade',
+  B: 'bastoni',
+};
+
+/** The impact frame's markup: the winning suit's symbol (A or B) from the inlined sprite, then the sparkles at their offsets (a briscola's ring or scatter). */
+export const clashFxHtml = (c: Variant): string =>
+  `<svg class="fx" viewBox="0 0 100 100" aria-hidden="true"><use href="#impact-${IMPACT_SUIT[c.suit]}-${c.frame}"/></svg>${sparkleOffsets(
+    c.sparkle,
+  )
+    .map(
+      ([x, y], k) =>
+        `<svg class="sparkle" viewBox="0 0 100 100" aria-hidden="true" style="--k:${String(k)};--sx:${String(x)};--sy:${String(y)}"><use href="#sparkle"/></svg>`,
+    )
+    .join('')}`;
+
+/**
+ * The fan through the clash: `#trick[data-stage]` and the variant's slots as data attributes
+ * (`data-charge/angle/sign/tempo/pose/after/side/value/shake`, the CSS's keyframes read them) with
+ * the charge's distance and lean as custom properties; the plays marked `winner`, `loser` or
+ * `bystander` from the charge to the aftermath; the fighters' axis (`--ux --uy --gap`) measured
+ * once as the charge opens (their rest boxes), so the strike meets at the midpoint; `.clash-fx`
+ * appended at the impact at that midpoint (`--cx --cy`; the fan's centre when nothing measures)
+ * and removed when the pack begins. Outside a beat every mark is off and the fan's markup is the
+ * goldens'.
+ */
+const paintClash = (trick: Element, v: View, b: Beat): void => {
+  const c = b.clash;
+  const fighting = b.fighting && c !== null && b.trick !== null;
+  const was = dataOf(trick, 'stage');
+  setAttr(trick, 'data-stage', b.stage);
+  const winner = fighting ? b.trick.winner : null;
+  const loser = fighting ? runnerUp(v.trumpCard.s, b.trick) : null;
+  queryAllIn(trick, '.play').forEach((play) => {
+    const seat = seatOfPlay(play);
+    toggleClass(play, 'winner', winner !== null && seat === String(winner));
+    toggleClass(play, 'loser', loser !== null && seat === String(loser));
+    toggleClass(play, 'bystander', fighting && seat !== String(winner) && seat !== String(loser));
+  });
+  const slots: ReadonlyArray<readonly [string, string | null]> = [
+    ['data-charge', c === null || !fighting ? null : String(c.chargeDist)],
+    ['data-angle', c === null || !fighting ? null : String(c.chargeAngle)],
+    ['data-sign', c === null || !fighting ? null : c.chargeSign > 0 ? '+' : '-'],
+    ['data-tempo', c === null || !fighting ? null : c.tempo],
+    ['data-pose', c === null || !fighting ? null : c.pose],
+    ['data-after', c === null || !fighting ? null : c.after],
+    ['data-side', c === null || !fighting ? null : c.side],
+    ['data-value', c === null || !fighting ? null : c.valueClass],
+    ['data-shake', c === null || !fighting ? null : String(c.shakePx)],
+  ];
+  slots.forEach(([name, value]) => {
+    setAttr(trick, name, value);
+  });
+  if (c !== null && fighting) {
+    setStyle(trick, '--charge-dist', String(c.chargeDist));
+    setStyle(trick, '--lean', `${String(c.chargeAngle * c.chargeSign)}deg`);
+    setStyle(trick, '--tempo', String(TEMPO_SCALE[c.tempo]));
+  }
+  // The axis, once, as the charge opens: the fighters still at rest.
+  if (b.stage === 'charge' && was !== 'charge' && winner !== null && loser !== null) {
+    const a = playOf(trick, winner);
+    const l = playOf(trick, loser);
+    const g = a === null || l === null ? null : clashGeometry(rectOf(a), rectOf(l));
+    const box = rectOf(trick);
+    const measured = g !== null && g.gap > 0 && (box.width > 0 || box.height > 0);
+    setStyle(trick, '--ux', measured ? g.ux.toFixed(3) : '1');
+    setStyle(trick, '--uy', measured ? g.uy.toFixed(3) : '0');
+    setStyle(trick, '--gap', measured ? `${g.gap.toFixed(1)}px` : 'var(--mid-w)');
+    setStyle(trick, '--cx', measured ? `${(g.cx - box.left).toFixed(1)}px` : '50%');
+    setStyle(trick, '--cy', measured ? `${(g.cy - box.top).toFixed(1)}px` : '50%');
+  }
+  // The frame, once per trick (`#trick[data-fx]` remembers it, the latch a repaint at the impact reads); gone with the pack.
+  const fxKey = b.impacted && c !== null && b.trick !== null ? String(b.trick.no) : null;
+  if (fxKey !== null && c !== null) {
+    if (dataOf(trick, 'fx') !== fxKey) {
+      appendHtml(
+        trick,
+        trustedHtml(
+          `<div class="clash-fx" data-suit="${IMPACT_SUIT[c.suit]}" data-frame="${c.frame}" data-sparkle="${c.sparkle}" data-steal="${String(c.steal)}">${clashFxHtml(c)}</div>`,
+        ),
+      );
+      setAttr(trick, 'data-fx', fxKey);
+    }
+  } else if (dataOf(trick, 'fx') !== null) {
+    const fx = queryIn(trick, '.clash-fx');
+    if (fx !== null) removeElement(fx);
+    setAttr(trick, 'data-fx', null);
+  }
 };
 
 // ---- the score strip and the status line (D9, §5.2) ------------------------------------------------------
@@ -839,7 +997,12 @@ const flightsFor = (
     }
     case 'drawRest':
       return drawFlights(b.trick, to.card, d, drawsAfter(b.trick.drew, me));
-    case 'hold':
+    // The clash is the CSS's over the fan's marks; the completing card's flight was the paint's (`playFlights`).
+    case 'follow':
+    case 'charge':
+    case 'strike':
+    case 'impact':
+    case 'aftermath':
     case null:
       return [];
   }
@@ -879,7 +1042,7 @@ const playFlights = (doc: PageLike, app: App): ReadonlyArray<Flight> => {
   if (prev.gameNo !== v.gameNo || prev.startedAt !== v.startedAt) return [];
   const b = beatOf(app.table.settle);
   const completing = b.before && b.trick !== null;
-  const shown = completing ? b.trick.cards : v.trick;
+  const shown = fanShown(v, b);
   const key = `${String(v.startedAt)}:${String(v.gameNo)}:${b.trick === null ? 'open' : String(b.trick.no)}:${trickKey(shown)}`;
   const screen = requireId(doc, 'tableScreen');
   if (dataOf(screen, 'flown') === key) return [];

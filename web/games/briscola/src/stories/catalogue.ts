@@ -27,12 +27,14 @@ import {
 import {
   awaitingDraw,
   initialApp,
+  isClashStage,
   liveView,
   reduce,
   resultOpen,
   type App,
   type Context,
   type Intent,
+  type SettleStage,
 } from '../ui/state.ts';
 
 /** The seed of every story's start (the deal, the dealer). */
@@ -230,11 +232,13 @@ export const factsOf = (app: App): StoryFacts => {
     handLive: liveView(app) !== null,
     handDown: app.table.curtain !== null,
     selected: app.table.selected,
-    // The fan paints the held trick through `hold` and `fly` alone; from `draw` on it is the view's (empty).
+    // The fan holds the trick through the clash and the pack, then empties for the draws (render.ts `fanShown`).
     trickCards:
-      settle !== null && (settle.stage === 'hold' || settle.stage === 'fly')
-        ? settle.trick.cards.length
-        : v.trick.length,
+      settle === null
+        ? v.trick.length
+        : isClashStage(settle.stage) || settle.stage === 'fly'
+          ? settle.trick.cards.length
+          : 0,
     stockCount,
     stockEmpty: stockCount <= 1,
     briscolaGone: !(v.trumpOnTable || settle?.trick.trumpTaken === true),
@@ -264,25 +268,23 @@ const lifted2 = chain((c) => {
 });
 const onePlayed2 = chain((c) => playFirst(c, revealed(c, localStart(c, 2))));
 const oneRevealed2 = chain((c) => revealed(c, playFirst(c, revealed(c, localStart(c, 2)))));
-const hold2 = chain((c) => {
-  const second = revealed(c, playFirst(c, revealed(c, localStart(c, 2))));
-  return playFirst(c, second);
-});
+/** Two seats' first trick completed: the beat at `follow`, the completing card's flight. */
+const completed = (c: Context): App =>
+  playFirst(c, revealed(c, playFirst(c, revealed(c, localStart(c, 2)))));
+/** The beat run (`settle/elapsed`) up to `stage`; the app as it stands if the stage is already past or never comes. */
+const untilStage = (c: Context, app: App, stage: SettleStage): App =>
+  app.table.settle === null || app.table.settle.stage === stage
+    ? app
+    : untilStage(c, run(c, app, [{ type: 'settle/elapsed' }]), stage);
+const hold2 = chain((c) => completed(c));
 /** The trick held, flown, and the beat at `draw`: my draw waits for the tap (docs/design/briscola-battle.md §3.1). */
-const drawAwaiting2 = chain((c) => {
-  const held = playFirst(c, revealed(c, playFirst(c, revealed(c, localStart(c, 2)))));
-  return run(c, held, [{ type: 'settle/elapsed' }, { type: 'settle/elapsed' }]);
-});
+const drawAwaiting2 = chain((c) => untilStage(c, completed(c), 'draw'));
 /** The tap taken: my back flies to its slot and turns over (`drawMine`). */
-const drawFlip2 = chain((c) => {
-  const held = playFirst(c, revealed(c, playFirst(c, revealed(c, localStart(c, 2)))));
-  return run(c, held, [
-    { type: 'settle/elapsed' },
-    { type: 'settle/elapsed' },
-    { type: 'settle/elapsed' },
-    { type: 'draw/tap' },
-  ]);
-});
+const drawFlip2 = chain((c) => run(c, untilStage(c, completed(c), 'draw'), [{ type: 'draw/tap' }]));
+/** The clash (docs/design/briscola-battle.md §3.1): the fighters charging, then the hit-stop with the impact frame, then the poses. */
+const clashCharge2 = chain((c) => untilStage(c, completed(c), 'charge'));
+const clashImpact2 = chain((c) => untilStage(c, completed(c), 'impact'));
+const clashAftermath2 = chain((c) => untilStage(c, completed(c), 'aftermath'));
 const settled2 = chain((c) => revealed(c, trick(c, localStart(c, 2))));
 const history2 = chain((c) =>
   run(c, revealed(c, trick(c, localStart(c, 2))), [{ type: 'history/open' }]),
@@ -330,6 +332,22 @@ export const STORIES: ReadonlyArray<Story> = [
     title: 'The trick held: both cards in the fan, the taking card marked, the stock still 34',
     app: hold2,
     screenshot: true,
+  }),
+  story({
+    id: 'clash-charge-2p',
+    title: 'The clash opens: the winner and the loser back away to charge, the fan marked',
+    app: clashCharge2,
+  }),
+  story({
+    id: 'clash-impact-2p',
+    title:
+      'The hit-stop: the winner lifted and trembling, the impact frame of its suit at the contact point',
+    app: clashImpact2,
+  }),
+  story({
+    id: 'clash-aftermath-2p',
+    title: 'The aftermath: the loser in its pose, the frame fading, sparkles for a briscola',
+    app: clashAftermath2,
   }),
   story({
     id: 'draw-awaiting-2p',

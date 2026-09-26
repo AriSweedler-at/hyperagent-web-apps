@@ -15,7 +15,13 @@ import {
   durationsFor,
   stageMs,
   type BeatStage,
+  BUDGET_MS,
+  IMPACT_FLOOR_MS,
+  STILL_MS,
+  clashBudgetMs,
+  freezeMsFor,
 } from './beat.ts';
+import { FREEZE_MS, TEMPO_SCALE } from './variant.ts';
 
 const STAGES = Object.keys(BEAT_MS) as ReadonlyArray<BeatStage>;
 
@@ -102,5 +108,33 @@ describe('stageMs', () => {
     ).forEach((stage) => {
       expect(BEAT_MS[stage].quick).toBeGreaterThanOrEqual(90);
     });
+  });
+});
+
+describe('the hit-stop and the budget (docs/design/briscola-battle.md §3.2, §6)', () => {
+  test('freezeMsFor: the value class at normal, ×0.6 floored at 80 for quick, the 300 ms still under reduced motion and off', () => {
+    expect(freezeMsFor(120, 'normal', false)).toBe(120);
+    expect(freezeMsFor(200, 'normal', false)).toBe(200);
+    expect(freezeMsFor(120, 'quick', false)).toBe(IMPACT_FLOOR_MS);
+    expect(freezeMsFor(160, 'quick', false)).toBe(96);
+    expect(freezeMsFor(200, 'quick', false)).toBe(120);
+    expect(freezeMsFor(200, 'normal', true)).toBe(STILL_MS);
+    expect(freezeMsFor(200, 'off', false)).toBe(STILL_MS);
+    expect(freezeMsFor(120, 'quick', true)).toBe(STILL_MS);
+  });
+
+  test('the budget invariant: from the completing paint to the chip landing, every (tempo, value class) stays under 1650 ms; heavy and huge pinned', () => {
+    Object.values(TEMPO_SCALE).forEach((tempo) => {
+      Object.values(FREEZE_MS).forEach((freeze) => {
+        expect(clashBudgetMs(tempo, freeze)).toBeLessThanOrEqual(BUDGET_MS);
+        expect(clashBudgetMs(tempo, freeze, 'quick')).toBeLessThanOrEqual(BUDGET_MS);
+      });
+    });
+    // 200 + round(120 × 1.15) + round(80 × 1.15) + 200 + round(300 × 1.15) + 320.
+    expect(clashBudgetMs(TEMPO_SCALE.heavy, FREEZE_MS.huge)).toBe(200 + 138 + 92 + 200 + 345 + 320);
+    expect(clashBudgetMs(TEMPO_SCALE.even, FREEZE_MS.big)).toBe(200 + 120 + 80 + 160 + 300 + 320);
+    expect(clashBudgetMs(TEMPO_SCALE.snappy, FREEZE_MS.pointless)).toBe(
+      200 + 102 + 68 + 120 + 255 + 320,
+    );
   });
 });
