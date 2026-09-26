@@ -397,10 +397,11 @@ plays the games with `?ice-policy=relay` through that relay and reads the select
 off every `RTCPeerConnection` the page built (`e2e/browser/record-pc.js` keeps them;
 `selected-pairs.js` reads `getStats()` as `ice.ts` `describe()` does); without `turnserver` on
 PATH they skip with the install line, and under `CI` the config refuses to start instead, so a
-broken install cannot pass as a skip. The site suite's two spec files run their tests in
-`parallel` mode (a file's tests share one worker by default, and the eight computed-style goldens
-at 14-16 s each made `e2e-site` the gate's long pole). Job `ci-ok` needs `changes` and every
-gate with `if: always()` and is green
+broken install cannot pass as a skip. The eight computed-style goldens (14-16 s each) run in
+order in one worker and make `e2e-site` the gate's long pole; Playwright's `parallel` mode was
+tried on that file (PR #133) and withdrawn: two viewports of one game host on the PeerServer at
+once and one never gets its room, and a toast still fading under four-way contention differed from
+the golden. Job `ci-ok` needs `changes` and every gate with `if: always()` and is green
 when each needed job succeeded or was skipped by `changes`, red on a failure or a cancellation
 (`changes` is needed so a crash in the selector is a failed need, not a row of green skips; a
 matrix job reports one result for all its entries, so `game` and `e2e-game` stand for six): GitHub
