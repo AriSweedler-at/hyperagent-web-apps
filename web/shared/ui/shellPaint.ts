@@ -13,6 +13,8 @@
 // tsconfig.pure.json) carves them out the way scorer/main.ts is, and tsconfig.web.json alone
 // compiles them (they need the DOM lib through dom.ts).
 import {
+  byId,
+  escapeHtml,
   hasClass,
   isDisabled,
   keyOf,
@@ -27,7 +29,8 @@ import {
   type Element,
   type PageLike,
 } from '../edge/dom.ts';
-import type { ShellState, ShellTypes } from './shell.ts';
+import { ensureKeyed } from './keyed.ts';
+import type { Role, SeatState, ShellState, ShellTypes } from './shell.ts';
 
 export type Dispatch<I> = (intent: I) => void;
 
@@ -50,15 +53,90 @@ export const paintScreen = (
 /** A waiting room's status line and whether it pulses (`app.hostStatus`, `app.guestStatus`). */
 export type WaitStatus = Readonly<{ text: string; pulse: boolean }>;
 
-/** What `paintWaiting` reads: gin's App carries these fields, backgammon's `app.shell` does. */
+/**
+ * What `paintWaiting` reads: every game's `app.shell` (shell.ts `ShellState`) carries these. The
+ * seat fields are read only for an N-seat page's `#seatList` (below); gin's and backgammon's
+ * pages have no such element, so nothing of theirs is painted differently.
+ */
 export type WaitingView = Readonly<{
   code: string | null;
   hostStatus: WaitStatus;
   guestStatus: WaitStatus;
   startGameVisible: boolean;
+  seats?: ReadonlyArray<SeatState>;
+  mySeat?: number;
+  role?: Role | null;
+  myName?: string;
+  oppName?: string | null;
 }>;
 
-/** `#roomCode`, `#hostWaitStatus` (+ its pulse), `#startGameBtn`, `#guestWaitStatus` (+ its pulse). */
+/** One row of the waiting room's seat list: the seat, who holds it (null while empty), whether its channel is open, and whether it is the viewer's own. */
+export type SeatRow = Readonly<{
+  seat: number;
+  name: string | null;
+  connected: boolean;
+  you: boolean;
+}>;
+
+/**
+ * The rows off the shell (docs/design/n-seat-sessions.md §7 `paintWaiting`): the host first (seat
+ * 0, its name mine as host and the host's as guest, connected because it is the room), then every
+ * guest seat in order; none while no room is open (`seats` empty).
+ */
+export const seatRows = (
+  w: Pick<WaitingView, 'seats' | 'mySeat' | 'role' | 'myName' | 'oppName'>,
+): ReadonlyArray<SeatRow> => {
+  const seats = w.seats ?? [];
+  if (seats.length === 0) return [];
+  const mySeat = w.mySeat ?? 0;
+  const hostName = w.role === 'guest' ? (w.oppName ?? null) : (w.myName ?? null);
+  return [
+    { seat: 0, name: hostName, connected: true, you: mySeat === 0 },
+    ...seats.map((s, i) => ({
+      seat: i + 1,
+      name: s.name,
+      connected: s.connected,
+      you: mySeat === i + 1,
+    })),
+  ];
+};
+
+/** A row's text: the name (or `Seat N` while empty), then ` · host`, ` · you`, ` · empty` as they apply. */
+export const seatLabel = (row: SeatRow): string =>
+  [
+    row.name ?? `Seat ${String(row.seat + 1)}`,
+    ...(row.seat === 0 ? ['host'] : []),
+    ...(row.you ? ['you'] : []),
+    ...(row.name === null ? ['empty'] : []),
+  ].join(' · ');
+
+/**
+ * The list's markup: one `<li>` per row with `data-seat`, `data-connected` and, on the viewer's
+ * own, `data-you`, and no class (the class contract scans web/shared for every game, so a class
+ * spelled here would need a rule in every theme or a row per game; a game's sheet styles
+ * `#seatList [data-connected]` as it likes).
+ */
+export const seatListHtml = (rows: ReadonlyArray<SeatRow>): string =>
+  rows
+    .map(
+      (row) =>
+        `<li data-seat="${String(row.seat)}" data-connected="${row.connected ? 'true' : 'false'}"${
+          row.you ? ' data-you=""' : ''
+        }>${escapeHtml(seatLabel(row))}</li>`,
+    )
+    .join('');
+
+/** The keyed slot's key: the rows in full, so the list is rebuilt only when a seat changes. */
+export const seatListKey = (rows: ReadonlyArray<SeatRow>): string => JSON.stringify(rows);
+
+/** The optional seat lists an N-seat page may carry, one per waiting screen (an id is one element, so the guest's screen has its own); neither is in `SHELL_IDS`. */
+export const SEAT_LIST_IDS: ReadonlyArray<string> = ['seatList', 'guestSeatList'];
+
+/**
+ * `#roomCode`, `#hostWaitStatus` (+ its pulse), `#startGameBtn`, `#guestWaitStatus` (+ its pulse);
+ * and the seat lists (`SEAT_LIST_IDS`), each rebuilt through the keyed slot from the shell's seats
+ * when the page carries it (an N-seat game's; gin's and backgammon's pages carry neither).
+ */
 export const paintWaiting = (doc: DocumentLike, w: WaitingView): void => {
   setText(requireId(doc, 'roomCode'), w.code ?? '----');
   const hostStatus = requireId(doc, 'hostWaitStatus');
@@ -68,6 +146,15 @@ export const paintWaiting = (doc: DocumentLike, w: WaitingView): void => {
   const guestStatus = requireId(doc, 'guestWaitStatus');
   setText(guestStatus, w.guestStatus.text);
   toggleClass(guestStatus, 'pulse', w.guestStatus.pulse);
+  const lists = SEAT_LIST_IDS.flatMap((id) => {
+    const list = byId(doc, id);
+    return list === null ? [] : [list];
+  });
+  if (lists.length === 0) return;
+  const rows = seatRows(w);
+  lists.forEach((list) => {
+    ensureKeyed(list, seatListKey(rows), () => seatListHtml(rows));
+  });
 };
 
 /**

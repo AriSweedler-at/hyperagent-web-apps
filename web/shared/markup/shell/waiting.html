@@ -1,7 +1,7 @@
   <!-- HOST WAITING -->
   <div id="hostWaitScreen" class="hidden">
     <h1>{{hostWaitTitle}}</h1>
-    <div class="subtitle">Have your opponent open this same page and enter the code</div>
+    <div class="subtitle">{{hostWaitSubtitle}}</div>
     <div {{centeredBox}}>
       <label>Room code</label>
       <div class="room-code" id="roomCode">----</div>
@@ -9,6 +9,7 @@
     </div>
     <div {{centeredBox}}>
       <div id="hostWaitStatus" {{pulseMuted}}>{{openingMsg}}</div>
+{{hostWaitList}}
       <div class="empty-note"{{pt10}}>{{keepOpenNote}}</div>
     </div>
     <button class="btn btn-go btn-block hidden" id="startGameBtn">{{startLabel}}</button>
@@ -20,6 +21,7 @@
     <h1>Joining…</h1>
     <div {{centeredBox}}>
       <div id="guestWaitStatus" {{pulseMuted}}>Connecting…</div>
+{{guestWaitList}}
     </div>
     <button class="btn btn-ghost btn-block" id="cancelGuestBtn">Back</button>
   </div>

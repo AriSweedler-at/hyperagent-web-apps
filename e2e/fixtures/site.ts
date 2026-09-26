@@ -95,6 +95,8 @@ export const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/backgammon-table-ux.spec.ts',
   '**/briscola-geometry.spec.ts',
   '**/briscola-local.spec.ts',
+  // Four contexts over the N-seat sessions: about the seats, not the origin.
+  '**/briscola-online.spec.ts',
   '**/briscola-stories.spec.ts',
   '**/computed-styles.spec.ts',
   '**/gin-drag-discard.spec.ts',

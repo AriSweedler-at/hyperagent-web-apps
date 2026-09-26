@@ -291,6 +291,34 @@ describe('shellSave', () => {
     });
   });
 
+  test('the seat names of a room past two seats are written after oppName and only when the caller has them, and read back; a row that is not a name or null is refused', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    const table = {
+      role: 'host',
+      code: 'ABCD',
+      myName: 'Ann',
+      target: 100,
+      game: { n: 1 },
+      oppName: 'Bob',
+      seatNames: ['Bob', null, 'Di'],
+      handoff: true,
+    } as const;
+    expect(writeSave(store, table).ok).toBe(true);
+    expect(s.map.get('toyMP_v1')).toBe(
+      '{"role":"host","code":"ABCD","myName":"Ann","target":100,"game":{"n":1},"oppName":"Bob","seatNames":["Bob",null,"Di"],"handoff":true}',
+    );
+    expect(readSave(store)).toEqual({ ok: true, value: table });
+    s.setItem(
+      'toyMP_v1',
+      '{"role":"host","code":"ABCD","myName":"Ann","target":100,"game":null,"oppName":null,"seatNames":["Bob",2]}',
+    );
+    expect(readSave(store)).toEqual({
+      ok: false,
+      error: { kind: 'invalid', key: 'toyMP_v1', reason: '$.seatNames[1]: expected string' },
+    });
+  });
+
   test('the waiting room`s stamp is written last and only when the caller has one, and read back; a save from before it decodes without one; a stamp that is not a number is refused', () => {
     const s = fakeStorage();
     const store = createStore(s);

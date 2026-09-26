@@ -28,6 +28,7 @@ const copy: ShellCopy = {
   localBtnLabel: 'Start',
   localNote: 'note',
   hostWaitTitle: 'Wait',
+  hostWaitSubtitle: 'Bring a friend',
   openingMsg: 'Opening',
   keepOpenNote: 'keep',
   startLabel: 'Deal',
@@ -74,6 +75,8 @@ const blocks: ShellBlocks = {
   hostFields: '  <button id="hostBtn">{{hostLabel}}</button>',
   localFields: '  <input id="p1NameInput">\n  <input id="p2NameInput">',
   playExtra: '',
+  hostWaitList: '',
+  guestWaitList: '',
   extraPanels: '',
   extraScreens: '',
   table:

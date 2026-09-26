@@ -1,0 +1,65 @@
+[
+  {
+    "t": "lobby",
+    "hostName": "Ann",
+    "seatCount": 3,
+    "gamesToWin": 1,
+    "removedTwo": "D",
+    "exchange": false,
+    "scoperta": false,
+    "partnerPeek": false,
+    "seats": [
+      {
+        "name": "Bo",
+        "connected": true
+      },
+      {
+        "name": "Cal",
+        "connected": true
+      }
+    ],
+    "you": 1
+  },
+  {
+    "t": "lobby",
+    "hostName": "Ann",
+    "seatCount": 3,
+    "gamesToWin": 1,
+    "removedTwo": "D",
+    "exchange": false,
+    "scoperta": false,
+    "partnerPeek": false,
+    "seats": [
+      {
+        "name": "Bo",
+        "connected": true
+      },
+      {
+        "name": "Cal",
+        "connected": true
+      }
+    ],
+    "you": 2
+  },
+  {
+    "t": "lobby",
+    "hostName": "Ann",
+    "seatCount": 3,
+    "gamesToWin": 1,
+    "removedTwo": "D",
+    "exchange": false,
+    "scoperta": false,
+    "partnerPeek": false,
+    "seats": [
+      {
+        "name": "Bo",
+        "connected": true
+      },
+      {
+        "name": "Cal",
+        "connected": false
+      }
+    ],
+    "you": 1
+  }
+]

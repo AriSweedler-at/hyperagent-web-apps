@@ -165,7 +165,9 @@ import {
   handoffLabel,
   awaitingDraw,
   liveView,
+  pausedMsg,
   resultOpen,
+  seatsDown,
   waitingToDealMsg,
   type App,
   type Intent,
@@ -217,9 +219,22 @@ export const paintHandoff = (doc: DocumentLike, app: App): void => {
   paintShellHandoff(doc, game !== null && game.options.seatCount === 2 ? handoffLabel(game) : null);
 };
 
-/** A seat's connection dot's whole class attribute (`#oppDot` at two players); pass-and-play hides it. */
-export const connDotClass = (app: App): string =>
-  `conn-dot ${app.shell.oppConnected ? 'on' : 'off'}${app.shell.role === 'local' ? ' hidden' : ''}`;
+/**
+ * Whether a seat's channel is up, as this device knows it (n-seat-sessions.md §7): the host reads
+ * every guest seat off `shell.seats`; a guest reads the host off `oppConnected` and the other
+ * guests off the last lobby frame, which the host re-sends on every seat lost or back mid-game
+ * (the view carries no channel state); a seat no frame has listed reads as up.
+ */
+export const seatConnected = (app: App, seat: Seat): boolean =>
+  app.shell.role === 'guest'
+    ? seat === 0
+      ? app.shell.oppConnected
+      : (app.shell.seats[seat - 1]?.connected ?? true)
+    : (app.shell.seats[seat - 1]?.connected ?? app.shell.oppConnected);
+
+/** A seat's connection dot's whole class attribute (`#oppDot` at two players; `connected` the seat's, the legacy pair's without); pass-and-play hides it. */
+export const connDotClass = (app: App, connected: boolean = app.shell.oppConnected): string =>
+  `conn-dot ${connected ? 'on' : 'off'}${app.shell.role === 'local' ? ' hidden' : ''}`;
 
 // ---- the card pack (D11, D13) -------------------------------------------------------------------------
 
@@ -389,9 +404,10 @@ const cellFor = (n: SeatCount, me: Seat, seat: Seat): RelativeCell =>
 /**
  * The three relative cells: `#seats[data-players]`, each cell's `hidden` and `data-seat`, its inside
  * keyed on what it shows (the name, the cards held or their count, the chips, the dot, the pack),
- * `to-move` on the actor's cell between beats and `gone` on a disconnected online seat. At two
- * players the one cell across carries `#oppDot` (tools/games.ts `SHELL.briscola.connDot`) and
- * `#oppName` (the two-seat shell's name for the other seat, which the shell specs read).
+ * `to-move` on the actor's cell between beats and `gone` on a disconnected online seat (each
+ * seat's own channel, `seatConnected`). At two players the one cell across carries `#oppDot`
+ * (tools/games.ts `SHELL.briscola.connDot`) and `#oppName` (the two-seat shell's name for the
+ * other seat, which the shell specs read).
  */
 export const paintSeats = (doc: DocumentLike, app: App, v: View, b: Beat, pack: CardPack): void => {
   const n = v.options.seatCount;
@@ -403,21 +419,27 @@ export const paintSeats = (doc: DocumentLike, app: App, v: View, b: Beat, pack: 
     const el = requireId(doc, seatCellId(cell));
     const seat = cells[cell];
     setHidden(el, seat === null);
-    if (seat === null) return;
+    // A cell with no seat carries no `data-seat` (a stale one from an earlier deal matched a seat's selector twice) and drops its key, so the next seat it shows is built afresh.
+    if (seat === null) {
+      setAttr(el, 'data-seat', null);
+      setAttr(el, 'data-key', null);
+      return;
+    }
     setAttr(el, 'data-seat', String(seat));
     const other = v.others.find((o) => o.idx === seat);
+    const connected = seatConnected(app, seat);
     const data: SeatCell = {
       name: nameOf(v.players, seat),
       handCount: handCountShown(b, seat, other?.handCount ?? 0),
       hand: other?.hand ?? null,
       tricks: tricksShown(v, b, seat),
       arriving: chipArriving(b, seat),
-      connected: online ? app.shell.oppConnected : null,
+      connected: online ? connected : null,
       ...(n === 2 && cell === 'R2' ? { dotId: 'oppDot', nameId: 'oppName' } : {}),
     };
     ensureKeyed(el, seatKey(data, pack.name), () => seatHtml(pack, data));
     toggleClass(el, 'to-move', b.stage === null && v.phase === 'trick' && v.turn === seat);
-    toggleClass(el, 'gone', online && !app.shell.oppConnected);
+    toggleClass(el, 'gone', online && !connected);
     // The live intent mirror (docs/design/briscola-battle.md §4.4): the slot-th back of that seat
     // lifts by class, outside the key (a hover never rebuilds the cell); nothing mid-beat; an
     // out-of-range slot toggles nothing.
@@ -428,8 +450,8 @@ export const paintSeats = (doc: DocumentLike, app: App, v: View, b: Beat, pack: 
     });
     const dot = queryIn(el, '.conn-dot');
     if (online && dot !== null) {
-      setAttr(dot, 'class', connDotClass(app));
-      setAttr(dot, 'title', app.shell.oppConnected ? 'Connected' : 'Disconnected');
+      setAttr(dot, 'class', connDotClass(app, connected));
+      setAttr(dot, 'title', connected ? 'Connected' : 'Disconnected');
     }
   });
 };
@@ -702,7 +724,8 @@ const exchangeClause = (v: View): string => {
 
 /**
  * `#statusText` (§5.8 copy): the taker through the hold and the flight, "Drawing…" through the
- * draws, the result once the game is over, else whose turn it is, with "Last three tricks" once the
+ * draws, the result once the game is over, who is to reconnect while a seat is down (the trick
+ * paused, ui/state.ts `seatsDown`), else whose turn it is, with "Last three tricks" once the
  * stock is out and the hands are full.
  */
 export const statusText = (app: App, v: View): string => {
@@ -711,6 +734,8 @@ export const statusText = (app: App, v: View): string => {
   if (b.awaiting) return DRAW_TAP_STATUS;
   if (b.stage !== null) return DRAWING_STATUS;
   if (v.phase === 'over') return resultLine(v);
+  const down = seatsDown(app);
+  if (down.length > 0) return pausedMsg(down);
   const lastThree = v.stockCount === 0 && v.trick.length === 0 && v.me.hand.length === HAND_SIZE;
   if (v.isMyTurn)
     return `${lastThree ? 'Last three tricks — your turn' : 'Your turn — play a card'}${v.canExchange ? exchangeClause(v) : ''}`;
@@ -844,9 +869,10 @@ const scoreline = (totals: ReadonlyArray<number>, first: Side): string =>
   [totals[first] ?? 0, ...totals.filter((_, side) => side !== first)].map(String).join('–');
 
 /**
- * `#rsTitle` / `#rsSub`: "Ann wins the game" · "71–49"; "Ann & Cara win the game" · "65–55"; "A
- * draw" · "60–60 · nobody scores this game"; at three players the sub lists every side by points
- * ("Bob 52 · Ann 41 · Cara 27").
+ * `#rsTitle` / `#rsSub`: "Ann wins the game" · "71–49"; "A draw" · "60–60 · nobody scores this
+ * game"; at three and four players (a free-for-all, every seat its own side) the sub lists every
+ * side by points ("Bob 52 · Ann 41 · Cara 27"); "Ann & Cara win the game" is kept for the day
+ * teams return.
  */
 export const resultSheetText = (v: View): Readonly<{ title: string; sub: string }> => {
   const r = v.result;
@@ -857,7 +883,7 @@ export const resultSheetText = (v: View): Readonly<{ title: string; sub: string 
   const plural = seatsOfSide(n, r.winner).length > 1;
   const title = `${sideLabel(v.players, n, r.winner)} win${plural ? '' : 's'} the game`;
   const sub =
-    n === 3
+    n >= 3
       ? [...sideList(n)]
           .sort((a, b) => (r.totals[b] ?? 0) - (r.totals[a] ?? 0))
           .map((side) => `${sideLabel(v.players, n, side)} ${String(r.totals[side] ?? 0)}`)

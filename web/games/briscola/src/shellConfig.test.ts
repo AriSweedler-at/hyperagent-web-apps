@@ -1,13 +1,22 @@
 // The half of the shell config spelled from the engine, the protocol and storage alone
 // (shellConfig.ts): the seat count parser off raw inputs with its fallback and the fixed terms
 // under the engine's normalisation, `pickOpts` over a hostile frame, the copy, the mode parser, the engine adapters
-// over a pair (create, apply, viewFor, over, finished, names, renameGuest, decodeState) and the
-// home read over a store (defaults when unreadable, the pack and the extra names when set). The
-// table hooks that complete it are ui/state.test.ts's.
+// over a pair and over three seats (create, apply, viewFor, over, finished, names, renameGuest by
+// seat, decodeState), the N-seat table and its copy forms (docs/design/n-seat-sessions.md §7: the
+// two-seat string at a table of two, the count past) and the home read over a store (defaults when
+// unreadable, the pack and the extra names when set). The table hooks that complete it are
+// ui/state.test.ts's.
 import { describe, expect, test } from 'vitest';
 
 import { createStore, type StorageLike } from '../../../shared/edge/storage.ts';
 import { mulberry32 } from '../../../shared/lib/rng.ts';
+import { WAITING_MSG } from '../../../shared/net/host.ts';
+import {
+  OPPONENT_LEFT_MSG,
+  WAITING_FOR_GUEST_MSG,
+  guestGoneMsg,
+  joinedMsg,
+} from '../../../shared/ui/shell.ts';
 import { applyAction, viewFor, type GameOptions, type Players } from './engine/index.ts';
 import {
   BRISCOLA_SHELL,
@@ -16,12 +25,21 @@ import {
   LEAVE_LOCAL_MSG,
   LEAVE_ONLINE_MSG,
   ONE_GAME,
+  TABLE_FULL_MSG,
   TABLE_TERMS,
+  emptySeatName,
   hostRoomMsg,
+  joinedText,
+  notEnoughMsg,
   parseOpts,
   parseSeatCount,
   pickOpts,
+  seatGoneMsg,
+  seatLeftMsg,
+  seatPlayers,
+  waitingMsg,
 } from './shellConfig.ts';
+import { lobby, welcome } from './protocol.ts';
 import { DEFAULT_CARD_PACK, SHELL_STORE, STORAGE_KEYS } from './storage.ts';
 import { initialShell } from './ui/state.ts';
 
@@ -50,7 +68,7 @@ describe('the copy', () => {
     expect(hostRoomMsg('Ann')).toBe('Connected — waiting for Ann to deal');
     expect(LEAVE_LOCAL_MSG).toBe('End this game? The score will be cleared.');
     expect(LEAVE_ONLINE_MSG).toBe('Leave this game? The table will close.');
-    expect(BRISCOLA_SHELL.copy.hostRoom('Bob', DEFAULT_OPTS)).toBe(hostRoomMsg('Bob'));
+    expect(BRISCOLA_SHELL.copy.hostRoom('Bob', DEFAULT_OPTS, 2, 2)).toBe(hostRoomMsg('Bob'));
     expect(BRISCOLA_SHELL.copy.leaveLocal).toBe(LEAVE_LOCAL_MSG);
     expect(BRISCOLA_SHELL.copy.leaveOnline).toBe(LEAVE_ONLINE_MSG);
     expect(BRISCOLA_SHELL.names.default).toBe(DEFAULT_NAME);
@@ -71,6 +89,82 @@ describe('the copy', () => {
       shown: 'online',
       stored: 'online',
     });
+  });
+});
+
+describe('the table (docs/design/n-seat-sessions.md §7)', () => {
+  test("seats two to four, fixed (a room starts full); the session's capacity is the room's seat count; the lobby is protocol.ts's four-argument builder, the welcome the codec's", () => {
+    expect(BRISCOLA_SHELL.seats).toEqual({ min: 2, max: 4, fixed: true });
+    const { capacity } = BRISCOLA_SHELL.opts;
+    if (capacity === undefined) throw new Error('no capacity reader');
+    expect(capacity(DEFAULT_OPTS)).toBe(2);
+    expect(capacity({ ...DEFAULT_OPTS, seatCount: 3 })).toBe(3);
+    expect(capacity({ ...DEFAULT_OPTS, seatCount: 4 })).toBe(4);
+    expect(BRISCOLA_SHELL.frames.lobby).toBe(lobby);
+    expect('welcome' in BRISCOLA_SHELL.frames).toBe(false);
+    // At two seats the frames are PR-4's, whatever table is passed; at three the table rides along.
+    const table = [{ name: 'Bo', connected: true }];
+    expect(lobby('Ann', DEFAULT_OPTS, table, 1)).toEqual({
+      t: 'lobby',
+      hostName: 'Ann',
+      ...DEFAULT_OPTS,
+    });
+    const three = { ...DEFAULT_OPTS, seatCount: 3 as const };
+    expect(welcome('Ann', three, [...table, { name: null, connected: false }], 2)).toEqual({
+      t: 'welcome',
+      hostName: 'Ann',
+      ...three,
+      seats: [...table, { name: null, connected: false }],
+      you: 2,
+    });
+  });
+
+  test('the N-seat copy is the shell`s two-seat string at a table of two, and counts past it', () => {
+    const { copy } = BRISCOLA_SHELL;
+    expect(copy.waiting?.(2)).toBe(WAITING_MSG);
+    expect(waitingMsg(3)).toBe('Waiting for 2 players to join');
+    expect(waitingMsg(4)).toBe('Waiting for 3 players to join');
+    expect(copy.joined?.('Bob', ['Bob'], 0)).toBe(joinedMsg('Bob'));
+    expect(joinedText('Bob', 2)).toBe('Bob joined! Waiting for 2 more.');
+    expect(joinedText('Cara', 1)).toBe('Cara joined! Waiting for 1 more.');
+    expect(copy.seatLeft?.('Bob', 1, 1, 2)).toBe(OPPONENT_LEFT_MSG);
+    expect(seatLeftMsg('Bob', 1, 2, 3)).toBe('Bob left. 2 of 3 seated.');
+    expect(seatLeftMsg(null, 2, 3, 4)).toBe('Seat 3 left. 3 of 4 seated.');
+    expect(emptySeatName(0)).toBe('Seat 1');
+    expect(copy.guestGone?.('Bob', 'ABCD', 1)).toBe(guestGoneMsg('Bob', 'ABCD'));
+    expect(seatGoneMsg(null, 'ABCD', 2)).toBe(guestGoneMsg('Seat 3', 'ABCD'));
+    expect(copy.notEnough?.(1, 2)).toBe(WAITING_FOR_GUEST_MSG);
+    expect(notEnoughMsg(2, 3)).toBe('2 of 3 seated — waiting for 1 more.');
+    expect(notEnoughMsg(2, 4)).toBe('2 of 4 seated — waiting for 2 more.');
+    expect(copy.roomFull).toBe(TABLE_FULL_MSG);
+    expect(copy.hostRoom('Ann', DEFAULT_OPTS, 3, 4)).toBe(
+      'Connected — 3 of 4 seated · waiting for Ann to deal',
+    );
+    expect(hostRoomMsg('Ann', 2, 3)).toBe('Connected — 2 of 3 seated · waiting for Ann to deal');
+  });
+
+  test('seatPlayers: the engine`s tuple for the count, a missing seat named by its number; create deals to the list the shell seated', () => {
+    const list = [
+      { id: 'host', name: 'Ann' },
+      { id: 'guest', name: 'Bob' },
+      { id: 'guest2', name: 'Cara' },
+    ];
+    expect(seatPlayers(2, list)).toEqual(list.slice(0, 2));
+    expect(seatPlayers(3, list)).toEqual(list);
+    expect(seatPlayers(4, list)).toEqual([...list, { id: 'p4', name: 'Player 4' }]);
+    const three = BRISCOLA_SHELL.engine.create(
+      list,
+      { ...DEFAULT_OPTS, seatCount: 3 },
+      mulberry32(3),
+      () => NOW,
+    );
+    expect(three.players).toEqual(list);
+    expect(three.options.seatCount).toBe(3);
+    expect(three.hands).toHaveLength(3);
+    // A rejoin renames the seat the session reseated the name at.
+    const renamed = BRISCOLA_SHELL.engine.renameGuest(three, 'Zed', 2);
+    expect(renamed.players.map((p) => p.name)).toEqual(['Ann', 'Bob', 'Zed']);
+    expect(viewFor(renamed, 2).me.name).toBe('Zed');
   });
 });
 
@@ -183,8 +277,8 @@ describe('the engine adapters over a pair', () => {
     expect(result.winnerOf(drawn)).toBeNull();
   });
 
-  test('renameGuest renames seat 1 alone; decodeState is the engine decoder', () => {
-    const renamed = engine.renameGuest(game, 'Zed');
+  test('renameGuest renames the seat it is told alone; decodeState is the engine decoder', () => {
+    const renamed = engine.renameGuest(game, 'Zed', 1);
     expect(renamed.players.map((p) => p.name)).toEqual(['Ann', 'Zed']);
     expect(renamed.players[0]).toBe(game.players[0]);
     expect(engine.decodeState(JSON.parse(JSON.stringify(game)))).toEqual({ ok: true, value: game });

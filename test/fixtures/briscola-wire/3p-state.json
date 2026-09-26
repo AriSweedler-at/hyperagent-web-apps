@@ -1,0 +1,435 @@
+[
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 1,
+        "id": "g1",
+        "name": "Bo",
+        "side": 1,
+        "hand": [
+          {
+            "id": "AD",
+            "r": 1,
+            "s": "D"
+          },
+          {
+            "id": "AS",
+            "r": 1,
+            "s": "S"
+          },
+          {
+            "id": "CD",
+            "r": 9,
+            "s": "D"
+          }
+        ]
+      },
+      "others": [
+        {
+          "idx": 2,
+          "id": "g2",
+          "name": "Cal",
+          "side": 2,
+          "handCount": 3
+        },
+        {
+          "idx": 0,
+          "id": "host",
+          "name": "Ann",
+          "side": 0,
+          "handCount": 3
+        }
+      ],
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann"
+        },
+        {
+          "id": "g1",
+          "name": "Bo"
+        },
+        {
+          "id": "g2",
+          "name": "Cal"
+        }
+      ],
+      "options": {
+        "seatCount": 3,
+        "gamesToWin": 1,
+        "removedTwo": "D",
+        "exchange": false,
+        "scoperta": false,
+        "partnerPeek": false
+      },
+      "gameNo": 1,
+      "phase": "trick",
+      "dealer": 2,
+      "leader": 0,
+      "turn": 0,
+      "actor": 0,
+      "isMyTurn": false,
+      "trumpCard": {
+        "id": "CB",
+        "r": 9,
+        "s": "B"
+      },
+      "trumpOnTable": true,
+      "stockCount": 30,
+      "stockTop": null,
+      "trick": [],
+      "legal": [],
+      "canExchange": false,
+      "exchanges": [],
+      "taken": [0, 0, 0],
+      "tricks": [0, 0, 0],
+      "sides": [0, 0, 0],
+      "trickNo": 0,
+      "lastTrick": null,
+      "match": {
+        "gamesToWin": 1,
+        "wins": [0, 0, 0],
+        "draws": 0
+      },
+      "matchOver": false,
+      "result": null,
+      "games": [],
+      "events": [
+        {
+          "id": 0,
+          "kind": "deal",
+          "seat": 2,
+          "at": 1700000000000,
+          "data": {
+            "dealer": 2,
+            "trumpCard": {
+              "id": "CB",
+              "r": 9,
+              "s": "B"
+            }
+          }
+        }
+      ],
+      "startedAt": 1700000000000,
+      "endedAt": null
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 2,
+        "id": "g2",
+        "name": "Cal",
+        "side": 2,
+        "hand": [
+          {
+            "id": "5D",
+            "r": 5,
+            "s": "D"
+          },
+          {
+            "id": "AB",
+            "r": 1,
+            "s": "B"
+          },
+          {
+            "id": "3D",
+            "r": 3,
+            "s": "D"
+          }
+        ]
+      },
+      "others": [
+        {
+          "idx": 0,
+          "id": "host",
+          "name": "Ann",
+          "side": 0,
+          "handCount": 3
+        },
+        {
+          "idx": 1,
+          "id": "g1",
+          "name": "Bo",
+          "side": 1,
+          "handCount": 3
+        }
+      ],
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann"
+        },
+        {
+          "id": "g1",
+          "name": "Bo"
+        },
+        {
+          "id": "g2",
+          "name": "Cal"
+        }
+      ],
+      "options": {
+        "seatCount": 3,
+        "gamesToWin": 1,
+        "removedTwo": "D",
+        "exchange": false,
+        "scoperta": false,
+        "partnerPeek": false
+      },
+      "gameNo": 1,
+      "phase": "trick",
+      "dealer": 2,
+      "leader": 0,
+      "turn": 0,
+      "actor": 0,
+      "isMyTurn": false,
+      "trumpCard": {
+        "id": "CB",
+        "r": 9,
+        "s": "B"
+      },
+      "trumpOnTable": true,
+      "stockCount": 30,
+      "stockTop": null,
+      "trick": [],
+      "legal": [],
+      "canExchange": false,
+      "exchanges": [],
+      "taken": [0, 0, 0],
+      "tricks": [0, 0, 0],
+      "sides": [0, 0, 0],
+      "trickNo": 0,
+      "lastTrick": null,
+      "match": {
+        "gamesToWin": 1,
+        "wins": [0, 0, 0],
+        "draws": 0
+      },
+      "matchOver": false,
+      "result": null,
+      "games": [],
+      "events": [
+        {
+          "id": 0,
+          "kind": "deal",
+          "seat": 2,
+          "at": 1700000000000,
+          "data": {
+            "dealer": 2,
+            "trumpCard": {
+              "id": "CB",
+              "r": 9,
+              "s": "B"
+            }
+          }
+        }
+      ],
+      "startedAt": 1700000000000,
+      "endedAt": null
+    }
+  },
+  {
+    "t": "state",
+    "view": {
+      "me": {
+        "idx": 2,
+        "id": "g2",
+        "name": "Cal",
+        "side": 2,
+        "hand": [
+          {
+            "id": "AB",
+            "r": 1,
+            "s": "B"
+          },
+          {
+            "id": "3D",
+            "r": 3,
+            "s": "D"
+          },
+          {
+            "id": "7S",
+            "r": 7,
+            "s": "S"
+          }
+        ]
+      },
+      "others": [
+        {
+          "idx": 0,
+          "id": "host",
+          "name": "Ann",
+          "side": 0,
+          "handCount": 3
+        },
+        {
+          "idx": 1,
+          "id": "g1",
+          "name": "Bo",
+          "side": 1,
+          "handCount": 3
+        }
+      ],
+      "players": [
+        {
+          "id": "host",
+          "name": "Ann"
+        },
+        {
+          "id": "g1",
+          "name": "Bo"
+        },
+        {
+          "id": "g2",
+          "name": "Cal"
+        }
+      ],
+      "options": {
+        "seatCount": 3,
+        "gamesToWin": 1,
+        "removedTwo": "D",
+        "exchange": false,
+        "scoperta": false,
+        "partnerPeek": false
+      },
+      "gameNo": 1,
+      "phase": "trick",
+      "dealer": 2,
+      "leader": 0,
+      "turn": 0,
+      "actor": 0,
+      "isMyTurn": false,
+      "trumpCard": {
+        "id": "CB",
+        "r": 9,
+        "s": "B"
+      },
+      "trumpOnTable": true,
+      "stockCount": 27,
+      "stockTop": null,
+      "trick": [],
+      "legal": [],
+      "canExchange": false,
+      "exchanges": [],
+      "taken": [11, 0, 0],
+      "tricks": [1, 0, 0],
+      "sides": [11, 0, 0],
+      "trickNo": 1,
+      "lastTrick": {
+        "no": 1,
+        "leader": 0,
+        "cards": [
+          {
+            "seat": 0,
+            "card": {
+              "id": "5B",
+              "r": 5,
+              "s": "B"
+            }
+          },
+          {
+            "seat": 1,
+            "card": {
+              "id": "AD",
+              "r": 1,
+              "s": "D"
+            }
+          },
+          {
+            "seat": 2,
+            "card": {
+              "id": "5D",
+              "r": 5,
+              "s": "D"
+            }
+          }
+        ],
+        "winner": 0,
+        "points": 11,
+        "drew": [0, 1, 2],
+        "trumpTaken": false
+      },
+      "match": {
+        "gamesToWin": 1,
+        "wins": [0, 0, 0],
+        "draws": 0
+      },
+      "matchOver": false,
+      "result": null,
+      "games": [],
+      "events": [
+        {
+          "id": 0,
+          "kind": "deal",
+          "seat": 2,
+          "at": 1700000000000,
+          "data": {
+            "dealer": 2,
+            "trumpCard": {
+              "id": "CB",
+              "r": 9,
+              "s": "B"
+            }
+          }
+        },
+        {
+          "id": 1,
+          "kind": "trick",
+          "seat": 0,
+          "at": 1700000000000,
+          "data": {
+            "no": 1,
+            "leader": 0,
+            "cards": [
+              {
+                "seat": 0,
+                "card": {
+                  "id": "5B",
+                  "r": 5,
+                  "s": "B"
+                }
+              },
+              {
+                "seat": 1,
+                "card": {
+                  "id": "AD",
+                  "r": 1,
+                  "s": "D"
+                }
+              },
+              {
+                "seat": 2,
+                "card": {
+                  "id": "5D",
+                  "r": 5,
+                  "s": "D"
+                }
+              }
+            ],
+            "winner": 0,
+            "winnerSide": 0,
+            "points": 11,
+            "valueClass": "big",
+            "winningCard": {
+              "id": "5B",
+              "r": 5,
+              "s": "B"
+            },
+            "winningClass": "pip",
+            "briscola": true,
+            "steal": false,
+            "overtrump": false,
+            "carichiLost": [1],
+            "drew": [0, 1, 2],
+            "trumpTaken": null
+          }
+        }
+      ],
+      "startedAt": 1700000000000,
+      "endedAt": null
+    }
+  }
+]

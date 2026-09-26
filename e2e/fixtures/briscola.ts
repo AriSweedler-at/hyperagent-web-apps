@@ -41,7 +41,13 @@ import {
 import { mulberry32 } from '../../web/shared/lib/rng.ts';
 import type { Box } from './boxes.ts';
 import { TOL, fitsScript, frameScript, type Frame, type Viewport } from './geometry.ts';
-import { DEFAULT_NAMES, reveal, startLocal, type Names } from './shell.ts';
+import {
+  TABLE_FULL_MSG,
+  hostRoomMsg,
+  waitingMsg,
+} from '../../web/games/briscola/src/shellConfig.ts';
+import { DEFAULT_NAMES, reveal, roomCode, startLocal, type Names } from './shell.ts';
+import { BROKER_TIMEOUT, WEBRTC_TIMEOUT } from './timeouts.ts';
 
 export type { Viewport, Names };
 export { DEFAULT_NAMES };
@@ -795,4 +801,138 @@ export const expectTableGeometry = (g: TableGeometry, when: string): void => {
   expectStrips(g, when);
   expectTargets(g, when);
   expectFits(g, when);
+};
+
+// ---- online: a table of three or four (docs/design/n-seat-sessions.md §7) -------------------------
+
+/** The peers of an N-seat table, the host first; `slice(0, n)` for a table of `n`. */
+export const TABLE_NAMES: readonly [string, string, string, string] = ['Host', 'Bea', 'Cy', 'Dee'];
+
+/** The element at `i`, or a test bug. */
+const at = <T>(list: ReadonlyArray<T>, i: number, what: string): T => {
+  const item = list[i];
+  if (item === undefined) throw new Error(`no ${what} at ${String(i)}`);
+  return item;
+};
+
+/**
+ * Open a table for `n` as `name`: the Online panel's seat count, the battle beat off (each device's
+ * own preference, docs/design/briscola-battle.md §3.7; a spec of forty plays cannot wait 1.5 s a
+ * trick), Open a table; resolves with the code once the broker has confirmed the room (the waiting
+ * copy names the count, shellConfig.ts `waitingMsg`).
+ */
+export const briscolaHostTable = async (
+  page: Page,
+  name: string,
+  n: SeatCount,
+): Promise<string> => {
+  await expect(page.locator('#onlineModeContent')).toBeVisible();
+  await page.locator('#nameInput').fill(name);
+  await page.locator('#playersSel').selectOption(String(n));
+  await page.locator('#speedSel').selectOption('off');
+  await page.locator('#hostBtn').click();
+  await expect(page.locator('#hostWaitScreen')).toBeVisible();
+  await expect(page.locator('#hostWaitStatus')).toContainText(waitingMsg(n), {
+    timeout: BROKER_TIMEOUT,
+  });
+  return roomCode(page, 'briscola');
+};
+
+/** The join form as a player fills it: the name, the beat off, the code typed (the field refuses a paste), Sit down. */
+const sitDown = async (page: Page, name: string, code: string): Promise<void> => {
+  await expect(page.locator('#onlineModeContent')).toBeVisible();
+  await page.locator('#nameInput').fill(name);
+  await page.locator('#speedSel').selectOption('off');
+  await page.locator('#codeInput').pressSequentially(code);
+  await expect(page.locator('#codeInput')).toHaveValue(code);
+  await page.locator('#joinBtn').click();
+  await expect(page.locator('#guestWaitScreen')).toBeVisible();
+};
+
+/** Sit down at the table by code as `name`; resolves once the host's frame names the room (its count is whatever is seated then; `hostRoomMsg`). */
+export const briscolaJoinTable = async (page: Page, name: string, code: string): Promise<void> => {
+  await sitDown(page, name, code);
+  await expect(page.locator('#guestWaitStatus')).toContainText('Connected —', {
+    timeout: WEBRTC_TIMEOUT,
+  });
+};
+
+/** A spare peer at a full table is told so and never seated (the host probes every seat first, so this takes a heartbeat). */
+export const briscolaRefused = async (page: Page, name: string, code: string): Promise<void> => {
+  await sitDown(page, name, code);
+  await expect(page.locator('#guestWaitStatus')).toHaveText(TABLE_FULL_MSG, {
+    timeout: WEBRTC_TIMEOUT,
+  });
+  await expect(page.locator('#tableScreen')).toBeHidden();
+};
+
+/** The guests' status once the table is full: the host's name and the count (shellConfig.ts `hostRoomMsg`). */
+export const tableFullStatus = (n: SeatCount): string => hostRoomMsg(TABLE_NAMES[0], n, n);
+
+/** One row of a waiting room's seat list as shown: the seat, whether its channel is up, whether it is the viewer's own. */
+export type SeatShown = readonly [seat: number, connected: boolean, you: boolean];
+export const seatListShown = (
+  page: Page,
+  id: 'seatList' | 'guestSeatList',
+): Promise<ReadonlyArray<SeatShown>> =>
+  page.evaluate<ReadonlyArray<SeatShown>>(
+    `Array.from(document.querySelectorAll('#${id} li')).map((li) => [Number(li.dataset.seat), li.dataset.connected === 'true', li.hasAttribute('data-you')])`,
+  );
+
+/** The pages by seat: the host's first, then each guest's in join order (seats are taken in connection order). */
+type Pages = ReadonlyArray<Page>;
+
+/** The trick and its length on a page, as one comparable string; '' before a view. */
+const positionOf = async (page: Page): Promise<string> => {
+  const v = await readView(page);
+  return v === null ? '' : `${String(v.trickNo)}:${String(v.trick.length)}`;
+};
+
+/**
+ * One whole trick over the wire: whoever the host's view says is to act plays its first legal card
+ * from its own page (the lift, then Play; e2e `playCard`), once that page has caught up with the
+ * host's position (its frame arrives a beat after the host applies), until the trick is full; then
+ * the beat settles on every page. Resolves with each page's settled view, in seat order.
+ */
+export const playTrickOnline = async (pages: Pages): Promise<ReadonlyArray<View>> => {
+  const hostPage = at(pages, 0, 'host page');
+  const start = await requireView(hostPage);
+  const no = start.trickNo + 1;
+  const play = async (left: number): Promise<void> => {
+    if (left === 0) return;
+    const v = await requireView(hostPage);
+    const page = at(pages, v.actor ?? v.turn, 'seat');
+    await expect.poll(() => positionOf(page)).toBe(await positionOf(hostPage));
+    await playCard(page, FIRST_LEGAL(await requireView(page)));
+    return play(left - 1);
+  };
+  await play(start.options.seatCount - start.trick.length);
+  return Promise.all(pages.map((page) => waitForSettle(page, no)));
+};
+
+/**
+ * The game to its end through the hook (`briscolaAct`, so nobody waits on the beat): whoever the
+ * host says is to act plays its first legal card from its own page once that page holds the host's
+ * position; resolves once every page's view is over, with those views in seat order.
+ */
+export const playOutOnline = async (pages: Pages): Promise<ReadonlyArray<View>> => {
+  const hostPage = at(pages, 0, 'host page');
+  const step = async (guard: number): Promise<void> => {
+    if (guard === 0) throw new Error('the game did not end');
+    const v = await requireView(hostPage);
+    if (v.phase === 'over') return;
+    const before = `${String(v.trickNo)}:${String(v.trick.length)}`;
+    const page = at(pages, v.actor ?? v.turn, 'seat');
+    await expect.poll(() => positionOf(page)).toBe(before);
+    await briscolaAct(page, { type: 'play', cardId: FIRST_LEGAL(await requireView(page)) });
+    await expect.poll(() => positionOf(hostPage)).not.toBe(before);
+    return step(guard - 1);
+  };
+  await step(60);
+  await Promise.all(
+    pages.map((page) =>
+      expect.poll(async () => (await readView(page))?.phase, { timeout: 15_000 }).toBe('over'),
+    ),
+  );
+  return Promise.all(pages.map((page) => requireView(page)));
 };

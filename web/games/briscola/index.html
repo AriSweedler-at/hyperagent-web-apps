@@ -86,8 +86,8 @@
                 <span class="field-label">Players</span>
                 <select id="playersSel">
                   <option value="2" selected>2 players</option>
-                  <option value="3" disabled>3 players · online soon</option>
-                  <option value="4" disabled>4 players · online soon</option>
+                  <option value="3">3 players</option>
+                  <option value="4">4 players</option>
                 </select>
               </div>
               <div class="field">
@@ -205,7 +205,7 @@
       <!-- HOST WAITING -->
       <div id="hostWaitScreen" class="hidden">
         <h1>Your table</h1>
-        <div class="subtitle">Have your opponent open this same page and enter the code</div>
+        <div class="subtitle">Have the others open this same page and enter the code</div>
         <div class="card-box centered">
           <label>Room code</label>
           <div class="room-code" id="roomCode">----</div>
@@ -213,6 +213,7 @@
         </div>
         <div class="card-box centered">
           <div id="hostWaitStatus" class="pulse muted">Opening the table…</div>
+          <ul class="seat-list" id="seatList" aria-label="Seats"></ul>
           <div class="empty-note">
             Keep this screen open while the others sit down. If you switch apps, come straight back
             and the table reconnects on its own.
@@ -227,6 +228,7 @@
         <h1>Joining…</h1>
         <div class="card-box centered">
           <div id="guestWaitStatus" class="pulse muted">Connecting…</div>
+          <ul class="seat-list" id="guestSeatList" aria-label="Seats"></ul>
         </div>
         <button class="btn btn-ghost btn-block" id="cancelGuestBtn">Back</button>
       </div>

@@ -30,7 +30,16 @@ import {
   type GuestFrame,
   type HostFrame,
 } from '../lib/protocol.ts';
-import { formatError, type Decoder } from '../lib/json.ts';
+import {
+  arrayOf,
+  boolean,
+  formatError,
+  integer,
+  nullable,
+  object,
+  string,
+  type Decoder,
+} from '../lib/json.ts';
 import { appendCapped, outcomeFor, type RecentGame } from '../lib/recentGames.ts';
 import type { Result } from '../lib/result.ts';
 import type { Rng } from '../lib/rng.ts';
@@ -99,6 +108,14 @@ type ExtraSeats<G extends ShellTypes> =
   G extends Readonly<{ Seat: infer S extends number }> ? S : never;
 /** A seat at the game's table: the shell's two and the game's own; `0 | 1` for the two-seat games. */
 export type SeatOf<G extends ShellTypes> = Seat | ExtraSeats<G>;
+/**
+ * What `engine.create` deals to (n-seat-sessions.md §7 `engine.create(players[])`): the pair for a
+ * two-seat game, whose bag names no seat past `0 | 1` (so gin's and backgammon's engines keep their
+ * tuple, type for type), and every seat in order for a game with more (`ShellTypes.Seat`).
+ */
+export type PlayersOf<G extends ShellTypes> = [ExtraSeats<G>] extends [never]
+  ? Readonly<[Player, Player]>
+  : ReadonlyArray<Player>;
 export type Tab<G extends ShellTypes> = 'play' | 'rules' | G['Tab'];
 export type Mode<G extends ShellTypes> = PlayMode | G['Mode'];
 /** The five screens every shell page carries, and the game's own. */
@@ -122,6 +139,14 @@ export type GuestFrameOf<G extends ShellTypes> = GuestFrame<G['Action']> | Ephem
 /** `#hostWaitStatus` / `#guestWaitStatus`: the text and whether it still pulses. */
 export type WaitStatus = Readonly<{ text: string; pulse: boolean }>;
 
+/**
+ * A guest seat of an open room (docs/design/n-seat-sessions.md §7): who holds it (null while it
+ * is empty; kept while its channel is down mid-game, for the rejoin) and whether its channel is
+ * open. Seat `s` of the room is `seats[s - 1]`; the host is seat 0 and has none.
+ */
+export type SeatState = Readonly<{ name: string | null; connected: boolean }>;
+export const EMPTY_SEAT: SeatState = { name: null, connected: false };
+
 // ---- the save, the resume offer and the home snapshot -------------------------------------------
 
 /** `persist()` writes one of three shapes by role, the shapes web/shared/edge/prefs.ts `shellSave` reads and writes; the host's own fields sit between `myName` and `game`. */
@@ -135,6 +160,8 @@ export type HostSave<G extends ShellTypes> = Readonly<{
   Readonly<{
     game: G['State'] | null;
     oppName: string | null;
+    /** Every guest seat's name in seat order (`seats`), written only for a room of more than two seats, so a two-seat save keeps the legacy literal; a resume reseats each by name (n-seat-sessions.md D6). */
+    seatNames?: ReadonlyArray<string | null>;
     /** Written only when true (the shell's `handoff`), so every other host save keeps the legacy literal. */
     handoff?: true;
     /** When the room was (re)opened, written only while it waits for its first guest (`game` null; docs/design/lobby-resume.md D1). */
@@ -154,6 +181,8 @@ export type HostResume<G extends ShellTypes> = Readonly<{
     /** The game in play, or null for a room still waiting for its first guest (lobby-resume.md D3). */
     game: G['State'] | null;
     oppName: string | null;
+    /** The save's seat names, when it carries them (a room of more than two seats): the room resumes with each seat named and disconnected. */
+    seatNames?: ReadonlyArray<string | null>;
     /** The save's `handoff` mark: the offer reads as the handoff, and the room resumes as one. */
     handoff: boolean;
     /** The save's `at`: when a waiting room was (re)opened, or null (a game in play, or a save from before the stamp). */
@@ -200,6 +229,23 @@ export type ShellState<G extends ShellTypes> = Readonly<{
   view: G['View'] | null;
   oppName: string | null;
   oppConnected: boolean;
+  /**
+   * The room's guest seats 1..N−1 in order (`seats[s − 1]`, n-seat-sessions.md §7): one per
+   * channel the host session holds, `capacity − 1` of them from `startHost` on (one for a two-seat
+   * game), what a guest's welcome or lobby frame carries beside the options in an N-seat game
+   * (`seats` and `you`, D3, read by `roomSeatingOf`), and [] at home and in pass-and-play. As
+   * host, `oppName`/`oppConnected` are
+   * `seats[0]`'s: every shell write sets both (`withSeats`), and a two-seat game's flows keep
+   * reading the two legacy fields (`seatsOf`), so its reducer, painters and pins are what they
+   * were; as guest the two name the host.
+   */
+  seats: ReadonlyArray<SeatState>;
+  /** My seat: 0 as host and in pass-and-play; as guest the `you` of the last welcome or lobby frame, 1 when the frame carries none. */
+  mySeat: SeatOf<G>;
+  /** Pass-and-play: every player's name in seat order (`cfg.result.playersOf` of seat 0's view); [] otherwise. */
+  localNames: ReadonlyArray<string>;
+  /** Pass-and-play: the seats played from this device, every seat in v1 (the seam for a mixed table); [] otherwise. */
+  localSeats: ReadonlyArray<SeatOf<G>>;
   nameTouched: boolean;
   /** Pass-and-play: the seat that lifted the curtain this turn. */
   revealed: SeatOf<G> | null;
@@ -329,8 +375,9 @@ export type ShellIntent<G extends ShellTypes> =
   /** `startHost(resumeCode)`: null draws a fresh code. */
   | Readonly<{ type: 'host/start'; code: string | null }>
   | Readonly<{ type: 'host/status'; text: string; stopPulse: boolean }>
-  | Readonly<{ type: 'host/frame'; frame: GuestFrameOf<G> }>
-  | Readonly<{ type: 'host/guestGone'; iceFailed: string | null }>
+  /** A guest frame; `seat` is the channel it came in on, from the seated adapter (boot.ts `sessionEvents(deps, { seats: true })`), absent (seat 1) for a two-seat game. */
+  | Readonly<{ type: 'host/frame'; frame: GuestFrameOf<G>; seat?: SeatOf<G> }>
+  | Readonly<{ type: 'host/guestGone'; iceFailed: string | null; seat?: SeatOf<G> }>
   /** `#startGameBtn`. */
   | Readonly<{ type: 'host/deal' }>
   // ---- net: guest ----
@@ -443,8 +490,8 @@ export type ShellEffect<G extends ShellTypes> =
   | Readonly<{ type: 'revealRule'; slot: RulesSlot; rule: string }>
   /** `ms` null is the default duration. */
   | Readonly<{ type: 'toast'; message: string; ms: number | null }>
-  /** To the current session's channel, if open. */
-  | Readonly<{ type: 'send'; frame: HostFrameOf<G> | GuestFrameOf<G> }>
+  /** To the current session's channel, if open; `seat` names one of a host's channels (an N-seat game), absent every open one, which at capacity 2 is the one channel. */
+  | Readonly<{ type: 'send'; frame: HostFrameOf<G> | GuestFrameOf<G>; seat?: SeatOf<G> }>
   | Readonly<{ type: 'fx'; cue: Cue<G> }>
   /**
    * Phrases the game's event binding chose (web/shared/ui/eventEffects.ts, sound-history.md
@@ -453,7 +500,16 @@ export type ShellEffect<G extends ShellTypes> =
    */
   | Readonly<{ type: 'phrases'; phrases: ReadonlyArray<Phrase> }>
   | Readonly<{ type: 'wakeLock'; hold: boolean }>
-  | Readonly<{ type: 'startHost'; code: string; attempt: number; resume: boolean }>
+  /** Open the room; `capacity` (seats, the host's included), `waiting` (the open status) and `names` (a resumed room's seat names, seeding the session's rejoin keys) ride only for an N-seat game (`HostOptions.capacity`/`waiting`/`names`), so a two-seat effect is the literal it was. */
+  | Readonly<{
+      type: 'startHost';
+      code: string;
+      attempt: number;
+      resume: boolean;
+      capacity?: number;
+      waiting?: string;
+      names?: ReadonlyArray<string | null>;
+    }>
   | Readonly<{ type: 'startGuest'; code: string; attempt: number }>
   /** Close the current session's channel and destroy its Peer. */
   | Readonly<{ type: 'closeNet' }>
@@ -609,9 +665,37 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     opening: string;
     connecting: (code: string) => string;
     handoff: (code: string, oppName: string | null) => string;
-    /** The guest's status once the host's welcome or lobby frame names the room (gin names the target). */
-    hostRoom: (hostName: string, opts: G['Opts']) => string;
+    /**
+     * The guest's status once the host's welcome or lobby frame names the room (gin names the
+     * target). `seated` is how many are at the table, the host included, of `capacity` seats: an
+     * N-seat game says "3 of 4 seated"; a two-seat game's takes the first two and is told 2 of 2.
+     */
+    hostRoom: (hostName: string, opts: G['Opts'], seated: number, capacity: number) => string;
+    // ---- the N-seat forms (n-seat-sessions.md §7), each with the two-seat string as its default; a two-seat game leaves them out ----
+    /** The host's open status with no hand dealt (`HostOptions.waiting`); absent, the session's WAITING_MSG. */
+    waiting?: (capacity: number) => string;
+    /** `name` joined the lobby; `names` are every seated guest in seat order, `remaining` the empty seats; absent, `joinedMsg(name)`. */
+    joined?: (name: string, names: ReadonlyArray<string>, remaining: number) => string;
+    /** Seat `seat` (`name`, or null for a seat never named) left the lobby; `seated` of `capacity` remain, the host counted; absent, OPPONENT_LEFT_MSG. */
+    seatLeft?: (name: string | null, seat: number, seated: number, capacity: number) => string;
+    /** Seat `seat`'s channel dropped mid-game; absent, `guestGoneMsg(name, code)`. */
+    guestGone?: (name: string | null, code: string | null, seat: number) => string;
+    /** The guest told the table is full; absent, ROOM_FULL_MSG. */
+    roomFull?: string;
+    /** `host/deal` with `seated` at the table (the host counted) and `min` needed; absent, WAITING_FOR_GUEST_MSG. */
+    notEnough?: (seated: number, min: number) => string;
   }>;
+  /**
+   * A table of more than two seats (n-seat-sessions.md §7): the players a room may hold, the
+   * host counted. Absent for the two-seat games, whose every flow is then the line it was. Set,
+   * the room opens at `opts.capacity(opts)` seats (2..`max`; `max` when the game supplies no
+   * reader), Start enables at `min` seated (or, with `fixed`, at the room's capacity: a fixed
+   * table starts full, since briscola's three-seat deck cannot be dealt to two; `min` is then the
+   * smallest table alone), the host's `send`/`startHost` effects name seats and the capacity, and
+   * a guest reads its seat and the table off the room frames (`roomSeatingOf`: `you` and `seats`
+   * beside the options, D3), which the game's protocol puts there.
+   */
+  seats?: Readonly<{ min: number; max: number; fixed?: boolean }>;
   opts: Readonly<{
     initial: G['Opts'];
     /** The raw select/input values off `host/click`/`local/click`; `current` is the shell's for a missing value. */
@@ -620,14 +704,12 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     ofGame: (game: G['State']) => G['Opts'];
     /** The option fields alone off a record that carries them (a welcome frame, a resume offer), in the literal's order. */
     pick: (from: G['Opts']) => G['Opts'];
+    /** An N-seat game: the seats a room under `opts` holds, the host's included (`HostOptions.capacity`; briscola its seat count). Read only with `cfg.seats`; absent then, `cfg.seats.max`. */
+    capacity?: (opts: G['Opts']) => number;
   }>;
   engine: Readonly<{
-    create: (
-      players: Readonly<[Player, Player]>,
-      opts: G['Opts'],
-      rng: Rng,
-      now: () => number,
-    ) => G['State'];
+    /** The deal: the host first, then every guest seat in order (`PlayersOf<G>`: the pair for a two-seat game). */
+    create: (players: PlayersOf<G>, opts: G['Opts'], rng: Rng, now: () => number) => G['State'];
     apply: (
       game: G['State'],
       seat: SeatOf<G>,
@@ -642,8 +724,8 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     finished: (game: G['State']) => boolean;
     /** The two seats' names, for the handoff (seat 0 hosts, seat 1 joins). */
     names: (game: G['State']) => Readonly<[string, string]>;
-    /** `game.players[1].name = name` on a rejoin. */
-    renameGuest: (game: G['State'], name: string) => G['State'];
+    /** `game.players[seat].name = name` on a rejoin; `seat` is 1 for a two-seat game, whose builder takes the first two. */
+    renameGuest: (game: G['State'], name: string, seat: SeatOf<G>) => G['State'];
     /** The engine state off `position/load`'s hand-made object (the save's decoder); its error names the path. */
     decodeState: Decoder<G['State']>;
   }>;
@@ -664,7 +746,13 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
   }>;
   /** The game's protocol.ts builders the shell sends. */
   frames: Readonly<{
-    lobby: (hostName: string, opts: G['Opts']) => HostFrameOf<G>;
+    /** The lobby frame for seat `you`: an N-seat game's carries the seat list and the receiver's seat (D3); a two-seat game's takes the first two. */
+    lobby: (
+      hostName: string,
+      opts: G['Opts'],
+      seats: ReadonlyArray<SeatState>,
+      you: SeatOf<G>,
+    ) => HostFrameOf<G>;
     state: (view: G['View']) => HostFrameOf<G>;
     toast: (message: string) => HostFrameOf<G>;
     action: (action: G['Action']) => GuestFrameOf<G>;
@@ -870,6 +958,126 @@ const withGuestStatus = <G extends ShellTypes>(
     guestStatus: { text, pulse: stopPulse ? false : app.shell.guestStatus.pulse },
   });
 
+// ---- seats (docs/design/n-seat-sessions.md §7; every helper is the two-seat line at one seat) ----
+
+/** A room of more than two seats: the game supplies `cfg.seats`; absent, every flow below takes the two-seat line it was. */
+const isNSeat = <G extends ShellTypes>(cfg: ShellConfig<G>): boolean => cfg.seats !== undefined;
+
+/**
+ * The room's seats as the host's flows read them. An N-seat game's are `shell.seats`; a two-seat
+ * game's are the legacy pair `oppName`/`oppConnected` (its suites build shells from those two
+ * fields alone, so they stay its source of truth and `shell.seats` is their mirror).
+ */
+const seatsOf = <G extends ShellTypes>(
+  s: ShellState<G>,
+  cfg: ShellConfig<G>,
+): ReadonlyArray<SeatState> =>
+  isNSeat(cfg) ? s.seats : [{ name: s.oppName, connected: s.oppConnected }];
+
+/** The seats written, and `oppName`/`oppConnected` with them as seat 1's (the host's reading of the two). */
+const withSeats = <G extends ShellTypes>(
+  app: ShellApp<G>,
+  seats: ReadonlyArray<SeatState>,
+): ShellApp<G> =>
+  withShell(app, {
+    seats,
+    oppName: seats[0]?.name ?? null,
+    oppConnected: seats[0]?.connected ?? false,
+  });
+
+/** `seats` grown to at least `n` entries, the new ones empty. */
+const seatsUpTo = (seats: ReadonlyArray<SeatState>, n: number): ReadonlyArray<SeatState> =>
+  Array.from({ length: Math.max(seats.length, n) }, (_, i) => seats[i] ?? EMPTY_SEAT);
+
+/** Seat `seat` (1-based) replaced, the list grown to reach it. */
+const seatAt = (
+  seats: ReadonlyArray<SeatState>,
+  seat: number,
+  next: SeatState,
+): ReadonlyArray<SeatState> =>
+  seatsUpTo(seats, seat).map((current, i) => (i === seat - 1 ? next : current));
+
+/** The guest seat for index `i` of `seats`: the array is in seat order, so the seat is the index plus one (the game's own seats past `0 | 1` come from its bag). */
+const guestSeat = <G extends ShellTypes>(i: number): SeatOf<G> => (i + 1) as SeatOf<G>;
+
+/** How many are at the table, the host counted. */
+const seatedCount = (seats: ReadonlyArray<SeatState>): number =>
+  1 + seats.filter((seat) => seat.connected).length;
+
+/** The table's seats for `opts`, the host's included: the game's `opts.capacity` (its `max` without one), floored at two as the session floors it; two for a two-seat game. */
+const capacityOf = <G extends ShellTypes>(opts: G['Opts'], cfg: ShellConfig<G>): number =>
+  cfg.seats === undefined
+    ? 2
+    : Math.max(2, cfg.opts.capacity === undefined ? cfg.seats.max : cfg.opts.capacity(opts));
+
+/**
+ * The players `engine.create` deals to, from the list the shell seated (the host, then every guest
+ * seat in order). The bag fixes whether the game's engine reads the pair or the list
+ * (`PlayersOf<G>`), which no call site can tell, so this is the one place the list is read as the
+ * game's type: a two-seat game is only ever handed two.
+ */
+const playersFor = <G extends ShellTypes>(players: ReadonlyArray<Player>): PlayersOf<G> =>
+  players as PlayersOf<G>;
+
+/** The seating an N-seat game's room frames carry beside the options (D3): the receiving guest's seat and one row per guest seat 1..N−1. */
+const seating = object({
+  you: integer(1),
+  seats: arrayOf(object({ name: nullable(string), connected: boolean })),
+});
+
+/**
+ * The receiver's seat and the table off a welcome or lobby frame, when the frame carries them
+ * (`you` naming one of `seats`); null for a frame without (a two-seat game's, or a seating that
+ * names no seat). The game's decoder has already refused a malformed seating on the wire; this
+ * reads what it let through, so the shell needs no reader from the game.
+ */
+export const roomSeatingOf = <G extends ShellTypes>(
+  frame: HostFrameOf<G>,
+): Readonly<{ you: SeatOf<G>; seats: ReadonlyArray<SeatState> }> | null => {
+  const decoded = seating(frame);
+  if (!decoded.ok) return null;
+  const { you, seats } = decoded.value;
+  return you <= seats.length ? { you: you as SeatOf<G>, seats } : null;
+};
+
+/** Players at the table before the host may deal: every seat of a fixed table (`cfg.seats.fixed`: the room's capacity), else the game's `min`, or two. */
+const minSeated = <G extends ShellTypes>(s: ShellState<G>, cfg: ShellConfig<G>): number =>
+  cfg.seats === undefined ? 2 : cfg.seats.fixed === true ? capacityOf(s.opts, cfg) : cfg.seats.min;
+
+/** A `send` effect to one seat of an N-seat room; a two-seat game's is the literal it was, no `seat` key (its one channel is every open one). */
+const sendTo = <G extends ShellTypes>(
+  frame: HostFrameOf<G>,
+  seat: SeatOf<G>,
+  cfg: ShellConfig<G>,
+): Effect<G> => (isNSeat(cfg) ? { type: 'send', frame, seat } : { type: 'send', frame });
+
+/** One lobby frame per connected seat, each with its own `you` (D3): on every seating change while the host waits, and at an N-seat table mid-game too (a seat down, a seat back), so every guest holds the table as the host does. */
+const lobbySends = <G extends ShellTypes>(
+  s: ShellState<G>,
+  cfg: ShellConfig<G>,
+): ReadonlyArray<Effect<G>> => {
+  const seats = seatsOf(s, cfg);
+  return seats.flatMap((seat, i) =>
+    seat.connected
+      ? [sendTo(cfg.frames.lobby(s.myName, s.opts, seats, guestSeat<G>(i)), guestSeat<G>(i), cfg)]
+      : [],
+  );
+};
+
+/**
+ * `guestNameFor` against every name at the table (the host's and the other seats'): the wire's
+ * normalisation, then ` 2`, ` 3`, … until it clashes with nobody, case-insensitively. Against the
+ * host's name alone it is `guestNameFor(raw, hostName)`, ` 2` appended once.
+ */
+export const guestNameAmong = (raw: string, taken: ReadonlyArray<string>): string => {
+  const named = guestNameFor(raw, '');
+  const clashes = (name: string): boolean =>
+    taken.some((t) => t.toLowerCase() === name.toLowerCase());
+  const free = (n: number): string =>
+    clashes(`${named} ${String(n)}`) ? free(n + 1) : `${named} ${String(n)}`;
+  return clashes(named) ? free(2) : named;
+};
+
 // ---- the cue memory (docs/design/dry-round-2.md F6) ---------------------------------------------
 
 /**
@@ -921,7 +1129,8 @@ const recordResult = <G extends ShellTypes>(
 ): Step<G> => {
   const s = app.shell;
   const view = s.view;
-  const seat = userSeatOf(s.role);
+  // My seat (`userSeatOf` for a two-seat game; an N-seat game's guest may sit past 1, the frame's `you`).
+  const seat = s.role === null ? null : s.mySeat;
   if (view === null || seat === null || !cfg.engine.over(view)) return pure(app);
   const key = cfg.result.keyOf(view);
   if (s.recorded === key) return pure(app);
@@ -950,7 +1159,11 @@ const painted = <G extends ShellTypes>(
 
 // ---- flows -------------------------------------------------------------------------------------
 
-/** `broadcast()`: my view, the guest's view on the wire, the table's per-view reset, saved, rendered. */
+/**
+ * `broadcast()`: my view, each connected seat's view on the wire (one `send` per seat, its own
+ * redaction, D4; a two-seat game's is the one `send` it was), the table's per-view reset, saved,
+ * rendered.
+ */
 export const broadcast = <G extends ShellTypes>(
   app: ShellApp<G>,
   ctx: Ctx,
@@ -958,13 +1171,26 @@ export const broadcast = <G extends ShellTypes>(
 ): Step<G> => {
   const game = app.shell.game;
   if (game === null) return pure(app);
+  const sends: ReadonlyArray<Effect<G>> = isNSeat(cfg)
+    ? app.shell.seats.flatMap((seat, i) =>
+        seat.connected
+          ? [
+              sendTo(
+                cfg.frames.state(cfg.engine.viewFor(game, guestSeat<G>(i))),
+                guestSeat<G>(i),
+                cfg,
+              ),
+            ]
+          : [],
+      )
+    : [{ type: 'send', frame: cfg.frames.state(cfg.engine.viewFor(game, 1)) }];
   return andThen(
     step(
       {
         shell: { ...app.shell, view: cfg.engine.viewFor(game, 0) },
         table: cfg.table.reset(app.table, 'view'),
       },
-      { type: 'send', frame: cfg.frames.state(cfg.engine.viewFor(game, 1)) },
+      ...sends,
       { type: 'persist' },
     ),
     (a) => painted(a, app.shell.view, ctx, cfg),
@@ -985,7 +1211,7 @@ export const hostDispatch = <G extends ShellTypes>(
   if (!res.ok)
     return seat === 0
       ? cfg.table.refuse(app, res.error)
-      : step(app, { type: 'send', frame: cfg.frames.toast(res.error) });
+      : step(app, sendTo(cfg.frames.toast(res.error), seat, cfg));
   return broadcast(
     { shell: { ...app.shell, game: res.value }, table: cfg.table.reset(app.table, 'applied') },
     ctx,
@@ -1026,10 +1252,24 @@ export const localSeated = <G extends ShellTypes>(
   app: ShellApp<G>,
   game: G['State'],
   cfg: ShellConfig<G>,
-): ShellApp<G> => ({
-  shell: { ...app.shell, role: 'local', code: null, oppConnected: true, game, revealed: null },
-  table: cfg.table.reset(app.table, 'startLocal'),
-});
+): ShellApp<G> => {
+  // Every seat is played from this device: the names off seat 0's view (the view has them for every role).
+  const localNames = cfg.result.playersOf(cfg.engine.viewFor(game, 0));
+  return {
+    shell: {
+      ...app.shell,
+      role: 'local',
+      code: null,
+      oppConnected: true,
+      game,
+      revealed: null,
+      mySeat: 0,
+      localNames,
+      localSeats: localNames.map((_, i) => i as SeatOf<G>),
+    },
+    table: cfg.table.reset(app.table, 'startLocal'),
+  };
+};
 
 /** `startLocal(game)`: pass-and-play, no Peer; the wake lock is held; the curtain names the starter. */
 export const startLocal = <G extends ShellTypes>(
@@ -1081,21 +1321,47 @@ const startHost = <G extends ShellTypes>(
 ): Step<G> => {
   const code = resumeCode ?? randomCode(cfg.id, ctx.rng);
   const attempt = app.shell.netAttempt + 1;
+  // The room's seats, `capacity − 1` of them: as the caller left them (empty for a fresh room; named
+  // and disconnected for a resumed or handed-off one), grown to the capacity the terms name.
+  const capacity = capacityOf(app.shell.opts, cfg);
+  const seats = seatsUpTo(seatsOf(app.shell, cfg), capacity - 1).slice(0, capacity - 1);
   return andThen(
     showScreen(
       withHostStatus(
-        withShell(app, {
-          role: 'host',
-          code,
-          netAttempt: attempt,
-          startGameVisible: false,
-          openedAt: ctx.now(),
-        }),
+        withSeats(
+          withShell(app, {
+            role: 'host',
+            code,
+            netAttempt: attempt,
+            startGameVisible: false,
+            openedAt: ctx.now(),
+            mySeat: 0,
+          }),
+          seats,
+        ),
         cfg.copy.opening,
       ),
       'hostWaitScreen',
     ),
-    (a) => step(a, { type: 'startHost', code, attempt, resume: resumeCode !== null }),
+    (a) =>
+      step(a, {
+        type: 'startHost',
+        code,
+        attempt,
+        resume: resumeCode !== null,
+        // An N-seat room tells the session its capacity and its own open status (D8), and a resumed
+        // or handed-off room the names its seats held, so the session seats each guest back by name
+        // whatever order they return in (D6); a two-seat game's effect is the literal it was.
+        ...(cfg.seats === undefined
+          ? {}
+          : {
+              capacity,
+              ...(cfg.copy.waiting === undefined ? {} : { waiting: cfg.copy.waiting(capacity) }),
+              ...(seats.some((seat) => seat.name !== null)
+                ? { names: seats.map((seat) => seat.name) }
+                : {}),
+            }),
+      }),
   );
 };
 
@@ -1109,7 +1375,8 @@ const startGuest = <G extends ShellTypes>(
   return andThen(
     showScreen(
       withGuestStatus(
-        withShell(app, { role: 'guest', code, netAttempt: attempt }),
+        // Seat 1 until the host's welcome names my seat; the seat list is the host's to send.
+        withShell(app, { role: 'guest', code, netAttempt: attempt, mySeat: 1, seats: [] }),
         cfg.copy.connecting(code),
       ),
       'guestWaitScreen',
@@ -1125,49 +1392,97 @@ const startGuest = <G extends ShellTypes>(
  */
 const guestGone = <G extends ShellTypes>(
   app: ShellApp<G>,
+  seat: SeatOf<G>,
   ctx: Ctx,
   cfg: ShellConfig<G>,
 ): Step<G> => {
   const s = app.shell;
   if (s.handoff) return pure(withHostStatus(app, cfg.copy.handoff(s.code ?? '', s.oppName)));
   if (s.game !== null && s.view !== null && !cfg.engine.over(s.view))
-    return andThen(painted(app, s.view, ctx, cfg), (a) =>
-      step(a, toast(guestGoneMsg(a.shell.oppName, a.shell.code), GONE_TOAST_MS)),
+    return andThen(painted(app, s.view, ctx, cfg), (a) => {
+      const name = seatsOf(a.shell, cfg)[seat - 1]?.name ?? null;
+      const text =
+        cfg.copy.guestGone === undefined
+          ? guestGoneMsg(name, a.shell.code)
+          : cfg.copy.guestGone(name, a.shell.code, seat);
+      // At an N-seat table every seat still up learns which one is down (the lobby carries the
+      // table; the views carry no channel state), so a guest can pause with the host.
+      return step(a, toast(text, GONE_TOAST_MS), ...(isNSeat(cfg) ? lobbySends(a.shell, cfg) : []));
+    });
+  if (s.game === null) {
+    if (!isNSeat(cfg))
+      return pure(withShell(withHostStatus(app, OPPONENT_LEFT_MSG), { startGameVisible: false }));
+    // The seat reads empty again, Start follows the count, the others learn the new lobby.
+    const name = s.seats[seat - 1]?.name ?? null;
+    const left = withSeats(app, seatAt(s.seats, seat, EMPTY_SEAT));
+    const seated = seatedCount(left.shell.seats);
+    const capacity = left.shell.seats.length + 1;
+    const text =
+      cfg.copy.seatLeft === undefined
+        ? OPPONENT_LEFT_MSG
+        : cfg.copy.seatLeft(name, seat, seated, capacity);
+    return step(
+      withShell(withHostStatus(left, text), {
+        startGameVisible: seated >= minSeated(left.shell, cfg),
+      }),
+      ...lobbySends(left.shell, cfg),
     );
-  if (s.game === null)
-    return pure(withShell(withHostStatus(app, OPPONENT_LEFT_MSG), { startGameVisible: false }));
+  }
   return pure(app);
 };
 
-/** `onGuestMsg(conn, msg)` for a decoded frame. */
+/** `onGuestMsg(conn, msg)` for a decoded frame on `seat`'s channel (1 for a two-seat game). */
 const hostFrame = <G extends ShellTypes>(
   app: ShellApp<G>,
   frame: GuestFrameOf<G>,
+  seat: SeatOf<G>,
   ctx: Ctx,
   cfg: ShellConfig<G>,
 ): Step<G> => {
   const s = app.shell;
   switch (frame.t) {
     case 'join': {
-      const name = guestNameFor(frame.name, s.myName);
-      const connected = withShell(app, { oppConnected: true, oppName: name, handoff: false });
+      // The name against the host's and the other seats' (the seat's own last name is not a clash: a rejoin keeps it).
+      const seats = seatsOf(s, cfg);
+      const others = seats.flatMap((other, i) =>
+        i === seat - 1 || other.name === null ? [] : [other.name],
+      );
+      const name = guestNameAmong(frame.name, [s.myName, ...others]);
+      const connected = withShell(withSeats(app, seatAt(seats, seat, { name, connected: true })), {
+        handoff: false,
+      });
       if (s.game !== null) {
-        // Rejoin: keep the seat, refresh the name.
-        return broadcast(
-          withShell(connected, { game: cfg.engine.renameGuest(s.game, name) }),
-          ctx,
-          cfg,
+        // Rejoin: keep the seat, refresh the name. At an N-seat table the lobby goes round first
+        // (the returner learns its seat, `you`, which the session may have moved by name since its
+        // welcome; every other seat learns the table is whole again), then the views.
+        const renamed = withShell(connected, {
+          game: cfg.engine.renameGuest(s.game, name, seat),
+        });
+        return andThen(
+          step(renamed, ...(isNSeat(cfg) ? lobbySends(renamed.shell, cfg) : [])),
+          (a) => broadcast(a, ctx, cfg),
         );
       }
+      const seated = seatedCount(connected.shell.seats);
+      const capacity = connected.shell.seats.length + 1;
+      const names = connected.shell.seats.flatMap((x) =>
+        x.connected && x.name !== null ? [x.name] : [],
+      );
+      const text =
+        cfg.copy.joined === undefined
+          ? joinedMsg(name)
+          : cfg.copy.joined(name, names, capacity - seated);
       return step(
-        withShell(withHostStatus(connected, joinedMsg(name)), { startGameVisible: true }),
-        { type: 'send', frame: cfg.frames.lobby(s.myName, s.opts) },
+        withShell(withHostStatus(connected, text), {
+          startGameVisible: seated >= minSeated(connected.shell, cfg),
+        }),
+        ...lobbySends(connected.shell, cfg),
       );
     }
     case 'action':
-      return s.game === null ? pure(app) : hostDispatch(app, 1, frame.action, ctx, cfg);
+      return s.game === null ? pure(app) : hostDispatch(app, seat, frame.action, ctx, cfg);
     case EPHEMERAL_TAG:
-      return cfg.table.ephemeral?.(app, frame, 1, ctx) ?? pure(app);
+      return cfg.table.ephemeral?.(app, frame, seat, ctx) ?? pure(app);
   }
 };
 
@@ -1182,15 +1497,23 @@ const guestFrame = <G extends ShellTypes>(
     case 'welcome':
     case 'lobby': {
       const opts = cfg.opts.pick(frame);
+      // An N-seat room's frame names my seat and lists the others (D3); a two-seat game's carries neither and says two of two.
+      const room = cfg.seats === undefined ? null : roomSeatingOf<G>(frame);
+      const seated = room === null ? 2 : seatedCount(room.seats);
+      const capacity = room === null ? 2 : room.seats.length + 1;
       return pure(
         withGuestStatus(
-          withShell(app, { oppName: frame.hostName, opts }),
-          cfg.copy.hostRoom(frame.hostName, opts),
+          withShell(app, {
+            oppName: frame.hostName,
+            opts,
+            ...(room === null ? {} : { mySeat: room.you, seats: room.seats }),
+          }),
+          cfg.copy.hostRoom(frame.hostName, opts, seated, capacity),
         ),
       );
     }
     case 'full':
-      return pure(withGuestStatus(app, ROOM_FULL_MSG));
+      return pure(withGuestStatus(app, cfg.copy.roomFull ?? ROOM_FULL_MSG));
     case 'toast':
       // The host refused the guest's move.
       return cfg.table.refuse(app, frame.msg);
@@ -1234,6 +1557,7 @@ export const resumeFor = <G extends ShellTypes>(
             ...cfg.opts.pick(save),
             game: save.game,
             oppName: save.oppName,
+            ...(save.seatNames === undefined ? {} : { seatNames: save.seatNames }),
             handoff: save.handoff === true,
             at: save.at ?? null,
           }
@@ -1328,16 +1652,19 @@ const resume = <G extends ShellTypes>(
       return startLocal(app, offer.game, ctx, cfg);
     case 'host':
       return startHost(
-        withShell(app, {
-          myName: offer.myName,
-          opts: cfg.opts.pick(offer),
-          game: offer.game,
-          oppName: offer.oppName,
-          // A waiting room has no game and no view yet: it reopens as it was, every seat free.
-          view: offer.game === null ? null : cfg.engine.viewFor(offer.game, 0),
-          // A handoff nobody joined resumes as one, under the code the invite already carries.
-          handoff: offer.handoff,
-        }),
+        withSeats(
+          withShell(app, {
+            myName: offer.myName,
+            opts: cfg.opts.pick(offer),
+            game: offer.game,
+            // A waiting room has no game and no view yet: it reopens as it was, every seat free.
+            view: offer.game === null ? null : cfg.engine.viewFor(offer.game, 0),
+            // A handoff nobody joined resumes as one, under the code the invite already carries.
+            handoff: offer.handoff,
+          }),
+          // Every seat named as saved and disconnected; each guest lands back in its own by name (D6).
+          (offer.seatNames ?? [offer.oppName]).map((name) => ({ name, connected: false })),
+        ),
         offer.code,
         ctx,
         cfg,
@@ -1362,20 +1689,23 @@ const handoff = <G extends ShellTypes>(
 ): Step<G> => {
   const [host, guest] = cfg.engine.names(game);
   return startHost(
-    {
-      shell: {
-        ...app.shell,
-        myName: host,
-        opts: cfg.opts.ofGame(game),
-        game,
-        oppName: guest,
-        oppConnected: false,
-        view: cfg.engine.viewFor(game, 0),
-        revealed: null,
-        handoff: true,
+    withSeats(
+      {
+        shell: {
+          ...app.shell,
+          myName: host,
+          opts: cfg.opts.ofGame(game),
+          game,
+          view: cfg.engine.viewFor(game, 0),
+          revealed: null,
+          handoff: true,
+          localNames: [],
+          localSeats: [],
+        },
+        table: cfg.table.reset(app.table, 'handoff'),
       },
-      table: cfg.table.reset(app.table, 'handoff'),
-    },
+      [{ name: guest, connected: false }],
+    ),
     null,
     ctx,
     cfg,
@@ -1398,6 +1728,11 @@ const leaveFinish = <G extends ShellTypes>(app: ShellApp<G>, cfg: ShellConfig<G>
         handoff: false,
         cues: cfg.cues.initial,
         recorded: null,
+        // No room and no table: the legacy `oppName` lingers until the next room names one.
+        seats: [],
+        mySeat: 0,
+        localNames: [],
+        localSeats: [],
       },
       table: cfg.table.reset(app.table, 'leave'),
     },
@@ -1411,7 +1746,7 @@ const leaveFinish = <G extends ShellTypes>(app: ShellApp<G>, cfg: ShellConfig<G>
  */
 const cancelFinish = <G extends ShellTypes>(app: ShellApp<G>): Step<G> =>
   step(
-    withShell(app, { role: null, netAttempt: app.shell.netAttempt + 1, handoff: false }),
+    withShell(app, { role: null, netAttempt: app.shell.netAttempt + 1, handoff: false, seats: [] }),
     app.shell.handoff && app.shell.game !== null
       ? { type: 'saveLocal', game: app.shell.game }
       : { type: 'clearSave' },
@@ -1481,14 +1816,16 @@ export const reduceShell = <G extends ShellTypes>(
     }
     case 'host/click':
       return startHost(
-        withShell(app, {
-          myName: nameOr(intent.name, cfg.names.default),
-          opts: cfg.opts.parse(intent, s.opts),
-          game: null,
-          view: null,
-          oppName: null,
-          oppConnected: false,
-        }),
+        withSeats(
+          withShell(app, {
+            myName: nameOr(intent.name, cfg.names.default),
+            opts: cfg.opts.parse(intent, s.opts),
+            game: null,
+            view: null,
+          }),
+          // A fresh room: no seat named (`startHost` opens the capacity the terms name).
+          [],
+        ),
         null,
         ctx,
         cfg,
@@ -1505,7 +1842,7 @@ export const reduceShell = <G extends ShellTypes>(
     case 'local/click': {
       const opts = cfg.opts.parse(intent, s.opts);
       const game = cfg.engine.create(
-        localPlayers(intent.p1, intent.p2, localNamesOf(cfg)),
+        playersFor<G>(localPlayers(intent.p1, intent.p2, localNamesOf(cfg))),
         opts,
         ctx.rng,
         ctx.now,
@@ -1601,25 +1938,41 @@ export const reduceShell = <G extends ShellTypes>(
     case 'host/status':
       return pure(withHostStatus(app, intent.text, intent.stopPulse));
     case 'host/frame':
-      return hostFrame(app, intent.frame, ctx, cfg);
+      return hostFrame(app, intent.frame, intent.seat ?? 1, ctx, cfg);
     case 'host/guestGone': {
-      const gone = withShell(app, { oppConnected: false });
+      // The seat's channel is down; its name is kept for the rejoin (the lobby's leave empties it below).
+      const seat = intent.seat ?? 1;
+      const seats = seatsOf(s, cfg);
+      const gone = withSeats(
+        app,
+        seatAt(seats, seat, { name: seats[seat - 1]?.name ?? null, connected: false }),
+      );
       return intent.iceFailed === null
-        ? guestGone(gone, ctx, cfg)
+        ? guestGone(gone, seat, ctx, cfg)
         : pure(withHostStatus(gone, intent.iceFailed));
     }
     case 'host/deal': {
-      if (!s.oppConnected) return step(app, toast(WAITING_FOR_GUEST_MSG));
-      const game = cfg.engine.create(
-        [
-          { id: 'host', name: s.myName },
-          // A connected opponent has a name; the fallback only satisfies the type.
-          { id: 'guest', name: s.oppName ?? DEFAULT_GUEST_NAME },
-        ],
-        s.opts,
-        ctx.rng,
-        ctx.now,
-      );
+      const seated = seatedCount(seatsOf(s, cfg));
+      if (seated < minSeated(s, cfg))
+        return step(
+          app,
+          toast(
+            cfg.copy.notEnough === undefined
+              ? WAITING_FOR_GUEST_MSG
+              : cfg.copy.notEnough(seated, minSeated(s, cfg)),
+          ),
+        );
+      // The host, then every guest seat in order (`guest`, `guest2`, `guest3`: seat 1 keeps the
+      // two-seat id). A connected seat has a name; the fallback only satisfies the type (a seat
+      // left empty at a flexible table is dealt to under it: seats are not compacted, D2).
+      const players: ReadonlyArray<Player> = [
+        { id: 'host', name: s.myName },
+        ...seatsOf(s, cfg).map((seat, i) => ({
+          id: i === 0 ? 'guest' : `guest${String(i + 1)}`,
+          name: seat.name ?? DEFAULT_GUEST_NAME,
+        })),
+      ];
+      const game = cfg.engine.create(playersFor<G>(players), s.opts, ctx.rng, ctx.now);
       return broadcast(
         { shell: { ...s, game }, table: cfg.table.reset(app.table, 'deal') },
         ctx,
@@ -1700,6 +2053,10 @@ export const initialShell = <G extends ShellTypes>(cfg: ShellConfig<G>): ShellSt
   view: null,
   oppName: null,
   oppConnected: false,
+  seats: [],
+  mySeat: 0,
+  localNames: [],
+  localSeats: [],
   nameTouched: false,
   revealed: null,
   homeTab: cfg.tabs.default,
@@ -1738,6 +2095,8 @@ export const saveFor = <G extends ShellTypes>(s: ShellState<G>): Save<G> | null 
         ...s.opts,
         game: s.game,
         oppName: s.oppName,
+        // The seat names ride only for a room of more than two seats (D6's rejoin key per seat); a two-seat save is the legacy literal.
+        ...(s.seats.length > 1 ? { seatNames: s.seats.map((seat) => seat.name) } : {}),
         ...(s.handoff ? { handoff: true } : {}),
         // The stamp rides only on the waiting room (lobby-resume.md D1): a game's save is the legacy literal.
         ...(s.game === null && s.openedAt !== null ? { at: s.openedAt } : {}),

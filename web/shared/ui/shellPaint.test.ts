@@ -4,7 +4,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { closestFrom, dataOf } from '../edge/dom.ts';
-import { fakeEl, fakePage, fakeTarget, type FakePage } from '../edge/page.fake.ts';
+import { fakeEl, fakePage, fakeTarget, type FakeEl, type FakePage } from '../edge/page.fake.ts';
 import {
   bindButtons,
   bindLongPress,
@@ -18,33 +18,39 @@ import {
   paintSheet,
   paintSound,
   paintWaiting,
+  seatLabel,
+  seatListHtml,
+  seatListKey,
+  seatRows,
   showToast,
   type Sheet,
 } from './shellPaint.ts';
 
 const SCREENS = ['homeScreen', 'hostWaitScreen', 'tableScreen'] as const;
 
-const page = (): FakePage =>
-  fakePage([
-    fakeEl('homeScreen'),
-    fakeEl('hostWaitScreen', { classes: ['hidden'] }),
-    fakeEl('tableScreen', { classes: ['hidden'] }),
-    fakeEl('roomCode', { text: '----' }),
-    fakeEl('hostWaitStatus', { classes: ['pulse'], text: 'Opening room…' }),
-    fakeEl('startGameBtn', { classes: ['btn', 'hidden'] }),
-    fakeEl('guestWaitStatus', { classes: ['pulse'] }),
-    fakeEl('toast'),
-    fakeEl('soundBtn', { text: '🔊', attrs: { title: 'Sound & vibration' } }),
-    fakeEl('handoffBtn', { classes: ['icon-btn', 'hidden'], attrs: { title: 'Continue online' } }),
-    fakeEl('connDot', { classes: ['conn-dot', 'off'], attrs: { title: 'Disconnected' } }),
-    fakeEl('rulesOverlay', { classes: ['overlay', 'hidden'] }),
-    fakeEl('closeRulesBtn'),
-    fakeEl('menuOverlay', { classes: ['overlay', 'hidden'] }),
-    fakeEl('closeMenuBtn'),
-    fakeEl('stockPile'),
-    fakeEl('undoBtn', { attrs: { disabled: '' } }),
-    fakeEl('hand'),
-  ]);
+/** The ids every shell page carries that these painters touch; `#seatList` is an N-seat page's alone and a test adds it. */
+const pageEls = (): ReadonlyArray<FakeEl> => [
+  fakeEl('homeScreen'),
+  fakeEl('hostWaitScreen', { classes: ['hidden'] }),
+  fakeEl('tableScreen', { classes: ['hidden'] }),
+  fakeEl('roomCode', { text: '----' }),
+  fakeEl('hostWaitStatus', { classes: ['pulse'], text: 'Opening room…' }),
+  fakeEl('startGameBtn', { classes: ['btn', 'hidden'] }),
+  fakeEl('guestWaitStatus', { classes: ['pulse'] }),
+  fakeEl('toast'),
+  fakeEl('soundBtn', { text: '🔊', attrs: { title: 'Sound & vibration' } }),
+  fakeEl('handoffBtn', { classes: ['icon-btn', 'hidden'], attrs: { title: 'Continue online' } }),
+  fakeEl('connDot', { classes: ['conn-dot', 'off'], attrs: { title: 'Disconnected' } }),
+  fakeEl('rulesOverlay', { classes: ['overlay', 'hidden'] }),
+  fakeEl('closeRulesBtn'),
+  fakeEl('menuOverlay', { classes: ['overlay', 'hidden'] }),
+  fakeEl('closeMenuBtn'),
+  fakeEl('stockPile'),
+  fakeEl('undoBtn', { attrs: { disabled: '' } }),
+  fakeEl('hand'),
+];
+
+const page = (): FakePage => fakePage(pageEls());
 
 const shown = (p: FakePage): ReadonlyArray<string> => SCREENS.filter((id) => !p.get(id).hidden());
 
@@ -109,6 +115,94 @@ describe('paintWaiting', () => {
     expect(p.get('guestWaitStatus').hasClass('pulse')).toBe(false);
     expect(p.get('startGameBtn').hidden()).toBe(false);
     expect(p.get('startGameBtn').hasClass('btn')).toBe(true);
+  });
+
+  test('the seat list, when the page has one: the host first, every seat with its state and mine marked, keyed on the rows; nothing while no room is open; a page without it is untouched', () => {
+    const waiting = {
+      code: 'ABCD',
+      hostStatus: { text: 'Waiting…', pulse: true },
+      guestStatus: { text: 'Connecting…', pulse: true },
+      startGameVisible: false,
+    };
+    // gin's and backgammon's pages: no `#seatList`, so the shell's seats paint nothing.
+    const plain = page();
+    paintWaiting(plain.doc, { ...waiting, seats: [{ name: 'Jeff', connected: true }], mySeat: 0 });
+    expect(plain.get('roomCode').text()).toBe('ABCD');
+    // An N-seat page: one list on the host's waiting screen, one on the guest's, painted alike.
+    const p = fakePage([...pageEls(), fakeEl('seatList'), fakeEl('guestSeatList')]);
+    // The host's own table of four: seat 1 taken, seat 2 empty, seat 3 named but down.
+    const rows = seatRows({
+      seats: [
+        { name: 'Bo', connected: true },
+        { name: null, connected: false },
+        { name: 'Di', connected: false },
+      ],
+      mySeat: 0,
+      role: 'host',
+      myName: 'Ann',
+    });
+    expect(rows).toEqual([
+      { seat: 0, name: 'Ann', connected: true, you: true },
+      { seat: 1, name: 'Bo', connected: true, you: false },
+      { seat: 2, name: null, connected: false, you: false },
+      { seat: 3, name: 'Di', connected: false, you: false },
+    ]);
+    expect(rows.map(seatLabel)).toEqual(['Ann · host · you', 'Bo', 'Seat 3 · empty', 'Di']);
+    expect(seatListHtml(rows)).toBe(
+      '<li data-seat="0" data-connected="true" data-you="">Ann · host · you</li>' +
+        '<li data-seat="1" data-connected="true">Bo</li>' +
+        '<li data-seat="2" data-connected="false">Seat 3 · empty</li>' +
+        '<li data-seat="3" data-connected="false">Di</li>',
+    );
+    paintWaiting(p.doc, {
+      ...waiting,
+      seats: [
+        { name: 'Bo', connected: true },
+        { name: null, connected: false },
+        { name: 'Di', connected: false },
+      ],
+      mySeat: 0,
+      role: 'host',
+      myName: 'Ann',
+    });
+    expect(p.get('seatList').text()).toBe(seatListHtml(rows));
+    expect(p.get('seatList').attr('data-key')).toBe(seatListKey(rows));
+    expect(p.get('guestSeatList').text()).toBe(seatListHtml(rows));
+    // A guest at seat 2 sees the host's name first and itself marked; a name is escaped.
+    const guest = seatRows({
+      seats: [
+        { name: 'Bo', connected: true },
+        { name: '<Cy>', connected: true },
+      ],
+      mySeat: 2,
+      role: 'guest',
+      oppName: 'Ann',
+    });
+    expect(guest.map(seatLabel)).toEqual(['Ann · host', 'Bo', '<Cy> · you']);
+    expect(seatListHtml(guest)).toContain(
+      'data-seat="2" data-connected="true" data-you="">&lt;Cy&gt; · you</li>',
+    );
+    // No room open: no rows, an empty list; a host whose name is unknown reads as an empty host seat.
+    expect(seatRows({ seats: [], mySeat: 0, role: 'host', myName: 'Ann' })).toEqual([]);
+    // A view with none of the optional fields: no rows; with seats alone, the host is seat 0 unnamed and the viewer.
+    expect(seatRows({})).toEqual([]);
+    expect(seatRows({ seats: [{ name: 'Bo', connected: true }], role: 'host' })).toEqual([
+      { seat: 0, name: null, connected: true, you: true },
+      { seat: 1, name: 'Bo', connected: true, you: false },
+    ]);
+    expect(
+      seatRows({ seats: [{ name: 'Bo', connected: true }], role: 'guest', mySeat: 1 })[0],
+    ).toEqual({
+      seat: 0,
+      name: null,
+      connected: true,
+      you: false,
+    });
+    paintWaiting(p.doc, { ...waiting, seats: [] });
+    expect(p.get('seatList').text()).toBe('');
+    expect(seatLabel({ seat: 0, name: null, connected: true, you: false })).toBe(
+      'Seat 1 · host · empty',
+    );
   });
 });
 

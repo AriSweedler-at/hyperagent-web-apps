@@ -12,6 +12,7 @@
 // takes a `Store` (./storage.ts); nothing here touches the browser itself, so prefs.test.ts runs it
 // over a Map.
 import {
+  arrayOf,
   formatError,
   literal,
   nullable,
@@ -179,6 +180,12 @@ export type HostSave<S, X extends object> = Readonly<{
     game: S | null;
     oppName: string | null;
     /**
+     * Every guest seat's name in seat order, for a room of more than two seats
+     * (docs/design/n-seat-sessions.md §7: a resume reseats each guest by name). Written only when
+     * the shell has more than one seat, so every two-seat save keeps the legacy literal byte for byte.
+     */
+    seatNames?: ReadonlyArray<string | null>;
+    /**
      * The game came from pass-and-play (the shell's `handoff`) and its remote seat has not
      * joined: a reload resumes the offer, and cancelling gives the game back to pass-and-play.
      * Written only when true, so every other host save keeps the legacy literal byte for byte.
@@ -238,9 +245,18 @@ export const shellSave = <S, X extends object>(
   const hostTail = object({
     game: nullable(cfg.decodeGame),
     oppName: nullable(string),
+    seatNames: optional(arrayOf(nullable(string))),
     handoff: optional(literal(true)),
     at: optional(number),
-  }) as Decoder<Readonly<{ game: S | null; oppName: string | null; handoff?: true; at?: number }>>;
+  }) as Decoder<
+    Readonly<{
+      game: S | null;
+      oppName: string | null;
+      seatNames?: ReadonlyArray<string | null>;
+      handoff?: true;
+      at?: number;
+    }>
+  >;
   const hostSave: Decoder<HostSave<S, X>> = (input) => {
     const head = hostHead(input);
     if (!head.ok) return head;
@@ -276,6 +292,7 @@ export const shellSave = <S, X extends object>(
           ...cfg.hostExtra.literal(save),
           game: save.game,
           oppName: save.oppName,
+          ...(save.seatNames === undefined ? {} : { seatNames: save.seatNames }),
           ...(save.handoff === true ? { handoff: true } : {}),
           ...(save.at === undefined ? {} : { at: save.at }),
         };

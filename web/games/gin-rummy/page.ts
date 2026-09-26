@@ -25,6 +25,7 @@ const copy: ShellCopy = {
   localNote:
     'One phone, no internet needed — it hides each player\'s cards until they tap "Show my cards" on their turn.',
   hostWaitTitle: 'Your room',
+  hostWaitSubtitle: 'Have your opponent open this same page and enter the code',
   openingMsg: 'Opening room…',
   keepOpenNote:
     'Keep this screen open while your opponent joins — if you switch apps, come straight back and the room reconnects on its own.',
@@ -181,6 +182,8 @@ const blocks: ShellBlocks = {
       <button class="btn btn-go grow" id="scEndNewBtn">New game</button>
     </div>
   </div>`,
+  hostWaitList: '',
+  guestWaitList: '',
   table: `  <!-- TABLE -->
   <div id="tableScreen" class="hidden">
     <div class="topbar">

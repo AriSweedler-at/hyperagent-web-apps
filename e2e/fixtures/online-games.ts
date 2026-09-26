@@ -5,7 +5,7 @@
 // fixtures (e2e/fixtures/gin.ts, backgammon.ts, fidice.ts). A game without a row is a type error
 // here. Its own file because those fixtures import e2e/fixtures/shell.ts (import-x/no-cycle). The
 // connection itself is here too: what every online spec opens with before it asks the game anything.
-import { expect, type Page } from '@playwright/test';
+import { expect, type Browser, type Page, type TestInfo } from '@playwright/test';
 
 import type { Game, ShellGame } from '../../tools/games.ts';
 import { bgBoardsAgree, bgStartLocal, boardKey, readBoard, requireBoard } from './backgammon.ts';
@@ -18,7 +18,7 @@ import {
 import { fidiceHostStarts, fidiceSameRound, fidiceSeatName, fidiceSeats } from './fidice.ts';
 import type { Viewport } from './geometry.ts';
 import { ginPassUpcard, ginStartLocal, readTable } from './gin.ts';
-import { invitePath, openGame, type GameHooks } from './player.ts';
+import { invitePath, newPlayer, openGame, type GameHooks, type Player } from './player.ts';
 import {
   DEFAULT_NAMES,
   ONLINE_NAMES,
@@ -430,4 +430,44 @@ export const connectByLink = async (
   await followInvite(guest.page, game, invitePath(project, game, code, hooks));
   await SHELL_DRIVERS[game].joined(host.page, guest.page);
   return code;
+};
+
+// ---- N peers (docs/design/n-seat-sessions.md §7; e2e/briscola-online.spec.ts) --------------------
+
+/** A host and `n - 1` guests, each its own context (e2e/fixtures/player.ts); `all` is the host first, then the guests in join (seat) order. */
+export type Peers = Readonly<{
+  host: Player;
+  guests: ReadonlyArray<Player>;
+  all: ReadonlyArray<Player>;
+}>;
+
+/**
+ * `n` players' contexts for an N-seat table, the host first. The `players` fixture drives two
+ * (e2e/fixtures/two-players.ts), so a spec of more builds them here, the guests seeded apart by
+ * their seat (`newPlayer` seeds by the title path and the role, so a second `guest` would draw the
+ * first's numbers), and closes them with `closePeers`, which asserts zero uncaught exceptions on
+ * every page as the fixture does.
+ */
+export const peers = async (browser: Browser, testInfo: TestInfo, n: number): Promise<Peers> => {
+  const host = await newPlayer(browser, 'host', testInfo);
+  const guests = await Promise.all(
+    Array.from({ length: n - 1 }, (_, i) =>
+      newPlayer(browser, 'guest', {
+        ...testInfo,
+        titlePath: [...testInfo.titlePath, `guest${String(i + 1)}`],
+      }),
+    ),
+  );
+  return { host, guests, all: [host, ...guests] };
+};
+
+/** Every context closed, then no page may have thrown. */
+export const closePeers = async (table: Peers): Promise<void> => {
+  await Promise.all(table.all.map((p) => p.context.close()));
+  table.all.forEach((p, i) => {
+    expect(
+      p.watched.errors(),
+      `${i === 0 ? 'host' : `guest ${String(i)}`} uncaught exceptions`,
+    ).toEqual([]);
+  });
 };

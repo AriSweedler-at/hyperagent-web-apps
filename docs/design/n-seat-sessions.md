@@ -153,8 +153,56 @@ report), frees the seat it left, and hands that seat to a held join if one waits
     because the two-seat suite pins that every error on a never-opened channel reports (it raises
     three on one channel, one per status branch); it is flagged instead, and the seat is given
     away under it.
+12. **The shell surface as landed** (PR-5, `web/shared/ui/{shell,shellEffects,shellPaint}.ts`,
+    `web/shared/edge/{boot,prefs}.ts`; §7 is the ask, this is the shape). Where it differs from §7:
+    `cfg.seats` is `{ min, max, fixed? }` (`fixed` below) and `opts.capacity?(opts)` sits under
+    `cfg.opts`, defaulting to `max` (a fixed table needs no reader); `engine.create` takes `PlayersOf<G>`, a
+    type off the game's bag (`ShellTypes.Seat` absent: the pair, so gin's and backgammon's
+    configs are type-identical; present: `ReadonlyArray<Player>`, the host first then every seat
+    in order with ids `host`, `guest`, `guest2`, `guest3`), rather than a second builder;
+    `engine.renameGuest(game, name, seat)` gains the seat (1 for a two-seat game) rather than a
+    `rename` beside it; `frames.welcome` is not a config field, because the shell never sends the
+    welcome: the session's codec builds it (the game's `net/host.ts`) off `hostContextOf`, and a
+    game whose welcome lists the table returns the shell's context plus `seats` from its own
+    `hostContextOf` (`BootConfig`'s fourth parameter `HC`); a guest's seat and the table are read
+    off a room frame structurally by `roomSeatingOf` (`you` a whole number naming one of `seats`,
+    `seats` rows of `{ name, connected }` beside the options, D3), so no reader enters the config
+    and a two-seat game's frames, carrying neither, read as none; `copy.joined(name, names,
+    remaining)` names the joiner too (seat 2 may join after seat 3, so the joiner is not the last
+    name), and two forms not in §7, `copy.seatLeft(name, seat, seated, capacity)` (a seat leaving
+    the lobby; OPPONENT_LEFT_MSG without) and `copy.notEnough(seated, min)` (Start below `min`;
+    WAITING_FOR_GUEST_MSG without), are optional beside `waiting`, `guestGone`, `roomFull`;
+    `copy.hostRoom(hostName, opts, seated, capacity)` counts the host among `seated`. `mySeat` is
+    what `recordGame` reads for every game (0 as host and in pass-and-play, the guest's `you`, 1
+    without one), which is `userSeatOf(role)` for a two-seat game. The seat list is class-free
+    (`<li data-seat data-connected [data-you]>` under `#seatList` and, on the guest's screen,
+    `#guestSeatList`, since one id is one element), because the class contract requires every
+    class `web/shared` names to be styled by every game's sheet; the design's `.seat-row`/
+    `.conn-dot` rows and the `.seat-team` mark are not built (the owner ruled four players a
+    free-for-all, every seat alone). The curtain's N−1 names are the game's `curtainText`, as
+    every curtain string is. The host save's `seatNames` is written only past two seats, after
+    `oppName`, so every two-seat save is the legacy literal; `ShellState.seats` is written for the
+    two-seat games too (seat 1 mirroring `oppName`/`oppConnected`), which their reducers, painters
+    and e2e never read, and which one FAKE `toEqual` pin in shell.test.ts (`host/guestGone`) gained
+    as the mirror.
+    `cfg.seats.fixed` (briscola's reducer PR): a fixed table starts full, so Start and the deal
+    wait for the room's capacity rather than `min` (the three-seat deck cannot be dealt to two),
+    and `min` names the smallest table alone; without it `min` gates as §7 says.
+    The online review of PR-5 added three things. `startHost` carries `names` (the seats' names,
+    when any seat is named: a resume or a handoff) into `HostOptions.names`, which seeds each
+    slot's rejoin key at construction, so after a host reload the guests come back to their own
+    seats in whatever order their rejoin timers fire (without it the resumed session knew no
+    names, seated them in connection order and renamed one "Cy 2"). Mid-game at an N-seat table
+    the lobby goes round on every seat lost and every seat back (`lobbySends` before the views on
+    a rejoin, after the toast on a `guestGone`), so every guest holds the table as the host does
+    (a guest's `seatsDown` reads it, its own seat never counted) and a guest the session moved by
+    name learns its seat (`you`); the views carry no channel state, and a two-seat game's flows are
+    untouched. The session's hold has a deadline (§4.4's HB_MISSED_MS after the knock): a probe
+    cleared with its channel's watch (an error on a seated channel) left a knocker waiting for
+    good, so at the deadline a watched seat silent that long is the knocker's, else it is a spare
+    peer.
 
-## 7. What the shell asks next (C2/C3, or the PR after; every item is today's shape at capacity 2)
+## 7. What the shell asks next (C2/C3, or the PR after; every item is today's shape at capacity 2; landed as §6.12)
 
 `sessionEvents(deps, {seats = false})`: with `seats: true` the two host intents carry `seat`
 (`{type: 'host/frame', frame, seat}`, `{type: 'host/guestGone', iceFailed, seat}`); the default

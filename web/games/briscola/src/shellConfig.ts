@@ -1,20 +1,34 @@
 // The half of briscola's shell config the game spells from its engine, protocol and storage alone
 // (docs/design/briscola.md §5.8; docs/design/shared-shell.md §4.3): the id the table codes are made
 // for, the default host name, the tabs, the two stored modes, the copy the shared flows paint (the
-// two leave confirms, the guest's status once the host has answered, and the sessions' three
-// status strings the shell paints before a session speaks), the option codec (`GameOptions`, the
-// room's six terms: the host save's own fields, the welcome frame's, the resume offer's; the home
-// screen sets the seat count alone, the rest are the fixed `TABLE_TERMS`, and the whole is
-// normalised as the engine normalises a room), the engine adapters, the frame builders, the cue
-// memory's start and the shell's store. The first game booted through the shared shell (D18): the table hooks
-// (`rendered` with the settle beat and the event-driven cues, `refuse`, the per-site `reset`,
-// pass-and-play's `viewer`/`revealer` over two, three or four seats) and the rest of `home` are the
-// reducer's (ui/state.ts `BRISCOLA`), which completes this record; a value import both ways would
-// be a cycle. Online is two-seat in this PR (D16): the shell's `host/deal` seats the host and its
-// one guest through `create` over a pair, and the N-seat lobby is PR-5's.
-import type { ShellGameData } from '../../../shared/ui/shell.ts';
+// two leave confirms, the guest's status once the host has answered, the sessions' three status
+// strings the shell paints before a session speaks, and the N-seat forms below), the option codec
+// (`GameOptions`, the room's six terms: the host save's own fields, the welcome frame's, the resume
+// offer's; the home screen sets the seat count alone, the rest are the fixed `TABLE_TERMS`, and the
+// whole is normalised as the engine normalises a room), the engine adapters, the frame builders,
+// the cue memory's start and the shell's store. The first game booted through the shared shell
+// (D18): the table hooks (`rendered` with the settle beat and the event-driven cues, `refuse`, the
+// per-site `reset`, pass-and-play's `viewer`/`revealer` over two, three or four seats) and the rest
+// of `home` are the reducer's (ui/state.ts `BRISCOLA`), which completes this record; a value import
+// both ways would be a cycle. Online seats two, three or four (docs/design/n-seat-sessions.md §7,
+// §6.12): `seats` is the table's range, `fixed` because a room starts full (the three-seat deck is
+// another deck: a table of three cannot be dealt to two), `opts.capacity` reads the room's seat
+// count as the session's capacity, `engine.create` deals to the list the shell seated (the host,
+// then every guest seat in order) through `seatPlayers`, `renameGuest` renames the seat a rejoin
+// names, and `frames.lobby` takes the table and the receiver's seat, which protocol.ts puts on the
+// wire past two seats and leaves off at two (PR-4's corpus). The welcome is the session codec's
+// (net/host.ts), not a frame the shell sends. Every N-seat copy form is the shell's two-seat
+// string at a table of two, so the two-seat pins and specs read what they read.
+import {
+  OPPONENT_LEFT_MSG,
+  WAITING_FOR_GUEST_MSG,
+  guestGoneMsg,
+  joinedMsg,
+  type Player,
+  type ShellGameData,
+} from '../../../shared/ui/shell.ts';
 import { connectingMsg } from '../../../shared/net/guest.ts';
-import { OPENING_MSG, handoffMsg } from '../../../shared/net/host.ts';
+import { OPENING_MSG, WAITING_MSG, handoffMsg } from '../../../shared/net/host.ts';
 import {
   SEAT_COUNTS,
   applyAction,
@@ -24,6 +38,7 @@ import {
   normaliseOptions,
   viewFor,
   type GameOptions,
+  type Players,
   type SeatCount,
 } from './engine/index.ts';
 import { action, lobby, state, toast } from './protocol.ts';
@@ -61,9 +76,47 @@ export const DEFAULT_NAME = 'Ari';
 export const LOCAL_NAMES: ReadonlyArray<string> = ['Ari', 'Lavi', 'Sandro', 'Grant'];
 export const LEAVE_LOCAL_MSG = 'End this game? The score will be cleared.';
 export const LEAVE_ONLINE_MSG = 'Leave this game? The table will close.';
-/** `#guestWaitStatus` once the host's lobby frame names the room (tools/games.ts SHELL `hostAnswered` pins the shape). */
-export const hostRoomMsg = (hostName: string): string =>
-  `Connected — waiting for ${hostName} to deal`;
+
+// ---- the N-seat copy (n-seat-sessions.md §7; the two-seat string at a table of two) ------------
+
+/** "Seat 3": a seat nobody has named yet, numbered as the waiting room lists it (the host is Seat 1). */
+export const emptySeatName = (seat: number): string => `Seat ${String(seat + 1)}`;
+/**
+ * `#guestWaitStatus` once the host's welcome or lobby frame names the room (tools/games.ts SHELL
+ * `hostAnswered` pins the two-seat shape); past two seats the count rides in front.
+ */
+export const hostRoomMsg = (hostName: string, seated = 2, capacity = 2): string =>
+  capacity === 2
+    ? `Connected — waiting for ${hostName} to deal`
+    : `Connected — ${String(seated)} of ${String(capacity)} seated · waiting for ${hostName} to deal`;
+/** `#hostWaitStatus` while the room waits with no hand dealt (`HostOptions.waiting`): the session's line at two, the count past. */
+export const waitingMsg = (capacity: number): string =>
+  capacity === 2 ? WAITING_MSG : `Waiting for ${String(capacity - 1)} players to join`;
+/** `#hostWaitStatus` after a join: the shell's line once the table is full, else how many are still to come. */
+export const joinedText = (name: string, remaining: number): string =>
+  remaining === 0 ? joinedMsg(name) : `${name} joined! Waiting for ${String(remaining)} more.`;
+/** A seat that left the lobby: the shell's line at two seats; past two, who left and the count. */
+export const seatLeftMsg = (
+  name: string | null,
+  seat: number,
+  seated: number,
+  capacity: number,
+): string =>
+  capacity === 2
+    ? OPPONENT_LEFT_MSG
+    : `${name ?? emptySeatName(seat)} left. ${String(seated)} of ${String(capacity)} seated.`;
+/** A seat's channel down mid-game: the shell's toast, the seat's player named (or its number, for a seat never named). */
+export const seatGoneMsg = (name: string | null, code: string | null, seat: number): string =>
+  guestGoneMsg(name ?? emptySeatName(seat), code);
+/** `#startGameBtn` below a full table: the shell's line at two seats, else the count. */
+export const notEnoughMsg = (seated: number, min: number): string =>
+  min === 2
+    ? WAITING_FOR_GUEST_MSG
+    : `${String(seated)} of ${String(min)} seated — waiting for ${String(min - seated)} more.`;
+/** A spare peer at a full table; the `full` frame carries no count, so the line names none. */
+export const TABLE_FULL_MSG = 'That table is full.';
+
+// ---- the options and the seats -----------------------------------------------------------------
 
 /** A seat count from a select's raw value (`"3"`), else `fallback`. */
 export const parseSeatCount = (raw: string | undefined, fallback: SeatCount): SeatCount =>
@@ -89,6 +142,24 @@ export const pickOpts = (from: GameOptions): GameOptions =>
     partnerPeek: from.partnerPeek,
   });
 
+/**
+ * The engine's `Players` tuple for `n` seats from a list (the shell's pass-and-play seats, or the
+ * host and every guest seat in order at a hosted table); a missing seat is `Player N`, which the
+ * shell's `localSeats` never leaves and a full table never has.
+ */
+export const seatPlayers = (n: SeatCount, seats: ReadonlyArray<Player>): Players => {
+  const at = (i: number): Player =>
+    seats[i] ?? { id: `p${String(i + 1)}`, name: `Player ${String(i + 1)}` };
+  switch (n) {
+    case 2:
+      return [at(0), at(1)];
+    case 3:
+      return [at(0), at(1), at(2)];
+    case 4:
+      return [at(0), at(1), at(2), at(3)];
+  }
+};
+
 export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
   id: 'briscola',
   names: { default: DEFAULT_NAME },
@@ -107,17 +178,28 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
     opening: OPENING_MSG,
     connecting: connectingMsg,
     handoff: handoffMsg,
-    hostRoom: (hostName) => hostRoomMsg(hostName),
+    hostRoom: (hostName, _opts, seated, capacity) => hostRoomMsg(hostName, seated, capacity),
+    waiting: waitingMsg,
+    joined: (name, _names, remaining) => joinedText(name, remaining),
+    seatLeft: seatLeftMsg,
+    guestGone: seatGoneMsg,
+    roomFull: TABLE_FULL_MSG,
+    notEnough: notEnoughMsg,
   },
+  /** Two, three or four at a table, fixed when the room opens (`opts.capacity`, n-seat-sessions.md D2) and started full (`fixed`). */
+  seats: { min: 2, max: 4, fixed: true },
   opts: {
     initial: DEFAULT_OPTS,
     parse: parseOpts,
     ofGame: (game) => game.options,
     pick: pickOpts,
+    /** The session hosts `seatCount - 1` guest channels. */
+    capacity: (opts: GameOptions) => opts.seatCount,
   },
   engine: {
-    // A pair is one of the engine's `Players` tuples (D1): the two-seat shell deals as gin's does.
-    create: (players, opts, rng, now) => createGame(players, opts, rng, now),
+    /** The deal over the seats the shell lists (the host first): the engine's tuple for the room's count. */
+    create: (players, opts, rng, now) =>
+      createGame(seatPlayers(opts.seatCount, players), opts, rng, now),
     apply: applyAction,
     viewFor,
     /** `position/load` (`window.__briscola.setup`): the save's decoder, E20's invariants refined. */
@@ -127,16 +209,17 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
     over: (view) => view.phase === 'over',
     finished: (game) => game.phase === 'over',
     names: (game) => [nameOf(game.players, 0), nameOf(game.players, 1)],
-    /** `game.players[1].name = name` on a rejoin. */
-    renameGuest: (game, name) => ({
+    /** `game.players[seat].name = name` on a rejoin (D6): the seat the session reseated the name at. */
+    renameGuest: (game, name, seat) => ({
       ...game,
-      players: game.players.map((p, i) => (i === 1 ? { ...p, name } : p)),
+      players: game.players.map((p, i) => (i === seat ? { ...p, name } : p)),
     }),
   },
   // The finished game's record (the owner, 2026-09-25): a game is its deal's clock (Play again
-  // deals under a new one), every seat's name, its score the points per side ("71–49", "60–60"),
-  // its victor the side the result names (null for a draw): side 0 is seat 0's (and seat 2's) in
-  // every seat count, so the outcome for the device's user reads off it as off a seat.
+  // deals under a new one), every seat's name, its score the points per side ("71–49",
+  // "50–40–30"), its victor the side the result names (null for a draw): every seat is its own
+  // side (a free-for-all at three and four), so the outcome for the device's user reads off it as
+  // off a seat.
   result: {
     keyOf: (view) => String(view.startedAt),
     playersOf: (view) => view.players.map((p) => p.name),
@@ -146,7 +229,7 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
   frames: { lobby, state, toast, action },
   cues: { initial: INITIAL_CUES },
   home: {
-    // This page's own keys: the seat count (the default when unreadable) on the fixed terms, the card pack, the language pack, the third and fourth names.
+    // This page's own keys: the seat count (the default when unreadable) on the fixed terms, the card pack, the language pack, the beat's speed, the third and fourth names.
     read: (store) => {
       const pack = readCardPack(store);
       const p3 = readP3Name(store);

@@ -1,0 +1,44 @@
+[
+  {
+    "t": "welcome",
+    "hostName": "Ann",
+    "seatCount": 3,
+    "gamesToWin": 1,
+    "removedTwo": "D",
+    "exchange": false,
+    "scoperta": false,
+    "partnerPeek": false,
+    "seats": [
+      {
+        "name": null,
+        "connected": false
+      },
+      {
+        "name": null,
+        "connected": false
+      }
+    ],
+    "you": 1
+  },
+  {
+    "t": "welcome",
+    "hostName": "Ann",
+    "seatCount": 3,
+    "gamesToWin": 1,
+    "removedTwo": "D",
+    "exchange": false,
+    "scoperta": false,
+    "partnerPeek": false,
+    "seats": [
+      {
+        "name": "Bo",
+        "connected": true
+      },
+      {
+        "name": null,
+        "connected": false
+      }
+    ],
+    "you": 2
+  }
+]

@@ -167,10 +167,10 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         'Online',
         'Pass the phone',
       ]);
-      // Online: the count select offers two, three and four; three and four ship disabled (D16).
+      // Online: the count select offers two, three and four, all open since PR-5 (n-seat-sessions.md §7).
       await expect(page.locator('#playersSel')).toHaveValue('2');
-      await expect(page.locator('#playersSel option[value="3"]')).toBeDisabled();
-      await expect(page.locator('#playersSel option[value="4"]')).toBeDisabled();
+      await expect(page.locator('#playersSel option[value="3"]')).toBeEnabled();
+      await expect(page.locator('#playersSel option[value="4"]')).toBeEnabled();
       await expect(page.locator('#hostBtn')).toHaveClass(/\bbtn-go\b/);
       // One game per sitting on the engine's default rules: nothing else to set, in either panel.
       await Promise.all(

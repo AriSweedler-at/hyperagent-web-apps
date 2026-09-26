@@ -1,0 +1,30 @@
+[
+  {
+    "t": "action",
+    "action": {
+      "type": "play",
+      "cardId": "2C"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "play",
+      "cardId": "2B"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "play",
+      "cardId": "6D"
+    }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "play",
+      "cardId": "2D"
+    }
+  }
+]
