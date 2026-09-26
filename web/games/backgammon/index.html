@@ -453,6 +453,23 @@
           <div class="bar near" id="barBottom" role="button" tabindex="0"></div>
           <div class="off" id="offLight" data-owner="0" role="button" tabindex="0"></div>
           <div class="off" id="offDark" data-owner="1" role="button" tabindex="0"></div>
+          <!-- Whose turn (the owner, 2026-09-25: "a swooping arrow so if it were scaled up and
+               superimposed on the board it would start from top right go to top left then bottom
+               left and head ends at bottom right (off)"; "about the size of a checker and off to
+               the left of the board"): the mover's route as one stroke in their checker's ring
+               colour, positioned by theme.css off the frame's left edge (data-seat, data-side from
+               render.ts paintTurn; the far player's route is the swoop mirrored); their tray wears
+               the same colours (theme.css .off.to-move). The path is the desktop board's route:
+               the phone's stood-on-end board turns it a quarter in CSS. -->
+          <svg
+            class="turn-arrow hidden"
+            id="turnArrow"
+            viewBox="0 0 100 100"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M90 14H34Q14 14 14 34V62Q14 82 34 82H84M74 72l10 10-10 10" />
+          </svg>
           <!-- ROLL (design §4.7): the start-of-turn call to action, over the board alone (the topbar
                stays in reach). Nothing dismisses it: it goes when the dice have settled. -->
           <div
@@ -476,18 +493,6 @@
         </div>
 
         <div class="controls" id="controls">
-          <!-- Whose turn (the owner, 2026-09-25): a small arrow in the mover's checker colours that
-               points at their side of the table (data-seat, data-side from render.ts paintTurn);
-               their tray wears the same colours (theme.css .off.to-move). -->
-          <svg
-            class="turn-arrow hidden"
-            id="turnArrow"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <path d="M12 21 5 13h4V3h6v10h4z" />
-          </svg>
           <div class="me-strip">
             <span class="name" id="myName">You</span>
             <span class="pips" id="pipsMe">167</span>

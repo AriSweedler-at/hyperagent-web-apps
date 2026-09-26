@@ -42,7 +42,7 @@ the rules by rule (`rules R13`).
 `#gameBadge` "Game 3 · 2–1 · to 5", `#rulesBtnGame #historyBtn` on the desktop, `#soundBtn` with
 `aria-pressed`), `#statusLine` (`#statusText`, `#statusDice.sr-only`), `#board` (its places, and
 last the roll modal `#rollOverlay.roll-modal`: `#rollModalTitle #rollModalSub #rollModalDice
-#rollModalBtn` "Buen mazal! roll" and `#doubleBtn`, §4.7), `.controls` (`#turnArrow`, `#myName #pipsMe`,
+#rollModalBtn` "Buen mazal! roll" and `#doubleBtn`, §4.7; `#turnArrow` hangs off its left edge), `.controls` (`#myName #pipsMe`,
 `#undoBtn` disabled rather than hidden, the reserved hidden `#doneBtn`, the roll slot holding
 `#diceMini` / `#waitNote` / `#resultChipBtn`, then `#moveChips` and `#chipCancelBtn`). Points carry `data-abs` (static),
 `data-own`, `pt-a`/`pt-b` (absolute parity, the two triangle shades) and `pt-near`/`pt-far` (own
@@ -53,9 +53,12 @@ are colour-fixed and CSS places them near or far by `#board[data-seat]`. `paintS
 pulses (`.opp-strip.to-move`) while they are to move. Whose turn it is reads at a glance (the
 owner, 2026-09-25: "default, no flip. Hand the phone across. And add a small indicator like an
 arrow that turns around and/or highlights the active user's end state that is colorized like the
-chips they are playing with"): `paintTurn` puts `to-move` on the actor's tray and `data-seat` /
-`data-side` on `#turnArrow`, the small arrow beside the mover's strip (§3.7); both follow
-`view.actor`, so a finished game or no game shows neither.
+chips they are playing with"; then "a swooping arrow so if it were scaled up and superimposed on
+the board it would start from top right go to top left then bottom left and head ends at bottom
+right (off)", "about the size of a checker and off to the left of the board"): `paintTurn` puts
+`to-move` on the actor's tray and `data-seat` / `data-side` on `#turnArrow`, the mover's route
+drawn a checker wide off the board's left edge (§3.7); both follow `view.actor`, so a finished
+game or no game shows neither.
 
 ### 2.2 Keys, highlights and flights
 
@@ -131,12 +134,14 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
 
 - phone: `--chrome-h 172px` (#app padding 24, topbar 44, status 22, controls 56, three 8px gaps,
   2px slack), `--bar-w 48px`, `--off-h 44px`, `--point-w clamp(44px, (100dvh - chrome - bar - off
-  - 16px) / 12, 64px)` (47px at 390x844), `--point-len min((100vw - 40px) / 2, 220px)`,
-  `--checker-d 0.86 point-w`, `--stack-step min(checker-d, (point-len - checker-d - 20px) / 4)`
-  (five coins fit with the label corner spared), `--die-s bar-w - 4px` (a 44px hit box, the face
-  2px inside);
+  - 16px) / 12, 64px)` (47px at 390x844), `--checker-d 0.86 point-w`, `--arrow-col checker-d +
+  6px` (the turn arrow's column, `#board { margin-left }`, 46px), `--point-len min((100vw - 40px -
+  arrow-col) / 2, 220px)` (152px), `--stack-step min(checker-d, (point-len - checker-d - 20px) /
+  4)` (five coins fit with the label corner spared), `--die-s bar-w - 4px` (a 44px hit box, the
+  face 2px inside);
 - desktop (from 900px): `--chrome-h 190px`, `--bar-w = --point-w`, `--off-h 0`, `--point-w
-  clamp(40px, min((100vw - 64px) / 14.5, (100dvh - chrome) / 11.4), 72px)` (53px at 1280x800),
+  clamp(40px, min((100vw - 64px) / 15.5, (100dvh - chrome) / 11.4), 72px)` (53px at 1280x800,
+  where the height binds; the extra half point of gutter is the turn arrow's room at 900px),
   `--point-len 5.2 point-w`, `--stack-step = --checker-d` (touching), `--die-s clamp(32px, 0.8
   point-w, 44px)`, `--off-w clamp(36px, 0.8 point-w, 56px)`; `#app` 1000px wide at the table.
 
@@ -221,7 +226,7 @@ keep the board and every control clear of it. No pattern: the meander stays the 
 | `arriving` | the just-landed checker during a flight | `visibility: hidden` |
 | `settling` | the top coin of a stack already five tall while the sixth flies in | `::after { visibility: hidden }`: the count badge waits for the landing; the coin itself stays |
 | `inert` on `#board` | not my turn / not moving | `pointer-events: none` on `.point,.bar,.off`; no outlines, no glow |
-| `to-move` on `.off`; `data-seat="0\|1"` + `data-side="near\|far"` on `#turnArrow` | the actor's tray; the arrow (the owner, 2026-09-25) | the tray: a soft wash and a hairline in that checker's colours (nacre at .22 under a `--gold` line for Light, `--accent-dark` at .3 under a `--nazar` line for Dark), through `:where(#offLight)` / `:where(#offDark)` so `.off.target`, later at the same specificity, still wins on a lit tray; the arrow: a 22px filled arrow in the same face and ring colours, pointing down at the near side, `rotate(180deg)` for `far` (the opponent moving, online), `transform`, `fill` and `stroke` over 200ms (none under reduced motion); hidden with the strip while `#controls.choosing` |
+| `to-move` on `.off`; `data-seat="0\|1"` + `data-side="near\|far"` on `#turnArrow` | the actor's tray; the route arrow (the owner, 2026-09-25) | the tray: a soft wash and a hairline in that checker's colours (nacre at .22 under a `--gold` line for Light, `--accent-dark` at .3 under a `--nazar` line for Dark), through `:where(#offLight)` / `:where(#offDark)` so `.off.target`, later at the same specificity, still wins on a lit tray; the arrow: the mover's route as one open stroke in a 100-unit box (top right, along the top, down the left, along the bottom to a chevron head at the bottom right: the off tray), `stroke-width 6`, round caps, `fill: none`, in the ring colour alone (`--gold` for Light, `--nazar` for Dark: the tray's hairline), `--checker-d` square, `position: absolute` in `#board` at `right: calc(100% + 6px)` (8px on the desktop) and `top: 50%`; the phone turns it a quarter (`scaleX(-1) rotate(90deg)`: up the left column, across, down the right); `far` mirrors it (`scaleX(1)` on the phone, `scaleY(-1)` on the desktop) into the opponent's route while they move online; `transform` and `stroke` over 200ms (none under reduced motion); `pointer-events: none` |
 | `theirs` on `.die` | the opponent's roll | `filter: saturate(.7) brightness(.85)` |
 | `used` on `.die` | a consumed die | `opacity: .4` and a diagonal slash over the pips |
 | `dead` on `.die` | no maximal play uses it | `opacity: .4`, a `--danger` strike, `aria-disabled` |

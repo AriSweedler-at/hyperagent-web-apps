@@ -557,9 +557,13 @@ label {
     calc((100dvh - var(--chrome-h) - var(--bar-w) - var(--off-h) - 16px) / 12),
     64px
   );
-  /* One column: (viewport - #app's 24px of gutters - the 16px frame) / 2, 175px at 390. */
-  --point-len: min(calc((100vw - 40px) / 2), 220px);
   --checker-d: calc(var(--point-w) * 0.86);
+  /* The turn arrow's column off the board's left edge (the owner, 2026-09-25: "about the size of
+     a checker and off to the left of the board"): a checker and a 6px gap, 46px at 390x844. */
+  --arrow-col: calc(var(--checker-d) + 6px);
+  /* One column: (viewport - #app's 24px of gutters - the arrow column - the 16px frame) / 2,
+     152px at 390. */
+  --point-len: min(calc((100vw - 40px - var(--arrow-col)) / 2), 220px);
   /* Five coins fit along a point with the label corner spared: 27.6px at 390x844 (layout.ts stackStep). */
   --stack-step: min(var(--checker-d), calc((var(--point-len) - var(--checker-d) - 20px) / 4));
   --die-s: calc(var(--bar-w) - 4px);
@@ -573,14 +577,16 @@ label {
 }
 @media (min-width: 900px) {
   #tableScreen {
-    /* Desktop: the classic flat board. Fourteen columns and a half of gutters across, 11.4 point
-       widths tall (two 5.2 rows plus the chrome): 53px at 1280x800, the board 754 x 572. */
+    /* Desktop: the classic flat board. Fourteen columns and one and a half of gutters across (the
+       half on the left is the turn arrow's, a checker and its gap, clear of #tableScreen's
+       overflow at 900px), 11.4 point widths tall (two 5.2 rows plus the chrome): 53px at
+       1280x800, where the height binds, the board 754 x 572. */
     --chrome-h: 190px;
     --bar-w: var(--point-w);
     --off-h: 0px;
     --point-w: clamp(
       40px,
-      min(calc((100vw - 64px) / 14.5), calc((100dvh - var(--chrome-h)) / 11.4)),
+      min(calc((100vw - 64px) / 15.5), calc((100dvh - var(--chrome-h)) / 11.4)),
       72px
     );
     --point-len: calc(var(--point-w) * 5.2);
@@ -656,34 +662,51 @@ label {
 .controls .btn {
   white-space: nowrap;
 }
-/* Whose turn, at a glance (the owner, 2026-09-25: "a small indicator like an arrow that turns
-   around and/or highlights the active user's end state that is colorized like the chips they are
-   playing with"; the board does not flip when the phone is handed across). #turnArrow sits beside
-   the mover's strip in the mover's checker colours (the nacre face and gold ring, or the deep-blue
-   face and nazar ring) and points down at the near side while the mover is the viewer; while the
-   opponent moves (online) it turns round to the far side. 200ms, a flight's pace; the mover's tray
-   wears the same colours (.off.to-move below). */
+/* Whose turn, at a glance (the owner, 2026-09-25: "a swooping arrow so if it were scaled up and
+   superimposed on the board it would start from top right go to top left then bottom left and
+   head ends at bottom right (off)"; "about the size of a checker and off to the left of the
+   board"; the board does not flip when the phone is handed across). #turnArrow is the mover's
+   route as one hairline stroke, a checker wide, hung off the frame's left edge at the board's
+   middle (the phone's --arrow-col, the desktop's gutter), in the mover's ring colour (gold for
+   Light, nazar for Dark: the same hairline their tray wears, .off.to-move below). The path is the
+   desktop board's route; the phone's board stands on end, so the glyph turns the same quarter
+   (a transpose: the route runs up the left column, across the top, down the right). The far
+   player's route is the mirror, so while the opponent moves online the glyph turns over; the
+   flip and the recolour take 200ms, a flight's pace. Every transform list keeps the same shape
+   so the flip interpolates as a turn, not a matrix blend. */
 .turn-arrow {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  stroke-width: 1.5;
+  position: absolute;
+  right: calc(100% + 6px);
+  top: 50%;
+  width: var(--checker-d);
+  height: var(--checker-d);
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
   stroke-linejoin: round;
+  pointer-events: none;
+  transform: translateY(-50%) scaleX(-1) rotate(90deg);
   transition:
     transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    fill 200ms,
     stroke 200ms;
 }
 .turn-arrow[data-seat='0'] {
-  fill: var(--nacre);
   stroke: var(--gold);
 }
 .turn-arrow[data-seat='1'] {
-  fill: var(--accent-dark);
   stroke: var(--nazar);
 }
 .turn-arrow[data-side='far'] {
-  transform: rotate(180deg);
+  transform: translateY(-50%) scaleX(1) rotate(90deg);
+}
+@media (min-width: 900px) {
+  .turn-arrow {
+    right: calc(100% + 8px);
+    transform: translateY(-50%) scaleY(1) rotate(0deg);
+  }
+  .turn-arrow[data-side='far'] {
+    transform: translateY(-50%) scaleY(-1) rotate(0deg);
+  }
 }
 /* The roll slot: the roll button, the mini dice, the wait note and the result chip share one box
    so the row has one height in every phase. */
@@ -724,7 +747,6 @@ label {
   justify-content: center;
   align-items: center;
 }
-#controls.choosing .turn-arrow,
 #controls.choosing .me-strip,
 #controls.choosing #undoBtn,
 #controls.choosing #doubleBtn,
@@ -790,6 +812,9 @@ label {
   position: relative;
   display: grid;
   flex: 0 0 auto;
+  /* Phone: the arrow's column (--arrow-col) on the left; the desktop centres the board and the
+     arrow hangs off its edge instead (.turn-arrow below). */
+  margin-left: var(--arrow-col);
   padding: 8px;
   border-radius: var(--radius);
   background: var(--felt);
@@ -825,6 +850,7 @@ label {
     grid-template-areas:
       'o13 o14 o15 o16 o17 o18 barTop o19 o20 o21 o22 o23 o24 offFar'
       'o12 o11 o10 o9 o8 o7 barBottom o6 o5 o4 o3 o2 o1 offNear';
+    margin-left: 0;
     justify-self: center;
     align-self: center;
   }
