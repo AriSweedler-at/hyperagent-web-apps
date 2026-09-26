@@ -1387,7 +1387,7 @@ describe('three and four seats online (docs/design/n-seat-sessions.md §7)', () 
     );
   });
 
-  test('at the table each seat`s dot and `gone` follow its own channel; a seat down pauses the trick (the hand inert, the status naming who is to reconnect); back, it resumes; a guest reads the host off the pair and the other seats as up', () => {
+  test('at the table each seat`s dot and `gone` follow its own channel; a seat down pauses the trick (the hand inert, the status naming who is to reconnect); back, it resumes; a guest reads the host off the pair and the other seats off its last lobby, pausing with the host', () => {
     const p = page();
     const app = dealt3();
     paint(p.doc, app);
@@ -1411,15 +1411,28 @@ describe('three and four seats online (docs/design/n-seat-sessions.md §7)', () 
     paint(p.doc, back);
     expect(p.get('seatR3').hasClass('gone')).toBe(false);
     expect(p.get('statusText').text()).not.toContain('reconnect');
-    // A guest: the host's dot is the pair's, the other guests' channels are unknown to it, so up.
+    // A guest: the host's dot is the pair's, the other guests' off the table its last lobby carried (all up here).
     const asGuest: App = {
       ...app,
-      shell: { ...app.shell, role: 'guest', oppConnected: false, view: viewFor(game(app), 1) },
+      shell: {
+        ...app.shell,
+        role: 'guest',
+        mySeat: 1,
+        oppConnected: false,
+        view: viewFor(game(app), 1),
+      },
     };
     expect(seatConnected(asGuest, 0)).toBe(false);
     expect(seatConnected(asGuest, 2)).toBe(true);
     paint(p.doc, asGuest);
     expect(p.get('statusText').text()).not.toContain('reconnect');
+    // The host's lobby says seat 2 is down: the guest's page pauses as the host's does, seat 2 marked gone.
+    const guestPaused: App = { ...asGuest, shell: { ...asGuest.shell, seats: gone.shell.seats } };
+    expect(seatConnected(guestPaused, 2)).toBe(false);
+    paint(p.doc, guestPaused);
+    expect(p.get('seatR3').hasClass('gone')).toBe(true);
+    expect(p.get('statusText').text()).toBe('Waiting for Cara to reconnect…');
+    expect(p.get('hand').hasClass('inert')).toBe(true);
   });
 
   test('the result sheet at four lists every seat by points, the winner first (a free-for-all, no teams); one row per seat', () => {

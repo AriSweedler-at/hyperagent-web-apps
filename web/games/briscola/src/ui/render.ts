@@ -222,7 +222,8 @@ export const paintHandoff = (doc: DocumentLike, app: App): void => {
 /**
  * Whether a seat's channel is up, as this device knows it (n-seat-sessions.md §7): the host reads
  * every guest seat off `shell.seats`; a guest reads the host off `oppConnected` and the other
- * guests off the last lobby frame (the view carries no channel state, so mid-game they read as up).
+ * guests off the last lobby frame, which the host re-sends on every seat lost or back mid-game
+ * (the view carries no channel state); a seat no frame has listed reads as up.
  */
 export const seatConnected = (app: App, seat: Seat): boolean =>
   app.shell.role === 'guest'

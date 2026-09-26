@@ -708,16 +708,22 @@ export const resultOpen = (app: App): boolean =>
   app.shell.view?.phase === 'over' && app.table.settle === null && !app.table.resultDismissed;
 
 /**
- * The seats whose channel is down mid-game, by name (a seat never named by its number), as the
- * host knows them (`shell.seats`, n-seat-sessions.md §7); [] for a guest, whose view carries no
- * channel state, in pass-and-play and before the deal. While one is down the trick is paused: the
- * host's hand is inert (`liveView`), a guest's action is refused with `pausedMsg` (`reduce`), and
- * the status line names who is to reconnect (render.ts `statusText`).
+ * The guest seats whose channel is down mid-game, by name (a seat never named by its number): the
+ * host's off `shell.seats` (n-seat-sessions.md §7); a guest's off the table the host's last lobby
+ * frame carried, which the shell re-sends on every seat lost or back mid-game, its own seat never
+ * counted (a guest hearing frames is up, whatever its row said when it was welcomed, and its seat
+ * may have moved by name since). [] in pass-and-play and before the deal; the host's own channel
+ * is the guest's `oppConnected` and the `guest/lost` flow. While one is down the trick is paused
+ * on every device: the hand is inert (`liveView`), a guest's action is refused by the host with
+ * `pausedMsg` (`reduce`), and the status line names who is to reconnect (render.ts `statusText`).
  */
 export const seatsDown = (app: App): ReadonlyArray<string> =>
-  app.shell.role === 'host' && app.shell.game !== null
+  (app.shell.role === 'host' && app.shell.game !== null) ||
+  (app.shell.role === 'guest' && app.shell.view !== null)
     ? app.shell.seats.flatMap((seat, i) =>
-        seat.connected ? [] : [seat.name ?? emptySeatName(i + 1)],
+        seat.connected || (app.shell.role === 'guest' && i + 1 === app.shell.mySeat)
+          ? []
+          : [seat.name ?? emptySeatName(i + 1)],
       )
     : [];
 

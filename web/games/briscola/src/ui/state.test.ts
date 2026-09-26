@@ -1825,6 +1825,10 @@ describe('hosting and joining three and four seats (docs/design/n-seat-sessions.
       { name: 'Cara', connected: false },
     ]);
     expect(toasts(gone.effects)).toEqual([[guestGoneMsg('Cara', app.shell.code), GONE_TOAST_MS]]);
+    // The seat still up learns the table (its lobby), so its own page pauses too.
+    expect(sent(gone.effects)).toEqual([
+      { type: 'send', frame: lobby('Ann', opts3, gone.app.shell.seats, 1), seat: 1 },
+    ]);
     expect(seatsDown(gone.app)).toEqual(['Cara']);
     expect(liveView(gone.app)).toBeNull();
     expect(pausedMsg(['Cara'])).toBe('Waiting for Cara to reconnect…');
@@ -1840,13 +1844,27 @@ describe('hosting and joining three and four seats (docs/design/n-seat-sessions.
     expect(refused.effects).toEqual([
       { type: 'send', frame: toastFrame('Waiting for Cara to reconnect…'), seat: 1 },
     ]);
-    // Seat 1 is still up: nothing is paused for the guest's own view, and the host is not toasted twice.
-    expect(seatsDown({ ...gone.app, shell: { ...gone.app.shell, role: 'guest' } })).toEqual([]);
-    // Back: a join on seat 2 (the session reseated the name, D6) renames the seat and broadcasts.
+    // A guest reads the same table off its last lobby: seat 1's page pauses for Cara; Cara's own
+    // page, back and welcomed with its old row still down, never counts itself.
+    const asGuest = (mySeat: 1 | 2): App => ({
+      ...gone.app,
+      shell: { ...gone.app.shell, role: 'guest', mySeat, view: viewFor(g, mySeat) },
+    });
+    expect(seatsDown(asGuest(1))).toEqual(['Cara']);
+    expect(liveView(asGuest(1))).toBeNull();
+    expect(seatsDown(asGuest(2))).toEqual([]);
+    // Back: a join on seat 2 (the session reseated the name, D6) renames the seat, sends the lobby
+    // round (Cara learns her seat, seat 1 that the table is whole) and broadcasts the views.
     const back = run(gone.app, join('Cara', 2));
     expect(back.app.shell.seats[1]).toEqual({ name: 'Cara', connected: true });
     expect(game(back.app).players[2]?.name).toBe('Cara');
-    expect(sent(back.effects).map((e) => e.seat)).toEqual([1, 2]);
+    expect(sent(back.effects).map((e) => [e.frame.t, e.seat])).toEqual([
+      ['lobby', 1],
+      ['lobby', 2],
+      ['state', 1],
+      ['state', 2],
+    ]);
+    expect(sent(back.effects)[1]?.frame).toEqual(lobby('Ann', opts3, back.app.shell.seats, 2));
     expect(seatsDown(back.app)).toEqual([]);
     expect(liveView(back.app)).toEqual(view(back.app).isMyTurn ? view(back.app) : null);
     // A seat never named is its number; ICE failed is the status alone, the seat kept as down.

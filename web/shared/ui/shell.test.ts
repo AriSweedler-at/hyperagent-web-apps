@@ -749,7 +749,7 @@ describe('a table of four (FAKE4: cfg.seats)', () => {
       seat: 1,
     });
     expect(game4(theirs.app)).toMatchObject({ moves: 2, turn: 2 });
-    // Seat 3 drops mid-game: its name is kept, the toast names it and the seat, and the next broadcast skips its channel.
+    // Seat 3 drops mid-game: its name is kept, the toast names it and the seat, the seats still up are sent the table (each its own `you`), and the next broadcast skips its channel.
     const down = run4(theirs.app, { type: 'host/guestGone', iceFailed: null, seat: 3 });
     expect(down.app.shell.seats[2]).toEqual({ name: 'Di', connected: false });
     expect(down.effects).toEqual([
@@ -758,6 +758,8 @@ describe('a table of four (FAKE4: cfg.seats)', () => {
         message: `Di dropped — rejoin with code ${String(app.shell.code)}.`,
         ms: GONE_TOAST_MS,
       },
+      { type: 'send', frame: lobby4('Ann', { level: 4 }, down.app.shell.seats, 1), seat: 1 },
+      { type: 'send', frame: lobby4('Ann', { level: 4 }, down.app.shell.seats, 2), seat: 2 },
     ]);
     const next = run4(down.app, {
       type: 'host/frame',
@@ -769,14 +771,17 @@ describe('a table of four (FAKE4: cfg.seats)', () => {
       2,
       'persist',
     ]);
-    // Di rejoins by seat: renamed at seat 3 through `cfg.seats.rename`, reconnected, everyone re-sent.
+    // Di rejoins by seat: renamed at seat 3 through `engine.renameGuest`, reconnected, the lobby round first (the table whole again, Diana's `you`), then everyone's view.
     const back = run4(next.app, join4('Diana', 3));
     expect(game4(back.app).players[3]).toEqual({ id: 'guest3', name: 'Diana' });
     expect(back.app.shell.seats[2]).toEqual({ name: 'Diana', connected: true });
-    expect(back.effects.map((e) => (e.type === 'send' ? e.seat : e.type))).toEqual([
-      1,
-      2,
-      3,
+    expect(back.effects.map((e) => (e.type === 'send' ? [e.frame.t, e.seat] : e.type))).toEqual([
+      ['lobby', 1],
+      ['lobby', 2],
+      ['lobby', 3],
+      ['state', 1],
+      ['state', 2],
+      ['state', 3],
       'persist',
     ]);
   });
@@ -845,10 +850,14 @@ describe('a table of four (FAKE4: cfg.seats)', () => {
       waiting: 'Waiting for 3 players to join…',
       names: ['Bo', 'Cy', 'Di'],
     });
-    // Cy is back (the session reseated the name at 2): the seat keeps its name, no ` 2` suffix, and the table is re-sent to Cy alone.
+    // Cy is back (the session reseated the name at 2): the seat keeps its name, no ` 2` suffix; Cy alone is connected, so the lobby (its seat, the table) and the view go to Cy alone.
     const back = run4(resumed.app, join4('Cy', 2));
     expect(back.app.shell.seats[1]).toEqual({ name: 'Cy', connected: true });
-    expect(back.effects.map((e) => (e.type === 'send' ? e.seat : e.type))).toEqual([2, 'persist']);
+    expect(back.effects).toEqual([
+      { type: 'send', frame: lobby4('Ann', { level: 4 }, back.app.shell.seats, 2), seat: 2 },
+      { type: 'send', frame: { t: 'state', view: viewFor4(game4(back.app), 2) }, seat: 2 },
+      { type: 'persist' },
+    ]);
     // A save with no seat names (a two-seat room, or one from before) resumes with seat 1 named as `oppName`.
     const legacy: Save<Fake4> = {
       role: 'host',

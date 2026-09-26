@@ -1051,7 +1051,7 @@ const sendTo = <G extends ShellTypes>(
   cfg: ShellConfig<G>,
 ): Effect<G> => (isNSeat(cfg) ? { type: 'send', frame, seat } : { type: 'send', frame });
 
-/** One lobby frame per connected seat, each with its own `you` (D3). */
+/** One lobby frame per connected seat, each with its own `you` (D3): on every seating change while the host waits, and at an N-seat table mid-game too (a seat down, a seat back), so every guest holds the table as the host does. */
 const lobbySends = <G extends ShellTypes>(
   s: ShellState<G>,
   cfg: ShellConfig<G>,
@@ -1405,7 +1405,9 @@ const guestGone = <G extends ShellTypes>(
         cfg.copy.guestGone === undefined
           ? guestGoneMsg(name, a.shell.code)
           : cfg.copy.guestGone(name, a.shell.code, seat);
-      return step(a, toast(text, GONE_TOAST_MS));
+      // At an N-seat table every seat still up learns which one is down (the lobby carries the
+      // table; the views carry no channel state), so a guest can pause with the host.
+      return step(a, toast(text, GONE_TOAST_MS), ...(isNSeat(cfg) ? lobbySends(a.shell, cfg) : []));
     });
   if (s.game === null) {
     if (!isNSeat(cfg))
@@ -1450,11 +1452,15 @@ const hostFrame = <G extends ShellTypes>(
         handoff: false,
       });
       if (s.game !== null) {
-        // Rejoin: keep the seat, refresh the name.
-        return broadcast(
-          withShell(connected, { game: cfg.engine.renameGuest(s.game, name, seat) }),
-          ctx,
-          cfg,
+        // Rejoin: keep the seat, refresh the name. At an N-seat table the lobby goes round first
+        // (the returner learns its seat, `you`, which the session may have moved by name since its
+        // welcome; every other seat learns the table is whole again), then the views.
+        const renamed = withShell(connected, {
+          game: cfg.engine.renameGuest(s.game, name, seat),
+        });
+        return andThen(
+          step(renamed, ...(isNSeat(cfg) ? lobbySends(renamed.shell, cfg) : [])),
+          (a) => broadcast(a, ctx, cfg),
         );
       }
       const seated = seatedCount(connected.shell.seats);
