@@ -21,6 +21,7 @@ import {
   handHtml,
   handKey,
   leadCue,
+  facePreloadHtml,
   scoreCells,
   scoreKey,
   scoreMode,
@@ -355,7 +356,8 @@ describe('the score strip and the game badge', () => {
     expect(scoreCells(four)).toEqual([
       { name: 'Ari', points: 20, tricks: 2, mine: false, leading: true },
       { name: 'Jeff', points: 10, tricks: 1, mine: false, leading: false },
-      { name: 'Cara (you)', points: 18, tricks: 1, mine: true, leading: false },
+      // Four cells across a phone ellipsised "Cara (you)" to "Cara (y…": at four seats the hairline alone marks mine.
+      { name: 'Cara', points: 18, tricks: 1, mine: true, leading: false },
       { name: 'Dan', points: 7, tricks: 1, mine: false, leading: false },
     ]);
     expect(scoreMode(4)).toBe('players');
@@ -425,6 +427,47 @@ describe('card names through the language pack (docs/design/language-packs.md §
     expect(hand).toContain('aria-label="ace of cups"');
     expect(handHtml(LINEA, ['AC', null, null], { selected: null, playable: [] })).not.toContain(
       'ace of cups',
+    );
+  });
+});
+
+describe('facePreloadHtml (the page review: no blank face on a card`s first appearance)', () => {
+  test('a files pack: one hidden <img> per face, the plain-fallback file (the 2x where one exists)', () => {
+    const html = facePreloadHtml(LINEA);
+    const srcs = [...html.matchAll(/<img src="([^"]+)" alt="" decoding="async">/g)].map(
+      (m) => m[1],
+    );
+    expect(srcs).toHaveLength(40);
+    expect(new Set(srcs).size).toBe(40);
+    expect(srcs[0]).toBe('../../shared/cards/linea/italian40/AC.svg');
+    expect(html.replace(/<img [^>]+>/g, '')).toBe('');
+  });
+
+  test('a glyph pack names no picture: nothing to fetch', () => {
+    expect(facePreloadHtml(GLYPH)).toBe('');
+  });
+
+  test('a sprite pack: every card shares its sheet, fetched once, the 2x sheet when the pack has one', () => {
+    const sprite = {
+      ...LINEA,
+      name: 'sheet' as never,
+      decks: {
+        italian40: {
+          kind: 'sprite' as const,
+          sheets: [
+            { ratio: 1, url: '../../shared/cards/sheet/1x.png' },
+            { ratio: 2, url: '../../shared/cards/sheet/2x.png' },
+          ],
+          cell: { width: 100, height: 193 },
+          cells: { AC: { x: 0, y: 0 }, '2C': { x: 1, y: 0 } },
+          aspect: 100 / 193,
+          inset: 0,
+          indices: 'printed' as const,
+        },
+      },
+    };
+    expect(facePreloadHtml(sprite)).toBe(
+      '<img src="../../shared/cards/sheet/2x.png" alt="" decoding="async">',
     );
   });
 });
