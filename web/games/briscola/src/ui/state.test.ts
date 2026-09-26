@@ -138,6 +138,7 @@ const home: HomeSnapshot = {
   opts: DEFAULT_OPTS,
   cardPack: DEFAULT_CARD_PACK,
   lang: 'it',
+  speed: 'normal',
   p3Name: null,
   p4Name: null,
 };
@@ -221,6 +222,7 @@ describe('the initial app', () => {
       lastPainted: null,
       cardPack: DEFAULT_CARD_PACK,
       lang: 'it',
+      speed: 'normal',
       tip: null,
       swallowTap: null,
       cardView: null,

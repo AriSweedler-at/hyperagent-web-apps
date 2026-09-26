@@ -115,7 +115,14 @@ const paintOptions = (doc: DocumentLike, app: App): void => {
     setValue(input, name ?? localNameFor(LOCAL_NAMES, seat));
     setAttr(input, DEFAULT_MARK, name === null ? '1' : null);
   });
+  // The battle beat's speed (docs/design/briscola-battle.md §3.7): one preference, shown by both panels.
+  SPEED_SELECTS.forEach((id) => {
+    setValue(requireId(doc, id), app.table.speed);
+  });
 };
+
+/** The "Battle animations" select of each panel: `normal` | `quick` | `off`, one stored preference (`briscola_speed`). */
+export const SPEED_SELECTS: ReadonlyArray<string> = ['speedSel', 'localSpeedSel'];
 
 /** What the shared shell paints, read off the App's shell slice. */
 const homeView = (app: App): HomeView<HomeTab> => ({
@@ -160,6 +167,11 @@ const bindOptions = (doc: PageLike, dispatch: (intent: Intent) => void): void =>
   });
   listenId(doc, LOCAL.players, 'change', () => {
     dispatch({ type: 'opts/set', raw: readLocalSeats(doc) });
+  });
+  SPEED_SELECTS.forEach((id) => {
+    listenId(doc, id, 'change', () => {
+      dispatch({ type: 'speed/set', speed: readValue(requireId(doc, id)) });
+    });
   });
   ([2, 3] as const).forEach((seat) => {
     const input = requireId(doc, EXTRA_NAME_INPUTS[seat]);

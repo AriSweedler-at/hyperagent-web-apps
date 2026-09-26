@@ -29,6 +29,7 @@ import {
 import { action, lobby, state, toast } from './protocol.ts';
 import {
   DEFAULT_CARD_PACK,
+  DEFAULT_SPEED,
   DEFAULT_HOME_TAB,
   DEFAULT_OPTS,
   DEFAULT_PLAY_MODE,
@@ -38,6 +39,7 @@ import {
   SHELL_STORE,
   TABLE_TERMS,
   readCardPack,
+  readSpeed,
   readOpts,
   readP3Name,
   readP4Name,
@@ -149,10 +151,12 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
       const pack = readCardPack(store);
       const p3 = readP3Name(store);
       const p4 = readP4Name(store);
+      const speed = readSpeed(store);
       return {
         opts: readOpts(store),
         cardPack: pack.ok ? pack.value : DEFAULT_CARD_PACK,
         lang: LANG_PREF.orDefault(store),
+        speed: speed.ok ? speed.value : DEFAULT_SPEED,
         p3Name: p3.ok ? p3.value : null,
         p4Name: p4.ok ? p4.value : null,
       };

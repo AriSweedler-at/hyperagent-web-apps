@@ -31,6 +31,7 @@ import {
   namePref,
   readTextWith,
   shellStore,
+  textPref,
   type GuestSave as ShellGuestSave,
   type HostSave as ShellHostSave,
   type LocalSave as ShellLocalSave,
@@ -43,6 +44,13 @@ import { defaultPackFor, type CardPackFor } from '../../../shared/lib/cards/pack
 import type { LanguagePackName } from '../../../shared/lib/lang/packs.ts';
 import { literal, map, refine, string, type Decoder } from '../../../shared/lib/json.ts';
 import type { Result } from '../../../shared/lib/result.ts';
+import {
+  DEFAULT_SPEED,
+  SPEEDS,
+  decodeSpeed,
+  isSpeed,
+  type Speed,
+} from '../../../shared/lib/speed.ts';
 import {
   SEAT_COUNTS,
   decodeOptions,
@@ -106,6 +114,8 @@ export const STORAGE_KEYS = {
   lang: 'briscola_lang',
   /** The seat count the home screen last chose (D3), a bare string: `2`|`3`|`4`. */
   players: 'briscola_players',
+  /** The battle beat's speed (docs/design/briscola-battle.md §3.7, D8; bare string): `normal` | `quick` | `off`. */
+  speed: 'briscola_speed',
 } as const;
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
@@ -192,6 +202,10 @@ export const { read: readCardPack, write: writeCardPack } = cardPackPref(
   STORAGE_KEYS.cardPack,
   DECK_KIND,
 );
+
+/** The battle beat's speed (docs/design/briscola-battle.md §3.7; web/shared/lib/speed.ts owns the literals): one key, one bare string. */
+export { DEFAULT_SPEED, SPEEDS, decodeSpeed, isSpeed, type Speed };
+export const { read: readSpeed, write: writeSpeed } = textPref(STORAGE_KEYS.speed, decodeSpeed);
 
 /** The language pack, one of the shared packs; `orDefault` is Italian when the key is missing or unreadable. */
 export const LANG_PREF = langPref(STORAGE_KEYS.lang, DEFAULT_LANG);

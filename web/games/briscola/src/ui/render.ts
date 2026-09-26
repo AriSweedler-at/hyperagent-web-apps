@@ -54,6 +54,7 @@ import {
   type PageLike,
 } from '../../../../shared/edge/dom.ts';
 import { defaultPackFor, packByName, type CardPack } from '../../../../shared/lib/cards/packs.ts';
+import type { Speed } from '../../../../shared/lib/speed.ts';
 import { resolveAspect, resolveBack } from '../../../../shared/lib/cards/resolve.ts';
 import { langByName, type LanguagePack } from '../../../../shared/lib/lang/packs.ts';
 import { suitSymbolId } from '../../../../shared/lib/cards/suits.ts';
@@ -740,10 +741,15 @@ const landings = (
 };
 
 /** The stage's flights (ui/motion.ts): the trick to its winner as the flight starts, a back to each drawer as the draws start; nothing while held. */
-const flightsFor = (v: View, b: Beat, drawn: string | null): ReadonlyArray<Flight> => {
+const flightsFor = (
+  v: View,
+  b: Beat,
+  drawn: string | null,
+  speed: Speed,
+): ReadonlyArray<Flight> => {
   if (b.trick === null) return [];
   const to = landings(v, drawn);
-  const d = durationsFor(reducedMotion());
+  const d = durationsFor(speed, reducedMotion());
   switch (b.stage) {
     case 'fly':
       return trickFlights(b.trick, to.taken(b.trick.winner), d);
@@ -763,6 +769,8 @@ const flightsFor = (v: View, b: Beat, drawn: string | null): ReadonlyArray<Fligh
 const paintGame = (doc: PageLike, app: App, pack: CardPack, lang: LanguagePack): void => {
   const v = app.shell.view;
   const screen = requireId(doc, 'tableScreen');
+  // The beat's clock for the CSS (`--beat-*` under `[data-speed]`, theme.css), the same switch the reducer's timers read.
+  setAttr(screen, 'data-speed', app.table.speed);
   if (v === null) {
     paintSheet(doc, 'resultOverlay', false);
     setAttr(screen, 'data-beat', null);
@@ -777,7 +785,7 @@ const paintGame = (doc: PageLike, app: App, pack: CardPack, lang: LanguagePack):
       : `${String(v.startedAt)}:${String(v.gameNo)}:${String(b.trick.no)}:${b.stage}`;
   if (dataOf(screen, 'beat') === beat) return;
   setAttr(screen, 'data-beat', beat);
-  flyCards(doc, flightsFor(v, b, drawnCardId(app, v, b)));
+  flyCards(doc, flightsFor(v, b, drawnCardId(app, v, b), app.table.speed));
 };
 
 // ---- the card names: the tip over a hand card and the card view (docs/design/language-packs.md §5) ----

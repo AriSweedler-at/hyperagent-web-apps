@@ -527,7 +527,12 @@ export type Step<G extends ShellTypes> = Readonly<{
   app: ShellApp<G>;
   effects: ReadonlyArray<Effect<G>>;
 }>;
-export type Ctx = Readonly<{ rng: Rng; now: () => number }>;
+export type Ctx = Readonly<{
+  rng: Rng;
+  now: () => number;
+  /** `prefers-reduced-motion: reduce` on this device (web/shared/edge/motion.ts), so a reducer's timers and the painter's CSS agree; absent in tests and stories that do not care. */
+  reducedMotion?: boolean;
+}>;
 
 // ---- the config a game supplies (docs/design/shared-shell.md §4.3) ------------------------------
 

@@ -83,6 +83,7 @@ const home: HomeSnapshot = {
   opts: DEFAULT_OPTS,
   cardPack: 'linea',
   lang: 'it',
+  speed: 'normal',
   p3Name: null,
   p4Name: null,
 };

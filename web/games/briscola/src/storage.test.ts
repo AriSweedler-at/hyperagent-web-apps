@@ -88,7 +88,7 @@ const OPTS_JSON =
   '"seatCount":2,"gamesToWin":1,"removedTwo":"C","exchange":false,"scoperta":false,"partnerPeek":false';
 
 describe('frozen constants', () => {
-  test('the thirteen keys (the match and house-rule keys retired), the tabs, modes, sound states, the defaults and the name cap (design §5.8)', () => {
+  test('the fourteen keys (the match and house-rule keys retired), the tabs, modes, sound states, the defaults and the name cap (design §5.8)', () => {
     expect(ALL_KEYS).toEqual([
       'briscolaMP_v1',
       'briscola_name',
@@ -103,6 +103,7 @@ describe('frozen constants', () => {
       'briscola_cardPack',
       'briscola_lang',
       'briscola_players',
+      'briscola_speed',
     ]);
     // Nothing of the other games': the games on one origin never read each other's keys.
     ALL_KEYS.forEach((key) => {

@@ -34,26 +34,17 @@ import { launchClone } from '../../../../shared/edge/motion.ts';
 import type { Seat, TrickRecord } from '../engine/index.ts';
 import { seatCellId, type RelativeCell } from './table.ts';
 
-// ---- durations (§5.3) ---------------------------------------------------------------------------------
+// ---- durations (§5.3): the pure clock is ui/beat.ts's, named through this module for the painter ------
 
-export type Durations = Readonly<{
-  /** The trick shown resolved, the taking card lifted, before anything flies. */
-  holdMs: number;
-  /** The trick's cards to the winner's cell. */
-  flyMs: number;
-  /** One back from the stock to a seat. */
-  drawMs: number;
-  /** Between one draw's start and the next. */
-  drawGapMs: number;
-}>;
+import type { Durations } from './beat.ts';
 
-export const DURATIONS: Durations = { holdMs: 900, flyMs: 320, drawMs: 260, drawGapMs: 160 };
-/** `prefers-reduced-motion`: every glide 1 ms, the hold 300 ms (long enough to read the trick). */
-export const REDUCED_DURATIONS: Durations = { holdMs: 300, flyMs: 1, drawMs: 1, drawGapMs: 1 };
-
-/** The durations for the page's preference (web/shared/edge/motion.ts `reducedMotion`). */
-export const durationsFor = (reducedMotion: boolean): Durations =>
-  reducedMotion ? REDUCED_DURATIONS : DURATIONS;
+export {
+  DURATIONS,
+  QUICK_DURATIONS,
+  REDUCED_DURATIONS,
+  durationsFor,
+  type Durations,
+} from './beat.ts';
 
 // ---- flights: the pure plans (§5.6 `flightsBetween`'s twin) -------------------------------------------
 

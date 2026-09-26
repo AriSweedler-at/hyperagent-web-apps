@@ -199,10 +199,12 @@ describe('home.read', () => {
       opts: DEFAULT_OPTS,
       cardPack: DEFAULT_CARD_PACK,
       lang: 'it',
+      speed: 'normal',
       p3Name: null,
       p4Name: null,
     });
     const storage = fakeStorage();
+    storage.setItem(STORAGE_KEYS.speed, 'quick');
     storage.setItem(STORAGE_KEYS.cardPack, 'linea');
     storage.setItem(STORAGE_KEYS.lang, 'en');
     storage.setItem(STORAGE_KEYS.p3Name, 'Cara');
@@ -214,6 +216,7 @@ describe('home.read', () => {
       lang: 'en',
       p3Name: 'Cara',
       p4Name: 'Dan',
+      speed: 'quick',
     });
     expect(BRISCOLA_SHELL.tabs.list).toEqual(['play', 'rules', 'about']);
     expect(BRISCOLA_SHELL.cues.initial).toEqual({ key: null });
