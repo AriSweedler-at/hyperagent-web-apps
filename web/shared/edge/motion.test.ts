@@ -195,6 +195,21 @@ describe('launchClone', () => {
     ]);
   });
 
+  test('an end turn lands the clone at its degrees, whether or not it started turned', () => {
+    const t = table(true, { endTurn: -6 });
+    launchClone(t.page.doc, t.source.el, rect(100, 200), rect(300, 600, 7, 26), t.options);
+    expect(t.log.slice(5)).toEqual([
+      'transform=none',
+      'read',
+      'transform=translate(200px, 400px) scale(0.175, 0.65) rotate(-6deg)',
+    ]);
+    const both = table(true, { turn: 90, endTurn: 4 });
+    launchClone(both.page.doc, both.source.el, rect(100, 200), rect(300, 600, 7, 26), both.options);
+    expect(both.log.at(-1)).toBe(
+      'transform=translate(200px, 400px) scale(0.175, 0.65) rotate(4deg)',
+    );
+  });
+
   test('a source of no size scales by 1 rather than dividing by zero; a source that cannot clone launches nothing', () => {
     const flat = table();
     launchClone(flat.page.doc, flat.source.el, rect(100, 200, 0, 0), rect(300, 600), flat.options);

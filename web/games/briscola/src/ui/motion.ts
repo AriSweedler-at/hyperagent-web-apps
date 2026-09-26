@@ -25,13 +25,16 @@ import {
   rectOf,
   removeClass,
   removeElement,
+  setAttr,
   setStyle,
   type Element,
   type PageLike,
   type Rect,
 } from '../../../../shared/edge/dom.ts';
 import { launchClone } from '../../../../shared/edge/motion.ts';
-import type { Seat, TrickRecord } from '../engine/index.ts';
+import type { Speed } from '../../../../shared/lib/speed.ts';
+import type { Played, Seat, TrickRecord } from '../engine/index.ts';
+import { stageMs } from './beat.ts';
 import { seatCellId, type RelativeCell } from './table.ts';
 
 // ---- durations (§5.3): the pure clock is ui/beat.ts's, named through this module for the painter ------
@@ -62,6 +65,13 @@ export type Flight = Readonly<{
   rotated?: true;
   /** The arrival hides under `arriving` until the clone lands (a drawn card). */
   hideArrival?: true;
+  /**
+   * The source's box, measured BEFORE the repaint that removed it (a played card's hand slot, an
+   * opponent's last back): the clone is then the ARRIVAL's, sent from this box to its own.
+   */
+  fromRect?: Rect;
+  /** Degrees the clone lands turned by: the fan card's tilt, so the landing matches the card under it. */
+  endTurn?: number;
 }>;
 
 /** The back on top of the stock. */
@@ -130,6 +140,59 @@ export const drawFlights = (
     };
   });
 
+// ---- the play and follow flights (docs/design/briscola-battle.md §3.1 PLAY, FOLLOW; §7 PR-D) ------
+
+/** The tilt theme.css gives the i-th of n fan cards (`.play .card`'s rotate): the fan leans out from its middle, 4° a card. */
+export const fanTilt = (i: number, n: number): number => (i - (n - 1) / 2) * 4;
+
+/**
+ * The box of a card whose BOUNDING rect is `r` when it sits turned by `deg` (the fan card under
+ * its tilt): the bounding box grows by the turn, so a clone scaled to it would land too big.
+ */
+export const unrotatedBox = (r: Rect, deg: number): Rect => {
+  const t = (Math.abs(deg) * Math.PI) / 180;
+  const c = Math.cos(t);
+  const s = Math.sin(t);
+  const k = c * c - s * s;
+  if (k < 1e-6) return r;
+  const w = (r.width * c - r.height * s) / k;
+  const h = (r.height * c - r.width * s) / k;
+  if (w <= 0 || h <= 0) return r;
+  return { left: r.left + (r.width - w) / 2, top: r.top + (r.height - h) / 2, width: w, height: h };
+};
+
+/**
+ * One card's flight to its place in the fan from where it stood before the repaint (`fromRect`),
+ * landing at its tilt: the trick's first card at PLAY's pace, a later one at FOLLOW's, the card
+ * that completes the trick at FOLLOW's fastest. `i` is the card's place in the fan of `n` shown
+ * cards; `completing` says the trick resolved on it; `k` staggers several plays that land in one
+ * paint (a catch-up after a beat) 100 ms apart.
+ */
+export const playFlight = (
+  play: Played,
+  fromRect: Rect,
+  i: number,
+  n: number,
+  completing: boolean,
+  speed: Speed,
+  reduced: boolean,
+  k = 0,
+): Flight => ({
+  from: fanCard(play.seat),
+  to: fanCard(play.seat),
+  ms: stageMs(i === 0 ? 'play' : completing ? 'followLast' : 'follow', speed, reduced),
+  delayMs: k * 100,
+  hideArrival: true as const,
+  fromRect,
+  endTurn: fanTilt(i, n),
+});
+
+/** The plays `shown` has that `prev` had not (the cards new to the fan this paint), in play order. */
+export const newPlays = (
+  prev: ReadonlyArray<Played>,
+  shown: ReadonlyArray<Played>,
+): ReadonlyArray<Played> => shown.filter((p) => !prev.some((q) => q.card.id === p.card.id));
+
 /** When the last flight has landed, in ms after the repaint; 0 for none. */
 export const totalMs = (flights: ReadonlyArray<Flight>): number =>
   flights.reduce((max, f) => Math.max(max, f.delayMs + f.ms), 0);
@@ -196,11 +259,13 @@ const arrivalBox = (from: Rect, to: Rect): Rect => {
  * when an end is missing, unmeasurable or the card cannot be cloned: the repaint alone has placed it.
  */
 const launch = (doc: PageLike, f: Flight): boolean => {
-  const source = find(doc, f.from);
   const target = find(doc, f.to);
+  // A source the repaint removed (a play): the arrival's clone leaves from the measured box.
+  const source = f.fromRect === undefined ? find(doc, f.from) : target;
   if (source === null || target === null) return false;
-  const fromRect = rectOf(source);
-  const to = rectOf(target);
+  const fromRect = f.fromRect ?? rectOf(source);
+  const endTurn = f.endTurn ?? 0;
+  const to = unrotatedBox(rectOf(target), endTurn);
   if (!measurable(fromRect) || !measurable(to)) return false;
   const rotated = f.rotated === true;
   const from = boxOf(fromRect, rotated);
@@ -212,12 +277,18 @@ const launch = (doc: PageLike, f: Flight): boolean => {
     delay: f.delayMs,
     scale: true,
     ...(rotated ? { turn: 90 } : {}),
+    ...(endTurn === 0 ? {} : { endTurn }),
     onDone: () => {
       removeClass(target, 'arriving');
+      setAttr(target, 'data-flying', null);
     },
   });
   if (clone === null) return false;
-  if (f.hideArrival === true) addClass(target, 'arriving');
+  if (f.hideArrival === true) {
+    addClass(target, 'arriving');
+    // Read by the painter: a repaint mid-flight keeps the arrival hidden under its clone.
+    setAttr(target, 'data-flying', '');
+  }
   // Read by theme.css `.flyer`'s transition: set before the style flush that starts it.
   setStyle(clone, '--fly-ms', `${String(f.ms)}ms`);
   return true;

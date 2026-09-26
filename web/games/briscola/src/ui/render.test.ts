@@ -402,6 +402,70 @@ describe('the two-player table', () => {
     expect(p.get('statusText').text()).toBe('Your turn — play a card');
   });
 
+  test('a play flies (PR-D): the fan card`s clone leaves from the hand slot measured before the repaint and lands at its tilt; the same fan repainted flies nothing; a dragged card lands by its ghost', () => {
+    const app = revealed(local());
+    const v = view(app);
+    const id = v.legal[0];
+    if (id === undefined) throw new Error('nothing legal');
+    const clone = fakeEl('clone', { classes: ['card', 'face', 'mid'] });
+    const seat = String(v.me.idx);
+    const fan = fakeEl('fan', { classes: ['card', 'face', 'mid'], attrs: { 'data-seat': seat } });
+    Object.assign(fan.el, {
+      getBoundingClientRect: () => ({ left: 300, top: 300, width: 56, height: 91 }),
+      cloneNode: () => clone.el,
+    });
+    const slotCard = fakeEl('held', { classes: ['card', 'face'] });
+    Object.assign(slotCard.el, {
+      getBoundingClientRect: () => ({ left: 20, top: 600, width: 80, height: 130 }),
+    });
+    const p = briscolaPage(MARKUP, {
+      hand: { queries: { [`.card[data-card="${id}"]`]: [slotCard] } },
+      trick: { queries: { [`.card[data-seat="${seat}"]`]: [fan], '.card': [fan] } },
+    });
+    paint(p.doc, app);
+    // The revealed hand: nothing has flown, the latch names the empty fan.
+    expect(p.get('tableScreen').attr('data-flown')).toBe(`${String(v.startedAt)}:1:open:`);
+    expect(clone.hasClass('flyer')).toBe(false);
+    const played = playFirst(app);
+    paint(p.doc, played);
+    const laid = view(played).trick[0];
+    if (laid === undefined) throw new Error('nothing laid');
+    expect(p.get('tableScreen').attr('data-flown')).toBe(
+      `${String(v.startedAt)}:1:open:${trickKey([laid])}`,
+    );
+    expect(clone.hasClass('flyer')).toBe(true);
+    expect(clone.style('left')).toBe('20px');
+    expect(clone.style('--fly-ms')).toBe('320ms');
+    expect(fan.hasClass('arriving')).toBe(true);
+    expect(fan.attr('data-flying')).toBe('');
+    // A repaint of the same fan (a tip, a lift) keeps the card hidden under its clone and launches nothing.
+    const flown = clone.style('transform');
+    paint(p.doc, played);
+    expect(fan.hasClass('arriving')).toBe(true);
+    expect(clone.style('transform')).toBe(flown);
+    clone.fire('transitionend');
+    expect(fan.hasClass('arriving')).toBe(false);
+    paint(p.doc, played);
+    expect(fan.hasClass('arriving')).toBe(false);
+    // A drag's release: the ghost lands the card, no flight leaves.
+    const ghost = briscolaPage(MARKUP, {
+      hand: { queries: { [`.card[data-card="${id}"]`]: [slotCard] } },
+      trick: { queries: { [`.card[data-seat="${seat}"]`]: [fan], '.card': [fan] } },
+    });
+    slotCard.el.classList.add('dragging');
+    const dragged = run(
+      app,
+      { type: 'card/dragStart', cardId: id },
+      { type: 'card/dragOver', over: true },
+      { type: 'card/dragEnd' },
+    ).app;
+    paint(ghost.doc, app);
+    const before = clone.style('transform');
+    paint(ghost.doc, dragged);
+    expect(view(dragged).trick).toHaveLength(1);
+    expect(clone.style('transform')).toBe(before);
+  });
+
   test('the settle beat: the taker marked and the counts held through hold and fly, the stock through the draw, then the cold paint', () => {
     const p = page();
     const one = playFirst(revealed(local()));
