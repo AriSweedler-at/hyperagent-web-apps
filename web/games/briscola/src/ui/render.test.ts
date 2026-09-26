@@ -1389,11 +1389,18 @@ describe('three and four seats online (docs/design/n-seat-sessions.md §7)', () 
 
   test('at the table each seat`s dot and `gone` follow its own channel; a seat down pauses the trick (the hand inert, the status naming who is to reconnect); back, it resumes; a guest reads the host off the pair and the other seats off its last lobby, pausing with the host', () => {
     const p = page();
+    // A two-player table first: the one cell across is the other seat's.
+    paint(p.doc, local());
+    expect(p.get('seatR2').attr('data-seat')).not.toBeNull();
     const app = dealt3();
     paint(p.doc, app);
     expect(p.get('seats').attr('data-players')).toBe('3');
     expect(p.get('seatR1').attr('data-seat')).toBe('1');
     expect(p.get('seatR3').attr('data-seat')).toBe('2');
+    // The cell across is hidden at three and carries no seat or key: `#seats .seat[data-seat="1"]` is one cell.
+    expect(p.get('seatR2').attr('hidden')).not.toBeNull();
+    expect(p.get('seatR2').attr('data-seat')).toBeNull();
+    expect(p.get('seatR2').attr('data-key')).toBeNull();
     expect(p.get('seatR1').text()).toContain('conn-dot on');
     expect(p.get('seatR3').text()).toContain('conn-dot on');
     expect(p.get('seatR3').hasClass('gone')).toBe(false);

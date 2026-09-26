@@ -419,7 +419,12 @@ export const paintSeats = (doc: DocumentLike, app: App, v: View, b: Beat, pack: 
     const el = requireId(doc, seatCellId(cell));
     const seat = cells[cell];
     setHidden(el, seat === null);
-    if (seat === null) return;
+    // A cell with no seat carries no `data-seat` (a stale one from an earlier deal matched a seat's selector twice) and drops its key, so the next seat it shows is built afresh.
+    if (seat === null) {
+      setAttr(el, 'data-seat', null);
+      setAttr(el, 'data-key', null);
+      return;
+    }
     setAttr(el, 'data-seat', String(seat));
     const other = v.others.find((o) => o.idx === seat);
     const connected = seatConnected(app, seat);
