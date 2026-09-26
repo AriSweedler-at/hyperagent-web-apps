@@ -30,7 +30,7 @@ to a target.
 | D20 | Refusals | Host-applied; a guest's refusal returns as a `toast` frame; the local role toasts directly. No undo: a played card is public the instant it is played. |
 | D21 | Redaction | `viewFor(state, seat)` is the only redaction: never `piles`, never another hand except under scoperta / partner peek, never `stock` beyond its count and scoperta's top card. `others` is in play order from the viewer. |
 | D23 | Copy language | English, with exactly these non-English strings in the engine: the Italian card names in the history copy (`cardName`). |
-| D24 | Exchange window | With `exchange` on: on the actor's own turn before playing, while the trump card is on the table and the side has a trick; a turned A/3/R/C/F for the 7 of trumps, a turned 7/6/5/4 for the 2; chains allowed. A deliberate deviation from "having just won, before drawing" because the draw is automatic. |
+| D24 | Exchange window | With `exchange: true`: on the actor's own turn before playing, while the trump card is on the table and the side has a trick; a turned A/3/R/C/F for the 7 of trumps, a turned 7/6/5/4 for the 2; chains allowed. A deliberate deviation from "having just won, before drawing" because the draw is automatic. **2026-09-25** (briscola-battle.md D12): the flag's third value `exchange: 'leader'` is the Loodens/BGA window: only as the seat leads a trick (`trick.length === 0`) and on a trick of its own (`piles[seat]`; four is a free-for-all, so `sideHasTrick` is per seat too and the values differ in the lead alone); refused `NOT_LEADING` once a card is on the table. `false`/`true` unchanged, `false` still the default. |
 
 ## 2. Rules as engine requirements
 
@@ -49,7 +49,7 @@ to a target.
 | E11 | The winner leads: `leader = turn = winner`. |
 | E12 | Result: `totals[side] = Σ taken` over the side's seats (`sideOf`: the seat for 2 and 3 players, `seat % 2` for four); the unique strictly highest total wins, a tie for the top draws (`winner: null, draw: true`). One `result` event `{winner, totals, draw, decided, wins}`; its line: `Ari wins 67–53`, `Ari and Jeff win 65–55`, `A draw, 60–60`, `Ari wins 50–40–30`, with ` and takes the match 2–0` (`take` for a pair) when the match ends; the winner's figure first, then the other sides in side order. `games` gains the record. |
 | E13 | Match: `wins[winner] += 1` on a win, `draws += 1` on a draw; `matchOver` when any `wins[i] >= gamesToWin`; `next` at `over` deals `gameNo + 1` with dealer `nextSeat(dealer)` from the same rng; refused `MATCH_OVER` once decided and `GAME_ON` during a game. |
-| E14 | Exchange (flag): `exchangeCardFor(trumpCard)` = the 7 of trumps when the trump card is A/3/R/C/F, the 2 when it is 7/6/5/4, `null` when it is the 2. `canExchange` = flag ∧ `phase 'trick'` ∧ `seat === turn` ∧ `stock.length > 0` ∧ the side has ≥ 1 trick ∧ the seat holds the called-for card. The swap makes the held card `trumpCard` and the stock's last element; the old trump card joins the end of the hand; `turn` unchanged; one `exchange` event. Refusals in order `NO_EXCHANGE`, `TRUMP_GONE`, `NO_TRICK_YET`, `NO_SWAP_CARD`. |
+| E14 | Exchange (flag): `exchangeCardFor(trumpCard)` = the 7 of trumps when the trump card is A/3/R/C/F, the 2 when it is 7/6/5/4, `null` when it is the 2. `canExchange` = flag ∧ `phase 'trick'` ∧ `seat === turn` ∧ `stock.length > 0` ∧ the side has ≥ 1 trick ∧ the seat holds the called-for card. The swap makes the held card `trumpCard` and the stock's last element; the old trump card joins the end of the hand; `turn` unchanged; one `exchange` event. Refusals in order `NO_EXCHANGE`, `TRUMP_GONE`, `NOT_LEADING` (under `'leader'`, a card already on the table), `NO_TRICK_YET`, `NO_SWAP_CARD`. |
 | E15 | Scoperta (flag, 2 players): every other hand and `stockTop = stock[0]` public (`null` when only the trump card is left). Stored `false` for 3 and 4 seats. |
 | E16 | Partner peek (flag, 4 players): with `stock.length === 0` the partner's `SeatView` carries `hand`; opponents' never. Stored `false` for 2 and 3. |
 | E17 | Redaction as D21; `legal` filled for the actor alone; `others` ordered `(me+1) % n, (me+2) % n, …`. |
@@ -112,6 +112,7 @@ E25's order. Every text is a `MESSAGES` entry worded for the player:
 | `NO_EXCHANGE` | `This table does not play the exchange` |
 | `TRUMP_GONE` | `The briscola has been drawn` |
 | `NO_TRICK_YET` | `Take a trick before you exchange` |
+| `NOT_LEADING` | `Exchange as you lead the trick, before its first card` |
 | `NO_SWAP_CARD` | `Only the sette (or the due) of briscola can be exchanged, and only for a higher card` |
 | `BAD_SEAT` | `No such seat at this table` |
 | `DEAL_PENDING` / `DRAW_PENDING` | `Dealing…` / `Drawing…` (reserved phases, never reached in v1) |

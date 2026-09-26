@@ -72,6 +72,14 @@ export const SEAT_COUNTS: ReadonlyArray<SeatCount> = [2, 3, 4];
 export const GAMES_TO_WIN: ReadonlyArray<GamesToWin> = [1, 2, 3];
 export const DEFAULT_GAMES_TO_WIN: GamesToWin = 2;
 export const DEFAULT_REMOVED_TWO: Suit = 'C';
+/**
+ * D24 / E14 / D12: `false` no exchange; `true` D24's window (the actor's own turn before playing,
+ * leader or follower, a trick of the side's); `'leader'` the Loodens/BGA window (as the seat leads
+ * a trick, on a trick of its own). On the wire and in a save as itself: a default table's frames
+ * carry `false` as they always did.
+ */
+export type ExchangeRule = boolean | 'leader';
+export const EXCHANGE_RULES: ReadonlyArray<ExchangeRule> = [false, true, 'leader'];
 
 export type GameOptions = Readonly<{
   seatCount: SeatCount;
@@ -79,8 +87,8 @@ export type GameOptions = Readonly<{
   gamesToWin: GamesToWin;
   /** D5: read only when `seatCount === 3`; stored always, default coppe. */
   removedTwo: Suit;
-  /** D24 / E14, default false. */
-  exchange: boolean;
+  /** D24 / E14 / D12, default false. */
+  exchange: ExchangeRule;
   /** E15, default false; stored false unless `seatCount === 2`. */
   scoperta: boolean;
   /** E16, default false; stored false unless `seatCount === 4`. */

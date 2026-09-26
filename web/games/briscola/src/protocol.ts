@@ -24,6 +24,7 @@ import {
   type WelcomeFrame as SharedWelcomeFrame,
 } from '../../../shared/lib/protocol.ts';
 import {
+  EXCHANGE_RULES,
   GAMES_TO_WIN,
   SEAT_COUNTS,
   SUITS,
@@ -47,12 +48,12 @@ export {
   type WireTag,
 } from '../../../shared/lib/protocol.ts';
 
-/** The room after `hostName`: the six options in `GameOptions` order (the host save's own fields too, storage.ts `HostExtra`). */
+/** The room after `hostName`: the six options in `GameOptions` order (the host save's own fields too, storage.ts `HostExtra`); `exchange` is `false`, `true` or `'leader'` (D12). */
 const room = {
   seatCount: literal(...SEAT_COUNTS),
   gamesToWin: literal(...GAMES_TO_WIN),
   removedTwo: literal(...SUITS),
-  exchange: boolean,
+  exchange: literal(...EXCHANGE_RULES),
   scoperta: boolean,
   partnerPeek: boolean,
 };

@@ -29,6 +29,7 @@ import {
 import { deckFor, idsOf, isCardId } from './cards.ts';
 import { nextSeat, sidesOf } from './seats.ts';
 import {
+  EXCHANGE_RULES,
   HAND_SIZE,
   LABEL,
   type Action,
@@ -81,7 +82,7 @@ export const decodeOptions: Decoder<GameOptions> = refine(
     seatCount,
     gamesToWin,
     removedTwo: suit,
-    exchange: boolean,
+    exchange: literal(...EXCHANGE_RULES),
     scoperta: boolean,
     partnerPeek: boolean,
   }),

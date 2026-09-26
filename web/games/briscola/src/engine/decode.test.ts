@@ -240,7 +240,7 @@ describe('decodeState refuses what the engine never emits (V6, V7, E20)', () => 
       '$.removedTwo: expected one of "C" | "D" | "S" | "B"',
     );
     expect(failureOf(decodeOptions({ ...o, exchange: 'yes' }))).toBe(
-      '$.exchange: expected boolean',
+      '$.exchange: expected one of false | true | "leader"',
     );
     expect(failureOf(decodeOptions({ ...o, seatCount: 3, scoperta: true }))).toBe(
       '$: expected scoperta at two players and the partner peek at four only',

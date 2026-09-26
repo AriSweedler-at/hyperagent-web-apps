@@ -313,7 +313,7 @@ describe('decodeFrame', () => {
     [
       'welcome with a string switch',
       { t: 'welcome', hostName: 'Ann', ...ROOM, exchange: 'on' },
-      '$.exchange: expected boolean',
+      '$.exchange: expected one of false | true | "leader"',
     ],
     [
       "welcome with backgammon's room",

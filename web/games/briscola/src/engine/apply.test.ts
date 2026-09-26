@@ -966,6 +966,59 @@ describe('the exchange (X1-X11)', () => {
     expect(viewFor(s, 0).canExchange).toBe(true);
     expect(viewFor(s, 1).canExchange).toBe(false);
   });
+
+  /** Seat 0 holding the 7C over T=AC with `leader` to lead, under the flag's value, the piles as given. */
+  const two = (exchange: boolean | 'leader', leader: Seat, piles: string[]): State =>
+    at(2, {
+      hands: ['7C 2D', '3D 4D'],
+      stock: '2S AC',
+      trump: 'AC',
+      leader,
+      opts: { exchange },
+      piles,
+    });
+
+  test("X12 (D12 'leader'): the Loodens/BGA window: seat 0 leads on a trick of its own → the swap; a card on the table shuts it → NOT_LEADING", () => {
+    const lead = two('leader', 0, ['2B 4B', '']);
+    expect(lead.options.exchange).toBe('leader');
+    expect(canExchange(lead, 0)).toBe(true);
+    expect(viewFor(lead, 0).canExchange).toBe(true);
+    expect(must(exchange(lead, 0)).trumpCard).toEqual(c('7C'));
+    // Seat 1 leads the 3D instead: seat 0 follows with the same card over the same trick and may not.
+    const follow = must(apply(two('leader', 1, ['2B 4B', '']), 1, { type: 'play', cardId: '3D' }));
+    expect(follow.turn).toBe(0);
+    expect(canExchange(follow, 0)).toBe(false);
+    expect(fail(exchange(follow, 0))).toBe(MESSAGES.NOT_LEADING);
+    expect(viewFor(follow, 0).canExchange).toBe(false);
+    // D24's window (`true`) lets the follower swap: the default behaviour is untouched.
+    const d24 = must(apply(two(true, 1, ['2B 4B', '']), 1, { type: 'play', cardId: '3D' }));
+    expect(canExchange(d24, 0)).toBe(true);
+  });
+
+  test("X13 (D12 'leader' at four): four is a free-for-all, so another seat's trick opens neither window; the seat's own opens both", () => {
+    const four = (exchange: boolean | 'leader', piles: string[]): State =>
+      at(4, {
+        hands: ['7C 2D', '3D 4D', '5D 6D', '7D FD'],
+        stock: '2S AC',
+        trump: 'AC',
+        leader: 0,
+        opts: { exchange },
+        piles,
+      });
+    const another = ['', '', '2B 4B 5B 6B', ''];
+    expect(canExchange(four(true, another), 0)).toBe(false);
+    expect(canExchange(four('leader', another), 0)).toBe(false);
+    expect(fail(exchange(four('leader', another), 0))).toBe(MESSAGES.NO_TRICK_YET);
+    const own = ['2B 4B 5B 6B', '', '', ''];
+    expect(canExchange(four(true, own), 0)).toBe(true);
+    expect(canExchange(four('leader', own), 0)).toBe(true);
+  });
+
+  test("X14: the flag's default is still `false`, and `'leader'` is stored as itself", () => {
+    expect(game(2).options.exchange).toBe(false);
+    expect(game(2, { exchange: 'leader' }).options.exchange).toBe('leader');
+    expect(fail(exchange(game(2), 0))).toBe(MESSAGES.NO_EXCHANGE);
+  });
 });
 
 describe('refusals (E1-E4) and the reserved phases', () => {
@@ -1034,6 +1087,7 @@ describe('refusals (E1-E4) and the reserved phases', () => {
       NO_EXCHANGE: 'This table does not play the exchange',
       TRUMP_GONE: 'The briscola has been drawn',
       NO_TRICK_YET: 'Take a trick before you exchange',
+      NOT_LEADING: 'Exchange as you lead the trick, before its first card',
       NO_SWAP_CARD:
         'Only the sette (or the due) of briscola can be exchanged, and only for a higher card',
       BAD_SEAT: 'No such seat at this table',
