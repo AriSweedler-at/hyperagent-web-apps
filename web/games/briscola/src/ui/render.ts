@@ -39,6 +39,7 @@ import {
   queryAllIn,
   queryIn,
   rectOf,
+  type Rect,
   requireId,
   setAttr,
   setChecked,
@@ -99,6 +100,8 @@ import {
   durationsFor,
   flyCards,
   handCard,
+  newPlays,
+  playFlight,
   seatCards,
   seatTaken,
   trickFlights,
@@ -452,7 +455,8 @@ const paintTrick = (
   );
   queryAllIn(trick, '.card').forEach((card) => {
     toggleClass(card, 'taking', taking !== null && dataOf(card, 'seat') === String(taking));
-    toggleClass(card, 'arriving', b.stage === 'fly');
+    // A play's clone still in the air keeps its card hidden through a repaint (`data-flying`, ui/motion.ts).
+    toggleClass(card, 'arriving', b.stage === 'fly' || dataOf(card, 'flying') !== null);
   });
   toggleClass(trick, 'drop-ready', app.table.drag !== null);
   toggleClass(trick, 'drop', app.table.drag?.over === true);
@@ -783,11 +787,77 @@ const flightsFor = (
 };
 
 /**
+ * Where a card about to reach the fan stood on the screen the LAST paint left (`prev`'s
+ * geometry): my hand slot's card, or the seat's newest tiny back. Null when nothing measurable
+ * stands there (a fake, a hidden tab), or when the card is the drag's: its ghost lands it.
+ */
+const playSource = (doc: PageLike, prev: View, seat: Seat, cardId: string): Rect | null => {
+  const me = prev.me.idx;
+  const el =
+    seat === me
+      ? queryIn(requireId(doc, 'hand'), `.card[data-card="${cardId}"]`)
+      : queryIn(
+          requireId(doc, seatCellId(cellFor(prev.options.seatCount, me, seat))),
+          '.seat-cards .card:last-child',
+        );
+  if (el === null || hasClass(el, 'dragging')) return null;
+  const r = rectOf(el);
+  return r.width > 0 || r.height > 0 ? r : null;
+};
+
+/**
+ * The play and follow flights of this paint (docs/design/briscola-battle.md §3.1, PR-D), planned
+ * BEFORE the table repaints (the sources go with it): every card the fan is about to show that
+ * the last paint's view had not, from where it stood to its place at its tilt, the trick's first
+ * at PLAY's pace, the rest at FOLLOW's, the completing card fastest. `#tableScreen[data-flown]`
+ * remembers the fan last flown, so a repaint of the same fan (a lift, a tip) launches nothing; a
+ * cold paint (no last view) or a new game flies nothing.
+ */
+const playFlights = (doc: PageLike, app: App): ReadonlyArray<Flight> => {
+  const v = app.shell.view;
+  const prev = app.table.lastPainted;
+  if (v === null || prev === null) return [];
+  if (prev.gameNo !== v.gameNo || prev.startedAt !== v.startedAt) return [];
+  const b = beatOf(app.table.settle);
+  const completing = b.before && b.trick !== null;
+  const shown = completing ? b.trick.cards : v.trick;
+  const key = `${String(v.startedAt)}:${String(v.gameNo)}:${b.trick === null ? 'open' : String(b.trick.no)}:${trickKey(shown)}`;
+  const screen = requireId(doc, 'tableScreen');
+  if (dataOf(screen, 'flown') === key) return [];
+  setAttr(screen, 'data-flown', key);
+  const reduced = reducedMotion();
+  return newPlays(prev.trick, shown).flatMap((p, k) => {
+    const from = playSource(doc, prev, p.seat, p.card.id);
+    const i = shown.findIndex((q) => q.card.id === p.card.id);
+    return from === null
+      ? []
+      : [
+          playFlight(
+            p,
+            from,
+            i,
+            shown.length,
+            completing && i === shown.length - 1,
+            app.table.speed,
+            reduced,
+            k,
+          ),
+        ];
+  });
+};
+
+/**
  * The game screens from a view: the table, its result sheet and the beat's flights, launched once
  * per stage (`#tableScreen[data-beat]` remembers the stage last flown, so a repaint mid-flight
- * launches nothing).
+ * launches nothing), after the plays measured before the repaint (`plays`).
  */
-const paintGame = (doc: PageLike, app: App, pack: CardPack, lang: LanguagePack): void => {
+const paintGame = (
+  doc: PageLike,
+  app: App,
+  pack: CardPack,
+  lang: LanguagePack,
+  plays: ReadonlyArray<Flight>,
+): void => {
   const v = app.shell.view;
   const screen = requireId(doc, 'tableScreen');
   // The beat's clock for the CSS (`--beat-*` under `[data-speed]`, theme.css), the same switch the reducer's timers read.
@@ -804,9 +874,12 @@ const paintGame = (doc: PageLike, app: App, pack: CardPack, lang: LanguagePack):
     b.trick === null || b.stage === null
       ? null
       : `${String(v.startedAt)}:${String(v.gameNo)}:${String(b.trick.no)}:${b.stage}`;
-  if (dataOf(screen, 'beat') === beat) return;
+  const staged =
+    dataOf(screen, 'beat') === beat
+      ? []
+      : flightsFor(v, b, drawnCardId(app, v, b), app.table.speed);
   setAttr(screen, 'data-beat', beat);
-  flyCards(doc, flightsFor(v, b, drawnCardId(app, v, b), app.table.speed));
+  flyCards(doc, [...plays, ...staged]);
 };
 
 // ---- the card names: the tip over a hand card and the card view (docs/design/language-packs.md §5) ----
@@ -856,9 +929,11 @@ export const paint = (doc: PageLike, app: App): void => {
   paintWaiting(doc, app);
   paintHome(doc, app);
   paintPack(doc, app.table.cardPack);
+  // Measured before the table repaints: the played card's slot and the seat's back go with it.
+  const plays = playFlights(doc, app);
   paintCurtain(doc, app);
   paintHandoff(doc, app);
-  paintGame(doc, app, pack, lang);
+  paintGame(doc, app, pack, lang, plays);
   paintFacePreload(doc, app, pack);
   paintOverlays(doc, app);
   paintTip(doc, app, lang);

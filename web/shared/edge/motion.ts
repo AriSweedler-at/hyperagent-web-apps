@@ -91,6 +91,8 @@ export type LaunchOptions = Readonly<{
   scale: boolean;
   /** Degrees the clone starts turned by (its box is `from`, the thing's own), righting itself as it flies; none when absent or 0. */
   turn?: number;
+  /** Degrees the clone lands turned by (a card settling into a fan at its tilt); it ends upright when absent or 0. */
+  endTurn?: number;
   /** After the clone is removed, whether by its transition's end or the fallback. */
   onDone: () => void;
 }>;
@@ -127,7 +129,9 @@ export const launchClone = (
   const scale = o.scale
     ? ` scale(${ratio(to.width, from.width)}, ${ratio(to.height, from.height)})`
     : '';
-  setStyle(clone, 'transform', `${translate}${scale}${turn === 0 ? '' : ' rotate(0)'}`);
+  const endTurn = o.endTurn ?? 0;
+  const rotate = endTurn !== 0 ? ` rotate(${String(endTurn)}deg)` : turn === 0 ? '' : ' rotate(0)';
+  setStyle(clone, 'transform', `${translate}${scale}${rotate}`);
   afterTransition(
     clone,
     () => {

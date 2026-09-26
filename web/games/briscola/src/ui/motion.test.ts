@@ -10,6 +10,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import type { Rect } from '../../../../shared/edge/dom.ts';
 import { fakeEl, fakePage, type FakeEl } from '../../../../shared/edge/page.fake.ts';
+import type { Played, Seat } from '../engine/index.ts';
 import {
   BRISCOLA,
   DURATIONS,
@@ -20,13 +21,17 @@ import {
   drawFlights,
   durationsFor,
   fanCard,
+  fanTilt,
   flyCards,
   handCard,
+  newPlays,
+  playFlight,
   seatCards,
   seatTaken,
   settleTimeline,
   totalMs,
   trickFlights,
+  unrotatedBox,
   type Flight,
 } from './motion.ts';
 
@@ -176,7 +181,96 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe('the play and follow flights (docs/design/briscola-battle.md §3.1, PR-D)', () => {
+  const played = (seat: Seat, id: string): Played => ({ seat, card: { id, r: 1, s: 'C' } });
+  const at = rect(10, 500, 69, 133);
+
+  test('fanTilt is theme.css`s rotate: the fan leans out from its middle, 4° a card', () => {
+    expect(fanTilt(0, 1)).toBe(0);
+    expect([fanTilt(0, 2), fanTilt(1, 2)]).toEqual([-2, 2]);
+    expect([fanTilt(0, 4), fanTilt(3, 4)]).toEqual([-6, 6]);
+  });
+
+  test('unrotatedBox undoes the tilt`s growth of the bounding rect, and leaves a box alone at 0° or when the sums do not close', () => {
+    const box = rect(100, 200, 60, 100);
+    expect(unrotatedBox(box, 0)).toEqual(box);
+    // A 60 × 100 card at 6°: bounding 60cos + 100sin by 100cos + 60sin; undone to the hundredth.
+    const t = (6 * Math.PI) / 180;
+    const bounding = rect(
+      100,
+      200,
+      60 * Math.cos(t) + 100 * Math.sin(t),
+      100 * Math.cos(t) + 60 * Math.sin(t),
+    );
+    const back = unrotatedBox(bounding, -6);
+    expect(back.width).toBeCloseTo(60, 6);
+    expect(back.height).toBeCloseTo(100, 6);
+    expect(back.left + back.width / 2).toBeCloseTo(bounding.left + bounding.width / 2, 6);
+    expect(back.top + back.height / 2).toBeCloseTo(bounding.top + bounding.height / 2, 6);
+    // 45°: the equations degenerate; a flat rect at a steep turn would go negative: both return the rect.
+    expect(unrotatedBox(box, 45)).toEqual(box);
+    expect(unrotatedBox(rect(0, 0, 1, 100), 40)).toEqual(rect(0, 0, 1, 100));
+  });
+
+  test('playFlight: the first card at PLAY`s pace, a follower at FOLLOW`s, the completing card fastest, each to its fan place at its tilt; the speed and a stagger apply', () => {
+    const first = playFlight(played(0, 'AC'), at, 0, 1, false, 'normal', false);
+    expect(first).toEqual({
+      from: fanCard(0),
+      to: fanCard(0),
+      ms: 320,
+      delayMs: 0,
+      hideArrival: true,
+      fromRect: at,
+      endTurn: 0,
+    });
+    expect(playFlight(played(1, '3C'), at, 1, 3, false, 'normal', false).ms).toBe(240);
+    const last = playFlight(played(1, '3C'), at, 1, 2, true, 'normal', false);
+    expect([last.ms, last.endTurn]).toEqual([200, 2]);
+    expect(playFlight(played(1, '3C'), at, 1, 2, true, 'quick', false).ms).toBe(120);
+    expect(playFlight(played(1, '3C'), at, 1, 2, true, 'normal', true).ms).toBe(1);
+    expect(playFlight(played(1, '3C'), at, 1, 2, false, 'normal', false, 2).delayMs).toBe(200);
+  });
+
+  test('newPlays: the cards the fan gains, in play order; nothing for the same fan or a fan that only shrank', () => {
+    const a = played(0, 'AC');
+    const b = played(1, '3C');
+    expect(newPlays([], [a])).toEqual([a]);
+    expect(newPlays([a], [a, b])).toEqual([b]);
+    expect(newPlays([], [a, b])).toEqual([a, b]);
+    expect(newPlays([a, b], [a, b])).toEqual([]);
+    expect(newPlays([a, b], [])).toEqual([]);
+  });
+});
+
 describe('flyCards', () => {
+  test('a play: the arrival`s own clone leaves from the box measured before the repaint, lands turned at the fan`s tilt, and the card stays hidden (`data-flying`) until it does', () => {
+    const t = table({ toAt: rect(300, 600, 69, 133) });
+    // The target is the fan card itself; it clones (the source has gone with the repaint).
+    Object.assign(t.landed.el, { cloneNode: () => t.clone.el });
+    const flight: Flight = {
+      from: fanCard(1),
+      to: seatTaken('R2'),
+      ms: 200,
+      delayMs: 0,
+      hideArrival: true,
+      fromRect: rect(100, 200, 69, 133),
+      endTurn: 2,
+    };
+    expect(flyCards(t.page.doc, [flight])).toBe(1);
+    expect(t.landed.hasClass('arriving')).toBe(true);
+    expect(t.landed.attr('data-flying')).toBe('');
+    expect(t.clone.style('left')).toBe('100px');
+    expect(t.clone.style('--fly-ms')).toBe('200ms');
+    expect(t.clone.style('transform')).toMatch(
+      /^translate\(200px, 400px\) scale\(0\.9\d\d?, 0\.9\d\d?\) rotate\(2deg\)$/,
+    );
+    t.clone.fire('transitionend');
+    expect(t.landed.hasClass('arriving')).toBe(false);
+    expect(t.landed.attr('data-flying')).toBeNull();
+    // A measured box of no size flies nothing: the repaint alone placed the card.
+    expect(flyCards(t.page.doc, [{ ...flight, fromRect: ZERO }])).toBe(0);
+  });
+
   test('a card flies from where it stood to the arrival centre at the scale that fits, then the clone goes', () => {
     const t = table();
     expect(flyCards(t.page.doc, [t.flight])).toBe(1);
