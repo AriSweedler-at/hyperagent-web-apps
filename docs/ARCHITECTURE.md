@@ -74,6 +74,7 @@ and tests that prove it land before the code they protect.
 │       │                        local,home,rules}.ts, ui/hand/{HandView,meldGroups}.ts, scorer/{scores,voice,csv,format,main}.ts
 │       ├── fidice/              index.html, main.ts, theme.css, src/ = the 38 modules at their // src/<path>.ts
 │       │                        marker paths (assets, domain (+probability.algorithms), bots, net, view, app)
+│       │                        (its move onto the shared shell: docs/design/fidice-shell-adoption.md, plan only)
 │       ├── backgammon/          Sheshbesh (docs/design/backgammon-{rules,board}.md): index.html (static screens,
 │       │   └── src/             24 points in one grid), main.ts, theme.css (formatted; redeclares the thirteen tokens),
 │       │                        engine/ (types, variants, board, moves, notation, setup, score, apply, view, decode,
