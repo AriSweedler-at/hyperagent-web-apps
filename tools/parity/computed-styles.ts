@@ -1514,8 +1514,11 @@ const fastForwardBr = (page: Page, stop: string): Promise<string> =>
       if (v === null || v.phase === 'over' || stop(v)) break;
       const acts = br.legal();
       if (acts.length === 0) {
-        if (br.app.table.settle === null) break;
-        br.dispatch({ type: 'settle/elapsed' });
+        const s = br.app.table.settle;
+        if (s === null) break;
+        // The beat waits for my tap to draw (no timer): the tap, else the timer's end.
+        const awaiting = s.stage === 'draw' && s.trick.drew.includes(s.me);
+        br.dispatch(awaiting ? { type: 'draw/tap' } : { type: 'settle/elapsed' });
         continue;
       }
       br.act(acts[Math.floor(Math.random() * acts.length)]);
@@ -1534,6 +1537,17 @@ const settleBr = async (page: Page): Promise<void> => {
   await page.waitForFunction(
     `window.__briscola.app.table.settle === null && document.querySelectorAll('.flyer, .drag-ghost, #tableScreen:not(.hidden) .card.arriving').length === 0 && !document.getElementById('toast').classList.contains('show')`,
   );
+};
+
+/**
+ * The beat waits for the phone holder's tap to draw (docs/design/briscola-battle.md §3.1 DRAW,
+ * ui/state.ts `awaitingDraw`; the wait has no timer): once it does, tap `#stock` as a finger would.
+ */
+const tapToDrawBr = async (page: Page): Promise<void> => {
+  await page.waitForFunction(
+    `(() => { const s = window.__briscola.app.table.settle; return s !== null && s.stage === 'draw' && s.trick.drew.includes(s.me); })()`,
+  );
+  await click(page, '#stock');
 };
 
 /** Lift the first card of the hand and play it (`card/tap`, then `#playBtn`). */
@@ -1581,6 +1595,7 @@ const driveBriscola = async (page: Page, shot: Shot): Promise<void> => {
   await click(page, '#curtainBtn');
   await snap('local: the second seat to play');
   await playFirstCard(page);
+  await tapToDrawBr(page);
   await visible(page, '#curtainOverlay');
   await snap('local: trick taken, curtain for the winner');
   await reveal();

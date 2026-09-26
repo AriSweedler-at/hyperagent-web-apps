@@ -230,7 +230,11 @@ export const factsOf = (app: App): StoryFacts => {
     handLive: liveView(app) !== null,
     handDown: app.table.curtain !== null,
     selected: app.table.selected,
-    trickCards: settle === null ? v.trick.length : settle.trick.cards.length,
+    // The fan paints the held trick through `hold` and `fly` alone; from `draw` on it is the view's (empty).
+    trickCards:
+      settle !== null && (settle.stage === 'hold' || settle.stage === 'fly')
+        ? settle.trick.cards.length
+        : v.trick.length,
     stockCount,
     stockEmpty: stockCount <= 1,
     briscolaGone: !(v.trumpOnTable || settle?.trick.trumpTaken === true),

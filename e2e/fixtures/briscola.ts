@@ -78,6 +78,23 @@ export const readEvents = (page: Page): Promise<ReadonlyArray<GameEvent>> =>
 export const readSettleStage = (page: Page): Promise<string | null> =>
   page.evaluate<string | null>('window.__briscola.app.table.settle?.stage ?? null');
 
+/**
+ * The beat waits for my tap to draw (ui/state.ts `awaitingDraw`, docs/design/briscola-battle.md
+ * §3.1 DRAW): the stage is `draw` and the seat this device shows is among the drawers. The wait
+ * has no timer, so a test that plays through a trick must tap (`tapToDraw`) or wait forever.
+ */
+export const readAwaitingDraw = (page: Page): Promise<boolean> =>
+  page.evaluate<boolean>(
+    `(() => { const s = window.__briscola.app.table.settle; return s !== null && s.stage === 'draw' && s.trick.drew.includes(s.me); })()`,
+  );
+
+/**
+ * Tap to draw as a finger does: `#stock` (its click is `draw/tap`; the reducer takes it while the
+ * beat waits and drops it otherwise, so a tap that lands after a collapse is harmless). The box
+ * stays when the stock is out (`.stock.empty`), so the last card's draw taps the same place.
+ */
+export const tapToDraw = (page: Page): Promise<void> => page.locator('#stock').click();
+
 /** An engine action through the reducer (`window.__briscola.act`), for every role. */
 export const briscolaAct = (page: Page, action: Action): Promise<void> =>
   page.evaluate(`window.__briscola.act(${JSON.stringify(action)})`);
@@ -173,7 +190,16 @@ export const waitForSettle = async (page: Page, no: number): Promise<View> => {
   await expect
     .poll(
       async () => {
-        const [view, stage] = await Promise.all([readView(page), readSettleStage(page)]);
+        const [view, stage, awaiting] = await Promise.all([
+          readView(page),
+          readSettleStage(page),
+          readAwaitingDraw(page),
+        ]);
+        // My draw waits for the tap (the phone holder's, D2 (a)): tap, then keep polling.
+        if (awaiting) {
+          await tapToDraw(page);
+          return 'draw (tapped)';
+        }
         return view?.lastTrick?.no === no && stage === null ? 'settled' : String(stage);
       },
       { timeout: 15_000 },
