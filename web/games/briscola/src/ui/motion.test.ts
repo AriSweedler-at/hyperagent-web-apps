@@ -10,6 +10,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import type { Rect } from '../../../../shared/edge/dom.ts';
 import { fakeEl, fakePage, type FakeEl } from '../../../../shared/edge/page.fake.ts';
+import type { Played, Seat } from '../engine/index.ts';
 import {
   BRISCOLA,
   DURATIONS,
@@ -181,7 +182,7 @@ afterEach(() => {
 });
 
 describe('the play and follow flights (docs/design/briscola-battle.md §3.1, PR-D)', () => {
-  const played = (seat: number, id: string) => ({ seat, card: { id, r: 1, s: 'C' } }) as const;
+  const played = (seat: Seat, id: string): Played => ({ seat, card: { id, r: 1, s: 'C' } });
   const at = rect(10, 500, 69, 133);
 
   test('fanTilt is theme.css`s rotate: the fan leans out from its middle, 4° a card', () => {
