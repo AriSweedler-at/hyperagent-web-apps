@@ -278,6 +278,25 @@ describe('sessionEvents', () => {
     expect(r.holds()).toBe(1);
   });
 
+  test('the seated adapter (an N-seat game): the frame and guestGone intents carry the seat the session names; every other intent is as before', () => {
+    const r = recorder();
+    const { host } = sessionEvents(r.deps, { seats: true });
+    host.frame({ t: 'join' }, 2);
+    host.guestGone(null, 3);
+    host.guestGone('ICE failed', 1);
+    host.status('Waiting for 3 players to join…');
+    expect(r.intents).toEqual([
+      { type: 'host/frame', frame: { t: 'join' }, seat: 2 },
+      { type: 'host/guestGone', iceFailed: null, seat: 3 },
+      { type: 'host/guestGone', iceFailed: 'ICE failed', seat: 1 },
+      { type: 'host/status', text: 'Waiting for 3 players to join…', stopPulse: false },
+    ]);
+    // `seats: false` spelled out is the default adapter.
+    const plain = recorder();
+    sessionEvents(plain.deps, { seats: false }).host.frame({ t: 'join' }, 2);
+    expect(plain.intents).toEqual([{ type: 'host/frame', frame: { t: 'join' } }]);
+  });
+
   test('every guest event is its intent', () => {
     const r = recorder();
     const { guest } = sessionEvents(r.deps);

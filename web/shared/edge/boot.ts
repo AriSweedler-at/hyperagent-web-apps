@@ -30,6 +30,7 @@ import type {
   HostFrameOf,
   Intent,
   ScreenId,
+  SeatOf,
   ShellApp,
   ShellTypes,
   TimerId,
@@ -123,34 +124,44 @@ export const shareInvite = (nav: ShareNavigatorLike, o: ShareInviteOptions): Pro
 /**
  * The intents a session raises: the same nine members of both games' `Intent` unions
  * (ui/state.ts), over the game's guest frame `G` and host frame `H`. A game's `dispatch` takes its
- * whole union, so it fits here as it is.
+ * whole union, so it fits here as it is. `S` is the game's seat type (shell.ts `SeatOf<G>`), which
+ * the two host intents carry only from the seated adapter (`sessionEvents(deps, { seats: true })`,
+ * docs/design/n-seat-sessions.md §7); the default adapter's objects are the two-seat ones.
  */
-export type SessionIntent<G, H> =
+export type SessionIntent<G, H, S extends number = number> =
   | Readonly<{ type: 'host/status'; text: string; stopPulse: boolean }>
   | Readonly<{ type: 'host/start'; code: string | null }>
-  | Readonly<{ type: 'host/frame'; frame: G }>
-  | Readonly<{ type: 'host/guestGone'; iceFailed: string | null }>
+  | Readonly<{ type: 'host/frame'; frame: G; seat?: S }>
+  | Readonly<{ type: 'host/guestGone'; iceFailed: string | null; seat?: S }>
   | Readonly<{ type: 'guest/status'; text: string; stopPulse: boolean }>
   | Readonly<{ type: 'guest/connected' }>
   | Readonly<{ type: 'guest/frame'; frame: H }>
   | Readonly<{ type: 'guest/lost' }>
   | Readonly<{ type: 'persist' }>;
 
-export type SessionEventDeps<G, H> = Readonly<{
-  dispatch: (intent: SessionIntent<G, H>) => void;
+export type SessionEventDeps<G, H, S extends number = number> = Readonly<{
+  dispatch: (intent: SessionIntent<G, H, S>) => void;
   toast: Toast;
   wakeLock: Pick<WakeLock, 'hold'>;
 }>;
+
+/** `seats`: the host's `frame` and `guestGone` intents carry the seat the session names (an N-seat game); off, they are the two-seat objects. */
+export type SessionEventOptions = Readonly<{ seats?: boolean }>;
 
 export type SessionEvents<G, H> = Readonly<{ host: HostEvents<G>; guest: GuestEvents<H> }>;
 
 /**
  * The adapters main.ts hands its sessions (`events` in their deps): every event is an intent
  * through `dispatch` (`status` with `stopPulse` false unless the session says so), a toast through
- * `toast` (an undefined `ms` is the default duration), and the wake lock held.
+ * `toast` (an undefined `ms` is the default duration), and the wake lock held. The session numbers
+ * every seat (1 at capacity 2); with `seats` the two host intents carry it as the game's seat type.
  */
-export const sessionEvents = <G, H>(deps: SessionEventDeps<G, H>): SessionEvents<G, H> => {
+export const sessionEvents = <G, H, S extends number = number>(
+  deps: SessionEventDeps<G, H, S>,
+  options: SessionEventOptions = {},
+): SessionEvents<G, H> => {
   const { dispatch, toast, wakeLock } = deps;
+  const seated = options.seats === true;
   const host: HostEvents<G> = {
     status: (text, stopPulse = false) => {
       dispatch({ type: 'host/status', text, stopPulse });
@@ -167,11 +178,18 @@ export const sessionEvents = <G, H>(deps: SessionEventDeps<G, H>): SessionEvents
     restart: (code) => {
       dispatch({ type: 'host/start', code });
     },
-    frame: (frame) => {
-      dispatch({ type: 'host/frame', frame });
+    // The session's seat is a number; the game's bag names the seats it seats (shell.ts `SeatOf`).
+    frame: (frame, seat) => {
+      dispatch(
+        seated ? { type: 'host/frame', frame, seat: seat as S } : { type: 'host/frame', frame },
+      );
     },
-    guestGone: (iceFailed) => {
-      dispatch({ type: 'host/guestGone', iceFailed });
+    guestGone: (iceFailed, seat) => {
+      dispatch(
+        seated
+          ? { type: 'host/guestGone', iceFailed, seat: seat as S }
+          : { type: 'host/guestGone', iceFailed },
+      );
     },
   };
   const guest: GuestEvents<H> = {
@@ -264,17 +282,31 @@ export type BootPage<G extends BootTypes> = Readonly<{
   clock: Clock;
 }>;
 
-/** A session as the boot drives it (web/shared/net): `kind` tells the host from the guest, `send` takes its side's frame. */
+/** A session as the boot drives it (web/shared/net): `kind` tells the host from the guest, `send` takes its side's frame (and, for a host, the one seat to send to; every open channel when absent). */
 export type SessionLike<K extends 'host' | 'guest', F> = Readonly<{
   kind: K;
-  send: (frame: F) => void;
+  send: (frame: F, seat?: number) => void;
   close: () => void;
 }>;
-export type HostDepsOf<G extends BootTypes> = NetDeps &
-  Readonly<{ read: () => HostContextOf<G>; events: HostEvents<GuestFrameOf<G>> }>;
+/**
+ * A host session's deps over the game's bag; `HC` is what its `read` returns: the shell's host
+ * context, or a game's wider one (an N-seat codec reads the seat list off it for its welcome, so
+ * the game's `reducer.hostContextOf` adds `seats` to the shell's and its `Host` asks for them).
+ */
+export type HostDepsOf<
+  G extends BootTypes,
+  HC extends HostContextOf<G> = HostContextOf<G>,
+> = NetDeps & Readonly<{ read: () => HC; events: HostEvents<GuestFrameOf<G>> }>;
 export type GuestDepsOf<G extends BootTypes> = NetDeps &
   Readonly<{ read: () => GuestContextOf; events: GuestEvents<HostFrameOf<G>> }>;
-export type HostOptionsOf = Readonly<{ code: string; attempt: number; resume: boolean }>;
+/** The host session's options less the game: `capacity` and `waiting` ride only for an N-seat room (shell.ts `startHost` effect). */
+export type HostOptionsOf = Readonly<{
+  code: string;
+  attempt: number;
+  resume: boolean;
+  capacity?: number;
+  waiting?: string;
+}>;
 export type GuestOptionsOf = Readonly<{ code: string; attempt: number }>;
 
 /** What a game's fx.ts `createFx` takes: the shared player's deps less the table and the persist it supplies. */
@@ -300,7 +332,12 @@ export type BootCtx<G extends BootTypes, App extends BootApp<G>> = Readonly<{
  * `App` its App (the boot reads `shell.soundFont` and `shell.view` of it), `Ex` the effect adapters
  * it has beside the shell's (gin's Score Counter and clipboard; backgammon none).
  */
-export type BootConfig<G extends BootTypes, App extends BootApp<G>, Ex extends object> = Readonly<{
+export type BootConfig<
+  G extends BootTypes,
+  App extends BootApp<G>,
+  Ex extends object,
+  HC extends HostContextOf<G> = HostContextOf<G>,
+> = Readonly<{
   page: BootPage<G>;
   game: Readonly<{
     /** The documented test hook's property on the window: `__gin`, `__backgammon` (tools/games.ts REGISTRY `hook`). */
@@ -329,7 +366,8 @@ export type BootConfig<G extends BootTypes, App extends BootApp<G>, Ex extends o
     ) => Readonly<{ app: App; effects: ReadonlyArray<Effect<G>> }>;
     runEffect: (app: App, effect: Effect<G>, deps: ShellEffectDeps<G> & Ex) => void;
     readHome: (store: G['Store']) => HomeSnapshot<G>;
-    hostContextOf: (app: App) => HostContextOf<G>;
+    /** What the host session reads back: the shell's, or the game's wider context (`HC`) its `Host` asks for. */
+    hostContextOf: (app: App) => HC;
     guestContextOf: (app: App) => GuestContextOf;
   }>;
   paint: Readonly<{
@@ -350,7 +388,7 @@ export type BootConfig<G extends BootTypes, App extends BootApp<G>, Ex extends o
   /** The game's fx.ts `createFx`: the shared cue player over its table and its sound key. */
   fx: (deps: FxDepsOf<G>) => CuePlayer<Cue<G>>;
   net: Readonly<{
-    Host: new (deps: HostDepsOf<G>, opts: HostOptionsOf) => SessionLike<'host', HostFrameOf<G>>;
+    Host: new (deps: HostDepsOf<G, HC>, opts: HostOptionsOf) => SessionLike<'host', HostFrameOf<G>>;
     Guest: new (
       deps: GuestDepsOf<G>,
       opts: GuestOptionsOf,
@@ -362,6 +400,8 @@ export type BootConfig<G extends BootTypes, App extends BootApp<G>, Ex extends o
      * a `send` of that frame goes out on whichever session is open, host or guest. Absent, no frame is one.
      */
     isEphemeral?: (frame: HostFrameOf<G> | GuestFrameOf<G>) => frame is EphemeralOf<G>;
+    /** A table of more than two seats: the host's `frame`/`guestGone` intents carry the seat (`sessionEvents(deps, { seats: true })`); absent for the two-seat games. */
+    seats?: boolean;
   }>;
   /** The engine's legal actions for a view (the hook's `legal()`). */
   legal: (view: G['View']) => ReadonlyArray<G['Action']>;
@@ -400,8 +440,9 @@ export const bootShell = <
   G extends BootTypes,
   App extends BootApp<G> = ShellApp<G> & BootApp<G>,
   Ex extends object = object,
+  HC extends HostContextOf<G> = HostContextOf<G>,
 >(
-  cfg: BootConfig<G, App, Ex>,
+  cfg: BootConfig<G, App, Ex, HC>,
 ): BootCtx<G, App> => {
   const { doc, win, nav, store, clock } = cfg.page;
   // The sound font (docs/design/sound-fonts.md §6): a value the console left in storage that names
@@ -492,11 +533,11 @@ export const bootShell = <
   };
 
   // The sessions' events as intents, toasts and the wake lock.
-  const { host: hostEvents, guest: guestEvents } = sessionEvents<GuestFrameOf<G>, HostFrameOf<G>>({
-    dispatch,
-    toast,
-    wakeLock,
-  });
+  const { host: hostEvents, guest: guestEvents } = sessionEvents<
+    GuestFrameOf<G>,
+    HostFrameOf<G>,
+    SeatOf<G>
+  >({ dispatch, toast, wakeLock }, { seats: cfg.net.seats === true });
 
   const deps: ShellEffectDeps<G> & Ex = {
     store,
@@ -510,10 +551,11 @@ export const bootShell = <
       else wakeLock.drop();
     },
     net: {
-      startHost: (code, attempt, resume) => {
+      // An N-seat room's terms (`room`) join the options; a two-seat game's options are the literal they were.
+      startHost: (code, attempt, resume, room) => {
         session = new cfg.net.Host(
           { ...netDeps, read: () => cfg.reducer.hostContextOf(app), events: hostEvents },
-          { code, attempt, resume },
+          { code, attempt, resume, ...room },
         );
       },
       startGuest: (code, attempt) => {
@@ -522,14 +564,14 @@ export const bootShell = <
           { code, attempt },
         );
       },
-      send: (frame) => {
+      send: (frame, seat) => {
         if (session === null) return;
         if (cfg.net.isEphemeral?.(frame) === true) {
           session.send(frame);
           return;
         }
         if (session.kind === 'host') {
-          if (!cfg.net.isGuestFrame(frame)) session.send(frame);
+          if (!cfg.net.isGuestFrame(frame)) session.send(frame, seat);
         } else if (cfg.net.isGuestFrame(frame)) session.send(frame);
       },
       close: () => {

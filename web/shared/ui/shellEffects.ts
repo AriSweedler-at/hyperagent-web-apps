@@ -14,6 +14,7 @@ import {
   type GuestFrameOf,
   type HostFrameOf,
   type Intent,
+  type SeatOf,
   type ShellConfig,
   type ShellEffect,
   type ShellState,
@@ -23,6 +24,9 @@ import {
 import type { RulesSlot } from './glossary.ts';
 import type { SoundFontName } from '../lib/sound/fonts.ts';
 import type { Phrase } from '../lib/sound/phrase.ts';
+
+/** An N-seat room's terms for the host session (`HostOptions.capacity`/`waiting`), off the `startHost` effect. */
+export type HostRoom = Readonly<{ capacity: number; waiting?: string }>;
 
 /** The adapters a shell effect reaches; a game's `EffectDeps` is this plus its own. */
 export type ShellEffectDeps<G extends ShellTypes> = Readonly<{
@@ -36,9 +40,11 @@ export type ShellEffectDeps<G extends ShellTypes> = Readonly<{
   fx: (what: Cue<G> | ReadonlyArray<Phrase>, font: SoundFontName) => void;
   wakeLock: (hold: boolean) => void;
   net: Readonly<{
-    startHost: (code: string, attempt: number, resume: boolean) => void;
+    /** Open the room; `room` is an N-seat game's capacity and open status (n-seat-sessions.md §7), never passed for a two-seat game. */
+    startHost: (code: string, attempt: number, resume: boolean, room?: HostRoom) => void;
     startGuest: (code: string, attempt: number) => void;
-    send: (frame: HostFrameOf<G> | GuestFrameOf<G>) => void;
+    /** To the session; `seat` names one of a host's channels, passed only when the effect carries one. */
+    send: (frame: HostFrameOf<G> | GuestFrameOf<G>, seat?: SeatOf<G>) => void;
     close: () => void;
   }>;
   confirm: (message: string) => boolean;
@@ -105,7 +111,9 @@ export const runShellEffect = <G extends ShellTypes>(
       deps.toast(effect.message, effect.ms);
       return;
     case 'send':
-      deps.net.send(effect.frame);
+      // The seat is passed only when the effect names one, so a two-seat game's adapter is called as it was.
+      if (effect.seat === undefined) deps.net.send(effect.frame);
+      else deps.net.send(effect.frame, effect.seat);
       return;
     case 'fx':
       deps.fx(effect.cue, shell.soundFont);
@@ -117,7 +125,14 @@ export const runShellEffect = <G extends ShellTypes>(
       deps.wakeLock(effect.hold);
       return;
     case 'startHost':
-      deps.net.startHost(effect.code, effect.attempt, effect.resume);
+      // The room's terms ride only when the effect carries a capacity (an N-seat game), so a two-seat game's adapter is called as it was.
+      if (effect.capacity === undefined)
+        deps.net.startHost(effect.code, effect.attempt, effect.resume);
+      else
+        deps.net.startHost(effect.code, effect.attempt, effect.resume, {
+          capacity: effect.capacity,
+          ...(effect.waiting === undefined ? {} : { waiting: effect.waiting }),
+        });
       return;
     case 'startGuest':
       deps.net.startGuest(effect.code, effect.attempt);
