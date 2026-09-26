@@ -155,8 +155,8 @@ report), frees the seat it left, and hands that seat to a held join if one waits
     away under it.
 12. **The shell surface as landed** (PR-5, `web/shared/ui/{shell,shellEffects,shellPaint}.ts`,
     `web/shared/edge/{boot,prefs}.ts`; §7 is the ask, this is the shape). Where it differs from §7:
-    `cfg.seats` is `{ min, max }` exactly and `opts.capacity?(opts)` sits under `cfg.opts`,
-    defaulting to `max` (a fixed table needs no reader); `engine.create` takes `PlayersOf<G>`, a
+    `cfg.seats` is `{ min, max, fixed? }` (`fixed` below) and `opts.capacity?(opts)` sits under
+    `cfg.opts`, defaulting to `max` (a fixed table needs no reader); `engine.create` takes `PlayersOf<G>`, a
     type off the game's bag (`ShellTypes.Seat` absent: the pair, so gin's and backgammon's
     configs are type-identical; present: `ReadonlyArray<Player>`, the host first then every seat
     in order with ids `host`, `guest`, `guest2`, `guest3`), rather than a second builder;
@@ -182,11 +182,25 @@ report), frees the seat it left, and hands that seat to a held join if one waits
     free-for-all, every seat alone). The curtain's N−1 names are the game's `curtainText`, as
     every curtain string is. The host save's `seatNames` is written only past two seats, after
     `oppName`, so every two-seat save is the legacy literal; `ShellState.seats` is written for the
-    two-seat games too (seat 1 mirroring `oppName`/`oppConnected`), which their pins, being
-    `toMatchObject` or built from `run()`, do not see.
+    two-seat games too (seat 1 mirroring `oppName`/`oppConnected`), which their reducers, painters
+    and e2e never read, and which one FAKE `toEqual` pin in shell.test.ts (`host/guestGone`) gained
+    as the mirror.
     `cfg.seats.fixed` (briscola's reducer PR): a fixed table starts full, so Start and the deal
     wait for the room's capacity rather than `min` (the three-seat deck cannot be dealt to two),
     and `min` names the smallest table alone; without it `min` gates as §7 says.
+    The online review of PR-5 added three things. `startHost` carries `names` (the seats' names,
+    when any seat is named: a resume or a handoff) into `HostOptions.names`, which seeds each
+    slot's rejoin key at construction, so after a host reload the guests come back to their own
+    seats in whatever order their rejoin timers fire (without it the resumed session knew no
+    names, seated them in connection order and renamed one "Cy 2"). Mid-game at an N-seat table
+    the lobby goes round on every seat lost and every seat back (`lobbySends` before the views on
+    a rejoin, after the toast on a `guestGone`), so every guest holds the table as the host does
+    (a guest's `seatsDown` reads it, its own seat never counted) and a guest the session moved by
+    name learns its seat (`you`); the views carry no channel state, and a two-seat game's flows are
+    untouched. The session's hold has a deadline (§4.4's HB_MISSED_MS after the knock): a probe
+    cleared with its channel's watch (an error on a seated channel) left a knocker waiting for
+    good, so at the deadline a watched seat silent that long is the knocker's, else it is a spare
+    peer.
 
 ## 7. What the shell asks next (C2/C3, or the PR after; every item is today's shape at capacity 2; landed as §6.12)
 
