@@ -1,13 +1,13 @@
-// Drives the shared shell through its DOM (docs/design/shared-shell.md §6.2): the ids the two shell
-// games' pages agree on (the home form, the waiting rooms, the curtain, the resume button, the
+// Drives the shared shell through its DOM (docs/design/shared-shell.md §6.2): the ids every shell
+// game's page agrees on (the home form, the waiting rooms, the curtain, the resume button, the
 // table's names and its 🌐), what each page says in its own words read off tools/games.ts SHELL, and
-// the code shape off web/shared/lib/roomCode.ts. e2e/shell-*.spec.ts drive both games through these
+// the code shape off web/shared/lib/roomCode.ts. e2e/shell-*.spec.ts drive every game through these
 // once; the game specs import `reveal` and `hostStarts` from here too (dry-round-2.md I5).
-// e2e/fixtures/gin.ts and backgammon.ts compose their pass-and-play starters from `startLocal`
-// and keep the table halves (what a hand or a board shows), which e2e/fixtures/online-games.ts rows
-// up per game for the shell specs. This file may not import either: they import it
-// (import-x/no-cycle). Nothing here reads a documented hook: whose room opened and who took the
-// phone are read from the elements a player sees.
+// e2e/fixtures/gin.ts, backgammon.ts, briscola.ts and fidice.ts compose their pass-and-play
+// starters from `startLocal` and keep the table halves (what a hand or a board shows), which
+// e2e/fixtures/online-games.ts rows up per game for the shell specs. This file may not import any
+// of them: they import it (import-x/no-cycle). Nothing here reads a documented hook: whose room
+// opened and who took the phone are read from the elements a player sees.
 import { expect, type Page } from '@playwright/test';
 
 import { REGISTRY, SHELL, type ShellGame } from '../../tools/games.ts';
@@ -33,7 +33,7 @@ export const DEFAULT_MARK = 'data-default';
 
 // ---- the shell's copy, byte-identical in both src trees (design §6, risk 10) --------------------
 
-/** `#hostWaitStatus` once the broker has confirmed a fresh room. */
+/** `#hostWaitStatus` once the broker has confirmed a fresh room (a table of two: `hostRoom` sets the game's `hostFields` so). */
 export const WAITING_MSG = 'Waiting for your opponent to join';
 /** `#hostWaitStatus` once the guest's join was answered. */
 export const joinedMsg = (name: string): string => `${name} joined!`;
@@ -68,6 +68,18 @@ const codeSource = (game: ShellGame): string => {
 /** A whole room code of the game. */
 export const codePattern = (game: ShellGame): RegExp => new RegExp(`^${codeSource(game)}$`);
 
+/**
+ * A code of the game's shape that nobody hosts (`KQZM` on a four-letter game, `KQZM7` on fidice's
+ * five): the invite a guest follows into an empty room. Every character is in every alphabet
+ * (web/shared/lib/roomCode.ts), so the page's shape check passes and the session asks the broker.
+ */
+export const unhostedCode = (game: ShellGame): string => {
+  const code = 'KQZM7'.slice(0, ROOM_CODE[game].length);
+  if (!codePattern(game).test(code))
+    throw new Error(`${game}: ${code} is not a code of its shape (${codeSource(game)})`);
+  return code;
+};
+
 /** `#hostWaitStatus` once the broker has confirmed the handed-off room; only then is `#roomCode` final. */
 export const roomOpenMsg = (game: ShellGame, names: Names = DEFAULT_NAMES): RegExp =>
   new RegExp(
@@ -76,12 +88,9 @@ export const roomOpenMsg = (game: ShellGame, names: Names = DEFAULT_NAMES): RegE
 
 // ---- storage ------------------------------------------------------------------------------------
 
-/** The game's save key and preference prefix: every shell game has the row (tools/games.test.ts). */
-const storageOf = (game: ShellGame): Readonly<{ saveKey: string; prefix: string }> => {
-  const storage = REGISTRY[game].storage;
-  if (storage === undefined) throw new Error(`${game} has no storage row in tools/games.ts`);
-  return storage;
-};
+/** The game's save key and preference prefix (tools/games.ts REGISTRY, pinned to the game's storage.ts by tools/games.test.ts). */
+const storageOf = (game: ShellGame): Readonly<{ saveKey: string; prefix: string }> =>
+  REGISTRY[game].storage;
 
 /** A shell preference's key: `<prefix><name>` (`homeTab`, `playMode`, `name`, ...). */
 export const prefKey = (game: ShellGame, name: string): string =>
@@ -108,10 +117,25 @@ export const roomCode = async (page: Page, game: ShellGame): Promise<string> => 
   return code.innerText();
 };
 
-/** Host a room as `name`; resolves with the code once the broker has confirmed the room. */
+/** An input is filled; a select has its option chosen (a string expression: the e2e project has no DOM types). */
+const setField = async (page: Page, id: string, value: string): Promise<void> => {
+  const tag = await page.evaluate<string>(`document.getElementById(${JSON.stringify(id)}).tagName`);
+  if (tag === 'SELECT') await page.locator(`#${id}`).selectOption(value);
+  else await page.locator(`#${id}`).fill(value);
+};
+
+/**
+ * Host a room as `name`, the host card's fields at the game's `hostFields` (fidice's chairs to
+ * two: the two-seat room these specs are written for); resolves with the code once the broker has
+ * confirmed the room.
+ */
 export const hostRoom = async (page: Page, game: ShellGame, name: string): Promise<string> => {
   await expect(page.locator('#onlineModeContent')).toBeVisible();
   await page.locator('#nameInput').fill(name);
+  await SHELL[game].hostFields.reduce(async (done, [id, value]) => {
+    await done;
+    await setField(page, id, value);
+  }, Promise.resolve());
   await page.locator('#hostBtn').click();
   await expect(page.locator('#hostWaitScreen')).toBeVisible();
   // The page re-rolls the code (and rewrites #roomCode) when the broker reports the id taken, so

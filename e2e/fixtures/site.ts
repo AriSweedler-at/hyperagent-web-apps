@@ -99,6 +99,8 @@ export const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/briscola-online.spec.ts',
   '**/briscola-stories.spec.ts',
   '**/computed-styles.spec.ts',
+  // Three contexts and a computer over the N-seat sessions, plus Solo and Watch: about the seats.
+  '**/fidice-online.spec.ts',
   '**/gin-drag-discard.spec.ts',
   '**/gin-arrange.spec.ts',
   '**/gin-card-back.spec.ts',

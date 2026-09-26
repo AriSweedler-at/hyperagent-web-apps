@@ -1,7 +1,7 @@
 // The committed shell pages are what the shared partials render (docs/design/dry-round-2.md §3 row
 // G2, §5 Wave F row F2; the drift idiom of backgammon-grid.test.ts): web/games/<g>/index.html is
-// pinned, byte for byte (every shell game's and, from M2 of docs/design/fidice-shell-adoption.md,
-// fidice's: tools/shell-markup.ts MARKUP_GAMES), to that tool composing
+// pinned, byte for byte (every shell game's: tools/games.ts SHELL_GAMES, fidice's among them since
+// M2 of docs/design/fidice-shell-adoption.md composed it), to that tool composing
 // web/shared/markup/shell/*.html with the game's page.ts (Prettier's output of it where Prettier
 // owns the file), so an edit to a partial or
 // a page.ts fails here until `node --experimental-strip-types tools/shell-markup.ts --write` is
@@ -14,17 +14,13 @@
 // every page at once (tools/ci/suites.ts).
 import { describe, expect, test } from 'vitest';
 
-import {
-  MARKUP_GAMES,
-  committedPage,
-  composePage,
-  readTemplates,
-} from '../../tools/shell-markup.ts';
+import { SHELL_GAMES } from '../../tools/games.ts';
+import { committedPage, composePage, readTemplates } from '../../tools/shell-markup.ts';
 import { BLOCK_IDS, PARTIALS, SCREEN_IDS, idsIn } from '../../web/shared/markup/shell.ts';
 import { SHELL_IDS } from '../../web/shared/ui/ids.ts';
 
 describe('the shell pages are what the partials render', () => {
-  test.each(MARKUP_GAMES)('%s: index.html is composePage(game), byte for byte', async (game) => {
+  test.each(SHELL_GAMES)('%s: index.html is composePage(game), byte for byte', async (game) => {
     expect(await composePage(game)).toBe(committedPage(game));
   });
 

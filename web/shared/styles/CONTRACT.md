@@ -85,10 +85,9 @@ no row.
 Rules of the table:
 
 - `Owner` is `gin-rummy`, `fidice`, `backgammon`, `shared` (a `shared` row applies to every game) or
-  `shell` (the pages that link `shell.css`: the shell games, `tools/games.ts` `SHELL_GAMES`, and fidice since M1
-  of docs/design/fidice-shell-adoption.md, `test/dist/classes.ts` `LINKS_SHELL_CSS`; a `shell` row styled in the
-  shell games' own themes reaches fidice only once it is a shell game, M5; a class the shell sheet styles is a
-  `shell` row, never a `shared` one; docs/design/dry-round-2.md G3).
+  `shell` (the pages that link `shell.css`: the shell games, `tools/games.ts` `SHELL_GAMES`, every game since M5
+  of docs/design/fidice-shell-adoption.md registered fidice; a class the shell sheet styles is a `shell` row,
+  never a `shared` one; docs/design/dry-round-2.md G3).
 - `Kind` is `class`; `id` and `attr` rows are not checked yet.
 - `Name` is one class or several separated by spaces (`m0 m1 m2 m3 m4`).
 - `Toggled by` names the TS module that produces the name; `Styled in` the stylesheet with the rule.

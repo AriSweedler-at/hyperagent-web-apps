@@ -1,8 +1,8 @@
 // The relay-forced game on every game (docs/MIGRATION.md step 15, docs/ARCHITECTURE.md "CI"):
 // host and guest open the page with `?ice-policy=relay` and an ICE list naming the harness's own
 // TURN relay (coturn on PORTS.turn, started by playwright.config.ts), so every ICE candidate must go
-// through that relay, and the game still joins, starts and toasts "Connected via relay" (both shell
-// pages; fidice's guest alone: the row's `relayToasts` in e2e/fixtures/online-games.ts); the
+// through that relay, and the game still joins, starts and toasts "Connected via relay" (both
+// sides on every page: the row's `relayToasts` in e2e/fixtures/online-games.ts); the
 // selected candidate pair, read off the RTCPeerConnection, says so too. Hermetic: it plays on every
 // PR, and skips only where coturn is not installed (until issue #19 the relay was turn.sweedler.com
 // and the nightly the one place this could run; now the nightly, E2E_TARGET=deployed, plays this
@@ -10,10 +10,11 @@
 // below, and in web/shared/edge/ice.test.ts and transport.test.ts: a page opened with it hands
 // PeerJS `iceTransportPolicy: 'relay'` under the game's peer id, asserted the moment the room is
 // registered, with no join attempted. Fidice's row replaced its own e2e/fidice-relay.spec.ts
-// (dry-round-2.md H1). Tagged per game (see shell-home.spec.ts), @relay and @online.
-import { GAMES, REGISTRY } from '../tools/games.ts';
+// (dry-round-2.md H1) and drives its shell path since M5 of docs/design/fidice-shell-adoption.md.
+// Tagged per game (see shell-home.spec.ts), @relay and @online.
+import { REGISTRY, SHELL_GAMES } from '../tools/games.ts';
 import { peerIdFor } from '../web/shared/lib/roomCode.ts';
-import { ONLINE_DRIVERS, connect } from './fixtures/online-games.ts';
+import { SHELL_DRIVERS, connect } from './fixtures/online-games.ts';
 import { expectPeerOptions, openGame, type GameHooks } from './fixtures/player.ts';
 import { RELAY_TOAST, expectRelayPath, skipWithoutRelay } from './fixtures/relay.ts';
 import { ONLINE_NAMES } from './fixtures/shell.ts';
@@ -21,10 +22,10 @@ import { expect, hostRoom, test } from './fixtures/two-players.ts';
 
 const RELAY_GAME: GameHooks = { relay: true, ice: 'turn' };
 
-GAMES.forEach((game) => {
+SHELL_GAMES.forEach((game) => {
   test.describe(game, { tag: `@${game}` }, () => {
     const spec = REGISTRY[game];
-    const driver = ONLINE_DRIVERS[game];
+    const driver = SHELL_DRIVERS[game];
 
     test(
       'relay-forced: host and guest connect through TURN, the relay path is toasted, both see the opening',

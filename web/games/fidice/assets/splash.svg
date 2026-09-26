@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Fidice">
+  <!-- The link-preview card (docs/design/link-previews.md §2), in Fidice's Kezar Lake palette (theme.css: mist,
+       lake, pine, birch, timber, one gold hairline; never gin's felt): the mist sky, a pine shoreline, the lake,
+       a birch dock with the cup and the five dice on it, the Fredoka wordmark. tools/splash.ts renders it to
+       web/public/games/fidice/splash.png; a machine without Fredoka falls back to the sans-serif after it. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dcecf5"/>
+      <stop offset="1" stop-color="#f6efe2"/>
+    </linearGradient>
+    <linearGradient id="lake" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b6f9e"/>
+      <stop offset="1" stop-color="#1d4f73"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#sky)"/>
+  <!-- the far shore: one quiet pine line -->
+  <path d="M0 372 L40 350 L70 372 L110 336 L150 372 L190 344 L220 372 L260 330 L300 372 L340 352 L370 372 L410 340 L450 372 L490 356 L520 372 L560 334 L600 372 L640 348 L670 372 L710 338 L750 372 L790 354 L820 372 L860 332 L900 372 L940 350 L970 372 L1010 342 L1050 372 L1090 356 L1120 372 L1160 336 L1200 372 L1200 392 L0 392 Z" fill="#1f4d3a"/>
+  <rect x="0" y="392" width="1200" height="238" fill="url(#lake)"/>
+  <rect x="0" y="392" width="1200" height="3" fill="#e6a93c" fill-opacity="0.9"/>
+  <!-- the dock -->
+  <rect x="660" y="430" width="480" height="26" rx="3" fill="#c68e4f"/>
+  <rect x="660" y="456" width="480" height="10" fill="#8b5a2b"/>
+  <rect x="690" y="466" width="14" height="80" fill="#5c3a1a"/>
+  <rect x="1090" y="466" width="14" height="80" fill="#5c3a1a"/>
+  <!-- the cup -->
+  <path d="M700 430 L716 340 L806 340 L822 430 Z" fill="#fbf7ef" stroke="#3a2716" stroke-width="3"/>
+  <rect x="708" y="332" width="106" height="14" rx="4" fill="#1f4d3a"/>
+  <!-- five dice, plain, one pip colour -->
+  <g fill="#fbf7ef" stroke="#3a2716" stroke-width="3">
+    <rect x="850" y="366" width="64" height="64" rx="10"/>
+    <rect x="928" y="366" width="64" height="64" rx="10"/>
+    <rect x="1006" y="366" width="64" height="64" rx="10"/>
+    <rect x="889" y="296" width="64" height="64" rx="10" transform="rotate(-8 921 328)"/>
+    <rect x="967" y="296" width="64" height="64" rx="10" transform="rotate(6 999 328)"/>
+  </g>
+  <g fill="#3a2716">
+    <!-- 4 -->
+    <circle cx="866" cy="382" r="5.5"/><circle cx="898" cy="382" r="5.5"/><circle cx="866" cy="414" r="5.5"/><circle cx="898" cy="414" r="5.5"/>
+    <!-- 6 -->
+    <circle cx="944" cy="380" r="5.5"/><circle cx="976" cy="380" r="5.5"/><circle cx="944" cy="398" r="5.5"/><circle cx="976" cy="398" r="5.5"/><circle cx="944" cy="416" r="5.5"/><circle cx="976" cy="416" r="5.5"/>
+    <!-- 2 -->
+    <circle cx="1022" cy="382" r="5.5"/><circle cx="1054" cy="414" r="5.5"/>
+    <!-- 5 -->
+    <g transform="rotate(-8 921 328)"><circle cx="905" cy="312" r="5.5"/><circle cx="937" cy="312" r="5.5"/><circle cx="921" cy="328" r="5.5"/><circle cx="905" cy="344" r="5.5"/><circle cx="937" cy="344" r="5.5"/></g>
+    <!-- 3 -->
+    <g transform="rotate(6 999 328)"><circle cx="983" cy="312" r="5.5"/><circle cx="999" cy="328" r="5.5"/><circle cx="1015" cy="344" r="5.5"/></g>
+  </g>
+  <text x="96" y="236" font-family="Fredoka, Nunito, -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="132" fill="#1f4d3a">Fidice</text>
+  <rect x="100" y="264" width="140" height="4" rx="2" fill="#e6a93c"/>
+  <text x="100" y="322" font-family="Nunito, -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-style="italic" font-size="34" fill="#66746c">One cup. Five dice. Don't get caught.</text>
+  <text x="98" y="580" font-family="Nunito, -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="26" fill="#f6efe2" fill-opacity="0.8" letter-spacing="1">games.sweedler.com</text>
+</svg>

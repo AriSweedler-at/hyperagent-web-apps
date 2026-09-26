@@ -19,7 +19,7 @@ import {
   startLocal,
 } from './fixtures/shell.ts';
 import { SHELL_DRIVERS } from './fixtures/online-games.ts';
-import { pagePath } from './fixtures/site.ts';
+import { gamePath } from './fixtures/player.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 const VIEWPORTS: Readonly<Record<string, Viewport>> = { phone: PHONE, desktop: DESKTOP };
@@ -35,7 +35,7 @@ SHELL_GAMES.forEach((game) => {
           project,
         }) => {
           const { page } = player;
-          await startLocal(page, pagePath(project, game), vp);
+          await startLocal(page, gamePath(project, game), vp);
           // The curtain hides the table from the first player until they take the phone.
           const curtain = page.locator('#curtainOverlay');
           const title = page.locator('#curtainTitle');
@@ -67,7 +67,7 @@ SHELL_GAMES.forEach((game) => {
       const { page } = player;
       const names = localNames(game);
       await page.setViewportSize({ width: PHONE.width, height: PHONE.height });
-      await page.goto(pagePath(project, game));
+      await page.goto(gamePath(project, game));
       await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
       await expect(page.locator('#p1NameInput')).toHaveValue(names[0]);
       await expect(page.locator('#p2NameInput')).toHaveValue(names[1]);
@@ -87,7 +87,7 @@ SHELL_GAMES.forEach((game) => {
       const { page } = player;
       const names = localNames(game);
       await page.setViewportSize({ width: PHONE.width, height: PHONE.height });
-      await page.goto(pagePath(project, game));
+      await page.goto(gamePath(project, game));
       await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
       const p1 = page.locator('#p1NameInput');
       const p2 = page.locator('#p2NameInput');
@@ -112,7 +112,7 @@ SHELL_GAMES.forEach((game) => {
       await expect.poll(() => readPref(page, game, 'name')).toBe('Zoë');
       await expect.poll(() => readPref(page, game, 'p2Name')).toBe('Max');
       // Back on the home screen the remembered names show unmarked, and a tap leaves them.
-      await page.goto(pagePath(project, game));
+      await page.goto(gamePath(project, game));
       await expect(page.locator('#localModeContent')).toBeVisible();
       await expect(p1).toHaveValue('Zoë');
       expect(await p1.getAttribute(DEFAULT_MARK)).toBeNull();

@@ -11,14 +11,16 @@
 // pointer-events: none kept it hidden), while on the Play tab the mode switch is the bar's second
 // row and the hover menu stays away. What a game's own panel adds (backgammon's online selects, its
 // rules count) stays in that game's spec. Page-only: about the page, not its origin. Each game's
-// describe carries the game's tag (`@gin-rummy`, `@backgammon`): tools/ci/suites.ts assigns the
-// describe to that game's e2e job by it, and a CLI --grep composes with it.
+// describe carries the game's tag (`@gin-rummy`, `@fidice`, ...): tools/ci/suites.ts assigns the
+// describe to that game's e2e job by it, and a CLI --grep composes with it. The page is opened
+// through `gamePath` (e2e/fixtures/player.ts): the harness hooks and the game's own query, which
+// puts fidice on its shell path (PAGE_QUERY).
 import type { Page } from '@playwright/test';
 
 import { REGISTRY, SHELL, SHELL_GAMES } from '../tools/games.ts';
 import { DESKTOP, PHONE, type Viewport } from './fixtures/geometry.ts';
+import { gamePath } from './fixtures/player.ts';
 import { DEFAULT_NAME, readPref } from './fixtures/shell.ts';
-import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 const VIEWPORTS: Readonly<Record<string, Viewport>> = { phone: PHONE, desktop: DESKTOP };
@@ -47,7 +49,7 @@ SHELL_GAMES.forEach((game) => {
         }) => {
           const { page } = player;
           await page.setViewportSize({ width: vp.width, height: vp.height });
-          await page.goto(pagePath(project, game));
+          await page.goto(gamePath(project, game));
           await expect(page).toHaveTitle(spec.title);
           await expect(page.locator('#homeScreen h1')).toHaveText(shell.heading);
           await expect(page.locator('#topTabbar .tab-btn')).toHaveText(shell.tabs);
@@ -112,7 +114,7 @@ SHELL_GAMES.forEach((game) => {
         }) => {
           const { page } = player;
           await page.setViewportSize({ width: vp.width, height: vp.height });
-          await page.goto(pagePath(project, game));
+          await page.goto(gamePath(project, game));
           await page.locator('#tabRulesBtn').click();
           await expect(page.locator('#rulesPanel')).toBeVisible();
           const submenu = page.locator('#playSubmenu');
@@ -136,7 +138,7 @@ SHELL_GAMES.forEach((game) => {
     }) => {
       const { page } = player;
       await page.setViewportSize({ width: DESKTOP.width, height: DESKTOP.height });
-      await page.goto(pagePath(project, game));
+      await page.goto(gamePath(project, game));
       await page.locator('#tabRulesBtn').click();
       await expect(page.locator('#rulesPanel')).toBeVisible();
       const submenu = page.locator('#playSubmenu');

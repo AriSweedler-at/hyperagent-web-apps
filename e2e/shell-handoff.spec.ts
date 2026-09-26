@@ -17,7 +17,7 @@ import type { Page } from '@playwright/test';
 import { SHELL, SHELL_GAMES, type ShellGame } from '../tools/games.ts';
 import { ROOM_CODE, peerIdFor } from '../web/shared/lib/roomCode.ts';
 import { PHONE } from './fixtures/geometry.ts';
-import { gameQuery, invitePath } from './fixtures/player.ts';
+import { gamePath, gameSearch, invitePath } from './fixtures/player.ts';
 import {
   DEFAULT_NAMES,
   INVITE_COPIED_MSG,
@@ -30,9 +30,9 @@ import {
   roomOpen,
   startLocal,
   takeOffer,
+  unhostedCode,
 } from './fixtures/shell.ts';
 import { SHELL_DRIVERS, type ShellDriver } from './fixtures/online-games.ts';
-import { pagePath, type Project } from './fixtures/site.ts';
 import { WEBRTC_TIMEOUT } from './fixtures/timeouts.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -49,10 +49,6 @@ Object.defineProperty(navigator, 'clipboard', {
   configurable: true,
   value: { writeText: (text) => { window.__copied = text; return Promise.resolve(); } },
 });`;
-
-/** The page's path with the harness hooks (`?peer=`, `?ice=`). */
-const gameUrl = (project: Project, game: ShellGame): string =>
-  `${pagePath(project, game)}${gameQuery()}`;
 
 /** The page's origin and path: what the invite link is built from, whatever the query or hash. */
 const pageUrlOf = (page: Page): string => {
@@ -105,7 +101,7 @@ SHELL_GAMES.forEach((game) => {
     }) => {
       const { page } = player;
       await page.addInitScript({ content: SHARE_SHEET });
-      const { code, before } = await handOff(page, game, driver, gameUrl(project, game));
+      const { code, before } = await handOff(page, game, driver, gamePath(project, game));
       await page.locator('#shareCodeBtn').click();
       await expect
         .poll(() => page.evaluate('window.__shared'))
@@ -125,7 +121,7 @@ SHELL_GAMES.forEach((game) => {
     test('without a share sheet (desktop) the link is copied', async ({ player, project }) => {
       const { page } = player;
       await page.addInitScript({ content: DESKTOP });
-      const { code } = await handOff(page, game, driver, gameUrl(project, game));
+      const { code } = await handOff(page, game, driver, gamePath(project, game));
       await page.locator('#shareCodeBtn').click();
       await expect(page.locator('#toast')).toHaveText(INVITE_COPIED_MSG);
       expect(await page.evaluate('window.__copied')).toBe(inviteLinkOf(page, code));
@@ -133,7 +129,7 @@ SHELL_GAMES.forEach((game) => {
 
     test(`${driver.curtainOffer.title}; cancel gives it back`, async ({ player, project }) => {
       const { page } = player;
-      await startLocal(page, gameUrl(project, game), PHONE);
+      await startLocal(page, gamePath(project, game), PHONE);
       await driver.curtainOffer.toCurtain(page);
       // The curtain names the seat about to take the phone and carries the game's buttons.
       await expect(page.locator('#curtainOverlay')).toBeVisible();
@@ -150,27 +146,29 @@ SHELL_GAMES.forEach((game) => {
       project,
     }) => {
       const { page } = player;
-      await page.goto(gameUrl(project, game));
+      await page.goto(gamePath(project, game));
       await page.evaluate(
         `localStorage.setItem(${JSON.stringify(prefKey(game, 'homeTab'))}, 'rules'); localStorage.setItem(${JSON.stringify(prefKey(game, 'playMode'))}, 'local');`,
       );
-      // A room nobody hosts: the guest is in its waiting room all the same, the session asking after it.
-      await page.goto(invitePath(project, game, 'kqzm'));
+      // A room nobody hosts (a code of the game's length, typed in lower case as a link may carry
+      // it): the guest is in its waiting room all the same, the session asking after it.
+      const nobody = unhostedCode(game);
+      await page.goto(invitePath(project, game, nobody.toLowerCase()));
       await expect(page.locator('#guestWaitScreen')).toBeVisible();
       await expect(page.locator('#homeScreen')).toBeHidden();
       expect(await readPref(page, game, 'playMode')).toBe('local');
       expect(await readPref(page, game, 'homeTab')).toBe('rules');
       expect(await readPref(page, game, 'name')).toBeNull();
-      // The link is spent: the harness hooks stay, the invite's parameters do not.
+      // The link is spent: the harness hooks and the page's own query stay, the invite's parameters do not.
       const url = new URL(page.url());
       expect(url.searchParams.has('join')).toBe(false);
-      expect(url.search).toBe(gameQuery());
+      expect(url.search).toBe(gameSearch(game));
       // Cancel is the ordinary home screen (the link stored nothing: the Rules tab comes back) with
       // the code the link filled still in the form, so the guest can try again by hand.
       await page.locator('#cancelGuestBtn').click();
       await expect(page.locator('#homeScreen')).toBeVisible();
       await expect(page.locator('#rulesPanel')).toBeVisible();
-      await expect(page.locator('#codeInput')).toHaveValue('KQZM');
+      await expect(page.locator('#codeInput')).toHaveValue(nobody);
       // A reload is the ordinary home screen (the stored Rules tab and pass-and-play mode).
       await page.reload();
       await expect(page.locator('#rulesPanel')).toBeVisible();
@@ -196,13 +194,13 @@ SHELL_GAMES.forEach((game) => {
       { tag: '@online' },
       async ({ players, project }) => {
         const { host, guest } = players;
-        const { code, before } = await handOff(host.page, game, driver, gameUrl(project, game));
+        const { code, before } = await handOff(host.page, game, driver, gamePath(project, game));
         // Pass and play opened no Peer; the handoff opened the room's.
         expect((await host.peerCalls()).map((c) => c.id)).toEqual([peerIdFor(game, code)]);
 
         // Bob's phone remembers his name from an earlier visit; the link sits him down as himself,
         // with nothing to type and nothing to tap.
-        await guest.page.goto(gameUrl(project, game));
+        await guest.page.goto(gamePath(project, game));
         await rememberName(guest.page, game, BOB);
         await guest.page.goto(invitePath(project, game, code));
         await expect(guest.page.locator('#guestWaitScreen')).toBeVisible();

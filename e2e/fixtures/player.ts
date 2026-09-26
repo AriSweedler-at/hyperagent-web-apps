@@ -17,6 +17,7 @@ import {
   type TestInfo,
 } from '@playwright/test';
 
+import type { Game } from '../../tools/games.ts';
 import { ALLOWED_FAILURES, routeOffline } from './offline.ts';
 import { readPeerCalls, type PeerCall } from './peer-calls.ts';
 import { RECORD_PC_SCRIPT } from './peer-connections.ts';
@@ -82,6 +83,32 @@ export const gameQuery = (hooks: GameHooks = {}): string => {
   return query === '' ? '' : `?${query}`;
 };
 
+/**
+ * A page's own query beside the harness hooks: what a game needs in its URL to be the page the
+ * specs drive. Fidice's shell path sits behind `?shell=1` until M6 of
+ * docs/design/fidice-shell-adoption.md flips the page (M5 registered it as a shell game, so the
+ * eight shell specs play it there); e2e/smoke.spec.ts opens the bare `pagePath` on purpose, the
+ * live path's load check until then. M6 deletes this with the flag.
+ */
+export const PAGE_QUERY: Partial<Record<Game, string>> = { fidice: 'shell=1' };
+
+/** The search half of `gamePath` (`?peer=…&ice=…`, then the page's own query): what an invite link's page keeps once it has read its code. */
+export const gameSearch = (game: PageName, hooks: GameHooks = {}): string => {
+  const params = new URLSearchParams(gameQuery(hooks));
+  const own = game === 'landing' ? undefined : PAGE_QUERY[game];
+  if (own !== undefined) {
+    new URLSearchParams(own).forEach((value, key) => {
+      params.set(key, value);
+    });
+  }
+  const query = params.toString();
+  return query === '' ? '' : `?${query}`;
+};
+
+/** The page to open on `project` (relative to its baseURL): `pagePath` with the harness hooks and the page's own query (PAGE_QUERY). */
+export const gamePath = (project: Project, game: PageName, hooks: GameHooks = {}): string =>
+  `${pagePath(project, game)}${gameSearch(game, hooks)}`;
+
 /** How a player's context differs from the default desktop one. */
 export type PlayerOptions = Readonly<{
   /** A phone: touch events and a coarse pointer (`matchMedia('(pointer: coarse)')` matches), so sound starts muted (sound-fonts.md §12). */
@@ -120,19 +147,20 @@ export const newPlayer = async (
   return { role, seed, context, page, watched, peerCalls: () => readPeerCalls(page) };
 };
 
-/** Open a game page on `project` with the `?peer=` and `?ice=` hooks (relative to the project's baseURL). */
+/** Open a game page on `project` with the `?peer=` and `?ice=` hooks and its own query (relative to the project's baseURL). */
 export const openGame = async (
   player: Player,
   project: Project,
   game: PageName,
   hooks: GameHooks = {},
 ): Promise<void> => {
-  await player.page.goto(`${pagePath(project, game)}${gameQuery(hooks)}`);
+  await player.page.goto(gamePath(project, game, hooks));
 };
 
 /**
  * The invite for `code` as a guest's browser opens it in the harness: the game's page with the
- * `?peer=` and `?ice=` hooks and `?join=<code>` (web/shared/lib/invite.ts JOIN_PARAM) beside them.
+ * `?peer=` and `?ice=` hooks, its own query, and `?join=<code>` (web/shared/lib/invite.ts
+ * JOIN_PARAM) beside them.
  */
 export const invitePath = (
   project: Project,
@@ -140,7 +168,7 @@ export const invitePath = (
   code: string,
   hooks: GameHooks = {},
 ): string => {
-  const params = new URLSearchParams(gameQuery(hooks));
+  const params = new URLSearchParams(gameSearch(game, hooks));
   params.set('join', code);
   return `${pagePath(project, game)}?${params.toString()}`;
 };
