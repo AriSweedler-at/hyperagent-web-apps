@@ -13,7 +13,7 @@
 // legacy wire (src/net/protocol.ts `hello`/`act`/`state`/`error`/`info`, its tokens, its
 // spectator role) is not spoken here: D5 rejoins by name, D6 keeps no spectator online. The
 // N-seat wire pins are the skeleton's (`NAME_MAX` 20, `TOAST_MAX` 500, `DEFAULT_GUEST_NAME`
-// 'Jeff', the `{t, hostName, ...room}` key order; plan §7 D1) and the goldens under
+// 'Guest', the `{t, hostName, ...room}` key order; plan §7 D1) and the goldens under
 // test/fixtures/fidice-wire/ (2p-*, 6p-*) are recorded by protocol.test.ts as briscola's are. A
 // wire-visible change adds a version field to the skeleton.
 import {

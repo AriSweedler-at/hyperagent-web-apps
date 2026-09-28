@@ -12,6 +12,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { arrayOf, boolean, literal, number, object, pair, string } from '../lib/json.ts';
+import { guestNameFor } from '../lib/protocol.ts';
 import type { RecentGame } from '../lib/recentGames.ts';
 import { err, ok, type Result } from '../lib/result.ts';
 import { mulberry32 } from '../lib/rng.ts';
@@ -37,6 +38,7 @@ import {
   fresh,
   guestContextOf,
   guestGoneMsg,
+  guestName,
   guestNameAmong,
   hostContextOf,
   hostDispatch,
@@ -661,7 +663,7 @@ describe('a table of four (FAKE4: cfg.seats)', () => {
       run4(opened4(), { type: 'host/frame', frame: { t: 'join', name: 'Bo' } }).app.shell.seats[0],
     ).toEqual({ name: 'Bo', connected: true });
     expect(guestNameAmong('Ann', ['ann', 'Ann 2', 'ANN 3'])).toBe('Ann 4');
-    expect(guestNameAmong('', ['Ann'])).toBe('Jeff');
+    expect(guestNameAmong('', ['Ann'])).toBe('Guest');
   });
 
   test('host/deal: refused below the table`s min with the count; else every seat dealt in order and each connected seat sent its own view', () => {
@@ -995,6 +997,7 @@ describe('the initial shell and the partitions', () => {
       oppConnected: false,
       seats: [],
       mySeat: 0,
+      seatedName: null,
       localNames: [],
       localSeats: [],
       nameTouched: false,
@@ -1278,7 +1281,9 @@ describe('home', () => {
   });
 
   test('join/link sits the guest down as the tap on #joinBtn would: the same state and effects after the form is filled, under the remembered name or the default; a bad code is the tap`s toast over the filled form; nothing while seated', () => {
-    // Nothing remembered: the input shows the game's first default, which the tap reads as untouched.
+    // Nothing remembered: the link's guest never saw the box, so the prefill it shows is not its
+    // word; the link stands for a tap on an EMPTY box, and the guest fallback is the name (C11:
+    // never the local default, which is the host's own name).
     const linked = run(withShell(initialApp, { homeTab: 'rules', playMode: 'local' }), {
       type: 'join/link',
       code: 'kqzm9',
@@ -1289,14 +1294,14 @@ describe('home', () => {
     }).app;
     const tapped = run(withShell(filled, { playMode: 'online', codeDraft: 'KQZM' }), {
       type: 'join/click',
-      name: 'Ari',
+      name: '',
       code: 'KQZM',
     });
     expect(linked.app).toEqual(tapped.app);
     expect(linked.app.shell).toMatchObject({
       role: 'guest',
       code: 'KQZM',
-      myName: 'Jeff',
+      myName: 'Guest',
       netAttempt: 1,
       screen: 'guestWaitScreen',
       guestStatus: { text: 'Connecting KQZM', pulse: true },
@@ -1452,7 +1457,7 @@ describe('hosting', () => {
     expect(effects).toEqual([{ type: 'send', frame: { t: 'lobby', hostName: 'Ann', level: 3 } }]);
     expect(
       run(started, { type: 'host/frame', frame: { t: 'join', name: '' } }).app.shell.oppName,
-    ).toBe('Jeff');
+    ).toBe('Guest');
     const idle = lobby();
     expect(
       run(idle, { type: 'host/frame', frame: { t: 'action', action: { type: 'move' } } }),
@@ -1475,9 +1480,15 @@ describe('hosting', () => {
       { type: 'persist' },
       { type: 'scrollTop' },
     ]);
-    // A connected guest with no name yet gets the wire's default seat name.
+    // A connected guest with no name yet is dealt to under the guest fallback: the word it would
+    // have chosen for itself, or the game's own.
     const nameless = run(withShell(lobby(), { oppName: null }), { type: 'host/deal' }).app;
-    expect(game(nameless).players[1]).toEqual({ id: 'guest', name: 'Jeff' });
+    expect(game(nameless).players[1]).toEqual({ id: 'guest', name: 'Guest' });
+    const visitor = reduceShell(withShell(lobby(), { oppName: null }), { type: 'host/deal' }, ctx, {
+      ...FAKE,
+      names: { default: 'Ari', guest: 'Visitor' },
+    }).app;
+    expect(game(visitor).players[1]).toEqual({ id: 'guest', name: 'Visitor' });
   });
 
   test('hostDispatch: the guest`s actions are applied for seat 1 and broadcast; a refusal goes back as a toast frame; the host`s own refusal is the refuse hook', () => {
@@ -1513,13 +1524,23 @@ describe('hosting', () => {
     expect(broadcast(initialApp, ctx, FAKE)).toEqual({ app: initialApp, effects: [] });
   });
 
-  test('a rejoin mid-game renames seat 1 and broadcasts; the handoff is over', () => {
-    const gone = withShell(hosting(), { oppConnected: false, handoff: true });
+  test('a rejoin mid-game renames seat 1 and broadcasts; the handoff is over; the wait screen`s line, hidden under the table, names the newcomer too', () => {
+    const gone = withShell(hosting(), {
+      oppConnected: false,
+      handoff: true,
+      hostStatus: { text: 'Handoff ABCD to Jeff', pulse: false },
+    });
     const { app, effects } = run(gone, {
       type: 'host/frame',
       frame: { t: 'join', name: 'Jeffrey' },
     });
-    expect(app.shell).toMatchObject({ oppConnected: true, oppName: 'Jeffrey', handoff: false });
+    expect(app.shell).toMatchObject({
+      oppConnected: true,
+      oppName: 'Jeffrey',
+      handoff: false,
+      // repro-names N3: a later look at the wait screen must not find "send Jeff the invite…".
+      hostStatus: { text: joinedMsg('Jeffrey'), pulse: false },
+    });
     expect(game(app).players[1]).toEqual({ id: 'guest', name: 'Jeffrey' });
     expect(kinds(effects)).toEqual(['send', 'persist', 'scrollTop']);
   });
@@ -1585,10 +1606,11 @@ describe('joining', () => {
       { type: 'scrollTop' },
       { type: 'startGuest', code: 'KQZM', attempt: 1 },
     ]);
-    // The untouched default host name joins as the wire's guest default; a touched one keeps it; empty is the default; long is cut.
+    // The box's text is the name, the untouched prefill included (as host/click counts it, touched
+    // or not); an empty box is the guest fallback; long is cut.
     expect(
       run(initialApp, { type: 'join/click', name: 'Ari', code: 'KQZM' }).app.shell.myName,
-    ).toBe('Jeff');
+    ).toBe('Ari');
     expect(
       run(withShell(initialApp, { nameTouched: true }), {
         type: 'join/click',
@@ -1597,7 +1619,7 @@ describe('joining', () => {
       }).app.shell.myName,
     ).toBe('Ari');
     expect(run(initialApp, { type: 'join/click', name: '  ', code: 'KQZM' }).app.shell.myName).toBe(
-      'Jeff',
+      'Guest',
     );
     expect(
       run(initialApp, { type: 'join/click', name: 'B'.repeat(25), code: 'KQZM' }).app.shell.myName,
@@ -1682,6 +1704,270 @@ describe('joining', () => {
     expect(waiting.effects).toEqual([{ type: 'scrollTop' }]);
     const done = run(withShell(seated(), { view: viewFor(over, 1) }), { type: 'guest/lost' });
     expect(done.app.shell.screen).toBe('guestWaitScreen');
+  });
+});
+
+describe("the guest's name is the guest's (the owner, 2026-09-28; C11)", () => {
+  /** Ann's two-seat room, nobody in it yet. */
+  const hosted = (): App => run(initialApp, { type: 'host/click', name: 'Ann', level: '3' }).app;
+  const welcome = (hostName: string): FakeIntent => ({
+    type: 'guest/frame',
+    frame: { t: 'welcome', hostName, level: 3 },
+  });
+
+  test('join/click seats the guest under what it typed, cut then trimmed, whatever this device remembers for either pass-and-play seat', () => {
+    const typed = run(
+      initialApp,
+      { type: 'home/init', home: { ...home, name: 'Ari', p2Name: 'Ethan' } },
+      { type: 'join/click', name: ' Xyz ', code: 'ABCD' },
+    ).app;
+    expect(typed.shell).toMatchObject({ role: 'guest', myName: 'Xyz', p2Name: 'Ethan' });
+    // The owner's sentence, host-side: the host's remembered second-seat name never stands in for
+    // the guest's; the join's word seats it, the status says so, and the deal names it.
+    const owner = run(
+      initialApp,
+      { type: 'home/init', home: { ...home, name: 'Ann', p2Name: 'Ethan' } },
+      { type: 'host/click', name: 'Ann', level: '3' },
+      { type: 'host/frame', frame: { t: 'join', name: 'Xyz' } },
+    ).app;
+    expect(owner.shell).toMatchObject({ role: 'host', oppName: 'Xyz', p2Name: 'Ethan' });
+    expect(owner.shell.hostStatus.text).toContain(joinedMsg('Xyz'));
+    expect(game(run(owner, { type: 'host/deal' }).app).players[1]).toEqual({
+      id: 'guest',
+      name: 'Xyz',
+    });
+    // The host's order (protocol.ts `guestNameFor`): cut to 20, then trim, so the wire string is
+    // the seated string even for a name set past the input's maxlength.
+    expect(
+      run(initialApp, { type: 'join/click', name: 'a'.repeat(19) + ' x', code: 'ABCD' }).app.shell
+        .myName,
+    ).toBe('a'.repeat(19));
+    expect(guestName('a'.repeat(19) + ' x', FAKE)).toBe('a'.repeat(19));
+  });
+
+  test('the untouched prefill joins as itself; an empty box as the guest fallback, chosen on the guest: the shared word, or the game`s own', () => {
+    expect(
+      run(initialApp, { type: 'join/click', name: 'Ari', code: 'ABCD' }).app.shell.myName,
+    ).toBe('Ari');
+    expect(run(initialApp, { type: 'join/click', name: '', code: 'ABCD' }).app.shell.myName).toBe(
+      'Guest',
+    );
+    const visitor = { ...FAKE, names: { default: 'Ari', guest: 'Visitor' } };
+    expect(
+      reduceShell(initialApp, { type: 'join/click', name: '   ', code: 'ABCD' }, ctx, visitor).app
+        .shell.myName,
+    ).toBe('Visitor');
+    expect(guestName('', FAKE)).toBe('Guest');
+    expect(guestName('  ', visitor)).toBe('Visitor');
+    expect(guestName(' Bo ', visitor)).toBe('Bo');
+  });
+
+  test('join/link: the remembered name when there is one, else the guest fallback (never the local default)', () => {
+    expect(
+      run(
+        initialApp,
+        { type: 'home/init', home: { ...home, name: 'Zoë' } },
+        { type: 'join/link', code: 'ABCD' },
+      ).app.shell.myName,
+    ).toBe('Zoë');
+    expect(
+      run(initialApp, { type: 'home/init', home }, { type: 'join/link', code: 'ABCD' }).app.shell
+        .myName,
+    ).toBe('Guest');
+    // A name typed into pass-and-play's first seat is remembered under the same key: it joins too.
+    expect(
+      run(initialApp, { type: 'p1name/typed', value: 'Ari' }, { type: 'join/link', code: 'ABCD' })
+        .app.shell.myName,
+    ).toBe('Ari');
+  });
+
+  test('the guest learns its seated name at the welcome: the host`s rule mirrored exactly, for a table of names; then the view`s word wins', () => {
+    const joined = run(initialApp, { type: 'join/click', name: 'ann', code: 'ABCD' }).app;
+    expect(joined.shell.seatedName).toBeNull();
+    const welcomed = run(joined, welcome('Ann')).app;
+    expect(welcomed.shell).toMatchObject({ myName: 'ann', oppName: 'Ann', seatedName: 'ann 2' });
+    // The host, from the same join: the same string (plan-names §5.4: `guestNameAmong` against the
+    // host's name alone is `guestNameFor`, and the guest holds both inputs).
+    expect(
+      run(hosted(), { type: 'host/frame', frame: { t: 'join', name: welcomed.shell.myName } }).app
+        .shell.oppName,
+    ).toBe('ann 2');
+    ['Bo', 'ann', 'ANN', 'Ann', 'Guest', '', '   ', ' Bo ', 'x'.repeat(20), 'Ann 2', 'ari'].forEach(
+      (name) => {
+        const guest = run(initialApp, { type: 'join/click', name, code: 'ABCD' }).app;
+        const told = run(guest, welcome('Ann')).app.shell.seatedName;
+        const seatedBy = run(hosted(), {
+          type: 'host/frame',
+          frame: { t: 'join', name: guest.shell.myName },
+        }).app.shell.oppName;
+        expect(told, name).toBe(seatedBy);
+        expect(told, name).toBe(guestNameFor(guest.shell.myName, 'Ann'));
+      },
+    );
+    // The lobby frame says the same; a state frame's own seat is authoritative: the mirrored word
+    // when it agrees, a word the guest could not have known when the host's rule differs.
+    const lobbied = run(welcomed, {
+      type: 'guest/frame',
+      frame: { t: 'lobby', hostName: 'Ann', level: 3 },
+    }).app;
+    expect(lobbied.shell.seatedName).toBe('ann 2');
+    const players: Readonly<[Player, Player]> = [
+      { id: 'host', name: 'Ann' },
+      { id: 'guest', name: 'ann 2' },
+    ];
+    const same = run(lobbied, {
+      type: 'guest/frame',
+      frame: { t: 'state', view: viewFor({ ...dealt, players }, 1) },
+    }).app;
+    expect(same.shell.seatedName).toBe('ann 2');
+    const renamed = run(same, {
+      type: 'guest/frame',
+      frame: {
+        t: 'state',
+        view: viewFor({ ...dealt, players: [players[0], { id: 'guest', name: 'renamed' }] }, 1),
+      },
+    }).app;
+    expect(renamed.shell.seatedName).toBe('renamed');
+    // A game whose view's players are chairs, not seats, maps my seat itself (`result.seatName`);
+    // a view with no row for me keeps the last word.
+    const stateFrame: FakeIntent = {
+      type: 'guest/frame',
+      frame: { t: 'state', view: viewFor({ ...dealt, players }, 1) },
+    };
+    const chaired: ShellConfig<Fake> = {
+      ...FAKE,
+      result: { ...FAKE.result, seatName: (view, seat) => `chair ${view.names[seat]}` },
+    };
+    expect(reduceShell(lobbied, stateFrame, ctx, chaired).app.shell.seatedName).toBe('chair ann 2');
+    const unchaired: ShellConfig<Fake> = {
+      ...FAKE,
+      result: { ...FAKE.result, seatName: () => null },
+    };
+    expect(reduceShell(lobbied, stateFrame, ctx, unchaired).app.shell.seatedName).toBe('ann 2');
+  });
+
+  test('seatedName is null until the host answers, after a leave or a cancel, and in every other role', () => {
+    expect(initialApp.shell.seatedName).toBeNull();
+    const joined = run(initialApp, { type: 'join/click', name: 'Bo', code: 'ABCD' }).app;
+    expect(joined.shell.seatedName).toBeNull();
+    const welcomed = run(joined, welcome('Ann')).app;
+    expect(welcomed.shell.seatedName).toBe('Bo');
+    expect(run(welcomed, { type: 'leave/finish' }).app.shell.seatedName).toBeNull();
+    expect(run(welcomed, { type: 'cancel/finish' }).app.shell.seatedName).toBeNull();
+    // A second room after the first: the welcome sets it afresh, the join resets it first.
+    const again = run(run(welcomed, { type: 'cancel/finish' }).app, {
+      type: 'join/click',
+      name: 'Cy',
+      code: 'WXYZ',
+    }).app;
+    expect(again.shell.seatedName).toBeNull();
+    expect(run(again, welcome('Ann')).app.shell.seatedName).toBe('Cy');
+    // The host and pass-and-play never set it (their painters read the engine's names).
+    expect(hosted().shell.seatedName).toBeNull();
+    expect(lobby().shell.seatedName).toBeNull();
+    expect(hosting().shell.seatedName).toBeNull();
+    expect(local().shell.seatedName).toBeNull();
+    expect(run(local(), { type: 'handoff/click' }).app.shell.seatedName).toBeNull();
+  });
+
+  test('N seats: my own row of the lobby names me; a welcome leaves it null whatever its row holds; a later lobby fills it; the state frame`s seat wins', () => {
+    const joined = run4(initialApp4, { type: 'join/click', name: 'Cy', code: 'ABCD' }).app;
+    expect(joined.shell.seatedName).toBeNull();
+    // The welcome goes out before the host hears the join: seat 2 (mine) is still empty.
+    const early = run4(joined, {
+      type: 'guest/frame',
+      frame: roomFrame4(
+        'welcome',
+        'Ann',
+        { level: 4 },
+        [{ name: 'Bo', connected: true }, EMPTY_SEAT, EMPTY_SEAT],
+        2,
+      ),
+    }).app;
+    expect(early.shell).toMatchObject({ mySeat: 2, seatedName: null });
+    const seats: ReadonlyArray<SeatState> = [
+      { name: 'Bo', connected: true },
+      { name: 'Cy 2', connected: true },
+      EMPTY_SEAT,
+    ];
+    const told = run4(early, {
+      type: 'guest/frame',
+      frame: roomFrame4('lobby', 'Ann', { level: 4 }, seats, 2),
+    }).app;
+    expect(told.shell.seatedName).toBe('Cy 2');
+    // A welcome's row for my seat is not mine yet: it goes out at channel open, before my join
+    // reaches the host, so the row can hold a vacated occupant's kept name (mid-game
+    // `host/guestGone` keeps the name, disconnected) or a resumed room's saved one; only the lobby
+    // that answers the join names me.
+    const stale = run4(joined, {
+      type: 'guest/frame',
+      frame: roomFrame4(
+        'welcome',
+        'Ann',
+        { level: 4 },
+        [{ name: 'Bo', connected: true }, { name: 'Cy', connected: false }, EMPTY_SEAT],
+        2,
+      ),
+    }).app;
+    expect(stale.shell).toMatchObject({ mySeat: 2, seatedName: null });
+    expect(
+      run4(stale, {
+        type: 'guest/frame',
+        frame: roomFrame4(
+          'lobby',
+          'Ann',
+          { level: 4 },
+          [{ name: 'Bo', connected: true }, { name: 'Zed', connected: true }, EMPTY_SEAT],
+          2,
+        ),
+      }).app.shell.seatedName,
+    ).toBe('Zed');
+    // A lobby whose row for me is still empty keeps the last word.
+    expect(
+      run4(told, {
+        type: 'guest/frame',
+        frame: roomFrame4(
+          'lobby',
+          'Ann',
+          { level: 4 },
+          [{ name: 'Bo', connected: true }, EMPTY_SEAT, EMPTY_SEAT],
+          2,
+        ),
+      }).app.shell.seatedName,
+    ).toBe('Cy 2');
+    // A frame with no seating is a room of exactly two (briscola's protocol leaves `seats`/`you`
+    // off at two seats), so the two-seat mirror applies whatever the game's capacity.
+    expect(
+      run4(told, { type: 'guest/frame', frame: { t: 'lobby', hostName: 'Ann', level: 4 } }).app
+        .shell.seatedName,
+    ).toBe('Cy');
+    expect(
+      run4(joined, { type: 'guest/frame', frame: { t: 'welcome', hostName: 'cy', level: 4 } }).app
+        .shell.seatedName,
+    ).toBe('Cy 2');
+    const dealtTo = run4(told, {
+      type: 'guest/frame',
+      frame: { t: 'state', view: viewFor4(game4(dealt4()), 2) },
+    }).app;
+    expect(dealtTo.shell.seatedName).toBe('Cy');
+  });
+
+  test('a second join frame from the same seat before the deal re-seats under the new name and rewrites the wait screen`s line (G5)', () => {
+    const renamed = run(lobby(), { type: 'host/frame', frame: { t: 'join', name: 'Xyz' } });
+    expect(renamed.app.shell).toMatchObject({
+      oppName: 'Xyz',
+      oppConnected: true,
+      startGameVisible: true,
+      hostStatus: { text: joinedMsg('Xyz') },
+      seats: [{ name: 'Xyz', connected: true }],
+    });
+    expect(renamed.effects).toEqual([
+      { type: 'send', frame: { t: 'lobby', hostName: 'Ann', level: 3 } },
+    ]);
+    // Renaming to the host's own name dedupes as a first join would.
+    expect(
+      run(lobby(), { type: 'host/frame', frame: { t: 'join', name: 'ann' } }).app.shell.oppName,
+    ).toBe('ann 2');
   });
 });
 

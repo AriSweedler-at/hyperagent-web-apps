@@ -149,6 +149,16 @@ export type ShellBlocks = Readonly<{
   hostWaitList: string;
   /** The same under `#guestWaitStatus` (`#guestSeatList`), or ''. */
   guestWaitList: string;
+  /**
+   * The guest's own seat as the host named it, under that list (`#guestSeatName`, shellPaint.ts
+   * `paintWaiting` through `byId`: "Playing as …" off the shell's `seatedName`): the id-only element
+   * `<div id="guestSeatName" class="hidden"></div>` for backgammon and briscola, each theme styling
+   * it by id (no class, so the class contract has no new row); '' for gin, whose composed DOM the
+   * parity oracle (tools/parity/gin-dom-parity.ts) holds to the legacy page checkpoint for
+   * checkpoint, and for fidice, whose seat list's ` · you` row already names my seat (no
+   * "Playing as …" line until the restyle decides; web/games/fidice/page.ts).
+   */
+  guestSeatName: string;
   /** `#homeScreen`'s panels between Rules and About (gin's score panel). */
   extraPanels: string;
   /** `#app`'s screens between the home and the waiting rooms (gin's scorer). */

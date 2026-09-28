@@ -392,6 +392,15 @@ label {
 .seat-list li[data-you] {
   font-weight: 600;
 }
+/* The guest's own seat as the host named it, under the seat list (shellPaint.ts `paintWaiting`,
+   "Playing as …"; the shell's `seatedName`): small, dim cream, centred; the list's ` · you` row
+   says the same in full. */
+#guestSeatName {
+  color: var(--cream-dim);
+  font-size: 0.88rem;
+  text-align: center;
+  padding-top: 6px;
+}
 .empty-note {
   font-size: 0.88rem;
   padding: 8px 0 0;

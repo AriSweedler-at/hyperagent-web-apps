@@ -22,6 +22,7 @@ import {
   seatListHtml,
   seatListKey,
   seatRows,
+  seatedAsMsg,
   showToast,
   type Sheet,
 } from './shellPaint.ts';
@@ -115,6 +116,35 @@ describe('paintWaiting', () => {
     expect(p.get('guestWaitStatus').hasClass('pulse')).toBe(false);
     expect(p.get('startGameBtn').hidden()).toBe(false);
     expect(p.get('startGameBtn').hasClass('btn')).toBe(true);
+  });
+
+  test('the seated name, when the page has the line: "Playing as …" shown for a name, hidden and empty for null or none; a page without it paints the rest as before', () => {
+    const waiting = {
+      code: 'ABCD',
+      hostStatus: { text: 'Waiting…', pulse: true },
+      guestStatus: { text: 'Connected', pulse: false },
+      startGameVisible: false,
+    };
+    // gin's page: no `#guestSeatName`, so the seated name paints nothing and the rest as before.
+    const plain = page();
+    paintWaiting(plain.doc, { ...waiting, seatedName: 'Ari 2' });
+    expect(plain.get('guestWaitStatus').text()).toBe('Connected');
+    expect(plain.get('roomCode').text()).toBe('ABCD');
+    // backgammon's and briscola's: the line under the status, hidden as shipped.
+    const p = fakePage([...pageEls(), fakeEl('guestSeatName', { classes: ['hidden'] })]);
+    paintWaiting(p.doc, { ...waiting, seatedName: 'Ari 2' });
+    expect(p.get('guestSeatName').text()).toBe('Playing as Ari 2');
+    expect(p.get('guestSeatName').hidden()).toBe(false);
+    paintWaiting(p.doc, { ...waiting, seatedName: 'Guest' });
+    expect(p.get('guestSeatName').text()).toBe(seatedAsMsg('Guest'));
+    paintWaiting(p.doc, { ...waiting, seatedName: null });
+    expect(p.get('guestSeatName').text()).toBe('');
+    expect(p.get('guestSeatName').hidden()).toBe(true);
+    paintWaiting(p.doc, { ...waiting, seatedName: 'Bo' });
+    expect(p.get('guestSeatName').hidden()).toBe(false);
+    paintWaiting(p.doc, waiting);
+    expect(p.get('guestSeatName').text()).toBe('');
+    expect(p.get('guestSeatName').hidden()).toBe(true);
   });
 
   test('the seat list, when the page has one: the host first, every seat with its state and mine marked, keyed on the rows; nothing while no room is open; a page without it is untouched', () => {

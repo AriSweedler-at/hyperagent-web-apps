@@ -286,9 +286,9 @@ describe('the goldens: what the builders emit, key for key, and what the decoder
 describe('the refusals and the pins the skeleton inherits (plan §7 D1)', () => {
   test('the seven tags, the caps, the default guest name; a stranger tag names the seven', () => {
     expect(WIRE_TAGS).toEqual(['join', 'action', 'welcome', 'lobby', 'full', 'toast', 'state']);
-    expect([NAME_MAX, TOAST_MAX, DEFAULT_GUEST_NAME]).toEqual([20, 500, 'Jeff']);
+    expect([NAME_MAX, TOAST_MAX, DEFAULT_GUEST_NAME]).toEqual([20, 500, 'Guest']);
     expect(SEAT_COUNTS).toEqual([2, 3, 4, 5, 6]);
-    expect(guestNameFor('', 'Ann')).toBe('Jeff');
+    expect(guestNameFor('', 'Ann')).toBe('Guest');
     expect(guestNameFor('  ann ', 'Ann')).toBe('ann 2');
     expect(guestNameFor('x'.repeat(30), 'Ann')).toBe('x'.repeat(20));
     expect(decodeFrame({ t: 'hello', role: 'player' })).toEqual({
