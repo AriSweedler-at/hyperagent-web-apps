@@ -525,6 +525,8 @@ type Options = Readonly<{
   sideways?: boolean;
   /** The page carries the turn gate (`gateMarkup`), as a page that plays sideways does. */
   gated?: boolean;
+  /** The window has a `screen` whose `orientation.lock` is a function (true: Android's Chromium family) or is absent (false: an iPhone); undefined, no `screen` at all. */
+  lock?: boolean;
 }>;
 
 type Log = Readonly<{
@@ -532,6 +534,8 @@ type Log = Readonly<{
   order: string[];
   intents: FakeIntent[];
   ctx: (readonly [number, number])[];
+  /** `ctx.canLock` as each reduce saw it. */
+  canLock: (boolean | undefined)[];
   ran: (readonly [string, number])[];
   paints: App[];
   sounds: boolean[];
@@ -582,6 +586,7 @@ const bootPage = (options: Options = {}) => {
     order: [],
     intents: [],
     ctx: [],
+    canLock: [],
     ran: [],
     paints: [],
     sounds: [],
@@ -641,6 +646,13 @@ const bootPage = (options: Options = {}) => {
       }),
     ...(options.unseeded === true ? {} : { __rng: mulberry32(7) }),
     ...(options.audio === true ? { AudioContext: FakeAudioContext } : {}),
+    ...(options.lock === undefined
+      ? {}
+      : {
+          screen: {
+            orientation: options.lock ? { lock: (): Promise<void> => Promise.resolve() } : {},
+          },
+        }),
     ...(options.coarse === undefined
       ? {}
       : {
@@ -686,6 +698,7 @@ const bootPage = (options: Options = {}) => {
     log.intents.push(intent);
     log.order.push(`intent:${intent.type}`);
     log.ctx.push([ctx.rng(), ctx.now()]);
+    log.canLock.push(ctx.canLock);
     if (intent.type === 'home/init') return { app: { ...app, home: intent.home }, effects: [] };
     if (intent.type === 'soundFont/set') {
       return { app: { ...app, shell: { ...app.shell, soundFont: intent.font } }, effects: [] };
@@ -955,6 +968,19 @@ describe('bootShell', () => {
       }),
     });
     expect(bare).toEqual([undefined]);
+  });
+
+  test("the reducer's ctx says whether this device can lock its rotation (shell.ts `Ctx.canLock`, the rotation hint's test): `screen.orientation.lock` a function says yes; no such function, or no `screen` at all, says no", () => {
+    const android = bootPage({ lock: true });
+    expect(android.log.canLock.length).toBeGreaterThan(0);
+    expect(new Set(android.log.canLock)).toEqual(new Set([true]));
+    // Every step's ctx agrees: read once at boot, not per dispatch.
+    android.run([]);
+    expect(android.log.canLock.at(-1)).toBe(true);
+    const iphone = bootPage({ lock: false });
+    expect(new Set(iphone.log.canLock)).toEqual(new Set([false]));
+    const bare = bootPage();
+    expect(new Set(bare.log.canLock)).toEqual(new Set([false]));
   });
 
   test('a game that plays sideways: the boot watches the two phone predicates into the reducer and paints the turn gate after every paint; a game that stays upright is watched for nothing and its page has no gate to paint', () => {
