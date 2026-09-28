@@ -1,28 +1,59 @@
-// The pure twin of the board's CSS (docs/design/backgammon-board.md §3.3, §7). theme.css
+// The pure twin of the board's CSS (docs/design/backgammon-board.md §3.1, §3.3, §7). theme.css
 // places the 24 points, the two bar halves, the dice and the two trays with two
-// `grid-template-areas` strings (the phone stands the board on end, the desktop lays it flat from
-// 900px) whose area names are own numbers, and the seat perspective is `data-own` on each point.
-// This module holds the same two templates as data and the same seat mapping, so the geometry
-// e2e (`boardGeometry`) and the painter tests have an oracle for where every place must be, and
+// `grid-template-areas` strings (the phone stands the board on end; the desktop, from 900px, and a
+// phone held sideways lay it flat: three layouts, two templates) whose area names are own
+// numbers, and the seat perspective is `data-own` on each point. This module holds the same two
+// templates as data, the same seat mapping, the same layout choice (`layoutFor`: the CSS's
+// `(min-width: 900px)` and its landscape query, a coarse pointer wider than tall under 500px) and
+// the same size arithmetic (`pointWidth`, `pointLength`), so the geometry e2e (`boardGeometry`)
+// and the painter tests have an oracle for where every place must be and how big, and
 // test/dist/backgammon-grid.test.ts parses the strings out of the built CSS and compares them with
 // `boardLayout`/`rowOrder` (design §10 risk 5: a typo in either string collapses the grid silently).
 // Pure: imports the engine's frame and nothing else; no DOM.
 import { err, ok, type Result } from '../../../../../shared/lib/result.ts';
 import { rulesOf, type PointIndex, type Seat } from '../../engine/index.ts';
 
-export type Layout = 'phone' | 'desktop';
+/** The phone stands the board on end; the desktop and a phone held sideways (`landscape`) lay it flat. */
+export type Layout = 'phone' | 'desktop' | 'landscape';
 /** The ids of the containers that hold checkers (`#point-N` is 1-based absolute). */
 export type PlaceId = `point-${number}` | 'barTop' | 'barBottom' | 'offLight' | 'offDark';
 /** Every grid area: the places plus the dice slot. */
 export type Area = PlaceId | 'dice';
 /** A grid rectangle in 1-based grid lines, as CSS `grid-area: row / col / row + rowSpan / col + colSpan`. */
 export type Cell = Readonly<{ row: number; col: number; rowSpan: number; colSpan: number }>;
-export type Viewport = Readonly<{ width: number; height: number }>;
+/** The safe-area insets a phone reports sideways (`env(safe-area-inset-*)`), in px; 0 in headless. */
+export type Insets = Readonly<{ left: number; right: number; bottom: number }>;
+/**
+ * What the CSS keys on: the viewport, whether the pointer is coarse (`(any-pointer: coarse)`; a
+ * finger, false in every desktop context and in headless without `hasTouch`) and the insets.
+ */
+export type Viewport = Readonly<{
+  width: number;
+  height: number;
+  coarse?: boolean;
+  insets?: Insets;
+}>;
 
 /** theme.css lays the board flat from this width (`@media (min-width: 900px)`). */
 export const DESKTOP_MIN_WIDTH = 900;
-export const layoutFor = (width: number): Layout =>
-  width >= DESKTOP_MIN_WIDTH ? 'desktop' : 'phone';
+/** theme.css's landscape query: a coarse pointer, wider than tall, at most this tall. */
+export const LANDSCAPE_MAX_HEIGHT = 500;
+/**
+ * From this width the landscape chrome is a rail beside the board (`(min-width: 714px)`); under
+ * it the chrome keeps its rows: 13 x 44 (twelve points and the bar at the floor) + the 44px tray
+ * + the 16px frame + two 16px edges + the 44px rail + its 6px gap.
+ */
+export const RAIL_MIN_WIDTH = 714;
+/**
+ * The layout a viewport gets: `landscape` for a coarse pointer wider than tall and at most 500px
+ * tall (a phone sideways, whatever its width: a Pixel 8 is 915 wide), else the width rule. A bare
+ * width is the width rule alone (callers with no height or pointer).
+ */
+export const layoutFor = (vp: Viewport | number): Layout => {
+  if (typeof vp === 'number') return vp >= DESKTOP_MIN_WIDTH ? 'desktop' : 'phone';
+  const landscape = vp.coarse === true && vp.width > vp.height && vp.height <= LANDSCAPE_MAX_HEIGHT;
+  return landscape ? 'landscape' : layoutFor(vp.width);
+};
 
 /** Five checkers are drawn; the sixth onward is the count badge on the top one (design §3.4). */
 export const MAX_DRAWN = 5;
@@ -32,10 +63,12 @@ export const LABEL_CORNER = 20;
 /**
  * `--stack-step`: the distance between coin centres. On a phone five coins fit along a point with
  * the label corner spared (27.6px at 390x844); on the desktop the run is longer than five
- * touching coins, so the `min` is the checker itself (touching, classic).
+ * touching coins, so the `min` is the checker itself (touching, classic). `spare` is what the run
+ * leaves at the point's ends: the phone's label corner, or the landscape's 18px (the desktop's
+ * 15px base offset and 3px at the tip).
  */
-export const stackStep = (pointLen: number, checkerD: number): number =>
-  Math.min(checkerD, (pointLen - checkerD - LABEL_CORNER) / 4);
+export const stackStep = (pointLen: number, checkerD: number, spare = LABEL_CORNER): number =>
+  Math.min(checkerD, (pointLen - checkerD - spare) / 4);
 /** How far a stack of `count` reaches along its axis: the oracle's `stackExtent(n) <= pointLen`. */
 export const stackExtent = (count: number, checkerD: number, step: number): number =>
   count <= 0 ? 0 : checkerD + (visibleOf(count) - 1) * step;
@@ -60,15 +93,51 @@ export const DESKTOP_GEOMETRY = {
   pointLenRatio: 5.2,
   checkerRatio: 0.86,
 } as const;
+/**
+ * A phone held sideways (design §3.1 landscape): the width is thirteen points (twelve and the
+ * bar), the tray and the frame inside what the chrome leaves beside the board; the height two
+ * point rows inside what it leaves above and below. Two schemes by width (`RAIL_MIN_WIDTH`): the
+ * rail (two 22px strips and a 44px rail with a 6px gap: 80px of chrome above and below, 50
+ * beside, plus the edges) and the rows (the phone's 170px of chrome rows, nothing beside but the
+ * edges). The edge is one number for both sides, the larger inset or 16px.
+ */
+export const LANDSCAPE_GEOMETRY = {
+  minEdge: 16,
+  rail: { beside: 50, chromeH: 80, minPointLen: 104 },
+  rows: { beside: 0, chromeH: 170, minPointLen: 90 },
+  trayW: 44,
+  frame: 16,
+  columns: 13,
+  minPointW: 44,
+  maxPointW: 64,
+  checkerRatio: 0.86,
+  stackSpare: 18,
+} as const;
 const clamp = (lo: number, x: number, hi: number): number => Math.min(hi, Math.max(lo, x));
-/** `--point-w` in px for a viewport: 47 at 390x844, 53.5 at 1280x800. */
+const schemeOf = (vp: Viewport) =>
+  vp.width >= RAIL_MIN_WIDTH ? LANDSCAPE_GEOMETRY.rail : LANDSCAPE_GEOMETRY.rows;
+/** `--edge`: the gutter on each side sideways, `max(16px, inset-l, inset-r)`. */
+export const edgeOf = (vp: Viewport): number =>
+  Math.max(LANDSCAPE_GEOMETRY.minEdge, vp.insets?.left ?? 0, vp.insets?.right ?? 0);
+/** `--chrome-w` sideways: both edges and, with the rail, the rail and its gap (82px inset-free; 32 with the rows). */
+export const chromeWidth = (vp: Viewport): number => 2 * edgeOf(vp) + schemeOf(vp).beside;
+/** `--point-w` in px for a viewport: 47 at 390x844, 53.5 at 1280x800, 54 at 844x390 on a phone. */
 export const pointWidth = (viewport: Viewport): number => {
   const { width, height } = viewport;
-  if (layoutFor(width) === 'phone') {
+  const layout = layoutFor(viewport);
+  if (layout === 'phone') {
     const g = PHONE_GEOMETRY;
     return clamp(
       g.minPointW,
       (height - g.chromeH - g.barW - g.offH - g.frame) / g.rows,
+      g.maxPointW,
+    );
+  }
+  if (layout === 'landscape') {
+    const g = LANDSCAPE_GEOMETRY;
+    return clamp(
+      g.minPointW,
+      (width - chromeWidth(viewport) - g.trayW - g.frame) / g.columns,
       g.maxPointW,
     );
   }
@@ -78,6 +147,19 @@ export const pointWidth = (viewport: Viewport): number => {
     Math.min((width - 64) / g.columns, (height - g.chromeH) / g.rows),
     g.maxPointW,
   );
+};
+/**
+ * `--point-len` sideways: half of what the chrome leaves above and below (with the frame and the
+ * bottom inset taken), floored per scheme (104 with the rail, 90 with the rows, each less half
+ * the bottom inset, so the floor's viewport stays 304 / 366 at any inset and the CSS fallback,
+ * which cannot read the inset, lifts exactly there; under the floor the document scrolls, design
+ * §3.10). 147 at 844x390, 94.5 at 667x375, 93.5 at 812x304 with a 21px home indicator.
+ */
+export const pointLength = (vp: Viewport): number => {
+  const s = schemeOf(vp);
+  const g = LANDSCAPE_GEOMETRY;
+  const insetB = vp.insets?.bottom ?? 0;
+  return Math.max(s.minPointLen - insetB / 2, (vp.height - s.chromeH - insetB - g.frame) / 2);
 };
 
 // ---- the seat frame ------------------------------------------------------------------------------
@@ -174,6 +256,7 @@ export const DESKTOP_TEMPLATE: ReadonlyArray<ReadonlyArray<string>> = [
     'offNear',
   ],
 ];
+/** The template a layout draws: the phone's, or the flat one the desktop and the landscape share. */
 export const templateOf = (layout: Layout): ReadonlyArray<ReadonlyArray<string>> =>
   layout === 'phone' ? PHONE_TEMPLATE : DESKTOP_TEMPLATE;
 /** The area names every template must place exactly once (the dice only where they are an area). */

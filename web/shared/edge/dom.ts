@@ -290,6 +290,22 @@ export const scrollIntoView = (el: Element, options: Readonly<ScrollIntoViewOpti
   scrollable.scrollIntoView?.call(el, options);
 };
 
+/**
+ * `el.focus()` where the element has it (a dialog takes focus when it opens: backgammon's turn
+ * gate on `#turnGateKeepBtn`, so a screen reader announces it and a keyboard lands inside it);
+ * nothing on a fake without one.
+ */
+export const focusElement = (el: Element): void => {
+  const focusable = el as Partial<Pick<HTMLElement, 'focus'>>;
+  focusable.focus?.call(el);
+};
+
+/** `el.blur()` where the element has it (a no-op on an element that is not focused); nothing on a fake without one. */
+export const blurElement = (el: Element): void => {
+  const focusable = el as Partial<Pick<HTMLElement, 'blur'>>;
+  focusable.blur?.call(el);
+};
+
 /** `requestAnimationFrame(fn)` where there is one; nothing on a fake. */
 export const nextFrame = (fn: () => void): void => {
   const frames = globalThis as Partial<Pick<typeof globalThis, 'requestAnimationFrame'>>;

@@ -1,5 +1,24 @@
 # Backgammon sideways on a phone: research synthesis
 
+> **Implemented (2026-09-28): the flat board, option A** (PR "feat(backgammon): The flat board on a
+> phone held sideways"). What landed: theme.css keys the layout on
+> `(any-pointer: coarse) and (orientation: landscape) and (max-height: 500px)` (the phone's shape,
+> never its width: a Pixel 8 and every Pro Max are 900px wide sideways; `any-pointer`, not
+> `pointer`, which two simulators saw flip after mouse clicks in the harness); the eight desktop
+> blocks that place the board carry the query in their lists, and blocks at the end of the file
+> re-tune the sizes and reflow the chrome into two 22px text strips above and below the board and a
+> 44px button rail on the right (menu, sound, the turn arrow in the free middle, Undo vertical)
+> from 714px wide; under it (the SE) the chrome keeps its rows. One `--edge = max(16px, inset-l,
+> inset-r)` pads both sides (R7: Android reports the cutout's side only). The new blocks use
+> `100svh`; the portrait clamps stay on `dvh`. Floors 104px (rail) / 90px (rows), fallbacks that
+> scroll under 304 / 366px. `ui/board/layout.ts` gained the `landscape` layout (`layoutFor(vp)`,
+> `pointWidth`, `pointLength`, `RAIL_MIN_WIDTH` 714); the geometry e2e runs sideways at 844x390 and
+> 667x375 on the touch fixture; the 390x844 and 1280x800 goldens are byte-identical. Numbers and
+> screenshots: the PR. Still open: what Safari and Chrome leave sideways on a real device (§7 PR 0,
+> the plan's G1); the portrait gate (D, its own PR); the Android lock (C-lite, a later PR); the
+> installable manifest (§6.4: no); the per-seat flip (§6.7: out of scope); the viewport-meta and
+> `touch-action` cleanups (a follow-up: a tap-heavy board could regress on double-tap zoom).
+
 Synthesized 2026-09-25 from the four sweeps in this folder: `platform-apis.md` (612 lines), `how-games-do-it.md` (460), `board-games-web.md` (159), `our-page.md` (183), plus `shots/` and `shots/measurements.json`. The repo was measured at 25cb36c (main), research only. Every URL below was fetched by a sweep on 2026-09-25; the date in parentheses is the one the page states. UNVERIFIED marks a claim no sweep confirmed from a fetched page.
 
 ## 1. The ask and the answer in ten lines

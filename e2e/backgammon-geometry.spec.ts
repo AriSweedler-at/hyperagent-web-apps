@@ -1,14 +1,19 @@
 // The board's geometry as a real-click test (docs/design/backgammon-board.md §7 "Geometry oracle"):
-// pass-and-play on one page at a phone, a laptop and a short phone. At every state of a turn
-// (under the curtain, to roll with the modal up, rolled, after a move, with the die-chip tray
-// open, under the next curtain, at the game over) the 24 points tile the board without overlap in the order
-// ui/board/layout.ts `rowOrder` states for the layout and the seat, every stack shows at most five
-// coins inside its place, every tap target is at least 44px on a phone, nothing scrolls where the
-// viewport fits, and the frame around the board (topbar, status line, board, controls) keeps the
-// boxes it had at the start. The short phone (375x667, under the 806px floor) exercises the
-// fallback: the document scrolls and the controls are reachable at the bottom of that scroll. Both
-// seats are checked through `window.__backgammon.setup`: the seat mapping (`#board[data-seat]`,
-// `data-own`) and the row order flip with the mover, and a seven-stack shows five coins.
+// pass-and-play on one page at a phone, a laptop, a short phone and two phones held sideways. At
+// every state of a turn (under the curtain, to roll with the modal up, rolled, after a move, with
+// the die-chip tray open, under the next curtain, at the game over) the 24 points tile the board
+// without overlap in the order ui/board/layout.ts `rowOrder` states for the layout and the seat,
+// every stack shows at most five coins inside its place, every tap target is at least 44px on a
+// phone, nothing scrolls where the viewport fits, and the frame around the board (the layout's
+// boxes: topbar, status line, board, controls upright; the strips, the badge and the rail buttons
+// sideways) keeps the boxes it had at the start. The short phone (375x667, under the 806px floor)
+// exercises the fallback: the document scrolls and the controls are reachable at the bottom of
+// that scroll. The two sideways cases run on the `phone` fixture (a touch context, so
+// `(any-pointer: coarse)` matches and theme.css lays the board flat, design §3.1 landscape): an
+// iPhone 12 at 844x390 (the chrome in a rail beside the board) and an SE at 667x375 (under 714px
+// the chrome keeps its rows). Both seats are checked through `window.__backgammon.setup`: the seat
+// mapping (`#board[data-seat]`, `data-own`) and the row order flip with the mover, and a
+// seven-stack shows five coins.
 import type { Page } from '@playwright/test';
 
 import { POINT_INDICES, rulesOf, type Seat } from '../web/games/backgammon/src/engine/index.ts';
@@ -22,10 +27,16 @@ import {
   ownPlace,
   requireBoard,
 } from './fixtures/backgammon.ts';
-import { boardGeometry, expectBoardGeometry } from './fixtures/backgammon-geometry.ts';
+import {
+  boardGeometry,
+  expectBoardGeometry,
+  frameSelectors,
+  layoutOf,
+} from './fixtures/backgammon-geometry.ts';
 import {
   DESKTOP,
   PHONE,
+  PHONE_LANDSCAPE,
   PHONE_SHORT,
   expectSameFrame,
   type Frame,
@@ -35,12 +46,18 @@ import { reveal } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
-type Case = Viewport & Readonly<{ scrolls: boolean }>;
+/** `touch`: the `phone` fixture (a touch context, a coarse pointer) instead of the mouse `player`. */
+type Case = Viewport & Readonly<{ scrolls: boolean; touch?: true }>;
 const VIEWPORTS: Readonly<Record<string, Case>> = {
   phone: { ...PHONE, scrolls: false },
   desktop: { ...DESKTOP, scrolls: false },
   // An iPhone SE: the 44px point floor needs 806px, so the document scrolls instead of clipping.
   'phone-short': { ...PHONE_SHORT, scrolls: true },
+  // An iPhone 12 sideways: the flat board at 54px points, the chrome in a 44px rail on the right.
+  'phone-landscape': { ...PHONE_LANDSCAPE, scrolls: false, touch: true },
+  // An iPhone SE sideways: under 714px the rail cannot stand beside the board, so the chrome keeps
+  // its rows above and below (44.2px points, 94.5 long), still on one screen.
+  'phone-landscape-rows': { width: 667, height: 375, scrolls: false, touch: true },
 };
 
 /** Light's 6-point holds seven (the count badge, five drawn); a legal 6-5 for either seat. */
@@ -65,16 +82,17 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
   test.describe(name, () => {
     test('the points tile the board in rowOrder, targets are 44px, nothing clips, the frame holds', async ({
       player,
+      phone,
       project,
     }) => {
-      const { page } = player;
+      const { page } = vp.touch === true ? phone : player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
       const start = await boardGeometry(page);
       expectBoardGeometry(start, await seatShown(page), vp.scrolls, 'curtain');
       const check = async (when: string, seat?: Seat): Promise<Frame> => {
         const g = await boardGeometry(page);
         expectBoardGeometry(g, seat ?? (await seatShown(page)), vp.scrolls, when);
-        expectSameFrame(g.frame, start.frame, when);
+        expectSameFrame(g.frame, start.frame, when, frameSelectors(layoutOf(g)));
         return g.frame;
       };
 
@@ -113,9 +131,10 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
 
     test('both seats: the seat mapping and the row order follow the mover; a seven-stack shows five', async ({
       player,
+      phone,
       project,
     }) => {
-      const { page } = player;
+      const { page } = vp.touch === true ? phone : player;
       await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
       await reveal(page);
       const frame = rulesOf('portes');

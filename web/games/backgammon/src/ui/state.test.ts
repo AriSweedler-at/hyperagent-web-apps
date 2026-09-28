@@ -44,6 +44,7 @@ import {
   WAITING_FOR_GUEST_MSG,
   badPositionMsg,
   cuesBetween,
+  gateOpen,
   guestContextOf,
   guestGoneMsg,
   handoffLabel,
@@ -237,6 +238,8 @@ describe('the initial app', () => {
       curtainMode: 'always',
       noMoveUntil: null,
       lastPainted: null,
+      portraitPhone: false,
+      gateDismissed: false,
     });
     expect(SCREENS).toEqual([
       'homeScreen',
@@ -1935,5 +1938,131 @@ describe('the rest of the shell', () => {
     expect(Object.keys(CUES).sort()).toEqual([...raised].sort());
     expect(CUES.hit.cue).toBe('capture');
     expect(CUES.bearOff.cue).toBe('score');
+  });
+});
+
+// Last: the seeded rng is shared, and the rolls this describe plays would shift every later one.
+describe('the turn gate (docs/design/backgammon-landscape.md §5D)', () => {
+  test('viewport/portrait holds the device`s orientation, no effect; gateOpen at the table upright alone; gate/keep is for this table; the reducer still takes taps under it', () => {
+    const atHome = run(initialApp, { type: 'home/init', home });
+    const upright = run(atHome.app, { type: 'viewport/portrait', portrait: true });
+    expect(upright.effects).toEqual([]);
+    expect(upright.app.table.portraitPhone).toBe(true);
+    // The home stays upright-friendly.
+    expect(gateOpen(upright.app)).toBe(false);
+    // Start: the orientation survives the table's reset, so the gate is up with the first curtain.
+    const started = run(upright.app, { type: 'local/click', p1: 'Ann', p2: 'Bob' }).app;
+    expect(started.table).toMatchObject({ portraitPhone: true, gateDismissed: false });
+    expect(gateOpen(started)).toBe(true);
+    // Turned sideways it goes; upright again it is back.
+    const sideways = run(started, { type: 'viewport/portrait', portrait: false }).app;
+    expect(gateOpen(sideways)).toBe(false);
+    expect(gateOpen(run(sideways, { type: 'viewport/portrait', portrait: true }).app)).toBe(true);
+    // The endgame screen is not gated.
+    expect(gateOpen({ ...started, shell: { ...started.shell, screen: 'endgameScreen' } })).toBe(
+      false,
+    );
+    // "Play upright": down for this table, through the next curtain and a turn of the phone.
+    const kept = run(started, { type: 'gate/keep' });
+    expect(kept.effects).toEqual([]);
+    expect(gateOpen(kept.app)).toBe(false);
+    const turn = playTurn(run(revealed(kept.app), { type: 'roll/click' }));
+    expect(turn.app.table.curtain).not.toBeNull();
+    expect(gateOpen(turn.app)).toBe(false);
+    const turned = run(
+      turn.app,
+      { type: 'viewport/portrait', portrait: false },
+      { type: 'viewport/portrait', portrait: true },
+    ).app;
+    expect(gateOpen(turned)).toBe(false);
+    // Not a modal in the reducer's sense: under the gate a tap still reduces; `inert` on the DOM is
+    // the guard.
+    expect(run(started, { type: 'curtain/reveal' }).app.table.curtain).toBeNull();
+    // Leave (its `initHome` effect brings `home/init`) keeps the orientation and drops the
+    // dismissal; the next table asks again.
+    const left = run(kept.app, { type: 'leave/finish' }, { type: 'home/init', home }).app;
+    expect(left.table).toMatchObject({ portraitPhone: true, gateDismissed: false });
+    expect(gateOpen(left)).toBe(false);
+    expect(gateOpen(run(left, { type: 'local/click', p1: 'Ann', p2: 'Bob' }).app)).toBe(true);
+    // A fine pointer (the watcher reported false, or never reported): never.
+    expect(gateOpen(local())).toBe(false);
+  });
+
+  test('a finished game is not gated: the result sheet reads upright, peeking too; the next game`s first curtain asks again; the end screen never', () => {
+    const upright = run(local('5'), { type: 'viewport/portrait', portrait: true }).app;
+    expect(gateOpen(upright)).toBe(true);
+    // Played out under the gate (taps reduce beneath it) to the result sheet: the table screen,
+    // the game over, the match on.
+    const done = playOut({ app: upright, effects: [] }, 4000).app;
+    expect(view(done)).toMatchObject({ phase: 'over', matchOver: false });
+    expect(done.shell).toMatchObject({ screen: 'tableScreen' });
+    expect(done.table).toMatchObject({
+      resultOpen: true,
+      portraitPhone: true,
+      gateDismissed: false,
+    });
+    expect(gateOpen(done)).toBe(false);
+    expect(gateOpen(run(done, { type: 'result/peek' }).app)).toBe(false);
+    // Next game: the first curtain, and the gate with it.
+    const next = run(done, { type: 'next/click' }).app;
+    expect(next.table.curtain).not.toBeNull();
+    expect(view(next).phase).not.toBe('over');
+    expect(gateOpen(next)).toBe(true);
+    // A 1-point match ends on the end screen: not gated either.
+    const over = playOut(
+      { app: run(local('1'), { type: 'viewport/portrait', portrait: true }).app, effects: [] },
+      4000,
+    ).app;
+    expect(over.shell.screen).toBe('endgameScreen');
+    expect(gateOpen(over)).toBe(false);
+  });
+
+  test('the host lost mid-match keeps "Play upright" (the shell keeps the same table up); a leave drops it', () => {
+    const g = game(hosting());
+    const seated = run(
+      initialApp,
+      { type: 'join/click', name: 'Bo', code: 'ABCD' },
+      { type: 'guest/connected' },
+      { type: 'guest/frame', frame: { t: 'state', view: viewFor(g, 1) } },
+      { type: 'viewport/portrait', portrait: true },
+    ).app;
+    expect(gateOpen(seated)).toBe(true);
+    const kept = run(seated, { type: 'gate/keep' }).app;
+    expect(gateOpen(kept)).toBe(false);
+    const lost = run(kept, { type: 'guest/lost' }).app;
+    expect(lost.shell).toMatchObject({ screen: 'tableScreen', oppConnected: false });
+    expect(lost.table).toMatchObject({ gateDismissed: true, portraitPhone: true });
+    expect(gateOpen(lost)).toBe(false);
+    // The rejoin's state frame touches nothing of it either.
+    const back = run(lost, {
+      type: 'guest/frame',
+      frame: { t: 'state', view: viewFor(g, 1) },
+    }).app;
+    expect(gateOpen(back)).toBe(false);
+    // Leave: the next table asks again.
+    const left = run(back, { type: 'leave/finish' }, { type: 'home/init', home }).app;
+    expect(left.table).toMatchObject({ gateDismissed: false, portraitPhone: true });
+  });
+
+  test('the host gone once the match is over (hostLeft): the end screen is not gated, and home then Start asks again', () => {
+    const g = game(hosting());
+    const seated = run(
+      initialApp,
+      { type: 'join/click', name: 'Bo', code: 'ABCD' },
+      { type: 'guest/connected' },
+      { type: 'guest/frame', frame: { t: 'state', view: viewFor(g, 1) } },
+      { type: 'viewport/portrait', portrait: true },
+      { type: 'gate/keep' },
+    ).app;
+    const over = { ...viewFor(g, 1), phase: 'over' as const, matchOver: true };
+    const done = run(seated, { type: 'guest/frame', frame: { t: 'state', view: over } }).app;
+    const gone = run(done, { type: 'guest/lost' }).app;
+    expect(gone.shell.screen).toBe('endgameScreen');
+    expect(gone.table).toMatchObject({ gateDismissed: false, portraitPhone: true });
+    expect(gateOpen(gone)).toBe(false);
+    const left = run(gone, { type: 'leave/finish' }, { type: 'home/init', home }).app;
+    expect(left.shell.screen).toBe('homeScreen');
+    expect(gateOpen(left)).toBe(false);
+    expect(gateOpen(run(left, { type: 'local/click', p1: 'Ann', p2: 'Bob' }).app)).toBe(true);
   });
 });

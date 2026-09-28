@@ -50,6 +50,7 @@ describe('the games registry', () => {
           localNames: ['Ari', 'Lavi'],
           localFields: [['localTargetInput', '100']],
           curtainButtons: 1,
+          firstCurtain: 'Pass the phone to {name}',
         },
       },
       fidice: {
@@ -90,6 +91,11 @@ describe('the games registry', () => {
             'board',
             'toast',
             ...Array.from({ length: 24 }, (_, i) => `point-${String(i + 1)}`),
+            'turnGate',
+            'turnGateTitle',
+            'turnGateSub',
+            'turnGateGoBtn',
+            'turnGateKeepBtn',
           ],
           rulesSlots: true,
         },
@@ -107,6 +113,7 @@ describe('the games registry', () => {
             ['localMatchLengthSel', '5'],
           ],
           curtainButtons: 2,
+          firstCurtain: '{name} starts',
         },
       },
       briscola: {
@@ -141,6 +148,7 @@ describe('the games registry', () => {
           localNames: ['Ari', 'Lavi'],
           localFields: [['localPlayersSel', '2']],
           curtainButtons: 2,
+          firstCurtain: 'Pass the phone to {name}',
         },
       },
     });

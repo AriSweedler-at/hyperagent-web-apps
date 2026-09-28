@@ -69,6 +69,8 @@ export type FakeEl = Readonly<{
   removed: () => boolean;
   /** How many times `scrollIntoView` was called (web/shared/edge/glossary.ts `revealRule`). */
   scrolledInto: () => number;
+  /** `focus()` was called more recently than `blur()` (dom.ts `focusElement`/`blurElement`). */
+  focused: () => boolean;
   /** Event types with a listener, in registration order. */
   listenerTypes: () => ReadonlyArray<string>;
   fire: (type: string, init?: FireInit) => FakeEvent;
@@ -128,6 +130,7 @@ export const fakeEl = (id: string, options: FakeElOptions = {}): FakeEl => {
     removed: false,
     checked: false,
     scrolls: 0,
+    focused: false,
   };
   const children = options.children ?? [];
   const query = (selector: string): ReadonlyArray<FakeEl> => {
@@ -206,6 +209,12 @@ export const fakeEl = (id: string, options: FakeElOptions = {}): FakeEl => {
     scrollIntoView: () => {
       state.scrolls += 1;
     },
+    focus: () => {
+      state.focused = true;
+    },
+    blur: () => {
+      state.focused = false;
+    },
     closest: () => null,
     select: () => undefined,
     addEventListener: (type: string, fn: Listener) => {
@@ -233,6 +242,7 @@ export const fakeEl = (id: string, options: FakeElOptions = {}): FakeEl => {
     checked: () => state.checked,
     removed: () => state.removed,
     scrolledInto: () => state.scrolls,
+    focused: () => state.focused,
     listenerTypes: () => [...listeners.keys()],
     fire,
   };

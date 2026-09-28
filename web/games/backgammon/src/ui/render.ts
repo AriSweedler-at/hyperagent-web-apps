@@ -2,8 +2,9 @@
 // §4 "The interaction model"; docs/ARCHITECTURE.md "Module boundaries": ui/ reaches the
 // document only through the shared DOM edge). `paint(doc, app)` is idempotent and runs after
 // every intent: the screen switch and the waiting statuses, the home screen (ui/home.ts), the
-// curtain (ui/local.ts), the table, the result sheet, the endgame and the overlays, each written
-// from the App (ui/state.ts) alone, so the same App always paints the same DOM. Gin's
+// curtain (ui/local.ts), the table, the result sheet, the endgame, the overlays and the turn gate
+// (`paintGate`: `inert` on everything under it), each written from the App (ui/state.ts) alone,
+// so the same App always paints the same DOM. Gin's
 // ui/render.ts is the shape (so a shared shell, design §5.3, stays mechanical); the
 // table is this game's.
 //
@@ -19,8 +20,10 @@
 // design §6); the input wiring of the home screen and the curtain is beside their paints.
 import {
   appendHtml,
+  blurElement,
   closestFrom,
   dataOf,
+  focusElement,
   hasClass,
   keyOf,
   listen,
@@ -115,7 +118,7 @@ import { bindHome, paintHome } from './home.ts';
 import { bindLocal, paintCurtain } from './local.ts';
 import { aboutHtml } from './about.ts';
 import { RULES_SLOT_IDS, rulesItemsHtml } from './rules.ts';
-import { SCREENS, handoffLabel, rollModalOpen, type App, type Intent } from './state.ts';
+import { SCREENS, gateOpen, handoffLabel, rollModalOpen, type App, type Intent } from './state.ts';
 
 export type { PageLike };
 export type Dispatch = (intent: Intent) => void;
@@ -521,7 +524,12 @@ const paintControls = (doc: DocumentLike, app: App, v: View): void => {
   // The roll is the modal's (`paintRoll`); the slot shows the mini dice while I move.
   toggleClass(requireId(doc, 'diceMini'), 'hidden', !(mine && v.phase === 'moving'));
   const wait = requireId(doc, 'waitNote');
-  toggleClass(wait, 'hidden', over || v.isMyTurn || app.table.curtain !== null);
+  // Never under the roll modal: my forfeited roll's tumble (R14) has the turn flipped already.
+  toggleClass(
+    wait,
+    'hidden',
+    over || v.isMyTurn || app.table.curtain !== null || rollModalOpen(app),
+  );
   setText(wait, waitNoteText(v));
   toggleClass(requireId(doc, 'resultChipBtn'), 'hidden', !(over && !app.table.resultOpen));
   // The die-chip tray takes the row while a choice is pending (design §4.3).
@@ -642,6 +650,51 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
   const toggle = requireId(doc, 'menuCurtainToggle');
   setChecked(toggle, app.table.curtainMode === 'always');
   setAttr(toggle, 'data-next', app.table.curtainMode === 'always' ? 'never' : 'always');
+  paintGate(doc, app);
+};
+
+// ---- the turn gate (docs/design/backgammon-landscape.md §5D) ----------------------------------
+
+/**
+ * What the turn gate makes `inert` while it is up: `#app` and every other overlay of the page,
+ * each a body sibling of the gate (the curtain, whose Roll button would otherwise take a tap
+ * through the upright board; the result, cube and resign sheets; the rules, history and menu
+ * sheets; the leave confirm), never the gate itself and never `#toast`, which sits above it
+ * (z 100 over 90). render.test.ts pins the list to the page's `.overlay` ids.
+ */
+export const GATED_IDS: ReadonlyArray<string> = [
+  'app',
+  'curtainOverlay',
+  'resultOverlay',
+  'cubeOverlay',
+  'resignOverlay',
+  'rulesOverlay',
+  'historyOverlay',
+  'menuOverlay',
+  'leaveConfirm',
+];
+
+/**
+ * `#turnGate` ("Turn your phone sideways") over the table and the curtain on a phone held upright
+ * (ui/state.ts `gateOpen`), until the phone turns or "Play upright". No media query paints it:
+ * the App holds the orientation (`viewport/portrait`), so a test can assert it and a fine-pointer
+ * page never sees it. `inert` on GATED_IDS while it is up (Safari 15.5+, Chrome 102+; where it is
+ * missing the gate is still a fixed overlay with `aria-modal`), both gone when it hides. A dialog
+ * takes focus: on the paint that shows it, `#turnGateKeepBtn` (its one control; the button just
+ * tapped sits inside inert `#app` and would keep focus otherwise, a screen reader silent, a
+ * keyboard stranded), and on the paint that hides it that button lets go (a blur on an unfocused
+ * element does nothing, so this is "if focus is inside the gate"). Every other paint leaves focus
+ * alone.
+ */
+const paintGate = (doc: DocumentLike, app: App): void => {
+  const open = gateOpen(app);
+  const wasOpen = !hasClass(requireId(doc, 'turnGate'), 'hidden');
+  paintSheet(doc, 'turnGate', open);
+  GATED_IDS.forEach((id) => {
+    setAttr(requireId(doc, id), 'inert', open ? '' : null);
+  });
+  if (open && !wasOpen) focusElement(requireId(doc, 'turnGateKeepBtn'));
+  if (!open && wasOpen) blurElement(requireId(doc, 'turnGateKeepBtn'));
 };
 
 // ---- whose turn (the owner, 2026-09-25) -----------------------------------------------------------
@@ -835,6 +888,9 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
       ['handoffBtn', { type: 'handoff/click' }],
       ['rulesBtnGame', { type: 'rules/toggle' }],
       ['historyBtn', { type: 'history/toggle' }],
+      // The turn gate's "Play upright"; "Go sideways" ships hidden until the Android lock PR
+      // shows and binds it.
+      ['turnGateKeepBtn', { type: 'gate/keep' }],
     ],
     { skipDisabled: true },
   );

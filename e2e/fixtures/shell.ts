@@ -55,9 +55,23 @@ export const resumeLabel = {
 
 export const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** `#curtainTitle`: the seat taking the phone, one of the two. */
+/** `#curtainTitle` on every curtain but a game's first: the seat taking the phone, one of the two. */
 export const curtainTitle = (names: Names = DEFAULT_NAMES): RegExp =>
   new RegExp(`^Pass the phone to (${escapeRegExp(names[0])}|${escapeRegExp(names[1])})$`);
+
+/**
+ * The first curtain's title for `names` (tools/games.ts SHELL `firstCurtain`, its `{name}` one of
+ * the two seats), the seat named as the one capture: gin and briscola "Pass the phone to Ann",
+ * backgammon "Ann starts" (whoever tapped Start is holding the phone and may be the starter).
+ */
+export const firstCurtainTitle = (game: ShellGame, names: Names = DEFAULT_NAMES): RegExp => {
+  const seat = `(${names.map(escapeRegExp).join('|')})`;
+  const [before = '', after = ''] = SHELL[game].firstCurtain.split('{name}');
+  return new RegExp(`^${escapeRegExp(before)}${seat}${escapeRegExp(after)}$`);
+};
+/** The seat the first curtain names, read off its title. */
+export const firstSeat = (game: ShellGame, names: Names, title: string): string =>
+  firstCurtainTitle(game, names).exec(title)?.[1] ?? '';
 
 // ---- the code -----------------------------------------------------------------------------------
 

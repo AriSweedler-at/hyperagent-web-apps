@@ -1,5 +1,5 @@
 // The viewports and the frame oracle the geometry specs share (docs/design/shared-shell.md §5 A5,
-// §6.1): a phone, a laptop and a short phone spelled once, and the two page-side scripts that read
+// §6.1): a phone, a laptop, a short phone and a phone held sideways spelled once, and the two page-side scripts that read
 // boxes in document coordinates (so a scrolled page compares with an unscrolled one) and whether
 // anything clips. e2e/gin-geometry.spec.ts and e2e/fixtures/backgammon-geometry.ts each held a
 // copy of these before the shared-shell plan moved them here; the specs' own selectors, phases
@@ -15,6 +15,12 @@ export const PHONE: Viewport = { width: 390, height: 844 };
 export const DESKTOP: Viewport = { width: 1280, height: 800 };
 /** An iPhone SE: under both games' floor heights, so the document scrolls instead of clipping. */
 export const PHONE_SHORT: Viewport = { width: 375, height: 667 };
+/**
+ * An iPhone 12 held sideways, inset-free (headless reports no safe area). On a touch context
+ * (`hasTouch`, so `(any-pointer: coarse)` matches) backgammon lays the board flat with its chrome in
+ * a rail beside it (docs/design/backgammon-board.md §3.1 landscape: 54px points); gin scrolls.
+ */
+export const PHONE_LANDSCAPE: Viewport = { width: 844, height: 390 };
 
 /** Half a pixel: the rounding between two reads of one layout. */
 export const TOL = 0.5;
@@ -41,18 +47,23 @@ export const readFrame = (page: Page, selectors: ReadonlyArray<string>): Promise
  * Page-side: nothing is clipped. `document` is false only where the page is allowed to scroll,
  * each of `ids` holds its content inside its own box, and `<reachable>Reachable` says the element
  * `reachable` (gin's actions row, backgammon's controls) is on screen once the window is scrolled
- * to its end; the scroll position is put back before the expression returns.
+ * to its end; the scroll position is put back before the expression returns. An element with no
+ * box of its own (backgammon's `#controls` is `display: contents` sideways: its children are the
+ * chrome grid's items) is read through its shown children, whichever phase shows (Undo, or the
+ * tray's cancel button); none boxed at all is a failure, never a pass on an empty rect.
  */
 export const fitsScript = (ids: ReadonlyArray<string>, reachable: string): string => `(() => {
   const fits = (id) => { const el = document.getElementById(id); return el.scrollHeight <= el.clientHeight + 1; };
   const before = window.scrollY;
   window.scrollTo(0, document.documentElement.scrollHeight);
-  const end = document.getElementById(${JSON.stringify(reachable)}).getBoundingClientRect();
+  const target = document.getElementById(${JSON.stringify(reachable)});
+  const boxed = (el) => el.getClientRects().length > 0;
+  const bottoms = (boxed(target) ? [target] : Array.from(target.children).filter(boxed)).map((el) => el.getBoundingClientRect().bottom);
   window.scrollTo(0, before);
   return {
     document: document.documentElement.scrollHeight <= window.innerHeight + 1,
     ...Object.fromEntries(${JSON.stringify(ids)}.map((id) => [id, fits(id)])),
-    ${JSON.stringify(`${reachable}Reachable`)}: end.bottom <= window.innerHeight + 0.5,
+    ${JSON.stringify(`${reachable}Reachable`)}: bottoms.length > 0 && Math.max(...bottoms) <= window.innerHeight + 0.5,
   };
 })()`;
 

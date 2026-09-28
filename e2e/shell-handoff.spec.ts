@@ -135,7 +135,10 @@ SHELL_GAMES.forEach((game) => {
       const { page } = player;
       await startLocal(page, gameUrl(project, game), PHONE);
       await driver.curtainOffer.toCurtain(page);
-      // The curtain names the seat about to take the phone and carries the game's buttons.
+      // The curtain hands the phone to a seat and carries the game's buttons. Every game is past
+      // its first curtain here (whose wording is the game's own: shell-local.spec.ts): gin's and
+      // backgammon's `toCurtain` play to the second, where backgammon first offers Continue
+      // online; briscola's first already reads "Pass the phone to".
       await expect(page.locator('#curtainOverlay')).toBeVisible();
       await expect(page.locator('#curtainTitle')).toHaveText(curtainTitle(DEFAULT_NAMES));
       await expect(page.locator('#curtainOverlay .btn')).toHaveCount(shell.curtainButtons);

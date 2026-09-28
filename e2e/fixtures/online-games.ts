@@ -8,7 +8,15 @@
 import { expect, type Browser, type Page, type TestInfo } from '@playwright/test';
 
 import type { Game, ShellGame } from '../../tools/games.ts';
-import { bgBoardsAgree, bgStartLocal, boardKey, readBoard, requireBoard } from './backgammon.ts';
+import {
+  bgBoardsAgree,
+  bgPlayTurn,
+  bgRoll,
+  bgStartLocal,
+  boardKey,
+  readBoard,
+  requireBoard,
+} from './backgammon.ts';
 import {
   briscolaReveal,
   briscolaStartLocal,
@@ -70,8 +78,11 @@ export type SeatNameCells = Readonly<{
 /** A shell game's row: the online half and what the other shell specs ask of its table. */
 export type ShellDriver = OnlineDriver &
   Readonly<{
-    /** The curtain's sub line for the seat taking the phone (`first`) while the other looks away. */
-    curtainSub: (first: string, other: string) => string;
+    /**
+     * The first curtain's sub line for the seat taking the phone (`first`) while the other looks
+     * away; backgammon's is the opening roll (two names, two dice), so a pattern.
+     */
+    curtainSub: (first: string, other: string) => string | RegExp;
     seatNames: SeatNameCells;
     /** The table as one page shows it, as one comparable string. */
     snapshot: (page: Page) => Promise<string>;
@@ -201,9 +212,15 @@ const gin: ShellDriver = {
 
 const bgSnapshot = async (page: Page): Promise<string> => boardKey(await readBoard(page));
 
+/** The opening roll as the first curtain says it (ui/local.ts `openingRollText`): light's name first, then dark's, whichever seat starts. */
+const openingRoll = (first: string, other: string): RegExp => {
+  const roll = (a: string, b: string): string => `${a} rolled [1-6], ${b} rolled [1-6]`;
+  return new RegExp(`^(${roll(first, other)}|${roll(other, first)})\\.$`);
+};
+
 const backgammon: ShellDriver = {
   ...shellOnline,
-  curtainSub: () => 'Your turn. Roll when you have the phone.',
+  curtainSub: openingRoll,
   seatNames: { me: '#myName', meText: (name) => name, seated: '#guestSeatName' },
   // The shell's start, then what backgammon's online table adds: no curtain on either side (pass
   // and play alone has one). The two asserts came here from `bgHostStarts` (dry-round-2.md I5).
@@ -230,8 +247,15 @@ const backgammon: ShellDriver = {
   curtainOffer: {
     title:
       "the curtain's Continue online takes the offer too, with the phone about to change hands",
-    // The opening winner's curtain is up as the game starts: it offers the reveal and the handoff.
-    toCurtain: () => Promise.resolve(),
+    // The first curtain names the starter and offers the reveal alone (ui/local.ts
+    // `paintCurtain`: a newcomer has one thing to tap); the starter rolls and plays, and the
+    // second curtain, with the phone about to change hands, offers the handoff too.
+    toCurtain: async (page) => {
+      await reveal(page);
+      await bgRoll(page);
+      await bgPlayTurn(page);
+      await expect(page.locator('#curtainOverlay')).toBeVisible();
+    },
     take: async (page) => {
       await page.locator('#curtainHandoffBtn').click();
       return roomOpen(page, 'backgammon');

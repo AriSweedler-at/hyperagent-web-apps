@@ -620,7 +620,10 @@ const bootPage = (options: Options = {}) => {
     ...(options.coarse === undefined
       ? {}
       : {
-          matchMedia: (query: string) => {
+          // A method, as the browser's is: called off the window it throws (Chromium's "Illegal
+          // invocation"), which is what `BootCtx.matchMedia` must never do.
+          matchMedia(this: unknown, query: string) {
+            if (this !== win) throw new Error('matchMedia called off the window');
             log.queries.push(query);
             return { matches: options.coarse === true };
           },
@@ -869,6 +872,30 @@ describe('bootShell', () => {
       'intent:home/init',
       'intent:resume/auto',
     ]);
+  });
+
+  test("the ctx's matchMedia is the window's, bound to it, for a game's watcher; none on a page without one", () => {
+    const seen: unknown[] = [];
+    const b = bootPage({
+      coarse: true,
+      hooks: () => ({
+        bind: (ctx) => {
+          // Called off the ctx, not the window: the fake throws unless it was bound.
+          seen.push(ctx.matchMedia?.('(orientation: portrait)').matches);
+        },
+      }),
+    });
+    expect(seen).toEqual([true]);
+    expect(b.log.queries).toEqual(['(pointer: coarse)', '(orientation: portrait)']);
+    const bare: unknown[] = [];
+    bootPage({
+      hooks: () => ({
+        bind: (ctx) => {
+          bare.push(ctx.matchMedia);
+        },
+      }),
+    });
+    expect(bare).toEqual([undefined]);
   });
 
   test("the hook: the shared members, the getter app, the game's own members after them", () => {

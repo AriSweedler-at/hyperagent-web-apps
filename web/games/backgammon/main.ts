@@ -7,10 +7,13 @@
 // roll is the seeded one, R27), Web Audio, vibration and the wake lock, handed to the reducer
 // (src/ui/state.ts) through `runEffect`, to the sessions (src/net) through their deps, and to the
 // paint (src/ui/render.ts). This file passes the page's objects and what is this game's: its
-// reducer, painters, sessions, cue table, sound keys, and the two members of `window.__backgammon`
-// (the documented test hook, design Q5) beyond the shared ones.
+// reducer, painters, sessions, cue table, sound keys, the two members of `window.__backgammon`
+// (the documented test hook, design Q5) beyond the shared ones, and the one watcher the turn gate
+// needs (`hooks.bind`: the window's `matchMedia` on PORTRAIT_PHONE, reported into the reducer as
+// `viewport/portrait`; docs/design/backgammon-landscape.md §5D).
 import { bootShell } from '../../shared/edge/boot.ts';
 import { realClock } from '../../shared/edge/clock.ts';
+import { watchMedia } from '../../shared/edge/media.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
 import { legalActions, type Action, type View } from './src/engine/index.ts';
 import { createFx } from './src/fx.ts';
@@ -21,6 +24,7 @@ import { STORAGE_KEYS, soundEnabled } from './src/storage.ts';
 import { fillNameInputs, fillP2NameInput, setCodeInput } from './src/ui/home.ts';
 import { bindAll, paint, paintSound, toastMarks } from './src/ui/render.ts';
 import {
+  PORTRAIT_PHONE,
   guestContextOf,
   hostContextOf,
   initialApp,
@@ -52,6 +56,13 @@ bootShell<Backgammon, App>({
   legal: legalActions,
   deps: {},
   hooks: {
+    // The turn gate's one fact about the device (ui/state.ts `gateOpen`): a phone held upright,
+    // reported once now and on every turn of the phone.
+    bind: (ctx) => {
+      watchMedia(ctx, PORTRAIT_PHONE, (portrait) => {
+        ctx.dispatch({ type: 'viewport/portrait', portrait });
+      });
+    },
     // `act` through the reducer; `view` my view; `setup` seats a position for e2e and stories
     // (pass-and-play only: the shell's `position/load`, web/shared/ui/shell.ts).
     hook: ({ app, dispatch }) => ({

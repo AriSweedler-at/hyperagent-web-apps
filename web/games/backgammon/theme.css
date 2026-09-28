@@ -8,12 +8,21 @@
    (§3.11: a CC0 photo of real medieval parchment, mirror-tiled, under a cream multiply), the home
    shell in a rich aegean blue with nacre text and fills and a gold hairline round it, an olive-wood
    board, gold elsewhere only as a hairline. The board is one
-   DOM in two grid templates (§3.3): the phone stands it on end (twelve rows of two points, a
-   bar band, an off row), the desktop lays it flat from 900px (two rows of thirteen). Every place
-   is a grid area named by its own number, so a seat swap is 24 `data-own` attributes and the
-   `data-seat` on #board, never a second template. web/games/backgammon/src/ui/board/layout.ts is
-   the pure twin of the two templates; test/dist/backgammon-grid.test.ts parses them out of the
-   built CSS and holds the two together. Prettier formats this file. */
+   DOM in two grid templates, three layouts (§3.3): the phone stands it on end (twelve rows of
+   two points, a bar band, an off row); the desktop, from 900px, and a phone held sideways (a
+   coarse pointer, landscape, under 500px tall: docs/design/backgammon-landscape.md) lay it flat
+   (two rows of thirteen). The flat template is written once: of the eleven `(min-width: 900px)`
+   blocks, the eight that place and stack the board (the turn arrow, #board's template, the seam,
+   the bars and dice, the points, the bar stacking, the trays, the cube) carry the landscape
+   query in their lists, and the blocks at the end of the file re-tune the sizes and reflow the
+   chrome; three stay the desktop's alone: the trim's 10px band and 16px gutters (the phone keeps
+   6 and 12), the desktop's variable block (the landscape block sets every variable itself) and
+   `.desk-only` (Rules and History stay in the phone's menu). Every place is a grid area named by
+   its own number, so a seat swap is 24 `data-own` attributes and the `data-seat` on #board,
+   never a second template. web/games/backgammon/src/ui/board/layout.ts is the pure twin of the
+   two templates and the three layouts; test/dist/backgammon-grid.test.ts parses the board
+   templates out of the built CSS and holds the two together, and pins the sideways chrome grid's
+   cells. Prettier formats this file. */
 :root {
   /* The thirteen shared names, on this game's palette (design §3.1; --go and --go-text: the call to
      action, docs/ARCHITECTURE.md "Calls to action"). */
@@ -310,6 +319,26 @@ label {
   text-align: left;
   padding: 8px 2px 0;
 }
+/* The sideways cue (page.ts: the online host card and both waiting rooms; a markup-carried class,
+   so no CONTRACT.md row) reads as a note on the panel and is a phone's line alone: where the
+   pointer is a mouse (a laptop, a tablet with a trackpad) the table is played as it stands and
+   the line would be noise. */
+.phone-cue {
+  color: var(--nacre-dim);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  padding: 8px 0 0;
+  text-align: center;
+}
+.phone-cue.left {
+  text-align: left;
+  padding: 8px 2px 0;
+}
+@media (hover: hover) and (pointer: fine) {
+  .phone-cue {
+    display: none;
+  }
+}
 .muted {
   color: var(--muted);
 }
@@ -441,6 +470,197 @@ label {
   }
 }
 
+/* ---------- the home and the waiting rooms sideways (docs/design/backgammon-landscape.md §5) ---------- */
+/* A phone held sideways on the home screen, under the table's own predicate (any-pointer: coarse
+   and a landscape under 500px tall; a fine pointer, and so the 390x844 golden, never matches):
+   two columns, so Open a table, Sit down and Start sit above a 304px fold with no scroll. The
+   Play tab and the two mode panels lay their children into the grid themselves
+   (display: contents), the masthead, the tab bar and the mode switch down the left, the cards on
+   the right in sub-columns: online the name, the host card and the join card side by side, the
+   name's the narrowest and the join card's the widest, so four letters of a code fit at their
+   tracking (2026-09-28: the first letter of ABCD was cut off at 667 and 780px); pass the phone
+   the players with Start under them and the options beside. A sub-column is 120-190px wide, so
+   each panel's rows wrap (a select, a name or the code takes a line of its own) and the code
+   loses some of its tracking. The tab bar keeps its own bottom edge (the switch is in the other
+   column) and the switch its full radii. The two waiting rooms lay out in two columns as well
+   (the host: the title, the code and its share button left; the status, Start the match and
+   Cancel right, the buttons at the foot of the column; the guest: the title and the status left,
+   Back right), so Start the match sits above a 304px fold once the opponent has joined
+   (2026-09-28: it sat at y 420 in 390). The table and the endgame are not touched: #app's cap
+   lifts for these three screens alone, through :has(). The whole block sits under @supports on
+   that selector: without :has() the cap could not lift and the grids would squeeze into 480px
+   (three online cards of 53px), so a browser without it keeps the portrait single column
+   sideways and scrolls, as before; @supports selector() itself predates :has() in every engine.
+   The nested query at the end is the same layout on a 667px-wide phone (an SE sideways): a
+   narrower left column, the online cards in two sub-columns (the host card, the tallest, alone
+   on the left; the name over the join card on the right, so Open a table clears a 375px fold),
+   and a smaller, tighter code. */
+@supports selector(:has(a)) {
+  @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+    #app:has(
+      > #homeScreen:not(.hidden),
+      > #hostWaitScreen:not(.hidden),
+      > #guestWaitScreen:not(.hidden)
+    ) {
+      max-width: 820px;
+    }
+    #homeScreen {
+      display: grid;
+      grid-template-columns: minmax(0, 250px) minmax(0, 1fr);
+      grid-template-rows: auto auto auto auto 1fr;
+      column-gap: 14px;
+      align-items: start;
+    }
+    #homeScreen > .masthead {
+      grid-area: 1 / 1;
+      margin: 0 0 8px;
+    }
+    #homeScreen > #resumeBox {
+      grid-area: 2 / 1;
+    }
+    #homeScreen > #topTabbar {
+      grid-area: 3 / 1;
+      margin: 0 0 10px;
+      border-radius: var(--radius-control);
+      box-shadow:
+        inset 0 0 0 1px var(--hair),
+        0 8px 22px rgba(6, 37, 61, 0.28);
+    }
+    #playPanel {
+      display: contents;
+    }
+    #playPanel > #playModeSwitch {
+      grid-area: 4 / 1;
+      border-top: none;
+      border-radius: var(--radius-control);
+    }
+    #onlineModeContent,
+    #localModeContent {
+      grid-area: 1 / 2 / -1 / 3;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: 12px;
+      align-items: start;
+    }
+    #onlineModeContent .row,
+    #localModeContent .row {
+      flex-wrap: wrap;
+    }
+    /* .grow is flex: 1 (a zero basis never overflows a line): a full-line basis makes each wrap. */
+    #onlineModeContent .row > *,
+    #localModeContent .row > * {
+      flex-basis: 100%;
+    }
+    #onlineModeContent {
+      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.1fr) minmax(0, 1.1fr);
+    }
+    #onlineModeContent > .card-box:nth-child(1) {
+      grid-area: 1 / 1;
+    }
+    #onlineModeContent > .card-box:nth-child(2) {
+      grid-area: 1 / 2;
+    }
+    #onlineModeContent > .card-box:nth-child(3) {
+      grid-area: 1 / 3;
+    }
+    #onlineModeContent .code-input {
+      letter-spacing: 0.3em;
+    }
+    #localModeContent > .card-box:nth-child(1) {
+      grid-area: 1 / 1;
+    }
+    #localModeContent > .card-box:nth-child(2) {
+      grid-area: 1 / 2 / 4 / 3;
+    }
+    #localModeContent > #localBtn {
+      grid-area: 2 / 1;
+    }
+    #localModeContent > .empty-note {
+      grid-area: 3 / 1;
+    }
+    #rulesPanel,
+    #aboutPanel {
+      grid-area: 1 / 2 / -1 / 3;
+    }
+    /* The host's waiting room: rows 1-2 are the title and its line, the code card spans the rest of
+       the left column; the status card spans rows 1-3 on the right, the two buttons take rows 4-5,
+       and the 1fr third row pushes them to the foot. Start the match is display: none until the
+       guest joins, so it takes no row until then. */
+    #hostWaitScreen {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-rows: auto auto 1fr auto auto;
+      column-gap: 14px;
+      align-items: start;
+    }
+    #hostWaitScreen > h1 {
+      grid-area: 1 / 1;
+      margin: 6px 0 0;
+    }
+    #hostWaitScreen > .subtitle {
+      grid-area: 2 / 1;
+    }
+    #hostWaitScreen > .card-box:nth-child(3) {
+      grid-area: 3 / 1 / 6 / 2;
+      margin-bottom: 0;
+    }
+    #hostWaitScreen > .card-box:nth-child(4) {
+      grid-area: 1 / 2 / 4 / 3;
+    }
+    #hostWaitScreen > #startGameBtn {
+      grid-area: 4 / 2;
+    }
+    #hostWaitScreen > #cancelHostBtn {
+      grid-area: 5 / 2;
+    }
+    /* The guest's: the title and the status card down the left, Back at the foot of the right. */
+    #guestWaitScreen {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-rows: auto 1fr;
+      column-gap: 14px;
+      align-items: start;
+    }
+    #guestWaitScreen > h1 {
+      grid-area: 1 / 1;
+      margin: 6px 0 0;
+    }
+    #guestWaitScreen > .card-box {
+      grid-area: 2 / 1;
+      margin-bottom: 0;
+    }
+    #guestWaitScreen > #cancelGuestBtn {
+      grid-area: 1 / 2 / 3 / 3;
+      align-self: end;
+    }
+    @media (max-width: 719px) {
+      #homeScreen {
+        grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+      }
+      /* Two sub-columns: three of 100px wrapped every label and clipped the selects. */
+      #onlineModeContent {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-rows: auto auto;
+      }
+      #onlineModeContent > .card-box:nth-child(1) {
+        grid-area: 1 / 2;
+      }
+      #onlineModeContent > .card-box:nth-child(2) {
+        grid-area: 1 / 1 / 3 / 2;
+      }
+      #onlineModeContent > .card-box:nth-child(3) {
+        grid-area: 2 / 2;
+      }
+      /* shell.css's .code-input holds its size with !important; the join card takes four wide
+         letters (WWWW) at this size and tracking. */
+      #onlineModeContent .code-input {
+        font-size: 1.1rem !important;
+        letter-spacing: 0.12em;
+      }
+    }
+  }
+}
+
 /* ---------- overlays and sheets (shell.css's shapes; here the ink scrim, the sheet's shadow and radius, the type scale) ---------- */
 .overlay {
   background: rgba(42, 26, 18, 0.55);
@@ -448,6 +668,31 @@ label {
 /* The curtain (design §4.9): aegean-deep at 78%, the position readable beneath. */
 .overlay.curtain {
   background: rgba(6, 37, 61, 0.78);
+}
+/* The turn gate (docs/design/backgammon-landscape.md §5D; ui/state.ts gateOpen, render.ts
+   paintGate): over the overlays (50) and the flyers (60), under the toast (100), in the curtain's
+   deep aegean denser still, so neither the table nor the curtain's cream sheet beneath (almost
+   the gate's own size) reads through as a second card. No media query shows it: the App holds
+   the orientation. The glyph is one small stroke in the accent, markup-carried (no TS toggles it,
+   so no CONTRACT.md row): 36px, so the quarter turn's arc and its arrowhead (about 4px of leg)
+   read as a turn and not as a phone outline alone. */
+#turnGate {
+  z-index: 90;
+  background: rgba(6, 37, 61, 0.93);
+}
+.turn-glyph {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.turn-glyph svg {
+  width: 36px;
+  height: 36px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .sheet {
   border-radius: 20px;
@@ -709,7 +954,10 @@ label {
 .turn-arrow[data-side='far'] {
   transform: translateY(-50%) scaleX(1) rotate(90deg);
 }
-@media (min-width: 900px) {
+/* A phone held sideways shares the flat template and the desktop's stacking: this query list is on
+   the eight desktop blocks that place the board (the blocks at the end of the file re-tune the sizes). */
+@media (min-width: 900px),
+  (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   .turn-arrow {
     right: calc(100% + 8px);
     transform: translateY(-50%) scaleY(1) rotate(0deg);
@@ -851,7 +1099,8 @@ label {
     'offFar offFar offFar offNear offNear offNear';
   user-select: none;
 }
-@media (min-width: 900px) {
+@media (min-width: 900px),
+  (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   #board {
     grid-template-columns: repeat(6, var(--point-w)) var(--bar-w) repeat(6, var(--point-w)) var(
         --off-w
@@ -988,7 +1237,8 @@ label {
       calc(100% - 16px - var(--off-h)) no-repeat,
     var(--felt);
 }
-@media (min-width: 900px) {
+@media (min-width: 900px),
+  (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   #board {
     background: var(--felt);
   }
@@ -1013,7 +1263,8 @@ label {
   cursor: pointer;
   z-index: 2;
 }
-@media (min-width: 900px) {
+@media (min-width: 900px),
+  (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   #barTop {
     border-radius: 6px 6px 0 0;
   }
@@ -1095,7 +1346,8 @@ label {
   --ox: calc(100% - var(--checker-d) - 14px);
   --oy: calc((var(--point-w) - var(--checker-d)) / 2);
 }
-@media (min-width: 900px) {
+@media (min-width: 900px),
+  (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   /* Desktop: far points hang from the top edge, near points rise from the bottom; checkers stack along y. */
   .point.pt-far::before {
     clip-path: polygon(0 0, 100% 0, 50% 100%);
@@ -1145,7 +1397,8 @@ label {
   --sy: 0;
   --ox: calc(100% - var(--checker-d) - 6px);
 }
-@media (min-width: 900px) {
+@media (min-width: 900px),
+  (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   .bar {
     --ox: calc((var(--bar-w) - var(--checker-d)) / 2);
   }
@@ -1299,7 +1552,8 @@ label {
 #board[data-seat='1'] #offDark {
   justify-content: flex-end;
 }
-@media (min-width: 900px) {
+@media (min-width: 900px),
+  (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   .off {
     flex-direction: column;
     padding: 6px 0;
@@ -1345,7 +1599,8 @@ label {
     margin-left: 4px;
   }
 }
-@media (min-width: 900px) {
+@media (min-width: 900px),
+  (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   #cube {
     grid-area: barTop / barTop / barBottom / barBottom;
     justify-self: center;
@@ -1897,6 +2152,458 @@ label {
   }
   body.fixed-screen #app {
     min-height: 100dvh;
+  }
+  #tableScreen {
+    overflow: visible;
+  }
+}
+
+/* ---------- a phone held sideways (design backgammon-landscape.md; §3.1, §3.3, §3.10) ---------- */
+/* The flat board on a phone in landscape. The query is the phone's shape, never its width: a Pixel 8
+   (915x412) and every Pro Max (926 to 956 wide) are 900px wide sideways and fell into the desktop
+   template at 40px points; with a coarse pointer nothing but a phone is under 500px tall in
+   landscape, and a fine pointer (every desktop window, the 1280x800 goldens) never enters.
+   `any-pointer`, not `pointer`: two simulators saw `(pointer: coarse)` flip after mouse clicks in
+   the harness, and a phone answers both the same. Eight of the desktop blocks above carry this
+   query in their lists, so the flat template, the column stacking and the desktop's dice, cube and
+   tray rules are shared, never copied; this block and the three after it, last in the file,
+   re-tune the sizes and pin the table where the two fallbacks above would have let it scroll.
+   From 714px wide the next block
+   reflows the chrome into two 22px text strips and a 44px button rail; under it the chrome keeps
+   its rows. ui/board/layout.ts `layoutFor`, `pointWidth` and `pointLength` are the arithmetic's twin. */
+@media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+  #app {
+    /* The notch and the home indicator: 47, 59 or 62px per short edge on a notched iPhone, 21px
+       below; 0 on the SE and on Android in a tab. `--inset-*` carries them into the geometry (and
+       is the seam a measurement overrides). One edge for both gutters, the larger inset or 16px:
+       iOS reports both sides at the notch's depth, Android only the cutout's side, so a gutter
+       per side would put the board off centre by the cutout; 16px keeps the leftmost point out
+       of the back-swipe band. */
+    --inset-l: env(safe-area-inset-left, 0px);
+    --inset-r: env(safe-area-inset-right, 0px);
+    --inset-b: env(safe-area-inset-bottom, 0px);
+    --edge: max(16px, var(--inset-l), var(--inset-r));
+    padding: 12px var(--edge) calc(12px + var(--inset-b));
+  }
+  body.fixed-screen #app {
+    max-width: none;
+  }
+  #tableScreen {
+    /* The two blocks below set --chrome-h and --chrome-w: what the chrome takes above and below the
+       board, and beside it. Twelve points, the bar (a point wide), a 44px tray and the 16px frame
+       fill the width that is left; two point rows the height. Floors: 44px points (a tap target)
+       and a point length each block sets (`--point-len-min`: 104px with the rail, five coins at a
+       12px step; 90 with the rows; each less half the home indicator, so the fallbacks' heights
+       hold with one). Under either the fallbacks at the end scroll. `svh`, not
+       `dvh`: nothing scrolls at the table, so the small viewport is the one there is, and it
+       stands still when a toolbar or the capsule comes and goes. */
+    --off-w: 44px;
+    --off-h: 0px;
+    --bar-w: var(--point-w);
+    --point-w: clamp(44px, calc((100vw - var(--chrome-w) - var(--off-w) - 16px) / 13), 64px);
+    --point-len: max(var(--point-len-min), calc((100svh - var(--chrome-h) - 16px) / 2));
+    --checker-d: calc(var(--point-w) * 0.86);
+    /* Five coins along the point: the desktop's 15px base offset and 3px at the tip spared. */
+    --stack-step: min(var(--checker-d), calc((var(--point-len) - var(--checker-d) - 18px) / 4));
+    --die-s: 44px;
+    --arrow-col: 0px;
+    overflow: hidden;
+  }
+  /* The roll sheet inside the shortest board (224px at the rail's floor, 203 with a home indicator,
+     196 in the rows at 640x360): 12px paddings, 44px dice, a 48px button; the sub line goes (the
+     title names the mover, and "your turn" is the whole message) and the title keeps to one line
+     (a 20-character name ellipsizes rather than adding 29px), so the sheet is 168px with any
+     name. Western's Double stands beside the roll button in one row instead of under it (the
+     sheet is a two-column grid; every other line spans both), so it costs no height. Should a
+     sheet ever outgrow the board it scrolls inside, never onto the strips. */
+  .roll-sheet {
+    padding: 12px 16px;
+    max-height: 100%;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+  }
+  .roll-sheet > * {
+    grid-column: 1 / -1;
+  }
+  .roll-sheet .sheet-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .roll-sheet .sheet-sub {
+    display: none;
+  }
+  .roll-dice {
+    --die-s: 44px;
+    margin: 0 0 6px;
+  }
+  .roll-cta {
+    min-height: 48px;
+    font-size: 1.05rem;
+  }
+  .roll-cta:has(+ #doubleBtn:not(.hidden)) {
+    grid-column: 1;
+  }
+  .roll-sheet #doubleBtn {
+    grid-column: 2;
+    width: auto;
+    margin: 0;
+  }
+  /* The curtain sheet leaves the position readable beneath (design §4.9): 14px paddings and
+     "Continue online" beside the reveal button, so the 246px sheet is ~180 over a 224px board
+     (247 with two 20-character names, whose title and reveal label wrap; it was 295). */
+  .overlay.curtain .sheet {
+    padding: 14px 18px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+  }
+  .overlay.curtain .sheet > * {
+    grid-column: 1 / -1;
+  }
+  .overlay.curtain #curtainBtn:has(+ #curtainHandoffBtn:not(.hidden)) {
+    grid-column: 1;
+  }
+  .overlay.curtain #curtainHandoffBtn {
+    grid-column: 2;
+    width: auto;
+    margin: 0;
+  }
+  /* The tray is a point long here, and fifteen of the desktop's 7px slabs with 2px gaps are 131px:
+     more than a notched iPhone's 136px tray holds with fourteen, and more than either floor. The
+     slabs thin with the point (7px until 130px, 5.2 at the 104px floor, 4.3 at the rows' 90) at
+     1px gaps, so a finished game's fifteen always sit inside the tray (the geometry oracle reads
+     every slab inside its place). */
+  .off {
+    gap: 1px;
+  }
+  .off .slab {
+    height: min(7px, calc((var(--point-len) - 26px) / 15));
+  }
+  /* The bar's half is a point long too, and the dice sit on its centre: five coins at the desktop's
+     0.45 step are 118px at the floor's 42px coins, over the near die. The step gives way so the
+     fifth coin ends 28px short of the centre (6px base offset, 6px spared, half a die): 7px at
+     the 104 floor, 9 at 111.5, 16.7 at 147; from 150-165px (by the coin's size) the desktop's
+     step stands. The near die reaches 48px from the centre (44 and half the 8px gap), so the
+     fifth coin's top 20px still lie under it wherever this branch binds: a stack that clears
+     the die would step 0.5px at the floor. The dice paint over
+     any coin that still reaches them (z 3: the selected coin lifts to 2), so a die is never hidden
+     under a checker. */
+  .bar {
+    --stack-step: min(
+      calc(var(--checker-d) * 0.45),
+      calc((var(--point-len) - var(--checker-d) - var(--die-s) / 2 - 12px) / 4)
+    );
+  }
+  #dice {
+    z-index: 3;
+  }
+  /* A double's four dice: at 44px they are 200px, the length of the bar at the 104 floor (208) and
+     more than the SE's 189. Four faces read at 30px (132px, 28px clear of each end at the floor);
+     a die pick is moot on a double, so the 44px target rule does not bind. Two dice keep 44. */
+  #dice:has(.die:nth-child(4)) {
+    --die-s: 30px;
+    gap: 4px;
+  }
+  /* Rules and History stay in the menu, as on the portrait phone. */
+  .desk-only {
+    display: none;
+  }
+  /* The handoff lives on the curtain here (#curtainHandoffBtn); its topbar twin would cost the rail 50px. */
+  #handoffBtn {
+    display: none;
+  }
+  /* The toast hangs from the top edge, not the foot (shell.css puts it 24px up from the bottom):
+     down there it covered the roll button after a hit, the near row's coins and the die-chip tray;
+     up here only the opponent's strip is under it, and the message supplements that line. It
+     grows to 600px before wrapping, so a hit with a 20-character name is one line: centred by
+     auto margins between both edges, not by `left: 50%` (a fixed box shrinks to fit what is left
+     of its containing block past `left`, half the screen). #toast stands outside #app, so
+     `--edge` is out of reach and the safe area is read again. It slides in from above as it
+     slid in from below. */
+  #toast {
+    top: 8px;
+    bottom: auto;
+    left: 0;
+    right: 0;
+    width: fit-content;
+    margin: 0 auto;
+    max-width: min(
+      600px,
+      calc(100vw - 2 * max(16px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)))
+    );
+    transform: translateY(-16px);
+  }
+  #toast.show {
+    transform: translateY(0);
+  }
+  /* The count badge does more work sideways (a seven-stack is five 42px coins at a 7-13px step and
+     this number): 20px and 12.8px type instead of the desktop's 16 and 10.56, the only text on the
+     table that was under 12.5px. */
+  .checker.top[data-count]::after {
+    right: -6px;
+    top: -6px;
+    min-width: 20px;
+    height: 20px;
+    line-height: 20px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+  }
+  /* The menu sheet (338px: a 44px header, three 54px rows, the toggle, 22px paddings) is taller
+     than 88dvh under 385px, and an inner scroll hid "Leave the table" with nothing to say so.
+     Rules and History share a row, every row is 44px, 6px gaps, 14px paddings: 224px, inside the
+     267px cap at the 304 floor with Leave whole. */
+  #menuOverlay .sheet {
+    padding: 14px 18px;
+  }
+  #menuOverlay .menu-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  #menuOverlay .menu-list > .toggle-row,
+  #menuLeaveBtn {
+    grid-column: 1 / -1;
+  }
+  #menuOverlay .menu-list .btn {
+    min-height: 44px;
+    padding: 10px 12px;
+    /* The grid's gap spaces the rows; the sheet's 8px between stacked blocks would lift History. */
+    margin: 0;
+  }
+  /* Match over (#endgameScreen, design §4.11; not a fixed screen, so the document scrolls when it
+     is taller than the viewport): its column of a title, the result card, the games card and the
+     Leave/Rematch row is 316px, under the fold at 304 and 330. Two columns in exactly the
+     viewport's height (#app's 24px and the home indicator taken, so the document stands still):
+     the title and the result on the left with the buttons at the foot, the games card on the
+     right, scrolling inside when a long match's list outgrows it. Rematch is on screen at the
+     floor. #app keeps the shell's 480px column off the table (the home is lane A2's); the two
+     columns need the width, so it opens while this screen shows. */
+  #app:has(> #endgameScreen:not(.hidden)) {
+    max-width: none;
+  }
+  #endgameScreen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    /* Placed by line, not by a fourth `grid-template-areas` (the dist guard counts three). */
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    column-gap: 16px;
+    height: calc(100svh - 24px - var(--inset-b));
+  }
+  #endgameScreen > h1 {
+    grid-area: 1 / 1;
+    margin: 0;
+    font-size: 1.6rem;
+  }
+  #endgameScreen > .card-box.centered {
+    grid-area: 2 / 1;
+    margin: 8px 0 0;
+    padding: 12px 16px;
+  }
+  #endgameScreen > .card-box:not(.centered) {
+    grid-area: 1 / 2 / 5 / 3;
+    align-self: start;
+    margin: 0;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+  /* Half the width holds a game's row only if the winner's name gives: a 20-character name
+     ellipsizes, the game number, the kind and the points keep their width. */
+  #endgameScreen .score-row > span {
+    flex: 0 0 auto;
+  }
+  #endgameScreen .score-row > .who {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #endgameScreen > .row {
+    grid-area: 4 / 1;
+    margin-top: 8px;
+  }
+  /* The short-viewport fallbacks above (805px under 900 wide, 645px from 900) both match a phone
+     sideways; the table is pinned again here, and the two fallbacks at the end lift it on purpose. */
+  body.fixed-screen,
+  body.fixed-screen #app {
+    height: 100svh;
+    max-height: 100svh;
+    overflow: hidden;
+  }
+}
+/* From 714px wide: the rail. #tableScreen becomes a grid of four columns (the board over three, the
+   rail) and six rows (a strip, four the board spans and the rail's buttons divide, a strip);
+   `display: contents` on .topbar and .controls makes their children the grid's items. Rows two
+   to five: the menu (spanning up into the top strip), the sound button, the free middle the turn
+   arrow hangs in off the board's right edge, Undo (spanning down into the bottom strip). 714 is
+   the narrowest viewport that stands the rail beside a 44px-floor board with no insets: 13 x 44
+   + the 44px tray + the 16px frame + two 16px edges + the 44px rail + its 6px gap. */
+@media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) and (min-width: 714px) {
+  #tableScreen {
+    --strip-h: 22px;
+    --rail-w: 44px;
+    --gap: 6px;
+    /* 104px: five coins at a 12px step. The point yields half the home indicator (93.5 with the
+       21px one: a 9px step), so 2 x floor + 16 + --chrome-h stays 304px at any inset and the
+       `max-height: 303px` fallback at the end lifts the pin exactly where the floor stops fitting;
+       a media query cannot read env(), so the floor meets it instead. */
+    --point-len-min: calc(104px - var(--inset-b) / 2);
+    /* #app's 24px, two strips, their two gaps, the home indicator: 80px and the inset. */
+    --chrome-h: calc(24px + 2 * var(--strip-h) + 2 * var(--gap) + var(--inset-b));
+    /* The two gutters (16px or the inset), the rail and its gap: 82px without insets, 144 with the
+       iPhone 12's, 168 on the 852x393 class: 54, 49.2 and 48px points. */
+    --chrome-w: calc(2 * var(--edge) + var(--rail-w) + var(--gap));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) var(--rail-w);
+    grid-template-rows: var(--strip-h) auto auto minmax(0, 1fr) auto var(--strip-h);
+    grid-template-areas:
+      'opp   badge  status rail1'
+      'board board  board  rail1'
+      'board board  board  rail2'
+      'board board  board  rail3'
+      'board board  board  rail4'
+      'me    me     slot   rail4';
+    gap: var(--gap);
+    align-items: center;
+  }
+  .topbar,
+  .controls {
+    display: contents;
+  }
+  #tableScreen .opp-strip {
+    grid-area: opp;
+  }
+  /* The badge's column sizes the two strips beside it: tabular figures keep it one width as the
+     score changes (the frame oracle reads the strips in every phase). */
+  #gameBadge {
+    grid-area: badge;
+    padding: 0 10px;
+    line-height: var(--strip-h);
+    font-variant-numeric: tabular-nums;
+  }
+  .status-line {
+    grid-area: status;
+    text-align: right;
+    padding: 0;
+  }
+  #board {
+    grid-area: board;
+  }
+  #tableScreen .me-strip {
+    grid-area: me;
+  }
+  .roll-slot {
+    grid-area: slot;
+    min-width: 0;
+    min-height: 0;
+    height: var(--strip-h);
+    align-items: flex-end;
+  }
+  /* The result chip keeps its 44px and stands up out of the strip over the tray's corner (the game is over). */
+  #resultChipBtn {
+    min-height: 44px;
+  }
+  .topbar > .row.tight {
+    flex-direction: column;
+    gap: var(--gap);
+    align-self: start;
+  }
+  .topbar > .row.tight:first-child {
+    grid-area: rail1;
+  }
+  .topbar > .row.tight:last-child {
+    grid-area: rail2;
+  }
+  #undoBtn,
+  #doneBtn,
+  #chipCancelBtn {
+    grid-area: rail4;
+    align-self: end;
+  }
+  #undoBtn,
+  #doneBtn {
+    writing-mode: vertical-rl;
+    width: var(--rail-w);
+    min-height: 0;
+    padding: 12px 0;
+  }
+  /* The die-chip tray floats over the board's bottom edge instead of replacing a strip. */
+  #controls.choosing #moveChips {
+    grid-area: board;
+    align-self: end;
+    justify-self: center;
+    margin-bottom: 14px;
+    z-index: 5;
+  }
+  /* Hung in the rail's free middle, 40px so a 47px checker's glyph never crosses the rail's edge. */
+  .turn-arrow {
+    right: auto;
+    left: calc(100% + var(--gap));
+    width: 40px;
+    height: 40px;
+    transform: translateY(-50%) scaleY(1) rotate(0deg);
+  }
+  .turn-arrow[data-side='far'] {
+    transform: translateY(-50%) scaleY(-1) rotate(0deg);
+  }
+  /* The cube (Western) hangs in the rail too, 10px under the arrow, whoever owns it: on the bar it
+     sat on the far half's coins (a half is a point long here) and over the top die of a double.
+     From the 304 floor up it clears Undo (the arrow ends at the board's middle + 20px, the cube
+     runs to + 60; Undo starts 18px lower at the floor, 8 with a home indicator). The owner's side,
+     which the desktop's bar shows, is not shown sideways: the roll sheet's Double says who may. */
+  #cube[data-owner] {
+    position: absolute;
+    /* `grid-area: auto`: placed, an absolutely positioned child of a grid takes its area as its
+       containing block, and the bar's half would be the 100%. */
+    grid-area: auto;
+    left: calc(100% + var(--gap) + 5px);
+    top: 50%;
+    margin: 30px 0 0;
+    align-self: auto;
+    justify-self: auto;
+  }
+}
+/* Under 714px wide (the iPhone SE's 667, a 640x360 Android) the rail cannot stand beside the 632px
+   board at the 44px floor, so the chrome keeps its rows: the phone's 170px above and below, the board
+   flat between them, 94px points on the SE. The arrow has no gutter here and gives way to the tray's colour. */
+@media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) and (max-width: 713px) {
+  #tableScreen {
+    /* 90px, less half the home indicator (as the rail's floor above), so 2 x floor + 16 + 170 +
+       inset-b stays 366px and the `max-height: 365px` fallback is exact at any inset. */
+    --point-len-min: calc(90px - var(--inset-b) / 2);
+    --chrome-h: calc(170px + var(--inset-b));
+    --chrome-w: calc(2 * var(--edge));
+  }
+  .roll-slot {
+    min-width: 0;
+  }
+  .turn-arrow {
+    display: none;
+  }
+  /* No rail to hang the cube in: it keeps the bar's top, off the dice (four 30px faces start 28px
+     in), whoever owns it; a far-bar coin still meets it (the SE alone, Western alone). */
+  #cube[data-owner] {
+    align-self: start;
+    margin-block: 6px 0;
+  }
+}
+/* Where the floors do not fit the document scrolls (the rule of §3.10): under 304px with the rail
+   (2 x 104 + 16 + 80), under 366px with the rows (2 x 90 + 16 + 170: an SE with Safari's toolbar);
+   the floors give up half the bottom inset, so both numbers hold with a home indicator. */
+@media (any-pointer: coarse) and (orientation: landscape) and (max-height: 303px),
+  (any-pointer: coarse) and (orientation: landscape) and (max-height: 365px) and (max-width: 713px) {
+  body.fixed-screen,
+  body.fixed-screen #app {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  body.fixed-screen #app {
+    min-height: 100svh;
   }
   #tableScreen {
     overflow: visible;
