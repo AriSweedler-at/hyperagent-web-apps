@@ -1576,9 +1576,9 @@ const guestFrame = <G extends ShellTypes>(
             ...app.shell,
             view: frame.view,
             oppConnected: true,
-            // My seat's name as the host dealt it: the word every painter shows, whatever rule made it.
-            seatedName:
-              cfg.result.playersOf(frame.view).at(app.shell.mySeat) ?? app.shell.seatedName,
+            // My seat's name as the host dealt it: the word every painter shows, whatever rule made
+            // it. The view names every seat (the game's decoder refused any other shape on the wire).
+            seatedName: cfg.result.playersOf(frame.view)[app.shell.mySeat],
           },
           table: cfg.table.reset(app.table, 'frame'),
         },
