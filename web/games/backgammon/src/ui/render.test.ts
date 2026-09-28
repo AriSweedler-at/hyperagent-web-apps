@@ -6,7 +6,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
-import { fakeEl, fakeTarget } from '../../../../shared/edge/page.fake.ts';
+import { fakeEl, fakeTarget, optionsFromMarkup } from '../../../../shared/edge/page.fake.ts';
 import type { RecentGame } from '../../../../shared/lib/recentGames.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { recentGamesHtml } from '../../../../shared/ui/recentGames.ts';
@@ -15,6 +15,7 @@ import type { Dice, Seat, State, View } from '../engine/index.ts';
 import { pos } from '../engine/test-helpers.ts';
 import { backgammonPage, type BackgammonPage } from './page.fake.ts';
 import {
+  GATED_IDS,
   HIT_TOAST_PREFIX,
   ROLLING_STATUS,
   RULES_SLOT_IDS,
@@ -218,7 +219,11 @@ describe('the table', () => {
     expect(shown(p)).toEqual(['tableScreen']);
     expect(p.body.hasClass('fixed-screen')).toBe(true);
     expect(p.get('curtainOverlay').hidden()).toBe(false);
-    expect(p.get('curtainTitle').text()).toMatch(/^Pass the phone to (Ann|Bob)$/);
+    // The first curtain names the starter (ui/local.ts `titleFor`); the gate is down: no watcher
+    // has spoken.
+    expect(p.get('curtainTitle').text()).toMatch(/^(Ann|Bob) starts$/);
+    expect(p.get('turnGate').hidden()).toBe(true);
+    expect(p.get('app').attr('inert')).toBeNull();
     expect(p.get('board').hasClass('inert')).toBe(true);
     // Seat 0 (Light) as the reducer shows the starter's view: own 24:2 13:5 8:3 6:5 and the mirror.
     const v = view(app);
@@ -286,6 +291,17 @@ describe('the table', () => {
     expect(p.get('dice').hasClass('rolling')).toBe(true);
     expect(p.get('diceMini').hasClass('rolling')).toBe(true);
     expect(p.get('board').attr('data-rolling')).toBe('1');
+    // The wait note never shows under the roll modal: my forfeited roll's tumble (R14) has the
+    // turn flipped already, and the modal is still up with the dice.
+    const forfeited = withView(tumbling, {
+      ...v,
+      isMyTurn: false,
+      lastAction: { seat: v.me.idx, kind: 'noMove', text: 'no move', at: NOW },
+    });
+    paint(p.doc, forfeited);
+    expect(p.get('rollOverlay').hidden()).toBe(false);
+    expect(p.get('waitNote').hidden()).toBe(true);
+    paint(p.doc, tumbling);
     expect(p.get('board').attr('data-rolled')).toBeNull();
     expect(p.get('board').hasClass('inert')).toBe(true);
     // The status line does not name the roll before the faces settle.
@@ -680,6 +696,60 @@ describe('the table', () => {
   });
 });
 
+describe('the turn gate (docs/design/backgammon-landscape.md §5D)', () => {
+  test('GATED_IDS is #app and every overlay of the page but the gate itself', () => {
+    const overlays = [...optionsFromMarkup(MARKUP)]
+      .filter(([, options]) => options.classes?.includes('overlay') === true)
+      .map(([id]) => id);
+    expect(overlays).toContain('turnGate');
+    expect(GATED_IDS).toEqual(['app', ...overlays.filter((id) => id !== 'turnGate')]);
+  });
+
+  test('hidden by default; up with inert on #app and the overlays at the table upright, the curtain untouched beneath; both gone sideways, after Play upright, and off the table', () => {
+    const p = page();
+    const app = local();
+    paint(p.doc, app);
+    expect(p.get('turnGate').hidden()).toBe(true);
+    GATED_IDS.forEach((id) => {
+      expect(p.get(id).attr('inert'), id).toBeNull();
+    });
+    const title = p.get('curtainTitle').text();
+    const upright = run(app, { type: 'viewport/portrait', portrait: true }).app;
+    paint(p.doc, upright);
+    expect(p.get('turnGate').hidden()).toBe(false);
+    GATED_IDS.forEach((id) => {
+      expect(p.get(id).attr('inert'), id).toBe('');
+    });
+    expect(p.get('turnGate').attr('inert')).toBeNull();
+    expect(p.get('toast').attr('inert')).toBeNull();
+    // The curtain is still up beneath, its texts as they were.
+    expect(p.get('curtainOverlay').hidden()).toBe(false);
+    expect(p.get('curtainTitle').text()).toBe(title);
+    // "Go sideways" is the Android lock PR's: shipped hidden, left hidden.
+    expect(p.get('turnGateGoBtn').hidden()).toBe(true);
+    expect(p.get('turnGateKeepBtn').hidden()).toBe(false);
+    // Sideways: gone, the attributes with it.
+    paint(p.doc, run(upright, { type: 'viewport/portrait', portrait: false }).app);
+    expect(p.get('turnGate').hidden()).toBe(true);
+    GATED_IDS.forEach((id) => {
+      expect(p.get(id).attr('inert'), id).toBeNull();
+    });
+    // Play upright: gone for this table.
+    paint(p.doc, run(upright, { type: 'gate/keep' }).app);
+    expect(p.get('turnGate').hidden()).toBe(true);
+    expect(p.get('app').attr('inert')).toBeNull();
+    // Upright on the home screen: nothing.
+    const homeUpright = run(
+      initialApp,
+      { type: 'home/init', home },
+      { type: 'viewport/portrait', portrait: true },
+    ).app;
+    paint(p.doc, homeUpright);
+    expect(p.get('turnGate').hidden()).toBe(true);
+    expect(p.get('app').attr('inert')).toBeNull();
+  });
+});
+
 describe('bindAll', () => {
   const wired = (): Readonly<{ p: BackgammonPage; intents: Intent[] }> => {
     const p = page();
@@ -766,6 +836,7 @@ describe('bindAll', () => {
     p.get('rulesBtnGame').fire('click');
     p.get('historyBtn').fire('click');
     p.get('chipCancelBtn').fire('click');
+    p.get('turnGateKeepBtn').fire('click');
     expect(intents.map((i) => i.type)).toEqual([
       'undo/click',
       'roll/click',
@@ -784,6 +855,7 @@ describe('bindAll', () => {
       'rules/toggle',
       'history/toggle',
       'chip/cancel',
+      'gate/keep',
     ]);
   });
 

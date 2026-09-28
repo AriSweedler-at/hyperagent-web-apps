@@ -110,6 +110,13 @@ export type ShellSpec = Readonly<{
    * offered under the curtain, where the phone is about to change hands; gin's table alone offers it).
    */
   curtainButtons: number;
+  /**
+   * The first curtain's title, `{name}` standing for the seat it names: gin and briscola hand the
+   * phone over ("Pass the phone to {name}"); backgammon names the starter ("{name} starts":
+   * whoever tapped Start is holding the phone and may be the starter, its ui/local.ts). Every
+   * later curtain hands the phone over on every game. Data, not a RegExp: the specs build one.
+   */
+  firstCurtain: string;
 }>;
 
 /**
@@ -132,6 +139,7 @@ export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
     localNames: ['Ari', 'Lavi'],
     localFields: [['localTargetInput', '100']],
     curtainButtons: 1,
+    firstCurtain: 'Pass the phone to {name}',
   },
   backgammon: {
     heading: 'Sheshbesh',
@@ -147,6 +155,8 @@ export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
       ['localMatchLengthSel', '5'],
     ],
     curtainButtons: 2,
+    // ui/local.ts `titleFor`: the opening roll decided who starts; the holder reads it, not "Pass".
+    firstCurtain: '{name} starts',
   },
   briscola: {
     heading: 'Briscola',
@@ -163,6 +173,7 @@ export const SHELL: Readonly<Record<ShellGame, ShellSpec>> = {
     localFields: [['localPlayersSel', '2']],
     // The reveal and "Continue online": the handoff is offered under the curtain at two seats (D17).
     curtainButtons: 2,
+    firstCurtain: 'Pass the phone to {name}',
   },
 };
 
@@ -171,6 +182,15 @@ const POINT_IDS: ReadonlyArray<string> = Array.from(
   { length: 24 },
   (_, i) => `point-${String(i + 1)}`,
 );
+
+/** The turn gate's ids (backgammon's page.ts `sheetsBefore`): the sheet, two texts, two buttons. */
+const GATE_IDS: ReadonlyArray<string> = [
+  'turnGate',
+  'turnGateTitle',
+  'turnGateSub',
+  'turnGateGoBtn',
+  'turnGateKeepBtn',
+];
 
 /** Every game the site builds, one row each, in the order the landing page lists them. */
 export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
@@ -225,9 +245,10 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
     storage: { saveKey: 'backgammonMP_v1', prefix: 'backgammon_' },
     debug: 0,
     // Gin-shaped: static screens, the 24 points (the seat mapping is an attribute, so the markup
-    // ships seat 0's `data-own` for every point) and the same empty rules slots.
+    // ships seat 0's `data-own` for every point), the turn gate's five ids (page.ts sheetsBefore;
+    // docs/design/backgammon-landscape.md §5D) and the same empty rules slots.
     pageShape: {
-      ids: ['app', 'homeScreen', 'tableScreen', 'board', 'toast', ...POINT_IDS],
+      ids: ['app', 'homeScreen', 'tableScreen', 'board', 'toast', ...POINT_IDS, ...GATE_IDS],
       rulesSlots: true,
     },
     contractFloors: { ts: 35, markup: 40 },

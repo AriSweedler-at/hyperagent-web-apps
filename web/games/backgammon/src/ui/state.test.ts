@@ -44,6 +44,7 @@ import {
   WAITING_FOR_GUEST_MSG,
   badPositionMsg,
   cuesBetween,
+  gateOpen,
   guestContextOf,
   guestGoneMsg,
   handoffLabel,
@@ -237,6 +238,8 @@ describe('the initial app', () => {
       curtainMode: 'always',
       noMoveUntil: null,
       lastPainted: null,
+      portraitPhone: false,
+      gateDismissed: false,
     });
     expect(SCREENS).toEqual([
       'homeScreen',
@@ -1935,5 +1938,53 @@ describe('the rest of the shell', () => {
     expect(Object.keys(CUES).sort()).toEqual([...raised].sort());
     expect(CUES.hit.cue).toBe('capture');
     expect(CUES.bearOff.cue).toBe('score');
+  });
+});
+
+// Last: the seeded rng is shared, and the rolls this describe plays would shift every later one.
+describe('the turn gate (docs/design/backgammon-landscape.md §5D)', () => {
+  test('viewport/portrait holds the device`s orientation, no effect; gateOpen at the table upright alone; gate/keep is for this table; the reducer still takes taps under it', () => {
+    const atHome = run(initialApp, { type: 'home/init', home });
+    const upright = run(atHome.app, { type: 'viewport/portrait', portrait: true });
+    expect(upright.effects).toEqual([]);
+    expect(upright.app.table.portraitPhone).toBe(true);
+    // The home stays upright-friendly.
+    expect(gateOpen(upright.app)).toBe(false);
+    // Start: the orientation survives the table's reset, so the gate is up with the first curtain.
+    const started = run(upright.app, { type: 'local/click', p1: 'Ann', p2: 'Bob' }).app;
+    expect(started.table).toMatchObject({ portraitPhone: true, gateDismissed: false });
+    expect(gateOpen(started)).toBe(true);
+    // Turned sideways it goes; upright again it is back.
+    const sideways = run(started, { type: 'viewport/portrait', portrait: false }).app;
+    expect(gateOpen(sideways)).toBe(false);
+    expect(gateOpen(run(sideways, { type: 'viewport/portrait', portrait: true }).app)).toBe(true);
+    // The endgame screen is not gated.
+    expect(gateOpen({ ...started, shell: { ...started.shell, screen: 'endgameScreen' } })).toBe(
+      false,
+    );
+    // "Play upright": down for this table, through the next curtain and a turn of the phone.
+    const kept = run(started, { type: 'gate/keep' });
+    expect(kept.effects).toEqual([]);
+    expect(gateOpen(kept.app)).toBe(false);
+    const turn = playTurn(run(revealed(kept.app), { type: 'roll/click' }));
+    expect(turn.app.table.curtain).not.toBeNull();
+    expect(gateOpen(turn.app)).toBe(false);
+    const turned = run(
+      turn.app,
+      { type: 'viewport/portrait', portrait: false },
+      { type: 'viewport/portrait', portrait: true },
+    ).app;
+    expect(gateOpen(turned)).toBe(false);
+    // Not a modal in the reducer's sense: under the gate a tap still reduces; `inert` on the DOM is
+    // the guard.
+    expect(run(started, { type: 'curtain/reveal' }).app.table.curtain).toBeNull();
+    // Leave (its `initHome` effect brings `home/init`) keeps the orientation and drops the
+    // dismissal; the next table asks again.
+    const left = run(kept.app, { type: 'leave/finish' }, { type: 'home/init', home }).app;
+    expect(left.table).toMatchObject({ portraitPhone: true, gateDismissed: false });
+    expect(gateOpen(left)).toBe(false);
+    expect(gateOpen(run(left, { type: 'local/click', p1: 'Ann', p2: 'Bob' }).app)).toBe(true);
+    // A fine pointer (the watcher reported false, or never reported): never.
+    expect(gateOpen(local())).toBe(false);
   });
 });

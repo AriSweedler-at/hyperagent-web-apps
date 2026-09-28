@@ -1,7 +1,8 @@
 // Sheshbesh's pass-and-play on one page (docs/design/backgammon-board.md §4, §5, §7), at a phone
 // and a laptop, the game's half: the home screen's own fields (the shell's half of the home screen
 // and of the pass-and-play start is e2e/shell-home.spec.ts and e2e/shell-local.spec.ts, for both
-// shell games). The table: a game starts under the curtain naming the opening winner, whose reveal
+// shell games). The table: a game starts under the curtain naming the opening winner as the
+// starter (not "Pass the phone": whoever tapped Start is holding it), whose reveal
 // brings the roll modal (portes; it cannot be dismissed, its button rolls and the dice tumble) or
 // the opening dice to play (Western); tap-to-move plays a turn with the legal sources and targets lit as the engine's view
 // has them and the status line naming what is left; undo rewinds; the die-chip tray opens where
@@ -91,14 +92,15 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       expect(view.phase).toBe('toRoll');
       const first = view.players[view.turn].name;
       const other = view.players[view.turn === 0 ? 1 : 0].name;
-      // The curtain covers a live board (the position is readable beneath) and hands it to the
-      // opening winner: one tap reveals; the roll waits in the modal (design §4.9, §4.7).
+      // The curtain covers a live board (the position is readable beneath) and names the opening
+      // winner as the starter (ui/local.ts `titleFor`: the holder may be them; every later curtain
+      // says "Pass the phone"): one tap reveals; the roll waits in the modal (design §4.9, §4.7).
       const curtain = await bgCurtain(page);
       // The first curtain carries the opening roll from the engine's log.
       const opening = view.log.filter((e) => e.kind === 'opening').at(-1)?.text ?? '';
       expect(opening).toMatch(/ starts$/);
       expect(curtain).toEqual({
-        title: `Pass the phone to ${first}`,
+        title: `${first} starts`,
         sub: 'Your turn. Roll when you have the phone.',
         last: opening,
         button: `${first} — your turn`,

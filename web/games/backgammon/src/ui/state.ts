@@ -8,11 +8,11 @@
 // codec, engine adapters, frames and store, completed here with the table hooks the shared flows
 // call: `reset` per site, `rendered`, `refuse`, pass-and-play's `viewer`/`revealer`, and the home
 // snapshot's own part); `table` is the board's interaction memory (the tapped source, the forced
-// die, the die-chip tray, a drag, the overlays, the curtain and the R14 beat), which no other game
-// has. `Intent` is every handler and every network event, and `reduce` returns the next App with
-// a list of `Effect`s: what to persist, toast, send, play or arm, as data. main.ts runs the
-// effects through the real adapters (`runEffect`: backgammon's three, then the shared runner) and
-// paints the App (ui/render.ts); the tests run the reducer alone.
+// die, the die-chip tray, a drag, the overlays, the curtain, the R14 beat and the turn gate), which
+// no other game has. `Intent` is every handler and every network event, and `reduce` returns the
+// next App with a list of `Effect`s: what to persist, toast, send, play or arm, as data. main.ts
+// runs the effects through the real adapters (`runEffect`: backgammon's three, then the shared
+// runner) and paints the App (ui/render.ts); the tests run the reducer alone.
 //
 // Backgammon's residue on the shell (shared-shell.md §4.3): the two option selects
 // (`variant/set`, `matchLength/set`, its own intents), `curtainMode` and its effect, and a guest
@@ -241,6 +241,17 @@ export type Table = Readonly<{
    * takes no tap, the painter cycles the faces.
    */
   rolling: boolean;
+  /**
+   * The device is a phone held upright right now (`PORTRAIT_PHONE`, from main.ts's matchMedia
+   * watcher as `viewport/portrait`, at boot and on every turn of the phone): a fact about the
+   * device, so `tableCleared` keeps it as it keeps `curtainMode`.
+   */
+  portraitPhone: boolean;
+  /**
+   * `#turnGateKeepBtn` "Play upright": the gate stays down for this table (`tableCleared` drops
+   * it).
+   */
+  gateDismissed: boolean;
 }>;
 
 export type App = ShellApp<Backgammon>;
@@ -261,7 +272,29 @@ export const initialTable: Table = {
   noMoveUntil: null,
   lastPainted: null,
   rolling: false,
+  portraitPhone: false,
+  gateDismissed: false,
 };
+
+/**
+ * A phone held upright, as the turn gate asks the window (docs/design/backgammon-landscape.md
+ * §5D): a coarse pointer, portrait, and a short side under 500px (a portrait tablet is 744+ wide
+ * and fits the stood-on-end board anyway). The mirror of theme.css's landscape query, with the
+ * bound on the short side; main.ts watches it (web/shared/edge/media.ts) and dispatches
+ * `viewport/portrait`. `any-pointer`, not `pointer`: a mouse click in an emulated touch context
+ * flips `pointer: coarse` off, and a phone answers both alike.
+ */
+export const PORTRAIT_PHONE =
+  '(any-pointer: coarse) and (orientation: portrait) and (max-width: 500px)';
+
+/**
+ * The turn gate is up (render.ts `paintGate`): at the table, on a phone held upright, until the
+ * phone turns or "Play upright" for this table. The home, the waiting rooms and the endgame stay
+ * upright-friendly. Not a modal in the reducer's sense: taps still reduce; `inert` on the DOM is
+ * the guard.
+ */
+export const gateOpen = (app: App): boolean =>
+  app.shell.screen === 'tableScreen' && app.table.portraitPhone && !app.table.gateDismissed;
 // ---- the strings the app (not the sessions) writes ---------------------------------------------
 
 /** A tapped point that is neither source nor target shakes for this long (design §4.2 rule 1). */
@@ -342,6 +375,13 @@ export type TableIntent =
   | Readonly<{ type: 'rules/toggle' }>
   /** `#menuCurtainToggle`: remembered under `backgammon_curtain`. */
   | Readonly<{ type: 'curtain/mode'; mode: CurtainMode }>
+  /**
+   * main.ts's matchMedia watcher on `PORTRAIT_PHONE` (web/shared/edge/media.ts): at boot and on
+   * every turn of the phone.
+   */
+  | Readonly<{ type: 'viewport/portrait'; portrait: boolean }>
+  /** `#turnGateKeepBtn` "Play upright": the turn gate stays down for this table. */
+  | Readonly<{ type: 'gate/keep' }>
   /** The `noMove` timer fired: the forfeited roll has been seen. */
   | Readonly<{ type: 'noMove/elapsed' }>
   /** The `shake` timer fired. */
@@ -485,8 +525,15 @@ const handedHits = (game: State, seat: Seat): ReadonlyArray<Effect> => {
 const viewKey = (v: View): string =>
   `${String(v.gameNo)}:${v.phase}:${String(v.turn)}:${String(v.log.length)}:${String(v.played.length)}`;
 // ---- flows -------------------------------------------------------------------------------------
-/** What a game leaves behind when it is left, lost or handed off: the table's taps and overlays; the curtain setting stays. */
-const tableCleared = (table: Table): Table => ({ ...initialTable, curtainMode: table.curtainMode });
+/**
+ * What a game leaves behind when it is left, lost or handed off: the table's taps, overlays and
+ * the gate's dismissal; the curtain setting and the device's orientation stay.
+ */
+const tableCleared = (table: Table): Table => ({
+  ...initialTable,
+  curtainMode: table.curtainMode,
+  portraitPhone: table.portraitPhone,
+});
 
 /**
  * The state side of a paint: nothing without a view; else the screen is the table or, once the
@@ -868,6 +915,11 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
         ...(dropped !== null && app.shell.game !== null ? handedHits(app.shell.game, dropped) : []),
       );
     }
+    case 'viewport/portrait':
+      // The paint follows (main.ts paints after every intent): the gate is `gateOpen`'s.
+      return pure(withTable(app, { portraitPhone: intent.portrait }));
+    case 'gate/keep':
+      return pure(withTable(app, { gateDismissed: true }));
     case 'noMove/elapsed': {
       const seen = withTable(app, { noMoveUntil: null });
       // Pass-and-play: the curtain now rises for the new mover; online the paint just re-reads.

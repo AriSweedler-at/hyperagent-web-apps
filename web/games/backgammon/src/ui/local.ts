@@ -6,7 +6,8 @@
 // One tap on the button reveals; the roll is the roll modal's, which comes up for the revealed
 // seat (design §4.7; until 2026-09-24 the button rolled too, `data-rolls`). The DOM half is the
 // shared shell's since docs/design/shared-shell.md §5 B1 (web/shared/ui/curtain.ts); the copy
-// stays here.
+// stays here. The first curtain of a game names the starter instead of asking for the phone
+// (`titleFor`): whoever tapped Start is holding it, and may be the starter.
 import { listenId, type PageLike } from '../../../../shared/edge/dom.ts';
 import {
   bindCurtain,
@@ -82,6 +83,16 @@ const subFor = (v: View, other: string): string => {
 };
 
 /**
+ * The title: who takes the phone. The first curtain of a game (nothing has happened since the
+ * opening roll: `lastAction` is the `opening` entry, setup.ts) names the starter instead, since
+ * whoever tapped Start or Next game is holding the phone and may well be the starter (the
+ * first-visit walk, 2026-09-28: "Pass it to whom? I am Ari."); `#curtainLast` carries the roll
+ * that decided it. Every later curtain hands the phone over.
+ */
+const titleFor = (v: View, name: string): string =>
+  v.lastAction?.kind === 'opening' ? `${name} starts` : `Pass the phone to ${name}`;
+
+/**
  * The curtain for the seat the phone is handed to (design §2.4 "The copy", the curtain row), read
  * from that seat's own view (`localBroadcast` shows the incoming actor's): `toRoll` hands over to
  * the roll modal (design §4.7), the Western opening plays the dice already rolled, a cube offer
@@ -91,7 +102,7 @@ export const curtainText = (v: View, incoming: Seat): CurtainText => {
   const name = v.players[incoming].name;
   const other = v.players[incoming === 0 ? 1 : 0].name;
   return {
-    title: `Pass the phone to ${name}`,
+    title: titleFor(v, name),
     sub: subFor(v, other),
     last: lastTurnText(v, incoming),
     button: buttonFor(v, name),

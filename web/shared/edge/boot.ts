@@ -50,6 +50,7 @@ import {
 } from './fx.ts';
 import { bindJargon, revealRule } from './glossary.ts';
 import { joinCodeFrom, withoutJoin } from './invite.ts';
+import type { MediaQueryListLike } from './media.ts';
 import { reducedMotion } from './motion.ts';
 import { browserNetDeps } from './netDeps.ts';
 import type { NetDeps } from './peer.ts';
@@ -260,8 +261,12 @@ export type BootWindowLike = InviteWindowLike &
     __rng?: Rng;
     AudioContext?: new () => unknown;
     webkitAudioContext?: new () => unknown;
-    /** `matchMedia('(pointer: coarse)')`: a phone or tablet, where sound starts muted (sound-fonts.md §12). */
-    matchMedia?: (query: string) => Readonly<{ matches: boolean }>;
+    /**
+     * `matchMedia('(pointer: coarse)')`: a phone or tablet, where sound starts muted
+     * (sound-fonts.md §12); handed on through `BootCtx.matchMedia` for a game's own watcher
+     * (web/shared/edge/media.ts `watchMedia`: backgammon's turn gate).
+     */
+    matchMedia?: (query: string) => MediaQueryListLike;
   }>;
 
 /**
@@ -326,6 +331,11 @@ export type BootCtx<G extends BootTypes, App extends BootApp<G>> = Readonly<{
   rng: Rng;
   /** `readHome` after the stored sound font (and the game's own `hooks.home` guard) is checked: the `home/init` snapshot. */
   homeSnapshot: () => HomeSnapshot<G>;
+  /**
+   * The window's `matchMedia`, bound to it (a detached copy throws "Illegal invocation"), for a
+   * game's `hooks.bind` to watch a query through media.ts; absent on a page without one.
+   */
+  matchMedia?: (query: string) => MediaQueryListLike;
 }>;
 
 /**
@@ -623,6 +633,7 @@ export const bootShell = <
     ...cfg.deps,
   };
 
+  const matchMedia = win.matchMedia?.bind(win);
   const ctx: BootCtx<G, App> = {
     dispatch,
     app: () => app,
@@ -632,6 +643,7 @@ export const bootShell = <
     now,
     rng,
     homeSnapshot,
+    ...(matchMedia === undefined ? {} : { matchMedia }),
   };
 
   cfg.hooks?.render?.(ctx);

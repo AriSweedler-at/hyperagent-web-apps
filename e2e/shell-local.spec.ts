@@ -1,28 +1,44 @@
 // The shell half of pass and play on both shell games (docs/design/shared-shell.md §6.3), at a phone
-// and a laptop: the mode switch, two names, Start; the curtain hands the phone to the first player
-// and speaks to the seats in the game's words (gin tells the other to look away, backgammon names
-// the turn); the reveal shows the table with the names in place; and the game is saved for "Resume
+// and a laptop: the mode switch, two names, Start; the first curtain names the first player (gin
+// and briscola hand the phone over, backgammon says who starts: SHELL `firstCurtain`) and speaks
+// to the seats in the game's words (gin tells the other to look away, backgammon names the turn);
+// the reveal shows the table with the names in place; and the game is saved for "Resume
 // pass & play" under the game's key with role 'local'. The game halves (the hand the curtain must
 // cover, the upcard and the discard; the opening roll, the dice, the cube, the Kapará toast) stay in
 // e2e/gin-local.spec.ts and e2e/backgammon-local.spec.ts. Page-only; tagged per game (see
 // shell-home.spec.ts).
-import { SHELL_GAMES } from '../tools/games.ts';
+import { SHELL, SHELL_GAMES, type ShellGame } from '../tools/games.ts';
 import { DESKTOP, PHONE, type Viewport } from './fixtures/geometry.ts';
 import {
   DEFAULT_MARK,
   DEFAULT_NAMES,
-  curtainTitle,
   localNames,
   readPref,
   readSave,
   reveal,
   startLocal,
+  type Names,
 } from './fixtures/shell.ts';
 import { SHELL_DRIVERS } from './fixtures/online-games.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 const VIEWPORTS: Readonly<Record<string, Viewport>> = { phone: PHONE, desktop: DESKTOP };
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * The first curtain's title for `names` (tools/games.ts SHELL `firstCurtain`, its `{name}` one of
+ * the two seats), the seat named as the one capture: gin and briscola "Pass the phone to Ann",
+ * backgammon "Ann starts" (whoever tapped Start is holding the phone and may be the starter).
+ */
+const firstCurtainTitle = (game: ShellGame, names: Names): RegExp => {
+  const seat = `(${names.map(escapeRegExp).join('|')})`;
+  const [before = '', after = ''] = SHELL[game].firstCurtain.split('{name}');
+  return new RegExp(`^${escapeRegExp(before)}${seat}${escapeRegExp(after)}$`);
+};
+/** The seat the first curtain names, read off its title. */
+const firstSeat = (game: ShellGame, names: Names, title: string): string =>
+  firstCurtainTitle(game, names).exec(title)?.[1] ?? '';
 
 SHELL_GAMES.forEach((game) => {
   test.describe(game, { tag: `@${game}` }, () => {
@@ -39,8 +55,8 @@ SHELL_GAMES.forEach((game) => {
           // The curtain hides the table from the first player until they take the phone.
           const curtain = page.locator('#curtainOverlay');
           const title = page.locator('#curtainTitle');
-          await expect(title).toHaveText(curtainTitle(DEFAULT_NAMES));
-          const first = (await title.innerText()).replace('Pass the phone to ', '');
+          await expect(title).toHaveText(firstCurtainTitle(game, DEFAULT_NAMES));
+          const first = firstSeat(game, DEFAULT_NAMES, await title.innerText());
           const other = first === DEFAULT_NAMES[0] ? DEFAULT_NAMES[1] : DEFAULT_NAMES[0];
           await expect(page.locator('#curtainSub')).toContainText(driver.curtainSub(first, other));
           await reveal(page);
@@ -73,8 +89,8 @@ SHELL_GAMES.forEach((game) => {
       await expect(page.locator('#p2NameInput')).toHaveValue(names[1]);
       await page.locator('#localBtn').click();
       const title = page.locator('#curtainTitle');
-      await expect(title).toHaveText(curtainTitle(names));
-      const first = (await title.innerText()).replace('Pass the phone to ', '');
+      await expect(title).toHaveText(firstCurtainTitle(game, names));
+      const first = firstSeat(game, names, await title.innerText());
       await reveal(page);
       await expect(page.locator('#myName')).toContainText(first);
       await expect(page.locator('#oppName')).toHaveText(first === names[0] ? names[1] : names[0]);
@@ -108,7 +124,9 @@ SHELL_GAMES.forEach((game) => {
       await p2.pressSequentially('Max');
       // Start seats the typed names, which were remembered as typed.
       await page.locator('#localBtn').click();
-      await expect(page.locator('#curtainTitle')).toHaveText(curtainTitle(['Zoë', 'Max']));
+      await expect(page.locator('#curtainTitle')).toHaveText(
+        firstCurtainTitle(game, ['Zoë', 'Max']),
+      );
       await expect.poll(() => readPref(page, game, 'name')).toBe('Zoë');
       await expect.poll(() => readPref(page, game, 'p2Name')).toBe('Max');
       // Back on the home screen the remembered names show unmarked, and a tap leaves them.

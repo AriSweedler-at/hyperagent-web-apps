@@ -77,7 +77,39 @@ describe('lastTurnText', () => {
 });
 
 describe('curtainText', () => {
-  const base: View = { ...bob, log: [entry('move', 0, 'Ann moved 8/5 6/5')] };
+  const moved = entry('move', 0, 'Ann moved 8/5 6/5');
+  /** A turn has been played: every curtain from here hands the phone over. */
+  const base: View = { ...bob, log: [moved], lastAction: moved };
+  test('the first curtain of a game names the starter, not "Pass the phone": the holder may be them; the roll that decided it is the last line', () => {
+    const starter = game.turn;
+    const name = game.players[starter].name;
+    expect(bob.lastAction?.kind).toBe('opening');
+    expect(curtainText(viewFor(game, starter), starter)).toEqual({
+      title: `${name} starts`,
+      sub: 'Your turn. Roll when you have the phone.',
+      last: game.log.at(-1)?.text,
+      button: `${name} — your turn`,
+    });
+    // A later game of the match opens the same way (setup.ts: its log announces it, then the roll).
+    const later = entry('opening', 1, 'Bob rolled 5, Ann rolled 2 — Bob starts');
+    const game2: View = {
+      ...bob,
+      log: [entry('game', 0, 'Game 2 begins'), later],
+      lastAction: later,
+    };
+    expect(curtainText(game2, 1).title).toBe('Bob starts');
+    // The Western opening: the starter plays the pair; still theirs to start.
+    const western: View = { ...bob, phase: 'moving', dice: [4, 2], lastAction: later };
+    expect(curtainText(western, 1)).toMatchObject({
+      title: 'Bob starts',
+      button: 'Bob — play 4-2',
+    });
+    // Once anything has happened (a move, a double), the phone changes hands.
+    expect(curtainText(base, 1).title).toBe('Pass the phone to Bob');
+    const doubled = entry('double', 0, 'Ann doubles to 2');
+    const offered: View = { ...bob, phase: 'cubeOffered', log: [doubled], lastAction: doubled };
+    expect(curtainText(offered, 1).title).toBe('Pass the phone to Bob');
+  });
   test('to roll: the button reveals and the sub says the roll waits behind it, or the cube', () => {
     expect(curtainText({ ...base, phase: 'toRoll', canDouble: false }, 1)).toEqual({
       title: 'Pass the phone to Bob',
@@ -130,7 +162,8 @@ describe('paintCurtain', () => {
     if (seat === null) throw new Error('the curtain should be up for the starter');
     const name = game.players[seat].name;
     expect(p.get('curtainOverlay').hidden()).toBe(false);
-    expect(p.get('curtainTitle').text()).toBe(`Pass the phone to ${name}`);
+    // The first curtain: the starter is named, the roll that decided it beneath.
+    expect(p.get('curtainTitle').text()).toBe(`${name} starts`);
     expect(p.get('curtainSub').text()).toBe('Your turn. Roll when you have the phone.');
     // The first curtain of a game carries the opening roll.
     expect(p.get('curtainLast').text()).toBe(started.shell.game?.log.at(-1)?.text);
@@ -142,7 +175,7 @@ describe('paintCurtain', () => {
     const revealed = reduce(started, { type: 'curtain/reveal' }, ctx).app;
     paintCurtain(p.doc, revealed);
     expect(p.get('curtainOverlay').hidden()).toBe(true);
-    expect(p.get('curtainTitle').text()).toBe(`Pass the phone to ${name}`);
+    expect(p.get('curtainTitle').text()).toBe(`${name} starts`);
     // A curtain without a view (unreachable) is not shown.
     paintCurtain(p.doc, { ...initialApp, table: { ...initialApp.table, curtain: 0 } });
     expect(p.get('curtainOverlay').hidden()).toBe(true);
