@@ -200,6 +200,20 @@ export const bgUndo = async (page: Page): Promise<View> => {
 };
 
 /**
+ * Play the rolled turn out, the engine's first legal move each time, until the curtain rises for
+ * the other seat (pass and play). A roll with no move (a forfeited turn, R14) needs no tap: the
+ * curtain rises by itself after the beat, so the caller awaits it.
+ */
+export const bgPlayTurn = async (page: Page): Promise<void> => {
+  const v = await requireBoard(page);
+  const [first] = v.legal;
+  if (first === undefined) return;
+  await bgMove(page, ownPlace(v, first.from), ownPlace(v, first.to));
+  if (await page.locator('#curtainOverlay').isVisible()) return;
+  await bgPlayTurn(page);
+};
+
+/**
  * Seat a position through `window.__backgammon.setup` (pass-and-play only; the shell's
  * `position/load`): the actor's view comes up with no curtain. Resolves once the page shows it.
  */

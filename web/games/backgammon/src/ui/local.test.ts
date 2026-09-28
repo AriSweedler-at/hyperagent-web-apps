@@ -2,7 +2,14 @@ import { describe, expect, test } from 'vitest';
 
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { createGame, viewFor, type LogEntry, type View } from '../engine/index.ts';
-import { bindLocal, curtainText, lastTurnText, paintCurtain } from './local.ts';
+import {
+  bindLocal,
+  curtainText,
+  lastTurnText,
+  openingCurtain,
+  openingRollText,
+  paintCurtain,
+} from './local.ts';
 import { backgammonPage } from './page.fake.ts';
 import { initialApp, reduce, type App, type HomeSnapshot, type Intent } from './state.ts';
 
@@ -80,14 +87,19 @@ describe('curtainText', () => {
   const moved = entry('move', 0, 'Ann moved 8/5 6/5');
   /** A turn has been played: every curtain from here hands the phone over. */
   const base: View = { ...bob, log: [moved], lastAction: moved };
-  test('the first curtain of a game names the starter, not "Pass the phone": the holder may be them; the roll that decided it is the last line', () => {
+  test('the first curtain of a game names the starter, not "Pass the phone": the holder may be them; the sub is the roll that decided it, once, and the last line is empty', () => {
     const starter = game.turn;
     const name = game.players[starter].name;
-    expect(bob.lastAction?.kind).toBe('opening');
-    expect(curtainText(viewFor(game, starter), starter)).toEqual({
+    const v = viewFor(game, starter);
+    expect(openingCurtain(v)).toBe(true);
+    // The roll sentence from the view's decisive dice, without the engine line's "— X starts".
+    const roll = `${game.players[0].name} rolled ${String(game.opening[0])}, ${game.players[1].name} rolled ${String(game.opening[1])}.`;
+    expect(openingRollText(v)).toBe(roll);
+    expect(game.log.at(-1)?.text).toBe(`${roll.slice(0, -1)} — ${name} starts`);
+    expect(curtainText(v, starter)).toEqual({
       title: `${name} starts`,
-      sub: 'Your turn. Roll when you have the phone.',
-      last: game.log.at(-1)?.text,
+      sub: roll,
+      last: '',
       button: `${name} — your turn`,
     });
     // A later game of the match opens the same way (setup.ts: its log announces it, then the roll).
@@ -97,14 +109,21 @@ describe('curtainText', () => {
       log: [entry('game', 0, 'Game 2 begins'), later],
       lastAction: later,
     };
-    expect(curtainText(game2, 1).title).toBe('Bob starts');
+    expect(curtainText(game2, 1)).toMatchObject({
+      title: 'Bob starts',
+      sub: openingRollText(game2),
+      last: '',
+    });
     // The Western opening: the starter plays the pair; still theirs to start.
     const western: View = { ...bob, phase: 'moving', dice: [4, 2], lastAction: later };
     expect(curtainText(western, 1)).toMatchObject({
       title: 'Bob starts',
+      sub: openingRollText(western),
+      last: '',
       button: 'Bob — play 4-2',
     });
     // Once anything has happened (a move, a double), the phone changes hands.
+    expect(openingCurtain(base)).toBe(false);
     expect(curtainText(base, 1).title).toBe('Pass the phone to Bob');
     const doubled = entry('double', 0, 'Ann doubles to 2');
     const offered: View = { ...bob, phase: 'cubeOffered', log: [doubled], lastAction: doubled };
@@ -162,16 +181,29 @@ describe('paintCurtain', () => {
     if (seat === null) throw new Error('the curtain should be up for the starter');
     const name = game.players[seat].name;
     expect(p.get('curtainOverlay').hidden()).toBe(false);
-    // The first curtain: the starter is named, the roll that decided it beneath.
+    // The first curtain: the starter is named, the roll that decided it is the sub, once; the
+    // last line is empty.
+    const v = started.shell.view;
+    if (v === null) throw new Error('a view');
     expect(p.get('curtainTitle').text()).toBe(`${name} starts`);
-    expect(p.get('curtainSub').text()).toBe('Your turn. Roll when you have the phone.');
-    // The first curtain of a game carries the opening roll.
-    expect(p.get('curtainLast').text()).toBe(started.shell.game?.log.at(-1)?.text);
+    expect(p.get('curtainSub').text()).toBe(openingRollText(v));
+    expect(p.get('curtainSub').text()).toMatch(/^\w+ rolled [1-6], \w+ rolled [1-6]\.$/);
+    expect(p.get('curtainLast').text()).toBe('');
     // The button reveals; the roll is the modal's (design §4.7), so no promise is painted.
     expect(p.get('curtainBtn').text()).toBe(`${name} — your turn`);
     expect(p.get('curtainBtn').attr('data-rolls')).toBeNull();
-    // The curtain offers the handoff to an online room (ui/state.ts `handoff/click`).
+    // "Continue online" (ui/state.ts `handoff/click`) waits for a later curtain: hidden on the
+    // first, back once the phone changes hands.
+    expect(p.get('curtainHandoffBtn').hidden()).toBe(true);
+    const moved = entry('move', 0, 'Ann moved 8/5 6/5');
+    const laterView: View = { ...v, log: [...v.log, moved], lastAction: moved };
+    const later: App = { ...started, shell: { ...started.shell, view: laterView } };
+    paintCurtain(p.doc, later);
+    expect(p.get('curtainTitle').text()).toBe(`Pass the phone to ${name}`);
+    expect(p.get('curtainLast').text()).toBe('Ann moved 8/5 6/5');
     expect(p.get('curtainHandoffBtn').hidden()).toBe(false);
+    paintCurtain(p.doc, started);
+    expect(p.get('curtainHandoffBtn').hidden()).toBe(true);
     const revealed = reduce(started, { type: 'curtain/reveal' }, ctx).app;
     paintCurtain(p.doc, revealed);
     expect(p.get('curtainOverlay').hidden()).toBe(true);

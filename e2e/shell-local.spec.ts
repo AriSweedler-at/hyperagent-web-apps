@@ -7,38 +7,24 @@
 // cover, the upcard and the discard; the opening roll, the dice, the cube, the Kapará toast) stay in
 // e2e/gin-local.spec.ts and e2e/backgammon-local.spec.ts. Page-only; tagged per game (see
 // shell-home.spec.ts).
-import { SHELL, SHELL_GAMES, type ShellGame } from '../tools/games.ts';
+import { SHELL_GAMES } from '../tools/games.ts';
 import { DESKTOP, PHONE, type Viewport } from './fixtures/geometry.ts';
 import {
   DEFAULT_MARK,
   DEFAULT_NAMES,
+  firstCurtainTitle,
+  firstSeat,
   localNames,
   readPref,
   readSave,
   reveal,
   startLocal,
-  type Names,
 } from './fixtures/shell.ts';
 import { SHELL_DRIVERS } from './fixtures/online-games.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 const VIEWPORTS: Readonly<Record<string, Viewport>> = { phone: PHONE, desktop: DESKTOP };
-
-const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/**
- * The first curtain's title for `names` (tools/games.ts SHELL `firstCurtain`, its `{name}` one of
- * the two seats), the seat named as the one capture: gin and briscola "Pass the phone to Ann",
- * backgammon "Ann starts" (whoever tapped Start is holding the phone and may be the starter).
- */
-const firstCurtainTitle = (game: ShellGame, names: Names): RegExp => {
-  const seat = `(${names.map(escapeRegExp).join('|')})`;
-  const [before = '', after = ''] = SHELL[game].firstCurtain.split('{name}');
-  return new RegExp(`^${escapeRegExp(before)}${seat}${escapeRegExp(after)}$`);
-};
-/** The seat the first curtain names, read off its title. */
-const firstSeat = (game: ShellGame, names: Names, title: string): string =>
-  firstCurtainTitle(game, names).exec(title)?.[1] ?? '';
 
 SHELL_GAMES.forEach((game) => {
   test.describe(game, { tag: `@${game}` }, () => {

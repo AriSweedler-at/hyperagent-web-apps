@@ -20,8 +20,10 @@
 // design §6); the input wiring of the home screen and the curtain is beside their paints.
 import {
   appendHtml,
+  blurElement,
   closestFrom,
   dataOf,
+  focusElement,
   hasClass,
   keyOf,
   listen,
@@ -677,14 +679,22 @@ export const GATED_IDS: ReadonlyArray<string> = [
  * (ui/state.ts `gateOpen`), until the phone turns or "Play upright". No media query paints it:
  * the App holds the orientation (`viewport/portrait`), so a test can assert it and a fine-pointer
  * page never sees it. `inert` on GATED_IDS while it is up (Safari 15.5+, Chrome 102+; where it is
- * missing the gate is still a fixed overlay with `aria-modal`), both gone when it hides.
+ * missing the gate is still a fixed overlay with `aria-modal`), both gone when it hides. A dialog
+ * takes focus: on the paint that shows it, `#turnGateKeepBtn` (its one control; the button just
+ * tapped sits inside inert `#app` and would keep focus otherwise, a screen reader silent, a
+ * keyboard stranded), and on the paint that hides it that button lets go (a blur on an unfocused
+ * element does nothing, so this is "if focus is inside the gate"). Every other paint leaves focus
+ * alone.
  */
 const paintGate = (doc: DocumentLike, app: App): void => {
   const open = gateOpen(app);
+  const wasOpen = !hasClass(requireId(doc, 'turnGate'), 'hidden');
   paintSheet(doc, 'turnGate', open);
   GATED_IDS.forEach((id) => {
     setAttr(requireId(doc, id), 'inert', open ? '' : null);
   });
+  if (open && !wasOpen) focusElement(requireId(doc, 'turnGateKeepBtn'));
+  if (!open && wasOpen) blurElement(requireId(doc, 'turnGateKeepBtn'));
 };
 
 // ---- whose turn (the owner, 2026-09-25) -----------------------------------------------------------

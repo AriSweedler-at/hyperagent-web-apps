@@ -93,18 +93,19 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const first = view.players[view.turn].name;
       const other = view.players[view.turn === 0 ? 1 : 0].name;
       // The curtain covers a live board (the position is readable beneath) and names the opening
-      // winner as the starter (ui/local.ts `titleFor`: the holder may be them; every later curtain
-      // says "Pass the phone"): one tap reveals; the roll waits in the modal (design §4.9, §4.7).
+      // winner as the starter (ui/local.ts `curtainText`: the holder may be them; every later
+      // curtain says "Pass the phone"), the roll that decided it as the sub, said once (the
+      // engine's log line would name the starter again), and no last line: one tap reveals; the
+      // roll waits in the modal (design §4.9, §4.7). "Continue online" waits for a later curtain.
       const curtain = await bgCurtain(page);
-      // The first curtain carries the opening roll from the engine's log.
-      const opening = view.log.filter((e) => e.kind === 'opening').at(-1)?.text ?? '';
-      expect(opening).toMatch(/ starts$/);
+      const [light, dark] = view.players;
       expect(curtain).toEqual({
         title: `${first} starts`,
-        sub: 'Your turn. Roll when you have the phone.',
-        last: opening,
+        sub: `${light.name} rolled ${String(view.opening[0])}, ${dark.name} rolled ${String(view.opening[1])}.`,
+        last: '',
         button: `${first} — your turn`,
       });
+      await expect(page.locator('#curtainHandoffBtn')).toBeHidden();
       await expect(page.locator('#dice .die.blank')).toHaveCount(2);
       await expect(page.locator('#rollOverlay')).toBeHidden();
       await page.locator('#curtainBtn').click();

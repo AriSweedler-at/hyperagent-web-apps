@@ -1987,4 +1987,82 @@ describe('the turn gate (docs/design/backgammon-landscape.md §5D)', () => {
     // A fine pointer (the watcher reported false, or never reported): never.
     expect(gateOpen(local())).toBe(false);
   });
+
+  test('a finished game is not gated: the result sheet reads upright, peeking too; the next game`s first curtain asks again; the end screen never', () => {
+    const upright = run(local('5'), { type: 'viewport/portrait', portrait: true }).app;
+    expect(gateOpen(upright)).toBe(true);
+    // Played out under the gate (taps reduce beneath it) to the result sheet: the table screen,
+    // the game over, the match on.
+    const done = playOut({ app: upright, effects: [] }, 4000).app;
+    expect(view(done)).toMatchObject({ phase: 'over', matchOver: false });
+    expect(done.shell).toMatchObject({ screen: 'tableScreen' });
+    expect(done.table).toMatchObject({
+      resultOpen: true,
+      portraitPhone: true,
+      gateDismissed: false,
+    });
+    expect(gateOpen(done)).toBe(false);
+    expect(gateOpen(run(done, { type: 'result/peek' }).app)).toBe(false);
+    // Next game: the first curtain, and the gate with it.
+    const next = run(done, { type: 'next/click' }).app;
+    expect(next.table.curtain).not.toBeNull();
+    expect(view(next).phase).not.toBe('over');
+    expect(gateOpen(next)).toBe(true);
+    // A 1-point match ends on the end screen: not gated either.
+    const over = playOut(
+      { app: run(local('1'), { type: 'viewport/portrait', portrait: true }).app, effects: [] },
+      4000,
+    ).app;
+    expect(over.shell.screen).toBe('endgameScreen');
+    expect(gateOpen(over)).toBe(false);
+  });
+
+  test('the host lost mid-match keeps "Play upright" (the shell keeps the same table up); a leave drops it', () => {
+    const g = game(hosting());
+    const seated = run(
+      initialApp,
+      { type: 'join/click', name: 'Bo', code: 'ABCD' },
+      { type: 'guest/connected' },
+      { type: 'guest/frame', frame: { t: 'state', view: viewFor(g, 1) } },
+      { type: 'viewport/portrait', portrait: true },
+    ).app;
+    expect(gateOpen(seated)).toBe(true);
+    const kept = run(seated, { type: 'gate/keep' }).app;
+    expect(gateOpen(kept)).toBe(false);
+    const lost = run(kept, { type: 'guest/lost' }).app;
+    expect(lost.shell).toMatchObject({ screen: 'tableScreen', oppConnected: false });
+    expect(lost.table).toMatchObject({ gateDismissed: true, portraitPhone: true });
+    expect(gateOpen(lost)).toBe(false);
+    // The rejoin's state frame touches nothing of it either.
+    const back = run(lost, {
+      type: 'guest/frame',
+      frame: { t: 'state', view: viewFor(g, 1) },
+    }).app;
+    expect(gateOpen(back)).toBe(false);
+    // Leave: the next table asks again.
+    const left = run(back, { type: 'leave/finish' }, { type: 'home/init', home }).app;
+    expect(left.table).toMatchObject({ gateDismissed: false, portraitPhone: true });
+  });
+
+  test('the host gone once the match is over (hostLeft): the end screen is not gated, and home then Start asks again', () => {
+    const g = game(hosting());
+    const seated = run(
+      initialApp,
+      { type: 'join/click', name: 'Bo', code: 'ABCD' },
+      { type: 'guest/connected' },
+      { type: 'guest/frame', frame: { t: 'state', view: viewFor(g, 1) } },
+      { type: 'viewport/portrait', portrait: true },
+      { type: 'gate/keep' },
+    ).app;
+    const over = { ...viewFor(g, 1), phase: 'over' as const, matchOver: true };
+    const done = run(seated, { type: 'guest/frame', frame: { t: 'state', view: over } }).app;
+    const gone = run(done, { type: 'guest/lost' }).app;
+    expect(gone.shell.screen).toBe('endgameScreen');
+    expect(gone.table).toMatchObject({ gateDismissed: false, portraitPhone: true });
+    expect(gateOpen(gone)).toBe(false);
+    const left = run(gone, { type: 'leave/finish' }, { type: 'home/init', home }).app;
+    expect(left.shell.screen).toBe('homeScreen');
+    expect(gateOpen(left)).toBe(false);
+    expect(gateOpen(run(left, { type: 'local/click', p1: 'Ann', p2: 'Bob' }).app)).toBe(true);
+  });
 });

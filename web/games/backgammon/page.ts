@@ -4,8 +4,9 @@
 // runs over it), so the composer formats the render with the repo's config and the residue here
 // (`blocks`: the head with its fonts, the table with its 24 points and the roll modal, the endgame,
 // the turn gate and the result, cube and resign sheets, the menu and the leave confirm, the two
-// rows of selects and the players row, and the one-line sideways cue on the online host card and
-// both wait screens) is the committed, formatted bytes, cut out of the page with the blank line
+// rows of selects and the players row, and the one-line sideways cue (`phone-cue`: a phone's
+// line, hidden where the pointer is a mouse) on the online host card and both wait screens) is
+// the committed, formatted bytes, cut out of the page with the blank line
 // each follows; the looks (`look`) are the theme's classes (docs/design/backgammon-board.md §5.1)
 // where gin carries inline styles.
 import type {
@@ -138,7 +139,7 @@ const blocks: ShellBlocks = {
                 </div>
               </div>
               <button class="btn btn-go btn-block" id="hostBtn">Open a table</button>
-              <div class="empty-note left">On a phone the table is played sideways.</div>`,
+              <div class="phone-cue left">Played sideways on a phone.</div>`,
   localFields: `            <div class="card-box">
               <label>Players</label>
               <div class="row">
@@ -183,12 +184,8 @@ const blocks: ShellBlocks = {
   playExtra: '',
   extraPanels: '',
   extraScreens: '',
-  hostWaitList: `      <div class="empty-note">
-        On a phone, hold it sideways once the match starts: the board lies flat.
-      </div>`,
-  guestWaitList: `      <div class="empty-note">
-        On a phone, hold it sideways once the match starts: the board lies flat.
-      </div>`,
+  hostWaitList: `      <div class="phone-cue">Hold the phone sideways once the match starts.</div>`,
+  guestWaitList: `      <div class="phone-cue">Hold the phone sideways once the match starts.</div>`,
   // "Playing as …" under the guest's status (web/shared/ui/shellPaint.ts `paintWaiting`): the id
   // alone, styled by theme.css `#guestSeatName`; hidden until the host's welcome names the seat.
   guestSeatName: `      <div id="guestSeatName" class="hidden"></div>`,
@@ -512,7 +509,9 @@ const blocks: ShellBlocks = {
          body sibling after the curtain, painted over it (theme.css: z-index 90); render.ts
          paintGate shows it from the App (ui/state.ts gateOpen: the table screen, the matchMedia
          watcher's portraitPhone, not gateDismissed) and sets inert on #app and every other overlay
-         while it is up. #turnGateGoBtn ships hidden: the Android lock PR shows and binds it. -->
+         while it is up; the paint focuses #turnGateKeepBtn as it opens. #turnGateGoBtn ships
+         hidden: the Android lock PR shows and binds it. The glyph: a phone outline and a quarter
+         turn's arc with its arrowhead, 36px (theme.css .turn-glyph), one stroke in the accent. -->
     <div
       id="turnGate"
       class="overlay hidden"
@@ -523,15 +522,15 @@ const blocks: ShellBlocks = {
       <div class="sheet centered">
         <div class="turn-glyph" aria-hidden="true">
           <svg viewBox="0 0 64 64" focusable="false">
-            <rect x="22" y="8" width="20" height="48" rx="4" />
-            <path d="M48 22a22 22 0 0 1 0 20" />
-            <path d="M44 38l4 4 4-4" />
+            <rect x="18" y="8" width="20" height="48" rx="4" />
+            <path d="M46 14a26 26 0 0 1 0 36" />
+            <path d="M39 43l7 7 7-7" />
           </svg>
         </div>
         <div class="sheet-title" id="turnGateTitle">Turn your phone sideways</div>
         <div class="sheet-sub" id="turnGateSub">
-          The board lies flat, like a real one. If it stays upright, rotation is locked in your
-          phone's settings.
+          The board lies flat, like a real one. If it stays upright, rotation is locked: swipe down
+          from the top edge and unlock it.
         </div>
         <button class="btn btn-go btn-block hidden" id="turnGateGoBtn">Go sideways</button>
         <button class="btn btn-ghost btn-block btn-sm" id="turnGateKeepBtn">Play upright</button>

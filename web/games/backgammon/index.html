@@ -101,7 +101,7 @@
                 </div>
               </div>
               <button class="btn btn-go btn-block" id="hostBtn">Open a table</button>
-              <div class="empty-note left">On a phone the table is played sideways.</div>
+              <div class="phone-cue left">Played sideways on a phone.</div>
               <div class="empty-note left">You'll get a 4-letter room code to share.</div>
             </div>
             <div class="card-box">
@@ -198,9 +198,7 @@
         </div>
         <div class="card-box centered">
           <div id="hostWaitStatus" class="pulse muted">Opening the table…</div>
-          <div class="empty-note">
-            On a phone, hold it sideways once the match starts: the board lies flat.
-          </div>
+          <div class="phone-cue">Hold the phone sideways once the match starts.</div>
           <div class="empty-note">
             Keep this screen open while your opponent joins. If you switch apps, come straight back
             and the table reconnects on its own.
@@ -215,9 +213,7 @@
         <h1>Joining…</h1>
         <div class="card-box centered">
           <div id="guestWaitStatus" class="pulse muted">Connecting…</div>
-          <div class="empty-note">
-            On a phone, hold it sideways once the match starts: the board lies flat.
-          </div>
+          <div class="phone-cue">Hold the phone sideways once the match starts.</div>
           <div id="guestSeatName" class="hidden"></div>
         </div>
         <button class="btn btn-ghost btn-block" id="cancelGuestBtn">Back</button>
@@ -554,7 +550,9 @@
          body sibling after the curtain, painted over it (theme.css: z-index 90); render.ts
          paintGate shows it from the App (ui/state.ts gateOpen: the table screen, the matchMedia
          watcher's portraitPhone, not gateDismissed) and sets inert on #app and every other overlay
-         while it is up. #turnGateGoBtn ships hidden: the Android lock PR shows and binds it. -->
+         while it is up; the paint focuses #turnGateKeepBtn as it opens. #turnGateGoBtn ships
+         hidden: the Android lock PR shows and binds it. The glyph: a phone outline and a quarter
+         turn's arc with its arrowhead, 36px (theme.css .turn-glyph), one stroke in the accent. -->
     <div
       id="turnGate"
       class="overlay hidden"
@@ -565,15 +563,15 @@
       <div class="sheet centered">
         <div class="turn-glyph" aria-hidden="true">
           <svg viewBox="0 0 64 64" focusable="false">
-            <rect x="22" y="8" width="20" height="48" rx="4" />
-            <path d="M48 22a22 22 0 0 1 0 20" />
-            <path d="M44 38l4 4 4-4" />
+            <rect x="18" y="8" width="20" height="48" rx="4" />
+            <path d="M46 14a26 26 0 0 1 0 36" />
+            <path d="M39 43l7 7 7-7" />
           </svg>
         </div>
         <div class="sheet-title" id="turnGateTitle">Turn your phone sideways</div>
         <div class="sheet-sub" id="turnGateSub">
-          The board lies flat, like a real one. If it stays upright, rotation is locked in your
-          phone's settings.
+          The board lies flat, like a real one. If it stays upright, rotation is locked: swipe down
+          from the top edge and unlock it.
         </div>
         <button class="btn btn-go btn-block hidden" id="turnGateGoBtn">Go sideways</button>
         <button class="btn btn-ghost btn-block btn-sm" id="turnGateKeepBtn">Play upright</button>

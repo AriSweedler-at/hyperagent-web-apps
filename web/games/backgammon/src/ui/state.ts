@@ -249,7 +249,7 @@ export type Table = Readonly<{
   portraitPhone: boolean;
   /**
    * `#turnGateKeepBtn` "Play upright": the gate stays down for this table (`tableCleared` drops
-   * it).
+   * it; a host lost mid-match keeps it, since the shell keeps the same table up).
    */
   gateDismissed: boolean;
 }>;
@@ -288,13 +288,18 @@ export const PORTRAIT_PHONE =
   '(any-pointer: coarse) and (orientation: portrait) and (max-width: 500px)';
 
 /**
- * The turn gate is up (render.ts `paintGate`): at the table, on a phone held upright, until the
- * phone turns or "Play upright" for this table. The home, the waiting rooms and the endgame stay
- * upright-friendly. Not a modal in the reducer's sense: taps still reduce; `inert` on the DOM is
- * the guard.
+ * The turn gate is up (render.ts `paintGate`): at the table, on a phone held upright, while a game
+ * is on, until the phone turns or "Play upright" for this table. The home, the waiting rooms and
+ * the endgame stay upright-friendly, and so does a finished game (`phase 'over'`: the result sheet
+ * is a card of text over a board nobody plays, read fine upright and handed over upright; the next
+ * game's first curtain brings the gate back). Not a modal in the reducer's sense: taps still
+ * reduce; `inert` on the DOM is the guard.
  */
 export const gateOpen = (app: App): boolean =>
-  app.shell.screen === 'tableScreen' && app.table.portraitPhone && !app.table.gateDismissed;
+  app.shell.screen === 'tableScreen' &&
+  app.shell.view?.phase !== 'over' &&
+  app.table.portraitPhone &&
+  !app.table.gateDismissed;
 // ---- the strings the app (not the sessions) writes ---------------------------------------------
 
 /** A tapped point that is neither source nor target shakes for this long (design §4.2 rule 1). */
@@ -526,8 +531,9 @@ const viewKey = (v: View): string =>
   `${String(v.gameNo)}:${v.phase}:${String(v.turn)}:${String(v.log.length)}:${String(v.played.length)}`;
 // ---- flows -------------------------------------------------------------------------------------
 /**
- * What a game leaves behind when it is left, lost or handed off: the table's taps, overlays and
- * the gate's dismissal; the curtain setting and the device's orientation stay.
+ * What a game leaves behind when it is left, handed off or over with the host gone: the table's
+ * taps, overlays and the gate's dismissal; the curtain setting and the device's orientation stay.
+ * (A host lost mid-match keeps the dismissal too: `reset` at `'lost'`.)
  */
 const tableCleared = (table: Table): Table => ({
   ...initialTable,
@@ -951,18 +957,21 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
 
 /**
  * What the table drops where a shared flow resets it, site by site as before the move (§4.3.2): a
- * pass-and-play start, the handoff, a leave and the host lost clear everything but the curtain
- * setting (`tableCleared`); a new view (`broadcast`, `localBroadcast`) drops the taps and the tray;
- * a deal, an applied action and a guest's `state` frame touch nothing (`settled` runs in
- * `rendered`).
+ * pass-and-play start, the handoff and a leave clear everything but the curtain setting
+ * (`tableCleared`); the host lost mid-match clears the same but keeps "Play upright", because the
+ * shell keeps this very table up while the guest reconnects (shell.ts `guest/lost` -> `painted`),
+ * and the same table does not ask twice; a new view (`broadcast`, `localBroadcast`) drops the taps
+ * and the tray; a deal, an applied action and a guest's `state` frame touch nothing (`settled`
+ * runs in `rendered`).
  */
 const reset = (table: Table, at: TableReset): Table => {
   switch (at) {
     case 'startLocal':
     case 'handoff':
     case 'leave':
-    case 'lost':
       return tableCleared(table);
+    case 'lost':
+      return { ...tableCleared(table), gateDismissed: table.gateDismissed };
     case 'view':
       return { ...table, selected: null, picked: null, pending: null };
     case 'deal':
