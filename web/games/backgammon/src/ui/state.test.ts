@@ -642,17 +642,18 @@ describe('joining', () => {
     const { app, effects } = run(initialApp, { type: 'join/click', name: '', code: 'abcd' });
     expect(app.shell).toMatchObject({
       role: 'guest',
-      myName: 'Jeff',
+      myName: 'Guest',
       code: 'ABCD',
       netAttempt: 1,
       screen: 'guestWaitScreen',
       guestStatus: { text: connectingMsg('ABCD'), pulse: true },
     });
     expect(effects.at(-1)).toEqual({ type: 'startGuest', code: 'ABCD', attempt: 1 });
-    // The untouched default host name is not a guest name; a touched one is.
+    // The box's text is the name, the untouched prefill included (the client defines its own
+    // name, 2026-09-28); typed or not.
     expect(
       run(initialApp, { type: 'join/click', name: 'Ari', code: 'ABCD' }).app.shell.myName,
-    ).toBe('Jeff');
+    ).toBe('Ari');
     const touched = run(initialApp, { type: 'name/typed', value: 'Ari' }).app;
     expect(run(touched, { type: 'join/click', name: 'Ari', code: 'ABCD' }).app.shell.myName).toBe(
       'Ari',

@@ -55,8 +55,9 @@ export type WaitStatus = Readonly<{ text: string; pulse: boolean }>;
 
 /**
  * What `paintWaiting` reads: every game's `app.shell` (shell.ts `ShellState`) carries these. The
- * seat fields are read only for an N-seat page's `#seatList` (below); gin's and backgammon's
- * pages have no such element, so nothing of theirs is painted differently.
+ * seat fields are read only for an N-seat page's `#seatList` (below) and `seatedName` only for a
+ * page with `#guestSeatName`; gin's page has neither element, so nothing of its is painted
+ * differently.
  */
 export type WaitingView = Readonly<{
   code: string | null;
@@ -68,6 +69,8 @@ export type WaitingView = Readonly<{
   role?: Role | null;
   myName?: string;
   oppName?: string | null;
+  /** As guest, what the host calls my seat (shell.ts `seatedName`): the "Playing as …" line; null or absent paints it hidden. */
+  seatedName?: string | null;
 }>;
 
 /** One row of the waiting room's seat list: the seat, who holds it (null while empty), whether its channel is open, and whether it is the viewer's own. */
@@ -133,9 +136,19 @@ export const seatListKey = (rows: ReadonlyArray<SeatRow>): string => JSON.string
 export const SEAT_LIST_IDS: ReadonlyArray<string> = ['seatList', 'guestSeatList'];
 
 /**
+ * `#guestSeatName`'s text: the guest's own seat as the host named it (the owner, 2026-09-28: the
+ * guest must be told), so a rename (` 2`) or the fallback ('Guest') is seen before the table, with
+ * Back one tap away to retype.
+ */
+export const seatedAsMsg = (name: string): string => `Playing as ${name}`;
+
+/**
  * `#roomCode`, `#hostWaitStatus` (+ its pulse), `#startGameBtn`, `#guestWaitStatus` (+ its pulse);
- * and the seat lists (`SEAT_LIST_IDS`), each rebuilt through the keyed slot from the shell's seats
- * when the page carries it (an N-seat game's; gin's and backgammon's pages carry neither).
+ * `#guestSeatName` ("Playing as …", or hidden while the host has not answered) when the page
+ * carries it (backgammon's and briscola's `guestSeatName` block; gin's page leaves it out for its
+ * DOM parity oracle); and the seat lists (`SEAT_LIST_IDS`), each rebuilt through the keyed slot
+ * from the shell's seats when the page carries it (an N-seat game's; gin's and backgammon's pages
+ * carry neither).
  */
 export const paintWaiting = (doc: DocumentLike, w: WaitingView): void => {
   setText(requireId(doc, 'roomCode'), w.code ?? '----');
@@ -146,6 +159,12 @@ export const paintWaiting = (doc: DocumentLike, w: WaitingView): void => {
   const guestStatus = requireId(doc, 'guestWaitStatus');
   setText(guestStatus, w.guestStatus.text);
   toggleClass(guestStatus, 'pulse', w.guestStatus.pulse);
+  const seatName = byId(doc, 'guestSeatName');
+  if (seatName !== null) {
+    const seated = w.seatedName ?? null;
+    setText(seatName, seated === null ? '' : seatedAsMsg(seated));
+    toggleClass(seatName, 'hidden', seated === null);
+  }
   const lists = SEAT_LIST_IDS.flatMap((id) => {
     const list = byId(doc, id);
     return list === null ? [] : [list];

@@ -10,11 +10,28 @@
 // host, a move propagating). Both origins: a spec about the origin. Tagged per game (see
 // shell-home.spec.ts) and @online (nightly.yml's grep, for its deployed and broker jobs). Fidice's
 // row in e2e/fixtures/online-games.ts replaced its own e2e/fidice-online.spec.ts (dry-round-2.md
-// H1).
+// H1). The last block is the guest's name (the owner, 2026-09-28: the client defines its own):
+// what the guest's box shows is what both tables seat, an empty box or a fresh invite link seats
+// 'Guest', a clash with the host is deduped once, and the guest wait screen says who you are
+// before the table does (backgammon and briscola; gin's page carries no such line).
+import type { Page } from '@playwright/test';
+
 import { GAMES, REGISTRY, SHELL_GAMES } from '../tools/games.ts';
 import { peerIdFor } from '../web/shared/lib/roomCode.ts';
 import { ONLINE_DRIVERS, SHELL_DRIVERS, connect, connectByLink } from './fixtures/online-games.ts';
-import { expectPeerOptions } from './fixtures/player.ts';
+import { expectPeerOptions, invitePath, openGame } from './fixtures/player.ts';
+import {
+  DEFAULT_MARK,
+  DEFAULT_NAME,
+  followInvite,
+  hostRoom,
+  join,
+  joinUntouched,
+  joinedMsg,
+  rememberName,
+  rememberP2Name,
+  seatedAsMsg,
+} from './fixtures/shell.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
 GAMES.forEach((game) => {
@@ -61,6 +78,102 @@ SHELL_GAMES.forEach((game) => {
         await driver.start(host.page, guest.page);
         await driver.expectOpening(host.page, guest.page);
         await driver.expectNames?.(host.page, guest.page);
+      },
+    );
+  });
+});
+
+// The guest's name is the guest's (C11). The host is Ann throughout, so the prefill 'Ari' is a
+// name of its own and the clash row is unambiguous.
+const HOST = 'Ann';
+
+SHELL_GAMES.forEach((game) => {
+  test.describe(game, { tag: `@${game}` }, () => {
+    const driver = SHELL_DRIVERS[game];
+    const cells = driver.seatNames;
+
+    /** Both tables up: the host's `#oppName` and the guest's own cell both read the guest's seated name; the guest's `#oppName` the host's. */
+    const expectSeated = async (host: Page, guest: Page, guestName: string): Promise<void> => {
+      await expect(host.locator('#oppName')).toHaveText(guestName);
+      await expect(guest.locator('#oppName')).toHaveText(HOST);
+      await expect(guest.locator(cells.me)).toHaveText(cells.meText(guestName));
+    };
+    /** The guest wait screen's "Playing as …" line, on the pages that carry one. */
+    const expectTold = async (guest: Page, name: string): Promise<void> => {
+      if (cells.seated === null) return;
+      await expect(guest.locator(cells.seated)).toHaveText(seatedAsMsg(name));
+      await expect(guest.locator(cells.seated)).toBeVisible();
+    };
+
+    test(
+      'the guest is the name it typed, on the wait screens and both tables: not the host`s remembered second seat, not a wire default',
+      { tag: '@online' },
+      async ({ players, project }) => {
+        const { host, guest } = players;
+        await openGame(host, project, game);
+        await openGame(guest, project, game);
+        // The host device remembers its own name and its usual pass-and-play opponent.
+        await rememberName(host.page, game, HOST);
+        await rememberP2Name(host.page, game, 'Ethan');
+        await host.page.reload();
+        await expect(host.page.locator('#p2NameInput')).toHaveValue('Ethan');
+        const code = await hostRoom(host.page, game, HOST);
+        await join(guest.page, game, 'Xyz', code);
+        await expect(host.page.locator('#hostWaitStatus')).toContainText(joinedMsg('Xyz'));
+        await expectTold(guest.page, 'Xyz');
+        await driver.start(host.page, guest.page);
+        await expectSeated(host.page, guest.page, 'Xyz');
+      },
+    );
+
+    test(
+      'the prefill left alone joins as itself (the box`s text is the name), and the guest is told before the table',
+      { tag: '@online' },
+      async ({ players, project }) => {
+        const { host, guest } = players;
+        await openGame(host, project, game);
+        await openGame(guest, project, game);
+        const code = await hostRoom(host.page, game, HOST);
+        // Fresh storage: the box shows the game's first default, marked as the prefill nobody touched.
+        await expect(guest.page.locator('#nameInput')).toHaveValue(DEFAULT_NAME);
+        await expect(guest.page.locator('#nameInput')).toHaveAttribute(DEFAULT_MARK, '1');
+        await joinUntouched(guest.page, game, code);
+        await expectTold(guest.page, DEFAULT_NAME);
+        await expect(host.page.locator('#hostWaitStatus')).toContainText(joinedMsg(DEFAULT_NAME));
+        await driver.start(host.page, guest.page);
+        await expectSeated(host.page, guest.page, DEFAULT_NAME);
+      },
+    );
+
+    test(
+      'a fresh guest by invite link, nothing typed and nothing remembered, joins as Guest and is told; never the local default',
+      { tag: '@online' },
+      async ({ players, project }) => {
+        const { host, guest } = players;
+        await openGame(host, project, game);
+        await openGame(guest, project, game);
+        const code = await hostRoom(host.page, game, HOST);
+        await followInvite(guest.page, game, invitePath(project, game, code));
+        await expectTold(guest.page, 'Guest');
+        await expect(host.page.locator('#hostWaitStatus')).toContainText(joinedMsg('Guest'));
+        await driver.start(host.page, guest.page);
+        await expectSeated(host.page, guest.page, 'Guest');
+      },
+    );
+
+    test(
+      'a guest named like the host is seated once removed, and told: Ann 2 on the wait screen and on both tables',
+      { tag: '@online' },
+      async ({ players, project }) => {
+        const { host, guest } = players;
+        await openGame(host, project, game);
+        await openGame(guest, project, game);
+        const code = await hostRoom(host.page, game, HOST);
+        await join(guest.page, game, HOST, code);
+        await expectTold(guest.page, `${HOST} 2`);
+        await expect(host.page.locator('#hostWaitStatus')).toContainText(joinedMsg(`${HOST} 2`));
+        await driver.start(host.page, guest.page);
+        await expectSeated(host.page, guest.page, `${HOST} 2`);
       },
     );
   });

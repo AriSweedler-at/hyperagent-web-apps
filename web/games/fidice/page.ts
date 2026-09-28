@@ -186,6 +186,8 @@ const blocks: ShellBlocks = {
         <label class="toggle" id="watchWrap"><input type="checkbox" id="watchCb"> I'll just watch</label>
       </div>`,
   guestWaitList: `      <ul class="seat-list" id="guestSeatList" aria-label="Seats"></ul>`,
+  // The seat list's ` · you` row names my seat; no "Playing as …" line until the restyle decides.
+  guestSeatName: '',
   table: `  <!-- TABLE (plan §4 M2): the shell's five controls, the ladder button and the connection dot in
        the topbar; the cup, the bid card, the seats and the bid picker paint into #fidiceTable from
        M4. Dark until M6: the legacy mount replaces #app's children with #app-root. -->

@@ -37,6 +37,8 @@ export const DEFAULT_MARK = 'data-default';
 export const WAITING_MSG = 'Waiting for your opponent to join';
 /** `#hostWaitStatus` once the guest's join was answered. */
 export const joinedMsg = (name: string): string => `${name} joined!`;
+/** `#guestSeatName` once the host's welcome named the guest's seat (web/shared/ui/shellPaint.ts `seatedAsMsg`); gin's page carries no such line. */
+export const seatedAsMsg = (name: string): string => `Playing as ${name}`;
 /** `#hostWaitStatus` once a resumed room is back on the broker. */
 export const reopenedMsg = (code: string): string => `Room ${code} reopened`;
 /** `#toast` after `#shareCodeBtn` on a browser with no share sheet. */
@@ -51,7 +53,7 @@ export const resumeLabel = {
     `Continue online: ${names[0]} hosts, ${names[1]} joins by invite`,
 } as const;
 
-const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** `#curtainTitle`: the seat taking the phone, one of the two. */
 export const curtainTitle = (names: Names = DEFAULT_NAMES): RegExp =>
@@ -146,6 +148,28 @@ export const rememberName = async (page: Page, game: ShellGame, name: string): P
   await page.evaluate(
     `localStorage.setItem(${JSON.stringify(prefKey(game, 'name'))}, ${JSON.stringify(name)})`,
   );
+};
+
+/** Remember `name` under the game's pass-and-play second-seat key (`#p2NameInput`), as a host device that named its usual opponent would have. */
+export const rememberP2Name = async (page: Page, game: ShellGame, name: string): Promise<void> => {
+  await page.evaluate(
+    `localStorage.setItem(${JSON.stringify(prefKey(game, 'p2Name'))}, ${JSON.stringify(name)})`,
+  );
+};
+
+/**
+ * Join a room by code with the name box left as the page filled it (the prefill, or a remembered
+ * name): only the code is typed, then `#joinBtn`. Resolves once the host has answered the join.
+ */
+export const joinUntouched = async (page: Page, game: ShellGame, code: string): Promise<void> => {
+  await expect(page.locator('#onlineModeContent')).toBeVisible();
+  await page.locator('#codeInput').pressSequentially(code);
+  await expect(page.locator('#codeInput')).toHaveValue(code);
+  await page.locator('#joinBtn').click();
+  await expect(page.locator('#guestWaitScreen')).toBeVisible();
+  await expect(page.locator('#guestWaitStatus')).toHaveText(SHELL[game].hostAnswered, {
+    timeout: WEBRTC_TIMEOUT,
+  });
 };
 
 /**

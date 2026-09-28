@@ -22,6 +22,7 @@ import { invitePath, newPlayer, openGame, type GameHooks, type Player } from './
 import {
   DEFAULT_NAMES,
   ONLINE_NAMES,
+  escapeRegExp,
   followInvite,
   hostStarts,
   joinedMsg,
@@ -54,11 +55,24 @@ export type OnlineDriver = Readonly<{
   relayToasts: ReadonlyArray<'host' | 'guest'>;
 }>;
 
+/**
+ * Where a seated page names the seats (e2e/shell-online.spec.ts, the guest's-name rows): the cell
+ * that names my own seat and what it reads for a name (gin's adds the running score), and the
+ * guest wait screen's "Playing as …" line, null on a page that carries none (gin's: its DOM parity
+ * oracle). The other seat is the shell's `#oppName` on every page.
+ */
+export type SeatNameCells = Readonly<{
+  me: string;
+  meText: (name: string) => string | RegExp;
+  seated: string | null;
+}>;
+
 /** A shell game's row: the online half and what the other shell specs ask of its table. */
 export type ShellDriver = OnlineDriver &
   Readonly<{
     /** The curtain's sub line for the seat taking the phone (`first`) while the other looks away. */
     curtainSub: (first: string, other: string) => string;
+    seatNames: SeatNameCells;
     /** The table as one page shows it, as one comparable string. */
     snapshot: (page: Page) => Promise<string>;
     /** Both tables agree (the guest's frame arrives a beat later); resolves with the host's snapshot. */
@@ -130,6 +144,12 @@ const ginSnapshot = async (page: Page): Promise<string> => JSON.stringify(await 
 const gin: ShellDriver = {
   ...shellOnline,
   curtainSub: (_first, other) => `${other}, look away`,
+  // `#myName` is "<name> · <total> pts" (src/ui/render.ts `paintHand`); no "Playing as" line.
+  seatNames: {
+    me: '#myName',
+    meText: (name) => new RegExp(`^${escapeRegExp(name)} · \\d+ pts$`),
+    seated: null,
+  },
   start: hostStarts,
   snapshot: ginSnapshot,
   agree: async (host, guest) => {
@@ -184,6 +204,7 @@ const bgSnapshot = async (page: Page): Promise<string> => boardKey(await readBoa
 const backgammon: ShellDriver = {
   ...shellOnline,
   curtainSub: () => 'Your turn. Roll when you have the phone.',
+  seatNames: { me: '#myName', meText: (name) => name, seated: '#guestSeatName' },
   // The shell's start, then what backgammon's online table adds: no curtain on either side (pass
   // and play alone has one). The two asserts came here from `bgHostStarts` (dry-round-2.md I5).
   start: async (host, guest) => {
@@ -300,6 +321,7 @@ const expectBriscolaStrip = async (page: Page, names: ReadonlyArray<string>): Pr
 const briscola: ShellDriver = {
   ...shellOnline,
   curtainSub: (_first, other) => `${other}, look away`,
+  seatNames: { me: '#myName', meText: (name) => name, seated: '#guestSeatName' },
   // The host deals from the waiting room; both tables come up with no curtain (online).
   start: async (host, guest) => {
     await expect(host.locator('#startGameBtn')).toBeVisible({ timeout: WEBRTC_TIMEOUT });

@@ -205,6 +205,9 @@ const blocks: ShellBlocks = {
   // device's own, data-you (theme.css `.seat-list`).
   hostWaitList: `      <ul class="seat-list" id="seatList" aria-label="Seats"></ul>`,
   guestWaitList: `      <ul class="seat-list" id="guestSeatList" aria-label="Seats"></ul>`,
+  // "Playing as …" under the list (shellPaint.ts `paintWaiting`): the id alone, styled by theme.css
+  // `#guestSeatName`; hidden until a lobby frame names my row.
+  guestSeatName: `      <div id="guestSeatName" class="hidden"></div>`,
   table: `      <!-- TABLE (design §5.2): one DOM for 2, 3 and 4 seats. I sit at the bottom; the other
            seats are relative cells (#seatR1 right, #seatR2 across, #seatR3 left) that seatCells
            (src/ui/layout.ts) maps to absolute seats; the static markup ships the 2-player shape.

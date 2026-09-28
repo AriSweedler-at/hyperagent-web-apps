@@ -11,7 +11,11 @@
 // prototype keys never reach the game. The legacy host read a join loosely
 // (`String(msg.name || 'Jeff').slice(0, 20).trim() || 'Jeff'`); the decoder takes only a string of
 // at most NAME_MAX characters (what a legacy guest ever sends) and `guestNameFor` applies the
-// host's normalisation. A wire-visible change adds a version field here.
+// host's normalisation: cut, trim, ` 2` on a clash. The fallback for an empty name is the GUEST's
+// since 2026-09-28 (the owner: the client defines its own name): web/shared/ui/shell.ts
+// `guestName` puts `DEFAULT_GUEST_NAME` on the wire before a join ever leaves the device, so the
+// host meets an empty name only from a hand-made frame, and `guestNameFor` keeps the same word for
+// that case. A wire-visible change adds a version field here (the fallback is data, not shape).
 //
 // The ephemeral lane (docs/design/briscola-battle.md §4.5): one more tag, `intent`, that a game
 // declares through `twoSeatProtocol`'s `extra.ephemeral` and that BOTH sides may send (briscola's
@@ -47,8 +51,13 @@ export type EphemeralFrame = Readonly<{ t: EphemeralTag }>;
 export const NAME_MAX = 20;
 /** A toast carries an engine refusal (the longest is well under 100 characters). */
 export const TOAST_MAX = 500;
-/** What the host calls a guest whose name is empty. */
-export const DEFAULT_GUEST_NAME = 'Jeff';
+/**
+ * What a guest is called when it typed nothing: chosen on the guest (shell.ts `guestName`, or a
+ * game's `names.guest`) and sent as its name; the host's `guestNameFor` keeps it as its own fallback
+ * for an empty name on the wire (a hand-made frame; no shipped guest sends one). 'Jeff' until
+ * 2026-09-28, gin's legacy literal, which no owner instruction ever asked for.
+ */
+export const DEFAULT_GUEST_NAME = 'Guest';
 
 export type JoinFrame = Readonly<{ t: 'join'; name: string }>;
 export type ActionFrame<A> = Readonly<{ t: 'action'; action: A }>;
@@ -217,8 +226,9 @@ export const twoSeatProtocol = <A, V, RF extends RoomFields, E extends Ephemeral
 
 /**
  * The name the host gives a joining guest (the legacy `onGuestMsg`): cut to NAME_MAX and trimmed,
- * `Jeff` when that leaves nothing, and ` 2` appended when it matches the host's own name
- * case-insensitively.
+ * `DEFAULT_GUEST_NAME` when that leaves nothing, and ` 2` appended when it matches the host's own
+ * name case-insensitively. The guest mirrors this at its welcome (shell.ts `seatedName`): same
+ * pure function, same two inputs, so the guest knows what the host calls it before the table.
  */
 export const guestNameFor = (rawName: string, hostName: string): string => {
   const trimmed = rawName.slice(0, NAME_MAX).trim();

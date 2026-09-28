@@ -184,6 +184,9 @@ const blocks: ShellBlocks = {
   extraScreens: '',
   hostWaitList: '',
   guestWaitList: '',
+  // "Playing as …" under the guest's status (web/shared/ui/shellPaint.ts `paintWaiting`): the id
+  // alone, styled by theme.css `#guestSeatName`; hidden until the host's welcome names the seat.
+  guestSeatName: `      <div id="guestSeatName" class="hidden"></div>`,
   table: `      <!-- TABLE (design §2.1). The 24 points are direct children of #board in absolute order;
            the seat perspective is data-own on each point and data-seat on the board, written by
            paintSeat; the static markup ships seat 0's. -->

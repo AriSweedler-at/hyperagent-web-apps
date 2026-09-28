@@ -184,6 +184,9 @@ const blocks: ShellBlocks = {
   </div>`,
   hostWaitList: '',
   guestWaitList: '',
+  // No "Playing as …" line: the parity oracle (tools/parity/gin-dom-parity.ts) holds this page to
+  // the legacy one; the guest still learns its seated name in `shell.seatedName`, unpainted.
+  guestSeatName: '',
   table: `  <!-- TABLE -->
   <div id="tableScreen" class="hidden">
     <div class="topbar">

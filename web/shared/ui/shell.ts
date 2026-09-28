@@ -242,10 +242,24 @@ export type ShellState<G extends ShellTypes> = Readonly<{
   seats: ReadonlyArray<SeatState>;
   /** My seat: 0 as host and in pass-and-play; as guest the `you` of the last welcome or lobby frame, 1 when the frame carries none. */
   mySeat: SeatOf<G>;
+  /**
+   * As guest, what the host calls my seat once it has answered: at a welcome or lobby frame with
+   * no seating (a room of exactly two) the host's rule mirrored (`guestNameFor(myName, hostName)`:
+   * exactly its `guestNameAmong` against its own name, the one other name at the table), at one
+   * with a seating my own row (`seats[you − 1]`, n-seat-sessions.md D3), then my seat's name off
+   * every `state` frame's view (`cfg.result.playersOf`, authoritative). Null until then, and in
+   * every other role. `myName` stays what was typed: it is the rejoin key and what the save keeps.
+   */
+  seatedName: string | null;
   /** Pass-and-play: every player's name in seat order (`cfg.result.playersOf` of seat 0's view); [] otherwise. */
   localNames: ReadonlyArray<string>;
   /** Pass-and-play: the seats played from this device, every seat in v1 (the seam for a mixed table); [] otherwise. */
   localSeats: ReadonlyArray<SeatOf<G>>;
+  /**
+   * The online name input has been typed into, or a remembered name filled it (`home/init`). The
+   * join no longer reads it (2026-09-28: the box's text is the guest's name, an untouched prefill
+   * included, as `host/click` always counted it); it stays as the record of the first-tap clear.
+   */
   nameTouched: boolean;
   /** Pass-and-play: the seat that lifted the curtain this turn. */
   revealed: SeatOf<G> | null;
@@ -636,8 +650,10 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
   /** The peer prefix and the room-code spec (web/shared/lib/roomCode.ts). */
   id: Game;
   names: Readonly<{
-    /** The host name an empty input means (the wire's guest default is `DEFAULT_GUEST_NAME`). */
+    /** The host name an empty input means, and the prefill of every name input. */
     default: string;
+    /** What a guest that typed nothing joins as (`guestName`); `DEFAULT_GUEST_NAME` when absent. */
+    guest?: string;
   }>;
   /**
    * The pass-and-play seats' defaults, first seat first: shown in the inputs when nothing is
@@ -886,6 +902,21 @@ export const withTable = <G extends ShellTypes>(
 const nameOr = (raw: string, fallback: string): string => {
   const trimmed = raw.trim();
   return (trimmed === '' ? fallback : trimmed).slice(0, NAME_MAX);
+};
+
+/**
+ * The name a guest joins under (the owner, 2026-09-28: the client defines its own name): what its
+ * input shows, cut to NAME_MAX then trimmed (the host's order, protocol.ts `guestNameFor`, so the
+ * string on the wire is the string the host seats), whenever that leaves anything, an untouched
+ * prefill included (as `host/click` counts it); else the game's guest fallback. Chosen here, on the
+ * guest, so the host never names a guest: its `guestNameAmong` only dedupes.
+ */
+export const guestName = (
+  raw: string,
+  cfg: Readonly<{ names: Readonly<{ guest?: string }> }>,
+): string => {
+  const typed = raw.slice(0, NAME_MAX).trim();
+  return typed === '' ? (cfg.names.guest ?? DEFAULT_GUEST_NAME) : typed;
 };
 
 /**
@@ -1375,8 +1406,15 @@ const startGuest = <G extends ShellTypes>(
   return andThen(
     showScreen(
       withGuestStatus(
-        // Seat 1 until the host's welcome names my seat; the seat list is the host's to send.
-        withShell(app, { role: 'guest', code, netAttempt: attempt, mySeat: 1, seats: [] }),
+        // Seat 1 and no seated name until the host's welcome names my seat; the seat list is the host's to send.
+        withShell(app, {
+          role: 'guest',
+          code,
+          netAttempt: attempt,
+          mySeat: 1,
+          seats: [],
+          seatedName: null,
+        }),
         cfg.copy.connecting(code),
       ),
       'guestWaitScreen',
@@ -1448,9 +1486,22 @@ const hostFrame = <G extends ShellTypes>(
         i === seat - 1 || other.name === null ? [] : [other.name],
       );
       const name = guestNameAmong(frame.name, [s.myName, ...others]);
-      const connected = withShell(withSeats(app, seatAt(seats, seat, { name, connected: true })), {
+      const joined = withShell(withSeats(app, seatAt(seats, seat, { name, connected: true })), {
         handoff: false,
       });
+      // The wait screen names the newcomer under its seated name on both paths: on a rejoin into a
+      // game the screen sits hidden under the table, but a stale "send Ethan the invite…" or
+      // "waiting for Xyz to rejoin…" must not be what a later look finds (repro-names N3).
+      const seated = seatedCount(joined.shell.seats);
+      const capacity = joined.shell.seats.length + 1;
+      const names = joined.shell.seats.flatMap((x) =>
+        x.connected && x.name !== null ? [x.name] : [],
+      );
+      const text =
+        cfg.copy.joined === undefined
+          ? joinedMsg(name)
+          : cfg.copy.joined(name, names, capacity - seated);
+      const connected = withHostStatus(joined, text);
       if (s.game !== null) {
         // Rejoin: keep the seat, refresh the name. At an N-seat table the lobby goes round first
         // (the returner learns its seat, `you`, which the session may have moved by name since its
@@ -1463,17 +1514,8 @@ const hostFrame = <G extends ShellTypes>(
           (a) => broadcast(a, ctx, cfg),
         );
       }
-      const seated = seatedCount(connected.shell.seats);
-      const capacity = connected.shell.seats.length + 1;
-      const names = connected.shell.seats.flatMap((x) =>
-        x.connected && x.name !== null ? [x.name] : [],
-      );
-      const text =
-        cfg.copy.joined === undefined
-          ? joinedMsg(name)
-          : cfg.copy.joined(name, names, capacity - seated);
       return step(
-        withShell(withHostStatus(connected, text), {
+        withShell(connected, {
           startGameVisible: seated >= minSeated(connected.shell, cfg),
         }),
         ...lobbySends(connected.shell, cfg),
@@ -1501,11 +1543,21 @@ const guestFrame = <G extends ShellTypes>(
       const room = cfg.seats === undefined ? null : roomSeatingOf<G>(frame);
       const seated = room === null ? 2 : seatedCount(room.seats);
       const capacity = room === null ? 2 : room.seats.length + 1;
+      // What the host calls me. A frame with no seating is a room of exactly two (a two-seat
+      // game's, and an N-seat game's at two seats, where its protocol leaves `seats`/`you` off):
+      // the host's rule mirrored (`guestNameFor` against its name, the one other name at the
+      // table, so exact by construction). A frame with one names my own row, which a welcome sent
+      // before my join reached the host still leaves null until the lobby that follows.
+      const seatedName =
+        room === null
+          ? guestNameFor(app.shell.myName, frame.hostName)
+          : (room.seats[room.you - 1]?.name ?? app.shell.seatedName);
       return pure(
         withGuestStatus(
           withShell(app, {
             oppName: frame.hostName,
             opts,
+            seatedName,
             ...(room === null ? {} : { mySeat: room.you, seats: room.seats }),
           }),
           cfg.copy.hostRoom(frame.hostName, opts, seated, capacity),
@@ -1520,7 +1572,14 @@ const guestFrame = <G extends ShellTypes>(
     case 'state':
       return painted(
         {
-          shell: { ...app.shell, view: frame.view, oppConnected: true },
+          shell: {
+            ...app.shell,
+            view: frame.view,
+            oppConnected: true,
+            // My seat's name as the host dealt it: the word every painter shows, whatever rule made it.
+            seatedName:
+              cfg.result.playersOf(frame.view).at(app.shell.mySeat) ?? app.shell.seatedName,
+          },
           table: cfg.table.reset(app.table, 'frame'),
         },
         app.shell.view,
@@ -1731,6 +1790,7 @@ const leaveFinish = <G extends ShellTypes>(app: ShellApp<G>, cfg: ShellConfig<G>
         // No room and no table: the legacy `oppName` lingers until the next room names one.
         seats: [],
         mySeat: 0,
+        seatedName: null,
         localNames: [],
         localSeats: [],
       },
@@ -1746,7 +1806,13 @@ const leaveFinish = <G extends ShellTypes>(app: ShellApp<G>, cfg: ShellConfig<G>
  */
 const cancelFinish = <G extends ShellTypes>(app: ShellApp<G>): Step<G> =>
   step(
-    withShell(app, { role: null, netAttempt: app.shell.netAttempt + 1, handoff: false, seats: [] }),
+    withShell(app, {
+      role: null,
+      netAttempt: app.shell.netAttempt + 1,
+      handoff: false,
+      seats: [],
+      seatedName: null,
+    }),
     app.shell.handoff && app.shell.game !== null
       ? { type: 'saveLocal', game: app.shell.game }
       : { type: 'clearSave' },
@@ -1833,11 +1899,7 @@ export const reduceShell = <G extends ShellTypes>(
     case 'join/click': {
       const code = validateCode(cfg.id, intent.code);
       if (!code.ok) return step(app, toast(code.error));
-      const typed = intent.name.trim();
-      const myName = (
-        typed !== '' && (s.nameTouched || typed !== cfg.names.default) ? typed : DEFAULT_GUEST_NAME
-      ).slice(0, NAME_MAX);
-      return startGuest(withShell(app, { myName }), code.value, cfg);
+      return startGuest(withShell(app, { myName: guestName(intent.name, cfg) }), code.value, cfg);
     }
     case 'local/click': {
       const opts = cfg.opts.parse(intent, s.opts);
@@ -1904,9 +1966,10 @@ export const reduceShell = <G extends ShellTypes>(
       // The invite link is the tap on `#joinBtn` (the owner, 2026-09-25: "it should immediately act
       // as if you have clicked that already"): the form is filled first, as it was, so a refusal or
       // a cancel leaves the code in the input on the Play tab in online mode (the mode is shown, not
-      // stored), then `join/click` with that code and the name the input shows, the remembered one
-      // or the game's first default, which the click's rule reads as untouched. A bad code is the
-      // click's toast over the filled form; a link followed while seated changes nothing.
+      // stored), then `join/click` with that code and the remembered name, or none: the link's
+      // guest never saw the box, so the prefill it shows is not its word, and the click's rule
+      // falls back to the guest's default (never the local one). A bad code is the click's toast
+      // over the filled form; a link followed while seated changes nothing.
       if (s.role !== null) return pure(app);
       const code = sanitiseCode(cfg.id, intent.code);
       // The device's own invite (the owner, 2026-09-25: "when a host device clicks the JOIN code
@@ -1914,13 +1977,12 @@ export const reduceShell = <G extends ShellTypes>(
       // Resume tap would bring it, and nobody joins.
       const own = hostOffer(s);
       if (own !== null && own.code === code) return resume(app, own, ctx, cfg);
-      const name = s.p1Name === '' ? localNameFor(localNamesOf(cfg), 0) : s.p1Name;
       return andThen(
         andThen(
           setHomeTab(withShell(app, { playMode: 'online', codeDraft: code }), 'play', false, cfg),
           (a) => step(a, { type: 'setCode', value: code }),
         ),
-        (a) => reduceShell(a, { type: 'join/click', name, code }, ctx, cfg),
+        (a) => reduceShell(a, { type: 'join/click', name: s.p1Name, code }, ctx, cfg),
       );
     }
     case 'sound/toggle':
@@ -1963,13 +2025,14 @@ export const reduceShell = <G extends ShellTypes>(
           ),
         );
       // The host, then every guest seat in order (`guest`, `guest2`, `guest3`: seat 1 keeps the
-      // two-seat id). A connected seat has a name; the fallback only satisfies the type (a seat
-      // left empty at a flexible table is dealt to under it: seats are not compacted, D2).
+      // two-seat id). A connected seat has a name; the fallback, the word a nameless guest would
+      // have chosen for itself, only satisfies the type (a seat left empty at a flexible table is
+      // dealt to under it: seats are not compacted, D2).
       const players: ReadonlyArray<Player> = [
         { id: 'host', name: s.myName },
         ...seatsOf(s, cfg).map((seat, i) => ({
           id: i === 0 ? 'guest' : `guest${String(i + 1)}`,
-          name: seat.name ?? DEFAULT_GUEST_NAME,
+          name: seat.name ?? guestName('', cfg),
         })),
       ];
       const game = cfg.engine.create(playersFor<G>(players), s.opts, ctx.rng, ctx.now);
@@ -2055,6 +2118,7 @@ export const initialShell = <G extends ShellTypes>(cfg: ShellConfig<G>): ShellSt
   oppConnected: false,
   seats: [],
   mySeat: 0,
+  seatedName: null,
   localNames: [],
   localSeats: [],
   nameTouched: false,

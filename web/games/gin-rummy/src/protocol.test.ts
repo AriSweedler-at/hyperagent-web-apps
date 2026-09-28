@@ -38,12 +38,12 @@ const view = viewFor(
 );
 
 describe('frozen constants', () => {
-  test('the seven tags, the name cap and the default guest name are the legacy literals', () => {
+  test('the seven tags and the name cap are the legacy literals; the guest default is the shared word since 2026-09-28', () => {
     expect([...WIRE_TAGS].sort()).toEqual(
       ['join', 'welcome', 'lobby', 'full', 'toast', 'state', 'action'].sort(),
     );
     expect(NAME_MAX).toBe(20);
-    expect(DEFAULT_GUEST_NAME).toBe('Jeff');
+    expect(DEFAULT_GUEST_NAME).toBe('Guest');
     expect(TOAST_MAX).toBe(500);
   });
 });
@@ -211,16 +211,16 @@ describe('decodeGuestFrame / decodeHostFrame keep each side to its own frames', 
 });
 
 describe('guestNameFor', () => {
-  test('cuts to 20, trims, defaults to Jeff and suffixes a clash with the host, as the legacy did', () => {
+  test('cuts to 20, trims, defaults to Guest (the guest`s own word for an empty box) and suffixes a clash with the host, as the legacy did', () => {
     expect(guestNameFor('Jeff', 'Ann')).toBe('Jeff');
     expect(guestNameFor('  Bo  ', 'Ann')).toBe('Bo');
-    expect(guestNameFor('', 'Ann')).toBe('Jeff');
-    expect(guestNameFor('   ', 'Ann')).toBe('Jeff');
+    expect(guestNameFor('', 'Ann')).toBe('Guest');
+    expect(guestNameFor('   ', 'Ann')).toBe('Guest');
     expect(guestNameFor('ann', 'Ann')).toBe('ann 2');
     expect(guestNameFor('ANN', 'ann')).toBe('ANN 2');
     expect(guestNameFor('abcdefghijklmnopqrstuvwxyz', 'Ann')).toBe('abcdefghijklmnopqrst');
     // The cut happens before the trim, as in `String(name).slice(0, 20).trim()`.
     expect(guestNameFor('abcdefghijklmnopqrs      x', 'Ann')).toBe('abcdefghijklmnopqrs');
-    expect(guestNameFor('', 'Jeff')).toBe('Jeff 2');
+    expect(guestNameFor('', 'Guest')).toBe('Guest 2');
   });
 });

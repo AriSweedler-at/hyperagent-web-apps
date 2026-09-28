@@ -466,7 +466,7 @@ describe('hosting', () => {
     expect(effects).toEqual([{ type: 'send', frame: { t: 'lobby', hostName: 'Ann', target: 50 } }]);
     expect(
       run(started, { type: 'host/frame', frame: { t: 'join', name: '' } }).app.shell.oppName,
-    ).toBe('Jeff');
+    ).toBe('Guest');
   });
 
   test('an action frame before the deal is ignored', () => {
@@ -606,10 +606,11 @@ describe('joining', () => {
       { type: 'scrollTop' },
       { type: 'startGuest', code: 'KQZM', attempt: 1 },
     ]);
-    // The untouched default "Ari" joins as Jeff; a touched "Ari" keeps it; empty is Jeff.
+    // The box's text is the name, the untouched prefill "Ari" included (the client defines its
+    // own name, 2026-09-28); an empty box is the guest fallback.
     expect(
       run(initialApp, { type: 'join/click', name: 'Ari', code: 'KQZM' }).app.shell.myName,
-    ).toBe('Jeff');
+    ).toBe('Ari');
     expect(
       run(
         { ...initialApp, shell: { ...initialApp.shell, nameTouched: true } },
@@ -617,7 +618,7 @@ describe('joining', () => {
       ).app.shell.myName,
     ).toBe('Ari');
     expect(run(initialApp, { type: 'join/click', name: '  ', code: 'KQZM' }).app.shell.myName).toBe(
-      'Jeff',
+      'Guest',
     );
   });
 

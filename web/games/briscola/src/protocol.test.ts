@@ -303,10 +303,10 @@ describe('the intent frame (docs/design/briscola-battle.md §4.1): the lane`s go
 });
 
 describe('frozen constants', () => {
-  test("the seven tags, the name cap and the default guest name are gin's literals", () => {
+  test("the seven tags and the name cap are gin's literals; the guest default is the shared 'Guest'", () => {
     expect(WIRE_TAGS).toEqual(['join', 'action', 'welcome', 'lobby', 'full', 'toast', 'state']);
     expect(NAME_MAX).toBe(20);
-    expect(DEFAULT_GUEST_NAME).toBe('Jeff');
+    expect(DEFAULT_GUEST_NAME).toBe('Guest');
     expect(TOAST_MAX).toBe(500);
   });
 });
@@ -543,9 +543,9 @@ describe('decodeGuestFrame / decodeHostFrame keep each side to its own frames', 
 });
 
 describe('guestNameFor', () => {
-  test("cuts to 20, trims, defaults to Jeff and suffixes a clash with the host, as gin's host does", () => {
+  test("cuts to 20, trims, defaults to Guest (the guest's own word for an empty box) and suffixes a clash with the host, as gin's host does", () => {
     expect(guestNameFor('Jeff', 'Ann')).toBe('Jeff');
-    expect(guestNameFor('', 'Ann')).toBe('Jeff');
+    expect(guestNameFor('', 'Ann')).toBe('Guest');
     expect(guestNameFor('ann', 'Ann')).toBe('ann 2');
     expect(guestNameFor('abcdefghijklmnopqrstuvwxyz', 'Ann')).toBe('abcdefghijklmnopqrst');
   });

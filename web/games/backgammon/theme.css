@@ -313,6 +313,16 @@ label {
 .muted {
   color: var(--muted);
 }
+/* The guest's own seat as the host named it, under the waiting room's status
+   (web/shared/ui/shellPaint.ts `paintWaiting`, "Playing as …"; the shell's `seatedName`): small
+   and dim, centred like the status, so a rename (` 2`) or the fallback ('Guest') is seen without
+   competing with the line above it. */
+#guestSeatName {
+  color: var(--nacre-dim);
+  font-size: 0.88rem;
+  text-align: center;
+  padding-top: 6px;
+}
 .badge {
   background: var(--nacre);
   color: var(--accent);

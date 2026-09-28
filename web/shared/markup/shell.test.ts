@@ -77,6 +77,7 @@ const blocks: ShellBlocks = {
   playExtra: '',
   hostWaitList: '',
   guestWaitList: '',
+  guestSeatName: '',
   extraPanels: '',
   extraScreens: '',
   table:

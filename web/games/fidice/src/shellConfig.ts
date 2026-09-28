@@ -23,7 +23,7 @@
 // (`seatId`): the host is `host`, the guests `guest`, `guest2`, … (the ids the shell's own deal
 // spells, web/shared/ui/shell.ts `host/deal`), the computers `bot0`, `bot1`, …; `engineSeatOf`
 // finds a shell seat's chair by id, so a chair left empty online (dropped at the deal, never dealt
-// to as `Jeff`) or a host who watches (no chair: `hostSeat` null, the HOST actor and the spectator
+// to as `Guest`) or a host who watches (no chair: `hostSeat` null, the HOST actor and the spectator
 // view) shifts nobody's view or turn. `seatTable` seats a table from the players the reducer lists
 // (the host first unless the room watches, then every connected guest in seat order) and the
 // room's computers, each with `profileFor(botChoice)` (a chair too many is refused by the engine

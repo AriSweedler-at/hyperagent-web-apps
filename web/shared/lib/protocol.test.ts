@@ -53,11 +53,11 @@ const SEVEN: ReadonlyArray<Frame<Action, View, Room>> = [
 ];
 
 describe('frozen constants', () => {
-  test("the seven tags in emit order, the name cap, the toast cap and the default guest name are gin's literals", () => {
+  test("the seven tags in emit order, the name cap and the toast cap are gin's literals; the default guest name is the shared 'Guest'", () => {
     expect(WIRE_TAGS).toEqual(['join', 'action', 'welcome', 'lobby', 'full', 'toast', 'state']);
     expect(NAME_MAX).toBe(20);
     expect(TOAST_MAX).toBe(500);
-    expect(DEFAULT_GUEST_NAME).toBe('Jeff');
+    expect(DEFAULT_GUEST_NAME).toBe('Guest');
   });
 });
 
@@ -302,16 +302,16 @@ describe('the ephemeral lane (docs/design/briscola-battle.md §4.5)', () => {
 });
 
 describe('guestNameFor', () => {
-  test('cuts to 20, trims, defaults to Jeff and suffixes a clash with the host, as the legacy did', () => {
+  test('cuts to 20, trims, defaults to Guest (the guest`s own word for an empty box, shell.ts `guestName`) and suffixes a clash with the host, as the legacy did', () => {
     expect(guestNameFor('Jeff', 'Ann')).toBe('Jeff');
     expect(guestNameFor('  Bo  ', 'Ann')).toBe('Bo');
-    expect(guestNameFor('', 'Ann')).toBe('Jeff');
-    expect(guestNameFor('   ', 'Ann')).toBe('Jeff');
+    expect(guestNameFor('', 'Ann')).toBe('Guest');
+    expect(guestNameFor('   ', 'Ann')).toBe('Guest');
     expect(guestNameFor('ann', 'Ann')).toBe('ann 2');
     expect(guestNameFor('ANN', 'ann')).toBe('ANN 2');
     expect(guestNameFor('abcdefghijklmnopqrstuvwxyz', 'Ann')).toBe('abcdefghijklmnopqrst');
     // The cut happens before the trim, as in `String(name).slice(0, 20).trim()`.
     expect(guestNameFor('abcdefghijklmnopqrs      x', 'Ann')).toBe('abcdefghijklmnopqrs');
-    expect(guestNameFor('', 'Jeff')).toBe('Jeff 2');
+    expect(guestNameFor('', 'Guest')).toBe('Guest 2');
   });
 });
