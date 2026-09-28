@@ -4,26 +4,34 @@ import type { PointIndex, Seat } from '../../engine/index.ts';
 import {
   DESKTOP_TEMPLATE,
   FIXED_AREAS,
+  LANDSCAPE_GEOMETRY,
+  LANDSCAPE_MAX_HEIGHT,
   PHONE_TEMPLATE,
   POINT_AREAS,
+  RAIL_MIN_WIDTH,
   absOf,
   absOfId,
   areaOf,
   boardLayout,
+  chromeWidth,
+  edgeOf,
   layoutFor,
   ownOf,
   parseAreas,
   pathFor,
   placeOf,
   pointId,
+  pointLength,
   pointWidth,
   rowOrder,
   sideOf,
   stackExtent,
   stackStep,
+  templateOf,
   visibleOf,
   type Area,
   type Cell,
+  type Layout,
 } from './layout.ts';
 
 const SEATS: ReadonlyArray<Seat> = [0, 1];
@@ -156,25 +164,34 @@ describe('boardLayout', () => {
     expect(cells.offLight).toEqual({ row: 2, col: 14, rowSpan: 1, colSpan: 1 });
   });
 
-  test('every place has a cell and no two places overlap (the dice excepted on the desktop)', () => {
-    (['phone', 'desktop'] as const).forEach((layout) => {
-      SEATS.forEach((seat) => {
-        const cells = boardLayout(layout, seat);
-        // 24 points, two bars, two trays, and the dice where they are a template area.
-        const places = (Object.keys(cells) as ReadonlyArray<Area>).filter(
-          (a) => layout === 'phone' || a !== 'dice',
-        );
-        expect(places).toHaveLength(layout === 'phone' ? 29 : 28);
-        places.forEach((a) => {
-          expect(at(cells, a).rowSpan * at(cells, a).colSpan, a).toBeGreaterThan(0);
-        });
-        places.forEach((a, i) => {
-          places.slice(i + 1).forEach((b) => {
-            expect(disjoint(at(cells, a), at(cells, b)), `${a} vs ${b}`).toBe(true);
+  test('landscape: the desktop template, cell for cell, for both seats', () => {
+    expect(templateOf('landscape')).toBe(DESKTOP_TEMPLATE);
+    SEATS.forEach((seat) => {
+      expect(boardLayout('landscape', seat)).toEqual(boardLayout('desktop', seat));
+    });
+  });
+
+  test('every place has a cell and no two places overlap (the dice excepted where the board is flat)', () => {
+    (['phone', 'desktop', 'landscape'] as const satisfies ReadonlyArray<Layout>).forEach(
+      (layout) => {
+        SEATS.forEach((seat) => {
+          const cells = boardLayout(layout, seat);
+          // 24 points, two bars, two trays, and the dice where they are a template area.
+          const places = (Object.keys(cells) as ReadonlyArray<Area>).filter(
+            (a) => layout === 'phone' || a !== 'dice',
+          );
+          expect(places).toHaveLength(layout === 'phone' ? 29 : 28);
+          places.forEach((a) => {
+            expect(at(cells, a).rowSpan * at(cells, a).colSpan, a).toBeGreaterThan(0);
+          });
+          places.forEach((a, i) => {
+            places.slice(i + 1).forEach((b) => {
+              expect(disjoint(at(cells, a), at(cells, b)), `${a} vs ${b}`).toBe(true);
+            });
           });
         });
-      });
-    });
+      },
+    );
   });
 });
 
@@ -190,8 +207,9 @@ describe('rowOrder', () => {
     expect(rows[13]).toEqual(['offDark', 'offLight']);
   });
 
-  test('desktop, seat 1: the mirror row by row', () => {
+  test('desktop and landscape, seat 1: the mirror row by row', () => {
     const rows = rowOrder('desktop', 1);
+    expect(rowOrder('landscape', 1)).toEqual(rows);
     expect(rows).toEqual([
       [
         'point-12',
@@ -230,13 +248,108 @@ describe('rowOrder', () => {
 });
 
 describe('the sizes', () => {
-  test('layoutFor switches at 900px', () => {
+  test('layoutFor: a bare width switches at 900px; a coarse pointer sideways under 500px tall is the landscape', () => {
     expect([layoutFor(390), layoutFor(899), layoutFor(900), layoutFor(1280)]).toEqual([
       'phone',
       'phone',
       'desktop',
       'desktop',
     ]);
+    const cases: ReadonlyArray<readonly [Parameters<typeof layoutFor>[0], Layout, string]> = [
+      [{ width: 844, height: 390, coarse: true }, 'landscape', 'an iPhone 12 sideways'],
+      [
+        { width: 844, height: 390, coarse: false },
+        'phone',
+        'a narrow mouse window keeps the phone board',
+      ],
+      [{ width: 844, height: 390 }, 'phone', 'no pointer fact: the width rule'],
+      [
+        { width: 915, height: 412, coarse: true },
+        'landscape',
+        'a Pixel 8: coarse beats the 900px width',
+      ],
+      [{ width: 956, height: 440, coarse: true }, 'landscape', 'a 16 Pro Max'],
+      [
+        { width: 1024, height: 768, coarse: true },
+        'desktop',
+        'a tablet sideways is over 500px tall',
+      ],
+      [{ width: 390, height: 844, coarse: true }, 'phone', 'a phone upright'],
+      [{ width: 844, height: LANDSCAPE_MAX_HEIGHT, coarse: true }, 'landscape', 'at the ceiling'],
+      [{ width: 844, height: LANDSCAPE_MAX_HEIGHT + 1, coarse: true }, 'phone', 'over it'],
+      [{ width: 500, height: 500, coarse: true }, 'phone', 'square is not wider than tall'],
+      [{ width: 1280, height: 800, coarse: false }, 'desktop', 'the laptop golden'],
+    ];
+    cases.forEach(([vp, layout, why]) => {
+      expect(layoutFor(vp), why).toBe(layout);
+    });
+  });
+
+  test('landscape widths: 13 points, the tray and the frame in what the edges and the rail leave', () => {
+    // Inset-free (headless): two 16px edges, the 44px rail and its 6px gap leave 702px at 844: 54px points.
+    expect(chromeWidth({ width: 844, height: 390, coarse: true })).toBe(82);
+    expect(pointWidth({ width: 844, height: 390, coarse: true })).toBeCloseTo(54, 5);
+    // A notched iPhone: the edge is the inset (47, 59, 62), both sides, so 144 / 168 / 174 of chrome.
+    const notched = (width: number, height: number, inset: number) => ({
+      width,
+      height,
+      coarse: true,
+      insets: { left: inset, right: inset, bottom: 21 },
+    });
+    expect(edgeOf(notched(844, 390, 47))).toBe(47);
+    expect(chromeWidth(notched(844, 390, 47))).toBe(144);
+    expect(pointWidth(notched(844, 390, 47))).toBeCloseTo(49.23, 2);
+    expect(pointWidth(notched(852, 393, 59))).toBeCloseTo(48, 5);
+    expect(pointWidth(notched(956, 440, 62))).toBeCloseTo(55.54, 2);
+    // Android reports one side only: the larger inset is the edge on both sides, so the board stays centred.
+    const cutout = {
+      width: 844,
+      height: 390,
+      coarse: true,
+      insets: { left: 30, right: 0, bottom: 0 },
+    };
+    expect(edgeOf(cutout)).toBe(30);
+    expect(chromeWidth(cutout)).toBe(110);
+    expect(pointWidth(cutout)).toBeCloseTo(51.85, 2);
+    // A Pixel 8 sideways: 59.5px points from 915.
+    expect(pointWidth({ width: 915, height: 412, coarse: true })).toBeCloseTo(59.46, 2);
+    // The rows scheme under RAIL_MIN_WIDTH: the edges alone (32px): 44.2 on the SE, the 44px floor at 640.
+    expect(chromeWidth({ width: 667, height: 375, coarse: true })).toBe(32);
+    expect(pointWidth({ width: 667, height: 375, coarse: true })).toBeCloseTo(44.23, 2);
+    expect(pointWidth({ width: 640, height: 360, coarse: true })).toBe(
+      LANDSCAPE_GEOMETRY.minPointW,
+    );
+    // The threshold: at 714 the rail stands beside a board exactly at the floor; one under, the rows are wider.
+    expect(RAIL_MIN_WIDTH).toBe(13 * 44 + 44 + 16 + 2 * 16 + 44 + 6);
+    expect(pointWidth({ width: RAIL_MIN_WIDTH, height: 390, coarse: true })).toBeCloseTo(44, 5);
+    expect(pointWidth({ width: RAIL_MIN_WIDTH - 1, height: 390, coarse: true })).toBeCloseTo(
+      47.77,
+      2,
+    );
+    expect(pointWidth({ width: 2000, height: 400, coarse: true })).toBe(
+      LANDSCAPE_GEOMETRY.maxPointW,
+    );
+  });
+
+  test('landscape lengths: two rows in what the chrome leaves, floored per scheme (104 rail, 90 rows)', () => {
+    expect(pointLength({ width: 844, height: 390, coarse: true })).toBe(147);
+    expect(
+      pointLength({
+        width: 844,
+        height: 390,
+        coarse: true,
+        insets: { left: 47, right: 47, bottom: 21 },
+      }),
+    ).toBe(136.5);
+    expect(pointLength({ width: 915, height: 356, coarse: true })).toBe(130);
+    expect(pointLength({ width: 780, height: 304, coarse: true })).toBe(104);
+    expect(pointLength({ width: 780, height: 290, coarse: true })).toBe(
+      LANDSCAPE_GEOMETRY.rail.minPointLen,
+    );
+    expect(pointLength({ width: 667, height: 375, coarse: true })).toBe(94.5);
+    expect(pointLength({ width: 640, height: 360, coarse: true })).toBe(
+      LANDSCAPE_GEOMETRY.rows.minPointLen,
+    );
   });
 
   test('pointWidth: 47px at 390x844, 53.5px at 1280x800, clamped at the floors and caps', () => {
@@ -258,5 +371,19 @@ describe('the sizes', () => {
     // Desktop: the run is long enough for touching coins.
     expect(stackStep(278, 46)).toBe(46);
     expect(stackExtent(5, 46, 46)).toBe(230);
+    // Sideways the run spares 18px (the desktop's 15px base offset and 3px at the tip): 20.6px
+    // steps at 844x390 (147px points, 46.4px coins); at the two floors 10.8 (104, the rail) and
+    // 8.5 (90, the rows), five coins inside the point either way.
+    const spare = LANDSCAPE_GEOMETRY.stackSpare;
+    const coin = (pointW: number) => pointW * LANDSCAPE_GEOMETRY.checkerRatio;
+    expect(stackStep(147, coin(54), spare)).toBeCloseTo(20.64, 2);
+    expect(stackStep(104, coin(49.7), spare)).toBeCloseTo(10.8, 1);
+    expect(stackExtent(5, coin(49.7), stackStep(104, coin(49.7), spare))).toBeLessThanOrEqual(
+      104 - spare,
+    );
+    expect(stackStep(90, coin(44), spare)).toBeCloseTo(8.54, 2);
+    expect(stackExtent(5, coin(44), stackStep(90, coin(44), spare))).toBeLessThanOrEqual(
+      90 - spare,
+    );
   });
 });

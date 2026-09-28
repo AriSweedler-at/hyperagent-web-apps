@@ -3,11 +3,15 @@
 // `page.evaluate` reads every rect in document coordinates (so a scrolled page compares with an
 // unscrolled one); the assertions are pure over that record: every point inside the board, the
 // 24 pairwise disjoint and one size, in the visual order `rowOrder` (ui/board/layout.ts, the CSS's
-// pure twin) states for the layout and the seat, every stack's visible coins inside its place and
-// no more than five, every tap target at least 44px on its short side on a phone, and no scroll
-// where the viewport fits (the document scrolls only under the fallback, design §3.1). The frame
-// and the overflow reads are the shared oracle's (e2e/fixtures/geometry.ts `frameScript`,
-// `fitsScript`, `expectSameFrame`; docs/design/shared-shell.md §5 A5), spliced into the one script.
+// pure twin) states for the layout and the seat (`layoutFor` over the width, the height and
+// whether the pointer is coarse: the phone upright, the desktop, or the phone held sideways),
+// every stack's visible coins inside its place and no more than five, every tap target at least
+// 44px on its short side on a phone (upright or sideways), and no scroll where the viewport fits
+// (the document scrolls only under a fallback, design §3.1, §3.10). The frame and the overflow
+// reads are the shared oracle's (e2e/fixtures/geometry.ts `frameScript`, `fitsScript`,
+// `expectSameFrame`; docs/design/shared-shell.md §5 A5), spliced into the one script; the frame's
+// boxes are the layout's (`frameSelectors`: sideways `.topbar` and `#controls` are
+// `display: contents` and measure nothing, so their children stand in).
 import { expect, type Page } from '@playwright/test';
 
 import {
@@ -31,6 +35,8 @@ export type Fits = Readonly<{
 export type BoardGeometry = Readonly<{
   width: number;
   height: number;
+  /** `(any-pointer: coarse)`: a finger (the `phone` fixture's touch context); false with a mouse. */
+  coarse: boolean;
   seat: string | null;
   board: Rect;
   /** `point-1`..`point-24`, the bars and the trays, each with its coins (slabs in a tray). */
@@ -43,13 +49,35 @@ export type BoardGeometry = Readonly<{
   frame: Frame;
 }>;
 
-/** The frame around the board: one box each, in every phase (design §7 `expectSameFrame`). */
-export const FRAME_SELECTORS: ReadonlyArray<string> = [
+/**
+ * The frame around the board: one box each, in every phase (design §7 `expectSameFrame`). Upright
+ * and on the desktop the topbar and the controls row are boxes of their own. Sideways they are
+ * `display: contents` (their children are the chrome grid's items, design §3.1 landscape) and
+ * measure nothing, so the two strips' items that show in every phase stand in: the opponent's
+ * strip, the badge (whose column sizes both strips), the status line and the two rail buttons.
+ * The bottom strip's own items hide while the die-chip tray is open; its 22px track is pinned, and
+ * the board's box, which the tracks place, holds it.
+ */
+const UPRIGHT_FRAME: ReadonlyArray<string> = [
   '#tableScreen .topbar',
   '#statusLine',
   '#board',
   '#controls',
 ];
+const LANDSCAPE_FRAME: ReadonlyArray<string> = [
+  '#tableScreen .opp-strip',
+  '#gameBadge',
+  '#statusLine',
+  '#board',
+  '#menuBtn',
+  '#soundBtn',
+];
+/** Every box the record reads (both frames); `frameSelectors` picks the layout's. */
+export const FRAME_SELECTORS: ReadonlyArray<string> = [
+  ...new Set([...UPRIGHT_FRAME, ...LANDSCAPE_FRAME]),
+];
+export const frameSelectors = (layout: Layout): ReadonlyArray<string> =>
+  layout === 'landscape' ? LANDSCAPE_FRAME : UPRIGHT_FRAME;
 const PLACE_IDS: ReadonlyArray<string> = [
   ...Array.from({ length: 24 }, (_, i) => `point-${String(i + 1)}`),
   'barTop',
@@ -84,6 +112,7 @@ const GEOMETRY = `(async () => {
   const board = document.getElementById('board');
   return {
     width: window.innerWidth, height: window.innerHeight,
+    coarse: matchMedia('(any-pointer: coarse)').matches,
     seat: board.getAttribute('data-seat'),
     board: rect(board),
     places: Object.fromEntries(${JSON.stringify(PLACE_IDS)}.map((id) => [id, stack(id)])),
@@ -100,6 +129,10 @@ const GEOMETRY = `(async () => {
 
 export const boardGeometry = (page: Page): Promise<BoardGeometry> =>
   page.evaluate<BoardGeometry>(GEOMETRY);
+
+/** The layout the page is in, as layout.ts decides it from the record's width, height and pointer. */
+export const layoutOf = (g: BoardGeometry): Layout =>
+  layoutFor({ width: g.width, height: g.height, coarse: g.coarse });
 
 const inside = (inner: Rect, outer: Rect): boolean =>
   inner.x >= outer.x - TOL &&
@@ -150,7 +183,7 @@ export const expectPointsTiled = (g: BoardGeometry, when: string): void => {
  * tray row; the desktop's two rows hold the bars and trays at their ends.
  */
 export const expectRowOrder = (g: BoardGeometry, seat: 0 | 1, when: string): void => {
-  const layout: Layout = layoutFor(g.width);
+  const layout = layoutOf(g);
   expect(g.seat, `${when}: #board[data-seat]`).toBe(String(seat));
   const rows = rowOrder(layout, seat).map((row) =>
     row.map((area) => [area, centre(rectOf(g, area))] as const),
@@ -188,9 +221,9 @@ export const expectStacks = (g: BoardGeometry, when: string): void => {
   });
 };
 
-/** On a phone every visible tap target is at least 44px on its short side (design §6). */
+/** On a phone, upright or sideways, every visible tap target is at least 44px on its short side (design §6). */
 export const expectTargets = (g: BoardGeometry, when: string): void => {
-  if (layoutFor(g.width) !== 'phone') return;
+  if (layoutOf(g) === 'desktop') return;
   const small = g.targets.filter((t) => Math.min(t.w, t.h) < 44 - TOL);
   expect(small, `${when}: targets under 44px`).toEqual([]);
 };

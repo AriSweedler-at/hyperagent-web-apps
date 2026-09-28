@@ -1,5 +1,5 @@
 // The viewports and the frame oracle the geometry specs share (docs/design/shared-shell.md §5 A5,
-// §6.1): a phone, a laptop and a short phone spelled once, and the two page-side scripts that read
+// §6.1): a phone, a laptop, a short phone and a phone held sideways spelled once, and the two page-side scripts that read
 // boxes in document coordinates (so a scrolled page compares with an unscrolled one) and whether
 // anything clips. e2e/gin-geometry.spec.ts and e2e/fixtures/backgammon-geometry.ts each held a
 // copy of these before the shared-shell plan moved them here; the specs' own selectors, phases
@@ -15,6 +15,12 @@ export const PHONE: Viewport = { width: 390, height: 844 };
 export const DESKTOP: Viewport = { width: 1280, height: 800 };
 /** An iPhone SE: under both games' floor heights, so the document scrolls instead of clipping. */
 export const PHONE_SHORT: Viewport = { width: 375, height: 667 };
+/**
+ * An iPhone 12 held sideways, inset-free (headless reports no safe area). On a touch context
+ * (`hasTouch`, so `(any-pointer: coarse)` matches) backgammon lays the board flat with its chrome in
+ * a rail beside it (docs/design/backgammon-board.md §3.1 landscape: 54px points); gin scrolls.
+ */
+export const PHONE_LANDSCAPE: Viewport = { width: 844, height: 390 };
 
 /** Half a pixel: the rounding between two reads of one layout. */
 export const TOL = 0.5;

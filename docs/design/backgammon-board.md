@@ -144,6 +144,32 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   where the height binds; the extra half point of gutter is the turn arrow's room at 900px),
   `--point-len 5.2 point-w`, `--stack-step = --checker-d` (touching), `--die-s clamp(32px, 0.8
   point-w, 44px)`, `--off-w clamp(36px, 0.8 point-w, 56px)`; `#app` 1000px wide at the table.
+- landscape (a phone held sideways: `(any-pointer: coarse) and (orientation: landscape) and
+  (max-height: 500px)`, the phone's shape and never its width, since a Pixel 8 and every Pro Max
+  are 900px wide sideways; `any-pointer`, since `(pointer: coarse)` was seen to flip after mouse
+  clicks in the harness; docs/design/backgammon-landscape.md; the blocks at the end of theme.css):
+  `#app` reads the safe area into `--inset-l/r/b` and pads both sides by one `--edge max(16px,
+  inset-l, inset-r)` (iOS reports both sides at the notch's depth, Android the cutout's side only,
+  so one edge keeps the board centred and the leftmost point out of the back-swipe band; `#app`'s
+  480px cap is lifted at the table); `--off-w 44px`, `--off-h 0`, `--bar-w = --point-w`,
+  `--point-w clamp(44px, (100vw - chrome-w - 44px - 16px) / 13, 64px)` (twelve points, the bar, the
+  tray and the frame in what the chrome leaves beside the board), `--point-len max(point-len-min,
+  (100svh - chrome-h - 16px) / 2)` (`svh`: nothing scrolls at the table, and the small viewport
+  stands still when a toolbar or the capsule comes and goes; the portrait clamps stay on `dvh`),
+  `--checker-d 0.86 point-w`, `--stack-step min(checker-d, (point-len - checker-d - 18px) / 4)`
+  (the desktop's 15px base offset and 3px at the tip spared), `--die-s 44px`, `--arrow-col 0`.
+  Two schemes by width. From 714px (13 x 44 + 44 + 16 + 2 x 16 + 44 + 6) the rail: `#tableScreen`
+  is a grid of four columns and six rows, `.topbar` and `.controls` `display: contents`, two 22px
+  strips above (opponent, badge, status) and below (me, the roll slot) the board and a 44px rail on
+  the right (menu, sound, the turn arrow hung in the free middle at 40px, Undo in `vertical-rl`;
+  the die-chip tray floats over the board's bottom edge and `#chipCancelBtn` takes Undo's slot);
+  `--chrome-w 2 edge + 44px + 6px` (82 inset-free, 144 on an iPhone 12), `--chrome-h 24 + 2 x 22 + 2
+  x 6 + inset-b` (80), floor `--point-len-min 104px`. Under 714px (the SE, a 640x360 Android) the
+  rows: the phone's chrome rows stay, `--chrome-w 2 edge`, `--chrome-h 170 + inset-b`, floor 90px,
+  the arrow hidden. The roll sheet shrinks to 44px dice and a 48px button (and loses 14px of padding under the rows, where the board is 196 to 205px tall); the tray's slabs thin with the point (`min(7px, (point-len - 26px) / 15)`, 1px gaps) so fifteen sit inside a tray a point long at either floor, and the bar's step gives way so five coins stay inside its half; `.desk-only` and `#handoffBtn` stay hidden (the menu and the curtain carry them). 54 x 147 at 844x390 inset-free,
+  49.2 x 136.5 on an iPhone 12 with its 47/47/21 insets, 48 x 138 on the 852x393 class, 44.2 x
+  94.5 on an SE. `layoutFor(vp)`, `pointWidth`, `pointLength`, `RAIL_MIN_WIDTH` and
+  `LANDSCAPE_GEOMETRY` in `ui/board/layout.ts` are the twin.
 
 ### 3.2 The screen's vertical structure
 
@@ -156,17 +182,28 @@ history live in `#menuOverlay` on the phone). `#controls.choosing` hides the me-
 Double and the roll slot and shows `#moveChips` and `#chipCancelBtn`: the tray takes the row
 without changing its height.
 
-### 3.3 The two grid templates and the seat mapping
+### 3.3 The two grid templates, three layouts, and the seat mapping
 
 `#board` is one grid with two `grid-template-areas` templates whose area names are own numbers
 (`o1..o24`, `barTop`, `dice`, `barBottom`, `offFar`, `offNear`). The phone template is fourteen rows
 (six points a side, the bar band, six more, the off row) in six columns, every point spanning three
-so the band names three areas; the desktop template two rows of fourteen columns with `#dice` and
-`#cube` overriding their area to span the bar column. `.point[data-own="N"] { grid-area: oN }` (24
+so the band names three areas; the flat template two rows of fourteen columns with `#dice` and
+`#cube` overriding their area to span the bar column. Three layouts draw the two: the phone
+upright stands the board on end; the desktop from 900px and a phone held sideways lay it flat. The
+flat template is written once: the landscape query (§3.1) joins the `(min-width: 900px)` list of
+the eight desktop blocks that place and stack the board (the turn arrow, `#board`'s template, the
+seam, the bars and dice, the points, the bar stacking, the trays, the cube), and the three that stay
+the desktop's alone are the trim, the desktop's variable block and `.desk-only` (theme.css's header
+names them). `layoutFor({ width, height, coarse })` in `ui/board/layout.ts` chooses among the three
+(`landscape` for a coarse pointer wider than tall and at most 500px tall, else the width rule; a
+bare width is the width rule alone), `templateOf` maps the landscape to the flat template and
+`boardLayout`/`rowOrder` treat it as the desktop. `.point[data-own="N"] { grid-area: oN }` (24
 one-liners) and `#board[data-seat]` for the trays are the whole seat mapping: for seat 0 `own =
 abs + 1`, for seat 1 `own = 24 − abs`. `ui/board/layout.ts` is the pure twin of the two strings and
 `test/dist/backgammon-grid.test.ts` parses them out of the built CSS and holds the two together
-(a typo in either string is otherwise silent). On the phone the centred cube sits at the dice
+(a typo in either string is otherwise silent); the landscape chrome grid on `#tableScreen` is a
+third `grid-template-areas` in the file, which the test tells apart by its naming no place (only
+the board's rows name `barTop`). On the phone the centred cube sits at the dice
 area's inner end (two 44px dice and the 26px cube fill the 116px area, so the dice start flush) and
 an owned cube moves into its owner's bar half; on the desktop `#cube` spans the bar column and
 `align-self` follows `data-owner="far|none|near"`, clearing two bar checkers.
@@ -294,7 +331,11 @@ With `--point-w` floored at 44px the phone board is 636px and the screen needs 8
 (`@media (max-height: 805px) and (max-width: 899px)`) the document scrolls instead of clipping the
 controls, gin's rule with the threshold derived for this board; the desktop's floor is 646px
 (`max-height: 645px`). The board itself can be scrolled from: `touch-action: none` is scoped to
-`.checker`.
+`.checker`. A phone held sideways (§3.1 landscape) matches both of those fallbacks and is pinned
+again by its own block, which comes later; it has its own floors and fallbacks, under the
+landscape query and on `100svh`: with the rail 2 x 104 + 16 + 80 = 304px, so under
+`(max-height: 303px)` the document scrolls; with the rows 2 x 90 + 16 + 170 = 366px, so under
+`(max-height: 365px) and (max-width: 713px)` it scrolls (an SE with Safari's toolbar).
 
 ### 3.11 Background and panel
 
