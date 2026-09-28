@@ -406,12 +406,22 @@ type FakeIntent = Intent<Fake>;
 type FakeEffect = Effect<Fake>;
 type HostFrame2 = HostFrameOf<Fake>;
 type GuestFrame2 = GuestFrameOf<Fake>;
-/** The App the boot reads two fields of; `home` and `steps` show the reducer ran. */
+/** The App the boot reads a few fields of (`BootApp`, the gate's among them); `home` and `steps` show the reducer ran. */
 type App = Readonly<{
   shell: Readonly<{
     soundFont: SoundFontName;
     view: View | null;
     recentGames: ReadonlyArray<RecentGame>;
+    screen:
+      | 'homeScreen'
+      | 'tableScreen'
+      | 'ownScreen'
+      | 'hostWaitScreen'
+      | 'guestWaitScreen'
+      | 'endgameScreen';
+    portraitPhone: boolean;
+    landscapePhone: boolean;
+    gateDismissed: boolean;
   }>;
   home: HomeSnapshot<Fake> | null;
   steps: number;
@@ -511,6 +521,10 @@ type Options = Readonly<{
   lane?: boolean;
   /** The game's own hooks, as gin passes them, over the log so a test can see the order they ran in. */
   hooks?: (log: Log) => NonNullable<BootConfig<Fake, App, Extra>['hooks']>;
+  /** The config carries a shell config: with `orientation: 'landscape'` (backgammon), or without it (a game that stays upright). */
+  sideways?: boolean;
+  /** The page carries the turn gate (`gateMarkup`), as a page that plays sideways does. */
+  gated?: boolean;
 }>;
 
 type Log = Readonly<{
@@ -548,11 +562,21 @@ const bootPage = (options: Options = {}) => {
   const store = mapStore(options.stored);
   /** The one rule in the rules slot, for the reveal. */
   const ruleEl: FakeEl = fakeEl('rule-knock');
-  const p = fakePage([
-    fakeEl('toast'),
-    fakeEl('soundBtn'),
-    fakeEl('rulesList', { queries: { '#rule-knock': [ruleEl] } }),
-  ]);
+  const overlay = fakeEl('rulesOverlay', { classes: ['overlay', 'hidden'] });
+  const gate = fakeEl('turnGate', { classes: ['overlay', 'hidden'] });
+  const p = fakePage(
+    [
+      fakeEl('toast'),
+      fakeEl('soundBtn'),
+      fakeEl('rulesList', { queries: { '#rule-knock': [ruleEl] } }),
+      fakeEl('app'),
+      overlay,
+      ...(options.gated === true ? [gate, fakeEl('turnGateKeepBtn')] : []),
+    ],
+    fakeEl('body', {
+      queries: { ':scope > .overlay': [overlay, ...(options.gated === true ? [gate] : [])] },
+    }),
+  );
   const visibility = { state: 'visible' };
   const log: Log = {
     order: [],
@@ -642,7 +666,15 @@ const bootPage = (options: Options = {}) => {
     },
   };
   const initialApp: App = {
-    shell: { soundFont: 'default', view: null, recentGames: [] },
+    shell: {
+      soundFont: 'default',
+      view: null,
+      recentGames: [],
+      screen: 'homeScreen',
+      portraitPhone: false,
+      landscapePhone: false,
+      gateDismissed: false,
+    },
     home: null,
     steps: 0,
   };
@@ -659,7 +691,26 @@ const bootPage = (options: Options = {}) => {
       return { app: { ...app, shell: { ...app.shell, soundFont: intent.font } }, effects: [] };
     }
     if (intent.type === 'render') {
-      return { app: { ...app, shell: { ...app.shell, view: VIEW } }, effects: [] };
+      // A view at the table: what the gate needs beside the orientation.
+      return {
+        app: { ...app, shell: { ...app.shell, view: VIEW, screen: 'tableScreen' } },
+        effects: [],
+      };
+    }
+    if (intent.type === 'viewport/portrait') {
+      return {
+        app: { ...app, shell: { ...app.shell, portraitPhone: intent.portrait } },
+        effects: [],
+      };
+    }
+    if (intent.type === 'viewport/landscape') {
+      return {
+        app: { ...app, shell: { ...app.shell, landscapePhone: intent.landscape } },
+        effects: [],
+      };
+    }
+    if (intent.type === 'gate/keep') {
+      return { app: { ...app, shell: { ...app.shell, gateDismissed: true } }, effects: [] };
     }
     if (intent.type === 'step') {
       return {
@@ -802,6 +853,14 @@ const bootPage = (options: Options = {}) => {
       },
     },
     ...(options.hooks === undefined ? {} : { hooks: options.hooks(log) }),
+    ...(options.sideways === undefined
+      ? {}
+      : {
+          shell: {
+            ...(options.sideways ? { orientation: 'landscape' as const } : {}),
+            engine: { over: (view: View) => view.seat === 9 },
+          },
+        }),
   };
   const boot = bootShell(cfg);
   /** Dispatch one `step` that runs `effects`; `change` makes the reducer return a new App. */
@@ -896,6 +955,50 @@ describe('bootShell', () => {
       }),
     });
     expect(bare).toEqual([undefined]);
+  });
+
+  test('a game that plays sideways: the boot watches the two phone predicates into the reducer and paints the turn gate after every paint; a game that stays upright is watched for nothing and its page has no gate to paint', () => {
+    // Coarse and upright (the fake window answers every query alike: coarse true means both
+    // portrait and landscape "match"; the reducer stores each as reported).
+    const b = bootPage({ coarse: true, sideways: true, gated: true });
+    expect(b.log.queries).toEqual([
+      '(pointer: coarse)',
+      '(any-pointer: coarse) and (orientation: portrait) and (max-width: 500px)',
+      '(any-pointer: coarse) and (orientation: landscape) and (max-height: 500px)',
+    ]);
+    expect(seen(b).slice(0, 2)).toEqual(['viewport/portrait', 'viewport/landscape']);
+    expect(b.log.intents[0]).toEqual({ type: 'viewport/portrait', portrait: true });
+    expect(b.log.intents[1]).toEqual({ type: 'viewport/landscape', landscape: true });
+    // Upright at home: no gate. At the table (`render` seats a view): the gate, inert beneath,
+    // focus on its button; "Play upright": gone, the attributes and the focus with it.
+    expect(b.p.get('turnGate').hidden()).toBe(true);
+    expect(b.p.get('app').attr('inert')).toBeNull();
+    b.boot.dispatch({ type: 'render' });
+    expect(b.p.get('turnGate').hidden()).toBe(false);
+    expect(b.p.get('app').attr('inert')).toBe('');
+    expect(b.p.get('rulesOverlay').attr('inert')).toBe('');
+    expect(b.p.get('turnGate').attr('inert')).toBeNull();
+    expect(b.p.get('turnGateKeepBtn').focused()).toBe(true);
+    b.boot.dispatch({ type: 'gate/keep' });
+    expect(b.p.get('turnGate').hidden()).toBe(true);
+    expect(b.p.get('app').attr('inert')).toBeNull();
+    expect(b.p.get('rulesOverlay').attr('inert')).toBeNull();
+    expect(b.p.get('turnGateKeepBtn').focused()).toBe(false);
+    // The same config on a page without the gate (a story, a test page): nothing to paint, no throw.
+    const bare = bootPage({ coarse: true, sideways: true });
+    bare.boot.dispatch({ type: 'render' });
+    expect(bare.p.get('app').attr('inert')).toBeNull();
+    // A game that stays upright: neither predicate is asked, nothing is dispatched for it, and the
+    // gate its page might carry is never painted.
+    const upright = bootPage({ coarse: true, sideways: false, gated: true });
+    expect(upright.log.queries).toEqual(['(pointer: coarse)']);
+    expect(seen(upright)).not.toContain('viewport/portrait');
+    upright.boot.dispatch({ type: 'render' });
+    expect(upright.p.get('turnGate').hidden()).toBe(true);
+    expect(upright.p.get('app').attr('inert')).toBeNull();
+    // A page without `matchMedia` at all: watched, reported nothing.
+    const silent = bootPage({ sideways: true, gated: true });
+    expect(seen(silent)).not.toContain('viewport/portrait');
   });
 
   test("the hook: the shared members, the getter app, the game's own members after them", () => {

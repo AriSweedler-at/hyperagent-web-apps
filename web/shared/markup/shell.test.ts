@@ -7,8 +7,11 @@ import { describe, expect, test } from 'vitest';
 
 import {
   BLOCK_IDS,
+  GATE_IDS,
   PARTIALS,
   SCREEN_IDS,
+  bodyAttrsOf,
+  gateMarkup,
   idsIn,
   renderShell,
   type ShellBlocks,
@@ -98,7 +101,7 @@ const blockNames = Object.keys(blocks);
 const templates: ShellTemplates = {
   page: [
     '{{head}}',
-    '<body>',
+    '<body{{bodyAttrs}}>',
     '{{home}}',
     '{{waiting}}',
     '{{curtain}}',
@@ -223,5 +226,56 @@ describe('idsIn', () => {
   test('every id attribute, in order, repeats included; a data-id is not one', () => {
     expect(idsIn('<a id="x"><b id="y" data-id="z"></b><c id="x"></c>')).toEqual(['x', 'y', 'x']);
     expect(idsIn('<p class="id"></p>')).toEqual([]);
+  });
+});
+
+describe('playing sideways (docs/design/shared-shell.md "Playing sideways")', () => {
+  test('bodyAttrsOf: an upright page spells nothing on the body, so its composed bytes are what they were; a page that plays sideways carries data-plays', () => {
+    expect(bodyAttrsOf({})).toBe('');
+    expect(bodyAttrsOf({ plays: 'landscape' })).toBe(' data-plays="landscape"');
+    expect(rendered.ok && rendered.value.split('\n')[1]).toBe('<body>');
+    const sideways = renderShell(templates, { ...page, plays: 'landscape' });
+    expect(sideways.ok && sideways.value.split('\n')[1]).toBe('<body data-plays="landscape">');
+  });
+
+  test('a page that plays sideways over a page.html without the body slot is an Err naming it; an upright page over the same skeleton is fine', () => {
+    const noSlot: ShellTemplates = {
+      ...templates,
+      page: templates.page.replace('{{bodyAttrs}}', ''),
+    };
+    expect(renderShell(noSlot, page).ok).toBe(true);
+    expect(renderShell(noSlot, { ...page, plays: 'landscape' })).toEqual({
+      ok: false,
+      error: 'the page plays landscape but no partial places {{bodyAttrs}} on the body',
+    });
+  });
+
+  test('gateMarkup: the gate block with its five ids in order (GATE_IDS, none a block id), the copy in its four places, Go sideways shipped hidden', () => {
+    const markup = gateMarkup({
+      title: 'Turn it',
+      sub: 'The board lies flat.',
+      goLabel: 'Go',
+      keepLabel: 'Keep',
+    });
+    expect(idsIn(markup)).toEqual([...GATE_IDS]);
+    expect(GATE_IDS).toEqual([
+      'turnGate',
+      'turnGateTitle',
+      'turnGateSub',
+      'turnGateGoBtn',
+      'turnGateKeepBtn',
+    ]);
+    // None is a shell id: test/dist/shell-ids.test.ts pins SHELL_IDS to the partials' ids and BLOCK_IDS.
+    expect(GATE_IDS.some((id) => Object.values(BLOCK_IDS).flat().includes(id))).toBe(false);
+    expect(markup).toContain('<div class="sheet-title" id="turnGateTitle">Turn it</div>');
+    expect(markup).toContain('<div class="sheet-sub" id="turnGateSub">The board lies flat.</div>');
+    expect(markup).toContain(
+      '<button class="btn btn-go btn-block hidden" id="turnGateGoBtn">Go</button>',
+    );
+    expect(markup).toContain('id="turnGateKeepBtn">Keep</button>');
+    expect(markup).toContain('class="overlay hidden"');
+    expect(markup).toContain('role="dialog"');
+    // A block: it starts on its own line and is indented as page.html's blocks are.
+    expect(markup.startsWith('\n    <!-- TURN GATE')).toBe(true);
   });
 });

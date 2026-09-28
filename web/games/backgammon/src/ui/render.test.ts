@@ -15,7 +15,6 @@ import type { Dice, Seat, State, View } from '../engine/index.ts';
 import { pos } from '../engine/test-helpers.ts';
 import { backgammonPage, type BackgammonPage } from './page.fake.ts';
 import {
-  GATED_IDS,
   HIT_TOAST_PREFIX,
   ROLLING_STATUS,
   RULES_SLOT_IDS,
@@ -696,78 +695,23 @@ describe('the table', () => {
   });
 });
 
-describe('the turn gate (docs/design/backgammon-landscape.md §5D)', () => {
-  test('GATED_IDS is #app and every overlay of the page but the gate itself', () => {
+describe('the turn gate (docs/design/backgammon-landscape.md §5D): the shell`s paint, not this one`s', () => {
+  test('the page carries the shell`s gate markup (web/shared/markup/shell.ts gateMarkup) as a body overlay, and this game`s paint leaves it and `inert` alone (the boot paints it, web/shared/ui/shellPaint.ts paintGate)', () => {
     const overlays = [...optionsFromMarkup(MARKUP)]
       .filter(([, options]) => options.classes?.includes('overlay') === true)
       .map(([id]) => id);
     expect(overlays).toContain('turnGate');
-    expect(GATED_IDS).toEqual(['app', ...overlays.filter((id) => id !== 'turnGate')]);
-  });
-
-  test('hidden by default; up with inert on #app and the overlays at the table upright, the curtain untouched beneath; both gone sideways, after Play upright, and off the table', () => {
+    expect(MARKUP).toContain('<body data-plays="landscape">');
     const p = page();
-    const app = local();
-    paint(p.doc, app);
+    const upright = run(local(), { type: 'viewport/portrait', portrait: true }).app;
+    expect(upright.shell.portraitPhone).toBe(true);
+    paint(p.doc, upright);
     expect(p.get('turnGate').hidden()).toBe(true);
-    GATED_IDS.forEach((id) => {
-      expect(p.get(id).attr('inert'), id).toBeNull();
-    });
-    const title = p.get('curtainTitle').text();
-    const upright = run(app, { type: 'viewport/portrait', portrait: true }).app;
-    paint(p.doc, upright);
-    expect(p.get('turnGate').hidden()).toBe(false);
-    GATED_IDS.forEach((id) => {
-      expect(p.get(id).attr('inert'), id).toBe('');
-    });
-    expect(p.get('turnGate').attr('inert')).toBeNull();
-    expect(p.get('toast').attr('inert')).toBeNull();
-    // A dialog takes focus: its one control, on the paint that showed it; a repaint leaves it.
-    expect(p.get('turnGateKeepBtn').focused()).toBe(true);
-    p.get('turnGateKeepBtn').el.blur();
-    paint(p.doc, upright);
-    expect(p.get('turnGateKeepBtn').focused()).toBe(false);
-    p.get('turnGateKeepBtn').el.focus();
-    // The curtain is still up beneath, its texts as they were.
+    expect(p.get('app').attr('inert')).toBeNull();
     expect(p.get('curtainOverlay').hidden()).toBe(false);
-    expect(p.get('curtainTitle').text()).toBe(title);
-    // "Go sideways" is the Android lock PR's: shipped hidden, left hidden.
+    // "Go sideways" is the Android lock PR's: shipped hidden.
     expect(p.get('turnGateGoBtn').hidden()).toBe(true);
     expect(p.get('turnGateKeepBtn').hidden()).toBe(false);
-    // Sideways: gone, the attributes with it, and the focus it took.
-    paint(p.doc, run(upright, { type: 'viewport/portrait', portrait: false }).app);
-    expect(p.get('turnGate').hidden()).toBe(true);
-    GATED_IDS.forEach((id) => {
-      expect(p.get(id).attr('inert'), id).toBeNull();
-    });
-    expect(p.get('turnGateKeepBtn').focused()).toBe(false);
-    // Play upright: gone for this table.
-    paint(p.doc, upright);
-    expect(p.get('turnGateKeepBtn').focused()).toBe(true);
-    paint(p.doc, run(upright, { type: 'gate/keep' }).app);
-    expect(p.get('turnGate').hidden()).toBe(true);
-    expect(p.get('app').attr('inert')).toBeNull();
-    expect(p.get('turnGateKeepBtn').focused()).toBe(false);
-    // A finished game is not gated (ui/state.ts `gateOpen`): the result sheet takes taps upright.
-    const last = at('L: 1:1 | D: 13:2 | bar 0/0 | off 14/13', 0, [6, 6], upright);
-    paint(p.doc, last);
-    expect(p.get('turnGate').hidden()).toBe(false);
-    const done = run(last, { type: 'off/tap' }).app;
-    expect(done.shell.view?.phase).toBe('over');
-    paint(p.doc, done);
-    expect(p.get('turnGate').hidden()).toBe(true);
-    expect(p.get('resultOverlay').hidden()).toBe(false);
-    expect(p.get('resultOverlay').attr('inert')).toBeNull();
-    expect(p.get('app').attr('inert')).toBeNull();
-    // Upright on the home screen: nothing.
-    const homeUpright = run(
-      initialApp,
-      { type: 'home/init', home },
-      { type: 'viewport/portrait', portrait: true },
-    ).app;
-    paint(p.doc, homeUpright);
-    expect(p.get('turnGate').hidden()).toBe(true);
-    expect(p.get('app').attr('inert')).toBeNull();
   });
 });
 

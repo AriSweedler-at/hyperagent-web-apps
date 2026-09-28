@@ -41,7 +41,7 @@
     <link rel="stylesheet" href="../../shared/styles/shell.css" />
     <link rel="stylesheet" href="./theme.css" />
   </head>
-  <body>
+  <body data-plays="landscape">
     <div id="app">
       <!-- HOME / LOBBY (docs/design/backgammon-board.md §5.1; "design §N" below is that document):
            Online (the default, as gin's) or Pass the phone. -->
@@ -546,13 +546,10 @@
       </div>
     </div>
 
-    <!-- TURN GATE (docs/design/backgammon-landscape.md §5D): a phone held upright at the table. A
-         body sibling after the curtain, painted over it (theme.css: z-index 90); render.ts
-         paintGate shows it from the App (ui/state.ts gateOpen: the table screen, the matchMedia
-         watcher's portraitPhone, not gateDismissed) and sets inert on #app and every other overlay
-         while it is up; the paint focuses #turnGateKeepBtn as it opens. #turnGateGoBtn ships
-         hidden: the Android lock PR shows and binds it. The glyph: a phone outline and a quarter
-         turn's arc with its arrowhead, 36px (theme.css .turn-glyph), one stroke in the accent. -->
+    <!-- TURN GATE (docs/design/backgammon-landscape.md §5D; web/shared/markup/shell.ts gateMarkup): a
+         phone held upright at the table. A body sibling after the curtain, painted over it
+         (shell.css: z-index 90); the boot paints it from the App (web/shared/ui/shell.ts gateOpen,
+         shellPaint.ts paintGate) and sets inert on #app and every other overlay while it is up. -->
     <div
       id="turnGate"
       class="overlay hidden"

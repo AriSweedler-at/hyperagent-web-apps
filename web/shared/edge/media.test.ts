@@ -1,10 +1,18 @@
-// `watchMedia` over a fake list (the turn gate's orientation, web/games/backgammon/src/ui/state.ts
-// `gateOpen`): the first report is the list's `matches` for the query asked, every `change` is
-// reported as it comes, a list without `addEventListener` reports once, and a host without
-// `matchMedia` (the boot test's window) reports nothing.
+// `watchMedia` over a fake list (the turn gate's orientation, web/shared/ui/shell.ts `gateOpen`):
+// the first report is the list's `matches` for the query asked, every `change` is reported as it
+// comes, a list without `addEventListener` reports once, and a host without `matchMedia` (the boot
+// test's window) reports nothing. The two phone predicates are pinned letter for letter: a theme
+// copies `LANDSCAPE_PHONE` into its `@media` lists (test/dist/landscape-predicate.test.ts) and the
+// boot watches both, so a drift here would move the board and the gate apart.
 import { describe, expect, test } from 'vitest';
 
-import { watchMedia, type MediaHostLike, type MediaQueryListLike } from './media.ts';
+import {
+  LANDSCAPE_PHONE,
+  PORTRAIT_PHONE,
+  watchMedia,
+  type MediaHostLike,
+  type MediaQueryListLike,
+} from './media.ts';
 
 type Listener = (event: Readonly<{ matches: boolean }>) => void;
 
@@ -47,6 +55,17 @@ const world = (matches: boolean, options: Readonly<{ listenable?: false }> = {})
     },
   };
 };
+
+describe('the phone predicates', () => {
+  test('a phone sideways is a coarse pointer, landscape, under 500px tall; upright the mirror with the bound on the short side', () => {
+    expect(LANDSCAPE_PHONE).toBe(
+      '(any-pointer: coarse) and (orientation: landscape) and (max-height: 500px)',
+    );
+    expect(PORTRAIT_PHONE).toBe(
+      '(any-pointer: coarse) and (orientation: portrait) and (max-width: 500px)',
+    );
+  });
+});
 
 describe('watchMedia', () => {
   test('reports the query`s matches now, then every change as it comes', () => {

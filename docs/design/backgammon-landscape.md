@@ -1,7 +1,10 @@
 # Backgammon sideways on a phone: research synthesis
 
 > **Implemented (2026-09-28): the flat board, option A** (PR "feat(backgammon): The flat board on a
-> phone held sideways"). What landed: theme.css keys the layout on
+> phone held sideways"). The turn gate and the orientation watchers are the shared shell's since the
+> same day: docs/design/shared-shell.md §6.6 "Playing sideways: how a game opts in" (backgammon opts
+> in with `orientation: 'landscape'`; `LANDSCAPE_PHONE` is spelled once in web/shared/edge/media.ts).
+> What landed: theme.css keys the layout on
 > `(any-pointer: coarse) and (orientation: landscape) and (max-height: 500px)` (the phone's shape,
 > never its width: a Pixel 8 and every Pro Max are 900px wide sideways; `any-pointer`, not
 > `pointer`, which two simulators saw flip after mouse clicks in the harness); the eight desktop

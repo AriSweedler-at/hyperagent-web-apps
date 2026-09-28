@@ -160,11 +160,11 @@ describe('the initial app', () => {
     ]);
   });
 
-  test('the shell`s intents are listed once, the shared shell reducer`s 45 (C2 took the curtain, the leave flow, visible, render and persist from the table side)', () => {
+  test('the shell`s intents are listed once, the shared shell reducer`s 48 (C2 took the curtain, the leave flow, visible, render and persist from the table side; the sideways lift added the two viewport turns and the gate`s keep)', () => {
     expect(SHELL_INTENT_TYPES).toContain('home/init');
     expect(SHELL_INTENT_TYPES).toContain('guest/lost');
     expect(SHELL_INTENT_TYPES).not.toContain('card/tap');
-    expect(SHELL_INTENT_TYPES).toHaveLength(45);
+    expect(SHELL_INTENT_TYPES).toHaveLength(48);
     expect(new Set(SHELL_INTENT_TYPES).size).toBe(SHELL_INTENT_TYPES.length);
   });
 });

@@ -25,6 +25,7 @@ import {
   EMPTY_SEAT,
   GONE_TOAST_MS,
   LONG_PRESS_MS,
+  gateOpen,
   LOST_HOST_MSG,
   OPPONENT_LEFT_MSG,
   ROOM_FULL_MSG,
@@ -1007,6 +1008,9 @@ describe('the initial shell and the partitions', () => {
       p1Name: '',
       p2Name: '',
       screen: 'homeScreen',
+      portraitPhone: false,
+      landscapePhone: false,
+      gateDismissed: false,
       netAttempt: 0,
       hostStatus: { text: 'Opening…', pulse: true },
       guestStatus: { text: CONNECTING_MSG, pulse: true },
@@ -1026,9 +1030,12 @@ describe('the initial shell and the partitions', () => {
     });
   });
 
-  test('the 45 shell intents and 29 shell effects are listed once; the guards partition a game`s unions', () => {
-    expect(SHELL_INTENT_TYPES).toHaveLength(45);
-    expect(new Set(SHELL_INTENT_TYPES).size).toBe(45);
+  test('the 48 shell intents and 29 shell effects are listed once; the guards partition a game`s unions', () => {
+    expect(SHELL_INTENT_TYPES).toHaveLength(48);
+    expect(new Set(SHELL_INTENT_TYPES).size).toBe(48);
+    expect(SHELL_INTENT_TYPES).toContain('viewport/portrait');
+    expect(SHELL_INTENT_TYPES).toContain('viewport/landscape');
+    expect(SHELL_INTENT_TYPES).toContain('gate/keep');
     expect(SHELL_INTENT_TYPES).toContain('resume/auto');
     expect(SHELL_INTENT_TYPES).toContain('curtain/reveal');
     expect(SHELL_INTENT_TYPES).toContain('position/load');
@@ -3004,5 +3011,129 @@ describe('runShellEffect', () => {
       FAKE,
     );
     expect(log).toEqual([['confirm', 'sure?']]);
+  });
+});
+
+// ---- playing sideways: the turn gate (docs/design/backgammon-landscape.md §5D; shared-shell.md "Playing sideways") ----
+
+describe('the turn gate: the shell holds the orientation and the dismissal, gateOpen reads them against the config', () => {
+  /** FAKE opted in, as backgammon's config is: sideways, with a result sheet (`gameOver`) at seven moves. */
+  const SIDEWAYS: ShellConfig<Fake> = {
+    ...FAKE,
+    orientation: 'landscape',
+    engine: { ...FAKE.engine, gameOver: (view) => view.moves === 7 },
+  };
+  const gate = (app: App, cfg: ShellConfig<Fake> = SIDEWAYS): boolean => gateOpen(app.shell, cfg);
+
+  test('the initial shell is upright-agnostic and undismissed; the three intents are shell intents, pure, and set their one field', () => {
+    expect(initialApp.shell).toMatchObject({
+      portraitPhone: false,
+      landscapePhone: false,
+      gateDismissed: false,
+    });
+    const portrait = run(initialApp, { type: 'viewport/portrait', portrait: true });
+    expect(portrait.effects).toEqual([]);
+    expect(portrait.app.shell.portraitPhone).toBe(true);
+    const landscape = run(portrait.app, { type: 'viewport/landscape', landscape: true });
+    expect(landscape.effects).toEqual([]);
+    expect(landscape.app.shell).toMatchObject({ portraitPhone: true, landscapePhone: true });
+    const kept = run(landscape.app, { type: 'gate/keep' });
+    expect(kept.effects).toEqual([]);
+    expect(kept.app.shell.gateDismissed).toBe(true);
+    expect(
+      run(landscape.app, { type: 'viewport/portrait', portrait: false }).app.shell,
+    ).toMatchObject({ portraitPhone: false, landscapePhone: true });
+  });
+
+  test('gateOpen: only a game that plays sideways, at the table, with a view, upright, undismissed; never a finished game (over, or the game`s gameOver), never at home, the waiting rooms or the end screen', () => {
+    const upright = run(local(), { type: 'viewport/portrait', portrait: true }).app;
+    expect(upright.shell.screen).toBe('tableScreen');
+    expect(gate(upright)).toBe(true);
+    // The config without the opt-in (gin's, briscola's): never, whatever the phone does.
+    expect(gate(upright, FAKE)).toBe(false);
+    // Sideways, or never reported: no.
+    expect(gate(run(upright, { type: 'viewport/portrait', portrait: false }).app)).toBe(false);
+    expect(gate(local())).toBe(false);
+    // Off the table: no.
+    expect(gate({ ...upright, shell: { ...upright.shell, screen: 'homeScreen' } })).toBe(false);
+    expect(gate({ ...upright, shell: { ...upright.shell, screen: 'hostWaitScreen' } })).toBe(false);
+    expect(gate({ ...upright, shell: { ...upright.shell, screen: 'endgameScreen' } })).toBe(false);
+    // No view (nothing to play): no.
+    expect(gate({ ...upright, shell: { ...upright.shell, view: null } })).toBe(false);
+    // The game over (`engine.over`), and the game's own result sheet (`engine.gameOver`): no.
+    const view = upright.shell.view;
+    if (view === null) throw new Error('no view');
+    expect(gate({ ...upright, shell: { ...upright.shell, view: { ...view, over: true } } })).toBe(
+      false,
+    );
+    expect(gate({ ...upright, shell: { ...upright.shell, view: { ...view, moves: 7 } } })).toBe(
+      false,
+    );
+    // A config without `gameOver` (gin's) gates that same view.
+    const bare: ShellConfig<Fake> = { ...FAKE, orientation: 'landscape' };
+    expect(
+      gate({ ...upright, shell: { ...upright.shell, view: { ...view, moves: 7 } } }, bare),
+    ).toBe(true);
+    // Dismissed: no, until the table changes.
+    expect(gate(run(upright, { type: 'gate/keep' }).app)).toBe(false);
+  });
+
+  test('the dismissal goes where the table goes: a pass-and-play start, position/load, the handoff and a leave drop it; the host lost mid-match keeps it (the same table stays up); the orientation survives them all', () => {
+    const kept = run(
+      initialApp,
+      { type: 'home/init', home },
+      { type: 'viewport/portrait', portrait: true },
+      { type: 'local/click', p1: 'Ann', p2: 'Bob', level: '2' },
+      { type: 'gate/keep' },
+    ).app;
+    expect(kept.shell).toMatchObject({ gateDismissed: true, portraitPhone: true });
+    expect(gate(kept)).toBe(false);
+    // A new pass-and-play game asks again (the same for a `position/load`, which starts one).
+    const restarted = run(kept, { type: 'local/click', p1: 'Ann', p2: 'Bob', level: '2' }).app;
+    expect(restarted.shell).toMatchObject({ gateDismissed: false, portraitPhone: true });
+    expect(gate(restarted)).toBe(true);
+    const loaded = run(run(restarted, { type: 'gate/keep' }).app, {
+      type: 'position/load',
+      state: dealt,
+    }).app;
+    expect(loaded.shell).toMatchObject({ gateDismissed: false, portraitPhone: true });
+    // The handoff: the game goes on as a room, the table's marks with it.
+    const handed = run(kept, { type: 'handoff/click' }).app;
+    expect(handed.shell).toMatchObject({ role: 'host', gateDismissed: false, portraitPhone: true });
+    // A leave (its `initHome` effect brings `home/init`): home, the next table asks again.
+    const left = run(kept, { type: 'leave/finish' }, { type: 'home/init', home }).app;
+    expect(left.shell).toMatchObject({
+      screen: 'homeScreen',
+      gateDismissed: false,
+      portraitPhone: true,
+    });
+    expect(gate(left)).toBe(false);
+    expect(gate(run(left, { type: 'local/click', p1: 'Ann', p2: 'Bob', level: '2' }).app)).toBe(
+      true,
+    );
+    // The host lost mid-match: the shell keeps this very table up, and the choice made at it.
+    const guest = run(
+      seated(),
+      { type: 'viewport/portrait', portrait: true },
+      { type: 'gate/keep' },
+    ).app;
+    expect(gate(guest)).toBe(false);
+    const lost = run(guest, { type: 'guest/lost' }).app;
+    expect(lost.shell).toMatchObject({
+      screen: 'tableScreen',
+      gateDismissed: true,
+      portraitPhone: true,
+    });
+    expect(gate(lost)).toBe(false);
+    // Once the game is over the lost host sends the guest to the wait screen, dismissal and all
+    // (the game that ended it is done asking; its leave resets, as above).
+    const overView = viewFor(over, 1);
+    const doneLost = run(
+      guest,
+      { type: 'guest/frame', frame: { t: 'state', view: overView } },
+      { type: 'guest/lost' },
+    ).app;
+    expect(doneLost.shell).toMatchObject({ screen: 'guestWaitScreen', gateDismissed: true });
+    expect(gate(doneLost)).toBe(false);
   });
 });

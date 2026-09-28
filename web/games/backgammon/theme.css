@@ -471,100 +471,23 @@ label {
 }
 
 /* ---------- the home and the waiting rooms sideways (docs/design/backgammon-landscape.md §5) ---------- */
-/* A phone held sideways on the home screen, under the table's own predicate (any-pointer: coarse
-   and a landscape under 500px tall; a fine pointer, and so the 390x844 golden, never matches):
-   two columns, so Open a table, Sit down and Start sit above a 304px fold with no scroll. The
-   Play tab and the two mode panels lay their children into the grid themselves
-   (display: contents), the masthead, the tab bar and the mode switch down the left, the cards on
-   the right in sub-columns: online the name, the host card and the join card side by side, the
-   name's the narrowest and the join card's the widest, so four letters of a code fit at their
-   tracking (2026-09-28: the first letter of ABCD was cut off at 667 and 780px); pass the phone
-   the players with Start under them and the options beside. A sub-column is 120-190px wide, so
-   each panel's rows wrap (a select, a name or the code takes a line of its own) and the code
-   loses some of its tracking. The tab bar keeps its own bottom edge (the switch is in the other
-   column) and the switch its full radii. The two waiting rooms lay out in two columns as well
-   (the host: the title, the code and its share button left; the status, Start the match and
-   Cancel right, the buttons at the foot of the column; the guest: the title and the status left,
-   Back right), so Start the match sits above a 304px fold once the opponent has joined
-   (2026-09-28: it sat at y 420 in 390). The table and the endgame are not touched: #app's cap
-   lifts for these three screens alone, through :has(). The whole block sits under @supports on
-   that selector: without :has() the cap could not lift and the grids would squeeze into 480px
-   (three online cards of 53px), so a browser without it keeps the portrait single column
-   sideways and scrolls, as before; @supports selector() itself predates :has() in every engine.
-   The nested query at the end is the same layout on a 667px-wide phone (an SE sideways): a
-   narrower left column, the online cards in two sub-columns (the host card, the tallest, alone
-   on the left; the name over the join card on the right, so Open a table clears a 375px fold),
-   and a smaller, tighter code. */
+/* The two-column landscape home and waiting rooms are shell.css's, scoped by the
+   body[data-plays="landscape"] this page carries (page.ts `plays`; docs/design/shared-shell.md
+   "Playing sideways"). What stays here is this game's: the masthead's place (its markup and class
+   are this page's), the tab bar's shadow in its ink, and the pass-the-phone panel's grid areas, which assume this page's two cards (the players' names, then
+   the options): the players with Start under them and the note beneath, the options beside,
+   spanning the three rows. The predicate is web/shared/edge/media.ts LANDSCAPE_PHONE verbatim
+   (test/dist/landscape-predicate.test.ts pins every landscape @media to it). */
 @supports selector(:has(a)) {
   @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
-    #app:has(
-      > #homeScreen:not(.hidden),
-      > #hostWaitScreen:not(.hidden),
-      > #guestWaitScreen:not(.hidden)
-    ) {
-      max-width: 820px;
-    }
-    #homeScreen {
-      display: grid;
-      grid-template-columns: minmax(0, 250px) minmax(0, 1fr);
-      grid-template-rows: auto auto auto auto 1fr;
-      column-gap: 14px;
-      align-items: start;
-    }
     #homeScreen > .masthead {
       grid-area: 1 / 1;
       margin: 0 0 8px;
     }
-    #homeScreen > #resumeBox {
-      grid-area: 2 / 1;
-    }
     #homeScreen > #topTabbar {
-      grid-area: 3 / 1;
-      margin: 0 0 10px;
-      border-radius: var(--radius-control);
       box-shadow:
         inset 0 0 0 1px var(--hair),
         0 8px 22px rgba(6, 37, 61, 0.28);
-    }
-    #playPanel {
-      display: contents;
-    }
-    #playPanel > #playModeSwitch {
-      grid-area: 4 / 1;
-      border-top: none;
-      border-radius: var(--radius-control);
-    }
-    #onlineModeContent,
-    #localModeContent {
-      grid-area: 1 / 2 / -1 / 3;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      column-gap: 12px;
-      align-items: start;
-    }
-    #onlineModeContent .row,
-    #localModeContent .row {
-      flex-wrap: wrap;
-    }
-    /* .grow is flex: 1 (a zero basis never overflows a line): a full-line basis makes each wrap. */
-    #onlineModeContent .row > *,
-    #localModeContent .row > * {
-      flex-basis: 100%;
-    }
-    #onlineModeContent {
-      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.1fr) minmax(0, 1.1fr);
-    }
-    #onlineModeContent > .card-box:nth-child(1) {
-      grid-area: 1 / 1;
-    }
-    #onlineModeContent > .card-box:nth-child(2) {
-      grid-area: 1 / 2;
-    }
-    #onlineModeContent > .card-box:nth-child(3) {
-      grid-area: 1 / 3;
-    }
-    #onlineModeContent .code-input {
-      letter-spacing: 0.3em;
     }
     #localModeContent > .card-box:nth-child(1) {
       grid-area: 1 / 1;
@@ -578,86 +501,6 @@ label {
     #localModeContent > .empty-note {
       grid-area: 3 / 1;
     }
-    #rulesPanel,
-    #aboutPanel {
-      grid-area: 1 / 2 / -1 / 3;
-    }
-    /* The host's waiting room: rows 1-2 are the title and its line, the code card spans the rest of
-       the left column; the status card spans rows 1-3 on the right, the two buttons take rows 4-5,
-       and the 1fr third row pushes them to the foot. Start the match is display: none until the
-       guest joins, so it takes no row until then. */
-    #hostWaitScreen {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      grid-template-rows: auto auto 1fr auto auto;
-      column-gap: 14px;
-      align-items: start;
-    }
-    #hostWaitScreen > h1 {
-      grid-area: 1 / 1;
-      margin: 6px 0 0;
-    }
-    #hostWaitScreen > .subtitle {
-      grid-area: 2 / 1;
-    }
-    #hostWaitScreen > .card-box:nth-child(3) {
-      grid-area: 3 / 1 / 6 / 2;
-      margin-bottom: 0;
-    }
-    #hostWaitScreen > .card-box:nth-child(4) {
-      grid-area: 1 / 2 / 4 / 3;
-    }
-    #hostWaitScreen > #startGameBtn {
-      grid-area: 4 / 2;
-    }
-    #hostWaitScreen > #cancelHostBtn {
-      grid-area: 5 / 2;
-    }
-    /* The guest's: the title and the status card down the left, Back at the foot of the right. */
-    #guestWaitScreen {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      grid-template-rows: auto 1fr;
-      column-gap: 14px;
-      align-items: start;
-    }
-    #guestWaitScreen > h1 {
-      grid-area: 1 / 1;
-      margin: 6px 0 0;
-    }
-    #guestWaitScreen > .card-box {
-      grid-area: 2 / 1;
-      margin-bottom: 0;
-    }
-    #guestWaitScreen > #cancelGuestBtn {
-      grid-area: 1 / 2 / 3 / 3;
-      align-self: end;
-    }
-    @media (max-width: 719px) {
-      #homeScreen {
-        grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
-      }
-      /* Two sub-columns: three of 100px wrapped every label and clipped the selects. */
-      #onlineModeContent {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        grid-template-rows: auto auto;
-      }
-      #onlineModeContent > .card-box:nth-child(1) {
-        grid-area: 1 / 2;
-      }
-      #onlineModeContent > .card-box:nth-child(2) {
-        grid-area: 1 / 1 / 3 / 2;
-      }
-      #onlineModeContent > .card-box:nth-child(3) {
-        grid-area: 2 / 2;
-      }
-      /* shell.css's .code-input holds its size with !important; the join card takes four wide
-         letters (WWWW) at this size and tracking. */
-      #onlineModeContent .code-input {
-        font-size: 1.1rem !important;
-        letter-spacing: 0.12em;
-      }
-    }
   }
 }
 
@@ -669,30 +512,12 @@ label {
 .overlay.curtain {
   background: rgba(6, 37, 61, 0.78);
 }
-/* The turn gate (docs/design/backgammon-landscape.md §5D; ui/state.ts gateOpen, render.ts
-   paintGate): over the overlays (50) and the flyers (60), under the toast (100), in the curtain's
-   deep aegean denser still, so neither the table nor the curtain's cream sheet beneath (almost
-   the gate's own size) reads through as a second card. No media query shows it: the App holds
-   the orientation. The glyph is one small stroke in the accent, markup-carried (no TS toggles it,
-   so no CONTRACT.md row): 36px, so the quarter turn's arc and its arrowhead (about 4px of leg)
-   read as a turn and not as a phone outline alone. */
+/* The turn gate's scrim (docs/design/backgammon-landscape.md §5D; the gate itself is the shell's:
+   web/shared/ui/shell.ts gateOpen, shellPaint.ts paintGate, shell.css its z-index and glyph): the
+   curtain's deep aegean denser still, so neither the table nor the curtain's cream sheet beneath
+   (almost the gate's own size) reads through as a second card. */
 #turnGate {
-  z-index: 90;
   background: rgba(6, 37, 61, 0.93);
-}
-.turn-glyph {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 6px;
-}
-.turn-glyph svg {
-  width: 36px;
-  height: 36px;
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .sheet {
   border-radius: 20px;
@@ -2593,19 +2418,22 @@ label {
 }
 /* Where the floors do not fit the document scrolls (the rule of §3.10): under 304px with the rail
    (2 x 104 + 16 + 80), under 366px with the rows (2 x 90 + 16 + 170: an SE with Safari's toolbar);
-   the floors give up half the bottom inset, so both numbers hold with a home indicator. */
-@media (any-pointer: coarse) and (orientation: landscape) and (max-height: 303px),
-  (any-pointer: coarse) and (orientation: landscape) and (max-height: 365px) and (max-width: 713px) {
-  body.fixed-screen,
-  body.fixed-screen #app {
-    height: auto;
-    max-height: none;
-    overflow: visible;
-  }
-  body.fixed-screen #app {
-    min-height: 100svh;
-  }
-  #tableScreen {
-    overflow: visible;
+   the floors give up half the bottom inset, so both numbers hold with a home indicator. The two
+   short-phone tiers nest under the phone predicate (LANDSCAPE_PHONE, spelled once outside), so the
+   dist pin reads one landscape query here and the tiers stay two height bounds. */
+@media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+  @media (max-height: 303px), (max-height: 365px) and (max-width: 713px) {
+    body.fixed-screen,
+    body.fixed-screen #app {
+      height: auto;
+      max-height: none;
+      overflow: visible;
+    }
+    body.fixed-screen #app {
+      min-height: 100svh;
+    }
+    #tableScreen {
+      overflow: visible;
+    }
   }
 }
