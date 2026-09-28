@@ -270,7 +270,7 @@ describe('the initial app', () => {
       'tableScreen',
       'endgameScreen',
     ]);
-    expect(SHELL_INTENT_TYPES).toHaveLength(45);
+    expect(SHELL_INTENT_TYPES).toHaveLength(48);
     expect(EMPTY_SLOTS).toEqual([null, null, null]);
   });
 });
