@@ -331,7 +331,7 @@ describe('the sizes', () => {
     );
   });
 
-  test('landscape lengths: two rows in what the chrome leaves, floored per scheme (104 rail, 90 rows)', () => {
+  test('landscape lengths: two rows in what the chrome leaves, floored per scheme (104 rail, 90 rows, less half the bottom inset)', () => {
     expect(pointLength({ width: 844, height: 390, coarse: true })).toBe(147);
     expect(
       pointLength({
@@ -346,6 +346,24 @@ describe('the sizes', () => {
     expect(pointLength({ width: 780, height: 290, coarse: true })).toBe(
       LANDSCAPE_GEOMETRY.rail.minPointLen,
     );
+    // A notched 375pt phone at the 304 floor: the floor gives up half the 21px home indicator, so
+    // 2 x 93.5 + 16 + 80 + 21 = 304 still fits, exactly where the CSS fallback starts scrolling.
+    expect(
+      pointLength({
+        width: 812,
+        height: 304,
+        coarse: true,
+        insets: { left: 47, right: 47, bottom: 21 },
+      }),
+    ).toBe(93.5);
+    expect(
+      pointLength({
+        width: 812,
+        height: 290,
+        coarse: true,
+        insets: { left: 47, right: 47, bottom: 21 },
+      }),
+    ).toBe(93.5);
     expect(pointLength({ width: 667, height: 375, coarse: true })).toBe(94.5);
     expect(pointLength({ width: 640, height: 360, coarse: true })).toBe(
       LANDSCAPE_GEOMETRY.rows.minPointLen,

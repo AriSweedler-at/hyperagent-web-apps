@@ -150,13 +150,16 @@ export const pointWidth = (viewport: Viewport): number => {
 };
 /**
  * `--point-len` sideways: half of what the chrome leaves above and below (with the frame and the
- * bottom inset taken), floored per scheme (104 with the rail, 90 with the rows; under the floor
- * the document scrolls, design §3.10). 147 at 844x390, 94.5 at 667x375.
+ * bottom inset taken), floored per scheme (104 with the rail, 90 with the rows, each less half
+ * the bottom inset, so the floor's viewport stays 304 / 366 at any inset and the CSS fallback,
+ * which cannot read the inset, lifts exactly there; under the floor the document scrolls, design
+ * §3.10). 147 at 844x390, 94.5 at 667x375, 93.5 at 812x304 with a 21px home indicator.
  */
 export const pointLength = (vp: Viewport): number => {
   const s = schemeOf(vp);
   const g = LANDSCAPE_GEOMETRY;
-  return Math.max(s.minPointLen, (vp.height - s.chromeH - (vp.insets?.bottom ?? 0) - g.frame) / 2);
+  const insetB = vp.insets?.bottom ?? 0;
+  return Math.max(s.minPointLen - insetB / 2, (vp.height - s.chromeH - insetB - g.frame) / 2);
 };
 
 // ---- the seat frame ------------------------------------------------------------------------------

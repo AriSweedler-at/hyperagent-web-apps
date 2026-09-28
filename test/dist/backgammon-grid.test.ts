@@ -8,7 +8,10 @@
 // order are the ones web/games/backgammon/src/ui/board/layout.ts reports, which the geometry e2e
 // and the painter tests take as their oracle. The file holds a third `grid-template-areas`: the
 // chrome grid a phone held sideways lays the table screen in (the strips, the board, the rail),
-// which names no place; the board's templates are the declarations that name `barTop`. Runs on
+// which names no place; the board's templates are the declarations that name `barTop`, and the
+// chrome grid is the one that does not, pinned here cell by cell (`CHROME_CELLS`) since a misspelt
+// or moved name there tears the sideways table just as silently (a `board` that is no rectangle
+// drops the whole declaration; `satus` for `status` slides the board off the left edge). Runs on
 // dist/ after the build (npm run test:site).
 import { expect, test } from 'vitest';
 
@@ -20,6 +23,7 @@ import {
   parseAreas,
   rowOrder,
   type Area,
+  type Cell,
   type Layout,
 } from '../../web/games/backgammon/src/ui/board/layout.ts';
 import { describeDist, distFiles, readDist } from './dist.ts';
@@ -34,15 +38,37 @@ const STRING = /"([^"]*)"|'([^']*)'/g;
 const rowsOf = (declaration: string): ReadonlyArray<ReadonlyArray<string>> =>
   [...declaration.matchAll(STRING)].map((m) => (m[1] ?? m[2] ?? '').trim().split(/\s+/));
 
+type Rows = ReadonlyArray<ReadonlyArray<string>>;
+/** A board template names `barTop`; the landscape chrome grid (`opp badge status rail1` and so on) does not. */
+const isBoard = (rows: Rows): boolean => rows.some((row) => row.includes('barTop'));
+/** Every `grid-template-areas` declaration of the built CSS, in source order. */
+const declarationsIn = (css: string): ReadonlyArray<Rows> =>
+  [...css.replace(CSS_COMMENT, ' ').matchAll(AREAS_DECLARATION)].map((m) => rowsOf(m[1] ?? ''));
+/** The board's templates in source order: the phone's first, the desktop's second. */
+const templatesIn = (css: string): ReadonlyArray<Rows> => declarationsIn(css).filter(isBoard);
+/** The chrome grid a phone held sideways lays `#tableScreen` in (theme.css, `(min-width: 714px)` sideways). */
+const chromeIn = (css: string): ReadonlyArray<Rows> =>
+  declarationsIn(css).filter((rows) => !isBoard(rows));
+
 /**
- * The board's templates as the built CSS states them, in source order: the phone's first, the
- * desktop's second. A declaration that names no `barTop` is not a board (the landscape chrome
- * grid: `opp badge status rail1` and so on) and is left out.
+ * The chrome grid's cells as designed (design §3.1 landscape; 1-based, as `parseAreas` reports
+ * them): six rows of four; the opponent's strip, the badge and the status line over the board,
+ * the board four rows by three columns, my strip and the roll slot under it; the rail's four
+ * slots down the last column, the first and the last two rows tall (the menu reaches up into the
+ * top strip's row, Undo down into the bottom's).
  */
-const templatesIn = (css: string): ReadonlyArray<ReadonlyArray<ReadonlyArray<string>>> =>
-  [...css.replace(CSS_COMMENT, ' ').matchAll(AREAS_DECLARATION)]
-    .map((m) => rowsOf(m[1] ?? ''))
-    .filter((rows) => rows.some((row) => row.includes('barTop')));
+const CHROME_CELLS: Readonly<Record<string, Cell>> = {
+  opp: { row: 1, col: 1, rowSpan: 1, colSpan: 1 },
+  badge: { row: 1, col: 2, rowSpan: 1, colSpan: 1 },
+  status: { row: 1, col: 3, rowSpan: 1, colSpan: 1 },
+  rail1: { row: 1, col: 4, rowSpan: 2, colSpan: 1 },
+  board: { row: 2, col: 1, rowSpan: 4, colSpan: 3 },
+  rail2: { row: 3, col: 4, rowSpan: 1, colSpan: 1 },
+  rail3: { row: 4, col: 4, rowSpan: 1, colSpan: 1 },
+  rail4: { row: 5, col: 4, rowSpan: 2, colSpan: 1 },
+  me: { row: 6, col: 1, rowSpan: 1, colSpan: 2 },
+  slot: { row: 6, col: 3, rowSpan: 1, colSpan: 1 },
+};
 
 const LAYOUTS: ReadonlyArray<Layout> = ['phone', 'desktop'];
 
@@ -50,12 +76,26 @@ describeDist('backgammon board grid', (root) => {
   const theme = distFiles(root).filter((file) => THEME.test(file));
   const css = theme.map((file) => readDist(root, file)).join('\n');
   const templates = templatesIn(css);
+  const chrome = chromeIn(css);
 
   test('the built theme exists and declares exactly two board templates (the chrome grid names no place): the phone, then the desktop', () => {
     expect(theme, 'dist/shared/assets/backgammon-<hash>.css').toHaveLength(1);
     expect(templates).toHaveLength(2);
     expect(templates[0]).toHaveLength(14);
     expect(templates[1]).toHaveLength(2);
+  });
+
+  test('the sideways chrome grid: one declaration, six rows of four, every name one rectangle, the cells as designed', () => {
+    expect(chrome).toHaveLength(1);
+    const rows = chrome[0] ?? [];
+    expect(rows).toHaveLength(6);
+    rows.forEach((row) => {
+      expect(row).toHaveLength(4);
+    });
+    const parsed = parseAreas(rows);
+    expect(parsed.ok, parsed.ok ? '' : parsed.error).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value).toEqual(CHROME_CELLS);
   });
 
   LAYOUTS.forEach((layout, index) => {

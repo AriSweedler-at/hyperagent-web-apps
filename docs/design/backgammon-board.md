@@ -166,7 +166,21 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   `--chrome-w 2 edge + 44px + 6px` (82 inset-free, 144 on an iPhone 12), `--chrome-h 24 + 2 x 22 + 2
   x 6 + inset-b` (80), floor `--point-len-min 104px`. Under 714px (the SE, a 640x360 Android) the
   rows: the phone's chrome rows stay, `--chrome-w 2 edge`, `--chrome-h 170 + inset-b`, floor 90px,
-  the arrow hidden. The roll sheet shrinks to 44px dice and a 48px button (and loses 14px of padding under the rows, where the board is 196 to 205px tall); the tray's slabs thin with the point (`min(7px, (point-len - 26px) / 15)`, 1px gaps) so fifteen sit inside a tray a point long at either floor, and the bar's step gives way so five coins stay inside its half; `.desk-only` and `#handoffBtn` stay hidden (the menu and the curtain carry them). 54 x 147 at 844x390 inset-free,
+  the arrow hidden. The roll sheet shrinks to 12px paddings, 44px dice and a 48px button, drops
+  its sub line, keeps its title to one line (a long name ellipsizes) and stands Western's Double
+  beside the roll button: 168px with any name, inside the shortest board (196 at 640x360, 203 at
+  the rail's floor with a home indicator), scrolling inside should it ever outgrow one; the tray's
+  slabs thin with the point (`min(7px, (point-len - 26px) / 15)`, 1px gaps) so fifteen sit inside
+  a tray a point long at either floor; the bar's step gives way so five coins end half a die short
+  of the bar's centre, where the dice sit (and the dice paint over any coin: z 3); a double's four
+  dice are 30px (132px in a bar 208 long at the floor); the cube hangs in the rail 10px under the
+  arrow (the rows keep it at the bar's top); the toast hangs from the top edge (600px wide before
+  wrapping) instead of the foot, where it covered the roll button and the die-chip tray; the count
+  badge is 20px with 12.8px type; the menu sheet lays Rules and History in one 44px row (224px,
+  Leave whole at the 304 floor), the curtain sheet stands "Continue online" beside the reveal
+  button at 14px paddings, and the match-over screen is two columns the viewport tall (the games
+  card scrolling inside), so Rematch is on screen at the floor; `.desk-only` and `#handoffBtn`
+  stay hidden (the menu and the curtain carry them). 54 x 147 at 844x390 inset-free,
   49.2 x 136.5 on an iPhone 12 with its 47/47/21 insets, 48 x 138 on the 852x393 class, 44.2 x
   94.5 on an SE. `layoutFor(vp)`, `pointWidth`, `pointLength`, `RAIL_MIN_WIDTH` and
   `LANDSCAPE_GEOMETRY` in `ui/board/layout.ts` are the twin.
@@ -203,7 +217,8 @@ abs + 1`, for seat 1 `own = 24 − abs`. `ui/board/layout.ts` is the pure twin o
 `test/dist/backgammon-grid.test.ts` parses them out of the built CSS and holds the two together
 (a typo in either string is otherwise silent); the landscape chrome grid on `#tableScreen` is a
 third `grid-template-areas` in the file, which the test tells apart by its naming no place (only
-the board's rows name `barTop`). On the phone the centred cube sits at the dice
+the board's rows name `barTop`) and pins cell by cell against `CHROME_CELLS` (a misspelt or moved
+name there tears the sideways table as silently). On the phone the centred cube sits at the dice
 area's inner end (two 44px dice and the 26px cube fill the 116px area, so the dice start flush) and
 an owned cube moves into its owner's bar half; on the desktop `#cube` spans the bar column and
 `align-self` follows `data-owner="far|none|near"`, clearing two bar checkers.
@@ -335,7 +350,11 @@ controls, gin's rule with the threshold derived for this board; the desktop's fl
 again by its own block, which comes later; it has its own floors and fallbacks, under the
 landscape query and on `100svh`: with the rail 2 x 104 + 16 + 80 = 304px, so under
 `(max-height: 303px)` the document scrolls; with the rows 2 x 90 + 16 + 170 = 366px, so under
-`(max-height: 365px) and (max-width: 713px)` it scrolls (an SE with Safari's toolbar).
+`(max-height: 365px) and (max-width: 713px)` it scrolls (an SE with Safari's toolbar). Both
+floors give up half the bottom inset (`--point-len-min: calc(104px - var(--inset-b) / 2)`, 90
+likewise; `pointLength` mirrors it), so 2 x (104 − inset-b/2) + 16 + 80 + inset-b = 304px at any
+inset and the fallbacks, which cannot read `env()`, lift exactly where the floor stops fitting:
+93.5px points at 812x304 with a 21px home indicator, a 203px board.
 
 ### 3.11 Background and panel
 
@@ -712,7 +731,8 @@ visual order per row/column; the oracle's expected order), `pathFor(seat)` (the 
 in movement order plus `off`), `stackStep(pointLen, checkerD)`, `visibleOf(count)`. A dist test
 (`test/dist/backgammon-grid.test.ts`) parses both `grid-template-areas` strings out of the built
 CSS and asserts each area forms exactly one rectangle per template, and that `rowOrder` agrees with
-the parsed templates. The reducer tests drive whole games through a tap policy (`playOut`) with a
+the parsed templates; the third string, the sideways chrome grid, it pins cell by cell
+(`CHROME_CELLS`). The reducer tests drive whole games through a tap policy (`playOut`) with a
 seeded rng; `state.test.ts` asserts the hit toast comes on the reveal and never at the flip.
 
 ## 8. Registration and gates

@@ -11,7 +11,8 @@
 // reads are the shared oracle's (e2e/fixtures/geometry.ts `frameScript`, `fitsScript`,
 // `expectSameFrame`; docs/design/shared-shell.md §5 A5), spliced into the one script; the frame's
 // boxes are the layout's (`frameSelectors`: sideways `.topbar` and `#controls` are
-// `display: contents` and measure nothing, so their children stand in).
+// `display: contents` and measure nothing, so their children stand in, as they do for the fits
+// leg's `controlsReachable`, which `fitsScript` reads through the boxed children then).
 import { expect, type Page } from '@playwright/test';
 
 import {
