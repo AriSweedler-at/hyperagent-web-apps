@@ -245,9 +245,10 @@ export type ShellState<G extends ShellTypes> = Readonly<{
   /**
    * As guest, what the host calls my seat once it has answered: at a welcome or lobby frame with
    * no seating (a room of exactly two) the host's rule mirrored (`guestNameFor(myName, hostName)`:
-   * exactly its `guestNameAmong` against its own name, the one other name at the table), at one
-   * with a seating my own row (`seats[you − 1]`, n-seat-sessions.md D3), then my seat's name off
-   * every `state` frame's view (`cfg.result.playersOf`, authoritative). Null until then, and in
+   * exactly its `guestNameAmong` against its own name, the one other name at the table), at a
+   * lobby with a seating my own row (`seats[you − 1]`, n-seat-sessions.md D3; a welcome's row is
+   * not mine yet, `guestFrame`), then my seat's name off every `state` frame's view
+   * (`cfg.result.seatName`, else `playersOf` at my seat: authoritative). Null until then, and in
    * every other role. `myName` stays what was typed: it is the rejoin key and what the save keeps.
    */
   seatedName: string | null;
@@ -256,9 +257,9 @@ export type ShellState<G extends ShellTypes> = Readonly<{
   /** Pass-and-play: the seats played from this device, every seat in v1 (the seam for a mixed table); [] otherwise. */
   localSeats: ReadonlyArray<SeatOf<G>>;
   /**
-   * The online name input has been typed into, or a remembered name filled it (`home/init`). The
-   * join no longer reads it (2026-09-28: the box's text is the guest's name, an untouched prefill
-   * included, as `host/click` always counted it); it stays as the record of the first-tap clear.
+   * The online input has been typed into, or a remembered name filled it (`home/init`). Nothing
+   * reads it since 2026-09-28 (the join takes the box's text as it is); kept for the moment as
+   * state the binder still reports, its removal a follow-up.
    */
   nameTouched: boolean;
   /** Pass-and-play: the seat that lifted the curtain this turn. */
@@ -757,6 +758,13 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
   result: Readonly<{
     keyOf: (view: G['View']) => string;
     playersOf: (view: G['View']) => ReadonlyArray<string>;
+    /**
+     * My seat's name off a view, null when the view has no row for it; absent,
+     * `playersOf(view)[seat]` (the games whose players sit in shell-seat order: gin, backgammon,
+     * briscola). A game whose view's players are chairs, not seats, supplies it (fidice: a
+     * watching host holds no chair).
+     */
+    seatName?: (view: G['View'], seat: SeatOf<G>) => string | null;
     scoreOf: (view: G['View']) => string;
     winnerOf: (view: G['View']) => SeatOf<G> | null;
   }>;
@@ -1546,12 +1554,17 @@ const guestFrame = <G extends ShellTypes>(
       // What the host calls me. A frame with no seating is a room of exactly two (a two-seat
       // game's, and an N-seat game's at two seats, where its protocol leaves `seats`/`you` off):
       // the host's rule mirrored (`guestNameFor` against its name, the one other name at the
-      // table, so exact by construction). A frame with one names my own row, which a welcome sent
-      // before my join reached the host still leaves null until the lobby that follows.
+      // table, so exact by construction). At a frame with a seating, only a `lobby` names my row,
+      // never a `welcome`: the welcome goes out at channel open, before my join reaches the host,
+      // so its row for my seat can be a vacated occupant's kept name (mid-game `host/guestGone`
+      // keeps `{ name, connected: false }` for the rejoin) or a resumed room's saved name; the
+      // lobby that answers my join names me.
       const seatedName =
         room === null
           ? guestNameFor(app.shell.myName, frame.hostName)
-          : (room.seats[room.you - 1]?.name ?? app.shell.seatedName);
+          : frame.t === 'lobby'
+            ? (room.seats[room.you - 1]?.name ?? app.shell.seatedName)
+            : app.shell.seatedName;
       return pure(
         withGuestStatus(
           withShell(app, {
@@ -1569,16 +1582,22 @@ const guestFrame = <G extends ShellTypes>(
     case 'toast':
       // The host refused the guest's move.
       return cfg.table.refuse(app, frame.msg);
-    case 'state':
+    case 'state': {
+      // My seat's name as the host dealt it: the word every painter shows, whatever rule made it.
+      // The view's row for my seat: `result.seatName` where a game's players are chairs, not
+      // seats; else the seat's index (the view names every seat: the game's decoder refused any
+      // other shape on the wire). A view with no row for me keeps the last word.
+      const named =
+        cfg.result.seatName === undefined
+          ? cfg.result.playersOf(frame.view)[app.shell.mySeat]
+          : cfg.result.seatName(frame.view, app.shell.mySeat);
       return painted(
         {
           shell: {
             ...app.shell,
             view: frame.view,
             oppConnected: true,
-            // My seat's name as the host dealt it: the word every painter shows, whatever rule made
-            // it. The view names every seat (the game's decoder refused any other shape on the wire).
-            seatedName: cfg.result.playersOf(frame.view)[app.shell.mySeat],
+            seatedName: named ?? app.shell.seatedName,
           },
           table: cfg.table.reset(app.table, 'frame'),
         },
@@ -1586,6 +1605,7 @@ const guestFrame = <G extends ShellTypes>(
         ctx,
         cfg,
       );
+    }
     case EPHEMERAL_TAG:
       return cfg.table.ephemeral?.(app, frame, 0, ctx) ?? pure(app);
   }

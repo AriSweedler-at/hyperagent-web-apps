@@ -155,7 +155,8 @@ export type ShellBlocks = Readonly<{
    * `<div id="guestSeatName" class="hidden"></div>` for backgammon and briscola, each theme styling
    * it by id (no class, so the class contract has no new row); '' for gin, whose composed DOM the
    * parity oracle (tools/parity/gin-dom-parity.ts) holds to the legacy page checkpoint for
-   * checkpoint, and for fidice until its shell path is composed like the others.
+   * checkpoint, and for fidice, whose seat list's ` · you` row already names my seat (no
+   * "Playing as …" line until the restyle decides; web/games/fidice/page.ts).
    */
   guestSeatName: string;
   /** `#homeScreen`'s panels between Rules and About (gin's score panel). */

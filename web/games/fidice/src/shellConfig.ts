@@ -328,6 +328,9 @@ export const FIDICE_SHELL: ShellGameData<Fidice> = {
   result: {
     keyOf: (view) => `${view.code}@${String(view.log[0]?.at ?? 0)}`,
     playersOf: (view) => view.players.map((p) => p.name),
+    // Chairs, not seats (a watching host holds no chair): the wait screen's ` · you` row names my
+    // seat; no "Playing as …" line until the restyle decides how chairs map to seats.
+    seatName: () => null,
     scoreOf: (view) =>
       view.players.map((p) => String(keepsScore(view) ? p.losses : p.lives)).join('–'),
     winnerOf: (view) => (view.winner === null ? null : shellSeatOfChair(view, view.winner)),

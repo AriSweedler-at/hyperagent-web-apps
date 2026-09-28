@@ -1722,6 +1722,20 @@ describe("the guest's name is the guest's (the owner, 2026-09-28; C11)", () => {
       { type: 'join/click', name: ' Xyz ', code: 'ABCD' },
     ).app;
     expect(typed.shell).toMatchObject({ role: 'guest', myName: 'Xyz', p2Name: 'Ethan' });
+    // The owner's sentence, host-side: the host's remembered second-seat name never stands in for
+    // the guest's; the join's word seats it, the status says so, and the deal names it.
+    const owner = run(
+      initialApp,
+      { type: 'home/init', home: { ...home, name: 'Ann', p2Name: 'Ethan' } },
+      { type: 'host/click', name: 'Ann', level: '3' },
+      { type: 'host/frame', frame: { t: 'join', name: 'Xyz' } },
+    ).app;
+    expect(owner.shell).toMatchObject({ role: 'host', oppName: 'Xyz', p2Name: 'Ethan' });
+    expect(owner.shell.hostStatus.text).toContain(joinedMsg('Xyz'));
+    expect(game(run(owner, { type: 'host/deal' }).app).players[1]).toEqual({
+      id: 'guest',
+      name: 'Xyz',
+    });
     // The host's order (protocol.ts `guestNameFor`): cut to 20, then trim, so the wire string is
     // the seated string even for a name set past the input's maxlength.
     expect(
@@ -1814,6 +1828,22 @@ describe("the guest's name is the guest's (the owner, 2026-09-28; C11)", () => {
       },
     }).app;
     expect(renamed.shell.seatedName).toBe('renamed');
+    // A game whose view's players are chairs, not seats, maps my seat itself (`result.seatName`);
+    // a view with no row for me keeps the last word.
+    const stateFrame: FakeIntent = {
+      type: 'guest/frame',
+      frame: { t: 'state', view: viewFor({ ...dealt, players }, 1) },
+    };
+    const chaired: ShellConfig<Fake> = {
+      ...FAKE,
+      result: { ...FAKE.result, seatName: (view, seat) => `chair ${view.names[seat]}` },
+    };
+    expect(reduceShell(lobbied, stateFrame, ctx, chaired).app.shell.seatedName).toBe('chair ann 2');
+    const unchaired: ShellConfig<Fake> = {
+      ...FAKE,
+      result: { ...FAKE.result, seatName: () => null },
+    };
+    expect(reduceShell(lobbied, stateFrame, ctx, unchaired).app.shell.seatedName).toBe('ann 2');
   });
 
   test('seatedName is null until the host answers, after a leave or a cancel, and in every other role', () => {
@@ -1840,7 +1870,7 @@ describe("the guest's name is the guest's (the owner, 2026-09-28; C11)", () => {
     expect(run(local(), { type: 'handoff/click' }).app.shell.seatedName).toBeNull();
   });
 
-  test('N seats: my own row of the lobby names me; a welcome whose row is still empty leaves it null; a later lobby fills it; the state frame`s seat wins', () => {
+  test('N seats: my own row of the lobby names me; a welcome leaves it null whatever its row holds; a later lobby fills it; the state frame`s seat wins', () => {
     const joined = run4(initialApp4, { type: 'join/click', name: 'Cy', code: 'ABCD' }).app;
     expect(joined.shell.seatedName).toBeNull();
     // The welcome goes out before the host hears the join: seat 2 (mine) is still empty.
@@ -1865,6 +1895,46 @@ describe("the guest's name is the guest's (the owner, 2026-09-28; C11)", () => {
       frame: roomFrame4('lobby', 'Ann', { level: 4 }, seats, 2),
     }).app;
     expect(told.shell.seatedName).toBe('Cy 2');
+    // A welcome's row for my seat is not mine yet: it goes out at channel open, before my join
+    // reaches the host, so the row can hold a vacated occupant's kept name (mid-game
+    // `host/guestGone` keeps the name, disconnected) or a resumed room's saved one; only the lobby
+    // that answers the join names me.
+    const stale = run4(joined, {
+      type: 'guest/frame',
+      frame: roomFrame4(
+        'welcome',
+        'Ann',
+        { level: 4 },
+        [{ name: 'Bo', connected: true }, { name: 'Cy', connected: false }, EMPTY_SEAT],
+        2,
+      ),
+    }).app;
+    expect(stale.shell).toMatchObject({ mySeat: 2, seatedName: null });
+    expect(
+      run4(stale, {
+        type: 'guest/frame',
+        frame: roomFrame4(
+          'lobby',
+          'Ann',
+          { level: 4 },
+          [{ name: 'Bo', connected: true }, { name: 'Zed', connected: true }, EMPTY_SEAT],
+          2,
+        ),
+      }).app.shell.seatedName,
+    ).toBe('Zed');
+    // A lobby whose row for me is still empty keeps the last word.
+    expect(
+      run4(told, {
+        type: 'guest/frame',
+        frame: roomFrame4(
+          'lobby',
+          'Ann',
+          { level: 4 },
+          [{ name: 'Bo', connected: true }, EMPTY_SEAT, EMPTY_SEAT],
+          2,
+        ),
+      }).app.shell.seatedName,
+    ).toBe('Cy 2');
     // A frame with no seating is a room of exactly two (briscola's protocol leaves `seats`/`you`
     // off at two seats), so the two-seat mirror applies whatever the game's capacity.
     expect(

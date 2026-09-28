@@ -298,6 +298,8 @@ describe('the engine adapters', () => {
     const view = FIDICE_SHELL.engine.viewFor(stamped, 0);
     expect(FIDICE_SHELL.result.keyOf(view)).toBe(`ABCDE@${String(NOW)}`);
     expect(FIDICE_SHELL.result.playersOf(view)).toEqual(['Ann', 'Bob']);
+    // Chairs, not seats: the shell takes no name off the view for my seat (the ` · you` row says).
+    expect(FIDICE_SHELL.result.seatName?.(view, 1)).toBeNull();
     expect(FIDICE_SHELL.result.scoreOf(view)).toBe('0–0');
     expect(
       FIDICE_SHELL.result.scoreOf({
