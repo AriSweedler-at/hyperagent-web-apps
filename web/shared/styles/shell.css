@@ -219,6 +219,30 @@ body.fixed-screen #app {
   text-align: center;
   margin-bottom: 12px;
 }
+/* The turn gate (docs/design/backgammon-landscape.md §5D; web/shared/ui/shell.ts gateOpen,
+   shellPaint.ts paintGate; the markup is web/shared/markup/shell.ts gateMarkup, carried by a page
+   whose game plays sideways): over the overlays (50) and the flyers (60), under the toast (100).
+   The theme paints its scrim (backgammon: the curtain's deep aegean, denser still). No media query
+   shows it: the App holds the orientation. The glyph is one small stroke in the accent,
+   markup-carried (no TS toggles it; CONTRACT.md's shell row): 36px, so the quarter turn's arc and
+   its arrowhead (about 4px of leg) read as a turn and not as a phone outline alone. */
+#turnGate {
+  z-index: 90;
+}
+.turn-glyph {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.turn-glyph svg {
+  width: 36px;
+  height: 36px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .rules-list {
   list-style: none;
   padding: 0;
@@ -534,4 +558,183 @@ details.history-row > .history-detail dd {
 ::-webkit-scrollbar {
   width: 0;
   height: 0;
+}
+
+/* ---------- the home and the waiting rooms sideways (docs/design/backgammon-landscape.md §5; docs/design/shared-shell.md "Playing sideways") ---------- */
+/* A phone held sideways on the home screen of a game that plays sideways (`body[data-plays="landscape"]`,
+   the attribute the composed page carries when its page.ts says `plays: 'landscape'`; gin's and
+   briscola's pages carry none and keep the upright column), under the board's own predicate
+   (web/shared/edge/media.ts LANDSCAPE_PHONE: any-pointer: coarse and a landscape under 500px tall; a
+   fine pointer, and so the 390x844 golden, never matches): two columns, so Open a table, Sit down
+   and Start sit above a 304px fold with no scroll. The Play tab and the two mode panels lay their
+   children into the grid themselves (display: contents), the masthead, the tab bar and the mode
+   switch down the left, the cards on the right in sub-columns: online the name, the host card and
+   the join card side by side (every shell page's online panel has these three cards), the name's
+   the narrowest and the join card's the widest, so four letters of a code fit at their tracking
+   (2026-09-28: the first letter of ABCD was cut off at 667 and 780px); pass the phone lays its
+   cards out too, but their number is the game's (backgammon two, gin three, briscola one), so
+   each game's theme places them (backgammon's theme.css: the players with Start under them and
+   the options beside). A sub-column is 120-190px wide, so each panel's rows wrap (a select, a name
+   or the code takes a line of its own) and the code loses some of its tracking. The tab bar keeps
+   its own bottom edge (the switch is in the other column) and the switch its full radii. The two
+   waiting rooms lay out in two columns as well (the host: the title, the code and its share
+   button left; the status, Start the match and Cancel right, the buttons at the foot of the
+   column; the guest: the title and the status left, Back right), so Start the match sits above a
+   304px fold once the opponent has joined (2026-09-28: it sat at y 420 in 390). The table and the
+   endgame are not touched: #app's cap lifts for these three screens alone, through :has(). The
+   whole block sits under @supports on that selector: without :has() the cap could not lift and
+   the grids would squeeze into 480px (three online cards of 53px), so a browser without it keeps
+   the portrait single column sideways and scrolls, as before; @supports selector() itself predates
+   :has() in every engine. The nested query at the end is the same layout on a 667px-wide phone
+   (an SE sideways): a narrower left column, the online cards in two sub-columns (the host card,
+   the tallest, alone on the left; the name over the join card on the right, so Open a table clears
+   a 375px fold), and a smaller, tighter code. */
+@supports selector(:has(a)) {
+  @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+    body[data-plays='landscape']
+      #app:has(
+        > #homeScreen:not(.hidden),
+        > #hostWaitScreen:not(.hidden),
+        > #guestWaitScreen:not(.hidden)
+      ) {
+      max-width: 820px;
+    }
+    body[data-plays='landscape'] #homeScreen {
+      display: grid;
+      grid-template-columns: minmax(0, 250px) minmax(0, 1fr);
+      grid-template-rows: auto auto auto auto 1fr;
+      column-gap: 14px;
+      align-items: start;
+    }
+    /* The masthead is each game's block (its class is the game's too: backgammon's theme places it at 1 / 1). */
+    body[data-plays='landscape'] #homeScreen > #resumeBox {
+      grid-area: 2 / 1;
+    }
+    /* The bar's shadow, in the theme's ink, is the theme's (backgammon's theme.css). */
+    body[data-plays='landscape'] #homeScreen > #topTabbar {
+      grid-area: 3 / 1;
+      margin: 0 0 10px;
+      border-radius: var(--radius-control);
+    }
+    body[data-plays='landscape'] #playPanel {
+      display: contents;
+    }
+    body[data-plays='landscape'] #playPanel > #playModeSwitch {
+      grid-area: 4 / 1;
+      border-top: none;
+      border-radius: var(--radius-control);
+    }
+    body[data-plays='landscape'] #onlineModeContent,
+    body[data-plays='landscape'] #localModeContent {
+      grid-area: 1 / 2 / -1 / 3;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: 12px;
+      align-items: start;
+    }
+    body[data-plays='landscape'] #onlineModeContent .row,
+    body[data-plays='landscape'] #localModeContent .row {
+      flex-wrap: wrap;
+    }
+    /* .grow is flex: 1 (a zero basis never overflows a line): a full-line basis makes each wrap. */
+    body[data-plays='landscape'] #onlineModeContent .row > *,
+    body[data-plays='landscape'] #localModeContent .row > * {
+      flex-basis: 100%;
+    }
+    body[data-plays='landscape'] #onlineModeContent {
+      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.1fr) minmax(0, 1.1fr);
+    }
+    body[data-plays='landscape'] #onlineModeContent > .card-box:nth-child(1) {
+      grid-area: 1 / 1;
+    }
+    body[data-plays='landscape'] #onlineModeContent > .card-box:nth-child(2) {
+      grid-area: 1 / 2;
+    }
+    body[data-plays='landscape'] #onlineModeContent > .card-box:nth-child(3) {
+      grid-area: 1 / 3;
+    }
+    body[data-plays='landscape'] #onlineModeContent .code-input {
+      letter-spacing: 0.3em;
+    }
+    body[data-plays='landscape'] #rulesPanel,
+    body[data-plays='landscape'] #aboutPanel {
+      grid-area: 1 / 2 / -1 / 3;
+    }
+    /* The host's waiting room: rows 1-2 are the title and its line, the code card spans the rest of
+       the left column; the status card spans rows 1-3 on the right, the two buttons take rows 4-5,
+       and the 1fr third row pushes them to the foot. Start the match is display: none until the
+       guest joins, so it takes no row until then. */
+    body[data-plays='landscape'] #hostWaitScreen {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-rows: auto auto 1fr auto auto;
+      column-gap: 14px;
+      align-items: start;
+    }
+    body[data-plays='landscape'] #hostWaitScreen > h1 {
+      grid-area: 1 / 1;
+      margin: 6px 0 0;
+    }
+    body[data-plays='landscape'] #hostWaitScreen > .subtitle {
+      grid-area: 2 / 1;
+    }
+    body[data-plays='landscape'] #hostWaitScreen > .card-box:nth-child(3) {
+      grid-area: 3 / 1 / 6 / 2;
+      margin-bottom: 0;
+    }
+    body[data-plays='landscape'] #hostWaitScreen > .card-box:nth-child(4) {
+      grid-area: 1 / 2 / 4 / 3;
+    }
+    body[data-plays='landscape'] #hostWaitScreen > #startGameBtn {
+      grid-area: 4 / 2;
+    }
+    body[data-plays='landscape'] #hostWaitScreen > #cancelHostBtn {
+      grid-area: 5 / 2;
+    }
+    /* The guest's: the title and the status card down the left, Back at the foot of the right. */
+    body[data-plays='landscape'] #guestWaitScreen {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-rows: auto 1fr;
+      column-gap: 14px;
+      align-items: start;
+    }
+    body[data-plays='landscape'] #guestWaitScreen > h1 {
+      grid-area: 1 / 1;
+      margin: 6px 0 0;
+    }
+    body[data-plays='landscape'] #guestWaitScreen > .card-box {
+      grid-area: 2 / 1;
+      margin-bottom: 0;
+    }
+    body[data-plays='landscape'] #guestWaitScreen > #cancelGuestBtn {
+      grid-area: 1 / 2 / 3 / 3;
+      align-self: end;
+    }
+    @media (max-width: 719px) {
+      body[data-plays='landscape'] #homeScreen {
+        grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+      }
+      /* Two sub-columns: three of 100px wrapped every label and clipped the selects. */
+      body[data-plays='landscape'] #onlineModeContent {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-rows: auto auto;
+      }
+      body[data-plays='landscape'] #onlineModeContent > .card-box:nth-child(1) {
+        grid-area: 1 / 2;
+      }
+      body[data-plays='landscape'] #onlineModeContent > .card-box:nth-child(2) {
+        grid-area: 1 / 1 / 3 / 2;
+      }
+      body[data-plays='landscape'] #onlineModeContent > .card-box:nth-child(3) {
+        grid-area: 2 / 2;
+      }
+      /* .code-input above holds its size with !important; the join card takes four wide letters
+         (WWWW) at this size and tracking. */
+      body[data-plays='landscape'] #onlineModeContent .code-input {
+        font-size: 1.1rem !important;
+        letter-spacing: 0.12em;
+      }
+    }
+  }
 }

@@ -185,7 +185,71 @@ export type ShellPage = Readonly<{
   notes: ShellNotes;
   look: ShellLook;
   blocks: ShellBlocks;
+  /**
+   * The game plays with the phone sideways (its `ShellConfig.orientation`,
+   * docs/design/shared-shell.md "Playing sideways"): the composed page's `<body>` carries
+   * `data-plays="landscape"`, which scopes shell.css's two-column landscape home and waiting rooms
+   * to it, so a page that stays upright (gin's, briscola's) is untouched byte for byte. Its
+   * `sheetsBefore` also carries `gateMarkup(...)`.
+   */
+  plays?: 'landscape';
 }>;
+
+/** The body attribute list a page's `plays` spells (page.html `<body{{bodyAttrs}}>`): '' for an upright page. */
+export const bodyAttrsOf = (page: Pick<ShellPage, 'plays'>): string =>
+  page.plays === 'landscape' ? ' data-plays="landscape"' : '';
+
+/** The turn gate's words: the title, the line under it, and its two buttons (the second ships hidden). */
+export type GateCopy = Readonly<{
+  title: string;
+  sub: string;
+  goLabel: string;
+  keepLabel: string;
+}>;
+
+/** The gate's ids, in the markup's order: the sheet, its two texts, its two buttons. The game's `pageShape.ids` (tools/games.ts) carries them; SHELL_IDS never does. */
+export const GATE_IDS: ReadonlyArray<string> = [
+  'turnGate',
+  'turnGateTitle',
+  'turnGateSub',
+  'turnGateGoBtn',
+  'turnGateKeepBtn',
+];
+
+/**
+ * The turn gate (docs/design/backgammon-landscape.md §5D; web/shared/ui/shell.ts `gateOpen`,
+ * shellPaint.ts `paintGate`): the block a game that plays sideways puts in its `sheetsBefore`, a
+ * body sibling after the curtain and painted over it (shell.css: z-index 90; the theme paints its
+ * scrim). `#turnGateGoBtn` ships hidden: the Android lock PR shows and binds it. The glyph is a
+ * phone outline and a quarter turn's arc with its arrowhead, 36px (shell.css .turn-glyph), one
+ * stroke in the accent. Indented as page.html's blocks are (four spaces), the comment first.
+ */
+export const gateMarkup = (copy: GateCopy): string => `
+    <!-- TURN GATE (docs/design/backgammon-landscape.md §5D; web/shared/markup/shell.ts gateMarkup): a
+         phone held upright at the table. A body sibling after the curtain, painted over it
+         (shell.css: z-index 90); the boot paints it from the App (web/shared/ui/shell.ts gateOpen,
+         shellPaint.ts paintGate) and sets inert on #app and every other overlay while it is up. -->
+    <div
+      id="turnGate"
+      class="overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="turnGateTitle"
+    >
+      <div class="sheet centered">
+        <div class="turn-glyph" aria-hidden="true">
+          <svg viewBox="0 0 64 64" focusable="false">
+            <rect x="18" y="8" width="20" height="48" rx="4" />
+            <path d="M46 14a26 26 0 0 1 0 36" />
+            <path d="M39 43l7 7 7-7" />
+          </svg>
+        </div>
+        <div class="sheet-title" id="turnGateTitle">${copy.title}</div>
+        <div class="sheet-sub" id="turnGateSub">${copy.sub}</div>
+        <button class="btn btn-go btn-block hidden" id="turnGateGoBtn">${copy.goLabel}</button>
+        <button class="btn btn-ghost btn-block btn-sm" id="turnGateKeepBtn">${copy.keepLabel}</button>
+      </div>
+    </div>`;
 
 /**
  * The shell ids (web/shared/ui/ids.ts SHELL_IDS) the partials cannot spell, each in the block that
@@ -287,7 +351,9 @@ const blockIdErrors = (blocks: ShellBlocks): ReadonlyArray<string> => [
  * Err lists every unfilled placeholder, every unused value and every block id missing or repeated.
  */
 export const renderShell = (templates: ShellTemplates, page: ShellPage): Result<string, string> => {
-  const slots: Values = { ...page.copy, ...page.notes, ...page.look };
+  const declared: Values = { ...page.copy, ...page.notes, ...page.look };
+  // The composer's own slot beside the page's: page.html's `<body{{bodyAttrs}}>`.
+  const slots: Values = { ...declared, bodyAttrs: bodyAttrsOf(page) };
   const own: Values = page.blocks;
   const inner: ReadonlyArray<Inner> = INNER.map((name) => ({
     name,
@@ -299,9 +365,19 @@ export const renderShell = (templates: ShellTemplates, page: ShellPage): Result<
   const whole = fillTemplate('page', templates.page, slots, { ...own, ...placed });
   const all = [...inner.map((one) => one.filled), whole];
   const used = new Set(all.flatMap((f) => f.used));
-  const unused = [...Object.keys(slots), ...Object.keys(own)]
+  const unused = [...Object.keys(declared), ...Object.keys(own)]
     .filter((name) => !used.has(name))
     .map((name) => `"${name}" is declared by the page but no partial reads it`);
-  const errors = [...all.flatMap((f) => f.errors), ...unused, ...blockIdErrors(page.blocks)];
+  // A page that plays sideways needs the body slot placed, or its attribute would be lost in silence.
+  const unplayed =
+    page.plays !== undefined && !used.has('bodyAttrs')
+      ? [`the page plays ${page.plays} but no partial places {{bodyAttrs}} on the body`]
+      : [];
+  const errors = [
+    ...all.flatMap((f) => f.errors),
+    ...unused,
+    ...unplayed,
+    ...blockIdErrors(page.blocks),
+  ];
   return errors.length === 0 ? ok(whole.lines.join('\n')) : err(errors.join('\n'));
 };

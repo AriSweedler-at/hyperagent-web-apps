@@ -605,6 +605,47 @@ SHELL_GAMES.forEach((game) => test.describe(game, { tag: `@${game}` }, () => { c
 
 Table drivers (`gin.ts` table half, `gin-play.ts`, the bg board helpers, `bgPosition`), `gin-dom-parity` and the legacy oracle (one game's migration proof), `backgammon-grid.test.ts`, CONTRACT.md rows (each documents its game's template-built classes; the two `connDotClass` rows merge into one `shared` row when the painters move, and the Rules sentence should read 'a GAMES member or shared'), vitest threshold ratchets, the nightly replay steps (two lines each), gin's stories stack (31 stories, 120 PNGs) until backgammon wants screenshots. Fidice keeps its 42-line driver: 0 ids and 10 selectors in common.
 
+## 6.6 Playing sideways: how a game opts in
+
+Backgammon's flat board is played with the phone sideways (docs/design/backgammon-landscape.md);
+the mechanism that asks for the turn of the phone is the shell's (2026-09-28, the owner: "DRY the
+'play in landscape mechanism' as its needed for lots"). A game opts in with one flag and keeps only
+its board CSS and its layout twin:
+
+1. **`ShellConfig.orientation: 'landscape'`** (`web/games/<g>/src/shellConfig.ts`). With it,
+   `bootShell` (`web/shared/edge/boot.ts`, handed the config as `BootConfig.shell`) watches the two
+   phone predicates of `web/shared/edge/media.ts`, `PORTRAIT_PHONE` and `LANDSCAPE_PHONE`, into the
+   reducer as `viewport/portrait` and `viewport/landscape` (`ShellState.portraitPhone`,
+   `landscapePhone`), and paints the turn gate after every paint of the game's own
+   (`web/shared/ui/shellPaint.ts` `paintGate` over `shell.ts` `gateOpen`). `main.ts` and
+   `render.ts` add nothing.
+2. **`gateOpen(s, cfg)`**: the opt-in, the table screen, a view that is not over (`engine.over`,
+   and `engine.gameOver` where the game has a result sheet inside a match: backgammon's
+   `phase === 'over'`), a phone held upright, not dismissed. "Play upright" (`gate/keep`,
+   `ShellState.gateDismissed`) holds for one table: dropped at the shell's pass-and-play start,
+   `position/load`, handoff and leave; kept when the host is lost mid-match, since the same table
+   stays up. A game whose own flow ends a table past the shell (backgammon's `hostLeft`) drops it
+   there too.
+3. **The page**: `ShellPage.plays: 'landscape'` puts `data-plays="landscape"` on the composed
+   `<body>` (`web/shared/markup/shell.ts` `bodyAttrsOf`, page.html `<body{{bodyAttrs}}>`), and
+   `sheetsBefore` carries `gateMarkup(copy)` (the sheet, its two texts, "Go sideways" shipped
+   hidden for the Android lock, "Play upright"). Its five ids (`GATE_IDS`) stay out of `SHELL_IDS`
+   and in the game's `pageShape.ids` (`tools/games.ts`). An upright page (gin, briscola) declares
+   neither and composes byte for byte as before.
+4. **The CSS**: `web/shared/styles/shell.css` holds the gate's shapes (`#turnGate` z 90,
+   `.turn-glyph`) and, under `LANDSCAPE_PHONE` scoped by `body[data-plays="landscape"]`, the
+   two-column home and waiting rooms (the online panel's three cards are every shell page's). The
+   theme keeps what is the game's: the gate's scrim colour, the pass-the-phone panel's grid areas
+   (its card count is the game's), the tab bar's shadow in its ink, and every board block. Each
+   landscape `@media` copies `LANDSCAPE_PHONE` verbatim, alone or with a width bound after it;
+   a tighter height tier nests under it. `test/dist/landscape-predicate.test.ts` pins that over
+   every theme and the shell sheet, so the board's layout and the gate's watcher cannot drift apart.
+5. **Tests**: `shell.test.ts` (the state, the intents, `gateOpen`, the resets), `shellPaint.test.ts`
+   (`paintGate`: `inert` on `#app` and every other `.overlay` body child, found by query since each
+   game's overlays differ; focus to the dismiss button), `boot.test.ts` (the watchers and the paint,
+   only with the opt-in), `media.test.ts` (the two strings), `markup/shell.test.ts` (`gateMarkup`,
+   `bodyAttrsOf`), and the game's own `state.test.ts` over its config.
+
 ## 7. Risks
 
 | # | Risk | Where it bites | Mitigation in the plan |

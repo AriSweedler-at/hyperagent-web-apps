@@ -13,13 +13,16 @@
 // tsconfig.pure.json) carves them out the way scorer/main.ts is, and tsconfig.web.json alone
 // compiles them (they need the DOM lib through dom.ts).
 import {
+  blurElement,
   byId,
   escapeHtml,
+  focusElement,
   hasClass,
   isDisabled,
   keyOf,
   listen,
   listenId,
+  queryAllIn,
   requireId,
   setAttr,
   setText,
@@ -241,6 +244,49 @@ export const paintConnDot = (doc: DocumentLike, id: string, v: ConnDotView): voi
 /** A sheet's overlay follows its flag. */
 export const paintSheet = (doc: DocumentLike, overlay: string, open: boolean): void => {
   toggleClass(requireId(doc, overlay), 'hidden', !open);
+};
+
+// ---- the turn gate (docs/design/backgammon-landscape.md §5D; docs/design/shared-shell.md "Playing sideways") ----
+
+/** The gate's ids (web/shared/markup/shell.ts `gateMarkup`): the sheet and its one live control. Not in SHELL_IDS: a page carries them only when its game plays sideways. */
+export const GATE_ID = 'turnGate';
+export const GATE_KEEP_ID = 'turnGateKeepBtn';
+/** Every overlay the gate covers: `.overlay` body children (page.html places every sheet and the curtain there), the gate itself filtered out below. */
+const OVERLAYS = ':scope > .overlay';
+
+/**
+ * `#turnGate` ("Turn your phone sideways") over the table and the curtain on a phone held upright
+ * (shell.ts `gateOpen`), until the phone turns or "Play upright". Painted by the boot after the
+ * game's own paint (boot.ts `repaint`), so no game's render.ts repeats it; a page without the gate
+ * (gin's, briscola's) is left alone, so every lookup is `byId`. No media query paints it: the App
+ * holds the orientation (`viewport/portrait`), so a test can assert it and a fine-pointer page
+ * never sees it. While it is up, `inert` on `#app` and on every other `.overlay` body child (the
+ * curtain, whose Roll button would otherwise take a tap through the upright board; the result,
+ * rules, history and menu sheets; the leave confirm), never the gate itself and never `#toast`,
+ * which is no overlay and sits above it (z 100 over 90); found by a query, not a list, because
+ * each game's overlays differ (Safari 15.5+, Chrome 102+ honour `inert`; where it is missing the
+ * gate is still a fixed overlay with `aria-modal`); both gone when it hides. A dialog takes focus:
+ * on the paint that shows it, `#turnGateKeepBtn` (its one control; the button just tapped sits
+ * inside inert `#app` and would keep focus otherwise, a screen reader silent, a keyboard
+ * stranded), and on the paint that hides it that button lets go (a blur on an unfocused element
+ * does nothing, so this is "if focus is inside the gate"). Every other paint leaves focus alone.
+ */
+export const paintGate = (doc: PageLike, open: boolean): void => {
+  const gate = byId(doc, GATE_ID);
+  if (gate === null) return;
+  const wasOpen = !hasClass(gate, 'hidden');
+  toggleClass(gate, 'hidden', !open);
+  const app = byId(doc, 'app');
+  [
+    ...(app === null ? [] : [app]),
+    ...queryAllIn(doc.body, OVERLAYS).filter((el) => el.id !== GATE_ID),
+  ].forEach((el) => {
+    setAttr(el, 'inert', open ? '' : null);
+  });
+  const keep = byId(doc, GATE_KEEP_ID);
+  if (keep === null) return;
+  if (open && !wasOpen) focusElement(keep);
+  if (!open && wasOpen) blurElement(keep);
 };
 
 /**

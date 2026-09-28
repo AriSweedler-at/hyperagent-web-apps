@@ -18,25 +18,28 @@ import { badSoundFontMsg, isSoundFont, type SoundFontName } from '../lib/sound/f
 import type { GuestEvents } from '../net/guest.ts';
 import type { HostEvents } from '../net/host.ts';
 import { ruleFromHash } from '../ui/glossary.ts';
-import type {
-  Ctx,
-  Cue,
-  Effect,
-  EphemeralOf,
-  GuestContextOf,
-  GuestFrameOf,
-  HomeSnapshot,
-  HostContextOf,
-  HostFrameOf,
-  Intent,
-  ScreenId,
-  SeatOf,
-  ShellApp,
-  ShellTypes,
-  TimerId,
+import {
+  gateOpen,
+  type Ctx,
+  type Cue,
+  type Effect,
+  type EphemeralOf,
+  type GateConfig,
+  type GateState,
+  type GuestContextOf,
+  type GuestFrameOf,
+  type HomeSnapshot,
+  type HostContextOf,
+  type HostFrameOf,
+  type Intent,
+  type ScreenId,
+  type SeatOf,
+  type ShellApp,
+  type ShellTypes,
+  type TimerId,
 } from '../ui/shell.ts';
 import type { ShellEffectDeps } from '../ui/shellEffects.ts';
-import type { ToastMarks } from '../ui/shellPaint.ts';
+import { paintGate, type ToastMarks } from '../ui/shellPaint.ts';
 import { createTimers, createToaster, type Toast } from '../ui/toast.ts';
 import type { CuePlayer, CuePlayerDeps } from './cuePlayer.ts';
 import type { DocumentLike, PageLike } from './dom.ts';
@@ -50,7 +53,7 @@ import {
 } from './fx.ts';
 import { bindJargon, revealRule } from './glossary.ts';
 import { joinCodeFrom, withoutJoin } from './invite.ts';
-import type { MediaQueryListLike } from './media.ts';
+import { LANDSCAPE_PHONE, PORTRAIT_PHONE, watchMedia, type MediaQueryListLike } from './media.ts';
 import { reducedMotion } from './motion.ts';
 import { browserNetDeps } from './netDeps.ts';
 import type { NetDeps } from './peer.ts';
@@ -224,13 +227,18 @@ export const sessionEvents = <G, H, S extends number = number>(
 /** A game's type bag with the store the edge builds (web/shared/edge/storage.ts): what `bootShell` reads of it. */
 export type BootTypes = ShellTypes & Readonly<{ Store: Store }>;
 
-/** What the boot reads of an App: the font every cue plays in, my view (the hook's `legal()`) and the finished games (the hook's `recentGames()`). */
+/**
+ * What the boot reads of an App: the font every cue plays in, my view (the hook's `legal()`), the
+ * finished games (the hook's `recentGames()`) and, for a game that plays sideways, what the turn
+ * gate reads (shell.ts `gateOpen`: the screen, the orientation, the dismissal).
+ */
 export type BootApp<G extends BootTypes> = Readonly<{
   shell: Readonly<{
     soundFont: SoundFontName;
     view: G['View'] | null;
     recentGames: ReadonlyArray<RecentGame>;
-  }>;
+  }> &
+    GateState<G>;
 }>;
 
 /**
@@ -263,8 +271,9 @@ export type BootWindowLike = InviteWindowLike &
     webkitAudioContext?: new () => unknown;
     /**
      * `matchMedia('(pointer: coarse)')`: a phone or tablet, where sound starts muted
-     * (sound-fonts.md §12); handed on through `BootCtx.matchMedia` for a game's own watcher
-     * (web/shared/edge/media.ts `watchMedia`: backgammon's turn gate).
+     * (sound-fonts.md §12); the two phone predicates of a game that plays sideways
+     * (web/shared/edge/media.ts `watchMedia` on `PORTRAIT_PHONE` and `LANDSCAPE_PHONE`, `cfg.shell`
+     * below); handed on through `BootCtx.matchMedia` for a game's own watcher.
      */
     matchMedia?: (query: string) => MediaQueryListLike;
   }>;
@@ -418,6 +427,13 @@ export type BootConfig<
   legal: (view: G['View']) => ReadonlyArray<G['Action']>;
   /** The game's own effect adapters beside the shell's (`Ex`): gin's `scorer` and `copy`; `{}` for backgammon. */
   deps: Ex;
+  /**
+   * The game's shell config, for what the boot reads of it (shell.ts `GateConfig`: a `ShellConfig`
+   * fits): with `orientation: 'landscape'` the boot watches the two phone predicates into the
+   * reducer (`viewport/portrait`, `viewport/landscape`) and paints the turn gate after every paint
+   * (shellPaint.ts `paintGate` over `gateOpen`). Absent, or without the orientation: nothing of it.
+   */
+  shell?: GateConfig<G>;
   hooks?: Readonly<{
     /** Before every home read: gin drops a stored card back that names no preset. */
     home?: (store: G['Store']) => void;
@@ -526,8 +542,13 @@ export const bootShell = <
   // (web/shared/edge/netDeps.ts) read the ?peer= hook and wake the sessions on visibility/online.
   const netDeps: NetDeps = browserNetDeps({ search: win.location.search, debug: cfg.game.debug });
 
+  /** The game plays sideways (docs/design/shared-shell.md "Playing sideways"): the watchers and the gate. */
+  const shell = cfg.shell;
+  const sideways = shell?.orientation === 'landscape';
   const repaint = (): void => {
     cfg.paint.paint(doc, app);
+    // The shared half of the paint: the turn gate over the game's own, from the App alone.
+    if (sideways) paintGate(doc, gateOpen(app.shell, shell));
   };
 
   const dispatch = (intent: Intent<G>): void => {
@@ -653,6 +674,16 @@ export const bootShell = <
     dispatch({ type: 'rules/show', rule });
   });
   cfg.hooks?.bind?.(ctx);
+  // A game that plays sideways: the phone's orientation into the App, now and on every turn of
+  // the phone (media.ts `watchMedia` reports nothing on a page without `matchMedia`).
+  if (sideways) {
+    watchMedia(ctx, PORTRAIT_PHONE, (portrait) => {
+      dispatch({ type: 'viewport/portrait', portrait });
+    });
+    watchMedia(ctx, LANDSCAPE_PHONE, (landscape) => {
+      dispatch({ type: 'viewport/landscape', landscape });
+    });
+  }
   cfg.paint.paintSound(doc, fx.enabled());
   // Browsers only let audio start after a user gesture: warm the context on the first tap, and
   // the table's samples in the App's font with it (cuePlayer.ts `warm`), so no phrase waits.

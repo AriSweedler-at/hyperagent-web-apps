@@ -65,6 +65,9 @@ export const parseVariant = (raw: string | undefined, fallback: ShippedVariant):
 
 export const BACKGAMMON_SHELL: ShellGameData<Backgammon> = {
   id: 'backgammon',
+  // The flat board is played with the phone sideways (docs/design/backgammon-landscape.md): the
+  // shell watches the orientation and asks for a turn of the phone at the table (its turn gate).
+  orientation: 'landscape',
   names: { default: DEFAULT_NAME },
   localNames: LOCAL_NAMES,
   tabs: { list: HOME_TABS, default: DEFAULT_HOME_TAB },
@@ -99,6 +102,8 @@ export const BACKGAMMON_SHELL: ShellGameData<Backgammon> = {
     apply: applyAction,
     viewFor,
     over: (view) => view.matchOver,
+    // The result sheet (design §4.11): one game over inside the match, read upright, not gated.
+    gameOver: (view) => view.phase === 'over',
     finished: (game) => matchOver(game.match),
     names: (game) => [game.players[0].name, game.players[1].name],
     /** `game.players[1].name = name` on a rejoin. */

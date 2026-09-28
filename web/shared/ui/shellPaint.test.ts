@@ -13,6 +13,7 @@ import {
   connDotView,
   hideToast,
   paintConnDot,
+  paintGate,
   paintHandoff,
   paintScreen,
   paintSheet,
@@ -457,5 +458,75 @@ describe('paintConnDot', () => {
     paintConnDot(p.doc, 'connDot', { connected: false, hidden: true });
     expect(p.get('connDot').attr('class')).toBe('conn-dot off hidden');
     expect(p.get('connDot').attr('title')).toBe('Disconnected');
+  });
+});
+
+describe('paintGate (docs/design/backgammon-landscape.md §5D; the shell`s, for a page that plays sideways)', () => {
+  /** A page as page.html lays it out: `#app`, then the overlays as body children, the gate among them; `#toast` is no overlay. */
+  const gatedPage = (): FakePage => {
+    const app = fakeEl('app');
+    const curtain = fakeEl('curtainOverlay', { classes: ['overlay', 'curtain', 'hidden'] });
+    const rules = fakeEl('rulesOverlay', { classes: ['overlay', 'hidden'] });
+    const gate = fakeEl('turnGate', { classes: ['overlay', 'hidden'] });
+    const keep = fakeEl('turnGateKeepBtn', { classes: ['btn'] });
+    return fakePage(
+      [app, curtain, rules, gate, keep, fakeEl('toast')],
+      fakeEl('body', { queries: { ':scope > .overlay': [curtain, gate, rules] } }),
+    );
+  };
+
+  test('open: the gate shows, #app and every other overlay body child are inert (never the gate, never the toast), focus on Play upright; a repaint leaves focus; closed: all of it gone and the button let go', () => {
+    const p = gatedPage();
+    paintGate(p.doc, false);
+    expect(p.get('turnGate').hidden()).toBe(true);
+    ['app', 'curtainOverlay', 'rulesOverlay', 'turnGate', 'toast'].forEach((id) => {
+      expect(p.get(id).attr('inert'), id).toBeNull();
+    });
+    expect(p.get('turnGateKeepBtn').focused()).toBe(false);
+    paintGate(p.doc, true);
+    expect(p.get('turnGate').hidden()).toBe(false);
+    ['app', 'curtainOverlay', 'rulesOverlay'].forEach((id) => {
+      expect(p.get(id).attr('inert'), id).toBe('');
+    });
+    expect(p.get('turnGate').attr('inert')).toBeNull();
+    expect(p.get('toast').attr('inert')).toBeNull();
+    expect(p.get('turnGateKeepBtn').focused()).toBe(true);
+    // The curtain's own hidden class is not the gate's business.
+    expect(p.get('curtainOverlay').hidden()).toBe(true);
+    // A repaint while open: nothing moves, focus is left where the user put it.
+    p.get('turnGateKeepBtn').el.blur();
+    paintGate(p.doc, true);
+    expect(p.get('turnGateKeepBtn').focused()).toBe(false);
+    p.get('turnGateKeepBtn').el.focus();
+    paintGate(p.doc, false);
+    expect(p.get('turnGate').hidden()).toBe(true);
+    ['app', 'curtainOverlay', 'rulesOverlay'].forEach((id) => {
+      expect(p.get(id).attr('inert'), id).toBeNull();
+    });
+    expect(p.get('turnGateKeepBtn').focused()).toBe(false);
+  });
+
+  test('a page without the gate (gin`s, briscola`s) is left alone; one with the gate but no #app or button still paints what it has', () => {
+    const app = fakeEl('app');
+    const rules = fakeEl('rulesOverlay', { classes: ['overlay', 'hidden'] });
+    const plain = fakePage(
+      [app, rules],
+      fakeEl('body', { queries: { ':scope > .overlay': [rules] } }),
+    );
+    paintGate(plain.doc, true);
+    expect(plain.get('app').attr('inert')).toBeNull();
+    expect(plain.get('rulesOverlay').attr('inert')).toBeNull();
+    // The gate alone (a story page): shown and inert set on the overlays it finds; no button to focus.
+    const gate = fakeEl('turnGate', { classes: ['overlay', 'hidden'] });
+    const bare = fakePage(
+      [gate, rules],
+      fakeEl('body', { queries: { ':scope > .overlay': [gate, rules] } }),
+    );
+    paintGate(bare.doc, true);
+    expect(bare.get('turnGate').hidden()).toBe(false);
+    expect(bare.get('rulesOverlay').attr('inert')).toBe('');
+    paintGate(bare.doc, false);
+    expect(bare.get('turnGate').hidden()).toBe(true);
+    expect(bare.get('rulesOverlay').attr('inert')).toBeNull();
   });
 });

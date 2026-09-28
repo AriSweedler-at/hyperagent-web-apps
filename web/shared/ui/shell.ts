@@ -271,6 +271,22 @@ export type ShellState<G extends ShellTypes> = Readonly<{
   /** The second player's name as last read from its key or typed. */
   p2Name: string;
   screen: ScreenId<G>;
+  /**
+   * The device is a phone held upright right now (web/shared/edge/media.ts `PORTRAIT_PHONE`, from
+   * the boot's matchMedia watcher as `viewport/portrait`, at boot and on every turn of the phone;
+   * only a game whose `cfg.orientation` is `'landscape'` is watched): a fact about the device, so
+   * no reset touches it. What `gateOpen` reads.
+   */
+  portraitPhone: boolean;
+  /** The mirror: a phone held sideways (`LANDSCAPE_PHONE`, `viewport/landscape`); a fact about the device too. */
+  landscapePhone: boolean;
+  /**
+   * `#turnGateKeepBtn` "Play upright": the turn gate stays down for this table. Dropped where the
+   * shell resets the table for a new one (a pass-and-play start, the handoff, a leave: the
+   * `cfg.table.reset` sites for `startLocal`, `handoff` and `leave`) and kept where the same table
+   * stays up (the host lost mid-match, `lost`: the same table does not ask twice).
+   */
+  gateDismissed: boolean;
   /** The `netAttempt` ticket: bumped by every start, cancel and leave. */
   netAttempt: number;
   hostStatus: WaitStatus;
@@ -415,17 +431,26 @@ export type ShellIntent<G extends ShellTypes> =
   | Readonly<{ type: 'leave/finish' }>
   /** The page became visible: the wake lock is taken again while in a game. */
   | Readonly<{ type: 'visible' }>
+  // ---- playing sideways (docs/design/shared-shell.md "Playing sideways"; a game with `cfg.orientation`) ----
+  /** The boot's matchMedia watcher on `PORTRAIT_PHONE` (web/shared/edge/media.ts): at boot and on every turn of the phone. */
+  | Readonly<{ type: 'viewport/portrait'; portrait: boolean }>
+  /** The boot's watcher on `LANDSCAPE_PHONE`. */
+  | Readonly<{ type: 'viewport/landscape'; landscape: boolean }>
+  /** `#turnGateKeepBtn` "Play upright": the turn gate stays down for this table. */
+  | Readonly<{ type: 'gate/keep' }>
   /** The hook's `render()`. */
   | Readonly<{ type: 'render' }>
   /** A session asked the app to persist. */
   | Readonly<{ type: 'persist' }>;
 
 /**
- * The shell's half of a game's `Intent` union: 45 types, backgammon's 38 less its two option
+ * The shell's half of a game's `Intent` union: 48 types, backgammon's 38 less its two option
  * selects (`variant/set`, `matchLength/set`, its own) plus the seven both games kept on the table
  * side after C1 (the curtain reveal, the leave flow, `visible`, `render`, `persist`), plus
  * `position/load`, backgammon's `sandbox/load` generalised (dry-round-2.md F5), plus
- * `resume/auto`, the boot's lobby resume (lobby-resume.md D4).
+ * `resume/auto`, the boot's lobby resume (lobby-resume.md D4), plus the three of playing sideways
+ * (`viewport/portrait`, `viewport/landscape`, `gate/keep`: backgammon's turn gate lifted here,
+ * docs/design/backgammon-landscape.md §5D).
  */
 export const SHELL_INTENT_TYPES = [
   'home/init',
@@ -471,6 +496,9 @@ export const SHELL_INTENT_TYPES = [
   'leave/confirmed',
   'leave/finish',
   'visible',
+  'viewport/portrait',
+  'viewport/landscape',
+  'gate/keep',
   'render',
   'persist',
 ] as const satisfies ReadonlyArray<ShellIntent<ShellTypes>['type']>;
@@ -650,6 +678,15 @@ export type ShellPrefs<G extends ShellTypes> = Readonly<{
 export type ShellConfig<G extends ShellTypes> = Readonly<{
   /** The peer prefix and the room-code spec (web/shared/lib/roomCode.ts). */
   id: Game;
+  /**
+   * The game is played with the phone sideways (backgammon's flat board,
+   * docs/design/backgammon-landscape.md; docs/design/shared-shell.md "Playing sideways"): the boot
+   * watches `PORTRAIT_PHONE` and `LANDSCAPE_PHONE` (web/shared/edge/media.ts) into
+   * `portraitPhone`/`landscapePhone`, and the turn gate (`gateOpen`, shellPaint.ts `paintGate`,
+   * the page's `gateMarkup`) asks for a turn of the phone at the table. Absent (gin, briscola):
+   * nothing is watched, no gate, the upright home as it is.
+   */
+  orientation?: 'landscape';
   names: Readonly<{
     /** The host name an empty input means, and the prefill of every name input. */
     default: string;
@@ -737,6 +774,12 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     viewFor: (game: G['State'], seat: SeatOf<G>) => G['View'];
     /** The view shows the game over: nothing to rejoin, nobody to toast for. */
     over: (view: G['View']) => boolean;
+    /**
+     * The view shows one game over while the match goes on (backgammon's result sheet, a card of
+     * text over a board nobody plays: `phase === 'over'`), read upright and not gated (`gateOpen`);
+     * absent, a game is over only when `over` says so.
+     */
+    gameOver?: (view: G['View']) => boolean;
     /** The saved game is over: not offered to resume. */
     finished: (game: G['State']) => boolean;
     /** The two seats' names, for the handoff (seat 0 hosts, seat 1 joins). */
@@ -905,6 +948,37 @@ export const withTable = <G extends ShellTypes>(
   app: ShellApp<G>,
   over: Partial<G['Table']>,
 ): ShellApp<G> => ({ ...app, table: { ...app.table, ...over } });
+
+// ---- playing sideways: the turn gate (docs/design/backgammon-landscape.md §5D) ------------------
+
+/** What `gateOpen` reads of the shell: the screen, the view, the orientation and the dismissal. */
+export type GateState<G extends ShellTypes> = Pick<
+  ShellState<G>,
+  'screen' | 'view' | 'portraitPhone' | 'gateDismissed'
+>;
+/** What `gateOpen` reads of the config: the opt-in and the two over predicates; a `ShellConfig` fits. */
+export type GateConfig<G extends ShellTypes> = Readonly<{
+  orientation?: 'landscape';
+  engine: Pick<ShellConfig<G>['engine'], 'over' | 'gameOver'>;
+}>;
+
+/**
+ * The turn gate is up (shellPaint.ts `paintGate`, painted by the boot after the game's own paint):
+ * in a game that plays sideways, at the table, on a phone held upright, while a game is on, until
+ * the phone turns or "Play upright" for this table. The home, the waiting rooms and the endgame
+ * stay upright-friendly, and so does a finished game (`engine.over`, or `engine.gameOver` where the
+ * game has one: backgammon's result sheet, read fine upright and handed over upright; the next
+ * game's first curtain brings the gate back). Not a modal in the reducer's sense: taps still
+ * reduce; `inert` on the DOM is the guard.
+ */
+export const gateOpen = <G extends ShellTypes>(s: GateState<G>, cfg: GateConfig<G>): boolean =>
+  cfg.orientation === 'landscape' &&
+  s.screen === 'tableScreen' &&
+  s.view !== null &&
+  !cfg.engine.over(s.view) &&
+  cfg.engine.gameOver?.(s.view) !== true &&
+  s.portraitPhone &&
+  !s.gateDismissed;
 
 /** `(value.trim() || fallback).slice(0, 20)`. */
 const nameOr = (raw: string, fallback: string): string => {
@@ -1305,6 +1379,7 @@ export const localSeated = <G extends ShellTypes>(
       mySeat: 0,
       localNames,
       localSeats: localNames.map((_, i) => i as SeatOf<G>),
+      gateDismissed: false,
     },
     table: cfg.table.reset(app.table, 'startLocal'),
   };
@@ -1342,7 +1417,7 @@ const loadPosition = <G extends ShellTypes>(
   const game = decoded.value;
   return localBroadcast(
     {
-      shell: { ...app.shell, game, revealed: cfg.local.revealer(game).seat },
+      shell: { ...app.shell, game, revealed: cfg.local.revealer(game).seat, gateDismissed: false },
       table: cfg.table.reset(app.table, 'startLocal'),
     },
     true,
@@ -1780,6 +1855,7 @@ const handoff = <G extends ShellTypes>(
           handoff: true,
           localNames: [],
           localSeats: [],
+          gateDismissed: false,
         },
         table: cfg.table.reset(app.table, 'handoff'),
       },
@@ -1791,7 +1867,7 @@ const handoff = <G extends ShellTypes>(
   );
 };
 
-/** `leaveGame()` after the confirm and the network close: the reset (the cue memory too: it belonged to the game left), then home. */
+/** `leaveGame()` after the confirm and the network close: the reset (the cue memory too, and the gate's dismissal: both belonged to the game left), then home. */
 const leaveFinish = <G extends ShellTypes>(app: ShellApp<G>, cfg: ShellConfig<G>): Step<G> =>
   step(
     {
@@ -1813,6 +1889,7 @@ const leaveFinish = <G extends ShellTypes>(app: ShellApp<G>, cfg: ShellConfig<G>
         seatedName: null,
         localNames: [],
         localSeats: [],
+        gateDismissed: false,
       },
       table: cfg.table.reset(app.table, 'leave'),
     },
@@ -2117,6 +2194,13 @@ export const reduceShell = <G extends ShellTypes>(
       return leaveFinish(app, cfg);
     case 'visible':
       return s.role === null ? pure(app) : step(app, { type: 'wakeLock', hold: true });
+    // The paint follows (the boot paints after every intent that changes the App): the gate is `gateOpen`'s.
+    case 'viewport/portrait':
+      return pure(withShell(app, { portraitPhone: intent.portrait }));
+    case 'viewport/landscape':
+      return pure(withShell(app, { landscapePhone: intent.landscape }));
+    case 'gate/keep':
+      return pure(withShell(app, { gateDismissed: true }));
     case 'render':
       return painted(app, s.view, ctx, cfg);
     case 'persist':
@@ -2148,6 +2232,9 @@ export const initialShell = <G extends ShellTypes>(cfg: ShellConfig<G>): ShellSt
   p1Name: '',
   p2Name: '',
   screen: 'homeScreen',
+  portraitPhone: false,
+  landscapePhone: false,
+  gateDismissed: false,
   netAttempt: 0,
   hostStatus: { text: cfg.copy.opening, pulse: true },
   guestStatus: { text: CONNECTING_MSG, pulse: true },
