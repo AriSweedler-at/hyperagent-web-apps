@@ -29,6 +29,8 @@ import {
   LOST_HOST_MSG,
   OPPONENT_LEFT_MSG,
   ROOM_FULL_MSG,
+  ROTATION_HINT_MS,
+  ROTATION_HINT_MSG,
   SANDBOX_LOCAL_ONLY_MSG,
   SHELL_EFFECT_TYPES,
   SHELL_INTENT_TYPES,
@@ -65,6 +67,7 @@ import {
   userSeatOf,
   withShell,
   withTable,
+  type Ctx,
   type CueMemory,
   type Effect,
   type HomeSnapshot,
@@ -331,16 +334,24 @@ const NOW = 1_700_000_000_000;
 const ctx = { rng: mulberry32(7), now: () => NOW };
 const initialApp: App = { shell: initialShell(FAKE), table: FAKE.table.initial };
 
-/** Dispatch shell intents in turn, collecting every effect. */
-const run = (app: App, ...intents: ReadonlyArray<FakeIntent>): FakeStep =>
+/** Dispatch shell intents in turn under `c` and `cfg`, collecting every effect (the rotation hint reads `ctx.canLock` and `cfg.orientation`). */
+const runIn = (
+  c: Ctx,
+  cfg: ShellConfig<Fake>,
+  app: App,
+  ...intents: ReadonlyArray<FakeIntent>
+): FakeStep =>
   intents.reduce<FakeStep>(
     (s, intent) => {
       if (!isShellIntent(intent)) throw new Error(`not a shell intent: ${intent.type}`);
-      const next = reduceShell(s.app, intent, ctx, FAKE);
+      const next = reduceShell(s.app, intent, c, cfg);
       return { app: next.app, effects: [...s.effects, ...next.effects] };
     },
     { app, effects: [] },
   );
+/** Dispatch shell intents in turn over FAKE, collecting every effect. */
+const run = (app: App, ...intents: ReadonlyArray<FakeIntent>): FakeStep =>
+  runIn(ctx, FAKE, app, ...intents);
 const kinds = (effects: ReadonlyArray<FakeEffect>): ReadonlyArray<string> =>
   effects.map((e) => e.type);
 const toasts = (effects: ReadonlyArray<FakeEffect>): ReadonlyArray<unknown> =>
@@ -1011,6 +1022,7 @@ describe('the initial shell and the partitions', () => {
       portraitPhone: false,
       landscapePhone: false,
       gateDismissed: false,
+      rotationHintShown: false,
       netAttempt: 0,
       hostStatus: { text: 'Opening…', pulse: true },
       guestStatus: { text: CONNECTING_MSG, pulse: true },
@@ -3016,13 +3028,14 @@ describe('runShellEffect', () => {
 
 // ---- playing sideways: the turn gate (docs/design/backgammon-landscape.md §5D; shared-shell.md "Playing sideways") ----
 
+/** FAKE opted in, as backgammon's config is: sideways, with a result sheet (`gameOver`) at seven moves. */
+const SIDEWAYS: ShellConfig<Fake> = {
+  ...FAKE,
+  orientation: 'landscape',
+  engine: { ...FAKE.engine, gameOver: (view) => view.moves === 7 },
+};
+
 describe('the turn gate: the shell holds the orientation and the dismissal, gateOpen reads them against the config', () => {
-  /** FAKE opted in, as backgammon's config is: sideways, with a result sheet (`gameOver`) at seven moves. */
-  const SIDEWAYS: ShellConfig<Fake> = {
-    ...FAKE,
-    orientation: 'landscape',
-    engine: { ...FAKE.engine, gameOver: (view) => view.moves === 7 },
-  };
   const gate = (app: App, cfg: ShellConfig<Fake> = SIDEWAYS): boolean => gateOpen(app.shell, cfg);
 
   test('the initial shell is upright-agnostic and undismissed; the three intents are shell intents, pure, and set their one field', () => {
@@ -3135,5 +3148,166 @@ describe('the turn gate: the shell holds the orientation and the dismissal, gate
     ).app;
     expect(doneLost.shell).toMatchObject({ screen: 'guestWaitScreen', gateDismissed: true });
     expect(gate(doneLost)).toBe(false);
+  });
+});
+
+describe("the rotation hint: lock the phone's rotation, once per table, sideways, on a device that can (the owner, 2026-09-28)", () => {
+  /** A device whose `screen.orientation.lock` is a function (Android's Chromium family), as the boot reads it into the ctx. */
+  const LOCKABLE: Ctx = { ...ctx, canLock: true };
+  const hints = (effects: ReadonlyArray<FakeEffect>): number =>
+    effects.filter((e) => e.type === 'toast' && e.message === ROTATION_HINT_MSG).length;
+  const HINT = [ROTATION_HINT_MSG, ROTATION_HINT_MS] as const;
+  const init: FakeIntent = { type: 'home/init', home };
+  const sideways: FakeIntent = { type: 'viewport/landscape', landscape: true };
+  const start: FakeIntent = { type: 'local/click', p1: 'Ann', p2: 'Bob', level: '2' };
+  const joined: ReadonlyArray<FakeIntent> = [
+    { type: 'join/click', name: 'Bo', code: 'ABCD' },
+    { type: 'guest/connected' },
+  ];
+  const stateFrame = (game: State): FakeIntent => ({
+    type: 'guest/frame',
+    frame: { t: 'state', view: viewFor(game, 1) },
+  });
+
+  test('the initial shell has not shown it; the first paint at the table with the phone sideways toasts it once, for 8 s, and marks the shell, in every role: pass-and-play at the start, the host at the deal, the guest at its first state frame', () => {
+    expect(initialApp.shell.rotationHintShown).toBe(false);
+    const local = runIn(LOCKABLE, SIDEWAYS, initialApp, init, sideways, start);
+    expect(toasts(local.effects)).toContainEqual(HINT);
+    expect(hints(local.effects)).toBe(1);
+    expect(local.app.shell).toMatchObject({ screen: 'tableScreen', rotationHintShown: true });
+    // The host: the waiting room is not the table; the deal's paint is.
+    const host = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      initialApp,
+      init,
+      sideways,
+      { type: 'host/click', name: 'Ann', level: '3' },
+      { type: 'host/frame', frame: { t: 'join', name: 'Jeff' } },
+    );
+    expect(hints(host.effects)).toBe(0);
+    expect(host.app.shell).toMatchObject({ screen: 'hostWaitScreen', rotationHintShown: false });
+    const deal = runIn(LOCKABLE, SIDEWAYS, host.app, { type: 'host/deal' });
+    expect(toasts(deal.effects)).toEqual([HINT]);
+    expect(deal.app.shell).toMatchObject({ screen: 'tableScreen', rotationHintShown: true });
+    // The guest: the first `state` frame paints its table.
+    const guest = runIn(LOCKABLE, SIDEWAYS, initialApp, sideways, ...joined);
+    expect(hints(guest.effects)).toBe(0);
+    const framed = runIn(LOCKABLE, SIDEWAYS, guest.app, stateFrame(dealt));
+    expect(toasts(framed.effects)).toEqual([HINT]);
+    expect(framed.app.shell).toMatchObject({
+      role: 'guest',
+      screen: 'tableScreen',
+      rotationHintShown: true,
+    });
+  });
+
+  test('never on a device that cannot lock (every iPhone: no `canLock`), never in a game that stays upright (no `orientation`), never with the phone upright or unreported; nothing is marked', () => {
+    const iphone = runIn(ctx, SIDEWAYS, initialApp, init, sideways, start);
+    expect(hints(iphone.effects)).toBe(0);
+    expect(iphone.app.shell).toMatchObject({
+      screen: 'tableScreen',
+      landscapePhone: true,
+      rotationHintShown: false,
+    });
+    const upright = runIn(LOCKABLE, FAKE, initialApp, init, sideways, start);
+    expect(hints(upright.effects)).toBe(0);
+    expect(upright.app.shell.rotationHintShown).toBe(false);
+    expect(hints(runIn(LOCKABLE, SIDEWAYS, initialApp, init, start).effects)).toBe(0);
+    const held = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      initialApp,
+      init,
+      { type: 'viewport/portrait', portrait: true },
+      { type: 'viewport/landscape', landscape: false },
+      start,
+    );
+    expect(hints(held.effects)).toBe(0);
+    expect(held.app.shell.rotationHintShown).toBe(false);
+  });
+
+  test('never on the home or in a waiting room: the turn of the phone there is remembered and the hint waits for the table; a table that came up upright (the gate up) gets it at the turn of the phone, before any move, and a second turn brings nothing', () => {
+    const atHome = runIn(LOCKABLE, SIDEWAYS, initialApp, init, sideways);
+    expect(hints(atHome.effects)).toBe(0);
+    expect(atHome.app.shell).toMatchObject({
+      screen: 'homeScreen',
+      landscapePhone: true,
+      rotationHintShown: false,
+    });
+    // Upright at the start: the gate, no hint yet.
+    const gated = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      initialApp,
+      init,
+      { type: 'viewport/portrait', portrait: true },
+      start,
+    );
+    expect(hints(gated.effects)).toBe(0);
+    expect(gateOpen(gated.app.shell, SIDEWAYS)).toBe(true);
+    // The turn: the gate goes and the hint comes, by itself.
+    const turned = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      gated.app,
+      { type: 'viewport/portrait', portrait: false },
+      sideways,
+    );
+    expect(toasts(turned.effects)).toEqual([HINT]);
+    expect(gateOpen(turned.app.shell, SIDEWAYS)).toBe(false);
+    expect(turned.app.shell.rotationHintShown).toBe(true);
+    // Upright and back: shown once for this table.
+    const again = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      turned.app,
+      { type: 'viewport/landscape', landscape: false },
+      sideways,
+    );
+    expect(hints(again.effects)).toBe(0);
+  });
+
+  test('never twice at one table: later paints (the curtain, a render, a frame) toast nothing more, and the host lost mid-match keeps the mark with the table', () => {
+    const local = runIn(LOCKABLE, SIDEWAYS, initialApp, init, sideways, start).app;
+    const played = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      local,
+      { type: 'curtain/reveal' },
+      { type: 'render' },
+      { type: 'curtain/reveal' },
+    );
+    expect(hints(played.effects)).toBe(0);
+    expect(played.app.shell.rotationHintShown).toBe(true);
+    const guest = runIn(LOCKABLE, SIDEWAYS, initialApp, sideways, ...joined, stateFrame(dealt)).app;
+    const more = runIn(LOCKABLE, SIDEWAYS, guest, stateFrame({ ...dealt, moves: 1, turn: 1 }), {
+      type: 'guest/lost',
+    });
+    expect(toasts(more.effects)).toEqual([[LOST_HOST_MSG, GONE_TOAST_MS]]);
+    expect(more.app.shell).toMatchObject({ screen: 'tableScreen', rotationHintShown: true });
+  });
+
+  test('again where the gate`s dismissal drops: a leave then a start, a position loaded, and the handoff (the next table asks once more)', () => {
+    const local = runIn(LOCKABLE, SIDEWAYS, initialApp, init, sideways, start).app;
+    const left = runIn(LOCKABLE, SIDEWAYS, local, { type: 'leave/finish' }, init);
+    expect(hints(left.effects)).toBe(0);
+    expect(left.app.shell).toMatchObject({
+      screen: 'homeScreen',
+      landscapePhone: true,
+      rotationHintShown: false,
+    });
+    const restarted = runIn(LOCKABLE, SIDEWAYS, left.app, start);
+    expect(toasts(restarted.effects)).toEqual([HINT]);
+    // A position loaded starts the table over (dry-round-2.md F5): it asks again.
+    const loaded = runIn(LOCKABLE, SIDEWAYS, restarted.app, {
+      type: 'position/load',
+      state: dealt,
+    });
+    expect(toasts(loaded.effects)).toEqual([HINT]);
+    // The handoff: the table's marks go with the table; the room's first paint at the table asks again.
+    const handed = runIn(LOCKABLE, SIDEWAYS, loaded.app, { type: 'handoff/click' });
+    expect(hints(handed.effects)).toBe(0);
+    expect(handed.app.shell).toMatchObject({ role: 'host', rotationHintShown: false });
   });
 });

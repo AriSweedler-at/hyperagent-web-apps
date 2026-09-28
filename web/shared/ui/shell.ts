@@ -287,6 +287,12 @@ export type ShellState<G extends ShellTypes> = Readonly<{
    * stays up (the host lost mid-match, `lost`: the same table does not ask twice).
    */
   gateDismissed: boolean;
+  /**
+   * The rotation hint (`ROTATION_HINT_MSG`: lock the phone's rotation, Android's Auto-rotate) was
+   * toasted at this table. Once per table, so it goes where `gateDismissed` goes: dropped at the
+   * same four sites, kept on `lost`. Set by `rotationHint`, never by the player.
+   */
+  rotationHintShown: boolean;
   /** The `netAttempt` ticket: bumped by every start, cancel and leave. */
   netAttempt: number;
   hostStatus: WaitStatus;
@@ -434,7 +440,7 @@ export type ShellIntent<G extends ShellTypes> =
   // ---- playing sideways (docs/design/shared-shell.md "Playing sideways"; a game with `cfg.orientation`) ----
   /** The boot's matchMedia watcher on `PORTRAIT_PHONE` (web/shared/edge/media.ts): at boot and on every turn of the phone. */
   | Readonly<{ type: 'viewport/portrait'; portrait: boolean }>
-  /** The boot's watcher on `LANDSCAPE_PHONE`. */
+  /** The boot's watcher on `LANDSCAPE_PHONE`; at the table, where the rotation hint is due (`rotationHint`). */
   | Readonly<{ type: 'viewport/landscape'; landscape: boolean }>
   /** `#turnGateKeepBtn` "Play upright": the turn gate stays down for this table. */
   | Readonly<{ type: 'gate/keep' }>
@@ -631,6 +637,14 @@ export type Ctx = Readonly<{
   now: () => number;
   /** `prefers-reduced-motion: reduce` on this device (web/shared/edge/motion.ts), so a reducer's timers and the painter's CSS agree; absent in tests and stories that do not care. */
   reducedMotion?: boolean;
+  /**
+   * `screen.orientation.lock` is a function on this device (web/shared/edge/boot.ts reads it once,
+   * false without a `screen`): Android's Chromium family, where Quick Settings' Auto-rotate locks
+   * the phone as it is held; absent on every iPhone browser, whose one switch, Portrait
+   * Orientation Lock, would snap the page upright. What the rotation hint (`rotationHint`) asks;
+   * absent in tests and stories that do not care.
+   */
+  canLock?: boolean;
 }>;
 
 // ---- the config a game supplies (docs/design/shared-shell.md §4.3) ------------------------------
@@ -980,6 +994,44 @@ export const gateOpen = <G extends ShellTypes>(s: GateState<G>, cfg: GateConfig<
   s.portraitPhone &&
   !s.gateDismissed;
 
+/**
+ * The rotation hint (the owner, 2026-09-28: "can we give a warning to lock the phone's rotation
+ * in landscape mode if we haven't already?", "also important for solo play"): toasted once per
+ * table, in every role, the first time the shell paints the table with the phone sideways on a
+ * device that can lock its rotation (`Ctx.canLock`: `screen.orientation.lock` is a function,
+ * Android's Chromium family, where Quick Settings' Auto-rotate locks the phone as it is held; an
+ * iPhone has only Portrait Orientation Lock, which would snap the page upright, so it never sees
+ * the hint). The copy is Android's gesture; `ROTATION_HINT_MS` outlasts the default toast, since
+ * the player reaches for Quick Settings. No markup of its own: the shell's `toast`.
+ */
+export const ROTATION_HINT_MSG =
+  "Lock the phone's rotation so the board stays sideways: swipe down, tap Auto-rotate.";
+export const ROTATION_HINT_MS = 8000;
+
+/**
+ * The hint's step over an App just painted or just turned: the toast and the mark, or the App as
+ * it is. Read at every `painted` and at `viewport/landscape`, so a table that came up upright (the
+ * gate up) gets it at the turn of the phone, not at the next move. Silent once shown for this
+ * table (`rotationHintShown`), off the table, with the phone upright or unreported, on a device
+ * that cannot lock, and in a game that stays upright (no `cfg.orientation`).
+ */
+const rotationHint = <G extends ShellTypes>(
+  app: ShellApp<G>,
+  ctx: Ctx,
+  cfg: ShellConfig<G>,
+): Step<G> => {
+  const s = app.shell;
+  const due =
+    cfg.orientation === 'landscape' &&
+    s.screen === 'tableScreen' &&
+    s.landscapePhone &&
+    ctx.canLock === true &&
+    !s.rotationHintShown;
+  return due
+    ? step(withShell(app, { rotationHintShown: true }), toast(ROTATION_HINT_MSG, ROTATION_HINT_MS))
+    : pure(app);
+};
+
 /** `(value.trim() || fallback).slice(0, 20)`. */
 const nameOr = (raw: string, fallback: string): string => {
   const trimmed = raw.trim();
@@ -1262,13 +1314,17 @@ const recordResult = <G extends ShellTypes>(
   });
 };
 
-/** The game's `rendered` hook, then the finished game's record: every view change ends here. */
+/** The game's `rendered` hook, then the finished game's record, then the rotation hint where it is due: every view change ends here. */
 const painted = <G extends ShellTypes>(
   app: ShellApp<G>,
   prev: G['View'] | null,
   ctx: Ctx,
   cfg: ShellConfig<G>,
-): Step<G> => andThen(cfg.table.rendered(app, prev, ctx), (a) => recordResult(a, ctx, cfg));
+): Step<G> =>
+  andThen(
+    andThen(cfg.table.rendered(app, prev, ctx), (a) => recordResult(a, ctx, cfg)),
+    (a) => rotationHint(a, ctx, cfg),
+  );
 
 // ---- flows -------------------------------------------------------------------------------------
 
@@ -1380,6 +1436,7 @@ export const localSeated = <G extends ShellTypes>(
       localNames,
       localSeats: localNames.map((_, i) => i as SeatOf<G>),
       gateDismissed: false,
+      rotationHintShown: false,
     },
     table: cfg.table.reset(app.table, 'startLocal'),
   };
@@ -1417,7 +1474,13 @@ const loadPosition = <G extends ShellTypes>(
   const game = decoded.value;
   return localBroadcast(
     {
-      shell: { ...app.shell, game, revealed: cfg.local.revealer(game).seat, gateDismissed: false },
+      shell: {
+        ...app.shell,
+        game,
+        revealed: cfg.local.revealer(game).seat,
+        gateDismissed: false,
+        rotationHintShown: false,
+      },
       table: cfg.table.reset(app.table, 'startLocal'),
     },
     true,
@@ -1856,6 +1919,7 @@ const handoff = <G extends ShellTypes>(
           localNames: [],
           localSeats: [],
           gateDismissed: false,
+          rotationHintShown: false,
         },
         table: cfg.table.reset(app.table, 'handoff'),
       },
@@ -1890,6 +1954,7 @@ const leaveFinish = <G extends ShellTypes>(app: ShellApp<G>, cfg: ShellConfig<G>
         localNames: [],
         localSeats: [],
         gateDismissed: false,
+        rotationHintShown: false,
       },
       table: cfg.table.reset(app.table, 'leave'),
     },
@@ -2198,7 +2263,8 @@ export const reduceShell = <G extends ShellTypes>(
     case 'viewport/portrait':
       return pure(withShell(app, { portraitPhone: intent.portrait }));
     case 'viewport/landscape':
-      return pure(withShell(app, { landscapePhone: intent.landscape }));
+      // The turn of the phone at a table that came up upright is where the rotation hint is due.
+      return rotationHint(withShell(app, { landscapePhone: intent.landscape }), ctx, cfg);
     case 'gate/keep':
       return pure(withShell(app, { gateDismissed: true }));
     case 'render':
@@ -2235,6 +2301,7 @@ export const initialShell = <G extends ShellTypes>(cfg: ShellConfig<G>): ShellSt
   portraitPhone: false,
   landscapePhone: false,
   gateDismissed: false,
+  rotationHintShown: false,
   netAttempt: 0,
   hostStatus: { text: cfg.copy.opening, pulse: true },
   guestStatus: { text: CONNECTING_MSG, pulse: true },

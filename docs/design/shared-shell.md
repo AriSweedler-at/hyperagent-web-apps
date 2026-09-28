@@ -626,6 +626,18 @@ its board CSS and its layout twin:
    `position/load`, handoff and leave; kept when the host is lost mid-match, since the same table
    stays up. A game whose own flow ends a table past the shell (backgammon's `hostLeft`) drops it
    there too.
+   **The rotation hint** rides the same state (2026-09-28, the owner: "can we give a warning to
+   lock the phone's rotation in landscape mode if we haven't already?", "also important for solo
+   play"): the first time the shell paints the table with the phone sideways (`painted`, or the
+   `viewport/landscape` turn at a table that came up upright) on a device that can lock its
+   rotation, it toasts `ROTATION_HINT_MSG` ("Lock the phone's rotation so the board stays
+   sideways: swipe down, tap Auto-rotate.") for `ROTATION_HINT_MS` (8 s) and marks
+   `ShellState.rotationHintShown`, which drops and holds exactly where `gateDismissed` does, so
+   every role hears it once per table. The device test is a capability, never a user agent
+   (`Ctx.canLock`, read once by the boot as `typeof screen.orientation.lock === 'function'`):
+   Android's Chromium family has the function and Quick Settings' Auto-rotate locks the phone as
+   it is held; no iPhone browser has it, and its one switch, Portrait Orientation Lock, would snap
+   the page upright, so an iPhone never sees the hint. No markup, no class: the shell's `toast`.
 3. **The page**: `ShellPage.plays: 'landscape'` puts `data-plays="landscape"` on the composed
    `<body>` (`web/shared/markup/shell.ts` `bodyAttrsOf`, page.html `<body{{bodyAttrs}}>`), and
    `sheetsBefore` carries `gateMarkup(copy)` (the sheet, its two texts, "Go sideways" shipped

@@ -11,6 +11,14 @@
 // not. Taps, not clicks, on the gate's own controls under the touch context: a phone taps, and the
 // gate's copy asks for a hand on the phone. Page-only (e2e/fixtures/site.ts PAGE_ONLY_SPECS):
 // about the page, not its origin.
+//
+// The rotation hint (shell.ts `rotationHint`, the owner 2026-09-28: "give a warning to lock the
+// phone's rotation in landscape mode") rides the same gate flows: on a phone whose browser can lock
+// its rotation (`screen.orientation.lock` a function: Android's Chromium family, stubbed here
+// before the page loads, since headless Chromium is one), the first time the table is painted
+// sideways the shell toasts `ROTATION_HINT_MSG` once (8 s), not again this table, and again after
+// Leave and Start; with the function gone (every iPhone browser) or on the fine-pointer `player`
+// the toast never shows it.
 import type { Page } from '@playwright/test';
 
 import {
@@ -25,6 +33,7 @@ import {
 import { PHONE, PHONE_LANDSCAPE } from './fixtures/geometry.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
+import { ROTATION_HINT_MSG } from '../web/shared/ui/shell.ts';
 
 const gateUp = async (page: Page): Promise<void> => {
   await expect(page.locator('#turnGate')).toBeVisible();
@@ -36,6 +45,25 @@ const gateDown = async (page: Page): Promise<void> => {
   await expect(page.locator('#turnGate')).toBeHidden();
   await expect(page.locator('#app')).not.toHaveAttribute('inert');
   await expect(page.locator('#curtainOverlay')).not.toHaveAttribute('inert');
+};
+
+/**
+ * `screen.orientation.lock` before the page loads: a function (Android's Chromium family; headless
+ * Chromium has one too, so the positive case does not lean on that) or gone (every iPhone browser).
+ */
+const withLock = async (page: Page, present: boolean): Promise<void> => {
+  // A string, as the geometry scripts are: the e2e tsconfig has no DOM lib to name `ScreenOrientation`.
+  await page.addInitScript(
+    `Object.defineProperty(ScreenOrientation.prototype, 'lock', { value: ${present ? '() => Promise.resolve()' : 'undefined'}, configurable: true });`,
+  );
+};
+/** `#toast` is up with `text` (the `show` class: `#toast` keeps its text after it hides). */
+const toastUp = async (page: Page, text: string): Promise<void> => {
+  await expect(page.locator('#toast')).toHaveText(text);
+  await expect(page.locator('#toast')).toHaveClass(/\bshow\b/);
+};
+const toastDown = async (page: Page): Promise<void> => {
+  await expect(page.locator('#toast')).not.toHaveClass(/\bshow\b/);
 };
 
 test('a phone upright at the table: the gate over the curtain, inert beneath; sideways it goes; upright it is back; Play upright holds through the next curtain; Leave and Start ask again', async ({
@@ -128,4 +156,72 @@ test('a fine pointer at a phone`s size (the desktop window, the goldens) never s
   await page.setViewportSize(PHONE);
   await expect(page.locator('#curtainOverlay')).toBeVisible();
   await gateDown(page);
+});
+
+test('a phone whose browser can lock its rotation (Android: `screen.orientation.lock` is a function) is told once to lock it, at the turn of the phone at the table, not under the gate; not again this table; again after Leave and Start', async ({
+  phone,
+  project,
+}) => {
+  const { page } = phone;
+  await withLock(page, true);
+  await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
+  await gateUp(page);
+  await toastDown(page);
+  // The turn: the gate goes and the hint comes, before any move.
+  await page.setViewportSize(PHONE_LANDSCAPE);
+  await gateDown(page);
+  await toastUp(page, ROTATION_HINT_MSG);
+  // It goes by itself (8 s), and the curtain, a roll and a turn (paints all) bring nothing more.
+  await toastDown(page);
+  await page.locator('#curtainBtn').tap();
+  await expect(page.locator('#curtainOverlay')).toBeHidden();
+  await bgRoll(page);
+  await bgPlayTurn(page);
+  await expect(page.locator('#curtainOverlay')).toBeVisible();
+  await toastDown(page);
+  // Leave, then Start, still sideways: the next table asks once more, at its first paint.
+  await page.locator('#curtainBtn').tap();
+  await expect(page.locator('#curtainOverlay')).toBeHidden();
+  page.once('dialog', (dialog) => {
+    void dialog.accept();
+  });
+  await page.locator('#menuBtn').tap();
+  await page.locator('#menuLeaveBtn').tap();
+  await expect(page.locator('#homeScreen')).toBeVisible();
+  await page.locator('#localBtn').tap();
+  await expect(page.locator('#curtainOverlay')).toBeVisible();
+  await toastUp(page, ROTATION_HINT_MSG);
+});
+
+test('a phone whose browser cannot lock its rotation (every iPhone: no `screen.orientation.lock`) is never told, turned or not', async ({
+  phone,
+  project,
+}) => {
+  const { page } = phone;
+  await withLock(page, false);
+  await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
+  await gateUp(page);
+  await page.setViewportSize(PHONE_LANDSCAPE);
+  await gateDown(page);
+  await expect(page.locator('#curtainOverlay')).toBeVisible();
+  await toastDown(page);
+  await expect(page.locator('#toast')).not.toContainText('Auto-rotate');
+  await page.locator('#curtainBtn').tap();
+  await expect(page.locator('#curtainOverlay')).toBeHidden();
+  await toastDown(page);
+  await expect(page.locator('#toast')).not.toContainText('Auto-rotate');
+});
+
+test('a fine pointer at a phone`s size (the desktop window) with a lock to offer is never told: the phone`s shape, not the window`s', async ({
+  player,
+  project,
+}) => {
+  const { page } = player;
+  await withLock(page, true);
+  await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
+  await expect(page.locator('#curtainOverlay')).toBeVisible();
+  await page.setViewportSize(PHONE_LANDSCAPE);
+  await gateDown(page);
+  await toastDown(page);
+  await expect(page.locator('#toast')).not.toContainText('Auto-rotate');
 });

@@ -276,6 +276,14 @@ export type BootWindowLike = InviteWindowLike &
      * below); handed on through `BootCtx.matchMedia` for a game's own watcher.
      */
     matchMedia?: (query: string) => MediaQueryListLike;
+    /**
+     * `screen.orientation.lock`, where the browser has one: read once at boot as the reducer's
+     * `Ctx.canLock` (shell.ts: the rotation hint's device test). A function on Android's Chromium
+     * family; absent on every iPhone browser, and no `screen` at all (the boot test's window)
+     * says no as well. The DOM lib spells no `lock` (Safari has none, so it is not baseline):
+     * read here as `unknown`, beside the `angle` the lib does spell, so the real `Window` fits.
+     */
+    screen?: Readonly<{ orientation?: Readonly<{ angle?: number; lock?: unknown }> }>;
   }>;
 
 /**
@@ -551,8 +559,16 @@ export const bootShell = <
     if (sideways) paintGate(doc, gateOpen(app.shell, shell));
   };
 
+  // The device can lock its rotation (shell.ts `Ctx.canLock`, the rotation hint's test): a fact
+  // about the browser, read once so every step's ctx agrees.
+  const canLock = typeof win.screen?.orientation?.lock === 'function';
   const dispatch = (intent: Intent<G>): void => {
-    const step = cfg.reducer.reduce(app, intent, { rng, now, reducedMotion: reducedMotion() });
+    const step = cfg.reducer.reduce(app, intent, {
+      rng,
+      now,
+      reducedMotion: reducedMotion(),
+      canLock,
+    });
     // The paint is a function of the App, so an unchanged App needs none. This matters on a
     // card's or a checker's pointerdown: a repaint would replace the element under the pointer,
     // and the browser would then drop the click that was to follow.
