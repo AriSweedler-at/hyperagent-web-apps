@@ -13,7 +13,8 @@
 // H1). The last block is the guest's name (the owner, 2026-09-28: the client defines its own):
 // what the guest's box shows is what both tables seat, an empty box or a fresh invite link seats
 // 'Guest', a clash with the host is deduped once, and the guest wait screen says who you are
-// before the table does (backgammon and briscola; gin's page carries no such line).
+// before the table does (backgammon and briscola; gin's page carries no such card), where the
+// name can be changed before the deal: the host's status and both tables follow.
 import type { Page } from '@playwright/test';
 
 import { GAMES, REGISTRY, SHELL_GAMES } from '../tools/games.ts';
@@ -25,12 +26,14 @@ import {
   DEFAULT_NAME,
   followInvite,
   hostRoom,
+  hostSeesMsg,
   join,
   joinUntouched,
   joinedMsg,
+  readPref,
   rememberName,
   rememberP2Name,
-  seatedAsMsg,
+  rename,
 } from './fixtures/shell.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -98,11 +101,12 @@ SHELL_GAMES.forEach((game) => {
       await expect(guest.locator('#oppName')).toHaveText(HOST);
       await expect(guest.locator(cells.me)).toHaveText(cells.meText(guestName));
     };
-    /** The guest wait screen's "Playing as …" line, on the pages that carry one. */
+    /** The guest wait screen's name card, on the pages that carry one: shown, its box holding the seated name, its note naming the host. */
     const expectTold = async (guest: Page, name: string): Promise<void> => {
       if (cells.seated === null) return;
-      await expect(guest.locator(cells.seated)).toHaveText(seatedAsMsg(name));
       await expect(guest.locator(cells.seated)).toBeVisible();
+      await expect(guest.locator('#guestNameInput')).toHaveValue(name);
+      await expect(guest.locator('#guestNameNote')).toHaveText(hostSeesMsg(HOST));
     };
 
     test(
@@ -158,6 +162,31 @@ SHELL_GAMES.forEach((game) => {
         await expect(host.page.locator('#hostWaitStatus')).toContainText(joinedMsg('Guest'));
         await driver.start(host.page, guest.page);
         await expectSeated(host.page, guest.page, 'Guest');
+      },
+    );
+
+    test(
+      'the guest changes its name on the wait screen: a link-joined Guest types Xyz and taps Change; the host`s status reads Xyz joined!, the card and both tables seat Xyz, and the name is remembered',
+      { tag: '@online' },
+      async ({ players, project }) => {
+        test.skip(
+          cells.seated === null,
+          'the page carries no name card (gin: its DOM parity oracle)',
+        );
+        const { host, guest } = players;
+        await openGame(host, project, game);
+        await openGame(guest, project, game);
+        const code = await hostRoom(host.page, game, HOST);
+        await followInvite(guest.page, game, invitePath(project, game, code));
+        await expectTold(guest.page, 'Guest');
+        await expect(host.page.locator('#hostWaitStatus')).toContainText(joinedMsg('Guest'));
+        await rename(guest.page, 'Xyz');
+        await expect(host.page.locator('#hostWaitStatus')).toContainText(joinedMsg('Xyz'));
+        await expectTold(guest.page, 'Xyz');
+        // Remembered as a name typed on the home screen is: the next visit joins under it.
+        expect(await readPref(guest.page, game, 'name')).toBe('Xyz');
+        await driver.start(host.page, guest.page);
+        await expectSeated(host.page, guest.page, 'Xyz');
       },
     );
 

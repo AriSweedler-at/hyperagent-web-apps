@@ -158,6 +158,7 @@ const SHELL_INTENTS: ShellIntentBuilders<Intent, HomeTab, Raw> = {
   resumeClick: { type: 'resume/click' },
   shareClick: { type: 'share/click' },
   cancel: { type: 'cancel' },
+  renameClick: (name) => ({ type: 'name/rename', name }),
 };
 
 /** Each panel's seat count is remembered as it changes; the third and fourth names are remembered as typed. */

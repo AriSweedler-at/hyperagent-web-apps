@@ -433,6 +433,13 @@ export type ShellIntent<G extends ShellTypes> =
    * owner, 2026-09-25: "it shouldn't make you THEN click 'sit down'"). Nothing while seated.
    */
   | Readonly<{ type: 'join/link'; code: string }>
+  /**
+   * `#guestRenameBtn`, or Enter in `#guestNameInput` (the guest wait screen's name card; the
+   * owner, 2026-09-28: the client defines its own name): the raw box text. A connected guest
+   * re-sends its join under the new name, which the host takes as a re-seat (`hostFrame` `join`,
+   * G5); ignored in every other role and while the host is not connected.
+   */
+  | Readonly<{ type: 'name/rename'; name: string }>
   /** `#soundBtn`. */
   | Readonly<{ type: 'sound/toggle' }>
   /** The hook's `soundFont(name)` (the console, for now): a valid font plays from now on and is remembered. */
@@ -499,7 +506,8 @@ export type ShellIntent<G extends ShellTypes> =
  * `resume/auto`, the boot's lobby resume (lobby-resume.md D4), plus the three of playing sideways
  * (`viewport/portrait`, `viewport/landscape`, `gate/keep`: backgammon's turn gate lifted here,
  * docs/design/backgammon-landscape.md §5D), plus the two of the Android lock (`gate/turn`,
- * `fullscreen/lost`, §5C), plus `flip/set`, the far seat's flip (§6 item 7).
+ * `fullscreen/lost`, §5C), plus `flip/set`, the far seat's flip (§6 item 7), plus `name/rename`,
+ * the guest wait screen's name card (the owner, 2026-09-28: the client defines its own name).
  */
 export const SHELL_INTENT_TYPES = [
   'home/init',
@@ -526,6 +534,7 @@ export const SHELL_INTENT_TYPES = [
   'submenu/dismiss',
   'code/typed',
   'join/link',
+  'name/rename',
   'sound/toggle',
   'soundFont/set',
   'flip/set',
@@ -898,6 +907,11 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     state: (view: G['View']) => HostFrameOf<G>;
     toast: (message: string) => HostFrameOf<G>;
     action: (action: G['Action']) => GuestFrameOf<G>;
+    /**
+     * The guest's join under `name` (the session sends the first at channel open, web/shared/net/guest.ts;
+     * the shell sends another on `name/rename`, which the host takes as a re-seat).
+     */
+    join: (name: string) => GuestFrameOf<G>;
   }>;
   cues: Readonly<{ initial: G['Cues'] }>;
   table: Readonly<{
@@ -2272,6 +2286,24 @@ export const reduceShell = <G extends ShellTypes>(
       return offer !== null && isShellResume(offer) && offer.kind === 'local'
         ? handoff(app, offer.game, ctx, cfg)
         : pure(app);
+    }
+    case 'name/rename': {
+      // Only a guest whose channel to the host is open: a second join on the same channel is the
+      // host's re-seat (`hostFrame` `join`, G5), before the deal or into a game (a rejoin's
+      // rename, `engine.renameGuest`). The seated name is the two-seat mirror at once (`guestFrame`
+      // `welcome`: a host at capacity 2 answers a repeat join with its status alone, so nothing
+      // else would tell the guest); an N-seat host's lobby names my row and overwrites it. What was
+      // typed is remembered as `name/typed` remembers it, so the next visit joins under it.
+      if (s.role !== 'guest' || !s.oppConnected) return pure(app);
+      const myName = guestName(intent.name, cfg);
+      return step(
+        withShell(app, {
+          myName,
+          seatedName: s.oppName === null ? s.seatedName : guestNameFor(myName, s.oppName),
+        }),
+        { type: 'send', frame: cfg.frames.join(myName) },
+        { type: 'rememberName', name: intent.name.trim() },
+      );
     }
     case 'cancel':
       // The Android lock a Sit down or a handoff took goes with the room (`unlockSideways`).

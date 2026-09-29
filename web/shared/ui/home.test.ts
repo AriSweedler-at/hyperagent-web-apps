@@ -54,6 +54,7 @@ const INTENTS: ShellIntentBuilders<Intent, Tab, Start> = {
   resumeClick: intent('resume/click'),
   shareClick: intent('share/click'),
   cancel: intent('cancel'),
+  renameClick: (name) => intent('name/rename', name),
 };
 
 type ShellPage = FakePage &
@@ -62,9 +63,10 @@ type ShellPage = FakePage &
 /**
  * The shell's ids as the markup ships them: the Play tab active, its panel shown, Online active.
  * The third mode button of each set carries no `data-mode` (a page never ships one; it pins what
- * the binder dispatches for the missing attribute).
+ * the binder dispatches for the missing attribute). `card` is the guest wait screen's name card
+ * (backgammon's and briscola's two ids); false is gin's page, which carries none.
  */
-const shellPage = (): ShellPage => {
+const shellPage = (card = true): ShellPage => {
   const modeButtons = [
     ...MODES.map((mode) =>
       fakeEl(`modeSwitch-${mode}`, {
@@ -108,6 +110,7 @@ const shellPage = (): ShellPage => {
     fakeEl('shareCodeBtn'),
     fakeEl('cancelHostBtn'),
     fakeEl('cancelGuestBtn'),
+    ...(card ? [fakeEl('guestNameInput'), fakeEl('guestRenameBtn')] : []),
     ...modeButtons,
     ...submenuButtons,
   ]);
@@ -289,6 +292,34 @@ describe('bindHomeShell', () => {
     );
     return { p, intents };
   };
+
+  test('the guest wait screen`s name card, where the page carries it: Change and Enter dispatch the box`s raw text and Enter lets the box go; a page without the card binds as before', () => {
+    const { p, intents } = wired();
+    type(p, 'guestNameInput', ' Xyz ');
+    p.get('guestNameInput').el.focus();
+    p.get('guestRenameBtn').fire('click');
+    expect(p.get('guestNameInput').focused()).toBe(true);
+    p.get('guestNameInput').fire('keydown', { key: 'a' });
+    p.get('guestNameInput').fire('keydown', { key: 'Enter' });
+    expect(intents).toEqual([intent('name/rename', ' Xyz '), intent('name/rename', ' Xyz ')]);
+    expect(p.get('guestNameInput').focused()).toBe(false);
+    // gin's page: neither id, so nothing is bound and nothing is asked of the page.
+    const bare = shellPage(false);
+    const seen: Intent[] = [];
+    bindHomeShell(
+      bare.doc,
+      (i) => {
+        seen.push(i);
+      },
+      {
+        tabs: TABS,
+        startOptions: { host: () => ({ opt: '' }), local: () => ({ opt: '' }) },
+        intents: INTENTS,
+      },
+    );
+    bare.get('cancelGuestBtn').fire('click');
+    expect(seen).toEqual([intent('cancel')]);
+  });
 
   test('the inputs and buttons dispatch with the raw values, the start options read at the click', () => {
     const { p, intents } = wired();
@@ -477,6 +508,7 @@ describe('shellIntents', () => {
     expect(intents.resumeClick).toEqual({ type: 'resume/click' });
     expect(intents.shareClick).toEqual({ type: 'share/click' });
     expect(intents.cancel).toEqual({ type: 'cancel' });
+    expect(intents.renameClick(' Xyz ')).toEqual({ type: 'name/rename', name: ' Xyz ' });
   });
 
   test('bound through bindHomeShell they dispatch the records both games pin, the options read at the click', () => {

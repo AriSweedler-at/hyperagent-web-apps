@@ -66,7 +66,8 @@ export type OnlineDriver = Readonly<{
 /**
  * Where a seated page names the seats (e2e/shell-online.spec.ts, the guest's-name rows): the cell
  * that names my own seat and what it reads for a name (gin's adds the running score), and the
- * guest wait screen's "Playing as …" line, null on a page that carries none (gin's: its DOM parity
+ * guest wait screen's name card (`#guestSeatName`, whose box `#guestNameInput` holds the seated
+ * name and whose note names the host), null on a page that carries none (gin's: its DOM parity
  * oracle). The other seat is the shell's `#oppName` on every page.
  */
 export type SeatNameCells = Readonly<{

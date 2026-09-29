@@ -66,7 +66,16 @@ import {
   type State,
   type Viewer,
 } from './domain/types.ts';
-import { MAX_BOTS, SEAT_COUNTS, action, lobby, state, toast, type SeatCount } from './protocol.ts';
+import {
+  MAX_BOTS,
+  SEAT_COUNTS,
+  action,
+  join,
+  lobby,
+  state,
+  toast,
+  type SeatCount,
+} from './protocol.ts';
 import {
   DEFAULT_HOME_TAB,
   DEFAULT_OPTS,
@@ -335,7 +344,7 @@ export const FIDICE_SHELL: ShellGameData<Fidice> = {
       view.players.map((p) => String(keepsScore(view) ? p.losses : p.lives)).join('–'),
     winnerOf: (view) => (view.winner === null ? null : shellSeatOfChair(view, view.winner)),
   },
-  frames: { lobby, state, toast, action },
+  frames: { lobby, state, toast, action, join },
   cues: { initial: INITIAL_CUES },
   home: {
     // This page's own keys: the host card's last terms (the defaults when unreadable) and the third to sixth names.

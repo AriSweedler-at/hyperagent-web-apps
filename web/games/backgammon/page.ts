@@ -190,9 +190,21 @@ const blocks: ShellBlocks = {
   extraScreens: '',
   hostWaitList: `      <div class="phone-cue">Hold the phone sideways once the match starts.</div>`,
   guestWaitList: `      <div class="phone-cue">Hold the phone sideways once the match starts.</div>`,
-  // "Playing as …" under the guest's status (web/shared/ui/shellPaint.ts `paintWaiting`): the id
-  // alone, styled by theme.css `#guestSeatName`; hidden until the host's welcome names the seat.
-  guestSeatName: `      <div id="guestSeatName" class="hidden"></div>`,
+  // The guest's name card under its status (web/shared/ui/shellPaint.ts `paintGuestName`; the
+  // owner, 2026-09-28: the client defines its own name): "Playing as", the box prefilled with the
+  // seat's name as the host named it, Change (or Enter) re-sending the join under what the box says
+  // (web/shared/ui/home.ts `bindHomeShell`, shell.ts `name/rename`), and a note naming who sees it.
+  // Styled by id in theme.css (`#guestSeatName`, `#guestNameNote`; no new class); hidden until the
+  // host's welcome names the seat. The four ids are this page's (tools/games.ts `pageShape.ids`),
+  // not SHELL_IDS: gin's page leaves the block out for its DOM parity oracle.
+  guestSeatName: `      <div id="guestSeatName" class="hidden">
+        <label for="guestNameInput">Playing as</label>
+        <div class="row">
+          <input type="text" id="guestNameInput" class="grow" maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" />
+          <button class="btn btn-secondary btn-sm" id="guestRenameBtn">Change</button>
+        </div>
+        <div class="muted" id="guestNameNote"></div>
+      </div>`,
   table: `      <!-- TABLE (design §2.1). The 24 points are direct children of #board in absolute order;
            the seat perspective is data-own on each point and data-seat on the board, written by
            paintSeat; the static markup ships seat 0's. -->

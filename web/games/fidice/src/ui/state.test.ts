@@ -99,7 +99,7 @@ const hosting = (
 
 describe('the type bag', () => {
   test('the table`s intent and effect names reuse none of the shell`s 50 and 30; every table intent is listed; the screens', () => {
-    expect(SHELL_INTENT_TYPES).toHaveLength(51);
+    expect(SHELL_INTENT_TYPES).toHaveLength(52);
     expect(SHELL_EFFECT_TYPES).toHaveLength(31);
     const shellIntents = new Set<string>(SHELL_INTENT_TYPES);
     const shellEffects = new Set<string>(SHELL_EFFECT_TYPES);

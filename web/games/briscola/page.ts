@@ -205,9 +205,21 @@ const blocks: ShellBlocks = {
   // device's own, data-you (theme.css `.seat-list`).
   hostWaitList: `      <ul class="seat-list" id="seatList" aria-label="Seats"></ul>`,
   guestWaitList: `      <ul class="seat-list" id="guestSeatList" aria-label="Seats"></ul>`,
-  // "Playing as …" under the list (shellPaint.ts `paintWaiting`): the id alone, styled by theme.css
-  // `#guestSeatName`; hidden until a lobby frame names my row.
-  guestSeatName: `      <div id="guestSeatName" class="hidden"></div>`,
+  // The guest's name card under the list (web/shared/ui/shellPaint.ts `paintGuestName`; the owner,
+  // 2026-09-28: the client defines its own name): "Playing as", the box prefilled with my row's name
+  // as the host named it, Change (or Enter) re-sending the join under what the box says
+  // (web/shared/ui/home.ts `bindHomeShell`, shell.ts `name/rename`; the host's lobby then names my
+  // row again), and a note naming who sees it. Styled by id in theme.css (`#guestSeatName`,
+  // `#guestNameNote`; no new class); hidden until a lobby frame names my row. The four ids are this
+  // page's (tools/games.ts `pageShape.ids`), not SHELL_IDS.
+  guestSeatName: `      <div id="guestSeatName" class="hidden">
+        <label for="guestNameInput">Playing as</label>
+        <div class="row">
+          <input type="text" id="guestNameInput" class="grow" maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" />
+          <button class="btn btn-secondary btn-sm" id="guestRenameBtn">Change</button>
+        </div>
+        <div class="muted" id="guestNameNote"></div>
+      </div>`,
   table: `      <!-- TABLE (design §5.2): one DOM for 2, 3 and 4 seats. I sit at the bottom; the other
            seats are relative cells (#seatR1 right, #seatR2 across, #seatR3 left) that seatCells
            (src/ui/layout.ts) maps to absolute seats; the static markup ships the 2-player shape.

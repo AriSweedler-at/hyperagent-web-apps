@@ -41,7 +41,7 @@ import {
   type Players,
   type SeatCount,
 } from './engine/index.ts';
-import { action, lobby, state, toast } from './protocol.ts';
+import { action, join, lobby, state, toast } from './protocol.ts';
 import {
   DEFAULT_CARD_PACK,
   DEFAULT_SPEED,
@@ -226,7 +226,7 @@ export const BRISCOLA_SHELL: ShellGameData<Briscola> = {
     scoreOf: (view) => (view.result?.totals ?? view.sides).map(String).join('–'),
     winnerOf: (view) => view.result?.winner ?? null,
   },
-  frames: { lobby, state, toast, action },
+  frames: { lobby, state, toast, action, join },
   cues: { initial: INITIAL_CUES },
   home: {
     // This page's own keys: the seat count (the default when unreadable) on the fixed terms, the card pack, the language pack, the beat's speed, the third and fourth names.

@@ -342,14 +342,25 @@ label {
 .muted {
   color: var(--muted);
 }
-/* The guest's own seat as the host named it, under the waiting room's status
-   (web/shared/ui/shellPaint.ts `paintWaiting`, "Playing as …"; the shell's `seatedName`): small
-   and dim, centred like the status, so a rename (` 2`) or the fallback ('Guest') is seen without
-   competing with the line above it. */
+/* The guest's name card under the waiting room's status (web/shared/ui/shellPaint.ts
+   `paintGuestName`; the owner, 2026-09-28: the client defines its own name): "Playing as" as the
+   panel's other labels (dimmed nacre, small caps), the box and its Change in one row (the box is
+   the home screen's `#nameInput` in every respect: shell.css's input rule and .card-box's
+   gold-tinted edge above; the button a secondary, small), and the note naming who sees the name in
+   dimmed nacre (.card-box .muted). Left-aligned inside the centred box, a hairline above, so it
+   reads as its own small form under the status rather than a second status line. */
 #guestSeatName {
-  color: var(--nacre-dim);
-  font-size: 0.88rem;
-  text-align: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+  text-align: left;
+}
+#guestSeatName .row {
+  margin-top: 8px;
+}
+#guestNameNote {
+  font-size: 0.82rem;
+  line-height: 1.4;
   padding-top: 6px;
 }
 .badge {

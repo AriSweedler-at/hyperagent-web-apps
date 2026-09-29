@@ -244,6 +244,7 @@ const FAKE: ShellConfig<Fake> = {
     state: (view) => ({ t: 'state', view }),
     toast: (msg) => ({ t: 'toast', msg }),
     action: (action) => ({ t: 'action', action }),
+    join: (name) => ({ t: 'join', name }),
   },
   cues: { initial: { seen: null } },
   table: {
@@ -566,6 +567,7 @@ const FAKE4: ShellConfig<Fake4> = {
     state: (view) => ({ t: 'state', view }),
     toast: (msg) => ({ t: 'toast', msg }),
     action: (action) => ({ t: 'action', action }),
+    join: (name) => ({ t: 'join', name }),
   },
   cues: { initial: { seen: null } },
   table: {
@@ -1048,10 +1050,11 @@ describe('the initial shell and the partitions', () => {
     });
   });
 
-  test('the 51 shell intents and 31 shell effects are listed once; the guards partition a game`s unions', () => {
-    expect(SHELL_INTENT_TYPES).toHaveLength(51);
-    expect(new Set(SHELL_INTENT_TYPES).size).toBe(51);
+  test('the 52 shell intents and 31 shell effects are listed once; the guards partition a game`s unions', () => {
+    expect(SHELL_INTENT_TYPES).toHaveLength(52);
+    expect(new Set(SHELL_INTENT_TYPES).size).toBe(52);
     expect(SHELL_INTENT_TYPES).toContain('flip/set');
+    expect(SHELL_INTENT_TYPES).toContain('name/rename');
     expect(SHELL_INTENT_TYPES).toContain('viewport/portrait');
     expect(SHELL_INTENT_TYPES).toContain('viewport/landscape');
     expect(SHELL_INTENT_TYPES).toContain('gate/keep');
@@ -1980,6 +1983,131 @@ describe("the guest's name is the guest's (the owner, 2026-09-28; C11)", () => {
       frame: { t: 'state', view: viewFor4(game4(dealt4()), 2) },
     }).app;
     expect(dealtTo.shell.seatedName).toBe('Cy');
+  });
+
+  test('name/rename: a connected guest re-sends its join under the trimmed box text, is seated by the two-seat mirror at once and remembers what it typed; empty is the guest fallback', () => {
+    const joined = run(
+      initialApp,
+      { type: 'join/click', name: 'Bo', code: 'ABCD' },
+      { type: 'guest/connected' },
+    ).app;
+    const told = run(joined, welcome('Ann')).app;
+    expect(told.shell.seatedName).toBe('Bo');
+    const renamed = run(told, { type: 'name/rename', name: '  Xyz ' });
+    expect(renamed.app.shell).toMatchObject({
+      role: 'guest',
+      myName: 'Xyz',
+      seatedName: 'Xyz',
+      oppName: 'Ann',
+    });
+    expect(renamed.effects).toEqual([
+      { type: 'send', frame: { t: 'join', name: 'Xyz' } },
+      { type: 'rememberName', name: 'Xyz' },
+    ]);
+    // The host, from that frame: the same word on its wait screen (G5 below).
+    expect(
+      run(lobby(), { type: 'host/frame', frame: { t: 'join', name: 'Xyz' } }).app.shell.oppName,
+    ).toBe('Xyz');
+    // The host's own name dedupes as the welcome did (the mirror is exact for a room of two); what
+    // the box says is what is remembered.
+    const clash = run(told, { type: 'name/rename', name: 'ann' });
+    expect(clash.app.shell).toMatchObject({ myName: 'ann', seatedName: 'ann 2' });
+    expect(clash.effects).toEqual([
+      { type: 'send', frame: { t: 'join', name: 'ann' } },
+      { type: 'rememberName', name: 'ann' },
+    ]);
+    expect(
+      run(hosted(), { type: 'host/frame', frame: { t: 'join', name: 'ann' } }).app.shell.oppName,
+    ).toBe('ann 2');
+    // Emptied: the guest fallback goes on the wire, and nothing is remembered (as `name/typed` of '').
+    const emptied = run(told, { type: 'name/rename', name: '   ' });
+    expect(emptied.app.shell).toMatchObject({ myName: 'Guest', seatedName: 'Guest' });
+    expect(emptied.effects).toEqual([
+      { type: 'send', frame: { t: 'join', name: 'Guest' } },
+      { type: 'rememberName', name: '' },
+    ]);
+    // Cut to NAME_MAX before the trim, the wire's order.
+    expect(run(told, { type: 'name/rename', name: `${'x'.repeat(20)} y` }).app.shell.myName).toBe(
+      'x'.repeat(20),
+    );
+    // Connected but not yet answered (no host name): the join goes out, the welcome names the seat.
+    const early = run(joined, { type: 'name/rename', name: 'Cy' });
+    expect(early.app.shell).toMatchObject({ myName: 'Cy', seatedName: null });
+    expect(kinds(early.effects)).toEqual(['send', 'rememberName']);
+    expect(run(early.app, welcome('Ann')).app.shell.seatedName).toBe('Cy');
+  });
+
+  test('name/rename into a game is a rejoin`s rename (the host path renames the seat); ignored while the host is not connected and in every other role', () => {
+    const atTable = run(seated(), { type: 'name/rename', name: 'Xyz' });
+    expect(atTable.app.shell.myName).toBe('Xyz');
+    expect(atTable.effects).toEqual([
+      { type: 'send', frame: { t: 'join', name: 'Xyz' } },
+      { type: 'rememberName', name: 'Xyz' },
+    ]);
+    // The host, mid-game, renames the seat off that frame; the state frame that answers names it.
+    expect(
+      game(run(hosting(), { type: 'host/frame', frame: { t: 'join', name: 'Xyz' } }).app).players[1]
+        .name,
+    ).toBe('Xyz');
+    const players: Readonly<[Player, Player]> = [
+      { id: 'host', name: 'Ann' },
+      { id: 'guest', name: 'Xyz' },
+    ];
+    expect(
+      run(atTable.app, {
+        type: 'guest/frame',
+        frame: { t: 'state', view: viewFor({ ...dealt, players }, 1) },
+      }).app.shell.seatedName,
+    ).toBe('Xyz');
+    // Not connected: before the channel opened, and after the host was lost.
+    const joined = run(initialApp, { type: 'join/click', name: 'Bo', code: 'ABCD' }).app;
+    expect(run(joined, { type: 'name/rename', name: 'Xyz' })).toEqual(pure(joined));
+    const lost = run(seated(), { type: 'guest/lost' }).app;
+    expect(lost.shell.oppConnected).toBe(false);
+    expect(run(lost, { type: 'name/rename', name: 'Xyz' })).toEqual(pure(lost));
+    // Every other role, and nobody at all.
+    [initialApp, hosted(), lobby(), hosting(), local()].forEach((app) => {
+      expect(run(app, { type: 'name/rename', name: 'Xyz' })).toEqual(pure(app));
+    });
+  });
+
+  test('name/rename at a table of N: the join goes out, the mirror stands until the lobby that answers names my row; the host dedupes against the other seats', () => {
+    const joined = run4(
+      initialApp4,
+      { type: 'join/click', name: 'Cy', code: 'ABCD' },
+      { type: 'guest/connected' },
+    ).app;
+    const told = run4(joined, {
+      type: 'guest/frame',
+      frame: roomFrame4(
+        'lobby',
+        'Ann',
+        { level: 4 },
+        [{ name: 'Bo', connected: true }, { name: 'Cy', connected: true }, EMPTY_SEAT],
+        2,
+      ),
+    }).app;
+    expect(told.shell.seatedName).toBe('Cy');
+    const renamed = run4(told, { type: 'name/rename', name: 'Bo' });
+    expect(renamed.app.shell).toMatchObject({ myName: 'Bo', seatedName: 'Bo' });
+    expect(renamed.effects).toEqual([
+      { type: 'send', frame: { t: 'join', name: 'Bo' } },
+      { type: 'rememberName', name: 'Bo' },
+    ]);
+    // The host: seat 2's second join dedupes against seat 1's Bo, and its lobby names my row.
+    const reseated = run4(full4(), join4('Bo', 2)).app;
+    expect(reseated.shell.seats.map((seat) => seat.name)).toEqual(['Bo', 'Bo 2', 'Di']);
+    const answered = run4(renamed.app, {
+      type: 'guest/frame',
+      frame: roomFrame4(
+        'lobby',
+        'Ann',
+        { level: 4 },
+        [{ name: 'Bo', connected: true }, { name: 'Bo 2', connected: true }, EMPTY_SEAT],
+        2,
+      ),
+    }).app;
+    expect(answered.shell.seatedName).toBe('Bo 2');
   });
 
   test('a second join frame from the same seat before the deal re-seats under the new name and rewrites the wait screen`s line (G5)', () => {
