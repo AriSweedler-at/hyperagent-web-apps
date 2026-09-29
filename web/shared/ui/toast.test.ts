@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { fakeClock } from '../edge/clock.fake.ts';
+import type { Clock } from '../lib/clock.ts';
 import { fakeEl, fakePage, type FakePage } from '../edge/page.fake.ts';
 import { TOAST_MS, createTimers, createToaster } from './toast.ts';
 
@@ -110,7 +111,7 @@ describe('createToaster', () => {
     expect(clock.pending()).toBe(0);
   });
 
-  test('a toast that outlasts the one up, or the one held, takes its place for good, as it always did; one slot holds the toast due last', () => {
+  test('a toast that outlasts the ones under it takes their place for good, as it always did; two interruptions come back in reverse, each for its own remainder', () => {
     const clock = fakeClock();
     const p = page();
     const toast = createToaster(p.doc, clock);
@@ -127,19 +128,48 @@ describe('createToaster', () => {
     clock.advance(1);
     expect(p.get('toast').hasClass('show')).toBe(false);
     expect(clock.pending()).toBe(0);
-    // Two interruptions: the toast due last comes back, the middle one is gone with the third.
+    // Two interruptions: the one interrupted last comes back first, until its own t=4100, then the
+    // hint until its own t=8000.
     toast('Lock the phone', 8000);
     clock.advance(1500);
     toast('Connected via relay');
     clock.advance(500);
     toast('Copied', 500);
-    clock.advance(500);
+    clock.advance(499);
+    expect(p.get('toast').text()).toBe('Copied');
+    clock.advance(1);
+    expect(p.get('toast').text()).toBe('Connected via relay');
+    clock.advance(1599);
+    expect(p.get('toast').text()).toBe('Connected via relay');
+    clock.advance(1);
     expect(p.get('toast').text()).toBe('Lock the phone');
-    clock.advance(5499);
+    clock.advance(3899);
     expect(p.get('toast').hasClass('show')).toBe(true);
     clock.advance(1);
     expect(p.get('toast').hasClass('show')).toBe(false);
     expect(clock.pending()).toBe(0);
+  });
+
+  test('the clock is never read: the legacy toast only set its timer, and the gin DOM-parity oracle steps Date.now on every read', () => {
+    const clock = fakeClock();
+    const reads: number[] = [];
+    const watched: Clock = {
+      ...clock,
+      now: () => {
+        reads.push(clock.now());
+        return clock.now();
+      },
+    };
+    const p = page();
+    const toast = createToaster(p.doc, watched);
+    toast('Lock the phone', 8000);
+    clock.advance(1500);
+    toast('Connected via relay');
+    clock.advance(500);
+    toast('Copied', 500);
+    clock.advance(6000);
+    expect(p.get('toast').hasClass('show')).toBe(false);
+    expect(reads).toEqual([]);
   });
 
   test('the marks follow the message brought back: off for the interrupter, on again for the one that earned them', () => {
