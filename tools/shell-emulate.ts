@@ -4,30 +4,43 @@
 // locally and decide for myself if they all look good before shipping to customers"). Four
 // commands over the one catalogue (web/shared/lib/devices.ts) and backgammon's CSS twin
 // (web/games/backgammon/src/ui/board/layout.ts), so what this tool prints is what the page
-// computes, never a second table:
-//   list                      the catalogue as a table: screen, dpr, insets, corner, the bar ranges
-//   explain --device <id> [--orientation portrait|landscape] [--mode browser|standalone|fullscreen] [--bar shown|hidden]
+// computes, never a second table. Two pages: backgammon (the board) and UI Sandbox
+// (web/games/ui-sandbox, docs/design/ui-sandbox.md: the frame and the safe-area map around the
+// layout examples), `--game` picking one; a sweep without it renders and checks both.
+//   list                      the catalogue as a table: screen, dpr, insets, corner, cut, the bar ranges
+//   explain --device <id> [--orientation portrait|landscape] [--mode browser|standalone|fullscreen] [--bar shown|hidden] [--game ..]
 //                             one case: the match, the corner and which corners are the screen's,
-//                             the viewport the bar leaves, the edge paddings, the landscape scheme,
-//                             point width and length, the chrome heights, the board's room
-//   render (--device <id> | --all) [--orientation ..] [--mode ..] [--bar ..] (--url <page> | --serve) [--out <dir|png>]
+//                             the viewport the bar leaves, then backgammon's edge paddings, landscape
+//                             scheme, point width and length, chrome heights and board room, or the
+//                             sandbox's safe-area map (the cut's side and span, the ears, every
+//                             edge's segments, where examples (g) and (h) land) per orientation type
+//   render (--device <id> | --all) [--orientation ..] [--mode ..] [--bar ..] [--game ..] (--url <site> | --serve) [--out <dir|png>]
 //                             Playwright Chromium at the device's viewport, screen and pixel ratio
-//                             (`isMobile`, `hasTouch`), the insets through the theme's seam, drives
-//                             pass and play to the rolled board and shoots the home, the curtain,
-//                             the roll modal and the board; `--all` sweeps every device x
-//                             orientation x mode (the tab twice: bar shown and hidden) into a folder
-//                             with an index.html contact sheet; a `.png` --out shoots the board alone
-//   check (--device <id> | --all) [..] (--url <page> | --serve) [--json <file>]
-//                             the same drive, then per case: the trim's computed radius equals the
-//                             catalogue's, the board fills its room sideways (`boardRoom`, to half a
-//                             pixel), the content clears the band by 4px, no document scroll above
-//                             the floor, every tap target 44px; a summary table, a JSON report,
+//                             (`isMobile`, `hasTouch`), the insets through the theme's seam;
+//                             backgammon: drives pass and play to the rolled board and shoots the
+//                             home, the curtain, the roll modal and the board; the sandbox: the
+//                             preview screen under each orientation type (both landscapes through
+//                             the page's `?type=`, since no emulator sets `screen.orientation.type`)
+//                             with examples (a), (f), (g), (h) and (i), the readout's device line
+//                             under the shots; `--all` sweeps every device x orientation x mode (the
+//                             tab twice: bar shown and hidden) into a folder with an index.html
+//                             contact sheet; a `.png` --out shoots the board (or example (h)) alone
+//   check (--device <id> | --all) [..] [--game ..] (--url <site> | --serve) [--json <file>]
+//                             the same drive, then per case: backgammon, the trim's computed radius
+//                             equals the catalogue's, the board fills its room sideways (`boardRoom`,
+//                             to half a pixel), the content clears the band by 4px, no document
+//                             scroll above the floor, every tap target 44px; the sandbox, what
+//                             e2e/ui-sandbox.spec.ts asserts (the four corners per the reach rule,
+//                             the device matched, the map the module's, (a) fits with 11px clearance,
+//                             (g) in the free segment, (h) exactly the map's ears and none over an
+//                             arc or the cut, no scroll); a summary table per game, a JSON report,
 //                             exit 1 on any failure
 // Examples (`npm run build` first for --serve, which serves dist/ on a free port):
 //   node --experimental-strip-types tools/shell-emulate.ts list
 //   node --experimental-strip-types tools/shell-emulate.ts explain --device iphone-393x852 --orientation landscape --mode browser
+//   node --experimental-strip-types tools/shell-emulate.ts explain --device iphone-393x852 --game ui-sandbox
 //   node --experimental-strip-types tools/shell-emulate.ts render --device iphone-390x844 --orientation landscape --serve --out /tmp/board.png
-//   node --experimental-strip-types tools/shell-emulate.ts render --all --serve             # = npm run shots
+//   node --experimental-strip-types tools/shell-emulate.ts render --all --serve             # = npm run shots, both games
 //   node --experimental-strip-types tools/shell-emulate.ts check --all --serve --json shots/check.json
 // The seam: headless Chromium reads every `env(safe-area-inset-*)` as 0 and no CDP call sets them
 // (Chromium 153's `Emulation.setSafeAreaInsetsOverride` refuses every parameter shape), so an init
@@ -72,16 +85,29 @@ import {
   emulationName,
   emulationsOf,
   cornersOf,
+  screenFor,
   type Bar,
   type Corners,
+  type Device,
   type DisplayMode,
   type Emulation,
   type Orientation,
 } from '../web/shared/lib/devices.ts';
+import {
+  EDGES,
+  lengthOf,
+  safeAreaMap,
+  type OrientationType,
+  type SafeAreaMap,
+  type Segment,
+} from '../web/shared/lib/safeArea.ts';
 import { PAGES_BASE_PATH } from '../e2e/fixtures/site.ts';
 import { startServer } from './serve-dist.ts';
 
 export type Command = 'list' | 'explain' | 'render' | 'check';
+/** The two pages the emulator drives. */
+export type GameName = 'backgammon' | 'ui-sandbox';
+export const GAME_NAMES: ReadonlyArray<GameName> = ['backgammon', 'ui-sandbox'];
 export type EmulateArgs = Readonly<{
   command: Command;
   device: string | null;
@@ -89,6 +115,8 @@ export type EmulateArgs = Readonly<{
   orientation: Orientation | null;
   mode: DisplayMode | null;
   bar: Bar | null;
+  /** `--game`: one page; null is both under `--all`, backgammon alone for one `--device` (`gamesFor`). */
+  game: GameName | null;
   url: string | null;
   serve: boolean;
   out: string | null;
@@ -118,6 +146,7 @@ export const parseEmulateArgs = (argv: ReadonlyArray<string>): EmulateArgs => {
       orientation: { type: 'string' },
       mode: { type: 'string' },
       bar: { type: 'string' },
+      game: { type: 'string' },
       url: { type: 'string' },
       serve: { type: 'boolean', default: false },
       out: { type: 'string' },
@@ -137,6 +166,7 @@ export const parseEmulateArgs = (argv: ReadonlyArray<string>): EmulateArgs => {
     orientation: oneOf('orientation', values.orientation, ORIENTATIONS),
     mode: oneOf('mode', values.mode, DISPLAY_MODES),
     bar: oneOf('bar', values.bar, BARS),
+    game: oneOf('game', values.game, GAME_NAMES),
     url: values.url ?? null,
     serve: values.serve,
     out: values.out ?? null,
@@ -154,12 +184,7 @@ export const parseEmulateArgs = (argv: ReadonlyArray<string>): EmulateArgs => {
 export const casesFor = (args: EmulateArgs): ReadonlyArray<Emulation> => {
   if (args.all) {
     return DEVICES.filter((d) => d.supported).flatMap((d) =>
-      emulationsOf(d).filter(
-        (e) =>
-          (args.orientation === null || e.orientation === args.orientation) &&
-          (args.mode === null || e.mode === args.mode) &&
-          (args.bar === null || e.mode !== 'browser' || e.bar === args.bar),
-      ),
+      emulationsOf(d).filter((e) => narrowed(args, e)),
     );
   }
   const device = args.device === null ? null : deviceById(args.device);
@@ -174,8 +199,73 @@ export const casesFor = (args: EmulateArgs): ReadonlyArray<Emulation> => {
   ];
 };
 
+/** The `--orientation`, `--mode` and `--bar` filters over one case (the bar matters in a tab alone). */
+const narrowed = (args: EmulateArgs, e: Emulation): boolean =>
+  (args.orientation === null || e.orientation === args.orientation) &&
+  (args.mode === null || e.mode === args.mode) &&
+  (args.bar === null || e.mode !== 'browser' || e.bar === args.bar);
+
+/** The pages an invocation drives: `--game`'s; else both under `--all`, and backgammon alone for one `--device` (a `.png` --out shoots its board, as it did). */
+export const gamesFor = (args: EmulateArgs): ReadonlyArray<GameName> =>
+  args.game !== null ? [args.game] : args.all ? GAME_NAMES : ['backgammon'];
+
+// ---- UI Sandbox's cases ----------------------------------------------------------------------------
+
+/** One sandbox case: the emulation and the `screen.orientation.type` the page is told (`?type=`), which puts the cut on the left or the right sideways. */
+export type SandboxCase = Readonly<{ e: Emulation; type: OrientationType }>;
+
+/** The orientation types a case is rendered under: both landscapes (the cut on the left, then on the right), the one portrait. */
+export const typesOf = (o: Orientation): ReadonlyArray<OrientationType> =>
+  o === 'landscape' ? ['landscape-primary', 'landscape-secondary'] : ['portrait-primary'];
+
+/** UI Sandbox's phones: every supported row but the iPads (no cut, the desktop template), as e2e/ui-sandbox.spec.ts sweeps them. */
+export const SANDBOX_PHONES: ReadonlyArray<Device> = DEVICES.filter(
+  (d) => d.kind !== 'ipad' && d.supported,
+);
+
+/** The sandbox's cases for an invocation: `casesFor`'s emulations over the phones, each under its orientation types; e2e/ui-sandbox.spec.ts's 56 (sideways bar-up twice, sideways fullscreen, upright bar-up) are among `--all`'s. */
+export const sandboxCasesFor = (args: EmulateArgs): ReadonlyArray<SandboxCase> => {
+  const withTypes = (es: ReadonlyArray<Emulation>): ReadonlyArray<SandboxCase> =>
+    es.flatMap((e) => typesOf(e.orientation).map((type) => ({ e, type })));
+  if (args.all)
+    return withTypes(
+      SANDBOX_PHONES.flatMap((d) => emulationsOf(d).filter((e) => narrowed(args, e))),
+    );
+  return withTypes(casesFor(args));
+};
+
+/** A sandbox case's name: the emulation's, then the type. */
+export const sandboxName = (c: SandboxCase): string => `${emulationName(c.e)} ${c.type}`;
+
+/** The row the page can tell for a case: upright in a tab the notch reads 0, so two classes on one screen part by their pixel ratio alone. */
+export const sandboxMatch = (e: Emulation): Device | null =>
+  deviceOf({ screen: e.screen, dpr: e.dpr, notch: e.notch });
+
+/** The safe-area map the module computes for a case: what the page must write (e2e/ui-sandbox.spec.ts asserts the same). */
+export const sandboxMap = (c: SandboxCase): SafeAreaMap =>
+  safeAreaMap({
+    corners: c.e.corners,
+    cut: sandboxMatch(c.e)?.cut ?? null,
+    type: c.type,
+    insets: c.e.insets,
+    viewport: c.e.viewport,
+    full: screenFor(c.e.device, c.e.orientation),
+  });
+
+/** The vertical edge without the cut, or null: where example (g)'s rail goes. */
+export const freeSideOf = (map: SafeAreaMap): 'left' | 'right' | null =>
+  map.cutEdge === 'left' ? 'right' : map.cutEdge === 'right' ? 'left' : null;
+
+/** How many ears example (h) shows: the cut's vertical edge's segments, 0 for a cut on a horizontal edge or none. */
+export const earsOf = (map: SafeAreaMap): number =>
+  map.cutEdge === 'left' || map.cutEdge === 'right' ? map.edges[map.cutEdge].length : 0;
+
 const px = (n: number): string => String(Math.round(n * 100) / 100);
 const pad = (s: string, n: number): string => s.padEnd(n);
+/** A row's cut as the readout spells it: `126 island`, `209 notch`, `none`. */
+const cutText = (cut: Device['cut']): string =>
+  cut === null ? 'none' : `${String(cut.length)} ${cut.island ? 'island' : 'notch'}`;
+const segmentText = (s: Segment): string => `${px(s.from)}-${px(s.to)} (${px(lengthOf(s))})`;
 
 /** `list`: the catalogue, one line per row. */
 export const listText = (): string => {
@@ -186,6 +276,7 @@ export const listText = (): string => {
     pad('up t/b', 8),
     pad('side l/r/b', 11),
     pad('corner', 7),
+    pad('cut', 11),
     pad('bar up', 8),
     pad('bar side', 9),
     pad('', 11),
@@ -202,6 +293,7 @@ export const listText = (): string => {
         11,
       ),
       pad(String(d.corner), 7),
+      pad(cutText(d.cut), 11),
       pad(`${String(d.toolbar.portrait.min)}-${String(d.toolbar.portrait.max)}`, 8),
       pad(`${String(d.toolbar.landscape.min)}-${String(d.toolbar.landscape.max)}`, 9),
       pad(d.verified ? '' : 'UNVERIFIED', 11),
@@ -312,6 +404,30 @@ export const explainText = (e: Emulation): string => {
     );
   }
   return lines.join('\n');
+};
+
+/** `explain --game ui-sandbox`: one case's safe-area map, from the same module the page runs, and where examples (g) and (h) land. */
+export const explainSandboxText = (c: SandboxCase): string => {
+  const e = c.e;
+  const d = e.device;
+  const match = sandboxMatch(e);
+  const map = sandboxMap(c);
+  const free = freeSideOf(map);
+  const ears = earsOf(map);
+  const reach = CORNER_KEYS.map((k) => `${k} ${px(e.corners[k])}`).join('  ');
+  return [
+    `${sandboxName(c)}${d.verified ? '' : '  (UNVERIFIED row)'}`,
+    `  ${d.models}`,
+    `  screen ${String(e.screen.width)}x${String(e.screen.height)} @${String(e.dpr)}x  viewport ${String(e.viewport.width)}x${String(e.viewport.height)}`,
+    `  insets t/r/b/l ${String(e.insets.top)}/${String(e.insets.right)}/${String(e.insets.bottom)}/${String(e.insets.left)}  match ${match === null ? 'unknown (heuristic)' : match.id}  cut ${cutText(match?.cut ?? null)}`,
+    `  frame corners: ${reach}`,
+    `  cut side ${map.cutEdge}${map.cut === null ? (map.cutEdge === 'none' ? '' : ' (off the page: under the bar)') : `  at ${segmentText(map.cut)}`}  ear ${px(map.ear)}  free side ${free ?? 'none'}`,
+    ...EDGES.map(
+      (edge) =>
+        `  safe ${edge}: ${map.edges[edge].length === 0 ? 'none' : map.edges[edge].map(segmentText).join(', ')}`,
+    ),
+    `  (g) rail: ${free === null || map.edges[free].length === 0 ? 'hidden (no free segment)' : `${free} segment 1`}  (h) ears: ${String(ears)}${ears === 0 && map.cutEdge !== 'none' && map.cut !== null ? ' (under 44px)' : ''}`,
+  ].join('\n');
 };
 
 // ---- the page ----------------------------------------------------------------------------------
@@ -487,6 +603,143 @@ export const judge = (e: Emulation, m: Measured): Verdict => {
   return { pass: checks.every((c) => c.pass), checks };
 };
 
+// ---- UI Sandbox: the measurement and the verdict ---------------------------------------------------
+
+/** The layout examples shot and measured per sandbox case (src/examples.ts ids): (a), (f), (g), (h), (i). */
+export const SANDBOX_EXAMPLES = ['cover', 'board', 'rail', 'ears', 'gutters'] as const;
+export type SandboxExample = (typeof SANDBOX_EXAMPLES)[number];
+export const EXAMPLE_LABELS: Readonly<Record<SandboxExample, string>> = {
+  cover: '(a) one box',
+  board: "(f) backgammon's shape",
+  rail: '(g) rail on the free side',
+  ears: '(h) buttons in the ears',
+  gutters: '(i) symmetric gutters',
+};
+
+/** One example as the page reports it (`__uiSandbox.report()`), plus what is visible and the document's height. */
+export type ExampleMeasure = Readonly<{
+  fits: boolean;
+  gaps: Readonly<Record<string, number>>;
+  placements: ReadonlyArray<string>;
+  /** Visible `.edge-rail .sq-btn` (example (g)). */
+  railButtons: number;
+  /** Visible `.ear` (example (h)). */
+  ears: number;
+  scrollHeight: number;
+}>;
+export type SandboxMeasured = Readonly<{
+  inner: Readonly<{ w: number; h: number }>;
+  /** `body::before`'s four computed corner radii in px (the frame's). */
+  corners: Corners;
+  /** `__uiSandbox.device()`: the row the page matched. */
+  device: string | null;
+  /** `__uiSandbox.map()`: the map the page wrote. */
+  map: SafeAreaMap;
+  /** The readout's first line (the device line), for the sheet. */
+  deviceLine: string;
+  examples: Readonly<Record<SandboxExample, ExampleMeasure>>;
+}>;
+
+const SANDBOX_PAGE = `(() => {
+  const h = window.__uiSandbox;
+  const cs = getComputedStyle(document.body, '::before');
+  const r = (v) => parseFloat(v) || 0;
+  return {
+    inner: { w: innerWidth, h: innerHeight },
+    corners: { tl: r(cs.borderTopLeftRadius), tr: r(cs.borderTopRightRadius), br: r(cs.borderBottomRightRadius), bl: r(cs.borderBottomLeftRadius) },
+    device: h.device(),
+    map: h.map(),
+    deviceLine: h.readout().split('\\n')[0],
+  };
+})()`;
+const SANDBOX_EXAMPLE = `(() => {
+  const rep = window.__uiSandbox.report();
+  const shown = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+  const count = (sel) => Array.from(document.querySelectorAll(sel)).filter(shown).length;
+  return {
+    fits: rep !== null && rep.fits,
+    gaps: rep === null ? {} : rep.gaps,
+    placements: rep === null ? [] : rep.placements,
+    railButtons: count('.edge-rail .sq-btn'),
+    ears: count('.ear'),
+    scrollHeight: document.documentElement.scrollHeight,
+  };
+})()`;
+
+/**
+ * The sandbox's invariants over a measurement (pure), the same e2e/ui-sandbox.spec.ts asserts, so
+ * the CLI and the spec agree case for case: the frame's four corners are the catalogue's radius
+ * where the reach rule says the corner is the screen's and 0 elsewhere; the page matched the
+ * emulated row; the map the page wrote equals the module's; example (a) fits without scroll and
+ * keeps 11px inside every edge; (g)'s three buttons sit in the free side's first segment (or the
+ * rail is hidden where the map names none); (h) shows exactly the map's ears, none over an arc or
+ * the cut; no example scrolls the document.
+ */
+export const judgeSandbox = (c: SandboxCase, m: SandboxMeasured): Verdict => {
+  const e = c.e;
+  const expected = sandboxMap(c);
+  const matched = sandboxMatch(e)?.id ?? null;
+  const checks: Check[] = [];
+  const corners = CORNER_KEYS.map((k) => `${k} ${px(m.corners[k])}`).join(' ');
+  const want = CORNER_KEYS.map((k) => `${k} ${px(e.corners[k])}`).join(' ');
+  checks.push({
+    name: 'corner',
+    pass: CORNER_KEYS.every((k) => Math.abs(m.corners[k] - e.corners[k]) <= 0.01),
+    detail: `frame ${corners}, catalogue ${want}`,
+  });
+  checks.push({
+    name: 'device',
+    pass: m.device === matched,
+    detail: `page ${m.device ?? 'unknown'}, catalogue ${matched ?? 'unknown'}`,
+  });
+  const same = JSON.stringify(m.map) === JSON.stringify(expected);
+  checks.push({
+    name: 'map',
+    pass: same,
+    detail: same
+      ? `cut ${m.map.cutEdge}, ear ${px(m.map.ear)}, segments ${EDGES.map((edge) => `${edge} ${String(m.map.edges[edge].length)}`).join(' ')}`
+      : `page ${JSON.stringify(m.map)} vs module ${JSON.stringify(expected)}`,
+  });
+  const cover = m.examples.cover;
+  const gaps = Object.entries(cover.gaps);
+  const tight = gaps.filter(([, g]) => g < CLEARANCE - TOL);
+  checks.push({
+    name: 'fits',
+    pass: cover.fits && tight.length === 0,
+    detail: `(a) ${cover.fits ? 'fits' : 'DOES NOT FIT'}; gaps ${gaps.map(([k, g]) => `${k} ${px(g)}`).join(' ')}`,
+  });
+  const free = freeSideOf(expected);
+  const freeSegment = free !== null && expected.edges[free].length > 0;
+  const rail = m.examples.rail;
+  checks.push({
+    name: 'rail',
+    pass: freeSegment
+      ? rail.railButtons === 3 && rail.placements.join('; ') === `rail: ${free} segment 1`
+      : rail.railButtons === 0,
+    detail: freeSegment
+      ? `(g) ${String(rail.railButtons)} buttons, ${rail.placements.join('; ') || 'no placement'}`
+      : `(g) no free segment: ${String(rail.railButtons)} buttons shown`,
+  });
+  const wanted = earsOf(expected);
+  const ears = m.examples.ears;
+  const over = ears.placements.slice(0, wanted).filter((p) => p.includes('OVER'));
+  checks.push({
+    name: 'ears',
+    pass: ears.ears === wanted && over.length === 0,
+    detail: `(h) ${String(ears.ears)} shown, the map holds ${String(wanted)}${over.length === 0 ? '' : `; ${over.join('; ')}`}`,
+  });
+  const scrolling = SANDBOX_EXAMPLES.filter((x) => m.examples[x].scrollHeight > m.inner.h + 1);
+  checks.push({
+    name: 'scroll',
+    pass: scrolling.length === 0,
+    detail:
+      scrolling.length === 0
+        ? `no scroll in ${String(m.inner.h)}`
+        : `scrolls: ${scrolling.join(', ')}`,
+  });
+  return { pass: checks.every((k) => k.pass), checks };
+};
+
 /** Page-side: no animation is running on the dice (the tumble is a keyframe animation that scales the faces, so a read mid-tumble sees 30px dice). */
 export const DICE_STILL = `() => document.getAnimations().every((a) => a.playState !== 'running' || !(a.effect instanceof KeyframeEffect && a.effect.target !== null && a.effect.target.closest('#dice') !== null))`;
 
@@ -503,12 +756,49 @@ export type Card = Readonly<{
   pictures: Readonly<Record<string, string>>;
 }>;
 
+/** A sandbox card: the case, the measurement, the verdict and one picture per example. */
+export type SandboxCard = Readonly<{
+  name: string;
+  c: SandboxCase;
+  measured: SandboxMeasured;
+  verdict: Verdict;
+  /** Example -> the PNG's path, relative to the sheet. */
+  pictures: Readonly<Record<string, string>>;
+}>;
+export type SheetCard = Card | SandboxCard;
+const isSandbox = (c: SheetCard): c is SandboxCard => 'c' in c;
+
 const esc = (s: string): string =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c);
 
-/** `index.html`: one card per case, the tab's two bar states side by side, every number and the verdict under the pictures. */
-export const sheetHtml = (cards: ReadonlyArray<Card>, stamp: string): string => {
+const checksHtml = (v: Verdict): string =>
+  v.checks
+    .map((k) => `<li class="${k.pass ? 'ok' : 'bad'}"><b>${esc(k.name)}</b> ${esc(k.detail)}</li>`)
+    .join('');
+
+/** `index.html`: backgammon's cards, then the sandbox's; per case every picture, every number and the verdict under them. */
+export const sheetHtml = (cards: ReadonlyArray<SheetCard>, stamp: string): string => {
   const passed = cards.filter((c) => c.verdict.pass).length;
+  const sandboxCard = (c: SandboxCard): string => {
+    const pics = SANDBOX_EXAMPLES.map(
+      (x) =>
+        `<figure><img src="${esc(c.pictures[x] ?? '')}" alt="${esc(`${c.name} ${x}`)}" loading="lazy"><figcaption>${esc(EXAMPLE_LABELS[x])}</figcaption></figure>`,
+    ).join('');
+    const map = c.measured.map;
+    return `<section class="card ${c.verdict.pass ? 'pass' : 'fail'}" id="${esc(`ui-sandbox-${c.name.replace(/[^a-z0-9]+/gi, '-')}`)}">
+<h2>${esc(c.c.e.device.models)} <small>${esc(c.name)}${c.c.e.device.verified ? '' : ' · UNVERIFIED row'}</small> <span class="badge">${c.verdict.pass ? 'pass' : 'FAIL'}</span></h2>
+<div class="pics">${pics}</div>
+<p class="device">${esc(c.measured.deviceLine)}</p>
+<dl>
+<dt>viewport</dt><dd>${String(c.c.e.viewport.width)}x${String(c.c.e.viewport.height)} @${String(c.c.e.dpr)}x (screen ${String(c.c.e.screen.width)}x${String(c.c.e.screen.height)})</dd>
+<dt>insets t/r/b/l</dt><dd>${String(c.c.e.insets.top)}/${String(c.c.e.insets.right)}/${String(c.c.e.insets.bottom)}/${String(c.c.e.insets.left)}</dd>
+<dt>corners tl/tr/br/bl</dt><dd>${CORNER_KEYS.map((k) => px(c.measured.corners[k])).join('/')} (catalogue ${CORNER_KEYS.map((k) => px(c.c.e.corners[k])).join('/')})</dd>
+<dt>cut</dt><dd>${esc(map.cutEdge)}${map.cut === null ? '' : ` at ${esc(segmentText(map.cut))}`}, ear ${px(map.ear)}, free side ${esc(freeSideOf(map) ?? 'none')}</dd>
+${EDGES.map((edge) => `<dt>safe ${edge}</dt><dd>${map.edges[edge].length === 0 ? 'none' : esc(map.edges[edge].map(segmentText).join(', '))}</dd>`).join('\n')}
+</dl>
+<ul class="checks">${checksHtml(c.verdict)}</ul>
+</section>`;
+  };
   const card = (c: Card): string => {
     const b = c.measured.board;
     const below = b === null ? NaN : c.measured.inner.h - (b.y + b.h);
@@ -516,11 +806,7 @@ export const sheetHtml = (cards: ReadonlyArray<Card>, stamp: string): string => 
       (s) =>
         `<figure><img src="${esc(c.pictures[s] ?? '')}" alt="${esc(`${c.name} ${s}`)}" loading="lazy"><figcaption>${esc(s)}</figcaption></figure>`,
     ).join('');
-    const checks = c.verdict.checks
-      .map(
-        (k) => `<li class="${k.pass ? 'ok' : 'bad'}"><b>${esc(k.name)}</b> ${esc(k.detail)}</li>`,
-      )
-      .join('');
+    const checks = checksHtml(c.verdict);
     return `<section class="card ${c.verdict.pass ? 'pass' : 'fail'}" id="${esc(c.name.replace(/[^a-z0-9]+/gi, '-'))}">
 <h2>${esc(c.e.device.models)} <small>${esc(c.name)}${c.e.device.verified ? '' : ' · UNVERIFIED row'}</small> <span class="badge">${c.verdict.pass ? 'pass' : 'FAIL'}</span></h2>
 <div class="pics">${pics}</div>
@@ -535,6 +821,8 @@ export const sheetHtml = (cards: ReadonlyArray<Card>, stamp: string): string => 
 <ul class="checks">${checks}</ul>
 </section>`;
   };
+  const boards = cards.filter((c): c is Card => !isSandbox(c));
+  const sandboxes = cards.filter(isSandbox);
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Shell screenshot sheet ${esc(stamp)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -550,10 +838,13 @@ figure{margin:0;flex:0 0 auto}figure img{display:block;max-height:320px;max-widt
 figcaption{font-size:12px;color:#666;text-align:center}
 dl{display:grid;grid-template-columns:max-content 1fr;gap:2px 12px;margin:8px 0;font-size:13px}dt{color:#666}dd{margin:0}
 .checks{list-style:none;padding:0;margin:0;font-size:13px}.checks li{padding:1px 0}.checks li::before{content:"✓ ";color:#7a8a3c}.checks li.bad::before{content:"✗ ";color:#b3261e}
+h2.game{font-size:16px;margin:24px 0 8px;border-bottom:1px solid #d9d4c7}
+.device{margin:6px 0 0;font:12px/1.4 ui-monospace,Menlo,monospace;color:#444}
 </style></head><body>
 <h1>Shell screenshot sheet · ${esc(stamp)} · ${String(passed)} of ${String(cards.length)} cases pass</h1>
-<p>Every phone the shell knows (web/shared/lib/devices.ts), each orientation and display mode, a browser tab twice (bar shown, then hidden): the home, the first curtain, the roll modal and the rolled board, at the device's pixel ratio. Look, then decide.</p>
-${cards.map(card).join('\n')}
+<p>Every phone the shell knows (web/shared/lib/devices.ts), each orientation and display mode, a browser tab twice (bar shown, then hidden), at the device's pixel ratio. Backgammon: the home, the first curtain, the roll modal and the rolled board. UI Sandbox: the preview screen under each orientation type (both landscapes: the cut on the left, then on the right) around examples (a), (f), (g), (h) and (i), the readout's device line under the shots. Look, then decide.</p>
+${boards.length === 0 ? '' : `<h2 class="game">Backgammon · ${String(boards.filter((c) => c.verdict.pass).length)} of ${String(boards.length)} pass</h2>\n${boards.map(card).join('\n')}`}
+${sandboxes.length === 0 ? '' : `<h2 class="game">UI Sandbox · ${String(sandboxes.filter((c) => c.verdict.pass).length)} of ${String(sandboxes.length)} pass</h2>\n${sandboxes.map(sandboxCard).join('\n')}`}
 </body></html>
 `;
 };
@@ -639,6 +930,51 @@ export const driveCase = async (
   }
 };
 
+/**
+ * One sandbox case: a context at the device as `driveCase` stands it (the seam installed, no seed:
+ * nothing random), the preview screen loaded under the case's orientation type and example (a),
+ * the page-level reading (the corners, the match, the map, the readout's device line), then each
+ * example in turn: set through the hook, a frame to paint, a shot where `pictures` names a path,
+ * the report and what is visible.
+ */
+export const driveSandbox = async (
+  browser: Browser,
+  url: string,
+  c: SandboxCase,
+  pictures: Readonly<Record<string, string>> | null,
+): Promise<SandboxMeasured> => {
+  const e = c.e;
+  const context = await browser.newContext({
+    viewport: { width: e.viewport.width, height: e.viewport.height },
+    screen: { width: e.screen.width, height: e.screen.height },
+    deviceScaleFactor: e.dpr,
+    isMobile: true,
+    hasTouch: true,
+  });
+  await context.addInitScript({ content: seamScript(e) });
+  const page = await context.newPage();
+  try {
+    await page.goto(`${url}?screen=preview&example=cover&type=${c.type}`);
+    await page.waitForFunction("typeof window.__uiSandbox === 'object'");
+    await page.waitForTimeout(50);
+    const head = await page.evaluate<Omit<SandboxMeasured, 'examples'>>(SANDBOX_PAGE);
+    const example = async (x: SandboxExample): Promise<ExampleMeasure> => {
+      await page.evaluate(`window.__uiSandbox.set('example', '${x}')`);
+      await page.waitForTimeout(50);
+      await shot(page, pictures?.[x] ?? null);
+      return page.evaluate<ExampleMeasure>(SANDBOX_EXAMPLE);
+    };
+    const cover = await example('cover');
+    const board = await example('board');
+    const rail = await example('rail');
+    const ears = await example('ears');
+    const gutters = await example('gutters');
+    return { ...head, examples: { cover, board, rail, ears, gutters } };
+  } finally {
+    await context.close();
+  }
+};
+
 const stampNow = (): string => {
   const d = new Date();
   const two = (n: number): string => String(n).padStart(2, '0');
@@ -647,13 +983,19 @@ const stampNow = (): string => {
 
 const fileNameOf = (e: Emulation, state: string): string =>
   `${emulationName(e).replace(/\s+/g, '_')}--${state}.png`;
+const sandboxFileNameOf = (c: SandboxCase, example: string): string =>
+  `ui-sandbox_${sandboxName(c).replace(/\s+/g, '_')}--${example}.png`;
 
 type Served = Readonly<{ url: string; close: () => Promise<void> }>;
-/** `--url` as given, or `--serve`: dist/ through tools/serve-dist.ts on a free port. */
-const pageUrl = async (args: EmulateArgs): Promise<Served> => {
-  if (args.url !== null) return { url: args.url, close: () => Promise.resolve() };
+/** `--url <site>` as given (the site's root, `games/<name>/` under it, a trailing slash added), or `--serve`: dist/ through tools/serve-dist.ts on a free port. */
+const siteUrl = async (args: EmulateArgs): Promise<Served> => {
+  if (args.url !== null)
+    return {
+      url: args.url.endsWith('/') ? args.url : `${args.url}/`,
+      close: () => Promise.resolve(),
+    };
   if (!args.serve)
-    throw new Error('--url <page> or --serve (serves dist/; run `npm run build` first)');
+    throw new Error('--url <site> or --serve (serves dist/; run `npm run build` first)');
   const running = await startServer({
     root: resolve('dist'),
     base: PAGES_BASE_PATH,
@@ -661,8 +1003,10 @@ const pageUrl = async (args: EmulateArgs): Promise<Served> => {
     port: 0,
     aliases: {},
   });
-  return { url: `${running.url}${PAGES_BASE_PATH}games/backgammon/`, close: running.close };
+  return { url: `${running.url}${PAGES_BASE_PATH}`, close: running.close };
 };
+/** A page's URL under the site's root. */
+const pageOf = (site: string, game: GameName): string => `${site}games/${game}/`;
 
 /** One after another (one Chromium context at a time), the results in order. */
 const inTurn = <T, R>(
@@ -674,20 +1018,21 @@ const inTurn = <T, R>(
     Promise.resolve([]),
   );
 
-const render = async (
+/** Every backgammon case driven and judged, a picture per state where `dir` is given (a `.png` `single` shoots the board alone). */
+const renderBoards = async (
   browser: Browser,
   url: string,
-  cases: ReadonlyArray<Emulation>,
-  out: string | null,
-): Promise<void> => {
-  const single = out?.endsWith('.png') === true;
-  const stamp = stampNow();
-  const dir = single ? dirname(resolve(out)) : resolve(out ?? `shots/${stamp}`);
-  mkdirSync(dir, { recursive: true });
-  const cards = await inTurn(cases, async (e): Promise<Card> => {
-    const pictures = single
-      ? { board: resolve(out) }
-      : Object.fromEntries(STATES.map((s) => [s, resolve(dir, fileNameOf(e, s))]));
+  args: EmulateArgs,
+  dir: string | null,
+  single: string | null,
+): Promise<ReadonlyArray<Card>> =>
+  inTurn(casesFor(args), async (e): Promise<Card> => {
+    const pictures =
+      single !== null
+        ? { board: single }
+        : dir === null
+          ? null
+          : Object.fromEntries(STATES.map((s) => [s, resolve(dir, fileNameOf(e, s))]));
     const measured = await driveCase(browser, url, e, pictures);
     const verdict = judge(e, measured);
     console.log(`${verdict.pass ? 'pass' : 'FAIL'}  ${emulationName(e)}`);
@@ -700,32 +1045,95 @@ const render = async (
       pictures: Object.fromEntries(STATES.map((s) => [s, fileNameOf(e, s)])),
     };
   });
-  if (single) return;
+
+/** Every sandbox case driven and judged, a picture per example where `dir` is given (a `.png` `single` shoots example (h) alone). */
+const renderSandbox = async (
+  browser: Browser,
+  url: string,
+  args: EmulateArgs,
+  dir: string | null,
+  single: string | null,
+): Promise<ReadonlyArray<SandboxCard>> =>
+  inTurn(sandboxCasesFor(args), async (c): Promise<SandboxCard> => {
+    const pictures =
+      single !== null
+        ? { ears: single }
+        : dir === null
+          ? null
+          : Object.fromEntries(
+              SANDBOX_EXAMPLES.map((x) => [x, resolve(dir, sandboxFileNameOf(c, x))]),
+            );
+    const measured = await driveSandbox(browser, url, c, pictures);
+    const verdict = judgeSandbox(c, measured);
+    console.log(`${verdict.pass ? 'pass' : 'FAIL'}  ui-sandbox ${sandboxName(c)}`);
+    return {
+      name: sandboxName(c),
+      c,
+      measured,
+      verdict,
+      pictures: Object.fromEntries(SANDBOX_EXAMPLES.map((x) => [x, sandboxFileNameOf(c, x)])),
+    };
+  });
+
+/** `render`: both games' cards (or `--game`'s) into one folder with the sheet; a `.png` --out shoots one picture and writes no sheet. */
+const render = async (browser: Browser, site: string, args: EmulateArgs): Promise<void> => {
+  const games = gamesFor(args);
+  const single = args.out?.endsWith('.png') === true ? resolve(args.out) : null;
+  const stamp = stampNow();
+  const dir = single !== null ? dirname(single) : resolve(args.out ?? `shots/${stamp}`);
+  mkdirSync(dir, { recursive: true });
+  const boards = games.includes('backgammon')
+    ? await renderBoards(browser, pageOf(site, 'backgammon'), args, dir, single)
+    : [];
+  const sandboxes = games.includes('ui-sandbox')
+    ? await renderSandbox(browser, pageOf(site, 'ui-sandbox'), args, dir, single)
+    : [];
+  if (single !== null) return;
+  const cards: ReadonlyArray<SheetCard> = [...boards, ...sandboxes];
   writeFileSync(resolve(dir, 'index.html'), sheetHtml(cards, stamp));
   console.log(`${String(cards.length)} cards -> ${resolve(dir, 'index.html')}`);
 };
 
-const check = async (
-  browser: Browser,
-  url: string,
-  cases: ReadonlyArray<Emulation>,
-  json: string | null,
-): Promise<number> => {
-  const report = await inTurn(cases, async (e) => {
-    const measured = await driveCase(browser, url, e, null);
-    return {
-      case: emulationName(e),
-      emulation: e,
-      twin: twinOf(e),
-      measured,
-      verdict: judge(e, measured),
-    };
-  });
-  console.log(summaryTable(report.map((r) => [r.case, r.verdict] as const)));
-  if (json !== null) {
-    mkdirSync(dirname(resolve(json)), { recursive: true });
-    writeFileSync(resolve(json), `${JSON.stringify(report, null, 2)}\n`);
-    console.log(`report -> ${resolve(json)}`);
+/** `check`: both games' verdicts (or `--game`'s), one summary table per game, the JSON report, exit 1 on any failure. */
+const check = async (browser: Browser, site: string, args: EmulateArgs): Promise<number> => {
+  const games = gamesFor(args);
+  const boards = games.includes('backgammon')
+    ? await renderBoards(browser, pageOf(site, 'backgammon'), args, null, null)
+    : [];
+  const sandboxes = games.includes('ui-sandbox')
+    ? await renderSandbox(browser, pageOf(site, 'ui-sandbox'), args, null, null)
+    : [];
+  if (boards.length > 0) {
+    console.log('\nbackgammon');
+    console.log(summaryTable(boards.map((r) => [r.name, r.verdict] as const)));
+  }
+  if (sandboxes.length > 0) {
+    console.log('\nui-sandbox');
+    console.log(summaryTable(sandboxes.map((r) => [r.name, r.verdict] as const)));
+  }
+  const report = [
+    ...boards.map((r) => ({
+      game: 'backgammon',
+      case: r.name,
+      emulation: r.e,
+      twin: r.twin,
+      measured: r.measured,
+      verdict: r.verdict,
+    })),
+    ...sandboxes.map((r) => ({
+      game: 'ui-sandbox',
+      case: r.name,
+      emulation: r.c.e,
+      type: r.c.type,
+      map: sandboxMap(r.c),
+      measured: r.measured,
+      verdict: r.verdict,
+    })),
+  ];
+  if (args.json !== null) {
+    mkdirSync(dirname(resolve(args.json)), { recursive: true });
+    writeFileSync(resolve(args.json), `${JSON.stringify(report, null, 2)}\n`);
+    console.log(`report -> ${resolve(args.json)}`);
   }
   return report.every((r) => r.verdict.pass) ? 0 : 1;
 };
@@ -735,19 +1143,23 @@ const run = async (args: EmulateArgs): Promise<number> => {
     console.log(listText());
     return 0;
   }
-  const cases = casesFor(args);
   if (args.command === 'explain') {
-    console.log(cases.map(explainText).join('\n\n'));
+    const games = gamesFor(args);
+    const texts = [
+      ...(games.includes('backgammon') ? casesFor(args).map(explainText) : []),
+      ...(games.includes('ui-sandbox') ? sandboxCasesFor(args).map(explainSandboxText) : []),
+    ];
+    console.log(texts.join('\n\n'));
     return 0;
   }
-  const served = await pageUrl(args);
+  const served = await siteUrl(args);
   const browser = await chromium.launch();
   try {
     if (args.command === 'render') {
-      await render(browser, served.url, cases, args.out);
+      await render(browser, served.url, args);
       return 0;
     }
-    return await check(browser, served.url, cases, args.json);
+    return await check(browser, served.url, args);
   } finally {
     await browser.close();
     await served.close();

@@ -14,16 +14,28 @@ import {
   CLEARANCE,
   DESKTOP_SCROLL_MAX_HEIGHT,
   PHONE_SCROLL_MAX_HEIGHT,
+  SANDBOX_EXAMPLES,
+  SANDBOX_PHONES,
   casesFor,
+  explainSandboxText,
   explainText,
+  gamesFor,
   judge,
+  judgeSandbox,
   listText,
   parseEmulateArgs,
+  sandboxCasesFor,
+  sandboxMap,
+  sandboxName,
   seamScript,
   sheetHtml,
   summaryTable,
   twinOf,
+  typesOf,
+  type ExampleMeasure,
   type Measured,
+  type SandboxCase,
+  type SandboxMeasured,
 } from './shell-emulate.ts';
 
 const iphone12 = deviceById('iphone-390x844');
@@ -85,6 +97,45 @@ describe('the command line', () => {
       /browser, standalone, fullscreen/,
     );
     expect(() => parseEmulateArgs(['explain', '--device', 'nokia'])).toThrow(/`list`/);
+    expect(parseEmulateArgs(['check', '--all', '--game', 'ui-sandbox'])).toMatchObject({
+      game: 'ui-sandbox',
+    });
+    expect(() => parseEmulateArgs(['check', '--game', 'chess'])).toThrow(/backgammon, ui-sandbox/);
+  });
+
+  test('gamesFor: --game names one; without it --all drives both and one --device drives backgammon alone', () => {
+    expect(gamesFor(parseEmulateArgs(['render', '--all']))).toEqual(['backgammon', 'ui-sandbox']);
+    expect(gamesFor(parseEmulateArgs(['render', '--device', 'iphone-390x844']))).toEqual([
+      'backgammon',
+    ]);
+    expect(gamesFor(parseEmulateArgs(['check', '--all', '--game', 'ui-sandbox']))).toEqual([
+      'ui-sandbox',
+    ]);
+    expect(
+      gamesFor(parseEmulateArgs(['check', '--device', 'iphone-390x844', '--game', 'ui-sandbox'])),
+    ).toEqual(['ui-sandbox']);
+  });
+
+  test('sandboxCasesFor: the phones (no iPad, no SE 1st gen) x every emulation, sideways under both landscape types and upright under the one portrait; the filters narrow; the e2e sweep`s 56 are among --all`s', () => {
+    expect(SANDBOX_PHONES.map((d) => d.kind)).not.toContain('ipad');
+    expect(SANDBOX_PHONES).toHaveLength(14);
+    expect(typesOf('landscape')).toEqual(['landscape-primary', 'landscape-secondary']);
+    expect(typesOf('portrait')).toEqual(['portrait-primary']);
+    const all = sandboxCasesFor(parseEmulateArgs(['check', '--all']));
+    // 8 emulations per phone: 4 upright (x1 type) + 4 sideways (x2 types) = 12.
+    expect(all).toHaveLength(14 * 12);
+    const names = all.map(sandboxName);
+    expect(names).toContain('iphone-393x852 landscape browser bar-shown landscape-secondary');
+    expect(names).toContain('iphone-393x852 landscape fullscreen landscape-primary');
+    expect(names).toContain('iphone-393x852 portrait browser bar-shown portrait-primary');
+    expect(names.some((n) => n.startsWith('ipad'))).toBe(false);
+    const upright = sandboxCasesFor(
+      parseEmulateArgs(['check', '--all', '--orientation', 'portrait']),
+    );
+    expect(upright).toHaveLength(14 * 4);
+    expect(upright.every((c) => c.type === 'portrait-primary')).toBe(true);
+    const one = sandboxCasesFor(parseEmulateArgs(['explain', '--device', 'iphone-390x844']));
+    expect(one.map((c) => c.type)).toEqual(['landscape-primary', 'landscape-secondary']);
   });
 
   test('casesFor: --all is every supported device x orientation x mode, the tab twice, narrowed by the filters; --device is one case with landscape/browser/shown defaults', () => {
@@ -178,6 +229,196 @@ describe('list and explain', () => {
     const short = twinOf(emulationFor(se1, 'landscape', 'browser', 'shown'));
     expect(short).toMatchObject({ scheme: 'rows', pointLen: 90, scrolls: true, floorHeight: 296 });
     expect(explainText(emulationFor(se1, 'landscape', 'browser', 'shown'))).toContain('SCROLLS');
+  });
+});
+
+describe('the sandbox: explain, the map and the verdict', () => {
+  const island = deviceById('iphone-393x852');
+  if (island === null) throw new Error('row missing');
+  const primary: SandboxCase = {
+    e: emulationFor(island, 'landscape', 'browser', 'shown'),
+    type: 'landscape-primary',
+  };
+  const secondary: SandboxCase = { ...primary, type: 'landscape-secondary' };
+  const upright: SandboxCase = {
+    e: emulationFor(island, 'portrait', 'browser', 'shown'),
+    type: 'portrait-primary',
+  };
+  /** A measurement that satisfies every sandbox invariant for a case: the page agrees with the module. */
+  const agreeing = (c: SandboxCase): SandboxMeasured => {
+    const map = sandboxMap(c);
+    const free = map.cutEdge === 'left' ? 'right' : map.cutEdge === 'right' ? 'left' : null;
+    const ears =
+      map.cutEdge === 'left' || map.cutEdge === 'right' ? map.edges[map.cutEdge].length : 0;
+    const h = c.e.viewport.height;
+    const base: ExampleMeasure = {
+      fits: true,
+      gaps: { top: 11, right: 70, bottom: 32, left: 70 },
+      placements: [],
+      railButtons: 0,
+      ears: 0,
+      scrollHeight: h,
+    };
+    return {
+      inner: { w: c.e.viewport.width, h },
+      corners: c.e.corners,
+      device: island.id,
+      map,
+      deviceLine: `device ${island.id}  ${island.models}`,
+      examples: {
+        cover: base,
+        board: base,
+        rail:
+          free === null
+            ? base
+            : { ...base, railButtons: 3, placements: [`rail: ${free} segment 1`] },
+        ears: {
+          ...base,
+          ears,
+          placements: Array.from(
+            { length: ears },
+            (_, i) => `ear${String(i + 1)}: ${map.cutEdge} segment ${String(i + 1)}`,
+          ),
+        },
+        gutters: base,
+      },
+    };
+  };
+
+  test('explain --game ui-sandbox: the match and the cut, the frame corners, the cut`s side and span, the ears, every edge`s segments, where (g) and (h) land; the secondary mirrors the primary; upright in a tab the cut is under the bar', () => {
+    const text = explainSandboxText(primary);
+    expect(text).toContain('iphone-393x852 landscape browser bar-shown landscape-primary');
+    expect(text).toContain('match iphone-393x852  cut 126 island');
+    expect(text).toContain('frame corners: tl 0  tr 0  br 55  bl 55');
+    expect(text).toContain('cut side left  at 83.5-209.5 (126)  ear 68.5  free side right');
+    expect(text).toContain('safe left: 0-77.5 (77.5), 215.5-284 (68.5)');
+    expect(text).toContain('(g) rail: right segment 1  (h) ears: 2');
+    const mirror = explainSandboxText(secondary);
+    expect(mirror).toContain('cut side right');
+    expect(mirror).toContain('safe right: 0-77.5 (77.5), 215.5-284 (68.5)');
+    expect(mirror).toContain('(g) rail: left segment 1');
+    const up = explainSandboxText(upright);
+    expect(up).toContain('cut side top (off the page: under the bar)');
+    expect(up).toContain('(g) rail: hidden (no free segment)  (h) ears: 0');
+  });
+
+  test('judgeSandbox: a page that agrees with the module passes the seven checks; each disagreement fails its own', () => {
+    const m = agreeing(primary);
+    const v = judgeSandbox(primary, m);
+    expect(v.checks.map((c) => c.name)).toEqual([
+      'corner',
+      'device',
+      'map',
+      'fits',
+      'rail',
+      'ears',
+      'scroll',
+    ]);
+    expect(v.pass, JSON.stringify(v.checks)).toBe(true);
+    const failing = (patch: Partial<SandboxMeasured>): ReadonlyArray<string> =>
+      judgeSandbox(primary, { ...m, ...patch })
+        .checks.filter((c) => !c.pass)
+        .map((c) => c.name);
+    expect(failing({ corners: { tl: 55, tr: 55, br: 55, bl: 55 } })).toEqual(['corner']);
+    expect(failing({ device: 'iphone-390x844' })).toEqual(['device']);
+    expect(failing({ device: null })).toEqual(['device']);
+    expect(failing({ map: { ...m.map, ear: 0 } })).toEqual(['map']);
+    const ex = m.examples;
+    expect(failing({ examples: { ...ex, cover: { ...ex.cover, fits: false } } })).toEqual(['fits']);
+    expect(
+      failing({ examples: { ...ex, cover: { ...ex.cover, gaps: { ...ex.cover.gaps, top: 9 } } } }),
+    ).toEqual(['fits']);
+    expect(failing({ examples: { ...ex, rail: { ...ex.rail, railButtons: 2 } } })).toEqual([
+      'rail',
+    ]);
+    expect(
+      failing({
+        examples: {
+          ...ex,
+          rail: { ...ex.rail, placements: ['rail: right OVER AN ARC OR THE CUT'] },
+        },
+      }),
+    ).toEqual(['rail']);
+    expect(failing({ examples: { ...ex, ears: { ...ex.ears, ears: 1 } } })).toEqual(['ears']);
+    expect(
+      failing({
+        examples: {
+          ...ex,
+          ears: {
+            ...ex.ears,
+            placements: ['ear1: left OVER AN ARC OR THE CUT', 'ear2: left segment 2'],
+          },
+        },
+      }),
+    ).toEqual(['ears']);
+    expect(
+      failing({ examples: { ...ex, board: { ...ex.board, scrollHeight: m.inner.h + 30 } } }),
+    ).toEqual(['scroll']);
+    expect(
+      judgeSandbox(primary, {
+        ...m,
+        examples: { ...ex, board: { ...ex.board, scrollHeight: m.inner.h + 30 } },
+      }).checks[6]?.detail,
+    ).toBe('scrolls: board');
+    // Upright in a tab: no free side, no ears; a rail or an ear shown fails.
+    const up = agreeing(upright);
+    expect(judgeSandbox(upright, up).pass).toBe(true);
+    expect(
+      judgeSandbox(upright, {
+        ...up,
+        examples: { ...up.examples, rail: { ...up.examples.rail, railButtons: 3 } },
+      }).checks[4],
+    ).toMatchObject({ name: 'rail', pass: false });
+    expect(
+      judgeSandbox(upright, {
+        ...up,
+        examples: { ...up.examples, ears: { ...up.examples.ears, ears: 2 } },
+      }).checks[5],
+    ).toMatchObject({ name: 'ears', pass: false });
+    expect(SANDBOX_EXAMPLES).toEqual(['cover', 'board', 'rail', 'ears', 'gutters']);
+  });
+
+  test('the sheet holds both games: a sandbox card with its five pictures, the device line and the cut, under its own heading; the counts per game and overall', () => {
+    const e = emulationFor(iphone12, 'landscape', 'browser', 'shown');
+    const fm = fitting(e);
+    const board = {
+      name: 'iphone-390x844 landscape browser bar-shown',
+      e,
+      twin: twinOf(e),
+      measured: fm,
+      verdict: judge(e, fm),
+      pictures: {
+        home: 'a--home.png',
+        curtain: 'a--curtain.png',
+        roll: 'a--roll.png',
+        board: 'a--board.png',
+      },
+    };
+    const m = agreeing(primary);
+    const sandbox = {
+      name: sandboxName(primary),
+      c: primary,
+      measured: m,
+      verdict: judgeSandbox(primary, m),
+      pictures: Object.fromEntries(SANDBOX_EXAMPLES.map((x) => [x, `s--${x}.png`])),
+    };
+    const html = sheetHtml([board, sandbox], '20260929-1200');
+    expect(html).toContain('2 of 2 cases pass');
+    expect(html).toContain('Backgammon · 1 of 1 pass');
+    expect(html).toContain('UI Sandbox · 1 of 1 pass');
+    expect(html.match(/<section class="card/g)).toHaveLength(2);
+    expect(html.match(/<img /g)).toHaveLength(4 + 5);
+    expect(html).toContain('src="s--ears.png"');
+    expect(html).toContain('(h) buttons in the ears');
+    expect(html).toContain(
+      '<p class="device">device iphone-393x852  iPhone 14 Pro, 15, 15 Pro, 16</p>',
+    );
+    expect(html).toContain(
+      '<dt>cut</dt><dd>left at 83.5-209.5 (126), ear 68.5, free side right</dd>',
+    );
+    expect(html).toContain('<b>ears</b>');
+    // Backgammon alone: no sandbox heading.
+    expect(sheetHtml([board], 'x')).not.toContain('UI Sandbox ·');
   });
 });
 
