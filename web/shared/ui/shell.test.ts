@@ -3082,6 +3082,9 @@ describe('runShellEffect', () => {
       [KEYS.flipTable, 'on'],
       [KEYS.recentGames, JSON.stringify([{ ...RECORD, at: NOW + 1 }, RECORD])],
     ]);
+    // The flip's other arm: off is written as the word, not a removed key (`home/init` reads `on` alone as the flip).
+    runShellEffect(shell, { type: 'writeFlip', on: false }, deps, FAKE);
+    expect(store.get(KEYS.flipTable)).toBe('off');
     runShellEffect(shell, { type: 'rememberName', name: '' }, deps, FAKE);
     expect(store.has(KEYS.name)).toBe(false);
   });

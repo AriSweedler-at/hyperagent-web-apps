@@ -179,14 +179,15 @@ describe('paintWaiting', () => {
   });
 
   test('the name card never fights typing: a box the player edited is left alone by every paint, and refilled only when the seated name changes while the box holds the previous seated name or the word the player sent', () => {
-    const waiting = {
+    // The room as a guest that has sent no word sees it; `waiting` is one that sent 'Guest'.
+    const unnamed = {
       code: 'ABCD',
       hostStatus: { text: 'Waiting…', pulse: true },
       guestStatus: { text: 'Connected', pulse: false },
       startGameVisible: false,
-      myName: 'Guest',
       oppName: 'Ann',
     };
+    const waiting = { ...unnamed, myName: 'Guest' };
     const p = cardPage();
     paintWaiting(p.doc, { ...waiting, seatedName: 'Guest' });
     expect(p.get('guestNameInput').value()).toBe('Guest');
@@ -231,6 +232,16 @@ describe('paintWaiting', () => {
     expect(p.get('guestNameInput').value()).toBe('');
     paintWaiting(p.doc, { ...waiting, myName: 'Cy', seatedName: 'Cy' });
     expect(p.get('guestNameInput').value()).toBe('Cy');
+    // A guest that has sent no word (`myName` absent: nothing for the box to be matched against)
+    // keeps what it typed through a seated-name change, which is still recorded; a box holding the
+    // previous seated name follows the next one as for anyone.
+    typeInto(p, 'guestNameInput', 'Cy typed');
+    paintWaiting(p.doc, { ...unnamed, seatedName: 'Cy 2' });
+    expect(p.get('guestNameInput').value()).toBe('Cy typed');
+    expect(p.get('guestNameInput').attr('data-seated')).toBe('Cy 2');
+    typeInto(p, 'guestNameInput', 'Cy 2');
+    paintWaiting(p.doc, { ...unnamed, seatedName: 'Cy 3' });
+    expect(p.get('guestNameInput').value()).toBe('Cy 3');
   });
 
   test('the seat list, when the page has one: the host first, every seat with its state and mine marked, keyed on the rows; nothing while no room is open; a page without it is untouched', () => {
