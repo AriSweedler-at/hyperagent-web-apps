@@ -2175,14 +2175,48 @@ label {
   /* The badge keeps one width as the score changes: tabular figures. */
   #gameBadge {
     grid-area: badge;
-    padding: 0 10px;
-    line-height: var(--strip-h);
+    padding: 2px 10px;
+    line-height: normal;
     font-variant-numeric: tabular-nums;
   }
   .status-line {
     grid-area: status;
     text-align: right;
     padding: 0;
+    height: auto;
+    min-height: 0;
+    line-height: normal;
+  }
+  /* The strip's text is centred by the browser (the owner, 2026-09-28: "equal padding above and
+     below the text ... Don't do hacky pixel pushing stuff"): every item is content-sized (the
+     portrait status line's `height: 22px; line-height: 22px` and the badge's
+     `line-height: var(--strip-h)` are dropped above) and the grid's `align-items: center` places
+     it in the 22px row. `text-box: trim-both cap alphabetic` makes each text box the letters' own,
+     cap height to baseline, instead of the font's content area, whose ascent (15px at 15.2px
+     Cardo) outweighs its descent (6px) and sat the glyphs 0.7px high, with the 22px line-height's
+     half-leading rounding them a further 1px high on the status line; the same-size items then
+     share one baseline. `overflow: hidden` (the names' and the status line's ellipsis) clips at
+     the padding box, so those trimmed boxes carry 0.3em of symmetric padding, the descenders' and
+     accents' room (10.5px of letters and 9px of padding stay under the row); the badge's pill
+     gets 6px round its 8.8px letters. A browser without the trim keeps the content-area layout
+     above. */
+  @supports (text-box-trim: trim-both) {
+    #tableScreen .opp-strip .name,
+    #tableScreen .me-strip .name,
+    #tableScreen .opp-strip .pips,
+    #tableScreen .me-strip .pips,
+    #gameBadge,
+    .status-line {
+      text-box: trim-both cap alphabetic;
+    }
+    #tableScreen .opp-strip .name,
+    #tableScreen .me-strip .name,
+    .status-line {
+      padding-block: 0.3em;
+    }
+    #gameBadge {
+      padding-block: 6px;
+    }
   }
   #board {
     grid-area: board;

@@ -29,6 +29,7 @@ import {
   type Viewport,
 } from './fixtures/backgammon.ts';
 import { TOL } from './fixtures/geometry.ts';
+import { PX_PER_CHAR, SLOTS, budget } from '../web/games/backgammon/src/ui/copy-budget.ts';
 import { reveal } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
@@ -596,6 +597,107 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
         .poll(() => page.evaluate<ReadonlyArray<string>>('window.__cues'))
         .toEqual(['roll', 'doubles']);
       await expect(page.locator('#dice .die.die-6')).toHaveCount(4);
+    });
+  });
+});
+
+// ---- sideways: the strip centres its text, the copy fits its slot (design §2.4, §3.1) ---------------
+
+/** A name at the shell's cap (NAME_MAX, 20 characters): the widest a name column and a name-bearing line get. */
+const LONG_NAMES = ['Konstantinopoulos XX', 'Konstantinopoulos YY'] as const;
+
+type GlyphBox = Readonly<{ sel: string; top: number; bottom: number; centre: number }>;
+/**
+ * Each strip item's glyph box: its border box less its block paddings, which under
+ * `text-box: trim-both cap alphabetic` (theme.css, the landscape block) is the letters' own box,
+ * cap height to baseline; and whether the browser trims at all.
+ */
+const stripGlyphs = (
+  page: Page,
+): Promise<Readonly<{ trims: boolean; rowCentre: number; items: ReadonlyArray<GlyphBox> }>> =>
+  page.evaluate(`(() => {
+    const sels = ['.opp-strip .name', '.opp-strip .pips', '#gameBadge', '#statusLine', '.me-strip .name', '.me-strip .pips'];
+    const items = sels.map((sel) => {
+      const el = document.querySelector(sel);
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      const top = r.top + parseFloat(cs.paddingTop);
+      const bottom = r.bottom - parseFloat(cs.paddingBottom);
+      return { sel, top, bottom, centre: (top + bottom) / 2 };
+    });
+    const app = getComputedStyle(document.getElementById('app'));
+    const screen = document.getElementById('tableScreen').getBoundingClientRect();
+    const rowCentre = screen.top + parseFloat(getComputedStyle(document.getElementById('tableScreen')).getPropertyValue('--strip-h')) / 2;
+    return { trims: CSS.supports('text-box-trim', 'trim-both'), rowCentre, items };
+  })()`);
+
+/** The widest px per character the status line's font reaches over the copy it shows, and the badge's over its widest text. */
+const measuredPxPerChar = (page: Page): Promise<Readonly<{ body: number; badge: number }>> =>
+  page.evaluate(`(() => {
+    const c = document.createElement('canvas').getContext('2d');
+    const fontOf = (sel) => { const cs = getComputedStyle(document.querySelector(sel)); return cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; };
+    const widest = (sel, lines) => { c.font = fontOf(sel); return Math.max(...lines.map((t) => c.measureText(t).width / t.length)); };
+    return {
+      body: widest('#statusText', ['Dice used — End turn, or Undo', 'Your turn. Buen mazal!', '3-1 · last move', '6-5 · the 6 cannot be played', 'Konstantinopoulos XX is rolling…']),
+      badge: widest('#gameBadge', ['Game 13 · 6–6 · to 7', 'Game 1 · 0–0 · to 5']),
+    };
+  })()`);
+
+const SIDEWAYS: Readonly<Record<string, Viewport>> = {
+  'rail floor': { width: 780, height: 304 },
+  'rows, 640 wide': { width: 640, height: 360 },
+};
+
+Object.entries(SIDEWAYS).forEach(([name, vp]) => {
+  test.describe(`sideways, ${name}`, () => {
+    test('the strip centres its glyphs on the row and shares a baseline; the last-move line fits the status slot; px per character is as the budget table says', async ({
+      phone,
+      project,
+    }) => {
+      const { page } = phone;
+      await bgStartLocal(page, pagePath(project, 'backgammon'), vp, LONG_NAMES);
+      await reveal(page);
+      // One die left after 8/5 with the 3: `3-1 · last move` (board.ts), the line the owner saw cut.
+      await bgSetup(page, bgPosition({ text: START, turn: 0, dice: [3, 1], names: LONG_NAMES }));
+      await bgMove(page, 8, 5);
+      await expect(page.locator('#statusText')).toHaveText('3-1 · last move');
+      const fits = await page.evaluate<Readonly<{ scroll: number; client: number }>>(
+        `(() => { const l = document.getElementById('statusLine'); return { scroll: l.scrollWidth, client: l.clientWidth }; })()`,
+      );
+      expect(
+        fits.scroll,
+        `#statusLine ellipsizes at ${String(vp.width)}x${String(vp.height)}: ${String(fits.scroll)}px of text in ${String(fits.client)}px`,
+      ).toBeLessThanOrEqual(fits.client);
+      // The budget's px per character (copy-budget.ts PX_PER_CHAR) against the served fonts, within 10%:
+      // past that, update the constant there with its derivation and re-derive the budgets.
+      const px = await measuredPxPerChar(page);
+      const within = (measured: number, pinned: number, which: string): void => {
+        expect(
+          Math.abs(measured - pinned) / pinned,
+          `PX_PER_CHAR.${which} is ${String(pinned)} but the served font measures ${measured.toFixed(2)}px per character: update copy-budget.ts (the constant and its comment) and re-derive the budgets`,
+        ).toBeLessThanOrEqual(0.1);
+      };
+      within(px.body, PX_PER_CHAR.body, 'body');
+      within(px.badge, PX_PER_CHAR.badge, 'badge');
+      expect('3-1 · last move'.length).toBeLessThanOrEqual(budget(SLOTS.stripStatus));
+      // The strip's text is centred by the browser (theme.css, the landscape block): every item's
+      // glyph box is centred on the 22px row within half a pixel, and the same-size items (the
+      // names, the pips, the status) share one baseline; the badge's smaller type is centred too.
+      const strip = await stripGlyphs(page);
+      expect(strip.trims, 'the harness Chromium trims text boxes (text-box-trim)').toBe(true);
+      strip.items.forEach((it) => {
+        expect(
+          Math.abs(it.centre - strip.rowCentre),
+          `${it.sel}'s glyph box is centred at ${it.centre.toFixed(2)}, the row at ${strip.rowCentre.toFixed(2)}`,
+        ).toBeLessThanOrEqual(0.5);
+      });
+      const baselines = strip.items.filter((it) => it.sel !== '#gameBadge').map((it) => it.bottom);
+      baselines.forEach((b) => {
+        expect(
+          Math.abs(b - (baselines[0] ?? b)),
+          `baselines: ${baselines.map((x) => x.toFixed(2)).join(', ')}`,
+        ).toBeLessThanOrEqual(0.5);
+      });
     });
   });
 });

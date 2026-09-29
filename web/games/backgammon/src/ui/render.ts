@@ -93,6 +93,7 @@ import {
   type Place,
   type PlaceId,
   type Target,
+  ROLLING_STATUS,
 } from './board.ts';
 import { bindDrag } from './board/dragger.ts';
 import { flyMoves } from './board/fly.ts';
@@ -243,7 +244,7 @@ const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
 const holdingNoMove = (app: App): boolean => app.table.noMoveUntil !== null;
 
 /** `#statusText` while the dice tumble (design §4.7): the roll is not named before the faces settle. */
-export const ROLLING_STATUS = 'Rolling…';
+export { ROLLING_STATUS };
 
 const paintStatus = (doc: DocumentLike, app: App, v: View): void => {
   const noMoveShown = holdingNoMove(app);

@@ -373,7 +373,7 @@ describe('the table', () => {
     expect(p.get(pt(5)).hasClass('hit')).toBe(false);
     expect(p.get('dice').text()).toContain('class="die die-3 used"');
     expect(p.get('undoBtn').disabled()).toBe(false);
-    expect(p.get('statusText').text()).toBe('Last move: then End turn, or Undo');
+    expect(p.get('statusText').text()).toBe('3-1 · last move');
     const undone = run(moved, { type: 'undo/click' }).app;
     paint(p.doc, undone);
     expect(p.get(pt(8)).attr('data-key')).toBe('L3');
@@ -391,7 +391,7 @@ describe('the table', () => {
     const one = run(rolled, { type: 'point/tap', point: 7 }, { type: 'point/tap', point: 4 }).app;
     paint(p.doc, one);
     expect(p.get('doneBtn').hidden()).toBe(true);
-    expect(p.get('statusText').text()).toBe('Last move: then End turn, or Undo');
+    expect(p.get('statusText').text()).toBe('3-1 · last move');
     const held = run(one, { type: 'point/tap', point: 5 }, { type: 'point/tap', point: 4 }).app;
     expect(game(held)).toMatchObject({ phase: 'moving', turn: 0 });
     paint(p.doc, held);

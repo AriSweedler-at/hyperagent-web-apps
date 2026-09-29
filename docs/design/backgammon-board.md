@@ -26,9 +26,9 @@ the rules by rule (`rules R13`).
 | Input | Tap-to-move, one tap per move, the sole legal source auto-selected (`.selected.auto`, ring without lift); drag through gin's dragger reshaped (`ui/board/dragger.ts`). |
 | Ambiguity | A die-chip tray in the controls row (`#moveChips`, 56px chips labelled with the dice as digits and the destination) only when a choice exists: a bear-off both dice suffice for, or two orders of a combined move whose intermediates differ. The trays always name the die they will spend (`data-die` "6", "6·5"). |
 | Which die | `.die.dead` when no maximal play uses a die; tap a die to force it (`die/pick`, targets recomputed for that die alone, the status line confirms "playing the 6"). |
-| Status line | Always names what is left ("3-1 · play both dice", "6-5 · the 6 cannot be played", "6-1 · enter from the bar", "Last move: the turn ends when you play it"), the dice in words in a visually hidden span. |
+| Status line | Always names what is left ("3-1 · play both dice", "6-5 · the 6 cannot be played", "6-1 · enter from the bar", "3-1 · last move"), the dice in words in a visually hidden span. Every line is budgeted against its slot (§2.4 "The copy budget"). |
 | Stacks | Five checkers drawn; a count badge on the top visible checker from the sixth on; the point label stays. |
-| Turn end | Online the turn ends by itself when no maximal play extends what was played (rules R13). Pass-and-play (the owner, 2026-09-28: "After I finish a turn in pass-and-play, it's very jarring. It immediately tells me to swap the phone over. I should be able to hit 'end turn' ... think about my next move, or consider undoing stuff") deals its match with `options.manualTurnEnd`: the mover then stays in `moving` with no legal move once the dice are used up (or the rest is unplayable), Undo still on, and `#doneBtn` "End turn" (`btn-primary`, beside Undo; sideways, over Undo in the rail) sends `done`, which flips the turn with the automatic end's exact bookkeeping (`endTurn`: the log lines, `lastPlay`, `turnStart`). A roll with no move still passes by itself (R14: nothing to think over, nothing to undo); fifteen off still ends the game at once. The status line reads "Dice used — End turn, or Undo" ("6-5 · the 5 cannot be played — End turn, or Undo"), and the last playable move's "Last move: then End turn, or Undo". `canEndTurn(view)` (engine/view.ts) is derived, so the `state` frame's shape is unchanged; the decoder reads a missing `manualTurnEnd` as false. Online keeps the automatic end (a follow-up: the option there too). |
+| Turn end | Online the turn ends by itself when no maximal play extends what was played (rules R13). Pass-and-play (the owner, 2026-09-28: "After I finish a turn in pass-and-play, it's very jarring. It immediately tells me to swap the phone over. I should be able to hit 'end turn' ... think about my next move, or consider undoing stuff") deals its match with `options.manualTurnEnd`: the mover then stays in `moving` with no legal move once the dice are used up (or the rest is unplayable), Undo still on, and `#doneBtn` "End turn" (`btn-primary`, beside Undo; sideways, over Undo in the rail) sends `done`, which flips the turn with the automatic end's exact bookkeeping (`endTurn`: the log lines, `lastPlay`, `turnStart`). A roll with no move still passes by itself (R14: nothing to think over, nothing to undo); fifteen off still ends the game at once. The status line reads "Dice used — End turn, or Undo" ("6-5 · the 5 cannot be played — End turn, or Undo"), and the last playable move's "3-1 · last move" (it was "Last move: then End turn, or Undo", cut sideways). `canEndTurn(view)` (engine/view.ts) is derived, so the `state` frame's shape is unchanged; the decoder reads a missing `manualTurnEnd` as false. Online keeps the automatic end (a follow-up: the option there too). |
 | Hit toast | "Kapará. {name} hit you on your {n}-point." for the player hit, in their own numbering, from the moves (`played[i].hit`, `lastPlay`), never from log text. Online it fires as the opponent's hit moves arrive; in pass-and-play when the phone reaches the player hit (§4.9). |
 | Accessibility | Every tap target ≥ 44px on the phone (the geometry e2e asserts it), a painted `aria-label` per place, Enter/Space on a focused place is its tap, Escape closes the sheet or the tray. |
 | Theme | "Subtle but recognizable": a parchment page (a CC0 photo of real medieval parchment, mirror-tiled, under a cream multiply; §3.11), the home shell in a rich aegean blue with nacre text and a gold hairline, olive-wood board, gold elsewhere only as a hairline, one low-contrast meander line on the frame, an olive trim along the window's edge. The dark checker a deep-blue disc with a fine blue ring (the eye motif as a subtle inner ring, never a literal eye); the light one a pale disc with a soft sheen. Checkers, dice and frame are CSS only, no images. GFS Didot for the title and the room code, Cardo for everything else, both from Google Fonts. |
@@ -121,6 +121,30 @@ Plain English except the three strings (Q11).
 | Leave confirms | gin's `LEAVE_LOCAL_MSG`/`LEAVE_ONLINE_MSG` texts |
 | Resume labels | Resume hosting room {code} · Rejoin room {code} · Resume pass & play: {a} vs {b} |
 
+**The copy budget** (`src/ui/copy-budget.ts`, tested by `copy-budget.test.ts`; the owner, 2026-09-28:
+"you have to make sure that text is not too long ... This is a game-level concern, and should also be
+unit tested so future copywriters cannot make this mistake"). A one-line slot (`white-space: nowrap;
+text-overflow: ellipsis`) cuts what does not fit, and vitest has no layout, so each slot's room is a
+character budget: its width at the narrowest viewport the design gives it over the theme font's px per
+character, measured once on the served page with canvas `measureText` (`PX_PER_CHAR`: the status
+line's 0.95rem Cardo reaches 7.1px per character on a lowercase line, the badge's bold 0.8rem 6.0) and
+pinned by the table-ux e2e within 10%. The table: `stripStatus`, `#statusLine` sideways in the rail at
+its 780x304 floor with the badge at its widest (`Game 13 · 6–6 · to 7`, 140px): 780 − 2 × 16 − (44 +
+6) − 2 × 160 − 72 − 4 × 6 − 140 = 142px, 20 characters; `portraitStatus`, the 390px phone less #app's
+24 and the line's 12 of padding, 354px, 49 characters. The rows scheme (the SE's 667, a 640x360
+Android) leaves the strip's status 72-100px and accepts the ellipsis there. The test enumerates every
+branch of `statusText` with the engine's positions (both seats from the start, Light through the test
+positions, names at NAME_MAX): the mover's own lines are held to the strip's budget, the lines that
+name the opponent (their turn, the cube, the result: the strip beside them shows the name already) to
+the portrait line's, and a failure reads `#statusLine copy "…" is 41 characters; the slot holds 20 at
+its narrowest (sideways, the rail at its 780x304 floor with the badge at its widest (140px): 142px at
+7.1px per character). Shorten it in src/ui/board.ts (statusText) (phase 'moving', one die left) or
+widen the slot in theme.css and the budget table (src/ui/copy-budget.ts).` `STRIP_DEBT` in the test is
+the ratchet: the eleven mover's lines over the strip's budget when it was introduced ("Your turn. Buen
+mazal!", "6-1 · enter from the bar", "Dice used — End turn, or Undo", …), spelled exactly, so a new
+long line or a longer edit fails and a line that comes under budget must leave the list; their brief
+forms, and a sideways brief for the opponent's lines, are the follow-up.
+
 ## 3. CSS
 
 ### 3.1 Tokens and geometry
@@ -188,7 +212,21 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   the 780 floor) and the slot is `--slot-w 72px` in every phase (the two 22px mini dice, 48; a
   double's four at 16px and 2px gaps, 70; the Result chip, 66, standing 44px tall down out of the
   strip over the board's top edge; the wait note stays hidden, the status line says it), so every
-  item of the strip keeps one box through a game (the frame oracle). While the die-chip tray is
+  item of the strip keeps one box through a game (the frame oracle). The strip's text is centred by
+  the browser (the owner, 2026-09-28: "equal padding above and below the text ... Don't do hacky
+  pixel pushing stuff"): every item is content-sized (the portrait status line's `height: 22px;
+  line-height: 22px` and the badge's `line-height: var(--strip-h)` are dropped sideways) and the
+  grid's `align-items: center` places it in the 22px row; under `@supports (text-box-trim:
+  trim-both)`, `text-box: trim-both cap alphabetic` on the names, the pips, the badge and the status
+  line makes each text box the letters' own (cap height to baseline) instead of the font's content
+  area, whose 15px ascent outweighs its 6px descent at 15.2px and sat the glyphs 0.7px high (a further
+  1px on the status line from the 22px line-height's half-leading); the names and the status line
+  carry 0.3em of symmetric padding, the descenders' room past `overflow: hidden`, the badge's pill 6px.
+  Measured at 844x390 and 780x304: every glyph box centred at y = 22.0 (the row's centre; they were
+  20.8-21.6), the names, pips and status on one baseline (27.23). The row itself stands 4px under the
+  trim's hairline and 6px over the board (#app's 11px and `--gap`), so the air above the letters is
+  9.8px and below 11.8: making those equal means `--strip-h: 24px` with a 4px row gap (the rail's
+  arithmetic unchanged, the rows' `chromeIn` 78 → 76) or 13px of padding, a follow-up. While the die-chip tray is
   open my strip and the slot stay shown (the base rule hides them: the tray took the controls row).
   `body.fixed-screen #app` pads 11px above (the trim's 6px band and its hairline, 4px of air: the
   owner, 2026-09-28, "the top of the names & such overlap the green border") and `max(11px, 6px +
@@ -572,11 +610,12 @@ passes the turn inside `roll`: the status reads "6-6 · no move — turn passes"
 `noMoveUntil = now + NO_MOVE_MS (1200)` (a `startTimer` effect) and keeps the position visible;
 `noMove/elapsed` lets the curtain rise (local) or the state settle (online). Turn end is the
 engine's: online the `move` that completes the maximal play flips `turn` (R7/R13), and when
-exactly one playable die remains the status line reads "Last move: the turn ends when you play
-it". Pass-and-play holds it instead (§1 "Turn end", `options.manualTurnEnd`): the completing move
+exactly one playable die remains the status line reads "3-1 · last move" (the owner, 2026-09-28: "Last
+move: the turn ends when you play it", 41 characters, was cut to "Last move: the turn ends when…" in
+the strip; the line is 15 now and the copy budget of §2.4 keeps it so). Pass-and-play holds it instead (§1 "Turn end", `options.manualTurnEnd`): the completing move
 leaves the mover in `moving` with `legal === []`, the status reads "Dice used — End turn, or Undo",
 `#doneBtn` "End turn" shows beside Undo (`done/click` → `applyAction(done)`), and the curtain rises
-only on the flip; the last playable move's line reads "Last move: then End turn, or Undo". A roll
+only on the flip; the last playable move's line reads "3-1 · last move" in this mode too. A roll
 with no move (R14) is never held: the beat above runs as it does online.
 
 ### 4.6 Undo
