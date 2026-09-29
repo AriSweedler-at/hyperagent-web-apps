@@ -40,13 +40,16 @@ export type OrientationLock = Readonly<{
   drop: () => void;
 }>;
 
-type LockFn = (orientation: 'landscape') => Promise<unknown>;
+/** What the lock holds: sideways (the games), or upright (UI Sandbox's portrait mode, the mirror). */
+export type LockOrientation = 'landscape' | 'portrait';
+type LockFn = (orientation: LockOrientation) => Promise<unknown>;
 const isLock = (value: unknown): value is LockFn => typeof value === 'function';
 
-/** The lock over the page's `document` and `screen` (main.ts passes the real ones through the boot, tests fakes). */
+/** The lock over the page's `document` and `screen` (main.ts passes the real ones through the boot, tests fakes); `which` is what it holds, sideways unless said. */
 export const createOrientationLock = (
   doc: FullscreenDocumentLike,
   screen: ScreenLike,
+  which: LockOrientation = 'landscape',
 ): OrientationLock => {
   const hold = async (): Promise<boolean> => {
     try {
@@ -57,7 +60,7 @@ export const createOrientationLock = (
       if (request === undefined) return false;
       // A method call on its object: `requestFullscreen` and `lock` throw "Illegal invocation" unbound.
       if ((doc.fullscreenElement ?? null) === null) await request.call(doc.documentElement);
-      await lock.call(orientation, 'landscape');
+      await lock.call(orientation, which);
       return true;
     } catch {
       /* denied, refused (a tablet, desktop Chromium), or no activation: the page stays as it is */

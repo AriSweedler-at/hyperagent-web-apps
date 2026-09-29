@@ -60,6 +60,10 @@ describe('the catalogue', () => {
       expect(d.toolbar.portrait.min).toBeLessThanOrEqual(d.toolbar.portrait.max);
       expect(d.toolbar.landscape.min).toBeLessThanOrEqual(d.toolbar.landscape.max);
       expect(deviceById(d.id)).toBe(d);
+      // The cut (safeArea.ts): every notched or islanded row names one, the whole-glass rows none.
+      if (d.cut !== null) expect(d.cut.length).toBeGreaterThan(0);
+      expect(d.cut === null).toBe(notchOf(d) === 0 && d.kind !== 'android');
+      if (d.kind === 'android' || d.insets.portrait.top >= 59) expect(d.cut?.island).toBe(true);
     });
     expect(deviceById('nope')).toBeNull();
   });

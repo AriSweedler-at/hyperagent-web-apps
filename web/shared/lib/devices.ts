@@ -75,6 +75,16 @@ export type Device = Readonly<{
   cutout: number;
   /** The display's corner radius in points; 0 on a squared screen. */
   corner: number;
+  /**
+   * The hardware cut in the top short edge, centred: its length along the edge in points, and
+   * whether it is an island (a pill or a hole detached from the edge: the Dynamic Island, an
+   * Android hole) or a notch (attached to the edge). Null where the glass is whole (the SE, the
+   * iPads). What the safe-area map (web/shared/lib/safeArea.ts) spares on the notch's side. Every
+   * length is UNVERIFIED (docs/design/ui-sandbox.md §3 names the sources): Apple publishes none,
+   * and the figures are the design community's (the X-class notch 209pt x 30pt; the 13/14 notch
+   * 162pt; the Dynamic Island 126pt x 37pt), the larger of a row's classes so no ear is oversold.
+   */
+  cut: Readonly<{ length: number; island: boolean }> | null;
   /** What the browser's bars take off the height in a tab, per orientation: min hidden, max shown. */
   toolbar: Readonly<{ portrait: Range; landscape: Range }>;
   /** True where every number is a published one; false where any is inferred (UNVERIFIED). */
@@ -100,6 +110,7 @@ const SAFARI_IPAD = { portrait: { min: 50, max: 70 }, landscape: { min: 50, max:
 const CHROME_ANDROID = { portrait: { min: 24, max: 80 }, landscape: { min: 0, max: 56 } } as const;
 
 type Notched = readonly [top: number, bottom: number, side: number, sideBottom: number];
+type Cut = Device['cut'];
 const iphone = (
   tag: string,
   models: string,
@@ -108,6 +119,7 @@ const iphone = (
   dpr: number,
   [top, bottom, side, sideBottom]: Notched,
   corner: number,
+  cut: Cut,
   extra: Partial<Pick<Device, 'verified' | 'supported'>> = {},
 ): Device => ({
   id: `iphone-${String(width)}x${String(height)}${tag === '' ? '' : `-${tag}`}`,
@@ -118,6 +130,7 @@ const iphone = (
   insets: { portrait: { top, bottom }, landscape: { left: side, right: side, bottom: sideBottom } },
   cutout: 0,
   corner,
+  cut,
   toolbar: top === 0 ? SAFARI_HOME_BUTTON : SAFARI_NOTCHED,
   verified: true,
   supported: true,
@@ -132,6 +145,7 @@ const ipad = (models: string, width: number, height: number, corner: number): De
   insets: { portrait: { top: 0, bottom: 0 }, landscape: { left: 0, right: 0, bottom: 0 } },
   cutout: 0,
   corner,
+  cut: null,
   toolbar: SAFARI_IPAD,
   verified: false,
   supported: true,
@@ -144,6 +158,7 @@ const android = (
   dpr: number,
   cutout: number,
   corner: number,
+  cut: Cut,
 ): Device => ({
   id: `android-${String(width)}x${String(height)}-${tag}`,
   models,
@@ -153,6 +168,7 @@ const android = (
   insets: { portrait: { top: 0, bottom: 0 }, landscape: { left: 0, right: 0, bottom: 0 } },
   cutout,
   corner,
+  cut,
   toolbar: CHROME_ANDROID,
   verified: false,
   supported: true,
@@ -166,35 +182,47 @@ const NOTCH_59: Notched = [59, 34, 59, 21];
 const NOTCH_62: Notched = [62, 34, 62, 21];
 const NO_NOTCH: Notched = [0, 0, 0, 0];
 
+// The cuts (UNVERIFIED, docs/design/ui-sandbox.md §3): the X-class notch, 209pt along the edge
+// (the 12's is the same width; the 13's and 14's are 162pt, a fifth narrower, and a row that
+// holds both keeps the wider); the XR's at 2x measures 230pt in points; the Dynamic Island (the
+// 14 Pro and every later Pro, the 15 and 16 lines, the 17s and the Air) 126pt x 37pt; a Pixel's
+// hole and a Galaxy's ≈ 40dp. The screen probe on a real phone settles each.
+const NOTCH_X: Cut = { length: 209, island: false };
+const NOTCH_XR: Cut = { length: 230, island: false };
+const ISLAND: Cut = { length: 126, island: true };
+const HOLE: Cut = { length: 40, island: true };
+
 /**
  * The catalogue: the iPhones by screen (the shared screens' classes adjacent, the notch and the
  * pixel ratio telling them apart), then the iPads and the two Android classes. A new phone is one
  * row: the sweep, the emulator and the sheet pick it up.
  */
 export const DEVICES: ReadonlyArray<Device> = [
-  iphone('x', 'iPhone X, XS, 11 Pro', 375, 812, 3, NOTCH_44, 39),
-  iphone('mini', 'iPhone 12 mini, 13 mini', 375, 812, 3, NOTCH_50, 44),
-  iphone('xr', 'iPhone XR, 11', 414, 896, 2, NOTCH_48, 41.5),
-  iphone('max', 'iPhone XS Max, 11 Pro Max', 414, 896, 3, NOTCH_44, 39),
-  iphone('', 'iPhone 12, 12 Pro, 13, 13 Pro, 14, 16e', 390, 844, 3, NOTCH_47, 47.33),
-  iphone('', 'iPhone 12 Pro Max, 13 Pro Max, 14 Plus', 428, 926, 3, NOTCH_47, 53.33),
-  iphone('', 'iPhone 14 Pro, 15, 15 Pro, 16', 393, 852, 3, NOTCH_59, 55),
-  iphone('', 'iPhone 14 Pro Max, 15 Plus, 15 Pro Max, 16 Plus', 430, 932, 3, NOTCH_59, 55),
-  iphone('', 'iPhone 16 Pro; 17, 17 Pro (UNVERIFIED)', 402, 874, 3, NOTCH_62, 62, {
+  iphone('x', 'iPhone X, XS, 11 Pro', 375, 812, 3, NOTCH_44, 39, NOTCH_X),
+  iphone('mini', 'iPhone 12 mini, 13 mini', 375, 812, 3, NOTCH_50, 44, NOTCH_X),
+  iphone('xr', 'iPhone XR, 11', 414, 896, 2, NOTCH_48, 41.5, NOTCH_XR),
+  iphone('max', 'iPhone XS Max, 11 Pro Max', 414, 896, 3, NOTCH_44, 39, NOTCH_X),
+  iphone('', 'iPhone 12, 12 Pro, 13, 13 Pro, 14, 16e', 390, 844, 3, NOTCH_47, 47.33, NOTCH_X),
+  iphone('', 'iPhone 12 Pro Max, 13 Pro Max, 14 Plus', 428, 926, 3, NOTCH_47, 53.33, NOTCH_X),
+  iphone('', 'iPhone 14 Pro, 15, 15 Pro, 16', 393, 852, 3, NOTCH_59, 55, ISLAND),
+  iphone('', 'iPhone 14 Pro Max, 15 Plus, 15 Pro Max, 16 Plus', 430, 932, 3, NOTCH_59, 55, ISLAND),
+  iphone('', 'iPhone 16 Pro; 17, 17 Pro (UNVERIFIED)', 402, 874, 3, NOTCH_62, 62, ISLAND, {
     verified: false,
   }),
-  iphone('', 'iPhone 16 Pro Max; 17 Pro Max (UNVERIFIED)', 440, 956, 3, NOTCH_62, 62, {
+  iphone('', 'iPhone 16 Pro Max; 17 Pro Max (UNVERIFIED)', 440, 956, 3, NOTCH_62, 62, ISLAND, {
     verified: false,
   }),
-  iphone('air', 'iPhone Air (UNVERIFIED)', 420, 912, 3, NOTCH_62, 62, { verified: false }),
-  iphone('se', 'iPhone SE (2nd, 3rd), 6, 7, 8', 375, 667, 2, NO_NOTCH, 0),
+  iphone('air', 'iPhone Air (UNVERIFIED)', 420, 912, 3, NOTCH_62, 62, ISLAND, {
+    verified: false,
+  }),
+  iphone('se', 'iPhone SE (2nd, 3rd), 6, 7, 8', 375, 667, 2, NO_NOTCH, 0, null),
   // iOS 15 was its last; the theme's container queries need Safari 16.
-  iphone('se1', 'iPhone SE (1st), 5s', 320, 568, 2, NO_NOTCH, 0, { supported: false }),
+  iphone('se1', 'iPhone SE (1st), 5s', 320, 568, 2, NO_NOTCH, 0, null, { supported: false }),
   ipad('iPad (9th), mini', 768, 1024, 0),
   ipad('iPad (10th), Air', 820, 1180, 18),
   ipad('iPad Pro 12.9', 1024, 1366, 18),
-  android('pixel', 'Pixel 7, 8', 412, 915, 2.625, 28, 32),
-  android('galaxy', 'Galaxy S23', 360, 780, 3, 30, 30),
+  android('pixel', 'Pixel 7, 8', 412, 915, 2.625, 28, 32, HOLE),
+  android('galaxy', 'Galaxy S23', 360, 780, 3, 30, 30, HOLE),
 ];
 
 /** The row with this id, or null. */
