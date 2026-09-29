@@ -1,4 +1,4 @@
-# Dice App Clip
+# Dice App Clip (and the reaction game's buddy)
 
 The owner's spec: "Build a minimal 'Dice' App Clip with a Roll button. Each roll generates two dice
 values and starts or updates a Live Activity. Show one die on each side of the compact Dynamic
@@ -11,6 +11,15 @@ not a published clip. Signing, App Store Connect, the App Clip experience, the A
 TestFlight are the owner's; they are the checklist under [Owner checklist](#owner-checklist). The
 webpage, the Smart App Banner and the `apple-app-site-association` file are the site's (the
 `sizer-island-dice` lane; its constant will live in `web/shared/lib/appClip.ts`).
+
+The same clip carries a second experience, the reaction game's **buddy**
+(`docs/design/rps-island.md`): the game itself runs in the browser on any phone; on an iPhone the
+page offers `https://games.sweedler.com/clip/rps?session=<id>`, the clip starts a Live Activity
+with a push token, pairs the token with the game's session at the Worker (`POST /api/rps/pair`),
+and from then on the Worker's APNs pushes move a pixel-art buddy in the Dynamic Island: sulking
+and blue when the score is down, walking when even, bouncing and yellow when up. The clip's own
+screen only says the buddy is in the island and links back to the game. The Worker's push route
+and APNs key are another lane's; the contract is the design's §8.
 
 Nothing under `ios/` is read by the web toolchain: Prettier skips it (`.prettierignore`) and a
 change here runs CI's `check` job alone (`tools/ci/suites.ts`, the `ios/**` row).
@@ -33,25 +42,41 @@ must belong to an app on the App Store; it shows the same screen.
 
 ```
 DiceModel/                      Swift package, pure: DieFace (1-6, the pip grid), Roll (two dice, the total,
-                                doubles, `?roll=a,b` in and out of a URL); Tests/ (swift test, 9 tests)
+                                doubles, `?roll=a,b` in and out of a URL); RPS/ (Hand, Outcome, Mood, Progress: the
+                                reaction game's rules, design §2, the shared spec the web engine ports); Tests/
+                                (swift test, 28 tests: the dice's 9 and the design's §6 vectors)
 Shared/DiceAttributes.swift     ActivityAttributes: ContentState { roll, rolledAt }, startedAt; the invocation URL
 Shared/DieView.swift            a die as SwiftUI shapes (rounded square, pips on the 3x3 grid); RollView = two
 Shared/DiceRoller.swift         the state: the last roll, Activity.request / update / end, the 8-hour ceiling
-Shared/RollScreen.swift         the one screen: the roll, the Roll button, the explanation; reads the invocation URL
+Shared/RollScreen.swift         the dice screen: the roll, the Roll button, the explanation; the roll URL from RootScreen
+Shared/MoodActivityAttributes.swift  the buddy's ActivityAttributes: ContentState { counter, prestige, band, at } = the
+                                Worker's content-state keys (at: Unix seconds); session, startedAt; Invocation.rps, .game
+Shared/BuddySprite.swift        PixelFrame + BuddyFrames (N pixel frames per mood, a frame duration; placeholders in
+                                code), PixelSpriteView, BuddyView (a frame per update), CounterText
+Shared/Config.swift             apiBase (RPS_API_BASE or games.sweedler.com), pairURL, the pairing retry numbers
+Shared/MoodActivity.swift       the buddy's state: Activity.request(pushType: .token), pushTokenUpdates -> POST pair
+                                (5 tries, doubling wait), contentUpdates for the preview, Send buddy home
+Shared/BuddyScreen.swift        the buddy screen: session, pairing state, a preview, Back to the game, Send buddy home
+Shared/RootScreen.swift         the two tabs (Dice, Buddy), the one reader of the invocation URL, Palette (the green)
 App/SheshbeshDiceApp.swift      @main, the parent app
 Clip/DiceClipApp.swift          @main, the App Clip
-DiceActivity/DiceActivityBundle.swift   @main WidgetBundle holding the one Live Activity (no widgets: a clip may not)
+DiceActivity/DiceActivityBundle.swift   @main WidgetBundle holding the two Live Activities (no widgets: a clip may not)
 DiceActivity/DiceActivityWidget.swift   ActivityConfiguration: Lock Screen view; DynamicIsland compact leading = die one,
                                 compact trailing = die two, expanded = both dice + total + time, minimal = die one
+DiceActivity/MoodActivityWidget.swift   the buddy's ActivityConfiguration: compact leading = the buddy, trailing = the
+                                signed counter in the band's colour, minimal = the buddy, expanded = buddy + counter +
+                                prestige + the band and time; the Lock Screen banner is the expanded row (design §5)
 Config/App-Info.plist           NSSupportsLiveActivities YES, NSSupportsLiveActivitiesFrequentUpdates NO
 Config/Clip-Info.plist          the same, plus NSAppClip (no notifications, no location confirmation)
 Config/Activity-Info.plist      NSExtensionPointIdentifier com.apple.widgetkit-extension (both extensions)
-Config/App.entitlements         applinks:games.sweedler.com (the URL opens the full app once installed)
-Config/Clip.entitlements        appclips:games.sweedler.com, parent-application-identifiers, on-demand-install-capable
+Config/App.entitlements         applinks:games.sweedler.com (the URL opens the full app once installed); aps-environment
+Config/Clip.entitlements        appclips:games.sweedler.com, parent-application-identifiers, on-demand-install-capable;
+                                aps-environment (the buddy's push token; Xcode sets production on archive)
 Config/ClipActivity.entitlements  on-demand-install-capable (the App Clip Extension capability)
 Config/Assets.xcassets          AppIcon set, empty: the owner drops the 1024x1024 PNG in (no other images anywhere)
 DiceClip.xcodeproj              the project (hand-written; four targets, the local package) and two shared schemes;
-                                the DiceClip scheme sets _XCAppClipURL to the invocation URL with ?roll=3,5
+                                the DiceClip scheme sets _XCAppClipURL to the dice URL with ?roll=3,5 and carries a
+                                disabled twin for the buddy (/clip/rps?session=ABCDEFGH) and a disabled RPS_API_BASE
 ```
 
 Swift 6 language mode throughout (`SWIFT_VERSION = 6.0`; the package's `swiftLanguageModes: [.v6]`),
@@ -79,6 +104,22 @@ SwiftUI only, no third-party packages, no image assets: every die is drawn.
   same way. `onOpenURL` covers the full app's universal link. Junk parses to nothing shown.
 - **Live Activities off.** `ActivityAuthorizationInfo().areActivitiesEnabled` is read before each
   publish; when a person has them off for the app, the screen says so and the dice still roll.
+- **The buddy's URL.** `RootScreen` reads every URL the app or clip is opened with (the clip's
+  `NSUserActivity`, the app's universal link, `onOpenURL`): `/clip/dice…` selects the Dice tab and
+  hands the URL to `RollScreen`; `/clip/rps?session=<id>` (eight ASCII letters or digits) selects
+  the Buddy tab and hands it to `BuddyScreen`, which calls `MoodActivity.start(session:)`.
+- **The buddy's activity.** `Activity.request(attributes: MoodActivityAttributes(session:,
+  startedAt:), content: fresh, pushType: .token)`, then a task over `activity.pushTokenUpdates`:
+  each token is hex-encoded and `POST`ed to `Config.pairURL` as `{ session, token, bundle }`; a
+  failure retries five times with a wait doubling from one second; the screen shows the state
+  (waiting for the token, pairing try n, paired, failed with a Try-again button). A second task
+  over `activity.contentUpdates` keeps the screen's preview equal to the island. The clip never
+  updates the activity itself: every change is a push from the Worker (design §8). A relaunch
+  adopts the activity a previous run left for the same session; "Send buddy home" ends it at once.
+- **The buddy's motion.** A Live Activity runs no free animation (design §7); `BuddyView` shows
+  frame `at mod N` of the band's frame set, so every push steps the walk, the bounce or the sulk,
+  and the band change morphs colour and shape with a spring. The frames are placeholder 8x8 pixel
+  grids in `BuddyFrames`; the art lane replaces the rows.
 
 ## Build and test here
 
@@ -91,28 +132,31 @@ xcodebuild -project DiceClip.xcodeproj -scheme SheshbeshDice \
 ```
 
 `CODE_SIGNING_ALLOWED=NO` compiles without a team; a device or TestFlight build needs one (step 1
-below). This Mac has Xcode 27.0 (27A266a), Swift 6.4 and the iOS 27.0 SDK but no simulator
+below). The buddy's pairing can point at a local or sandbox Worker: enable the `RPS_API_BASE`
+variable in the `DiceClip` scheme (Config.apiBase), and flip the two `_XCAppClipURL` entries to
+launch as the buddy. This Mac has Xcode 27.0 (27A266a), Swift 6.4 and the iOS 27.0 SDK but no simulator
 runtime: to run the clip on a simulator install one (Xcode > Settings > Components, or
 `xcodebuild -downloadPlatform iOS`), pick an iPhone 15 Pro or later for the Island, and use the
 `DiceClip` scheme, whose `_XCAppClipURL` launches it as if from the invocation URL.
 
-Results on this Mac, 2026-09-29:
+Results on this Mac, 2026-09-29 (the buddy's pass; the dice's first pass read 9 tests, 2.0 MB and 1.0 MB):
 
-- `swift test` (DiceModel, macOS arm64, Swift 6.4): `Test run with 9 tests in 2 suites passed`.
-- `xcodebuild -scheme DiceClip -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build`:
-  `** BUILD SUCCEEDED **`, 0 errors, 0 warnings.
-- `xcodebuild -scheme SheshbeshDice ...` (all four targets): `** BUILD SUCCEEDED **`, 0 errors,
-  2 warnings, both the App Intents metadata processor's "Metadata extraction skipped, no
-  AppIntents.framework dependency found" (a note on any target without App Intents).
-- The products (Debug, unstripped, so an archive is smaller): `SheshbeshDice.app` 2.0 MB holding
-  `AppClips/DiceClip.app` (1.0 MB) and `PlugIns/DiceActivityApp.appex`; `DiceClip.app` holds
-  `PlugIns/DiceActivity.appex` (452 KB). The clip's built Info.plist reads `CFBundleIdentifier
-  com.sweedler.games.dice.Clip`, `MinimumOSVersion 17.0`, `NSAppClip` with both requests false,
-  `NSSupportsLiveActivities true`, `NSSupportsLiveActivitiesFrequentUpdates false`; the extension's
-  reads `com.sweedler.games.dice.Clip.DiceActivity` with `NSExtensionPointIdentifier
-  com.apple.widgetkit-extension`.
+- `swift test` (DiceModel, macOS arm64, Swift 6.4): `Test run with 28 tests in 6 suites passed`
+  (DieFace, Roll, Hand, Outcome, Mood, Progress; the design's 14 verdict vectors and 6 tech-up
+  vectors are parameterised cases).
+- `xcodebuild -scheme SheshbeshDice -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build`
+  (all four targets): `** BUILD SUCCEEDED **`, 0 errors, 2 warnings, both the App Intents metadata
+  processor's "Metadata extraction skipped, no AppIntents.framework dependency found" (a note on
+  any target without App Intents).
+- `xcodebuild -scheme DiceClip ...` (the clip and its extension): `** BUILD SUCCEEDED **`, 0 errors,
+  0 warnings.
+- The products (Debug, unstripped, so an archive is smaller): `SheshbeshDice.app` 3.9 MB holding
+  `AppClips/DiceClip.app` (1.9 MB) and `PlugIns/DiceActivityApp.appex`; `DiceClip.app` holds
+  `PlugIns/DiceActivity.appex`. The clip's built Info.plist reads `CFBundleIdentifier
+  com.sweedler.games.dice.Clip`, `MinimumOSVersion 17.0`.
 - Not run here: the clip on a phone or a simulator (no runtime installed, no team), so the Island's
-  rendering is unseen until step 8's local experience.
+  rendering, the push token and the pairing call are unseen until step 8's local experience; the
+  Worker's `/api/rps/pair` route and its pushes are another lane's.
 
 ## Owner checklist
 
@@ -121,9 +165,10 @@ Everything only the account holder can do, in order. Nothing here was attempted 
 1. **Signing team.** Open `ios/DiceClip/DiceClip.xcodeproj`; for each of the four targets, Signing
    & Capabilities > Team. Or once, in the project file: `DEVELOPMENT_TEAM = "";` (two places, the
    project's Debug and Release) becomes your team id. Automatic signing then registers the four
-   App IDs with their capabilities (Associated Domains and App Clip on the clip, App Clip Extension
-   on `DiceActivity`, Associated Domains on the app). The team id is under Membership details at
-   developer.apple.com/account.
+   App IDs with their capabilities (Associated Domains, App Clip and Push Notifications on the
+   clip, App Clip Extension on `DiceActivity`, Associated Domains and Push Notifications on the
+   app; the `aps-environment` entitlement is already in both entitlements files). The team id is
+   under Membership details at developer.apple.com/account.
 2. **App icon.** Drop a 1024x1024 PNG into `Config/Assets.xcassets/AppIcon.appiconset/` and add its
    `"filename"` to the entry in `Contents.json` (the app and the clip share the set). App Store
    Connect refuses a build without one.
@@ -140,7 +185,11 @@ Everything only the account holder can do, in order. Nothing here was attempted 
    invocation URL `https://games.sweedler.com/clip/dice` and its own card copy; the advanced card
    is also what App Clip Codes, QR and NFC would need. App Store Connect verifies the AASA (step
    6) "after you've uploaded a build to App Store Connect and created an App Clip experience"
-   ([Associating your App Clip][associating]).
+   ([Associating your App Clip][associating]). Then a **second advanced App Clip experience** for
+   the buddy with the invocation URL `https://games.sweedler.com/clip/rps` (the page appends
+   `?session=<id>`; an advanced experience matches by URL prefix), its own card copy ("Your buddy
+   in the island") and its own header image. The AASA needs nothing new: one clip bundle id covers
+   both URLs, and the `applinks` block's `/clip/*` pattern (step 6) covers both paths.
 6. **The AASA's team id.** The site serves `https://games.sweedler.com/.well-known/apple-app-site-association`
    (JSON, no redirect); the `appclips` block must read
 
@@ -150,7 +199,8 @@ Everything only the account holder can do, in order. Nothing here was attempted 
 
    with `TEAMID` from step 1. For the full app to take the URL over once installed
    (`App.entitlements`), an `applinks` block too:
-   `{ "applinks": { "details": [{ "appIDs": ["TEAMID.com.sweedler.games.dice"], "components": [{ "/": "/clip/dice*" }] }] } }`.
+   `{ "applinks": { "details": [{ "appIDs": ["TEAMID.com.sweedler.games.dice"], "components": [{ "/": "/clip/*" }] }] } }`
+   (`/clip/*` covers `/clip/dice` and `/clip/rps`).
    The site's constant lives in `web/shared/lib/appClip.ts` once the `sizer-island-dice` lane
    lands; fill the team id there.
 7. **The Smart App Banner** (the site's page at `/clip/dice`, same lane):
@@ -164,8 +214,17 @@ Everything only the account holder can do, in order. Nothing here was attempted 
    Settings > Developer > Local Experiences > Register Local Experience: URL prefix
    `https://games.sweedler.com/clip/dice`, bundle id `com.sweedler.games.dice.Clip`, a title, a
    subtitle, an action, a photo; then open the URL in Safari or scan it.
+   The same registration for the buddy: URL prefix `https://games.sweedler.com/clip/rps`, the same
+   bundle id, its own title; open `https://games.sweedler.com/clip/rps?session=ABCDEFGH` in Safari.
 9. **Live Activities on the phone.** Settings > Sheshbesh Dice (or the clip) > Live Activities:
    on by default; the screen tells you when they are off.
+9b. **APNs for the buddy.** Certificates, Identifiers & Profiles > Keys > + > Apple Push
+   Notifications service (APNs): download the `.p8` once, note the Key ID and your Team ID; the
+   Worker (the `rps` push lane) signs its APNs requests with them and sends to
+   `api.sandbox.push.apple.com` for Xcode builds and `api.push.apple.com` for TestFlight and the
+   App Store, topic `com.sweedler.games.dice.Clip.push-type.liveactivity` (or the app's bundle id
+   when the full app holds the activity: the clip sends its own bundle id when it pairs). Push
+   Notifications on the two App IDs is step 1's automatic signing, or a checkbox on the identifier.
 10. **The site half's dropdown** (the owner's second ask: the playground item that rolls dice in an
     iPhone island, its green call to action disabled unless the phone has the hardware) is the
     `sizer-island-dice` lane's; it points at this clip's invocation URL.
@@ -192,7 +251,14 @@ Everything only the account holder can do, in order. Nothing here was attempted 
 - **Background.** "App Clips can't perform background activity" ([Choosing][choosing]); the activity
   is requested and updated while the clip is in the foreground, which a Roll tap always is.
 - **Update budget.** `NSSupportsLiveActivitiesFrequentUpdates` is `false`: a roll every few
-  seconds is fine under the standard budget; the frequent-updates entitlement is for feeds.
+  seconds is fine under the standard budget; the frequent-updates entitlement is for feeds. The
+  buddy's pushes are one per round (every two to four seconds while playing): Apple "allows for a
+  certain budget of ActivityKit push notifications per hour" and "may throttle" beyond it
+  ([Starting and updating with push notifications][pushes]); if a long session gets throttled,
+  set the key to `true` in both Info.plists and the person can still turn frequent pushes off.
+- **No free animation.** The island runs no animation of its own between updates (design §7): the
+  buddy moves a frame per push. The 1 fps timer-glyph-font trick is documented there for the art
+  lane.
 
 ## Sources
 
@@ -207,6 +273,10 @@ Apple Developer Documentation, read 2026-09-29:
 - [Configuring the launch experience of your App Clip][configuring]
 - [Testing the launch experience of your App Clip][testing]
 - [Choosing the right functionality for your App Clip][choosing]
+- [Starting and updating Live Activities with ActivityKit push notifications][pushes]
+
+The buddy in the island: `docs/design/rps-island.md` §5 (a screenshot lands here once the clip runs
+on a phone with an Island; none exists yet: no simulator runtime, no team on this Mac).
 
 [offering]: https://developer.apple.com/documentation/appclip/offering-live-activities-with-your-app-clip
 [displaying]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
@@ -217,3 +287,4 @@ Apple Developer Documentation, read 2026-09-29:
 [configuring]: https://developer.apple.com/documentation/appclip/configuring-the-launch-experience-of-your-app-clip
 [testing]: https://developer.apple.com/documentation/appclip/testing-the-launch-experience-of-your-app-clip
 [choosing]: https://developer.apple.com/documentation/appclip/choosing-the-right-functionality-for-your-app-clip
+[pushes]: https://developer.apple.com/documentation/activitykit/starting-and-updating-live-activities-with-activitykit-push-notifications
