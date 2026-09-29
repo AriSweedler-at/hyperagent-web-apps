@@ -7,6 +7,8 @@ import SwiftUI
 
 struct BuddyScreen: View {
     @State private var buddy = MoodActivity()
+    /// The preview's timer origin until an activity has one of its own.
+    @State private var opened = Date.now
     let isClip: Bool
     /// The URL the app or clip was opened with, routed here by RootScreen.
     let webURL: URL?
@@ -46,8 +48,7 @@ struct BuddyScreen: View {
     @ViewBuilder private var preview: some View {
         let state = buddy.state ?? .fresh()
         HStack(spacing: 20) {
-            BuddyView(state: state)
-                .frame(width: 96, height: 96)
+            BuddyView(state: state, start: buddy.startedAt ?? opened, size: 96)
             VStack(alignment: .leading, spacing: 4) {
                 CounterText(counter: state.counter)
                     .font(.system(size: 44, weight: .bold, design: .rounded))

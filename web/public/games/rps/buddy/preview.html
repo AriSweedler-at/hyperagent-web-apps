@@ -157,6 +157,80 @@
       <span id="counter">−5</span><span id="ladder" class="buddy play"></span
       ><span id="label">very-sad</span>
     </div>
+    <!-- buddy-font: the timer fonts, written by tools/buddy-font.ts -->
+    <style>
+      @font-face {
+        font-family: 'Buddy-VerySad';
+        src: url(fonts/Buddy-VerySad.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'Buddy-Sad';
+        src: url(fonts/Buddy-Sad.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'Buddy-Neutral';
+        src: url(fonts/Buddy-Neutral.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'Buddy-Happy';
+        src: url(fonts/Buddy-Happy.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'Buddy-VeryHappy';
+        src: url(fonts/Buddy-VeryHappy.ttf) format('truetype');
+      }
+      .glyph {
+        font-size: 96px;
+        line-height: 1;
+        height: 96px;
+        width: 96px;
+        margin: 0 auto;
+        color: var(--c);
+      }
+      .glyph.island {
+        font-size: 32px;
+        height: 32px;
+        width: 32px;
+      }
+    </style>
+    <h1>
+      The timer fonts: the seconds digit of a clock, one glyph per mood (what the island shows at 1
+      fps)
+    </h1>
+    <div class="sets" id="fonts">
+      <figure>
+        <div class="glyph" style="font-family: 'Buddy-VerySad'">0</div>
+        <figcaption><code>Buddy-VerySad</code></figcaption>
+      </figure>
+      <figure>
+        <div class="glyph" style="font-family: 'Buddy-Sad'">0</div>
+        <figcaption><code>Buddy-Sad</code></figcaption>
+      </figure>
+      <figure>
+        <div class="glyph" style="font-family: 'Buddy-Neutral'">0</div>
+        <figcaption><code>Buddy-Neutral</code></figcaption>
+      </figure>
+      <figure>
+        <div class="glyph" style="font-family: 'Buddy-Happy'">0</div>
+        <figcaption><code>Buddy-Happy</code></figcaption>
+      </figure>
+      <figure>
+        <div class="glyph" style="font-family: 'Buddy-VeryHappy'">0</div>
+        <figcaption><code>Buddy-VeryHappy</code></figcaption>
+      </figure>
+    </div>
+    <script>
+      const colours = ['#3b6fd6', '#6c9bea', '#f2e6a8', '#f5cd3b', '#ffd200'];
+      const glyphs = Array.from(document.querySelectorAll('#fonts .glyph'));
+      glyphs.forEach((g, i) => g.style.setProperty('--c', colours[i]));
+      const tickFont = () => {
+        const digit = String(Math.floor(Date.now() / 1000) % 10);
+        glyphs.forEach((g) => (g.textContent = digit));
+      };
+      tickFont();
+      setInterval(tickFont, 250);
+    </script>
+    <!-- /buddy-font -->
     <h1>Frame table</h1>
     <table>
       <thead>

@@ -2,8 +2,9 @@
 // buddy in the compact leading region and the signed counter in the trailing one, the buddy as the
 // minimal glyph; expanded, the buddy large at the left, the counter at the right, the prestige in
 // the centre and when the last round ended at the bottom. The Lock Screen banner is the expanded
-// row in one line. Every update (a push from the Worker) moves the buddy a frame and morphs its
-// colour; tapping opens the clip on this session.
+// row in one line. The buddy is the timer font's seconds digit (BuddySprite.swift), moving at 1 fps
+// from the activity's start with no push; a push changes its band, which morphs its colour and
+// frames; tapping opens the clip on this session.
 import ActivityKit
 import DiceModel
 import SwiftUI
@@ -12,15 +13,14 @@ import WidgetKit
 struct MoodActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: MoodActivityAttributes.self) { context in
-            BuddyLockScreenView(state: context.state)
+            BuddyLockScreenView(state: context.state, start: context.attributes.startedAt)
                 .activityBackgroundTint(Color(red: 0.10, green: 0.14, blue: 0.12))
                 .activitySystemActionForegroundColor(.white)
                 .widgetURL(Invocation.rpsURL(session: context.attributes.session))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    BuddyView(state: context.state)
-                        .frame(width: 56, height: 56)
+                    BuddyView(state: context.state, start: context.attributes.startedAt, size: 56)
                         .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
@@ -41,7 +41,7 @@ struct MoodActivityWidget: Widget {
                         .foregroundStyle(.secondary)
                 }
             } compactLeading: {
-                BuddyView(state: context.state)
+                BuddyView(state: context.state, start: context.attributes.startedAt, size: 32)
                     .padding(2)
             } compactTrailing: {
                 CounterText(counter: context.state.counter)
@@ -49,7 +49,7 @@ struct MoodActivityWidget: Widget {
                     .foregroundStyle(Color(context.state.band.fill))
                     .padding(.horizontal, 2)
             } minimal: {
-                BuddyView(state: context.state)
+                BuddyView(state: context.state, start: context.attributes.startedAt, size: 28)
                     .padding(3)
             }
             .widgetURL(Invocation.rpsURL(session: context.attributes.session))
@@ -62,11 +62,11 @@ struct MoodActivityWidget: Widget {
 /// and the time at the right.
 struct BuddyLockScreenView: View {
     let state: MoodActivityAttributes.ContentState
+    let start: Date
 
     var body: some View {
         HStack(spacing: 16) {
-            BuddyView(state: state)
-                .frame(width: 60, height: 60)
+            BuddyView(state: state, start: start, size: 60)
             VStack(alignment: .leading, spacing: 2) {
                 CounterText(counter: state.counter)
                     .font(.system(size: 40, weight: .bold, design: .rounded))

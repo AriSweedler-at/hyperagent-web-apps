@@ -1,10 +1,13 @@
-// The buddy as pixel art drawn in code: a frame is rows of characters, one per pixel (`.` clear,
-// `#` the band's fill, `o` ink for eyes and mouth, `=` a darker shade), N frames per mood with one
-// frame duration, so another lane can swap the placeholder frames for sourced art without touching
-// the views. The island shows frame `k` and moves to the next on every update: the platform runs no
-// free animation of its own (docs/design/rps-island.md §4, §7).
+// The buddy in the island. Moving: `Text(timerInterval:)` is the one view a Live Activity runs on
+// its own, so each band has a font whose ten digit glyphs are its frames (Config/Fonts, written by
+// tools/buddy-font.ts from web/public/games/rps/buddy/) and the timer's seconds digit, clipped to
+// one em, is the buddy at 1 fps with no push (docs/design/rps-buddy.md "Moving in the island";
+// docs/design/rps-island.md §7). Fallback, when a font is not in the bundle: the pixel frames drawn
+// in code below (rows of characters, one per pixel: `.` clear, `#` the fill, `o` ink, `=` a darker
+// shade), frame `at mod N` per push.
 import DiceModel
 import SwiftUI
+import UIKit
 
 /// One frame: equal-length rows of pixel characters.
 struct PixelFrame: Hashable, Sendable {
@@ -197,18 +200,78 @@ extension EnvironmentValues {
     }
 }
 
-/// The buddy for a state: the frame the update landed on, in the band's colours, morphing on change.
-struct BuddyView: View {
-    let state: MoodActivityAttributes.ContentState
+/// The timer fonts, one per band: `Buddy-VerySad` … `Buddy-VeryHappy`, 1024 units per em over the
+/// 24-pixel grid, digit `d` the band's frame `d mod N`, space and colon empty and zero-wide. They are
+/// registered in Activity-Info.plist (`UIAppFonts`) and copied by both extensions' Resources phase.
+enum BuddyFont {
+    static func name(for mood: Mood) -> String {
+        switch mood {
+        case .verySad: "Buddy-VerySad"
+        case .sad: "Buddy-Sad"
+        case .neutral: "Buddy-Neutral"
+        case .happy: "Buddy-Happy"
+        case .veryHappy: "Buddy-VeryHappy"
+        }
+    }
+
+    /// Whether the band's font is in this bundle; false shows the pushed frame instead.
+    static func isAvailable(for mood: Mood) -> Bool {
+        UIFont(name: name(for: mood), size: 32) != nil
+    }
+
+    /// The timer's far end past the activity's eight-hour ceiling, so the digits never stop.
+    static let span: TimeInterval = 24 * 60 * 60
+}
+
+/// The buddy as the seconds digit of a running timer in the band's font. The text is laid out at
+/// its own width (`m:ss`: every digit one em, the colon nothing) and aligned trailing in a one-em
+/// frame, so the minutes and the tens digit hang out of the clip on the left and only the units
+/// digit, the frame, shows. One em is `size` points; the digit at any moment is a function of
+/// `start` alone, so every surface shows the same frame.
+struct TimerBuddyView: View {
+    let band: Mood
+    let start: Date
+    let size: CGFloat
 
     var body: some View {
-        let frames = BuddyFrames.frames(for: state.band)
-        let frame = frames.isEmpty ? PixelFrame(rows: []) : frames[BuddyFrames.index(for: state)]
-        PixelSpriteView(frame: frame, fill: Color(state.band.fill), ink: Color(Mood.ink))
-            .id(frame)
-            .transition(.scale(scale: 0.8).combined(with: .opacity))
-            .animation(.spring(duration: 0.4), value: state)
-            .accessibilityLabel("\(state.band.label) buddy")
+        Text(timerInterval: start ... start.addingTimeInterval(BuddyFont.span),
+             countsDown: false, showsHours: false)
+            .font(.custom(BuddyFont.name(for: band), size: size))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(1)
+            .fixedSize()
+            .frame(width: size, height: size, alignment: .trailing)
+            .clipped()
+            .foregroundStyle(Color(band.fill))
+    }
+}
+
+/// The buddy for a state at `size` points: the timer font's frame when the band's font is in the
+/// bundle, else the frame the update landed on, drawn in code; in the band's colour, morphing on a
+/// band change.
+struct BuddyView: View {
+    let state: MoodActivityAttributes.ContentState
+    /// When the activity began: the timer's origin.
+    let start: Date
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if BuddyFont.isAvailable(for: state.band) {
+                TimerBuddyView(band: state.band, start: start, size: size)
+            } else {
+                let frames = BuddyFrames.frames(for: state.band)
+                let frame = frames.isEmpty ? PixelFrame(rows: []) : frames[BuddyFrames.index(for: state)]
+                PixelSpriteView(frame: frame, fill: Color(state.band.fill), ink: Color(Mood.ink))
+                    .frame(width: size, height: size)
+                    .id(frame)
+            }
+        }
+        .id(state.band)
+        .transition(.scale(scale: 0.8).combined(with: .opacity))
+        .animation(.spring(duration: 0.4), value: state)
+        .accessibilityLabel("\(state.band.label) buddy")
     }
 }
 
