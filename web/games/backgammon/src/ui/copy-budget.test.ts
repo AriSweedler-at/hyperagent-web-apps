@@ -82,7 +82,6 @@ const BLOT_ON_7 = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:4 18:1 | bar 0/0 | 
 const T5 = 'L: 24:1 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 1/0 | off 0/0';
 const T9 = 'L: 24:1 10:1 9:1 8:1 | D: 5:2 23:2 24:2 13:9 | bar 0/0 | off 11/0';
 const T10 = 'L: 6:2 5:2 4:2 3:2 2:2 1:2 | D: 13:15 | bar 0/0 | off 3/0';
-const T12 = 'L: 4:1 2:1 | D: 13:15 | bar 0/0 | off 13/0';
 const T15 = 'L: 24:2 6:3 5:3 4:3 3:2 2:2 | D: 2:2 3:2 4:2 5:2 6:2 7:2 13:3 | bar 0/0 | off 0/0';
 const T25 = 'L: 1:1 | D: 13:15 | bar 0/0 | off 14/0';
 const NO_ENTRY = 'L: 13:14 | D: 1:2 2:2 3:2 4:2 5:2 6:2 13:3 | bar 1/0 | off 0/0';
@@ -119,7 +118,6 @@ const startLines = (seat: Seat): ReadonlyArray<CopyLine> => {
 const moverLines = (): ReadonlyArray<CopyLine> => {
   const at = (text: string, dice: Dice | null): View => viewFor(stateAt(text, 0, dice), 0);
   const tray = at(BLOT_ON_7, [6, 3]);
-  const off = at(T12, [6, 5]);
   const heldDead = move(stateAt(T15, 0, [6, 5], 'portes', true), '6/1');
   const noMove = step(stateAt(T15, 0, null), 0, { type: 'roll' });
   const noEntry = step(stateAt(NO_ENTRY, 0, null), 0, { type: 'roll' });
@@ -134,10 +132,6 @@ const moverLines = (): ReadonlyArray<CopyLine> => {
     status("phase 'moving', bearing off", at(T10, [6, 5])),
     status("phase 'moving', the tray open, two ways", tray, {
       pending: pendingFor(tray, 12, 3),
-      noMoveShown: false,
-    }),
-    status("phase 'moving', the tray open, either die bears off", off, {
-      pending: pendingFor(off, 3, 'off'),
       noMoveShown: false,
     }),
     status("phase 'moving', the turn held, a die dead", viewFor(heldDead, 0)),
@@ -204,7 +198,6 @@ const SAMPLES: Readonly<Record<keyof typeof STATUS_TEMPLATES, Template>> = {
   diceUsed: T.diceUsed(),
   heldDead: T.heldDead(6),
   twoWays: T.twoWays([6, 5], 'off'),
-  eitherOff: T.eitherOff(),
 };
 
 describe('the budget table', () => {
@@ -260,7 +253,7 @@ describe('every status template fits the strip', () => {
 describe('every status line fits the strip sideways', () => {
   test("the mover's lines, the owner's last-move line among them", () => {
     const lines = moverLines();
-    expect(lines.length).toBe(27);
+    expect(lines.length).toBe(26);
     const over = overBudget(SLOTS.stripStatus, lines);
     expect(over.map((o) => o.message).join('\n\n')).toBe('');
     // The line the owner saw cut: `3-1 · last move`, in every mode and for both seats.

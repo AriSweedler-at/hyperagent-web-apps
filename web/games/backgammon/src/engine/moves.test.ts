@@ -351,17 +351,22 @@ describe('dice and move helpers', () => {
     expect(movesFrom([a, b, c, d], 'bar')).toEqual([a]);
   });
 
-  test('moveTo: the exact die when own(from) === die, else the largest legal die', () => {
+  test('moveTo: the smallest legal die that suffices (the exact die when there is one); the bigger stays in hand', () => {
     const exact = legalFirstMoves(pos('L: 4:1 2:1 | D: 13:15 | bar 0/0 | off 13/0'), 0, [6, 4], R);
-    expect(moveTo(exact, 3, 'off', 0, R)).toEqual(mv(0, '4/off'));
-    const t20 = legalFirstMoves(pos('L: 3:1 2:1 | D: 13:15 | bar 0/0 | off 13/0'), 0, [6, 4], R);
-    expect(moveTo(t20, 2, 'off', 0, R)).toEqual(mv(0, '3/off(6)'));
+    expect(moveTo(exact, 3, 'off')).toEqual(mv(0, '4/off'));
+    // A 3-point checker: with 5-4 the 4 (the owner: "use the 4 because it is smaller"), with 6-6
+    // a 6, with 5-3 the exact 3.
+    const three = pos('L: 3:1 2:1 | D: 13:15 | bar 0/0 | off 13/0');
+    expect(moveTo(legalFirstMoves(three, 0, [5, 4], R), 2, 'off')).toEqual(mv(0, '3/off(4)'));
+    expect(moveTo(legalFirstMoves(three, 0, [6, 6], R), 2, 'off')).toEqual(mv(0, '3/off(6)'));
+    expect(moveTo(legalFirstMoves(three, 0, [5, 3], R), 2, 'off')).toEqual(mv(0, '3/off'));
+    // A point is one distance away, so exactly one die reaches it; nothing where nothing is legal.
     const t1 = legalFirstMoves(pos(START), 0, [3, 1], R);
-    expect(moveTo(t1, 7, 4, 0, R)).toEqual(mv(0, '8/5'));
-    expect(moveTo(t1, 7, 'off', 0, R)).toBeNull();
-    expect(moveTo(t1, 12, 11, 0, R)).toBeNull();
+    expect(moveTo(t1, 7, 4)).toEqual(mv(0, '8/5'));
+    expect(moveTo(t1, 7, 'off')).toBeNull();
+    expect(moveTo(t1, 12, 11)).toBeNull();
     const bar = legalFirstMoves(pos(t5Pos), 0, [6, 1], R);
-    expect(moveTo(bar, 'bar', 23, 0, R)).toEqual(mv(0, 'bar/24'));
+    expect(moveTo(bar, 'bar', 23)).toEqual(mv(0, 'bar/24'));
   });
   const t5Pos = `L: 24:1 13:5 8:3 6:5 | ${D_START} | bar 1/0 | off 0/0`;
 

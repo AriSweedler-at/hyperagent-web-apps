@@ -612,13 +612,26 @@ unambiguous destination.
 
 ### 4.4 Which die
 
-A single-step destination names its die. Bear-off from own `n` with the exact die `n`: that die;
-from the highest point below a bigger die: that die; when both dice bear off the same checker the
-disc reads `6·5` and the tap opens two chips (`moveTo(legal, from, 'off')`, exact else largest, is
-what the drag-drop and the replay policy use). `.die.dead`: for non-doubles, die `d` is dead iff no
-play in `v.plays` contains a move with `die === d`; for doubles, the last `4 − v.plays[0].length`
-faces. Tapping a dead die does nothing (`aria-disabled`). Tap-a-die-to-force-it (`die/pick`)
-recomputes targets for that die alone and the status line reads "6-4 · playing the 6".
+A single-step destination names its die. A point is one distance away, so exactly one die reaches
+it; only a bear-off can be reached with either die, and then the tap spends the smallest die that
+suffices, the exact die (own `n` with die `n`) when there is one, and the bigger die stays in
+hand: from own 4 with 6-5 the disc reads `5`, one tap bears off with it, the 6 is still live. The
+owner (2026-09-28): "when you are moving pips off, and you have all your pips at or below the roll
+… you should always use the best dice to move them off first. That is, use the 4 because it is
+smaller. Then use the 5. It shouldn't make you pick when the two are functionally the same. It
+does matter and you should ask the user which of the 2 ways they wanna move it when they are doing
+2 moves in 1." The engine's `moveTo(legal, from, to)` is that policy (the drag-drop's default);
+`targetsOf` keeps the one chain it names, so the disc, the tap and the drop agree, and the die-chip
+tray (§4.3) opens only for a real alternative: two orders of a combined move whose waypoints or
+hits differ. A player who needs the bigger die for that checker plays the other die first and
+bears off with the one left, or undoes ("move the blockable number first and then leave the
+remaining die so you can off it. If you off the wrong die first then just undo"). A recorded
+game keeps each played move's die on its action, so it replays with its own die whatever the
+policy (the log line reads `4/off 2/off`; `moveLabel`'s `4/off(5)` is the test table's spelling).
+`.die.dead`: for non-doubles, die `d` is dead iff no play in `v.plays`
+contains a move with `die === d`; for doubles, the last `4 − v.plays[0].length` faces. Tapping a
+dead die does nothing (`aria-disabled`). Tap-a-die-to-force-it (`die/pick`) recomputes targets for
+that die alone, so a picked 6 bears off with the 6, and the status line reads "6-4 · playing the 6".
 
 ### 4.5 Forced play, auto-select and the end of the turn
 

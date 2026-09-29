@@ -296,11 +296,11 @@ export type TargetKind = 'target' | 'target-2';
 export type Target = Readonly<{
   to: To;
   kind: TargetKind;
-  /** `"3"`; `"6·5"` when either die bears off; `"3+1"`; `"6+3?"` when the tap opens the tray. */
+  /** `"3"` (a bear-off both dice suffice for names the die it spends, design §4.4); `"3+1"`; `"6+3?"` when the tap opens the tray. */
   die: string;
   /** The tap opens the die-chip tray instead of committing (design §4.3). */
   opens: boolean;
-  /** In chip order: the higher first die, then fewer hits; `chip/tap {index}` indexes this list. */
+  /** In chip order: the higher first die, then fewer hits; `chip/tap {index}` indexes this list. A single step stands alone. */
   chains: ReadonlyArray<Chain>;
 }>;
 
@@ -365,19 +365,16 @@ const diceLabel = (dice: ReadonlyArray<Die>): string =>
     ? `${String(dice[0])}×${String(dice.length)}`
     : dice.join('+');
 
+/** Design §4.4: of two single steps to one place (only a bear-off has two), the smaller die, as the engine's `moveTo`. */
+const smallerDie = (a: Chain, b: Chain): number => firstDie(a) - firstDie(b);
+
 const targetAt = (to: To, chains: ReadonlyArray<Chain>): Target => {
   const sorted = [...chains].sort(compareChains);
-  const singles = sorted.filter((c) => c.moves.length === 1);
-  // One step reaches a point with exactly one die; only a bear-off can take either (design §4.4
-  // "6·5"), and then the tap opens the tray so the player picks the die that dims.
-  if (singles.length > 0)
-    return {
-      to,
-      kind: 'target',
-      die: singles.map((c) => String(firstDie(c))).join('·'),
-      opens: singles.length > 1,
-      chains: singles,
-    };
+  // One step reaches a point with exactly one die; only a bear-off can take either, and then the
+  // tap spends the smaller one without asking (design §4.4): the disc names it, the bigger stays.
+  const [single] = sorted.filter((c) => c.moves.length === 1).sort(smallerDie);
+  if (single !== undefined)
+    return { to, kind: 'target', die: String(firstDie(single)), opens: false, chains: [single] };
   const opens = new Set(sorted.map((c) => c.hits.join(','))).size > 1;
   const dice = diceLabel(sorted[0]?.moves.map((m) => m.die) ?? []);
   return { to, kind: 'target-2', die: `${dice}${opens ? '?' : ''}`, opens, chains: sorted };
@@ -511,14 +508,13 @@ export const STATUS_TEMPLATES = {
   /** The held turn (design §1 "Turn end"): what stops the dice, then the button to press. */
   diceUsed: (): Template => ['Dice used · End turn'],
   heldDead: (d: Die): Template => [die(d), ' is dead · End turn'],
-  /** The tray open (design §4.3, §4.4): the chain's dice and its end; both dice bearing off. */
+  /** The tray open (design §4.3): the chain's dice and its end. */
   twoWays: (dice: ReadonlyArray<Die>, to: string): Template => [
     pair(dice),
     ' to ',
     place(to),
     ', two ways',
   ],
-  eitherOff: (): Template => ['Either die bears off'],
 };
 const T = STATUS_TEMPLATES;
 
@@ -537,11 +533,9 @@ const mayDouble = (v: View, seat: Seat): boolean =>
 const placeName = (v: View, place: From | To): string =>
   place === 'bar' ? 'bar' : place === 'off' ? 'off' : String(ownPoint(v, place));
 
-/** `6+3 to 4, two ways` (design §2.4); `Either die bears off` (§4.4). */
+/** `6+3 to 4, two ways` (design §2.4): the tray opens only for a combined move with a real alternative (§4.4). */
 const pendingStatus = (v: View, pending: Pending): Template =>
-  pending.chains.every((c) => c.moves.length === 1)
-    ? T.eitherOff()
-    : T.twoWays(pending.chains[0]?.moves.map((m) => m.die) ?? [], placeName(v, pending.to));
+  T.twoWays(pending.chains[0]?.moves.map((m) => m.die) ?? [], placeName(v, pending.to));
 
 const isDouble = (v: View): boolean => v.dice !== null && v.dice[0] === v.dice[1];
 

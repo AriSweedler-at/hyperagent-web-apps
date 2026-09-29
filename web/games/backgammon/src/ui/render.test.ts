@@ -442,32 +442,20 @@ describe('the table', () => {
     expect(p.get(pt(5)).hasClass('hit')).toBe(false);
   });
 
-  test('the die-chip tray: both dice bear off the same checker, the tap opens two chips', () => {
+  test('both dice bear off the same checker: the tray disc names the smaller, the tap spends it, no chips (design §4.4)', () => {
     const p = page();
     const bearing = at('L: 4:1 2:1 | D: 13:2 | bar 0/0 | off 13/13', 0, [6, 5]);
     paint(p.doc, bearing);
     expect(p.get('offLight').hasClass('target')).toBe(true);
-    expect(p.get('offLight').attr('data-die')).toBe('6·5');
-    expect(p.get('offLight').attr('aria-label')).toBe('Your tray, 13 off, target with the 6·5');
+    expect(p.get('offLight').attr('data-die')).toBe('5');
+    expect(p.get('offLight').attr('aria-label')).toBe('Your tray, 13 off, target with the 5');
     expect(p.get('offDark').hasClass('target')).toBe(false);
     expect(p.get('controls').hasClass('choosing')).toBe(false);
-    const pending = run(bearing, { type: 'off/tap' }).app;
-    paint(p.doc, pending);
-    expect(pending.table.pending).not.toBeNull();
-    expect(p.get('controls').hasClass('choosing')).toBe(true);
-    expect(p.get('moveChips').hidden()).toBe(false);
-    expect(p.get('chipCancelBtn').hidden()).toBe(false);
-    expect(
-      p
-        .get('moveChips')
-        .text()
-        .match(/class="chip"/g),
-    ).toHaveLength(2);
-    expect(p.get('moveChips').text()).toContain('data-index="0" data-dice="6" data-to="off"');
-    expect(p.get('statusText').text()).toBe('Either die bears off');
-    const chosen = run(pending, { type: 'chip/tap', index: 0 }).app;
-    paint(p.doc, chosen);
+    const spent = run(bearing, { type: 'off/tap' }).app;
+    paint(p.doc, spent);
+    expect(spent.table.pending).toBeNull();
     expect(p.get('controls').hasClass('choosing')).toBe(false);
+    expect(p.get('moveChips').hidden()).toBe(true);
     expect(p.get('offLight').attr('data-key')).toBe('14');
     expect(
       p
@@ -475,6 +463,8 @@ describe('the table', () => {
         .text()
         .match(/class="slab"/g),
     ).toHaveLength(14);
+    // The 6 is still in hand for the 2: the status says so.
+    expect(p.get('statusText').text()).toBe('6-5 · last move');
   });
 
   test('game over: the result sheet, then the Result chip; match over: the endgame screen', () => {

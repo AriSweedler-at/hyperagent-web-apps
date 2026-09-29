@@ -303,22 +303,15 @@ export const movesFrom = (legal: ReadonlyArray<Move>, from: From): ReadonlyArray
   legal.filter((m) => m.from === from);
 
 /**
- * The move a tap on `to` means: only a bear-off can be reached with more than one die, and then
- * the exact die (own(from) === die) wins, else the largest legal die.
+ * The move a tap or a drop on `to` means: only a bear-off can be reached with more than one die,
+ * and then the smallest legal die that suffices is spent (the exact die, own(from) === die, when
+ * there is one) and the bigger die stays in hand (design §4.4; the owner, 2026-09-28: "use the 4
+ * because it is smaller. Then use the 5").
  */
-export const moveTo = (
-  legal: ReadonlyArray<Move>,
-  from: From,
-  to: To,
-  seat: Seat,
-  rules: VariantRules,
-): Move | null => {
-  const candidates = legal.filter((m) => m.from === from && m.to === to);
-  const exact = candidates.find((m) => m.from !== 'bar' && rules.ownOf(seat, m.from) === m.die);
-  return (
-    exact ?? candidates.reduce<Move | null>((b, m) => (b === null || m.die > b.die ? m : b), null)
-  );
-};
+export const moveTo = (legal: ReadonlyArray<Move>, from: From, to: To): Move | null =>
+  legal
+    .filter((m) => m.from === from && m.to === to)
+    .reduce<Move | null>((b, m) => (b === null || m.die < b.die ? m : b), null);
 
 /**
  * The distinct boards after playing all of `order` (0 when it cannot be played in full): the
