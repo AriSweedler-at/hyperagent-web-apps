@@ -68,9 +68,9 @@ export const deviceOf = (inputs: DeviceInputs): DeviceClass | null => {
   const rows = DEVICES.filter(
     (d) => d.screen.width === screen.width && d.screen.height === screen.height,
   );
-  if (rows.length === 0) return null;
-  const byNotch = rows.find((d) => d.notch === inputs.notch && d.dpr === inputs.dpr);
-  return byNotch ?? rows[0] ?? null;
+  const first = rows[0];
+  if (first === undefined) return null;
+  return rows.find((d) => d.notch === inputs.notch && d.dpr === inputs.dpr) ?? first;
 };
 
 /**
