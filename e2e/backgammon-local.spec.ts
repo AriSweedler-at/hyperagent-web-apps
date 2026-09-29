@@ -43,7 +43,7 @@ const VIEWPORTS: Readonly<Record<string, Viewport>> = {
 
 /** Light to play 6-3 from the start against a Dark blot on Light's 7: 13/4 reaches it two ways (design §4.3). */
 const TWO_ORDERS = 'L: 24:2 13:5 8:3 6:5 | D: 18:1 2:14 | bar 0/0 | off 0/0';
-/** Light bears off with 6-5 from own 4: both dice suffice (the tray), then 2/off wins a gammon. */
+/** Light bears off with 6-5 from own 4: both dice suffice, the 5 is spent (design §4.4), then 2/off wins a gammon. */
 const BOTH_SUFFICE = 'L: 4:1 2:1 | D: 24:2 1:13 | bar 0/0 | off 13/0';
 /** A Dark blot on Light's 5-point (Dark's 20); Light rolls 3-1 and hits it with the 3 from the 8. */
 const BLOT_ON_FIVE = 'L: 24:2 13:5 8:3 6:5 | D: 20:1 24:2 13:5 8:3 6:4 | bar 0/0 | off 0/0';
@@ -255,7 +255,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#curtainOverlay')).toBeVisible();
     });
 
-    test('the die-chip tray: both dice bear the same checker off; a bear-off ends the game with a gammon on the sheet', async ({
+    test('both dice bear the same checker off: one tap spends the smaller, no tray, the bigger stays live; the last checker off ends the game with a gammon on the sheet', async ({
       player,
       project,
     }) => {
@@ -264,30 +264,27 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await reveal(page);
       const v = await bgSetup(page, bgPosition({ text: BOTH_SUFFICE, turn: 0, dice: [6, 5] }));
       expect(v.me.idx).toBe(0);
-      // The tray disc names both dice; the tap opens two chips, the higher die first (design §4.4).
+      // The disc names the die the tap will spend: the 5, the smaller that suffices (design §4.4;
+      // the owner: "use the 4 because it is smaller. Then use the 5"). No tray asks.
       await expect(page.locator('#offLight')).toHaveClass(/\btarget\b/);
-      await expect(page.locator('#offLight')).toHaveAttribute('data-die', '6·5');
+      await expect(page.locator('#offLight')).toHaveAttribute('data-die', '5');
       await bgTap(page, 'off');
-      await expect(page.locator('#controls')).toHaveClass(/\bchoosing\b/);
-      const chips = page.locator('#moveChips .chip');
-      await expect(chips).toHaveCount(2);
-      await expect(chips.nth(0)).toHaveAttribute('data-dice', '6');
-      await expect(chips.nth(1)).toHaveAttribute('data-dice', '5');
-      await expect(chips.nth(0)).toHaveAttribute('data-to', 'off');
-      await expect(page.locator('#statusText')).toHaveText('Either die bears off');
-      // The ✕ closes the tray; the tap opens it again, and a chip spends its die.
-      await page.locator('#chipCancelBtn').click();
-      await expect(page.locator('#controls')).not.toHaveClass(/\bchoosing\b/);
-      await bgTap(page, 'off');
-      await chips.nth(1).click();
       await expect.poll(async () => (await requireBoard(page)).played.length).toBe(1);
+      await expect(page.locator('#controls')).not.toHaveClass(/\bchoosing\b/);
+      await expect(page.locator('#moveChips .chip')).toHaveCount(0);
+      const after = await requireBoard(page);
+      expect(after.played).toEqual([{ from: 3, to: 'off', die: 5, hit: false }]);
+      expect(after.movesLeft).toEqual([6]);
       await expect(page.locator('#dice .die.die-5.used')).toHaveCount(1);
+      await expect(page.locator('#dice .die.die-6')).not.toHaveClass(/\bused\b/);
       await expect(page.locator('#offLight .slab')).toHaveCount(14);
       await expect(page.locator('#statusText')).toHaveText('6-5 · last move');
-      // The last checker off: the game is over, Dark has borne nothing off, so it is a gammon.
+      // The last checker off: the game is over, Dark has borne nothing off, so it is a gammon; the
+      // turn's log line (the die lives on the played move, not in the line).
       await bgMove(page, 2, 'off');
       await expect(page.locator('#offLight .slab')).toHaveCount(15);
       await expect(page.locator('#resultOverlay')).toBeVisible();
+      expect((await requireBoard(page)).log.map((e) => e.text)).toContain('Ann moved 4/off 2/off');
       await expect(page.locator('#rsTitle')).toHaveText('Ann wins 2 points · gammon');
       await expect(page.locator('#rsSub')).toHaveText(/^Bob had 15 checkers left · \d+ pips$/);
       await expect(page.locator('#rsScore')).toHaveText('Ann 2 – 0 Bob · match to 5');

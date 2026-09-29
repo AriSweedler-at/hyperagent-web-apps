@@ -737,7 +737,7 @@ const barTap = (app: App): Step => {
   return sourcesOf(v).includes('bar') ? step(withTable(app, { selected: 'bar' }), tap) : pure(app);
 };
 
-/** Rule 7: my tray as a destination; two sufficing dice open the tray of chips. */
+/** Rule 7: my tray as a destination; two sufficing dice spend the smaller without asking (design §4.4). */
 const offTap = (app: App, ctx: Context): Step => {
   const v = movingView(app);
   if (v === null || app.table.drag !== null) return pure(app);
@@ -774,7 +774,7 @@ const dragOver = (app: App, over: To | null): Step => {
   return lit === d.over ? pure(app) : pure(withTable(app, { drag: { ...d, over: lit } }));
 };
 
-/** The default chain for a drop: `moveTo` (exact, else the largest die) for the tray, the first chip otherwise. */
+/** The default chain for a drop: `moveTo` (the smallest die that suffices) for the tray, the first chip otherwise. */
 const dragEnd = (app: App, ctx: Context): Step => {
   const d = app.table.drag;
   if (d === null) return pure(app);
@@ -782,7 +782,7 @@ const dragEnd = (app: App, ctx: Context): Step => {
   const dropped = withTable(app, { drag: null, selected: null });
   if (v === null || d.over === null) return pure(dropped);
   if (d.over === 'off') {
-    const m = moveTo(v.legal, d.from, 'off', v.me.idx, rulesOf(v.variant));
+    const m = moveTo(v.legal, d.from, 'off');
     return m === null ? pure(dropped) : commit(dropped, [m], ctx);
   }
   const target = targetsOf(v, d.from, app.table.picked).find((t) => t.to === d.over);

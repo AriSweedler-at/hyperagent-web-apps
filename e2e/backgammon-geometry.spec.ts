@@ -68,7 +68,13 @@ const VIEWPORTS: Readonly<Record<string, Case>> = {
 
 /** Light's 6-point holds seven (the count badge, five drawn); a legal 6-5 for either seat. */
 const STACKS = 'L: 24:2 13:5 8:1 6:7 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';
-/** Light bears off with 6-5 from own 4: both dice suffice, so the tap opens the tray (design §4.3); then 2/off ends the game. */
+/**
+ * Light's one movable checker, on 13, to play 6-3 against a Dark blot on Light's 7: 13/4 reaches it
+ * two ways, so the tap opens the tray (design §4.3). The sole source is auto-selected without a
+ * lift (§4.5), so every coin stays in its place for the frame check.
+ */
+const TWO_ORDERS = 'L: 13:1 1:14 | D: 18:1 2:14 | bar 0/0 | off 0/0';
+/** Light bears off with 6-5 from own 4: both dice suffice, the tap spends the 5 (design §4.4); then 2/off ends the game. */
 const BOTH_SUFFICE = 'L: 4:1 2:1 | D: 24:2 1:13 | bar 0/0 | off 13/0';
 
 /** The seat whose view the page shows. */
@@ -123,17 +129,22 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await check('next turn, under the curtain');
 
       // To roll (a position seated before its roll: the button and the blank dice), the die-chip
-      // tray, then the game over: the sheet is over the board and the frame holds throughout.
+      // tray (13/4 two ways, design §4.3), then the game over: the sheet is over the board and the
+      // frame holds throughout.
       await bgSetup(page, bgPosition({ text: BOTH_SUFFICE, turn: 0 }));
       await expect(page.locator('#rollOverlay')).toBeVisible();
       await check('to roll', 0);
       await bgRoll(page);
-      await bgSetup(page, bgPosition({ text: BOTH_SUFFICE, turn: 0, dice: [6, 5] }));
-      await bgTap(page, 'off');
+      await bgSetup(page, bgPosition({ text: TWO_ORDERS, turn: 0, dice: [6, 3] }));
+      await bgTap(page, 4);
       await expect(page.locator('#controls')).toHaveClass(/\bchoosing\b/);
       await expect(page.locator('#moveChips .chip')).toHaveCount(2);
       await check('tray open', 0);
-      await page.locator('#moveChips .chip[data-index="0"]').click();
+      await page.locator('#chipCancelBtn').click();
+      await expect(page.locator('#controls')).not.toHaveClass(/\bchoosing\b/);
+      // Both dice bear the same checker off: one tap spends the 5 (design §4.4), then 2/off ends it.
+      await bgSetup(page, bgPosition({ text: BOTH_SUFFICE, turn: 0, dice: [6, 5] }));
+      await bgTap(page, 'off');
       await bgMove(page, 2, 'off');
       await expect(page.locator('#resultOverlay')).toBeVisible();
       await check('game over', 0);

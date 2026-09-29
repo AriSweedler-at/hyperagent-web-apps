@@ -1069,23 +1069,17 @@ describe('the hit toast in pass-and-play', () => {
 });
 
 describe('the dice, the bar, the tray and a drag', () => {
-  test('bear-off with either die opens two chips; the chosen die is the one spent (design §4.4)', () => {
+  test('bear-off with either die: one tap spends the smaller, no tray, the bigger stays live; a picked die is forced (design §4.4)', () => {
     const app = at(BOTH_SUFFICE, 0, [6, 5]);
     const v = view(app);
     // The sole source is derived: nothing is stored, the tray tap acts on it.
     expect(sourcesOf(v)).toEqual([3]);
     expect(app.table.selected).toBeNull();
-    const opened = run(app, { type: 'off/tap' });
-    const pending = opened.app.table.pending;
-    if (pending === null) throw new Error('no tray');
-    expect(pending).toMatchObject({ from: 3, to: 'off' });
-    expect(pending.chains.map((c) => c.moves)).toEqual([
-      [{ from: 3, to: 'off', die: 6 }],
-      [{ from: 3, to: 'off', die: 5 }],
-    ]);
-    const five = run(opened.app, { type: 'chip/tap', index: 1 });
-    const g = game(five.app);
-    expect(g.played).toEqual([{ from: 3, to: 'off', die: 5, hit: false }]);
+    // Own 4 with 6-5: both suffice and the 5 is the smaller, so the tap bears off with it at once
+    // (the owner, 2026-09-28: "use the 4 because it is smaller. Then use the 5") and the 6 is live.
+    const five = run(app, { type: 'off/tap' });
+    expect(five.app.table.pending).toBeNull();
+    expect(game(five.app).played).toEqual([{ from: 3, to: 'off', die: 5, hit: false }]);
     expect(view(five.app).movesLeft).toEqual([6]);
     expect(cues(five.effects)).toEqual(['bearOff']);
     // The 6 then bears off the 2 by itself: one tap, the game ends 15 off, the sheet opens.
@@ -1093,9 +1087,22 @@ describe('the dice, the bar, the tray and a drag', () => {
     expect(game(last.app)).toMatchObject({ phase: 'over', board: { off: [15, 0] } });
     expect(last.app.table.resultOpen).toBe(true);
     expect(cues(last.effects)).toEqual(['bearOff', 'win']);
-    // Cancel returns the row; a stray tap on the board also closes the tray.
-    expect(run(opened.app, { type: 'chip/cancel' }).app.table.pending).toBeNull();
-    expect(run(opened.app, { type: 'off/tap' }).app.table.pending).toBeNull();
+    // A 3-point checker under 5-4 spends the 4; a picked 5 forces the 5, and the commit releases it.
+    const three = 'L: 3:1 2:1 | D: 24:2 1:13 | bar 0/0 | off 13/0';
+    expect(game(run(at(three, 0, [5, 4]), { type: 'off/tap' }).app).played).toEqual([
+      { from: 2, to: 'off', die: 4, hit: false },
+    ]);
+    const picked = run(at(three, 0, [5, 4]), { type: 'die/pick', die: 5 }, { type: 'off/tap' });
+    expect(game(picked.app).played).toEqual([{ from: 2, to: 'off', die: 5, hit: false }]);
+    expect(picked.app.table.picked).toBeNull();
+    // A real alternative still asks: 13/4 with 6-3 reaches own 4 two ways, so the tray opens (§4.3).
+    const two = run(
+      at(TWO_ORDERS, 0, [6, 3]),
+      { type: 'point/tap', point: 12 },
+      { type: 'point/tap', point: 3 },
+    );
+    expect(two.app.table.pending).toMatchObject({ from: 12, to: 3 });
+    expect(two.app.table.pending?.chains).toHaveLength(2);
   });
 
   test('die/pick forces a die in hand, again releases it; a die not in hand or dead is ignored; a commit clears it', () => {
@@ -1177,14 +1184,14 @@ describe('the dice, the bar, the tray and a drag', () => {
       { type: 'checker/dragEnd' },
     );
     expect(game(combined.app).played.map((m) => m.die)).toEqual([6, 3]);
-    // The tray drop spends the exact die when one matches, else the largest (`moveTo`).
+    // The tray drop spends the smallest die that suffices (`moveTo`, design §4.4): the 5, as a tap would.
     const tray = run(
       at(BOTH_SUFFICE, 0, [6, 5]),
       { type: 'checker/dragStart', from: 3 },
       { type: 'checker/dragOver', over: 'off' },
       { type: 'checker/dragEnd' },
     );
-    expect(game(tray.app).played).toEqual([{ from: 3, to: 'off', die: 6, hit: false }]);
+    expect(game(tray.app).played).toEqual([{ from: 3, to: 'off', die: 5, hit: false }]);
     expect(run(app, { type: 'checker/dragEnd' })).toEqual({ app, effects: [] });
   });
 
@@ -1788,12 +1795,7 @@ describe('what changed between two views', () => {
     expect(cuesBetween(v0, view(rolled.app), 'local')).toEqual(['roll']);
     expect(cuesBetween(view(rolled.app), view(rolled.app), 'local')).toEqual([]);
     const off = at(BOTH_SUFFICE, 0, [6, 5]);
-    const won = run(
-      off,
-      { type: 'off/tap' },
-      { type: 'chip/tap', index: 0 },
-      { type: 'off/tap' },
-    ).app;
+    const won = run(off, { type: 'off/tap' }, { type: 'off/tap' }).app;
     const g = game(won);
     expect(cuesBetween(viewFor(g, 1), viewFor(g, 1), 'guest')).toEqual([]);
     const before = viewFor({ ...g, phase: 'moving' }, 1);

@@ -301,7 +301,7 @@ describe('selection', () => {
     ]);
   });
 
-  test('a hit on one path opens the tray (T13 and design §4.3); either die bearing off reads 6·5 (T12)', () => {
+  test('a hit on one path opens the tray (T13 and design §4.3); either die bearing off names the smaller and commits (T12, §4.4)', () => {
     const t13 = targetsOf(viewAt(BLOT_ON_5, 0, [3, 1]), 7, null);
     expect(t13.map((x) => [x.to, x.die, x.opens])).toEqual([
       [3, '3+1?', true],
@@ -315,11 +315,14 @@ describe('selection', () => {
       [6, 'target', '6'],
       [9, 'target', '3'],
     ]);
+    // Own 4 with 6-5: both suffice, the 5 is the smaller, so the disc reads `5`, the tap commits
+    // that one chain and the 6 stays in hand; a picked 6 forces the 6 (design §4.4).
     const off = targetsOf(viewAt(T12, 0, [6, 5]), 3, null);
-    expect(off.map((x) => [x.to, x.kind, x.die, x.opens])).toEqual([
-      ['off', 'target', '6·5', true],
-    ]);
-    expect(off[0]?.chains.map((c) => c.moves[0]?.die)).toEqual([6, 5]);
+    expect(off.map((x) => [x.to, x.kind, x.die, x.opens])).toEqual([['off', 'target', '5', false]]);
+    expect(off[0]?.chains.map((c) => c.moves)).toEqual([[{ from: 3, to: 'off', die: 5 }]]);
+    expect(targetsOf(viewAt(T12, 0, [6, 5]), 3, 6)[0]?.die).toBe('6');
+    // The exact die is the smallest that suffices: own 4 with 6-4 spends the 4.
+    expect(targetsOf(viewAt(T12, 0, [6, 4]), 3, null)[0]?.die).toBe('4');
   });
 
   test("chips: own numbering, the mockup's labels, the tray markup and its key", () => {
@@ -339,7 +342,7 @@ describe('selection', () => {
     expect(chipsKey(chips)).toBe('6+3>4/7/7|3+6>4/10/');
     const off = viewAt(T12, 0, [6, 5]);
     const offChips = chipsFor(off, targetsOf(off, 3, null)[0]?.chains ?? []);
-    expect(offChips.map(chipLabel)).toEqual(['6 → off', '5 → off']);
+    expect(offChips.map(chipLabel)).toEqual(['5 → off']);
   });
 });
 
@@ -383,13 +386,6 @@ describe('statusText', () => {
         noMoveShown: false,
       }),
     ).toBe('6+3 to 4, two ways');
-    const off = viewAt(T12, 0, [6, 5]);
-    expect(
-      statusText(off, {
-        pending: { from: 3, to: 'off', chains: targetsOf(off, 3, null)[0]?.chains ?? [] },
-        noMoveShown: false,
-      }),
-    ).toBe('Either die bears off');
   });
 
   test("the opponent's turn, the cube, the forfeited roll and the end", () => {
