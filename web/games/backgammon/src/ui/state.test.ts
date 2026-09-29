@@ -1469,6 +1469,7 @@ const deps = (
       toast: note('toast'),
       fx: note('fx'),
       wakeLock: note('wakeLock'),
+      orientationLock: note('orientationLock'),
       net: {
         startHost: note('startHost'),
         startGuest: note('startGuest'),

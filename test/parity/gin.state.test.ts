@@ -44,6 +44,7 @@ const depsOver = (store: EffectDeps['store'], dispatch: (i: Intent) => void): Ef
   toast: quiet,
   fx: quiet,
   wakeLock: quiet,
+  orientationLock: quiet,
   net: { startHost: quiet, startGuest: quiet, send: quiet, close: quiet },
   confirm: () => true,
   scrollTop: quiet,

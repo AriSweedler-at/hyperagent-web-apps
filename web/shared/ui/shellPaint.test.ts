@@ -526,4 +526,50 @@ describe('paintGate (docs/design/backgammon-landscape.md §5D; the shell`s, for 
     expect(bare.get('turnGate').hidden()).toBe(true);
     expect(bare.get('rulesOverlay').attr('inert')).toBeNull();
   });
+
+  test('canLock shows "Go sideways" (the Android lock`s tap, docs/design/backgammon-landscape.md §5C) and gives it the focus a dialog owes its first control; without it the button stays hidden and Play upright takes focus; hiding lets whichever go', () => {
+    const withGo = (): FakePage => {
+      const app = fakeEl('app');
+      const gate = fakeEl('turnGate', { classes: ['overlay', 'hidden'] });
+      const go = fakeEl('turnGateGoBtn', { classes: ['btn', 'hidden'] });
+      const keep = fakeEl('turnGateKeepBtn', { classes: ['btn'] });
+      return fakePage([app, gate, go, keep], fakeEl('body', { queries: { '.overlay': [gate] } }));
+    };
+    const android = withGo();
+    paintGate(android.doc, true, true);
+    expect(android.get('turnGate').hidden()).toBe(false);
+    expect(android.get('turnGateGoBtn').hidden()).toBe(false);
+    expect(android.get('turnGateGoBtn').focused()).toBe(true);
+    expect(android.get('turnGateKeepBtn').focused()).toBe(false);
+    // A repaint while open leaves focus where the player put it.
+    android.get('turnGateGoBtn').el.blur();
+    android.get('turnGateKeepBtn').el.focus();
+    paintGate(android.doc, true, true);
+    expect(android.get('turnGateGoBtn').focused()).toBe(false);
+    expect(android.get('turnGateKeepBtn').focused()).toBe(true);
+    // Hidden: the button that had focus lets go.
+    paintGate(android.doc, false, true);
+    expect(android.get('turnGateKeepBtn').focused()).toBe(false);
+    expect(android.get('turnGateGoBtn').hidden()).toBe(false);
+    // The device fact can change between paints only in a test; the paint follows it either way.
+    paintGate(android.doc, false);
+    expect(android.get('turnGateGoBtn').hidden()).toBe(true);
+    // An iPhone (no canLock, the default): the one control, as before.
+    const iphone = withGo();
+    paintGate(iphone.doc, true);
+    expect(iphone.get('turnGateGoBtn').hidden()).toBe(true);
+    expect(iphone.get('turnGateGoBtn').focused()).toBe(false);
+    expect(iphone.get('turnGateKeepBtn').focused()).toBe(true);
+    paintGate(iphone.doc, false);
+    expect(iphone.get('turnGateKeepBtn').focused()).toBe(false);
+    // A gated page without the Go button (a story) under canLock: Play upright takes focus.
+    const noGo = fakePage(
+      [fakeEl('turnGate', { classes: ['overlay', 'hidden'] }), fakeEl('turnGateKeepBtn')],
+      fakeEl('body', { queries: { '.overlay': [] } }),
+    );
+    paintGate(noGo.doc, true, true);
+    expect(noGo.get('turnGateKeepBtn').focused()).toBe(true);
+    paintGate(noGo.doc, false, true);
+    expect(noGo.get('turnGateKeepBtn').focused()).toBe(false);
+  });
 });

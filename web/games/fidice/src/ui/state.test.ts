@@ -97,9 +97,9 @@ const hosting = (
 });
 
 describe('the type bag', () => {
-  test('the table`s intent and effect names reuse none of the shell`s 48 and 29; every table intent is listed; the screens', () => {
-    expect(SHELL_INTENT_TYPES).toHaveLength(48);
-    expect(SHELL_EFFECT_TYPES).toHaveLength(29);
+  test('the table`s intent and effect names reuse none of the shell`s 50 and 30; every table intent is listed; the screens', () => {
+    expect(SHELL_INTENT_TYPES).toHaveLength(50);
+    expect(SHELL_EFFECT_TYPES).toHaveLength(30);
     const shellIntents = new Set<string>(SHELL_INTENT_TYPES);
     const shellEffects = new Set<string>(SHELL_EFFECT_TYPES);
     expect(TABLE_INTENT_TYPES.filter((t) => shellIntents.has(t))).toEqual([]);
@@ -636,6 +636,7 @@ const fakeDeps = (store: ReturnType<typeof createStore>): Partial<EffectDeps> =>
   store,
   fx: () => undefined,
   wakeLock: () => undefined,
+  orientationLock: () => undefined,
   scrollTop: () => undefined,
   confirm: () => true,
   toggleSound: () => undefined,

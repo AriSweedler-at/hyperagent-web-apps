@@ -527,6 +527,8 @@ type Options = Readonly<{
   gated?: boolean;
   /** The window has a `screen` whose `orientation.lock` is a function (true: Android's Chromium family) or is absent (false: an iPhone); undefined, no `screen` at all. */
   lock?: boolean;
+  /** The screen's `lock` rejects (a tablet that refuses, desktop Chromium): the attempt does not take. */
+  refuse?: boolean;
 }>;
 
 type Log = Readonly<{
@@ -558,6 +560,8 @@ type Log = Readonly<{
   queries: string[];
   /** The `fallback` each `cfg.sound.enabled(store, fallback)` call carried. */
   fallbacks: boolean[];
+  /** The Android lock's calls in order: `request` (fullscreen), `lock:<orientation>`, `unlock`, `exit`. */
+  locks: string[];
 }>;
 
 /** One booted page: what the boot was given, and everything it touched, recorded. */
@@ -575,7 +579,9 @@ const bootPage = (options: Options = {}) => {
       fakeEl('rulesList', { queries: { '#rule-knock': [ruleEl] } }),
       fakeEl('app'),
       overlay,
-      ...(options.gated === true ? [gate, fakeEl('turnGateKeepBtn')] : []),
+      ...(options.gated === true
+        ? [gate, fakeEl('turnGateGoBtn', { classes: ['btn', 'hidden'] }), fakeEl('turnGateKeepBtn')]
+        : []),
     ],
     fakeEl('body', {
       queries: { '.overlay': [overlay, ...(options.gated === true ? [gate] : [])] },
@@ -605,7 +611,10 @@ const bootPage = (options: Options = {}) => {
     listeners: [],
     queries: [],
     fallbacks: [],
+    locks: [],
   };
+  /** The page is in fullscreen (the fake `requestFullscreen`/`exitFullscreen` flip it; a test flips it for a back gesture). */
+  const fullscreen = { on: false };
   const doc: BootDocumentLike = {
     getElementById: p.doc.getElementById,
     body: p.doc.body,
@@ -616,6 +625,22 @@ const bootPage = (options: Options = {}) => {
     },
     get visibilityState() {
       return visibility.state;
+    },
+    // The Fullscreen API as the Android lock reads it (orientation.ts): recorded, and the flag flipped.
+    documentElement: {
+      requestFullscreen: () => {
+        log.locks.push('request');
+        fullscreen.on = true;
+        return Promise.resolve();
+      },
+    },
+    exitFullscreen: () => {
+      log.locks.push('exit');
+      fullscreen.on = false;
+      return Promise.resolve();
+    },
+    get fullscreenElement() {
+      return fullscreen.on ? p.doc.body : null;
     },
   };
   const pending = { effects: [] as ReadonlyArray<FakeEffect> };
@@ -650,7 +675,20 @@ const bootPage = (options: Options = {}) => {
       ? {}
       : {
           screen: {
-            orientation: options.lock ? { lock: (): Promise<void> => Promise.resolve() } : {},
+            // Android's `lock` (recorded; refused where the options say) and `unlock`; an iPhone's neither.
+            orientation: options.lock
+              ? {
+                  lock: (orientation: string): Promise<void> => {
+                    log.locks.push(`lock:${orientation}`);
+                    return options.refuse === true
+                      ? Promise.reject(new Error('refused'))
+                      : Promise.resolve();
+                  },
+                  unlock: (): void => {
+                    log.locks.push('unlock');
+                  },
+                }
+              : {},
           },
         }),
     ...(options.coarse === undefined
@@ -725,6 +763,10 @@ const bootPage = (options: Options = {}) => {
     if (intent.type === 'gate/keep') {
       return { app: { ...app, shell: { ...app.shell, gateDismissed: true } }, effects: [] };
     }
+    // "Go sideways": the shell's `lockSideways` would step the lock; the stub steps it outright.
+    if (intent.type === 'gate/turn') {
+      return { app, effects: [{ type: 'orientationLock', hold: true }] };
+    }
     if (intent.type === 'step') {
       return {
         app: intent.change === true ? { ...app, steps: app.steps + 1 } : app,
@@ -748,6 +790,7 @@ const bootPage = (options: Options = {}) => {
     else if (effect.type === 'fx') deps.fx(effect.cue, app.shell.soundFont);
     else if (effect.type === 'phrases') deps.fx(effect.phrases, app.shell.soundFont);
     else if (effect.type === 'wakeLock') deps.wakeLock(effect.hold);
+    else if (effect.type === 'orientationLock') deps.orientationLock(effect.hold);
     else if (effect.type === 'startHost')
       deps.net.startHost(effect.code, effect.attempt, effect.resume);
     else if (effect.type === 'startGuest') deps.net.startGuest(effect.code, effect.attempt);
@@ -883,7 +926,7 @@ const bootPage = (options: Options = {}) => {
   };
   const hook = (): Readonly<Record<string, unknown>> =>
     win['__fake'] as Readonly<Record<string, unknown>>;
-  return { boot, run, hook, log, p, ruleEl, clock, store, win, visibility, fxDeps };
+  return { boot, run, hook, log, p, ruleEl, clock, store, win, visibility, fxDeps, fullscreen };
 };
 
 /** The types of the intents the reducer saw. */
@@ -1036,6 +1079,72 @@ describe('bootShell', () => {
     // A page without `matchMedia` at all: watched, reported nothing.
     const silent = bootPage({ sideways: true, gated: true });
     expect(seen(silent)).not.toContain('viewport/portrait');
+  });
+
+  test("the Android lock (docs/design/backgammon-landscape.md §5C): Go sideways shows where the device can lock and takes the gate's focus; its tap is the boot's `gate/turn`, run as fullscreen then the landscape lock; a back gesture (fullscreenchange, no element) is `fullscreen/lost`; a refused lock reports the loss; the drop unlocks and leaves fullscreen; an iPhone's gate hides the button; an upright game listens to nothing", async () => {
+    const b = bootPage({ coarse: true, sideways: true, gated: true, lock: true });
+    b.boot.dispatch({ type: 'render' });
+    expect(b.p.get('turnGate').hidden()).toBe(false);
+    expect(b.p.get('turnGateGoBtn').hidden()).toBe(false);
+    expect(b.p.get('turnGateGoBtn').focused()).toBe(true);
+    expect(b.p.get('turnGateKeepBtn').focused()).toBe(false);
+    // The tap: the boot's binding, the effect through the adapter, both calls in order.
+    b.p.get('turnGateGoBtn').fire('click');
+    expect(b.log.intents.at(-1)).toEqual({ type: 'gate/turn' });
+    expect(b.log.ran.at(-1)).toEqual(['orientationLock', 0]);
+    await settle();
+    expect(b.log.locks).toEqual(['request', 'lock:landscape']);
+    expect(b.fullscreen.on).toBe(true);
+    expect(seen(b)).not.toContain('fullscreen/lost');
+    // Entering fullscreen fires the event with the element set: no loss.
+    b.p.fire('fullscreenchange');
+    expect(seen(b)).not.toContain('fullscreen/lost');
+    // The back gesture: the browser left fullscreen (and unlocked) before the event.
+    b.fullscreen.on = false;
+    b.p.fire('fullscreenchange');
+    expect(b.log.intents.at(-1)).toEqual({ type: 'fullscreen/lost' });
+    // Already in fullscreen, the next hold locks without asking for fullscreen again.
+    b.fullscreen.on = true;
+    b.run([{ type: 'orientationLock', hold: true }]);
+    await settle();
+    expect(b.log.locks).toEqual(['request', 'lock:landscape', 'lock:landscape']);
+    // The drop: unlock, then out of fullscreen.
+    b.run([{ type: 'orientationLock', hold: false }]);
+    await settle();
+    expect(b.log.locks.slice(3)).toEqual(['unlock', 'exit']);
+    expect(b.fullscreen.on).toBe(false);
+    // A drop outside fullscreen unlocks only.
+    b.run([{ type: 'orientationLock', hold: false }]);
+    expect(b.log.locks.slice(5)).toEqual(['unlock']);
+    // A lock the screen refuses: the adapter is silent and the boot tells the reducer the attempt did not take.
+    const refused = bootPage({
+      coarse: true,
+      sideways: true,
+      gated: true,
+      lock: true,
+      refuse: true,
+    });
+    refused.boot.dispatch({ type: 'render' });
+    refused.p.get('turnGateGoBtn').fire('click');
+    await settle();
+    expect(refused.log.locks).toEqual(['request', 'lock:landscape']);
+    expect(refused.log.intents.at(-1)).toEqual({ type: 'fullscreen/lost' });
+    // An iPhone (no `lock`): the gate keeps its one control and focuses it.
+    const iphone = bootPage({ coarse: true, sideways: true, gated: true, lock: false });
+    iphone.boot.dispatch({ type: 'render' });
+    expect(iphone.p.get('turnGate').hidden()).toBe(false);
+    expect(iphone.p.get('turnGateGoBtn').hidden()).toBe(true);
+    expect(iphone.p.get('turnGateKeepBtn').focused()).toBe(true);
+    // The fullscreen listener is the sideways game's alone; a bare sideways page has no button to bind.
+    const types = (page: ReturnType<typeof bootPage>): ReadonlyArray<string> =>
+      page.log.listeners.map(([type]) => type);
+    expect(types(b)).toContain('fullscreenchange');
+    expect(types(bootPage({ coarse: true, sideways: false, gated: true }))).not.toContain(
+      'fullscreenchange',
+    );
+    const bare = bootPage({ coarse: true, sideways: true, lock: true });
+    bare.boot.dispatch({ type: 'render' });
+    expect(bare.p.get('app').attr('inert')).toBeNull();
   });
 
   test("the hook: the shared members, the getter app, the game's own members after them", () => {

@@ -160,11 +160,11 @@ describe('the initial app', () => {
     ]);
   });
 
-  test('the shell`s intents are listed once, the shared shell reducer`s 48 (C2 took the curtain, the leave flow, visible, render and persist from the table side; the sideways lift added the two viewport turns and the gate`s keep)', () => {
+  test('the shell`s intents are listed once, the shared shell reducer`s 50 (C2 took the curtain, the leave flow, visible, render and persist from the table side; the sideways lift added the two viewport turns and the gate`s keep; the Android lock its Go sideways and the fullscreen loss)', () => {
     expect(SHELL_INTENT_TYPES).toContain('home/init');
     expect(SHELL_INTENT_TYPES).toContain('guest/lost');
     expect(SHELL_INTENT_TYPES).not.toContain('card/tap');
-    expect(SHELL_INTENT_TYPES).toHaveLength(48);
+    expect(SHELL_INTENT_TYPES).toHaveLength(50);
     expect(new Set(SHELL_INTENT_TYPES).size).toBe(SHELL_INTENT_TYPES.length);
   });
 });
@@ -1582,6 +1582,7 @@ describe('runEffect', () => {
       toast: note('toast'),
       fx: note('fx'),
       wakeLock: note('wakeLock'),
+      orientationLock: note('orientationLock'),
       net: {
         startHost: note('startHost'),
         startGuest: note('startGuest'),

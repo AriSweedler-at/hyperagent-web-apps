@@ -646,6 +646,30 @@ its board CSS and its layout twin:
    so an iPhone never sees the hint; desktop Chromium has the function too (it rejects), so a
    touchscreen laptop in a short window, a phone to `LANDSCAPE_PHONE`'s `any-pointer: coarse`, is
    kept out by its hovering trackpad. No markup, no class: the shell's `toast`.
+   **The Android lock** (docs/design/backgammon-landscape.md §5C; the owner, 2026-09-25: "it
+   should lock the user into place to make it sideways. Only on mobile!") rides the same
+   `Ctx.canLock`: a web page cannot lock an iPhone, and Android's Chromium family can only inside
+   fullscreen and only from a tap, so the shell steps one effect, `orientationLock` (`hold`
+   true: `document.documentElement.requestFullscreen()`, then
+   `screen.orientation.lock('landscape')`, run by `web/shared/edge/orientation.ts`
+   `createOrientationLock(doc, screen)`, which the boot wires beside the wake lock and which
+   swallows every failure), at the taps a game is played through and nowhere else
+   (`lockSideways`: the pass-and-play Start, the host's deal, the guest's Sit down, the home's
+   Resume, the curtain's Roll, the gate's own "Go sideways" `gate/turn`, and a game's own turn
+   tap, backgammon's `roll/click`; the invite link at boot is no tap). Once per loss, not at every
+   turn: `ShellState.orientationLocked` is set as the effect is emitted (the paint in the same
+   tap already knows) and dropped by `fullscreen/lost`, which the boot dispatches from
+   `fullscreenchange` when `document.fullscreenElement` is null (a back gesture leaves fullscreen
+   and unlocks with it; nothing can re-enter before the next tap) and from the adapter's own
+   report that an attempt did not take (a tablet that refuses, desktop Chromium); while held, no
+   tap steps the effect again and the rotation hint is silent (the lock does its work); at the
+   loss, the hint is due where it was silent. A leave or a cancel drops the lock (`hold` false:
+   unlock, then out of fullscreen) after the wake lock and before the network closes, on a device
+   that can lock whether or not the state still says held, since a refused lock is still
+   fullscreen. `#turnGateGoBtn` ("Go sideways", shipped hidden) is painted by `paintGate(doc,
+   open, canLock)` and takes the gate's focus where it shows; the boot binds it as it binds "Play
+   upright". The real fullscreen and rotation are a device check; the e2e stubs both APIs before
+   the page loads and reads their calls back.
 3. **The page**: `ShellPage.plays: 'landscape'` puts `data-plays="landscape"` on the composed
    `<body>` (`web/shared/markup/shell.ts` `bodyAttrsOf`, page.html `<body{{bodyAttrs}}>`), and
    `sheetsBefore` carries `gateMarkup(copy)` (the sheet, its two texts, "Go sideways" shipped
@@ -663,8 +687,12 @@ its board CSS and its layout twin:
 5. **Tests**: `shell.test.ts` (the state, the intents, `gateOpen`, the resets), `shellPaint.test.ts`
    (`paintGate`: `inert` on `#app` and every other `.overlay` in the body, found by class since each
    game's overlays differ and where a page places one changes nothing; focus to the dismiss button),
-   `boot.test.ts` (the watchers, the paint and the tap on "Play upright", only with the opt-in), `media.test.ts` (the two strings), `markup/shell.test.ts` (`gateMarkup`,
-   `bodyAttrsOf`), and the game's own `state.test.ts` over its config.
+   `boot.test.ts` (the watchers, the paint and the tap on "Play upright", only with the opt-in; the
+   Android lock's tap, its two calls in order, the `fullscreenchange` loss, a refused lock's report
+   and the drop), `orientation.test.ts` (the adapter over fakes: the order, every failure silent),
+   `media.test.ts` (the two strings), `markup/shell.test.ts` (`gateMarkup`, `bodyAttrsOf`), and
+   the game's own `state.test.ts` over its config; `e2e/backgammon-gate.spec.ts` stubs the lock
+   and the fullscreen APIs and reads their calls back through every tap and the back gesture.
 
 ## 7. Risks
 

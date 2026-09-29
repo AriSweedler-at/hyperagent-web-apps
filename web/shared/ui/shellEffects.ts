@@ -43,6 +43,8 @@ export type ShellEffectDeps<G extends ShellTypes> = Readonly<{
    */
   fx: (what: Cue<G> | ReadonlyArray<Phrase>, font: SoundFontName) => void;
   wakeLock: (hold: boolean) => void;
+  /** The Android lock (web/shared/edge/orientation.ts `createOrientationLock`): true holds fullscreen and the landscape lock inside the tap, false lets both go. */
+  orientationLock: (hold: boolean) => void;
   net: Readonly<{
     /** Open the room; `room` is an N-seat game's capacity and open status (n-seat-sessions.md §7), never passed for a two-seat game. */
     startHost: (code: string, attempt: number, resume: boolean, room?: HostRoom) => void;
@@ -127,6 +129,9 @@ export const runShellEffect = <G extends ShellTypes>(
       return;
     case 'wakeLock':
       deps.wakeLock(effect.hold);
+      return;
+    case 'orientationLock':
+      deps.orientationLock(effect.hold);
       return;
     case 'startHost':
       // The room's terms ride only when the effect carries a capacity (an N-seat game), so a two-seat game's adapter is called as it was.

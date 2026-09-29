@@ -293,6 +293,20 @@ export type ShellState<G extends ShellTypes> = Readonly<{
    * same four sites, kept on `lost`. Set by `rotationHint`, never by the player.
    */
   rotationHintShown: boolean;
+  /**
+   * The Android lock is held (docs/design/backgammon-landscape.md §5C; the owner, 2026-09-25: "it
+   * should lock the user into place to make it sideways. Only on mobile!"): the `orientationLock`
+   * effect was stepped at a tap (`lockSideways`: fullscreen on the document, then
+   * `screen.orientation.lock('landscape')`) and nothing has reported it gone. Set as the effect is
+   * emitted, so the paint inside the same tap already knows; dropped by `fullscreen/lost` (the
+   * boot's `fullscreenchange` with no fullscreen element: a back gesture, which unlocks too; or
+   * the adapter's own report that the attempt failed) and at every leave and cancel, where the
+   * lock is dropped with it. A fact about the page, not the table: no table reset touches it.
+   * While held, the rotation hint (`rotationHint`) is silent and no tap steps the effect again;
+   * once lost, the next tap re-enters, and nothing but a tap can (`requestFullscreen` needs
+   * transient activation).
+   */
+  orientationLocked: boolean;
   /** The `netAttempt` ticket: bumped by every start, cancel and leave. */
   netAttempt: number;
   hostStatus: WaitStatus;
@@ -444,19 +458,29 @@ export type ShellIntent<G extends ShellTypes> =
   | Readonly<{ type: 'viewport/landscape'; landscape: boolean }>
   /** `#turnGateKeepBtn` "Play upright": the turn gate stays down for this table. */
   | Readonly<{ type: 'gate/keep' }>
+  /** `#turnGateGoBtn` "Go sideways" (shown where `Ctx.canLock`): the Android lock, `lockSideways`, from the gate's own tap. */
+  | Readonly<{ type: 'gate/turn' }>
+  /**
+   * The boot's `fullscreenchange` with no fullscreen element (a back gesture left fullscreen, and
+   * the spec unlocks the orientation with it), or the adapter's report that the attempt failed:
+   * the lock is gone (`orientationLocked`), the next tap re-enters, and the rotation hint is due
+   * again where it was silent.
+   */
+  | Readonly<{ type: 'fullscreen/lost' }>
   /** The hook's `render()`. */
   | Readonly<{ type: 'render' }>
   /** A session asked the app to persist. */
   | Readonly<{ type: 'persist' }>;
 
 /**
- * The shell's half of a game's `Intent` union: 48 types, backgammon's 38 less its two option
+ * The shell's half of a game's `Intent` union: 50 types, backgammon's 38 less its two option
  * selects (`variant/set`, `matchLength/set`, its own) plus the seven both games kept on the table
  * side after C1 (the curtain reveal, the leave flow, `visible`, `render`, `persist`), plus
  * `position/load`, backgammon's `sandbox/load` generalised (dry-round-2.md F5), plus
  * `resume/auto`, the boot's lobby resume (lobby-resume.md D4), plus the three of playing sideways
  * (`viewport/portrait`, `viewport/landscape`, `gate/keep`: backgammon's turn gate lifted here,
- * docs/design/backgammon-landscape.md §5D).
+ * docs/design/backgammon-landscape.md §5D), plus the two of the Android lock (`gate/turn`,
+ * `fullscreen/lost`, §5C).
  */
 export const SHELL_INTENT_TYPES = [
   'home/init',
@@ -505,6 +529,8 @@ export const SHELL_INTENT_TYPES = [
   'viewport/portrait',
   'viewport/landscape',
   'gate/keep',
+  'gate/turn',
+  'fullscreen/lost',
   'render',
   'persist',
 ] as const satisfies ReadonlyArray<ShellIntent<ShellTypes>['type']>;
@@ -549,6 +575,13 @@ export type ShellEffect<G extends ShellTypes> =
    */
   | Readonly<{ type: 'phrases'; phrases: ReadonlyArray<Phrase> }>
   | Readonly<{ type: 'wakeLock'; hold: boolean }>
+  /**
+   * The Android lock (docs/design/backgammon-landscape.md §5C): `hold` asks the adapter for
+   * fullscreen on the document, then `screen.orientation.lock('landscape')`, inside the tap that
+   * stepped it (`lockSideways`); false unlocks and leaves fullscreen (a leave, a cancel). Every
+   * failure is silent at the adapter and reported back as `fullscreen/lost`.
+   */
+  | Readonly<{ type: 'orientationLock'; hold: boolean }>
   /** Open the room; `capacity` (seats, the host's included), `waiting` (the open status) and `names` (a resumed room's seat names, seeding the session's rejoin keys) ride only for an N-seat game (`HostOptions.capacity`/`waiting`/`names`), so a two-seat effect is the literal it was. */
   | Readonly<{
       type: 'startHost';
@@ -605,6 +638,7 @@ export const SHELL_EFFECT_TYPES = [
   'fx',
   'phrases',
   'wakeLock',
+  'orientationLock',
   'startHost',
   'startGuest',
   'closeNet',
@@ -1032,11 +1066,55 @@ const rotationHint = <G extends ShellTypes>(
     s.screen === 'tableScreen' &&
     s.landscapePhone &&
     ctx.canLock === true &&
+    !s.orientationLocked &&
     !s.rotationHintShown;
   return due
     ? step(withShell(app, { rotationHintShown: true }), toast(ROTATION_HINT_MSG, ROTATION_HINT_MS))
     : pure(app);
 };
+
+// ---- playing sideways: the Android lock (docs/design/backgammon-landscape.md §5C) ------------------
+
+/**
+ * The Android lock's step at a tap (the owner, 2026-09-25: "it should lock the user into place to
+ * make it sideways. Only on mobile!"): the `orientationLock` effect, held, and the mark, or the
+ * App as it is. A web page cannot lock an iPhone (no `screen.orientation.lock`, no element
+ * fullscreen); Android's Chromium family can, only inside fullscreen and only from a tap, since
+ * `requestFullscreen` needs transient activation, so the effect is stepped at the taps a game is
+ * played through and nowhere else: the pass-and-play Start (`startLocal`), the host's deal, the
+ * guest's Sit down (`join/click`; the invite link at boot is no tap), the home's Resume, the
+ * curtain's Roll (`curtain/reveal`), the gate's own "Go sideways" (`gate/turn`), and, in
+ * backgammon, the roll modal's CTA (`roll/click`). Once per loss, not at every turn: silent while
+ * `orientationLocked`, which `fullscreen/lost` (a back gesture, a failed attempt) clears so the
+ * next tap re-enters. Nothing on a device that cannot lock (`Ctx.canLock`: every iPhone, every
+ * desktop) and nothing in a game that stays upright (no `cfg.orientation`), so every other game's
+ * effect lists are what they were.
+ */
+export const lockSideways = <G extends ShellTypes>(
+  app: ShellApp<G>,
+  ctx: Ctx,
+  cfg: ShellConfig<G>,
+): Step<G> => {
+  const due =
+    cfg.orientation === 'landscape' && ctx.canLock === true && !app.shell.orientationLocked;
+  return due
+    ? step(withShell(app, { orientationLocked: true }), { type: 'orientationLock', hold: true })
+    : pure(app);
+};
+
+/**
+ * The lock's drop, for a leave or a cancel: the effect on a device that can lock in a game that
+ * plays sideways, whether or not the state still says held (a lock lost to a back gesture left
+ * nothing to drop, and the adapter is silent about it; a fullscreen whose lock was refused is
+ * still fullscreen, and this is what leaves it); nothing anywhere else.
+ */
+const unlockSideways = <G extends ShellTypes>(
+  ctx: Ctx,
+  cfg: ShellConfig<G>,
+): ReadonlyArray<ShellEffect<G>> =>
+  cfg.orientation === 'landscape' && ctx.canLock === true
+    ? [{ type: 'orientationLock', hold: false }]
+    : [];
 
 /** `(value.trim() || fallback).slice(0, 20)`. */
 const nameOr = (raw: string, fallback: string): string => {
@@ -1448,15 +1526,18 @@ export const localSeated = <G extends ShellTypes>(
   };
 };
 
-/** `startLocal(game)`: pass-and-play, no Peer; the wake lock is held; the curtain names the starter. */
+/** `startLocal(game)`: pass-and-play, no Peer; the wake lock is held, and the Android lock where the device can (`lockSideways`: the Start is a tap); the curtain names the starter. */
 export const startLocal = <G extends ShellTypes>(
   app: ShellApp<G>,
   game: G['State'],
   ctx: Ctx,
   cfg: ShellConfig<G>,
 ): Step<G> =>
-  andThen(step(localSeated(app, game, cfg), { type: 'wakeLock', hold: true }), (a) =>
-    localBroadcast(a, true, ctx, cfg),
+  andThen(
+    andThen(step(localSeated(app, game, cfg), { type: 'wakeLock', hold: true }), (a) =>
+      lockSideways(a, ctx, cfg),
+    ),
+    (a) => localBroadcast(a, true, ctx, cfg),
   );
 
 /**
@@ -1961,6 +2042,8 @@ const leaveFinish = <G extends ShellTypes>(app: ShellApp<G>, cfg: ShellConfig<G>
         localSeats: [],
         gateDismissed: false,
         rotationHintShown: false,
+        // `leave/confirmed` dropped the lock: the page is upright-free again until the next tap.
+        orientationLocked: false,
       },
       table: cfg.table.reset(app.table, 'leave'),
     },
@@ -1980,6 +2063,8 @@ const cancelFinish = <G extends ShellTypes>(app: ShellApp<G>): Step<G> =>
       handoff: false,
       seats: [],
       seatedName: null,
+      // `cancel` dropped the lock a Sit down or a handoff took.
+      orientationLocked: false,
     }),
     app.shell.handoff && app.shell.game !== null
       ? { type: 'saveLocal', game: app.shell.game }
@@ -2067,7 +2152,10 @@ export const reduceShell = <G extends ShellTypes>(
     case 'join/click': {
       const code = validateCode(cfg.id, intent.code);
       if (!code.ok) return step(app, toast(code.error));
-      return startGuest(withShell(app, { myName: guestName(intent.name, cfg) }), code.value, cfg);
+      // The Sit down is a tap: the Android lock rides it (`lockSideways`), before the room.
+      return andThen(lockSideways(app, ctx, cfg), (a) =>
+        startGuest(withShell(a, { myName: guestName(intent.name, cfg) }), code.value, cfg),
+      );
     }
     case 'local/click': {
       const opts = cfg.opts.parse(intent, s.opts);
@@ -2079,8 +2167,13 @@ export const reduceShell = <G extends ShellTypes>(
       );
       return startLocal(withShell(app, { opts }), game, ctx, cfg);
     }
-    case 'resume/click':
-      return s.resume === null ? pure(app) : resume(app, s.resume, ctx, cfg);
+    case 'resume/click': {
+      // Resume is a tap: the Android lock re-enters on it (a reload left fullscreen behind).
+      const offer = s.resume;
+      return offer === null
+        ? pure(app)
+        : andThen(lockSideways(app, ctx, cfg), (a) => resume(a, offer, ctx, cfg));
+    }
     case 'resume/auto': {
       if (s.role !== null) return pure(app);
       const own = hostOffer(s);
@@ -2095,7 +2188,13 @@ export const reduceShell = <G extends ShellTypes>(
         : pure(app);
     }
     case 'cancel':
-      return step(app, { type: 'closeNet' }, { type: 'then', intent: { type: 'cancel/finish' } });
+      // The Android lock a Sit down or a handoff took goes with the room (`unlockSideways`).
+      return step(
+        app,
+        ...unlockSideways(ctx, cfg),
+        { type: 'closeNet' },
+        { type: 'then', intent: { type: 'cancel/finish' } },
+      );
     case 'cancel/finish':
       return cancelFinish(app);
     case 'screen/show':
@@ -2150,7 +2249,15 @@ export const reduceShell = <G extends ShellTypes>(
           setHomeTab(withShell(app, { playMode: 'online', codeDraft: code }), 'play', false, cfg),
           (a) => step(a, { type: 'setCode', value: code }),
         ),
-        (a) => reduceShell(a, { type: 'join/click', name: s.p1Name, code }, ctx, cfg),
+        // The link is no tap (the boot runs it): the click's Android lock is not asked for, since
+        // `requestFullscreen` without activation would only fail; the next tap takes it.
+        (a) =>
+          reduceShell(
+            a,
+            { type: 'join/click', name: s.p1Name, code },
+            { ...ctx, canLock: false },
+            cfg,
+          ),
       );
     }
     case 'sound/toggle':
@@ -2204,10 +2311,13 @@ export const reduceShell = <G extends ShellTypes>(
         })),
       ];
       const game = cfg.engine.create(playersFor<G>(players), s.opts, ctx.rng, ctx.now);
-      return broadcast(
-        { shell: { ...s, game }, table: cfg.table.reset(app.table, 'deal') },
-        ctx,
-        cfg,
+      // The deal is a tap: the Android lock rides it (`lockSideways`), before the table paints.
+      return andThen(lockSideways(app, ctx, cfg), (a) =>
+        broadcast(
+          { shell: { ...a.shell, game }, table: cfg.table.reset(a.table, 'deal') },
+          ctx,
+          cfg,
+        ),
       );
     }
     // ---- net: guest ----
@@ -2236,13 +2346,20 @@ export const reduceShell = <G extends ShellTypes>(
       const game = s.game;
       if (game === null) return pure(app);
       const { seat, effects } = cfg.local.revealer(game);
-      return andThen(
-        step(
-          { shell: { ...s, revealed: seat }, table: { ...app.table, curtain: null } },
-          tap,
-          ...effects,
+      // The curtain's Roll is the tap every turn has: the Android lock re-enters on it after a
+      // back gesture (`lockSideways`, silent while held), then the reveal.
+      return andThen(lockSideways(app, ctx, cfg), (locked) =>
+        andThen(
+          step(
+            {
+              shell: { ...locked.shell, revealed: seat },
+              table: { ...locked.table, curtain: null },
+            },
+            tap,
+            ...effects,
+          ),
+          (a) => localBroadcast(a, true, ctx, cfg),
         ),
-        (a) => localBroadcast(a, true, ctx, cfg),
       );
     }
     case 'position/load':
@@ -2254,10 +2371,12 @@ export const reduceShell = <G extends ShellTypes>(
         then: { type: 'leave/confirmed' },
       });
     case 'leave/confirmed':
-      // The network closes before the reset (see the header), then `leave/finish` resets.
+      // The network closes before the reset (see the header), then `leave/finish` resets. The
+      // Android lock is dropped with the wake lock (`unlockSideways`: only where it could be held).
       return step(
         app,
         { type: 'wakeLock', hold: false },
+        ...unlockSideways(ctx, cfg),
         { type: 'closeNet' },
         { type: 'then', intent: { type: 'leave/finish' } },
       );
@@ -2273,6 +2392,15 @@ export const reduceShell = <G extends ShellTypes>(
       return rotationHint(withShell(app, { landscapePhone: intent.landscape }), ctx, cfg);
     case 'gate/keep':
       return pure(withShell(app, { gateDismissed: true }));
+    case 'gate/turn':
+      // "Go sideways": the lock from the gate's own tap; the gate goes when the watcher sees the turn.
+      return lockSideways(app, ctx, cfg);
+    case 'fullscreen/lost':
+      // The lock is gone (a back gesture, a failed attempt): the mark drops, and the rotation hint,
+      // silent while it was held, is due now if the table is sideways; nothing when nothing was held.
+      return s.orientationLocked
+        ? rotationHint(withShell(app, { orientationLocked: false }), ctx, cfg)
+        : pure(app);
     case 'render':
       return painted(app, s.view, ctx, cfg);
     case 'persist':
@@ -2308,6 +2436,7 @@ export const initialShell = <G extends ShellTypes>(cfg: ShellConfig<G>): ShellSt
   landscapePhone: false,
   gateDismissed: false,
   rotationHintShown: false,
+  orientationLocked: false,
   netAttempt: 0,
   hostStatus: { text: cfg.copy.opening, pulse: true },
   guestStatus: { text: CONNECTING_MSG, pulse: true },

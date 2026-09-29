@@ -248,9 +248,11 @@ export const paintSheet = (doc: DocumentLike, overlay: string, open: boolean): v
 
 // ---- the turn gate (docs/design/backgammon-landscape.md §5D; docs/design/shared-shell.md "Playing sideways") ----
 
-/** The gate's ids (web/shared/markup/shell.ts `gateMarkup`): the sheet and its one live control, bound by the boot (web/shared/edge/boot.ts), never by a game's render.ts. Not in SHELL_IDS: a page carries them only when its game plays sideways. */
+/** The gate's ids (web/shared/markup/shell.ts `gateMarkup`): the sheet and its two live controls, bound by the boot (web/shared/edge/boot.ts), never by a game's render.ts. Not in SHELL_IDS: a page carries them only when its game plays sideways. */
 export const GATE_ID = 'turnGate';
 export const GATE_KEEP_ID = 'turnGateKeepBtn';
+/** "Go sideways": the Android lock from the gate's own tap (`gate/turn`); shown only where the device can lock (`canLock` below), so an iPhone's gate keeps its one control. */
+export const GATE_GO_ID = 'turnGateGoBtn';
 /** Every overlay the gate covers: each `.overlay` in the body wherever it sits (page.html places every sheet and the curtain as body children; one nested deeper would only be set inert under an inert parent, harmless), the gate itself filtered out below. */
 const OVERLAYS = '.overlay';
 
@@ -268,12 +270,15 @@ const OVERLAYS = '.overlay';
  * the page fake and the browser agree (Safari 15.5+, Chrome 102+ honour `inert`; where it is
  * missing the gate is still a fixed overlay with `aria-modal`); both gone when it hides. A dialog
  * takes focus:
- * on the paint that shows it, `#turnGateKeepBtn` (its one control; the button just tapped sits
- * inside inert `#app` and would keep focus otherwise, a screen reader silent, a keyboard
- * stranded), and on the paint that hides it that button lets go (a blur on an unfocused element
- * does nothing, so this is "if focus is inside the gate"). Every other paint leaves focus alone.
+ * on the paint that shows it, its first control ("Go sideways" where the device can lock, else
+ * "Play upright": the button just tapped sits inside inert `#app` and would keep focus otherwise,
+ * a screen reader silent, a keyboard stranded), and on the paint that hides it both buttons let go
+ * (a blur on an unfocused element does nothing, so this is "if focus is inside the gate"). Every
+ * other paint leaves focus alone. `canLock` (shell.ts `Ctx.canLock`, the boot's device fact) shows
+ * `#turnGateGoBtn`, the Android lock's tap (docs/design/backgammon-landscape.md §5C): a web page
+ * cannot lock an iPhone, so its gate keeps the one control and the copy's own advice.
  */
-export const paintGate = (doc: PageLike, open: boolean): void => {
+export const paintGate = (doc: PageLike, open: boolean, canLock = false): void => {
   const gate = byId(doc, GATE_ID);
   if (gate === null) return;
   const wasOpen = !hasClass(gate, 'hidden');
@@ -285,10 +290,17 @@ export const paintGate = (doc: PageLike, open: boolean): void => {
   ].forEach((el) => {
     setAttr(el, 'inert', open ? '' : null);
   });
+  const go = byId(doc, GATE_GO_ID);
+  if (go !== null) toggleClass(go, 'hidden', !canLock);
   const keep = byId(doc, GATE_KEEP_ID);
-  if (keep === null) return;
-  if (open && !wasOpen) focusElement(keep);
-  if (!open && wasOpen) blurElement(keep);
+  const first = canLock && go !== null ? go : keep;
+  if (open && !wasOpen && first !== null) focusElement(first);
+  if (!open && wasOpen)
+    [go, keep]
+      .filter((el) => el !== null)
+      .forEach((el) => {
+        blurElement(el);
+      });
 };
 
 /**
