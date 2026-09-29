@@ -497,7 +497,8 @@ tools/ci/                    suites.ts (the one table: suite -> tests, coverage 
 infra/games-proxy/           Cloudflare Worker (TypeScript) serving the site at games.sweedler.com
 infra/turn-worker/           Cloudflare Worker (plain JS) minting TURN credentials at turn.sweedler.com
 ios/DiceClip/                the Dice App Clip (Swift, Xcode, no web code): a Roll button whose Live Activity puts one die on each side of the
-                             Dynamic Island; ios/DiceClip/README.md is the owner's runbook (signing, App Store Connect, the AASA, TestFlight)
+                             Dynamic Island, and the reaction game's pixel buddy, a Live Activity the Worker moves by push (docs/design/rps-island.md);
+                             ios/DiceClip/README.md is the owner's runbook (signing, App Store Connect, the AASA, APNs, TestFlight)
 docs/                        ARCHITECTURE.md (the layout and its rules), MIGRATION.md (the plan and its Deviations), design/ (per-feature designs)
 .github/workflows/           ci.yml (changes -> check + one job per shared suite and a matrix per game side -> ci-ok -> deploy; a PR's superseded run is cancelled), nightly.yml (the deployed page through local servers; the public-broker replay)
 .github/actions/npm-ci/      the scanned install that rewrites the runner's lockfile copy (see "Develop")

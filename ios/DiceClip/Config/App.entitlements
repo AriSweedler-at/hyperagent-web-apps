@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- The parent app's entitlements: the universal link, so once the full app is installed the
-     invocation URL opens it in the clip's place (needs an `applinks` block in the site's AASA). -->
+     invocation URL opens it in the clip's place (needs an `applinks` block in the site's AASA), and
+     the push environment the buddy's Live Activity needs for its token (Xcode swaps in
+     `production` when archiving). -->
 <plist version="1.0">
 <dict>
+	<key>aps-environment</key>
+	<string>development</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:games.sweedler.com</string>

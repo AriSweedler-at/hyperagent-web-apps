@@ -1,17 +1,14 @@
-// The one screen the app and the clip share: the last roll drawn large, the Roll button, and a
-// line on what a roll does to the Dynamic Island. The clip also reads the invocation URL it was
-// launched with (`?roll=a,b`) and shows that roll as if it had just been made here.
+// The dice screen the app and the clip share: the last roll drawn large, the Roll button, and a
+// line on what a roll does to the Dynamic Island. The invocation URL (`?roll=a,b`) reaches it from
+// RootScreen, which reads every URL once; a roll on it shows as if it had just been made here.
 import SwiftUI
 
 struct RollScreen: View {
     @State private var roller = DiceRoller()
     /// The clip says so in its explanation; the full app does not.
     let isClip: Bool
-
-    /// The games' call-to-action green and its label colour (web/shared/styles/tokens.css `--go`
-    /// #c2d06d and `--go-text` #10281a), so the one button here is the one the site's players know.
-    private let startGreen = Color(red: 0xC2 / 255.0, green: 0xD0 / 255.0, blue: 0x6D / 255.0)
-    private let startText = Color(red: 0x10 / 255.0, green: 0x28 / 255.0, blue: 0x1A / 255.0)
+    /// The URL the app or clip was opened with, routed here by RootScreen.
+    let webURL: URL?
 
     var body: some View {
         VStack(spacing: 28) {
@@ -26,17 +23,16 @@ struct RollScreen: View {
                     .padding(.vertical, 10)
             }
             .buttonStyle(.borderedProminent)
-            .tint(startGreen)
-            .foregroundStyle(startText)
+            .tint(Palette.startGreen)
+            .foregroundStyle(Palette.startText)
             .accessibilityHint("Rolls two dice and puts them in the Dynamic Island")
             explanation
             Spacer(minLength: 0)
         }
         .padding(24)
-        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
-            if let url = activity.webpageURL { roller.show(webURL: url) }
+        .onChange(of: webURL, initial: true) { _, url in
+            if let url { roller.show(webURL: url) }
         }
-        .onOpenURL { url in roller.show(webURL: url) }
     }
 
     @ViewBuilder private var lastRoll: some View {

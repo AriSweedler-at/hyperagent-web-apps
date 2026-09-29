@@ -59,6 +59,19 @@
             value = "https://games.sweedler.com/clip/dice?roll=3,5"
             isEnabled = "YES">
          </EnvironmentVariable>
+         <!-- The buddy: the same clip launched as the second experience; flip isEnabled on this one
+              and off on the dice to see the buddy screen (the Worker must know the session). -->
+         <EnvironmentVariable
+            key = "_XCAppClipURL"
+            value = "https://games.sweedler.com/clip/rps?session=ABCDEFGH"
+            isEnabled = "NO">
+         </EnvironmentVariable>
+         <!-- Where the pairing POST goes when not production (Config.apiBase). -->
+         <EnvironmentVariable
+            key = "RPS_API_BASE"
+            value = "http://localhost:8787"
+            isEnabled = "NO">
+         </EnvironmentVariable>
       </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction

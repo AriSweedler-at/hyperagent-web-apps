@@ -8,13 +8,15 @@ import DiceModel
 import Foundation
 import Observation
 
-/// Where the roll shown on screen came from.
 /// ActivityKit's `Activity` is a class the framework does not mark Sendable, yet its `update` and
 /// `end` are nonisolated async and Apple's own sample awaits them from arbitrary tasks. The roller
-/// keeps the activity on the main actor and only ever hands it to those two calls, so the marking
-/// states what the framework guarantees and lets Swift 6 pass the value out of the actor.
-extension Activity: @unchecked @retroactive Sendable where Attributes == DiceAttributes {}
+/// and the buddy's MoodActivity keep their activity on the main actor and only ever hand it to those
+/// two calls, so the marking states what the framework guarantees and lets Swift 6 pass the value
+/// out of the actor. Unconditional: Swift allows one Sendable conformance per type, and two
+/// attribute types share it.
+extension Activity: @unchecked @retroactive Sendable {}
 
+/// Where the roll shown on screen came from.
 enum RollSource: Equatable {
     /// The Roll button.
     case tapped
