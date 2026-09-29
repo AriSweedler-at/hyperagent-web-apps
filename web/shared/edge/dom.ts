@@ -305,6 +305,34 @@ export const setStyle = (el: Element, prop: string, value: string): void => {
   styled.style?.setProperty(prop, value);
 };
 
+/** The document's root as the boot writes and reads it: `documentElement`, optional and untyped so the page fakes need none. */
+export type RootDocumentLike = Readonly<{ documentElement?: unknown }>;
+/** The window's `getComputedStyle`, where the page has one (the fakes have none). */
+export type StyleReaderLike = Readonly<{
+  getComputedStyle?: (el: Element) => Readonly<{ getPropertyValue: (name: string) => string }>;
+}>;
+/**
+ * `documentElement.style.setProperty(prop, value)`: a custom property a theme reads on `:root`
+ * (`--screen-corner`, docs/design/backgammon-board.md §3.6). Nothing on a root without a style.
+ */
+export const setRootStyle = (doc: RootDocumentLike, prop: string, value: string): void => {
+  const root = doc.documentElement as Partial<Pick<HTMLElement, 'style'>> | undefined;
+  root?.style?.setProperty(prop, value);
+};
+/**
+ * The computed value of `prop` on the root (a custom property with its `var()` and `env()`
+ * substituted), or null where the page cannot say: no root, or no `getComputedStyle` (a fake).
+ * Called on `win` as a method: detached, Chromium's throws "Illegal invocation".
+ */
+export const readRootStyle = (
+  doc: RootDocumentLike,
+  win: StyleReaderLike,
+  prop: string,
+): string | null => {
+  if (doc.documentElement === undefined || win.getComputedStyle === undefined) return null;
+  return win.getComputedStyle(doc.documentElement as Element).getPropertyValue(prop);
+};
+
 /** A deep clone of `el` appended to `parent`, or null where the element cannot be cloned (a fake). */
 export const cloneInto = (parent: Element, el: Element): Element | null => {
   const source = el as Partial<Pick<HTMLElement, 'cloneNode'>>;

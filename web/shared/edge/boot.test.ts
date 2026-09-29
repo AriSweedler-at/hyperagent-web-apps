@@ -537,6 +537,8 @@ type Options = Readonly<{
   refuse?: boolean;
   /** The App starts seated in pass and play with the far seat's flip on (shell.ts `flipped` reads the role, the setting, the screen, the view and the curtain). */
   flip?: boolean;
+  /** The window's `screen` has this size in CSS points (with `getComputedStyle` answering `--screen-corner` with `notch`): the device table's inputs (screen.ts). */
+  screenSize?: Readonly<{ width: number; height: number; notch: string }>;
 }>;
 
 type Log = Readonly<{
@@ -570,6 +572,8 @@ type Log = Readonly<{
   fallbacks: boolean[];
   /** The Android lock's calls in order: `request` (fullscreen), `lock:<orientation>`, `unlock`, `exit`. */
   locks: string[];
+  /** Every `--property` the boot wrote on the root's inline style (screen.ts `applyScreenCorner`). */
+  rootStyles: (readonly [string, string])[];
 }>;
 
 /** One booted page: what the boot was given, and everything it touched, recorded. */
@@ -620,6 +624,7 @@ const bootPage = (options: Options = {}) => {
     queries: [],
     fallbacks: [],
     locks: [],
+    rootStyles: [],
   };
   /** The page is in fullscreen (the fake `requestFullscreen`/`exitFullscreen` flip it; a test flips it for a back gesture). */
   const fullscreen = { on: false };
@@ -640,6 +645,12 @@ const bootPage = (options: Options = {}) => {
         log.locks.push('request');
         fullscreen.on = true;
         return Promise.resolve();
+      },
+      // The root's inline style: `--screen-corner` lands here (screen.ts `applyScreenCorner`).
+      style: {
+        setProperty: (prop: string, value: string) => {
+          log.rootStyles.push([prop, value]);
+        },
       },
     },
     exitFullscreen: () => {
@@ -679,25 +690,43 @@ const bootPage = (options: Options = {}) => {
       }),
     ...(options.unseeded === true ? {} : { __rng: mulberry32(7) }),
     ...(options.audio === true ? { AudioContext: FakeAudioContext } : {}),
-    ...(options.lock === undefined
+    ...(options.lock === undefined && options.screenSize === undefined
       ? {}
       : {
           screen: {
+            // The screen's size, where a test names one (the device table's key).
+            ...(options.screenSize === undefined
+              ? {}
+              : { width: options.screenSize.width, height: options.screenSize.height }),
             // Android's `lock` (recorded; refused where the options say) and `unlock`; an iPhone's neither.
-            orientation: options.lock
-              ? {
-                  lock: (orientation: string): Promise<void> => {
-                    log.locks.push(`lock:${orientation}`);
-                    return options.refuse === true
-                      ? Promise.reject(new Error('refused'))
-                      : Promise.resolve();
-                  },
-                  unlock: (): void => {
-                    log.locks.push('unlock');
-                  },
-                }
-              : {},
+            ...(options.lock === undefined
+              ? {}
+              : {
+                  orientation: options.lock
+                    ? {
+                        lock: (orientation: string): Promise<void> => {
+                          log.locks.push(`lock:${orientation}`);
+                          return options.refuse === true
+                            ? Promise.reject(new Error('refused'))
+                            : Promise.resolve();
+                        },
+                        unlock: (): void => {
+                          log.locks.push('unlock');
+                        },
+                      }
+                    : {},
+                }),
           },
+        }),
+    ...(options.screenSize === undefined
+      ? {}
+      : {
+          devicePixelRatio: 3,
+          // The theme's `--screen-corner` fallback as the browser computes it, `env()` substituted.
+          getComputedStyle: () => ({
+            getPropertyValue: (name: string) =>
+              name === '--screen-corner' ? (options.screenSize?.notch ?? '') : '',
+          }),
         }),
     ...(options.coarse === undefined
       ? {}
@@ -1028,6 +1057,22 @@ describe('bootShell', () => {
       }),
     });
     expect(bare).toEqual([undefined]);
+  });
+
+  test("the trim's corner (screen.ts, web/shared/lib/devices.ts): a 390x844 screen with a 47px notch writes `--screen-corner: 47.33px` on the root, the 393x852 class 55px over its 59px insets, a screen with no notch (headless, a portrait tab) or none at all writes nothing", () => {
+    expect(
+      bootPage({ screenSize: { width: 390, height: 844, notch: '47px' } }).log.rootStyles,
+    ).toEqual([['--screen-corner', '47.33px']]);
+    // Sideways, and the fallback unsimplified: the largest length is the notch.
+    expect(
+      bootPage({ screenSize: { width: 852, height: 393, notch: 'max(0px, 59px, 59px)' } }).log
+        .rootStyles,
+    ).toEqual([['--screen-corner', '55px']]);
+    expect(
+      bootPage({ screenSize: { width: 390, height: 844, notch: '0px' } }).log.rootStyles,
+    ).toEqual([]);
+    expect(bootPage({ lock: false }).log.rootStyles).toEqual([]);
+    expect(bootPage().log.rootStyles).toEqual([]);
   });
 
   test("the reducer's ctx says whether this device can lock its rotation (shell.ts `Ctx.canLock`, the rotation hint's test): `screen.orientation.lock` a function on a device with no pointer that hovers says yes; no such function, a pointer that hovers (a touchscreen laptop), no `matchMedia`, or no `screen` at all, says no", () => {

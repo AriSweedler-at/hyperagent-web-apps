@@ -180,7 +180,13 @@ the card view name the cards in it: docs/design/language-packs.md):
 docs/design/briscola.md D19, docs/design/briscola-board.md §7),
 `window.__rng` (a seeded rng installed before boot), `#rule-<id>` (gin and backgammon: a rule deep
 link, docs/design/glossary-links.md; `main.ts` dispatches `rules/show` after `home/init`, so the
-page opens on the Rules tab scrolled to that rule, and the hash stays), `?peer=host:port` (PeerServer override),
+page opens on the Rules tab scrolled to that rule, and the hash stays), `?probe=1` (every shell
+game: a small fixed monospace readout of what the shell read of the screen, web/shared/edge/screen.ts
+`renderProbe`: `innerWidth×innerHeight`, `screen.width×height`, `devicePixelRatio`, `100svh/dvh/lvh`
+and the four safe-area insets in px each measured off a hidden element, `display-mode`, the device
+class and the trim's corner radius the boot matched (web/shared/lib/devices.ts) and `#board`'s box;
+re-read a frame after every tap, dismissed by a tap on itself; a look at a real phone, never the
+fix, which the shell computes by itself: docs/design/backgammon-board.md §3.6), `?peer=host:port` (PeerServer override),
 `?ice=<url>` (ICE config override), `?ice-policy=relay` (port-only: `iceTransportPolicy: 'relay'`
 inside the Peer `config`, for the `@relay` specs' relay-forced games), `?join=<code>` (every
 game's invite convention, built by `web/shared/lib/invite.ts` and read by `web/shared/edge/invite.ts`; fidice keeps its `#join=` /

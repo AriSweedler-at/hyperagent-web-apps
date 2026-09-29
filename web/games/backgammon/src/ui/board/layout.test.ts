@@ -5,6 +5,8 @@ import {
   DESKTOP_TEMPLATE,
   FIXED_AREAS,
   LANDSCAPE_GEOMETRY,
+  boardRoom,
+  chromeHeight,
   LANDSCAPE_MAX_HEIGHT,
   PHONE_TEMPLATE,
   POINT_AREAS,
@@ -21,6 +23,7 @@ import {
   pathFor,
   placeOf,
   pointId,
+  paddingOf,
   pointLength,
   pointWidth,
   rowOrder,
@@ -331,35 +334,45 @@ describe('the sizes', () => {
     );
   });
 
-  test('landscape lengths: two rows in what the chrome leaves, floored per scheme (104 rail, 90 rows, less half the bottom inset)', () => {
-    // The rail's 40px of chrome (6 + 22 + 6 + 6): 167 at 844x390 inset-free, 156.5 with the
-    // iPhone 12's 21px home indicator, 150 on a Pixel 8 with its toolbar, 124 at 780x304.
-    expect(pointLength({ width: 844, height: 390, coarse: true })).toBe(167);
-    expect(
-      pointLength({
-        width: 844,
-        height: 390,
-        coarse: true,
-        insets: { left: 47, right: 47, bottom: 21 },
-      }),
-    ).toBe(156.5);
-    expect(pointLength({ width: 915, height: 356, coarse: true })).toBe(150);
-    expect(pointLength({ width: 780, height: 304, coarse: true })).toBe(124);
-    // The floor: 2 x 104 + 16 + 40 = 264 exactly; under it the floor holds and the CSS scrolls.
-    expect(pointLength({ width: 780, height: 264, coarse: true })).toBe(104);
+  test('landscape lengths: two rows in what the chrome leaves, floored per scheme (104 rail, 90 rows, less half of what the bottom inset adds)', () => {
+    // The rail's 50px of chrome inset-free (11 + 22 + 6 + 11): 162 at 844x390, 154 with the
+    // iPhone 12's 21px home indicator (11 + 22 + 6 + 27 = 66), 145 on a Pixel 8 with its toolbar,
+    // 119 at 780x304.
+    expect(paddingOf({ width: 844, height: 390, coarse: true })).toEqual({ top: 11, bottom: 11 });
+    expect(chromeHeight({ width: 844, height: 390, coarse: true })).toBe(50);
+    expect(pointLength({ width: 844, height: 390, coarse: true })).toBe(162);
+    const iphone12 = {
+      width: 844,
+      height: 390,
+      coarse: true,
+      insets: { left: 47, right: 47, bottom: 21 },
+    };
+    expect(paddingOf(iphone12)).toEqual({ top: 11, bottom: 27 });
+    expect(chromeHeight(iphone12)).toBe(66);
+    expect(pointLength(iphone12)).toBe(154);
+    // A 4px home indicator: the 11px floor under the board still holds (6 + 4 < 11).
+    expect(paddingOf({ ...iphone12, insets: { left: 47, right: 47, bottom: 4 } })).toEqual({
+      top: 11,
+      bottom: 11,
+    });
+    expect(pointLength({ width: 915, height: 356, coarse: true })).toBe(145);
+    expect(pointLength({ width: 780, height: 304, coarse: true })).toBe(119);
+    // The floor: 2 x 104 + 16 + 50 = 274 exactly; under it the floor holds and the CSS scrolls.
+    expect(pointLength({ width: 780, height: 274, coarse: true })).toBe(104);
     expect(pointLength({ width: 780, height: 250, coarse: true })).toBe(
       LANDSCAPE_GEOMETRY.rail.minPointLen,
     );
-    // A notched 375pt phone at the 264 floor: the floor gives up half the 21px home indicator, so
-    // 2 x 93.5 + 16 + 40 + 21 = 264 still fits, exactly where the CSS fallback starts scrolling.
+    // A notched 375pt phone at the 274 floor: the floor gives up half of what the 21px home
+    // indicator adds past the 11px (16 / 2 = 8), so 2 x 96 + 16 + 66 = 274 still fits, exactly
+    // where the CSS fallback starts scrolling.
     expect(
       pointLength({
         width: 812,
-        height: 264,
+        height: 274,
         coarse: true,
         insets: { left: 47, right: 47, bottom: 21 },
       }),
-    ).toBe(93.5);
+    ).toBe(96);
     expect(
       pointLength({
         width: 812,
@@ -367,26 +380,50 @@ describe('the sizes', () => {
         coarse: true,
         insets: { left: 47, right: 47, bottom: 21 },
       }),
-    ).toBe(93.5);
-    // The rows' 90px of chrome (6 + 22 + 6 + 44 + 6, the same strip and a button row under the
-    // board): 134.5 on an SE, 109.5 with Safari's toolbar up (it scrolled under the phone's 170),
-    // 127 at 640x360; the floor is 2 x 90 + 16 + 90 = 286 exactly, and 79.5 with a 21px home
-    // indicator (2 x 79.5 + 16 + 90 + 21 = 286 still).
-    expect(pointLength({ width: 667, height: 375, coarse: true })).toBe(134.5);
-    expect(pointLength({ width: 667, height: 325, coarse: true })).toBe(109.5);
-    expect(pointLength({ width: 640, height: 360, coarse: true })).toBe(127);
-    expect(pointLength({ width: 640, height: 286, coarse: true })).toBe(90);
+    ).toBe(96);
+    // The rows' 100px of chrome (11 + 22 + 6 + 44 + 6 + 11, the same strip and a button row under
+    // the board): 129.5 on an SE, 104.5 with Safari's toolbar up, 122 at 640x360; the floor is
+    // 2 x 90 + 16 + 100 = 296 exactly, and 82 with a 21px home indicator (2 x 82 + 16 + 116 = 296
+    // still).
+    expect(chromeHeight({ width: 667, height: 375, coarse: true })).toBe(100);
+    expect(pointLength({ width: 667, height: 375, coarse: true })).toBe(129.5);
+    expect(pointLength({ width: 667, height: 325, coarse: true })).toBe(104.5);
+    expect(pointLength({ width: 640, height: 360, coarse: true })).toBe(122);
+    expect(pointLength({ width: 640, height: 296, coarse: true })).toBe(90);
     expect(pointLength({ width: 640, height: 270, coarse: true })).toBe(
       LANDSCAPE_GEOMETRY.rows.minPointLen,
     );
     expect(
       pointLength({
         width: 667,
-        height: 286,
+        height: 296,
         coarse: true,
         insets: { left: 0, right: 0, bottom: 21 },
       }),
-    ).toBe(79.5);
+    ).toBe(82);
+  });
+
+  test('boardRoom: the board stands 39px under the top and 11 over the bottom with the rail (27 over a 21px home indicator), 39 and 61 with the rows', () => {
+    expect(boardRoom({ width: 844, height: 390, coarse: true })).toEqual({ top: 39, bottom: 11 });
+    expect(
+      boardRoom({
+        width: 852,
+        height: 393,
+        coarse: true,
+        insets: { left: 59, right: 59, bottom: 21 },
+      }),
+    ).toEqual({ top: 39, bottom: 27 });
+    expect(boardRoom({ width: 667, height: 375, coarse: true })).toEqual({ top: 39, bottom: 61 });
+    // The room and the point length agree: two rows and the frame fill it, in both schemes.
+    [
+      { width: 844, height: 390, coarse: true },
+      { width: 667, height: 375, coarse: true },
+    ].forEach((vp) => {
+      const room = boardRoom(vp);
+      expect(2 * pointLength(vp) + LANDSCAPE_GEOMETRY.frame).toBe(
+        vp.height - room.top - room.bottom,
+      );
+    });
   });
 
   test('pointWidth: 47px at 390x844, 53.5px at 1280x800, clamped at the floors and caps', () => {
