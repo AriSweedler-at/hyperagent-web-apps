@@ -80,17 +80,24 @@ no. Nothing renders under a notch or an island; the hardware is opaque.
 
 ## 4. Settings
 
-Orientation mode: `auto` (nothing), `landscape` (the shell's `orientation: 'landscape'`
-behaviour on this page: the gate "Turn your phone sideways" on `PORTRAIT_PHONE`, "Go sideways"
-where the device can lock, the rotation hint when the lock fails), `portrait` (the mirror: the gate
-on `LANDSCAPE_PHONE`, a lock to `portrait`). The frame on or off with its three tokens (band 0-12px,
-colour, hairline) written on the root live; the layout example; the flip. Stored under
-`uiSandbox_mode`, `_frame`, `_band`, `_color`, `_hairline`, `_example`, `_flip`. The query overrides
-a run without storing: `?example=rail&frame=off&mode=portrait&flip=on&band=3`, `?screen=preview`,
-`?type=landscape-secondary` (the orientation type no emulator can set).
+Orientation mode: `auto` (nothing), `landscape` (the shell's `orientation: 'landscape'` behaviour
+on this page: the gate "Turn your phone sideways" on `PORTRAIT_PHONE`, "Go sideways" where the
+device can lock, the rotation hint when the lock fails), `portrait` (the mirror: the gate "Turn your
+phone upright" on `LANDSCAPE_PHONE`, "Go upright", a lock to `portrait`). The frame on or off with
+its three tokens (band 0-12px, colour, hairline) written on the root live; the layout example; the
+flip. Stored under `uiSandbox_mode`, `_frame`, `_band`, `_color`, `_hairline`, `_example`, `_flip`.
+The query overrides a run without storing: `?example=rail&frame=off&mode=portrait&flip=on&band=3`,
+`?screen=preview`, `?type=landscape-secondary` (the orientation type no emulator can set).
 
-`ShellConfig.orientation` is not generalised in this PR (the sandbox gates itself); the
-`createOrientationLock` adapter gained the `which` parameter the portrait lock needs.
+The gate is the shell's, not the page's own: the markup is `gateMarkup`'s block (the same ids and
+classes, shell.css's z-index and glyph, the texts shipped empty), the decision is
+`web/shared/ui/shell.ts` `wrongWay(orientation, { portraitPhone, landscapePhone })` (the predicate
+`gateOpen` reads), the paint is `web/shared/ui/shellPaint.ts` `paintGate(doc, open, canLock,
+GATE_COPY[orientation])` (`inert` on `#app`, focus to the first control, the four texts for the way
+asked), and the lock is `createOrientationLock(doc, screen, which)`. `ShellConfig.orientation` is
+`'landscape' | 'portrait' | 'any'` (docs/design/shared-shell.md §6.6): backgammon's page carries
+its own words in its markup; this page passes `GATE_COPY`'s row on every paint because the setting
+changes live. What the page keeps of its own: the dismissal for the run, the lock's toast.
 
 ## 5. The layout examples
 
@@ -107,27 +114,77 @@ phone (landscape-primary to -secondary) moves (g) and (h) across live: the `chan
 
 ## 6. Emulation and regression
 
+Two nets over the same cases, so a phone that fails one fails the other:
+
 `e2e/ui-sandbox.spec.ts` (the `site` suite, `pages` only): every supported phone sideways in a tab
 with the bar up in both landscapes, sideways filling the screen, and upright in a tab, one context
-each at the device's viewport, screen, pixel ratio and insets (`seamScript`). Per case: the frame's
-four corners equal the catalogue's per the reach rule; `__uiSandbox.device()` equals the emulated
-row; `__uiSandbox.map()` deep-equals `safeAreaMap` over the case; example (a) fits without scroll
-and keeps 11px (band + hairline + gap) inside every edge; (g)'s three buttons sit in the free side's
-segment; (h) shows exactly as many ears as the map holds, none over an arc or the cut. A screenshot
-of (h) is attached per case.
+each at the device's viewport, screen, pixel ratio and insets (`seamScript`): 14 phones x 4 = 56
+cases. Per case: the frame's four corners equal the catalogue's per the reach rule;
+`__uiSandbox.device()` equals the emulated row; `__uiSandbox.map()` deep-equals `safeAreaMap` over
+the case; example (a) fits without scroll and keeps 11px (band + hairline + gap) inside every edge;
+(g)'s three buttons sit in the free side's segment; (h) shows exactly as many ears as the map
+holds, none over an arc or the cut. A screenshot of (h) is attached per case.
+
+`tools/shell-emulate.ts --game ui-sandbox` (`list`, `explain`, `render`, `check`; a sweep without
+`--game` takes backgammon and the sandbox both, so `npm run shots` renders the two into one contact
+sheet under gitignored `shots/<stamp>/index.html`): the same phones x every emulation (both
+orientations x the three display modes, the tab twice) x the orientation types (both landscapes,
+the one portrait) = 168 cases, the spec's 56 among them. `render` shoots the preview screen around
+examples (a), (f), (g), (h) and (i) per case and puts the readout's device line under the shots;
+`check` (`judgeSandbox`, pure, tools/shell-emulate.test.ts) asserts what the spec asserts: `corner`,
+`device`, `map`, `fits`, `rail`, `ears`, `scroll`, one summary table per game, `--json` for the
+report, exit 1 on any failure. `explain --game ui-sandbox` prints the map a case must produce (the
+cut's side and span, the ear, every edge's segments, where (g) and (h) land) with no browser.
 
 ### From a user's screenshot to a passing test
 
-1. Read the readout they pasted: `device`, `screen`, `dpr`, `insets`, `type`, the corners.
-2. `unknown: heuristic`: add a row to `DEVICES` in `web/shared/lib/devices.ts` with the screen, the
-   pixel ratio, the insets, the radius (kylebshr/ScreenCorners) and the cut; cite the source in the
-   row's comment, UNVERIFIED where the readout is the only one. A wrong number on a known row:
-   correct it there.
-3. `node --experimental-strip-types tools/shell-emulate.ts explain --device <id> --orientation
-   landscape --mode browser` prints what the page will compute; `npm run shots` renders backgammon
-   on the row; the sandbox spec at your offset runs the new row's four cases.
-4. Fix what the screenshot shows differently (a wrong cut length moves the ears; a wrong radius
-   moves the arcs), until the sweep is green.
+The input is the readout's Copy text beside the screenshot (Info screen, "Copy readout"), for example:
 
-Open: `tools/shell-emulate.ts --game ui-sandbox` (render the sandbox's states into the contact
-sheet beside backgammon's) is not in this PR; the spec above is the regression sweep.
+```
+device iphone-393x852  iPhone 14 Pro, 15, 15 Pro, 16
+corner radius 55px  cut 126pt island
+screen 393x852  dpr 3  full 852x393
+inner 852x343  visualViewport 852x343 @1
+insets top 0  right 59  bottom 21  left 59
+display-mode browser  orientation landscape  type landscape-primary
+browser bar at the top (the top corners are its)
+reaches tl square  tr square  br 55  bl 55
+cut side left  at 83.5-209.5 (126)  ear 68.5
+safe left: 0-77.5 (77.5), 215.5-284 (68.5)
+```
+
+1. The `device` line. `unknown: heuristic`: add a row to `DEVICES` in `web/shared/lib/devices.ts`
+   with the `screen`, the `dpr`, the `insets` (upright and sideways: two screenshots, or the
+   readout twice), the radius (kylebshr/ScreenCorners) and the cut; cite the source in the row's
+   comment, UNVERIFIED where the readout is the only one. A known row whose numbers differ from the
+   readout's: correct the row.
+2. `node --experimental-strip-types tools/shell-emulate.ts explain --device <id> --game ui-sandbox
+   --orientation landscape --mode browser` prints the map the page will compute for the row under
+   both landscape types; compare its `cut side ... at ...` and `safe <edge>` lines with the
+   readout's. A difference is a wrong `cut` (its length moves the ears and the cut's span), a
+   wrong `corner` (moves the arcs), or a wrong inset.
+3. `node --experimental-strip-types tools/shell-emulate.ts check --device <id> --game ui-sandbox
+   --serve` drives the row (after `npm run build`); `npm run shots` puts it on the sheet;
+   `E2E_PORT_OFFSET=<n> npx playwright test e2e/ui-sandbox.spec.ts --project=pages` runs the row's
+   four cases.
+4. Fix until the check and the spec are green, then compare the sheet's (h) with the screenshot:
+   the buttons sit where the phone's ears are.
+
+### UNVERIFIED, and the one screenshot that settles each
+
+1. iOS's `landscape-primary` is the notch on the LEFT (the Screen Orientation spec's angle table,
+   which the map follows; that iOS follows it is the open part). The screenshot: an iPhone held
+   sideways with the notch on the left, the Info screen; its `type` line must read
+   `landscape-primary`. `landscape-secondary` with the notch on the left means the map's
+   `cutEdgeOf` must swap the two.
+2. The cut lengths per model (`Device.cut`: 209pt X-class, 230pt XR, 126pt island, 40dp hole).
+   The screenshot: the Preview screen on example (h) sideways; the two buttons must clear the
+   notch or the island with the 6px `CUT_MARGIN` of air, neither under it nor far from it. The
+   readout's `cut side ... at a-b` gives the span the page assumed; the distance in the screenshot
+   gives the correction.
+3. The 375x812 pair (the X and the 12 mini) is indistinguishable upright in a tab (the notch reads
+   0, both are 3x, the first row stands). The screenshot: a 12 mini upright in a Safari tab, the
+   Info screen; the `device` line reads `iphone-375x812-x`. If the corner radius in the
+   screenshot's frame is the mini's 44 and not the X's 39, the match needs a second input (the
+   `visualViewport` height or `100lvh` under the bar differ by the models' toolbar heights: the
+   `toolbar` ranges are UNVERIFIED too, and one screenshot per model with the bar up gives both).

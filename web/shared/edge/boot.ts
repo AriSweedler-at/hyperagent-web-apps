@@ -21,6 +21,7 @@ import { ruleFromHash } from '../ui/glossary.ts';
 import {
   flipped,
   gateOpen,
+  playsOrientation,
   type Ctx,
   type Cue,
   type Effect,
@@ -554,9 +555,18 @@ export const bootShell = <
   // edge reads readonly patterns and calls the structural subset, so the real objects are widened.
   const navLike = nav as NavigatorLike;
   const wakeLock: WakeLock = createWakeLock(navLike);
+  const shell = cfg.shell;
+  /** The shell config of a game that plays one way (shell.ts `playsOrientation`: sideways or upright), or null for a game that plays either way or holds no shell config: the watchers, the gate and the lock's target follow it. */
+  const gated = shell === undefined || playsOrientation(shell) === null ? null : shell;
+  const plays = gated === null ? null : playsOrientation(gated);
   // The Android lock (orientation.ts; docs/design/backgammon-landscape.md §5C) over the document
-  // and the screen; a window without a `screen` (the boot test's) gets one that does nothing.
-  const orientationLock: OrientationLock = createOrientationLock(doc, win.screen ?? {});
+  // and the screen, holding the way the game plays (sideways unless the config says upright); a
+  // window without a `screen` (the boot test's) gets one that does nothing.
+  const orientationLock: OrientationLock = createOrientationLock(
+    doc,
+    win.screen ?? {},
+    plays ?? 'landscape',
+  );
   const AudioCtor = win.AudioContext ?? win.webkitAudioContext;
   // A phone starts muted (the owner, 2026-09-25: "start muted on mobile so tapping the unmute is
   // what enables sound"; sound-fonts.md §12): iPhone Safari only lets audio start inside a tap
@@ -618,14 +628,12 @@ export const bootShell = <
     typeof win.screen?.orientation?.lock === 'function' &&
     win.matchMedia?.('(hover: none)').matches === true;
 
-  /** The game plays sideways (docs/design/shared-shell.md "Playing sideways"): the watchers and the gate. */
-  const shell = cfg.shell;
-  const sideways = shell?.orientation === 'landscape';
   const repaint = (): void => {
     cfg.paint.paint(doc, app);
-    // The shared half of the paint: the turn gate over the game's own, from the App alone, its
-    // "Go sideways" shown where the device can lock.
-    if (sideways) paintGate(doc, gateOpen(app.shell, shell), canLock);
+    // The shared half of the paint for a game that plays one way (docs/design/shared-shell.md
+    // "Playing sideways"): the turn gate over the game's own, from the App alone, its "Go
+    // sideways" (or "Go upright") shown where the device can lock; the words are the markup's.
+    if (gated !== null) paintGate(doc, gateOpen(app.shell, gated), canLock);
     // The far seat's flip (shell.ts `flipped`): the body's `data-flip`, for any game whose config the boot holds.
     if (shell !== undefined) paintFlip(doc, flipped(app, shell));
   };
@@ -782,12 +790,12 @@ export const bootShell = <
     dispatch({ type: 'rules/show', rule });
   });
   cfg.hooks?.bind?.(ctx);
-  // A game that plays sideways: the phone's orientation into the App, now and on every turn of
-  // the phone (media.ts `watchMedia` reports nothing on a page without `matchMedia`), and the
+  // A game that plays one way (sideways or upright): the phone's orientation into the App, now and on
+  // every turn of the phone (media.ts `watchMedia` reports nothing on a page without `matchMedia`), and the
   // gate's one live control, "Play upright" (shellPaint.ts `GATE_KEEP_ID`), so a game's render.ts
   // binds nothing for the gate; `byId`, not `listenId`, because a sideways page without the gate
   // markup (a story, a test page) has no button to bind.
-  if (sideways) {
+  if (gated !== null) {
     watchMedia(ctx, PORTRAIT_PHONE, (portrait) => {
       dispatch({ type: 'viewport/portrait', portrait });
     });

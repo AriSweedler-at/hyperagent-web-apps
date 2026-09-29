@@ -763,14 +763,17 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
   /** The peer prefix and the room-code spec (web/shared/lib/roomCode.ts). */
   id: Game;
   /**
-   * The game is played with the phone sideways (backgammon's flat board,
-   * docs/design/backgammon-landscape.md; docs/design/shared-shell.md "Playing sideways"): the boot
-   * watches `PORTRAIT_PHONE` and `LANDSCAPE_PHONE` (web/shared/edge/media.ts) into
-   * `portraitPhone`/`landscapePhone`, and the turn gate (`gateOpen`, shellPaint.ts `paintGate`,
-   * the page's `gateMarkup`) asks for a turn of the phone at the table. Absent (gin, briscola):
-   * nothing is watched, no gate, the upright home as it is.
+   * The way the game is played on a phone (docs/design/shared-shell.md "Playing sideways"):
+   * `'landscape'` (backgammon's flat board, docs/design/backgammon-landscape.md) or `'portrait'`
+   * (the mirror: UI Sandbox's portrait mode). With either, the boot watches `PORTRAIT_PHONE` and
+   * `LANDSCAPE_PHONE` (web/shared/edge/media.ts) into `portraitPhone`/`landscapePhone`, the turn
+   * gate (`gateOpen`, shellPaint.ts `paintGate` with `GATE_COPY[orientation]`'s words, the page's
+   * `gateMarkup`) asks for a turn of the phone at the table when it is held the other way
+   * (`wrongWay`), the Android lock holds that orientation (boot.ts hands it to
+   * `createOrientationLock`) and the rotation hint speaks of it. `'any'` or absent (gin, briscola,
+   * fidice): nothing is watched, no gate, the upright home as it is.
    */
-  orientation?: 'landscape';
+  orientation?: PlayOrientation | 'any';
   names: Readonly<{
     /** The host name an empty input means, and the prefill of every name input. */
     default: string;
@@ -1046,21 +1049,50 @@ export const withTable = <G extends ShellTypes>(
 
 // ---- playing sideways: the turn gate (docs/design/backgammon-landscape.md §5D) ------------------
 
-/** What `gateOpen` reads of the shell: the screen, the view, the orientation, the dismissal and the lock. */
+/** What `gateOpen` reads of the shell: the screen, the view, the two phone predicates, the dismissal and the lock. */
 export type GateState<G extends ShellTypes> = Pick<
   ShellState<G>,
-  'screen' | 'view' | 'portraitPhone' | 'gateDismissed' | 'orientationLocked'
+  'screen' | 'view' | 'portraitPhone' | 'landscapePhone' | 'gateDismissed' | 'orientationLocked'
 >;
 /** What `gateOpen` reads of the config: the opt-in and the two over predicates; a `ShellConfig` fits. */
 export type GateConfig<G extends ShellTypes> = Readonly<{
-  orientation?: 'landscape';
+  orientation?: PlayOrientation | 'any';
   engine: Pick<ShellConfig<G>['engine'], 'over' | 'gameOver'>;
 }>;
 
+/** The one way a game is played on a phone: sideways (backgammon) or upright (UI Sandbox's portrait mode); `ShellConfig.orientation` less `'any'`. */
+export type PlayOrientation = 'landscape' | 'portrait';
+
+/** The way a config plays, or null where it plays either way (`'any'`, or the key absent: gin, briscola, fidice). */
+export const playsOrientation = (
+  cfg: Readonly<{ orientation?: PlayOrientation | 'any' }>,
+): PlayOrientation | null =>
+  cfg.orientation === 'landscape' || cfg.orientation === 'portrait' ? cfg.orientation : null;
+
+/** What `wrongWay` reads of the shell: the two phone predicates as the boot's watchers reported them. */
+export type PhoneWay = Pick<ShellState<ShellTypes>, 'portraitPhone' | 'landscapePhone'>;
+
+/**
+ * The phone is held the other way from the one the game plays (the turn gate's reason, shared with
+ * UI Sandbox, which has no App): upright where the game plays sideways (`portraitPhone`), sideways
+ * where it plays upright (`landscapePhone`); never where it plays either way, and never on a phone
+ * neither watcher has reported (a desktop window matches neither predicate).
+ */
+export const wrongWay = (orientation: PlayOrientation | 'any' | undefined, s: PhoneWay): boolean =>
+  orientation === 'landscape'
+    ? s.portraitPhone
+    : orientation === 'portrait'
+      ? s.landscapePhone
+      : false;
+
+/** The phone is held the way the game plays: where the rotation hint is due. */
+const rightWay = (orientation: PlayOrientation, s: PhoneWay): boolean =>
+  orientation === 'landscape' ? s.landscapePhone : s.portraitPhone;
+
 /**
  * The turn gate is up (shellPaint.ts `paintGate`, painted by the boot after the game's own paint):
- * in a game that plays sideways, at the table, on a phone held upright, while a game is on, until
- * the phone turns or "Play upright" for this table, and never while the Android lock is held
+ * in a game that plays one way, at the table, on a phone held the other way (`wrongWay`), while a
+ * game is on, until the phone turns or "Play upright" (or "Play sideways") for this table, and never while the Android lock is held
  * (`orientationLocked`: the tap that took it is turning the phone, so the sheet would only flash
  * over the curtain until the watcher sees the turn; `fullscreen/lost` clears the mark, and a phone
  * still upright then gets the gate back). The home, the waiting rooms and the endgame stay
@@ -1070,12 +1102,11 @@ export type GateConfig<G extends ShellTypes> = Readonly<{
  * reduce; `inert` on the DOM is the guard.
  */
 export const gateOpen = <G extends ShellTypes>(s: GateState<G>, cfg: GateConfig<G>): boolean =>
-  cfg.orientation === 'landscape' &&
+  wrongWay(cfg.orientation, s) &&
   s.screen === 'tableScreen' &&
   s.view !== null &&
   !cfg.engine.over(s.view) &&
   cfg.engine.gameOver?.(s.view) !== true &&
-  s.portraitPhone &&
   !s.gateDismissed &&
   !s.orientationLocked;
 
@@ -1134,7 +1165,13 @@ export const flipped = <G extends ShellTypes>(app: FlipApp<G>, cfg: FlipConfig<G
  */
 export const ROTATION_HINT_MSG =
   "Lock the phone's rotation so the board stays sideways: swipe down and make sure Auto-rotate is off.";
+/** The mirror, for a game that plays upright (`orientation: 'portrait'`): the same gesture, the other way to hold the phone. */
+export const ROTATION_HINT_UPRIGHT_MSG =
+  "Lock the phone's rotation so the page stays upright: swipe down and make sure Auto-rotate is off.";
 export const ROTATION_HINT_MS = 8000;
+/** The hint's words for the way a game plays. */
+export const rotationHintMsg = (orientation: PlayOrientation): string =>
+  orientation === 'landscape' ? ROTATION_HINT_MSG : ROTATION_HINT_UPRIGHT_MSG;
 
 /**
  * The hint's step over an App just painted or just turned: the toast and the mark, or the App as
@@ -1149,15 +1186,19 @@ const rotationHint = <G extends ShellTypes>(
   cfg: ShellConfig<G>,
 ): Step<G> => {
   const s = app.shell;
+  const plays = playsOrientation(cfg);
   const due =
-    cfg.orientation === 'landscape' &&
+    plays !== null &&
     s.screen === 'tableScreen' &&
-    s.landscapePhone &&
+    rightWay(plays, s) &&
     ctx.canLock === true &&
     !s.orientationLocked &&
     !s.rotationHintShown;
-  return due
-    ? step(withShell(app, { rotationHintShown: true }), toast(ROTATION_HINT_MSG, ROTATION_HINT_MS))
+  return plays !== null && due
+    ? step(
+        withShell(app, { rotationHintShown: true }),
+        toast(rotationHintMsg(plays), ROTATION_HINT_MS),
+      )
     : pure(app);
 };
 
@@ -1188,7 +1229,7 @@ export const lockSideways = <G extends ShellTypes>(
   cfg: ShellConfig<G>,
 ): Step<G> => {
   const due =
-    cfg.orientation === 'landscape' &&
+    playsOrientation(cfg) !== null &&
     ctx.canLock === true &&
     !app.shell.orientationLocked &&
     !app.shell.gateDismissed;
@@ -1207,7 +1248,7 @@ const unlockSideways = <G extends ShellTypes>(
   ctx: Ctx,
   cfg: ShellConfig<G>,
 ): ReadonlyArray<ShellEffect<G>> =>
-  cfg.orientation === 'landscape' && ctx.canLock === true
+  playsOrientation(cfg) !== null && ctx.canLock === true
     ? [{ type: 'orientationLock', hold: false }]
     : [];
 
@@ -2505,8 +2546,11 @@ export const reduceShell = <G extends ShellTypes>(
     case 'visible':
       return s.role === null ? pure(app) : step(app, { type: 'wakeLock', hold: true });
     // The paint follows (the boot paints after every intent that changes the App): the gate is `gateOpen`'s.
-    case 'viewport/portrait':
-      return pure(withShell(app, { portraitPhone: intent.portrait }));
+    case 'viewport/portrait': {
+      // In a game that plays upright, the turn to upright at a table that came up sideways is where the rotation hint is due.
+      const turned = withShell(app, { portraitPhone: intent.portrait });
+      return playsOrientation(cfg) === 'portrait' ? rotationHint(turned, ctx, cfg) : pure(turned);
+    }
     case 'viewport/landscape':
       // The turn of the phone at a table that came up upright is where the rotation hint is due.
       return rotationHint(withShell(app, { landscapePhone: intent.landscape }), ctx, cfg);

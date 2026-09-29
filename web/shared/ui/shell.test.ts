@@ -32,6 +32,7 @@ import {
   ROOM_FULL_MSG,
   ROTATION_HINT_MS,
   ROTATION_HINT_MSG,
+  ROTATION_HINT_UPRIGHT_MSG,
   SANDBOX_LOCAL_ONLY_MSG,
   SHELL_EFFECT_TYPES,
   SHELL_INTENT_TYPES,
@@ -56,8 +57,10 @@ import {
   localPlayers,
   localSeated,
   localSeats,
+  playsOrientation,
   pure,
   readHome,
+  rotationHintMsg,
   reduceShell,
   resumeFor,
   roomSeatingOf,
@@ -67,6 +70,7 @@ import {
   toast,
   userSeatOf,
   withShell,
+  wrongWay,
   withTable,
   type Ctx,
   type CueMemory,
@@ -3833,5 +3837,89 @@ describe("the far seat's flip (docs/design/backgammon-landscape.md §6 item 7; t
     expect(flipped(withTable(h, { curtain: 1 }), HOLDING)).toBe(false);
     // A ShellConfig fits the flip config as it is.
     expect(flipped(on, FAKE)).toBe(false);
+  });
+});
+
+// ---- playing upright: the mirror (ShellConfig.orientation 'portrait'; UI Sandbox's portrait mode) ----
+
+describe("playing upright: `orientation: 'portrait'` is the mirror of sideways, `'any'` (or absent) plays either way", () => {
+  const UPRIGHT: ShellConfig<Fake> = { ...FAKE, orientation: 'portrait' };
+  const ANY: ShellConfig<Fake> = { ...FAKE, orientation: 'any' };
+  const LOCKABLE: Ctx = { ...ctx, canLock: true };
+  const init: FakeIntent = { type: 'home/init', home };
+  const flat: FakeIntent = { type: 'viewport/landscape', landscape: true };
+  const stood: FakeIntent = { type: 'viewport/portrait', portrait: true };
+  const start: FakeIntent = { type: 'local/click', p1: 'Ann', p2: 'Bob', level: '2' };
+  const lost: FakeIntent = { type: 'fullscreen/lost' };
+  const locks = (effects: ReadonlyArray<FakeEffect>): ReadonlyArray<boolean> =>
+    effects.flatMap((e) => (e.type === 'orientationLock' ? [e.hold] : []));
+
+  test('playsOrientation names the one way or null; wrongWay is the phone held the other way, never for either way or an unreported phone; the hint has words for each way', () => {
+    expect(playsOrientation(FAKE)).toBeNull();
+    expect(playsOrientation(ANY)).toBeNull();
+    expect(playsOrientation(SIDEWAYS)).toBe('landscape');
+    expect(playsOrientation(UPRIGHT)).toBe('portrait');
+    const held = { portraitPhone: true, landscapePhone: false };
+    const lying = { portraitPhone: false, landscapePhone: true };
+    const desk = { portraitPhone: false, landscapePhone: false };
+    expect(wrongWay('landscape', held)).toBe(true);
+    expect(wrongWay('landscape', lying)).toBe(false);
+    expect(wrongWay('portrait', lying)).toBe(true);
+    expect(wrongWay('portrait', held)).toBe(false);
+    expect(wrongWay('portrait', desk)).toBe(false);
+    expect(wrongWay('any', lying)).toBe(false);
+    expect(wrongWay(undefined, held)).toBe(false);
+    expect(rotationHintMsg('landscape')).toBe(ROTATION_HINT_MSG);
+    expect(rotationHintMsg('portrait')).toBe(ROTATION_HINT_UPRIGHT_MSG);
+    expect(ROTATION_HINT_UPRIGHT_MSG).toContain('upright');
+  });
+
+  test('the gate: up at the table on a phone held sideways, down once upright; the same shell under a sideways or an any config reads the other way round or never', () => {
+    const lying = runIn(ctx, UPRIGHT, initialApp, init, flat, start).app;
+    expect(lying.shell).toMatchObject({ screen: 'tableScreen', landscapePhone: true });
+    expect(gateOpen(lying.shell, UPRIGHT)).toBe(true);
+    expect(gateOpen(lying.shell, SIDEWAYS)).toBe(false);
+    expect(gateOpen(lying.shell, ANY)).toBe(false);
+    const turned = runIn(
+      ctx,
+      UPRIGHT,
+      lying,
+      { type: 'viewport/landscape', landscape: false },
+      stood,
+    ).app;
+    expect(gateOpen(turned.shell, UPRIGHT)).toBe(false);
+    expect(gateOpen(turned.shell, SIDEWAYS)).toBe(true);
+    // "Play sideways" (the same intent, the mirror's words) holds the gate down.
+    expect(gateOpen(runIn(ctx, UPRIGHT, lying, { type: 'gate/keep' }).app.shell, UPRIGHT)).toBe(
+      false,
+    );
+  });
+
+  test('the hint speaks of upright and is due at the turn to upright (viewport/portrait) at a table that came up sideways, once; the Start tap steps the lock as sideways does; a sideways game steps nothing at viewport/portrait; an any config locks and hints nothing', () => {
+    const lying = runIn(LOCKABLE, UPRIGHT, initialApp, init, flat, start, lost);
+    expect(locks(lying.effects)).toEqual([true]);
+    expect(toasts(lying.effects)).toEqual([]);
+    expect(lying.app.shell).toMatchObject({ orientationLocked: false, rotationHintShown: false });
+    const turned = runIn(
+      LOCKABLE,
+      UPRIGHT,
+      lying.app,
+      { type: 'viewport/landscape', landscape: false },
+      stood,
+    );
+    expect(toasts(turned.effects)).toEqual([[ROTATION_HINT_UPRIGHT_MSG, ROTATION_HINT_MS]]);
+    expect(turned.app.shell.rotationHintShown).toBe(true);
+    expect(toasts(runIn(LOCKABLE, UPRIGHT, turned.app, stood, { type: 'render' }).effects)).toEqual(
+      [],
+    );
+    // Sideways at the table with the lock lost: the hint is silent (the phone is the wrong way), the gate speaks.
+    const board = runIn(LOCKABLE, SIDEWAYS, initialApp, init, stood, start, lost);
+    expect(toasts(board.effects)).toEqual([]);
+    expect(runIn(LOCKABLE, SIDEWAYS, board.app, stood).effects).toEqual([]);
+    // Either way: no lock, no hint, no gate, whatever the phone does.
+    const any = runIn(LOCKABLE, ANY, initialApp, init, flat, stood, start);
+    expect(locks(any.effects)).toEqual([]);
+    expect(toasts(any.effects)).toEqual([]);
+    expect(gateOpen(any.app.shell, ANY)).toBe(false);
   });
 });

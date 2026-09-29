@@ -15,6 +15,7 @@ import {
   hostSeesMsg,
   paintConnDot,
   paintFlip,
+  GATE_COPY,
   paintGate,
   paintHandoff,
   paintScreen,
@@ -683,5 +684,43 @@ describe('paintFlip (shell.ts `flipped`; docs/design/backgammon-landscape.md §6
     expect(p.body.attr('data-flip')).toBeNull();
     paintFlip(p.doc, false);
     expect(p.body.attr('data-flip')).toBeNull();
+  });
+});
+
+describe("paintGate's words (GATE_COPY: the gate's four texts per way a game plays; UI Sandbox's orientation setting)", () => {
+  test('handed a row, the paint writes the title, the line, the lock button and the dismissal on every paint, open or not; without one the markup`s words stand; a page missing a text is left alone', () => {
+    const texts = (): FakePage =>
+      fakePage(
+        [
+          fakeEl('app'),
+          fakeEl('turnGate', { classes: ['overlay', 'hidden'] }),
+          fakeEl('turnGateTitle'),
+          fakeEl('turnGateSub'),
+          fakeEl('turnGateGoBtn', { classes: ['btn', 'hidden'] }),
+          fakeEl('turnGateKeepBtn'),
+        ],
+        fakeEl('body', { queries: { '.overlay': [] } }),
+      );
+    const p = texts();
+    paintGate(p.doc, true, true, GATE_COPY.portrait);
+    expect(p.get('turnGateTitle').text()).toBe('Turn your phone upright');
+    expect(p.get('turnGateSub').text()).toContain('made for portrait');
+    expect(p.get('turnGateGoBtn').text()).toBe('Go upright');
+    expect(p.get('turnGateKeepBtn').text()).toBe('Play sideways');
+    paintGate(p.doc, false, false, GATE_COPY.landscape);
+    expect(p.get('turnGateTitle').text()).toBe('Turn your phone sideways');
+    expect(p.get('turnGateGoBtn').text()).toBe('Go sideways');
+    expect(p.get('turnGateKeepBtn').text()).toBe('Play upright');
+    // No row: the words are left as they were.
+    paintGate(p.doc, true);
+    expect(p.get('turnGateTitle').text()).toBe('Turn your phone sideways');
+    // A page without one of the texts (a story with the sheet alone): the others are written.
+    const bare = fakePage(
+      [fakeEl('turnGate', { classes: ['overlay', 'hidden'] }), fakeEl('turnGateKeepBtn')],
+      fakeEl('body', { queries: { '.overlay': [] } }),
+    );
+    paintGate(bare.doc, true, false, GATE_COPY.portrait);
+    expect(bare.get('turnGateKeepBtn').text()).toBe('Play sideways');
+    expect(Object.keys(GATE_COPY)).toEqual(['landscape', 'portrait']);
   });
 });

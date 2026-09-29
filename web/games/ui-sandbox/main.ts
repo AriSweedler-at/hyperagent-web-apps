@@ -5,7 +5,8 @@
 // modules, no engine and no reducer: the frame's reading (web/shared/edge/screen.ts `applyFrame`,
 // `watchFrame`), the safe-area map (web/shared/lib/safeArea.ts) written on the root as custom
 // properties and drawn as an SVG, the readout (src/readout.ts) with a Copy button, the settings
-// (src/settings.ts) through the shell's prefs, the orientation gate and the Android lock
+// (src/settings.ts) through the shell's prefs, the shell's turn gate (web/shared/ui/shell.ts
+// `wrongWay`, shellPaint.ts `paintGate` and `GATE_COPY`) and the Android lock
 // (web/shared/edge/orientation.ts) in either direction, and the layout examples (src/examples.ts)
 // measured after every paint. Everything the DOM is asked goes through web/shared/edge/dom.ts. The
 // documented hook `window.__uiSandbox` (docs/ARCHITECTURE.md "Documented test hooks") exposes the
@@ -53,6 +54,8 @@ import {
   type ExampleReport,
   type MeasuredBox,
 } from './src/examples.ts';
+import { wrongWay, type PlayOrientation } from '../../shared/ui/shell.ts';
+import { GATE_COPY, paintGate } from '../../shared/ui/shellPaint.ts';
 import { drawMap, mapRows } from './src/mapSvg.ts';
 import { MEDIA_QUERIES, matchedDevice, readoutText, type Readout } from './src/readout.ts';
 import {
@@ -246,42 +249,30 @@ const paintExample = (): void => {
     );
 };
 
-// ---- the gate -----------------------------------------------------------------------------------
+// ---- the gate: the shell's (web/shared/ui/shell.ts `wrongWay`, shellPaint.ts `paintGate`) -----
 
-const gateWanted = (): 'sideways' | 'upright' | null => {
-  if (gateDismissed || locked) return null;
-  if (settings.mode === 'landscape' && portraitPhone) return 'sideways';
-  if (settings.mode === 'portrait' && landscapePhone) return 'upright';
-  return null;
+/** The orientation setting as `ShellConfig.orientation` spells it: `auto` plays either way. */
+const playsAs = (): PlayOrientation | 'any' => (settings.mode === 'auto' ? 'any' : settings.mode);
+
+/** The way the gate asks for, or null: the shell's predicate over the two watchers, unless dismissed for this run or the lock is held. */
+const gateWanted = (): PlayOrientation | null => {
+  const plays = playsAs();
+  return plays !== 'any' &&
+    !gateDismissed &&
+    !locked &&
+    wrongWay(plays, { portraitPhone, landscapePhone })
+    ? plays
+    : null;
 };
 
 const canLock =
   typeof (screen.orientation as Readonly<{ lock?: unknown }>).lock === 'function' &&
   !win.matchMedia('(any-pointer: fine)').matches;
 
-const paintGate = (): void => {
+/** The shell's paint: the sheet, `inert` on `#app`, focus to the first control, "Go" where the device can lock, the words for the way asked. */
+const paintTurnGate = (): void => {
   const want = gateWanted();
-  const gate = requireId(doc, 'turnGate');
-  setHidden(gate, want === null);
-  setAttr(doc.body, 'data-gate', want);
-  if (want === null) return;
-  setText(
-    requireId(doc, 'turnGateTitle'),
-    want === 'sideways' ? 'Turn your phone sideways' : 'Turn your phone upright',
-  );
-  setText(
-    requireId(doc, 'turnGateSub'),
-    want === 'sideways'
-      ? 'This layout is made for landscape. Turn the phone, or keep it upright.'
-      : 'This layout is made for portrait. Turn the phone, or keep it sideways.',
-  );
-  const go = requireId(doc, 'turnGateGoBtn');
-  setHidden(go, !canLock);
-  setText(go, want === 'sideways' ? 'Go sideways' : 'Go upright');
-  setText(
-    requireId(doc, 'turnGateKeepBtn'),
-    want === 'sideways' ? 'Play upright' : 'Play sideways',
-  );
+  paintGate(doc, want !== null, canLock, want === null ? undefined : GATE_COPY[want]);
 };
 
 const toast = (text: string): void => {
@@ -325,7 +316,7 @@ const repaint = (): void => {
   writeMap();
   paintScreen();
   paintSettings();
-  paintGate();
+  paintTurnGate();
   if (screenShown === 'preview') paintExample();
   else paintInfo();
 };
