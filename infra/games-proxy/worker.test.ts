@@ -3,7 +3,12 @@ import { resolve } from 'node:path';
 
 import { describe, expect, test, vi } from 'vitest';
 
-import { ALIASES as REGISTRY_ALIASES, SHELL_GAMES } from '../../tools/games.ts';
+import {
+  ALIASES as REGISTRY_ALIASES,
+  GAMES,
+  LANDING_HREFS,
+  SHELL_GAMES,
+} from '../../tools/games.ts';
 import { JOIN_PARAM as INVITE_PARAM } from '../../web/shared/lib/invite.ts';
 import { ROOM_CODE } from '../../web/shared/lib/roomCode.ts';
 import worker, {
@@ -15,6 +20,8 @@ import worker, {
   joinPreview,
   mapPath,
   metaContent,
+  shortHref,
+  shortenLandingLinks,
   unmapPath,
 } from './worker.ts';
 
@@ -585,6 +592,215 @@ describe('fetch handler: link previews', () => {
         );
         expect(res.status).toBe(200);
         expect(res.headers.get('content-length')).toBe('77');
+      },
+    ));
+});
+
+// ---- Landing links ---------------------------------------------------------------------------
+
+describe('shortHref: a landing href to the short URL on this origin', () => {
+  test.each([
+    ['games/gin-rummy/', '/gin-rummy/'],
+    ['games/fidice/', '/fidice/'],
+    ['games/backgammon/', '/backgammon/'],
+    ['games/briscola/', '/briscola/'],
+    // The alias: the Worker serves /sheshbesh/ in place.
+    ['games/sheshbesh/', '/sheshbesh/'],
+    // The other spellings of the same folder.
+    ['./games/gin-rummy/', '/gin-rummy/'],
+    ['/games/gin-rummy/', '/gin-rummy/'],
+    ['/hyperagent-web-apps/games/gin-rummy/', '/gin-rummy/'],
+    // Without the slash (the upstream's slash redirect then lands on /<name>/: one hop, no /games/
+    // in it), with a query, a fragment, a file.
+    ['games/gin-rummy', '/gin-rummy'],
+    ['games/gin-rummy/?join=TNJQ', '/gin-rummy/?join=TNJQ'],
+    ['games/gin-rummy/#rules', '/gin-rummy/#rules'],
+    ['games/backgammon/splash.png', '/backgammon/splash.png'],
+    // games/ alone is the landing page itself, as /games/ redirects to /.
+    ['games/', '/'],
+  ])('%s -> %s', (href, short) => {
+    expect(shortHref(href)).toBe(short);
+  });
+
+  test.each([
+    'shared/favicon.svg',
+    './shared/favicon.ico',
+    '/shared/ice.js',
+    'https://github.com/AriSweedler-at/hyperagent-web-apps',
+    // An absolute URL names its origin on purpose.
+    'https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/',
+    '#top',
+    'mailto:ari@example.com',
+    '',
+    'games',
+    'gamesx/gin-rummy/',
+    'my-games/gin-rummy/',
+    '../games/gin-rummy/',
+  ])('%s is not under games/ and stays as it is', (href) => {
+    expect(shortHref(href)).toBe(href);
+  });
+
+  test('every landing card is shortened to the path /games/<name>/ redirects to: the redirect, done ahead of the click', () => {
+    LANDING_HREFS.forEach((href) => {
+      const mapped = mapPath(`/${href}`);
+      expect(mapped.kind, href).toBe('redirect');
+      expect(shortHref(href), href).toBe(mapped.path);
+    });
+    expect(LANDING_HREFS.map(shortHref)).toEqual(GAMES.map((game) => `/${game}/`));
+  });
+});
+
+describe('shortenLandingLinks: the committed landing page (web/index.html)', () => {
+  const landing = readFileSync(resolve(import.meta.dirname, '../../web/index.html'), 'utf8');
+  const hrefsIn = (html: string): ReadonlyArray<string> =>
+    [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1] ?? '');
+
+  test('rewrites exactly the card hrefs, `games/` to `/`; every other byte stays', () => {
+    expect(shortenLandingLinks(landing)).toBe(landing.replaceAll('href="games/', 'href="/'));
+    expect(shortenLandingLinks(landing)).not.toBe(landing);
+  });
+
+  test('the cards then point at the short URLs in registry order; the icons and the source link are untouched', () => {
+    const before = hrefsIn(landing);
+    const after = hrefsIn(shortenLandingLinks(landing));
+    expect(after.filter((href) => href.startsWith('/'))).toEqual(GAMES.map((game) => `/${game}/`));
+    expect(after.filter((href) => !href.startsWith('/'))).toEqual(
+      before.filter((href) => !href.startsWith('games/')),
+    );
+  });
+});
+
+/** A landing page as web/index.html spells it: relative cards, the alias, the icon, an outside link, and the other spellings. */
+const LANDING_PAGE = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" href="./shared/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<a class="card" href="games/gin-rummy/">Gin Rummy</a>
+<a class="card" href="games/fidice/">Fidice</a>
+<a class="card" href="games/backgammon/">Sheshbesh</a>
+<a class="card" href="games/briscola/">Briscola</a>
+<a href="games/sheshbesh/">the alias</a>
+<a href="/games/gin-rummy">rooted, no slash</a>
+<a href="/hyperagent-web-apps/games/gin-rummy/?join=TNJQ">the long form</a>
+<a href="shared/README.md">not a game</a>
+<a href="https://github.com/AriSweedler-at/hyperagent-web-apps">source</a>
+</body>
+</html>
+`;
+/** LANDING_PAGE as this origin serves it, spelled out. */
+const SHORTENED = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" href="./shared/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<a class="card" href="/gin-rummy/">Gin Rummy</a>
+<a class="card" href="/fidice/">Fidice</a>
+<a class="card" href="/backgammon/">Sheshbesh</a>
+<a class="card" href="/briscola/">Briscola</a>
+<a href="/sheshbesh/">the alias</a>
+<a href="/gin-rummy">rooted, no slash</a>
+<a href="/gin-rummy/?join=TNJQ">the long form</a>
+<a href="shared/README.md">not a game</a>
+<a href="https://github.com/AriSweedler-at/hyperagent-web-apps">source</a>
+</body>
+</html>
+`;
+/** A game page's own links: relative to it, and none of the Worker's business. */
+const GAME_PAGE = '<a href="../">back to the games</a> <a href="games/odd/">relative, odd</a>';
+
+const pageUpstream =
+  (html: string): Upstream =>
+  () =>
+    new Response(html, {
+      status: 200,
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'content-length': String(html.length),
+        'content-encoding': 'identity',
+        etag: '"page-2"',
+      },
+    });
+
+describe('fetch handler: landing links', () => {
+  test('GET / serves the landing page with its links short; length and encoding go, the rest of the headers stay', () =>
+    withUpstream(pageUpstream(LANDING_PAGE), async () => {
+      const res = await get('/');
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(SHORTENED);
+      expect(res.headers.get('content-length')).toBeNull();
+      expect(res.headers.get('content-encoding')).toBeNull();
+      expect(res.headers.get('content-type')).toBe('text/html; charset=utf-8');
+      expect(res.headers.get('etag')).toBe('"page-2"');
+    }));
+
+  test('the long form of the landing page, /hyperagent-web-apps/, is rewritten the same way', () =>
+    withUpstream(pageUpstream(LANDING_PAGE), async () => {
+      expect(await (await get('/hyperagent-web-apps/')).text()).toBe(SHORTENED);
+    }));
+
+  test('the landing page is fetched from upstream as before: the rewrite is on the way back', () =>
+    withUpstream(
+      (req) => {
+        expect(req.url).toBe(`${GH}/hyperagent-web-apps/`);
+        return pageUpstream(LANDING_PAGE)(req);
+      },
+      async () => {
+        expect((await get('/')).status).toBe(200);
+      },
+    ));
+
+  test.each(['/backgammon/', '/sheshbesh/', '/gin-rummy/'])(
+    'a game page at %s is not touched: its relative links are its own, length and all',
+    (path) =>
+      withUpstream(pageUpstream(GAME_PAGE), async () => {
+        const res = await get(path);
+        expect(await res.text()).toBe(GAME_PAGE);
+        expect(res.headers.get('content-length')).toBe(String(GAME_PAGE.length));
+        expect(res.headers.get('content-encoding')).toBe('identity');
+      }),
+  );
+
+  test.each([
+    ['/games/briscola/', '/briscola/'],
+    ['/games/gin-rummy', '/gin-rummy'],
+    ['/games/sheshbesh/', '/sheshbesh/'],
+  ])('%s still redirects to %s, for the links already out there', (path, short) =>
+    withUpstream(noUpstream, async () => {
+      const res = await get(path);
+      expect(res.status).toBe(301);
+      expect(res.headers.get('Location')).toBe(`${ORIGIN}${short}`);
+    }),
+  );
+
+  test('HEAD / passes through with its length: there is no body to rewrite', () =>
+    withUpstream(
+      () =>
+        new Response(null, {
+          status: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8', 'content-length': '77' },
+        }),
+      async () => {
+        const res = await worker.fetch(new Request(`${ORIGIN}/`, { method: 'HEAD' }));
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-length')).toBe('77');
+      },
+    ));
+
+  test('an upstream error for / is untouched', () =>
+    withUpstream(
+      () =>
+        new Response(LANDING_PAGE, {
+          status: 503,
+          headers: { 'content-type': 'text/html; charset=utf-8', 'content-length': '9' },
+        }),
+      async () => {
+        const res = await get('/');
+        expect(res.status).toBe(503);
+        expect(await res.text()).toBe(LANDING_PAGE);
+        expect(res.headers.get('content-length')).toBe('9');
       },
     ));
 });

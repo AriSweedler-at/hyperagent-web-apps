@@ -5,7 +5,9 @@
 //                   place so the address bar keeps /ALIAS/)
 //   /ALIAS       -> 301 to /ALIAS/                          (this origin's slash redirect: the
 //                   upstream's would land on /GAME/)
-//   /games/XXX   -> 301 to /XXX                            (landing-page links; /games/ALIAS too)
+//   /games/XXX   -> 301 to /XXX                            (links already out there; /games/ALIAS too.
+//                   The landing page itself is served with its `games/XXX/` hrefs rewritten to
+//                   /XXX/, "Landing links" below, so a click from it never takes this hop.)
 //   /shared/…    -> .../hyperagent-web-apps/shared/…       (assets loaded relatively by game pages)
 //   /favicon.ico -> .../hyperagent-web-apps/shared/favicon.ico (the one icon the site ships; browsers
 //                   and bookmarks ask the origin root for it)
@@ -14,6 +16,9 @@
 // a trailing slash fall into the /XXX rule. worker.test.ts pins every row of this table.
 // A page fetched with `?join=CODE` (an invite link) has its Open Graph head rewritten to name the
 // code: "Link previews" below, docs/design/link-previews.md.
+// Two rewrites of a page body, then, both plain string rewrites over the buffered page rather than
+// HTMLRewriter: the handler also runs in node (worker.test.ts, tools/proxy-dev.ts behind the
+// Playwright `proxy` project), which has none, and both pages are this repo's own markup.
 // The upstream origin is env.UPSTREAM (default https://arisweedler-at.github.io) so the same
 // handler can front a local dist server in tests (tools/proxy-dev.ts).
 // Deploy with `npx wrangler deploy` from this directory (wrangler bundles TypeScript natively).
@@ -106,10 +111,8 @@ const rewriteLocation = (
 // Open Graph head. The Pages origin serves one static head per game; this origin can vary it by
 // query, so a GET for a page that carries a code gets its head rewritten: the title and the
 // descriptions say the code, og:url is the invite itself, the splash og:image stays the game's.
-// A string rewrite over the buffered page rather than HTMLRewriter: the handler also runs in node
-// (worker.test.ts, tools/proxy-dev.ts behind the Playwright `proxy` project), which has no
-// HTMLRewriter, and the pages are this repo's own composed markup (tools/shell-markup.ts), whose
-// meta tags spell `property`/`name` before `content` on one line each.
+// A string rewrite (the file header says why), over pages that are this repo's own composed markup
+// (tools/shell-markup.ts), whose meta tags spell `property`/`name` before `content` on one line each.
 
 /** The query parameter an invite link carries (web/shared/lib/invite.ts JOIN_PARAM; the test pins the two). */
 export const JOIN_PARAM = 'join';
@@ -166,8 +169,66 @@ export const joinPreview = (html: string, code: string, inviteUrl: string): stri
   return tags.reduce((page, [key, value]) => setMeta(page, key, value), html);
 };
 
+// ---- Landing links ---------------------------------------------------------------------------
+// web/index.html is one page for both origins and links its cards relatively, `games/<name>/`. On
+// this origin that resolves to /games/<name>/, a 301 to /<name>/: every click paid a redirect hop,
+// and the browser's history and autocomplete recorded the long form first, so players ended up
+// copying and sharing /games/<name>/ (the owner's ask, 2026-09-28). Served from here, the landing
+// page has its hrefs rewritten to the short URLs up front: a click is one request, and /<name>/ is
+// the only form a player sees, copies or is offered. The redirect stays for links already out there.
+
+/** The upstream pathname of the landing page: what `/` fetches (and what its long form passes through as). */
+const LANDING = `${SITE}/`;
+
+/**
+ * The spellings of "under the site's games/" an href can carry, as the landing page resolves
+ * them: relative to it, `/`-rooted on this origin, or the long form under the site prefix.
+ */
+const GAMES_PREFIXES: ReadonlyArray<string> = ['games/', './games/', '/games/', `${SITE}/games/`];
+
+/**
+ * An href as the landing page spells it -> the short URL on this origin: `games/<name>/…` in any
+ * of GAMES_PREFIXES's spellings, with or without a trailing slash, query or fragment, becomes
+ * `/<name>/…`, the very path mapPath redirects `/games/<name>/…` to (worker.test.ts pins the two
+ * equal for every landing card). Every other href (another host, the site's shared/ assets, a
+ * fragment, a mailto:) comes back as it is. Like mapPath it knows no list of games: whatever follows
+ * games/ is a game's folder or an alias, and a name the site does not hold is the same 404 at
+ * /<name>/ that it was at /games/<name>/.
+ */
+export const shortHref = (href: string): string => {
+  const prefix = GAMES_PREFIXES.find((p) => href.startsWith(p));
+  return prefix === undefined ? href : `/${href.slice(prefix.length)}`;
+};
+
+/** `href="…"` on any tag: the opening, the value, the closing quote (the page is this repo's own markup, double-quoted). */
+const HREF = /(\bhref=")([^"]*)(")/g;
+
+/** The landing page with every href under games/ shortened (shortHref); every other byte is the upstream's. */
+export const shortenLandingLinks = (html: string): string =>
+  html.replace(
+    HREF,
+    (_attr: string, open: string, value: string, close: string) =>
+      `${open}${shortHref(value)}${close}`,
+  );
+
 const isHtml = (headers: Headers): boolean =>
   (headers.get('content-type') ?? '').startsWith('text/html');
+
+/**
+ * The rewrite a GET's HTML body gets on this origin, if any: the landing page's links shortened,
+ * or an invite's preview (the two never meet: the landing page takes no code). `upstreamPath` is
+ * the mapped upstream pathname the page is fetched from.
+ */
+const bodyRewrite = (
+  url: Readonly<URL>,
+  upstreamPath: string,
+): ((html: string) => string) | undefined => {
+  if (upstreamPath === LANDING) return shortenLandingLinks;
+  const code = joinCode(url);
+  if (code === undefined) return undefined;
+  const invite = `${url.origin}${url.pathname}?${JOIN_PARAM}=${code}`;
+  return (html) => joinPreview(html, code, invite);
+};
 
 /** The module-Worker shape Cloudflare calls; tools/proxy-dev.ts calls the same `fetch`. */
 export type Handler = Readonly<{
@@ -199,15 +260,14 @@ const handler: Handler = {
     const response = await fetch(proxyReq);
     const headers = rewriteLocation(response.headers, target, url.origin);
 
-    // A GET for a page under an invite code: the head is rewritten (link previews above). The body
-    // changes, so the upstream's length and encoding no longer describe it. HEAD has no body to
-    // rewrite and passes through as it is.
-    const code = request.method === 'GET' ? joinCode(url) : undefined;
-    if (code !== undefined && response.status === 200 && isHtml(response.headers)) {
+    // A GET for a page this origin rewrites (the landing page's links, an invite's preview): the
+    // body changes, so the upstream's length and encoding no longer describe it. HEAD has no body
+    // to rewrite and passes through as it is.
+    const rewrite = request.method === 'GET' ? bodyRewrite(url, mapped.path) : undefined;
+    if (rewrite !== undefined && response.status === 200 && isHtml(response.headers)) {
       headers.delete('content-length');
       headers.delete('content-encoding');
-      const invite = `${url.origin}${url.pathname}?${JOIN_PARAM}=${code}`;
-      return new Response(joinPreview(await response.text(), code, invite), {
+      return new Response(rewrite(await response.text()), {
         status: response.status,
         statusText: response.statusText,
         headers,
