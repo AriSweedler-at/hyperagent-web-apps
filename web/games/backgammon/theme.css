@@ -2076,33 +2076,39 @@ label {
     --edge: max(16px, var(--inset-l), var(--inset-r));
     padding: 12px var(--edge) calc(12px + var(--inset-b));
   }
-  /* 6px above the strip and below the board (the base padding's 12 each), the home indicator kept:
-     at the table only, so the sideways home and the match-over screen keep the 24. */
+  /* 11px above the strip (the trim's 6px band and its hairline, then 4px of air: the owner,
+     2026-09-28: "the top of the names & such overlap the green border") and the same below the
+     board, or 6px over the home indicator where there is one (its 21px band clears the trim by
+     itself). At the table only, so the sideways home and the match-over screen keep the base
+     padding's 12 each. `--pad-v` is the pair, for the board's arithmetic below. */
   body.fixed-screen #app {
     max-width: none;
-    padding-top: 6px;
-    padding-bottom: calc(6px + var(--inset-b));
+    --pad-v: calc(11px + max(11px, 6px + var(--inset-b)));
+    padding-top: 11px;
+    padding-bottom: max(11px, 6px + var(--inset-b));
   }
   #tableScreen {
     /* The two blocks below set --chrome-h and --chrome-w: what the chrome takes above and below the
-       board, and beside it. Twelve points, the bar (a point wide), a 44px tray and the 16px frame
-       fill the width that is left; two point rows the height. Floors: 44px points (a tap target)
-       and a point length each block sets (`--point-len-min`: 104px with the rail, five coins at a
-       12px step; 90 with the rows; each less half the home indicator, so the fallbacks' heights
-       hold with one). Under either the fallbacks at the end scroll. `svh`, not
-       `dvh`: nothing scrolls at the table, so the small viewport is the one there is, and it
-       stands still when a toolbar or the capsule comes and goes. */
+       board (#app's paddings, `--pad-v`, included), and beside it. Twelve points, the bar (a point
+       wide), a 44px tray and the 16px frame fill the width that is left; two point rows the height.
+       The height is measured, never computed from a viewport unit: #tableScreen is a size
+       container and #board (below) reads `100cqh`, this element's height, so the board fills
+       exactly what the chrome leaves whatever `svh` and `dvh` say. (The owner's iPhone showed
+       parchment above and below a board sized from `100svh` inside an #app that stood `100dvh`
+       tall: the portrait fallback's `min-height: 100dvh` outlived the `max-height: 100svh` pin,
+       and a min-height beats a max-height.) Floors: 44px points (a tap target) and a point length
+       each block sets (`--point-len-min`: 104px with the rail, five coins at a 12px step; 90 with
+       the rows; each less half of what the home indicator adds to the chrome, so the fallbacks'
+       heights hold with one). Under either the fallbacks at the end scroll. */
     --off-w: 44px;
     --off-h: 0px;
     --bar-w: var(--point-w);
     --point-w: clamp(44px, calc((100vw - var(--chrome-w) - var(--off-w) - 16px) / 13), 64px);
-    --point-len: max(var(--point-len-min), calc((100svh - var(--chrome-h) - 16px) / 2));
     --checker-d: calc(var(--point-w) * 0.86);
-    /* Five coins along the point: the desktop's 15px base offset and 3px at the tip spared. */
-    --stack-step: min(var(--checker-d), calc((var(--point-len) - var(--checker-d) - 18px) / 4));
     --die-s: 44px;
     --arrow-col: 0px;
     overflow: hidden;
+    container-type: size;
     /* The chrome grid (the two blocks below set its template): one 22px strip over the board
        (the owner, 2026-09-28: "WAY too much padding around the board's top and bottom ... The
        names & scores are great, but they can live on the same Y-axis value") holding, left to
@@ -2126,6 +2132,18 @@ label {
   .topbar,
   .controls {
     display: contents;
+  }
+  /* The point length from the board's room: #tableScreen's height (`100cqh`; a container unit reads
+     the nearest ancestor container, so the property lives on #board, and every rule that reads it
+     is inside the board) less the chrome inside the screen (`--chrome-h` less #app's paddings) and
+     the 16px frame, halved; never under the floor. `--stack-step` moves with it: five coins along
+     the point, the desktop's 15px base offset and 3px at the tip spared. */
+  #board {
+    --point-len: max(
+      var(--point-len-min),
+      calc((100cqh - (var(--chrome-h) - var(--pad-v)) - 16px) / 2)
+    );
+    --stack-step: min(var(--checker-d), calc((var(--point-len) - var(--checker-d) - 18px) / 4));
   }
   /* Both strips in the one row: 6px between the colour disc, the name and the pips (the phone's
      8), the name ellipsizing past its column, the pips three figures wide whatever the count (so
@@ -2203,8 +2221,8 @@ label {
     margin-bottom: 14px;
     z-index: 5;
   }
-  /* The roll sheet inside the shortest board (224px at the rail's floor, 203 with a home indicator,
-     196 in the rows at the 286px floor): 12px paddings, 44px dice, a 48px button; the sub line goes (the
+  /* The roll sheet inside the shortest board (224px at the rail's floor, 208 with a home indicator,
+     196 in the rows at the 296px floor): 12px paddings, 44px dice, a 48px button; the sub line goes (the
      title names the mover, and "your turn" is the whole message) and the title keeps to one line
      (a 20-character name ellipsizes rather than adding 29px), so the sheet is 168px with any
      name. Western's Double stands beside the roll button in one row instead of under it (the
@@ -2311,16 +2329,16 @@ label {
   }
   /* The toast hangs under the strip, not from the foot (shell.css puts it 24px up from the bottom):
      down there it covered the roll button after a hit, the near row's coins and the die-chip tray;
-     at 8px it covered the names and the status for its 2.6-8 s. 34px is #app's 6px, the strip and
+     at 8px it covered the names and the status for its 2.6-8 s. 39px is #app's 11px, the strip and
      its gap (#toast stands outside #app, so the grid's variables are out of reach and the sum is
      spelled), so the 41px box lies over the board's top frame and the far points' tips alone, clear
-     of the roll sheet (centred in the viewport: its top is 90px at the 780x304 floor, 103 at
+     of the roll sheet (centred in the viewport: its top is 92px at the 780x304 floor, 105 at
      844x330). It grows to 600px before wrapping, so a hit with a 20-character name is one line:
      centred by auto margins between both edges, not by `left: 50%` (a fixed box shrinks to fit
      what is left of its containing block past `left`, half the screen); `--edge` is out of reach
      too, so the safe area is read again. It slides in from above as it slid in from below. */
   #toast {
-    top: calc(6px + 22px + 6px);
+    top: calc(11px + 22px + 6px);
     bottom: auto;
     left: 0;
     right: 0;
@@ -2423,17 +2441,24 @@ label {
     margin-top: 8px;
   }
   /* The short-viewport fallbacks above (805px under 900 wide, 645px from 900) both match a phone
-     sideways; the table is pinned again here, and the two fallbacks at the end lift it on purpose. */
+     sideways; the table is pinned again here, and the two fallbacks at the end lift it on purpose.
+     `dvh`, as the shell pins it (shell.css `body.fixed-screen`): the trim is `position: fixed;
+     inset: 0`, the dynamic viewport's box, and #app must be that box or the board floats inside
+     it; `min-height: 0` undoes the fallback's `min-height: 100dvh`, which outlived the earlier
+     `max-height: 100svh` here (a min-height beats a max-height) and was the parchment above and
+     below the board on the owner's iPhone. */
   body.fixed-screen,
   body.fixed-screen #app {
-    height: 100svh;
-    max-height: 100svh;
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
     overflow: hidden;
   }
 }
 /* From 714px wide: the rail. The chrome grid (the block above) is six columns (the board over five,
    the rail) and six rows (the strip, five the board spans and the rail's buttons divide): the chrome
-   above and below the board is 40px, not the phone's 80, and the points are 20px longer. Rows two
+   above and below the board is 50px (the trim cleared), not the phone's 80, and the points are
+   15px longer. Rows two
    to six: the menu (spanning up into the strip), the sound button, the free middle the turn arrow
    hangs in off the board's right edge, End turn (pass-and-play's held turn; its row is empty while
    the button is hidden), Undo at the board's foot. 714 is the narrowest viewport that stands the
@@ -2442,13 +2467,14 @@ label {
 @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) and (min-width: 714px) {
   #tableScreen {
     --rail-w: 44px;
-    /* 104px: five coins at a 12px step. The point yields half the home indicator (93.5 with the
-       21px one: a 9px step), so 2 x floor + 16 + --chrome-h stays 264px at any inset and the
-       `max-height: 263px` fallback at the end lifts the pin exactly where the floor stops fitting;
-       a media query cannot read env(), so the floor meets it instead. */
-    --point-len-min: calc(104px - var(--inset-b) / 2);
-    /* #app's 12px, the strip, its gap, the home indicator: 40px and the inset. */
-    --chrome-h: calc(12px + var(--strip-h) + var(--gap) + var(--inset-b));
+    /* 104px: five coins at a 12px step. The point yields half of what the home indicator adds to
+       #app's paddings past their 22px (96 with the 21px one: a 10px step), so 2 x floor + 16 +
+       --chrome-h stays 274px at any inset and the `max-height: 273px` fallback at the end lifts
+       the pin exactly where the floor stops fitting; a media query cannot read env(), so the
+       floor meets it instead. */
+    --point-len-min: calc(104px - (var(--pad-v) - 22px) / 2);
+    /* #app's paddings, the strip, its gap: 50px inset-free, 66 with a 21px home indicator. */
+    --chrome-h: calc(var(--pad-v) + var(--strip-h) + var(--gap));
     /* The two gutters (16px or the inset), the rail and its gap: 82px without insets, 144 with the
        iPhone 12's, 168 on the 852x393 class: 54, 49.2 and 48px points. */
     --chrome-w: calc(2 * var(--edge) + var(--rail-w) + var(--gap));
@@ -2514,9 +2540,9 @@ label {
   }
   /* The cube (Western) hangs in the rail too, 6px under the arrow, whoever owns it: on the bar it
      sat on the far half's coins (a half is a point long here) and over the top die of a double.
-     From the 264 floor up it clears Undo (the arrow ends at the board's middle + 20px, the cube
-     runs to + 56; Undo, 44.8px at the board's foot, starts 0.7px lower on a 203px board, the
-     floor's with a home indicator, 31px lower at 780x304). The owner's side, which the desktop's
+     From the 274 floor up it clears Undo (the arrow ends at the board's middle + 20px, the cube
+     runs to + 56; Undo, 44.8px at the board's foot, starts 3px lower on a 208px board, the
+     floor's with a home indicator, 26px lower at 780x304). The owner's side, which the desktop's
      bar shows, is not shown sideways: the roll sheet's Double says who may. */
   #cube[data-owner] {
     position: absolute;
@@ -2534,9 +2560,9 @@ label {
    board at the 44px floor, so the buttons take a 44px row under the board instead: the menu and the
    sound button at its left, Undo and End turn at its right (End turn at its own width, the call to
    action in the corner a thumb reaches; it was a 506px bar across the phone's controls row), the
-   same strip as the rail's over the board. The chrome above and below is 90px (it was the phone's
+   same strip as the rail's over the board. The chrome above and below is 100px (it was the phone's
    170: a 44px topbar, the 22px status line and a 56px controls row with their gaps), so the SE's
-   points are 134.5px long, not 94.5. The six columns serve both rows: the opponent's strip spans the
+   points are 129.5px long, not 94.5. The six columns serve both rows: the opponent's strip spans the
    menu's 44px and the rest of its width, the sound button starts the second column, Undo ends my
    strip's column and End turn the slot's, 92px here ("End turn" is 82: 10 to spare); the names'
    columns are 132px (the badge, 124px, and the slot leave the status line 131px at 667, 104 at
@@ -2546,13 +2572,13 @@ label {
     --btn-h: 44px;
     --name-w: 132px;
     --slot-w: 92px;
-    /* 90px, less half the home indicator (as the rail's floor above), so 2 x floor + 16 + 90 +
-       inset-b stays 286px and the `max-height: 285px` fallback is exact at any inset. */
-    --point-len-min: calc(90px - var(--inset-b) / 2);
-    /* #app's 12px, the strip, the button row, their two gaps, the home indicator: 90px and the inset. */
-    --chrome-h: calc(
-      12px + var(--strip-h) + var(--gap) + var(--btn-h) + var(--gap) + var(--inset-b)
-    );
+    /* 90px, less half of what the home indicator adds to the paddings (as the rail's floor above),
+       so 2 x floor + 16 + --chrome-h stays 296px and the `max-height: 295px` fallback is exact at
+       any inset. */
+    --point-len-min: calc(90px - (var(--pad-v) - 22px) / 2);
+    /* #app's paddings, the strip, the button row, their two gaps: 100px inset-free, 116 with a 21px
+       home indicator. */
+    --chrome-h: calc(var(--pad-v) + var(--strip-h) + var(--gap) + var(--btn-h) + var(--gap));
     --chrome-w: calc(2 * var(--edge));
     grid-template-columns:
       44px calc(var(--name-w) - 44px - var(--gap)) auto minmax(0, 1fr) var(--name-w)
@@ -2595,14 +2621,14 @@ label {
     margin-block: 6px 0;
   }
 }
-/* Where the floors do not fit the document scrolls (the rule of §3.10): under 264px with the rail
-   (2 x 104 + 16 + 40), under 286px with the rows (2 x 90 + 16 + 90; an SE with Safari's toolbar,
-   325px, fits now: it scrolled under the phone's 170px of chrome); the floors give up half the
-   bottom inset, so both numbers hold with a home indicator. The two short-phone tiers nest under
-   the phone predicate (LANDSCAPE_PHONE, spelled once outside), so the dist pin reads one landscape
-   query here and the tiers stay two height bounds. */
+/* Where the floors do not fit the document scrolls (the rule of §3.10): under 274px with the rail
+   (2 x 104 + 16 + 50), under 296px with the rows (2 x 90 + 16 + 100; an SE with Safari's toolbar,
+   325px, fits: it scrolled under the phone's 170px of chrome); the floors give up half of what the
+   bottom inset adds, so both numbers hold with a home indicator. The two short-phone tiers nest
+   under the phone predicate (LANDSCAPE_PHONE, spelled once outside), so the dist pin reads one
+   landscape query here and the tiers stay two height bounds. */
 @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
-  @media (max-height: 263px), (max-height: 285px) and (max-width: 713px) {
+  @media (max-height: 273px), (max-height: 295px) and (max-width: 713px) {
     body.fixed-screen,
     body.fixed-screen #app {
       height: auto;
@@ -2610,10 +2636,18 @@ label {
       overflow: visible;
     }
     body.fixed-screen #app {
-      min-height: 100svh;
+      min-height: 100dvh;
     }
+    /* No size container while the document scrolls: contained, #tableScreen would measure #app's
+       minimum and the board a room it does not have; uncontained, the board's floor sets the
+       height and the scroll. The board keeps the floor outright (a container unit with no
+       container reads the small viewport, which is under the floor here). */
     #tableScreen {
       overflow: visible;
+      container-type: normal;
+    }
+    #board {
+      --point-len: var(--point-len-min);
     }
   }
 }

@@ -16,6 +16,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import {
+  boardRoom,
   layoutFor,
   rowOrder,
   type Area,
@@ -243,6 +244,28 @@ export const expectFits = (g: BoardGeometry, scrolls: boolean, when: string): vo
   });
 };
 
+/**
+ * Sideways, where the viewport fits, the board fills its room (design §3.1 landscape: the CSS
+ * measures it with a container unit, the twin computes it): its top edge stands exactly the
+ * padding and the chrome above under the viewport's top, its bottom edge exactly the padding and
+ * the chrome below over the viewport's bottom (`boardRoom`: 39 and 11 with the rail inset-free, 39
+ * and 61 with the rows; headless reports no insets), so no parchment shows beyond the gaps the
+ * chrome owns. Upright and on the desktop the board is a clamp of the viewport, not its filler.
+ */
+export const expectFillsRoom = (g: BoardGeometry, when: string): void => {
+  if (layoutOf(g) !== 'landscape') return;
+  const room = boardRoom({ width: g.width, height: g.height, coarse: g.coarse });
+  expect(
+    Math.abs(g.board.y - room.top),
+    `${when}: the board's top is ${String(g.board.y)}, not ${String(room.top)}`,
+  ).toBeLessThanOrEqual(TOL);
+  const below = g.height - (g.board.y + g.board.h);
+  expect(
+    Math.abs(below - room.bottom),
+    `${when}: ${String(below)} under the board, not ${String(room.bottom)}`,
+  ).toBeLessThanOrEqual(TOL);
+};
+
 /** The whole oracle for one state of the table. */
 export const expectBoardGeometry = (
   g: BoardGeometry,
@@ -255,4 +278,5 @@ export const expectBoardGeometry = (
   expectStacks(g, when);
   expectTargets(g, when);
   expectFits(g, scrolls, when);
+  if (!scrolls) expectFillsRoom(g, when);
 };

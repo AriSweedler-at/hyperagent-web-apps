@@ -158,11 +158,20 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   so one edge keeps the board centred and the leftmost point out of the back-swipe band; `#app`'s
   480px cap is lifted at the table); `--off-w 44px`, `--off-h 0`, `--bar-w = --point-w`,
   `--point-w clamp(44px, (100vw - chrome-w - 44px - 16px) / 13, 64px)` (twelve points, the bar, the
-  tray and the frame in what the chrome leaves beside the board), `--point-len max(point-len-min,
-  (100svh - chrome-h - 16px) / 2)` (`svh`: nothing scrolls at the table, and the small viewport
-  stands still when a toolbar or the capsule comes and goes; the portrait clamps stay on `dvh`),
-  `--checker-d 0.86 point-w`, `--stack-step min(checker-d, (point-len - checker-d - 18px) / 4)`
-  (the desktop's 15px base offset and 3px at the tip spared), `--die-s 44px`, `--arrow-col 0`.
+  tray and the frame in what the chrome leaves beside the board); the point length is measured,
+  not computed from a viewport unit: `#tableScreen` is a size container (`container-type: size`)
+  and `#board` declares `--point-len max(point-len-min, (100cqh - (chrome-h - pad-v) - 16px) / 2)`
+  (`100cqh` is `#tableScreen`'s height, read by a descendant because a container unit resolves
+  against an ancestor container; `--pad-v` is `#app`'s two vertical paddings, so the subtraction
+  is the chrome inside the screen; every rule that reads `--point-len` sideways is inside the
+  board, `--stack-step` moved with it), so the board fills exactly what the chrome leaves whatever
+  `svh` and `dvh` say. (2026-09-28, the owner: "way too much blank space above and below the
+  board": the board was sized from `100svh` while `#app` stood `100dvh` tall, the portrait
+  fallback's `min-height: 100dvh` outliving the landscape pin's `max-height: 100svh`, since a
+  min-height beats a max-height; the pin is `100dvh` with `min-height: 0` now, the trim's own
+  box, `position: fixed; inset: 0`.) `--checker-d 0.86 point-w`, `--stack-step min(checker-d,
+  (point-len - checker-d - 18px) / 4)` (the desktop's 15px base offset and 3px at the tip
+  spared), `--die-s 44px`, `--arrow-col 0`.
   Two schemes by width. From 714px (13 x 44 + 44 + 16 + 2 x 16 + 44 + 6) the rail: `#tableScreen`
   is a grid of six columns and five rows, `.topbar` and `.controls` `display: contents`, one 22px
   strip above the board (the owner, 2026-09-28: "WAY too much padding around the board's top and
@@ -181,11 +190,15 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   strip over the board's top edge; the wait note stays hidden, the status line says it), so every
   item of the strip keeps one box through a game (the frame oracle). While the die-chip tray is
   open my strip and the slot stay shown (the base rule hides them: the tray took the controls row).
-  `body.fixed-screen #app` pads 6px above and `6px + inset-b` below in both schemes (the base
-  block's 12 each stay on the sideways home and the match-over screen); `--chrome-w 2 edge + 44px +
-  6px` (82 inset-free, 144 on an iPhone 12), `--chrome-h 12 + 22 + 6 + inset-b` (40), floor
-  `--point-len-min 104px`. The cube hangs 6px under the arrow (`margin-top: 26px`), clear of Undo
-  from the 264 floor up (0.7px on the floor's 203px board with a home indicator). Under 714px (the
+  `body.fixed-screen #app` pads 11px above (the trim's 6px band and its hairline, 4px of air: the
+  owner, 2026-09-28, "the top of the names & such overlap the green border") and `max(11px, 6px +
+  inset-b)` below (the home indicator's 21px band clears the trim by itself) in both schemes (the
+  base block's 12 each stay on the sideways home and the match-over screen); `--pad-v` is the pair
+  (22 inset-free, 38 with a 21px home indicator); `--chrome-w 2 edge + 44px + 6px` (82 inset-free,
+  144 on an iPhone 12), `--chrome-h pad-v + 22 + 6` (50; 66 with the home indicator), floor
+  `--point-len-min 104px - (pad-v - 22px) / 2` (96 with the home indicator: 2 x floor + 16 +
+  chrome-h is 274 at any inset). The cube hangs 6px under the arrow (`margin-top: 26px`), clear of
+  Undo from the 274 floor up (3px on the floor's 208px board with a home indicator). Under 714px (the
   SE, a 640x360 Android) the rows: the same strip over the board and the buttons in a 44px row
   under it, the menu and the sound button at its left, Undo and End turn at its right (End turn at
   its own width, `justify-self: end`; shell.css's `.btn-primary` is `width: 100%`, which had
@@ -194,9 +207,10 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   opponent's strip spans the menu's column and the next, the sound button starts the second, Undo
   ends my strip's column and End turn the slot's) by three rows (`22px minmax(0, 1fr) 44px`), with
   `--name-w 132px` and `--slot-w 92px` ("End turn" is 82; the badge, 124, and the slot leave the
-  status line 131px at 667, 104 at 640); `--chrome-w 2 edge`, `--chrome-h 12 + 22 + 6 + 44 + 6 +
-  inset-b` (90; it was the phone's 170), floor 90px, the arrow hidden: 134.5px points on the SE
-  (94.5 before), 109.5 with Safari's toolbar up (it scrolled before). The roll sheet shrinks to 12px paddings, 44px dice and a 48px button, drops
+  status line 131px at 667, 104 at 640); `--chrome-w 2 edge`, `--chrome-h pad-v + 22 + 6 + 44 +
+  6` (100; it was the phone's 170), floor `90px - (pad-v - 22px) / 2` (2 x floor + 16 + chrome-h is
+  296 at any inset), the arrow hidden: 129.5px points on the SE (94.5 before), 104.5 with Safari's
+  toolbar up (it scrolled before). The roll sheet shrinks to 12px paddings, 44px dice and a 48px button, drops
   its sub line, keeps its title to one line (a long name ellipsizes) and stands Western's Double
   beside the roll button: 168px with any name, inside the shortest board (196 at 640x360, 203 at
   the rail's floor with a home indicator), scrolling inside should it ever outgrow one; the tray's
@@ -204,18 +218,21 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   a tray a point long at either floor; the bar's step gives way so five coins end half a die short
   of the bar's centre, where the dice sit (and the dice paint over any coin: z 3); a double's four
   dice are 30px (132px in a bar 208 long at the floor); the cube hangs in the rail 6px under the
-  arrow (the rows keep it at the bar's top); the toast hangs under the strip (`top: 34px`: #app's
-  6, the strip, its gap; 600px wide before wrapping) instead of the foot, where it covered the roll
+  arrow (the rows keep it at the bar's top); the toast hangs under the strip (`top: 39px`: #app's
+  11, the strip, its gap; 600px wide before wrapping) instead of the foot, where it covered the roll
   button and the die-chip tray, and instead of 8px, where it covered the names and the status for
   its 2.6-8 s: the 41px box lies over the board's top frame and the far points' tips, clear of the
-  roll sheet (centred in the viewport: its top is 90px at the 780x304 floor, 103 at 844x330); the count
+  roll sheet (centred in the viewport: its top is 92px at the 780x304 floor, 105 at 844x330); the count
   badge is 20px with 12.8px type; the menu sheet lays Rules and History in one 44px row (224px,
   inside the 88dvh cap from the 264 floor up), the curtain sheet stands "Continue online" beside
   the reveal button at 14px paddings, and the match-over screen is two columns the viewport tall
   (the games card scrolling inside), so Rematch is on screen at the floor; `.desk-only` and
-  `#handoffBtn` stay hidden (the menu and the curtain carry them). 54 x 167 at 844x390 inset-free,
-  49.2 x 156.5 on an iPhone 12 with its 47/47/21 insets, 48 x 158 on the 852x393 class, 44.2 x
-  134.5 on an SE. `layoutFor(vp)`, `pointWidth`, `pointLength`, `RAIL_MIN_WIDTH` and
+  `#handoffBtn` stay hidden (the menu and the curtain carry them). 54 x 162 at 844x390 inset-free,
+  49.2 x 154 on an iPhone 12 with its 47/47/21 insets, 48 x 155.5 on the 852x393 class, 44.2 x
+  129.5 on an SE; the board's edges stand 39px under the viewport's top and 11 over its bottom
+  with the rail (27 over a home indicator), 39 and 61 with the rows (`boardRoom`; the geometry
+  e2e's `expectFillsRoom` pins both at 844x390 and 667x375 in every phase). `layoutFor(vp)`,
+  `pointWidth`, `paddingOf`, `chromeHeight`, `pointLength`, `boardRoom`, `RAIL_MIN_WIDTH` and
   `LANDSCAPE_GEOMETRY` in `ui/board/layout.ts` are the twin.
 
 ### 3.2 The screen's vertical structure
@@ -306,9 +323,31 @@ beside the trim declares `--screen-corner` as the largest of the top, left and r
 approximation, not a measurement. The bottom inset is the home indicator's band (34pt upright,
 21pt sideways), unrelated to the corner, and is left out. The SE, a desktop, headless Chromium
 and Android Chrome in a tab (whose toolbar owns the page's top corners) read 0 and keep square
-corners; an Android phone in fullscreen with a display cutout rounds by the cutout's depth. `env()`
-cannot be overridden in a headless probe, so the value goes through the custom property, which a
-probe sets on `body`.
+corners; an Android phone in fullscreen with a display cutout rounds by the cutout's depth.
+
+The insets are the fallback (the owner, 2026-09-28: "the outer corners of the green border don't
+match the edge of my screen perfectly": 59 on the 393x852 class whose radius is 55, 44 on an X
+whose radius is 39). The measurement is a table: `web/shared/lib/devices.ts` (pure) holds every
+iPhone class by its portrait screen in CSS points with its pixel ratio, its notch depth and its
+display's corner radius (`_displayCornerRadius`, in points): 375x812 → 39 (X, XS, 11 Pro; the 12
+and 13 mini share the screen and read 44, told apart by their 50pt notch against 44), 414x896 →
+41.5, 390x844 → 47.33, 428x926 → 53.33, 393x852 → 55, 430x932 → 55, 402x874 → 62, 440x956 → 62,
+375x667 and 320x568 → 0. `deviceOf({ screen, dpr, notch })` matches the portrait-normalised size
+(iOS reports `screen` upright in either orientation; Android swaps it) and `cornerRadius` gives
+the class's radius, the notch itself for a screen no row names (an Android, a Display Zoom
+setting), and null where the notch is unread or 0 (headless, a portrait browser tab whose corners
+are the browser's, an SE, an iPad), so the theme's `env()` fallback stands at 0. The shell reads
+every input itself (`web/shared/edge/screen.ts` `applyScreenCorner`, from `bootShell` for every
+shell game): `screen.width/height`, `devicePixelRatio`, and the notch off the computed value of
+the theme's own `--screen-corner` fallback (`env()` substituted: `47px`, or unsimplified
+`max(47px, 0px, 0px)`; the largest length), so a theme that declares the property opts in and one
+that does not gets nothing written; a radius found is set on `documentElement`'s inline style
+(dom.ts `setRootStyle`), which beats the `:root` rule. Nothing is asked of the player.
+`?probe=1` (docs/ARCHITECTURE.md "Documented test hooks") draws the same inputs and the board's
+box in a small monospace panel, a look at a real phone, not the fix; `devices.test.ts` and the
+boot test pin the table and the write. The goldens (390x844, 1280x800) are untouched: headless
+reports the viewport as the screen but no insets, so the notch is 0 and nothing is written.
+
 
 ### 3.7 Highlight states
 
@@ -395,15 +434,17 @@ With `--point-w` floored at 44px the phone board is 636px and the screen needs 8
 controls, gin's rule with the threshold derived for this board; the desktop's floor is 646px
 (`max-height: 645px`). The board itself can be scrolled from: `touch-action: none` is scoped to
 `.checker`. A phone held sideways (§3.1 landscape) matches both of those fallbacks and is pinned
-again by its own block, which comes later; it has its own floors and fallbacks, under the
-landscape query and on `100svh`: with the rail 2 x 104 + 16 + 40 = 264px, so under
-`(max-height: 263px)` the document scrolls; with the rows 2 x 90 + 16 + 90 = 286px, so under
-`(max-height: 285px) and (max-width: 713px)` it scrolls (an SE with Safari's toolbar up, 325px,
-fits since the button row replaced the phone's 170px of chrome). Both
-floors give up half the bottom inset (`--point-len-min: calc(104px - var(--inset-b) / 2)`, 90
-likewise; `pointLength` mirrors it), so 2 x (104 − inset-b/2) + 16 + 40 + inset-b = 264px at any
-inset and the fallbacks, which cannot read `env()`, lift exactly where the floor stops fitting:
-93.5px points at 812x264 with a 21px home indicator, a 203px board.
+again by its own block, which comes later (`100dvh`, the shell's pin and the trim's box); it has
+its own floors and fallbacks, under the landscape query: with the rail 2 x 104 + 16 + 50 = 274px,
+so under `(max-height: 273px)` the document scrolls; with the rows 2 x 90 + 16 + 100 = 296px, so
+under `(max-height: 295px) and (max-width: 713px)` it scrolls (an SE with Safari's toolbar up,
+325px, fits since the button row replaced the phone's 170px of chrome). Both floors give up half
+of what the bottom inset adds to `#app`'s paddings (`--point-len-min: calc(104px - (var(--pad-v)
+- 22px) / 2)`, 90 likewise; `pointLength` mirrors both), so 2 x floor + 16 + chrome-h is 274 /
+296px at any inset and the fallbacks, which cannot read `env()`, lift exactly where the floor
+stops fitting: 96px points at 812x274 with a 21px home indicator, a 208px board. Under a fallback
+`#tableScreen` drops its size container (`container-type: normal`) and the board takes the floor
+outright, so the board's own height, not a measured room, sets the document's scroll.
 
 ### 3.11 Background and panel
 

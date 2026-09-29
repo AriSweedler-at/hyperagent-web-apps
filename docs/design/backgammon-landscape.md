@@ -57,6 +57,16 @@
 > a flight and a ghost would have rendered point-reflected. `e2e/backgammon-flip.spec.ts` plays it
 > on the touch fixture at 844x390: the attribute per seat, a two-tap move and a drag through the
 > turn. Nothing flips online or at home; gin and briscola hold the key and the state but no toggle.
+> **The board fills its room, the strip clears the trim, the trim's corners are the screen's
+> (2026-09-28, the owner's iPhone: "way too much blank space above and below the board", "the top
+> of the names & such overlap the green border", "the outer corners of the green border don't match
+> the edge of my screen")**: `#tableScreen` is a size container and `#board` sizes its rows from
+> `100cqh` (docs/design/backgammon-board.md §3.1 landscape; the pin is `100dvh` with `min-height:
+> 0`, since the portrait fallback's `min-height: 100dvh` had outlived the `100svh` pin and left the
+> board short of `#app`); the rail's `#app` pads 11px above the strip and `max(11px, 6px +
+> inset-b)` below the board (the floor's viewport is 274 now, §3.10); the display's corner radius
+> comes from a device table by the screen's size (web/shared/lib/devices.ts, §3.6), read and written
+> by the shell itself, the insets the fallback; `?probe=1` draws the inputs on the page.
 
 Synthesized 2026-09-25 from the four sweeps in this folder: `platform-apis.md` (612 lines), `how-games-do-it.md` (460), `board-games-web.md` (159), `our-page.md` (183), plus `shots/` and `shots/measurements.json`. The repo was measured at 25cb36c (main), research only. Every URL below was fetched by a sweep on 2026-09-25; the date in parentheses is the one the page states. UNVERIFIED marks a claim no sweep confirmed from a fetched page.
 

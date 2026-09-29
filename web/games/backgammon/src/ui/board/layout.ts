@@ -96,17 +96,38 @@ export const DESKTOP_GEOMETRY = {
 /**
  * A phone held sideways (design §3.1 landscape): the width is thirteen points (twelve and the
  * bar), the tray and the frame inside what the chrome leaves beside the board; the height two
- * point rows inside what it leaves above and below. One 22px strip over the board with 6px above
- * it and below the board in both schemes; the buttons decide the scheme, by width
- * (`RAIL_MIN_WIDTH`): the rail (a 44px rail beside the board with a 6px gap: 40px of chrome above
- * and below, 50 beside, plus the edges) and the rows (a 44px button row under the board with its
- * 6px gap: 90px above and below, nothing beside but the edges). The edge is one number for both
- * sides, the larger inset or 16px.
+ * point rows inside what it leaves above and below. One 22px strip over the board in both schemes,
+ * #app padding 11px above it (the trim's 7px and 4px of air) and `max(11px, 6px + inset-b)` below
+ * the board (`padBottom` the least, `padAir` what the home indicator's band gets over it); the
+ * buttons decide the scheme, by width (`RAIL_MIN_WIDTH`): the rail (a 44px rail beside the board
+ * with a 6px gap: `chromeIn` 28 inside the screen, the strip and its gap, 50px of chrome above and
+ * below inset-free, 50 beside, plus the edges) and the rows (a 44px button row under the board with
+ * its 6px gap: `chromeIn` 78, 100px above and below, nothing beside but the edges). `chromeAbove`
+ * is the chrome's share over the board (the strip and its gap in both), the rest sits under it.
+ * The edge is one number for both sides, the larger inset or 16px. The CSS measures the board's
+ * room (`#tableScreen` is a size container, `#board` reads `100cqh`); the twin computes the same
+ * from the viewport's height less the chrome.
  */
 export const LANDSCAPE_GEOMETRY = {
   minEdge: 16,
-  rail: { beside: 50, chromeH: 40, minPointLen: 104 },
-  rows: { beside: 0, chromeH: 90, minPointLen: 90 },
+  rail: {
+    beside: 50,
+    padTop: 11,
+    padBottom: 11,
+    padAir: 6,
+    chromeIn: 28,
+    chromeAbove: 28,
+    minPointLen: 104,
+  },
+  rows: {
+    beside: 0,
+    padTop: 11,
+    padBottom: 11,
+    padAir: 6,
+    chromeIn: 78,
+    chromeAbove: 28,
+    minPointLen: 90,
+  },
   trayW: 44,
   frame: 16,
   columns: 13,
@@ -150,18 +171,40 @@ export const pointWidth = (viewport: Viewport): number => {
     g.maxPointW,
   );
 };
+/** `#app`'s two vertical paddings at the table sideways: 11 and `max(11, 6 + inset-b)` in both schemes. */
+export const paddingOf = (vp: Viewport): Readonly<{ top: number; bottom: number }> => {
+  const s = schemeOf(vp);
+  return { top: s.padTop, bottom: Math.max(s.padBottom, s.padAir + (vp.insets?.bottom ?? 0)) };
+};
+/** `--chrome-h` sideways: the paddings and the chrome inside the screen above and below the board (50 with the rail inset-free, 66 with a 21px home indicator; 100 with the rows). */
+export const chromeHeight = (vp: Viewport): number => {
+  const pad = paddingOf(vp);
+  return pad.top + pad.bottom + schemeOf(vp).chromeIn;
+};
 /**
- * `--point-len` sideways: half of what the chrome leaves above and below (with the frame and the
- * bottom inset taken), floored per scheme (104 with the rail, 90 with the rows, each less half
- * the bottom inset, so the floor's viewport stays 264 / 286 at any inset and the CSS fallback,
- * which cannot read the inset, lifts exactly there; under the floor the document scrolls, design
- * §3.10). 167 at 844x390, 134.5 at 667x375, 93.5 at 812x264 with a 21px home indicator.
+ * The board's room sideways: how far its top edge stands from the viewport's top (the padding and
+ * the chrome above) and its bottom edge from the viewport's bottom (the padding and the chrome
+ * below): 39 and 11 with the rail inset-free, 39 and 27 with a 21px home indicator; 39 and 61 with
+ * the rows. Where the viewport fits (no fallback scroll) the board's edges sit exactly there: the
+ * geometry e2e's `expectFillsRoom`.
+ */
+export const boardRoom = (vp: Viewport): Readonly<{ top: number; bottom: number }> => {
+  const s = schemeOf(vp);
+  const pad = paddingOf(vp);
+  return { top: pad.top + s.chromeAbove, bottom: pad.bottom + s.chromeIn - s.chromeAbove };
+};
+/**
+ * `--point-len` sideways: half of what the chrome leaves (with the frame taken), floored per
+ * scheme (104 with the rail, 90 with the rows, each less half of what the bottom inset adds to
+ * the paddings, so the floor's viewport stays 274 / 296 at any inset and the CSS fallback, which
+ * cannot read the inset, lifts exactly there; under the floor the document scrolls, design §3.10).
+ * 162 at 844x390, 129.5 at 667x375, 96 at 812x274 with a 21px home indicator.
  */
 export const pointLength = (vp: Viewport): number => {
   const s = schemeOf(vp);
-  const g = LANDSCAPE_GEOMETRY;
-  const insetB = vp.insets?.bottom ?? 0;
-  return Math.max(s.minPointLen - insetB / 2, (vp.height - s.chromeH - insetB - g.frame) / 2);
+  const pad = paddingOf(vp);
+  const floor = s.minPointLen - (pad.top + pad.bottom - s.padTop - s.padBottom) / 2;
+  return Math.max(floor, (vp.height - chromeHeight(vp) - LANDSCAPE_GEOMETRY.frame) / 2);
 };
 
 // ---- the seat frame ------------------------------------------------------------------------------
