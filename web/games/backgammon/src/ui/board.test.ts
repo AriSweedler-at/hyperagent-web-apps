@@ -348,8 +348,8 @@ describe('statusText', () => {
     viewFor(stateAt(START, turn, dice, 'backgammon'), viewer);
 
   test('my turn: before the roll, both dice, the bar, a dead die, a double, bear-off, the last move', () => {
-    expect(statusText(viewAt(START, 0, null))).toBe('Your turn. Buen mazal!');
-    expect(statusText(western(0, null))).toBe('Your turn. Double or roll');
+    expect(statusText(viewAt(START, 0, null))).toBe('Buen mazal! Roll');
+    expect(statusText(western(0, null))).toBe('Double or roll');
     expect(statusText(viewAt(START, 0, [3, 1]))).toBe('3-1 · play both dice');
     // A forced die is confirmed on the line (the tray, when open, comes first).
     expect(statusText(viewAt(START, 0, [6, 4]), { ...PLAIN_STATUS, picked: 6 })).toBe(
@@ -359,9 +359,9 @@ describe('statusText', () => {
       '6-1 · playing the 1',
     );
     expect(statusText(viewAt(START, 0, [6, 6]))).toBe('6-6 · play all four');
-    expect(statusText(viewAt(T5, 0, [6, 1]))).toBe('6-1 · enter from the bar');
-    expect(statusText(viewAt(T15, 0, [6, 5]))).toBe('6-5 · the 6 cannot be played');
-    expect(statusText(viewAt(T9, 0, [4, 4]))).toBe('4-4 · only three of the four can be played');
+    expect(statusText(viewAt(T5, 0, [6, 1]))).toBe('6-1 · enter from bar');
+    expect(statusText(viewAt(T15, 0, [6, 5]))).toBe('6-5 · the 6 is dead');
+    expect(statusText(viewAt(T9, 0, [4, 4]))).toBe('4-4 · three can play');
     expect(statusText(viewFor(move(stateAt(T9, 0, [4, 4]), '8/4'), 0))).toBe('4-4 · 2 moves left');
     expect(statusText(viewAt(T10, 0, [6, 5]))).toBe('6-5 · bear off');
     // T24 after 6/4: one die left, one play; the engine will end the turn on the next move.
@@ -382,27 +382,27 @@ describe('statusText', () => {
         pending: { from: 12, to: 3, chains: target?.chains ?? [] },
         noMoveShown: false,
       }),
-    ).toBe('13 · 6+3 reaches 4 two ways');
+    ).toBe('6+3 to 4, two ways');
     const off = viewAt(T12, 0, [6, 5]);
     expect(
       statusText(off, {
         pending: { from: 3, to: 'off', chains: targetsOf(off, 3, null)[0]?.chains ?? [] },
         noMoveShown: false,
       }),
-    ).toBe('4 · either die bears off');
+    ).toBe('Either die bears off');
   });
 
   test("the opponent's turn, the cube, the forfeited roll and the end", () => {
-    expect(statusText(viewAt(START, 0, null, 1))).toBe('Ari is rolling…');
+    expect(statusText(viewAt(START, 0, null, 1))).toBe('Ari to roll');
     expect(statusText(western(0, null, 1))).toBe('Ari may double');
     expect(statusText(viewAt(START, 0, [3, 1], 1))).toBe('Ari to move · 3-1');
     const offered = step(stateAt(START, 0, null, 'backgammon'), 0, { type: 'double' });
-    expect(statusText(viewFor(offered, 1))).toBe('Ari doubles to 2. Take or pass?');
-    expect(statusText(viewFor(offered, 0))).toBe('Jeff is answering the double');
+    expect(statusText(viewFor(offered, 1))).toBe('Ari doubles to 2');
+    expect(statusText(viewFor(offered, 0))).toBe('Jeff to answer');
     const passed = step(stateAt(T15, 0, null), 0, { type: 'roll' });
-    expect(statusText(viewFor(passed, 0))).toBe('Jeff is rolling…');
+    expect(statusText(viewFor(passed, 0))).toBe('Jeff to roll');
     expect(statusText(viewFor(passed, 0), { pending: null, noMoveShown: true })).toBe(
-      '6-6 · no move — turn passes',
+      '6-6 · turn passes',
     );
     const noEntry = step(
       stateAt('L: 13:14 | D: 1:2 2:2 3:2 4:2 5:2 6:2 13:3 | bar 1/0 | off 0/0', 0, null),
@@ -410,11 +410,9 @@ describe('statusText', () => {
       { type: 'roll' },
     );
     expect(statusText(viewFor(noEntry, 1), { pending: null, noMoveShown: true })).toBe(
-      '6-6 · no entry — turn passes',
+      '6-6 · turn passes',
     );
-    expect(statusText(viewFor(move(stateAt(T25, 0, [1, 4]), '1/off(4)'), 1))).toBe(
-      'Ari wins 2 points · gammon',
-    );
+    expect(statusText(viewFor(move(stateAt(T25, 0, [1, 4]), '1/off(4)'), 1))).toBe('Ari wins 2');
   });
 });
 

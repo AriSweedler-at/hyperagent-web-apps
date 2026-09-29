@@ -271,7 +271,7 @@ describe('the table', () => {
     expect(p.get('board').attr('data-rolling')).toBeNull();
     expect(p.get('board').attr('data-rolled')).toBeNull();
     expect(p.get('undoBtn').disabled()).toBe(true);
-    expect(p.get('statusText').text()).toBe('Your turn. Buen mazal!');
+    expect(p.get('statusText').text()).toBe('Buen mazal! Roll');
     expect(p.get('statusDice').text()).toBe('');
     expect(p.get('dice').attr('aria-label')).toBe('Roll');
     expect(p.get('board').hasClass('inert')).toBe(true);
@@ -397,7 +397,7 @@ describe('the table', () => {
     paint(p.doc, held);
     expect(p.get('doneBtn').hidden()).toBe(false);
     expect(p.get('undoBtn').disabled()).toBe(false);
-    expect(p.get('statusText').text()).toBe('Dice used — End turn, or Undo');
+    expect(p.get('statusText').text()).toBe('Dice used · End turn');
     expect(p.get('curtainOverlay').hidden()).toBe(true);
     expect(p.get('diceMini').hidden()).toBe(false);
     // The tap: the turn flips, the curtain rises for Bob, the button goes with the mover's controls.
@@ -428,7 +428,7 @@ describe('the table', () => {
     // Bob holds his 2-point (my 23): the 2 enters nowhere, and the disc says so by its absence.
     expect(p.get(pt(23)).hasClass('target')).toBe(false);
     expect(p.get(pt(23)).attr('data-die')).toBeNull();
-    expect(p.get('statusText').text()).toBe('4-2 · enter from the bar');
+    expect(p.get('statusText').text()).toBe('4-2 · enter from bar');
     // 8/5* with the 3: the blot leaves for Bob's bar and its point flashes `hit`.
     const hitting = at('L: 8:1 6:2 | D: 20:1 12:2 | bar 0/0 | off 12/12', 0, [3, 1]);
     paint(p.doc, hitting);
@@ -464,7 +464,7 @@ describe('the table', () => {
         .match(/class="chip"/g),
     ).toHaveLength(2);
     expect(p.get('moveChips').text()).toContain('data-index="0" data-dice="6" data-to="off"');
-    expect(p.get('statusText').text()).toBe('4 · either die bears off');
+    expect(p.get('statusText').text()).toBe('Either die bears off');
     const chosen = run(pending, { type: 'chip/tap', index: 0 }).app;
     paint(p.doc, chosen);
     expect(p.get('controls').hasClass('choosing')).toBe(false);
@@ -495,7 +495,7 @@ describe('the table', () => {
     expect(p.get('rsScore').text()).toBe('Ann 1 – 0 Bob · match to 5');
     expect(p.get('rsNextBtn').text()).toBe('Next game');
     expect(p.get('rsNextBtn').disabled()).toBe(false);
-    expect(p.get('statusText').text()).toBe('Ann wins 1 point');
+    expect(p.get('statusText').text()).toBe('Ann wins 1');
     expect(p.get('resultChipBtn').hidden()).toBe(true);
     expect(p.get('board').hasClass('inert')).toBe(true);
     expect(p.get('rollOverlay').hidden()).toBe(true);

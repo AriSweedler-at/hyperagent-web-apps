@@ -108,7 +108,7 @@ Plain English except the three strings (Q11).
 | Host waiting (`#hostWaitStatus`) | Waiting for your opponent to join · code **ABCD**; `#startGameBtn` "Start the match" |
 | Guest waiting | Joining ABCD… / Connected — waiting for Ari to start |
 | Roll modal | title "Your turn" (pass-and-play: "{name} — your turn", the cue that the phone changed hands, the only one with the curtain off), sub "Roll to start your turn" / "Double, or roll to start your turn" (Western, the cube on offer), the button Buen mazal! `<small>roll</small>`, `#doubleBtn` "Double" beside it |
-| Status line | §1 "Status line"; while the dice tumble: "Rolling…" (`ROLLING_STATUS`, the roll is not named before the faces settle, §4.7); the tray open: "13 · 6+3 reaches 4 two ways", "4 · either die bears off"; a die picked: "6-4 · playing the 6"; a forfeited roll: "6-6 · no move — turn passes", "4-2 · no entry — turn passes" |
+| Status line | §1 "Status line"; every line a template of literal text and capped blocks (`STATUS_TEMPLATES`, board.ts; "The copy budget" below), at most 20 characters; while the dice tumble: "Rolling…" (`ROLLING_STATUS`, the roll is not named before the faces settle, §4.7); the tray open: "6+3 to 4, two ways", "Either die bears off"; a die picked: "6-4 · playing the 6"; a forfeited roll: "6-6 · turn passes" |
 | Target discs | one die: `3`; a combined move: `6+3`, `3+3`, three or four of a double `3×3`, `3×4`; `?` when the tap opens the tray; both dice bearing off: `6·5` |
 | Die chips | line one the dice as digits `6·3`, line two the landing `→ 4 via 7, hits` / `→ 4 via 10` / `→ off`; the whole as the chip's `aria-label` |
 | Curtain | title "Pass the phone to {name}", sub by phase: `toRoll` "Your turn. Roll when you have the phone." / with `canDouble` "Your turn. Double, or roll." / `cubeOffered` "{doubler} doubles to {v}" / else "Your turn."; `#curtainLast` the turn just finished ("Ari moved 8/5* 6/5 · Ari hit you on your 20-point": the hits in the incoming player's own numbering, the notation the mover's), a forfeited roll as logged, or before any turn the opening roll ("Ari rolled 6, Jeff rolled 4 — Ari starts"; "— Ari plays 6-4" in Western); button by phase, and it only reveals: `toRoll` → "{name} — your turn" (the roll modal follows), `moving` (the Western opening) → "{name} — play 6-3", `cubeOffered` → "{name} — answer", `over` → "{name} — look"; handoff "Continue online" |
@@ -121,29 +121,51 @@ Plain English except the three strings (Q11).
 | Leave confirms | gin's `LEAVE_LOCAL_MSG`/`LEAVE_ONLINE_MSG` texts |
 | Resume labels | Resume hosting room {code} · Rejoin room {code} · Resume pass & play: {a} vs {b} |
 
-**The copy budget** (`src/ui/copy-budget.ts`, tested by `copy-budget.test.ts`; the owner, 2026-09-28:
-"you have to make sure that text is not too long ... This is a game-level concern, and should also be
-unit tested so future copywriters cannot make this mistake"). A one-line slot (`white-space: nowrap;
-text-overflow: ellipsis`) cuts what does not fit, and vitest has no layout, so each slot's room is a
-character budget: its width at the narrowest viewport the design gives it over the theme font's px per
-character, measured once on the served page with canvas `measureText` (`PX_PER_CHAR`: the status
-line's 0.95rem Cardo reaches 7.1px per character on a lowercase line, the badge's bold 0.8rem 6.0) and
-pinned by the table-ux e2e within 10%. The table: `stripStatus`, `#statusLine` sideways in the rail at
-its 780x304 floor with the badge at its widest (`Game 13 · 6–6 · to 7`, 140px): 780 − 2 × 16 − (44 +
-6) − 2 × 160 − 72 − 4 × 6 − 140 = 142px, 20 characters; `portraitStatus`, the 390px phone less #app's
-24 and the line's 12 of padding, 354px, 49 characters. The rows scheme (the SE's 667, a 640x360
-Android) leaves the strip's status 72-100px and accepts the ellipsis there. The test enumerates every
-branch of `statusText` with the engine's positions (both seats from the start, Light through the test
-positions, names at NAME_MAX): the mover's own lines are held to the strip's budget, the lines that
-name the opponent (their turn, the cube, the result: the strip beside them shows the name already) to
-the portrait line's, and a failure reads `#statusLine copy "…" is 41 characters; the slot holds 20 at
-its narrowest (sideways, the rail at its 780x304 floor with the badge at its widest (140px): 142px at
-7.1px per character). Shorten it in src/ui/board.ts (statusText) (phase 'moving', one die left) or
-widen the slot in theme.css and the budget table (src/ui/copy-budget.ts).` `STRIP_DEBT` in the test is
-the ratchet: the eleven mover's lines over the strip's budget when it was introduced ("Your turn. Buen
-mazal!", "6-1 · enter from the bar", "Dice used — End turn, or Undo", …), spelled exactly, so a new
-long line or a longer edit fails and a line that comes under budget must leave the list; their brief
-forms, and a sideways brief for the opponent's lines, are the follow-up.
+**The copy budget** (`src/ui/copy-budget.ts` and `src/ui/copy.ts`, tested by `copy-budget.test.ts`
+and `copy.test.ts`; the owner, 2026-09-28: "you have to make sure that text is not too long ... This is
+a game-level concern, and should also be unit tested so future copywriters cannot make this mistake";
+"if there is a status line that interpolates information, cap the width of interpolated information &
+use that as a building block"). A one-line slot (`white-space: nowrap; text-overflow: ellipsis`) cuts
+what does not fit, and vitest has no layout, so each slot's room is a character budget: its width at
+the narrowest viewport the design gives it over the theme font's px per character, measured once on
+the served page with canvas `measureText` (`PX_PER_CHAR`: the status line's 0.95rem Cardo reaches
+7.1px per character on a lowercase line, the badge's bold 0.8rem 6.0) and pinned by the table-ux e2e
+within 10%. The table: `stripStatus`, `#statusLine` sideways in the rail at its 780x304 floor with the
+badge at its widest (`Game 13 · 6–6 · to 7`, 140px): 780 − 2 × 16 − (44 + 6) − 2 × 160 − 72 − 4 × 6 −
+140 = 142px, 20 characters; `portraitStatus`, the 390px phone less #app's 24 and the line's 12 of
+padding, 354px, 49 characters. Sideways `#statusLine` is one element online and pass-and-play, so the
+opponent's lines land in the same 20 characters as the mover's. The known limit: the rows scheme (the
+SE's 667, a 640x360 Android) leaves the strip's status 72-100px, 10-14 characters, where a 20-character
+line still ellipsizes; widening that slot is a theme.css change (the screen-frame lane's), and the
+table here follows it.
+
+**The building blocks** (`ui/copy.ts`). A status line is a template: literal text and blocks. A block
+is an interpolated value clipped to a cap, the widest it can be in characters, derived from the
+engine's constants: `roll` 3 (`6-6`, `diceText`), `die` 1, `count` 1 (a double's four moves,
+`expandDice`), `countWord` 5 (`three`), `cube` 2 (`CUBE_MAX`, 64), `points` 3 (a backgammon on the
+cube's top, 192), `place` 3 (`24`, `bar`, `off`), `pair` 3 (`6+3`, the two dice a two-order move
+spends), and `name(n)`, a name in at most n characters, cut on a grapheme boundary (`Intl.Segmenter`)
+with one `…` and never a space before it; the shell's NAME_MAX (20) stays the storage cap. `render`
+writes the line and `worstCase` sums the literals and the caps, so a template never renders longer
+than its worst case. Every branch of `statusText` is a template in `STATUS_TEMPLATES` (board.ts) with
+a worst case of at most 20; a name's cap is what the words leave it: `name(12)` in "Konstantino… to
+roll", `name(9)` in "Konstant… may double", `name(6)` in "Konst… to move · 6-5", `name(10)` in
+"Konstanti… to answer", `name(6)` in "Konst… doubles to 64", `name(11)` in "Konstantin… wins 192".
+The mover's lines: "Buen mazal! Roll", "Double or roll", "3-1 · play both dice", "6-6 · play all
+four", "6-1 · enter from bar", "6-5 · the 6 is dead", "4-4 · three can play", "4-4 · 2 moves left",
+"6-5 · bear off", "3-1 · last move", "6-4 · playing the 6", "6+3 to 4, two ways", "Either die bears
+off", "Dice used · End turn", "6 is dead · End turn", "6-6 · turn passes" (a forfeited roll says the
+roll and that the turn passes; the held turn says what stops the dice and the button to press). The
+test holds every template's worst case to the strip with no input at all, the failure naming the
+template and its shape: `#statusLine template "oppToAnswer" ({name:8} is answering the double) can
+reach 32 characters; the slot holds 20 at its narrowest (sideways, the rail at its 780x304 floor with
+the badge at its widest (140px): 142px at 7.1px per character). Shorten its words or a block's cap in
+src/ui/board.ts (STATUS_TEMPLATES), or widen the slot in theme.css and the budget table
+(src/ui/copy-budget.ts).`; then enumerates every branch with the engine's positions (both seats from
+the start, Light through the test positions, names at NAME_MAX), the mover's 27 lines and the
+opponent's 11, all against the strip, a line over budget failing with its text, its length, the
+budget's derivation, the producer and the input; and pins the badge (140px) and the portrait line
+(49). There is no ratchet: a line that does not fit fails.
 
 ## 3. CSS
 
@@ -845,7 +867,7 @@ checkers; `.point.can-move` set equals `sourcesOf(view)`; `.point.selected`, `.s
 .checker` after a hit; `#offLight .slab` count; `#dice .die.die-3.used`, `.die.dead`,
 `.die.picked`; `#moveChips .chip` count and `data-*`; `#rollOverlay` visible per `rollModalOpen`,
 `#rollModalBtn` disabled while `#board[data-rolling]`, `#board[data-rolled]` once the dice stand
-(the specs' wait after a roll); `#statusText` (pinned strings from `statusText`); `#curtainBtn` text;
+(the specs' wait after a roll); `#statusText` (the strings `STATUS_TEMPLATES` render, §2.4 "The building blocks", each at most 20 characters, pinned in board.test.ts, render.test.ts and the local e2e); `#curtainBtn` text;
 `#curtainLast`; `#rsTitle`; `#gameBadge`; the toast "Kapará…" after the reveal;
 `#turnArrow[data-seat][data-side]` and `.off.to-move` equal `view.actor` and its side (hidden with
 no actor). Painter tests over
