@@ -105,7 +105,7 @@ way.
 Prettier leaves alone what must keep its bytes (`.prettierignore`): `legacy/**`, `web/index.html`
 (dist parity compares against it verbatim), the gin and fidice `index.html` and `theme.css` (the
 legacy layout, so a diff against `legacy/` reads as the hoist alone; backgammon's, with no legacy
-twin, are formatted), the generated fixtures, `docs/` and `infra/turn-worker/`.
+twin, are formatted), the generated fixtures, `docs/`, `infra/turn-worker/` and `ios/` (Xcode's files).
 
 ## Tests
 
@@ -496,6 +496,8 @@ tools/                       serve-dist, proxy-dev, hooks-verify, games.ts (REGI
 tools/ci/                    suites.ts (the one table: suite -> tests, coverage rows, specs, and change -> jobs), affected.ts, run-affected.ts
 infra/games-proxy/           Cloudflare Worker (TypeScript) serving the site at games.sweedler.com
 infra/turn-worker/           Cloudflare Worker (plain JS) minting TURN credentials at turn.sweedler.com
+ios/DiceClip/                the Dice App Clip (Swift, Xcode, no web code): a Roll button whose Live Activity puts one die on each side of the
+                             Dynamic Island; ios/DiceClip/README.md is the owner's runbook (signing, App Store Connect, the AASA, TestFlight)
 docs/                        ARCHITECTURE.md (the layout and its rules), MIGRATION.md (the plan and its Deviations), design/ (per-feature designs)
 .github/workflows/           ci.yml (changes -> check + one job per shared suite and a matrix per game side -> ci-ok -> deploy; a PR's superseded run is cancelled), nightly.yml (the deployed page through local servers; the public-broker replay)
 .github/actions/npm-ci/      the scanned install that rewrites the runner's lockfile copy (see "Develop")

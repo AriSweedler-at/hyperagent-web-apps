@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The clip's widget extension: the App Clip Extension capability, which is what lets an App
+     Clip carry a widget extension at all. The parent app's twin extension has no entitlements. -->
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.on-demand-install-capable</key>
+	<true/>
+</dict>
+</plist>
