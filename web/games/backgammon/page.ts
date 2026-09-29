@@ -222,6 +222,9 @@ const blocks: ShellBlocks = {
             </button>
           </div>
           <div class="opp-strip">
+            <!-- Which colour each name plays: the disc wears the seat's checker (theme.css .seat-dot);
+                 render.ts writes data-seat from the view, the markup ships seat 0's view. -->
+            <span class="seat-dot" id="oppSeatDot" data-seat="1" aria-hidden="true"></span>
             <span class="name" id="oppName">Opponent</span>
             <span class="conn-dot" id="oppDot"></span>
             <span class="pips" id="pipsOpp">167</span>
@@ -483,6 +486,7 @@ const blocks: ShellBlocks = {
 
         <div class="controls" id="controls">
           <div class="me-strip">
+            <span class="seat-dot" id="mySeatDot" data-seat="0" aria-hidden="true"></span>
             <span class="name" id="myName">You</span>
             <span class="pips" id="pipsMe">167</span>
           </div>

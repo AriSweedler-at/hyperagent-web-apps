@@ -92,7 +92,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const check = async (when: string, seat?: Seat): Promise<Frame> => {
         const g = await boardGeometry(page);
         expectBoardGeometry(g, seat ?? (await seatShown(page)), vp.scrolls, when);
-        expectSameFrame(g.frame, start.frame, when, frameSelectors(layoutOf(g)));
+        expectSameFrame(g.frame, start.frame, when, frameSelectors(layoutOf(g), g.width));
         return g.frame;
       };
 

@@ -227,6 +227,9 @@ export const gameBadgeText = (v: View): string =>
 
 const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
   setText(requireId(doc, 'oppName'), v.opp.name);
+  // The disc before the name wears the seat's checker (theme.css `.seat-dot[data-seat]`): in
+  // pass-and-play the seats swap with the mover, and the disc follows the name.
+  setAttr(requireId(doc, 'oppSeatDot'), 'data-seat', String(v.opp.idx));
   paintConnDot(doc, 'oppDot', connDotView(app.shell));
   setHtml(requireId(doc, 'pipsOpp'), trustedHtml(pipHtml(v.pips[v.opp.idx])));
   // The strip has no id of its own (design §2.1): the opponent's name pulses while they are to move.
@@ -512,6 +515,7 @@ export const waitNoteText = (v: View): string =>
 
 const paintControls = (doc: DocumentLike, app: App, v: View): void => {
   setText(requireId(doc, 'myName'), v.me.name);
+  setAttr(requireId(doc, 'mySeatDot'), 'data-seat', String(v.me.idx));
   setHtml(requireId(doc, 'pipsMe'), trustedHtml(pipHtml(v.pips[v.me.idx])));
   const mine = v.isMyTurn && app.table.curtain === null;
   const over = v.phase === 'over';

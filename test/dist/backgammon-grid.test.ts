@@ -7,7 +7,7 @@
 // and asserts that every name forms exactly one rectangle and that the cells and the visual row
 // order are the ones web/games/backgammon/src/ui/board/layout.ts reports, which the geometry e2e
 // and the painter tests take as their oracle. The file holds a third `grid-template-areas`: the
-// chrome grid a phone held sideways lays the table screen in (the strips, the board, the rail),
+// chrome grid a phone held sideways lays the table screen in (the strip, the board, the rail),
 // which names no place; the board's templates are the declarations that name `barTop`, and the
 // chrome grid is the one that does not, pinned here cell by cell (`CHROME_CELLS`) since a misspelt
 // or moved name there tears the sideways table just as silently (a `board` that is no rectangle
@@ -52,22 +52,22 @@ const chromeIn = (css: string): ReadonlyArray<Rows> =>
 
 /**
  * The chrome grid's cells as designed (design §3.1 landscape; 1-based, as `parseAreas` reports
- * them): six rows of four; the opponent's strip, the badge and the status line over the board,
- * the board four rows by three columns, my strip and the roll slot under it; the rail's four
- * slots down the last column, the first and the last two rows tall (the menu reaches up into the
- * top strip's row, Undo down into the bottom's).
+ * them): five rows of six; one strip over the board holding the opponent's strip, the badge, the
+ * status line, my strip and the roll slot; the board four rows by five columns under it; the
+ * rail's four slots down the last column, the first two rows tall (the menu reaches up into the
+ * strip's row), Undo at the board's foot.
  */
 const CHROME_CELLS: Readonly<Record<string, Cell>> = {
   opp: { row: 1, col: 1, rowSpan: 1, colSpan: 1 },
   badge: { row: 1, col: 2, rowSpan: 1, colSpan: 1 },
   status: { row: 1, col: 3, rowSpan: 1, colSpan: 1 },
-  rail1: { row: 1, col: 4, rowSpan: 2, colSpan: 1 },
-  board: { row: 2, col: 1, rowSpan: 4, colSpan: 3 },
-  rail2: { row: 3, col: 4, rowSpan: 1, colSpan: 1 },
-  rail3: { row: 4, col: 4, rowSpan: 1, colSpan: 1 },
-  rail4: { row: 5, col: 4, rowSpan: 2, colSpan: 1 },
-  me: { row: 6, col: 1, rowSpan: 1, colSpan: 2 },
-  slot: { row: 6, col: 3, rowSpan: 1, colSpan: 1 },
+  me: { row: 1, col: 4, rowSpan: 1, colSpan: 1 },
+  slot: { row: 1, col: 5, rowSpan: 1, colSpan: 1 },
+  rail1: { row: 1, col: 6, rowSpan: 2, colSpan: 1 },
+  board: { row: 2, col: 1, rowSpan: 4, colSpan: 5 },
+  rail2: { row: 3, col: 6, rowSpan: 1, colSpan: 1 },
+  rail3: { row: 4, col: 6, rowSpan: 1, colSpan: 1 },
+  rail4: { row: 5, col: 6, rowSpan: 1, colSpan: 1 },
 };
 
 const LAYOUTS: ReadonlyArray<Layout> = ['phone', 'desktop'];
@@ -85,12 +85,12 @@ describeDist('backgammon board grid', (root) => {
     expect(templates[1]).toHaveLength(2);
   });
 
-  test('the sideways chrome grid: one declaration, six rows of four, every name one rectangle, the cells as designed', () => {
+  test('the sideways chrome grid: one declaration, five rows of six, every name one rectangle, the cells as designed', () => {
     expect(chrome).toHaveLength(1);
     const rows = chrome[0] ?? [];
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(5);
     rows.forEach((row) => {
-      expect(row).toHaveLength(4);
+      expect(row).toHaveLength(6);
     });
     const parsed = parseAreas(rows);
     expect(parsed.ok, parsed.ok ? '' : parsed.error).toBe(true);

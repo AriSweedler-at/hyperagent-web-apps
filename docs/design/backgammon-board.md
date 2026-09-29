@@ -38,18 +38,23 @@ the rules by rule (`rules R13`).
 
 ### 2.1 The table screen
 
-`#tableScreen`: `.topbar` (`#menuBtn`, the opponent strip `#oppName #oppDot #pipsOpp`,
+`#tableScreen`: `.topbar` (`#menuBtn`, the opponent strip `#oppSeatDot #oppName #oppDot #pipsOpp`,
 `#gameBadge` "Game 3 · 2–1 · to 5", `#rulesBtnGame #historyBtn` on the desktop, `#soundBtn` with
 `aria-pressed`), `#statusLine` (`#statusText`, `#statusDice.sr-only`), `#board` (its places, and
 last the roll modal `#rollOverlay.roll-modal`: `#rollModalTitle #rollModalSub #rollModalDice
-#rollModalBtn` "Buen mazal! roll" and `#doubleBtn`, §4.7; `#turnArrow` hangs off its left edge), `.controls` (`#myName #pipsMe`,
+#rollModalBtn` "Buen mazal! roll" and `#doubleBtn`, §4.7; `#turnArrow` hangs off its left edge), `.controls` (`#mySeatDot #myName #pipsMe`,
 `#undoBtn` disabled rather than hidden, the reserved hidden `#doneBtn`, the roll slot holding
 `#diceMini` / `#waitNote` / `#resultChipBtn`, then `#moveChips` and `#chipCancelBtn`). Points carry `data-abs` (static),
 `data-own`, `pt-a`/`pt-b` (absolute parity, the two triangle shades) and `pt-near`/`pt-far` (own
 1..12 near). `#barTop` is always the far player's bar and `#barBottom` mine; `#offLight`/`#offDark`
 are colour-fixed and CSS places them near or far by `#board[data-seat]`. `paintSeat` rewrites
 `data-own`, `pt-near`/`pt-far` and `data-seat` only when the seat differs, so the markup ships seat
-0's and the page fake and the goldens see a whole board before any paint. The opponent's name
+0's and the page fake and the goldens see a whole board before any paint. Each name wears its
+colour (the owner, 2026-09-28: "The names should get indicators for which color they are"): the
+disc before it (`#oppSeatDot`, `#mySeatDot`: `.seat-dot[data-seat]`, 12px, painted like that
+seat's checker, §3.5; 10px in the sideways strip) takes `data-seat` from the view's seats in
+`paintOpponent` and `paintControls`, so in pass-and-play the discs swap with the mover as the names
+do; the markup ships seat 0's view. The opponent's name
 pulses (`.opp-strip.to-move`) while they are to move. Whose turn it is reads at a glance (the
 owner, 2026-09-25: "default, no flip. Hand the phone across. And add a small indicator like an
 arrow that turns around and/or highlights the active user's end state that is colorized like the
@@ -159,12 +164,28 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   `--checker-d 0.86 point-w`, `--stack-step min(checker-d, (point-len - checker-d - 18px) / 4)`
   (the desktop's 15px base offset and 3px at the tip spared), `--die-s 44px`, `--arrow-col 0`.
   Two schemes by width. From 714px (13 x 44 + 44 + 16 + 2 x 16 + 44 + 6) the rail: `#tableScreen`
-  is a grid of four columns and six rows, `.topbar` and `.controls` `display: contents`, two 22px
-  strips above (opponent, badge, status) and below (me, the roll slot) the board and a 44px rail on
-  the right (menu, sound, the turn arrow hung in the free middle at 40px, Undo in `vertical-rl`;
-  the die-chip tray floats over the board's bottom edge and `#chipCancelBtn` takes Undo's slot);
-  `--chrome-w 2 edge + 44px + 6px` (82 inset-free, 144 on an iPhone 12), `--chrome-h 24 + 2 x 22 + 2
-  x 6 + inset-b` (80), floor `--point-len-min 104px`. Under 714px (the SE, a 640x360 Android) the
+  is a grid of six columns and five rows, `.topbar` and `.controls` `display: contents`, one 22px
+  strip above the board (the owner, 2026-09-28: "WAY too much padding around the board's top and
+  bottom ... The names & scores are great, but they can live on the same Y-axis value") holding,
+  left to right, the opponent's strip (disc, name, pips), the badge, the status line, my strip and
+  the roll slot, and a 44px rail on the right (menu, sound, the turn arrow hung in the free middle
+  at 40px, Undo in `vertical-rl` at the board's foot, 44.8px; the die-chip tray floats over the
+  board's bottom edge and `#chipCancelBtn` takes Undo's slot). The strip's columns: `160px auto
+  minmax(0, 1fr) 160px 72px` before the rail; each name's strip is a fixed `--name-w` column
+  whatever the name (an `auto` column moved 2.5px when the seats swapped between "Ann" and "Bob";
+  the name ellipsizes past it, my strip sits against the slot, the pips `min-width: 3ch` so the
+  ellipsis point stands still as the count loses a figure), the badge's tabular figures keep it
+  one width, the status line takes what is left (right-aligned, ellipsis: 216px at 844, 152 at
+  the 780 floor) and the slot is `--slot-w 72px` in every phase (the two 22px mini dice, 48; a
+  double's four at 16px and 2px gaps, 70; the Result chip, 66, standing 44px tall down out of the
+  strip over the board's top edge; the wait note stays hidden, the status line says it), so every
+  item of the strip keeps one box through a game (the frame oracle). While the die-chip tray is
+  open my strip and the slot stay shown (the base rule hides them: the tray took the controls row).
+  `body.fixed-screen #app` pads 6px above and `6px + inset-b` below (the base block's 12 each stay
+  on the sideways home and the match-over screen); `--chrome-w 2 edge + 44px + 6px` (82 inset-free,
+  144 on an iPhone 12), `--chrome-h 12 + 22 + 6 + inset-b` (40), floor `--point-len-min 104px`. The
+  cube hangs 6px under the arrow (`margin-top: 26px`), clear of Undo from the 264 floor up (0.7px
+  on the floor's 203px board with a home indicator). Under 714px (the SE, a 640x360 Android) the
   rows: the phone's chrome rows stay, `--chrome-w 2 edge`, `--chrome-h 170 + inset-b`, floor 90px,
   the arrow hidden. The roll sheet shrinks to 12px paddings, 44px dice and a 48px button, drops
   its sub line, keeps its title to one line (a long name ellipsizes) and stands Western's Double
@@ -173,15 +194,16 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   slabs thin with the point (`min(7px, (point-len - 26px) / 15)`, 1px gaps) so fifteen sit inside
   a tray a point long at either floor; the bar's step gives way so five coins end half a die short
   of the bar's centre, where the dice sit (and the dice paint over any coin: z 3); a double's four
-  dice are 30px (132px in a bar 208 long at the floor); the cube hangs in the rail 10px under the
+  dice are 30px (132px in a bar 208 long at the floor); the cube hangs in the rail 6px under the
   arrow (the rows keep it at the bar's top); the toast hangs from the top edge (600px wide before
-  wrapping) instead of the foot, where it covered the roll button and the die-chip tray; the count
+  wrapping) instead of the foot, where it covered the roll button and the die-chip tray (at 8px it
+  lies over the strip and, 46px tall, the board's top 20px: the frame and the labels); the count
   badge is 20px with 12.8px type; the menu sheet lays Rules and History in one 44px row (224px,
-  Leave whole at the 304 floor), the curtain sheet stands "Continue online" beside the reveal
-  button at 14px paddings, and the match-over screen is two columns the viewport tall (the games
-  card scrolling inside), so Rematch is on screen at the floor; `.desk-only` and `#handoffBtn`
-  stay hidden (the menu and the curtain carry them). 54 x 147 at 844x390 inset-free,
-  49.2 x 136.5 on an iPhone 12 with its 47/47/21 insets, 48 x 138 on the 852x393 class, 44.2 x
+  inside the 88dvh cap from the 264 floor up), the curtain sheet stands "Continue online" beside
+  the reveal button at 14px paddings, and the match-over screen is two columns the viewport tall
+  (the games card scrolling inside), so Rematch is on screen at the floor; `.desk-only` and
+  `#handoffBtn` stay hidden (the menu and the curtain carry them). 54 x 167 at 844x390 inset-free,
+  49.2 x 156.5 on an iPhone 12 with its 47/47/21 insets, 48 x 158 on the 852x393 class, 44.2 x
   94.5 on an SE. `layoutFor(vp)`, `pointWidth`, `pointLength`, `RAIL_MIN_WIDTH` and
   `LANDSCAPE_GEOMETRY` in `ui/board/layout.ts` are the twin.
 
@@ -348,13 +370,13 @@ controls, gin's rule with the threshold derived for this board; the desktop's fl
 (`max-height: 645px`). The board itself can be scrolled from: `touch-action: none` is scoped to
 `.checker`. A phone held sideways (§3.1 landscape) matches both of those fallbacks and is pinned
 again by its own block, which comes later; it has its own floors and fallbacks, under the
-landscape query and on `100svh`: with the rail 2 x 104 + 16 + 80 = 304px, so under
-`(max-height: 303px)` the document scrolls; with the rows 2 x 90 + 16 + 170 = 366px, so under
+landscape query and on `100svh`: with the rail 2 x 104 + 16 + 40 = 264px, so under
+`(max-height: 263px)` the document scrolls; with the rows 2 x 90 + 16 + 170 = 366px, so under
 `(max-height: 365px) and (max-width: 713px)` it scrolls (an SE with Safari's toolbar). Both
 floors give up half the bottom inset (`--point-len-min: calc(104px - var(--inset-b) / 2)`, 90
-likewise; `pointLength` mirrors it), so 2 x (104 − inset-b/2) + 16 + 80 + inset-b = 304px at any
+likewise; `pointLength` mirrors it), so 2 x (104 − inset-b/2) + 16 + 40 + inset-b = 264px at any
 inset and the fallbacks, which cannot read `env()`, lift exactly where the floor stops fitting:
-93.5px points at 812x304 with a 21px home indicator, a 203px board.
+93.5px points at 812x264 with a 21px home indicator, a 203px board.
 
 ### 3.11 Background and panel
 

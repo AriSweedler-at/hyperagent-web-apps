@@ -599,6 +599,21 @@ describe('the table', () => {
     expect(p.get('point-1').hasClass('pt-near')).toBe(true);
   });
 
+  test('the colour discs before the names (the owner, 2026-09-28): each wears its seat, the markup ships seat 0`s view, and in pass-and-play they swap with the mover', () => {
+    const p = page();
+    expect(p.get('mySeatDot').attr('data-seat')).toBe('0');
+    expect(p.get('oppSeatDot').attr('data-seat')).toBe('1');
+    const app = local();
+    // Light's view: my disc is Light's (nacre, `data-seat="0"`), the opponent's Dark's.
+    paint(p.doc, withView(app, viewFor(game(app), 0)));
+    expect(p.get('mySeatDot').attr('data-seat')).toBe('0');
+    expect(p.get('oppSeatDot').attr('data-seat')).toBe('1');
+    // The phone handed across: Dark's view, the discs follow the names.
+    paint(p.doc, withView(app, viewFor(game(app), 1)));
+    expect(p.get('mySeatDot').attr('data-seat')).toBe('1');
+    expect(p.get('oppSeatDot').attr('data-seat')).toBe('0');
+  });
+
   test('whose turn (the owner, 2026-09-25): the route arrow and the lit tray follow the actor in their checker colours; the other seat sees the route mirrored; a finished game or no game shows neither', () => {
     const p = page();
     const start = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:5 | bar 0/0 | off 0/0';

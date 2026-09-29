@@ -104,12 +104,12 @@ describe('the landscape predicate is spelled once', () => {
     // the innermost @media enclosing each is a LANDSCAPE_PHONE list, so a tier flattened to the
     // top level (a height bound alone fits an upright phone too) fails here, not only one that
     // spelled its own orientation.
-    expect(mediaLists(bg).filter((l) => l.includes('303px') && l.includes('orientation'))).toEqual(
+    expect(mediaLists(bg).filter((l) => l.includes('263px') && l.includes('orientation'))).toEqual(
       [],
     );
     const nested = nestedMediaLists(bg);
     expect(nested.map((n) => n.list)).toEqual(mediaLists(bg));
-    const tiers = nested.filter((n) => n.list.includes('303px') || n.list.includes('365px'));
+    const tiers = nested.filter((n) => n.list.includes('263px') || n.list.includes('365px'));
     expect(tiers.length).toBeGreaterThanOrEqual(1);
     tiers.forEach((tier) => {
       const inner = tier.enclosing.at(-1) ?? '';
