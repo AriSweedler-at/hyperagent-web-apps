@@ -345,42 +345,38 @@ The frame is `#board`'s 8px padding over `--felt` with one gold inset hairline; 
 pinstripes, no watermark). The phone's centre seam is a 1px `--card` line painted into `#board`'s
 background so the band and the trays interrupt it. `.bar` and `#dice` sit on `--walnut` so the
 band reads as one. The trim (the owner: "green style trim in the background at the border of the
-window") is `body::before`: a fixed, inert `--olive` band along the viewport's edge, 6px on a phone
-and 10px from 900px, with one `--gold` hairline on its inner side, at `z-index: 0` under every
-positioned thing (overlays 50, flyers 60, the toast 100); `#app`'s gutters (12px, 16px from 900px)
-keep the board and every control clear of it. No pattern: the meander stays the frame's alone.
+window") is the shell's screen frame (docs/design/screen-frame.md), dressed by this theme: `page.ts`
+says `frame: true`, so the composed `<body>` carries `data-frame` and shell.css draws
+`body[data-frame]::before`, a fixed, inert band along the viewport's edge with a hairline on its
+inner side, at `z-index: 0` under every positioned thing (overlays 50, flyers 60, the toast 100);
+theme.css sets `--frame-band: 6px` (10px from 900px), `--frame-color: var(--olive)`,
+`--frame-hairline: var(--gold)` and `--frame-gap: 5px`, so the shell's clearance rule pads `#app`
+by 12px (16px from 900px), or the safe-area inset where that is more, and the board and every
+control stay clear of the band. No pattern: the meander stays the frame's alone.
 
 The trim's corners follow the screen's (the owner: "the green border hugs the real screen's
-border"). Under `viewport-fit=cover` the band reaches the glass, and a notched iPhone's rounded
-corners would clip a square one, so `body::before` carries `border-radius: var(--screen-corner)`;
-the inset hairline follows the padding box's smaller radius (41px inside a 47px corner) and the
-10px desktop band inherits the same rule. No CSS or JS API exposes the display's corner radius;
-the safe-area insets track it on a notched iPhone within a few pixels (X/XS/11 Pro: inset 44pt,
-radius about 39; 12/13/14: 47/47; 14 Pro/15/16: 59/about 55; 16 Pro: 62/62), so a `:root` rule
-beside the trim declares `--screen-corner` as the largest of the top, left and right insets, an
-approximation, not a measurement. The bottom inset is the home indicator's band (34pt upright,
-21pt sideways), unrelated to the corner, and is left out. The SE, a desktop, headless Chromium
-and Android Chrome in a tab (whose toolbar owns the page's top corners) read 0 and keep square
-corners; an Android phone in fullscreen with a display cutout rounds by the cutout's depth.
-
-The insets are the fallback (the owner, 2026-09-28: "the outer corners of the green border don't
-match the edge of my screen perfectly": 59 on the 393x852 class whose radius is 55, 44 on an X
-whose radius is 39). The measurement is a table: `web/shared/lib/devices.ts` (pure) holds every
-iPhone class by its portrait screen in CSS points with its pixel ratio, its notch depth and its
-display's corner radius (`_displayCornerRadius`, in points): 375x812 → 39 (X, XS, 11 Pro; the 12
-and 13 mini share the screen and read 44, told apart by their 50pt notch against 44), 414x896 →
-41.5, 390x844 → 47.33, 428x926 → 53.33, 393x852 → 55, 430x932 → 55, 402x874 → 62, 440x956 → 62,
-375x667 and 320x568 → 0. `deviceOf({ screen, dpr, notch })` matches the portrait-normalised size
-(iOS reports `screen` upright in either orientation; Android swaps it) and `cornerRadius` gives
-the class's radius, the notch itself for a screen no row names (an Android, a Display Zoom
-setting), and null where the notch is unread or 0 (headless, a portrait browser tab whose corners
-are the browser's, an SE, an iPad), so the theme's `env()` fallback stands at 0. The shell reads
-every input itself (`web/shared/edge/screen.ts` `applyScreenCorner`, from `bootShell` for every
-shell game): `screen.width/height`, `devicePixelRatio`, and the notch off the computed value of
-the theme's own `--screen-corner` fallback (`env()` substituted: `47px`, or unsimplified
-`max(47px, 0px, 0px)`; the largest length), so a theme that declares the property opts in and one
-that does not gets nothing written; a radius found is set on `documentElement`'s inline style
-(dom.ts `setRootStyle`), which beats the `:root` rule. Nothing is asked of the player.
+border"; and sideways under Safari's bar, "the border's top corners should be square instead of
+circular to reflect the actual viewport"). Under `viewport-fit=cover` the band reaches the glass,
+and a notched iPhone's rounded corners would clip a square one. No CSS or JS API exposes the
+display's corner radius or which edges of the page are the screen's (screen-frame.md §2), so the
+shell answers with a table and a rule: `web/shared/lib/devices.ts` holds every iPhone class by its
+portrait screen in CSS points with its pixel ratio, its insets and its display's radius
+(`_displayCornerRadius`, in points: 375x812 → 39, or 44 for the 12 and 13 mini told apart by their
+50pt notch; 414x896 → 41.5; 390x844 → 47.33; 428x926 → 53.33; 393x852 and 430x932 → 55; 402x874
+and 440x956 → 62; the SE 0), and `reachOf` says which corners are the screen's (all four
+installed or fullscreen or in a tab that fills the screen; in a tab otherwise only where both
+edges are proven, a non-zero inset on a side, the height against the screen's for the top and the
+bottom: with the bar up sideways the top pair is square and the bottom pair round). The boot reads
+every input itself (`web/shared/edge/screen.ts` `applyFrame`, from `bootShell` for a framed page):
+`screen.width/height`, `devicePixelRatio`, `innerWidth/innerHeight`, the display mode, the four
+insets off shell.css's `--frame-inset-*` (`env()` substituted), and writes the four
+`--frame-corner-{tl,tr,br,bl}` on `documentElement`'s inline style (dom.ts `setRootStyle`), which
+beats shell.css's `:root` fallback (the largest of the top and side insets: 44 on an X whose
+radius is 39, 59 on the 393x852 class whose radius is 55, an approximation that stands until the
+boot has written and on a page without it); and again on `resize`, `orientationchange`, the visual
+viewport's `resize` (Safari's bar showing or hiding) and `fullscreenchange`. The inset hairline
+follows the padding box's smaller radius (41px inside a 47px corner). Nothing is asked of the
+player.
 
 The table grew into the device catalogue (docs/design/devices.md): every row carries its insets
 upright and sideways, the browser bar's height range and whether its numbers are published or
@@ -388,10 +384,11 @@ inferred; `tools/shell-emulate.ts` stands a headless page on any row (`explain`,
 `npm run shots` for the contact sheet), the twin's device sweep in layout.test.ts proves the board
 fills its room on every phone at both bar heights, and e2e/backgammon-devices.spec.ts proves it on
 the served page.
-`?probe=1` (docs/ARCHITECTURE.md "Documented test hooks") draws the same inputs and the board's
-box in a small monospace panel, a look at a real phone, not the fix; `devices.test.ts` and the
-boot test pin the table and the write. The goldens (390x844, 1280x800) are untouched: headless
-reports the viewport as the screen but no insets, so the notch is 0 and nothing is written.
+`?probe=1` (docs/ARCHITECTURE.md "Documented test hooks") draws the same inputs, the four corners
+and the board's box in a small monospace panel, a look at a real phone, not the fix;
+`devices.test.ts`, `screen.test.ts` and the boot test pin the table, the rule and the write. The
+goldens (390x844, 1280x800) are untouched: headless reports the viewport as the screen but no
+insets, so every corner is square and `#app`'s paddings compute to the 12px and 16px they were.
 
 
 ### 3.7 Highlight states

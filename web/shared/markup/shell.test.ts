@@ -233,6 +233,11 @@ describe('playing sideways (docs/design/shared-shell.md "Playing sideways")', ()
   test('bodyAttrsOf: an upright page spells nothing on the body, so its composed bytes are what they were; a page that plays sideways carries data-plays', () => {
     expect(bodyAttrsOf({})).toBe('');
     expect(bodyAttrsOf({ plays: 'landscape' })).toBe(' data-plays="landscape"');
+    // The screen frame's opt-in (docs/design/screen-frame.md): backgammon's body carries both.
+    expect(bodyAttrsOf({ frame: true })).toBe(' data-frame');
+    expect(bodyAttrsOf({ plays: 'landscape', frame: true })).toBe(
+      ' data-plays="landscape" data-frame',
+    );
     expect(rendered.ok && rendered.value.split('\n')[1]).toBe('<body>');
     const sideways = renderShell(templates, { ...page, plays: 'landscape' });
     expect(sideways.ok && sideways.value.split('\n')[1]).toBe('<body data-plays="landscape">');

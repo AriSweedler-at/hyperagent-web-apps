@@ -8,10 +8,12 @@ import { describe, expect, test } from 'vitest';
 
 import {
   BARS,
+  CORNER_KEYS,
   DEVICES,
   DISPLAY_MODES,
   ORIENTATIONS,
   cornerRadius,
+  cornersOf,
   deviceById,
   deviceLabel,
   deviceOf,
@@ -22,8 +24,13 @@ import {
   notchOf,
   portraitOf,
   reachOf,
+  screenFor,
   viewportFor,
+  type Bar,
+  type Device,
   type DeviceInputs,
+  type DisplayMode,
+  type Orientation,
 } from './devices.ts';
 
 const on = (width: number, height: number, dpr: number, notch: number | null): DeviceInputs => ({
@@ -174,28 +181,117 @@ describe('the emulation cases', () => {
     expect(viewportFor(pixel, 'portrait', 'browser', 'shown')).toEqual({ width: 412, height: 835 });
   });
 
-  test('reach: all four corners outside a tab; in a tab only where both edges have an inset, the top sideways counting as reached over a home indicator', () => {
+  test('reach (the edge-reach rule, docs/design/screen-frame.md §4): all four corners outside a tab and in a tab that is the whole screen; sideways with the bar up the top pair is square over a home indicator; upright in a tab and on an SE every corner is square', () => {
     const all = { tl: true, tr: true, br: true, bl: true };
-    expect(
-      reachOf('portrait', 'standalone', insetsFor(iphone12, 'portrait', 'standalone')),
-    ).toEqual(all);
-    expect(reachOf('landscape', 'fullscreen', insetsFor(se, 'landscape', 'fullscreen'))).toEqual(
-      all,
-    );
-    expect(reachOf('portrait', 'browser', insetsFor(iphone12, 'portrait', 'browser'))).toEqual({
+    const none = { tl: false, tr: false, br: false, bl: false };
+    const reach = (d: Device, o: Orientation, mode: DisplayMode, bar: Bar) =>
+      reachOf({
+        mode,
+        insets: insetsFor(d, o, mode),
+        viewport: viewportFor(d, o, mode, bar),
+        full: screenFor(d, o),
+      });
+    expect(reach(iphone12, 'portrait', 'standalone', 'hidden')).toEqual(all);
+    expect(reach(se, 'landscape', 'fullscreen', 'hidden')).toEqual(all);
+    // The bar hidden sideways: the viewport is the screen.
+    expect(reach(iphone12, 'landscape', 'browser', 'hidden')).toEqual(all);
+    // The bar up sideways: 50px short, the bottom inset says the bottom edge is the screen's, so the bar is at the top.
+    expect(reach(iphone12, 'landscape', 'browser', 'shown')).toEqual({
       tl: false,
       tr: false,
-      br: false,
-      bl: false,
+      br: true,
+      bl: true,
     });
-    expect(reachOf('landscape', 'browser', insetsFor(iphone12, 'landscape', 'browser'))).toEqual(
-      all,
-    );
-    expect(reachOf('landscape', 'browser', insetsFor(se, 'landscape', 'browser'))).toEqual({
+    // Upright in a tab: no side inset, so no corner, bar up or hidden.
+    expect(reach(iphone12, 'portrait', 'browser', 'shown')).toEqual(none);
+    expect(reach(iphone12, 'portrait', 'browser', 'hidden')).toEqual(none);
+    // The SE sideways with its bar up: no inset anywhere, the bar is taken to be at the bottom; no side reaches.
+    expect(reach(se, 'landscape', 'browser', 'shown')).toEqual(none);
+    expect(reach(se, 'landscape', 'browser', 'hidden')).toEqual(all);
+    // Android in a tab: no inset in a tab at all.
+    expect(reach(pixel, 'landscape', 'browser', 'shown')).toEqual(none);
+    expect(reach(pixel, 'landscape', 'browser', 'hidden')).toEqual(all);
+    // No viewport to read (a fake window): only the insets speak, so the bottom pair over the home indicator.
+    const sideInsets = insetsFor(iphone12, 'landscape', 'browser');
+    expect(reachOf({ mode: 'browser', insets: sideInsets, viewport: null, full: null })).toEqual({
       tl: false,
       tr: false,
-      br: false,
-      bl: false,
+      br: true,
+      bl: true,
+    });
+    expect(
+      reachOf({
+        mode: 'browser',
+        insets: sideInsets,
+        viewport: { width: 844, height: 390 },
+        full: null,
+      }),
+    ).toEqual({ tl: false, tr: false, br: true, bl: true });
+    // As tall as the screen but narrower (a split view): no bar takes an edge, both pairs reach where the sides do.
+    expect(
+      reachOf({
+        mode: 'browser',
+        insets: sideInsets,
+        viewport: { width: 700, height: 390 },
+        full: { width: 844, height: 390 },
+      }),
+    ).toEqual(all);
+    // A top inset in a short tab (upright standalone-like insets under a bar): the top edge is proven by the inset, the sides are not.
+    expect(
+      reachOf({
+        mode: 'browser',
+        insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        viewport: { width: 390, height: 750 },
+        full: { width: 390, height: 844 },
+      }),
+    ).toEqual(none);
+    expect(
+      reachOf({
+        mode: 'browser',
+        insets: { top: 47, right: 47, bottom: 0, left: 47 },
+        viewport: { width: 390, height: 750 },
+        full: { width: 390, height: 844 },
+      }),
+    ).toEqual({ tl: true, tr: true, br: false, bl: false });
+  });
+
+  test('cornersOf: the radius at every reached corner, 0 elsewhere; the emulation carries the four', () => {
+    expect(cornersOf(47.33, { tl: true, tr: true, br: true, bl: true })).toEqual({
+      tl: 47.33,
+      tr: 47.33,
+      br: 47.33,
+      bl: 47.33,
+    });
+    expect(cornersOf(47.33, { tl: false, tr: false, br: true, bl: true })).toEqual({
+      tl: 0,
+      tr: 0,
+      br: 47.33,
+      bl: 47.33,
+    });
+    expect(cornersOf(55, { tl: true, tr: false, br: false, bl: true })).toEqual({
+      tl: 55,
+      tr: 0,
+      br: 0,
+      bl: 55,
+    });
+    expect(CORNER_KEYS).toEqual(['tl', 'tr', 'br', 'bl']);
+    expect(emulationFor(iphone12, 'landscape', 'browser', 'shown').corners).toEqual({
+      tl: 0,
+      tr: 0,
+      br: 47.33,
+      bl: 47.33,
+    });
+    expect(emulationFor(iphone12, 'landscape', 'browser', 'hidden').corners).toEqual({
+      tl: 47.33,
+      tr: 47.33,
+      br: 47.33,
+      bl: 47.33,
+    });
+    expect(emulationFor(se, 'landscape', 'fullscreen').corners).toEqual({
+      tl: 0,
+      tr: 0,
+      br: 0,
+      bl: 0,
     });
   });
 

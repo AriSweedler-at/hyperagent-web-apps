@@ -727,6 +727,17 @@ its board CSS and its layout twin:
    the game's own `state.test.ts` over its config; `e2e/backgammon-gate.spec.ts` stubs the lock
    and the fullscreen APIs and reads their calls back through every tap and the back gesture.
 
+### 6.7 The screen frame: how a game opts in
+
+A game that wants a band along the screen's edge (backgammon's trim) says `frame: true` on its
+`ShellPage`; the composer puts `data-frame` on the `<body>`, shell.css draws
+`body[data-frame]::before` and pads `#app` past the band and the safe-area insets, and the boot
+(`web/shared/edge/screen.ts` `applyFrame`, gated on the attribute) writes the four corner radii
+from the device catalogue and the edge-reach rule, live as the browser's bar shows and hides. The
+theme dresses it with `--frame-band`, `--frame-color` and `--frame-hairline` on `:root` (and
+`--frame-gap` for the air) and draws nothing of its own. A page without the flag is untouched byte
+for byte. The rule, the research and the validation: docs/design/screen-frame.md.
+
 ## 7. Risks
 
 | # | Risk | Where it bites | Mitigation in the plan |

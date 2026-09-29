@@ -4,8 +4,9 @@
 // the height in a tab. The owner (2026-09-28): "the shell must [figure this out]. And there should
 // be a CLI to interact with the shell engine in order to validate this and emulate." So: the rows
 // are data, every function over them is pure, and three readers share them: the boot
-// (web/shared/edge/screen.ts `applyScreenCorner`: `screen`, `devicePixelRatio` and the notch off
-// the page, then `cornerRadius`), the layout sweep (web/games/backgammon/src/ui/board/layout.test.ts,
+// (web/shared/edge/screen.ts `applyFrame`: `screen`, `devicePixelRatio`, the insets and the
+// viewport off the page, then `cornerRadius`, `reachOf` and `cornersOf` into the screen frame's
+// four corners, docs/design/screen-frame.md), the layout sweep (web/games/backgammon/src/ui/board/layout.test.ts,
 // every row x orientation x mode through the CSS's pure twin) and the emulator
 // (tools/shell-emulate.ts `list`, `explain`, `render`, `check`: Playwright with `emulationFor`'s
 // viewport, insets and screen). A row is a device class: every iPhone that shares a screen in CSS
@@ -232,8 +233,9 @@ export const deviceOf = (inputs: DeviceInputs): Device | null => {
 };
 
 /**
- * `--screen-corner` in px: the device's radius when its class is known, else the notch's depth
- * (the CSS fallback's own heuristic, `max(env(safe-area-inset-top), -left, -right)`), and null
+ * The display's radius in px (what the frame's corners take where they are the screen's): the
+ * device's radius when its class is known, else the notch's depth (the CSS fallback's own
+ * heuristic, `max(env(safe-area-inset-top), -left, -right)`), and null
  * where neither says (no notch read, or a notch of 0: the glass's corners are under the browser's
  * chrome, or square, and the theme's `env()` fallback stands at 0). A known class whose notch the
  * page reads as 0 is null too: in a portrait browser tab the page never reaches the corners.
@@ -271,9 +273,12 @@ export const insetsFor = (d: Device, o: Orientation, mode: DisplayMode): Insets 
   };
 };
 
+/** A portrait screen turned for an orientation: the points as `innerWidth x innerHeight` would read them standalone. */
+export const turnFor = (screen: ScreenSize, o: Orientation): ViewportSize =>
+  o === 'portrait' ? screen : { width: screen.height, height: screen.width };
+
 /** The screen as `innerWidth x innerHeight` would read it standalone: the points, turned for the orientation. */
-export const screenFor = (d: Device, o: Orientation): ViewportSize =>
-  o === 'portrait' ? d.screen : { width: d.screen.height, height: d.screen.width };
+export const screenFor = (d: Device, o: Orientation): ViewportSize => turnFor(d.screen, o);
 
 /** What the browser's bar takes off the height: the toolbar range's max with the bar shown, its min hidden; 0 outside a tab. */
 export const toolbarFor = (d: Device, o: Orientation, mode: DisplayMode, bar: Bar): number =>
@@ -292,22 +297,57 @@ export const viewportFor = (
 
 /** The four corners of the viewport; true where the page's corner is the screen's own. */
 export type Reach = Readonly<{ tl: boolean; tr: boolean; br: boolean; bl: boolean }>;
+/** Every corner the screen's: standalone, fullscreen, a tab that fills the screen. */
+export const EVERY_CORNER: Reach = { tl: true, tr: true, br: true, bl: true };
+
+/** What the edge-reach rule reads (docs/design/screen-frame.md §4): the page's mode, its insets, its viewport and the whole screen turned for the orientation (`screenFor`). */
+export type ReachInputs = Readonly<{
+  mode: DisplayMode;
+  insets: Insets;
+  /** `innerWidth x innerHeight`; null where the page has none (a fake). */
+  viewport: ViewportSize | null;
+  /** The whole screen in this orientation; null where the page has no `screen` to read. */
+  full: ViewportSize | null;
+}>;
 
 /**
- * The edge-reach rule (the screen-frame design): every corner is the screen's standalone and
- * fullscreen; in a tab a corner is the screen's only where both its edges provably reach the glass
- * (a non-zero inset on that side), and sideways the top edge counts as reached when the bottom
- * inset is non-zero (iOS puts the toolbar at the bottom then: UNVERIFIED). Everything else is
- * square (the corner is the browser's).
+ * The edge-reach rule (docs/design/screen-frame.md §4; the owner, 2026-09-28, on his iPhone
+ * sideways with Safari's bar up: "the border is sized perfectly ... Although then the border's top
+ * corners should be square"): every corner is the screen's standalone and fullscreen, and in a tab
+ * whose viewport is the whole screen (no bar at all). Otherwise a corner is the screen's only
+ * where both its edges provably reach the glass. A non-zero inset on a side proves that side. The
+ * edges no inset speaks for (the top and the bottom sideways; the top upright) are read off the
+ * height: as tall as the screen, no bar, both reach; shorter, a bar takes one of them, the top
+ * where the bottom inset is non-zero (the bottom edge is the screen's: iOS's home indicator), else
+ * the bottom (UNVERIFIED for Chrome Android, whose bar is at the top; its side insets are 0 in a
+ * tab, so no corner rounds there either way). No height to read, only the insets speak. Everything
+ * else is square: the corner is the browser's.
  */
-export const reachOf = (o: Orientation, mode: DisplayMode, insets: Insets): Reach => {
-  if (mode !== 'browser') return { tl: true, tr: true, br: true, bl: true };
-  const top = insets.top > 0 || (o === 'landscape' && insets.bottom > 0);
-  const bottom = insets.bottom > 0;
+export const reachOf = ({ mode, insets, viewport, full }: ReachInputs): Reach => {
+  if (mode !== 'browser') return EVERY_CORNER;
+  const known = viewport !== null && full !== null;
+  const short = known && viewport.height < full.height;
+  if (known && !short && viewport.width >= full.width) return EVERY_CORNER;
+  const barTop = short && insets.bottom > 0;
+  const barBottom = short && insets.bottom <= 0;
+  const top = insets.top > 0 || (known && !short) || barBottom;
+  const bottom = insets.bottom > 0 || (known && !short) || barTop;
   const left = insets.left > 0;
   const right = insets.right > 0;
   return { tl: top && left, tr: top && right, br: bottom && right, bl: bottom && left };
 };
+
+/** The four corner radii in px: the display's where the corner is the screen's, 0 where it is the browser's. */
+export type Corners = Readonly<{ tl: number; tr: number; br: number; bl: number }>;
+export const CORNER_KEYS: ReadonlyArray<keyof Corners> = ['tl', 'tr', 'br', 'bl'];
+
+/** The radii `--frame-corner-{tl,tr,br,bl}` take: `radius` at every reached corner, 0 elsewhere. */
+export const cornersOf = (radius: number, reach: Reach): Corners => ({
+  tl: reach.tl ? radius : 0,
+  tr: reach.tr ? radius : 0,
+  br: reach.br ? radius : 0,
+  bl: reach.bl ? radius : 0,
+});
 
 /** One emulated case: everything Playwright and the twin need to stand a page on this device. */
 export type Emulation = Readonly<{
@@ -321,11 +361,13 @@ export type Emulation = Readonly<{
   screen: ScreenSize;
   dpr: number;
   insets: Insets;
-  /** What the theme's `--screen-corner` fallback computes to (the largest of the top and side insets): the boot's notch. */
+  /** What the shell's `--frame-corner` fallback computes to (the largest of the top and side insets): the boot's notch. */
   notch: number;
-  /** The radius the boot writes (`cornerRadius`), or 0 where it writes nothing and the `env()` fallback stands. */
+  /** The display's radius (`cornerRadius`), or 0 where the boot has none to write (the frame's corners are square). */
   corner: number;
   reach: Reach;
+  /** The four radii the boot writes (`cornersOf`): `corner` at each reached corner, 0 elsewhere. */
+  corners: Corners;
 }>;
 
 /** The case for a device, an orientation, a mode and a bar state (the bar matters in a tab alone: `hidden` elsewhere). */
@@ -338,18 +380,22 @@ export const emulationFor = (
   const insets = insetsFor(device, orientation, mode);
   const notch = Math.max(insets.top, insets.left, insets.right);
   const shownBar: Bar = mode === 'browser' ? bar : 'hidden';
+  const viewport = viewportFor(device, orientation, mode, shownBar);
+  const corner = cornerRadius({ screen: device.screen, dpr: device.dpr, notch }) ?? 0;
+  const reach = reachOf({ mode, insets, viewport, full: screenFor(device, orientation) });
   return {
     device,
     orientation,
     mode,
     bar: shownBar,
-    viewport: viewportFor(device, orientation, mode, shownBar),
+    viewport,
     screen: device.screen,
     dpr: device.dpr,
     insets,
     notch,
-    corner: cornerRadius({ screen: device.screen, dpr: device.dpr, notch }) ?? 0,
-    reach: reachOf(orientation, mode, insets),
+    corner,
+    reach,
+    corners: cornersOf(corner, reach),
   };
 };
 

@@ -33,9 +33,10 @@ The functions, each pure and table-tested (devices.test.ts, one `test.each` over
   portrait, since iOS reports it upright in either orientation); on a shared screen the row whose
   notch and dpr both match, else the dpr's (a hardware constant), else the notch's, else the first;
   null for a screen no row names.
-- `cornerRadius(inputs)`: what the boot writes as `--screen-corner`: the class's radius, the notch
-  itself for an unknown screen, null where no notch was read (the theme's `env()` fallback stands
-  at 0: headless, a portrait tab, an SE, an iPad). Unchanged from §3.6.
+- `cornerRadius(inputs)`: the display's radius the frame's corners take where they are the
+  screen's (docs/design/screen-frame.md): the class's radius, the notch itself for an unknown
+  screen, null where no notch was read (the corners are square: headless, a portrait tab, an SE,
+  an iPad). `reachOf` and `cornersOf` turn it into the four `--frame-corner-*`.
 - `deviceLabel(inputs)`: the id, or `unknown (heuristic)`; the `?probe=1` readout prints it.
 - `insetsFor(device, orientation, mode)`, `viewportFor(device, orientation, mode, bar)`,
   `emulationFor(...)`, `emulationsOf(device)`: the eight cases a device stands in (two orientations
@@ -65,10 +66,13 @@ the Pixel and Galaxy rows (0 insets in a tab, a cutout of 28-30 fullscreen, radi
 
 ## 3. The runtime
 
-Unchanged in mechanism from §3.6: `bootShell` calls `applyScreenCorner`, which reads `screen`,
-`devicePixelRatio` and the notch off the theme's own `--screen-corner` fallback and writes the
-class's radius on the root. The probe prints the matched id or `unknown (heuristic)`. Nothing is
-asked of the player; a new phone is one catalogue row. The per-corner variables wait for the frame.
+`bootShell` calls `applyFrame` (web/shared/edge/screen.ts) on a framed page, which reads `screen`,
+`devicePixelRatio`, the viewport, the display mode and the four insets off shell.css's
+`--frame-inset-*`, and writes the class's radius at each corner the edge-reach rule says is the
+screen's as `--frame-corner-{tl,tr,br,bl}` on the root, again on every resize, turn, visual
+viewport resize and fullscreen change (docs/design/screen-frame.md §4). The probe prints the
+matched id or `unknown (heuristic)` and the four corners. Nothing is asked of the player; a new
+phone is one catalogue row.
 
 ## 4. The emulator (`tools/shell-emulate.ts`)
 
@@ -91,8 +95,8 @@ The seam. Headless Chromium reads every `env(safe-area-inset-*)` as 0, `Emulatio
 Playwright. So an init script writes the case's insets on `#app` as `--inset-l`, `--inset-r`,
 `--inset-b` (the theme's own variables; theme.css names them "the seam a measurement overrides", and
 this PR routes the portrait bottom padding through `--inset-b` too) and the notch on the root's
-inline `--screen-corner` (what the fallback would compute), which the boot reads and replaces with
-the class's radius exactly as on a phone. No stylesheet reads `display-mode`; the mode drives the
+inline `--frame-inset-*` (what shell.css's `env()` would read), which the boot reads and turns into
+the four corners exactly as on a phone. No stylesheet reads `display-mode`; the mode drives the
 viewport and the insets alone. Documented under "Documented test hooks" in docs/ARCHITECTURE.md.
 
 ## 5. The tests

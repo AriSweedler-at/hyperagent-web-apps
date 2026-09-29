@@ -226,7 +226,7 @@ Open it, look, decide. The same invariants gate CI without pictures:
 failure), the twin's device sweep in `web/games/backgammon/src/ui/board/layout.test.ts` and the
 Playwright sweep `e2e/backgammon-devices.spec.ts` (each device's board attached to the report).
 Headless Chromium reads every safe-area inset as 0, so the emulator writes the case's insets
-through the theme's own seam (`--inset-*` on `#app`, the notch as `--screen-corner`); the browser
+through two seams (shell.css's `--frame-inset-*` on `:root`, the theme's `--inset-*` on `#app`); the browser
 bar heights are recorded ranges, not measurements (docs/design/devices.md).
 
 **Moving a golden.** A PR that changes what a golden pins says so in its body and touches only that

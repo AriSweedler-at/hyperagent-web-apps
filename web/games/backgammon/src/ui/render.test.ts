@@ -759,7 +759,7 @@ describe('the turn gate (docs/design/backgammon-landscape.md §5D): the shell`s 
       .filter(([, options]) => options.classes?.includes('overlay') === true)
       .map(([id]) => id);
     expect(overlays).toContain('turnGate');
-    expect(MARKUP).toContain('<body data-plays="landscape">');
+    expect(MARKUP).toContain('<body data-plays="landscape" data-frame>');
     const p = page();
     const upright = run(local(), { type: 'viewport/portrait', portrait: true }).app;
     expect(upright.shell.portraitPhone).toBe(true);

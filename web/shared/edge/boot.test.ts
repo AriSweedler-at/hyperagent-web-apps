@@ -537,7 +537,7 @@ type Options = Readonly<{
   refuse?: boolean;
   /** The App starts seated in pass and play with the far seat's flip on (shell.ts `flipped` reads the role, the setting, the screen, the view and the curtain). */
   flip?: boolean;
-  /** The window's `screen` has this size in CSS points (with `getComputedStyle` answering `--screen-corner` with `notch`): the device table's inputs (screen.ts). */
+  /** The window's `screen` has this size in CSS points (with `getComputedStyle` answering shell.css's `--frame-inset-top`, `-left` and `-right` with `notch`, `-bottom` with 0): the device catalogue's inputs (screen.ts). */
   screenSize?: Readonly<{ width: number; height: number; notch: string }>;
 }>;
 
@@ -572,7 +572,7 @@ type Log = Readonly<{
   fallbacks: boolean[];
   /** The Android lock's calls in order: `request` (fullscreen), `lock:<orientation>`, `unlock`, `exit`. */
   locks: string[];
-  /** Every `--property` the boot wrote on the root's inline style (screen.ts `applyScreenCorner`). */
+  /** Every `--property` the boot wrote on the root's inline style (screen.ts `applyFrame`: the four `--frame-corner-*`). */
   rootStyles: (readonly [string, string])[];
 }>;
 
@@ -597,6 +597,11 @@ const bootPage = (options: Options = {}) => {
     ],
     fakeEl('body', {
       queries: { '.overlay': [overlay, ...(options.gated === true ? [gate] : [])] },
+      // A page with a screen to read is a framed one (backgammon's `<body data-frame>`): the boot
+      // writes the frame's corners there and nowhere else.
+      ...(options.screenSize === undefined && options.lock === undefined
+        ? {}
+        : { attrs: { 'data-frame': '' } }),
     }),
   );
   const visibility = { state: 'visible' };
@@ -646,7 +651,7 @@ const bootPage = (options: Options = {}) => {
         fullscreen.on = true;
         return Promise.resolve();
       },
-      // The root's inline style: `--screen-corner` lands here (screen.ts `applyScreenCorner`).
+      // The root's inline style: the frame's `--frame-corner-*` land here (screen.ts `applyFrame`).
       style: {
         setProperty: (prop: string, value: string) => {
           log.rootStyles.push([prop, value]);
@@ -722,10 +727,16 @@ const bootPage = (options: Options = {}) => {
       ? {}
       : {
           devicePixelRatio: 3,
-          // The theme's `--screen-corner` fallback as the browser computes it, `env()` substituted.
+          // shell.css's `--frame-inset-*` as the browser computes them, `env()` substituted: the
+          // notch on the top and both sides (the test's window has no viewport, so only the insets
+          // speak for the reach rule), nothing below.
           getComputedStyle: () => ({
             getPropertyValue: (name: string) =>
-              name === '--screen-corner' ? (options.screenSize?.notch ?? '') : '',
+              name === '--frame-inset-bottom'
+                ? '0px'
+                : name.startsWith('--frame-inset-')
+                  ? (options.screenSize?.notch ?? '')
+                  : '',
           }),
         }),
     ...(options.coarse === undefined
@@ -1059,18 +1070,24 @@ describe('bootShell', () => {
     expect(bare).toEqual([undefined]);
   });
 
-  test("the trim's corner (screen.ts, web/shared/lib/devices.ts): a 390x844 screen with a 47px notch writes `--screen-corner: 47.33px` on the root, the 393x852 class 55px over its 59px insets, a screen with no notch (headless, a portrait tab) or none at all writes nothing", () => {
+  test("the frame's corners (screen.ts `applyFrame`, web/shared/lib/devices.ts): a 390x844 screen with a 47px notch on the top and the sides writes the class's 47.33px at the two top corners and 0 at the bottom pair (no bottom inset, no viewport: only the insets speak), the 393x852 class 55px over its 59px insets, a screen with no notch (headless, a portrait tab) four zeros, no screen at all nothing", () => {
+    const corners = (tl: string, tr: string, br: string, bl: string) => [
+      ['--frame-corner-tl', tl],
+      ['--frame-corner-tr', tr],
+      ['--frame-corner-br', br],
+      ['--frame-corner-bl', bl],
+    ];
     expect(
       bootPage({ screenSize: { width: 390, height: 844, notch: '47px' } }).log.rootStyles,
-    ).toEqual([['--screen-corner', '47.33px']]);
+    ).toEqual(corners('47.33px', '47.33px', '0px', '0px'));
     // Sideways, and the fallback unsimplified: the largest length is the notch.
     expect(
       bootPage({ screenSize: { width: 852, height: 393, notch: 'max(0px, 59px, 59px)' } }).log
         .rootStyles,
-    ).toEqual([['--screen-corner', '55px']]);
+    ).toEqual(corners('55px', '55px', '0px', '0px'));
     expect(
       bootPage({ screenSize: { width: 390, height: 844, notch: '0px' } }).log.rootStyles,
-    ).toEqual([]);
+    ).toEqual(corners('0px', '0px', '0px', '0px'));
     expect(bootPage({ lock: false }).log.rootStyles).toEqual([]);
     expect(bootPage().log.rootStyles).toEqual([]);
   });

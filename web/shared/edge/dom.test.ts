@@ -16,6 +16,7 @@ import {
   hasClass,
   inputDataOf,
   inputTypeOf,
+  hasAttr,
   isDisabled,
   isWithin,
   keyOf,
@@ -262,6 +263,8 @@ describe('values, styles and queries (over page.fake.ts)', () => {
     expect(isDisabled(pile.el)).toBe(false);
     pile.el.toggleAttribute('disabled', true);
     expect(isDisabled(pile.el)).toBe(true);
+    expect(hasAttr(pile.el, 'disabled')).toBe(true);
+    expect(hasAttr(pile.el, 'data-frame')).toBe(false);
     expect(queryIn(pile.el, '.pile-label')).toBe(label.el);
     expect(queryIn(pile.el, '.nope')).toBeNull();
     expect(queryAllIn(pile.el, '.pile-label')).toEqual([label.el]);

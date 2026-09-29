@@ -221,6 +221,65 @@ body.fixed-screen {
   -webkit-touch-callout: none;
 }
 
+/* ---------- the screen frame (docs/design/screen-frame.md) ----------
+   A game that opts in (page.ts `frame: true`, so the composed `<body>` carries `data-frame`;
+   backgammon does) gets a band along the viewport's edge with a hairline on its inner side, fixed
+   and inert, and #app padded so nothing it holds touches the band. The owner (2026-09-28): "The
+   application should just be able to put the border in without considering anything else." Three
+   tokens dress it (the theme sets them on :root, after this file): `--frame-band` the band's width,
+   `--frame-color` its colour, `--frame-hairline` the hairline's colour (transparent for none); a
+   fourth, `--frame-gap`, is the air between the hairline and the content (4px unless the theme
+   says). It paints at z-index 0, under every positioned thing (overlays 50, flyers 60, the toast
+   100). Its corners follow the screen's: under viewport-fit=cover the band reaches the glass, whose
+   corners are round on every notched phone, and no CSS or JS API says by how much
+   (screen-frame.md §2). The boot writes the four `--frame-corner-*` on the root (screen.ts
+   `applyFrame`: the device catalogue's radius at each corner the page provably reaches, 0 at each a
+   browser bar owns, re-read as the bar shows and hides); until it has, and on a page without it,
+   the fallback below stands: the largest of the top and side insets, which tracks the radius on a
+   notched iPhone within a few px and is 0 wherever the page's corners are the browser's (an upright
+   tab, an Android tab, the SE, a desktop). The four insets are declared here so the boot can read
+   them substituted off the root's computed style (a `--custom` property carries its `env()`
+   resolved) and a measurement can override them inline (tools/shell-emulate.ts `seamScript`). */
+:root {
+  --frame-band: 6px;
+  --frame-color: var(--accent);
+  --frame-hairline: transparent;
+  --frame-hairline-w: 1px;
+  --frame-gap: 4px;
+  --frame-inset-top: env(safe-area-inset-top, 0px);
+  --frame-inset-right: env(safe-area-inset-right, 0px);
+  --frame-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --frame-inset-left: env(safe-area-inset-left, 0px);
+  --frame-corner: max(var(--frame-inset-top), var(--frame-inset-left), var(--frame-inset-right));
+  --frame-corner-tl: var(--frame-corner);
+  --frame-corner-tr: var(--frame-corner);
+  --frame-corner-br: var(--frame-corner);
+  --frame-corner-bl: var(--frame-corner);
+}
+body[data-frame]::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border: var(--frame-band) solid var(--frame-color);
+  /* The band's outer edge; the inset hairline follows the padding box's smaller radius. */
+  border-radius: var(--frame-corner-tl) var(--frame-corner-tr) var(--frame-corner-br)
+    var(--frame-corner-bl);
+  box-shadow: inset 0 0 0 var(--frame-hairline-w) var(--frame-hairline);
+}
+/* The clearance: the band, the hairline and the gap, or the safe-area inset where that is more
+   (the notch, the home indicator). `:where()` keeps this at #app's own specificity, so a theme's
+   later `#app { padding }` (backgammon's sideways table: one symmetric `--edge` for both sides and
+   its own vertical budget) still wins. */
+:where(body[data-frame]) #app {
+  --frame-clear: calc(var(--frame-band) + var(--frame-hairline-w) + var(--frame-gap));
+  padding: max(var(--frame-clear), var(--frame-inset-top))
+    max(var(--frame-clear), var(--frame-inset-right))
+    max(var(--frame-clear), var(--frame-inset-bottom))
+    max(var(--frame-clear), var(--frame-inset-left));
+}
+
 /* ---------- overlays and sheets ---------- */
 /* Each theme paints the overlay's scrim and the sheet's edge (gin a gold border, backgammon a shadow) and radius. */
 .overlay {

@@ -164,6 +164,8 @@ export const selectText = (el: Element): void => {
 export const dataOf = (el: Element, name: string): string | null => el.getAttribute(`data-${name}`);
 
 export const isDisabled = (el: Element): boolean => el.hasAttribute('disabled');
+/** The element carries the attribute, whatever its value (`hasAttr(body, 'data-frame')`: the screen frame's opt-in, screen.ts). */
+export const hasAttr = (el: Element, name: string): boolean => el.hasAttribute(name);
 
 /** `el.querySelector(selector)` inside `el`. */
 export const queryIn = (el: Element, selector: string): Element | null =>
@@ -313,7 +315,7 @@ export type StyleReaderLike = Readonly<{
 }>;
 /**
  * `documentElement.style.setProperty(prop, value)`: a custom property a theme reads on `:root`
- * (`--screen-corner`, docs/design/backgammon-board.md §3.6). Nothing on a root without a style.
+ * (the screen frame's `--frame-corner-*`, docs/design/screen-frame.md). Nothing on a root without a style.
  */
 export const setRootStyle = (doc: RootDocumentLike, prop: string, value: string): void => {
   const root = doc.documentElement as Partial<Pick<HTMLElement, 'style'>> | undefined;
