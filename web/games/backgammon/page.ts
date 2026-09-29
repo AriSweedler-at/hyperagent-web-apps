@@ -104,6 +104,7 @@ const blocks: ShellBlocks = {
     <title>Sheshbesh — backgammon</title>
     <link rel="icon" href="../../shared/favicon.svg" type="image/svg+xml" />
     <link rel="alternate icon" href="../../shared/favicon.ico" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="#0b3c5d" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />

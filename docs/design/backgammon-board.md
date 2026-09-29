@@ -181,13 +181,22 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   strip over the board's top edge; the wait note stays hidden, the status line says it), so every
   item of the strip keeps one box through a game (the frame oracle). While the die-chip tray is
   open my strip and the slot stay shown (the base rule hides them: the tray took the controls row).
-  `body.fixed-screen #app` pads 6px above and `6px + inset-b` below (the base block's 12 each stay
-  on the sideways home and the match-over screen); `--chrome-w 2 edge + 44px + 6px` (82 inset-free,
-  144 on an iPhone 12), `--chrome-h 12 + 22 + 6 + inset-b` (40), floor `--point-len-min 104px`. The
-  cube hangs 6px under the arrow (`margin-top: 26px`), clear of Undo from the 264 floor up (0.7px
-  on the floor's 203px board with a home indicator). Under 714px (the SE, a 640x360 Android) the
-  rows: the phone's chrome rows stay, `--chrome-w 2 edge`, `--chrome-h 170 + inset-b`, floor 90px,
-  the arrow hidden. The roll sheet shrinks to 12px paddings, 44px dice and a 48px button, drops
+  `body.fixed-screen #app` pads 6px above and `6px + inset-b` below in both schemes (the base
+  block's 12 each stay on the sideways home and the match-over screen); `--chrome-w 2 edge + 44px +
+  6px` (82 inset-free, 144 on an iPhone 12), `--chrome-h 12 + 22 + 6 + inset-b` (40), floor
+  `--point-len-min 104px`. The cube hangs 6px under the arrow (`margin-top: 26px`), clear of Undo
+  from the 264 floor up (0.7px on the floor's 203px board with a home indicator). Under 714px (the
+  SE, a 640x360 Android) the rows: the same strip over the board and the buttons in a 44px row
+  under it, the menu and the sound button at its left, Undo and End turn at its right (End turn at
+  its own width, `justify-self: end`; shell.css's `.btn-primary` is `width: 100%`, which had
+  stretched it to 506px across the phone's controls row), the tray's cancel in Undo's cell; the
+  grid is six columns (`44px calc(name-w - 44px - gap) auto minmax(0, 1fr) name-w slot-w`: the
+  opponent's strip spans the menu's column and the next, the sound button starts the second, Undo
+  ends my strip's column and End turn the slot's) by three rows (`22px minmax(0, 1fr) 44px`), with
+  `--name-w 132px` and `--slot-w 92px` ("End turn" is 82; the badge, 124, and the slot leave the
+  status line 131px at 667, 104 at 640); `--chrome-w 2 edge`, `--chrome-h 12 + 22 + 6 + 44 + 6 +
+  inset-b` (90; it was the phone's 170), floor 90px, the arrow hidden: 134.5px points on the SE
+  (94.5 before), 109.5 with Safari's toolbar up (it scrolled before). The roll sheet shrinks to 12px paddings, 44px dice and a 48px button, drops
   its sub line, keeps its title to one line (a long name ellipsizes) and stands Western's Double
   beside the roll button: 168px with any name, inside the shortest board (196 at 640x360, 203 at
   the rail's floor with a home indicator), scrolling inside should it ever outgrow one; the tray's
@@ -195,16 +204,18 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   a tray a point long at either floor; the bar's step gives way so five coins end half a die short
   of the bar's centre, where the dice sit (and the dice paint over any coin: z 3); a double's four
   dice are 30px (132px in a bar 208 long at the floor); the cube hangs in the rail 6px under the
-  arrow (the rows keep it at the bar's top); the toast hangs from the top edge (600px wide before
-  wrapping) instead of the foot, where it covered the roll button and the die-chip tray (at 8px it
-  lies over the strip and, 46px tall, the board's top 20px: the frame and the labels); the count
+  arrow (the rows keep it at the bar's top); the toast hangs under the strip (`top: 34px`: #app's
+  6, the strip, its gap; 600px wide before wrapping) instead of the foot, where it covered the roll
+  button and the die-chip tray, and instead of 8px, where it covered the names and the status for
+  its 2.6-8 s: the 41px box lies over the board's top frame and the far points' tips, clear of the
+  roll sheet (centred in the viewport: its top is 90px at the 780x304 floor, 103 at 844x330); the count
   badge is 20px with 12.8px type; the menu sheet lays Rules and History in one 44px row (224px,
   inside the 88dvh cap from the 264 floor up), the curtain sheet stands "Continue online" beside
   the reveal button at 14px paddings, and the match-over screen is two columns the viewport tall
   (the games card scrolling inside), so Rematch is on screen at the floor; `.desk-only` and
   `#handoffBtn` stay hidden (the menu and the curtain carry them). 54 x 167 at 844x390 inset-free,
   49.2 x 156.5 on an iPhone 12 with its 47/47/21 insets, 48 x 158 on the 852x393 class, 44.2 x
-  94.5 on an SE. `layoutFor(vp)`, `pointWidth`, `pointLength`, `RAIL_MIN_WIDTH` and
+  134.5 on an SE. `layoutFor(vp)`, `pointWidth`, `pointLength`, `RAIL_MIN_WIDTH` and
   `LANDSCAPE_GEOMETRY` in `ui/board/layout.ts` are the twin.
 
 ### 3.2 The screen's vertical structure
@@ -386,8 +397,9 @@ controls, gin's rule with the threshold derived for this board; the desktop's fl
 `.checker`. A phone held sideways (§3.1 landscape) matches both of those fallbacks and is pinned
 again by its own block, which comes later; it has its own floors and fallbacks, under the
 landscape query and on `100svh`: with the rail 2 x 104 + 16 + 40 = 264px, so under
-`(max-height: 263px)` the document scrolls; with the rows 2 x 90 + 16 + 170 = 366px, so under
-`(max-height: 365px) and (max-width: 713px)` it scrolls (an SE with Safari's toolbar). Both
+`(max-height: 263px)` the document scrolls; with the rows 2 x 90 + 16 + 90 = 286px, so under
+`(max-height: 285px) and (max-width: 713px)` it scrolls (an SE with Safari's toolbar up, 325px,
+fits since the button row replaced the phone's 170px of chrome). Both
 floors give up half the bottom inset (`--point-len-min: calc(104px - var(--inset-b) / 2)`, 90
 likewise; `pointLength` mirrors it), so 2 x (104 − inset-b/2) + 16 + 40 + inset-b = 264px at any
 inset and the fallbacks, which cannot read `env()`, lift exactly where the floor stops fitting:

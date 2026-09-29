@@ -11,9 +11,9 @@
    DOM in two grid templates, three layouts (§3.3): the phone stands it on end (twelve rows of
    two points, a bar band, an off row); the desktop, from 900px, and a phone held sideways (a
    coarse pointer, landscape, under 500px tall: docs/design/backgammon-landscape.md) lay it flat
-   (two rows of thirteen; sideways from 714px wide the chrome is one 22px strip over the board,
-   names with their colour discs, the badge, the status and the roll slot in a row, and a 44px
-   rail beside it). The flat template is written once: of the eleven `(min-width: 900px)`
+   (two rows of thirteen; sideways the chrome is one 22px strip over the board, names with their
+   colour discs, the badge, the status and the roll slot in a row, and the buttons in a 44px rail
+   beside it from 714px wide, in a 44px row under it below). The flat template is written once: of the eleven `(min-width: 900px)`
    blocks, the eight that place and stack the board (the turn arrow, #board's template, the seam,
    the bars and dice, the points, the bar stacking, the trays, the cube) carry the landscape
    query in their lists, and the blocks at the end of the file re-tune the sizes and reflow the
@@ -2058,10 +2058,10 @@ label {
    query in their lists, so the flat template, the column stacking and the desktop's dice, cube and
    tray rules are shared, never copied; this block and the three after it, last in the file,
    re-tune the sizes and pin the table where the two fallbacks above would have let it scroll.
-   From 714px wide the next block
-   reflows the chrome into one 22px text strip over the board and a 44px button rail beside it;
-   under it the chrome keeps its rows. ui/board/layout.ts `layoutFor`, `pointWidth` and
-   `pointLength` are the arithmetic's twin. */
+   This block reflows the chrome into
+   one 22px text strip over the board (the grid's shared rules are here); the next two place the
+   buttons, in a 44px rail beside the board from 714px wide and in a 44px row under it below.
+   ui/board/layout.ts `layoutFor`, `pointWidth` and `pointLength` are the arithmetic's twin. */
 @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   #app {
     /* The notch and the home indicator: 47, 59 or 62px per short edge on a notched iPhone, 21px
@@ -2076,8 +2076,12 @@ label {
     --edge: max(16px, var(--inset-l), var(--inset-r));
     padding: 12px var(--edge) calc(12px + var(--inset-b));
   }
+  /* 6px above the strip and below the board (the base padding's 12 each), the home indicator kept:
+     at the table only, so the sideways home and the match-over screen keep the 24. */
   body.fixed-screen #app {
     max-width: none;
+    padding-top: 6px;
+    padding-bottom: calc(6px + var(--inset-b));
   }
   #tableScreen {
     /* The two blocks below set --chrome-h and --chrome-w: what the chrome takes above and below the
@@ -2099,9 +2103,108 @@ label {
     --die-s: 44px;
     --arrow-col: 0px;
     overflow: hidden;
+    /* The chrome grid (the two blocks below set its template): one 22px strip over the board
+       (the owner, 2026-09-28: "WAY too much padding around the board's top and bottom ... The
+       names & scores are great, but they can live on the same Y-axis value") holding, left to
+       right, the opponent's strip (their colour, name, pips), the badge, the status line, my strip
+       and the roll slot; `display: contents` on .topbar and .controls makes their children the
+       grid's items. Each name's strip is a column `--name-w` wide, whatever the name (an `auto`
+       column moved 2.5px when the seats swapped between "Ann" and "Bob" under the next curtain,
+       and the frame oracle reads the strip in every phase): a longer name ellipsizes. The roll
+       slot is `--slot-w` in every phase (the two 22px mini dice, 48px; the Result chip, 66: `.btn-sm`'s
+       12px paddings round the word), so the status column stands still. The rail keeps 160 and 72
+       (the badge and the slot leave the status line 152px at the 780px floor, 216 at 844); the rows
+       block under 714px re-tunes both. */
+    --strip-h: 22px;
+    --gap: 6px;
+    --name-w: 160px;
+    --slot-w: 72px;
+    display: grid;
+    gap: var(--gap);
+    align-items: center;
+  }
+  .topbar,
+  .controls {
+    display: contents;
+  }
+  /* Both strips in the one row: 6px between the colour disc, the name and the pips (the phone's
+     8), the name ellipsizing past its column, the pips three figures wide whatever the count (so
+     the name's ellipsis point stands still as the count loses a figure). My strip sits against the
+     slot, so the right-hand group (my name, the dice, the buttons) reads as one. */
+  #tableScreen .opp-strip,
+  #tableScreen .me-strip {
+    gap: 6px;
+  }
+  #tableScreen .opp-strip {
+    grid-area: opp;
+  }
+  #tableScreen .me-strip {
+    grid-area: me;
+    justify-content: flex-end;
+  }
+  #tableScreen .opp-strip .pips,
+  #tableScreen .me-strip .pips {
+    min-width: 3ch;
+    text-align: right;
+  }
+  #tableScreen .seat-dot {
+    width: 10px;
+    height: 10px;
+  }
+  /* The badge keeps one width as the score changes: tabular figures. */
+  #gameBadge {
+    grid-area: badge;
+    padding: 0 10px;
+    line-height: var(--strip-h);
+    font-variant-numeric: tabular-nums;
+  }
+  .status-line {
+    grid-area: status;
+    text-align: right;
+    padding: 0;
+  }
+  #board {
+    grid-area: board;
+  }
+  /* The slot at the strip's end: the mini dice while I move; the wait note is the status line's
+     message already, so it stays hidden here. */
+  .roll-slot {
+    grid-area: slot;
+    min-width: 0;
+    min-height: 0;
+    width: var(--slot-w);
+    height: var(--strip-h);
+    align-items: flex-start;
+  }
+  .roll-slot .wait-note {
+    display: none;
+  }
+  /* A double's four mini dice (100px at 22) inside the 72px slot: 16px faces at 2px gaps, 70px. */
+  .roll-slot .dice-mini:has(.die:nth-child(4)) {
+    --die-s: 16px;
+    gap: 2px;
+  }
+  /* The result chip keeps its 44px and stands down out of the strip over the board's top edge (the
+     game is over), as it stood up out of the bottom strip. */
+  #resultChipBtn {
+    min-height: 44px;
+  }
+  /* The die-chip tray floats over the board here (below), so my strip and the slot keep their
+     places in the strip while it is open: the status column never moves. */
+  #controls.choosing .me-strip,
+  #controls.choosing .roll-slot {
+    display: flex;
+  }
+  /* The die-chip tray floats over the board's bottom edge instead of replacing a strip. */
+  #controls.choosing #moveChips {
+    grid-area: board;
+    align-self: end;
+    justify-self: center;
+    margin-bottom: 14px;
+    z-index: 5;
   }
   /* The roll sheet inside the shortest board (224px at the rail's floor, 203 with a home indicator,
-     196 in the rows at 640x360): 12px paddings, 44px dice, a 48px button; the sub line goes (the
+     196 in the rows at the 286px floor): 12px paddings, 44px dice, a 48px button; the sub line goes (the
      title names the mover, and "your turn" is the whole message) and the title keeps to one line
      (a 20-character name ellipsizes rather than adding 29px), so the sheet is 168px with any
      name. Western's Double stands beside the roll button in one row instead of under it (the
@@ -2206,16 +2309,18 @@ label {
   #handoffBtn {
     display: none;
   }
-  /* The toast hangs from the top edge, not the foot (shell.css puts it 24px up from the bottom):
+  /* The toast hangs under the strip, not from the foot (shell.css puts it 24px up from the bottom):
      down there it covered the roll button after a hit, the near row's coins and the die-chip tray;
-     up here only the opponent's strip is under it, and the message supplements that line. It
-     grows to 600px before wrapping, so a hit with a 20-character name is one line: centred by
-     auto margins between both edges, not by `left: 50%` (a fixed box shrinks to fit what is left
-     of its containing block past `left`, half the screen). #toast stands outside #app, so
-     `--edge` is out of reach and the safe area is read again. It slides in from above as it
-     slid in from below. */
+     at 8px it covered the names and the status for its 2.6-8 s. 34px is #app's 6px, the strip and
+     its gap (#toast stands outside #app, so the grid's variables are out of reach and the sum is
+     spelled), so the 41px box lies over the board's top frame and the far points' tips alone, clear
+     of the roll sheet (centred in the viewport: its top is 90px at the 780x304 floor, 103 at
+     844x330). It grows to 600px before wrapping, so a hit with a 20-character name is one line:
+     centred by auto margins between both edges, not by `left: 50%` (a fixed box shrinks to fit
+     what is left of its containing block past `left`, half the screen); `--edge` is out of reach
+     too, so the safe area is read again. It slides in from above as it slid in from below. */
   #toast {
-    top: 8px;
+    top: calc(6px + 22px + 6px);
     bottom: auto;
     left: 0;
     right: 0;
@@ -2279,7 +2384,7 @@ label {
   #endgameScreen {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    /* Placed by line, not by a fourth `grid-template-areas` (the dist guard counts three). */
+    /* Placed by line, not by a fifth `grid-template-areas` (the dist guard counts four). */
     grid-template-rows: auto auto minmax(0, 1fr) auto;
     column-gap: 16px;
     height: calc(100svh - 24px - var(--inset-b));
@@ -2326,37 +2431,17 @@ label {
     overflow: hidden;
   }
 }
-/* From 714px wide: the rail. #tableScreen becomes a grid of six columns (the board over five, the
-   rail) and six rows (one strip, five the board spans and the rail's buttons divide);
-   `display: contents` on .topbar and .controls makes their children the grid's items. The strip
-   (the owner, 2026-09-28: "WAY too much padding around the board's top and bottom ... The names &
-   scores are great, but they can live on the same Y-axis value") holds, left to right, the
-   opponent's strip (their colour, name, pips), the badge, the status line, my strip and the roll
-   slot: the chrome above and below the board is 40px, not 80, and the points are 20px longer.
-   Rows two to six: the menu (spanning up into the strip), the sound button, the free middle the
-   turn arrow hangs in off the board's right edge, End turn (pass-and-play's held turn; its row is
-   empty while the button is hidden), Undo at the board's foot. 714 is the narrowest viewport that
-   stands the rail beside a 44px-floor board with no insets: 13 x 44 + the 44px tray + the 16px
-   frame + two 16px edges + the 44px rail + its 6px gap. */
+/* From 714px wide: the rail. The chrome grid (the block above) is six columns (the board over five,
+   the rail) and six rows (the strip, five the board spans and the rail's buttons divide): the chrome
+   above and below the board is 40px, not the phone's 80, and the points are 20px longer. Rows two
+   to six: the menu (spanning up into the strip), the sound button, the free middle the turn arrow
+   hangs in off the board's right edge, End turn (pass-and-play's held turn; its row is empty while
+   the button is hidden), Undo at the board's foot. 714 is the narrowest viewport that stands the
+   rail beside a 44px-floor board with no insets: 13 x 44 + the 44px tray + the 16px frame + two
+   16px edges + the 44px rail + its 6px gap. */
 @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) and (min-width: 714px) {
-  /* 6px above the strip and below the board (the base block's 12 each), the home indicator kept:
-     at the table only, so the sideways home and the match-over screen keep the base block's 24. */
-  body.fixed-screen #app {
-    padding-top: 6px;
-    padding-bottom: calc(6px + var(--inset-b));
-  }
   #tableScreen {
-    --strip-h: 22px;
     --rail-w: 44px;
-    --gap: 6px;
-    /* Each name's strip is a column this wide, whatever the name (an `auto` column moved 2.5px
-       when the seats swapped between "Ann" and "Bob" under the next curtain, and the frame oracle
-       reads the strip in every phase): a longer name ellipsizes; the badge and the slot leave the
-       status line 152px at the 780px floor, 216 at 844. */
-    --name-w: 160px;
-    /* The roll slot: the two 22px mini dice (48px), or the Result chip (72px: `.btn-sm`'s 12px
-       paddings round the word), one width in every phase so the status column stands still. */
-    --slot-w: 72px;
     /* 104px: five coins at a 12px step. The point yields half the home indicator (93.5 with the
        21px one: a 9px step), so 2 x floor + 16 + --chrome-h stays 264px at any inset and the
        `max-height: 263px` fallback at the end lifts the pin exactly where the floor stops fitting;
@@ -2367,7 +2452,6 @@ label {
     /* The two gutters (16px or the inset), the rail and its gap: 82px without insets, 144 with the
        iPhone 12's, 168 on the 852x393 class: 54, 49.2 and 48px points. */
     --chrome-w: calc(2 * var(--edge) + var(--rail-w) + var(--gap));
-    display: grid;
     /* The strips and the slot their fixed widths, the badge its content's (tabular figures), the
        status line what is left: every item of the strip keeps one box through a game (the frame
        oracle reads them in every phase). */
@@ -2382,80 +2466,6 @@ label {
       'board board board  board board rail3'
       'board board board  board board rail4'
       'board board board  board board rail5';
-    gap: var(--gap);
-    align-items: center;
-  }
-  .topbar,
-  .controls {
-    display: contents;
-  }
-  /* Both strips in the one row: 6px between the colour disc, the name and the pips (the rows'
-     8), the name ellipsizing past its column, the pips three figures wide whatever the count (so
-     the name's ellipsis point stands still as the count loses a figure). My strip sits against the
-     slot, so the right-hand group (my name, the dice, the rail) reads as one. */
-  #tableScreen .opp-strip,
-  #tableScreen .me-strip {
-    gap: 6px;
-  }
-  #tableScreen .opp-strip {
-    grid-area: opp;
-  }
-  #tableScreen .me-strip {
-    grid-area: me;
-    justify-content: flex-end;
-  }
-  #tableScreen .opp-strip .pips,
-  #tableScreen .me-strip .pips {
-    min-width: 3ch;
-    text-align: right;
-  }
-  #tableScreen .seat-dot {
-    width: 10px;
-    height: 10px;
-  }
-  /* The badge keeps one width as the score changes: tabular figures. */
-  #gameBadge {
-    grid-area: badge;
-    padding: 0 10px;
-    line-height: var(--strip-h);
-    font-variant-numeric: tabular-nums;
-  }
-  .status-line {
-    grid-area: status;
-    text-align: right;
-    padding: 0;
-  }
-  #board {
-    grid-area: board;
-  }
-  /* The slot at the strip's end: the mini dice while I move; the wait note is the status line's
-     message already, so it stays hidden here. */
-  .roll-slot {
-    grid-area: slot;
-    min-width: 0;
-    min-height: 0;
-    width: var(--slot-w);
-    height: var(--strip-h);
-    align-items: flex-start;
-  }
-  .roll-slot .wait-note {
-    display: none;
-  }
-  /* A double's four mini dice (100px at 22) inside the 72px slot: 16px faces at 2px gaps, 70px. */
-  .roll-slot .dice-mini:has(.die:nth-child(4)) {
-    --die-s: 16px;
-    gap: 2px;
-  }
-  /* The result chip keeps its 44px and stands down out of the strip over the board's top edge (the
-     game is over), as it stood up out of the bottom strip. */
-  #resultChipBtn {
-    min-height: 44px;
-  }
-  /* The die-chip tray floats over the board here (below), so my strip and the slot keep their
-     places in the strip while it is open: the status column never moves. */
-  #controls.choosing .me-strip,
-  #controls.choosing .roll-slot {
-    display: flex;
   }
   .topbar > .row.tight {
     flex-direction: column;
@@ -2491,14 +2501,6 @@ label {
   #doneBtn {
     padding: 8px 0;
   }
-  /* The die-chip tray floats over the board's bottom edge instead of replacing a strip. */
-  #controls.choosing #moveChips {
-    grid-area: board;
-    align-self: end;
-    justify-self: center;
-    margin-bottom: 14px;
-    z-index: 5;
-  }
   /* Hung in the rail's free middle, 40px so a 47px checker's glyph never crosses the rail's edge. */
   .turn-arrow {
     right: auto;
@@ -2529,18 +2531,59 @@ label {
   }
 }
 /* Under 714px wide (the iPhone SE's 667, a 640x360 Android) the rail cannot stand beside the 632px
-   board at the 44px floor, so the chrome keeps its rows: the phone's 170px above and below, the board
-   flat between them, 94px points on the SE. The arrow has no gutter here and gives way to the tray's colour. */
+   board at the 44px floor, so the buttons take a 44px row under the board instead: the menu and the
+   sound button at its left, Undo and End turn at its right (End turn at its own width, the call to
+   action in the corner a thumb reaches; it was a 506px bar across the phone's controls row), the
+   same strip as the rail's over the board. The chrome above and below is 90px (it was the phone's
+   170: a 44px topbar, the 22px status line and a 56px controls row with their gaps), so the SE's
+   points are 134.5px long, not 94.5. The six columns serve both rows: the opponent's strip spans the
+   menu's 44px and the rest of its width, the sound button starts the second column, Undo ends my
+   strip's column and End turn the slot's, 92px here ("End turn" is 82: 10 to spare); the names'
+   columns are 132px (the badge, 124px, and the slot leave the status line 131px at 667, 104 at
+   640; a name ellipsizes past 84px). The arrow has no gutter here and gives way to the tray's colour. */
 @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) and (max-width: 713px) {
   #tableScreen {
-    /* 90px, less half the home indicator (as the rail's floor above), so 2 x floor + 16 + 170 +
-       inset-b stays 366px and the `max-height: 365px` fallback is exact at any inset. */
+    --btn-h: 44px;
+    --name-w: 132px;
+    --slot-w: 92px;
+    /* 90px, less half the home indicator (as the rail's floor above), so 2 x floor + 16 + 90 +
+       inset-b stays 286px and the `max-height: 285px` fallback is exact at any inset. */
     --point-len-min: calc(90px - var(--inset-b) / 2);
-    --chrome-h: calc(170px + var(--inset-b));
+    /* #app's 12px, the strip, the button row, their two gaps, the home indicator: 90px and the inset. */
+    --chrome-h: calc(
+      12px + var(--strip-h) + var(--gap) + var(--btn-h) + var(--gap) + var(--inset-b)
+    );
     --chrome-w: calc(2 * var(--edge));
+    grid-template-columns:
+      44px calc(var(--name-w) - 44px - var(--gap)) auto minmax(0, 1fr) var(--name-w)
+      var(--slot-w);
+    grid-template-rows: var(--strip-h) minmax(0, 1fr) var(--btn-h);
+    /* The two free cells between the sound button and Undo are one `.` rectangle (the grid pin
+       parses the template as the board's). */
+    grid-template-areas:
+      'opp   opp   badge status me    slot'
+      'board board board board  board board'
+      'menu  sound .     .      undo  done';
   }
-  .roll-slot {
-    min-width: 0;
+  .topbar > .row.tight:first-child {
+    grid-area: menu;
+  }
+  .topbar > .row.tight:last-child {
+    grid-area: sound;
+    justify-self: start;
+  }
+  /* Undo at my strip's end; the tray's cancel takes its cell while the tray is open (Undo is hidden then). */
+  #undoBtn,
+  #chipCancelBtn {
+    grid-area: undo;
+    justify-self: end;
+  }
+  /* End turn at the row's end, its own width: shell.css's .btn-primary is `width: 100%`, which
+     filled the phone's controls row here. */
+  #doneBtn {
+    grid-area: done;
+    justify-self: end;
+    width: auto;
   }
   .turn-arrow {
     display: none;
@@ -2553,12 +2596,13 @@ label {
   }
 }
 /* Where the floors do not fit the document scrolls (the rule of §3.10): under 264px with the rail
-   (2 x 104 + 16 + 40), under 366px with the rows (2 x 90 + 16 + 170: an SE with Safari's toolbar);
-   the floors give up half the bottom inset, so both numbers hold with a home indicator. The two
-   short-phone tiers nest under the phone predicate (LANDSCAPE_PHONE, spelled once outside), so the
-   dist pin reads one landscape query here and the tiers stay two height bounds. */
+   (2 x 104 + 16 + 40), under 286px with the rows (2 x 90 + 16 + 90; an SE with Safari's toolbar,
+   325px, fits now: it scrolled under the phone's 170px of chrome); the floors give up half the
+   bottom inset, so both numbers hold with a home indicator. The two short-phone tiers nest under
+   the phone predicate (LANDSCAPE_PHONE, spelled once outside), so the dist pin reads one landscape
+   query here and the tiers stay two height bounds. */
 @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
-  @media (max-height: 263px), (max-height: 365px) and (max-width: 713px) {
+  @media (max-height: 263px), (max-height: 285px) and (max-width: 713px) {
     body.fixed-screen,
     body.fixed-screen #app {
       height: auto;
