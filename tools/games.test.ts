@@ -96,6 +96,7 @@ describe('the games registry', () => {
             'turnGateSub',
             'turnGateGoBtn',
             'turnGateKeepBtn',
+            'menuFlipToggle',
           ],
           rulesSlots: true,
         },

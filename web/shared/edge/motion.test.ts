@@ -243,3 +243,26 @@ describe('reducedMotionOf', () => {
     expect(reducedMotion()).toBe(false);
   });
 });
+
+describe("launchClone under the far seat's flip (dom.ts `bodySpace`)", () => {
+  test('a turned body: the clone is laid out at the reflected rect and translated by the reflected delta, so it flies from where the checker stood to where it landed as the eye sees them', () => {
+    const t = table();
+    t.page.body.el.setAttribute('data-flip', '1');
+    Object.assign(t.page.body.el, {
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 400 }),
+    });
+    launchClone(t.page.doc, t.source.el, rect(100, 200, 40, 40), rect(300, 600, 7, 26), t.options);
+    // 800 - 100 - 40 = 660, 400 - 200 - 40 = 160; the destination reflects to (493, -226), and the
+    // clone's own corner (`transform-origin: 0 0`) is what the scale keeps in place there.
+    expect(t.log).toEqual([
+      '--checker-d=40px',
+      'left=660px',
+      'top=160px',
+      'width=40px',
+      'height=40px',
+      'transform=none',
+      'read',
+      'transform=translate(-167px, -386px) scale(0.175, 0.65)',
+    ]);
+  });
+});

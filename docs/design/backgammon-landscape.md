@@ -43,6 +43,20 @@
 > relative href to the public/ file as written (the favicon links are the precedent; §5C's
 > UNVERIFIED is closed). Left to the owner: the install itself on an Android phone (Chrome's menu,
 > "Install app"), then opening it sideways.
+> **The far seat's flip (§6 item 7) landed
+> 2026-09-28** as a pass-and-play setting in the menu sheet ("Phone flat between us: flip the board
+> each turn", `#menuFlipToggle`, off by default, `backgammon_flipTable`): the shell holds it
+> (`ShellState.flipForFar`, `flip/set`, `writeFlip`, read at `home/init`), derives `flipped` (pass
+> and play, on, at the table, seat 1 looking: under the curtain that rises for them, else the seat
+> whose view is shown, backgammon's `local.holder` = `view.me.idx`), and the boot paints
+> `data-flip="1"` on the body, which shell.css turns 180° (`rotate`): the body is the viewport at
+> the table, so the curtain, the sheets, the toast (the theme's top anchor lands at the far
+> reader's top), the flyers and the drag ghost turn with it, and taps hit-test through the
+> transform. The two kernels that place a clone on the body by measured rects (motion.ts
+> `launchClone`, drag.ts) reflect them into the turned body (dom.ts `bodySpace`, `bodyPoint`), or
+> a flight and a ghost would have rendered point-reflected. `e2e/backgammon-flip.spec.ts` plays it
+> on the touch fixture at 844x390: the attribute per seat, a two-tap move and a drag through the
+> turn. Nothing flips online or at home; gin and briscola hold the key and the state but no toggle.
 
 Synthesized 2026-09-25 from the four sweeps in this folder: `platform-apis.md` (612 lines), `how-games-do-it.md` (460), `board-games-web.md` (159), `our-page.md` (183), plus `shots/` and `shots/measurements.json`. The repo was measured at 25cb36c (main), research only. Every URL below was fetched by a sweep on 2026-09-25; the date in parentheses is the one the page states. UNVERIFIED marks a claim no sweep confirmed from a fetched page.
 
@@ -184,7 +198,7 @@ Build A first: it is the fit, it is additive, and it is what oskol, backgammon-b
 4. Installable-app manifest: yes or no? It is the only OS-enforced landscape (Android). It adds a manifest, icons and the asset/smoke test surface; iOS 26 opens Home Screen sites as web apps regardless and never honours `orientation`.
 5. What "only on mobile" means: `(pointer: coarse) and (hover: none)` (the 2026 idiom) versus the repo's width-only splits at 900px; and whether an Android tablet in landscape gets the phone-landscape template or the desktop one (lichess and baddie key on height under 540-600px). `(max-width: 899px) and (orientation: landscape)` alone also catches a narrow laptop window (800x700) that scrolls a portrait board today: accept A there, or add `(pointer: coarse)` and `hasTouch: true` in the geometry spec and `computed-styles.ts:1458` (measured in §5D: without it headless Chromium reports a fine pointer).
 6. Chrome placement in landscape, insets included: at 844x390 (47+47) the two side columns share 90px, ~45 each; 74px, 37 each, on the 852-wide 59+59 class; 90px on the 874-wide 16 Pro (62+62); 7px on the SE (667 − 24 − 636). So "side columns with 175px points" means one of: the chrome overlaps the inset zone (the notch and the home-indicator corners), or the board drops under 44px points, or the chrome goes top and bottom with 134px points. The badge (~130px nowrap) and the roll slot (`min-width: 168px`) are re-cut for whichever width results. This is the first decision the design round hits.
-7. Chirality when the phone lies flat between two players: `paintSeat` always puts the mover's home bottom-right; a 180-degree turn per seat exists nowhere today. Hand-to-hand passing needs nothing.
+7. Chirality when the phone lies flat between two players: `paintSeat` always puts the mover's home bottom-right; a 180-degree turn per seat exists nowhere today. Hand-to-hand passing needs nothing. _Implemented 2026-09-28 as an opt-in (the note at the top): the menu's "Phone flat between us" turns the whole body for seat 1's turns; hand-to-hand passing leaves it off._
 8. A third computed-style viewport (844x390) for all three games, or only the e2e geometry case for backgammon?
 9. Gin shares the shell and treats a landscape phone as a scrolling short viewport (`web/games/gin-rummy/theme.css:20,213`; `e2e/gin-geometry.spec.ts:104`): same treatment later, or leave.
 10. The home-screen copy "The board stays in view; a curtain says whose turn it is." (`#localModeContent`) is false in landscape today; keep it once A lands, or reword.

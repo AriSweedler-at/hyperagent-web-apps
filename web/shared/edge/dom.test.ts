@@ -5,6 +5,8 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   addClass,
   appendHtml,
+  bodyPoint,
+  bodySpace,
   byId,
   childCount,
   clear,
@@ -466,5 +468,41 @@ describe('geometry, styles, clones, frames and pointers (over page.fake.ts and b
     expect(targetIdOf(bare)).toBe('');
     expect(targetValueOf(bare)).toBe('');
     expect(closestFrom(bare, '.card')).toBeNull();
+  });
+});
+
+describe('bodySpace and bodyPoint (the far seat\'s flip: shell.css `body[data-flip="1"]`)', () => {
+  /** A body measuring 800 x 400 at the origin, turned when `flip`. */
+  const bodyOf = (flip: boolean, left = 0, top = 0) => {
+    const body = fakeEl('body', flip ? { attrs: { 'data-flip': '1' } } : {});
+    Object.assign(body.el, {
+      getBoundingClientRect: () => ({ left, top, width: 800, height: 400 }),
+    });
+    return { body: body.el };
+  };
+  const r = { left: 100, top: 50, width: 40, height: 30 };
+
+  test('upright, both are the identity; turned, a rect and a point are reflected through the body`s centre, so a clone placed by the result renders where the rect was read', () => {
+    expect(bodySpace(bodyOf(false), r)).toBe(r);
+    const p = { x: 100, y: 50, id: 3 };
+    expect(bodyPoint(bodyOf(false), p)).toBe(p);
+    // 800 - 100 - 40 = 660; 400 - 50 - 30 = 320: the reflected box's far edges are the original's near ones.
+    expect(bodySpace(bodyOf(true), r)).toEqual({ left: 660, top: 320, width: 40, height: 30 });
+    expect(bodyPoint(bodyOf(true), p)).toEqual({ x: 700, y: 350, id: 3 });
+    // Reflecting twice is the identity: the reflection is its own inverse.
+    expect(bodySpace(bodyOf(true), bodySpace(bodyOf(true), r))).toEqual(r);
+    // A body not at the origin reflects through its own centre, not the viewport's.
+    expect(bodySpace(bodyOf(true, 10, 20), r)).toEqual({
+      left: 2 * 10 + 800 - 100 - 40,
+      top: 2 * 20 + 400 - 50 - 30,
+      width: 40,
+      height: 30,
+    });
+    // A body that cannot be measured (a fake) reflects through the origin: all zeros, no throw.
+    const bare = { body: fakeEl('body', { attrs: { 'data-flip': '1' } }).el };
+    expect(bodySpace(bare, r)).toEqual({ left: -140, top: -80, width: 40, height: 30 });
+    // Any other value of the attribute is upright.
+    const other = { body: fakeEl('body', { attrs: { 'data-flip': '0' } }).el };
+    expect(bodySpace(other, r)).toBe(r);
   });
 });

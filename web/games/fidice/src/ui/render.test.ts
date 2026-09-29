@@ -47,6 +47,7 @@ const home: HomeSnapshot = {
   homeTab: 'play',
   playMode: 'online',
   soundFont: 'default',
+  flipTable: false,
   save: null,
   recentGames: [],
   opts: DEFAULT_OPTS,

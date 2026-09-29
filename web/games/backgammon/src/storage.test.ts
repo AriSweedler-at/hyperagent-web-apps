@@ -22,6 +22,7 @@ import {
   STORAGE_KEYS,
   clearSave,
   readCurtainMode,
+  readFlipTable,
   readHomeTab,
   readMatchLength,
   readName,
@@ -34,6 +35,7 @@ import {
   readVariant,
   soundEnabled,
   writeCurtainMode,
+  writeFlipTable,
   writeHomeTab,
   writeMatchLength,
   writeName,
@@ -72,7 +74,7 @@ const game = createGame(
 );
 
 describe('frozen constants', () => {
-  test('the eleven keys, the tabs, modes, sound states, curtain modes, the engine defaults and the name cap', () => {
+  test('the twelve keys, the tabs, modes, sound states, curtain modes, the engine defaults and the name cap', () => {
     expect(ALL_KEYS).toEqual([
       'backgammonMP_v1',
       'backgammon_name',
@@ -82,6 +84,7 @@ describe('frozen constants', () => {
       'backgammon_sound',
       'backgammon_soundFont',
       'backgammon_recentGames',
+      'backgammon_flipTable',
       'backgammon_variant',
       'backgammon_matchLength',
       'backgammon_curtain',
@@ -315,6 +318,29 @@ describe('the bare-string preferences', () => {
         kind: 'invalid',
         key: STORAGE_KEYS.soundFont,
         reason: '$: expected one of "default" | "felt" | "arcade"',
+      },
+    });
+  });
+
+  test('the far seat`s flip round-trips as a bare on/off under its own key; a missing or unknown value reads as an error (the shell reads both as off)', () => {
+    const s = fakeStorage();
+    const store = createStore(s);
+    expect(readFlipTable(store)).toEqual({
+      ok: false,
+      error: { kind: 'missing', key: STORAGE_KEYS.flipTable },
+    });
+    (['on', 'off'] as const).forEach((state) => {
+      expect(writeFlipTable(store, state).ok).toBe(true);
+      expect(s.map.get(STORAGE_KEYS.flipTable)).toBe(state);
+      expect(readFlipTable(store)).toEqual({ ok: true, value: state });
+    });
+    s.setItem(STORAGE_KEYS.flipTable, 'sideways');
+    expect(readFlipTable(store)).toEqual({
+      ok: false,
+      error: {
+        kind: 'invalid',
+        key: STORAGE_KEYS.flipTable,
+        reason: '$: expected one of "on" | "off"',
       },
     });
   });

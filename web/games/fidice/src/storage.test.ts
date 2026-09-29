@@ -90,6 +90,7 @@ describe('frozen constants', () => {
       'fidice_playMode',
       'fidice_sound',
       'fidice_soundFont',
+      'fidice_flipTable',
       'fidice_recentGames',
       'fidice_lives',
       'fidice_seats',

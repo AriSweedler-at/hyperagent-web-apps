@@ -246,9 +246,19 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
     debug: 0,
     // Gin-shaped: static screens, the 24 points (the seat mapping is an attribute, so the markup
     // ships seat 0's `data-own` for every point), the turn gate's five ids (page.ts sheetsBefore;
-    // docs/design/backgammon-landscape.md §5D) and the same empty rules slots.
+    // docs/design/backgammon-landscape.md §5D), the menu's flip toggle (§6 item 7) and the same
+    // empty rules slots.
     pageShape: {
-      ids: ['app', 'homeScreen', 'tableScreen', 'board', 'toast', ...POINT_IDS, ...GATE_IDS],
+      ids: [
+        'app',
+        'homeScreen',
+        'tableScreen',
+        'board',
+        'toast',
+        ...POINT_IDS,
+        ...GATE_IDS,
+        'menuFlipToggle',
+      ],
       rulesSlots: true,
     },
     contractFloors: { ts: 35, markup: 40 },

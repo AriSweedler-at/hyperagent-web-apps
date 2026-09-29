@@ -591,6 +591,22 @@ details.history-row > .history-detail dd {
   height: 0;
 }
 
+/* ---------- the far seat's flip (docs/design/backgammon-landscape.md §6 item 7; docs/design/shared-shell.md "Playing sideways") ---------- */
+/* A phone lying flat between two players is read upside down by the one across the table: while
+   the shell says so (web/shared/ui/shell.ts `flipped`: pass and play, the setting on, at the table,
+   seat 1 looking, whether the curtain is up for them or their view is shown), the boot paints
+   `data-flip="1"` on the body (shellPaint.ts `paintFlip`) and the body makes a half turn. At the
+   table the body is the viewport (`fixed-screen` above: 100dvh, no scroll), so the turn maps it
+   onto itself and everything the body holds turns with it: #app, every fixed overlay (the curtain,
+   the sheets, the leave confirm), #toast (the theme's sideways anchor at the top edge lands at the
+   reader's top), the flyers and the drag ghost (their kernels reflect the rects they place by,
+   web/shared/edge/dom.ts `bodySpace`); pointer hit-testing follows the transform. An attribute,
+   not a class: the class contract (CONTRACT.md) has no row, and the composed page carries none
+   (only `data-plays`, below, is markup). */
+body[data-flip='1'] {
+  rotate: 180deg;
+}
+
 /* ---------- the home and the waiting rooms sideways (docs/design/backgammon-landscape.md §5; docs/design/shared-shell.md "Playing sideways") ---------- */
 /* A phone held sideways on the home screen of a game that plays sideways (`body[data-plays="landscape"]`,
    the attribute the composed page carries when its page.ts says `plays: 'landscape'`; gin's and

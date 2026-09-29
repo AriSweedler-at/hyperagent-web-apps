@@ -964,11 +964,14 @@ const revealer: ShellConfig<Backgammon>['local']['revealer'] = (game) => {
   return { seat, effects: handedHits(game, seat) };
 };
 
+/** The seat a view is for: who holds the phone while the curtain is down (the shell's `flipped` turns the table when it is seat 1). */
+const holder: NonNullable<ShellConfig<Backgammon>['local']['holder']> = (view) => view.me.idx;
+
 /** Backgammon's shell config: shellConfig.ts's half completed with the table hooks and the home snapshot's own part (the options into the shell, the curtain mode onto the table). */
 export const BACKGAMMON: ShellConfig<Backgammon> = {
   ...BACKGAMMON_SHELL,
   table: { initial: initialTable, reset, rendered, refuse },
-  local: { viewer, revealer },
+  local: { viewer, revealer, holder },
   home: {
     ...BACKGAMMON_SHELL.home,
     apply: (app, home) => ({

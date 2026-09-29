@@ -6,7 +6,8 @@
 // re-encodes byte for byte (R32). It takes a `Store` from web/shared/edge/storage.ts, so tests run
 // it over a Map. The save is JSON; every preference is a bare string (`backgammon_name`,
 // `backgammon_homeTab`, `backgammon_playMode`, `backgammon_sound`, `backgammon_soundFont`,
-// `backgammon_variant`, `backgammon_matchLength`, `backgammon_curtain`), as gin's are. The readers
+// `backgammon_flipTable`, `backgammon_variant`, `backgammon_matchLength`, `backgammon_curtain`), as
+// gin's are. The readers
 // and writers both shells share (the name rule, the bare-string preferences, the save's three
 // roles) are built by web/shared/edge/prefs.ts (docs/design/shared-shell.md §5 A3) over the keys,
 // the engine decoder and the host save's own fields spelled here, grouped as the `SHELL_STORE` the
@@ -18,11 +19,13 @@ import {
   SOUND_STATES,
   decodeName,
   decodePlayMode,
+  decodeFlipState,
   decodeSoundFont,
   decodeSoundState,
   readTextWith,
   shellStore,
   textPref,
+  type FlipState,
   type GuestSave as ShellGuestSave,
   type HostSave as ShellHostSave,
   type LocalSave as ShellLocalSave,
@@ -39,10 +42,12 @@ export {
   NAME_MAX,
   PLAY_MODES,
   SOUND_STATES,
+  decodeFlipState,
   decodeName,
   decodePlayMode,
   decodeSoundFont,
   decodeSoundState,
+  type FlipState,
   type PlayMode,
   type SoundState,
 };
@@ -87,6 +92,11 @@ export const STORAGE_KEYS = {
    * first, at most 20; the owner's game history of 2026-09-25). This game's own key, like the font.
    */
   recentGames: 'backgammon_recentGames',
+  /**
+   * The pass-and-play table turned for the far seat: `on` or `off` (bare string; the shell's
+   * `flipForFar`, `#menuFlipToggle`; docs/design/backgammon-landscape.md §6 item 7). Missing reads as off.
+   */
+  flipTable: 'backgammon_flipTable',
   /** The ruleset the home screen last chose (bare string, a shipped variant only). */
   variant: 'backgammon_variant',
   /** The match length the home screen last chose (bare string naming one of MATCH_LENGTHS). */
@@ -164,6 +174,8 @@ export const {
   enabled: soundEnabled,
 } = SHELL_STORE.sound;
 export const { read: readSoundFont, write: writeSoundFont } = SHELL_STORE.soundFont;
+/** The far seat's flip, `on` or `off` (prefs.ts `FLIP_STATES`). */
+export const { read: readFlipTable, write: writeFlipTable } = SHELL_STORE.flipTable;
 /** The finished matches: the stored list or [], and one match put first under the cap. */
 export const {
   read: readRecentGames,

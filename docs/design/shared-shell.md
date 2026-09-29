@@ -690,6 +690,30 @@ its board CSS and its layout twin:
    landscape `@media` copies `LANDSCAPE_PHONE` verbatim, alone or with a width bound after it;
    a tighter height tier nests under it. `test/dist/landscape-predicate.test.ts` pins that over
    every theme and the shell sheet, so the board's layout and the gate's watcher cannot drift apart.
+   **The far seat's flip** (docs/design/backgammon-landscape.md §6 item 7; the owner, 2026-09-25:
+   the pass-the-phone flow "should naturally follow as the phone will be held sideways") is the
+   shell's too, and needs no orientation: a phone lying flat between two players is read upside
+   down by the one across the table, so a pass-and-play setting, `ShellState.flipForFar` (read at
+   `home/init` from the game's `flipTable` key, prefs.ts `FLIP_STATES` `on`/`off`, a key every
+   game's storage.ts names; written by `flip/set` through the `writeFlip` effect; off by default;
+   kept through every start, leave and cancel), turns the whole page for seat 1's turns.
+   `flipped(app, cfg)` is true in pass and play alone, with the setting on, at the table (where
+   the body is the viewport, `fixed-screen`), when the seat looking at the phone is seat 1: the
+   seat the curtain is up for while it is up (`table.curtain`), else the seat whose view is shown,
+   by the game's `cfg.local.holder(view)` hook (backgammon `view.me.idx`; a game without it never
+   turns for a shown view). The boot paints it after every paint of a game whose config it holds
+   (`paintFlip`: `data-flip="1"` on the body, an attribute, so no CONTRACT.md row), and shell.css
+   turns the body (`body[data-flip="1"] { rotate: 180deg }`): every fixed overlay, the toast, the
+   flyers and the drag ghost are body children and turn with it; hit-testing follows the
+   transform. The two kernels that place a clone on the body by measured viewport rects
+   (motion.ts `launchClone`, drag.ts's ghost and its motion) reflect rects and points into the
+   turned body first (dom.ts `bodySpace`, `bodyPoint`, the identity upright), or they would render
+   point-reflected. Backgammon's menu sheet carries the toggle (`#menuFlipToggle`, `flip/set`);
+   gin and briscola hold the state and the key and may add theirs. Tests: `shell.test.ts` (the
+   setting, the snapshot, the truth table), `shellPaint.test.ts`, `boot.test.ts`, `dom.test.ts`,
+   `motion.test.ts`, `drag.test.ts`, backgammon's `state/render/storage.test.ts`,
+   `e2e/backgammon-flip.spec.ts` (the attribute per seat, a tapped move and a drag through the turn
+   on the touch fixture at 844x390).
 5. **Tests**: `shell.test.ts` (the state, the intents, `gateOpen`, the resets), `shellPaint.test.ts`
    (`paintGate`: `inert` on `#app` and every other `.overlay` in the body, found by class since each
    game's overlays differ and where a page places one changes nothing; focus to the first shown

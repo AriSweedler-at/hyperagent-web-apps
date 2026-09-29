@@ -39,6 +39,8 @@ import { DRAG_THRESHOLD, inside, startedDrag, type Point, type Rect } from '../l
 import {
   addClass,
   afterTransition,
+  bodyPoint,
+  bodySpace,
   capturePointer,
   cloneInto,
   listen,
@@ -97,6 +99,21 @@ const direct = (p: Point): Mover => ({
 /** The default motion: the ghost sits on the pointer. */
 export const DIRECT: Motion = { at: direct, perFrame: false };
 
+/**
+ * `motion` fed points in the body's space (dom.ts `bodyPoint`): the ghost is laid out on the body,
+ * which the far seat's flip turns 180°, so every point the motion sees, the pointer, where the drag
+ * began and where the ghost lands, is reflected into that space, and its translate comes out turned
+ * with the body; upright, every point is what it was. A reflection keeps distances, so a motion with
+ * momentum lags the same way turned.
+ */
+const inBodySpace = (doc: Readonly<{ body: Element }>, motion: Motion): Motion => {
+  const wrap = (m: Mover): Mover => ({
+    transform: (origin) => m.transform(bodyPoint(doc, origin)),
+    step: (target) => wrap(m.step(bodyPoint(doc, target))),
+  });
+  return { perFrame: motion.perFrame, at: (p) => wrap(motion.at(bodyPoint(doc, p))) };
+};
+
 /** A drag as the hooks see it: what was pressed, where, and what the pointer is over. */
 export type Session<Src, Over> = Readonly<{
   key: Src;
@@ -149,7 +166,7 @@ export const bindDrag = <Src, Over, Intent>(
   dispatch: (intent: Intent) => void,
   cfg: DragConfig<Src, Over, Intent>,
 ): void => {
-  const motion = cfg.motion ?? DIRECT;
+  const motion = inBodySpace(doc, cfg.motion ?? DIRECT);
   const source = cfg.source ?? ((s: Session<Src, Over>): Element | null => s.el);
   const same = cfg.sameOver ?? ((a: Over | null, b: Over | null): boolean => a === b);
   const held: { s: Held<Src, Over> | null } = { s: null };
@@ -179,10 +196,12 @@ export const bindDrag = <Src, Over, Intent>(
     addClass(ghost, GHOST_CLASS);
     removeClass(ghost, ...cfg.ghost.strip);
     // The ghost sits on the body, outside the table's size variable: it takes the source's measured
-    // width as its own, so every em of its face is the source's.
+    // width as its own, so every em of its face is the source's. Its box is the source's rect in
+    // the body's space (dom.ts `bodySpace`: reflected while the far seat's flip turns the body).
+    const box = bodySpace(doc, base);
     setStyle(ghost, cfg.ghost.sizeVar, px(base.width));
-    setStyle(ghost, 'left', px(base.left));
-    setStyle(ghost, 'top', px(base.top));
+    setStyle(ghost, 'left', px(box.left));
+    setStyle(ghost, 'top', px(box.top));
     setStyle(ghost, 'width', px(base.width));
     setStyle(ghost, 'height', px(base.height));
     capturePointer(s.surface, s.pointerId);

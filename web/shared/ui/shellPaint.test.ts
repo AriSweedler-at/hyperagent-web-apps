@@ -13,6 +13,7 @@ import {
   connDotView,
   hideToast,
   paintConnDot,
+  paintFlip,
   paintGate,
   paintHandoff,
   paintScreen,
@@ -571,5 +572,21 @@ describe('paintGate (docs/design/backgammon-landscape.md §5D; the shell`s, for 
     expect(noGo.get('turnGateKeepBtn').focused()).toBe(true);
     paintGate(noGo.doc, false, true);
     expect(noGo.get('turnGateKeepBtn').focused()).toBe(false);
+  });
+});
+
+describe('paintFlip (shell.ts `flipped`; docs/design/backgammon-landscape.md §6 item 7)', () => {
+  test('`data-flip="1"` on the body while the table is turned for the far seat, removed otherwise; the attribute alone, no class', () => {
+    const p = page();
+    expect(p.body.attr('data-flip')).toBeNull();
+    paintFlip(p.doc, true);
+    expect(p.body.attr('data-flip')).toBe('1');
+    expect(p.body.classes()).toEqual([]);
+    paintFlip(p.doc, true);
+    expect(p.body.attr('data-flip')).toBe('1');
+    paintFlip(p.doc, false);
+    expect(p.body.attr('data-flip')).toBeNull();
+    paintFlip(p.doc, false);
+    expect(p.body.attr('data-flip')).toBeNull();
   });
 });

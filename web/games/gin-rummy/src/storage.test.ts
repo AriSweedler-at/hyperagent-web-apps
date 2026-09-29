@@ -86,6 +86,7 @@ describe('frozen constants', () => {
       'ginRummy_sort',
       'ginRummy_cardPack',
       'ginRummy_soundFont',
+      'ginRummy_flipTable',
       'ginRummy_recentGames',
       'ginRummyScorerState_v2',
     ]);

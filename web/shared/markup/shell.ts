@@ -190,7 +190,8 @@ export type ShellPage = Readonly<{
    * docs/design/shared-shell.md "Playing sideways"): the composed page's `<body>` carries
    * `data-plays="landscape"`, which scopes shell.css's two-column landscape home and waiting rooms
    * to it, so a page that stays upright (gin's, briscola's) is untouched byte for byte. Its
-   * `sheetsBefore` also carries `gateMarkup(...)`.
+   * `sheetsBefore` also carries `gateMarkup(...)`. The body's other attribute, `data-flip`, is the
+   * boot's paint, never the markup's (web/shared/ui/shellPaint.ts `paintFlip`: the far seat's flip).
    */
   plays?: 'landscape';
 }>;

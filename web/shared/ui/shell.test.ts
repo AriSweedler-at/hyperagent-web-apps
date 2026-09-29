@@ -25,6 +25,7 @@ import {
   EMPTY_SEAT,
   GONE_TOAST_MS,
   LONG_PRESS_MS,
+  flipped,
   gateOpen,
   LOST_HOST_MSG,
   OPPONENT_LEFT_MSG,
@@ -161,6 +162,7 @@ const KEYS = {
   homeTab: 'fake_homeTab',
   playMode: 'fake_playMode',
   soundFont: 'fake_soundFont',
+  flipTable: 'fake_flipTable',
   recentGames: 'fake_recentGames',
   colour: 'fake_colour',
 } as const;
@@ -304,6 +306,7 @@ const FAKE: ShellConfig<Fake> = {
     homeTab: pref(KEYS.homeTab, TABS),
     playMode: pref(KEYS.playMode, ['online', 'local']),
     soundFont: pref(KEYS.soundFont, SOUND_FONTS),
+    flipTable: pref(KEYS.flipTable, ['on', 'off']),
     recentGames: {
       read: (store) => JSON.parse(store.get(KEYS.recentGames) ?? '[]') as ReadonlyArray<RecentGame>,
       append: (store, game) =>
@@ -369,6 +372,7 @@ const home: Snapshot = {
   homeTab: 'play',
   playMode: 'online',
   soundFont: 'default',
+  flipTable: false,
   save: null,
   recentGames: [],
   colour: 'green',
@@ -1038,14 +1042,16 @@ describe('the initial shell and the partitions', () => {
       longPressed: false,
       codeDraft: '',
       soundFont: 'default',
+      flipForFar: false,
       recentGames: [],
       recorded: null,
     });
   });
 
-  test('the 50 shell intents and 30 shell effects are listed once; the guards partition a game`s unions', () => {
-    expect(SHELL_INTENT_TYPES).toHaveLength(50);
-    expect(new Set(SHELL_INTENT_TYPES).size).toBe(50);
+  test('the 51 shell intents and 31 shell effects are listed once; the guards partition a game`s unions', () => {
+    expect(SHELL_INTENT_TYPES).toHaveLength(51);
+    expect(new Set(SHELL_INTENT_TYPES).size).toBe(51);
+    expect(SHELL_INTENT_TYPES).toContain('flip/set');
     expect(SHELL_INTENT_TYPES).toContain('viewport/portrait');
     expect(SHELL_INTENT_TYPES).toContain('viewport/landscape');
     expect(SHELL_INTENT_TYPES).toContain('gate/keep');
@@ -1055,8 +1061,9 @@ describe('the initial shell and the partitions', () => {
     expect(SHELL_INTENT_TYPES).toContain('curtain/reveal');
     expect(SHELL_INTENT_TYPES).toContain('position/load');
     expect(SHELL_INTENT_TYPES).toContain('persist');
-    expect(SHELL_EFFECT_TYPES).toHaveLength(30);
-    expect(new Set(SHELL_EFFECT_TYPES).size).toBe(30);
+    expect(SHELL_EFFECT_TYPES).toHaveLength(31);
+    expect(new Set(SHELL_EFFECT_TYPES).size).toBe(31);
+    expect(SHELL_EFFECT_TYPES).toContain('writeFlip');
     expect(SHELL_EFFECT_TYPES).toContain('orientationLock');
     expect(SHELL_EFFECT_TYPES).toContain('phrases');
     expect(SHELL_EFFECT_TYPES).toContain('recordGame');
@@ -2832,6 +2839,7 @@ describe('storage and what the sessions read back', () => {
       homeTab: 'about',
       playMode: 'local',
       soundFont: 'arcade',
+      flipTable: false,
       save: { role: 'guest', code: 'KQZM', myName: 'Jeff' },
       recentGames: [RECORD],
       colour: 'red',
@@ -2934,6 +2942,7 @@ describe('runShellEffect', () => {
     runShellEffect(shell, { type: 'writeHomeTab', tab: 'about' }, deps, FAKE);
     runShellEffect(shell, { type: 'writePlayMode', mode: 'local' }, deps, FAKE);
     runShellEffect(shell, { type: 'writeSoundFont', font: 'felt' }, deps, FAKE);
+    runShellEffect(shell, { type: 'writeFlip', on: true }, deps, FAKE);
     runShellEffect(shell, { type: 'recordGame', game: RECORD }, deps, FAKE);
     runShellEffect(shell, { type: 'recordGame', game: { ...RECORD, at: NOW + 1 } }, deps, FAKE);
     expect([...store.entries()].filter(([k]) => k !== KEYS.save)).toEqual([
@@ -2942,6 +2951,7 @@ describe('runShellEffect', () => {
       [KEYS.homeTab, 'about'],
       [KEYS.playMode, 'local'],
       [KEYS.soundFont, 'felt'],
+      [KEYS.flipTable, 'on'],
       [KEYS.recentGames, JSON.stringify([{ ...RECORD, at: NOW + 1 }, RECORD])],
     ]);
     runShellEffect(shell, { type: 'rememberName', name: '' }, deps, FAKE);
@@ -3617,5 +3627,80 @@ describe("the Android lock: fullscreen and the landscape lock behind a tap, once
     const atHome = runIn(LOCKABLE, SIDEWAYS, initialApp, init, sideways, sitDown, lost);
     expect(hints(atHome.effects)).toBe(0);
     expect(atHome.app.shell).toMatchObject({ screen: 'guestWaitScreen', orientationLocked: false });
+  });
+});
+
+describe("the far seat's flip (docs/design/backgammon-landscape.md §6 item 7; the owner, 2026-09-25: the pass-the-phone flow follows the phone held sideways)", () => {
+  /** FAKE with the holder hook: a view is for its `seat`. */
+  const HOLDING: ShellConfig<Fake> = {
+    ...FAKE,
+    local: { ...FAKE.local, holder: (view) => view.seat },
+  };
+  const flip = (app: App, on: boolean): App => run(app, { type: 'flip/set', on }).app;
+
+  test('flip/set holds the setting and writes it; home/init reads it back off the snapshot; readHome reads the key as on, and anything else as off', () => {
+    const on = run(initialApp, { type: 'flip/set', on: true });
+    expect(on.app.shell.flipForFar).toBe(true);
+    expect(on.effects).toEqual([{ type: 'writeFlip', on: true }]);
+    const off = run(on.app, { type: 'flip/set', on: false });
+    expect(off.app.shell.flipForFar).toBe(false);
+    expect(off.effects).toEqual([{ type: 'writeFlip', on: false }]);
+    expect(initialApp.shell.flipForFar).toBe(false);
+    // The snapshot's boolean into the shell, either way.
+    expect(
+      run(initialApp, { type: 'home/init', home: { ...home, flipTable: true } }).app.shell
+        .flipForFar,
+    ).toBe(true);
+    expect(
+      run(on.app, { type: 'home/init', home: { ...home, flipTable: false } }).app.shell.flipForFar,
+    ).toBe(false);
+    // The key: `on` is on; `off`, a foreign value and no key at all read as off.
+    const store: Store = new Map();
+    expect(readHome(store, FAKE).flipTable).toBe(false);
+    store.set(KEYS.flipTable, 'on');
+    expect(readHome(store, FAKE).flipTable).toBe(true);
+    store.set(KEYS.flipTable, 'off');
+    expect(readHome(store, FAKE).flipTable).toBe(false);
+    store.set(KEYS.flipTable, 'sideways');
+    expect(readHome(store, FAKE).flipTable).toBe(false);
+    // A setting, not a table fact: a start, a leave and a cancel keep it.
+    const started = run(on.app, { type: 'local/click', p1: 'Ann', p2: 'Bob', level: '1' }).app;
+    expect(started.shell.flipForFar).toBe(true);
+    const left = run(started, { type: 'leave/request' }, { type: 'leave/finish' }).app;
+    expect(left.shell).toMatchObject({ role: null, flipForFar: true });
+  });
+
+  test('flipped: pass and play alone, the setting on, at the table, seat 1 looking (under its curtain, or holding the phone by the game`s holder hook); never online, at home, for seat 0, or without the hook', () => {
+    const table = run(initialApp, { type: 'local/click', p1: 'Ann', p2: 'Bob', level: '1' }).app;
+    // The starter's curtain is up for seat 0: whoever tapped Start is holding the phone.
+    expect(table.table.curtain).toBe(0);
+    expect(table.shell.screen).toBe('tableScreen');
+    expect(flipped(table, HOLDING)).toBe(false);
+    const on = flip(table, true);
+    expect(flipped(on, HOLDING)).toBe(false);
+    // The curtain up for seat 1: the phone is being handed across, and the curtain is what seat 1 reads.
+    expect(flipped(withTable(on, { curtain: 1 }), HOLDING)).toBe(true);
+    // Off: nothing turns, whoever looks.
+    expect(flipped(withTable(table, { curtain: 1 }), HOLDING)).toBe(false);
+    // The curtain down: the seat whose view is shown, by the hook.
+    const revealed = run(on, { type: 'curtain/reveal' }).app;
+    expect(revealed.table.curtain).toBeNull();
+    expect(revealed.shell.view?.seat).toBe(0);
+    expect(flipped(revealed, HOLDING)).toBe(false);
+    const moved = run(revealed, { type: 'position/load', state: { ...dealt, turn: 1 } }).app;
+    expect(moved.table.curtain).toBeNull();
+    expect(moved.shell.view?.seat).toBe(1);
+    expect(flipped(moved, HOLDING)).toBe(true);
+    // Without the hook the shell cannot tell who holds the phone: it never turns for a shown view.
+    expect(flipped(moved, FAKE)).toBe(false);
+    expect(flipped(withTable(moved, { curtain: 1 }), FAKE)).toBe(true);
+    // Not at the table (the endgame scrolls upright), not at home, not online.
+    expect(flipped(withShell(moved, { screen: 'endgameScreen' }), HOLDING)).toBe(false);
+    expect(flipped(flip(initialApp, true), HOLDING)).toBe(false);
+    const h = flip(hosting(), true);
+    expect(h.shell.role).toBe('host');
+    expect(flipped(withTable(h, { curtain: 1 }), HOLDING)).toBe(false);
+    // A ShellConfig fits the flip config as it is.
+    expect(flipped(on, FAKE)).toBe(false);
   });
 });

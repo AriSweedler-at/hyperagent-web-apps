@@ -19,11 +19,14 @@ import type { GuestEvents } from '../net/guest.ts';
 import type { HostEvents } from '../net/host.ts';
 import { ruleFromHash } from '../ui/glossary.ts';
 import {
+  flipped,
   gateOpen,
   type Ctx,
   type Cue,
   type Effect,
   type EphemeralOf,
+  type FlipConfig,
+  type FlipShell,
   type GateConfig,
   type GateState,
   type GuestContextOf,
@@ -39,7 +42,13 @@ import {
   type TimerId,
 } from '../ui/shell.ts';
 import type { ShellEffectDeps } from '../ui/shellEffects.ts';
-import { GATE_GO_ID, GATE_KEEP_ID, paintGate, type ToastMarks } from '../ui/shellPaint.ts';
+import {
+  GATE_GO_ID,
+  GATE_KEEP_ID,
+  paintFlip,
+  paintGate,
+  type ToastMarks,
+} from '../ui/shellPaint.ts';
 import { createTimers, createToaster, type Toast } from '../ui/toast.ts';
 import type { CuePlayer, CuePlayerDeps } from './cuePlayer.ts';
 import { byId, listen, type DocumentLike, type PageLike } from './dom.ts';
@@ -239,7 +248,10 @@ export type BootApp<G extends BootTypes> = Readonly<{
     view: G['View'] | null;
     recentGames: ReadonlyArray<RecentGame>;
   }> &
-    GateState<G>;
+    GateState<G> &
+    FlipShell<G>;
+  /** The table's curtain (`ShellTypes.Table`): what the far seat's flip reads (shell.ts `flipped`). */
+  table: Readonly<{ curtain: number | null }>;
 }>;
 
 /**
@@ -457,8 +469,10 @@ export type BootConfig<
    * fits): with `orientation: 'landscape'` the boot watches the two phone predicates into the
    * reducer (`viewport/portrait`, `viewport/landscape`) and paints the turn gate after every paint
    * (shellPaint.ts `paintGate` over `gateOpen`). Absent, or without the orientation: nothing of it.
+   * With it, whatever the orientation, the far seat's flip is painted too (shellPaint.ts
+   * `paintFlip` over `flipped`, `FlipConfig`: the game's `local.holder` hook).
    */
-  shell?: GateConfig<G>;
+  shell?: GateConfig<G> & FlipConfig<G>;
   hooks?: Readonly<{
     /** Before every home read: gin drops a stored card back that names no preset. */
     home?: (store: G['Store']) => void;
@@ -589,6 +603,8 @@ export const bootShell = <
     // The shared half of the paint: the turn gate over the game's own, from the App alone, its
     // "Go sideways" shown where the device can lock.
     if (sideways) paintGate(doc, gateOpen(app.shell, shell), canLock);
+    // The far seat's flip (shell.ts `flipped`): the body's `data-flip`, for any game whose config the boot holds.
+    if (shell !== undefined) paintFlip(doc, flipped(app, shell));
   };
 
   const dispatch = (intent: Intent<G>): void => {

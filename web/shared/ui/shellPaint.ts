@@ -303,6 +303,19 @@ export const paintGate = (doc: PageLike, open: boolean, canLock = false): void =
       });
 };
 
+// ---- the far seat's flip (shell.ts `flipped`; docs/design/backgammon-landscape.md §6 item 7) ----
+
+/**
+ * `data-flip="1"` on the body while the table is turned for the seat across it (shell.css
+ * `body[data-flip="1"] { rotate: 180deg }`), removed otherwise: painted by the boot after the
+ * game's own paint, from `flipped` alone, so no game's render.ts repeats it. An attribute, not a
+ * class, so the class contract has no row for it (web/shared/styles/CONTRACT.md notes it beside
+ * `inert`).
+ */
+export const paintFlip = (doc: PageLike, flipped: boolean): void => {
+  setAttr(doc.body, 'data-flip', flipped ? '1' : null);
+};
+
 /**
  * A sheet is an overlay a flag shows; the same flag's intent answers its close button and a tap
  * on its backdrop (the overlay element itself, never its children). Each game lists its own.

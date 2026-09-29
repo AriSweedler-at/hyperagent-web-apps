@@ -483,6 +483,7 @@ describe('shellStore', () => {
       sound: 'g_sound',
       soundFont: 'g_soundFont',
       recentGames: 'g_recentGames',
+      flipTable: 'g_flipTable',
       extra: 'g_extra',
     } as const;
     const shell = shellStore<
@@ -504,6 +505,7 @@ describe('shellStore', () => {
     shell.playMode.write(store, 'local');
     shell.sound.write(store, 'off');
     shell.soundFont.write(store, 'felt');
+    shell.flipTable.write(store, 'on');
     shell.recentGames.append(store, RECORD);
     shell.save.writeSave(store, {
       role: 'host',
@@ -520,6 +522,7 @@ describe('shellStore', () => {
       ['g_playMode', 'local'],
       ['g_sound', 'off'],
       ['g_soundFont', 'felt'],
+      ['g_flipTable', 'on'],
       ['g_recentGames', JSON.stringify([RECORD])],
       [
         'g_save',

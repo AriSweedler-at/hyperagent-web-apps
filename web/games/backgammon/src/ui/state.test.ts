@@ -7,7 +7,7 @@ import { describe, expect, test } from 'vitest';
 import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
 import { createStore, type StorageLike } from '../../../../shared/edge/storage.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
-import { DEFAULT_LOCAL_NAMES, gateOpen } from '../../../../shared/ui/shell.ts';
+import { DEFAULT_LOCAL_NAMES, flipped, gateOpen } from '../../../../shared/ui/shell.ts';
 import { actorOf, applyAction, MESSAGES, viewFor, withPosition } from '../engine/index.ts';
 import type { Dice, Seat, State, View } from '../engine/index.ts';
 import { connectingMsg } from '../net/guest.ts';
@@ -104,6 +104,7 @@ const home: HomeSnapshot = {
   variant: 'portes',
   curtainMode: 'always',
   soundFont: 'default',
+  flipTable: false,
   save: null,
   recentGames: [],
 };
@@ -1700,6 +1701,7 @@ describe('storage', () => {
       variant: 'backgammon',
       curtainMode: 'never',
       soundFont: 'felt',
+      flipTable: false,
       save: null,
       recentGames: [],
     });
@@ -2080,5 +2082,43 @@ describe('the turn gate (docs/design/backgammon-landscape.md §5D; the shell`s, 
     expect(left.shell.screen).toBe('homeScreen');
     expect(gate(left)).toBe(false);
     expect(gate(run(left, { type: 'local/click', p1: 'Ann', p2: 'Bob' }).app)).toBe(true);
+  });
+});
+
+describe("the far seat's flip (design: docs/design/backgammon-landscape.md §6 item 7)", () => {
+  test('flip/set holds the setting and writes it; home/init reads it; the table turns for seat 1 under its curtain or holding the phone (`holder`: the view`s seat), never for seat 0, online, or off', () => {
+    const app = local();
+    const on = run(app, { type: 'flip/set', on: true });
+    expect(on.app.shell.flipForFar).toBe(true);
+    expect(on.effects).toEqual([{ type: 'writeFlip', on: true }]);
+    expect(
+      run(initialApp, { type: 'home/init', home: { ...home, flipTable: true } }).app.shell
+        .flipForFar,
+    ).toBe(true);
+    // The first curtain names the starter: the table turns exactly when that is seat 1.
+    const starter = app.table.curtain;
+    expect(starter).not.toBeNull();
+    expect(flipped(on.app, BACKGAMMON)).toBe(starter === 1);
+    expect(flipped(app, BACKGAMMON)).toBe(false);
+    // Seat 1 to play, the curtain down (a loaded position seats the actor): the view is seat 1's, so the table turns.
+    const dark = at(TWO_ORDERS, 1, [3, 1], on.app);
+    expect(dark.table.curtain).toBeNull();
+    expect(dark.shell.view?.me.idx).toBe(1);
+    expect(flipped(dark, BACKGAMMON)).toBe(true);
+    // Seat 0 to play: upright.
+    const light = at(TWO_ORDERS, 0, [3, 1], on.app);
+    expect(light.shell.view?.me.idx).toBe(0);
+    expect(flipped(light, BACKGAMMON)).toBe(false);
+    // Seat 0's turn played out: the curtain rises for seat 1, and the table turns with the curtain,
+    // before the reveal (the phone is being handed across, and the curtain is what seat 1 reads).
+    const handed = playTurn({ app: light, effects: [] });
+    expect(handed.app.table.curtain).toBe(1);
+    expect(flipped(handed.app, BACKGAMMON)).toBe(true);
+    expect(flipped(revealed(handed.app), BACKGAMMON)).toBe(true);
+    // Online the same view never turns.
+    const hosted = run(lobbyApp(), { type: 'host/deal' }).app;
+    const hostedOn = run(hosted, { type: 'flip/set', on: true }).app;
+    expect(hostedOn.shell.role).toBe('host');
+    expect(flipped(hostedOn, BACKGAMMON)).toBe(false);
   });
 });

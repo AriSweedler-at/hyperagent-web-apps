@@ -88,6 +88,7 @@ const home: HomeSnapshot = {
   sort: 'suit',
   cardBack: 'default',
   soundFont: 'default',
+  flipTable: false,
   save: null,
   recentGames: [],
   scorer: null,
@@ -164,7 +165,7 @@ describe('the initial app', () => {
     expect(SHELL_INTENT_TYPES).toContain('home/init');
     expect(SHELL_INTENT_TYPES).toContain('guest/lost');
     expect(SHELL_INTENT_TYPES).not.toContain('card/tap');
-    expect(SHELL_INTENT_TYPES).toHaveLength(50);
+    expect(SHELL_INTENT_TYPES).toHaveLength(51);
     expect(new Set(SHELL_INTENT_TYPES).size).toBe(SHELL_INTENT_TYPES.length);
   });
 });
@@ -1450,6 +1451,7 @@ describe('storage', () => {
       sort: 'rank',
       cardBack: 'yu-gi-oh',
       soundFont: 'arcade',
+      flipTable: false,
       save: { role: 'guest', code: 'KQZM', myName: 'Jeff' },
       recentGames: [],
       scorer: {

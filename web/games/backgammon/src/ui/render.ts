@@ -648,6 +648,11 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
   const toggle = requireId(doc, 'menuCurtainToggle');
   setChecked(toggle, app.table.curtainMode === 'always');
   setAttr(toggle, 'data-next', app.table.curtainMode === 'always' ? 'never' : 'always');
+  // The far seat's flip (the shell's `flipForFar`, `flip/set`): the same shape; the body's
+  // `data-flip` itself is the boot's paint (shellPaint.ts `paintFlip`), not this one's.
+  const flip = requireId(doc, 'menuFlipToggle');
+  setChecked(flip, app.shell.flipForFar);
+  setAttr(flip, 'data-next', app.shell.flipForFar ? 'off' : 'on');
   // The turn gate is the shell's paint (web/shared/ui/shellPaint.ts `paintGate`, called by the
   // boot after this one from shell.ts `gateOpen`; docs/design/backgammon-landscape.md §5D), and its
   // "Play upright" the boot's binding (web/shared/edge/boot.ts): `bindAll` below binds none of it.
@@ -864,6 +869,10 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   listen(curtainToggle, 'change', () => {
     const next = dataOf(curtainToggle, 'next');
     if (next === 'always' || next === 'never') dispatch({ type: 'curtain/mode', mode: next });
+  });
+  const flipToggle = requireId(doc, 'menuFlipToggle');
+  listen(flipToggle, 'change', () => {
+    dispatch({ type: 'flip/set', on: dataOf(flipToggle, 'next') === 'on' });
   });
 };
 

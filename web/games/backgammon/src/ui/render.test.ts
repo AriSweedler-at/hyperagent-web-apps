@@ -73,6 +73,7 @@ const home: HomeSnapshot = {
   matchLength: 5,
   curtainMode: 'always',
   soundFont: 'default',
+  flipTable: false,
   save: null,
   recentGames: [],
 };
@@ -561,16 +562,24 @@ describe('the table', () => {
     expect(p.get('menuOverlay').hidden()).toBe(false);
     expect(p.get('menuCurtainToggle').checked()).toBe(true);
     expect(p.get('menuCurtainToggle').attr('data-next')).toBe('never');
+    // The far seat's flip beside it: off by default, its next value on.
+    expect(p.get('menuFlipToggle').checked()).toBe(false);
+    expect(p.get('menuFlipToggle').attr('data-next')).toBe('on');
     expect(p.get('rulesOverlay').hidden()).toBe(true);
     expect(p.get('rulesList').attr('data-key')).toBe('portes');
     const never = run(
       rolled,
       { type: 'curtain/mode', mode: 'never' },
+      { type: 'flip/set', on: true },
       { type: 'rules/toggle' },
     ).app;
     paint(p.doc, never);
     expect(p.get('menuCurtainToggle').checked()).toBe(false);
     expect(p.get('menuCurtainToggle').attr('data-next')).toBe('always');
+    expect(p.get('menuFlipToggle').checked()).toBe(true);
+    expect(p.get('menuFlipToggle').attr('data-next')).toBe('off');
+    // The body's `data-flip` is the boot's paint (shellPaint.ts `paintFlip`), not this one's.
+    expect(p.body.attr('data-flip')).toBeNull();
     expect(p.get('rulesOverlay').hidden()).toBe(false);
     expect(p.get('historyOverlay').hidden()).toBe(true);
   });
@@ -845,13 +854,20 @@ describe('bindAll', () => {
     p.get('menuCurtainToggle').el.setAttribute('data-next', 'never');
     p.get('menuCurtainToggle').fire('change');
     expect(intents.at(-1)).toEqual({ type: 'curtain/mode', mode: 'never' });
+    p.get('menuFlipToggle').el.setAttribute('data-next', 'on');
+    p.get('menuFlipToggle').fire('change');
+    expect(intents.at(-1)).toEqual({ type: 'flip/set', on: true });
+    p.get('menuFlipToggle').el.setAttribute('data-next', 'off');
+    p.get('menuFlipToggle').fire('change');
+    expect(intents.at(-1)).toEqual({ type: 'flip/set', on: false });
     p.get('closeRulesBtn').fire('click');
     p.get('closeHistoryBtn').fire('click');
     p.get('closeMenuBtn').fire('click');
     p.get('rulesOverlay').fire('click', { target: fakeTarget({ id: 'rulesOverlay' }) });
     p.get('rulesOverlay').fire('click', { target: fakeTarget({ id: 'closeRulesBtn' }) });
     p.get('resultOverlay').fire('click', { target: fakeTarget({ id: 'resultOverlay' }) });
-    expect(intents.slice(8)).toEqual([
+    // Past the two toggles' four intents: the close buttons and the backdrops.
+    expect(intents.slice(10)).toEqual([
       { type: 'rules/toggle' },
       { type: 'history/toggle' },
       { type: 'menu/toggle' },

@@ -566,6 +566,16 @@ const blocks: ShellBlocks = {
             <input type="checkbox" id="menuCurtainToggle" checked />
             <span>Curtain between turns</span>
           </label>
+          <!-- The far seat's flip (docs/design/backgammon-landscape.md §6 item 7): the shell's
+               flipForFar, off by default; the body's half turn is the boot's paint. -->
+          <label class="toggle-row">
+            <input type="checkbox" id="menuFlipToggle" />
+            <span
+              >Phone flat between us: flip the board each turn<br /><small class="muted"
+                >For a phone lying flat between two players.</small
+              ></span
+            >
+          </label>
           <button class="btn btn-ghost btn-block" id="menuLeaveBtn">Leave the table</button>
         </div>
       </div>
