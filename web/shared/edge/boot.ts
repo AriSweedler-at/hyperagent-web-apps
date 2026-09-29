@@ -39,7 +39,7 @@ import {
   type TimerId,
 } from '../ui/shell.ts';
 import type { ShellEffectDeps } from '../ui/shellEffects.ts';
-import { GATE_KEEP_ID, paintGate, type ToastMarks } from '../ui/shellPaint.ts';
+import { GATE_GO_ID, GATE_KEEP_ID, paintGate, type ToastMarks } from '../ui/shellPaint.ts';
 import { createTimers, createToaster, type Toast } from '../ui/toast.ts';
 import type { CuePlayer, CuePlayerDeps } from './cuePlayer.ts';
 import { byId, listen, type DocumentLike, type PageLike } from './dom.ts';
@@ -54,6 +54,7 @@ import {
 import { bindJargon, revealRule } from './glossary.ts';
 import { joinCodeFrom, withoutJoin } from './invite.ts';
 import { LANDSCAPE_PHONE, PORTRAIT_PHONE, watchMedia, type MediaQueryListLike } from './media.ts';
+import { createOrientationLock, type OrientationLock } from './orientation.ts';
 import { reducedMotion } from './motion.ts';
 import { browserNetDeps } from './netDeps.ts';
 import type { NetDeps } from './peer.ts';
@@ -249,6 +250,16 @@ export type BootDocumentLike = PageLike &
   Readonly<{
     visibilityState: string;
     createElement?: (tag: 'audio') => HTMLAudioElement;
+    /**
+     * The Fullscreen API as the Android lock reads it (orientation.ts `FullscreenDocumentLike`;
+     * docs/design/backgammon-landscape.md §5C): `documentElement.requestFullscreen` (the whole
+     * document, since the curtain, the sheets and the toast are `#app`'s body siblings),
+     * `exitFullscreen`, and `fullscreenElement`, null once a back gesture has left fullscreen. All
+     * optional, so the fakes need nothing and an iPhone browser (no element fullscreen) fits.
+     */
+    documentElement?: Readonly<{ requestFullscreen?: () => Promise<void> }>;
+    exitFullscreen?: () => Promise<void>;
+    fullscreenElement?: unknown;
   }>;
 
 /** `fetch`'s answer as `fetchArrayBuffer` reads it. */
@@ -287,7 +298,9 @@ export type BootWindowLike = InviteWindowLike &
      * not baseline): read here as `unknown`, beside the `angle` the lib does spell, so the real
      * `Window` fits.
      */
-    screen?: Readonly<{ orientation?: Readonly<{ angle?: number; lock?: unknown }> }>;
+    screen?: Readonly<{
+      orientation?: Readonly<{ angle?: number; lock?: unknown; unlock?: () => void }>;
+    }>;
   }>;
 
 /**
@@ -504,6 +517,9 @@ export const bootShell = <
   // edge reads readonly patterns and calls the structural subset, so the real objects are widened.
   const navLike = nav as NavigatorLike;
   const wakeLock: WakeLock = createWakeLock(navLike);
+  // The Android lock (orientation.ts; docs/design/backgammon-landscape.md §5C) over the document
+  // and the screen; a window without a `screen` (the boot test's) gets one that does nothing.
+  const orientationLock: OrientationLock = createOrientationLock(doc, win.screen ?? {});
   const AudioCtor = win.AudioContext ?? win.webkitAudioContext;
   // A phone starts muted (the owner, 2026-09-25: "start muted on mobile so tapping the unmute is
   // what enables sound"; sound-fonts.md §12): iPhone Safari only lets audio start inside a tap
@@ -554,24 +570,27 @@ export const bootShell = <
   // (web/shared/edge/netDeps.ts) read the ?peer= hook and wake the sessions on visibility/online.
   const netDeps: NetDeps = browserNetDeps({ search: win.location.search, debug: cfg.game.debug });
 
+  // The device can lock its rotation (shell.ts `Ctx.canLock`: the rotation hint's test, the
+  // Android lock's guard and the gate's "Go sideways"): a fact about the browser, read once so
+  // every step's ctx and every paint agree. The function alone is desktop Chromium's too (where
+  // it rejects), and `LANDSCAPE_PHONE`'s `any-pointer: coarse` takes a touchscreen laptop in a
+  // short window for a phone, so the device must also have no pointer that hovers: a laptop's
+  // trackpad does, a phone's finger does not, and it is never told Android's gesture. A window
+  // without `matchMedia` cannot say, and says no.
+  const canLock =
+    typeof win.screen?.orientation?.lock === 'function' &&
+    win.matchMedia?.('(hover: none)').matches === true;
+
   /** The game plays sideways (docs/design/shared-shell.md "Playing sideways"): the watchers and the gate. */
   const shell = cfg.shell;
   const sideways = shell?.orientation === 'landscape';
   const repaint = (): void => {
     cfg.paint.paint(doc, app);
-    // The shared half of the paint: the turn gate over the game's own, from the App alone.
-    if (sideways) paintGate(doc, gateOpen(app.shell, shell));
+    // The shared half of the paint: the turn gate over the game's own, from the App alone, its
+    // "Go sideways" shown where the device can lock.
+    if (sideways) paintGate(doc, gateOpen(app.shell, shell), canLock);
   };
 
-  // The device can lock its rotation (shell.ts `Ctx.canLock`, the rotation hint's test): a fact
-  // about the browser, read once so every step's ctx agrees. The function alone is desktop
-  // Chromium's too (where it rejects), and `LANDSCAPE_PHONE`'s `any-pointer: coarse` takes a
-  // touchscreen laptop in a short window for a phone, so the device must also have no pointer
-  // that hovers: a laptop's trackpad does, a phone's finger does not, and it is never told
-  // Android's gesture. A window without `matchMedia` cannot say, and says no.
-  const canLock =
-    typeof win.screen?.orientation?.lock === 'function' &&
-    win.matchMedia?.('(hover: none)').matches === true;
   const dispatch = (intent: Intent<G>): void => {
     const step = cfg.reducer.reduce(app, intent, {
       rng,
@@ -607,6 +626,17 @@ export const bootShell = <
     wakeLock: (hold) => {
       if (hold) void wakeLock.hold();
       else wakeLock.drop();
+    },
+    orientationLock: (hold) => {
+      // Inside the tap that stepped it: fullscreen, then the landscape lock. The reducer marked
+      // the lock held as it emitted the effect; an attempt that did not take (desktop Chromium's
+      // `lock` rejects, a tablet may refuse) is reported back so the mark drops, the rotation hint
+      // is due again and the next tap tries once more.
+      if (hold)
+        void orientationLock.hold().then((held) => {
+          if (!held) dispatch({ type: 'fullscreen/lost' });
+        });
+      else orientationLock.drop();
     },
     net: {
       // An N-seat room's terms (`room`) join the options; a two-seat game's options are the literal they were.
@@ -718,6 +748,20 @@ export const bootShell = <
         dispatch({ type: 'gate/keep' });
       });
     }
+    // "Go sideways" (painted only where `canLock`): the Android lock from the gate's own tap.
+    const go = byId(doc, GATE_GO_ID);
+    if (go !== null) {
+      listen(go, 'click', () => {
+        dispatch({ type: 'gate/turn' });
+      });
+    }
+    // The lock ends with fullscreen (a back gesture runs the spec's fully-unlock steps), and
+    // nothing re-locks without a tap: the App learns of the loss here, so the next tap re-enters
+    // and the rotation hint, silent while the lock was held, is due again. Entering fullscreen
+    // fires the same event with the element set, which is no loss.
+    doc.addEventListener('fullscreenchange', () => {
+      if ((doc.fullscreenElement ?? null) === null) dispatch({ type: 'fullscreen/lost' });
+    });
   }
   cfg.paint.paintSound(doc, fx.enabled());
   // Browsers only let audio start after a user gesture: warm the context on the first tap, and

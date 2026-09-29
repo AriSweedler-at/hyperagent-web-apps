@@ -6,20 +6,32 @@
 // sideways (844x390) the gate goes and the curtain is where it was; upright again it is back;
 // "Play upright" keeps it down through the next curtain (reached by play, not by the
 // `position/load` seam, which resets the table as a new start would); Leave and Start ask once
-// more. The gate takes focus as a dialog should (`#turnGateKeepBtn`) and lets it go when it hides.
+// more. The gate takes focus as a dialog should (its first control) and lets it go when it hides.
 // A finished game is not gated: the result sheet takes taps upright, and the next game's first
 // curtain asks again. On the fine-pointer `player` at the same size it never shows, turned or
 // not. Taps, not clicks, on the gate's own controls under the touch context: a phone taps, and the
 // gate's copy asks for a hand on the phone. Page-only (e2e/fixtures/site.ts PAGE_ONLY_SPECS):
 // about the page, not its origin.
 //
+// The Android lock (design §5C; shell.ts `lockSideways`, web/shared/edge/orientation.ts, the owner
+// 2026-09-25: "it should lock the user into place to make it sideways. Only on mobile!") rides the
+// taps: on a phone whose browser can lock its rotation (`screen.orientation.lock` a function and no
+// pointer that hovers: Android's Chromium family, which headless Chromium under the touch context
+// is too), Start asks for fullscreen on the document, then the landscape lock; while the lock is
+// held no tap asks again and the rotation hint is silent; a back gesture (fullscreen left, the
+// `fullscreenchange` with no element) is the loss, the hint is due, and the next tap (the curtain's
+// Roll, the roll modal's CTA, the gate's own "Go sideways") re-enters; Leave unlocks and leaves
+// fullscreen. Both APIs are stubbed before the page loads (`withLock`), recording their calls on
+// the window, since headless Chromium's fullscreen and rotation are not a phone's: the real
+// fullscreen and rotation stay a device check for the owner.
+//
 // The rotation hint (shell.ts `rotationHint`, the owner 2026-09-28: "give a warning to lock the
-// phone's rotation in landscape mode") rides the same gate flows: on a phone whose browser can lock
-// its rotation (`screen.orientation.lock` a function: Android's Chromium family, stubbed here
-// before the page loads, since headless Chromium is one), the first time the table is painted
-// sideways the shell toasts `ROTATION_HINT_MSG` once (8 s), not again this table, and again after
-// Leave and Start; with the function gone (every iPhone browser) or on the fine-pointer `player`
-// the toast never shows it.
+// phone's rotation in landscape mode") rides the same flows: on a phone whose lock is refused (a
+// tablet, a denied fullscreen: the adapter reports the loss a microtask after the tap), the first
+// time the table is sideways with the lock gone the shell toasts `ROTATION_HINT_MSG` once (8 s),
+// not again this table, and again after Leave and Start; with the function gone (every iPhone
+// browser) or on the fine-pointer `player` the toast never shows it; with the lock held it stays
+// silent until the lock is lost.
 import type { Page } from '@playwright/test';
 
 import {
@@ -36,11 +48,18 @@ import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 import { ROTATION_HINT_MSG } from '../web/shared/ui/shell.ts';
 
-const gateUp = async (page: Page): Promise<void> => {
+/** The gate is up; `lockable` says whether the device can lock, which shows "Go sideways" and gives it the focus. */
+const gateUp = async (page: Page, lockable = true): Promise<void> => {
   await expect(page.locator('#turnGate')).toBeVisible();
   await expect(page.locator('#app')).toHaveAttribute('inert', '');
   await expect(page.locator('#curtainOverlay')).toHaveAttribute('inert', '');
-  await expect(page.locator('#turnGateKeepBtn')).toBeFocused();
+  if (lockable) {
+    await expect(page.locator('#turnGateGoBtn')).toBeVisible();
+    await expect(page.locator('#turnGateGoBtn')).toBeFocused();
+  } else {
+    await expect(page.locator('#turnGateGoBtn')).toBeHidden();
+    await expect(page.locator('#turnGateKeepBtn')).toBeFocused();
+  }
 };
 const gateDown = async (page: Page): Promise<void> => {
   await expect(page.locator('#turnGate')).toBeHidden();
@@ -49,15 +68,41 @@ const gateDown = async (page: Page): Promise<void> => {
 };
 
 /**
- * `screen.orientation.lock` before the page loads: a function (Android's Chromium family; headless
- * Chromium has one too, so the positive case does not lean on that) or gone (every iPhone browser).
+ * `screen.orientation.lock`/`unlock` and the document's fullscreen before the page loads, every
+ * call recorded on `window.__lockCalls` (`request`, `lock:<orientation>`, `unlock`, `exit`).
+ * `held`: the lock resolves (Android); `refused`: it rejects (a tablet, desktop Chromium);
+ * `absent`: no `lock` at all (every iPhone browser). Fullscreen flips `window.__fullscreen.on`
+ * and fires `fullscreenchange` as the browser does, so the boot's listener sees the element set on
+ * entry and null on exit; `backGesture` below is the exit the browser makes on its own.
  */
-const withLock = async (page: Page, present: boolean): Promise<void> => {
+type LockMode = 'held' | 'refused' | 'absent';
+const withLock = async (page: Page, mode: LockMode): Promise<void> => {
+  const lock =
+    mode === 'absent'
+      ? 'undefined'
+      : `(o) => { calls.push('lock:' + o); return ${mode === 'held' ? 'Promise.resolve()' : "Promise.reject(new Error('refused'))"}; }`;
   // A string, as the geometry scripts are: the e2e tsconfig has no DOM lib to name `ScreenOrientation`.
-  await page.addInitScript(
-    `Object.defineProperty(ScreenOrientation.prototype, 'lock', { value: ${present ? '() => Promise.resolve()' : 'undefined'}, configurable: true });`,
-  );
+  await page.addInitScript(`(() => {
+    const calls = [];
+    const state = { on: false };
+    window.__lockCalls = calls;
+    window.__fullscreen = state;
+    const change = () => { queueMicrotask(() => document.dispatchEvent(new Event('fullscreenchange'))); };
+    Object.defineProperty(ScreenOrientation.prototype, 'lock', { value: ${lock}, configurable: true });
+    Object.defineProperty(ScreenOrientation.prototype, 'unlock', { value: () => { calls.push('unlock'); }, configurable: true });
+    Object.defineProperty(Element.prototype, 'requestFullscreen', { value: function () { calls.push('request'); state.on = true; change(); return Promise.resolve(); }, configurable: true });
+    Object.defineProperty(Document.prototype, 'exitFullscreen', { value: function () { calls.push('exit'); state.on = false; change(); return Promise.resolve(); }, configurable: true });
+    Object.defineProperty(Document.prototype, 'fullscreenElement', { get: () => (state.on ? document.documentElement : null), configurable: true });
+  })();`);
 };
+/** The calls the stubs recorded so far. */
+const lockCalls = (page: Page): Promise<ReadonlyArray<string>> =>
+  page.evaluate<ReadonlyArray<string>>('window.__lockCalls');
+/** The browser left fullscreen on its own (Android's back gesture): the spec unlocks with it. */
+const backGesture = (page: Page): Promise<unknown> =>
+  page.evaluate(
+    "(() => { window.__fullscreen.on = false; document.dispatchEvent(new Event('fullscreenchange')); })()",
+  );
 /** `#toast` is up with `text` (the `show` class: `#toast` keeps its text after it hides). */
 const toastUp = async (page: Page, text: string): Promise<void> => {
   await expect(page.locator('#toast')).toHaveText(text);
@@ -82,12 +127,12 @@ test('a phone upright at the table: the gate over the curtain, inert beneath; si
   project,
 }) => {
   const { page } = phone;
+  await withLock(page, 'held');
   await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
   await gateUp(page);
   await expect(page.locator('#turnGateTitle')).toHaveText('Turn your phone sideways');
+  await expect(page.locator('#turnGateGoBtn')).toHaveText('Go sideways');
   await expect(page.locator('#turnGateKeepBtn')).toHaveText('Play upright');
-  // "Go sideways" is the Android lock PR's: shipped hidden.
-  await expect(page.locator('#turnGateGoBtn')).toBeHidden();
   const title = await page.locator('#curtainTitle').innerText();
   // The curtain's button takes no tap through the gate: the gate intercepts, nothing is revealed.
   await expect(page.locator('#curtainBtn').tap({ timeout: 1500 })).rejects.toThrow();
@@ -95,7 +140,7 @@ test('a phone upright at the table: the gate over the curtain, inert beneath; si
   // Turned sideways: the gate goes by itself (and lets focus go), the curtain is where it was.
   await page.setViewportSize(PHONE_LANDSCAPE);
   await gateDown(page);
-  await expect(page.locator('#turnGateKeepBtn')).not.toBeFocused();
+  await expect(page.locator('#turnGateGoBtn')).not.toBeFocused();
   await expect(page.locator('#curtainOverlay')).toBeVisible();
   await expect(page.locator('#curtainTitle')).toHaveText(title);
   // Upright again: back.
@@ -130,6 +175,7 @@ test('a finished game is not gated: the result sheet takes taps upright; the nex
   project,
 }) => {
   const { page } = phone;
+  await withLock(page, 'held');
   await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
   await gateUp(page);
   // Sideways, the last checker of a 5-point match's first game is borne off: the sheet comes up.
@@ -169,15 +215,81 @@ test('a fine pointer at a phone`s size (the desktop window, the goldens) never s
   await gateDown(page);
 });
 
-test('a phone whose browser can lock its rotation (Android: `screen.orientation.lock` is a function) is told once to lock it, at the turn of the phone at the table, not under the gate; not again this table; again after Leave and Start', async ({
+test('Android: Start asks for fullscreen then the landscape lock; held, no tap asks again and the hint is silent; a back gesture loses it, the hint is due, and the curtain`s Roll, the roll modal`s CTA and Go sideways each re-enter; Leave unlocks and leaves fullscreen', async ({
   phone,
   project,
 }) => {
   const { page } = phone;
-  await withLock(page, true);
+  await withLock(page, 'held');
   await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
   await gateUp(page);
-  // Not under the gate: the table came up upright.
+  // The Start tap: fullscreen on the document, then the lock, in that order, once.
+  await expect.poll(() => lockCalls(page)).toEqual(['request', 'lock:landscape']);
+  // Held: the gate's own tap asks nothing more (the gate waits for the watcher to see the turn).
+  await page.locator('#turnGateGoBtn').tap();
+  await gateUp(page);
+  expect(await lockCalls(page)).toEqual(['request', 'lock:landscape']);
+  // The phone turns (the lock's work, here the viewport's): the gate goes; no hint while held.
+  await page.setViewportSize(PHONE_LANDSCAPE);
+  await gateDown(page);
+  await toastStill(page);
+  await page.locator('#curtainBtn').tap();
+  await expect(page.locator('#curtainOverlay')).toBeHidden();
+  expect(await lockCalls(page)).toEqual(['request', 'lock:landscape']);
+  await toastStill(page);
+  // The back gesture: the lock is lost, and the hint says how to keep the phone sideways.
+  await backGesture(page);
+  await toastUp(page, ROTATION_HINT_MSG);
+  // The roll modal's CTA is the next tap: it re-enters.
+  await bgRoll(page);
+  await expect
+    .poll(() => lockCalls(page))
+    .toEqual(['request', 'lock:landscape', 'request', 'lock:landscape']);
+  await bgPlayTurn(page);
+  await expect(page.locator('#curtainOverlay')).toBeVisible();
+  // Lost again: the curtain's Roll re-enters; the hint was shown for this table already.
+  await backGesture(page);
+  await toastDown(page);
+  await page.locator('#curtainBtn').tap();
+  await expect(page.locator('#curtainOverlay')).toBeHidden();
+  await expect.poll(async () => (await lockCalls(page)).length).toBe(6);
+  await toastStill(page);
+  // Upright with the lock lost: Go sideways is the tap that re-enters.
+  await backGesture(page);
+  await page.setViewportSize(PHONE);
+  await gateUp(page);
+  await page.locator('#turnGateGoBtn').tap();
+  await expect
+    .poll(async () => (await lockCalls(page)).slice(6))
+    .toEqual(['request', 'lock:landscape']);
+  // Leave: unlock, then out of fullscreen.
+  await page.locator('#turnGateKeepBtn').tap();
+  await gateDown(page);
+  page.once('dialog', (dialog) => {
+    void dialog.accept();
+  });
+  await page.locator('#menuBtn').tap();
+  await page.locator('#menuLeaveBtn').tap();
+  await expect(page.locator('#homeScreen')).toBeVisible();
+  await expect.poll(async () => (await lockCalls(page)).slice(8)).toEqual(['unlock', 'exit']);
+  // The next Start locks again.
+  await page.locator('#localBtn').tap();
+  await expect(page.locator('#curtainOverlay')).toBeVisible();
+  await expect
+    .poll(async () => (await lockCalls(page)).slice(10))
+    .toEqual(['request', 'lock:landscape']);
+});
+
+test('a phone whose lock is refused (Android`s function, a tablet`s no: the loss reported a moment after the tap) is told once to lock its rotation, at the turn of the phone at the table, not under the gate; not again this table; again after Leave and Start', async ({
+  phone,
+  project,
+}) => {
+  const { page } = phone;
+  await withLock(page, 'refused');
+  await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
+  await gateUp(page);
+  // The attempt was made and refused; not under the gate: the table came up upright.
+  await expect.poll(() => lockCalls(page)).toEqual(['request', 'lock:landscape']);
   await toastStill(page);
   // The turn: the gate goes and the hint comes, before any move.
   await page.setViewportSize(PHONE_LANDSCAPE);
@@ -207,14 +319,15 @@ test('a phone whose browser can lock its rotation (Android: `screen.orientation.
   await toastUp(page, ROTATION_HINT_MSG);
 });
 
-test('a phone whose browser cannot lock its rotation (every iPhone: no `screen.orientation.lock`) is never told, turned or not', async ({
+test('a phone whose browser cannot lock its rotation (every iPhone: no `screen.orientation.lock`) is never told and never asked: no Go sideways, no fullscreen, turned or not', async ({
   phone,
   project,
 }) => {
   const { page } = phone;
-  await withLock(page, false);
+  await withLock(page, 'absent');
   await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
-  await gateUp(page);
+  await gateUp(page, false);
+  expect(await lockCalls(page)).toEqual([]);
   await page.setViewportSize(PHONE_LANDSCAPE);
   await gateDown(page);
   await expect(page.locator('#curtainOverlay')).toBeVisible();
@@ -224,18 +337,20 @@ test('a phone whose browser cannot lock its rotation (every iPhone: no `screen.o
   await expect(page.locator('#curtainOverlay')).toBeHidden();
   await toastDown(page);
   await expect(page.locator('#toast')).not.toContainText('Auto-rotate');
+  expect(await lockCalls(page)).toEqual([]);
 });
 
-test('a fine pointer at a phone`s size (the desktop window) with a lock to offer is never told: the phone`s shape, not the window`s', async ({
+test('a fine pointer at a phone`s size (the desktop window) with a lock to offer is never told and never asked: the phone`s shape, not the window`s', async ({
   player,
   project,
 }) => {
   const { page } = player;
-  await withLock(page, true);
+  await withLock(page, 'held');
   await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
   await expect(page.locator('#curtainOverlay')).toBeVisible();
   await page.setViewportSize(PHONE_LANDSCAPE);
   await gateDown(page);
   await toastDown(page);
   await expect(page.locator('#toast')).not.toContainText('Auto-rotate');
+  expect(await lockCalls(page)).toEqual([]);
 });

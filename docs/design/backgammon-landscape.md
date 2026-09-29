@@ -18,9 +18,20 @@
 > `pointWidth`, `pointLength`, `RAIL_MIN_WIDTH` 714); the geometry e2e runs sideways at 844x390 and
 > 667x375 on the touch fixture; the 390x844 and 1280x800 goldens are byte-identical. Numbers and
 > screenshots: the PR. Still open: what Safari and Chrome leave sideways on a real device (§7 PR 0,
-> the plan's G1); the portrait gate (D, its own PR); the Android lock (C-lite, a later PR); the
-> installable manifest (§6.4: no); the per-seat flip (§6.7: out of scope); the viewport-meta and
-> `touch-action` cleanups (a follow-up: a tap-heavy board could regress on double-tap zoom).
+> the plan's G1); the installable manifest (§6.4: no); the per-seat flip (§6.7: out of scope); the
+> viewport-meta and `touch-action` cleanups (a follow-up: a tap-heavy board could regress on
+> double-tap zoom). The portrait gate (D) landed the same day as the shell's (shared-shell.md
+> §6.6). **The Android lock (C-lite, §5C) landed 2026-09-28** as the shell's `orientationLock`
+> effect beside the wake lock (shell.ts `lockSideways`, web/shared/edge/orientation.ts): fullscreen
+> on the document then `screen.orientation.lock('landscape')`, stepped inside the taps the game is
+> played through (Start, the deal, Sit down, Resume, the curtain's Roll, the roll modal's CTA, the
+> gate's "Go sideways", now shown where `Ctx.canLock`), once per loss rather than at every turn
+> (`ShellState.orientationLocked`; the boot's `fullscreenchange` listener and the adapter's own
+> failure report dispatch `fullscreen/lost`, and the next tap re-enters), dropped with the wake
+> lock on leave and cancel; the rotation hint (§6.6) is silent while the lock is held and due at
+> the loss. The e2e stubs both APIs and reads their calls back; the real fullscreen, its Android
+> "swipe down to exit" hint on every entry, and the rotation itself stay a device check for the
+> owner (§7 PR 3). The manifest (PR 4) stays out.
 
 Synthesized 2026-09-25 from the four sweeps in this folder: `platform-apis.md` (612 lines), `how-games-do-it.md` (460), `board-games-web.md` (159), `our-page.md` (183), plus `shots/` and `shots/measurements.json`. The repo was measured at 25cb36c (main), research only. Every URL below was fetched by a sweep on 2026-09-25; the date in parentheses is the one the page states. UNVERIFIED marks a claim no sweep confirmed from a fetched page.
 

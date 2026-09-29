@@ -709,7 +709,8 @@ describe('the turn gate (docs/design/backgammon-landscape.md §5D): the shell`s 
     expect(p.get('turnGate').hidden()).toBe(true);
     expect(p.get('app').attr('inert')).toBeNull();
     expect(p.get('curtainOverlay').hidden()).toBe(false);
-    // "Go sideways" is the Android lock PR's: shipped hidden.
+    // "Go sideways" ships hidden; the boot's `paintGate` shows it where the device can lock
+    // (web/shared/ui/shellPaint.ts), never this game's paint.
     expect(p.get('turnGateGoBtn').hidden()).toBe(true);
     expect(p.get('turnGateKeepBtn').hidden()).toBe(false);
   });

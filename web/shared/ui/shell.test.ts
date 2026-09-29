@@ -1023,6 +1023,7 @@ describe('the initial shell and the partitions', () => {
       landscapePhone: false,
       gateDismissed: false,
       rotationHintShown: false,
+      orientationLocked: false,
       netAttempt: 0,
       hostStatus: { text: 'Opening…', pulse: true },
       guestStatus: { text: CONNECTING_MSG, pulse: true },
@@ -1042,18 +1043,21 @@ describe('the initial shell and the partitions', () => {
     });
   });
 
-  test('the 48 shell intents and 29 shell effects are listed once; the guards partition a game`s unions', () => {
-    expect(SHELL_INTENT_TYPES).toHaveLength(48);
-    expect(new Set(SHELL_INTENT_TYPES).size).toBe(48);
+  test('the 50 shell intents and 30 shell effects are listed once; the guards partition a game`s unions', () => {
+    expect(SHELL_INTENT_TYPES).toHaveLength(50);
+    expect(new Set(SHELL_INTENT_TYPES).size).toBe(50);
     expect(SHELL_INTENT_TYPES).toContain('viewport/portrait');
     expect(SHELL_INTENT_TYPES).toContain('viewport/landscape');
     expect(SHELL_INTENT_TYPES).toContain('gate/keep');
+    expect(SHELL_INTENT_TYPES).toContain('gate/turn');
+    expect(SHELL_INTENT_TYPES).toContain('fullscreen/lost');
     expect(SHELL_INTENT_TYPES).toContain('resume/auto');
     expect(SHELL_INTENT_TYPES).toContain('curtain/reveal');
     expect(SHELL_INTENT_TYPES).toContain('position/load');
     expect(SHELL_INTENT_TYPES).toContain('persist');
-    expect(SHELL_EFFECT_TYPES).toHaveLength(29);
-    expect(new Set(SHELL_EFFECT_TYPES).size).toBe(29);
+    expect(SHELL_EFFECT_TYPES).toHaveLength(30);
+    expect(new Set(SHELL_EFFECT_TYPES).size).toBe(30);
+    expect(SHELL_EFFECT_TYPES).toContain('orientationLock');
     expect(SHELL_EFFECT_TYPES).toContain('phrases');
     expect(SHELL_EFFECT_TYPES).toContain('recordGame');
     expect(isShellIntent<Fake>({ type: 'home/init', home })).toBe(true);
@@ -2887,6 +2891,7 @@ describe('runShellEffect', () => {
       toast: note('toast'),
       fx: note('fx'),
       wakeLock: note('wakeLock'),
+      orientationLock: note('orientationLock'),
       net: {
         startHost: note('startHost'),
         startGuest: note('startGuest'),
@@ -2953,6 +2958,7 @@ describe('runShellEffect', () => {
       { type: 'fx', cue: 'ding' },
       { type: 'phrases', phrases: [SHELL_CUES.win, { steps: [{ cue: 'good.trick' }], buzz: 9 }] },
       { type: 'wakeLock', hold: true },
+      { type: 'orientationLock', hold: true },
       { type: 'startHost', code: 'ABCD', attempt: 2, resume: false },
       // An N-seat room's terms travel as the adapter's fourth argument, the names only when the effect carries them.
       { type: 'startHost', code: 'ABCD', attempt: 2, resume: true, capacity: 4, waiting: 'w' },
@@ -2993,6 +2999,7 @@ describe('runShellEffect', () => {
       ['fx', 'ding', 'felt'],
       ['fx', [SHELL_CUES.win, { steps: [{ cue: 'good.trick' }], buzz: 9 }], 'felt'],
       ['wakeLock', true],
+      ['orientationLock', true],
       ['startHost', 'ABCD', 2, false],
       ['startHost', 'ABCD', 2, true, { capacity: 4, waiting: 'w' }],
       ['startHost', 'ABCD', 2, true, { capacity: 3, names: ['Bo', null] }],
@@ -3168,10 +3175,18 @@ describe("the rotation hint: lock the phone's rotation, once per table, sideways
     type: 'guest/frame',
     frame: { t: 'state', view: viewFor(game, 1) },
   });
+  /**
+   * On a device that can lock, every tap that seats a table takes the Android lock (`lockSideways`)
+   * and the hint is silent while it is held: the lock does the hint's work. These tests model the
+   * lock not taking (a tablet's refusal, desktop Chromium: the adapter reports `fullscreen/lost` a
+   * microtask after the tap), which is when the hint is due; the lock's own describe below has the
+   * held case.
+   */
+  const lost: FakeIntent = { type: 'fullscreen/lost' };
 
-  test('the initial shell has not shown it; the first paint at the table with the phone sideways toasts it once, for 8 s, and marks the shell, in every role: pass-and-play at the start, the host at the deal, the guest at its first state frame', () => {
+  test('the initial shell has not shown it; the first paint at the table with the phone sideways toasts it once, for 8 s, and marks the shell, in every role: pass-and-play at the start, the host at the deal, the guest at its first state frame (each once the tap`s lock is reported lost)', () => {
     expect(initialApp.shell.rotationHintShown).toBe(false);
-    const local = runIn(LOCKABLE, SIDEWAYS, initialApp, init, sideways, start);
+    const local = runIn(LOCKABLE, SIDEWAYS, initialApp, init, sideways, start, lost);
     expect(toasts(local.effects)).toContainEqual(HINT);
     expect(hints(local.effects)).toBe(1);
     expect(local.app.shell).toMatchObject({ screen: 'tableScreen', rotationHintShown: true });
@@ -3187,11 +3202,11 @@ describe("the rotation hint: lock the phone's rotation, once per table, sideways
     );
     expect(hints(host.effects)).toBe(0);
     expect(host.app.shell).toMatchObject({ screen: 'hostWaitScreen', rotationHintShown: false });
-    const deal = runIn(LOCKABLE, SIDEWAYS, host.app, { type: 'host/deal' });
+    const deal = runIn(LOCKABLE, SIDEWAYS, host.app, { type: 'host/deal' }, lost);
     expect(toasts(deal.effects)).toEqual([HINT]);
     expect(deal.app.shell).toMatchObject({ screen: 'tableScreen', rotationHintShown: true });
-    // The guest: the first `state` frame paints its table.
-    const guest = runIn(LOCKABLE, SIDEWAYS, initialApp, sideways, ...joined);
+    // The guest: the Sit down's lock is lost in the waiting room (no hint there); the first `state` frame paints its table.
+    const guest = runIn(LOCKABLE, SIDEWAYS, initialApp, sideways, ...joined, lost);
     expect(hints(guest.effects)).toBe(0);
     const framed = runIn(LOCKABLE, SIDEWAYS, guest.app, stateFrame(dealt));
     expect(toasts(framed.effects)).toEqual([HINT]);
@@ -3243,6 +3258,8 @@ describe("the rotation hint: lock the phone's rotation, once per table, sideways
       init,
       { type: 'viewport/portrait', portrait: true },
       start,
+      // The lock lost with the phone upright: no hint yet either (the table is not sideways).
+      lost,
     );
     expect(hints(gated.effects)).toBe(0);
     expect(gateOpen(gated.app.shell, SIDEWAYS)).toBe(true);
@@ -3269,7 +3286,7 @@ describe("the rotation hint: lock the phone's rotation, once per table, sideways
   });
 
   test('never twice at one table: later paints (the curtain, a render, a frame) toast nothing more, and the host lost mid-match keeps the mark with the table', () => {
-    const local = runIn(LOCKABLE, SIDEWAYS, initialApp, init, sideways, start).app;
+    const local = runIn(LOCKABLE, SIDEWAYS, initialApp, init, sideways, start, lost).app;
     const played = runIn(
       LOCKABLE,
       SIDEWAYS,
@@ -3280,7 +3297,15 @@ describe("the rotation hint: lock the phone's rotation, once per table, sideways
     );
     expect(hints(played.effects)).toBe(0);
     expect(played.app.shell.rotationHintShown).toBe(true);
-    const guest = runIn(LOCKABLE, SIDEWAYS, initialApp, sideways, ...joined, stateFrame(dealt)).app;
+    const guest = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      initialApp,
+      sideways,
+      ...joined,
+      lost,
+      stateFrame(dealt),
+    ).app;
     const more = runIn(LOCKABLE, SIDEWAYS, guest, stateFrame({ ...dealt, moves: 1, turn: 1 }), {
       type: 'guest/lost',
     });
@@ -3297,7 +3322,7 @@ describe("the rotation hint: lock the phone's rotation, once per table, sideways
       landscapePhone: true,
       rotationHintShown: false,
     });
-    const restarted = runIn(LOCKABLE, SIDEWAYS, left.app, start);
+    const restarted = runIn(LOCKABLE, SIDEWAYS, left.app, start, lost);
     expect(toasts(restarted.effects)).toEqual([HINT]);
     // A position loaded starts the table over (dry-round-2.md F5): it asks again.
     const loaded = runIn(LOCKABLE, SIDEWAYS, restarted.app, {
@@ -3309,5 +3334,223 @@ describe("the rotation hint: lock the phone's rotation, once per table, sideways
     const handed = runIn(LOCKABLE, SIDEWAYS, loaded.app, { type: 'handoff/click' });
     expect(hints(handed.effects)).toBe(0);
     expect(handed.app.shell).toMatchObject({ role: 'host', rotationHintShown: false });
+  });
+});
+
+describe("the Android lock: fullscreen and the landscape lock behind a tap, once per loss, dropped on leave (the owner, 2026-09-25: 'lock the user into place'; docs/design/backgammon-landscape.md §5C)", () => {
+  /** A device whose `screen.orientation.lock` is a function and whose pointer never hovers, as the boot reads it into the ctx. */
+  const LOCKABLE: Ctx = { ...ctx, canLock: true };
+  const HOLD = { type: 'orientationLock', hold: true } as const;
+  const DROP = { type: 'orientationLock', hold: false } as const;
+  const locks = (effects: ReadonlyArray<FakeEffect>): ReadonlyArray<boolean> =>
+    effects.flatMap((e) => (e.type === 'orientationLock' ? [e.hold] : []));
+  const hints = (effects: ReadonlyArray<FakeEffect>): number =>
+    effects.filter((e) => e.type === 'toast' && e.message === ROTATION_HINT_MSG).length;
+  const init: FakeIntent = { type: 'home/init', home };
+  const sideways: FakeIntent = { type: 'viewport/landscape', landscape: true };
+  const start: FakeIntent = { type: 'local/click', p1: 'Ann', p2: 'Bob', level: '2' };
+  const sitDown: FakeIntent = { type: 'join/click', name: 'Bo', code: 'ABCD' };
+  const lost: FakeIntent = { type: 'fullscreen/lost' };
+  const turn: FakeIntent = { type: 'gate/turn' };
+
+  test('the initial shell holds no lock; the pass-and-play Start steps the effect once, right after the wake lock, and marks the shell; the mark survives the table resets a start makes', () => {
+    expect(initialApp.shell.orientationLocked).toBe(false);
+    const atHome = runIn(LOCKABLE, SIDEWAYS, initialApp, init).app;
+    const local = runIn(LOCKABLE, SIDEWAYS, atHome, start);
+    expect(kinds(local.effects).slice(0, 3)).toEqual(['wakeLock', 'orientationLock', 'persist']);
+    expect(locks(local.effects)).toEqual([true]);
+    expect(local.app.shell).toMatchObject({ screen: 'tableScreen', orientationLocked: true });
+    // The seat and the position load reset the table's marks, never the page's lock.
+    expect(localSeated(local.app, dealt, SIDEWAYS).shell.orientationLocked).toBe(true);
+    const loaded = runIn(LOCKABLE, SIDEWAYS, local.app, { type: 'position/load', state: dealt });
+    expect(locks(loaded.effects)).toEqual([]);
+    expect(loaded.app.shell.orientationLocked).toBe(true);
+  });
+
+  test("every tap a game is played through steps it: the host's deal (not the room), the guest's Sit down (a bad code does not), the home's Resume, the curtain's Roll and the gate's Go sideways; the invite link at boot never does", () => {
+    const room = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      initialApp,
+      init,
+      { type: 'host/click', name: 'Ann', level: '3' },
+      { type: 'host/frame', frame: { t: 'join', name: 'Jeff' } },
+    );
+    expect(locks(room.effects)).toEqual([]);
+    expect(room.app.shell.orientationLocked).toBe(false);
+    const deal = runIn(LOCKABLE, SIDEWAYS, room.app, { type: 'host/deal' });
+    expect(kinds(deal.effects)[0]).toBe('orientationLock');
+    expect(locks(deal.effects)).toEqual([true]);
+    expect(deal.app.shell).toMatchObject({ screen: 'tableScreen', orientationLocked: true });
+    const bad = runIn(LOCKABLE, SIDEWAYS, initialApp, { type: 'join/click', name: 'Bo', code: '' });
+    expect(locks(bad.effects)).toEqual([]);
+    expect(bad.app.shell.orientationLocked).toBe(false);
+    const guest = runIn(LOCKABLE, SIDEWAYS, initialApp, sitDown);
+    expect(kinds(guest.effects)).toEqual(['orientationLock', 'scrollTop', 'startGuest']);
+    expect(guest.app.shell).toMatchObject({ role: 'guest', orientationLocked: true });
+    const linked = runIn(LOCKABLE, SIDEWAYS, initialApp, init, { type: 'join/link', code: 'ABCD' });
+    expect(locks(linked.effects)).toEqual([]);
+    expect(linked.app.shell).toMatchObject({ role: 'guest', orientationLocked: false });
+    const offered = runIn(LOCKABLE, SIDEWAYS, initialApp, {
+      type: 'home/init',
+      home: { ...home, save: { role: 'local', game: dealt } },
+    });
+    const resumed = runIn(LOCKABLE, SIDEWAYS, offered.app, { type: 'resume/click' });
+    expect(kinds(resumed.effects)[0]).toBe('orientationLock');
+    expect(resumed.app.shell).toMatchObject({ role: 'local', orientationLocked: true });
+    // Nothing offered: nothing stepped.
+    expect(runIn(LOCKABLE, SIDEWAYS, initialApp, { type: 'resume/click' }).effects).toEqual([]);
+    const gated = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      runIn(LOCKABLE, SIDEWAYS, initialApp, init, start, lost).app,
+      { type: 'viewport/portrait', portrait: true },
+    );
+    expect(gateOpen(gated.app.shell, SIDEWAYS)).toBe(true);
+    const turned = runIn(LOCKABLE, SIDEWAYS, gated.app, turn);
+    expect(turned.effects).toEqual([HOLD]);
+    expect(turned.app.shell.orientationLocked).toBe(true);
+    // The gate stays until the watcher sees the phone turn: the state is the device's, not the tap's.
+    expect(gateOpen(turned.app.shell, SIDEWAYS)).toBe(true);
+    const curtain = runIn(LOCKABLE, SIDEWAYS, runIn(LOCKABLE, SIDEWAYS, turned.app, lost).app, {
+      type: 'curtain/reveal',
+    });
+    expect(kinds(curtain.effects).slice(0, 2)).toEqual(['orientationLock', 'fx']);
+    expect(curtain.app.shell).toMatchObject({ revealed: 0, orientationLocked: true });
+  });
+
+  test('once per loss, not at every turn: while held, no tap steps it again; fullscreen/lost drops the mark (nothing when nothing was held) and the next tap re-enters', () => {
+    const local = runIn(LOCKABLE, SIDEWAYS, initialApp, init, start).app;
+    const held = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      local,
+      { type: 'curtain/reveal' },
+      turn,
+      { type: 'render' },
+      { type: 'curtain/reveal' },
+    );
+    expect(locks(held.effects)).toEqual([]);
+    expect(held.app.shell.orientationLocked).toBe(true);
+    const dropped = runIn(LOCKABLE, SIDEWAYS, held.app, lost);
+    expect(dropped.app.shell.orientationLocked).toBe(false);
+    expect(locks(dropped.effects)).toEqual([]);
+    // Lost twice (the adapter's report after the gesture's): the App is the same object.
+    expect(runIn(LOCKABLE, SIDEWAYS, dropped.app, lost).app).toBe(dropped.app);
+    expect(runIn(LOCKABLE, SIDEWAYS, initialApp, lost).app).toBe(initialApp);
+    const again = runIn(LOCKABLE, SIDEWAYS, dropped.app, { type: 'curtain/reveal' });
+    expect(locks(again.effects)).toEqual([true]);
+    expect(again.app.shell.orientationLocked).toBe(true);
+  });
+
+  test('never on a device that cannot lock (every iPhone, every desktop: no canLock), never in a game that stays upright (no orientation): the taps step nothing, Go sideways is inert, the leave drops nothing, and every effect list is what it was', () => {
+    const iphone = runIn(ctx, SIDEWAYS, initialApp, init, start, { type: 'curtain/reveal' }, turn);
+    expect(locks(iphone.effects)).toEqual([]);
+    expect(iphone.app.shell.orientationLocked).toBe(false);
+    expect(runIn(ctx, SIDEWAYS, iphone.app, turn).app).toBe(iphone.app);
+    expect(run(iphone.app, { type: 'leave/confirmed' }).effects).toEqual([
+      { type: 'wakeLock', hold: false },
+      { type: 'closeNet' },
+      { type: 'then', intent: { type: 'leave/finish' } },
+    ]);
+    const upright = runIn(
+      LOCKABLE,
+      FAKE,
+      initialApp,
+      init,
+      start,
+      { type: 'curtain/reveal' },
+      turn,
+    );
+    expect(locks(upright.effects)).toEqual([]);
+    expect(upright.app.shell.orientationLocked).toBe(false);
+    expect(runIn(LOCKABLE, FAKE, initialApp, sitDown).effects.map((e) => e.type)).toEqual([
+      'scrollTop',
+      'startGuest',
+    ]);
+    expect(runIn(LOCKABLE, FAKE, upright.app, { type: 'cancel' }).effects).toEqual([
+      { type: 'closeNet' },
+      { type: 'then', intent: { type: 'cancel/finish' } },
+    ]);
+  });
+
+  test('dropped on leave and on cancel, where the device can lock in a game that plays sideways, held or lost (a refused lock is still fullscreen): after the wake lock and before the network closes; the finish clears the mark', () => {
+    const local = runIn(LOCKABLE, SIDEWAYS, initialApp, init, start).app;
+    expect(runIn(LOCKABLE, SIDEWAYS, local, { type: 'leave/confirmed' }).effects).toEqual([
+      { type: 'wakeLock', hold: false },
+      DROP,
+      { type: 'closeNet' },
+      { type: 'then', intent: { type: 'leave/finish' } },
+    ]);
+    const lostFirst = runIn(LOCKABLE, SIDEWAYS, local, lost).app;
+    expect(
+      locks(runIn(LOCKABLE, SIDEWAYS, lostFirst, { type: 'leave/confirmed' }).effects),
+    ).toEqual([false]);
+    const left = runIn(LOCKABLE, SIDEWAYS, local, { type: 'leave/finish' });
+    expect(left.app.shell).toMatchObject({ role: null, orientationLocked: false });
+    const guest = runIn(LOCKABLE, SIDEWAYS, initialApp, sitDown).app;
+    expect(runIn(LOCKABLE, SIDEWAYS, guest, { type: 'cancel' }).effects).toEqual([
+      DROP,
+      { type: 'closeNet' },
+      { type: 'then', intent: { type: 'cancel/finish' } },
+    ]);
+    const cancelled = runIn(LOCKABLE, SIDEWAYS, guest, { type: 'cancel/finish' });
+    expect(cancelled.app.shell).toMatchObject({ role: null, orientationLocked: false });
+    // The next Start after a leave locks again: the page is free until its next tap.
+    const restarted = runIn(LOCKABLE, SIDEWAYS, left.app, init, start);
+    expect(locks(restarted.effects)).toEqual([true]);
+  });
+
+  test('the rotation hint is silent while the lock is held (the lock does its work) and due at the loss: sideways at the table, fullscreen/lost hints once, and a table that came up upright hints at the turn only if the lock is gone', () => {
+    const held = runIn(LOCKABLE, SIDEWAYS, initialApp, init, sideways, start);
+    expect(hints(held.effects)).toBe(0);
+    expect(held.app.shell).toMatchObject({ orientationLocked: true, rotationHintShown: false });
+    const played = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      held.app,
+      { type: 'curtain/reveal' },
+      { type: 'render' },
+    );
+    expect(hints(played.effects)).toBe(0);
+    // A back gesture: the lock is gone, the phone may turn, and the hint says how to keep it sideways.
+    const dropped = runIn(LOCKABLE, SIDEWAYS, played.app, lost);
+    expect(toasts(dropped.effects)).toEqual([[ROTATION_HINT_MSG, ROTATION_HINT_MS]]);
+    expect(dropped.app.shell).toMatchObject({ orientationLocked: false, rotationHintShown: true });
+    // Once per table, as before: the next loss and the next paint hint nothing more.
+    const more = runIn(LOCKABLE, SIDEWAYS, dropped.app, { type: 'curtain/reveal' }, lost, {
+      type: 'render',
+    });
+    expect(hints(more.effects)).toBe(0);
+    // Upright at the start (the gate up), the lock held: the turn of the phone hints nothing.
+    const gated = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      initialApp,
+      init,
+      { type: 'viewport/portrait', portrait: true },
+      start,
+    );
+    const turnedHeld = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      gated.app,
+      { type: 'viewport/portrait', portrait: false },
+      sideways,
+    );
+    expect(hints(turnedHeld.effects)).toBe(0);
+    // The same turn with the lock lost first: the hint, as #160 had it.
+    const turnedLost = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      runIn(LOCKABLE, SIDEWAYS, gated.app, lost).app,
+      { type: 'viewport/portrait', portrait: false },
+      sideways,
+    );
+    expect(hints(turnedLost.effects)).toBe(1);
+    // A loss at home or upright hints nothing: the table sideways is the hint's place.
+    const atHome = runIn(LOCKABLE, SIDEWAYS, initialApp, init, sideways, sitDown, lost);
+    expect(hints(atHome.effects)).toBe(0);
+    expect(atHome.app.shell).toMatchObject({ screen: 'guestWaitScreen', orientationLocked: false });
   });
 });

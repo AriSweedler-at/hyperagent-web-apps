@@ -43,6 +43,7 @@ import {
   isShellEffect,
   isShellIntent,
   localBroadcast,
+  lockSideways,
   pure,
   readHome as shellReadHome,
   reduceShell,
@@ -825,10 +826,14 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
     case 'roll/click':
       // `#rollModalBtn` (design §4.7): the engine rolls at once; the tumble starts now, so the
       // guest's modal holds its button until the host's frame brings the faces (the timer then
-      // restarts with them, in `rendered`).
+      // restarts with them, in `rendered`). The tap every turn has: the Android lock re-enters on
+      // it after a back gesture (shell.ts `lockSideways`, silent while held; landscape.md §5C).
       return v?.phase === 'toRoll'
-        ? then(step(withTable(app, { rolling: true }), TUMBLE_TIMER), (a) =>
-            act(a, [{ type: 'roll' }], ctx),
+        ? then(
+            then(lockSideways(app, ctx, BACKGAMMON), (locked) =>
+              step(withTable(locked, { rolling: true }), TUMBLE_TIMER),
+            ),
+            (a) => act(a, [{ type: 'roll' }], ctx),
           )
         : pure(app);
     case 'undo/click':
