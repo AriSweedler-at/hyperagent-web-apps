@@ -622,11 +622,14 @@ its board CSS and its layout twin:
    `shell:`; `render.ts` adds nothing.
 2. **`gateOpen(s, cfg)`**: the opt-in, the table screen, a view that is not over (`engine.over`,
    and `engine.gameOver` where the game has a result sheet inside a match: backgammon's
-   `phase === 'over'`), a phone held upright, not dismissed. "Play upright" (`gate/keep`,
+   `phase === 'over'`), a phone held upright, not dismissed, and not while the Android lock is
+   held (`ShellState.orientationLocked`: the tap that took it is turning the phone, so the sheet
+   would only flash over the curtain until the watcher sees the turn; `fullscreen/lost` clears
+   the mark, and a phone still upright then gets the gate back). "Play upright" (`gate/keep`,
    `ShellState.gateDismissed`) holds for one table: dropped at the shell's pass-and-play start,
-   `position/load`, handoff and leave; kept when the host is lost mid-match, since the same table
-   stays up. A game whose own flow ends a table past the shell (backgammon's `hostLeft`) drops it
-   there too.
+   `position/load`, handoff, leave and cancel; kept when the host is lost mid-match, since the
+   same table stays up. A game whose own flow ends a table past the shell (backgammon's
+   `hostLeft`) drops it there too.
    **The rotation hint** rides the same state (2026-09-28, the owner: "can we give a warning to
    lock the phone's rotation in landscape mode if we haven't already?", "also important for solo
    play"): the first time the shell paints the table with the phone sideways (`painted`, or the
@@ -663,7 +666,10 @@ its board CSS and its layout twin:
    and unlocks with it; nothing can re-enter before the next tap) and from the adapter's own
    report that an attempt did not take (a tablet that refuses, desktop Chromium); while held, no
    tap steps the effect again and the rotation hint is silent (the lock does its work); at the
-   loss, the hint is due where it was silent. A leave or a cancel drops the lock (`hold` false:
+   loss, the hint is due where it was silent. Never against "Play upright": `lockSideways` reads
+   `gateDismissed` too, so after the choice no tap of this table (the curtain's Roll, backgammon's
+   roll modal) locks the phone again; the next table's start, load, handoff, leave or cancel
+   clears the mark, and its first tap locks. A leave or a cancel drops the lock (`hold` false:
    unlock, then out of fullscreen) after the wake lock and before the network closes, on a device
    that can lock whether or not the state still says held, since a refused lock is still
    fullscreen. `#turnGateGoBtn` ("Go sideways", shipped hidden) is painted by `paintGate(doc,
@@ -686,7 +692,8 @@ its board CSS and its layout twin:
    every theme and the shell sheet, so the board's layout and the gate's watcher cannot drift apart.
 5. **Tests**: `shell.test.ts` (the state, the intents, `gateOpen`, the resets), `shellPaint.test.ts`
    (`paintGate`: `inert` on `#app` and every other `.overlay` in the body, found by class since each
-   game's overlays differ and where a page places one changes nothing; focus to the dismiss button),
+   game's overlays differ and where a page places one changes nothing; focus to the first shown
+   control, "Go sideways" under `canLock` else the dismiss button, both let go when the gate hides),
    `boot.test.ts` (the watchers, the paint and the tap on "Play upright", only with the opt-in; the
    Android lock's tap, its two calls in order, the `fullscreenchange` loss, a refused lock's report
    and the drop), `orientation.test.ts` (the adapter over fakes: the order, every failure silent),
