@@ -21,6 +21,8 @@ import {
   LEGACY_GAMES,
   REGISTRY,
   SHELL_GAMES,
+  SOLO,
+  SOLO_PAGES,
   TOOL_NAMES,
 } from '../../tools/games.ts';
 import { isManifestGame, shippedFiles } from '../../tools/icons.ts';
@@ -41,13 +43,12 @@ const sha256 = (path: string): string =>
 const legacyPage = (game: string): string => resolve(REPO_ROOT, 'legacy', game, 'index.html');
 
 /**
- * Folders under games/ that hold served files and no page yet: the RPS buddy frames
- * (docs/design/rps-buddy.md §3, web/public/games/rps/buddy/) ship before the reaction game's page;
- * when that page lands, rps joins tools/games.ts and leaves this list. Each is its files alone.
+ * The served files a solo page's folder carries beside its page and bundle: the reaction game's
+ * buddy frames (docs/design/rps-buddy.md §3, web/public/games/rps/buddy/), copied verbatim.
  */
-const ASSET_FOLDERS: ReadonlyArray<Readonly<{ folder: string; under: string }>> = [
-  { folder: 'rps', under: `${BUDDY_DIR.replace('web/public/', '')}/` },
-];
+const SOLO_ASSETS: Readonly<Record<(typeof SOLO_PAGES)[number], ReadonlyArray<string>>> = {
+  rps: [`${BUDDY_DIR.replace('web/public/', '')}/`],
+};
 
 describeDist('dist parity with legacy/ and web/', (root) => {
   test('index.html (the landing page) is byte-identical to web/index.html', () => {
@@ -163,6 +164,63 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     });
   });
 
+  // A solo page (tools/games.ts SOLO_PAGES; docs/design/rps-island.md D1): built like a game (its
+  // bundle and map beside the page, its own CSS under shared/assets/), its title and ids as its
+  // row spells them, no PeerJS, and its served assets beside it. It links no shared sheet (its
+  // theme imports the tokens and the primitives, so the games' shared CSS chunk stays one file).
+  SOLO_PAGES.forEach((page) => {
+    const { title, pageShape } = SOLO[page];
+    test(`the ${page} page is built beside its bundle, carries its title and ids, and its assets`, () => {
+      const files = distFiles(root);
+      const bundles = files.filter((file) =>
+        new RegExp(`^games/${page}/app-[\\w-]+\\.js$`).test(file),
+      );
+      expect(bundles).toHaveLength(1);
+      expect(files).toContain(`${bundles[0] ?? ''}.map`);
+      expect(
+        files.filter((file) => new RegExp(`^shared/assets/${page}-[\\w-]+\\.css$`).test(file)),
+      ).toHaveLength(1);
+      const assets = SOLO_ASSETS[page];
+      const own = files.filter(
+        (file) =>
+          file.startsWith(`games/${page}/`) && !assets.some((under) => file.startsWith(under)),
+      );
+      expect(own.sort()).toEqual(
+        [`games/${page}/index.html`, bundles[0] ?? '', `${bundles[0] ?? ''}.map`].sort(),
+      );
+      assets.forEach((under) => {
+        expect(files.filter((file) => file.startsWith(under)).length, under).toBeGreaterThan(0);
+      });
+      const html = readDist(root, `games/${page}/index.html`);
+      expect(html).toContain(`<title>${title}</title>`);
+      pageShape.ids.forEach((id) => {
+        expect(html).toContain(`id="${id}"`);
+      });
+      expect(html).toMatch(/<script type="module" crossorigin src="\.\/app-[\w-]+\.js"><\/script>/);
+      expect(html).not.toContain('peerjs.min.js');
+      expect(html).not.toContain('shared/ice.js');
+      const references = referencesIn(`games/${page}/index.html`, html)
+        .map(({ value }) => value)
+        .filter((value) => !value.startsWith('https://'));
+      expect(references.filter((value) => value.includes('/favicon.'))).toEqual([
+        '../../shared/favicon.svg',
+        '../../shared/favicon.ico',
+      ]);
+      const sheets = references.filter((value) => value.endsWith('.css'));
+      expect(sheets).toEqual([
+        expect.stringMatching(
+          new RegExp(`^\\.\\./\\.\\./shared/assets/${page}-[\\w-]+\\.css$`),
+        ) as string,
+      ]);
+      references.forEach((value) => {
+        const target = value.startsWith('./')
+          ? `games/${page}/${value.slice(2)}`
+          : value.replace('../../', '');
+        expect(distHasFile(root, target), `${value} -> ${target}`).toBe(true);
+      });
+    });
+  });
+
   // The shape of each page as tools/games.ts REGISTRY spells it: the title, the ids of its static
   // screens (fidice's composed shell page's since M2 of docs/design/fidice-shell-adoption.md, dark
   // while its legacy app paints into `#app`; gin keeps the legacy ids;
@@ -247,36 +305,27 @@ describeDist('dist parity with legacy/ and web/', (root) => {
 
   test('the tree holds the landing page, every game page and nothing stray at the root', () => {
     const files = distFiles(root);
-    ['.nojekyll', 'index.html', ...GAMES.map((game) => `games/${game}/index.html`)].forEach(
-      (file) => {
-        expect(files, file).toContain(file);
-      },
-    );
+    [
+      '.nojekyll',
+      'index.html',
+      ...GAMES.map((game) => `games/${game}/index.html`),
+      ...SOLO_PAGES.map((page) => `games/${page}/index.html`),
+    ].forEach((file) => {
+      expect(files, file).toContain(file);
+    });
     // The classic ICE loader went with the last legacy page (step 13); it is bundled now.
     expect(files).not.toContain('shared/ice.js');
-    // games/ holds one folder per game, one per alias (tools/games.ts ALIASES) and one per tool
-    // page (TOOLS), nothing else; an alias folder is its stub alone, never a bundle or a map.
+    // games/ holds one folder per game, one per solo page, one per alias (tools/games.ts ALIASES)
+    // and one per tool page (TOOLS), nothing else; an alias folder is its stub alone, never a
+    // bundle or a map (it is not a game page).
     const folders = [
       ...new Set(
         files.filter((file) => file.startsWith('games/')).map((file) => file.split('/')[1]),
       ),
     ];
     expect(folders.sort()).toEqual(
-      [
-        ...GAMES,
-        ...Object.keys(ALIASES),
-        ...TOOL_NAMES,
-        ...ASSET_FOLDERS.map(({ folder }) => folder),
-      ].sort(),
+      [...GAMES, ...SOLO_PAGES, ...Object.keys(ALIASES), ...TOOL_NAMES].sort(),
     );
-    ASSET_FOLDERS.forEach(({ folder, under }) => {
-      const held = files.filter((file) => file.startsWith(`games/${folder}/`));
-      expect(held.length, folder).toBeGreaterThan(0);
-      expect(
-        held.filter((file) => !file.startsWith(under)),
-        `${folder}: only ${under}`,
-      ).toEqual([]);
-    });
     ALIAS_PAGES.forEach(({ alias, page }) => {
       expect(files.filter((file) => file.startsWith(`games/${alias}/`))).toEqual([page]);
     });

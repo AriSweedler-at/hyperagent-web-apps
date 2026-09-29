@@ -5,7 +5,7 @@
 // also resolve on the origin they are clicked from, in one request: on the proxy the Worker serves
 // the landing page with its `games/XXX/` hrefs already rewritten to /XXX/ (worker.ts "Landing
 // links"), so a click never takes the /games/XXX -> /XXX redirect, which stays for old links.
-import { ALIASES, GAMES, HOOKS, LANDING_HREFS } from '../tools/games.ts';
+import { ALIASES, LANDING_HREFS, LANDING_PAGES, PAGE_HOOKS } from '../tools/games.ts';
 import { gameQuery } from './fixtures/player.ts';
 import {
   EXPECTED_TITLES,
@@ -29,7 +29,7 @@ PAGES.forEach((name) => {
     const ice = watched.responses().filter((response) => response.url.endsWith('shared/ice.js'));
     if (name !== 'landing') {
       // docs/MIGRATION.md steps 9 and 12: no classic scripts; the documented hook shows the boot finished.
-      await expect.poll(() => page.evaluate<string>(`typeof ${HOOKS[name]}`)).toBe('object');
+      await expect.poll(() => page.evaluate<string>(`typeof ${PAGE_HOOKS[name]}`)).toBe('object');
       expect(await page.evaluate<string>('typeof Peer')).toBe('undefined');
       expect(await page.evaluate<string>('typeof window.HyperIce')).toBe('undefined');
       expect(ice, 'shared/ice.js must not be requested').toEqual([]);
@@ -45,7 +45,7 @@ PAGES.forEach((name) => {
 
 /** The card hrefs as each origin serves them: relative on Pages, short on the proxy (rewritten by the Worker as it serves `/`). */
 const cardHrefs = (project: Project): ReadonlyArray<string> =>
-  project === 'proxy' ? GAMES.map((game) => `/${game}/`) : LANDING_HREFS;
+  project === 'proxy' ? LANDING_PAGES.map((page) => `/${page}/`) : LANDING_HREFS;
 
 test('landing: every card link resolves on this origin', async ({ player, project }) => {
   const { page } = player;
@@ -66,7 +66,7 @@ test('landing: every card link resolves on this origin', async ({ player, projec
 // A card click is one document request that lands on the game's page at this origin's own path:
 // no redirect hop (`redirectedFrom()` is null), so the address bar and the history hold the short
 // URL alone on the proxy. The same on Pages, where the relative href resolves in place.
-GAMES.forEach((game) => {
+LANDING_PAGES.forEach((game) => {
   test(`landing: the ${game} card lands on the game in one request`, async ({
     player,
     project,

@@ -11,11 +11,15 @@ import {
   GAMES,
   HOOKS,
   LANDING_HREFS,
+  LANDING_PAGES,
   LEGACY_GAMES,
+  PAGE_HOOKS,
   PAGE_TITLES,
   REGISTRY,
   SHELL,
   SHELL_GAMES,
+  SOLO,
+  SOLO_PAGES,
 } from './games.ts';
 
 describe('the games registry', () => {
@@ -202,9 +206,32 @@ describe('the games registry', () => {
       fidice: "Fidice — one-cup liar's dice",
       backgammon: 'Sheshbesh — backgammon',
       briscola: 'Briscola — cards',
+      rps: 'Rock Paper Scissors',
       // The tool page (TOOLS): smoked like a game, no game.
       'ui-sandbox': 'UI Sandbox',
     });
+  });
+
+  test('the solo pages: the reaction game alone, a row with a title, a hook, a suite, its spec and its ids; never a game', () => {
+    expect(SOLO_PAGES).toEqual(['rps']);
+    expect(Object.keys(SOLO)).toEqual(SOLO_PAGES);
+    expect(SOLO.rps).toMatchObject({
+      title: 'Rock Paper Scissors',
+      hook: 'window.__rps',
+      suite: 'rps',
+      specs: ['**/rps.spec.ts'],
+    });
+    expect(SOLO.rps.pageShape.ids).toEqual(
+      expect.arrayContaining(['app', 'counter', 'counterFace', 'buddy', 'islandSlot', 'techUpBtn']),
+    );
+    SOLO_PAGES.forEach((page) => {
+      expect(GAMES as ReadonlyArray<string>, `${page} is a solo page, not a game`).not.toContain(
+        page,
+      );
+      expect(existsSync(resolve(import.meta.dirname, '..', 'web', 'games', page)), page).toBe(true);
+    });
+    expect(PAGE_HOOKS).toEqual({ ...HOOKS, rps: 'window.__rps' });
+    expect(LANDING_PAGES).toEqual([...GAMES, 'rps']);
   });
 
   test('pins every page hook, read off the rows', () => {
@@ -217,12 +244,13 @@ describe('the games registry', () => {
     });
   });
 
-  test('the landing hrefs are games/<g>/ in GAMES order', () => {
+  test('the landing hrefs are games/<g>/ in LANDING_PAGES order: the games, then the solo pages', () => {
     expect(LANDING_HREFS).toEqual([
       'games/gin-rummy/',
       'games/fidice/',
       'games/backgammon/',
       'games/briscola/',
+      'games/rps/',
     ]);
   });
 

@@ -8,7 +8,7 @@ import { expect, test } from 'vitest';
 
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
 import { mapPath, unmapPath } from '../../infra/games-proxy/worker.ts';
-import { GAMES, LANDING_HREFS, LANDING_TOOL_HREFS } from '../../tools/games.ts';
+import { GAMES, LANDING_HREFS, LANDING_TOOL_HREFS, SOLO_PAGES } from '../../tools/games.ts';
 import {
   ALIAS_PAGES,
   allReferences,
@@ -51,9 +51,9 @@ describeDist('dist paths on both origins', (root) => {
     expect(checked.length).toBeGreaterThanOrEqual(8);
   });
 
-  test('every game page is built', () => {
-    GAMES.forEach((game) => {
-      expect(distHasFile(root, `games/${game}/index.html`), game).toBe(true);
+  test('every game page and every solo page is built', () => {
+    [...GAMES, ...SOLO_PAGES].forEach((page) => {
+      expect(distHasFile(root, `games/${page}/index.html`), page).toBe(true);
     });
   });
 

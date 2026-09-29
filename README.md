@@ -18,6 +18,7 @@ pages got here.
 | Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/     | https://games.sweedler.com/fidice/                                               | `web/games/fidice/`     |
 | Sheshbesh (backgammon)       | https://arisweedler-at.github.io/hyperagent-web-apps/games/backgammon/ | https://games.sweedler.com/backgammon/ and https://games.sweedler.com/sheshbesh/ | `web/games/backgammon/` |
 | Briscola                     | https://arisweedler-at.github.io/hyperagent-web-apps/games/briscola/   | https://games.sweedler.com/briscola/                                             | `web/games/briscola/`   |
+| Rock Paper Scissors          | https://arisweedler-at.github.io/hyperagent-web-apps/games/rps/        | https://games.sweedler.com/rps/                                                  | `web/games/rps/`        |
 | UI Sandbox (a tool, no game) | https://arisweedler-at.github.io/hyperagent-web-apps/games/ui-sandbox/ | https://games.sweedler.com/ui-sandbox/                                           | `web/games/ui-sandbox/` |
 
 Both origins serve the same `dist/`. `games.sweedler.com` is the Cloudflare Worker in

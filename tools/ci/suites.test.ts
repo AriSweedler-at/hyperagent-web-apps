@@ -7,7 +7,7 @@ import { relative, resolve } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
-import { GAMES, REGISTRY } from '../games.ts';
+import { GAMES, REGISTRY, SOLO, SOLO_PAGES } from '../games.ts';
 import { matchesAny } from './glob.ts';
 import {
   E2E_SUITES,
@@ -179,21 +179,23 @@ describe('every test file belongs to exactly one suite', () => {
       'fidice',
       'backgammon',
       'briscola',
+      'rps',
       'site',
       'harness',
     ]);
-    expect(E2E_SUITES).toEqual(['gin', 'fidice', 'backgammon', 'briscola', 'site']);
+    expect(E2E_SUITES).toEqual(['gin', 'fidice', 'backgammon', 'briscola', 'rps', 'site']);
     expect(JOBS).toEqual([
       ...SUITE_NAMES,
       'e2e-gin',
       'e2e-fidice',
       'e2e-backgammon',
       'e2e-briscola',
+      'e2e-rps',
       'e2e-site',
     ]);
     // The game suites are the matrix jobs' values: each has both halves (the unit script and the
-    // e2e script the two jobs run), in job order.
-    expect(GAME_SUITES).toEqual(['gin', 'fidice', 'backgammon', 'briscola']);
+    // e2e script the two jobs run), in job order; the reaction game, a solo page, rides them too.
+    expect(GAME_SUITES).toEqual(['gin', 'fidice', 'backgammon', 'briscola', 'rps']);
     expect(SUITE_NAMES.filter(isGameSuite)).toEqual(GAME_SUITES);
     GAME_SUITES.forEach((game) => {
       expect(E2E_SUITES, game).toContain(game);
@@ -229,9 +231,16 @@ describe('every test file belongs to exactly one suite', () => {
       tag: '@briscola',
       otherTags: ['@gin-rummy', '@fidice', '@backgammon'],
     });
-    // Every game names a suite of its own (two rows naming one suite would drop a game from the
-    // reverse map silently), and every game suite is some game's.
-    expect([...GAME_SUITES].sort()).toEqual(GAMES.map((game) => REGISTRY[game].suite).sort());
+    // A solo page's e2e half is its own specs alone: no shared spec, no tag.
+    expect(SUITES.rps.e2e).toStrictEqual({ files: ['**/rps.spec.ts'], otherTags: [] });
+    // Every game and solo page names a suite of its own (two rows naming one suite would drop one
+    // from the reverse map silently), and every game suite is some page's.
+    expect([...GAME_SUITES].sort()).toEqual(
+      [
+        ...GAMES.map((game) => REGISTRY[game].suite),
+        ...SOLO_PAGES.map((page) => SOLO[page].suite),
+      ].sort(),
+    );
   });
 
   test('the per-suite file counts as cut over (the table of the design, re-counted on main)', () => {
@@ -246,6 +255,8 @@ describe('every test file belongs to exactly one suite', () => {
     expect(counts['backgammon']).toBeGreaterThanOrEqual(21);
     // The engine's six files (docs/design/briscola-rules.md §5), added with PR-2.
     expect(counts['briscola']).toBeGreaterThanOrEqual(18);
+    // The reaction game: the engine, the codec's round trip, the reducer, storage, fx, the buddy table.
+    expect(counts['rps']).toBeGreaterThanOrEqual(5);
     expect(counts['site']).toBeGreaterThanOrEqual(8);
     expect(counts['harness']).toBeGreaterThanOrEqual(6);
   });
@@ -256,6 +267,33 @@ describe('every test file belongs to exactly one suite', () => {
  * that owns it now and the figures. A row may ratchet up (edit both places), never down or out.
  */
 const ROWS_BEFORE: ReadonlyArray<readonly [string, Suite, Thresholds]> = [
+  // The reaction game's rows (docs/design/rps-island.md): a solo page, measured at its landing.
+  [
+    'web/games/rps/src/engine/**',
+    'rps',
+    { lines: 95, functions: 95, statements: 95, branches: 90 },
+  ],
+  [
+    'web/games/rps/src/storage.ts',
+    'rps',
+    { lines: 95, functions: 95, statements: 95, branches: 90 },
+  ],
+  ['web/games/rps/src/fx.ts', 'rps', { lines: 95, functions: 95, statements: 95, branches: 90 }],
+  [
+    'web/games/rps/src/ui/state.ts',
+    'rps',
+    { lines: 95, functions: 95, statements: 95, branches: 90 },
+  ],
+  [
+    'web/games/rps/src/ui/buddy.ts',
+    'rps',
+    { lines: 95, functions: 95, statements: 95, branches: 90 },
+  ],
+  [
+    'web/games/rps/src/ui/sound.ts',
+    'rps',
+    { lines: 95, functions: 95, statements: 95, branches: 90 },
+  ],
   ['web/shared/lib/**', 'shared', { lines: 100, functions: 100, branches: 100, statements: 100 }],
   // Added after the partition (docs/design/glossary-links.md §3): held at 100 like shared/lib.
   ['web/shared/ui/**', 'shared', { lines: 100, functions: 100, branches: 100, statements: 100 }],
@@ -473,6 +511,13 @@ const ROWS_BEFORE: ReadonlyArray<readonly [string, Suite, Thresholds]> = [
 ];
 
 const INCLUDE_BEFORE: ReadonlyArray<string> = [
+  // The reaction game (docs/design/rps-island.md), a solo page on the matrix jobs.
+  'web/games/rps/src/engine/**/*.ts',
+  'web/games/rps/src/storage.ts',
+  'web/games/rps/src/fx.ts',
+  'web/games/rps/src/ui/state.ts',
+  'web/games/rps/src/ui/buddy.ts',
+  'web/games/rps/src/ui/sound.ts',
   'web/shared/lib/**/*.ts',
   'web/shared/edge/**/*.ts',
   'web/shared/net/**/*.ts',
@@ -643,6 +688,12 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
     ['briscola', 'e2e-briscola', 'site', 'e2e-site', 'harness'],
   ],
   ['the briscola wire goldens', ['test/fixtures/briscola-wire/state.json'], ['briscola']],
+  [
+    'the reaction game (a solo page)',
+    ['web/games/rps/src/engine/engine.ts', 'web/games/rps/theme.css'],
+    ['rps', 'e2e-rps', 'site', 'e2e-site', 'harness'],
+  ],
+  ["the reaction game's own spec", ['e2e/rps.spec.ts'], ['e2e-rps']],
   ['a briscola spec', ['e2e/briscola-local.spec.ts'], ['e2e-briscola']],
   ['a briscola style golden', ['test/fixtures/styles/briscola.390x844.json'], ['e2e-site']],
   ['a backgammon style golden', ['test/fixtures/styles/backgammon.390x844.json'], ['e2e-site']],
