@@ -104,7 +104,10 @@ body {
   /* The home indicator's band, read through the same `--inset-b` the sideways block declares: the
      one seam a measurement (tools/shell-emulate.ts) overrides, upright as sideways. The paddings
      are the shell's (shell.css "the screen frame": the band, the hairline and `--frame-gap`, or the
-     inset where that is more): 12px here, 16 from 900px. */
+     inset where that is more): 12px here, 16 from 900px, the notch's 47-62px above and the home
+     indicator's 34 below once installed. Nothing here counts them: the upright table measures the
+     room they leave (the geometry section: #app is a size container at the table and #tableScreen
+     reads `100cqh`), so a phone the catalogue has never seen fits too. */
   --inset-b: env(safe-area-inset-bottom, 0px);
 }
 /* The trim (the owner: "green style trim in the background at the border of the window"): the
@@ -654,24 +657,29 @@ label {
 }
 
 /* ---------- the table: geometry (design §3.1) ---------- */
-/* At the table the page never scrolls (gin's rule): the board's point width is a clamp() of the
-   viewport, every row above and below it has one height in every phase, and the fallback under
-   `@media (max-height: 805px)` at the end of this section lets a short viewport scroll instead of
-   clipping the controls. */
+/* At the table the page never scrolls (gin's rule): the board's point width fills the room the
+   chrome leaves, every row above and below it has one height in every phase, and the fallback
+   under `@media (max-height: 805px)` at the end of this section lets a short viewport scroll
+   instead of clipping the controls. */
 #tableScreen {
-  /* Phone: the board stands on end. Everything that is not the board measures 172px: #app padding
-     24, topbar 44, status line 22, controls 56, three 8px gaps, and 2px of slack for rounding.
-     The board is twelve point rows, the bar band, the off row and 16px of frame, so at 390x844
-     --point-w is (844 - 172 - 48 - 44 - 16) / 12 = 47px and the board 672px.
-     Below the 44px floor (806px tall) the fallback scrolls. */
-  --chrome-h: 172px;
+  /* Phone: the board stands on end. The chrome inside the screen measures 148px (`--chrome-in`):
+     topbar 44, status line 22, controls 56, three 8px gaps, and 2px of slack for rounding. The
+     room is measured, never computed from a viewport unit: at the table #app is a size container
+     (the rule after this block) and `100cqh` is its content box, the viewport less the shell's
+     paddings (docs/design/screen-frame.md §3: 12px each in a tab or headless; the notch and the
+     home indicator once installed, 47 and 34 on an iPhone 12). The board is twelve point rows,
+     the bar band, the off row and 16px of frame in what the chrome leaves, so at 390x844
+     --point-w is (820 - 148 - 48 - 44 - 16) / 12 = 47px and the board 672px; installed,
+     (763 - 256) / 12 = 42.25 and the board 615, the controls ending 2px over the indicator's
+     band. No floor here: a floor the room cannot hold pushed the controls under the band on every
+     notched phone installed (2026-09-29, the emulator's `clear` sweep); the four smallest classes
+     get 39.8-43.7px rows, each still 147-152px long. The 44px floor is the scroll fallback's
+     alone (`@media (max-height: 805px)` at the end of this section), where the document scrolls.
+     ui/board/layout.ts `uprightRoom`, `pointWidth` and `uprightFoot` are the twin. */
+  --chrome-in: 148px;
   --bar-w: 48px;
   --off-h: 44px;
-  --point-w: clamp(
-    44px,
-    calc((100dvh - var(--chrome-h) - var(--bar-w) - var(--off-h) - 16px) / 12),
-    64px
-  );
+  --point-w: min(calc((100cqh - var(--chrome-in) - var(--bar-w) - var(--off-h) - 16px) / 12), 64px);
   --checker-d: calc(var(--point-w) * 0.86);
   /* The turn arrow's column off the board's left edge (the owner, 2026-09-25: "about the size of
      a checker and off to the left of the board"): a checker and a 6px gap, 46px at 390x844. */
@@ -689,6 +697,20 @@ label {
   min-height: 0;
   overflow: hidden;
   gap: 8px;
+}
+/* The room's measure: at the table #app stands the shell's `100dvh` with the frame's clearance or
+   the insets for paddings (shell.css), and as a size container its content box is what `100cqh`
+   above reads: exactly what the paddings leave, whatever they are. Upright only: `min-height:
+   501px` keeps a phone sideways (under 500px tall) out, since its block makes #tableScreen the
+   container and lifts the pin in fallbacks of its own; under 900px, since the desktop's board is a
+   clamp of the viewport and its 645px fallback lets #app grow. The 805px fallback below drops the
+   container the same way: contained, #app could not grow with the floor's board. Nothing fixed or
+   absolute inside #app reads the viewport for its box (the overlays and the toast are body's,
+   the roll sheet and the arrow are #board's), so the layout containment this brings moves nothing. */
+@media (max-width: 899px) and (min-height: 501px) {
+  body.fixed-screen #app {
+    container-type: size;
+  }
 }
 @media (min-width: 900px) {
   #tableScreen {
@@ -1995,9 +2017,12 @@ label {
 }
 
 /* ---------- short viewports (design §3.10) ---------- */
-/* With --point-w floored at 44px the board is 636px and the screen needs 806px. Below that the
-   document scrolls instead of clipping the controls row; the board itself can be scrolled from
-   (touch-action: none is scoped to .checker). */
+/* At 44px points (design §6, the tap target) the board is 636px and the screen needs 806px
+   inset-free (24 of paddings, 146 of chrome, the board). Below that the document scrolls instead
+   of clipping the controls row; the board itself can be scrolled from (touch-action: none is
+   scoped to .checker). The query reads the viewport, not the room: a media query cannot read
+   `env()`, so an installed phone's insets do not move it, and above it the room decides the
+   point width (the geometry section). */
 @media (max-height: 805px) and (max-width: 899px) {
   body.fixed-screen,
   body.fixed-screen #app {
@@ -2007,9 +2032,14 @@ label {
   }
   body.fixed-screen #app {
     min-height: 100dvh;
+    /* No size container while the document scrolls: contained, #app could not grow past the
+       viewport and the floor's board would be clipped. */
+    container-type: normal;
   }
   #tableScreen {
     overflow: visible;
+    /* The floor outright (uncontained, `100cqh` would read the small viewport). */
+    --point-w: 44px;
   }
 }
 /* The desktop board floors at 40px points (11.4 x 40 + 190 = 646px); shorter windows scroll too. */

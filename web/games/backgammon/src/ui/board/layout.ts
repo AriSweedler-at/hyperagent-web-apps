@@ -21,8 +21,12 @@ export type PlaceId = `point-${number}` | 'barTop' | 'barBottom' | 'offLight' | 
 export type Area = PlaceId | 'dice';
 /** A grid rectangle in 1-based grid lines, as CSS `grid-area: row / col / row + rowSpan / col + colSpan`. */
 export type Cell = Readonly<{ row: number; col: number; rowSpan: number; colSpan: number }>;
-/** The safe-area insets a phone reports sideways (`env(safe-area-inset-*)`), in px; 0 in headless. */
-export type Insets = Readonly<{ left: number; right: number; bottom: number }>;
+/**
+ * The safe-area insets a phone reports (`env(safe-area-inset-*)`), in px; 0 in headless. Sideways
+ * the notch is `left` and `right` and the home indicator `bottom`; upright the notch is `top`
+ * (installed; 0 in a tab, where the browser's bar owns that edge) and the indicator `bottom`.
+ */
+export type Insets = Readonly<{ top?: number; left: number; right: number; bottom: number }>;
 /**
  * What the CSS keys on: the viewport, whether the pointer is coarse (`(any-pointer: coarse)`; a
  * finger, false in every desktop context and in headless without `hasTouch`) and the insets.
@@ -73,15 +77,32 @@ export const stackStep = (pointLen: number, checkerD: number, spare = LABEL_CORN
 export const stackExtent = (count: number, checkerD: number, step: number): number =>
   count <= 0 ? 0 : checkerD + (visibleOf(count) - 1) * step;
 
-/** theme.css's `--point-w` clamps, by layout (design §3.1). */
+/**
+ * The phone upright (design §3.1 phone, §3.10). The shell pads #app by its clearance (the trim's
+ * 6px band, the 1px hairline, 5px of air: 12) or the safe-area inset where that is more (the notch
+ * above once installed, the home indicator below; docs/design/screen-frame.md §3); the chrome
+ * inside the screen is the topbar, the status line, the controls and three 8px gaps (`chromeIn`,
+ * 146) plus 2px of slack for rounding; the board is twelve point rows, the bar band, the off row
+ * and the frame. The CSS measures the room (#app is a size container at the table, #tableScreen
+ * reads `100cqh`); the twin computes it from the viewport less the paddings (`uprightRoom`). At
+ * most `scrollMaxHeight` tall the document scrolls and the board takes the 44px floor (design §6;
+ * the floor's board and the inset-free chrome need 806, and the media query reads the viewport,
+ * so the insets do not move it); above it the room decides, capped at 64, and there is no floor: a
+ * floor the room cannot hold would push the controls under the indicator's band, which was the
+ * notch's defect. The four smallest notched classes installed get 39.8-43.7px rows, each still
+ * 147-152px long (the tap target is the whole row).
+ */
 export const PHONE_GEOMETRY = {
-  chromeH: 172,
+  clearance: 12,
+  chromeIn: 146,
+  slack: 2,
   barW: 48,
   offH: 44,
   frame: 16,
   rows: 12,
   minPointW: 44,
   maxPointW: 64,
+  scrollMaxHeight: 805,
   checkerRatio: 0.86,
 } as const;
 export const DESKTOP_GEOMETRY = {
@@ -144,15 +165,28 @@ export const edgeOf = (vp: Viewport): number =>
   Math.max(LANDSCAPE_GEOMETRY.minEdge, vp.insets?.left ?? 0, vp.insets?.right ?? 0);
 /** `--chrome-w` sideways: both edges and, with the rail, the rail and its gap (82px inset-free; 32 with the rows). */
 export const chromeWidth = (vp: Viewport): number => 2 * edgeOf(vp) + schemeOf(vp).beside;
+/** #app's vertical paddings upright, the shell's rule: `max(clearance, inset)` above and below (12 and 12 in a tab or headless; 47 and 34 on an iPhone 12 installed). */
+export const uprightPadding = (vp: Viewport): Readonly<{ top: number; bottom: number }> => ({
+  top: Math.max(PHONE_GEOMETRY.clearance, vp.insets?.top ?? 0),
+  bottom: Math.max(PHONE_GEOMETRY.clearance, vp.insets?.bottom ?? 0),
+});
+/** What `100cqh` reads upright: #app's content box, the viewport less its paddings (820 at 390x844 inset-free, 763 installed). */
+export const uprightRoom = (vp: Viewport): number => {
+  const pad = uprightPadding(vp);
+  return vp.height - pad.top - pad.bottom;
+};
+/** The upright scroll tier (design §3.10): at most 805px tall the document scrolls and the board takes the 44px floor; the CSS's media query reads the viewport, so the insets do not move it. */
+export const uprightScrolls = (vp: Viewport): boolean =>
+  vp.height <= PHONE_GEOMETRY.scrollMaxHeight;
 /** `--point-w` in px for a viewport: 47 at 390x844, 53.5 at 1280x800, 54 at 844x390 on a phone. */
 export const pointWidth = (viewport: Viewport): number => {
   const { width, height } = viewport;
   const layout = layoutFor(viewport);
   if (layout === 'phone') {
     const g = PHONE_GEOMETRY;
-    return clamp(
-      g.minPointW,
-      (height - g.chromeH - g.barW - g.offH - g.frame) / g.rows,
+    if (uprightScrolls(viewport)) return g.minPointW;
+    return Math.min(
+      (uprightRoom(viewport) - g.chromeIn - g.slack - g.barW - g.offH - g.frame) / g.rows,
       g.maxPointW,
     );
   }
@@ -171,6 +205,19 @@ export const pointWidth = (viewport: Viewport): number => {
     g.maxPointW,
   );
 };
+/** The upright board's height: twelve rows, the bar band, the off row and the frame (672 at 390x844; 615 installed on an iPhone 12; 636 at the floor). */
+export const uprightBoardHeight = (vp: Viewport): number => {
+  const g = PHONE_GEOMETRY;
+  return g.rows * pointWidth(vp) + g.barW + g.offH + g.frame;
+};
+/**
+ * Where the controls row ends upright, from the viewport's top, unscrolled: the top padding, the
+ * chrome and the board (830 at 390x844: the 12px padding and 2px of slack under it; 808 installed on an iPhone 12,
+ * 2px over the indicator's band). Where the viewport fits (no scroll tier) it is at most the
+ * height less the bottom padding: the devices e2e's standalone probe reads it off the page.
+ */
+export const uprightFoot = (vp: Viewport): number =>
+  uprightPadding(vp).top + PHONE_GEOMETRY.chromeIn + uprightBoardHeight(vp);
 /** `#app`'s two vertical paddings at the table sideways: 11 and `max(11, 6 + inset-b)` in both schemes. */
 export const paddingOf = (vp: Viewport): Readonly<{ top: number; bottom: number }> => {
   const s = schemeOf(vp);

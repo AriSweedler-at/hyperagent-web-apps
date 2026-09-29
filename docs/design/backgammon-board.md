@@ -183,13 +183,28 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
 --walnut --nacre-sheen --serif-display --serif-text`, and the shell's (§3.11) `--panel --nacre
 --nacre-dim --hair --parchment-cream`. Geometry lives on `#tableScreen` like gin's `--card-w`:
 
-- phone: `--chrome-h 172px` (#app padding 24, topbar 44, status 22, controls 56, three 8px gaps,
-  2px slack), `--bar-w 48px`, `--off-h 44px`, `--point-w clamp(44px, (100dvh - chrome - bar - off
-  - 16px) / 12, 64px)` (47px at 390x844), `--checker-d 0.86 point-w`, `--arrow-col checker-d +
-  6px` (the turn arrow's column, `#board { margin-left }`, 46px), `--point-len min((100vw - 40px -
-  arrow-col) / 2, 220px)` (152px), `--stack-step min(checker-d, (point-len - checker-d - 20px) /
-  4)` (five coins fit with the label corner spared), `--die-s bar-w - 4px` (a 44px hit box, the
-  face 2px inside);
+- phone: `--chrome-in 148px` (the chrome inside the screen: topbar 44, status 22, controls 56,
+  three 8px gaps, 2px slack), `--bar-w 48px`, `--off-h 44px`, `--point-w min((100cqh - chrome-in
+  - bar - off - 16px) / 12, 64px)`: the room is measured, never computed from a viewport unit. At
+  the table `body.fixed-screen #app` is a size container (`(max-width: 899px) and (min-height:
+  501px)`, so a phone sideways, under 500px tall, keeps its own scheme) and `100cqh` is its
+  content box, the viewport less the shell's paddings (screen-frame.md §3: the frame's 12px
+  clearance, or the notch and the home indicator once installed), so the board fills exactly what
+  the chrome leaves whatever the insets: 47px points and a 672px board at 390x844 in a tab or
+  headless (820 - 256, over 12; the same 47 the viewport arithmetic gave, so the goldens stand);
+  42.25 and 615 on an iPhone 12 installed (47 and 34 leave 763), the controls ending 2px over the
+  indicator's band; 41.9 on the 393x852 class (59/34), 48.6 on 430x932, 39.8 on 375x812 (44/34).
+  No floor above the scroll tier: the 44px floor the CSS held before (2026-09-29) pushed the
+  controls under the band on every notched phone installed, so the four smallest classes
+  (375x812, 390x844, 393x852, 402x874) take 39.8-43.7px rows, each 147-152px long (§6: the tap
+  target is the whole row); the floor is the scroll tier's alone (§3.10). `--checker-d 0.86
+  point-w`, `--arrow-col checker-d + 6px` (the turn arrow's column, `#board { margin-left }`,
+  46px), `--point-len min((100vw - 40px - arrow-col) / 2, 220px)` (152px), `--stack-step
+  min(checker-d, (point-len - checker-d - 20px) / 4)` (five coins fit with the label corner
+  spared), `--die-s bar-w - 4px` (a 44px hit box, the face 2px inside). `uprightPadding`,
+  `uprightRoom`, `uprightScrolls`, `pointWidth`, `uprightBoardHeight`, `uprightFoot` and
+  `PHONE_GEOMETRY` in `ui/board/layout.ts` are the twin; its sweep in layout.test.ts stands every
+  catalogued phone upright in every mode;
 - desktop (from 900px): `--chrome-h 190px`, `--bar-w = --point-w`, `--off-h 0`, `--point-w
   clamp(40px, min((100vw - 64px) / 15.5, (100dvh - chrome) / 11.4), 72px)` (53px at 1280x800,
   where the height binds; the extra half point of gutter is the turn arrow's room at 900px),
@@ -373,8 +388,12 @@ says `frame: true`, so the composed `<body>` carries `data-frame` and shell.css 
 inner side, at `z-index: 0` under every positioned thing (overlays 50, flyers 60, the toast 100);
 theme.css sets `--frame-band: 6px` (10px from 900px), `--frame-color: var(--olive)`,
 `--frame-hairline: var(--gold)` and `--frame-gap: 5px`, so the shell's clearance rule pads `#app`
-by 12px (16px from 900px), or the safe-area inset where that is more, and the board and every
-control stay clear of the band. No pattern: the meander stays the frame's alone.
+by 12px (16px from 900px), or the safe-area inset where that is more, on every side, and the board
+and every control stay clear of the band. The theme counts none of it: the upright table measures
+the room the paddings leave and fits it (§3.1: `#app` a size container at the table, the board's
+row from `100cqh`; the devices e2e's standalone probe sits at the table on the iPhone 12 class
+and reads the controls ending 2px over the indicator's band with nothing scrolling), as the
+sideways table has since 2026-09-28. No pattern: the meander stays the frame's alone.
 
 The trim's corners follow the screen's (the owner: "the green border hugs the real screen's
 border"; and sideways under Safari's bar, "the border's top corners should be square instead of
@@ -409,8 +428,12 @@ the served page.
 `?probe=1` (docs/ARCHITECTURE.md "Documented test hooks") draws the same inputs, the four corners
 and the board's box in a small monospace panel, a look at a real phone, not the fix;
 `devices.test.ts`, `screen.test.ts` and the boot test pin the table, the rule and the write. The
-goldens (390x844, 1280x800) are untouched: headless reports the viewport as the screen but no
-insets, so every corner is square and `#app`'s paddings compute to the 12px and 16px they were.
+goldens (390x844, 1280x800) were re-recorded once for the room's measure (2026-09-29): headless
+reports the viewport as the screen but no insets, so every corner is square, `#app`'s paddings
+compute to the 12px and 16px they were and every table screen's geometry is byte for byte what it
+was; what moved is the text of the five derived tokens (`--point-w` and what reads it) and, on the
+home and match-over screens, where `#app` is not a container, the hidden board's `100cqh` reading
+the viewport (49 for 47), which nothing shown reads.
 
 
 ### 3.7 Highlight states
@@ -493,11 +516,15 @@ task ends), not play: they are culled before the next launch, and the parity dri
 
 ### 3.10 Short viewports
 
-With `--point-w` floored at 44px the phone board is 636px and the screen needs 806px; below that
-(`@media (max-height: 805px) and (max-width: 899px)`) the document scrolls instead of clipping the
-controls, gin's rule with the threshold derived for this board; the desktop's floor is 646px
-(`max-height: 645px`). The board itself can be scrolled from: `touch-action: none` is scoped to
-`.checker`. A phone held sideways (§3.1 landscape) matches both of those fallbacks and is pinned
+At 44px points the phone board is 636px and the screen needs 806px inset-free (24 of paddings, 146
+of chrome, the board); at most 805px tall (`@media (max-height: 805px) and (max-width: 899px)`)
+the document scrolls instead of clipping the controls, gin's rule with the threshold derived for
+this board, and the board takes the 44px floor outright (`#tableScreen { --point-w: 44px }`;
+`#app` drops its size container, since contained it could not grow past the viewport); the
+desktop's floor is 646px (`max-height: 645px`). The query reads the viewport: a media query cannot
+read `env()`, so an installed phone's insets do not move the tier, and above it the room decides
+the row (§3.1), with no floor. The board itself can be scrolled from: `touch-action: none` is
+scoped to `.checker`. A phone held sideways (§3.1 landscape) matches both of those fallbacks and is pinned
 again by its own block, which comes later (`100dvh`, the shell's pin and the trim's box); it has
 its own floors and fallbacks, under the landscape query: with the rail 2 x 104 + 16 + 50 = 274px,
 so under `(max-height: 273px)` the document scrolls; with the rows 2 x 90 + 16 + 100 = 296px, so
