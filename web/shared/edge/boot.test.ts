@@ -578,7 +578,7 @@ const bootPage = (options: Options = {}) => {
       ...(options.gated === true ? [gate, fakeEl('turnGateKeepBtn')] : []),
     ],
     fakeEl('body', {
-      queries: { ':scope > .overlay': [overlay, ...(options.gated === true ? [gate] : [])] },
+      queries: { '.overlay': [overlay, ...(options.gated === true ? [gate] : [])] },
     }),
   );
   const visibility = { state: 'visible' };
@@ -970,20 +970,28 @@ describe('bootShell', () => {
     expect(bare).toEqual([undefined]);
   });
 
-  test("the reducer's ctx says whether this device can lock its rotation (shell.ts `Ctx.canLock`, the rotation hint's test): `screen.orientation.lock` a function says yes; no such function, or no `screen` at all, says no", () => {
-    const android = bootPage({ lock: true });
+  test("the reducer's ctx says whether this device can lock its rotation (shell.ts `Ctx.canLock`, the rotation hint's test): `screen.orientation.lock` a function on a device with no pointer that hovers says yes; no such function, a pointer that hovers (a touchscreen laptop), no `matchMedia`, or no `screen` at all, says no", () => {
+    // The fake window answers every query alike: `coarse: true` is a phone (`(hover: none)` holds).
+    const android = bootPage({ lock: true, coarse: true });
     expect(android.log.canLock.length).toBeGreaterThan(0);
     expect(new Set(android.log.canLock)).toEqual(new Set([true]));
+    expect(android.log.queries).toContain('(hover: none)');
     // Every step's ctx agrees: read once at boot, not per dispatch.
     android.run([]);
     expect(android.log.canLock.at(-1)).toBe(true);
-    const iphone = bootPage({ lock: false });
+    expect(android.log.queries.filter((q) => q === '(hover: none)')).toHaveLength(1);
+    const iphone = bootPage({ lock: false, coarse: true });
     expect(new Set(iphone.log.canLock)).toEqual(new Set([false]));
+    // Desktop Chromium has the function too (it rejects): a touchscreen laptop's trackpad hovers.
+    const laptop = bootPage({ lock: true, coarse: false });
+    expect(new Set(laptop.log.canLock)).toEqual(new Set([false]));
+    const mute = bootPage({ lock: true });
+    expect(new Set(mute.log.canLock)).toEqual(new Set([false]));
     const bare = bootPage();
     expect(new Set(bare.log.canLock)).toEqual(new Set([false]));
   });
 
-  test('a game that plays sideways: the boot watches the two phone predicates into the reducer and paints the turn gate after every paint; a game that stays upright is watched for nothing and its page has no gate to paint', () => {
+  test('a game that plays sideways: the boot watches the two phone predicates into the reducer, paints the turn gate after every paint and binds its "Play upright"; a game that stays upright is watched for nothing, its page has no gate to paint and the button is left unbound', () => {
     // Coarse and upright (the fake window answers every query alike: coarse true means both
     // portrait and landscape "match"; the reducer stores each as reported).
     const b = bootPage({ coarse: true, sideways: true, gated: true });
@@ -1005,7 +1013,9 @@ describe('bootShell', () => {
     expect(b.p.get('rulesOverlay').attr('inert')).toBe('');
     expect(b.p.get('turnGate').attr('inert')).toBeNull();
     expect(b.p.get('turnGateKeepBtn').focused()).toBe(true);
-    b.boot.dispatch({ type: 'gate/keep' });
+    // The tap on "Play upright" is the boot's binding: no game's render.ts binds the gate.
+    b.p.get('turnGateKeepBtn').fire('click');
+    expect(b.log.intents.at(-1)).toEqual({ type: 'gate/keep' });
     expect(b.p.get('turnGate').hidden()).toBe(true);
     expect(b.p.get('app').attr('inert')).toBeNull();
     expect(b.p.get('rulesOverlay').attr('inert')).toBeNull();
@@ -1022,6 +1032,7 @@ describe('bootShell', () => {
     upright.boot.dispatch({ type: 'render' });
     expect(upright.p.get('turnGate').hidden()).toBe(true);
     expect(upright.p.get('app').attr('inert')).toBeNull();
+    expect(upright.p.get('turnGateKeepBtn').listenerTypes()).toEqual([]);
     // A page without `matchMedia` at all: watched, reported nothing.
     const silent = bootPage({ sideways: true, gated: true });
     expect(seen(silent)).not.toContain('viewport/portrait');

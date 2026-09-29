@@ -248,11 +248,11 @@ export const paintSheet = (doc: DocumentLike, overlay: string, open: boolean): v
 
 // ---- the turn gate (docs/design/backgammon-landscape.md §5D; docs/design/shared-shell.md "Playing sideways") ----
 
-/** The gate's ids (web/shared/markup/shell.ts `gateMarkup`): the sheet and its one live control. Not in SHELL_IDS: a page carries them only when its game plays sideways. */
+/** The gate's ids (web/shared/markup/shell.ts `gateMarkup`): the sheet and its one live control, bound by the boot (web/shared/edge/boot.ts), never by a game's render.ts. Not in SHELL_IDS: a page carries them only when its game plays sideways. */
 export const GATE_ID = 'turnGate';
 export const GATE_KEEP_ID = 'turnGateKeepBtn';
-/** Every overlay the gate covers: `.overlay` body children (page.html places every sheet and the curtain there), the gate itself filtered out below. */
-const OVERLAYS = ':scope > .overlay';
+/** Every overlay the gate covers: each `.overlay` in the body wherever it sits (page.html places every sheet and the curtain as body children; one nested deeper would only be set inert under an inert parent, harmless), the gate itself filtered out below. */
+const OVERLAYS = '.overlay';
 
 /**
  * `#turnGate` ("Turn your phone sideways") over the table and the curtain on a phone held upright
@@ -260,12 +260,14 @@ const OVERLAYS = ':scope > .overlay';
  * game's own paint (boot.ts `repaint`), so no game's render.ts repeats it; a page without the gate
  * (gin's, briscola's) is left alone, so every lookup is `byId`. No media query paints it: the App
  * holds the orientation (`viewport/portrait`), so a test can assert it and a fine-pointer page
- * never sees it. While it is up, `inert` on `#app` and on every other `.overlay` body child (the
+ * never sees it. While it is up, `inert` on `#app` and on every other `.overlay` in the body (the
  * curtain, whose Roll button would otherwise take a tap through the upright board; the result,
  * rules, history and menu sheets; the leave confirm), never the gate itself and never `#toast`,
- * which is no overlay and sits above it (z 100 over 90); found by a query, not a list, because
- * each game's overlays differ (Safari 15.5+, Chrome 102+ honour `inert`; where it is missing the
- * gate is still a fixed overlay with `aria-modal`); both gone when it hides. A dialog takes focus:
+ * which is no overlay and sits above it (z 100 over 90); found by class, not by a list or by
+ * place, because each game's overlays differ and where a page nests one changes nothing here, so
+ * the page fake and the browser agree (Safari 15.5+, Chrome 102+ honour `inert`; where it is
+ * missing the gate is still a fixed overlay with `aria-modal`); both gone when it hides. A dialog
+ * takes focus:
  * on the paint that shows it, `#turnGateKeepBtn` (its one control; the button just tapped sits
  * inside inert `#app` and would keep focus otherwise, a screen reader silent, a keyboard
  * stranded), and on the paint that hides it that button lets go (a blur on an unfocused element

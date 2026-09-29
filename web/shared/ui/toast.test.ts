@@ -87,4 +87,74 @@ describe('createToaster', () => {
     toast('Invite copied to clipboard');
     expect(p.get('toast').classes()).toEqual(['show']);
   });
+
+  test('a shorter toast over a longer one holds it: the 2.6 s path toast at t=1500 over the 8 s rotation hint shows its own text, and at t=4100 the hint is back until its own t=8000', () => {
+    const clock = fakeClock();
+    const p = page();
+    const toast = createToaster(p.doc, clock);
+    toast('Lock the phone', 8000);
+    clock.advance(1500);
+    toast('Connected via relay');
+    expect(p.get('toast').text()).toBe('Connected via relay');
+    expect(p.get('toast').hasClass('show')).toBe(true);
+    clock.advance(2599);
+    expect(p.get('toast').text()).toBe('Connected via relay');
+    clock.advance(1);
+    expect(p.get('toast').text()).toBe('Lock the phone');
+    expect(p.get('toast').hasClass('show')).toBe(true);
+    clock.advance(3899);
+    expect(p.get('toast').text()).toBe('Lock the phone');
+    expect(p.get('toast').hasClass('show')).toBe(true);
+    clock.advance(1);
+    expect(p.get('toast').hasClass('show')).toBe(false);
+    expect(clock.pending()).toBe(0);
+  });
+
+  test('a toast that outlasts the one up, or the one held, takes its place for good, as it always did; one slot holds the toast due last', () => {
+    const clock = fakeClock();
+    const p = page();
+    const toast = createToaster(p.doc, clock);
+    // Held, then outlasted: the hint is dropped, nothing comes back.
+    toast('Lock the phone', 8000);
+    clock.advance(1500);
+    toast('Connected via relay');
+    clock.advance(500);
+    toast('Room code: ABCD', 10000);
+    clock.advance(2100);
+    expect(p.get('toast').text()).toBe('Room code: ABCD');
+    clock.advance(7899);
+    expect(p.get('toast').hasClass('show')).toBe(true);
+    clock.advance(1);
+    expect(p.get('toast').hasClass('show')).toBe(false);
+    expect(clock.pending()).toBe(0);
+    // Two interruptions: the toast due last comes back, the middle one is gone with the third.
+    toast('Lock the phone', 8000);
+    clock.advance(1500);
+    toast('Connected via relay');
+    clock.advance(500);
+    toast('Copied', 500);
+    clock.advance(500);
+    expect(p.get('toast').text()).toBe('Lock the phone');
+    clock.advance(5499);
+    expect(p.get('toast').hasClass('show')).toBe(true);
+    clock.advance(1);
+    expect(p.get('toast').hasClass('show')).toBe(false);
+    expect(clock.pending()).toBe(0);
+  });
+
+  test('the marks follow the message brought back: off for the interrupter, on again for the one that earned them', () => {
+    const clock = fakeClock();
+    const p = page();
+    const toast = createToaster(p.doc, clock, TOAST_MS, (message) => ({
+      hit: message.startsWith('Kapará.'),
+    }));
+    toast('Kapará. Bob hit you on your 5-point.', 8000);
+    expect(p.get('toast').classes()).toEqual(['hit', 'show']);
+    clock.advance(1000);
+    toast('Connected directly');
+    expect(p.get('toast').classes()).toEqual(['show']);
+    clock.advance(TOAST_MS);
+    expect(p.get('toast').text()).toBe('Kapará. Bob hit you on your 5-point.');
+    expect(new Set(p.get('toast').classes())).toEqual(new Set(['hit', 'show']));
+  });
 });

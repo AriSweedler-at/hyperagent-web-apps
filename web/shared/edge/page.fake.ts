@@ -265,8 +265,8 @@ export type FakePage = Readonly<{
 /**
  * The page's elements by id, and the body: `body` takes the body's own options (a query for the
  * overlays the turn gate covers, web/shared/ui/shellPaint.ts `paintGate`: `pageFromMarkup` declares
- * `:scope > .overlay` as every element whose markup class list has `overlay`, since page.html
- * places every sheet and the curtain as a body child).
+ * `.overlay` as every element whose markup class list has `overlay`, which is what the browser's
+ * query on the body finds too, wherever the page places each).
  */
 export const fakePage = (elements: ReadonlyArray<FakeEl>, body = fakeEl('body')): FakePage => {
   const byId = new Map(elements.map((e) => [e.id, e]));
@@ -376,9 +376,9 @@ export const pageFromMarkup = (
     .filter((id) => id in declared || id in extra)
     .map((id) => withChildren(id, { ...declared[id], ...extra[id] }));
   const elements = [...plainEls.values(), ...composed, ...more];
-  // The overlays as body children, for the gate's `:scope > .overlay` (shellPaint.ts `paintGate`).
+  // Every overlay, for the gate's `.overlay` query on the body (shellPaint.ts `paintGate`).
   const overlays = elements.filter((el) => el.hasClass('overlay'));
-  return fakePage(elements, fakeEl('body', { queries: { ':scope > .overlay': overlays } }));
+  return fakePage(elements, fakeEl('body', { queries: { '.overlay': overlays } }));
 };
 
 // ---- the shell page -------------------------------------------------------------------------------

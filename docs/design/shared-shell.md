@@ -605,7 +605,7 @@ SHELL_GAMES.forEach((game) => test.describe(game, { tag: `@${game}` }, () => { c
 
 Table drivers (`gin.ts` table half, `gin-play.ts`, the bg board helpers, `bgPosition`), `gin-dom-parity` and the legacy oracle (one game's migration proof), `backgammon-grid.test.ts`, CONTRACT.md rows (each documents its game's template-built classes; the two `connDotClass` rows merge into one `shared` row when the painters move, and the Rules sentence should read 'a GAMES member or shared'), vitest threshold ratchets, the nightly replay steps (two lines each), gin's stories stack (31 stories, 120 PNGs) until backgammon wants screenshots. Fidice keeps its 42-line driver: 0 ids and 10 selectors in common.
 
-## 6.6 Playing sideways: how a game opts in
+### 6.6 Playing sideways: how a game opts in
 
 Backgammon's flat board is played with the phone sideways (docs/design/backgammon-landscape.md);
 the mechanism that asks for the turn of the phone is the shell's (2026-09-28, the owner: "DRY the
@@ -617,8 +617,9 @@ its board CSS and its layout twin:
    phone predicates of `web/shared/edge/media.ts`, `PORTRAIT_PHONE` and `LANDSCAPE_PHONE`, into the
    reducer as `viewport/portrait` and `viewport/landscape` (`ShellState.portraitPhone`,
    `landscapePhone`), and paints the turn gate after every paint of the game's own
-   (`web/shared/ui/shellPaint.ts` `paintGate` over `shell.ts` `gateOpen`). `main.ts` and
-   `render.ts` add nothing.
+   (`web/shared/ui/shellPaint.ts` `paintGate` over `shell.ts` `gateOpen`), and binds the gate's
+   one control, "Play upright" (`gate/keep`). `main.ts` passes its shell config to `bootShell` as
+   `shell:`; `render.ts` adds nothing.
 2. **`gateOpen(s, cfg)`**: the opt-in, the table screen, a view that is not over (`engine.over`,
    and `engine.gameOver` where the game has a result sheet inside a match: backgammon's
    `phase === 'over'`), a phone held upright, not dismissed. "Play upright" (`gate/keep`,
@@ -631,13 +632,20 @@ its board CSS and its layout twin:
    play"): the first time the shell paints the table with the phone sideways (`painted`, or the
    `viewport/landscape` turn at a table that came up upright) on a device that can lock its
    rotation, it toasts `ROTATION_HINT_MSG` ("Lock the phone's rotation so the board stays
-   sideways: swipe down, tap Auto-rotate.") for `ROTATION_HINT_MS` (8 s) and marks
-   `ShellState.rotationHintShown`, which drops and holds exactly where `gateDismissed` does, so
-   every role hears it once per table. The device test is a capability, never a user agent
-   (`Ctx.canLock`, read once by the boot as `typeof screen.orientation.lock === 'function'`):
-   Android's Chromium family has the function and Quick Settings' Auto-rotate locks the phone as
-   it is held; no iPhone browser has it, and its one switch, Portrait Orientation Lock, would snap
-   the page upright, so an iPhone never sees the hint. No markup, no class: the shell's `toast`.
+   sideways: swipe down and make sure Auto-rotate is off.", the state to reach, not the tile's
+   tap, so a phone locked sideways already is not told to undo it) for `ROTATION_HINT_MS` (8 s)
+   and marks `ShellState.rotationHintShown`, which drops and holds exactly where `gateDismissed`
+   does (backgammon's `hostLeft` included), so every role hears it once per table. Online, the
+   2.6 s path toast ("Connected via relay", 1.5 s after the channel opens) may land over it: the
+   toaster holds the hint and gives it back for its remainder (`web/shared/ui/toast.ts`
+   `createToaster`). The device test is a capability, never a user agent (`Ctx.canLock`, read
+   once by the boot as `typeof screen.orientation.lock === 'function'` and
+   `matchMedia('(hover: none)').matches`): Android's Chromium family has the function, no pointer
+   of it hovers, and Quick Settings' Auto-rotate locks the phone as it is held; no iPhone browser
+   has the function, and its one switch, Portrait Orientation Lock, would snap the page upright,
+   so an iPhone never sees the hint; desktop Chromium has the function too (it rejects), so a
+   touchscreen laptop in a short window, a phone to `LANDSCAPE_PHONE`'s `any-pointer: coarse`, is
+   kept out by its hovering trackpad. No markup, no class: the shell's `toast`.
 3. **The page**: `ShellPage.plays: 'landscape'` puts `data-plays="landscape"` on the composed
    `<body>` (`web/shared/markup/shell.ts` `bodyAttrsOf`, page.html `<body{{bodyAttrs}}>`), and
    `sheetsBefore` carries `gateMarkup(copy)` (the sheet, its two texts, "Go sideways" shipped
@@ -653,9 +661,9 @@ its board CSS and its layout twin:
    a tighter height tier nests under it. `test/dist/landscape-predicate.test.ts` pins that over
    every theme and the shell sheet, so the board's layout and the gate's watcher cannot drift apart.
 5. **Tests**: `shell.test.ts` (the state, the intents, `gateOpen`, the resets), `shellPaint.test.ts`
-   (`paintGate`: `inert` on `#app` and every other `.overlay` body child, found by query since each
-   game's overlays differ; focus to the dismiss button), `boot.test.ts` (the watchers and the paint,
-   only with the opt-in), `media.test.ts` (the two strings), `markup/shell.test.ts` (`gateMarkup`,
+   (`paintGate`: `inert` on `#app` and every other `.overlay` in the body, found by class since each
+   game's overlays differ and where a page places one changes nothing; focus to the dismiss button),
+   `boot.test.ts` (the watchers, the paint and the tap on "Play upright", only with the opt-in), `media.test.ts` (the two strings), `markup/shell.test.ts` (`gateMarkup`,
    `bodyAttrsOf`), and the game's own `state.test.ts` over its config.
 
 ## 7. Risks

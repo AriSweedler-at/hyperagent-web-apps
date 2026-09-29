@@ -2052,7 +2052,7 @@ describe('the turn gate (docs/design/backgammon-landscape.md §5D; the shell`s, 
     expect(left.shell).toMatchObject({ gateDismissed: false, portraitPhone: true });
   });
 
-  test('the host gone once the match is over (hostLeft, this game`s own path past the shell): the dismissal goes with the table, the end screen is not gated, and home then Start asks again', () => {
+  test('the host gone once the match is over (hostLeft, this game`s own path past the shell): the dismissal and the rotation hint`s mark go with the table, the end screen is not gated, and home then Start asks again', () => {
     const g = game(hosting());
     const seated = run(
       initialApp,
@@ -2064,10 +2064,14 @@ describe('the turn gate (docs/design/backgammon-landscape.md §5D; the shell`s, 
     ).app;
     const over = { ...viewFor(g, 1), phase: 'over' as const, matchOver: true };
     const done = run(seated, { type: 'guest/frame', frame: { t: 'state', view: over } }).app;
-    const gone = run(done, { type: 'guest/lost' }).app;
+    // The hint's mark (shell.ts `rotationHintShown`, set at a sideways paint on a device that can
+    // lock; seeded here, since this ctx has no `canLock`) goes with the table as the dismissal does.
+    const told = { ...done, shell: { ...done.shell, rotationHintShown: true } };
+    const gone = run(told, { type: 'guest/lost' }).app;
     expect(gone.shell).toMatchObject({
       screen: 'endgameScreen',
       gateDismissed: false,
+      rotationHintShown: false,
       portraitPhone: true,
     });
     expect(gate(gone)).toBe(false);

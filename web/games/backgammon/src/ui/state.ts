@@ -985,9 +985,10 @@ export const initialApp: App = { shell: initialShell, table: initialTable };
  * shell's `guest/lost` knows the table mid-match and the wait screen), taken in `reduce` first.
  */
 const hostLeft = (app: App, v: View, ctx: Context): Step => {
-  // The table went with the host: the gate's dismissal goes as a leave drops it (shell.ts `leaveFinish`).
+  // The table went with the host: the gate's dismissal and the rotation hint's mark go as a leave
+  // drops them (shell.ts `leaveFinish`), so the next table asks, and is told, again.
   const lost = {
-    shell: { ...app.shell, oppConnected: false, gateDismissed: false },
+    shell: { ...app.shell, oppConnected: false, gateDismissed: false, rotationHintShown: false },
     table: tableCleared(app.table),
   };
   return then(rendered(lost, v, ctx), (a) =>

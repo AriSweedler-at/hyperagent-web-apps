@@ -4,7 +4,9 @@
 // phone copies it verbatim, alone or with a width bound after it (`... and (min-width: 714px)`).
 // A height tier tighter than 500px (the short-phone fallbacks) nests under it instead of spelling
 // its own orientation query, so this pin reads one predicate per landscape block and the board's
-// layout can never drift from the gate's watcher. Read off the source sheets, not dist/, so it needs
+// layout can never drift from the gate's watcher; a brace-depth walk holds each tier under a
+// predicate block, not merely free of an orientation query of its own. Read off the source sheets,
+// not dist/, so it needs
 // no build: the sheets are copied through as they are. The predicate is read off media.ts as text
 // too (tsconfig.node.json compiles no web/shared/edge module), and pinned letter for letter beside
 // media.test.ts's pin. In the `site` suite beside the other guards.
@@ -45,6 +47,33 @@ const landscapeLists = (css: string): ReadonlyArray<string> =>
 const isPhonePredicate = (query: string): boolean =>
   query === LANDSCAPE_PHONE || query.startsWith(`${LANDSCAPE_PHONE} and (`);
 
+/** A list keys on a landscape phone alone: every query of it is the predicate, or it with a width bound. */
+const isPhoneList = (list: string): boolean =>
+  list.split(',').every((q) => isPhonePredicate(q.trim()));
+
+/** An `@media` list with the `@media` lists enclosing it, outermost first. */
+type NestedList = Readonly<{ list: string; enclosing: ReadonlyArray<string> }>;
+
+/** The walk's state: the open frames (a list for an `@media`, null for any other rule) and the lists seen. */
+type Walk = Readonly<{ stack: ReadonlyArray<string | null>; found: ReadonlyArray<NestedList> }>;
+
+/**
+ * Every `@media` list with its enclosing `@media` lists, by a brace-depth walk over the stripped
+ * sheet: `@media … {` opens a frame that names its list, any other `{` (`@supports`, a selector)
+ * a frame that names none, and `}` closes the innermost frame.
+ */
+const nestedMediaLists = (css: string): ReadonlyArray<NestedList> =>
+  [...stripped(css).matchAll(/@media\s+([^{]+)\{|[{}]/g)].reduce<Walk>(
+    (walk, m: ReadonlyArray<string>) => {
+      if (m[0] === '}') return { ...walk, stack: walk.stack.slice(0, -1) };
+      if (m[0] === '{') return { ...walk, stack: [...walk.stack, null] };
+      const list = (m[1] ?? '').replace(/\s+/g, ' ').trim();
+      const enclosing = walk.stack.filter((frame): frame is string => frame !== null);
+      return { stack: [...walk.stack, list], found: [...walk.found, { list, enclosing }] };
+    },
+    { stack: [], found: [] },
+  ).found;
+
 describe('the landscape predicate is spelled once', () => {
   test('LANDSCAPE_PHONE names a coarse pointer, landscape and a height under 500px', () => {
     expect(LANDSCAPE_PHONE).toBe(
@@ -71,10 +100,21 @@ describe('the landscape predicate is spelled once', () => {
   test('backgammon (the flat board) keys its layout on it in at least a dozen blocks; the shell sheet in one (the sideways home)', () => {
     const bg = source('web/games/backgammon/theme.css');
     expect(landscapeLists(bg).length).toBeGreaterThanOrEqual(12);
-    // The two short-phone tiers nest under it: no list of their own names the orientation.
+    // The two short-phone tiers nest under it: no list of their own names the orientation, and
+    // the innermost @media enclosing each is a LANDSCAPE_PHONE list, so a tier flattened to the
+    // top level (a height bound alone fits an upright phone too) fails here, not only one that
+    // spelled its own orientation.
     expect(mediaLists(bg).filter((l) => l.includes('303px') && l.includes('orientation'))).toEqual(
       [],
     );
+    const nested = nestedMediaLists(bg);
+    expect(nested.map((n) => n.list)).toEqual(mediaLists(bg));
+    const tiers = nested.filter((n) => n.list.includes('303px') || n.list.includes('365px'));
+    expect(tiers.length).toBeGreaterThanOrEqual(1);
+    tiers.forEach((tier) => {
+      const inner = tier.enclosing.at(-1) ?? '';
+      expect(isPhoneList(inner) && inner !== '', `${tier.list} sits under ${inner}`).toBe(true);
+    });
     const shell = source('web/shared/styles/shell.css');
     expect(landscapeLists(shell)).toEqual([LANDSCAPE_PHONE]);
   });
