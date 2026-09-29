@@ -34,6 +34,7 @@
     "test:affected": "node --experimental-strip-types tools/ci/run-affected.ts",
     "affected": "node --experimental-strip-types tools/ci/affected.ts",
     "serve": "node --experimental-strip-types tools/serve-dist.ts --root dist --base /hyperagent-web-apps/ --alias e2e-ice.json=e2e/fixtures/e2e-ice.json",
+    "shots": "npm run build && node --experimental-strip-types tools/shell-emulate.ts render --all --serve",
     "proxy:dev": "node --experimental-strip-types tools/proxy-dev.ts --upstream http://127.0.0.1:4173",
     "fixtures:legacy": "node --experimental-strip-types tools/legacy/extract-gin-engine.ts && node --experimental-strip-types tools/legacy/extract-fidice-core.ts && node --experimental-strip-types tools/legacy/extract-gin-ui.ts",
     "fixtures:gin-wire": "node --experimental-strip-types tools/legacy/record-gin-wire.ts",

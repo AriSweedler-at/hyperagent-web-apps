@@ -343,6 +343,13 @@ the theme's own `--screen-corner` fallback (`env()` substituted: `47px`, or unsi
 `max(47px, 0px, 0px)`; the largest length), so a theme that declares the property opts in and one
 that does not gets nothing written; a radius found is set on `documentElement`'s inline style
 (dom.ts `setRootStyle`), which beats the `:root` rule. Nothing is asked of the player.
+
+The table grew into the device catalogue (docs/design/devices.md): every row carries its insets
+upright and sideways, the browser bar's height range and whether its numbers are published or
+inferred; `tools/shell-emulate.ts` stands a headless page on any row (`explain`, `render`, `check`,
+`npm run shots` for the contact sheet), the twin's device sweep in layout.test.ts proves the board
+fills its room on every phone at both bar heights, and e2e/backgammon-devices.spec.ts proves it on
+the served page.
 `?probe=1` (docs/ARCHITECTURE.md "Documented test hooks") draws the same inputs and the board's
 box in a small monospace panel, a look at a real phone, not the fix; `devices.test.ts` and the
 boot test pin the table and the write. The goldens (390x844, 1280x800) are untouched: headless

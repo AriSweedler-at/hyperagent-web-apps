@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest';
 
+import {
+  DEVICES,
+  emulationName,
+  emulationsOf,
+  type Emulation,
+} from '../../../../../shared/lib/devices.ts';
 import type { PointIndex, Seat } from '../../engine/index.ts';
 import {
   DESKTOP_TEMPLATE,
@@ -35,6 +41,7 @@ import {
   type Area,
   type Cell,
   type Layout,
+  type Viewport,
 } from './layout.ts';
 
 const SEATS: ReadonlyArray<Seat> = [0, 1];
@@ -459,5 +466,85 @@ describe('the sizes', () => {
     expect(stackExtent(5, coin(44), stackStep(90, coin(44), spare))).toBeLessThanOrEqual(
       90 - spare,
     );
+  });
+});
+
+/**
+ * The device sweep (the owner, 2026-09-28: "add unit tests to make sure that the board fills up
+ * the right amount of space"): every phone the catalogue knows (web/shared/lib/devices.ts), held
+ * sideways, in a tab with the browser's bar shown and hidden (the recorded toolbar range's max and
+ * min off the height), standalone and fullscreen, through the CSS's pure twin. Where the viewport
+ * fits, two point rows and the frame fill the board's room to half a pixel (no parchment above or
+ * below beyond the chrome's own gaps); the floor (and the scroll fallback with it) holds only
+ * under the floor's own height, so a phone at its full height never scrolls; every point is at
+ * least 44px wide; and the scheme is the width's (the rail from 714px, the rows below). One row
+ * per device: a new phone is one line in the catalogue. The iPads stand taller than 500px sideways
+ * and take the desktop template, by design (`LANDSCAPE_MAX_HEIGHT`); the SE 1st gen is catalogued
+ * unsupported (iOS 15 cannot run the theme) and its width promise is not made.
+ */
+describe('the device sweep: the board fills its room on every phone, both bar states, every mode', () => {
+  const sideways = (e: Emulation): Viewport => ({
+    width: e.viewport.width,
+    height: e.viewport.height,
+    coarse: true,
+    insets: { left: e.insets.left, right: e.insets.right, bottom: e.insets.bottom },
+  });
+  const cases = DEVICES.flatMap((d) =>
+    emulationsOf(d).filter((e) => e.orientation === 'landscape'),
+  );
+
+  test('the sweep covers every device in every landscape case: three modes, the tab twice', () => {
+    expect(cases).toHaveLength(DEVICES.length * 4);
+  });
+
+  test.each(cases.map((e) => [emulationName(e), e] as const))('%s', (_name, e) => {
+    const vp = sideways(e);
+    const d = e.device;
+    if (d.kind === 'ipad') {
+      expect(layoutFor(vp), 'an iPad sideways is over 500px tall: the desktop template').toBe(
+        'desktop',
+      );
+      return;
+    }
+    expect(layoutFor(vp)).toBe('landscape');
+    const scheme = vp.width >= RAIL_MIN_WIDTH ? LANDSCAPE_GEOMETRY.rail : LANDSCAPE_GEOMETRY.rows;
+    const room = boardRoom(vp);
+    const len = pointLength(vp);
+    const chrome = chromeHeight(vp);
+    const pad = paddingOf(vp);
+    const floor =
+      scheme.minPointLen - (pad.top + pad.bottom - scheme.padTop - scheme.padBottom) / 2;
+    const floorHeight = 2 * floor + LANDSCAPE_GEOMETRY.frame + chrome;
+    const scrolls = vp.height < floorHeight;
+    // Never under the floor at the phone's full height (the bar hidden, standalone, fullscreen):
+    // only the bar up on the shortest phones pushes the height under it.
+    if (e.bar === 'hidden') expect(scrolls, `${String(vp.height)}px scrolls`).toBe(false);
+    if (scrolls) {
+      expect(len).toBe(floor);
+    } else {
+      // Fills: two rows and the frame are exactly the height less the room above and below.
+      const boardHeight = vp.height - room.top - room.bottom;
+      expect(Math.abs(2 * len + LANDSCAPE_GEOMETRY.frame - boardHeight)).toBeLessThanOrEqual(0.5);
+      expect(len).toBeGreaterThanOrEqual(floor);
+      // The room is the chrome's own: the padding and the strip above, the padding (over the home
+      // indicator where there is one) and the buttons' row below.
+      expect(room.top).toBe(scheme.padTop + scheme.chromeAbove);
+      expect(room.bottom).toBe(
+        Math.max(scheme.padBottom, scheme.padAir + e.insets.bottom) +
+          scheme.chromeIn -
+          scheme.chromeAbove,
+      );
+    }
+    // Every point a tap target: 44px wide before the clamp (the SE 1st gen excepted, unsupported).
+    if (d.supported) {
+      const unclamped =
+        (vp.width - chromeWidth(vp) - LANDSCAPE_GEOMETRY.trayW - LANDSCAPE_GEOMETRY.frame) /
+        LANDSCAPE_GEOMETRY.columns;
+      expect(
+        unclamped,
+        `${String(vp.width)}px wide: ${String(unclamped)}px points`,
+      ).toBeGreaterThanOrEqual(LANDSCAPE_GEOMETRY.minPointW);
+      expect(pointWidth(vp)).toBeGreaterThanOrEqual(LANDSCAPE_GEOMETRY.minPointW);
+    }
   });
 });
