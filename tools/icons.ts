@@ -9,9 +9,14 @@
 // drawing serves both `any` sizes. The `any` tile has rounded corners, so its render omits the page
 // background and the corners come out transparent; the maskable render keeps it (no transparency
 // anywhere). Vite copies public/ verbatim, so the PNGs ship at games/<g>/icons/<file> on both
-// origins, where the manifest's `./icons/<file>` (relative to the manifest) finds them. Re-run
-// when an SVG changes and commit the PNGs; test/dist/manifest.test.ts holds each PNG's size to its
-// manifest row and every icon URL to a file the build ships on both origins.
+// origins, where the manifest's `./icons/<file>` (relative to the manifest) finds them. One more
+// PNG is not the manifest's: iOS reads `<link rel="apple-touch-icon">` in the page's head for a
+// Home Screen bookmark (and never the manifest's icons; without the link it shows a screenshot of
+// the page), so TOUCH_ICONS renders the maskable drawing at 180x180 with its background kept (iOS
+// rounds the corners itself and paints black behind a transparent pixel) to icons/apple-touch-icon.png,
+// and the head links it. Re-run when an SVG changes and commit the PNGs; test/dist/manifest.test.ts
+// holds each PNG's size to its manifest row (the touch icon to 180, opaque) and every icon URL to
+// a file the build ships on both origins.
 //   node --experimental-strip-types tools/icons.ts
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -25,8 +30,11 @@ import { REPO_ROOT, isMain } from './legacy/extract.ts';
 /** The games that ship a manifest: backgammon alone plays sideways. */
 export const MANIFEST_GAMES: ReadonlyArray<ShellGame> = ['backgammon'];
 
-/** The manifest's `purpose` for an icon: shown as drawn, or cut to the launcher's shape. */
-export type IconPurpose = 'any' | 'maskable';
+/**
+ * The manifest's `purpose` for an icon: shown as drawn, or cut to the launcher's shape; `touch` is
+ * iOS's Home Screen icon, linked from the head and not the manifest's (the maskable drawing, opaque).
+ */
+export type IconPurpose = 'any' | 'maskable' | 'touch';
 
 /** One icon the manifest names: its drawn source, its rendered file and the size of both. */
 export type IconSpec = Readonly<{
@@ -39,13 +47,15 @@ export type IconSpec = Readonly<{
 export const manifestPath = (game: ShellGame): string =>
   `web/public/games/${game}/manifest.webmanifest`;
 
-/** The drawn source, repo-relative: one per purpose. */
+/** The drawn source, repo-relative: the `any` tile, or the full-bleed drawing (maskable and touch). */
 export const iconSvg = (game: ShellGame, purpose: IconPurpose): string =>
   `web/games/${game}/assets/${purpose === 'any' ? 'icon' : 'icon-maskable'}.svg`;
 
-/** The rendered file's name, as the manifest's `src` spells it under ./icons/. */
+/** The rendered file's name under ./icons/: as the manifest's `src` spells it, or the name iOS's link carries. */
 export const iconFile = ({ purpose, size }: IconSpec): string =>
-  `${purpose === 'any' ? 'icon' : 'maskable'}-${String(size)}.png`;
+  purpose === 'touch'
+    ? 'apple-touch-icon.png'
+    : `${purpose === 'any' ? 'icon' : 'maskable'}-${String(size)}.png`;
 
 /** The rendered PNG, repo-relative (served at games/<g>/icons/<file>). */
 export const iconPng = (icon: IconSpec): string =>
@@ -60,16 +70,23 @@ export const ICONS: ReadonlyArray<IconSpec> = MANIFEST_GAMES.flatMap(
   ],
 );
 
+/** iOS's Home Screen icon per installable game: 180x180 (the size every iPhone since the 6 Plus asks for), the head links it. */
+export const TOUCH_ICONS: ReadonlyArray<IconSpec> = MANIFEST_GAMES.map((game): IconSpec => ({
+  game,
+  purpose: 'touch',
+  size: 180,
+}));
+
 /** True for a game that ships a manifest: what the dist guards branch on for a page's extra files. */
 export const isManifestGame = (game: string): game is ShellGame =>
   MANIFEST_GAMES.some((candidate) => candidate === game);
 
-/** The manifest and its icons as the build ships them under games/<g>/ (Vite copies public/ verbatim). */
+/** The manifest, its icons and the touch icon as the build ships them under games/<g>/ (Vite copies public/ verbatim). */
 export const shippedFiles = (game: ShellGame): ReadonlyArray<string> => [
   `games/${game}/manifest.webmanifest`,
-  ...ICONS.filter((icon) => icon.game === game).map(
-    (icon) => `games/${game}/icons/${iconFile(icon)}`,
-  ),
+  ...[...ICONS, ...TOUCH_ICONS]
+    .filter((icon) => icon.game === game)
+    .map((icon) => `games/${game}/icons/${iconFile(icon)}`),
 ];
 
 const render = async (browser: Browser, icon: IconSpec): Promise<string> => {
@@ -92,7 +109,9 @@ const render = async (browser: Browser, icon: IconSpec): Promise<string> => {
 const main = async (): Promise<void> => {
   const browser = await chromium.launch();
   try {
-    const written = await Promise.all(ICONS.map((icon) => render(browser, icon)));
+    const written = await Promise.all(
+      [...ICONS, ...TOUCH_ICONS].map((icon) => render(browser, icon)),
+    );
     written.forEach((path) => {
       console.log(`${path}: written`);
     });

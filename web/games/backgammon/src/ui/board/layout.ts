@@ -39,9 +39,9 @@ export const DESKTOP_MIN_WIDTH = 900;
 /** theme.css's landscape query: a coarse pointer, wider than tall, at most this tall. */
 export const LANDSCAPE_MAX_HEIGHT = 500;
 /**
- * From this width the landscape chrome is a rail beside the board (`(min-width: 714px)`); under
- * it the chrome keeps its rows: 13 x 44 (twelve points and the bar at the floor) + the 44px tray
- * + the 16px frame + two 16px edges + the 44px rail + its 6px gap.
+ * From this width the landscape chrome's buttons are a rail beside the board (`(min-width: 714px)`);
+ * under it they are a row under the board: 13 x 44 (twelve points and the bar at the floor) + the
+ * 44px tray + the 16px frame + two 16px edges + the 44px rail + its 6px gap.
  */
 export const RAIL_MIN_WIDTH = 714;
 /**
@@ -96,16 +96,17 @@ export const DESKTOP_GEOMETRY = {
 /**
  * A phone held sideways (design §3.1 landscape): the width is thirteen points (twelve and the
  * bar), the tray and the frame inside what the chrome leaves beside the board; the height two
- * point rows inside what it leaves above and below. Two schemes by width (`RAIL_MIN_WIDTH`): the
- * rail (one 22px strip over the board with 6px above it and below the board, and a 44px rail with
- * a 6px gap: 40px of chrome above and below, 50 beside, plus the edges) and the rows (the phone's
- * 170px of chrome rows, nothing beside but the edges). The edge is one number for both sides, the
- * larger inset or 16px.
+ * point rows inside what it leaves above and below. One 22px strip over the board with 6px above
+ * it and below the board in both schemes; the buttons decide the scheme, by width
+ * (`RAIL_MIN_WIDTH`): the rail (a 44px rail beside the board with a 6px gap: 40px of chrome above
+ * and below, 50 beside, plus the edges) and the rows (a 44px button row under the board with its
+ * 6px gap: 90px above and below, nothing beside but the edges). The edge is one number for both
+ * sides, the larger inset or 16px.
  */
 export const LANDSCAPE_GEOMETRY = {
   minEdge: 16,
   rail: { beside: 50, chromeH: 40, minPointLen: 104 },
-  rows: { beside: 0, chromeH: 170, minPointLen: 90 },
+  rows: { beside: 0, chromeH: 90, minPointLen: 90 },
   trayW: 44,
   frame: 16,
   columns: 13,
@@ -152,9 +153,9 @@ export const pointWidth = (viewport: Viewport): number => {
 /**
  * `--point-len` sideways: half of what the chrome leaves above and below (with the frame and the
  * bottom inset taken), floored per scheme (104 with the rail, 90 with the rows, each less half
- * the bottom inset, so the floor's viewport stays 264 / 366 at any inset and the CSS fallback,
+ * the bottom inset, so the floor's viewport stays 264 / 286 at any inset and the CSS fallback,
  * which cannot read the inset, lifts exactly there; under the floor the document scrolls, design
- * §3.10). 167 at 844x390, 94.5 at 667x375, 93.5 at 812x264 with a 21px home indicator.
+ * §3.10). 167 at 844x390, 134.5 at 667x375, 93.5 at 812x264 with a 21px home indicator.
  */
 export const pointLength = (vp: Viewport): number => {
   const s = schemeOf(vp);

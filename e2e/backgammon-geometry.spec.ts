@@ -10,8 +10,8 @@
 // exercises the fallback: the document scrolls and the controls are reachable at the bottom of
 // that scroll. The two sideways cases run on the `phone` fixture (a touch context, so
 // `(any-pointer: coarse)` matches and theme.css lays the board flat, design §3.1 landscape): an
-// iPhone 12 at 844x390 (the chrome in a rail beside the board) and an SE at 667x375 (under 714px
-// the chrome keeps its rows). Both seats are checked through `window.__backgammon.setup`: the seat
+// iPhone 12 at 844x390 (the buttons in a rail beside the board) and an SE at 667x375 (under 714px
+// they are a row under it). Both seats are checked through `window.__backgammon.setup`: the seat
 // mapping (`#board[data-seat]`, `data-own`) and the row order flip with the mover, and a
 // seven-stack shows five coins.
 import type { Page } from '@playwright/test';
@@ -61,8 +61,8 @@ const VIEWPORTS: Readonly<Record<string, Case>> = {
   'phone-short': { ...PHONE_SHORT, scrolls: true },
   // An iPhone 12 sideways: the flat board at 54px points, the chrome in a 44px rail on the right.
   'phone-landscape': { ...PHONE_LANDSCAPE, scrolls: false, touch: true },
-  // An iPhone SE sideways: under 714px the rail cannot stand beside the board, so the chrome keeps
-  // its rows above and below (44.2px points, 94.5 long), still on one screen.
+  // An iPhone SE sideways: under 714px the rail cannot stand beside the board, so the buttons take
+  // a row under it, the same strip above (44.2px points, 134.5 long), still on one screen.
   'phone-landscape-rows': { width: 667, height: 375, scrolls: false, touch: true },
 };
 
@@ -102,7 +102,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const check = async (when: string, seat?: Seat): Promise<Frame> => {
         const g = await boardGeometry(page);
         expectBoardGeometry(g, seat ?? (await seatShown(page)), vp.scrolls, when);
-        expectSameFrame(g.frame, start.frame, when, frameSelectors(layoutOf(g), g.width));
+        expectSameFrame(g.frame, start.frame, when, frameSelectors(layoutOf(g)));
         return g.frame;
       };
 

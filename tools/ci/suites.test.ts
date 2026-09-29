@@ -647,6 +647,15 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
     ['shared', 'site', 'e2e-site'],
   ],
   [
+    "a page's served files",
+    [
+      'web/public/games/backgammon/manifest.webmanifest',
+      'web/public/games/backgammon/icons/apple-touch-icon.png',
+      'web/public/games/gin-rummy/splash.png',
+    ],
+    ['site', 'e2e-site'],
+  ],
+  [
     'the stories baselines',
     ['e2e/__screenshots__/gin-stories.spec.ts/x--390x844-linux.png'],
     ['e2e-gin'],

@@ -368,10 +368,25 @@ describe('the sizes', () => {
         insets: { left: 47, right: 47, bottom: 21 },
       }),
     ).toBe(93.5);
-    expect(pointLength({ width: 667, height: 375, coarse: true })).toBe(94.5);
-    expect(pointLength({ width: 640, height: 360, coarse: true })).toBe(
+    // The rows' 90px of chrome (6 + 22 + 6 + 44 + 6, the same strip and a button row under the
+    // board): 134.5 on an SE, 109.5 with Safari's toolbar up (it scrolled under the phone's 170),
+    // 127 at 640x360; the floor is 2 x 90 + 16 + 90 = 286 exactly, and 79.5 with a 21px home
+    // indicator (2 x 79.5 + 16 + 90 + 21 = 286 still).
+    expect(pointLength({ width: 667, height: 375, coarse: true })).toBe(134.5);
+    expect(pointLength({ width: 667, height: 325, coarse: true })).toBe(109.5);
+    expect(pointLength({ width: 640, height: 360, coarse: true })).toBe(127);
+    expect(pointLength({ width: 640, height: 286, coarse: true })).toBe(90);
+    expect(pointLength({ width: 640, height: 270, coarse: true })).toBe(
       LANDSCAPE_GEOMETRY.rows.minPointLen,
     );
+    expect(
+      pointLength({
+        width: 667,
+        height: 286,
+        coarse: true,
+        insets: { left: 0, right: 0, bottom: 21 },
+      }),
+    ).toBe(79.5);
   });
 
   test('pointWidth: 47px at 390x844, 53.5px at 1280x800, clamped at the floors and caps', () => {

@@ -16,7 +16,6 @@
 import { expect, type Page } from '@playwright/test';
 
 import {
-  RAIL_MIN_WIDTH,
   layoutFor,
   rowOrder,
   type Area,
@@ -54,14 +53,12 @@ export type BoardGeometry = Readonly<{
 /**
  * The frame around the board: one box each, in every phase (design §7 `expectSameFrame`). Upright
  * and on the desktop the topbar and the controls row are boxes of their own. Sideways they are
- * `display: contents` from 714px wide (their children are the chrome grid's items, design §3.1
- * landscape: the rail scheme) and measure nothing, so the one strip's items stand in: the
- * opponent's strip, the badge, the status line, my strip and the roll slot (the rail block keeps
- * the last two shown while the die-chip tray is open, and every strip column one width in every
- * phase, so nothing in the strip moves) and the two rail buttons. Under 714px (the rows scheme)
- * the topbar and the controls keep the phone's rows, where the roll slot's content resizes my
- * strip (`flex: 1`), so the rows read the items that hold there: the opponent's strip, the badge,
- * the status line and the two rail buttons.
+ * `display: contents` (their children are the chrome grid's items, design §3.1 landscape, in both
+ * width schemes) and measure nothing, so the one strip's items stand in: the opponent's strip, the
+ * badge, the status line, my strip and the roll slot (the landscape block keeps the last two shown
+ * while the die-chip tray is open, and every strip column one width in every phase, so nothing in
+ * the strip moves) and the menu and sound buttons (in the rail from 714px wide, in the row under
+ * the board below).
  */
 const UPRIGHT_FRAME: ReadonlyArray<string> = [
   '#tableScreen .topbar',
@@ -69,7 +66,7 @@ const UPRIGHT_FRAME: ReadonlyArray<string> = [
   '#board',
   '#controls',
 ];
-const RAIL_FRAME: ReadonlyArray<string> = [
+const LANDSCAPE_FRAME: ReadonlyArray<string> = [
   '#tableScreen .opp-strip',
   '#gameBadge',
   '#statusLine',
@@ -79,21 +76,13 @@ const RAIL_FRAME: ReadonlyArray<string> = [
   '#menuBtn',
   '#soundBtn',
 ];
-const ROWS_FRAME: ReadonlyArray<string> = [
-  '#tableScreen .opp-strip',
-  '#gameBadge',
-  '#statusLine',
-  '#board',
-  '#menuBtn',
-  '#soundBtn',
-];
-/** Every box the record reads (all frames); `frameSelectors` picks the layout's. */
+/** Every box the record reads (both frames); `frameSelectors` picks the layout's. */
 export const FRAME_SELECTORS: ReadonlyArray<string> = [
-  ...new Set([...UPRIGHT_FRAME, ...RAIL_FRAME, ...ROWS_FRAME]),
+  ...new Set([...UPRIGHT_FRAME, ...LANDSCAPE_FRAME]),
 ];
-/** The frame for a layout at a width: sideways, the rail's strip from `RAIL_MIN_WIDTH`, the rows under it. */
-export const frameSelectors = (layout: Layout, width: number): ReadonlyArray<string> =>
-  layout !== 'landscape' ? UPRIGHT_FRAME : width >= RAIL_MIN_WIDTH ? RAIL_FRAME : ROWS_FRAME;
+/** The frame for a layout: the strip's items and the two buttons sideways, the rows upright and on the desktop. */
+export const frameSelectors = (layout: Layout): ReadonlyArray<string> =>
+  layout === 'landscape' ? LANDSCAPE_FRAME : UPRIGHT_FRAME;
 const PLACE_IDS: ReadonlyArray<string> = [
   ...Array.from({ length: 24 }, (_, i) => `point-${String(i + 1)}`),
   'barTop',

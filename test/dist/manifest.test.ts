@@ -9,8 +9,10 @@
 // declares (the IHDR is read, so a re-rendered icon of another size fails here), one of them
 // maskable; the colours are the theme's `--bg` and `--accent`; the head's theme-color is the
 // manifest's. Vite copies public/ verbatim and leaves the head's relative href as written (the
-// favicon links are the precedent), which the first test pins. Runs on dist/ after the build
-// (npm run test:site).
+// favicon links are the precedent), which the first test pins. The head also links the Home
+// Screen icon iOS reads (`apple-touch-icon`, never the manifest's icons; tools/icons.ts
+// TOUCH_ICONS): 180x180, opaque (the IHDR's colour type says so), from the same folder, resolving
+// on both origins like the manifest's. Runs on dist/ after the build (npm run test:site).
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -19,7 +21,7 @@ import { expect, test } from 'vitest';
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
 import { mapPath, metaContent } from '../../infra/games-proxy/worker.ts';
 import { ALIASES, type ShellGame } from '../../tools/games.ts';
-import { ICONS, MANIFEST_GAMES, iconFile } from '../../tools/icons.ts';
+import { ICONS, MANIFEST_GAMES, TOUCH_ICONS, iconFile } from '../../tools/icons.ts';
 import { REPO_ROOT, describeDist, distHasFile, readDist, referencesIn } from './dist.ts';
 
 /** Any origin: only pathnames matter on the Pages side. */
@@ -43,12 +45,16 @@ type Manifest = Readonly<{
 const manifestFile = (game: ShellGame): string => `games/${game}/manifest.webmanifest`;
 const pageFile = (game: ShellGame): string => `games/${game}/index.html`;
 const HREF = './manifest.webmanifest';
+const TOUCH_HREF = './icons/apple-touch-icon.png';
 
 /** A PNG's IHDR: width and height, big-endian, right after the 8-byte signature and the chunk header. */
 const pngSize = (bytes: Buffer): Readonly<{ width: number; height: number }> => ({
   width: bytes.readUInt32BE(16),
   height: bytes.readUInt32BE(20),
 });
+/** The IHDR's colour type (the byte after the bit depth): 2 is truecolour with no alpha channel, 6 truecolour with one. */
+const pngColourType = (bytes: Buffer): number => bytes.readUInt8(25);
+const TRUECOLOUR_OPAQUE = 2;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /** A `:root` token's hex value in the game's theme.css (the manifest's colours are the theme's). */
@@ -167,6 +173,38 @@ describeDist('the installable manifest', (root) => {
           const file = distPathFor(resolvedPath(base, src));
           expect(distHasFile(root, file), `${name}: ${src}`).toBe(true);
         });
+      });
+    });
+
+    test(`${game}: the head links ${TOUCH_HREF} once, as written; the build ships it 180x180 and opaque`, () => {
+      const page = readDist(root, pageFile(game));
+      const links = referencesIn(pageFile(game), page).filter(({ value }) => value === TOUCH_HREF);
+      expect(links).toEqual([{ file: pageFile(game), kind: 'href', value: TOUCH_HREF }]);
+      expect(page).toContain(`<link rel="apple-touch-icon" href="${TOUCH_HREF}" />`);
+      const touch = TOUCH_ICONS.filter((icon) => icon.game === game);
+      expect(touch.map((icon) => [iconFile(icon), icon.size])).toEqual([
+        ['apple-touch-icon.png', 180],
+      ]);
+      touch.forEach((icon) => {
+        const file = `games/${game}/icons/${iconFile(icon)}`;
+        expect(distHasFile(root, file), file).toBe(true);
+        const bytes = readFileSync(resolve(root.dir, file));
+        expect(bytes.subarray(0, 8).equals(PNG_SIGNATURE), `${file} is a PNG`).toBe(true);
+        expect(pngSize(bytes), file).toEqual({ width: icon.size, height: icon.size });
+        // iOS paints black behind a transparent pixel: the render keeps the drawing's background.
+        expect(pngColourType(bytes), `${file} is opaque`).toBe(TRUECOLOUR_OPAQUE);
+      });
+    });
+
+    test(`${game}: the Home Screen icon resolves on the Pages origin and through the Worker under the game's name and its alias`, () => {
+      const pagesBase = `${ORIGIN}${PAGES_BASE_PATH}${pageFile(game)}`;
+      const pagesFile = pagesFileFor(resolvedPath(pagesBase, TOUCH_HREF));
+      expect(pagesFile).toBe(`games/${game}/icons/apple-touch-icon.png`);
+      expect(distHasFile(root, pagesFile), pagesFile).toBe(true);
+      proxyNames(game).forEach((name) => {
+        const file = distPathFor(resolvedPath(`${PROXY_ORIGIN}/${name}/`, TOUCH_HREF));
+        expect(file, name).toBe(pagesFile);
+        expect(distHasFile(root, file), `${name}: ${TOUCH_HREF}`).toBe(true);
       });
     });
   });

@@ -110,10 +110,15 @@ describeDist('dist parity with legacy/ and web/', (root) => {
       // An installable game's manifest (tools/icons.ts MANIFEST_GAMES), linked from the head like the
       // icon and copied from web/public/games/<g>/ as written (checked below with the rest); the icons
       // it names are the manifest's references, not the page's (test/dist/manifest.test.ts follows them).
+      // Its Home Screen icon (`apple-touch-icon`: iOS reads the link, never the manifest) is the page's
+      // own reference, from the same folder (manifest.test.ts holds its size and both origins).
       const manifests = references.filter((value) => value.endsWith('.webmanifest'));
       expect(manifests).toEqual(isManifestGame(game) ? ['./manifest.webmanifest'] : []);
+      const touchIcons = references.filter((value) => value.endsWith('/apple-touch-icon.png'));
+      expect(touchIcons).toEqual(isManifestGame(game) ? ['./icons/apple-touch-icon.png'] : []);
       const relative = references.filter(
-        (value) => !icons.includes(value) && !manifests.includes(value),
+        (value) =>
+          !icons.includes(value) && !manifests.includes(value) && !touchIcons.includes(value),
       );
       expect(relative[0]).toMatch(/^\.\/app-[\w-]+\.js$/);
       const sheets = relative.filter((value) => value.endsWith('.css'));

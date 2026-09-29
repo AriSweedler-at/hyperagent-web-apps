@@ -942,6 +942,15 @@ export const RULES: ReadonlyArray<Rule> = [
     why: 'the served card-pack files: the manifest test reads them, the dist guards and the smoke serve them',
   },
   {
+    // A page's served files (docs/design/link-previews.md §2, backgammon-landscape.md §5C): the
+    // splash, a manifest and its icons, copied into dist as they are. The dist guards read them
+    // (dist-parity's shipped list, manifest.test.ts) and the smoke serves them on both origins;
+    // nothing under web/public is imported, so the game's own suites have nothing to re-run.
+    globs: ['web/public/games/**'],
+    runs: ['site', 'e2e-site'],
+    why: "a page's served files (the splash, a manifest, its icons): the dist guards read them and the smoke serves them",
+  },
+  {
     globs: ['test/integration/**'],
     runs: ['shared-integration'],
     why: 'the transport contract',
