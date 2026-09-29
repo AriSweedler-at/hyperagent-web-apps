@@ -104,8 +104,12 @@ body {
   /* The home indicator's band, read through the same `--inset-b` the sideways block declares: the
      one seam a measurement (tools/shell-emulate.ts) overrides, upright as sideways. The paddings
      are the shell's (shell.css "the screen frame": the band, the hairline and `--frame-gap`, or the
-     inset where that is more): 12px here, 16 from 900px. */
+     inset where that is more): 12px here, 16 from 900px; the top alone stays 12 under a notch,
+     because the upright table's budget counts 12 (172px of chrome, the phone block below) and the
+     notch's 47-62px would push the controls past the foot (the emulator's `clear` check, portrait
+     standalone). The notch's zone upright is a follow-up (docs/design/screen-frame.md §7). */
   --inset-b: env(safe-area-inset-bottom, 0px);
+  padding-top: 12px;
 }
 /* The trim (the owner: "green style trim in the background at the border of the window"): the
    shell's screen frame (docs/design/screen-frame.md; page.ts `frame: true`), dressed here: a quiet
@@ -123,6 +127,9 @@ body {
 @media (min-width: 900px) {
   :root {
     --frame-band: 10px;
+  }
+  #app {
+    padding-top: 16px;
   }
 }
 /* GFS Didot for the title and the room code only (design §1 Theme); Cardo everywhere else. */

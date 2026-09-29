@@ -373,8 +373,10 @@ says `frame: true`, so the composed `<body>` carries `data-frame` and shell.css 
 inner side, at `z-index: 0` under every positioned thing (overlays 50, flyers 60, the toast 100);
 theme.css sets `--frame-band: 6px` (10px from 900px), `--frame-color: var(--olive)`,
 `--frame-hairline: var(--gold)` and `--frame-gap: 5px`, so the shell's clearance rule pads `#app`
-by 12px (16px from 900px), or the safe-area inset where that is more, and the board and every
-control stay clear of the band. No pattern: the meander stays the frame's alone.
+by 12px (16px from 900px), or the safe-area inset where that is more (the top upright excepted:
+the theme holds it at 12, since the upright table's 172px budget counts 12 and a notch's 47-62px
+pushed the controls past the foot; screen-frame.md §7), and the board and every control stay clear
+of the band. No pattern: the meander stays the frame's alone.
 
 The trim's corners follow the screen's (the owner: "the green border hugs the real screen's
 border"; and sideways under Safari's bar, "the border's top corners should be square instead of

@@ -144,7 +144,8 @@ One flag and three tokens.
 - Nothing else: no `body::before`, no padding arithmetic, no corner rule. Backgammon (the trim,
   docs/design/backgammon-board.md §3.6): `--frame-band: 6px` (10px from 900px),
   `--frame-color: var(--olive)`, `--frame-hairline: var(--gold)`, `--frame-gap: 5px` (so its
-  gutters stay the 12px and 16px its board arithmetic counts).
+  gutters stay the 12px and 16px its board arithmetic counts), and one `#app { padding-top }` of
+  its own upright (§7).
 
 ## 6. Validation
 
@@ -170,3 +171,8 @@ One flag and three tokens.
   a `kind` check.
 - `safe-area-max-inset-*` and any future radius API: swap the fallback and the table's role when
   one ships.
+- Backgammon upright keeps its top gutter at 12px (16 from 900px) over the shell's
+  `max(clearance, inset-top)`: its portrait table budget counts 12 and the notch's 47-62px pushed
+  the controls past the foot (the emulator's `clear` check). Sizing the upright board for the
+  notch's zone is its own change; the shell's rule stands for every other side and every other
+  game.
