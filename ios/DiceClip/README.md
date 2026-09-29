@@ -225,6 +225,11 @@ Everything only the account holder can do, in order. Nothing here was attempted 
    App Store, topic `com.sweedler.games.dice.Clip.push-type.liveactivity` (or the app's bundle id
    when the full app holds the activity: the clip sends its own bundle id when it pairs). Push
    Notifications on the two App IDs is step 1's automatic signing, or a checkbox on the identifier.
+11. **The buddy moving.** With the clip on a phone and a session paired, the island's buddy should
+    change frame once a second on its own (docs/design/rps-buddy.md §6: the timer font). If a digit
+    shows instead, the font did not register (`Config/Activity-Info.plist` `UIAppFonts`, the
+    extensions' Resources phase); if the 8 × 8 code-drawn buddy shows, `UIFont(name:)` was nil in
+    the extension. Neither could be checked here: no simulator runtime, no signing team.
 10. **The site half's dropdown** (the owner's second ask: the playground item that rolls dice in an
     iPhone island, its green call to action disabled unless the phone has the hardware) is the
     `sizer-island-dice` lane's; it points at this clip's invocation URL.

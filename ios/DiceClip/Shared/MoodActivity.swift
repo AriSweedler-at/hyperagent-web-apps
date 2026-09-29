@@ -65,6 +65,10 @@ final class MoodActivity {
     var activitiesEnabled: Bool { ActivityAuthorizationInfo().areActivitiesEnabled }
 
     private var activity: Activity<MoodActivityAttributes>?
+
+    /// When the live activity began: the timer buddy's origin, so the screen's preview shows the
+    /// island's frame.
+    var startedAt: Date? { activity?.attributes.startedAt }
     private var tokenTask: Task<Void, Never>?
     private var lastToken: String?
     private let client: PairingClient

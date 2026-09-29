@@ -1,9 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- The widget extensions' Info.plist (both DiceActivity targets): the WidgetKit extension point.
-     CFBundle* keys come from the build settings. -->
+     CFBundle* keys come from the build settings. UIAppFonts registers the buddy's five timer fonts
+     (Config/Fonts, written by tools/buddy-font.ts; docs/design/rps-buddy.md "Moving in the island"),
+     copied flat into the bundle by the Resources phase. -->
 <plist version="1.0">
 <dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Buddy-VerySad.ttf</string>
+		<string>Buddy-Sad.ttf</string>
+		<string>Buddy-Neutral.ttf</string>
+		<string>Buddy-Happy.ttf</string>
+		<string>Buddy-VeryHappy.ttf</string>
+	</array>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>

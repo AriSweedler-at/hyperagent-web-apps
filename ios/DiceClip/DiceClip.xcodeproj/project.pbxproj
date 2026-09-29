@@ -57,6 +57,16 @@
 		E200000000000000000001A /* RootScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000001A /* RootScreen.swift */; };
 		E3000000000000000000043 /* MoodActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000043 /* MoodActivityWidget.swift */; };
 		E4000000000000000000043 /* MoodActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000043 /* MoodActivityWidget.swift */; };
+		E30000000000000000000061 /* Buddy-VerySad.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000061 /* Buddy-VerySad.ttf */; };
+		E30000000000000000000062 /* Buddy-Sad.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000062 /* Buddy-Sad.ttf */; };
+		E30000000000000000000063 /* Buddy-Neutral.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000063 /* Buddy-Neutral.ttf */; };
+		E30000000000000000000064 /* Buddy-Happy.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000064 /* Buddy-Happy.ttf */; };
+		E30000000000000000000065 /* Buddy-VeryHappy.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000065 /* Buddy-VeryHappy.ttf */; };
+		E40000000000000000000061 /* Buddy-VerySad.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000061 /* Buddy-VerySad.ttf */; };
+		E40000000000000000000062 /* Buddy-Sad.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000062 /* Buddy-Sad.ttf */; };
+		E40000000000000000000063 /* Buddy-Neutral.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000063 /* Buddy-Neutral.ttf */; };
+		E40000000000000000000064 /* Buddy-Happy.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000064 /* Buddy-Happy.ttf */; };
+		E40000000000000000000065 /* Buddy-VeryHappy.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000065 /* Buddy-VeryHappy.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -146,6 +156,11 @@
 		CC0000000000000000000019 /* BuddyScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyScreen.swift; sourceTree = "<group>"; };
 		CC000000000000000000001A /* RootScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootScreen.swift; sourceTree = "<group>"; };
 		CC0000000000000000000043 /* MoodActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodActivityWidget.swift; sourceTree = "<group>"; };
+		CC0000000000000000000061 /* Buddy-VerySad.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Buddy-VerySad.ttf"; sourceTree = "<group>"; };
+		CC0000000000000000000062 /* Buddy-Sad.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Buddy-Sad.ttf"; sourceTree = "<group>"; };
+		CC0000000000000000000063 /* Buddy-Neutral.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Buddy-Neutral.ttf"; sourceTree = "<group>"; };
+		CC0000000000000000000064 /* Buddy-Happy.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Buddy-Happy.ttf"; sourceTree = "<group>"; };
+		CC0000000000000000000065 /* Buddy-VeryHappy.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Buddy-VeryHappy.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -260,8 +275,21 @@
 				CC0000000000000000000055 /* Clip.entitlements */,
 				CC0000000000000000000056 /* ClipActivity.entitlements */,
 				CC0000000000000000000057 /* Assets.xcassets */,
+				BB0000000000000000000060 /* Fonts */,
 			);
 			path = Config;
+			sourceTree = "<group>";
+		};
+		BB0000000000000000000060 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				CC0000000000000000000061 /* Buddy-VerySad.ttf */,
+				CC0000000000000000000062 /* Buddy-Sad.ttf */,
+				CC0000000000000000000063 /* Buddy-Neutral.ttf */,
+				CC0000000000000000000064 /* Buddy-Happy.ttf */,
+				CC0000000000000000000065 /* Buddy-VeryHappy.ttf */,
+			);
+			path = Fonts;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -319,6 +347,7 @@
 			buildPhases = (
 				F30000000000000000000001 /* Sources */,
 				F30000000000000000000002 /* Frameworks */,
+				F30000000000000000000003 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -338,6 +367,7 @@
 			buildPhases = (
 				F40000000000000000000001 /* Sources */,
 				F40000000000000000000002 /* Frameworks */,
+				F40000000000000000000003 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -413,6 +443,30 @@
 			buildActionMask = 2147483647;
 			files = (
 				E20000000000000000000057 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F30000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E30000000000000000000061 /* Buddy-VerySad.ttf in Resources */,
+				E30000000000000000000062 /* Buddy-Sad.ttf in Resources */,
+				E30000000000000000000063 /* Buddy-Neutral.ttf in Resources */,
+				E30000000000000000000064 /* Buddy-Happy.ttf in Resources */,
+				E30000000000000000000065 /* Buddy-VeryHappy.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F40000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E40000000000000000000061 /* Buddy-VerySad.ttf in Resources */,
+				E40000000000000000000062 /* Buddy-Sad.ttf in Resources */,
+				E40000000000000000000063 /* Buddy-Neutral.ttf in Resources */,
+				E40000000000000000000064 /* Buddy-Happy.ttf in Resources */,
+				E40000000000000000000065 /* Buddy-VeryHappy.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -78,7 +78,10 @@ Five bands, the owner's colours, and a frame set per band. The colours are the m
 | happy | 2 … 4 | smile | `#F5CD3B` yellow | ground (squashed), air | bouncing |
 | very happy | 5 | wide smile | `#FFD200` bright yellow | air, grin | bouncing high |
 
-A frame is rows of characters, one per pixel: `.` clear, `#` the fill, `=` the fill at 70%, `o`
+The shipped frames are the 24 × 24 PNGs under `web/public/games/rps/buddy/` (rps-buddy.md §3:
+6-frame sulks and bounces, a 4-frame walk, a 4-frame hop between neighbours), and the island shows
+them through the timer fonts (rps-buddy.md §6, §7 option 1 below). The rows below are the fallback
+drawn in code when a font is missing. A frame is rows of characters, one per pixel: `.` clear, `#` the fill, `=` the fill at 70%, `o`
 ink (`#1F2430`). The placeholders are 8 × 8 and two frames per band; the interface is
 `BuddyFrames.frames(for: Mood) -> [PixelFrame]` and `BuddyFrames.frameDuration` (500 ms), and
 `PixelSpriteView` draws any grid at any size, the pixels snapped to a cell. Sourced art replaces the
@@ -162,21 +165,22 @@ What that leaves, in order of frame rate without a push:
 
 1. **A timer glyph font (1 fps).** `Text(timerInterval:)` runs on its own; with a custom font whose
    ten digit glyphs are ten buddy frames, and the text clipped to its last digit, the seconds digit
-   cycles the frames at 1 fps for the activity's whole life. This is the notch-pet apps' shape of
-   trick and the best rate the platform gives. It needs a font file (an asset the art lane would
-   build from the final frames), so it is not in this pass.
+   cycles the frames at 1 fps for the activity's whole life. The best rate the platform gives;
+   **shipped** (2026-09-29): `tools/buddy-font.ts` writes one TrueType font per band from the
+   frames, `BuddySprite.swift` shows the timer clipped to its last glyph (rps-buddy.md §6; whether a
+   notch-pet app does the same is unverified there).
 2. **`ProgressView(timerInterval:)` (smooth, but a bar).** Runs continuously too, as a filling bar
    or ring; it can shrink the game's window on the Lock Screen but cannot drive a sprite's position.
-3. **A frame per update (chosen here).** Every push carries a new `at`; the buddy shows frame
+3. **A frame per update (the fallback).** Every push carries a new `at`; the buddy shows frame
    `at mod N` for its band, so each round steps the walk, the bounce or the sulk, and the band's
    change morphs colour and shape with a spring. During play a round lands every two to four
    seconds, so the buddy moves at roughly 0.3–0.5 fps and rests between games. No asset, no font,
    no budget beyond the round's own push.
 
 Nothing gives 2 fps or more inside a Live Activity without pushes as of iOS 26; the free-running
-ceiling is the timer's second (option 1). The clip ships option 3 now with option 1's frame
-interface ready (`BuddyFrames`), and the web page, with no such limit, animates the same frames at
-`frameDuration`.
+ceiling is the timer's second (option 1). The clip ships option 1, with option 3 as the fallback
+when a band's font is not in the bundle (`BuddyFont.isAvailable`), and the web page, with no such
+limit, animates the same frames from the sheets.
 
 ## 8. Pairing and pushes
 
