@@ -312,6 +312,27 @@ target, no `/`-rooted URL anywhere in the file) and the alias's mapping on both 
 being its stub alone. The smoke spec opens `<alias>/?join=…` on both projects and expects the
 game's title at the game's path on Pages and at the alias's path on the proxy.
 
+**The island scoreboard.** The RPS game's buddy lives in the iPhone's Dynamic Island, which no web
+page can draw: it is the Dice App Clip's Live Activity (`ios/DiceClip`), and a Live Activity is
+updated by its app or by an APNs push to the activity's push token. The Worker is the bridge
+(`infra/games-proxy/rps-push.ts`, routed under `/api/rps/` ahead of every proxy path, same-origin
+only: no CORS header, so the Pages origin has no island). The game mints an 8-character session id
+and opens the clip at `/clip/rps?session=<id>`; the clip starts the activity with `pushType: .token`
+and `POST`s `{session, token, bundle}` to `/api/rps/pair` (KV `RPS_PAIRS`, `pair:<session>`, 24 h);
+the game polls `GET /api/rps/pair/<session>` for `{paired}`, then `POST`s each round's mood to
+`/api/rps/mood` as `{session, counter, prestige, band, at}`, which the Worker forwards to
+`api.push.apple.com/3/device/<token>` as `{"aps": {"timestamp", "event": "update", "content-state":
+{…}}}` with `apns-push-type: liveactivity`, `apns-topic: <bundle>.push-type.liveactivity`, priority
+5 and expiration 0, under an ES256 provider token signed with the team's `.p8` key (WebCrypto,
+one token per key id reused for 50 minutes). One push per session per 2 s (a 429 otherwise);
+Apple's refusal is a 502 carrying its `reason`, and a 410 or `BadDeviceToken` forgets the pair.
+Without the binding or the `APNS_*` secrets every route is a 503 and the proxy is unchanged.
+`rps-push.test.ts` pins every route and status over a Map-backed store and a captured fetch, and
+verifies the token's signature against a key pair generated in the test; `tools/proxy-dev.ts` runs
+the same routes over an in-memory store and a stub APNs so the `proxy` e2e can pair and post. The
+island lags the page by the push's latency (accepted); an Android phone plays the same game with no
+buddy in the bar. Design: `docs/design/rps-island.md`.
+
 localStorage stays per-origin (unchanged). Peer ids are origin-independent, so a github.io host
 and a games.sweedler.com guest still meet on the broker.
 

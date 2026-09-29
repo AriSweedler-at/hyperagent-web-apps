@@ -464,6 +464,12 @@ const ROWS_BEFORE: ReadonlyArray<readonly [string, Suite, Thresholds]> = [
     'site',
     { lines: 95, functions: 95, statements: 95, branches: 93 },
   ],
+  // Added by docs/design/rps-island.md: the island scoreboard's routes beside the Worker.
+  [
+    'infra/games-proxy/rps-push.ts',
+    'site',
+    { lines: 95, functions: 95, statements: 95, branches: 93 },
+  ],
 ];
 
 const INCLUDE_BEFORE: ReadonlyArray<string> = [
@@ -511,6 +517,8 @@ const INCLUDE_BEFORE: ReadonlyArray<string> = [
   'web/games/gin-rummy/src/net/**/*.ts',
   'web/games/gin-rummy/src/fx.ts',
   'infra/games-proxy/worker.ts',
+  // Added by docs/design/rps-island.md: the island scoreboard's routes beside the Worker.
+  'infra/games-proxy/rps-push.ts',
 ];
 
 describe('the coverage rows moved, not renumbered', () => {

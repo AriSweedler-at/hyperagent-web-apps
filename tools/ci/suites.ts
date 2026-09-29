@@ -710,10 +710,12 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       'test/tokens.test.ts',
       // No .js under web/.
       'test/ratchet.test.ts',
-      // The games.sweedler.com Worker is how the site is served; its row is the one infra/ row.
+      // The games.sweedler.com Worker is how the site is served, and its island-scoreboard routes
+      // (rps-push.ts) ride it: the two infra/ rows.
       'infra/games-proxy/worker.test.ts',
       // UI Sandbox (docs/design/ui-sandbox.md): a tool page, not a game; its pure modules' tests.
       'web/games/ui-sandbox/**/*.test.ts',
+      'infra/games-proxy/rps-push.test.ts',
     ],
     // The dist guards read the build output (asset URLs, both origins, the class contract, landing
     // parity, the backgammon grid); each skips with a note when dist/ is absent.
@@ -721,10 +723,12 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
     browser: false,
     needsBuild: true,
     coverage: {
-      include: ['infra/games-proxy/worker.ts'],
-      // The Worker's table tests over a stubbed global fetch. Measured: 100/100/100/96.7.
+      include: ['infra/games-proxy/worker.ts', 'infra/games-proxy/rps-push.ts'],
+      // The Worker's table tests over a stubbed global fetch. Measured: 100/100/100/96.7. The
+      // island routes over a Map-backed store and a captured fetch, the same floor.
       thresholds: {
         'infra/games-proxy/worker.ts': { lines: 95, functions: 95, statements: 95, branches: 93 },
+        'infra/games-proxy/rps-push.ts': { lines: 95, functions: 95, statements: 95, branches: 93 },
       },
     },
     // Every page on both origins, the computed-style goldens (two viewports per game), and UI
