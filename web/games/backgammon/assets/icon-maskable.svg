@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 512 512" role="img" aria-label="Sheshbesh">
+  <!-- The installed app's maskable icon (docs/design/backgammon-landscape.md §5C): the launcher cuts
+       this to its own shape, so the aegean panel bleeds to every edge with no transparency, and the
+       mark (three olive-wood points on a gold floor line, three plain checkers, no text) sits inside
+       the central 80% circle the Web App Manifest spec calls the safe zone: every corner of the mark is
+       under 205px from the centre. tools/icons.ts renders it at 512 (manifest `purpose: maskable`) to
+       web/public/games/backgammon/icons/maskable-512.png. -->
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d4266"/>
+      <stop offset="0.6" stop-color="#0b3c5d"/>
+      <stop offset="1" stop-color="#082e49"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#panel)"/>
+  <g transform="translate(118 396)">
+    <polygon points="0,0 92,0 46,-200" fill="#a67c52"/>
+    <polygon points="92,0 184,0 138,-200" fill="#6e4b2a"/>
+    <polygon points="184,0 276,0 230,-200" fill="#a67c52"/>
+    <circle cx="46" cy="-42" r="30" fill="#f3ecdf" stroke="#d9cbad" stroke-width="3"/>
+    <circle cx="46" cy="-108" r="30" fill="#f3ecdf" stroke="#d9cbad" stroke-width="3"/>
+    <circle cx="230" cy="-42" r="30" fill="#4a2e1c" stroke="#2a1a12" stroke-width="3"/>
+    <line x1="-8" y1="0" x2="284" y2="0" stroke="#c9a227" stroke-width="3" stroke-opacity="0.85"/>
+  </g>
+</svg>

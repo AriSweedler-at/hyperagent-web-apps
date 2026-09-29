@@ -37,8 +37,8 @@ export const DEFAULT_MARK = 'data-default';
 export const WAITING_MSG = 'Waiting for your opponent to join';
 /** `#hostWaitStatus` once the guest's join was answered. */
 export const joinedMsg = (name: string): string => `${name} joined!`;
-/** `#guestSeatName` once the host's welcome named the guest's seat (web/shared/ui/shellPaint.ts `seatedAsMsg`); gin's page carries no such line. */
-export const seatedAsMsg = (name: string): string => `Playing as ${name}`;
+/** `#guestNameNote` on the guest wait screen's name card, once the host has answered (web/shared/ui/shellPaint.ts `hostSeesMsg`); gin's page carries no card. */
+export const hostSeesMsg = (hostName: string): string => `${hostName} will see this name.`;
 /** `#hostWaitStatus` once a resumed room is back on the broker. */
 export const reopenedMsg = (code: string): string => `Room ${code} reopened`;
 /** `#toast` after `#shareCodeBtn` on a browser with no share sheet. */
@@ -198,6 +198,17 @@ export const followInvite = async (page: Page, game: ShellGame, url: string): Pr
   await expect(page.locator('#guestWaitStatus')).toHaveText(SHELL[game].hostAnswered, {
     timeout: WEBRTC_TIMEOUT,
   });
+};
+
+/**
+ * Change the name on the guest wait screen's card (the owner, 2026-09-28: the client defines its
+ * own name): `name` into `#guestNameInput`, then `#guestRenameBtn`; the guest re-sends its join and
+ * the host re-seats it (web/shared/ui/shell.ts `name/rename`). What the host then says, and what
+ * the card shows, is the spec's to expect.
+ */
+export const rename = async (page: Page, name: string): Promise<void> => {
+  await page.locator('#guestNameInput').fill(name);
+  await page.locator('#guestRenameBtn').click();
 };
 
 // ---- online: the start ----------------------------------------------------------------------------

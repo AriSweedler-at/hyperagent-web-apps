@@ -27,6 +27,7 @@
 import {
   addClass,
   afterTransition,
+  bodySpace,
   cloneInto,
   rectOf,
   removeClass,
@@ -104,12 +105,17 @@ export type LaunchOptions = Readonly<{
 export const launchClone = (
   doc: Readonly<{ body: Element }>,
   source: Element,
-  from: Rect,
-  to: Rect,
+  fromRect: Rect,
+  toRect: Rect,
   o: LaunchOptions,
 ): Element | null => {
   const clone = cloneInto(doc.body, source);
   if (clone === null) return null;
+  // The clone is laid out in the body's space, which the far seat's flip turns (dom.ts
+  // `bodySpace`): both rects are reflected into it, so the flight starts and lands where the eye
+  // sees the checkers whether or not the table is turned.
+  const from = bodySpace(doc, fromRect);
+  const to = bodySpace(doc, toRect);
   addClass(clone, ...o.classes);
   removeClass(clone, ...o.strip);
   setStyle(clone, o.sizeVar, px(from.width));

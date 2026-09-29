@@ -37,6 +37,13 @@ export const PLAY_MODES = ['online', 'local'] as const;
 export type PlayMode = (typeof PLAY_MODES)[number];
 export const SOUND_STATES = ['on', 'off'] as const;
 export type SoundState = (typeof SOUND_STATES)[number];
+/**
+ * `flipTable`: the pass-and-play table turned for the seat across it (web/shared/ui/shell.ts
+ * `flipForFar`; docs/design/backgammon-landscape.md §6 item 7), `on` or `off` as a bare string;
+ * a missing or unreadable key reads as off.
+ */
+export const FLIP_STATES = ['on', 'off'] as const;
+export type FlipState = (typeof FLIP_STATES)[number];
 /** `rememberName` sliced what it stored to this many characters (the wire cap too). */
 export const NAME_MAX = 20;
 
@@ -45,6 +52,7 @@ export const decodeName: Decoder<string> = refine(string, (s) => s !== '', 'a no
 export const decodePlayMode: Decoder<PlayMode> = literal(...PLAY_MODES);
 export const decodeSoundState: Decoder<SoundState> = literal(...SOUND_STATES);
 export const decodeSoundFont: Decoder<SoundFontName> = literal(...SOUND_FONTS);
+export const decodeFlipState: Decoder<FlipState> = literal(...FLIP_STATES);
 /**
  * The card pack a game with this deck kind may store (docs/design/card-packs.md §2): one of
  * `packsFor(kind)`, so a stored `linea` is refused under gin's key and accepted under briscola's.
@@ -322,6 +330,8 @@ export type ShellKeys = Readonly<{
   soundFont: string;
   /** The finished games (`<game>_recentGames`, JSON; web/shared/lib/recentGames.ts). */
   recentGames: string;
+  /** The far seat's flip (`<game>_flipTable`, `on`/`off`; shell.ts `flipForFar`). */
+  flipTable: string;
 }>;
 
 /** The shell's readers and writers over one game's keys: what `web/shared/ui/shell.ts` reads `initHome` from and `shellEffects.ts` writes the effects through. */
@@ -335,11 +345,13 @@ export type ShellStore<S, X extends object, Tab extends string> = Readonly<{
   soundFont: TextPref<SoundFontName>;
   /** The finished games, newest first, at most RECENT_GAMES_CAP (the `recordGame` effect appends). */
   recentGames: RecentGamesPref;
+  /** The far seat's flip, `on` or `off` (the shell reads it as a boolean at `home/init`; the `writeFlip` effect writes it). */
+  flipTable: TextPref<FlipState>;
   save: ShellSave<S, X>;
 }>;
 
 /**
- * The shell's store for a game: the seven preferences, the finished games and the save, each over
+ * The shell's store for a game: the eight preferences, the finished games and the save, each over
  * the game's own key, so a game's storage.ts spells its keys once and destructures its
  * `readName`/`writeName`/… from here (docs/design/shared-shell.md §5 C2 "shellStore/shellKeys onto
  * prefs.ts").
@@ -360,6 +372,7 @@ export const shellStore = <S, X extends object, Tab extends string>(
   sound: soundPref(keys.sound),
   soundFont: textPref(keys.soundFont, decodeSoundFont),
   recentGames: recentGamesPref(keys.recentGames),
+  flipTable: textPref(keys.flipTable, decodeFlipState),
   save: shellSave({
     key: keys.save,
     game: cfg.game,

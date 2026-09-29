@@ -265,6 +265,40 @@ export const rectOf = (el: Element): Rect => {
     : { left: r.left, top: r.top, width: r.width, height: r.height };
 };
 
+/**
+ * The far seat's flip (web/shared/ui/shell.ts `flipped`, shellPaint.ts `paintFlip`): `data-flip="1"`
+ * on the body while shell.css turns it 180° (`body[data-flip="1"] { rotate: 180deg }`), and with
+ * it the containing block of every fixed child of the body. A rect read off the page (`rectOf`)
+ * is in viewport space, but a clone placed on the body by `left`/`top` is laid out in the body's
+ * own, turned space, so it would render point-reflected through the body's centre: `bodySpace`
+ * is that reflection of a rect, `bodyPoint` of a point, both the identity while the body is
+ * upright, so the motion kernel (motion.ts `launchClone`) and the drag kernel (drag.ts) place
+ * their clones where the eye expects them either way. The body's own rect is the same box turned
+ * or not (a half turn about its centre maps it onto itself), so its centre is read off it as it is.
+ */
+const flippedBody = (doc: Readonly<{ body: Element }>): Rect | null =>
+  dataOf(doc.body, 'flip') === '1' ? rectOf(doc.body) : null;
+
+export const bodySpace = (doc: Readonly<{ body: Element }>, r: Rect): Rect => {
+  const b = flippedBody(doc);
+  if (b === null) return r;
+  return {
+    left: 2 * b.left + b.width - r.left - r.width,
+    top: 2 * b.top + b.height - r.top - r.height,
+    width: r.width,
+    height: r.height,
+  };
+};
+
+export const bodyPoint = <P extends Readonly<{ x: number; y: number }>>(
+  doc: Readonly<{ body: Element }>,
+  p: P,
+): P => {
+  const b = flippedBody(doc);
+  if (b === null) return p;
+  return { ...p, x: 2 * b.left + b.width - p.x, y: 2 * b.top + b.height - p.y };
+};
+
 /** `el.style.setProperty(prop, value)`; an empty value removes the inline property. Nothing on a fake. */
 export const setStyle = (el: Element, prop: string, value: string): void => {
   const styled = el as Partial<Pick<HTMLElement, 'style'>>;

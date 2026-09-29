@@ -13,7 +13,7 @@ import type { ShellGameData } from '../../../shared/ui/shell.ts';
 import { applyAction, createGame, decodeState, viewFor } from './engine/index.ts';
 import { connectingMsg } from './net/guest.ts';
 import { OPENING_MSG, handoffMsg } from './net/host.ts';
-import { action, lobby, state, toast } from './protocol.ts';
+import { action, join, lobby, state, toast } from './protocol.ts';
 import { unlocksSandbox } from './sandbox.ts';
 import {
   DEFAULT_CARD_BACK,
@@ -95,7 +95,7 @@ export const GIN_SHELL: ShellGameData<Gin> = {
     scoreOf: (view) => `${String(view.players[0].total)}–${String(view.players[1].total)}`,
     winnerOf: (view) => view.winner,
   },
-  frames: { lobby, state, toast, action },
+  frames: { lobby, state, toast, action, join },
   cues: { initial: INITIAL_CUES },
   home: {
     // This page's own keys (defaults when unreadable; main.ts logs a bad card back), and the Score Counter's session.

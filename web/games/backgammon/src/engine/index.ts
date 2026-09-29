@@ -23,7 +23,7 @@ export const ENGINE: TwoSeatEngine<State, View, Action, CreateGameOptions> = {
   decodeAction,
 };
 
-export { actorOf, applyAction, canDouble, MESSAGES } from './apply.ts';
+export { actorOf, applyAction, canDouble, MESSAGES, turnHeld } from './apply.ts';
 export {
   afterMove,
   boardKey,
@@ -141,4 +141,4 @@ export type {
   View,
 } from './types.ts';
 export { isShippedVariant, rulesOf, SHIPPED_VARIANTS, VARIANTS } from './variants.ts';
-export { legalActions, viewFor } from './view.ts';
+export { canEndTurn, legalActions, viewFor } from './view.ts';

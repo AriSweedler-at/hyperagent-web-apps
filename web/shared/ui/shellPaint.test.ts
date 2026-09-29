@@ -12,7 +12,9 @@ import {
   connDotClass,
   connDotView,
   hideToast,
+  hostSeesMsg,
   paintConnDot,
+  paintFlip,
   paintGate,
   paintHandoff,
   paintScreen,
@@ -23,7 +25,6 @@ import {
   seatListHtml,
   seatListKey,
   seatRows,
-  seatedAsMsg,
   showToast,
   type Sheet,
 } from './shellPaint.ts';
@@ -53,6 +54,21 @@ const pageEls = (): ReadonlyArray<FakeEl> => [
 ];
 
 const page = (): FakePage => fakePage(pageEls());
+
+/** Backgammon's and briscola's page: the shell ids plus the guest wait screen's name card (its Change is the binder's, not the paint's), hidden as shipped. */
+const cardPage = (): FakePage =>
+  fakePage([
+    ...pageEls(),
+    fakeEl('guestSeatName', { classes: ['hidden'] }),
+    fakeEl('guestNameInput'),
+    fakeEl('guestNameNote'),
+  ]);
+
+/** Type into an input as the player would (the fake's inputs carry a writable value). */
+const typeInto = (p: FakePage, id: string, value: string): void => {
+  const input = p.get(id).el as HTMLInputElement;
+  input.value = value;
+};
 
 const shown = (p: FakePage): ReadonlyArray<string> => SCREENS.filter((id) => !p.get(id).hidden());
 
@@ -119,33 +135,113 @@ describe('paintWaiting', () => {
     expect(p.get('startGameBtn').hasClass('btn')).toBe(true);
   });
 
-  test('the seated name, when the page has the line: "Playing as …" shown for a name, hidden and empty for null or none; a page without it paints the rest as before', () => {
+  test('the name card, when the page has it: shown with the box prefilled and the note naming the host once the host has answered, hidden and emptied for null or none; a page without it paints the rest as before', () => {
     const waiting = {
       code: 'ABCD',
       hostStatus: { text: 'Waiting…', pulse: true },
       guestStatus: { text: 'Connected', pulse: false },
       startGameVisible: false,
+      myName: 'Ari',
+      oppName: 'Ann',
     };
     // gin's page: no `#guestSeatName`, so the seated name paints nothing and the rest as before.
     const plain = page();
     paintWaiting(plain.doc, { ...waiting, seatedName: 'Ari 2' });
     expect(plain.get('guestWaitStatus').text()).toBe('Connected');
     expect(plain.get('roomCode').text()).toBe('ABCD');
-    // backgammon's and briscola's: the line under the status, hidden as shipped.
-    const p = fakePage([...pageEls(), fakeEl('guestSeatName', { classes: ['hidden'] })]);
+    // backgammon's and briscola's: the card under the status, hidden as shipped.
+    const p = cardPage();
     paintWaiting(p.doc, { ...waiting, seatedName: 'Ari 2' });
-    expect(p.get('guestSeatName').text()).toBe('Playing as Ari 2');
     expect(p.get('guestSeatName').hidden()).toBe(false);
+    expect(p.get('guestNameInput').value()).toBe('Ari 2');
+    expect(p.get('guestNameInput').attr('data-seated')).toBe('Ari 2');
+    expect(p.get('guestNameNote').text()).toBe(hostSeesMsg('Ann'));
+    expect(p.get('guestNameNote').text()).toBe('Ann will see this name.');
     paintWaiting(p.doc, { ...waiting, seatedName: 'Guest' });
-    expect(p.get('guestSeatName').text()).toBe(seatedAsMsg('Guest'));
-    paintWaiting(p.doc, { ...waiting, seatedName: null });
-    expect(p.get('guestSeatName').text()).toBe('');
+    expect(p.get('guestNameInput').value()).toBe('Guest');
+    // No seat named (before the welcome, after a cancel): hidden, the box and the note emptied.
+    paintWaiting(p.doc, { ...waiting, seatedName: null, oppName: null });
     expect(p.get('guestSeatName').hidden()).toBe(true);
+    expect(p.get('guestNameInput').value()).toBe('');
+    expect(p.get('guestNameInput').attr('data-seated')).toBeNull();
+    expect(p.get('guestNameNote').text()).toBe('');
     paintWaiting(p.doc, { ...waiting, seatedName: 'Bo' });
     expect(p.get('guestSeatName').hidden()).toBe(false);
+    expect(p.get('guestNameInput').value()).toBe('Bo');
+    expect(p.get('guestNameNote').text()).toBe('Ann will see this name.');
     paintWaiting(p.doc, waiting);
-    expect(p.get('guestSeatName').text()).toBe('');
     expect(p.get('guestSeatName').hidden()).toBe(true);
+    expect(p.get('guestNameInput').value()).toBe('');
+    // A card without its box or note (a page that carries the wrapper alone) paints what it has.
+    const bare = fakePage([...pageEls(), fakeEl('guestSeatName', { classes: ['hidden'] })]);
+    paintWaiting(bare.doc, { ...waiting, seatedName: 'Bo' });
+    expect(bare.get('guestSeatName').hidden()).toBe(false);
+  });
+
+  test('the name card never fights typing: a box the player edited is left alone by every paint, and refilled only when the seated name changes while the box holds the previous seated name or the word the player sent', () => {
+    // The room as a guest that has sent no word sees it; `waiting` is one that sent 'Guest'.
+    const unnamed = {
+      code: 'ABCD',
+      hostStatus: { text: 'Waiting…', pulse: true },
+      guestStatus: { text: 'Connected', pulse: false },
+      startGameVisible: false,
+      oppName: 'Ann',
+    };
+    const waiting = { ...unnamed, myName: 'Guest' };
+    const p = cardPage();
+    paintWaiting(p.doc, { ...waiting, seatedName: 'Guest' });
+    expect(p.get('guestNameInput').value()).toBe('Guest');
+    // Typing: every repaint with the same seated name (a status, a seat list) touches nothing.
+    typeInto(p, 'guestNameInput', 'Xy');
+    paintWaiting(p.doc, { ...waiting, seatedName: 'Guest' });
+    paintWaiting(p.doc, {
+      ...waiting,
+      seatedName: 'Guest',
+      guestStatus: { text: 'Connected — still', pulse: false },
+    });
+    expect(p.get('guestNameInput').value()).toBe('Xy');
+    // Change tapped with 'ann' in the box: the reducer sent 'ann' (`myName`) and mirrored 'ann 2';
+    // the box takes the answer, since what it holds is the word that was sent.
+    typeInto(p, 'guestNameInput', 'ann');
+    paintWaiting(p.doc, { ...waiting, myName: 'ann', seatedName: 'ann 2' });
+    expect(p.get('guestNameInput').value()).toBe('ann 2');
+    expect(p.get('guestNameInput').attr('data-seated')).toBe('ann 2');
+    // The lobby answering with the same word: nothing to do.
+    paintWaiting(p.doc, { ...waiting, myName: 'ann', seatedName: 'ann 2' });
+    expect(p.get('guestNameInput').value()).toBe('ann 2');
+    // Typed on before an answer arrived: a seated name that is neither the previous one nor the
+    // sent word leaves the box alone, and is still recorded as the last seated name.
+    typeInto(p, 'guestNameInput', 'ann 2 more');
+    paintWaiting(p.doc, { ...waiting, myName: 'ann', seatedName: 'ann 3' });
+    expect(p.get('guestNameInput').value()).toBe('ann 2 more');
+    expect(p.get('guestNameInput').attr('data-seated')).toBe('ann 3');
+    // A box holding the previous seated name follows the next one (nothing was typed since).
+    typeInto(p, 'guestNameInput', 'ann 3');
+    paintWaiting(p.doc, { ...waiting, myName: 'ann', seatedName: 'ann 4' });
+    expect(p.get('guestNameInput').value()).toBe('ann 4');
+    // The sent word is compared as the wire normalises it: the spaces around it and a cut at 20.
+    typeInto(p, 'guestNameInput', '  Xyz ');
+    paintWaiting(p.doc, { ...waiting, myName: 'Xyz', seatedName: 'Xyz' });
+    expect(p.get('guestNameInput').value()).toBe('Xyz');
+    typeInto(p, 'guestNameInput', `${'x'.repeat(20)}tail`);
+    paintWaiting(p.doc, { ...waiting, myName: 'x'.repeat(20), seatedName: `${'x'.repeat(20)} 2` });
+    expect(p.get('guestNameInput').value()).toBe(`${'x'.repeat(20)} 2`);
+    // Leaving the room (`cancel/finish`: null) empties a box that held the seated name; the next
+    // room's welcome fills the empty box.
+    paintWaiting(p.doc, { ...waiting, seatedName: null });
+    expect(p.get('guestNameInput').value()).toBe('');
+    paintWaiting(p.doc, { ...waiting, myName: 'Cy', seatedName: 'Cy' });
+    expect(p.get('guestNameInput').value()).toBe('Cy');
+    // A guest that has sent no word (`myName` absent: nothing for the box to be matched against)
+    // keeps what it typed through a seated-name change, which is still recorded; a box holding the
+    // previous seated name follows the next one as for anyone.
+    typeInto(p, 'guestNameInput', 'Cy typed');
+    paintWaiting(p.doc, { ...unnamed, seatedName: 'Cy 2' });
+    expect(p.get('guestNameInput').value()).toBe('Cy typed');
+    expect(p.get('guestNameInput').attr('data-seated')).toBe('Cy 2');
+    typeInto(p, 'guestNameInput', 'Cy 2');
+    paintWaiting(p.doc, { ...unnamed, seatedName: 'Cy 3' });
+    expect(p.get('guestNameInput').value()).toBe('Cy 3');
   });
 
   test('the seat list, when the page has one: the host first, every seat with its state and mine marked, keyed on the rows; nothing while no room is open; a page without it is untouched', () => {
@@ -571,5 +667,21 @@ describe('paintGate (docs/design/backgammon-landscape.md §5D; the shell`s, for 
     expect(noGo.get('turnGateKeepBtn').focused()).toBe(true);
     paintGate(noGo.doc, false, true);
     expect(noGo.get('turnGateKeepBtn').focused()).toBe(false);
+  });
+});
+
+describe('paintFlip (shell.ts `flipped`; docs/design/backgammon-landscape.md §6 item 7)', () => {
+  test('`data-flip="1"` on the body while the table is turned for the far seat, removed otherwise; the attribute alone, no class', () => {
+    const p = page();
+    expect(p.body.attr('data-flip')).toBeNull();
+    paintFlip(p.doc, true);
+    expect(p.body.attr('data-flip')).toBe('1');
+    expect(p.body.classes()).toEqual([]);
+    paintFlip(p.doc, true);
+    expect(p.body.attr('data-flip')).toBe('1');
+    paintFlip(p.doc, false);
+    expect(p.body.attr('data-flip')).toBeNull();
+    paintFlip(p.doc, false);
+    expect(p.body.attr('data-flip')).toBeNull();
   });
 });

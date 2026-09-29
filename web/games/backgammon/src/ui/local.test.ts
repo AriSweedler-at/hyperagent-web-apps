@@ -166,6 +166,7 @@ describe('paintCurtain', () => {
     matchLength: 5,
     curtainMode: 'always',
     soundFont: 'default',
+    flipTable: false,
     save: null,
     recentGames: [],
   };

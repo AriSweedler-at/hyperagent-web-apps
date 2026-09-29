@@ -332,7 +332,9 @@ describe('the sizes', () => {
   });
 
   test('landscape lengths: two rows in what the chrome leaves, floored per scheme (104 rail, 90 rows, less half the bottom inset)', () => {
-    expect(pointLength({ width: 844, height: 390, coarse: true })).toBe(147);
+    // The rail's 40px of chrome (6 + 22 + 6 + 6): 167 at 844x390 inset-free, 156.5 with the
+    // iPhone 12's 21px home indicator, 150 on a Pixel 8 with its toolbar, 124 at 780x304.
+    expect(pointLength({ width: 844, height: 390, coarse: true })).toBe(167);
     expect(
       pointLength({
         width: 844,
@@ -340,18 +342,20 @@ describe('the sizes', () => {
         coarse: true,
         insets: { left: 47, right: 47, bottom: 21 },
       }),
-    ).toBe(136.5);
-    expect(pointLength({ width: 915, height: 356, coarse: true })).toBe(130);
-    expect(pointLength({ width: 780, height: 304, coarse: true })).toBe(104);
-    expect(pointLength({ width: 780, height: 290, coarse: true })).toBe(
+    ).toBe(156.5);
+    expect(pointLength({ width: 915, height: 356, coarse: true })).toBe(150);
+    expect(pointLength({ width: 780, height: 304, coarse: true })).toBe(124);
+    // The floor: 2 x 104 + 16 + 40 = 264 exactly; under it the floor holds and the CSS scrolls.
+    expect(pointLength({ width: 780, height: 264, coarse: true })).toBe(104);
+    expect(pointLength({ width: 780, height: 250, coarse: true })).toBe(
       LANDSCAPE_GEOMETRY.rail.minPointLen,
     );
-    // A notched 375pt phone at the 304 floor: the floor gives up half the 21px home indicator, so
-    // 2 x 93.5 + 16 + 80 + 21 = 304 still fits, exactly where the CSS fallback starts scrolling.
+    // A notched 375pt phone at the 264 floor: the floor gives up half the 21px home indicator, so
+    // 2 x 93.5 + 16 + 40 + 21 = 264 still fits, exactly where the CSS fallback starts scrolling.
     expect(
       pointLength({
         width: 812,
-        height: 304,
+        height: 264,
         coarse: true,
         insets: { left: 47, right: 47, bottom: 21 },
       }),
@@ -359,7 +363,7 @@ describe('the sizes', () => {
     expect(
       pointLength({
         width: 812,
-        height: 290,
+        height: 250,
         coarse: true,
         insets: { left: 47, right: 47, bottom: 21 },
       }),

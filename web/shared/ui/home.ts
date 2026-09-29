@@ -18,6 +18,8 @@
 // every tab) are painted only while the Play tab is the current one and are otherwise left as
 // they were.
 import {
+  blurElement,
+  byId,
   dataOf,
   inputDataOf,
   inputTypeOf,
@@ -225,6 +227,12 @@ export type ShellIntentBuilders<I, Tab extends string, Start> = Readonly<{
   resumeClick: I;
   shareClick: I;
   cancel: I;
+  /**
+   * `#guestRenameBtn`, or Enter in `#guestNameInput`: the box's raw text (the guest wait screen's
+   * name card, backgammon's and briscola's pages; gin's carries none, so the binder looks the two
+   * ids up and binds nothing without them).
+   */
+  renameClick: (name: string) => I;
 }>;
 
 /**
@@ -259,6 +267,7 @@ export const shellIntents = <G extends ShellTypes>(): ShellIntentBuilders<
   resumeClick: { type: 'resume/click' },
   shareClick: { type: 'share/click' },
   cancel: { type: 'cancel' },
+  renameClick: (name) => ({ type: 'name/rename', name }),
 });
 
 /** What `bindHomeShell` needs from a game: its tabs, its start-option readers and its intents. */
@@ -280,7 +289,10 @@ export type HomeShellBindings<I, Tab extends string, Start> = Readonly<{
  */
 export { bindLongPress };
 
-/** Every shell control of the home screen and the two waiting screens, as the legacy registered them. */
+/**
+ * Every shell control of the home screen and the two waiting screens, as the legacy registered
+ * them; since 2026-09-28 also the guest wait screen's name card where the page carries one.
+ */
 export const bindHomeShell = <I, Tab extends string, Start>(
   doc: PageLike,
   dispatch: (intent: I) => void,
@@ -375,5 +387,21 @@ export const bindHomeShell = <I, Tab extends string, Start>(
     listenId(doc, id, 'click', () => {
       dispatch(intents.cancel);
     });
+  });
+  // The guest wait screen's name card (backgammon's and briscola's `guestSeatName` block; gin's page
+  // carries none, so both ids are looked up, never required): Change, or Enter in the box, re-sends
+  // the join under what the box says (shell.ts `name/rename`). Enter also lets the box go, so a
+  // phone's keyboard closes as it does after the tap.
+  const guestNameInput = byId(doc, 'guestNameInput');
+  const guestRenameBtn = byId(doc, 'guestRenameBtn');
+  if (guestNameInput === null || guestRenameBtn === null) return;
+  const rename = (): void => {
+    dispatch(intents.renameClick(readValue(guestNameInput)));
+  };
+  listen(guestRenameBtn, 'click', rename);
+  listen(guestNameInput, 'keydown', (e) => {
+    if (keyOf(e) !== 'Enter') return;
+    rename();
+    blurElement(guestNameInput);
   });
 };

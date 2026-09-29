@@ -26,7 +26,10 @@ import { PLAYERS } from './test-helpers.ts';
 /** A random match of 3 runs a few hundred steps; the cap only turns a hang into a failure. */
 const STEP_CAP = 20_000;
 
-/** Doubles at 15%, undoes at 5%, passes at 25%, otherwise a uniformly random legal move. */
+/**
+ * Doubles at 15%, undoes at 5%, passes at 25%, otherwise a uniformly random legal move; a held
+ * turn (pass-and-play's `manualTurnEnd`, design §1 "Turn end") is ended, or undone at 5%.
+ */
 const choose = (view: View, pick: () => number): Action => {
   switch (view.phase) {
     case 'over':
@@ -34,6 +37,7 @@ const choose = (view: View, pick: () => number): Action => {
     case 'cubeOffered':
       return { type: pick() < 0.75 ? 'take' : 'pass' };
     case 'moving': {
+      if (bg.canEndTurn(view)) return pick() < 0.05 ? { type: 'undo' } : { type: 'done' };
       if (view.canUndo && pick() < 0.05) return { type: 'undo' };
       const m = view.legal[Math.floor(pick() * view.legal.length)];
       if (m === undefined) throw new Error('no legal move while moving');
@@ -137,9 +141,17 @@ const checkStep = ({ before, after, view, actor, action, rngCalls, step, cov }: 
     'the views disagree',
   );
   const nextActor = bg.actorOf(after);
+  // Under `manualTurnEnd` the mover may be held in `moving` with nothing left: End turn is then on.
+  const heldAfter = bg.turnHeld(after);
+  if (heldAfter) {
+    ensure(after.played.length > 0, label, 'a held turn with nothing played');
+    ensure(bg.canEndTurn(bg.viewFor(after, after.turn)), label, 'a held turn without End turn');
+    cov.add('held');
+  }
   [v0, v1].forEach((v) => {
     if (v.me.idx !== nextActor || after.phase !== 'moving')
       ensure(v.legal.length === 0, label, 'legal for a non-mover');
+    else if (heldAfter) ensure(v.legal.length === 0, label, 'a move offered in a held turn');
     else ensure(v.legal.length > 0, label, 'no legal move for the mover');
     if (after.phase === 'moving' && after.dice !== null)
       ensure(
@@ -187,6 +199,13 @@ const checkStep = ({ before, after, view, actor, action, rngCalls, step, cov }: 
         ensure(grew >= 1, label, 'a completed turn logs its line');
       else ensure(grew === 0, label, 'a move mid-turn logs nothing');
       break;
+    case 'done':
+      ensure(before.options.manualTurnEnd, label, 'done without the option');
+      ensure(after.turn !== before.turn && after.phase === 'toRoll', label, 'done did not flip');
+      ensure(grew >= 1, label, 'End turn logs the turn line');
+      ensure(same(after.lastPlay, before.played), label, 'End turn kept the play');
+      cov.add('done');
+      break;
     case 'next':
       ensure(after.log.length >= 2, label, 'a new game opens with its lines');
       break;
@@ -233,11 +252,13 @@ const playMatch = (
   rotation: ReadonlyArray<ShippedVariant>,
   matchLength: number,
   cov: Set<string>,
+  manualTurnEnd = false,
 ): number => {
   const run = driveGame(bg.ENGINE, {
     seed,
     now,
-    start: (dice, clock) => bg.createGame(PLAYERS, { matchLength, rotation }, dice, clock),
+    start: (dice, clock) =>
+      bg.createGame(PLAYERS, { matchLength, rotation, manualTurnEnd }, dice, clock),
     policy: (view, pick) => choose(view, pick),
     stepCap: STEP_CAP,
     over: (s) => s.phase === 'over' && bg.matchOver(s.match),
@@ -270,12 +291,12 @@ const playMatch = (
 };
 
 /**
- * How many matches the three suites play together: 91 by default (60 + 25 + 6; every push and PR,
- * about eight seconds), `BG_REPLAY_GAMES=1000` in .github/workflows/nightly.yml beside gin's
+ * How many matches the four suites play together: 99 by default (60 + 25 + 6 + 8; every push and
+ * PR, about eight seconds), `BG_REPLAY_GAMES=1000` in .github/workflows/nightly.yml beside gin's
  * `GIN_REPLAY_GAMES`, lower for a quick local run. Each suite keeps its share of the total, and the
  * outcome-coverage assertions expect at least the default.
  */
-const { share, timeoutMs: TIMEOUT_MS } = replayScale('BG_REPLAY_GAMES', 91);
+const { share, timeoutMs: TIMEOUT_MS } = replayScale('BG_REPLAY_GAMES', 99);
 
 describe('seeded random play to the end (R33)', () => {
   test(
@@ -327,6 +348,20 @@ describe('seeded random play to the end (R33)', () => {
       const cov = new Set<string>();
       seeds(5001, share(6)).forEach((seed) => playMatch(seed, ['portes', 'backgammon'], 3, cov));
       ['single', 'gammon', 'crawford'].forEach((c) => {
+        expect(cov.has(c), c).toBe(true);
+      });
+      expect(cov.has('held')).toBe(false);
+      expect(cov.has('done')).toBe(false);
+    },
+    TIMEOUT_MS,
+  );
+
+  test(
+    'pass-and-play`s End turn: every turn with a play is held for `done`, undone or ended, to the end of the match',
+    () => {
+      const cov = new Set<string>();
+      seeds(7001, share(8)).forEach((seed) => playMatch(seed, ['portes'], 3, cov, true));
+      ['held', 'done', 'undo', 'noMove', 'hit', 'single'].forEach((c) => {
         expect(cov.has(c), c).toBe(true);
       });
     },

@@ -12,7 +12,7 @@ import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { recentGamesHtml } from '../../../../shared/ui/recentGames.ts';
 import { viewFor, withPosition } from '../engine/index.ts';
 import type { Dice, Seat, State, View } from '../engine/index.ts';
-import { pos } from '../engine/test-helpers.ts';
+import { pos, START } from '../engine/test-helpers.ts';
 import { backgammonPage, type BackgammonPage } from './page.fake.ts';
 import {
   HIT_TOAST_PREFIX,
@@ -73,6 +73,7 @@ const home: HomeSnapshot = {
   matchLength: 5,
   curtainMode: 'always',
   soundFont: 'default',
+  flipTable: false,
   save: null,
   recentGames: [],
 };
@@ -372,11 +373,45 @@ describe('the table', () => {
     expect(p.get(pt(5)).hasClass('hit')).toBe(false);
     expect(p.get('dice').text()).toContain('class="die die-3 used"');
     expect(p.get('undoBtn').disabled()).toBe(false);
-    expect(p.get('statusText').text()).toBe('Last move: the turn ends when you play it');
+    expect(p.get('statusText').text()).toBe('Last move: then End turn, or Undo');
     const undone = run(moved, { type: 'undo/click' }).app;
     paint(p.doc, undone);
     expect(p.get(pt(8)).attr('data-key')).toBe('L3');
     expect(p.get('undoBtn').disabled()).toBe(true);
+  });
+
+  test('End turn (design §1 "Turn end"): hidden mid-turn and online, the primary button beside Undo once pass-and-play`s dice are used up, the status says so, the tap flips the turn', () => {
+    const p = page();
+    const rolled = at(START, 0, [3, 1]);
+    paint(p.doc, rolled);
+    expect(p.get('doneBtn').hidden()).toBe(true);
+    // The markup's class and label ("End turn") are the page's own; the e2e reads the label.
+    expect(p.get('doneBtn').hasClass('btn-primary')).toBe(true);
+    // 8/5 with the 3, then 6/5 with the 1 (the taps take absolute indices: own n is n - 1 for Light).
+    const one = run(rolled, { type: 'point/tap', point: 7 }, { type: 'point/tap', point: 4 }).app;
+    paint(p.doc, one);
+    expect(p.get('doneBtn').hidden()).toBe(true);
+    expect(p.get('statusText').text()).toBe('Last move: then End turn, or Undo');
+    const held = run(one, { type: 'point/tap', point: 5 }, { type: 'point/tap', point: 4 }).app;
+    expect(game(held)).toMatchObject({ phase: 'moving', turn: 0 });
+    paint(p.doc, held);
+    expect(p.get('doneBtn').hidden()).toBe(false);
+    expect(p.get('undoBtn').disabled()).toBe(false);
+    expect(p.get('statusText').text()).toBe('Dice used — End turn, or Undo');
+    expect(p.get('curtainOverlay').hidden()).toBe(true);
+    expect(p.get('diceMini').hidden()).toBe(false);
+    // The tap: the turn flips, the curtain rises for Bob, the button goes with the mover's controls.
+    const ended = run(held, { type: 'done/click' }).app;
+    expect(game(ended)).toMatchObject({ phase: 'toRoll', turn: 1 });
+    paint(p.doc, ended);
+    expect(p.get('doneBtn').hidden()).toBe(true);
+    expect(p.get('curtainOverlay').hidden()).toBe(false);
+    expect(p.get('undoBtn').disabled()).toBe(true);
+    // Online the host keeps the automatic end (the option is off in its match): the same position
+    // without the option never shows the button, whatever the painter is handed.
+    const offline = { ...game(held), options: { ...game(held).options, manualTurnEnd: false } };
+    paint(p.doc, withView(held, viewFor(offline, 0)));
+    expect(p.get('doneBtn').hidden()).toBe(true);
   });
 
   test('a checker on the bar is the derived sole source (`selected auto`); a hit marks the point', () => {
@@ -561,16 +596,24 @@ describe('the table', () => {
     expect(p.get('menuOverlay').hidden()).toBe(false);
     expect(p.get('menuCurtainToggle').checked()).toBe(true);
     expect(p.get('menuCurtainToggle').attr('data-next')).toBe('never');
+    // The far seat's flip beside it: off by default, its next value on.
+    expect(p.get('menuFlipToggle').checked()).toBe(false);
+    expect(p.get('menuFlipToggle').attr('data-next')).toBe('on');
     expect(p.get('rulesOverlay').hidden()).toBe(true);
     expect(p.get('rulesList').attr('data-key')).toBe('portes');
     const never = run(
       rolled,
       { type: 'curtain/mode', mode: 'never' },
+      { type: 'flip/set', on: true },
       { type: 'rules/toggle' },
     ).app;
     paint(p.doc, never);
     expect(p.get('menuCurtainToggle').checked()).toBe(false);
     expect(p.get('menuCurtainToggle').attr('data-next')).toBe('always');
+    expect(p.get('menuFlipToggle').checked()).toBe(true);
+    expect(p.get('menuFlipToggle').attr('data-next')).toBe('off');
+    // The body's `data-flip` is the boot's paint (shellPaint.ts `paintFlip`), not this one's.
+    expect(p.body.attr('data-flip')).toBeNull();
     expect(p.get('rulesOverlay').hidden()).toBe(false);
     expect(p.get('historyOverlay').hidden()).toBe(true);
   });
@@ -588,6 +631,21 @@ describe('the table', () => {
     paintSeat(p.doc, viewFor(game(app), 0));
     expect(p.get('point-1').attr('data-own')).toBe('1');
     expect(p.get('point-1').hasClass('pt-near')).toBe(true);
+  });
+
+  test('the colour discs before the names (the owner, 2026-09-28): each wears its seat, the markup ships seat 0`s view, and in pass-and-play they swap with the mover', () => {
+    const p = page();
+    expect(p.get('mySeatDot').attr('data-seat')).toBe('0');
+    expect(p.get('oppSeatDot').attr('data-seat')).toBe('1');
+    const app = local();
+    // Light's view: my disc is Light's (nacre, `data-seat="0"`), the opponent's Dark's.
+    paint(p.doc, withView(app, viewFor(game(app), 0)));
+    expect(p.get('mySeatDot').attr('data-seat')).toBe('0');
+    expect(p.get('oppSeatDot').attr('data-seat')).toBe('1');
+    // The phone handed across: Dark's view, the discs follow the names.
+    paint(p.doc, withView(app, viewFor(game(app), 1)));
+    expect(p.get('mySeatDot').attr('data-seat')).toBe('1');
+    expect(p.get('oppSeatDot').attr('data-seat')).toBe('0');
   });
 
   test('whose turn (the owner, 2026-09-25): the route arrow and the lit tray follow the actor in their checker colours; the other seat sees the route mirrored; a finished game or no game shows neither', () => {
@@ -845,13 +903,20 @@ describe('bindAll', () => {
     p.get('menuCurtainToggle').el.setAttribute('data-next', 'never');
     p.get('menuCurtainToggle').fire('change');
     expect(intents.at(-1)).toEqual({ type: 'curtain/mode', mode: 'never' });
+    p.get('menuFlipToggle').el.setAttribute('data-next', 'on');
+    p.get('menuFlipToggle').fire('change');
+    expect(intents.at(-1)).toEqual({ type: 'flip/set', on: true });
+    p.get('menuFlipToggle').el.setAttribute('data-next', 'off');
+    p.get('menuFlipToggle').fire('change');
+    expect(intents.at(-1)).toEqual({ type: 'flip/set', on: false });
     p.get('closeRulesBtn').fire('click');
     p.get('closeHistoryBtn').fire('click');
     p.get('closeMenuBtn').fire('click');
     p.get('rulesOverlay').fire('click', { target: fakeTarget({ id: 'rulesOverlay' }) });
     p.get('rulesOverlay').fire('click', { target: fakeTarget({ id: 'closeRulesBtn' }) });
     p.get('resultOverlay').fire('click', { target: fakeTarget({ id: 'resultOverlay' }) });
-    expect(intents.slice(8)).toEqual([
+    // Past the two toggles' four intents: the close buttons and the backdrops.
+    expect(intents.slice(10)).toEqual([
       { type: 'rules/toggle' },
       { type: 'history/toggle' },
       { type: 'menu/toggle' },

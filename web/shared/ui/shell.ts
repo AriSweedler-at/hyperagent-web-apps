@@ -55,6 +55,8 @@ export type Seat = 0 | 1;
 export type Role = 'host' | 'guest' | 'local';
 /** The stored modes (web/shared/edge/prefs.ts `PLAY_MODES`); a game may show more (`G['Mode']`). */
 export type PlayMode = 'online' | 'local';
+/** The stored flip setting (prefs.ts `FLIP_STATES`), which the shell holds as the boolean `flipForFar`. */
+export type FlipState = 'on' | 'off';
 /** A seat as the engines take it: gin's `PlayerInfo`, backgammon's `Player`. */
 export type Player = Readonly<{ id: string; name: string }>;
 
@@ -203,6 +205,8 @@ export type HomeSnapshot<G extends ShellTypes> = Readonly<{
   playMode: PlayMode;
   /** A bad value read as the default (main.ts logs it). */
   soundFont: SoundFontName;
+  /** The far seat's flip (`flipForFar`): the game's `flipTable` key, off when missing or unreadable. */
+  flipTable: boolean;
   save: Save<G> | null;
   /** The finished games this device remembers, newest first (web/shared/lib/recentGames.ts). */
   recentGames: ReadonlyArray<RecentGame>;
@@ -345,6 +349,16 @@ export type ShellState<G extends ShellTypes> = Readonly<{
   /** The font every cue plays in (docs/design/sound-fonts.md §6). */
   soundFont: SoundFontName;
   /**
+   * "Phone flat between us: flip the board each turn" (the pass-and-play setting; the owner,
+   * 2026-09-25: the pass-the-phone flow "should naturally follow as the phone will be held
+   * sideways"; docs/design/backgammon-landscape.md §6 item 7): a phone lying flat between two
+   * players is read upside down by the one across the table, so the whole page turns 180° for
+   * seat 1's turns (`flipped`, painted by the boot as `data-flip` on the body). A preference,
+   * not a table fact: read at `home/init` from the game's `flipTable` key, written by `flip/set`
+   * through `writeFlip`, kept through every start, leave and cancel. Off by default.
+   */
+  flipForFar: boolean;
+  /**
    * The finished games this device remembers, newest first, at most RECENT_GAMES_CAP: read at
    * `home/init`, the record of a game that just ended put first as its `recordGame` effect
    * appends the same record to storage (web/shared/lib/recentGames.ts).
@@ -419,10 +433,19 @@ export type ShellIntent<G extends ShellTypes> =
    * owner, 2026-09-25: "it shouldn't make you THEN click 'sit down'"). Nothing while seated.
    */
   | Readonly<{ type: 'join/link'; code: string }>
+  /**
+   * `#guestRenameBtn`, or Enter in `#guestNameInput` (the guest wait screen's name card; the
+   * owner, 2026-09-28: the client defines its own name): the raw box text. A connected guest
+   * re-sends its join under the new name, which the host takes as a re-seat (`hostFrame` `join`,
+   * G5); ignored in every other role and while the host is not connected.
+   */
+  | Readonly<{ type: 'name/rename'; name: string }>
   /** `#soundBtn`. */
   | Readonly<{ type: 'sound/toggle' }>
   /** The hook's `soundFont(name)` (the console, for now): a valid font plays from now on and is remembered. */
   | Readonly<{ type: 'soundFont/set'; font: SoundFontName }>
+  /** `#menuFlipToggle` (backgammon's menu sheet): the far seat's flip, `flipForFar`, remembered under the game's `flipTable` key. */
+  | Readonly<{ type: 'flip/set'; on: boolean }>
   /** `#shareCodeBtn`. */
   | Readonly<{ type: 'share/click' }>
   // ---- net: host ----
@@ -476,14 +499,15 @@ export type ShellIntent<G extends ShellTypes> =
   | Readonly<{ type: 'persist' }>;
 
 /**
- * The shell's half of a game's `Intent` union: 50 types, backgammon's 38 less its two option
+ * The shell's half of a game's `Intent` union: 51 types, backgammon's 38 less its two option
  * selects (`variant/set`, `matchLength/set`, its own) plus the seven both games kept on the table
  * side after C1 (the curtain reveal, the leave flow, `visible`, `render`, `persist`), plus
  * `position/load`, backgammon's `sandbox/load` generalised (dry-round-2.md F5), plus
  * `resume/auto`, the boot's lobby resume (lobby-resume.md D4), plus the three of playing sideways
  * (`viewport/portrait`, `viewport/landscape`, `gate/keep`: backgammon's turn gate lifted here,
  * docs/design/backgammon-landscape.md §5D), plus the two of the Android lock (`gate/turn`,
- * `fullscreen/lost`, §5C).
+ * `fullscreen/lost`, §5C), plus `flip/set`, the far seat's flip (§6 item 7), plus `name/rename`,
+ * the guest wait screen's name card (the owner, 2026-09-28: the client defines its own name).
  */
 export const SHELL_INTENT_TYPES = [
   'home/init',
@@ -510,8 +534,10 @@ export const SHELL_INTENT_TYPES = [
   'submenu/dismiss',
   'code/typed',
   'join/link',
+  'name/rename',
   'sound/toggle',
   'soundFont/set',
+  'flip/set',
   'share/click',
   'host/start',
   'host/status',
@@ -558,6 +584,8 @@ export type ShellEffect<G extends ShellTypes> =
   | Readonly<{ type: 'writeHomeTab'; tab: Tab<G> }>
   | Readonly<{ type: 'writePlayMode'; mode: PlayMode }>
   | Readonly<{ type: 'writeSoundFont'; font: SoundFontName }>
+  /** The far seat's flip into the game's `flipTable` key (`on`/`off`). */
+  | Readonly<{ type: 'writeFlip'; on: boolean }>
   /**
    * A game just ended on this device (the owner, 2026-09-25: "after a game is finished (either
    * online or pass-and-play) the datetime & score should be recorded, including the victor"):
@@ -634,6 +662,7 @@ export const SHELL_EFFECT_TYPES = [
   'writeHomeTab',
   'writePlayMode',
   'writeSoundFont',
+  'writeFlip',
   'recordGame',
   'revealRule',
   'toast',
@@ -719,6 +748,8 @@ export type ShellPrefs<G extends ShellTypes> = Readonly<{
   homeTab: Pref<G['Store'], Tab<G>>;
   playMode: Pref<G['Store'], PlayMode>;
   soundFont: Pref<G['Store'], SoundFontName>;
+  /** The far seat's flip (prefs.ts `FLIP_STATES`): `readHome` reads it as a boolean, `writeFlip` writes it. */
+  flipTable: Pref<G['Store'], FlipState>;
   recentGames: RecentGamesPref<G['Store']>;
   save: Readonly<{
     readSave: (store: G['Store']) => Result<Save<G>, unknown>;
@@ -876,6 +907,11 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     state: (view: G['View']) => HostFrameOf<G>;
     toast: (message: string) => HostFrameOf<G>;
     action: (action: G['Action']) => GuestFrameOf<G>;
+    /**
+     * The guest's join under `name` (the session sends the first at channel open, web/shared/net/guest.ts;
+     * the shell sends another on `name/rename`, which the host takes as a re-seat).
+     */
+    join: (name: string) => GuestFrameOf<G>;
   }>;
   cues: Readonly<{ initial: G['Cues'] }>;
   table: Readonly<{
@@ -915,6 +951,12 @@ export type ShellConfig<G extends ShellTypes> = Readonly<{
     revealer: (
       game: G['State'],
     ) => Readonly<{ seat: SeatOf<G>; effects: ReadonlyArray<Effect<G>> }>;
+    /**
+     * The seat a pass-and-play view is for (backgammon `view.me.idx`): who is looking at the
+     * phone while the curtain is down, what `flipped` reads to turn the table for seat 1. A game
+     * without the flip setting leaves it out, and its table never turns.
+     */
+    holder?: (view: G['View']) => SeatOf<G>;
   }>;
   home: Readonly<{
     /** The game's own keys for the snapshot (`G['Home']`). */
@@ -1036,6 +1078,45 @@ export const gateOpen = <G extends ShellTypes>(s: GateState<G>, cfg: GateConfig<
   s.portraitPhone &&
   !s.gateDismissed &&
   !s.orientationLocked;
+
+// ---- the far seat's flip (docs/design/backgammon-landscape.md §6 item 7) ------------------------
+
+/** What `flipped` reads of the shell: the role, the setting, the screen and the view. */
+export type FlipShell<G extends ShellTypes> = Pick<
+  ShellState<G>,
+  'role' | 'flipForFar' | 'screen' | 'view'
+>;
+/** What `flipped` reads of the App: the shell's four fields and the table's curtain (`ShellTypes.Table`); a `ShellApp` fits. */
+export type FlipApp<G extends ShellTypes> = Readonly<{
+  shell: FlipShell<G>;
+  table: Readonly<{ curtain: number | null }>;
+}>;
+/** What `flipped` reads of the config: the game's `holder` hook; a `ShellConfig` fits. */
+export type FlipConfig<G extends ShellTypes> = Readonly<{
+  local?: Pick<ShellConfig<G>['local'], 'holder'>;
+}>;
+
+/**
+ * The page is turned 180° for the seat across the table (shellPaint.ts `paintFlip`, painted by
+ * the boot after the game's own paint as `data-flip="1"` on the body; shell.css rotates the body,
+ * which at the table is the viewport, so every fixed overlay, the toast, the flyers and the drag
+ * ghost turn with it and hit-testing follows the transform; the two kernels that place a clone
+ * on the body by measured rects reflect them into the turned space, dom.ts `bodySpace`). In
+ * pass-and-play alone, with `flipForFar` on, at the table (where the body is the viewport,
+ * `fixed-screen`; the endgame scrolls upright), when the seat now looking at the phone is seat
+ * 1: the seat the curtain is up for while it is up (the phone is being handed to them, and the
+ * curtain is what they read), else the seat whose view is shown (`cfg.local.holder` of the view;
+ * a game without the hook never turns). Never online, never at home, never for seat 0, who laid
+ * the phone down.
+ */
+export const flipped = <G extends ShellTypes>(app: FlipApp<G>, cfg: FlipConfig<G>): boolean => {
+  const s = app.shell;
+  if (s.role !== 'local' || !s.flipForFar || s.screen !== 'tableScreen') return false;
+  const holder = cfg.local?.holder;
+  const facing =
+    app.table.curtain ?? (s.view === null || holder === undefined ? null : holder(s.view));
+  return facing === 1;
+};
 
 /**
  * The rotation hint (the owner, 2026-09-28: "can we give a warning to lock the phone's rotation
@@ -1940,6 +2021,7 @@ const initHome = <G extends ShellTypes>(
               homeTab: home.homeTab,
               playMode: home.playMode,
               soundFont: home.soundFont,
+              flipForFar: home.flipTable,
               recentGames: home.recentGames,
             }),
             home,
@@ -2205,6 +2287,24 @@ export const reduceShell = <G extends ShellTypes>(
         ? handoff(app, offer.game, ctx, cfg)
         : pure(app);
     }
+    case 'name/rename': {
+      // Only a guest whose channel to the host is open: a second join on the same channel is the
+      // host's re-seat (`hostFrame` `join`, G5), before the deal or into a game (a rejoin's
+      // rename, `engine.renameGuest`). The seated name is the two-seat mirror at once (`guestFrame`
+      // `welcome`: a host at capacity 2 answers a repeat join with its status alone, so nothing
+      // else would tell the guest); an N-seat host's lobby names my row and overwrites it. What was
+      // typed is remembered as `name/typed` remembers it, so the next visit joins under it.
+      if (s.role !== 'guest' || !s.oppConnected) return pure(app);
+      const myName = guestName(intent.name, cfg);
+      return step(
+        withShell(app, {
+          myName,
+          seatedName: s.oppName === null ? s.seatedName : guestNameFor(myName, s.oppName),
+        }),
+        { type: 'send', frame: cfg.frames.join(myName) },
+        { type: 'rememberName', name: intent.name.trim() },
+      );
+    }
     case 'cancel':
       // The Android lock a Sit down or a handoff took goes with the room (`unlockSideways`).
       return step(
@@ -2285,6 +2385,8 @@ export const reduceShell = <G extends ShellTypes>(
         type: 'writeSoundFont',
         font: intent.font,
       });
+    case 'flip/set':
+      return step(withShell(app, { flipForFar: intent.on }), { type: 'writeFlip', on: intent.on });
     case 'share/click':
       return s.code === null ? pure(app) : step(app, { type: 'share', code: s.code });
     // ---- net: host ----
@@ -2469,6 +2571,7 @@ export const initialShell = <G extends ShellTypes>(cfg: ShellConfig<G>): ShellSt
   longPressed: false,
   codeDraft: '',
   soundFont: DEFAULT_SOUND_FONT,
+  flipForFar: false,
   recentGames: [],
   recorded: null,
 });
@@ -2499,7 +2602,7 @@ export const saveFor = <G extends ShellTypes>(s: ShellState<G>): Save<G> | null 
   }
 };
 
-/** `initHome`'s reads: the names, the tab and mode (defaults when unreadable), the font, the save, the finished games, and the game's own keys. */
+/** `initHome`'s reads: the names, the tab and mode (defaults when unreadable), the font, the flip, the save, the finished games, and the game's own keys. */
 export const readHome = <G extends ShellTypes>(
   store: G['Store'],
   cfg: ShellConfig<G>,
@@ -2509,6 +2612,7 @@ export const readHome = <G extends ShellTypes>(
   const tab = cfg.prefs.homeTab.read(store);
   const mode = cfg.prefs.playMode.read(store);
   const font = cfg.prefs.soundFont.read(store);
+  const flip = cfg.prefs.flipTable.read(store);
   const save = cfg.prefs.save.readSave(store);
   return {
     name: name.ok ? name.value : null,
@@ -2516,6 +2620,7 @@ export const readHome = <G extends ShellTypes>(
     homeTab: tab.ok ? tab.value : cfg.tabs.default,
     playMode: mode.ok ? mode.value : cfg.modes.default,
     soundFont: font.ok ? font.value : DEFAULT_SOUND_FONT,
+    flipTable: flip.ok && flip.value === 'on',
     save: save.ok ? save.value : null,
     recentGames: cfg.prefs.recentGames.read(store),
     ...cfg.home.read(store),

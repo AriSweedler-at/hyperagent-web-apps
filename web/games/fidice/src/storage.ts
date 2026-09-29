@@ -98,6 +98,8 @@ export const STORAGE_KEYS = {
   sound: 'fidice_sound',
   /** The sound font (web/shared/lib/sound/fonts.ts, bare string): this game's own key (docs/design/sound-fonts.md §6). */
   soundFont: 'fidice_soundFont',
+  /** The far seat's flip, `on`/`off` (the shell's `flipForFar`; no toggle on this page, the key is the shell's). */
+  flipTable: 'fidice_flipTable',
   /** The finished games this device remembers (web/shared/lib/recentGames.ts, JSON, newest first, at most 20). */
   recentGames: 'fidice_recentGames',
   /** The kayaks each the host card last chose (bare digits; `0` keeps score). */

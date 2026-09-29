@@ -16,8 +16,14 @@
 // seven-stack shows five coins.
 import type { Page } from '@playwright/test';
 
-import { POINT_INDICES, rulesOf, type Seat } from '../web/games/backgammon/src/engine/index.ts';
 import {
+  POINT_INDICES,
+  canEndTurn,
+  rulesOf,
+  type Seat,
+} from '../web/games/backgammon/src/engine/index.ts';
+import {
+  bgEndTurn,
   bgMove,
   bgPosition,
   bgRoll,
@@ -68,9 +74,13 @@ const BOTH_SUFFICE = 'L: 4:1 2:1 | D: 24:2 1:13 | bar 0/0 | off 13/0';
 /** The seat whose view the page shows. */
 const seatShown = async (page: Page): Promise<Seat> => (await requireBoard(page)).me.idx;
 
-/** Play the engine's first legal move (one die) until the turn passes to the other seat. */
+/** Play the engine's first legal move (one die) until the dice are used up, then End turn: the turn passes to the other seat. */
 const finishTurn = async (page: Page): Promise<void> => {
   const v = await requireBoard(page);
+  if (canEndTurn(v)) {
+    await bgEndTurn(page);
+    return;
+  }
   const [first] = v.legal;
   if (!v.isMyTurn || v.phase !== 'moving' || first === undefined) return;
   await bgMove(page, ownPlace(v, first.from), ownPlace(v, first.to));
@@ -92,7 +102,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const check = async (when: string, seat?: Seat): Promise<Frame> => {
         const g = await boardGeometry(page);
         expectBoardGeometry(g, seat ?? (await seatShown(page)), vp.scrolls, when);
-        expectSameFrame(g.frame, start.frame, when, frameSelectors(layoutOf(g)));
+        expectSameFrame(g.frame, start.frame, when, frameSelectors(layoutOf(g), g.width));
         return g.frame;
       };
 

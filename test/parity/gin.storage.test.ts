@@ -74,9 +74,10 @@ const roundTrips: Readonly<Record<string, RoundTrip>> = {
 
 describe('the captured legacy payloads', () => {
   test('cover all seven legacy keys, the three save roles and both sound states', () => {
-    // `ginRummy_p2Name`, `ginRummy_sort`, `ginRummy_cardPack`, `ginRummy_soundFont` and
-    // `ginRummy_recentGames` are this page's own keys: the legacy never stored the second name, an
-    // arrangement, a pack, a font or a finished game, so no capture exists for them. `ginRummy_scorerNames` is
+    // `ginRummy_p2Name`, `ginRummy_sort`, `ginRummy_cardPack`, `ginRummy_soundFont`,
+    // `ginRummy_flipTable` and `ginRummy_recentGames` are this page's own keys: the legacy never
+    // stored the second name, an arrangement, a pack, a font, the far seat's flip or a finished
+    // game, so no capture exists for them. `ginRummy_scorerNames` is
     // retired (the Score Counter scores the two pass-and-play names): its capture stays as the
     // record of what the legacy wrote, and nothing reads it.
     const ours: ReadonlyArray<string> = [
@@ -84,6 +85,7 @@ describe('the captured legacy payloads', () => {
       STORAGE_KEYS.sort,
       STORAGE_KEYS.cardPack,
       STORAGE_KEYS.soundFont,
+      STORAGE_KEYS.flipTable,
       STORAGE_KEYS.recentGames,
     ];
     const retired: ReadonlyArray<string> = ['ginRummy_scorerNames'];

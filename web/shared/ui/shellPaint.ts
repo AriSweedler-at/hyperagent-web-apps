@@ -15,6 +15,7 @@
 import {
   blurElement,
   byId,
+  dataOf,
   escapeHtml,
   focusElement,
   hasClass,
@@ -23,15 +24,18 @@ import {
   listen,
   listenId,
   queryAllIn,
+  readValue,
   requireId,
   setAttr,
   setText,
+  setValue,
   targetIdOf,
   toggleClass,
   type DocumentLike,
   type Element,
   type PageLike,
 } from '../edge/dom.ts';
+import { NAME_MAX } from '../lib/protocol.ts';
 import { ensureKeyed } from './keyed.ts';
 import type { Role, SeatState, ShellState, ShellTypes } from './shell.ts';
 
@@ -58,9 +62,9 @@ export type WaitStatus = Readonly<{ text: string; pulse: boolean }>;
 
 /**
  * What `paintWaiting` reads: every game's `app.shell` (shell.ts `ShellState`) carries these. The
- * seat fields are read only for an N-seat page's `#seatList` (below) and `seatedName` only for a
- * page with `#guestSeatName`; gin's page has neither element, so nothing of its is painted
- * differently.
+ * seat fields are read only for an N-seat page's `#seatList` (below), and `seatedName`, `myName`
+ * and `oppName` for a page with the name card `#guestSeatName` (`paintGuestName`); gin's page has
+ * neither element, so nothing of its is painted differently.
  */
 export type WaitingView = Readonly<{
   code: string | null;
@@ -72,7 +76,7 @@ export type WaitingView = Readonly<{
   role?: Role | null;
   myName?: string;
   oppName?: string | null;
-  /** As guest, what the host calls my seat (shell.ts `seatedName`): the "Playing as …" line; null or absent paints it hidden. */
+  /** As guest, what the host calls my seat (shell.ts `seatedName`): the name card's box; null or absent paints the card hidden. */
   seatedName?: string | null;
 }>;
 
@@ -139,19 +143,64 @@ export const seatListKey = (rows: ReadonlyArray<SeatRow>): string => JSON.string
 export const SEAT_LIST_IDS: ReadonlyArray<string> = ['seatList', 'guestSeatList'];
 
 /**
- * `#guestSeatName`'s text: the guest's own seat as the host named it (the owner, 2026-09-28: the
- * guest must be told), so a rename (` 2`) or the fallback ('Guest') is seen before the table, with
- * Back one tap away to retype.
+ * The guest wait screen's name card (backgammon's and briscola's `guestSeatName` block,
+ * web/games/<g>/page.ts): the card, its box, its Change and the note under them. None is in
+ * SHELL_IDS (gin's page carries none, for its DOM parity oracle): each is looked up with `byId`
+ * here and in home.ts `bindHomeShell`, and listed in the game's `pageShape.ids` (tools/games.ts).
  */
-export const seatedAsMsg = (name: string): string => `Playing as ${name}`;
+export const GUEST_NAME_IDS = {
+  card: 'guestSeatName',
+  input: 'guestNameInput',
+  rename: 'guestRenameBtn',
+  note: 'guestNameNote',
+} as const;
+
+/** `#guestNameNote`: who reads the name in the box (the owner, 2026-09-28: the client defines its own name, and the host sees it). */
+export const hostSeesMsg = (hostName: string): string => `${hostName} will see this name.`;
+
+/** The data attribute the box keeps the last seated name it was filled with under (`paintGuestName`). */
+const SEATED_MARK = 'seated';
+
+/**
+ * The name card, where the page carries it (`GUEST_NAME_IDS.card`; the owner, 2026-09-28: the
+ * client defines its own name): shown once the host has named my seat (`seatedName`), hidden
+ * before and in every other role; the note names the host (`oppName`); the box holds the seated
+ * name, so a rename (` 2`) or the fallback ('Guest') is seen before the table, and Change (or
+ * Enter; home.ts) re-sends the join under what the box says (shell.ts `name/rename`). The box is
+ * the player's while it is typed in: it is refilled only when the seated name changes and the box
+ * still holds the previous seated name (nothing typed since) or the word the player sent (`myName`
+ * as the wire normalises it, `NAME_MAX` then trimmed: the host's answer to a Change, ` 2` and all,
+ * replaces what was typed), so a paint between keystrokes never fights the typing and the
+ * `fillName` effect deps stay the home inputs' alone. The last seated name rides on the box as
+ * `data-seated`, since the paint reads no App of its own.
+ */
+const paintGuestName = (doc: DocumentLike, w: WaitingView): void => {
+  const card = byId(doc, GUEST_NAME_IDS.card);
+  if (card === null) return;
+  const seated = w.seatedName ?? null;
+  toggleClass(card, 'hidden', seated === null);
+  const note = byId(doc, GUEST_NAME_IDS.note);
+  const host = w.oppName ?? null;
+  if (note !== null) setText(note, host === null ? '' : hostSeesMsg(host));
+  const input = byId(doc, GUEST_NAME_IDS.input);
+  if (input === null) return;
+  const next = seated ?? '';
+  const prev = dataOf(input, SEATED_MARK) ?? '';
+  if (next === prev) return;
+  const value = readValue(input);
+  const sent = w.myName ?? null;
+  const untouched = value === prev || (sent !== null && value.slice(0, NAME_MAX).trim() === sent);
+  if (untouched) setValue(input, next);
+  setAttr(input, `data-${SEATED_MARK}`, next === '' ? null : next);
+};
 
 /**
  * `#roomCode`, `#hostWaitStatus` (+ its pulse), `#startGameBtn`, `#guestWaitStatus` (+ its pulse);
- * `#guestSeatName` ("Playing as …", or hidden while the host has not answered) when the page
- * carries it (backgammon's and briscola's `guestSeatName` block; gin's page leaves it out for its
- * DOM parity oracle); and the seat lists (`SEAT_LIST_IDS`), each rebuilt through the keyed slot
- * from the shell's seats when the page carries it (an N-seat game's; gin's and backgammon's pages
- * carry neither).
+ * the name card (`paintGuestName`: `#guestSeatName` with its box and note, hidden while the host
+ * has not answered) when the page carries it (backgammon's and briscola's `guestSeatName` block;
+ * gin's page leaves it out for its DOM parity oracle); and the seat lists (`SEAT_LIST_IDS`), each
+ * rebuilt through the keyed slot from the shell's seats when the page carries it (an N-seat game's;
+ * gin's and backgammon's pages carry neither).
  */
 export const paintWaiting = (doc: DocumentLike, w: WaitingView): void => {
   setText(requireId(doc, 'roomCode'), w.code ?? '----');
@@ -162,12 +211,7 @@ export const paintWaiting = (doc: DocumentLike, w: WaitingView): void => {
   const guestStatus = requireId(doc, 'guestWaitStatus');
   setText(guestStatus, w.guestStatus.text);
   toggleClass(guestStatus, 'pulse', w.guestStatus.pulse);
-  const seatName = byId(doc, 'guestSeatName');
-  if (seatName !== null) {
-    const seated = w.seatedName ?? null;
-    setText(seatName, seated === null ? '' : seatedAsMsg(seated));
-    toggleClass(seatName, 'hidden', seated === null);
-  }
+  paintGuestName(doc, w);
   const lists = SEAT_LIST_IDS.flatMap((id) => {
     const list = byId(doc, id);
     return list === null ? [] : [list];
@@ -301,6 +345,19 @@ export const paintGate = (doc: PageLike, open: boolean, canLock = false): void =
       .forEach((el) => {
         blurElement(el);
       });
+};
+
+// ---- the far seat's flip (shell.ts `flipped`; docs/design/backgammon-landscape.md §6 item 7) ----
+
+/**
+ * `data-flip="1"` on the body while the table is turned for the seat across it (shell.css
+ * `body[data-flip="1"] { rotate: 180deg }`), removed otherwise: painted by the boot after the
+ * game's own paint, from `flipped` alone, so no game's render.ts repeats it. An attribute, not a
+ * class, so the class contract has no row for it (web/shared/styles/CONTRACT.md notes it beside
+ * `inert`).
+ */
+export const paintFlip = (doc: PageLike, flipped: boolean): void => {
+  setAttr(doc.body, 'data-flip', flipped ? '1' : null);
 };
 
 /**

@@ -61,5 +61,11 @@
     "action": {
       "type": "next"
     }
+  },
+  {
+    "t": "action",
+    "action": {
+      "type": "done"
+    }
   }
 ]

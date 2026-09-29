@@ -453,6 +453,8 @@ As landed (B3, `web/shared/edge/boot.ts`): the three helper signatures differ fr
 
 As landed (the invite sits the guest down, 2026-09-25; the owner: "when you visit a '?join=TNJQ' link, it shouldn't make you THEN click 'sit down'. Instead, it should immediately act as if you have clicked that already"): `applyInviteLink` is unchanged and still dispatches `join/link { code }` right after `home/init`; what changed is the reducer's branch. `join/link` fills the form as before (`setHomeTab('play')` without a write, `playMode: 'online'` shown and not stored, `codeDraft` and the `setCode` effect), then reduces `join/click { name, code }` on the result, `name` being what the name input shows: `p1Name` when the remembered or typed name is there, else the game's first default (`localNameFor(localNamesOf(cfg), 0)`), which `join/click`'s rule reads as the untouched default and seats as `DEFAULT_GUEST_NAME`, exactly as the tap did. So the guest lands on `guestWaitScreen` with the `scrollTop` and `startGuest` effects of the tap, and a link visit and a tap produce the same App and, after `setCode`, the same effects (shell.test.ts pins the equality). A refusal is the tap's: a code of the wrong length toasts `lengthError` over the filled form and seats nobody; a room not found, full or lost is the session's status on the wait screen, and Cancel is the ordinary `initHome` with the code still in the input (the link stored nothing, so the stored tab and mode come back). A link followed while seated (`role !== null`, any room) changes nothing, so a second visit is idempotent. The e2e fixture's `followInvite` opens the link and expects the wait screen with no tap; `connectByLink` (online-games.ts) is `connect` over it with the guest's name remembered first.
 
+As landed (the guest's name is the guest's, 2026-09-28; the owner: "the p1 p2 names that show up should be defined by the client. So if a client joining a room is named XYZ then it should show up to the host as named XYZ"): on a page that carries the `guestSeatName` block (backgammon's, briscola's; gin's leaves it out for its DOM parity oracle, fidice's until its restyle) the guest wait screen's "Playing as" is a small card, not a line: the label, the box `#guestNameInput` prefilled with `seatedName` as the host named the seat, a Change button `#guestRenameBtn` (or Enter in the box) and the note `#guestNameNote` "<host> will see this name." (`hostSeesMsg`). `bindHomeShell` binds the two controls where the page has them (`byId`, never required; the four ids are each page's `pageShape.ids`, not `SHELL_IDS`) and dispatches `name/rename { name }` with the box's raw text. The reducer, for a connected guest alone (`role === 'guest'` and `oppConnected`; before the deal or into a game, where it is a rejoin's rename), sets `myName` to `guestName(name, cfg)`, sends `cfg.frames.join(myName)` (`join` is the builder every game's protocol exported already, now on the shared frame set: no wire change), remembers what was typed (`rememberName`, as `name/typed` does, so the next visit joins under it) and sets `seatedName` to the two-seat mirror (`guestNameFor(myName, oppName)`) at once, since a host at capacity 2 answers a repeat join with its status alone; an N-seat host's lobby names my row and overwrites it. The host side is G5 as it stood: a second join on the same channel re-seats under the new name (`guestNameAmong` against its own and the other seats'), rewrites its status and, mid-game, `engine.renameGuest` then the views; the host session's rejoin key follows every join (`reseat`). `paintGuestName` (shellPaint.ts, from `paintWaiting`) shows the card with `seatedName`, writes the note, and fills the box only when the seated name changes while the box still holds the previous seated name or the word the player sent (`myName` as the wire normalises it, so the host's ` 2` replaces what was typed), so a paint between keystrokes never fights the typing and the `fillName` effect deps stay the home inputs'; the last seated name rides on the box as `data-seated`. The card is styled by id in each theme (no class row). Pinned in shell.test.ts (the rename's effects and guards, at two seats and at N), shellPaint.test.ts (the card's fields, the typing rule), home.test.ts (the bindings, and a page without the card) and e2e/shell-online.spec.ts (a link-joined Guest becomes Xyz on the host's status, the card and both tables, and is remembered).
+
 As landed (the lobby survives a host's refresh, 2026-09-25; docs/design/lobby-resume.md): the
 waiting room's host save, written at the Peer's `open` as before, carries `at` (its opening, only
 while `game` is null, so every mid-game literal is unchanged); `resumeFor` offers a host save with
@@ -690,6 +692,30 @@ its board CSS and its layout twin:
    landscape `@media` copies `LANDSCAPE_PHONE` verbatim, alone or with a width bound after it;
    a tighter height tier nests under it. `test/dist/landscape-predicate.test.ts` pins that over
    every theme and the shell sheet, so the board's layout and the gate's watcher cannot drift apart.
+   **The far seat's flip** (docs/design/backgammon-landscape.md §6 item 7; the owner, 2026-09-25:
+   the pass-the-phone flow "should naturally follow as the phone will be held sideways") is the
+   shell's too, and needs no orientation: a phone lying flat between two players is read upside
+   down by the one across the table, so a pass-and-play setting, `ShellState.flipForFar` (read at
+   `home/init` from the game's `flipTable` key, prefs.ts `FLIP_STATES` `on`/`off`, a key every
+   game's storage.ts names; written by `flip/set` through the `writeFlip` effect; off by default;
+   kept through every start, leave and cancel), turns the whole page for seat 1's turns.
+   `flipped(app, cfg)` is true in pass and play alone, with the setting on, at the table (where
+   the body is the viewport, `fixed-screen`), when the seat looking at the phone is seat 1: the
+   seat the curtain is up for while it is up (`table.curtain`), else the seat whose view is shown,
+   by the game's `cfg.local.holder(view)` hook (backgammon `view.me.idx`; a game without it never
+   turns for a shown view). The boot paints it after every paint of a game whose config it holds
+   (`paintFlip`: `data-flip="1"` on the body, an attribute, so no CONTRACT.md row), and shell.css
+   turns the body (`body[data-flip="1"] { rotate: 180deg }`): every fixed overlay, the toast, the
+   flyers and the drag ghost are body children and turn with it; hit-testing follows the
+   transform. The two kernels that place a clone on the body by measured viewport rects
+   (motion.ts `launchClone`, drag.ts's ghost and its motion) reflect rects and points into the
+   turned body first (dom.ts `bodySpace`, `bodyPoint`, the identity upright), or they would render
+   point-reflected. Backgammon's menu sheet carries the toggle (`#menuFlipToggle`, `flip/set`);
+   gin and briscola hold the state and the key and may add theirs. Tests: `shell.test.ts` (the
+   setting, the snapshot, the truth table), `shellPaint.test.ts`, `boot.test.ts`, `dom.test.ts`,
+   `motion.test.ts`, `drag.test.ts`, backgammon's `state/render/storage.test.ts`,
+   `e2e/backgammon-flip.spec.ts` (the attribute per seat, a tapped move and a drag through the turn
+   on the touch fixture at 844x390).
 5. **Tests**: `shell.test.ts` (the state, the intents, `gateOpen`, the resets), `shellPaint.test.ts`
    (`paintGate`: `inert` on `#app` and every other `.overlay` in the body, found by class since each
    game's overlays differ and where a page places one changes nothing; focus to the first shown

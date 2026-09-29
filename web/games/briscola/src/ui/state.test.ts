@@ -159,6 +159,7 @@ const home: HomeSnapshot = {
   homeTab: 'play',
   playMode: 'local',
   soundFont: 'default',
+  flipTable: false,
   save: null,
   recentGames: [],
   opts: DEFAULT_OPTS,
@@ -270,7 +271,7 @@ describe('the initial app', () => {
       'tableScreen',
       'endgameScreen',
     ]);
-    expect(SHELL_INTENT_TYPES).toHaveLength(50);
+    expect(SHELL_INTENT_TYPES).toHaveLength(52);
     expect(EMPTY_SLOTS).toEqual([null, null, null]);
   });
 });

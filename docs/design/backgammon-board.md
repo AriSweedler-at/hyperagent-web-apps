@@ -28,7 +28,7 @@ the rules by rule (`rules R13`).
 | Which die | `.die.dead` when no maximal play uses a die; tap a die to force it (`die/pick`, targets recomputed for that die alone, the status line confirms "playing the 6"). |
 | Status line | Always names what is left ("3-1 · play both dice", "6-5 · the 6 cannot be played", "6-1 · enter from the bar", "Last move: the turn ends when you play it"), the dice in words in a visually hidden span. |
 | Stacks | Five checkers drawn; a count badge on the top visible checker from the sixth on; the point label stays. |
-| Turn end | No `done` action: the turn ends by itself when no maximal play extends what was played (rules R13); `#doneBtn` is reserved and hidden in every state. |
+| Turn end | Online the turn ends by itself when no maximal play extends what was played (rules R13). Pass-and-play (the owner, 2026-09-28: "After I finish a turn in pass-and-play, it's very jarring. It immediately tells me to swap the phone over. I should be able to hit 'end turn' ... think about my next move, or consider undoing stuff") deals its match with `options.manualTurnEnd`: the mover then stays in `moving` with no legal move once the dice are used up (or the rest is unplayable), Undo still on, and `#doneBtn` "End turn" (`btn-primary`, beside Undo; sideways, over Undo in the rail) sends `done`, which flips the turn with the automatic end's exact bookkeeping (`endTurn`: the log lines, `lastPlay`, `turnStart`). A roll with no move still passes by itself (R14: nothing to think over, nothing to undo); fifteen off still ends the game at once. The status line reads "Dice used — End turn, or Undo" ("6-5 · the 5 cannot be played — End turn, or Undo"), and the last playable move's "Last move: then End turn, or Undo". `canEndTurn(view)` (engine/view.ts) is derived, so the `state` frame's shape is unchanged; the decoder reads a missing `manualTurnEnd` as false. Online keeps the automatic end (a follow-up: the option there too). |
 | Hit toast | "Kapará. {name} hit you on your {n}-point." for the player hit, in their own numbering, from the moves (`played[i].hit`, `lastPlay`), never from log text. Online it fires as the opponent's hit moves arrive; in pass-and-play when the phone reaches the player hit (§4.9). |
 | Accessibility | Every tap target ≥ 44px on the phone (the geometry e2e asserts it), a painted `aria-label` per place, Enter/Space on a focused place is its tap, Escape closes the sheet or the tray. |
 | Theme | "Subtle but recognizable": a parchment page (a CC0 photo of real medieval parchment, mirror-tiled, under a cream multiply; §3.11), the home shell in a rich aegean blue with nacre text and a gold hairline, olive-wood board, gold elsewhere only as a hairline, one low-contrast meander line on the frame, an olive trim along the window's edge. The dark checker a deep-blue disc with a fine blue ring (the eye motif as a subtle inner ring, never a literal eye); the light one a pale disc with a soft sheen. Checkers, dice and frame are CSS only, no images. GFS Didot for the title and the room code, Cardo for everything else, both from Google Fonts. |
@@ -38,18 +38,23 @@ the rules by rule (`rules R13`).
 
 ### 2.1 The table screen
 
-`#tableScreen`: `.topbar` (`#menuBtn`, the opponent strip `#oppName #oppDot #pipsOpp`,
+`#tableScreen`: `.topbar` (`#menuBtn`, the opponent strip `#oppSeatDot #oppName #oppDot #pipsOpp`,
 `#gameBadge` "Game 3 · 2–1 · to 5", `#rulesBtnGame #historyBtn` on the desktop, `#soundBtn` with
 `aria-pressed`), `#statusLine` (`#statusText`, `#statusDice.sr-only`), `#board` (its places, and
 last the roll modal `#rollOverlay.roll-modal`: `#rollModalTitle #rollModalSub #rollModalDice
-#rollModalBtn` "Buen mazal! roll" and `#doubleBtn`, §4.7; `#turnArrow` hangs off its left edge), `.controls` (`#myName #pipsMe`,
+#rollModalBtn` "Buen mazal! roll" and `#doubleBtn`, §4.7; `#turnArrow` hangs off its left edge), `.controls` (`#mySeatDot #myName #pipsMe`,
 `#undoBtn` disabled rather than hidden, the reserved hidden `#doneBtn`, the roll slot holding
 `#diceMini` / `#waitNote` / `#resultChipBtn`, then `#moveChips` and `#chipCancelBtn`). Points carry `data-abs` (static),
 `data-own`, `pt-a`/`pt-b` (absolute parity, the two triangle shades) and `pt-near`/`pt-far` (own
 1..12 near). `#barTop` is always the far player's bar and `#barBottom` mine; `#offLight`/`#offDark`
 are colour-fixed and CSS places them near or far by `#board[data-seat]`. `paintSeat` rewrites
 `data-own`, `pt-near`/`pt-far` and `data-seat` only when the seat differs, so the markup ships seat
-0's and the page fake and the goldens see a whole board before any paint. The opponent's name
+0's and the page fake and the goldens see a whole board before any paint. Each name wears its
+colour (the owner, 2026-09-28: "The names should get indicators for which color they are"): the
+disc before it (`#oppSeatDot`, `#mySeatDot`: `.seat-dot[data-seat]`, 12px, painted like that
+seat's checker, §3.5; 10px in the sideways strip) takes `data-seat` from the view's seats in
+`paintOpponent` and `paintControls`, so in pass-and-play the discs swap with the mover as the names
+do; the markup ships seat 0's view. The opponent's name
 pulses (`.opp-strip.to-move`) while they are to move. Whose turn it is reads at a glance (the
 owner, 2026-09-25: "default, no flip. Hand the phone across. And add a small indicator like an
 arrow that turns around and/or highlights the active user's end state that is colorized like the
@@ -159,12 +164,28 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   `--checker-d 0.86 point-w`, `--stack-step min(checker-d, (point-len - checker-d - 18px) / 4)`
   (the desktop's 15px base offset and 3px at the tip spared), `--die-s 44px`, `--arrow-col 0`.
   Two schemes by width. From 714px (13 x 44 + 44 + 16 + 2 x 16 + 44 + 6) the rail: `#tableScreen`
-  is a grid of four columns and six rows, `.topbar` and `.controls` `display: contents`, two 22px
-  strips above (opponent, badge, status) and below (me, the roll slot) the board and a 44px rail on
-  the right (menu, sound, the turn arrow hung in the free middle at 40px, Undo in `vertical-rl`;
-  the die-chip tray floats over the board's bottom edge and `#chipCancelBtn` takes Undo's slot);
-  `--chrome-w 2 edge + 44px + 6px` (82 inset-free, 144 on an iPhone 12), `--chrome-h 24 + 2 x 22 + 2
-  x 6 + inset-b` (80), floor `--point-len-min 104px`. Under 714px (the SE, a 640x360 Android) the
+  is a grid of six columns and five rows, `.topbar` and `.controls` `display: contents`, one 22px
+  strip above the board (the owner, 2026-09-28: "WAY too much padding around the board's top and
+  bottom ... The names & scores are great, but they can live on the same Y-axis value") holding,
+  left to right, the opponent's strip (disc, name, pips), the badge, the status line, my strip and
+  the roll slot, and a 44px rail on the right (menu, sound, the turn arrow hung in the free middle
+  at 40px, Undo in `vertical-rl` at the board's foot, 44.8px; the die-chip tray floats over the
+  board's bottom edge and `#chipCancelBtn` takes Undo's slot). The strip's columns: `160px auto
+  minmax(0, 1fr) 160px 72px` before the rail; each name's strip is a fixed `--name-w` column
+  whatever the name (an `auto` column moved 2.5px when the seats swapped between "Ann" and "Bob";
+  the name ellipsizes past it, my strip sits against the slot, the pips `min-width: 3ch` so the
+  ellipsis point stands still as the count loses a figure), the badge's tabular figures keep it
+  one width, the status line takes what is left (right-aligned, ellipsis: 216px at 844, 152 at
+  the 780 floor) and the slot is `--slot-w 72px` in every phase (the two 22px mini dice, 48; a
+  double's four at 16px and 2px gaps, 70; the Result chip, 66, standing 44px tall down out of the
+  strip over the board's top edge; the wait note stays hidden, the status line says it), so every
+  item of the strip keeps one box through a game (the frame oracle). While the die-chip tray is
+  open my strip and the slot stay shown (the base rule hides them: the tray took the controls row).
+  `body.fixed-screen #app` pads 6px above and `6px + inset-b` below (the base block's 12 each stay
+  on the sideways home and the match-over screen); `--chrome-w 2 edge + 44px + 6px` (82 inset-free,
+  144 on an iPhone 12), `--chrome-h 12 + 22 + 6 + inset-b` (40), floor `--point-len-min 104px`. The
+  cube hangs 6px under the arrow (`margin-top: 26px`), clear of Undo from the 264 floor up (0.7px
+  on the floor's 203px board with a home indicator). Under 714px (the SE, a 640x360 Android) the
   rows: the phone's chrome rows stay, `--chrome-w 2 edge`, `--chrome-h 170 + inset-b`, floor 90px,
   the arrow hidden. The roll sheet shrinks to 12px paddings, 44px dice and a 48px button, drops
   its sub line, keeps its title to one line (a long name ellipsizes) and stands Western's Double
@@ -173,15 +194,16 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   slabs thin with the point (`min(7px, (point-len - 26px) / 15)`, 1px gaps) so fifteen sit inside
   a tray a point long at either floor; the bar's step gives way so five coins end half a die short
   of the bar's centre, where the dice sit (and the dice paint over any coin: z 3); a double's four
-  dice are 30px (132px in a bar 208 long at the floor); the cube hangs in the rail 10px under the
+  dice are 30px (132px in a bar 208 long at the floor); the cube hangs in the rail 6px under the
   arrow (the rows keep it at the bar's top); the toast hangs from the top edge (600px wide before
-  wrapping) instead of the foot, where it covered the roll button and the die-chip tray; the count
+  wrapping) instead of the foot, where it covered the roll button and the die-chip tray (at 8px it
+  lies over the strip and, 46px tall, the board's top 20px: the frame and the labels); the count
   badge is 20px with 12.8px type; the menu sheet lays Rules and History in one 44px row (224px,
-  Leave whole at the 304 floor), the curtain sheet stands "Continue online" beside the reveal
-  button at 14px paddings, and the match-over screen is two columns the viewport tall (the games
-  card scrolling inside), so Rematch is on screen at the floor; `.desk-only` and `#handoffBtn`
-  stay hidden (the menu and the curtain carry them). 54 x 147 at 844x390 inset-free,
-  49.2 x 136.5 on an iPhone 12 with its 47/47/21 insets, 48 x 138 on the 852x393 class, 44.2 x
+  inside the 88dvh cap from the 264 floor up), the curtain sheet stands "Continue online" beside
+  the reveal button at 14px paddings, and the match-over screen is two columns the viewport tall
+  (the games card scrolling inside), so Rematch is on screen at the floor; `.desk-only` and
+  `#handoffBtn` stay hidden (the menu and the curtain carry them). 54 x 167 at 844x390 inset-free,
+  49.2 x 156.5 on an iPhone 12 with its 47/47/21 insets, 48 x 158 on the 852x393 class, 44.2 x
   94.5 on an SE. `layoutFor(vp)`, `pointWidth`, `pointLength`, `RAIL_MIN_WIDTH` and
   `LANDSCAPE_GEOMETRY` in `ui/board/layout.ts` are the twin.
 
@@ -261,6 +283,21 @@ window") is `body::before`: a fixed, inert `--olive` band along the viewport's e
 and 10px from 900px, with one `--gold` hairline on its inner side, at `z-index: 0` under every
 positioned thing (overlays 50, flyers 60, the toast 100); `#app`'s gutters (12px, 16px from 900px)
 keep the board and every control clear of it. No pattern: the meander stays the frame's alone.
+
+The trim's corners follow the screen's (the owner: "the green border hugs the real screen's
+border"). Under `viewport-fit=cover` the band reaches the glass, and a notched iPhone's rounded
+corners would clip a square one, so `body::before` carries `border-radius: var(--screen-corner)`;
+the inset hairline follows the padding box's smaller radius (41px inside a 47px corner) and the
+10px desktop band inherits the same rule. No CSS or JS API exposes the display's corner radius;
+the safe-area insets track it on a notched iPhone within a few pixels (X/XS/11 Pro: inset 44pt,
+radius about 39; 12/13/14: 47/47; 14 Pro/15/16: 59/about 55; 16 Pro: 62/62), so a `:root` rule
+beside the trim declares `--screen-corner` as the largest of the top, left and right insets, an
+approximation, not a measurement. The bottom inset is the home indicator's band (34pt upright,
+21pt sideways), unrelated to the corner, and is left out. The SE, a desktop, headless Chromium
+and Android Chrome in a tab (whose toolbar owns the page's top corners) read 0 and keep square
+corners; an Android phone in fullscreen with a display cutout rounds by the cutout's depth. `env()`
+cannot be overridden in a headless probe, so the value goes through the custom property, which a
+probe sets on `body`.
 
 ### 3.7 Highlight states
 
@@ -348,13 +385,13 @@ controls, gin's rule with the threshold derived for this board; the desktop's fl
 (`max-height: 645px`). The board itself can be scrolled from: `touch-action: none` is scoped to
 `.checker`. A phone held sideways (§3.1 landscape) matches both of those fallbacks and is pinned
 again by its own block, which comes later; it has its own floors and fallbacks, under the
-landscape query and on `100svh`: with the rail 2 x 104 + 16 + 80 = 304px, so under
-`(max-height: 303px)` the document scrolls; with the rows 2 x 90 + 16 + 170 = 366px, so under
+landscape query and on `100svh`: with the rail 2 x 104 + 16 + 40 = 264px, so under
+`(max-height: 263px)` the document scrolls; with the rows 2 x 90 + 16 + 170 = 366px, so under
 `(max-height: 365px) and (max-width: 713px)` it scrolls (an SE with Safari's toolbar). Both
 floors give up half the bottom inset (`--point-len-min: calc(104px - var(--inset-b) / 2)`, 90
-likewise; `pointLength` mirrors it), so 2 x (104 − inset-b/2) + 16 + 80 + inset-b = 304px at any
+likewise; `pointLength` mirrors it), so 2 x (104 − inset-b/2) + 16 + 40 + inset-b = 264px at any
 inset and the fallbacks, which cannot read `env()`, lift exactly where the floor stops fitting:
-93.5px points at 812x304 with a 21px home indicator, a 203px board.
+93.5px points at 812x264 with a 21px home indicator, a 203px board.
 
 ### 3.11 Background and panel
 
@@ -474,15 +511,21 @@ destination: one tap per move, never zero. If `v.playsTotal === 1` the destinati
 passes the turn inside `roll`: the status reads "6-6 · no move — turn passes", the reducer sets
 `noMoveUntil = now + NO_MOVE_MS (1200)` (a `startTimer` effect) and keeps the position visible;
 `noMove/elapsed` lets the curtain rise (local) or the state settle (online). Turn end is the
-engine's: the `move` that completes the maximal play flips `turn` (R7/R13). When exactly one
-playable die remains the status line reads "Last move: the turn ends when you play it".
+engine's: online the `move` that completes the maximal play flips `turn` (R7/R13), and when
+exactly one playable die remains the status line reads "Last move: the turn ends when you play
+it". Pass-and-play holds it instead (§1 "Turn end", `options.manualTurnEnd`): the completing move
+leaves the mover in `moving` with `legal === []`, the status reads "Dice used — End turn, or Undo",
+`#doneBtn` "End turn" shows beside Undo (`done/click` → `applyAction(done)`), and the curtain rises
+only on the flip; the last playable move's line reads "Last move: then End turn, or Undo". A roll
+with no move (R14) is never held: the beat above runs as it does online.
 
 ### 4.6 Undo
 
 `#undoBtn` "Undo": enabled when `phase === 'moving'`, my turn, `played.length > 0`; disabled, not
 hidden (the controls row keeps its shape). `undo/click` → `applyAction(undo)` (R26): board back to
-`turnStart`, `played = []`; host-applied online. `flightsBetween` yields the reversed flights. The
-last die of a turn cannot be undone; the status line said so before the tap.
+`turnStart`, `played = []`; host-applied online. `flightsBetween` yields the reversed flights. Online
+the last die of a turn cannot be undone; the status line said so before the tap. In pass-and-play
+the whole turn stays undoable until End turn (§1 "Turn end"): the held turn is still `moving`.
 
 ### 4.7 The roll modal, the tumble and the roll slot
 

@@ -23,10 +23,7 @@
     />
     <meta name="twitter:image" content="https://games.sweedler.com/briscola/splash.png" />
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Briscola — cards</title>
     <link rel="icon" href="../../shared/favicon.svg" type="image/svg+xml" />
     <link rel="alternate icon" href="../../shared/favicon.ico" />
@@ -229,7 +226,23 @@
         <div class="card-box centered">
           <div id="guestWaitStatus" class="pulse muted">Connecting…</div>
           <ul class="seat-list" id="guestSeatList" aria-label="Seats"></ul>
-          <div id="guestSeatName" class="hidden"></div>
+          <div id="guestSeatName" class="hidden">
+            <label for="guestNameInput">Playing as</label>
+            <div class="row">
+              <input
+                type="text"
+                id="guestNameInput"
+                class="grow"
+                maxlength="20"
+                autocomplete="off"
+                autocorrect="off"
+                spellcheck="false"
+                enterkeyhint="done"
+              />
+              <button class="btn btn-secondary btn-sm" id="guestRenameBtn">Change</button>
+            </div>
+            <div class="muted" id="guestNameNote"></div>
+          </div>
         </div>
         <button class="btn btn-ghost btn-block" id="cancelGuestBtn">Back</button>
       </div>

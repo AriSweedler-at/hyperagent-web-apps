@@ -90,6 +90,7 @@ export const baseUrl = (project: Project): string =>
  * since dry-round-2.md I7 (D11), so the projects and what each plays are read in one place.
  */
 export const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
+  '**/backgammon-flip.spec.ts',
   '**/backgammon-gate.spec.ts',
   '**/backgammon-geometry.spec.ts',
   '**/backgammon-local.spec.ts',

@@ -67,6 +67,7 @@ describe('openings (S1-S3)', () => {
       jacoby: false,
       beavers: false,
       automaticDoubles: false,
+      manualTurnEnd: false,
     });
     expect(s.turnStart).toEqual(s.board);
     expect(texts(s)).toEqual(['Ari rolled 3, Jeff rolled 1 — Ari plays 3-1']);
@@ -525,4 +526,132 @@ describe('the match (S11, S13, S15)', () => {
     expect(rng.calls()).toBe(2);
   });
   const toRollWestern = (): State => at('backgammon', START, 1, null);
+});
+
+describe('End turn (`manualTurnEnd`, design §1 "Turn end")', () => {
+  /** Pass-and-play's match: the turn is held once the dice are used up. */
+  const held = (variant: ShippedVariant = 'portes'): State =>
+    createGame(PLAYERS, { rotation: [variant], manualTurnEnd: true }, scripted(3, 1), now);
+  /** Light to play 3-1 from the start, the option on. */
+  const start = (): State => withPosition(held(), pos(START), 0, [3, 1]);
+
+  test('the option is stored, false when absent, and the decoders read it back', () => {
+    expect(held().options.manualTurnEnd).toBe(true);
+    expect(game('portes').options.manualTurnEnd).toBe(false);
+    expect(
+      createGame(PLAYERS, { manualTurnEnd: false }, scripted(3, 1), now).options,
+    ).toMatchObject({
+      manualTurnEnd: false,
+    });
+  });
+
+  test('the last move holds the turn in `moving` with no legal move; Undo is still on; nothing is logged yet', () => {
+    const two = play(start(), 0, ['8/5', '6/5']);
+    expect(two).toMatchObject({ phase: 'moving', turn: 0 });
+    expect(two.played).toHaveLength(2);
+    expect(remainingDice(two)).toEqual([]);
+    expect(legalMoves(two)).toEqual([]);
+    expect(two.lastPlay).toEqual([]);
+    expect(two.turnStart).toEqual(start().board);
+    expect(texts(two)).toEqual(texts(start()));
+    // Undo across the held turn: back to the roll, the dice kept, the turn still Light's.
+    const undone = must(apply(two, 0, { type: 'undo' }));
+    expect(undone).toMatchObject({ phase: 'moving', turn: 0, played: [], dice: [3, 1] });
+    expect(undone.board).toEqual(start().board);
+    expect(labels(undone)).toEqual(labels(start()));
+  });
+
+  test('`done` flips the held turn exactly as the automatic end did: the log, lastPlay, turnStart, the phase', () => {
+    const auto = play(withPosition(game('portes'), pos(START), 0, [3, 1]), 0, ['8/5', '6/5']);
+    expect(auto).toMatchObject({ phase: 'toRoll', turn: 1 });
+    const two = play(start(), 0, ['8/5', '6/5']);
+    const ended = must(apply(two, 0, { type: 'done' }));
+    expect(ended).toMatchObject({
+      phase: 'toRoll',
+      turn: 1,
+      played: [],
+      turnStart: null,
+      dice: [3, 1],
+    });
+    expect(ended.board).toEqual(auto.board);
+    expect(ended.lastPlay).toEqual(auto.lastPlay);
+    expect(ended.log.slice(start().log.length)).toEqual(auto.log.slice(start().log.length));
+    expect(ended.lastAction).toEqual(auto.lastAction);
+    expect(texts(ended).at(-1)).toBe('Ari moved 8/5 6/5');
+    // The next mover's roll is theirs: nothing of the held turn lingers.
+    expect(must(apply(ended, 1, { type: 'roll' }, scripted(6, 5)))).toMatchObject({
+      phase: 'moving',
+      turn: 1,
+    });
+  });
+
+  test('a hit and a bear-off in the held turn keep their lines and their `hit` marks', () => {
+    // Light hits 8/5* with the 3, covers 6/5 with the 1 (a Dark blot on Light's 5-point).
+    const blot = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:4 20:1 | bar 0/0 | off 0/0';
+    const two = play(withPosition(held(), pos(blot), 0, [3, 1]), 0, ['8/5*', '6/5']);
+    expect(two.played.map((m) => m.hit)).toEqual([true, false]);
+    expect(two.board.bar).toEqual([0, 1]);
+    const ended = must(apply(two, 0, { type: 'done' }));
+    expect(ended.lastPlay.map((m) => m.hit)).toEqual([true, false]);
+    expect(texts(ended).slice(-2)).toEqual(['Ari moved 8/5* 6/5', 'Ari hit Jeff on the 5-point']);
+    expect(ended.log.at(-1)).toMatchObject({ seat: 0, kind: 'hit' });
+    expect(ended.lastAction?.kind).toBe('hit');
+  });
+
+  test('`done` is refused while a move is left, before the roll, under a double and after the game; the option off it never applies', () => {
+    const one = play(start(), 0, ['8/5']);
+    expect(fail(apply(one, 0, { type: 'done' }))).toBe(MESSAGES.MOVES_LEFT);
+    expect(fail(apply(start(), 0, { type: 'done' }))).toBe(MESSAGES.MOVES_LEFT);
+    expect(fail(apply(withPosition(held(), pos(START), 0, null), 0, { type: 'done' }))).toBe(
+      MESSAGES.ROLL_FIRST,
+    );
+    expect(fail(apply(start(), 1, { type: 'done' }))).toBe(MESSAGES.NOT_YOUR_TURN);
+    const offered = must(
+      apply(withPosition(held('backgammon'), pos(START), 0, null), 0, { type: 'double' }),
+    );
+    expect(fail(apply(offered, 1, { type: 'done' }))).toBe(MESSAGES.ANSWER_DOUBLE);
+    // Without the option the turn is never held, so `done` finds moves left or a flipped turn.
+    const auto = withPosition(game('portes'), pos(START), 0, [3, 1]);
+    expect(fail(apply(auto, 0, { type: 'done' }))).toBe(MESSAGES.MOVES_LEFT);
+    const flipped = play(auto, 0, ['8/5', '6/5']);
+    expect(fail(apply(flipped, 0, { type: 'done' }))).toBe(MESSAGES.NOT_YOUR_TURN);
+    expect(fail(apply(flipped, 1, { type: 'done' }))).toBe(MESSAGES.ROLL_FIRST);
+  });
+
+  test('a roll with no move still passes the turn by itself (R14), option or not', () => {
+    // Light on the bar against a closed board: no die enters (ui/state.test.ts's SHUT_OUT).
+    const shut = 'L: 13:14 | D: 1:2 2:2 3:2 4:2 5:2 6:2 7:3 | bar 1/0 | off 0/0';
+    const rolled = must(
+      apply(withPosition(held(), pos(shut), 0, null), 0, { type: 'roll' }, scripted(6, 6)),
+    );
+    expect(rolled).toMatchObject({ phase: 'toRoll', turn: 1, played: [], lastPlay: [] });
+    expect(rolled.lastAction?.kind).toBe('noMove');
+  });
+
+  test('the rest of the roll unplayable: the turn is held after the playable die, and `done` ends it', () => {
+    // Light's 6 cannot be played from own 8 or 6 (Dark holds own 2 and 24/18... ) : play the 1, the 6 dies.
+    const blocked = 'L: 8:1 6:2 | D: 2:2 20:1 13:5 8:3 6:4 24:1 | bar 0/0 | off 12/0';
+    const at61 = withPosition(held(), pos(blocked), 0, [6, 1]);
+    const playable = legalMoves(at61);
+    expect(playable.length).toBeGreaterThan(0);
+    const [first] = playable;
+    if (first === undefined) throw new Error('no move');
+    const one = must(apply(at61, 0, { type: 'move', ...first }));
+    if (one.phase === 'moving' && legalMoves(one).length === 0) {
+      expect(remainingDice(one).length).toBeGreaterThan(0);
+      expect(must(apply(one, 0, { type: 'done' }))).toMatchObject({ phase: 'toRoll', turn: 1 });
+    } else {
+      // Both dice played after all: the position offered two moves; the held turn follows the second.
+      const two = must(apply(one, 0, { type: 'move', ...(legalMoves(one)[0] ?? first) }));
+      expect(two).toMatchObject({ phase: 'moving', turn: 0 });
+      expect(must(apply(two, 0, { type: 'done' }))).toMatchObject({ phase: 'toRoll', turn: 1 });
+    }
+  });
+
+  test('fifteen off ends the game at once, option or not', () => {
+    const last = withPosition(held(), pos('L: 1:1 | D: 13:14 | bar 0/1 | off 14/0'), 0, [1, 1]);
+    const over = must(apply(last, 0, moveAction(0, '1/off')));
+    expect(over).toMatchObject({ phase: 'over', played: [] });
+    expect(over.result?.winner).toBe(0);
+  });
 });

@@ -103,6 +103,8 @@ export const STORAGE_KEYS = {
   sound: 'briscola_sound',
   /** The sound font (web/shared/lib/sound/fonts.ts, bare string): this game's own key (docs/design/sound-fonts.md §6). */
   soundFont: 'briscola_soundFont',
+  /** The far seat's flip, `on`/`off` (the shell's `flipForFar`; no toggle on this page yet, the key is the shell's). */
+  flipTable: 'briscola_flipTable',
   /**
    * The finished matches this device remembers (web/shared/lib/recentGames.ts, JSON, newest
    * first, at most 20; the owner's game history of 2026-09-25). This game's own key, like the font.

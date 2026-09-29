@@ -23,6 +23,7 @@ import {
   bgSetup,
   bgStartLocal,
   bgTap,
+  bgEndTurn,
   bgUndo,
   ownOfId,
   ownPlace,
@@ -197,7 +198,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator(`#dice .die.die-${String(first.die)}.used`)).toHaveCount(1);
       await expect(page.locator('#statusText')).toHaveText(
         after.plays[0]?.length === 1
-          ? 'Last move: the turn ends when you play it'
+          ? 'Last move: then End turn, or Undo'
           : new RegExp(`^${diceText(after.dice ?? [1, 1])} · \\d moves left$`),
       );
       await expect(page.locator('#undoBtn')).toBeEnabled();
@@ -236,10 +237,21 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(chips.nth(1)).toHaveAttribute('data-dice', '3+6');
       await expect(chips.nth(1)).toHaveAttribute('data-via', '10');
       await chips.nth(0).click();
-      // Both dice spent through the hit: the turn is Bob's, his checker on the bar.
-      await expect.poll(async () => (await requireBoard(page)).lastPlay.length).toBe(2);
-      const after = await requireBoard(page);
+      // Both dice spent through the hit: the turn is held for Ann to think or undo (design §1
+      // "Turn end"): End turn stands beside Undo, the status says so, no curtain yet.
+      await expect.poll(async () => (await requireBoard(page)).played.length).toBe(2);
+      await expect(page.locator('#doneBtn')).toBeVisible();
+      await expect(page.locator('#doneBtn')).toHaveText('End turn');
+      await expect(page.locator('#doneBtn')).toHaveClass(/\bbtn-primary\b/);
+      await expect(page.locator('#undoBtn')).toBeEnabled();
+      await expect(page.locator('#statusText')).toHaveText('Dice used — End turn, or Undo');
+      await expect(page.locator('#curtainOverlay')).toBeHidden();
+      expect((await requireBoard(page)).board.bar).toEqual([0, 1]);
+      // End turn: the turn is Bob's, his checker on the bar, the curtain up for him.
+      const after = await bgEndTurn(page);
+      expect(after.lastPlay).toHaveLength(2);
       expect(after.board.bar).toEqual([0, 1]);
+      await expect(page.locator('#doneBtn')).toBeHidden();
       await expect(page.locator('#curtainOverlay')).toBeVisible();
     });
 
@@ -271,9 +283,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect.poll(async () => (await requireBoard(page)).played.length).toBe(1);
       await expect(page.locator('#dice .die.die-5.used')).toHaveCount(1);
       await expect(page.locator('#offLight .slab')).toHaveCount(14);
-      await expect(page.locator('#statusText')).toHaveText(
-        'Last move: the turn ends when you play it',
-      );
+      await expect(page.locator('#statusText')).toHaveText('Last move: then End turn, or Undo');
       // The last checker off: the game is over, Dark has borne nothing off, so it is a gammon.
       await bgMove(page, 2, 'off');
       await expect(page.locator('#offLight .slab')).toHaveCount(15);
@@ -321,7 +331,13 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await reveal(page);
       await bgSetup(page, bgPosition({ text: BLOT_ON_FIVE, turn: 0, dice: [3, 1] }));
       await bgMove(page, 8, 7);
-      const after = await bgMove(page, 8, 5);
+      const held = await bgMove(page, 8, 5);
+      // Ann still holds the phone: the dice are used, the turn waits for End turn (or Undo).
+      expect(held.me.idx).toBe(0);
+      expect(held.played.map((m) => m.hit)).toEqual([false, true]);
+      await expect(page.locator('#doneBtn')).toBeVisible();
+      await expect(page.locator('#curtainOverlay')).toBeHidden();
+      const after = await bgEndTurn(page);
       // The turn passed to Bob: the page shows his view under the curtain, his checker on the bar.
       expect(after.me.idx).toBe(1);
       expect(after.board.bar).toEqual([0, 1]);

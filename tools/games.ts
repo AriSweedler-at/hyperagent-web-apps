@@ -192,6 +192,17 @@ const GATE_IDS: ReadonlyArray<string> = [
   'turnGateKeepBtn',
 ];
 
+/**
+ * The guest wait screen's name card (backgammon's and briscola's page.ts `guestSeatName` block;
+ * web/shared/ui/shellPaint.ts GUEST_NAME_IDS): the card, its box, its Change and its note.
+ */
+const GUEST_NAME_IDS: ReadonlyArray<string> = [
+  'guestSeatName',
+  'guestNameInput',
+  'guestRenameBtn',
+  'guestNameNote',
+];
+
 /** Every game the site builds, one row each, in the order the landing page lists them. */
 export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
   'gin-rummy': {
@@ -246,9 +257,20 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
     debug: 0,
     // Gin-shaped: static screens, the 24 points (the seat mapping is an attribute, so the markup
     // ships seat 0's `data-own` for every point), the turn gate's five ids (page.ts sheetsBefore;
-    // docs/design/backgammon-landscape.md §5D) and the same empty rules slots.
+    // docs/design/backgammon-landscape.md §5D), the menu's flip toggle (§6 item 7), the guest's
+    // name card and the same empty rules slots.
     pageShape: {
-      ids: ['app', 'homeScreen', 'tableScreen', 'board', 'toast', ...POINT_IDS, ...GATE_IDS],
+      ids: [
+        'app',
+        'homeScreen',
+        'tableScreen',
+        'board',
+        'toast',
+        ...POINT_IDS,
+        ...GATE_IDS,
+        'menuFlipToggle',
+        ...GUEST_NAME_IDS,
+      ],
       rulesSlots: true,
     },
     contractFloors: { ts: 35, markup: 40 },
@@ -262,7 +284,8 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
     storage: { saveKey: 'briscolaMP_v1', prefix: 'briscola_' },
     debug: 0,
     // Gin-shaped: static screens, the table's fixed slots (the hand, the fan, the stock and the
-    // briscola under it, the score strip) and the same empty rules slots (docs/design/briscola.md §5.8).
+    // briscola under it, the score strip), the guest's name card and the same empty rules slots
+    // (docs/design/briscola.md §5.8).
     pageShape: {
       ids: [
         'app',
@@ -274,6 +297,7 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
         'briscola',
         'scoreStrip',
         'toast',
+        ...GUEST_NAME_IDS,
       ],
       rulesSlots: true,
     },

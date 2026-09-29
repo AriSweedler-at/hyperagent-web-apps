@@ -88,7 +88,7 @@ const OPTS_JSON =
   '"seatCount":2,"gamesToWin":1,"removedTwo":"C","exchange":false,"scoperta":false,"partnerPeek":false';
 
 describe('frozen constants', () => {
-  test('the fourteen keys (the match and house-rule keys retired), the tabs, modes, sound states, the defaults and the name cap (design §5.8)', () => {
+  test('the fifteen keys (the match and house-rule keys retired), the tabs, modes, sound states, the defaults and the name cap (design §5.8)', () => {
     expect(ALL_KEYS).toEqual([
       'briscolaMP_v1',
       'briscola_name',
@@ -99,6 +99,7 @@ describe('frozen constants', () => {
       'briscola_playMode',
       'briscola_sound',
       'briscola_soundFont',
+      'briscola_flipTable',
       'briscola_recentGames',
       'briscola_cardPack',
       'briscola_lang',

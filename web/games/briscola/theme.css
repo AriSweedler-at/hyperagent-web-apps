@@ -392,13 +392,25 @@ label {
 .seat-list li[data-you] {
   font-weight: 600;
 }
-/* The guest's own seat as the host named it, under the seat list (shellPaint.ts `paintWaiting`,
-   "Playing as …"; the shell's `seatedName`): small, dim cream, centred; the list's ` · you` row
-   says the same in full. */
+/* The guest's name card under the seat list (web/shared/ui/shellPaint.ts `paintGuestName`; the
+   owner, 2026-09-28: the client defines its own name): "Playing as" as the panel's other labels
+   (dimmed cream, small caps), the box and its Change in one row (the box is the home screen's
+   `#nameInput` in every respect: the input rule below and .card-box's gold-tinted edge above; the
+   button a secondary, small), and the note naming who sees the name in dimmed cream (.card-box
+   .muted). Left-aligned inside the centred box, a hairline above, so it reads as its own small form
+   under the list, whose ` · you` row says the seated name in full. */
 #guestSeatName {
-  color: var(--cream-dim);
-  font-size: 0.88rem;
-  text-align: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+  text-align: left;
+}
+#guestSeatName .row {
+  margin-top: 8px;
+}
+#guestNameNote {
+  font-size: 0.82rem;
+  line-height: 1.4;
   padding-top: 6px;
 }
 .empty-note {
@@ -1480,6 +1492,16 @@ details.history-row > .history-detail dt {
 }
 #hand .card {
   touch-action: none;
+}
+/* The table's other tap targets (shell.css says the same of the controls): a slot, the stock and
+   the trump (tap to draw, the exchange) and the peek; `manipulation` leaves the pinch to the browser
+   and takes double-tap zoom, so a quick second tap never zooms now that the viewport meta allows a
+   zoom. The hand's cards keep `none` above, for their drag. */
+.slot,
+.stock,
+.briscola,
+.actions .pile-peek {
+  touch-action: manipulation;
 }
 
 /* ---------- card names (docs/design/language-packs.md §5): the chosen language pack's words ---------- */

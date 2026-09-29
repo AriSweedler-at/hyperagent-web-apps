@@ -47,6 +47,7 @@ import {
 } from '../../../../shared/edge/dom.ts';
 import {
   POINT_INDICES,
+  canEndTurn,
   matchWinner,
   rulesOf,
   type Die,
@@ -227,6 +228,9 @@ export const gameBadgeText = (v: View): string =>
 
 const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
   setText(requireId(doc, 'oppName'), v.opp.name);
+  // The disc before the name wears the seat's checker (theme.css `.seat-dot[data-seat]`): in
+  // pass-and-play the seats swap with the mover, and the disc follows the name.
+  setAttr(requireId(doc, 'oppSeatDot'), 'data-seat', String(v.opp.idx));
   paintConnDot(doc, 'oppDot', connDotView(app.shell));
   setHtml(requireId(doc, 'pipsOpp'), trustedHtml(pipHtml(v.pips[v.opp.idx])));
   // The strip has no id of its own (design §2.1): the opponent's name pulses while they are to move.
@@ -512,13 +516,14 @@ export const waitNoteText = (v: View): string =>
 
 const paintControls = (doc: DocumentLike, app: App, v: View): void => {
   setText(requireId(doc, 'myName'), v.me.name);
+  setAttr(requireId(doc, 'mySeatDot'), 'data-seat', String(v.me.idx));
   setHtml(requireId(doc, 'pipsMe'), trustedHtml(pipHtml(v.pips[v.me.idx])));
   const mine = v.isMyTurn && app.table.curtain === null;
   const over = v.phase === 'over';
   // Disabled, not hidden: the controls row keeps its shape (design §4.6).
   setDisabled(requireId(doc, 'undoBtn'), !(mine && v.canUndo));
-  // Reserved (design §1 "Turn end"): the turn ends by itself.
-  toggleClass(requireId(doc, 'doneBtn'), 'hidden', true);
+  // "End turn" (design §1 "Turn end"): pass-and-play's held turn, beside Undo; hidden everywhere else.
+  toggleClass(requireId(doc, 'doneBtn'), 'hidden', !(mine && canEndTurn(v)));
   // The roll is the modal's (`paintRoll`); the slot shows the mini dice while I move.
   toggleClass(requireId(doc, 'diceMini'), 'hidden', !(mine && v.phase === 'moving'));
   const wait = requireId(doc, 'waitNote');
@@ -648,6 +653,11 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
   const toggle = requireId(doc, 'menuCurtainToggle');
   setChecked(toggle, app.table.curtainMode === 'always');
   setAttr(toggle, 'data-next', app.table.curtainMode === 'always' ? 'never' : 'always');
+  // The far seat's flip (the shell's `flipForFar`, `flip/set`): the same shape; the body's
+  // `data-flip` itself is the boot's paint (shellPaint.ts `paintFlip`), not this one's.
+  const flip = requireId(doc, 'menuFlipToggle');
+  setChecked(flip, app.shell.flipForFar);
+  setAttr(flip, 'data-next', app.shell.flipForFar ? 'off' : 'on');
   // The turn gate is the shell's paint (web/shared/ui/shellPaint.ts `paintGate`, called by the
   // boot after this one from shell.ts `gateOpen`; docs/design/backgammon-landscape.md §5D), and its
   // "Play upright" the boot's binding (web/shared/edge/boot.ts): `bindAll` below binds none of it.
@@ -864,6 +874,10 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
   listen(curtainToggle, 'change', () => {
     const next = dataOf(curtainToggle, 'next');
     if (next === 'always' || next === 'never') dispatch({ type: 'curtain/mode', mode: next });
+  });
+  const flipToggle = requireId(doc, 'menuFlipToggle');
+  listen(flipToggle, 'change', () => {
+    dispatch({ type: 'flip/set', on: dataOf(flipToggle, 'next') === 'on' });
   });
 };
 

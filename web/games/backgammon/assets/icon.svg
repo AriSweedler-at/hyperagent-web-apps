@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 512 512" role="img" aria-label="Sheshbesh">
+  <!-- The installed app's icon (docs/design/backgammon-landscape.md §5C), cut from splash.svg in the
+       Sheshbesh theme (theme.css): the aegean panel on a rounded tile, a gold hairline the three
+       olive-wood points stand on, three plain checkers, no text. The root is sized 100% over the
+       512 viewBox so tools/icons.ts renders it at 192 and 512 (manifest `purpose: any`) to
+       web/public/games/backgammon/icons/icon-<size>.png; the corners outside the tile are transparent. -->
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d4266"/>
+      <stop offset="0.6" stop-color="#0b3c5d"/>
+      <stop offset="1" stop-color="#082e49"/>
+    </linearGradient>
+    <clipPath id="tile">
+      <rect width="512" height="512" rx="80"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="512" height="512" fill="url(#panel)"/>
+    <g transform="translate(88 488)">
+      <polygon points="0,0 112,0 56,-232" fill="#a67c52"/>
+      <polygon points="112,0 224,0 168,-232" fill="#6e4b2a"/>
+      <polygon points="224,0 336,0 280,-232" fill="#a67c52"/>
+      <circle cx="56" cy="-52" r="38" fill="#f3ecdf" stroke="#d9cbad" stroke-width="4"/>
+      <circle cx="56" cy="-132" r="38" fill="#f3ecdf" stroke="#d9cbad" stroke-width="4"/>
+      <circle cx="280" cy="-52" r="38" fill="#4a2e1c" stroke="#2a1a12" stroke-width="4"/>
+    </g>
+  </g>
+  <rect x="24" y="24" width="464" height="464" rx="56" fill="none" stroke="#c9a227" stroke-width="3" stroke-opacity="0.85"/>
+</svg>

@@ -99,11 +99,13 @@ const blocks: ShellBlocks = {
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <title>Sheshbesh — backgammon</title>
     <link rel="icon" href="../../shared/favicon.svg" type="image/svg+xml" />
     <link rel="alternate icon" href="../../shared/favicon.ico" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#0b3c5d" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -188,9 +190,21 @@ const blocks: ShellBlocks = {
   extraScreens: '',
   hostWaitList: `      <div class="phone-cue">Hold the phone sideways once the match starts.</div>`,
   guestWaitList: `      <div class="phone-cue">Hold the phone sideways once the match starts.</div>`,
-  // "Playing as …" under the guest's status (web/shared/ui/shellPaint.ts `paintWaiting`): the id
-  // alone, styled by theme.css `#guestSeatName`; hidden until the host's welcome names the seat.
-  guestSeatName: `      <div id="guestSeatName" class="hidden"></div>`,
+  // The guest's name card under its status (web/shared/ui/shellPaint.ts `paintGuestName`; the
+  // owner, 2026-09-28: the client defines its own name): "Playing as", the box prefilled with the
+  // seat's name as the host named it, Change (or Enter) re-sending the join under what the box says
+  // (web/shared/ui/home.ts `bindHomeShell`, shell.ts `name/rename`), and a note naming who sees it.
+  // Styled by id in theme.css (`#guestSeatName`, `#guestNameNote`; no new class); hidden until the
+  // host's welcome names the seat. The four ids are this page's (tools/games.ts `pageShape.ids`),
+  // not SHELL_IDS: gin's page leaves the block out for its DOM parity oracle.
+  guestSeatName: `      <div id="guestSeatName" class="hidden">
+        <label for="guestNameInput">Playing as</label>
+        <div class="row">
+          <input type="text" id="guestNameInput" class="grow" maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" />
+          <button class="btn btn-secondary btn-sm" id="guestRenameBtn">Change</button>
+        </div>
+        <div class="muted" id="guestNameNote"></div>
+      </div>`,
   table: `      <!-- TABLE (design §2.1). The 24 points are direct children of #board in absolute order;
            the seat perspective is data-own on each point and data-seat on the board, written by
            paintSeat; the static markup ships seat 0's. -->
@@ -208,6 +222,9 @@ const blocks: ShellBlocks = {
             </button>
           </div>
           <div class="opp-strip">
+            <!-- Which colour each name plays: the disc wears the seat's checker (theme.css .seat-dot);
+                 render.ts writes data-seat from the view, the markup ships seat 0's view. -->
+            <span class="seat-dot" id="oppSeatDot" data-seat="1" aria-hidden="true"></span>
             <span class="name" id="oppName">Opponent</span>
             <span class="conn-dot" id="oppDot"></span>
             <span class="pips" id="pipsOpp">167</span>
@@ -469,12 +486,14 @@ const blocks: ShellBlocks = {
 
         <div class="controls" id="controls">
           <div class="me-strip">
+            <span class="seat-dot" id="mySeatDot" data-seat="0" aria-hidden="true"></span>
             <span class="name" id="myName">You</span>
             <span class="pips" id="pipsMe">167</span>
           </div>
           <button class="btn btn-secondary btn-sm" id="undoBtn" disabled>Undo</button>
-          <!-- Reserved (design §1 "Turn end"): the turn ends by itself; hidden in every state. -->
-          <button class="btn btn-secondary btn-sm hidden" id="doneBtn">Done</button>
+          <!-- "End turn" (design §1 "Turn end"): pass-and-play holds the turn once the dice are used
+               up, and this ends it; the in-game call to action (btn-primary), hidden everywhere else. -->
+          <button class="btn btn-primary btn-sm hidden" id="doneBtn">End turn</button>
           <!-- The roll slot (design §3.2): the mini dice, the wait note and the result chip share
                one box; the roll itself is the modal's (#rollOverlay, in the board). -->
           <div class="roll-slot">
@@ -563,6 +582,16 @@ const blocks: ShellBlocks = {
           <label class="toggle-row">
             <input type="checkbox" id="menuCurtainToggle" checked />
             <span>Curtain between turns</span>
+          </label>
+          <!-- The far seat's flip (docs/design/backgammon-landscape.md §6 item 7): the shell's
+               flipForFar, off by default; the body's half turn is the boot's paint. -->
+          <label class="toggle-row">
+            <input type="checkbox" id="menuFlipToggle" />
+            <span
+              >Phone flat between us: flip the board each turn<br /><small class="muted"
+                >For a phone lying flat between two players.</small
+              ></span
+            >
           </label>
           <button class="btn btn-ghost btn-block" id="menuLeaveBtn">Leave the table</button>
         </div>

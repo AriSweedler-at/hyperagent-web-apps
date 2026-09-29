@@ -144,6 +144,7 @@ const GOLDENS: Readonly<Record<WireTag, ReadonlyArray<Frame>>> = {
     action({ type: 'take' }),
     action({ type: 'pass' }),
     action({ type: 'next' }),
+    action({ type: 'done' }),
   ],
   welcome: [
     welcome('Ann', { matchLength: 5, variant: 'portes' }),
@@ -341,7 +342,7 @@ describe('decodeFrame', () => {
     [
       'action of an unknown type',
       { t: 'action', action: { type: 'cheat' } },
-      '$.action.type: expected one of "roll" | "move" | "undo" | "double" | "take" | "pass" | "next"',
+      '$.action.type: expected one of "roll" | "move" | "undo" | "double" | "take" | "pass" | "next" | "done"',
     ],
     [
       'move without a die',
@@ -418,7 +419,7 @@ describe('decodeGuestFrame / decodeHostFrame keep each side to its own frames', 
   test('isGuestFrame routes a send: join and action to the host, the rest to the guest', () => {
     expect(WIRE_TAGS.map((tag) => GOLDENS[tag].map(isGuestFrame))).toEqual([
       [true, true],
-      Array.from({ length: 9 }, () => true),
+      Array.from({ length: 10 }, () => true),
       [false, false],
       [false, false],
       [false],

@@ -25,6 +25,7 @@ import {
   EMPTY_SEAT,
   GONE_TOAST_MS,
   LONG_PRESS_MS,
+  flipped,
   gateOpen,
   LOST_HOST_MSG,
   OPPONENT_LEFT_MSG,
@@ -161,6 +162,7 @@ const KEYS = {
   homeTab: 'fake_homeTab',
   playMode: 'fake_playMode',
   soundFont: 'fake_soundFont',
+  flipTable: 'fake_flipTable',
   recentGames: 'fake_recentGames',
   colour: 'fake_colour',
 } as const;
@@ -242,6 +244,7 @@ const FAKE: ShellConfig<Fake> = {
     state: (view) => ({ t: 'state', view }),
     toast: (msg) => ({ t: 'toast', msg }),
     action: (action) => ({ t: 'action', action }),
+    join: (name) => ({ t: 'join', name }),
   },
   cues: { initial: { seen: null } },
   table: {
@@ -304,6 +307,7 @@ const FAKE: ShellConfig<Fake> = {
     homeTab: pref(KEYS.homeTab, TABS),
     playMode: pref(KEYS.playMode, ['online', 'local']),
     soundFont: pref(KEYS.soundFont, SOUND_FONTS),
+    flipTable: pref(KEYS.flipTable, ['on', 'off']),
     recentGames: {
       read: (store) => JSON.parse(store.get(KEYS.recentGames) ?? '[]') as ReadonlyArray<RecentGame>,
       append: (store, game) =>
@@ -369,6 +373,7 @@ const home: Snapshot = {
   homeTab: 'play',
   playMode: 'online',
   soundFont: 'default',
+  flipTable: false,
   save: null,
   recentGames: [],
   colour: 'green',
@@ -562,6 +567,7 @@ const FAKE4: ShellConfig<Fake4> = {
     state: (view) => ({ t: 'state', view }),
     toast: (msg) => ({ t: 'toast', msg }),
     action: (action) => ({ t: 'action', action }),
+    join: (name) => ({ t: 'join', name }),
   },
   cues: { initial: { seen: null } },
   table: {
@@ -1038,14 +1044,17 @@ describe('the initial shell and the partitions', () => {
       longPressed: false,
       codeDraft: '',
       soundFont: 'default',
+      flipForFar: false,
       recentGames: [],
       recorded: null,
     });
   });
 
-  test('the 50 shell intents and 30 shell effects are listed once; the guards partition a game`s unions', () => {
-    expect(SHELL_INTENT_TYPES).toHaveLength(50);
-    expect(new Set(SHELL_INTENT_TYPES).size).toBe(50);
+  test('the 52 shell intents and 31 shell effects are listed once; the guards partition a game`s unions', () => {
+    expect(SHELL_INTENT_TYPES).toHaveLength(52);
+    expect(new Set(SHELL_INTENT_TYPES).size).toBe(52);
+    expect(SHELL_INTENT_TYPES).toContain('flip/set');
+    expect(SHELL_INTENT_TYPES).toContain('name/rename');
     expect(SHELL_INTENT_TYPES).toContain('viewport/portrait');
     expect(SHELL_INTENT_TYPES).toContain('viewport/landscape');
     expect(SHELL_INTENT_TYPES).toContain('gate/keep');
@@ -1055,8 +1064,9 @@ describe('the initial shell and the partitions', () => {
     expect(SHELL_INTENT_TYPES).toContain('curtain/reveal');
     expect(SHELL_INTENT_TYPES).toContain('position/load');
     expect(SHELL_INTENT_TYPES).toContain('persist');
-    expect(SHELL_EFFECT_TYPES).toHaveLength(30);
-    expect(new Set(SHELL_EFFECT_TYPES).size).toBe(30);
+    expect(SHELL_EFFECT_TYPES).toHaveLength(31);
+    expect(new Set(SHELL_EFFECT_TYPES).size).toBe(31);
+    expect(SHELL_EFFECT_TYPES).toContain('writeFlip');
     expect(SHELL_EFFECT_TYPES).toContain('orientationLock');
     expect(SHELL_EFFECT_TYPES).toContain('phrases');
     expect(SHELL_EFFECT_TYPES).toContain('recordGame');
@@ -1975,6 +1985,131 @@ describe("the guest's name is the guest's (the owner, 2026-09-28; C11)", () => {
     expect(dealtTo.shell.seatedName).toBe('Cy');
   });
 
+  test('name/rename: a connected guest re-sends its join under the trimmed box text, is seated by the two-seat mirror at once and remembers what it typed; empty is the guest fallback', () => {
+    const joined = run(
+      initialApp,
+      { type: 'join/click', name: 'Bo', code: 'ABCD' },
+      { type: 'guest/connected' },
+    ).app;
+    const told = run(joined, welcome('Ann')).app;
+    expect(told.shell.seatedName).toBe('Bo');
+    const renamed = run(told, { type: 'name/rename', name: '  Xyz ' });
+    expect(renamed.app.shell).toMatchObject({
+      role: 'guest',
+      myName: 'Xyz',
+      seatedName: 'Xyz',
+      oppName: 'Ann',
+    });
+    expect(renamed.effects).toEqual([
+      { type: 'send', frame: { t: 'join', name: 'Xyz' } },
+      { type: 'rememberName', name: 'Xyz' },
+    ]);
+    // The host, from that frame: the same word on its wait screen (G5 below).
+    expect(
+      run(lobby(), { type: 'host/frame', frame: { t: 'join', name: 'Xyz' } }).app.shell.oppName,
+    ).toBe('Xyz');
+    // The host's own name dedupes as the welcome did (the mirror is exact for a room of two); what
+    // the box says is what is remembered.
+    const clash = run(told, { type: 'name/rename', name: 'ann' });
+    expect(clash.app.shell).toMatchObject({ myName: 'ann', seatedName: 'ann 2' });
+    expect(clash.effects).toEqual([
+      { type: 'send', frame: { t: 'join', name: 'ann' } },
+      { type: 'rememberName', name: 'ann' },
+    ]);
+    expect(
+      run(hosted(), { type: 'host/frame', frame: { t: 'join', name: 'ann' } }).app.shell.oppName,
+    ).toBe('ann 2');
+    // Emptied: the guest fallback goes on the wire, and nothing is remembered (as `name/typed` of '').
+    const emptied = run(told, { type: 'name/rename', name: '   ' });
+    expect(emptied.app.shell).toMatchObject({ myName: 'Guest', seatedName: 'Guest' });
+    expect(emptied.effects).toEqual([
+      { type: 'send', frame: { t: 'join', name: 'Guest' } },
+      { type: 'rememberName', name: '' },
+    ]);
+    // Cut to NAME_MAX before the trim, the wire's order.
+    expect(run(told, { type: 'name/rename', name: `${'x'.repeat(20)} y` }).app.shell.myName).toBe(
+      'x'.repeat(20),
+    );
+    // Connected but not yet answered (no host name): the join goes out, the welcome names the seat.
+    const early = run(joined, { type: 'name/rename', name: 'Cy' });
+    expect(early.app.shell).toMatchObject({ myName: 'Cy', seatedName: null });
+    expect(kinds(early.effects)).toEqual(['send', 'rememberName']);
+    expect(run(early.app, welcome('Ann')).app.shell.seatedName).toBe('Cy');
+  });
+
+  test('name/rename into a game is a rejoin`s rename (the host path renames the seat); ignored while the host is not connected and in every other role', () => {
+    const atTable = run(seated(), { type: 'name/rename', name: 'Xyz' });
+    expect(atTable.app.shell.myName).toBe('Xyz');
+    expect(atTable.effects).toEqual([
+      { type: 'send', frame: { t: 'join', name: 'Xyz' } },
+      { type: 'rememberName', name: 'Xyz' },
+    ]);
+    // The host, mid-game, renames the seat off that frame; the state frame that answers names it.
+    expect(
+      game(run(hosting(), { type: 'host/frame', frame: { t: 'join', name: 'Xyz' } }).app).players[1]
+        .name,
+    ).toBe('Xyz');
+    const players: Readonly<[Player, Player]> = [
+      { id: 'host', name: 'Ann' },
+      { id: 'guest', name: 'Xyz' },
+    ];
+    expect(
+      run(atTable.app, {
+        type: 'guest/frame',
+        frame: { t: 'state', view: viewFor({ ...dealt, players }, 1) },
+      }).app.shell.seatedName,
+    ).toBe('Xyz');
+    // Not connected: before the channel opened, and after the host was lost.
+    const joined = run(initialApp, { type: 'join/click', name: 'Bo', code: 'ABCD' }).app;
+    expect(run(joined, { type: 'name/rename', name: 'Xyz' })).toEqual(pure(joined));
+    const lost = run(seated(), { type: 'guest/lost' }).app;
+    expect(lost.shell.oppConnected).toBe(false);
+    expect(run(lost, { type: 'name/rename', name: 'Xyz' })).toEqual(pure(lost));
+    // Every other role, and nobody at all.
+    [initialApp, hosted(), lobby(), hosting(), local()].forEach((app) => {
+      expect(run(app, { type: 'name/rename', name: 'Xyz' })).toEqual(pure(app));
+    });
+  });
+
+  test('name/rename at a table of N: the join goes out, the mirror stands until the lobby that answers names my row; the host dedupes against the other seats', () => {
+    const joined = run4(
+      initialApp4,
+      { type: 'join/click', name: 'Cy', code: 'ABCD' },
+      { type: 'guest/connected' },
+    ).app;
+    const told = run4(joined, {
+      type: 'guest/frame',
+      frame: roomFrame4(
+        'lobby',
+        'Ann',
+        { level: 4 },
+        [{ name: 'Bo', connected: true }, { name: 'Cy', connected: true }, EMPTY_SEAT],
+        2,
+      ),
+    }).app;
+    expect(told.shell.seatedName).toBe('Cy');
+    const renamed = run4(told, { type: 'name/rename', name: 'Bo' });
+    expect(renamed.app.shell).toMatchObject({ myName: 'Bo', seatedName: 'Bo' });
+    expect(renamed.effects).toEqual([
+      { type: 'send', frame: { t: 'join', name: 'Bo' } },
+      { type: 'rememberName', name: 'Bo' },
+    ]);
+    // The host: seat 2's second join dedupes against seat 1's Bo, and its lobby names my row.
+    const reseated = run4(full4(), join4('Bo', 2)).app;
+    expect(reseated.shell.seats.map((seat) => seat.name)).toEqual(['Bo', 'Bo 2', 'Di']);
+    const answered = run4(renamed.app, {
+      type: 'guest/frame',
+      frame: roomFrame4(
+        'lobby',
+        'Ann',
+        { level: 4 },
+        [{ name: 'Bo', connected: true }, { name: 'Bo 2', connected: true }, EMPTY_SEAT],
+        2,
+      ),
+    }).app;
+    expect(answered.shell.seatedName).toBe('Bo 2');
+  });
+
   test('a second join frame from the same seat before the deal re-seats under the new name and rewrites the wait screen`s line (G5)', () => {
     const renamed = run(lobby(), { type: 'host/frame', frame: { t: 'join', name: 'Xyz' } });
     expect(renamed.app.shell).toMatchObject({
@@ -2832,6 +2967,7 @@ describe('storage and what the sessions read back', () => {
       homeTab: 'about',
       playMode: 'local',
       soundFont: 'arcade',
+      flipTable: false,
       save: { role: 'guest', code: 'KQZM', myName: 'Jeff' },
       recentGames: [RECORD],
       colour: 'red',
@@ -2934,6 +3070,7 @@ describe('runShellEffect', () => {
     runShellEffect(shell, { type: 'writeHomeTab', tab: 'about' }, deps, FAKE);
     runShellEffect(shell, { type: 'writePlayMode', mode: 'local' }, deps, FAKE);
     runShellEffect(shell, { type: 'writeSoundFont', font: 'felt' }, deps, FAKE);
+    runShellEffect(shell, { type: 'writeFlip', on: true }, deps, FAKE);
     runShellEffect(shell, { type: 'recordGame', game: RECORD }, deps, FAKE);
     runShellEffect(shell, { type: 'recordGame', game: { ...RECORD, at: NOW + 1 } }, deps, FAKE);
     expect([...store.entries()].filter(([k]) => k !== KEYS.save)).toEqual([
@@ -2942,8 +3079,12 @@ describe('runShellEffect', () => {
       [KEYS.homeTab, 'about'],
       [KEYS.playMode, 'local'],
       [KEYS.soundFont, 'felt'],
+      [KEYS.flipTable, 'on'],
       [KEYS.recentGames, JSON.stringify([{ ...RECORD, at: NOW + 1 }, RECORD])],
     ]);
+    // The flip's other arm: off is written as the word, not a removed key (`home/init` reads `on` alone as the flip).
+    runShellEffect(shell, { type: 'writeFlip', on: false }, deps, FAKE);
+    expect(store.get(KEYS.flipTable)).toBe('off');
     runShellEffect(shell, { type: 'rememberName', name: '' }, deps, FAKE);
     expect(store.has(KEYS.name)).toBe(false);
   });
@@ -3617,5 +3758,80 @@ describe("the Android lock: fullscreen and the landscape lock behind a tap, once
     const atHome = runIn(LOCKABLE, SIDEWAYS, initialApp, init, sideways, sitDown, lost);
     expect(hints(atHome.effects)).toBe(0);
     expect(atHome.app.shell).toMatchObject({ screen: 'guestWaitScreen', orientationLocked: false });
+  });
+});
+
+describe("the far seat's flip (docs/design/backgammon-landscape.md §6 item 7; the owner, 2026-09-25: the pass-the-phone flow follows the phone held sideways)", () => {
+  /** FAKE with the holder hook: a view is for its `seat`. */
+  const HOLDING: ShellConfig<Fake> = {
+    ...FAKE,
+    local: { ...FAKE.local, holder: (view) => view.seat },
+  };
+  const flip = (app: App, on: boolean): App => run(app, { type: 'flip/set', on }).app;
+
+  test('flip/set holds the setting and writes it; home/init reads it back off the snapshot; readHome reads the key as on, and anything else as off', () => {
+    const on = run(initialApp, { type: 'flip/set', on: true });
+    expect(on.app.shell.flipForFar).toBe(true);
+    expect(on.effects).toEqual([{ type: 'writeFlip', on: true }]);
+    const off = run(on.app, { type: 'flip/set', on: false });
+    expect(off.app.shell.flipForFar).toBe(false);
+    expect(off.effects).toEqual([{ type: 'writeFlip', on: false }]);
+    expect(initialApp.shell.flipForFar).toBe(false);
+    // The snapshot's boolean into the shell, either way.
+    expect(
+      run(initialApp, { type: 'home/init', home: { ...home, flipTable: true } }).app.shell
+        .flipForFar,
+    ).toBe(true);
+    expect(
+      run(on.app, { type: 'home/init', home: { ...home, flipTable: false } }).app.shell.flipForFar,
+    ).toBe(false);
+    // The key: `on` is on; `off`, a foreign value and no key at all read as off.
+    const store: Store = new Map();
+    expect(readHome(store, FAKE).flipTable).toBe(false);
+    store.set(KEYS.flipTable, 'on');
+    expect(readHome(store, FAKE).flipTable).toBe(true);
+    store.set(KEYS.flipTable, 'off');
+    expect(readHome(store, FAKE).flipTable).toBe(false);
+    store.set(KEYS.flipTable, 'sideways');
+    expect(readHome(store, FAKE).flipTable).toBe(false);
+    // A setting, not a table fact: a start, a leave and a cancel keep it.
+    const started = run(on.app, { type: 'local/click', p1: 'Ann', p2: 'Bob', level: '1' }).app;
+    expect(started.shell.flipForFar).toBe(true);
+    const left = run(started, { type: 'leave/request' }, { type: 'leave/finish' }).app;
+    expect(left.shell).toMatchObject({ role: null, flipForFar: true });
+  });
+
+  test('flipped: pass and play alone, the setting on, at the table, seat 1 looking (under its curtain, or holding the phone by the game`s holder hook); never online, at home, for seat 0, or without the hook', () => {
+    const table = run(initialApp, { type: 'local/click', p1: 'Ann', p2: 'Bob', level: '1' }).app;
+    // The starter's curtain is up for seat 0: whoever tapped Start is holding the phone.
+    expect(table.table.curtain).toBe(0);
+    expect(table.shell.screen).toBe('tableScreen');
+    expect(flipped(table, HOLDING)).toBe(false);
+    const on = flip(table, true);
+    expect(flipped(on, HOLDING)).toBe(false);
+    // The curtain up for seat 1: the phone is being handed across, and the curtain is what seat 1 reads.
+    expect(flipped(withTable(on, { curtain: 1 }), HOLDING)).toBe(true);
+    // Off: nothing turns, whoever looks.
+    expect(flipped(withTable(table, { curtain: 1 }), HOLDING)).toBe(false);
+    // The curtain down: the seat whose view is shown, by the hook.
+    const revealed = run(on, { type: 'curtain/reveal' }).app;
+    expect(revealed.table.curtain).toBeNull();
+    expect(revealed.shell.view?.seat).toBe(0);
+    expect(flipped(revealed, HOLDING)).toBe(false);
+    const moved = run(revealed, { type: 'position/load', state: { ...dealt, turn: 1 } }).app;
+    expect(moved.table.curtain).toBeNull();
+    expect(moved.shell.view?.seat).toBe(1);
+    expect(flipped(moved, HOLDING)).toBe(true);
+    // Without the hook the shell cannot tell who holds the phone: it never turns for a shown view.
+    expect(flipped(moved, FAKE)).toBe(false);
+    expect(flipped(withTable(moved, { curtain: 1 }), FAKE)).toBe(true);
+    // Not at the table (the endgame scrolls upright), not at home, not online.
+    expect(flipped(withShell(moved, { screen: 'endgameScreen' }), HOLDING)).toBe(false);
+    expect(flipped(flip(initialApp, true), HOLDING)).toBe(false);
+    const h = flip(hosting(), true);
+    expect(h.shell.role).toBe('host');
+    expect(flipped(withTable(h, { curtain: 1 }), HOLDING)).toBe(false);
+    // A ShellConfig fits the flip config as it is.
+    expect(flipped(on, FAKE)).toBe(false);
   });
 });

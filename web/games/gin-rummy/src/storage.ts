@@ -98,6 +98,8 @@ export const STORAGE_KEYS = {
    * game on the origin keeps its own choice (docs/design/sound-fonts.md §6); set from the console for now.
    */
   soundFont: 'ginRummy_soundFont',
+  /** The far seat's flip, `on`/`off` (the shell's `flipForFar`; no toggle on this page yet, the key is the shell's). */
+  flipTable: 'ginRummy_flipTable',
   /**
    * The finished games this device remembers (web/shared/lib/recentGames.ts, JSON, newest first,
    * at most 20; the owner's game history of 2026-09-25). This page's own key, like the sound font.

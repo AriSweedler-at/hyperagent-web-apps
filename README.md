@@ -437,6 +437,8 @@ web/index.html               landing page, the first Vite entry (no scripts); di
 web/public/.nojekyll         copied to dist/ so Pages serves dotfiles and folders untouched
 web/public/shared/cards/     the served card-pack files: backs/ (gin's five, copied), linea/ (generated), napoletane/ (cut from the
                              owner's sheet); docs/design/card-packs.md
+web/public/games/<g>/        splash.png (tools/splash.ts, the og:image); backgammon's manifest.webmanifest + icons/ (tools/icons.ts: the
+                             installable app, fullscreen and landscape on Android; docs/design/backgammon-landscape.md §5C)
 web/shared/lib/              shared pure TypeScript: result, rng, json decoders, roomCode, name, invite, shuffle, events, game (the
                              two-seat contract), protocol (the wire skeleton), drag (the drag numbers), clock types, sound (sound/:
                              cues, fonts, phrases), card packs (cards/), language packs (lang/: what a card is called)

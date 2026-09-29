@@ -11,9 +11,11 @@ import {
   boolean,
   integer,
   literal,
+  map,
   nullable,
   object,
   oneOf,
+  optional,
   pair,
   refine,
   string,
@@ -124,13 +126,18 @@ export const decodeBoard: Decoder<Board> = refine(
 );
 
 const player: Decoder<Player> = object({ id: string, name: string });
-const options: Decoder<MatchOptions> = object({
-  matchLength: integer(1),
-  rotation: refine(arrayOf(shippedVariant), (r) => r.length > 0, 'a non-empty rotation'),
-  jacoby: boolean,
-  beavers: boolean,
-  automaticDoubles: boolean,
-});
+/** `manualTurnEnd` (End turn) is read false when absent: every save and frame before the option stays valid. */
+const options: Decoder<MatchOptions> = map(
+  object({
+    matchLength: integer(1),
+    rotation: refine(arrayOf(shippedVariant), (r) => r.length > 0, 'a non-empty rotation'),
+    jacoby: boolean,
+    beavers: boolean,
+    automaticDoubles: boolean,
+    manualTurnEnd: optional(boolean),
+  }),
+  (o): MatchOptions => ({ ...o, manualTurnEnd: o.manualTurnEnd ?? false }),
+);
 const cube: Decoder<Cube> = object({ value: cubeValue, owner: nullable(decodeSeat) });
 const match: Decoder<Match> = object({
   length: integer(1),
@@ -249,7 +256,9 @@ export const decodeView: Decoder<View> = refine(
   'a phase that agrees with dice, played and result',
 );
 
-const plainAction = object({ type: literal('roll', 'undo', 'double', 'take', 'pass', 'next') });
+const plainAction = object({
+  type: literal('roll', 'undo', 'double', 'take', 'pass', 'next', 'done'),
+});
 const moveAction = object({ type: literal('move'), from, to, die: decodeDie });
 
 /**
@@ -264,4 +273,5 @@ export const decodeAction: Decoder<Action> = taggedUnion('type', {
   take: plainAction,
   pass: plainAction,
   next: plainAction,
+  done: plainAction,
 });

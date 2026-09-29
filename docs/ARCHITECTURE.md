@@ -44,6 +44,9 @@ and tests that prove it land before the code they protect.
 │   ├── public/shared/cards/     the served card-pack files (docs/design/card-packs.md): backs/ (gin's five, copied),
 │   │                            linea/ (forty SVG faces and a back, generated), napoletane/ (eighty JPEG faces cut from
 │   │                            the owner's sheet under assets/cards/); ../../shared/cards/ from a game page
+│   ├── public/games/<g>/        what a page ships that no Vite asset reference names: splash.png (tools/splash.ts, the
+│   │                            og:image); backgammon's manifest.webmanifest and icons/ (tools/icons.ts: the installable
+│   │                            app, fullscreen and landscape on Android; docs/design/backgammon-landscape.md §5C)
 │   ├── shared/                  the only code both games may import (alias @shared/*)
 │   │   ├── lib/                 PURE: result, rng, json (decoders), roomCode (alphabets, prefixes, sanitiser), cards
 │   │   │                        (the deck kinds, the card packs and their resolution), name (normaliseName),

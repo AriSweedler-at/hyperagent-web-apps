@@ -158,7 +158,7 @@ const startGame = (
   };
 };
 
-/** A new match: `matchLength ?? 5`, `rotation` non-empty or ['portes'], then game 1's opening. */
+/** A new match: `matchLength ?? 5`, `rotation` non-empty or ['portes'], `manualTurnEnd ?? false`, then game 1's opening. */
 export const createGame = (
   players: Pair<Player>,
   opts: CreateGameOptions,
@@ -174,6 +174,7 @@ export const createGame = (
     jacoby: false,
     beavers: false,
     automaticDoubles: false,
+    manualTurnEnd: opts.manualTurnEnd ?? false,
   };
   const carried = { length: matchLength, score: [0, 0] as Pair<number>, crawfordDone: false };
   return startGame(players, options, 1, carried, [], rng, now);

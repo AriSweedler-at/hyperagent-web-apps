@@ -26,7 +26,7 @@ import {
 } from './engine/index.ts';
 import { connectingMsg } from './net/guest.ts';
 import { OPENING_MSG, handoffMsg } from './net/host.ts';
-import { action, lobby, state, toast } from './protocol.ts';
+import { action, join, lobby, state, toast } from './protocol.ts';
 import {
   DEFAULT_CURTAIN_MODE,
   DEFAULT_HOME_TAB,
@@ -122,7 +122,7 @@ export const BACKGAMMON_SHELL: ShellGameData<Backgammon> = {
     scoreOf: (view) => `${String(view.match.score[0])}–${String(view.match.score[1])}`,
     winnerOf: (view) => matchWinner(view.match),
   },
-  frames: { lobby, state, toast, action },
+  frames: { lobby, state, toast, action, join },
   cues: { initial: INITIAL_CUES },
   home: {
     // This page's own keys: the options and the curtain mode (defaults when unreadable).

@@ -65,8 +65,9 @@ export type ShippedVariant = 'portes' | 'backgammon';
 /**
  * `opening` is reserved and never emitted in v1: `createGame`/`nextGame` resolve the opening roll,
  * so a game starts in `moving` (Western: the winner plays the opening pair) or `toRoll` (tavli: the
- * winner rerolls). There is no `toDouble` phase (a double is legal in `toRoll` when `canDouble`)
- * and no `done` action (the turn ends by itself when the play is complete, R13).
+ * winner rerolls). There is no `toDouble` phase (a double is legal in `toRoll` when `canDouble`).
+ * The turn ends by itself when the play is complete (R13) unless the match's `manualTurnEnd`
+ * option holds it: the mover then stays in `moving` with no legal move until `done` (End turn).
  */
 export type Phase = 'opening' | 'toRoll' | 'cubeOffered' | 'moving' | 'over';
 
@@ -92,6 +93,13 @@ export type MatchOptions = Readonly<{
   jacoby: boolean;
   beavers: boolean;
   automaticDoubles: boolean;
+  /**
+   * Pass-and-play (the owner, 2026-09-28: "I should be able to hit 'end turn' ... think about my
+   * next move, or consider undoing stuff"): the turn does not flip when the dice are used up; the
+   * mover stays in `moving` with no legal move, may still undo, and `done` ends the turn. False
+   * online, where the host's automatic end is the wire's; a save or frame without the key reads false.
+   */
+  manualTurnEnd: boolean;
 }>;
 
 /** `kind` lets the UI cue sounds and toasts without parsing `text`. */
@@ -163,9 +171,19 @@ export type State = Readonly<{
   endedAt: number | null;
 }>;
 
-export const ACTION_TYPES = ['roll', 'move', 'undo', 'double', 'take', 'pass', 'next'] as const;
+export const ACTION_TYPES = [
+  'roll',
+  'move',
+  'undo',
+  'double',
+  'take',
+  'pass',
+  'next',
+  'done',
+] as const;
+/** `done` (End turn) is legal only under `manualTurnEnd`, once no move extends `played`. */
 export type Action =
-  | Readonly<{ type: 'roll' | 'undo' | 'double' | 'take' | 'pass' | 'next' }>
+  | Readonly<{ type: 'roll' | 'undo' | 'double' | 'take' | 'pass' | 'next' | 'done' }>
   | Readonly<{ type: 'move'; from: From; to: To; die: Die }>;
 
 /** The per-seat view: the state plus the selectors the UI needs, `legal` for the actor only. */
@@ -245,6 +263,8 @@ export type CreateGameOptions = Readonly<{
   matchLength?: number;
   /** [DEFAULT_VARIANT] when absent or empty. */
   rotation?: ReadonlyArray<ShippedVariant>;
+  /** False when absent: the turn ends by itself (online, and every game before the option). */
+  manualTurnEnd?: boolean;
 }>;
 
 export const POINTS = 24;

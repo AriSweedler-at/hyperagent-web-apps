@@ -1336,7 +1336,10 @@ const readBg = (page: Page): Promise<BgSummary> =>
  * the timer's own intent) instead of waiting. Every act in the loop launches a flight whose clone
  * only a timer removes, and no timer fires inside one task: the loop sweeps the clones and the
  * marks they left before it returns (fly.ts culls a burst past MAX_LIVE_FLYERS on its own, but a
- * whole match is thousands). Returns the phase it stopped in.
+ * whole match is thousands). Pass-and-play holds a finished turn for End turn (design §1 "Turn
+ * end"): `done` is then the one act, taken without a pick, so the seeded draws fall on the same
+ * moves and rolls as before the option and the goldens read the same match. Returns the phase it
+ * stopped in.
  */
 const fastForward = (page: Page, stop: string, nextGames = false): Promise<string> =>
   page.evaluate<string>(`(() => {
@@ -1354,7 +1357,8 @@ const fastForward = (page: Page, stop: string, nextGames = false): Promise<strin
         continue;
       }
       held = 0;
-      bg.act(acts[Math.floor(Math.random() * acts.length)]);
+      const only = acts.length === 1 ? acts[0] : null;
+      bg.act(only !== null && only.type === 'done' ? only : acts[Math.floor(Math.random() * acts.length)]);
     }
     document.querySelectorAll('.flyer').forEach((f) => f.remove());
     document.querySelectorAll('.checker.arriving, .checker.settling').forEach((c) => c.classList.remove('arriving', 'settling'));
@@ -1428,13 +1432,18 @@ const driveBackgammon = async (page: Page, shot: Shot): Promise<void> => {
   await page.keyboard.press('Escape');
 
   // ---- the states the seeded policy reaches: on the bar, a dead die, bearing off ----
+  // A turn with a move to make (`legal`): pass-and-play holds a finished turn in `moving` for End
+  // turn (design §1 "Turn end"), and that held beat is not the state these shots pin.
   const states: ReadonlyArray<readonly [string, string]> = [
-    ['turn: a checker on the bar', "v.phase === 'moving' && v.board.bar[v.me.idx] > 0"],
+    [
+      'turn: a checker on the bar',
+      "v.phase === 'moving' && v.legal.length > 0 && v.board.bar[v.me.idx] > 0",
+    ],
     [
       'turn: only one die can be played',
       "v.phase === 'moving' && v.played.length === 0 && v.dice !== null && v.dice[0] !== v.dice[1] && v.plays.every((p) => p.length === 1)",
     ],
-    ['turn: bearing off', "v.phase === 'moving' && v.canBearOff[v.me.idx]"],
+    ['turn: bearing off', "v.phase === 'moving' && v.legal.length > 0 && v.canBearOff[v.me.idx]"],
   ];
   // The first source whose targets include a tray (so the tray's die disc is on show), else the first.
   const selectSource = async (sources: ReadonlyArray<string>): Promise<void> => {

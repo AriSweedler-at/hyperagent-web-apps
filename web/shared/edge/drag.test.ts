@@ -19,7 +19,7 @@ import {
   type Point,
   type Rect,
 } from './drag.ts';
-import { fakeEl, fakePage, fakeTarget, type FakeEl } from './page.fake.ts';
+import { fakeEl, fakePage, fakeTarget, type FakeEl, type FakePage } from './page.fake.ts';
 
 type Intent =
   | Readonly<{ type: 'start'; key: string }>
@@ -58,6 +58,8 @@ type Table = Readonly<{
   frames: (() => void)[];
   /** `targetAt` calls, the session's `over` at each. */
   asked: ReadonlyArray<string | null>;
+  /** The page, for its body (the far seat's flip turns it). */
+  page: FakePage;
 }>;
 
 /** Two surfaces; the coin (40px at 100,200) on `a`; two targets, X at 300..400 x 300..400 and Y at 500..600 x 300..400. */
@@ -116,7 +118,7 @@ const table = (options: Options = {}): Table => {
       ghost: { sizeVar: '--coin-d', strip: ['top', 'selected'] },
     },
   );
-  return { a, b, coin, ghost, intents, captured, released, frames, asked };
+  return { a, b, coin, ghost, intents, captured, released, frames, asked, page };
 };
 
 const on = (coin: FakeEl | null, x: number, y: number, pointerId = 1) => ({
@@ -300,5 +302,32 @@ describe('bindDrag', () => {
     plain.a.fire('pointerup', on(plain.coin, 200, 100));
     expect(plain.intents.map((i) => i.type)).toEqual(['start', 'start', 'end']);
     expect(plain.captured).toEqual([]);
+  });
+});
+
+describe("the ghost under the far seat's flip (dom.ts `bodySpace`, `bodyPoint`)", () => {
+  test('a turned body: the ghost is laid out at the reflected source rect and every translate is the reflected pointer delta, so it sits on the finger; the landing glide reflects too', () => {
+    const t = table();
+    t.page.body.el.setAttribute('data-flip', '1');
+    Object.assign(t.page.body.el, {
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 400 }),
+    });
+    t.a.fire('pointerdown', on(t.coin, 100, 100));
+    t.a.fire('pointermove', on(t.coin, 108, 100));
+    // The coin at (100, 200) 40 square reflects to (660, 160).
+    expect(['left', 'top', 'width', 'height'].map((prop) => t.ghost.style(prop))).toEqual([
+      '660px',
+      '160px',
+      '40px',
+      '40px',
+    ]);
+    expect(t.ghost.style('transform')).toBe('translate(0px, 0px)');
+    // The pointer 12.5 right and 9.874 up of where the drag began: the ghost's translate is the
+    // opposite in the body's space, which the turn brings back to the finger.
+    t.a.fire('pointermove', on(t.coin, 120.5, 90.126));
+    expect(t.ghost.style('transform')).toBe('translate(-12.5px, 9.87px)');
+    // Released over nothing: the glide back to the source's own rect is a zero translate either way.
+    t.a.fire('pointerup', on(t.coin, 120.5, 90.126));
+    expect(t.ghost.style('transform')).toBe('translate(0px, 0px)');
   });
 });

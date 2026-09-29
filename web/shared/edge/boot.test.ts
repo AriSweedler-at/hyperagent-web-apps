@@ -423,7 +423,11 @@ type App = Readonly<{
     landscapePhone: boolean;
     gateDismissed: boolean;
     orientationLocked: boolean;
+    role: 'local' | null;
+    flipForFar: boolean;
   }>;
+  /** The table's curtain, what the far seat's flip reads beside the shell. */
+  table: Readonly<{ curtain: number | null }>;
   home: HomeSnapshot<Fake> | null;
   steps: number;
 }>;
@@ -438,6 +442,7 @@ const HOME: HomeSnapshot<Fake> = {
   homeTab: 'play',
   playMode: 'online',
   soundFont: 'default',
+  flipTable: false,
   save: null,
   recentGames: [],
   extra: 'x',
@@ -530,6 +535,8 @@ type Options = Readonly<{
   lock?: boolean;
   /** The screen's `lock` rejects (a tablet that refuses, desktop Chromium): the attempt does not take. */
   refuse?: boolean;
+  /** The App starts seated in pass and play with the far seat's flip on (shell.ts `flipped` reads the role, the setting, the screen, the view and the curtain). */
+  flip?: boolean;
 }>;
 
 type Log = Readonly<{
@@ -726,7 +733,10 @@ const bootPage = (options: Options = {}) => {
       landscapePhone: false,
       orientationLocked: false,
       gateDismissed: false,
+      role: options.flip === true ? 'local' : null,
+      flipForFar: options.flip === true,
     },
+    table: { curtain: null },
     home: null,
     steps: 0,
   };
@@ -764,6 +774,9 @@ const bootPage = (options: Options = {}) => {
     }
     if (intent.type === 'gate/keep') {
       return { app: { ...app, shell: { ...app.shell, gateDismissed: true } }, effects: [] };
+    }
+    if (intent.type === 'flip/set') {
+      return { app: { ...app, shell: { ...app.shell, flipForFar: intent.on } }, effects: [] };
     }
     // "Go sideways": the shell's `lockSideways` would step the lock; the stub steps it outright.
     if (intent.type === 'gate/turn') {
@@ -917,6 +930,8 @@ const bootPage = (options: Options = {}) => {
           shell: {
             ...(options.sideways ? { orientation: 'landscape' as const } : {}),
             engine: { over: (view: View) => view.seat === 9 },
+            // The far seat's flip reads who holds the phone off the view (shell.ts `flipped`).
+            local: { holder: (view: View) => (view.seat === 1 ? 1 : 0) },
           },
         }),
   };
@@ -1034,6 +1049,27 @@ describe('bootShell', () => {
     expect(new Set(mute.log.canLock)).toEqual(new Set([false]));
     const bare = bootPage();
     expect(new Set(bare.log.canLock)).toEqual(new Set([false]));
+  });
+
+  test("the far seat's flip is the boot's paint too (shellPaint.ts `paintFlip` over shell.ts `flipped`): the body's data-flip after every paint of a game whose config the boot holds, whatever its orientation; nothing without a shell config", () => {
+    // Upright game, seated in pass and play with the setting on: at home nothing; at the table
+    // (`render` seats seat 1's view) the body turns; the setting off, it is upright again.
+    const b = bootPage({ sideways: false, flip: true });
+    expect(b.p.body.attr('data-flip')).toBeNull();
+    b.boot.dispatch({ type: 'render' });
+    expect(b.p.body.attr('data-flip')).toBe('1');
+    b.boot.dispatch({ type: 'flip/set', on: false });
+    expect(b.p.body.attr('data-flip')).toBeNull();
+    b.boot.dispatch({ type: 'flip/set', on: true });
+    expect(b.p.body.attr('data-flip')).toBe('1');
+    // The same App under a config without a shell half: nothing is painted, nothing throws.
+    const bare = bootPage({ flip: true });
+    bare.boot.dispatch({ type: 'render' });
+    expect(bare.p.body.attr('data-flip')).toBeNull();
+    // A game that plays sideways paints it beside the gate.
+    const sideways = bootPage({ sideways: true, gated: true, flip: true });
+    sideways.boot.dispatch({ type: 'render' });
+    expect(sideways.p.body.attr('data-flip')).toBe('1');
   });
 
   test('a game that plays sideways: the boot watches the two phone predicates into the reducer, paints the turn gate after every paint and binds its "Play upright"; a game that stays upright is watched for nothing, its page has no gate to paint and the button is left unbound', () => {
