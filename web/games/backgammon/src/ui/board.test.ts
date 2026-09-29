@@ -370,10 +370,8 @@ describe('statusText', () => {
       played: [{ from: 5, to: 3, die: 2, hit: false }],
     };
     expect(viewFor(last, 0).movesLeft).toEqual([5]);
-    expect(statusText(viewFor(last, 0))).toBe('Last move: the turn ends when you play it');
-    expect(statusText(viewFor(move(stateAt(START, 0, [3, 1]), '8/5'), 0))).toBe(
-      'Last move: the turn ends when you play it',
-    );
+    expect(statusText(viewFor(last, 0))).toBe('5-2 · last move');
+    expect(statusText(viewFor(move(stateAt(START, 0, [3, 1]), '8/5'), 0))).toBe('3-1 · last move');
   });
 
   test('the tray open', () => {

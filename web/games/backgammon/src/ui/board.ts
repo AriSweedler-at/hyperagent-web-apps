@@ -448,6 +448,8 @@ export type StatusOpts = Readonly<{
   picked?: Die | null;
 }>;
 export const PLAIN_STATUS: StatusOpts = { pending: null, noMoveShown: false };
+/** The line while the dice tumble (design §4.7): the roll is not named before the faces settle. */
+export const ROLLING_STATUS = 'Rolling…';
 
 const rollOf = (v: View): string => (v.dice === null ? '' : diceText(v.dice));
 const COUNT_WORDS: ReadonlyArray<string> = ['none', 'one', 'two', 'three', 'four'];
@@ -491,10 +493,10 @@ const movingStatus = (v: View, pending: Pending | null, picked: Die | null): str
   const playable = v.plays[0]?.length ?? 0;
   if (v.board.bar[v.me.idx] > 0) return `${roll} · enter from the bar`;
   if (dead.length > 0 && v.played.length === 0) return `${roll} · ${deadStatus(v, dead, playable)}`;
-  if (playable === 1)
-    return v.options.manualTurnEnd
-      ? 'Last move: then End turn, or Undo'
-      : 'Last move: the turn ends when you play it';
+  // One die left: `5-2 · last move` (15 characters, inside the strip's budget sideways; it was
+  // "Last move: the turn ends when you play it", 41, cut to "Last move: the turn ends when…" on
+  // the owner's phone). The held turn's line, or the flip, says what follows.
+  if (playable === 1) return `${roll} · last move`;
   if (v.canBearOff[v.me.idx]) return `${roll} · bear off`;
   if (v.played.length === 0)
     return `${roll} · play ${v.movesLeft.length === 2 ? 'both dice' : 'all four'}`;

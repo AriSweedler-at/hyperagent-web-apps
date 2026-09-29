@@ -198,7 +198,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator(`#dice .die.die-${String(first.die)}.used`)).toHaveCount(1);
       await expect(page.locator('#statusText')).toHaveText(
         after.plays[0]?.length === 1
-          ? 'Last move: then End turn, or Undo'
+          ? `${diceText(after.dice ?? [1, 1])} · last move`
           : new RegExp(`^${diceText(after.dice ?? [1, 1])} · \\d moves left$`),
       );
       await expect(page.locator('#undoBtn')).toBeEnabled();
@@ -283,7 +283,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect.poll(async () => (await requireBoard(page)).played.length).toBe(1);
       await expect(page.locator('#dice .die.die-5.used')).toHaveCount(1);
       await expect(page.locator('#offLight .slab')).toHaveCount(14);
-      await expect(page.locator('#statusText')).toHaveText('Last move: then End turn, or Undo');
+      await expect(page.locator('#statusText')).toHaveText('6-5 · last move');
       // The last checker off: the game is over, Dark has borne nothing off, so it is a gammon.
       await bgMove(page, 2, 'off');
       await expect(page.locator('#offLight .slab')).toHaveCount(15);
