@@ -1,0 +1,113 @@
+{
+  "size": 24,
+  "moods": {
+    "very-sad": {
+      "frames": 6,
+      "ms": 220,
+      "sheet": "very-sad.png",
+      "w": 24,
+      "h": 24,
+      "motion": "sulk",
+      "band": "verySad",
+      "colour": "#3b6fd6",
+      "min": -5,
+      "max": -5
+    },
+    "sad": {
+      "frames": 6,
+      "ms": 240,
+      "sheet": "sad.png",
+      "w": 24,
+      "h": 24,
+      "motion": "sulk",
+      "band": "sad",
+      "colour": "#6c9bea",
+      "min": -4,
+      "max": -2
+    },
+    "neutral": {
+      "frames": 4,
+      "ms": 160,
+      "sheet": "neutral.png",
+      "w": 24,
+      "h": 24,
+      "motion": "walk",
+      "band": "neutral",
+      "colour": "#f2e6a8",
+      "min": -1,
+      "max": 1
+    },
+    "happy": {
+      "frames": 6,
+      "ms": 110,
+      "sheet": "happy.png",
+      "w": 24,
+      "h": 24,
+      "motion": "bounce",
+      "band": "happy",
+      "colour": "#f5cd3b",
+      "min": 2,
+      "max": 4
+    },
+    "very-happy": {
+      "frames": 6,
+      "ms": 90,
+      "sheet": "very-happy.png",
+      "w": 24,
+      "h": 24,
+      "motion": "bounce",
+      "band": "veryHappy",
+      "colour": "#ffd200",
+      "min": 5,
+      "max": 5
+    }
+  },
+  "transitions": {
+    "very-sad-to-sad": {
+      "frames": 4,
+      "ms": 120,
+      "sheet": "very-sad-to-sad.png",
+      "w": 24,
+      "h": 24,
+      "motion": "hop",
+      "from": "very-sad",
+      "to": "sad"
+    },
+    "sad-to-neutral": {
+      "frames": 4,
+      "ms": 120,
+      "sheet": "sad-to-neutral.png",
+      "w": 24,
+      "h": 24,
+      "motion": "hop",
+      "from": "sad",
+      "to": "neutral"
+    },
+    "neutral-to-happy": {
+      "frames": 4,
+      "ms": 120,
+      "sheet": "neutral-to-happy.png",
+      "w": 24,
+      "h": 24,
+      "motion": "hop",
+      "from": "neutral",
+      "to": "happy"
+    },
+    "happy-to-very-happy": {
+      "frames": 4,
+      "ms": 120,
+      "sheet": "happy-to-very-happy.png",
+      "w": 24,
+      "h": 24,
+      "motion": "hop",
+      "from": "happy",
+      "to": "very-happy"
+    }
+  },
+  "license": {
+    "name": "original",
+    "author": "drawn in this repository by tools/buddy-frames.ts",
+    "source": "https://github.com/AriSweedler-at/hyperagent-web-apps/blob/main/tools/buddy-frames.ts",
+    "note": "Original pixel art, no third-party assets; see LICENSES.md beside this file."
+  }
+}

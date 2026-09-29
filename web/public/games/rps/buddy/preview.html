@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RPS buddy frames</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px;
+        background: #111;
+        color: #eee;
+        font:
+          14px/1.4 system-ui,
+          sans-serif;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 16px;
+      }
+      .sets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px 32px;
+        margin: 0 0 32px;
+      }
+      figure {
+        margin: 0;
+        text-align: center;
+      }
+      figcaption {
+        margin-top: 8px;
+        color: #aaa;
+      }
+      .buddy {
+        display: block;
+        width: 144px;
+        height: 144px;
+        margin: 0 auto;
+        background-repeat: no-repeat;
+        background-size: calc(var(--frames) * 144px) 144px;
+        image-rendering: pixelated;
+        animation: play calc(var(--frames) * var(--ms) * 1ms) steps(var(--frames)) infinite;
+      }
+      .buddy.once {
+        animation-iteration-count: 1;
+        animation-fill-mode: forwards;
+      }
+      .buddy.back {
+        animation-direction: reverse;
+      }
+      @keyframes play {
+        to {
+          background-position: calc(var(--frames) * -144px) 0;
+        }
+      }
+      .island {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 6px 18px;
+        border-radius: 999px;
+        background: #000;
+        border: 1px solid #333;
+      }
+      .island .buddy {
+        width: 48px;
+        height: 48px;
+        background-size: calc(var(--frames) * 48px) 48px;
+      }
+      .island .buddy.play {
+        animation-name: play-small;
+      }
+      @keyframes play-small {
+        to {
+          background-position: calc(var(--frames) * -48px) 0;
+        }
+      }
+      table {
+        border-collapse: collapse;
+        margin-top: 16px;
+      }
+      td,
+      th {
+        padding: 4px 12px;
+        border-bottom: 1px solid #333;
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>RPS buddy: every set, 24 × 24 px at 6×</h1>
+    <div class="sets">
+      <figure>
+        <div
+          class="buddy"
+          style="--frames: 6; --ms: 220; background-image: url(very-sad.png)"
+        ></div>
+        <figcaption><code>very-sad</code> · sulk · 6 × 220 ms</figcaption>
+      </figure>
+      <figure>
+        <div class="buddy" style="--frames: 6; --ms: 240; background-image: url(sad.png)"></div>
+        <figcaption><code>sad</code> · sulk · 6 × 240 ms</figcaption>
+      </figure>
+      <figure>
+        <div class="buddy" style="--frames: 4; --ms: 160; background-image: url(neutral.png)"></div>
+        <figcaption><code>neutral</code> · walk · 4 × 160 ms</figcaption>
+      </figure>
+      <figure>
+        <div class="buddy" style="--frames: 6; --ms: 110; background-image: url(happy.png)"></div>
+        <figcaption><code>happy</code> · bounce · 6 × 110 ms</figcaption>
+      </figure>
+      <figure>
+        <div
+          class="buddy"
+          style="--frames: 6; --ms: 90; background-image: url(very-happy.png)"
+        ></div>
+        <figcaption><code>very-happy</code> · bounce · 6 × 90 ms</figcaption>
+      </figure>
+      <figure>
+        <div
+          class="buddy"
+          style="--frames: 4; --ms: 120; background-image: url(very-sad-to-sad.png)"
+        ></div>
+        <figcaption><code>very-sad-to-sad</code> · hop · 4 × 120 ms</figcaption>
+      </figure>
+      <figure>
+        <div
+          class="buddy"
+          style="--frames: 4; --ms: 120; background-image: url(sad-to-neutral.png)"
+        ></div>
+        <figcaption><code>sad-to-neutral</code> · hop · 4 × 120 ms</figcaption>
+      </figure>
+      <figure>
+        <div
+          class="buddy"
+          style="--frames: 4; --ms: 120; background-image: url(neutral-to-happy.png)"
+        ></div>
+        <figcaption><code>neutral-to-happy</code> · hop · 4 × 120 ms</figcaption>
+      </figure>
+      <figure>
+        <div
+          class="buddy"
+          style="--frames: 4; --ms: 120; background-image: url(happy-to-very-happy.png)"
+        ></div>
+        <figcaption><code>happy-to-very-happy</code> · hop · 4 × 120 ms</figcaption>
+      </figure>
+    </div>
+    <h1>
+      The ladder: −5 up to +5 and back, a hop between each step (2×, 48 px: about the island's
+      height)
+    </h1>
+    <div class="island">
+      <span id="counter">−5</span><span id="ladder" class="buddy play"></span
+      ><span id="label">very-sad</span>
+    </div>
+    <h1>Frame table</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>set</th>
+          <th>motion</th>
+          <th>frames</th>
+          <th>ms/frame</th>
+          <th>loop ms</th>
+          <th>sheet</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>very-sad</code></td>
+          <td>sulk</td>
+          <td>6</td>
+          <td>220</td>
+          <td>1320</td>
+          <td><code>very-sad.png</code></td>
+        </tr>
+        <tr>
+          <td><code>sad</code></td>
+          <td>sulk</td>
+          <td>6</td>
+          <td>240</td>
+          <td>1440</td>
+          <td><code>sad.png</code></td>
+        </tr>
+        <tr>
+          <td><code>neutral</code></td>
+          <td>walk</td>
+          <td>4</td>
+          <td>160</td>
+          <td>640</td>
+          <td><code>neutral.png</code></td>
+        </tr>
+        <tr>
+          <td><code>happy</code></td>
+          <td>bounce</td>
+          <td>6</td>
+          <td>110</td>
+          <td>660</td>
+          <td><code>happy.png</code></td>
+        </tr>
+        <tr>
+          <td><code>very-happy</code></td>
+          <td>bounce</td>
+          <td>6</td>
+          <td>90</td>
+          <td>540</td>
+          <td><code>very-happy.png</code></td>
+        </tr>
+        <tr>
+          <td><code>very-sad-to-sad</code></td>
+          <td>hop</td>
+          <td>4</td>
+          <td>120</td>
+          <td>480</td>
+          <td><code>very-sad-to-sad.png</code></td>
+        </tr>
+        <tr>
+          <td><code>sad-to-neutral</code></td>
+          <td>hop</td>
+          <td>4</td>
+          <td>120</td>
+          <td>480</td>
+          <td><code>sad-to-neutral.png</code></td>
+        </tr>
+        <tr>
+          <td><code>neutral-to-happy</code></td>
+          <td>hop</td>
+          <td>4</td>
+          <td>120</td>
+          <td>480</td>
+          <td><code>neutral-to-happy.png</code></td>
+        </tr>
+        <tr>
+          <td><code>happy-to-very-happy</code></td>
+          <td>hop</td>
+          <td>4</td>
+          <td>120</td>
+          <td>480</td>
+          <td><code>happy-to-very-happy.png</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <script>
+      const sets = [
+        { name: 'very-sad', frames: 6, ms: 220 },
+        { name: 'sad', frames: 6, ms: 240 },
+        { name: 'neutral', frames: 4, ms: 160 },
+        { name: 'happy', frames: 6, ms: 110 },
+        { name: 'very-happy', frames: 6, ms: 90 },
+        { name: 'very-sad-to-sad', frames: 4, ms: 120 },
+        { name: 'sad-to-neutral', frames: 4, ms: 120 },
+        { name: 'neutral-to-happy', frames: 4, ms: 120 },
+        { name: 'happy-to-very-happy', frames: 4, ms: 120 },
+      ];
+      const moods = sets.slice(0, 5);
+      const hops = sets.slice(5);
+      const el = document.getElementById('ladder');
+      const label = document.getElementById('label');
+      const counter = document.getElementById('counter');
+      const show = (set, cls) => {
+        el.className = 'buddy play ' + cls;
+        el.style.setProperty('--frames', String(set.frames));
+        el.style.setProperty('--ms', String(set.ms));
+        el.style.backgroundImage = 'url(' + set.name + '.png)';
+        label.textContent = set.name;
+      };
+      const steps = [...moods.keys(), ...moods.keys()].map((i, k) => (k < 5 ? i : 4 - (k - 5)));
+      let k = 0;
+      const tick = () => {
+        const i = steps[k % steps.length];
+        const next = steps[(k + 1) % steps.length];
+        counter.textContent = ['−5', '−3', '0', '3', '5'][i];
+        show(moods[i], '');
+        setTimeout(() => {
+          const up = next > i;
+          const hop = hops[Math.min(i, next)];
+          show(hop, up ? 'once' : 'once back');
+          k += 1;
+          setTimeout(tick, hop.frames * hop.ms);
+        }, 1800);
+      };
+      tick();
+    </script>
+  </body>
+</html>
