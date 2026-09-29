@@ -231,7 +231,7 @@ export type BootTypes = ShellTypes & Readonly<{ Store: Store }>;
 /**
  * What the boot reads of an App: the font every cue plays in, my view (the hook's `legal()`), the
  * finished games (the hook's `recentGames()`) and, for a game that plays sideways, what the turn
- * gate reads (shell.ts `gateOpen`: the screen, the orientation, the dismissal).
+ * gate reads (shell.ts `gateOpen`: the screen, the orientation, the dismissal, the Android lock).
  */
 export type BootApp<G extends BootTypes> = Readonly<{
   shell: Readonly<{

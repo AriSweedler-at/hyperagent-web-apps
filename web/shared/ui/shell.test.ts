@@ -3410,11 +3410,12 @@ describe("the Android lock: fullscreen and the landscape lock behind a tap, once
     const turned = runIn(LOCKABLE, SIDEWAYS, gated.app, turn);
     expect(turned.effects).toEqual([HOLD]);
     expect(turned.app.shell.orientationLocked).toBe(true);
-    // The gate stays until the watcher sees the phone turn: the state is the device's, not the tap's.
-    expect(gateOpen(turned.app.shell, SIDEWAYS)).toBe(true);
-    const curtain = runIn(LOCKABLE, SIDEWAYS, runIn(LOCKABLE, SIDEWAYS, turned.app, lost).app, {
-      type: 'curtain/reveal',
-    });
+    // The gate goes with the tap that took the lock (the lock turns the phone); a loss with the
+    // phone still upright brings it back.
+    expect(gateOpen(turned.app.shell, SIDEWAYS)).toBe(false);
+    const lostUpright = runIn(LOCKABLE, SIDEWAYS, turned.app, lost);
+    expect(gateOpen(lostUpright.app.shell, SIDEWAYS)).toBe(true);
+    const curtain = runIn(LOCKABLE, SIDEWAYS, lostUpright.app, { type: 'curtain/reveal' });
     expect(kinds(curtain.effects).slice(0, 2)).toEqual(['orientationLock', 'fx']);
     expect(curtain.app.shell).toMatchObject({ revealed: 0, orientationLocked: true });
   });
@@ -3441,6 +3442,60 @@ describe("the Android lock: fullscreen and the landscape lock behind a tap, once
     const again = runIn(LOCKABLE, SIDEWAYS, dropped.app, { type: 'curtain/reveal' });
     expect(locks(again.effects)).toEqual([true]);
     expect(again.app.shell.orientationLocked).toBe(true);
+  });
+
+  test('the gate never paints while the lock is held: Start with the phone upright takes the lock and the sheet stays down (the tap turns the phone), fullscreen/lost with the phone still upright brings it back, and a device that cannot lock is gated as before', () => {
+    const upright: FakeIntent = { type: 'viewport/portrait', portrait: true };
+    const held = runIn(LOCKABLE, SIDEWAYS, initialApp, init, upright, start);
+    expect(locks(held.effects)).toEqual([true]);
+    expect(held.app.shell).toMatchObject({
+      screen: 'tableScreen',
+      portraitPhone: true,
+      orientationLocked: true,
+      gateDismissed: false,
+    });
+    expect(gateOpen(held.app.shell, SIDEWAYS)).toBe(false);
+    // A render while held (the boot paints after every intent): still down.
+    expect(
+      gateOpen(runIn(LOCKABLE, SIDEWAYS, held.app, { type: 'render' }).app.shell, SIDEWAYS),
+    ).toBe(false);
+    const lostUpright = runIn(LOCKABLE, SIDEWAYS, held.app, lost);
+    expect(lostUpright.app.shell.orientationLocked).toBe(false);
+    expect(gateOpen(lostUpright.app.shell, SIDEWAYS)).toBe(true);
+    // The same taps on an iPhone (no canLock): no lock to hold, the gate as before.
+    const iphone = runIn(ctx, SIDEWAYS, initialApp, init, upright, start);
+    expect(iphone.app.shell.orientationLocked).toBe(false);
+    expect(gateOpen(iphone.app.shell, SIDEWAYS)).toBe(true);
+  });
+
+  test("never against Play upright: with the lock lost and the phone upright, gate/keep then the curtain's Roll and later paints step no lock and the mark stays clear; Leave then Start asks again (the choice went with the table)", () => {
+    const kept = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      initialApp,
+      init,
+      start,
+      lost,
+      { type: 'viewport/portrait', portrait: true },
+      { type: 'gate/keep' },
+    );
+    expect(kept.app.shell).toMatchObject({ gateDismissed: true, orientationLocked: false });
+    expect(gateOpen(kept.app.shell, SIDEWAYS)).toBe(false);
+    const played = runIn(
+      LOCKABLE,
+      SIDEWAYS,
+      kept.app,
+      { type: 'curtain/reveal' },
+      { type: 'render' },
+      { type: 'curtain/reveal' },
+      lost,
+    );
+    expect(locks(played.effects)).toEqual([]);
+    expect(played.app.shell).toMatchObject({ gateDismissed: true, orientationLocked: false });
+    // Leave, then Start: the next table's first tap locks, and its gate may show.
+    const restarted = runIn(LOCKABLE, SIDEWAYS, played.app, { type: 'leave/finish' }, init, start);
+    expect(locks(restarted.effects)).toEqual([true]);
+    expect(restarted.app.shell).toMatchObject({ gateDismissed: false, orientationLocked: true });
   });
 
   test('never on a device that cannot lock (every iPhone, every desktop: no canLock), never in a game that stays upright (no orientation): the taps step nothing, Go sideways is inert, the leave drops nothing, and every effect list is what it was', () => {
@@ -3496,6 +3551,16 @@ describe("the Android lock: fullscreen and the landscape lock behind a tap, once
     ]);
     const cancelled = runIn(LOCKABLE, SIDEWAYS, guest, { type: 'cancel/finish' });
     expect(cancelled.app.shell).toMatchObject({ role: null, orientationLocked: false });
+    // A guest whose host was lost after "Play upright" (the table's marks are kept with the
+    // table) cancels from the wait screen: the marks go with the room, so the next table's first
+    // tap locks and its gate may show.
+    const stale = withShell(guest, { gateDismissed: true, rotationHintShown: true });
+    expect(runIn(LOCKABLE, SIDEWAYS, stale, { type: 'cancel/finish' }).app.shell).toMatchObject({
+      role: null,
+      orientationLocked: false,
+      gateDismissed: false,
+      rotationHintShown: false,
+    });
     // The next Start after a leave locks again: the page is free until its next tap.
     const restarted = runIn(LOCKABLE, SIDEWAYS, left.app, init, start);
     expect(locks(restarted.effects)).toEqual([true]);

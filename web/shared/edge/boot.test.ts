@@ -422,6 +422,7 @@ type App = Readonly<{
     portraitPhone: boolean;
     landscapePhone: boolean;
     gateDismissed: boolean;
+    orientationLocked: boolean;
   }>;
   home: HomeSnapshot<Fake> | null;
   steps: number;
@@ -723,6 +724,7 @@ const bootPage = (options: Options = {}) => {
       screen: 'homeScreen',
       portraitPhone: false,
       landscapePhone: false,
+      orientationLocked: false,
       gateDismissed: false,
     },
     home: null,

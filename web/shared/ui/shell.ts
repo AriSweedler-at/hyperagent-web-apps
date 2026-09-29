@@ -281,16 +281,19 @@ export type ShellState<G extends ShellTypes> = Readonly<{
   /** The mirror: a phone held sideways (`LANDSCAPE_PHONE`, `viewport/landscape`); a fact about the device too. */
   landscapePhone: boolean;
   /**
-   * `#turnGateKeepBtn` "Play upright": the turn gate stays down for this table. Dropped where the
-   * shell resets the table for a new one (a pass-and-play start, the handoff, a leave: the
-   * `cfg.table.reset` sites for `startLocal`, `handoff` and `leave`) and kept where the same table
+   * `#turnGateKeepBtn` "Play upright": the turn gate stays down for this table, and the Android
+   * lock (`lockSideways`) steps nothing more for it: the gate offered the lock and the upright
+   * board as the player's choice (docs/design/backgammon-landscape.md §6 item 11). Dropped where
+   * the shell resets the table for a new one (a pass-and-play start, the handoff, a leave: the
+   * `cfg.table.reset` sites for `startLocal`, `handoff` and `leave`) and at a cancel (the room
+   * goes, and a guest whose host was lost takes no stale choice home), kept where the same table
    * stays up (the host lost mid-match, `lost`: the same table does not ask twice).
    */
   gateDismissed: boolean;
   /**
    * The rotation hint (`ROTATION_HINT_MSG`: lock the phone's rotation, Android's Auto-rotate) was
    * toasted at this table. Once per table, so it goes where `gateDismissed` goes: dropped at the
-   * same four sites, kept on `lost`. Set by `rotationHint`, never by the player.
+   * same five sites, kept on `lost`. Set by `rotationHint`, never by the player.
    */
   rotationHintShown: boolean;
   /**
@@ -1001,10 +1004,10 @@ export const withTable = <G extends ShellTypes>(
 
 // ---- playing sideways: the turn gate (docs/design/backgammon-landscape.md §5D) ------------------
 
-/** What `gateOpen` reads of the shell: the screen, the view, the orientation and the dismissal. */
+/** What `gateOpen` reads of the shell: the screen, the view, the orientation, the dismissal and the lock. */
 export type GateState<G extends ShellTypes> = Pick<
   ShellState<G>,
-  'screen' | 'view' | 'portraitPhone' | 'gateDismissed'
+  'screen' | 'view' | 'portraitPhone' | 'gateDismissed' | 'orientationLocked'
 >;
 /** What `gateOpen` reads of the config: the opt-in and the two over predicates; a `ShellConfig` fits. */
 export type GateConfig<G extends ShellTypes> = Readonly<{
@@ -1015,8 +1018,11 @@ export type GateConfig<G extends ShellTypes> = Readonly<{
 /**
  * The turn gate is up (shellPaint.ts `paintGate`, painted by the boot after the game's own paint):
  * in a game that plays sideways, at the table, on a phone held upright, while a game is on, until
- * the phone turns or "Play upright" for this table. The home, the waiting rooms and the endgame
- * stay upright-friendly, and so does a finished game (`engine.over`, or `engine.gameOver` where the
+ * the phone turns or "Play upright" for this table, and never while the Android lock is held
+ * (`orientationLocked`: the tap that took it is turning the phone, so the sheet would only flash
+ * over the curtain until the watcher sees the turn; `fullscreen/lost` clears the mark, and a phone
+ * still upright then gets the gate back). The home, the waiting rooms and the endgame stay
+ * upright-friendly, and so does a finished game (`engine.over`, or `engine.gameOver` where the
  * game has one: backgammon's result sheet, read fine upright and handed over upright; the next
  * game's first curtain brings the gate back). Not a modal in the reducer's sense: taps still
  * reduce; `inert` on the DOM is the guard.
@@ -1028,7 +1034,8 @@ export const gateOpen = <G extends ShellTypes>(s: GateState<G>, cfg: GateConfig<
   !cfg.engine.over(s.view) &&
   cfg.engine.gameOver?.(s.view) !== true &&
   s.portraitPhone &&
-  !s.gateDismissed;
+  !s.gateDismissed &&
+  !s.orientationLocked;
 
 /**
  * The rotation hint (the owner, 2026-09-28: "can we give a warning to lock the phone's rotation
@@ -1086,9 +1093,13 @@ const rotationHint = <G extends ShellTypes>(
  * curtain's Roll (`curtain/reveal`), the gate's own "Go sideways" (`gate/turn`), and, in
  * backgammon, the roll modal's CTA (`roll/click`). Once per loss, not at every turn: silent while
  * `orientationLocked`, which `fullscreen/lost` (a back gesture, a failed attempt) clears so the
- * next tap re-enters. Nothing on a device that cannot lock (`Ctx.canLock`: every iPhone, every
- * desktop) and nothing in a game that stays upright (no `cfg.orientation`), so every other game's
- * effect lists are what they were.
+ * next tap re-enters. Never against "Play upright" (`gateDismissed`): the gate offers the lock and
+ * the upright board as the player's choice for this table (docs/design/backgammon-landscape.md §6
+ * item 11), so after it no tap of this table locks the phone again; the next table's start, load,
+ * handoff, leave or cancel clears the mark, and `gate/turn` never sees it set, since its gate was
+ * up. Nothing on a device that cannot lock (`Ctx.canLock`: every iPhone, every desktop) and
+ * nothing in a game that stays upright (no `cfg.orientation`), so every other game's effect lists
+ * are what they were.
  */
 export const lockSideways = <G extends ShellTypes>(
   app: ShellApp<G>,
@@ -1096,7 +1107,10 @@ export const lockSideways = <G extends ShellTypes>(
   cfg: ShellConfig<G>,
 ): Step<G> => {
   const due =
-    cfg.orientation === 'landscape' && ctx.canLock === true && !app.shell.orientationLocked;
+    cfg.orientation === 'landscape' &&
+    ctx.canLock === true &&
+    !app.shell.orientationLocked &&
+    !app.shell.gateDismissed;
   return due
     ? step(withShell(app, { orientationLocked: true }), { type: 'orientationLock', hold: true })
     : pure(app);
@@ -2065,6 +2079,10 @@ const cancelFinish = <G extends ShellTypes>(app: ShellApp<G>): Step<G> =>
       seatedName: null,
       // `cancel` dropped the lock a Sit down or a handoff took.
       orientationLocked: false,
+      // The table's marks go with the room: a guest whose host was lost after "Play upright"
+      // takes no stale choice (and no spent hint) home to the next table.
+      gateDismissed: false,
+      rotationHintShown: false,
     }),
     app.shell.handoff && app.shell.game !== null
       ? { type: 'saveLocal', game: app.shell.game }

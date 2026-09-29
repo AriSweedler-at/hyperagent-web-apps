@@ -122,12 +122,15 @@ const toastStill = async (page: Page): Promise<void> => {
   await expect(page.locator('#toast')).not.toHaveClass(/\bshow\b/, { timeout: 1000 });
 };
 
-test('a phone upright at the table: the gate over the curtain, inert beneath; sideways it goes; upright it is back; Play upright holds through the next curtain; Leave and Start ask again', async ({
+test('a phone upright at the table: the gate over the curtain, inert beneath; sideways it goes; upright it is back; Play upright holds through the next curtain and asks for no lock; Leave and Start ask again', async ({
   phone,
   project,
 }) => {
   const { page } = phone;
-  await withLock(page, 'held');
+  // The lock refused (a tablet): the loss lands a moment after the tap and the gate opens, with
+  // "Go sideways" shown since the device can lock. A held lock turns the phone and shows no gate
+  // (the Android test below).
+  await withLock(page, 'refused');
   await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
   await gateUp(page);
   await expect(page.locator('#turnGateTitle')).toHaveText('Turn your phone sideways');
@@ -146,7 +149,8 @@ test('a phone upright at the table: the gate over the curtain, inert beneath; si
   // Upright again: back.
   await page.setViewportSize(PHONE);
   await gateUp(page);
-  // "Play upright": down for this table, through the next curtain.
+  // "Play upright": down for this table, through the next curtain, and the table's choice: the
+  // curtain's Roll and the roll modal's CTA ask for no lock (the Start tap's attempt is all).
   await page.locator('#turnGateKeepBtn').tap();
   await gateDown(page);
   await page.locator('#curtainBtn').tap();
@@ -155,6 +159,7 @@ test('a phone upright at the table: the gate over the curtain, inert beneath; si
   await bgPlayTurn(page);
   await expect(page.locator('#curtainOverlay')).toBeVisible();
   await gateDown(page);
+  expect(await lockCalls(page)).toEqual(['request', 'lock:landscape']);
   // Leave (the menu's row, past the confirm), then Start: the table's choice went with the table.
   await page.locator('#curtainBtn').tap();
   await expect(page.locator('#curtainOverlay')).toBeHidden();
@@ -175,7 +180,7 @@ test('a finished game is not gated: the result sheet takes taps upright; the nex
   project,
 }) => {
   const { page } = phone;
-  await withLock(page, 'held');
+  await withLock(page, 'refused');
   await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
   await gateUp(page);
   // Sideways, the last checker of a 5-point match's first game is borne off: the sheet comes up.
@@ -215,21 +220,18 @@ test('a fine pointer at a phone`s size (the desktop window, the goldens) never s
   await gateDown(page);
 });
 
-test('Android: Start asks for fullscreen then the landscape lock; held, no tap asks again and the hint is silent; a back gesture loses it, the hint is due, and the curtain`s Roll, the roll modal`s CTA and Go sideways each re-enter; Leave unlocks and leaves fullscreen', async ({
+test('Android: Start asks for fullscreen then the landscape lock, with no gate over the curtain while it is held; no tap asks again and the hint is silent; a back gesture loses it, the hint is due, and the curtain`s Roll, the roll modal`s CTA and Go sideways each re-enter; Leave unlocks and leaves fullscreen; Play upright after a loss holds against the next tap', async ({
   phone,
   project,
 }) => {
   const { page } = phone;
   await withLock(page, 'held');
   await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
-  await gateUp(page);
-  // The Start tap: fullscreen on the document, then the lock, in that order, once.
+  // The Start tap: fullscreen on the document, then the lock, in that order, once; the tap is
+  // turning the phone, so no gate over the curtain (the stub leaves the viewport to the test).
+  await gateDown(page);
   await expect.poll(() => lockCalls(page)).toEqual(['request', 'lock:landscape']);
-  // Held: the gate's own tap asks nothing more (the gate waits for the watcher to see the turn).
-  await page.locator('#turnGateGoBtn').tap();
-  await gateUp(page);
-  expect(await lockCalls(page)).toEqual(['request', 'lock:landscape']);
-  // The phone turns (the lock's work, here the viewport's): the gate goes; no hint while held.
+  // The phone turns (the lock's work, here the viewport's): still no gate; no hint while held.
   await page.setViewportSize(PHONE_LANDSCAPE);
   await gateDown(page);
   await toastStill(page);
@@ -254,7 +256,8 @@ test('Android: Start asks for fullscreen then the landscape lock; held, no tap a
   await expect(page.locator('#curtainOverlay')).toBeHidden();
   await expect.poll(async () => (await lockCalls(page)).length).toBe(6);
   await toastStill(page);
-  // Upright with the lock lost: Go sideways is the tap that re-enters.
+  // Upright with the lock lost: the gate is back, and Go sideways is the tap that re-enters; the
+  // gate goes with the tap.
   await backGesture(page);
   await page.setViewportSize(PHONE);
   await gateUp(page);
@@ -262,9 +265,8 @@ test('Android: Start asks for fullscreen then the landscape lock; held, no tap a
   await expect
     .poll(async () => (await lockCalls(page)).slice(6))
     .toEqual(['request', 'lock:landscape']);
-  // Leave: unlock, then out of fullscreen.
-  await page.locator('#turnGateKeepBtn').tap();
   await gateDown(page);
+  // Leave: unlock, then out of fullscreen.
   page.once('dialog', (dialog) => {
     void dialog.accept();
   });
@@ -278,6 +280,16 @@ test('Android: Start asks for fullscreen then the landscape lock; held, no tap a
   await expect
     .poll(async () => (await lockCalls(page)).slice(10))
     .toEqual(['request', 'lock:landscape']);
+  // Lost, still upright: the gate is back; "Play upright" is the table's choice, so neither the
+  // curtain's Roll nor the roll modal's CTA asks for the lock again.
+  await backGesture(page);
+  await gateUp(page);
+  await page.locator('#turnGateKeepBtn').tap();
+  await gateDown(page);
+  await page.locator('#curtainBtn').tap();
+  await expect(page.locator('#curtainOverlay')).toBeHidden();
+  await bgRoll(page);
+  expect((await lockCalls(page)).length).toBe(12);
 });
 
 test('a phone whose lock is refused (Android`s function, a tablet`s no: the loss reported a moment after the tap) is told once to lock its rotation, at the turn of the phone at the table, not under the gate; not again this table; again after Leave and Start', async ({
