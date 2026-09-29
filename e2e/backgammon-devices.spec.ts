@@ -6,8 +6,11 @@
 // insets (through the theme's seam, tools/shell-emulate.ts `seamScript`), driven to the rolled
 // board. Asserted with the geometry oracle (e2e/fixtures/backgammon-geometry.ts): the board fills
 // its room (`expectFillsRoom`), no document scroll where the twin says the viewport fits, every
-// tap target 44px, the strip 4px inside the trim's hairline and the trim's corner radius the
-// catalogue's (`judge`, the emulator's own verdict). Each device's board is attached to the report
+// tap target 44px, the strip 4px inside the frame's hairline and the frame's four corners the
+// catalogue's radius where the reach rule says the corner is the screen's, 0 where a bar owns it
+// (`judge`, the emulator's own verdict). Last, the frame probe (docs/design/screen-frame.md §6): the
+// iPhone 12 class upright standalone and sideways in a tab with the bar up, the page as it loads,
+// the four radii and #app's clearance off the insets read straight off the computed styles. Each device's board is attached to the report
 // (`playwright show-report` shows them); no video. The iPads (the desktop template sideways) and
 // the unsupported SE 1st gen are left to the twin's sweep in layout.test.ts. Page-only (site.ts
 // PAGE_ONLY_SPECS): about the page, not the origin.
@@ -21,7 +24,16 @@ import {
   twinOf,
   type Measured,
 } from '../tools/shell-emulate.ts';
-import { DEVICES, emulationFor, emulationName, type Emulation } from '../web/shared/lib/devices.ts';
+import {
+  CORNER_KEYS,
+  DEVICES,
+  EVERY_CORNER,
+  cornersOf,
+  deviceById,
+  emulationFor,
+  emulationName,
+  type Emulation,
+} from '../web/shared/lib/devices.ts';
 import { bgRoll } from './fixtures/backgammon.ts';
 import { boardGeometry, expectBoardGeometry } from './fixtures/backgammon-geometry.ts';
 import { reveal } from './fixtures/shell.ts';
@@ -47,8 +59,9 @@ const MEASURE = `(() => {
     board: board === null ? null : rect(board),
     frame,
     targets,
-    corner: parseFloat(getComputedStyle(document.body, '::before').borderTopLeftRadius) || 0,
-    rootCorner: getComputedStyle(document.documentElement).getPropertyValue('--screen-corner').trim(),
+    corners: (() => { const cs = getComputedStyle(document.body, '::before'); const r = (v) => parseFloat(v) || 0; return { tl: r(cs.borderTopLeftRadius), tr: r(cs.borderTopRightRadius), br: r(cs.borderBottomRightRadius), bl: r(cs.borderBottomLeftRadius) }; })(),
+    rootCorners: ['tl', 'tr', 'br', 'bl'].map((k) => getComputedStyle(document.documentElement).getPropertyValue('--frame-corner-' + k).trim()).filter((v) => v !== '').join('/'),
+    fullscreen: document.fullscreenElement !== null,
     screen: [screen.width, screen.height],
     dpr: devicePixelRatio,
     coarse: matchMedia('(any-pointer: coarse)').matches,
@@ -56,7 +69,7 @@ const MEASURE = `(() => {
 })()`;
 
 CASES.forEach((e) => {
-  test(`${emulationName(e)}: the board fills its room, the trim's corner is ${String(e.corner)}px, nothing clips`, async ({
+  test(`${emulationName(e)}: the board fills its room, the frame's corners are ${CORNER_KEYS.map((k) => String(e.corners[k])).join('/')}px, nothing clips`, async ({
     browser,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'pages', 'about the page, not the origin');
@@ -112,7 +125,93 @@ CASES.forEach((e) => {
         verdict.checks.filter((c) => !c.pass).map((c) => `${c.name}: ${c.detail}`),
         emulationName(e),
       ).toEqual([]);
-      expect(measured.corner).toBe(e.corner);
+      // At the table Chromium's emulated phone grants the Android lock's fullscreen (the viewport
+      // stays the case's), and the rule rounds every corner there, as on a real Android.
+      expect(measured.corners).toEqual(
+        measured.fullscreen ? cornersOf(e.corner, EVERY_CORNER) : e.corners,
+      );
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+/**
+ * The frame probe: the shell's screen frame at 390x844 (upright, standalone: every corner round,
+ * #app padded past the notch and the home indicator) and at 844x390 (sideways in a Safari tab with
+ * the bar up: the top pair square, the bottom pair round, the side gutters the insets' 47px). Read
+ * off the composed page as it loads, no table sat at: the frame is the shell's, not the board's.
+ */
+const iphone12 = deviceById('iphone-390x844');
+if (iphone12 === null) throw new Error('iphone-390x844 missing from the catalogue');
+const PROBES: ReadonlyArray<Readonly<{ e: Emulation; standalone: boolean }>> = [
+  { e: emulationFor(iphone12, 'portrait', 'standalone'), standalone: true },
+  { e: emulationFor(iphone12, 'landscape', 'browser', 'shown'), standalone: false },
+];
+/** `body::before`'s band and radii, #app's four paddings, all in px. */
+const FRAME_MEASURE = `(() => {
+  const r = (v) => parseFloat(v) || 0;
+  const cs = getComputedStyle(document.body, '::before');
+  const app = getComputedStyle(document.getElementById('app'));
+  return {
+    band: r(cs.borderTopWidth),
+    corners: { tl: r(cs.borderTopLeftRadius), tr: r(cs.borderTopRightRadius), br: r(cs.borderBottomRightRadius), bl: r(cs.borderBottomLeftRadius) },
+    padding: { top: r(app.paddingTop), right: r(app.paddingRight), bottom: r(app.paddingBottom), left: r(app.paddingLeft) },
+  };
+})()`;
+type FrameMeasure = Readonly<{
+  band: number;
+  corners: Readonly<Record<string, number>>;
+  padding: Readonly<{ top: number; right: number; bottom: number; left: number }>;
+}>;
+
+PROBES.forEach(({ e, standalone }) => {
+  test(`frame probe, ${emulationName(e)}: the corners are ${CORNER_KEYS.map((k) => String(e.corners[k])).join('/')}px and #app clears the band by 5px or stands past the inset`, async ({
+    browser,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'pages', 'about the page, not the origin');
+    const context = await browser.newContext({
+      baseURL: baseUrl('pages'),
+      viewport: { width: e.viewport.width, height: e.viewport.height },
+      screen: { width: e.screen.width, height: e.screen.height },
+      deviceScaleFactor: e.dpr,
+      isMobile: true,
+      hasTouch: true,
+    });
+    await context.addInitScript({ content: seamScript(e) });
+    // Playwright cannot install the page: `matchMedia('(display-mode: standalone)')` is answered
+    // by hand for the standalone case, before the boot asks.
+    if (standalone) {
+      await context.addInitScript({
+        content: `(() => { const real = matchMedia.bind(window); window.matchMedia = (q) => q === '(display-mode: standalone)' ? { matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false } : real(q); })();`,
+      });
+    }
+    const page = await context.newPage();
+    try {
+      await page.goto(pagePath('pages', 'backgammon'));
+      await expect(page.locator('#homeScreen')).toBeVisible();
+      const m = await page.evaluate<FrameMeasure>(FRAME_MEASURE);
+      expect(m.band).toBe(6);
+      expect(m.corners).toEqual(e.corners);
+      // The clearance: the band, the hairline and backgammon's 5px of air (12px), or the inset.
+      // Sideways the theme's own #app rule stands (theme.css: one `--edge` for both sides, the
+      // home indicator added below), as the brief keeps it.
+      const clear = 12;
+      expect(m.padding).toEqual(
+        e.orientation === 'landscape'
+          ? {
+              top: clear,
+              right: Math.max(16, e.insets.left, e.insets.right),
+              bottom: clear + e.insets.bottom,
+              left: Math.max(16, e.insets.left, e.insets.right),
+            }
+          : {
+              top: Math.max(clear, e.insets.top),
+              right: Math.max(clear, e.insets.right),
+              bottom: Math.max(clear, e.insets.bottom),
+              left: Math.max(clear, e.insets.left),
+            },
+      );
     } finally {
       await context.close();
     }

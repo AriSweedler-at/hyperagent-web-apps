@@ -102,50 +102,27 @@ body {
 }
 #app {
   /* The home indicator's band, read through the same `--inset-b` the sideways block declares: the
-     one seam a measurement (tools/shell-emulate.ts) overrides, upright as sideways. */
+     one seam a measurement (tools/shell-emulate.ts) overrides, upright as sideways. The paddings
+     are the shell's (shell.css "the screen frame": the band, the hairline and `--frame-gap`, or the
+     inset where that is more): 12px here, 16 from 900px. */
   --inset-b: env(safe-area-inset-bottom, 0px);
-  padding: 12px 12px calc(12px + var(--inset-b));
 }
-/* The trim (the owner: "green style trim in the background at the border of the window"): a quiet
-   olive band along the viewport's edge with a gold hairline on its inner side, fixed and inert.
-   It paints at z-index 0, under every positioned thing (overlays 50, flyers 60, the toast 100) and
-   away from every control: #app's 12px gutters keep the board and the buttons clear of the band
-   (6px on a phone, 10px from 900px). No pattern: the meander stays the board frame's alone. Its
-   corners follow the screen's (the owner: "the green border hugs the real screen's border"):
-   under viewport-fit=cover the band reaches the glass, and a notched iPhone's rounded corners
-   would clip a square one. */
+/* The trim (the owner: "green style trim in the background at the border of the window"): the
+   shell's screen frame (docs/design/screen-frame.md; page.ts `frame: true`), dressed here: a quiet
+   olive band along the viewport's edge with a gold hairline on its inner side, 6px on a phone and
+   10px from 900px. No pattern: the meander stays the board frame's alone. Its corners follow the
+   screen's (the owner: "the green border hugs the real screen's border"; design §3.6): the boot
+   writes them from the device catalogue and the edge-reach rule. 5px of air, not the shell's 4,
+   keeps the gutters at the 12 and 16 the board's arithmetic counts (ui/board/layout.ts). */
 :root {
-  /* No API exposes the display's corner radius; the safe-area insets track it on a notched iPhone
-     within a few pixels (X/XS/11 Pro: inset 44, radius ~39; 12-14: 47/47; 14 Pro-16: 59/~55;
-     16 Pro: 62/62), so the largest of the top and side insets stands in for it. The bottom inset
-     is the home indicator's band, not a corner, and stays out. 0 keeps square corners on the SE,
-     on a desktop and in an Android tab (the toolbar owns the page's top corners; in fullscreen a
-     cutout reports on its side only). A probe sets the property itself: env() cannot be faked. */
-  --screen-corner: max(
-    env(safe-area-inset-top, 0px),
-    env(safe-area-inset-left, 0px),
-    env(safe-area-inset-right, 0px)
-  );
-}
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  border: 6px solid var(--olive);
-  /* The band's outer edge; the inset hairline follows the padding box's smaller radius. */
-  border-radius: var(--screen-corner);
-  box-shadow: inset 0 0 0 1px var(--gold);
+  --frame-band: 6px;
+  --frame-color: var(--olive);
+  --frame-hairline: var(--gold);
+  --frame-gap: 5px;
 }
 @media (min-width: 900px) {
-  body::before {
-    border-width: 10px;
-  }
-  /* Wider gutters keep the topbar and the controls 6px off the wider band; the desktop's
-     --chrome-h budget (190px) already has the room. */
-  #app {
-    padding: 16px 16px calc(16px + var(--inset-b));
+  :root {
+    --frame-band: 10px;
   }
 }
 /* GFS Didot for the title and the room code only (design §1 Theme); Cardo everywhere else. */

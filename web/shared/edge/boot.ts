@@ -51,7 +51,14 @@ import {
 } from '../ui/shellPaint.ts';
 import { createTimers, createToaster, type Toast } from '../ui/toast.ts';
 import type { CuePlayer, CuePlayerDeps } from './cuePlayer.ts';
-import { byId, listen, type DocumentLike, type PageLike, type StyleReaderLike } from './dom.ts';
+import {
+  byId,
+  listen,
+  type DocumentLike,
+  type Listenable,
+  type PageLike,
+  type StyleReaderLike,
+} from './dom.ts';
 import {
   createAudioCues,
   createWakeLock,
@@ -63,7 +70,7 @@ import {
 import { bindJargon, revealRule } from './glossary.ts';
 import { joinCodeFrom, withoutJoin } from './invite.ts';
 import { LANDSCAPE_PHONE, PORTRAIT_PHONE, watchMedia, type MediaQueryListLike } from './media.ts';
-import { applyScreenCorner, probeAsked, renderProbe } from './screen.ts';
+import { applyFrame, framed, probeAsked, renderProbe, watchFrame } from './screen.ts';
 import { createOrientationLock, type OrientationLock } from './orientation.ts';
 import { reducedMotion } from './motion.ts';
 import { browserNetDeps } from './netDeps.ts';
@@ -272,7 +279,7 @@ export type BootDocumentLike = PageLike &
      */
     documentElement?: Readonly<{
       requestFullscreen?: () => Promise<void>;
-      /** The root's inline style, where the boot writes `--screen-corner` (screen.ts, dom.ts `setRootStyle`). */
+      /** The root's inline style, where the boot writes the frame's `--frame-corner-*` (screen.ts, dom.ts `setRootStyle`). */
       style?: Readonly<{ setProperty: (prop: string, value: string) => void }>;
     }>;
     exitFullscreen?: () => Promise<void>;
@@ -322,10 +329,13 @@ export type BootWindowLike = InviteWindowLike &
       width?: number;
       height?: number;
     }>;
-    /** With `screen` and `getComputedStyle` (dom.ts `StyleReaderLike`: the notch off the theme's `--screen-corner` fallback), the device table's inputs and the probe's readout (screen.ts). */
+    /** With `screen` and `getComputedStyle` (dom.ts `StyleReaderLike`: the insets off shell.css's `--frame-inset-*`), the device catalogue's inputs, the frame's corners and the probe's readout (screen.ts). */
     devicePixelRatio?: number;
     innerWidth?: number;
     innerHeight?: number;
+    /** The frame watcher's two (screen.ts `watchFrame`): `resize`/`orientationchange`, and the visual viewport's `resize` as Safari's bar moves. */
+    addEventListener?: Listenable['addEventListener'];
+    visualViewport?: Listenable | null;
   }>;
 
 /**
@@ -752,12 +762,19 @@ export const bootShell = <
     ...(matchMedia === undefined ? {} : { matchMedia }),
   };
 
-  // The trim's corners (docs/design/backgammon-board.md §3.6): the display's radius from the device
-  // table where the screen and the notch name one, written on the root as `--screen-corner` over
-  // the theme's `env()` fallback; a theme without the property reads as none and gets nothing.
+  // The screen frame's corners (docs/design/screen-frame.md §4; backgammon-board.md §3.6): the
+  // display's radius from the device catalogue at each corner the page provably reaches, 0 at each
+  // a browser bar owns, written on the root as the four `--frame-corner-*` over shell.css's `env()`
+  // fallback, and again as the bar shows or hides, the phone turns or fullscreen comes and goes
+  // (screen.ts `watchFrame`); a page without a frame (gin, briscola) reads nothing of them.
   // `?probe=1` (docs/ARCHITECTURE.md "Documented test hooks") draws the same numbers on the page.
-  const corner = applyScreenCorner(doc, win);
-  if (probeAsked(win.location.search)) renderProbe(doc, win, corner);
+  if (framed(doc)) {
+    applyFrame(doc, win);
+    watchFrame(doc, win, () => {
+      applyFrame(doc, win);
+    });
+  }
+  if (probeAsked(win.location.search)) renderProbe(doc, win);
   cfg.hooks?.render?.(ctx);
   cfg.paint.bindAll(doc, dispatch);
   // A tap on jargon in the About copy or in a rule (docs/design/glossary-links.md) shows that rule.

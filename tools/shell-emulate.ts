@@ -33,7 +33,7 @@
 // (Chromium 153's `Emulation.setSafeAreaInsetsOverride` refuses every parameter shape), so an init
 // script writes the case's insets on `#app` as `--inset-l/-r/-b` (the theme's own variables, its
 // comment naming them the seam a measurement overrides) and the notch on the root as
-// `--screen-corner` (what the theme's fallback would compute), which the boot then reads and
+// the four `--frame-inset-*` (what shell.css's `env()` would read), which the boot then reads and
 // replaces with the class's radius exactly as on a phone. `display-mode` cannot be emulated either
 // and no stylesheet reads it: the mode drives the viewport and the insets alone. Screenshots are at
 // the device's pixel ratio. The pure parts (the arguments, the case list, the explain text, the
@@ -61,7 +61,9 @@ import {
 } from '../web/games/backgammon/src/ui/board/layout.ts';
 import {
   BARS,
+  CORNER_KEYS,
   DEVICES,
+  EVERY_CORNER,
   DISPLAY_MODES,
   ORIENTATIONS,
   deviceById,
@@ -69,7 +71,9 @@ import {
   emulationFor,
   emulationName,
   emulationsOf,
+  cornersOf,
   type Bar,
+  type Corners,
   type DisplayMode,
   type Emulation,
   type Orientation,
@@ -276,9 +280,7 @@ export const explainText = (e: Emulation): string => {
   const d = e.device;
   const match = deviceOf({ screen: e.screen, dpr: e.dpr, notch: e.notch });
   const t = twinOf(e);
-  const reach = (['tl', 'tr', 'br', 'bl'] as const)
-    .map((c) => `${c} ${e.reach[c] ? px(d.corner) : '0'}`)
-    .join('  ');
+  const reach = CORNER_KEYS.map((c) => `${c} ${px(e.corners[c])}`).join('  ');
   const lines = [
     `${emulationName(e)}${d.verified ? '' : '  (UNVERIFIED row)'}`,
     `  ${d.models}`,
@@ -288,7 +290,7 @@ export const explainText = (e: Emulation): string => {
         : ''
     }`,
     `  insets t/r/b/l ${String(e.insets.top)}/${String(e.insets.right)}/${String(e.insets.bottom)}/${String(e.insets.left)}  notch ${String(e.notch)}`,
-    `  match ${match === null ? 'unknown (heuristic)' : match.id}  --screen-corner ${e.notch > 0 ? `${px(e.corner)}px` : 'env() fallback (0)'}  screen corners: ${reach}`,
+    `  match ${match === null ? 'unknown (heuristic)' : match.id}  radius ${e.notch > 0 ? `${px(e.corner)}px` : 'none (square)'}  frame corners: ${reach}`,
     `  layout ${t.layout}${t.scheme === null ? '' : ` (${t.scheme})`}`,
   ];
   if (t.layout === 'landscape') {
@@ -314,14 +316,16 @@ export const explainText = (e: Emulation): string => {
 
 // ---- the page ----------------------------------------------------------------------------------
 
-/** The init script for a case: the insets on `#app`, the notch on the root, before the boot reads either. */
+/** The init script for a case: the four insets on the root (shell.css's `--frame-inset-*`, what the boot reads for the frame) and on `#app` (the theme's `--inset-*` seam), before the boot reads either. */
 export const seamScript = (e: Emulation): string => `(() => {
   const insets = ${JSON.stringify(e.insets)};
-  const notch = ${String(e.notch)};
   const apply = () => {
     const root = document.documentElement;
     if (root === null) return false;
-    if (notch > 0) root.style.setProperty('--screen-corner', notch + 'px');
+    root.style.setProperty('--frame-inset-top', insets.top + 'px');
+    root.style.setProperty('--frame-inset-right', insets.right + 'px');
+    root.style.setProperty('--frame-inset-bottom', insets.bottom + 'px');
+    root.style.setProperty('--frame-inset-left', insets.left + 'px');
     const app = document.getElementById('app');
     if (app === null) return false;
     app.style.setProperty('--inset-l', insets.left + 'px');
@@ -359,9 +363,12 @@ export type Measured = Readonly<{
   board: Box | null;
   frame: Readonly<Record<string, Box | null>>;
   targets: ReadonlyArray<Readonly<{ sel: string; w: number; h: number }>>;
-  /** `body::before`'s computed `border-top-left-radius` in px. */
-  corner: number;
-  rootCorner: string;
+  /** `body::before`'s four computed corner radii in px (the frame's). */
+  corners: Corners;
+  /** The root's four `--frame-corner-*` as written, `/`-joined ('' where the boot wrote none). */
+  rootCorners: string;
+  /** `document.fullscreenElement` is set: the page asked for fullscreen (the Android lock at the table, which Chromium's emulated phone grants), so every corner is the screen's whatever the case's mode. */
+  fullscreen: boolean;
   screen: readonly [number, number];
   dpr: number;
   coarse: boolean;
@@ -385,8 +392,9 @@ const MEASURE = `(() => {
     board: board === null ? null : rect(board),
     frame,
     targets,
-    corner: parseFloat(getComputedStyle(document.body, '::before').borderTopLeftRadius) || 0,
-    rootCorner: getComputedStyle(document.documentElement).getPropertyValue('--screen-corner').trim(),
+    corners: (() => { const cs = getComputedStyle(document.body, '::before'); const r = (v) => parseFloat(v) || 0; return { tl: r(cs.borderTopLeftRadius), tr: r(cs.borderTopRightRadius), br: r(cs.borderBottomRightRadius), bl: r(cs.borderBottomLeftRadius) }; })(),
+    rootCorners: ['tl', 'tr', 'br', 'bl'].map((k) => getComputedStyle(document.documentElement).getPropertyValue('--frame-corner-' + k).trim()).filter((v) => v !== '').join('/'),
+    fullscreen: document.fullscreenElement !== null,
     screen: [screen.width, screen.height],
     dpr: devicePixelRatio,
     coarse: matchMedia('(any-pointer: coarse)').matches,
@@ -401,7 +409,8 @@ export const TOL = 0.5;
 export const CLEARANCE = 11;
 
 /**
- * The invariants over a measurement (pure): the trim's radius is the catalogue's; sideways where
+ * The invariants over a measurement (pure): the frame's four corners are the catalogue's radius
+ * where the reach rule says the corner is the screen's and 0 elsewhere; sideways where
  * the viewport fits, the board's edges sit exactly `boardRoom` from the viewport's; every frame
  * box and the board clear the band by 4px; no document scroll above the floor (and the floor's
  * scroll under it); every tap target 44px on a phone.
@@ -409,10 +418,15 @@ export const CLEARANCE = 11;
 export const judge = (e: Emulation, m: Measured): Verdict => {
   const t = twinOf(e);
   const checks: Check[] = [];
+  // The page in fullscreen (the Android lock, granted by Chromium's emulated phone at the table
+  // while the viewport stays the case's) is the screen's on every corner, whatever the case's mode.
+  const want = m.fullscreen ? cornersOf(e.corner, EVERY_CORNER) : e.corners;
+  const corners = CORNER_KEYS.map((k) => `${k} ${px(m.corners[k])}`).join(' ');
+  const expected = CORNER_KEYS.map((k) => `${k} ${px(want[k])}`).join(' ');
   checks.push({
     name: 'corner',
-    pass: Math.abs(m.corner - e.corner) <= 0.01,
-    detail: `trim ${px(m.corner)}px, catalogue ${px(e.corner)}px (root ${m.rootCorner === '' ? 'none' : m.rootCorner})`,
+    pass: CORNER_KEYS.every((k) => Math.abs(m.corners[k] - want[k]) <= 0.01),
+    detail: `frame ${corners}, catalogue ${expected}${m.fullscreen ? ' (page in fullscreen)' : ''} (root ${m.rootCorners === '' ? 'none' : m.rootCorners})`,
   });
   const board = m.board;
   const below = board === null ? NaN : m.inner.h - (board.y + board.h);
@@ -515,7 +529,7 @@ export const sheetHtml = (cards: ReadonlyArray<Card>, stamp: string): string => 
 <dt>insets t/r/b/l</dt><dd>${String(c.e.insets.top)}/${String(c.e.insets.right)}/${String(c.e.insets.bottom)}/${String(c.e.insets.left)}</dd>
 <dt>board</dt><dd>${b === null ? 'none' : `${px(b.x)},${px(b.y)} ${px(b.w)}x${px(b.h)}`}</dd>
 <dt>gap above / below</dt><dd>${b === null ? '-' : `${px(b.y)} / ${px(below)}`}${c.twin.layout === 'landscape' ? ` (room ${px(c.twin.room.top)} / ${px(c.twin.room.bottom)})` : ''}</dd>
-<dt>corner</dt><dd>${px(c.measured.corner)}px (catalogue ${px(c.e.corner)})</dd>
+<dt>corners tl/tr/br/bl</dt><dd>${CORNER_KEYS.map((k) => px(c.measured.corners[k])).join('/')} (catalogue ${CORNER_KEYS.map((k) => px(c.e.corners[k])).join('/')})</dd>
 <dt>layout</dt><dd>${esc(c.twin.layout)}${c.twin.scheme === null ? '' : ` ${c.twin.scheme}`}, point ${px(c.twin.pointW)} x ${px(c.twin.pointLen)}</dd>
 </dl>
 <ul class="checks">${checks}</ul>

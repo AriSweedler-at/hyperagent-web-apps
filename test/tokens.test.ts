@@ -126,12 +126,23 @@ test('backgammon theme.css redeclares every shared name: its palette never inher
   expect(SHARED.filter((name) => !backgammon.has(name))).toEqual([]);
 });
 
-test('shell.css reads every shell token and declares no custom property of its own', () => {
+test('shell.css reads every shell token and declares no custom property of its own, the screen frame`s `--frame-*` apart (its mechanism, not a palette role: docs/design/screen-frame.md)', () => {
   const css = stripComments(readFileSync(SHELL_CSS, 'utf8'));
   expect(
     SHELL_TOKENS.filter((name) => !css.includes(`var(${name})`)),
     'unread',
   ).toEqual([]);
-  expect(rootBlocks(css), 'no :root').toEqual([]);
-  expect(css.match(/--[\w-]+\s*:/g) ?? [], 'declarations').toEqual([]);
+  const isFrame = (decl: string): boolean => decl.startsWith('--frame-');
+  const declarations = css.match(/--[\w-]+\s*:/g) ?? [];
+  expect(
+    declarations.filter((d) => !isFrame(d)),
+    'declarations',
+  ).toEqual([]);
+  // Its one :root holds the frame's defaults, insets and corner fallbacks and nothing else.
+  rootBlocks(css).forEach((block) => {
+    expect(
+      (block.match(/--[\w-]+\s*:/g) ?? []).filter((d) => !isFrame(d)),
+      'a :root with more than the frame',
+    ).toEqual([]);
+  });
 });

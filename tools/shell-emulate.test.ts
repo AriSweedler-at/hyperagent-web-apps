@@ -4,7 +4,12 @@
 // sheet. The drive itself is proved by e2e/backgammon-devices.spec.ts and `npm run shots`.
 import { describe, expect, test } from 'vitest';
 
-import { deviceById, emulationFor, type Emulation } from '../web/shared/lib/devices.ts';
+import {
+  CORNER_KEYS,
+  deviceById,
+  emulationFor,
+  type Emulation,
+} from '../web/shared/lib/devices.ts';
 import {
   CLEARANCE,
   DESKTOP_SCROLL_MAX_HEIGHT,
@@ -41,8 +46,9 @@ const fitting = (e: Emulation): Measured => {
       { sel: '#point-1', w: t.pointW, h: t.pointLen },
       { sel: '#menuBtn', w: 44, h: 44 },
     ],
-    corner: e.corner,
-    rootCorner: e.corner > 0 ? `${String(e.corner)}px` : '',
+    corners: e.corners,
+    rootCorners: CORNER_KEYS.map((k) => `${String(e.corners[k])}px`).join('/'),
+    fullscreen: false,
     screen: [e.screen.width, e.screen.height],
     dpr: e.dpr,
     coarse: true,
@@ -115,13 +121,16 @@ describe('list and explain', () => {
     expect(text).not.toMatch(/iphone-390x844 .*UNVERIFIED/);
   });
 
-  test('explain, sideways in a tab: the match, the radius over the notch, the rail scheme, the twin numbers, and the other bar state', () => {
+  test('explain, sideways in a tab: the match, the radius over the notch, the frame corners (the bar up takes the top pair), the rail scheme, the twin numbers, and the other bar state', () => {
     const text = explainText(emulationFor(iphone12, 'landscape', 'browser', 'shown'));
     expect(text).toContain('iphone-390x844 landscape browser bar-shown');
     expect(text).toContain('viewport 844x340');
     expect(text).toContain('insets t/r/b/l 0/47/21/47  notch 47');
-    expect(text).toContain('match iphone-390x844  --screen-corner 47.33px');
-    expect(text).toContain('tl 47.33  tr 47.33  br 47.33  bl 47.33');
+    expect(text).toContain('match iphone-390x844  radius 47.33px');
+    expect(text).toContain('tl 0  tr 0  br 47.33  bl 47.33');
+    expect(explainText(emulationFor(iphone12, 'landscape', 'browser', 'hidden'))).toContain(
+      'tl 47.33  tr 47.33  br 47.33  bl 47.33',
+    );
     expect(text).toContain('layout landscape (rail)');
     expect(text).toContain('edge 47  chrome-w 144');
     expect(text).toContain('padding 11/27  chrome-h 66  room above/below 39/27');
@@ -132,7 +141,7 @@ describe('list and explain', () => {
 
   test('explain, upright in a tab and an iPad sideways: no notch means the env() fallback and square corners; the iPad is the desktop template', () => {
     const upright = explainText(emulationFor(iphone12, 'portrait', 'browser', 'hidden'));
-    expect(upright).toContain('--screen-corner env() fallback (0)');
+    expect(upright).toContain('radius none (square)');
     expect(upright).toContain('tl 0  tr 0  br 0  bl 0');
     expect(upright).toContain('layout phone');
     const tablet = explainText(emulationFor(ipad, 'landscape', 'standalone'));
@@ -180,11 +189,27 @@ describe('the verdict', () => {
     expect(v.pass, JSON.stringify(v.checks)).toBe(true);
   });
 
-  test('the corner off by the insets fails; the fallback at 0 where nothing was written passes upright', () => {
+  test('a corner off by the insets fails, as does a round top pair where the bar owns the top; four zeros pass upright in a tab', () => {
     const e = emulationFor(iphone12, 'landscape', 'standalone');
-    const v = judge(e, { ...fitting(e), corner: 47 });
+    const v = judge(e, { ...fitting(e), corners: { tl: 47, tr: 47.33, br: 47.33, bl: 47.33 } });
     expect(v.checks[0]).toMatchObject({ name: 'corner', pass: false });
-    expect(v.checks[0]?.detail).toContain('trim 47px, catalogue 47.33px');
+    expect(v.checks[0]?.detail).toContain(
+      'frame tl 47 tr 47.33 br 47.33 bl 47.33, catalogue tl 47.33 tr 47.33 br 47.33 bl 47.33',
+    );
+    const barUp = emulationFor(iphone12, 'landscape', 'browser', 'shown');
+    expect(
+      judge(barUp, { ...fitting(barUp), corners: { tl: 47.33, tr: 47.33, br: 47.33, bl: 47.33 } })
+        .checks[0],
+    ).toMatchObject({ name: 'corner', pass: false });
+    expect(judge(barUp, fitting(barUp)).checks[0]).toMatchObject({ pass: true });
+    // The page in fullscreen (the Android lock granted at the table): four round corners pass.
+    const locked = judge(barUp, {
+      ...fitting(barUp),
+      fullscreen: true,
+      corners: { tl: 47.33, tr: 47.33, br: 47.33, bl: 47.33 },
+    });
+    expect(locked.checks[0]).toMatchObject({ pass: true });
+    expect(locked.checks[0]?.detail).toContain('(page in fullscreen)');
     const up = emulationFor(iphone12, 'portrait', 'browser', 'shown');
     expect(judge(up, fitting(up)).checks[0]).toMatchObject({ pass: true });
   });
@@ -236,14 +261,14 @@ describe('the verdict', () => {
 });
 
 describe('the seam and the sheet', () => {
-  test('the seam script writes the insets on #app and the notch on the root, and nothing on the root without a notch', () => {
+  test('the seam script writes the four insets on the root (the frame reads them) and on #app (the theme does)', () => {
     const sideways = seamScript(emulationFor(iphone12, 'landscape', 'standalone'));
     expect(sideways).toContain('const insets = {"top":0,"right":47,"bottom":21,"left":47}');
-    expect(sideways).toContain('const notch = 47');
-    expect(sideways).toContain("'--screen-corner'");
+    expect(sideways).toContain("'--frame-inset-top'");
+    expect(sideways).toContain("'--frame-inset-left'");
     expect(sideways).toContain("'--inset-l'");
     expect(seamScript(emulationFor(se, 'portrait', 'browser', 'shown'))).toContain(
-      'const notch = 0',
+      'const insets = {"top":0,"right":0,"bottom":0,"left":0}',
     );
   });
 
@@ -281,7 +306,7 @@ describe('the seam and the sheet', () => {
   test('the summary table: one row per case, a column per check, the count last', () => {
     const e = emulationFor(iphone12, 'landscape', 'browser', 'hidden');
     const ok = judge(e, fitting(e));
-    const bad = judge(e, { ...fitting(e), corner: 0 });
+    const bad = judge(e, { ...fitting(e), corners: { tl: 0, tr: 0, br: 0, bl: 0 } });
     const text = summaryTable([
       ['a', ok],
       ['b', bad],

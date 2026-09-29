@@ -187,12 +187,13 @@ page opens on the Rules tab scrolled to that rule, and the hash stays), `?probe=
 game: a small fixed monospace readout of what the shell read of the screen, web/shared/edge/screen.ts
 `renderProbe`: `innerWidth×innerHeight`, `screen.width×height`, `devicePixelRatio`, `100svh/dvh/lvh`
 and the four safe-area insets in px each measured off a hidden element, `display-mode`, the matched
-catalogue id (or `unknown (heuristic)` where the insets stand in) and the trim's corner radius the
-boot wrote (web/shared/lib/devices.ts) and `#board`'s box; re-read a frame after every tap,
-dismissed by a tap on itself; a look at a real phone, never the fix, which the shell computes by
-itself: docs/design/backgammon-board.md §3.6), the inset seam (backgammon's theme.css: `--inset-l`,
-`--inset-r`, `--inset-b` on `#app` carry the safe-area insets into the geometry, and the boot reads
-the notch off the root's computed `--screen-corner`; tools/shell-emulate.ts `seamScript` and
+catalogue id (or `unknown (heuristic)` where the insets stand in), the display mode, the reach
+rule's inputs and the frame's four corners the boot wrote (web/shared/lib/devices.ts,
+docs/design/screen-frame.md) and `#board`'s box; re-read a frame after every tap and every change
+the frame watcher sees, dismissed by a tap on itself; a look at a real phone, never the fix, which
+the shell computes by itself), the inset seam (shell.css's `--frame-inset-*` on `:root`, which the
+boot reads for the frame; backgammon's theme.css `--inset-l`, `--inset-r`, `--inset-b` on `#app`
+carry the same insets into the geometry; tools/shell-emulate.ts `seamScript` and
 e2e/backgammon-devices.spec.ts write a catalogued phone's values onto those two elements' inline
 styles from an init script, since headless Chromium reads every `env(safe-area-inset-*)` as 0 and no
 CDP call sets them: docs/design/devices.md), `?peer=host:port` (PeerServer override),

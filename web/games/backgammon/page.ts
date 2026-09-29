@@ -613,4 +613,11 @@ const blocks: ShellBlocks = {
   rulesIcon: '',
 };
 
-export const BACKGAMMON_PAGE: ShellPage = { copy, notes, look, blocks, plays: 'landscape' };
+export const BACKGAMMON_PAGE: ShellPage = {
+  copy,
+  notes,
+  look,
+  blocks,
+  plays: 'landscape',
+  frame: true,
+};

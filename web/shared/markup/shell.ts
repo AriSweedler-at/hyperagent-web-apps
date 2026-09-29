@@ -194,11 +194,18 @@ export type ShellPage = Readonly<{
    * boot's paint, never the markup's (web/shared/ui/shellPaint.ts `paintFlip`: the far seat's flip).
    */
   plays?: 'landscape';
+  /**
+   * The game wants the shell's screen frame (docs/design/screen-frame.md; web/shared/styles/shell.css
+   * "the screen frame"): the composed `<body>` carries `data-frame`, which scopes the band, its
+   * corners and #app's clearance to it; the theme dresses it with `--frame-band`, `--frame-color`
+   * and `--frame-hairline` on `:root`. Backgammon's trim; gin, briscola and fidice go without.
+   */
+  frame?: true;
 }>;
 
-/** The body attribute list a page's `plays` spells (page.html `<body{{bodyAttrs}}>`): '' for an upright page. */
-export const bodyAttrsOf = (page: Pick<ShellPage, 'plays'>): string =>
-  page.plays === 'landscape' ? ' data-plays="landscape"' : '';
+/** The body attribute list a page's `plays` and `frame` spell (page.html `<body{{bodyAttrs}}>`): '' for an upright, frameless page. */
+export const bodyAttrsOf = (page: Pick<ShellPage, 'plays' | 'frame'>): string =>
+  `${page.plays === 'landscape' ? ' data-plays="landscape"' : ''}${page.frame === true ? ' data-frame' : ''}`;
 
 /** The turn gate's words: the title, the line under it, and its two buttons (the second ships hidden). */
 export type GateCopy = Readonly<{
