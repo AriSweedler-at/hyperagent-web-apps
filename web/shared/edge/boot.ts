@@ -39,10 +39,10 @@ import {
   type TimerId,
 } from '../ui/shell.ts';
 import type { ShellEffectDeps } from '../ui/shellEffects.ts';
-import { paintGate, type ToastMarks } from '../ui/shellPaint.ts';
+import { GATE_KEEP_ID, paintGate, type ToastMarks } from '../ui/shellPaint.ts';
 import { createTimers, createToaster, type Toast } from '../ui/toast.ts';
 import type { CuePlayer, CuePlayerDeps } from './cuePlayer.ts';
-import type { DocumentLike, PageLike } from './dom.ts';
+import { byId, listen, type DocumentLike, type PageLike } from './dom.ts';
 import {
   createAudioCues,
   createWakeLock,
@@ -271,17 +271,21 @@ export type BootWindowLike = InviteWindowLike &
     webkitAudioContext?: new () => unknown;
     /**
      * `matchMedia('(pointer: coarse)')`: a phone or tablet, where sound starts muted
-     * (sound-fonts.md §12); the two phone predicates of a game that plays sideways
-     * (web/shared/edge/media.ts `watchMedia` on `PORTRAIT_PHONE` and `LANDSCAPE_PHONE`, `cfg.shell`
-     * below); handed on through `BootCtx.matchMedia` for a game's own watcher.
+     * (sound-fonts.md §12); `matchMedia('(hover: none)')`: no pointer that hovers, the half of
+     * `Ctx.canLock` that keeps a touchscreen laptop out; the two phone predicates of a game that
+     * plays sideways (web/shared/edge/media.ts `watchMedia` on `PORTRAIT_PHONE` and
+     * `LANDSCAPE_PHONE`, `cfg.shell` below); handed on through `BootCtx.matchMedia` for a game's
+     * own watcher.
      */
     matchMedia?: (query: string) => MediaQueryListLike;
     /**
-     * `screen.orientation.lock`, where the browser has one: read once at boot as the reducer's
-     * `Ctx.canLock` (shell.ts: the rotation hint's device test). A function on Android's Chromium
-     * family; absent on every iPhone browser, and no `screen` at all (the boot test's window)
-     * says no as well. The DOM lib spells no `lock` (Safari has none, so it is not baseline):
-     * read here as `unknown`, beside the `angle` the lib does spell, so the real `Window` fits.
+     * `screen.orientation.lock`, where the browser has one: read once at boot, with `(hover: none)`
+     * above, as the reducer's `Ctx.canLock` (shell.ts: the rotation hint's device test). A function
+     * on every Chromium, Android's and the desktop's alike (where it rejects), so the function
+     * alone does not say "a phone"; absent on every iPhone browser, and no `screen` at all (the
+     * boot test's window) says no as well. The DOM lib spells no `lock` (Safari has none, so it is
+     * not baseline): read here as `unknown`, beside the `angle` the lib does spell, so the real
+     * `Window` fits.
      */
     screen?: Readonly<{ orientation?: Readonly<{ angle?: number; lock?: unknown }> }>;
   }>;
@@ -560,8 +564,14 @@ export const bootShell = <
   };
 
   // The device can lock its rotation (shell.ts `Ctx.canLock`, the rotation hint's test): a fact
-  // about the browser, read once so every step's ctx agrees.
-  const canLock = typeof win.screen?.orientation?.lock === 'function';
+  // about the browser, read once so every step's ctx agrees. The function alone is desktop
+  // Chromium's too (where it rejects), and `LANDSCAPE_PHONE`'s `any-pointer: coarse` takes a
+  // touchscreen laptop in a short window for a phone, so the device must also have no pointer
+  // that hovers: a laptop's trackpad does, a phone's finger does not, and it is never told
+  // Android's gesture. A window without `matchMedia` cannot say, and says no.
+  const canLock =
+    typeof win.screen?.orientation?.lock === 'function' &&
+    win.matchMedia?.('(hover: none)').matches === true;
   const dispatch = (intent: Intent<G>): void => {
     const step = cfg.reducer.reduce(app, intent, {
       rng,
@@ -691,7 +701,10 @@ export const bootShell = <
   });
   cfg.hooks?.bind?.(ctx);
   // A game that plays sideways: the phone's orientation into the App, now and on every turn of
-  // the phone (media.ts `watchMedia` reports nothing on a page without `matchMedia`).
+  // the phone (media.ts `watchMedia` reports nothing on a page without `matchMedia`), and the
+  // gate's one live control, "Play upright" (shellPaint.ts `GATE_KEEP_ID`), so a game's render.ts
+  // binds nothing for the gate; `byId`, not `listenId`, because a sideways page without the gate
+  // markup (a story, a test page) has no button to bind.
   if (sideways) {
     watchMedia(ctx, PORTRAIT_PHONE, (portrait) => {
       dispatch({ type: 'viewport/portrait', portrait });
@@ -699,6 +712,12 @@ export const bootShell = <
     watchMedia(ctx, LANDSCAPE_PHONE, (landscape) => {
       dispatch({ type: 'viewport/landscape', landscape });
     });
+    const keep = byId(doc, GATE_KEEP_ID);
+    if (keep !== null) {
+      listen(keep, 'click', () => {
+        dispatch({ type: 'gate/keep' });
+      });
+    }
   }
   cfg.paint.paintSound(doc, fx.enabled());
   // Browsers only let audio start after a user gesture: warm the context on the first tap, and

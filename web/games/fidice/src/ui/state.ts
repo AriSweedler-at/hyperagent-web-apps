@@ -346,7 +346,7 @@ export const TABLE_FULL_TOAST = 'Table is full.';
 /** What `initHome` reads from storage, in one snapshot (`readHome`): the shell's keys and fidice's (`Home`). */
 export type HomeSnapshot = SharedHomeSnapshot<Fidice>;
 
-/** The table's half of `Intent`, fidice's own after the shell's 45 (web/shared/ui/shell.ts `ShellIntent`). */
+/** The table's half of `Intent`, fidice's own after the shell's 48 (web/shared/ui/shell.ts `ShellIntent`). */
 export type TableIntent =
   /** `act(action)`: every role (the hook, and the controls below resolve to it). */
   | Readonly<{ type: 'act'; action: Action }>
@@ -397,7 +397,7 @@ export type TableIntent =
   | Readonly<{ type: 'bot/step' }>
   | Readonly<{ type: 'autoNext' }>;
 
-/** Every table intent's `type`, for the disjointness proof against the shell's 45 (state.test.ts). */
+/** Every table intent's `type`, for the disjointness proof against the shell's 48 (state.test.ts). */
 export const TABLE_INTENT_TYPES = [
   'act',
   'bid/place',

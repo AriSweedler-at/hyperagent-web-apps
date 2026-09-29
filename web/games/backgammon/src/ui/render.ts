@@ -649,7 +649,8 @@ const paintOverlays = (doc: DocumentLike, app: App): void => {
   setChecked(toggle, app.table.curtainMode === 'always');
   setAttr(toggle, 'data-next', app.table.curtainMode === 'always' ? 'never' : 'always');
   // The turn gate is the shell's paint (web/shared/ui/shellPaint.ts `paintGate`, called by the
-  // boot after this one from shell.ts `gateOpen`; docs/design/backgammon-landscape.md §5D).
+  // boot after this one from shell.ts `gateOpen`; docs/design/backgammon-landscape.md §5D), and its
+  // "Play upright" the boot's binding (web/shared/edge/boot.ts): `bindAll` below binds none of it.
 };
 
 // ---- whose turn (the owner, 2026-09-25) -----------------------------------------------------------
@@ -843,9 +844,6 @@ export const bindTable = (doc: PageLike, dispatch: Dispatch): void => {
       ['handoffBtn', { type: 'handoff/click' }],
       ['rulesBtnGame', { type: 'rules/toggle' }],
       ['historyBtn', { type: 'history/toggle' }],
-      // The turn gate's "Play upright"; "Go sideways" ships hidden until the Android lock PR
-      // shows and binds it.
-      ['turnGateKeepBtn', { type: 'gate/keep' }],
     ],
     { skipDisabled: true },
   );

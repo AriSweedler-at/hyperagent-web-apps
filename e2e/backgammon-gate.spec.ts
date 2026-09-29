@@ -1,5 +1,6 @@
 // The turn gate on a phone held upright at the table (docs/design/backgammon-landscape.md §5D;
-// ui/state.ts `gateOpen`, render.ts `paintGate`), on the served page. Under the touch context
+// web/shared/ui/shell.ts `gateOpen`, web/shared/ui/shellPaint.ts `paintGate`, painted and bound by
+// web/shared/edge/boot.ts), on the served page. Under the touch context
 // (`phone`: `(any-pointer: coarse)` holds) at 390x844, Start brings the first curtain up and the
 // gate over it, `#app` and the curtain `inert` (a tap on the curtain's button never lands); turned
 // sideways (844x390) the gate goes and the curtain is where it was; upright again it is back;
@@ -62,8 +63,18 @@ const toastUp = async (page: Page, text: string): Promise<void> => {
   await expect(page.locator('#toast')).toHaveText(text);
   await expect(page.locator('#toast')).toHaveClass(/\bshow\b/);
 };
+/** `#toast` is down, waited for: the hint's 8 s may still be running. */
 const toastDown = async (page: Page): Promise<void> => {
   await expect(page.locator('#toast')).not.toHaveClass(/\bshow\b/);
+};
+/**
+ * `#toast` stays down, looked at once (1 s), where "nothing more" is meant: the hint's effect runs
+ * inside the dispatch the tap or the move triggered, before the repaint the assertion just
+ * resolved waited for, so a hint re-fired there is up already and fails here; `toastDown`'s
+ * retried 10 s would let the 8 s hint expire into a pass.
+ */
+const toastStill = async (page: Page): Promise<void> => {
+  await expect(page.locator('#toast')).not.toHaveClass(/\bshow\b/, { timeout: 1000 });
 };
 
 test('a phone upright at the table: the gate over the curtain, inert beneath; sideways it goes; upright it is back; Play upright holds through the next curtain; Leave and Start ask again', async ({
@@ -166,7 +177,8 @@ test('a phone whose browser can lock its rotation (Android: `screen.orientation.
   await withLock(page, true);
   await bgStartLocal(page, pagePath(project, 'backgammon'), PHONE);
   await gateUp(page);
-  await toastDown(page);
+  // Not under the gate: the table came up upright.
+  await toastStill(page);
   // The turn: the gate goes and the hint comes, before any move.
   await page.setViewportSize(PHONE_LANDSCAPE);
   await gateDown(page);
@@ -175,10 +187,12 @@ test('a phone whose browser can lock its rotation (Android: `screen.orientation.
   await toastDown(page);
   await page.locator('#curtainBtn').tap();
   await expect(page.locator('#curtainOverlay')).toBeHidden();
+  await toastStill(page);
   await bgRoll(page);
+  await toastStill(page);
   await bgPlayTurn(page);
   await expect(page.locator('#curtainOverlay')).toBeVisible();
-  await toastDown(page);
+  await toastStill(page);
   // Leave, then Start, still sideways: the next table asks once more, at its first paint.
   await page.locator('#curtainBtn').tap();
   await expect(page.locator('#curtainOverlay')).toBeHidden();

@@ -471,11 +471,11 @@ describe('paintGate (docs/design/backgammon-landscape.md §5D; the shell`s, for 
     const keep = fakeEl('turnGateKeepBtn', { classes: ['btn'] });
     return fakePage(
       [app, curtain, rules, gate, keep, fakeEl('toast')],
-      fakeEl('body', { queries: { ':scope > .overlay': [curtain, gate, rules] } }),
+      fakeEl('body', { queries: { '.overlay': [curtain, gate, rules] } }),
     );
   };
 
-  test('open: the gate shows, #app and every other overlay body child are inert (never the gate, never the toast), focus on Play upright; a repaint leaves focus; closed: all of it gone and the button let go', () => {
+  test('open: the gate shows, #app and every other overlay are inert (never the gate, never the toast), focus on Play upright; a repaint leaves focus; closed: all of it gone and the button let go', () => {
     const p = gatedPage();
     paintGate(p.doc, false);
     expect(p.get('turnGate').hidden()).toBe(true);
@@ -509,10 +509,7 @@ describe('paintGate (docs/design/backgammon-landscape.md §5D; the shell`s, for 
   test('a page without the gate (gin`s, briscola`s) is left alone; one with the gate but no #app or button still paints what it has', () => {
     const app = fakeEl('app');
     const rules = fakeEl('rulesOverlay', { classes: ['overlay', 'hidden'] });
-    const plain = fakePage(
-      [app, rules],
-      fakeEl('body', { queries: { ':scope > .overlay': [rules] } }),
-    );
+    const plain = fakePage([app, rules], fakeEl('body', { queries: { '.overlay': [rules] } }));
     paintGate(plain.doc, true);
     expect(plain.get('app').attr('inert')).toBeNull();
     expect(plain.get('rulesOverlay').attr('inert')).toBeNull();
@@ -520,7 +517,7 @@ describe('paintGate (docs/design/backgammon-landscape.md §5D; the shell`s, for 
     const gate = fakeEl('turnGate', { classes: ['overlay', 'hidden'] });
     const bare = fakePage(
       [gate, rules],
-      fakeEl('body', { queries: { ':scope > .overlay': [gate, rules] } }),
+      fakeEl('body', { queries: { '.overlay': [gate, rules] } }),
     );
     paintGate(bare.doc, true);
     expect(bare.get('turnGate').hidden()).toBe(false);

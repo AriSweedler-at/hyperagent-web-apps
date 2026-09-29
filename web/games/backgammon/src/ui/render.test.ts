@@ -801,7 +801,6 @@ describe('bindAll', () => {
     p.get('rulesBtnGame').fire('click');
     p.get('historyBtn').fire('click');
     p.get('chipCancelBtn').fire('click');
-    p.get('turnGateKeepBtn').fire('click');
     expect(intents.map((i) => i.type)).toEqual([
       'undo/click',
       'roll/click',
@@ -820,8 +819,9 @@ describe('bindAll', () => {
       'rules/toggle',
       'history/toggle',
       'chip/cancel',
-      'gate/keep',
     ]);
+    // The gate's "Play upright" is the boot's binding (web/shared/edge/boot.ts), not this game's.
+    expect(p.get('turnGateKeepBtn').listenerTypes()).toEqual([]);
   });
 
   test('the tray, the menu rows, the curtain toggle and the sheet backdrops', () => {

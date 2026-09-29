@@ -638,11 +638,13 @@ export type Ctx = Readonly<{
   /** `prefers-reduced-motion: reduce` on this device (web/shared/edge/motion.ts), so a reducer's timers and the painter's CSS agree; absent in tests and stories that do not care. */
   reducedMotion?: boolean;
   /**
-   * `screen.orientation.lock` is a function on this device (web/shared/edge/boot.ts reads it once,
-   * false without a `screen`): Android's Chromium family, where Quick Settings' Auto-rotate locks
-   * the phone as it is held; absent on every iPhone browser, whose one switch, Portrait
-   * Orientation Lock, would snap the page upright. What the rotation hint (`rotationHint`) asks;
-   * absent in tests and stories that do not care.
+   * `screen.orientation.lock` is a function on this device and no pointer of it hovers
+   * (`(hover: none)`; web/shared/edge/boot.ts reads both once, false without a `screen` or a
+   * `matchMedia`): Android's Chromium family, where Quick Settings' Auto-rotate locks the phone as
+   * it is held. Absent on every iPhone browser, whose one switch, Portrait Orientation Lock, would
+   * snap the page upright; false on a touchscreen laptop, whose Chromium has the function (it
+   * rejects) but whose trackpad hovers. What the rotation hint (`rotationHint`) asks; absent in
+   * tests and stories that do not care.
    */
   canLock?: boolean;
 }>;
@@ -998,14 +1000,18 @@ export const gateOpen = <G extends ShellTypes>(s: GateState<G>, cfg: GateConfig<
  * The rotation hint (the owner, 2026-09-28: "can we give a warning to lock the phone's rotation
  * in landscape mode if we haven't already?", "also important for solo play"): toasted once per
  * table, in every role, the first time the shell paints the table with the phone sideways on a
- * device that can lock its rotation (`Ctx.canLock`: `screen.orientation.lock` is a function,
- * Android's Chromium family, where Quick Settings' Auto-rotate locks the phone as it is held; an
- * iPhone has only Portrait Orientation Lock, which would snap the page upright, so it never sees
- * the hint). The copy is Android's gesture; `ROTATION_HINT_MS` outlasts the default toast, since
- * the player reaches for Quick Settings. No markup of its own: the shell's `toast`.
+ * device that can lock its rotation (`Ctx.canLock`: `screen.orientation.lock` is a function and
+ * no pointer hovers, Android's Chromium family, where Quick Settings' Auto-rotate locks the phone
+ * as it is held; an iPhone has only Portrait Orientation Lock, which would snap the page upright,
+ * so it never sees the hint; a touchscreen laptop's trackpad hovers, so nor does it). The copy is
+ * Android's gesture and names the state to reach, Auto-rotate off, not the tile's tap, so a
+ * player who locked the phone sideways already is not told to undo it; `ROTATION_HINT_MS` outlasts
+ * the default toast, since the player reaches for Quick Settings, and a shorter toast over it
+ * (the path toast, online) gives it back its remainder (toast.ts `createToaster`). No markup of
+ * its own: the shell's `toast`.
  */
 export const ROTATION_HINT_MSG =
-  "Lock the phone's rotation so the board stays sideways: swipe down, tap Auto-rotate.";
+  "Lock the phone's rotation so the board stays sideways: swipe down and make sure Auto-rotate is off.";
 export const ROTATION_HINT_MS = 8000;
 
 /**
