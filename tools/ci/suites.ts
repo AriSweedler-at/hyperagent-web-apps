@@ -712,6 +712,8 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
       'test/ratchet.test.ts',
       // The games.sweedler.com Worker is how the site is served; its row is the one infra/ row.
       'infra/games-proxy/worker.test.ts',
+      // UI Sandbox (docs/design/ui-sandbox.md): a tool page, not a game; its pure modules' tests.
+      'web/games/ui-sandbox/**/*.test.ts',
     ],
     // The dist guards read the build output (asset URLs, both origins, the class contract, landing
     // parity, the backgammon grid); each skips with a note when dist/ is absent.
@@ -725,8 +727,12 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
         'infra/games-proxy/worker.ts': { lines: 95, functions: 95, statements: 95, branches: 93 },
       },
     },
-    // Every page on both origins, and the six computed-style goldens (two viewports per game).
-    e2e: { files: ['**/smoke.spec.ts', '**/computed-styles.spec.ts'], otherTags: [] },
+    // Every page on both origins, the computed-style goldens (two viewports per game), and UI
+    // Sandbox's device sweep (the frame's corners and the safe-area map on every catalogued phone).
+    e2e: {
+      files: ['**/smoke.spec.ts', '**/computed-styles.spec.ts', '**/ui-sandbox.spec.ts'],
+      otherTags: [],
+    },
   },
   harness: {
     unit: [
@@ -959,7 +965,7 @@ export const RULES: ReadonlyArray<Rule> = [
     why: 'the transport contract',
   },
   {
-    globs: ['web/index.html', 'web/games/sheshbesh/**'],
+    globs: ['web/index.html', 'web/games/sheshbesh/**', 'web/games/ui-sandbox/**'],
     runs: ['site', 'e2e-site'],
     why: 'the landing page and the alias stub: dist parity and the smoke',
   },
@@ -969,7 +975,7 @@ export const RULES: ReadonlyArray<Rule> = [
     why: 'the site guards themselves',
   },
   {
-    globs: ['e2e/smoke.spec.ts', 'e2e/computed-styles.spec.ts'],
+    globs: ['e2e/smoke.spec.ts', 'e2e/computed-styles.spec.ts', 'e2e/ui-sandbox.spec.ts'],
     runs: ['e2e-site'],
     why: 'the site specs themselves',
   },

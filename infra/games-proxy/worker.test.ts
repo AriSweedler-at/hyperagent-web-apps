@@ -8,6 +8,7 @@ import {
   GAMES,
   LANDING_HREFS,
   SHELL_GAMES,
+  TOOL_NAMES,
 } from '../../tools/games.ts';
 import { JOIN_PARAM as INVITE_PARAM } from '../../web/shared/lib/invite.ts';
 import { ROOM_CODE } from '../../web/shared/lib/roomCode.ts';
@@ -663,7 +664,11 @@ describe('shortenLandingLinks: the committed landing page (web/index.html)', () 
   test('the cards then point at the short URLs in registry order; the icons and the source link are untouched', () => {
     const before = hrefsIn(landing);
     const after = hrefsIn(shortenLandingLinks(landing));
-    expect(after.filter((href) => href.startsWith('/'))).toEqual(GAMES.map((game) => `/${game}/`));
+    // The cards, then the landing page's tools line (tools/games.ts TOOLS: UI Sandbox).
+    expect(after.filter((href) => href.startsWith('/'))).toEqual([
+      ...GAMES.map((game) => `/${game}/`),
+      ...TOOL_NAMES.map((tool) => `/${tool}/`),
+    ]);
     expect(after.filter((href) => !href.startsWith('/'))).toEqual(
       before.filter((href) => !href.startsWith('games/')),
     );

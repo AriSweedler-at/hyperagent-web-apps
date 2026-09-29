@@ -21,8 +21,23 @@ export type { Game };
  */
 export type GameSuite = 'gin' | 'fidice' | 'backgammon' | 'briscola';
 
-/** The pages smoke opens: every game and the landing page. */
-export type PageName = Game | 'landing';
+/**
+ * The tool pages (docs/design/ui-sandbox.md): built and smoked like a game (a folder under
+ * web/games/, a `<title>`, a documented hook), served at games.sweedler.com/<name>/ by the Worker's
+ * generic mapping, but no game: no room code, no suite of their own (the `site` suite claims their
+ * tests and spec), no landing card (the landing page lists them on its tools line, `a.tool`), no
+ * dist-guard rows about bundles or splashes. UI Sandbox is the first: the shell's screen frame,
+ * safe-area map and orientation gate on a page with no engine.
+ */
+export type ToolName = 'ui-sandbox';
+export type ToolSpec = Readonly<{ title: string; hook: string }>;
+export const TOOLS: Readonly<Record<ToolName, ToolSpec>> = {
+  'ui-sandbox': { title: 'UI Sandbox', hook: 'window.__uiSandbox' },
+};
+export const TOOL_NAMES: ReadonlyArray<ToolName> = Object.keys(TOOLS) as ReadonlyArray<ToolName>;
+
+/** The pages smoke opens: every game, every tool page and the landing page. */
+export type PageName = Game | ToolName | 'landing';
 
 /** One game's row: every fact about it the harness reads. */
 export type GameSpec = Readonly<{
@@ -322,13 +337,19 @@ export const LEGACY_GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice'];
 export const PAGE_TITLES: Readonly<Record<PageName, string>> = {
   landing: "Ari's web apps",
   ...perGame((spec) => spec.title),
+  ...(Object.fromEntries(TOOL_NAMES.map((t) => [t, TOOLS[t].title])) as Record<ToolName, string>),
 };
 
 /** The documented test hook each page exposes once its boot finished (docs/ARCHITECTURE.md "Documented test hooks"). */
-export const HOOKS: Readonly<Record<Game, string>> = perGame((spec) => spec.hook);
+export const HOOKS: Readonly<Record<Game | ToolName, string>> = {
+  ...perGame((spec) => spec.hook),
+  ...(Object.fromEntries(TOOL_NAMES.map((t) => [t, TOOLS[t].hook])) as Record<ToolName, string>),
+};
 
 /** The landing page's card links, relative to the site root, in GAMES order. */
 export const LANDING_HREFS: ReadonlyArray<string> = GAMES.map((game) => `games/${game}/`);
+/** The landing page's tools line, `a.tool` links after the cards, in TOOL_NAMES order. */
+export const LANDING_TOOL_HREFS: ReadonlyArray<string> = TOOL_NAMES.map((t) => `games/${t}/`);
 
 /**
  * A game's second URL name -> the game folder it stands for: `/sheshbesh/` is the backgammon page.

@@ -1,0 +1,508 @@
+/* UI Sandbox (docs/design/ui-sandbox.md): a plain tool page on the shell's tokens, base and frame.
+   The frame's three tokens are set by main.ts on the root from the settings; this file draws the
+   screens, the layout examples' boxes and the two notch-aware examples off the safe-area map's
+   custom properties (`--safe-free-*`, `--safe-<edge>-*`, written by main.ts on the root). */
+:root {
+  --frame-band: 6px;
+  --frame-color: #7a8a3c;
+  --frame-hairline: #e0b35a;
+  --frame-gap: 4px;
+  --ink: #e8e6e1;
+  --muted: #9a9891;
+  --panel: #181b22;
+  --line: #2a2f3a;
+  --green: #4f9d5a;
+  --green-soft: rgba(79, 157, 90, 0.35);
+  --red: #b3261e;
+  --box: #23405e;
+  --box-2: #5e3a23;
+  --box-3: #3d2a5e;
+}
+html,
+body {
+  margin: 0;
+  background: #0f1115;
+  color: var(--ink);
+  font:
+    14px/1.4 system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    sans-serif;
+}
+body {
+  min-height: 100dvh;
+}
+#app {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+h2 {
+  font-size: 1rem;
+  margin: 14px 0 4px;
+}
+.note {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 4px 0;
+}
+code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.85em;
+}
+.btn {
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 14px;
+  min-height: 44px;
+}
+.btn.small {
+  min-height: 32px;
+  padding: 4px 10px;
+}
+.btn.ghost {
+  background: transparent;
+}
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ---- the menu ---- */
+#menu {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+}
+#menu .tab {
+  font: inherit;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  min-height: 44px;
+}
+#menu .tab[aria-pressed='true'] {
+  color: var(--ink);
+  border-color: var(--frame-color);
+}
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.screen[hidden] {
+  display: none;
+}
+body[data-screen='preview'] #menu {
+  display: none;
+}
+
+/* ---- info ---- */
+#readout {
+  margin: 6px 0;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font:
+    11px/1.4 ui-monospace,
+    Menlo,
+    monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+#mapSvg {
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  display: block;
+  background: #000;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+#mapSvg .glass {
+  fill: #14171d;
+  stroke: #444;
+  stroke-width: 0.6;
+}
+#mapSvg .arc {
+  fill: #2a2f3a;
+}
+#mapSvg .cut {
+  fill: url(#hatch);
+  stroke: #999;
+  stroke-width: 0.4;
+}
+#mapSvg .seg {
+  fill: var(--green-soft);
+  stroke: var(--green);
+  stroke-width: 0.5;
+}
+#mapSvg text {
+  fill: var(--ink);
+  font:
+    3.2px ui-monospace,
+    Menlo,
+    monospace;
+}
+#mapSvg .hatch-line {
+  stroke: #888;
+  stroke-width: 0.5;
+}
+.vars {
+  border-collapse: collapse;
+  font:
+    11px/1.5 ui-monospace,
+    Menlo,
+    monospace;
+  margin: 8px 0 16px;
+}
+.vars td {
+  padding: 0 10px 0 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+/* ---- settings ---- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0;
+  max-width: 480px;
+}
+.field.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.field select,
+.field input[type='color'] {
+  font: inherit;
+  min-height: 44px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 8px;
+}
+.field input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+}
+.field input[type='range'] {
+  width: 100%;
+}
+
+/* ---- preview ---- */
+#previewScreen {
+  position: relative;
+}
+#stage {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  gap: 2px;
+  position: relative;
+}
+#stage[data-example='top'],
+#stage[data-example='strips'],
+#stage[data-example='board'] {
+  flex-direction: column;
+}
+#stage .board-row {
+  flex: 1;
+  display: flex;
+  gap: 2px;
+  min-height: 0;
+}
+.box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--box);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-sizing: border-box;
+  color: var(--ink);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.box.fill {
+  flex: 1;
+}
+.box.bar.v {
+  flex: 0 0 44px;
+  background: var(--box-2);
+  writing-mode: vertical-rl;
+}
+.box.bar.h {
+  flex: 0 0 22px;
+  background: var(--box-3);
+  font-size: 11px;
+}
+.box-name {
+  font-weight: 600;
+  opacity: 0.85;
+}
+.box-size {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  font:
+    10px/1 ui-monospace,
+    Menlo,
+    monospace;
+  color: rgba(255, 255, 255, 0.8);
+  writing-mode: horizontal-tb;
+}
+.grid13 {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: 2px;
+  min-height: 0;
+}
+.grid13 .col {
+  display: block;
+  background: repeating-linear-gradient(180deg, #3a5a3a 0 50%, #5a4a2a 50% 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.grid13 .col.mid {
+  background: #333;
+}
+.gutters {
+  position: relative;
+  flex: 1;
+  display: flex;
+  padding: 0 max(var(--frame-inset-left), var(--frame-inset-right));
+  background: repeating-linear-gradient(45deg, #222 0 6px, #2c2c2c 6px 12px);
+}
+.sq-btn {
+  font: inherit;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--frame-hairline, #e0b35a);
+  background: var(--green);
+  color: #fff;
+  display: block;
+}
+/* (g) the rail on the free side: at the glass inside the band, between the arcs; hidden where the map names no free side. */
+.edge-rail {
+  position: fixed;
+  top: var(--safe-free-from);
+  height: calc(var(--safe-free-to) - var(--safe-free-from));
+  width: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+  background: rgba(79, 157, 90, 0.18);
+  outline: 1px dashed var(--green);
+  z-index: 5;
+}
+:root[data-free-side='right'] .edge-rail {
+  right: calc(var(--frame-band) + var(--frame-hairline-w));
+}
+:root[data-free-side='left'] .edge-rail {
+  left: calc(var(--frame-band) + var(--frame-hairline-w));
+}
+:root[data-free-side='none'] .edge-rail {
+  display: none;
+}
+/* (h) the two ears on the cut's side, each a segment of that edge. */
+.ear {
+  position: fixed;
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(79, 157, 90, 0.18);
+  outline: 1px dashed var(--green);
+  z-index: 5;
+}
+:root[data-notch-side='left'] .ear {
+  left: calc(var(--frame-band) + var(--frame-hairline-w));
+}
+:root[data-notch-side='right'] .ear {
+  right: calc(var(--frame-band) + var(--frame-hairline-w));
+}
+:root[data-notch-side='left'] .ear-1 {
+  top: var(--safe-left-from);
+  height: calc(var(--safe-left-to) - var(--safe-left-from));
+}
+:root[data-notch-side='left'] .ear-2 {
+  top: var(--safe-left-2-from);
+  height: calc(var(--safe-left-2-to) - var(--safe-left-2-from));
+}
+:root[data-notch-side='right'] .ear-1 {
+  top: var(--safe-right-from);
+  height: calc(var(--safe-right-to) - var(--safe-right-from));
+}
+:root[data-notch-side='right'] .ear-2 {
+  top: var(--safe-right-2-from);
+  height: calc(var(--safe-right-2-to) - var(--safe-right-2-from));
+}
+:root:not([data-notch-side='left']):not([data-notch-side='right']) .ear,
+:root[data-notch-side='left'][data-ears='0'] .ear,
+:root[data-notch-side='right'][data-ears='0'] .ear,
+:root[data-ears='1'] .ear-2 {
+  display: none;
+}
+.edge-note {
+  position: absolute;
+  left: 8px;
+  bottom: 44px;
+  margin: 0;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.7);
+  color: var(--ink);
+  font-size: 11px;
+  border-radius: 6px;
+  max-width: 70%;
+  z-index: 6;
+}
+.edge-note:empty {
+  display: none;
+}
+#previewBar {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  z-index: 7;
+}
+#previewBar select {
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  background: rgba(24, 27, 34, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 32px;
+  max-width: 55vw;
+}
+#report {
+  position: absolute;
+  left: 4px;
+  bottom: 44px;
+  margin: 0;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 6px;
+  font:
+    11px/1.4 ui-monospace,
+    Menlo,
+    monospace;
+  white-space: pre-wrap;
+  max-width: 80%;
+  z-index: 7;
+}
+#report[hidden] {
+  display: none;
+}
+
+/* ---- the gate and the toast ---- */
+.gate {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.82);
+  padding: 20px;
+}
+.gate[hidden] {
+  display: none;
+}
+.gate-card {
+  max-width: 360px;
+  text-align: center;
+}
+.gate-glyph {
+  width: 42px;
+  height: 70px;
+  margin: 0 auto 14px;
+  border: 2px solid var(--frame-color);
+  border-radius: 8px;
+  animation: sandbox-turn 1.6s ease-in-out infinite alternate;
+}
+body[data-gate='upright'] .gate-glyph {
+  animation-direction: alternate-reverse;
+}
+@keyframes sandbox-turn {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(90deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gate-glyph {
+    animation: none;
+  }
+}
+.gate-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 12px;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, var(--frame-inset-bottom));
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  z-index: 100;
+}
+.toast[hidden] {
+  display: none;
+}
+.ruler {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.ruler[data-ruler='svh'] {
+  height: 100svh;
+}
+.ruler[data-ruler='dvh'] {
+  height: 100dvh;
+}
+.ruler[data-ruler='lvh'] {
+  height: 100lvh;
+}
+.ruler[data-ruler='vw'] {
+  width: 100vw;
+}
+/* The half turn, as shell.css turns a game's body for the far seat. */
+body[data-flip='1'] #app {
+  transform: rotate(180deg);
+}

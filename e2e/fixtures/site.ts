@@ -17,7 +17,7 @@
 import { accessSync, constants } from 'node:fs';
 import { delimiter, join } from 'node:path';
 
-import { GAMES, PAGE_TITLES, type PageName } from '../../tools/games.ts';
+import { GAMES, PAGE_TITLES, TOOL_NAMES, type PageName } from '../../tools/games.ts';
 
 export type Project = 'pages' | 'proxy';
 export type { PageName };
@@ -121,6 +121,8 @@ export const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   // The sessions' silence watch is a timer, the same on either origin.
   '**/shell-liveness.spec.ts',
   '**/shell-local.spec.ts',
+  // UI Sandbox's device sweep: about the page's frame and map, not the origin.
+  '**/ui-sandbox.spec.ts',
 ];
 
 /** The specs a project leaves out: the page-only ones on every project but `pages`. */
@@ -233,8 +235,8 @@ export const LEGACY_ALIASES: Readonly<Record<string, string>> = {
   'legacy/shared/ice.js': 'legacy/shared/ice.js',
 };
 
-/** Every page smoke opens: the landing page, then the games as tools/games.ts lists them. */
-export const PAGES: ReadonlyArray<PageName> = ['landing', ...GAMES];
+/** Every page smoke opens: the landing page, then the games as tools/games.ts lists them, then the tool pages. */
+export const PAGES: ReadonlyArray<PageName> = ['landing', ...GAMES, ...TOOL_NAMES];
 
 export const EXPECTED_TITLES: Readonly<Record<PageName, string>> = PAGE_TITLES;
 

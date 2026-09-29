@@ -202,6 +202,8 @@ describe('the games registry', () => {
       fidice: "Fidice — one-cup liar's dice",
       backgammon: 'Sheshbesh — backgammon',
       briscola: 'Briscola — cards',
+      // The tool page (TOOLS): smoked like a game, no game.
+      'ui-sandbox': 'UI Sandbox',
     });
   });
 
@@ -211,6 +213,7 @@ describe('the games registry', () => {
       fidice: 'window.__fidice',
       backgammon: 'window.__backgammon',
       briscola: 'window.__briscola',
+      'ui-sandbox': 'window.__uiSandbox',
     });
   });
 

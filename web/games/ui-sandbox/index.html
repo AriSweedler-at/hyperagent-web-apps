@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>UI Sandbox</title>
+    <meta
+      name="description"
+      content="UI Sandbox: what your phone tells a page about its screen, and how the shell's frame and safe-area map answer."
+    />
+    <link rel="icon" href="../../shared/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="../../shared/favicon.ico" />
+    <meta name="theme-color" content="#1b1f26" />
+    <link rel="stylesheet" href="../../shared/styles/tokens.css" />
+    <link rel="stylesheet" href="../../shared/styles/base.css" />
+    <link rel="stylesheet" href="../../shared/styles/shell.css" />
+    <link rel="stylesheet" href="./theme.css" />
+  </head>
+  <body data-frame>
+    <div id="app">
+      <!-- The menu: the information panel, the settings and the preview, one screen at a time. -->
+      <nav id="menu" aria-label="UI Sandbox">
+        <button type="button" class="tab" data-screen="info" aria-pressed="true">Info</button>
+        <button type="button" class="tab" data-screen="settings" aria-pressed="false">
+          Settings
+        </button>
+        <button type="button" class="tab" data-screen="preview" aria-pressed="false">
+          Preview screen with border
+        </button>
+      </nav>
+
+      <!-- INFO: the readout and the safe-area map's drawing. -->
+      <section id="infoScreen" class="screen" data-screen="info">
+        <div class="row">
+          <button type="button" id="copyBtn" class="btn">Copy readout</button>
+          <span id="copyNote" class="note" aria-live="polite"></span>
+        </div>
+        <pre id="readout" aria-live="polite"></pre>
+        <h2>Safe-area map</h2>
+        <p class="note">
+          The screen in screen space: the corner arcs, the cut hatched on its side, the usable
+          segments in green with their length, one custom property per value.
+        </p>
+        <svg id="mapSvg" viewBox="0 0 100 100" role="img" aria-label="safe-area map"></svg>
+        <table id="mapTable" class="vars">
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <!-- SETTINGS -->
+      <section id="settingsScreen" class="screen" data-screen="settings" hidden>
+        <label class="field"
+          >Orientation
+          <select id="modeSel">
+            <option value="auto">Auto: never ask</option>
+            <option value="landscape">Landscape: the gate and the lock, as backgammon</option>
+            <option value="portrait">Portrait: the mirror, "turn your phone upright"</option>
+          </select>
+        </label>
+        <label class="field check"
+          ><input type="checkbox" id="frameChk" /> Screen frame (the shell's band)</label
+        >
+        <label class="field"
+          >Band width <output id="bandOut">6px</output>
+          <input type="range" id="bandRange" min="0" max="12" step="1" />
+        </label>
+        <label class="field">Band colour <input type="color" id="colorInput" /></label>
+        <label class="field check"><input type="checkbox" id="hairlineChk" /> Inner hairline</label>
+        <label class="field"
+          >Layout example
+          <select id="exampleSel"></select>
+        </label>
+        <label class="field check"
+          ><input type="checkbox" id="flipChk" /> Flip the content a half turn (pass and play's far
+          seat)</label
+        >
+        <p class="note">
+          Stored in this browser under <code>uiSandbox_*</code>. The query overrides a run:
+          <code
+            >?example=rail&amp;frame=off&amp;mode=portrait&amp;flip=on&amp;type=landscape-secondary</code
+          >.
+        </p>
+      </section>
+
+      <!-- PREVIEW: the frame as a game gets it, around the chosen example. -->
+      <section id="previewScreen" class="screen" data-screen="preview" hidden>
+        <div id="stage" data-example=""></div>
+        <div id="previewBar">
+          <select id="previewExampleSel" aria-label="Layout example"></select>
+          <button type="button" id="previewInfoBtn" class="btn small" aria-expanded="false">
+            Report
+          </button>
+        </div>
+        <pre id="report" hidden></pre>
+      </section>
+    </div>
+
+    <!-- The turn gate of the sandbox's own: sideways or upright, per the orientation mode. -->
+    <div
+      id="turnGate"
+      class="gate"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="turnGateTitle"
+    >
+      <div class="gate-card">
+        <div class="gate-glyph" aria-hidden="true"></div>
+        <h2 id="turnGateTitle"></h2>
+        <p id="turnGateSub"></p>
+        <div class="gate-actions">
+          <button type="button" id="turnGateGoBtn" class="btn" hidden></button>
+          <button type="button" id="turnGateKeepBtn" class="btn ghost"></button>
+        </div>
+      </div>
+    </div>
+    <div id="toast" class="toast" hidden></div>
+    <!-- The rulers the readout measures the viewport units off. -->
+    <i class="ruler" data-ruler="svh" aria-hidden="true"></i>
+    <i class="ruler" data-ruler="dvh" aria-hidden="true"></i>
+    <i class="ruler" data-ruler="lvh" aria-hidden="true"></i>
+    <i class="ruler" data-ruler="vw" aria-hidden="true"></i>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
