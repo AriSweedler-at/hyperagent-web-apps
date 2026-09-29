@@ -14,6 +14,7 @@ import { resolve } from 'node:path';
 
 import { expect, test } from 'vitest';
 
+import { PUBLIC_DIR as BUDDY_DIR } from '../../tools/buddy-frames.ts';
 import { ALIASES, GAMES, LEGACY_GAMES, REGISTRY, SHELL_GAMES } from '../../tools/games.ts';
 import { isManifestGame, shippedFiles } from '../../tools/icons.ts';
 import { OWN_SHEET, SHEETS_MAX, isShellGame } from './classes.ts';
@@ -31,6 +32,15 @@ const sha256 = (path: string): string =>
   createHash('sha256').update(readFileSync(path)).digest('hex');
 
 const legacyPage = (game: string): string => resolve(REPO_ROOT, 'legacy', game, 'index.html');
+
+/**
+ * Folders under games/ that hold served files and no page yet: the RPS buddy frames
+ * (docs/design/rps-buddy.md §3, web/public/games/rps/buddy/) ship before the reaction game's page;
+ * when that page lands, rps joins tools/games.ts and leaves this list. Each is its files alone.
+ */
+const ASSET_FOLDERS: ReadonlyArray<Readonly<{ folder: string; under: string }>> = [
+  { folder: 'rps', under: `${BUDDY_DIR.replace('web/public/', '')}/` },
+];
 
 describeDist('dist parity with legacy/ and web/', (root) => {
   test('index.html (the landing page) is byte-identical to web/index.html', () => {
@@ -244,7 +254,17 @@ describeDist('dist parity with legacy/ and web/', (root) => {
         files.filter((file) => file.startsWith('games/')).map((file) => file.split('/')[1]),
       ),
     ];
-    expect(folders.sort()).toEqual([...GAMES, ...Object.keys(ALIASES)].sort());
+    expect(folders.sort()).toEqual(
+      [...GAMES, ...Object.keys(ALIASES), ...ASSET_FOLDERS.map(({ folder }) => folder)].sort(),
+    );
+    ASSET_FOLDERS.forEach(({ folder, under }) => {
+      const held = files.filter((file) => file.startsWith(`games/${folder}/`));
+      expect(held.length, folder).toBeGreaterThan(0);
+      expect(
+        held.filter((file) => !file.startsWith(under)),
+        `${folder}: only ${under}`,
+      ).toEqual([]);
+    });
     ALIAS_PAGES.forEach(({ alias, page }) => {
       expect(files.filter((file) => file.startsWith(`games/${alias}/`))).toEqual([page]);
     });
