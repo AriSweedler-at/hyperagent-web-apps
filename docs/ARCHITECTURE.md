@@ -267,6 +267,21 @@ the Worker's catch-all to `/hyperagent-web-apps/games/fidice/app-x.js`) and `/sh
    `/hyperagent-web-apps/` on :4173) and project `proxy` (`tools/proxy-dev.ts` on :8787 running the
    real `worker.ts` fetch handler with `UPSTREAM=http://127.0.0.1:4173`).
 
+**Landing links.** `web/index.html` is one page for both origins and links its cards relatively
+(`games/<name>/`, `tools/games.ts` `LANDING_HREFS`). On Pages that resolves in place; on
+games.sweedler.com it would resolve to `/games/<name>/`, a 301 to `/<name>/`, so every click paid a
+hop and the browser recorded the long form first, which is what players then copied and shared. The
+Worker therefore rewrites the landing page's hrefs as it serves `/` (and its long form
+`/hyperagent-web-apps/`): `shortHref` turns `games/<name>/…` in any spelling (`./games/`,
+`/games/`, the site prefix; with or without a slash, query or fragment) into `/<name>/…`, the path
+`mapPath` redirects `/games/<name>/…` to, and leaves every other href (another host, `shared/`, a
+fragment) alone; `shortenLandingLinks` applies it to every `href="…"` of the buffered page, a string
+rewrite like the link previews' (node has no `HTMLRewriter`). Game pages are never rewritten; the
+`/games/<name>/` redirect stays for links already out there. `worker.test.ts` pins the rewrite
+against the committed landing page and the redirect table; `e2e/smoke.spec.ts` clicks every card
+on both projects and asserts one document request, no `redirectedFrom()`, landing at the origin's
+own path.
+
 **Aliases.** A game may have a second URL name (`tools/games.ts` `ALIASES`: `sheshbesh` ->
 `backgammon`). An alias is not a game: no landing card, no `GAMES`, room-code, title or hook row;
 only the game's own URL is linked from the landing page. Each origin serves it its own way:

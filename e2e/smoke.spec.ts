@@ -2,14 +2,17 @@
 // pages are typed since docs/MIGRATION.md step 13: the documented hook booted, PeerJS and ICE
 // arrive bundled and no classic script is requested), zero uncaught exceptions and zero failed
 // requests outside the allowlist (e2e/fixtures/offline.ts). The landing page's card links must
-// also resolve on the origin they are clicked from: on the proxy that means the Worker's
-// /games/XXX -> /XXX redirect.
-import { ALIASES, HOOKS, LANDING_HREFS } from '../tools/games.ts';
+// also resolve on the origin they are clicked from, in one request: on the proxy the Worker serves
+// the landing page with its `games/XXX/` hrefs already rewritten to /XXX/ (worker.ts "Landing
+// links"), so a click never takes the /games/XXX -> /XXX redirect, which stays for old links.
+import { ALIASES, GAMES, HOOKS, LANDING_HREFS } from '../tools/games.ts';
 import { gameQuery } from './fixtures/player.ts';
 import {
   EXPECTED_TITLES,
   PAGES,
   PAGES_BASE_PATH,
+  type Project,
+  baseUrl,
   folderPath,
   pagePath,
   titleOf,
@@ -40,12 +43,16 @@ PAGES.forEach((name) => {
   });
 });
 
+/** The card hrefs as each origin serves them: relative on Pages, short on the proxy (rewritten by the Worker as it serves `/`). */
+const cardHrefs = (project: Project): ReadonlyArray<string> =>
+  project === 'proxy' ? GAMES.map((game) => `/${game}/`) : LANDING_HREFS;
+
 test('landing: every card link resolves on this origin', async ({ player, project }) => {
   const { page } = player;
   await page.goto(pagePath(project, 'landing'));
   const cards = await page.locator('a.card').all();
   const hrefs = await Promise.all(cards.map((card) => card.getAttribute('href')));
-  expect(hrefs).toEqual(LANDING_HREFS);
+  expect(hrefs).toEqual(cardHrefs(project));
   await Promise.all(
     hrefs.map(async (href) => {
       const target = new URL(href ?? '', page.url()).toString();
@@ -54,6 +61,29 @@ test('landing: every card link resolves on this origin', async ({ player, projec
       expect(await response.text(), target).toContain('<title>');
     }),
   );
+});
+
+// A card click is one document request that lands on the game's page at this origin's own path:
+// no redirect hop (`redirectedFrom()` is null), so the address bar and the history hold the short
+// URL alone on the proxy. The same on Pages, where the relative href resolves in place.
+GAMES.forEach((game) => {
+  test(`landing: the ${game} card lands on the game in one request`, async ({
+    player,
+    project,
+  }) => {
+    const { page } = player;
+    await page.goto(pagePath(project, 'landing'));
+    const expected = new URL(folderPath(project, game), baseUrl(project)).pathname;
+    const [document] = await Promise.all([
+      page.waitForResponse((response) => response.request().resourceType() === 'document'),
+      page.locator(`a.card[href$="/${game}/"]`).click(),
+    ]);
+    expect(new URL(document.url()).pathname).toBe(expected);
+    expect(document.status()).toBe(200);
+    expect(document.request().redirectedFrom(), 'a redirect hop before the page').toBeNull();
+    await expect(page).toHaveTitle(titleOf(game));
+    expect(new URL(page.url()).pathname).toBe(expected);
+  });
 });
 
 // An alias (tools/games.ts ALIASES) is a game's page under a second name. On the Pages origin the

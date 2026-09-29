@@ -21,7 +21,11 @@ pages got here.
 
 Both origins serve the same `dist/`. `games.sweedler.com` is the Cloudflare Worker in
 `infra/games-proxy/`: `/gin-rummy/`, `/fidice/`, `/backgammon/` and `/briscola/` are the short URLs, `/games/<name>/`
-redirects to them and `/shared/...` maps to the site's `shared/` directory. Sheshbesh answers to two
+redirects to them and `/shared/...` maps to the site's `shared/` directory. The landing page is
+one file for both origins and links its cards `games/<name>/`; the Worker rewrites those hrefs to
+`/<name>/` as it serves `/`, so a click from games.sweedler.com is one request and neither the
+address bar nor the history ever holds `/games/` (the redirect stays for links already out
+there). Sheshbesh answers to two
 names: `/sheshbesh/` is the backgammon page served in place by the Worker, and on GitHub Pages
 `games/sheshbesh/` forwards to `games/backgammon/`; only `/backgammon/` is linked from the landing
 page. A host on one origin and a guest on the other still meet: peer ids carry no origin.
