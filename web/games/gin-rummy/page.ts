@@ -84,7 +84,7 @@ const blocks: ShellBlocks = {
     <meta name="twitter:description" content="Gin rummy for two in the browser: pass one phone, or host a room and send the link. No app, no sign-up.">
     <meta name="twitter:image" content="https://games.sweedler.com/gin-rummy/splash.png">
     <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gin Rummy</title>
 <link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
 <link rel="alternate icon" href="/shared/favicon.ico">

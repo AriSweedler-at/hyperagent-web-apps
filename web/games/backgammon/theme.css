@@ -1115,6 +1115,16 @@ label {
   overflow: visible;
   cursor: default;
 }
+/* A tap on the board is a tap (shell.css says the same of the controls): `manipulation` leaves the
+   pinch to the browser and takes double-tap zoom, so a quick second tap on a point moves at once
+   instead of zooming, now that the viewport meta allows a zoom. The checker keeps `none` below,
+   for its drag. */
+.point,
+.bar,
+.off,
+#dice {
+  touch-action: manipulation;
+}
 .point::before {
   content: '';
   position: absolute;

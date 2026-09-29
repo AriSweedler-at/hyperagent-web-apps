@@ -21,6 +21,24 @@
 * {
   -webkit-tap-highlight-color: transparent;
 }
+/* A tap on a control is a tap: `manipulation` leaves the pan and the pinch to the browser and takes
+   double-tap zoom, so a quick second tap is delivered at once instead of held for a zoom. The
+   pages' viewport meta allows a zoom (2026-09-29: `maximum-scale=1.0, user-scalable=no` dropped,
+   a WCAG 1.4.4 failure iOS ignored anyway), so this is what keeps a tap-heavy screen from zooming;
+   each game's theme.css says the same of its table's tap targets, and `none` on a dragged card or
+   checker still wins there (the intersection along the ancestors is what the browser allows). */
+.btn,
+.icon-btn,
+.tab-btn,
+.tab-submenu button,
+.mode-btn,
+.chip,
+input,
+select,
+textarea,
+summary {
+  touch-action: manipulation;
+}
 html,
 body {
   padding: 0;
@@ -123,6 +141,13 @@ input::placeholder {
   color: var(--muted);
   font-weight: 400;
 }
+/* A prefilled default (`data-default`, ui/home.ts `fillInputs`: the game's name, shown because
+   nothing is remembered) reads as a suggestion, in the placeholder's ink and italic; the first tap
+   clears it and drops the mark, and a typed or remembered name is upright in --text. */
+input[data-default='1'] {
+  color: var(--muted);
+  font-style: italic;
+}
 label {
   font-size: 0.78rem;
   color: var(--muted);
@@ -188,6 +213,12 @@ body.fixed-screen #app {
   max-height: 100dvh;
   min-height: 0;
   overflow: hidden;
+}
+/* At the table a pull past an edge is neither a refresh nor a rubber band, and a long press on a
+   checker or a card brings up no callout (the property inherits, so the body's covers the table). */
+body.fixed-screen {
+  overscroll-behavior: none;
+  -webkit-touch-callout: none;
 }
 
 /* ---------- overlays and sheets ---------- */
@@ -630,7 +661,15 @@ details.history-row > .history-detail dd {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       column-gap: 12px;
+      row-gap: 12px;
       align-items: start;
+    }
+    /* Upright, a card's bottom margin spaces the column; in the grid the row gap does, and the
+       margin under the tallest card (the host card, 364px at 844x390) was the 10px the document
+       scrolled sideways (2026-09-28: #app 12 + 376 + 12 = 400 in 390). */
+    body[data-plays='landscape'] #onlineModeContent > .card-box,
+    body[data-plays='landscape'] #localModeContent > .card-box {
+      margin-bottom: 0;
     }
     body[data-plays='landscape'] #onlineModeContent .row,
     body[data-plays='landscape'] #localModeContent .row {

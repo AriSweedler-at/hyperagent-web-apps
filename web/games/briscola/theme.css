@@ -1481,6 +1481,16 @@ details.history-row > .history-detail dt {
 #hand .card {
   touch-action: none;
 }
+/* The table's other tap targets (shell.css says the same of the controls): a slot, the stock and
+   the trump (tap to draw, the exchange) and the peek; `manipulation` leaves the pinch to the browser
+   and takes double-tap zoom, so a quick second tap never zooms now that the viewport meta allows a
+   zoom. The hand's cards keep `none` above, for their drag. */
+.slot,
+.stock,
+.briscola,
+.actions .pile-peek {
+  touch-action: manipulation;
+}
 
 /* ---------- card names (docs/design/language-packs.md §5): the chosen language pack's words ---------- */
 /* A hand card's children take no pointer events, so a hover over a corner index is a hover over the

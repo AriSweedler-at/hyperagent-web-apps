@@ -262,6 +262,10 @@
      with its speed, then glides into the cell. touch-action: none on every card, so a phone drags or
      long-presses instead of scrolling. The other cards glide between cells (ui/hand/flip.ts). */
   .hand .card { touch-action: none; }
+  /* The piles and the peek are taps (shell.css says the same of the controls): manipulation leaves the
+     pinch to the browser and takes double-tap zoom, so a quick second tap never zooms now that the
+     viewport meta allows a zoom; the cards keep none above, for their drag. */
+  .pile, .pile-peek, .arrange-btn { touch-action: manipulation; }
   .slot.dragging .card { opacity: 0; }
   .drag-ghost { position: fixed; margin: 0; z-index: 60; pointer-events: none; will-change: transform; box-shadow: 0 14px 28px rgba(0,0,0,0.55); transition: none; }
   .drag-ghost.landing { transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }

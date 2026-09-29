@@ -53,1616 +53,2260 @@
     "--text": "#2b1d14",
     "--tiny-w": "26px"
   },
-  "values": ["\"Bodoni Moda\", \"GFS Didot\", Didot, \"Bodoni MT\", Georgia, serif", "#163f3e", "#1d4ed8", "#1f2a12", "#235a59", "#2b1d14", "#2f7d32", "#6b5a4a", "#7a2f1d", "#a3b070", "#a6442b", "#b7472a", "#c81e1e", "#d3a12a", "#d6b97f", "#e7c9bb", "#e9dfcc", "#ede3d1", "#f7f1e6", "#faf5e8", "#fbf6ea", "'Bodoni Moda', 'GFS Didot', 'Didot', 'Bodoni MT', Georgia, serif", "'Lora', 'Cardo', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif", "0", "0.35", "0.4", "0.45", "0.4992px", "0.518", "0.5181347150259067", "0.6", "0.672px", "0.7488px", "0.912px", "0.994819px", "0px", "0px 0px 0px 0px", "0px 0px 0px 14.4px", "0px 0px 0px 2px", "0px 0px 0px 6px", "0px 0px 0px auto", "0px 0px 12px 0px", "0px 0px 12px 12px", "0px 0px 16px 0px", "0px 0px 1px", "0px 10px", "0px 12px", "0px 12px 0px 10px", "0px 4px", "0px 5px", "0px 6px", "0px 8px", "0px auto 0px auto", "1", "10.56px", "10px", "10px 0px 0px 0px", "10px 0px 14px 0px", "10px 12px", "11", "111.333px", "11px 6px", "12.4352px", "12.48px", "12.8px", "12px", "12px 0px 0px 0px", "12px 12px 0px 0px", "12px 16px", "13.6px", "132px", "13px 14px", "13px 34px 13px 14px", "14.08px", "14.4px", "14.72px", "14px 0px 0px", "14px 18px", "15.2px", "15.68px", "16.8px", "16px", "17.6px", "1px", "1px 0px 0px", "1px 6px", "2.08px", "20px", "21.6px", "22px 18px", "24px", "26px", "2px", "2px 0px", "2px 0px 0px", "2px 4px", "320ms", "33.6px", "400", "48px", "4px", "4px 0px 0px 0px", "4px 0px 14px 0px", "4px 0px 16px 0px", "4px 0px 2px 0px", "4px 18px 4px 0px", "5.52213px", "50%", "56px", "69.0267px", "6px", "700", "72px", "8.90667px", "8px", "8px 0px 0px 0px", "8px 0px 10px 0px", "8px 10px", "8px 10px 0px", "8px 2px 0px", "8px 4px", "9", "9.6px", "999px", "9px", "9px 6px", "<265 chars sha256:c0638c072e8d74f1>", "Lora, Cardo, \"Palatino Linotype\", \"Book Antiqua\", Palatino, Georgia, serif", "block", "calc(24px * 0.5181347150259067)", "calc(clamp(\n    72px,\n    min(calc((100vw - 56px) / 3), calc((100dvh - 576px) * 0.5181347150259067)),\n    124px\n  ) * 0.62)", "clamp(\n    72px,\n    min(calc((100vw - 56px) / 3), calc((100dvh - 576px) * 0.5181347150259067)),\n    124px\n  )", "dashed", "flex", "grid", "hidden", "inline", "inline-block", "inline-flex", "inset 0 0 0 1px rgba(214, 185, 127, 0.62), 0 8px 22px rgba(44, 30, 23, 0.28)", "linear-gradient(180deg, #4a3529 0%, #3b2a20 60%, #2c1e17 100%)", "linear-gradient(180deg, #5a4232 0%, #4a3529 100%)", "linear-gradient(45deg, rgba(0, 0, 0, 0) 50%, rgb(107, 90, 74) 50%), linear-gradient(135deg, rgb(107, 90, 74) 50%, rgba(0, 0, 0, 0) 50%)", "linear-gradient(rgb(74, 53, 41) 0%, rgb(59, 42, 32) 60%, rgb(44, 30, 23) 100%)", "linear-gradient(rgb(90, 66, 50) 0%, rgb(74, 53, 41) 100%)", "list-item", "min(6px, (132px - calc(24px * 0.5181347150259067)) / max(0 - 1, 1))", "min(6px, (132px - calc(24px * 0.5181347150259067)) / max(1 - 1, 1))", "min(6px, (132px - calc(24px * 0.5181347150259067)) / max(9 - 1, 1))", "min(6px, (48px - calc(24px * 0.5181347150259067)) / max(0 - 1, 1))", "min(6px, (48px - calc(24px * 0.5181347150259067)) / max(1 - 1, 1))", "min(6px, (48px - calc(24px * 0.5181347150259067)) / max(11 - 1, 1))", "none", "none none solid", "normal", "radial-gradient(at 50% 35%, rgb(44, 109, 107) 0%, rgb(35, 90, 89) 60%, rgb(25, 70, 69) 100%)", "radial-gradient(ellipse at 50% 35%, #2c6d6b 0%, #235a59 60%, #194645 100%)", "rgb(107, 90, 74)", "rgb(107, 90, 74) rgb(107, 90, 74) rgba(43, 29, 20, 0.18)", "rgb(122, 47, 29)", "rgb(163, 176, 112)", "rgb(166, 68, 43)", "rgb(166, 68, 43) 0px 0px 0px 3px, rgba(0, 0, 0, 0.35) 0px 8px 16px 0px", "rgb(166, 68, 43) 3px 0px 0px 0px inset, rgba(43, 29, 20, 0.18) 0px 0px 0px 1px inset", "rgb(179, 166, 147)", "rgb(200, 30, 30)", "rgb(211, 161, 42)", "rgb(214, 185, 127) 0px -2px 0px 0px inset", "rgb(214, 185, 127) 0px 0px 0px 2px inset, rgba(44, 30, 23, 0.28) 0px 8px 22px 0px", "rgb(22, 63, 62)", "rgb(22, 63, 62) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.18) 0px 0px 24px 0px inset", "rgb(233, 223, 204)", "rgb(237, 227, 209)", "rgb(247, 241, 230)", "rgb(250, 245, 232)", "rgb(251, 246, 234)", "rgb(251, 246, 234) 2px 2px 0px 0px, rgba(43, 29, 20, 0.18) 2px 2px 0px 1px, rgb(251, 246, 234) 4px 4px 0px 0px, rgba(43, 29, 20, 0.18) 4px 4px 0px 1px, rgba(0, 0, 0, 0.25) 0px 1px 2px 0px", "rgb(29, 78, 216)", "rgb(31, 42, 18)", "rgb(43, 29, 20)", "rgb(43, 29, 20) rgb(43, 29, 20) rgba(43, 29, 20, 0.18)", "rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0.25) 0px 1px 2px 0px, rgba(43, 29, 20, 0.18) 0px 0px 0px 1px", "rgba(122, 47, 29, 0.78)", "rgba(214, 185, 127, 0.35) rgb(247, 241, 230) rgb(247, 241, 230)", "rgba(214, 185, 127, 0.4)", "rgba(214, 185, 127, 0.62)", "rgba(214, 185, 127, 0.62) 0px 0px 0px 1px inset, rgba(44, 30, 23, 0.28) 0px 6px 16px 0px", "rgba(214, 185, 127, 0.62) 0px 0px 0px 1px inset, rgba(44, 30, 23, 0.28) 0px 8px 22px 0px", "rgba(214, 185, 127, 0.62) 0px 0px 0px 1px inset, rgba(44, 30, 23, 0.35) 0px 10px 26px 0px", "rgba(214, 185, 127, 0.62) 0px 0px 0px 1px inset, rgba(44, 30, 23, 0.45) 0px 18px 48px 0px", "rgba(214, 185, 127, 0.62) 1px 1px 0px 0px inset, rgba(214, 185, 127, 0.62) -1px 0px 0px 0px inset, rgba(44, 30, 23, 0.28) 0px 8px 22px 0px", "rgba(247, 241, 230, 0.12)", "rgba(247, 241, 230, 0.3)", "rgba(247, 241, 230, 0.72)", "rgba(43, 29, 20, 0.18)", "rgba(43, 29, 20, 0.18) 0px 0px 0px 1px inset", "rgba(44, 30, 23, 0.35) 0px 8px 24px 0px", "rgba(95, 113, 51, 0.6) 0px 0px 0px 1px inset, rgba(44, 30, 23, 0.28) 0px 6px 16px 0px", "solid", "solid none none", "table", "table-cell", "uppercase", "url(\"<pages>/shared/cards/linea/back.svg\")", "url(\"<pages>/shared/cards/linea/italian40/3S.svg\")", "url(\"<pages>/shared/cards/linea/italian40/4B.svg\")", "url(\"<pages>/shared/cards/linea/italian40/4D.svg\")", "url(\"<pages>/shared/cards/linea/italian40/5C.svg\")", "url(\"<pages>/shared/cards/linea/italian40/5D.svg\")", "url(\"<pages>/shared/cards/linea/italian40/6B.svg\")", "url(\"<pages>/shared/cards/linea/italian40/FC.svg\")", "url(\"<pages>/shared/cards/linea/italian40/RC.svg\")", "url(\"<pages>/shared/cards/linea/italian40/RD.svg\")", "url(../../shared/cards/linea/back.svg)", "visible"],
+  "values": ["\"Bodoni Moda\", \"GFS Didot\", Didot, \"Bodoni MT\", Georgia, serif", "#163f3e", "#1d4ed8", "#1f2a12", "#235a59", "#2b1d14", "#2f7d32", "#6b5a4a", "#7a2f1d", "#a3b070", "#a6442b", "#b7472a", "#c81e1e", "#d3a12a", "#d6b97f", "#e7c9bb", "#e9dfcc", "#ede3d1", "#f7f1e6", "#faf5e8", "#fbf6ea", "'Bodoni Moda', 'GFS Didot', 'Didot', 'Bodoni MT', Georgia, serif", "'Lora', 'Cardo', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif", "-0.000", "0", "0.18", "0.24", "0.3", "0.35", "0.4", "0.45", "0.4992px", "0.518", "0.5181347150259067", "0.6", "0.672px", "0.7488px", "0.85", "0.912px", "0.994819px", "0px", "0px 0px 0px 0px", "0px 0px 0px 14.4px", "0px 0px 0px 2px", "0px 0px 0px 6px", "0px 0px 0px auto", "0px 0px 12px 0px", "0px 0px 12px 12px", "0px 0px 16px 0px", "0px 0px 1px", "0px 10px", "0px 12px", "0px 12px 0px 10px", "0px 4px", "0px 5px", "0px 6px", "0px 8px", "0px auto 0px auto", "1", "1.000", "1.15", "10.56px", "10deg", "10px", "10px 0px 0px 0px", "10px 0px 14px 0px", "10px 12px", "11", "111.333px", "117.9px", "11px 6px", "12.4352px", "12.48px", "12.8px", "120ms", "12px", "12px 0px 0px 0px", "12px 12px 0px 0px", "12px 16px", "13.6px", "132px", "134.4px", "13px 14px", "13px 34px 13px 14px", "14.08px", "14.4px", "14.72px", "14deg", "14px 0px 0px", "14px 18px", "15.2px", "15.68px", "16.8px", "16px", "17.6px", "1px", "1px 0px 0px", "1px 6px", "2.08px", "200ms", "20px", "21.6px", "22px 18px", "24px", "26px", "2px", "2px 0px", "2px 0px 0px", "2px 4px", "300ms", "320ms", "33.6px", "400", "48px", "4px", "4px 0px 0px 0px", "4px 0px 14px 0px", "4px 0px 16px 0px", "4px 0px 2px 0px", "4px 18px 4px 0px", "5.52213px", "50%", "56px", "69.0267px", "6px", "700", "72px", "8.90667px", "80ms", "8px", "8px 0px 0px 0px", "8px 0px 10px 0px", "8px 10px", "8px 10px 0px", "8px 2px 0px", "8px 4px", "9", "9.6px", "90ms", "999px", "9px", "9px 6px", "<265 chars sha256:c0638c072e8d74f1>", "Lora, Cardo, \"Palatino Linotype\", \"Book Antiqua\", Palatino, Georgia, serif", "block", "calc(24px * 0.5181347150259067)", "calc(clamp(\n    72px,\n    min(calc((100vw - 56px) / 3), calc((100dvh - 576px) * 0.5181347150259067)),\n    124px\n  ) * 0.62)", "clamp(\n    72px,\n    min(calc((100vw - 56px) / 3), calc((100dvh - 576px) * 0.5181347150259067)),\n    124px\n  )", "dashed", "flex", "grid", "hidden", "inline", "inline-block", "inline-flex", "inset 0 0 0 1px rgba(214, 185, 127, 0.62), 0 8px 22px rgba(44, 30, 23, 0.28)", "linear-gradient(180deg, #4a3529 0%, #3b2a20 60%, #2c1e17 100%)", "linear-gradient(180deg, #5a4232 0%, #4a3529 100%)", "linear-gradient(45deg, rgba(0, 0, 0, 0) 50%, rgb(107, 90, 74) 50%), linear-gradient(135deg, rgb(107, 90, 74) 50%, rgba(0, 0, 0, 0) 50%)", "linear-gradient(rgb(74, 53, 41) 0%, rgb(59, 42, 32) 60%, rgb(44, 30, 23) 100%)", "linear-gradient(rgb(90, 66, 50) 0%, rgb(74, 53, 41) 100%)", "list-item", "min(6px, (132px - calc(24px * 0.5181347150259067)) / max(0 - 1, 1))", "min(6px, (132px - calc(24px * 0.5181347150259067)) / max(1 - 1, 1))", "min(6px, (132px - calc(24px * 0.5181347150259067)) / max(9 - 1, 1))", "min(6px, (48px - calc(24px * 0.5181347150259067)) / max(0 - 1, 1))", "min(6px, (48px - calc(24px * 0.5181347150259067)) / max(1 - 1, 1))", "min(6px, (48px - calc(24px * 0.5181347150259067)) / max(11 - 1, 1))", "none", "none none solid", "normal", "radial-gradient(at 50% 35%, rgb(44, 109, 107) 0%, rgb(35, 90, 89) 60%, rgb(25, 70, 69) 100%)", "radial-gradient(ellipse at 50% 35%, #2c6d6b 0%, #235a59 60%, #194645 100%)", "rgb(107, 90, 74)", "rgb(107, 90, 74) rgb(107, 90, 74) rgba(43, 29, 20, 0.18)", "rgb(122, 47, 29)", "rgb(163, 176, 112)", "rgb(166, 68, 43)", "rgb(166, 68, 43) 0px 0px 0px 3px, rgba(0, 0, 0, 0.35) 0px 8px 16px 0px", "rgb(166, 68, 43) 3px 0px 0px 0px inset, rgba(43, 29, 20, 0.18) 0px 0px 0px 1px inset", "rgb(179, 166, 147)", "rgb(200, 30, 30)", "rgb(211, 161, 42)", "rgb(214, 185, 127) 0px -2px 0px 0px inset", "rgb(214, 185, 127) 0px 0px 0px 2px inset, rgba(44, 30, 23, 0.28) 0px 8px 22px 0px", "rgb(22, 63, 62)", "rgb(22, 63, 62) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.18) 0px 0px 24px 0px inset", "rgb(233, 223, 204)", "rgb(237, 227, 209)", "rgb(247, 241, 230)", "rgb(250, 245, 232)", "rgb(251, 246, 234)", "rgb(251, 246, 234) 2px 2px 0px 0px, rgba(43, 29, 20, 0.18) 2px 2px 0px 1px, rgb(251, 246, 234) 4px 4px 0px 0px, rgba(43, 29, 20, 0.18) 4px 4px 0px 1px, rgba(0, 0, 0, 0.25) 0px 1px 2px 0px", "rgb(29, 78, 216)", "rgb(31, 42, 18)", "rgb(43, 29, 20)", "rgb(43, 29, 20) rgb(43, 29, 20) rgba(43, 29, 20, 0.18)", "rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0.25) 0px 1px 2px 0px, rgba(43, 29, 20, 0.18) 0px 0px 0px 1px", "rgba(122, 47, 29, 0.78)", "rgba(214, 185, 127, 0.35) rgb(247, 241, 230) rgb(247, 241, 230)", "rgba(214, 185, 127, 0.4)", "rgba(214, 185, 127, 0.62)", "rgba(214, 185, 127, 0.62) 0px 0px 0px 1px inset, rgba(44, 30, 23, 0.28) 0px 6px 16px 0px", "rgba(214, 185, 127, 0.62) 0px 0px 0px 1px inset, rgba(44, 30, 23, 0.28) 0px 8px 22px 0px", "rgba(214, 185, 127, 0.62) 0px 0px 0px 1px inset, rgba(44, 30, 23, 0.35) 0px 10px 26px 0px", "rgba(214, 185, 127, 0.62) 0px 0px 0px 1px inset, rgba(44, 30, 23, 0.45) 0px 18px 48px 0px", "rgba(214, 185, 127, 0.62) 1px 1px 0px 0px inset, rgba(214, 185, 127, 0.62) -1px 0px 0px 0px inset, rgba(44, 30, 23, 0.28) 0px 8px 22px 0px", "rgba(247, 241, 230, 0.12)", "rgba(247, 241, 230, 0.3)", "rgba(247, 241, 230, 0.72)", "rgba(43, 29, 20, 0.18)", "rgba(43, 29, 20, 0.18) 0px 0px 0px 1px inset", "rgba(44, 30, 23, 0.35) 0px 8px 24px 0px", "rgba(95, 113, 51, 0.6) 0px 0px 0px 1px inset, rgba(44, 30, 23, 0.28) 0px 6px 16px 0px", "solid", "solid none none", "table", "table-cell", "uppercase", "url(\"<pages>/shared/cards/linea/back.svg\")", "url(\"<pages>/shared/cards/linea/italian40/3S.svg\")", "url(\"<pages>/shared/cards/linea/italian40/4B.svg\")", "url(\"<pages>/shared/cards/linea/italian40/4D.svg\")", "url(\"<pages>/shared/cards/linea/italian40/5C.svg\")", "url(\"<pages>/shared/cards/linea/italian40/5D.svg\")", "url(\"<pages>/shared/cards/linea/italian40/6B.svg\")", "url(\"<pages>/shared/cards/linea/italian40/FC.svg\")", "url(\"<pages>/shared/cards/linea/italian40/RC.svg\")", "url(\"<pages>/shared/cards/linea/italian40/RD.svg\")", "url(../../shared/cards/linea/back.svg)", "visible"],
   "styles": {
-    "054cd1e1a9d6": {
-      "v": [177, 152, 179, 107, 152, 35, 152, 179, 128, 127, 64, 111, 154, 154, 35, 53, 35, 152, 215],
+    "0141db7a0db7": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 144, 143, 100, 125, 170, 170, 41, 58, 106, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--suit-ink": 2
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "06200b977939": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 133, 127, 81, 98, 100, 154, 36, 53, 35, 152, 215],
+    "03662ad3b627": {
+      "v": [191, 221, 195, 120, 168, 40, 198, 195, 144, 143, 123, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 146,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "06386f2822d1": {
-      "v": [173, 152, 179, 65, 152, 35, 196, 179, 133, 127, 69, 98, 114, 154, 36, 53, 45, 152, 215],
+    "0382b92cceae": {
+      "v": [180, 168, 195, 121, 168, 40, 168, 195, 168, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "07c96250fb40": {
-      "v": [181, 152, 173, 65, 152, 35, 152, 173, 133, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
+    "07278f916f0d": {
+      "v": [189, 168, 201, 75, 215, 95, 168, 173, 153, 143, 92, 112, 170, 170, 130, 58, 82, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 26,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 53
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19
       }
     },
     "08012b00254a": {
-      "v": [181, 152, 194, 35, 152, 35, 152, 194, 128, 127, 63, 111, 154, 32, 36, 53, 35, 203, 215],
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 144, 143, 72, 125, 170, 36, 41, 58, 40, 219, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
-      }
-    },
-    "082100fc7887": {
-      "v": [175, 213, 179, 106, 152, 35, 182, 179, 128, 127, 109, 98, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 130,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
       }
     },
     "0853d024d03f": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 133, 127, 81, 98, 114, 154, 66, 53, 35, 152, 215],
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 149, 143, 93, 112, 129, 170, 76, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
+      }
+    },
+    "0868545ec262": {
+      "v": [197, 171, 189, 75, 168, 40, 186, 189, 149, 143, 93, 112, 170, 170, 41, 58, 135, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "0a67a9eaaa76": {
-      "v": [181, 152, 193, 65, 199, 83, 152, 194, 138, 127, 74, 111, 110, 154, 115, 53, 58, 152, 215],
+      "v": [197, 168, 209, 75, 215, 95, 168, 210, 154, 143, 85, 125, 124, 170, 130, 58, 66, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
+      }
+    },
+    "0a9cc3e46f76": {
+      "v": [190, 220, 195, 39, 168, 40, 198, 195, 144, 143, 71, 125, 170, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 145,
+        "--chip-h": 103,
+        "--chip-step": 163,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--n": 58,
+        "--strip-w": 80
+      }
+    },
+    "0eea05e65aa9": {
+      "v": [189, 168, 195, 139, 168, 40, 212, 195, 149, 143, 73, 125, 124, 170, 41, 58, 52, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--suit-ink": 13
+      }
+    },
+    "0f15dd177d36": {
+      "v": [197, 168, 210, 127, 148, 105, 168, 189, 144, 143, 93, 112, 170, 170, 40, 34, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "12732254b743": {
-      "v": [159, 152, 173, 65, 152, 35, 197, 173, 128, 127, 81, 111, 154, 154, 36, 23, 68, 152, 215],
+      "v": [175, 168, 189, 75, 168, 40, 213, 189, 144, 143, 93, 125, 170, 170, 41, 24, 78, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "12de4259d240": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 136, 127, 74, 111, 154, 154, 36, 53, 35, 152, 215],
+    "144682be85b2": {
+      "v": [197, 168, 173, 40, 168, 40, 168, 173, 168, 143, 75, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "136c24533c51": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 128, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
+    "1ac15dc1b6c9": {
+      "v": [197, 168, 189, 75, 168, 40, 168, 189, 149, 143, 93, 112, 103, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 53
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--charge-dist": 27,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--gap": 81,
+        "--lean": 87,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 37,
+        "--ux": 59,
+        "--uy": 23
       }
     },
-    "141a2f2051f8": {
-      "v": [175, 213, 179, 106, 152, 35, 182, 179, 128, 127, 109, 98, 154, 154, 36, 53, 35, 152, 135],
+    "1d74abfd4aeb": {
+      "v": [197, 168, 189, 127, 168, 40, 168, 189, 144, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 130,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "1df788326877": {
-      "v": [181, 152, 157, 35, 152, 35, 152, 157, 128, 127, 75, 111, 154, 154, 36, 53, 35, 152, 215],
+      "v": [197, 168, 173, 40, 168, 40, 168, 173, 144, 143, 86, 125, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "22fe8c2926df": {
-      "v": [173, 152, 179, 123, 152, 35, 196, 179, 133, 127, 64, 111, 110, 154, 36, 53, 47, 152, 215],
+    "1ec15b5a7bcf": {
+      "v": [189, 168, 195, 75, 168, 40, 212, 195, 168, 143, 94, 112, 170, 170, 41, 58, 97, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--suit-ink": 12
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "1fb4b0bd48cd": {
+      "v": [197, 168, 189, 75, 168, 40, 168, 189, 149, 143, 93, 112, 103, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--charge-dist": 25,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--gap": 69,
+        "--lean": 62,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 60,
+        "--ux": 59,
+        "--uy": 23
       }
     },
     "23acbb4a42c1": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 133, 127, 81, 98, 55, 154, 115, 53, 35, 152, 215],
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 149, 143, 93, 112, 63, 170, 130, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "24b163d56226": {
-      "v": [171, 152, 179, 124, 152, 35, 152, 179, 133, 127, 75, 98, 55, 154, 36, 53, 117, 152, 215],
+      "v": [187, 168, 195, 140, 168, 40, 168, 195, 149, 143, 86, 112, 63, 170, 41, 58, 132, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "2a54857f42da": {
-      "v": [181, 152, 173, 65, 152, 35, 152, 173, 133, 127, 81, 98, 90, 154, 36, 53, 35, 152, 215],
+    "271b7d0755bf": {
+      "v": [191, 226, 195, 127, 168, 40, 198, 195, 144, 143, 68, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 53
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "2a68f68103c4": {
-      "v": [181, 152, 157, 114, 152, 35, 152, 157, 133, 127, 75, 98, 114, 154, 36, 53, 120, 152, 215],
+      "v": [197, 168, 173, 129, 168, 40, 168, 173, 149, 143, 86, 112, 129, 170, 41, 58, 135, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "2d50132f8f3d": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 128, 127, 64, 111, 154, 154, 36, 53, 35, 152, 215],
+    "2ebebc8c37fc": {
+      "v": [190, 220, 195, 39, 168, 40, 198, 195, 144, 143, 71, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--suit-ink": 13
-      }
-    },
-    "2dbdafa15584": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 128, 127, 64, 111, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--suit-ink": 2
-      }
-    },
-    "2e1b87a7edd7": {
-      "v": [181, 152, 173, 113, 152, 35, 152, 173, 128, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 145,
+        "--chip-h": 103,
+        "--chip-step": 167,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--n": 67,
+        "--strip-w": 113
       }
     },
     "2f5cedb75dc6": {
-      "v": [181, 152, 194, 35, 152, 35, 152, 194, 128, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 144, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "338c0e8cf52b": {
-      "v": [181, 152, 157, 35, 152, 35, 152, 157, 128, 127, 75, 98, 154, 154, 36, 53, 35, 152, 215],
+      "v": [197, 168, 173, 40, 168, 40, 168, 173, 144, 143, 86, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "3403f6a3f6e2": {
-      "v": [169, 152, 173, 123, 152, 35, 152, 173, 128, 127, 54, 111, 154, 154, 36, 53, 49, 152, 215],
+    "37c6f39b39d8": {
+      "v": [189, 168, 195, 75, 168, 40, 179, 195, 149, 143, 79, 112, 129, 170, 41, 58, 50, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 53
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "36790eccb115": {
-      "v": [175, 211, 179, 106, 152, 35, 182, 179, 128, 127, 109, 98, 154, 154, 36, 53, 35, 152, 215],
+    "3a24c187133d": {
+      "v": [197, 168, 189, 75, 168, 40, 168, 189, 149, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 130,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 53
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--charge-dist": 25,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 28,
+        "--fly-ms": 110,
+        "--gap": 69,
+        "--lean": 62,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 60,
+        "--ux": 59,
+        "--uy": 23
       }
     },
-    "36ab3961e8b1": {
-      "v": [175, 209, 179, 106, 152, 35, 182, 179, 128, 127, 109, 98, 154, 154, 36, 53, 35, 152, 215],
+    "41138c22d370": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 144, 143, 73, 125, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 130,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "3a69c924f4a7": {
-      "v": [174, 204, 179, 34, 152, 35, 182, 179, 128, 127, 62, 111, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 129,
-        "--chip-h": 90,
-        "--chip-step": 148,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 121,
-        "--strip-w": 70
-      }
-    },
-    "3b25b5110b85": {
-      "v": [181, 155, 173, 65, 152, 35, 170, 173, 133, 127, 81, 98, 154, 154, 36, 53, 120, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "3bd9b2004d08": {
-      "v": [174, 204, 179, 113, 152, 35, 182, 179, 128, 127, 60, 98, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--suit-ink": 2
       }
     },
     "4117b9a2a6af": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 128, 127, 79, 98, 154, 154, 41, 53, 35, 152, 215],
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 144, 143, 91, 112, 170, 170, 46, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "4270f7930e0b": {
-      "v": [181, 152, 194, 35, 152, 35, 152, 194, 128, 127, 78, 98, 154, 154, 35, 53, 35, 152, 215],
+    "439811a53f25": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 144, 143, 79, 125, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
         "--fan-overlap": 24,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 53
-      }
-    },
-    "437090cec122": {
-      "v": [181, 152, 194, 35, 152, 35, 152, 194, 128, 127, 78, 98, 154, 154, 35, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 53
-      }
-    },
-    "44a903ce2ca6": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 134, 127, 81, 98, 110, 154, 36, 53, 95, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "453c9e62cdf2": {
-      "v": [173, 152, 179, 124, 152, 35, 167, 179, 128, 127, 78, 111, 154, 154, 36, 53, 61, 152, 215],
+      "v": [189, 168, 195, 140, 168, 40, 183, 195, 144, 143, 90, 125, 170, 170, 41, 58, 70, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
-      }
-    },
-    "4834db9edefc": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 133, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-step": 149,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 23,
-        "--strip-w": 99
       }
     },
     "4a3a382d96ef": {
-      "v": [181, 143, 173, 65, 152, 35, 189, 173, 133, 127, 81, 98, 92, 154, 36, 23, 100, 152, 135],
+      "v": [197, 159, 189, 75, 168, 40, 205, 189, 149, 143, 93, 112, 105, 170, 41, 24, 114, 168, 151],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
-      }
-    },
-    "4de80316b63c": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 133, 127, 74, 111, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-step": 146,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 23,
-        "--strip-w": 70
       }
     },
     "4f2f009a0884": {
-      "v": [181, 152, 161, 35, 152, 35, 152, 161, 136, 127, 75, 111, 154, 154, 36, 53, 35, 152, 215],
+      "v": [197, 168, 177, 40, 168, 40, 168, 177, 152, 143, 86, 125, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "52ec42c9bbef": {
-      "v": [175, 211, 179, 113, 152, 35, 162, 179, 128, 127, 60, 98, 154, 154, 36, 53, 35, 152, 215],
+    "5197f73285e6": {
+      "v": [191, 229, 195, 120, 168, 40, 198, 195, 144, 143, 123, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 146,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "52ff1fb86f24": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 133, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
+    "52b09e9eb64c": {
+      "v": [181, 168, 195, 121, 168, 40, 168, 195, 144, 143, 73, 125, 170, 170, 40, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-step": 150,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 53,
-        "--strip-w": 99
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--suit-ink": 12
       }
     },
     "542c711759e4": {
-      "v": [172, 126, 179, 35, 152, 35, 152, 179, 128, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
+      "v": [188, 142, 195, 40, 168, 40, 168, 195, 144, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
         "--accent": 10,
         "--accent-dark": 8,
-        "--aspect": 28,
-        "--back": 152,
+        "--aspect": 32,
+        "--back": 168,
         "--back-colour": 1,
         "--baize": 4,
         "--baize-edge": 1,
         "--bg": 17,
         "--card": 18,
         "--card-2": 16,
-        "--card-edge": 195,
+        "--card-edge": 211,
         "--card-face": 20,
-        "--card-w": 112,
+        "--card-w": 126,
         "--cream": 18,
-        "--cream-dim": 194,
+        "--cream-dim": 210,
         "--danger": 11,
         "--emphasis": 10,
-        "--felt": 156,
+        "--felt": 172,
         "--fill": 18,
-        "--fill-hover": 192,
+        "--fill-hover": 208,
         "--font-body": 22,
         "--font-display": 21,
         "--go": 9,
         "--go-text": 3,
         "--gold": 14,
-        "--hair": 186,
+        "--hair": 202,
         "--ink-hover": 18,
-        "--ink-on-bar": 194,
+        "--ink-on-bar": 210,
         "--ink-on-fill": 5,
-        "--mid-w": 108,
+        "--mid-w": 122,
         "--muted": 7,
-        "--panel": 140,
-        "--panel-2": 141,
-        "--radius": 65,
-        "--radius-control": 65,
-        "--radius-inner": 65,
-        "--radius-tab": 124,
+        "--panel": 156,
+        "--panel-2": 157,
+        "--radius": 75,
+        "--radius-control": 75,
+        "--radius-inner": 75,
+        "--radius-tab": 140,
         "--serif-display": 21,
         "--serif-text": 22,
-        "--shadow-shell": 139,
+        "--shadow-shell": 155,
         "--suit-B": 6,
         "--suit-C": 12,
         "--suit-D": 13,
         "--suit-S": 2,
-        "--surface-bar": 140,
-        "--surface-shell": 140,
+        "--surface-bar": 156,
+        "--surface-shell": 156,
         "--terracotta-pale": 15,
         "--text": 5,
-        "--tiny-w": 91
+        "--tiny-w": 104
       }
     },
-    "55240df46b01": {
-      "v": [175, 207, 179, 113, 152, 35, 182, 179, 128, 127, 60, 98, 154, 154, 36, 53, 35, 152, 215],
+    "5a6ce02f6f63": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 149, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "5aebd31969cf": {
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 168, 143, 85, 112, 170, 170, 41, 58, 44, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "5b13e7855e82": {
+      "v": [191, 223, 195, 127, 168, 40, 198, 195, 144, 143, 68, 112, 170, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "5b7ce8ed5dbd": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 128, 127, 73, 98, 154, 154, 36, 53, 35, 152, 215],
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 144, 143, 84, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
+      }
+    },
+    "5c13dd9bdd12": {
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 144, 143, 90, 112, 170, 170, 40, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--charge-dist": 25,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 30,
+        "--fly-ms": 110,
+        "--gap": 69,
+        "--lean": 62,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 60,
+        "--ux": 59,
+        "--uy": 23
       }
     },
     "5c1fec3de207": {
-      "v": [173, 142, 185, 65, 199, 83, 152, 179, 128, 127, 80, 98, 154, 154, 36, 53, 72, 152, 215],
+      "v": [189, 158, 201, 75, 215, 95, 168, 195, 144, 143, 92, 112, 170, 170, 41, 58, 83, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "5ddcd3b55e06": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 134, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
+    "5c7422515ac9": {
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 144, 143, 90, 112, 170, 170, 40, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--charge-dist": 25,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 28,
+        "--fly-ms": 110,
+        "--gap": 69,
+        "--lean": 62,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 60,
+        "--ux": 59,
+        "--uy": 23
+      }
+    },
+    "5cf07a733498": {
+      "v": [197, 160, 189, 75, 168, 40, 203, 189, 149, 143, 94, 125, 124, 170, 41, 29, 89, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "60890314f549": {
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 144, 143, 72, 112, 170, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "61049a550572": {
-      "v": [183, 152, 179, 35, 152, 35, 152, 179, 152, 127, 81, 98, 154, 154, 36, 53, 81, 152, 215],
+      "v": [199, 168, 195, 40, 168, 40, 168, 195, 168, 143, 93, 112, 170, 170, 41, 58, 93, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "622779fadda7": {
-      "v": [173, 152, 179, 123, 152, 35, 196, 179, 133, 127, 64, 111, 110, 154, 36, 53, 47, 152, 215],
+    "64f407d35ae0": {
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 144, 143, 90, 112, 170, 170, 40, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--suit-ink": 13
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--charge-dist": 26,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--gap": 146,
+        "--lean": 62,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 58,
+        "--ux": 58,
+        "--uy": 24
       }
     },
-    "63c333b3be5e": {
-      "v": [173, 152, 179, 65, 152, 35, 196, 179, 152, 127, 82, 98, 154, 154, 36, 53, 85, 152, 215],
+    "69e4ac0d411e": {
+      "v": [189, 168, 195, 75, 168, 40, 179, 195, 149, 143, 79, 112, 124, 170, 41, 58, 56, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "640664053d7a": {
-      "v": [181, 152, 194, 35, 152, 35, 152, 194, 128, 127, 63, 98, 154, 154, 36, 53, 35, 152, 215],
+    "6ce7377b8a0f": {
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 144, 143, 93, 112, 170, 170, 41, 58, 40, 168, 151],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "65481e4202f0": {
-      "v": [181, 152, 194, 113, 132, 92, 152, 173, 128, 127, 81, 98, 154, 154, 35, 30, 35, 152, 215],
+    "6eaa2f4abda9": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 149, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-step": 166,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--n": 58,
+        "--strip-w": 113
       }
     },
-    "65da9242a300": {
-      "v": [173, 152, 179, 65, 152, 35, 163, 179, 133, 127, 69, 98, 110, 154, 36, 53, 51, 152, 215],
+    "74cd5eefa0b2": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 149, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-step": 165,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--n": 24,
+        "--strip-w": 113
       }
     },
-    "66c7f7a96d86": {
-      "v": [175, 210, 179, 113, 152, 35, 182, 179, 128, 127, 60, 98, 154, 154, 36, 53, 35, 152, 215],
+    "7545daa71f3a": {
+      "v": [191, 222, 195, 127, 168, 40, 198, 195, 144, 143, 68, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "67d10e318e6a": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 133, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
+    "7651e7da1646": {
+      "v": [191, 229, 195, 120, 168, 40, 198, 195, 144, 143, 123, 112, 170, 170, 41, 58, 40, 168, 151],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "6b45d04feea2": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 133, 127, 74, 111, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-step": 148,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 121,
-        "--strip-w": 70
-      }
-    },
-    "6dcc813e83f6": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 133, 127, 81, 98, 55, 154, 115, 53, 48, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "6f1c66c31d40": {
-      "v": [181, 155, 173, 65, 152, 35, 170, 173, 133, 127, 81, 98, 55, 154, 36, 53, 118, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 146,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "76a6b552da48": {
-      "v": [173, 152, 185, 65, 199, 83, 152, 179, 137, 127, 80, 98, 154, 154, 115, 53, 71, 152, 215],
+      "v": [189, 168, 201, 75, 215, 95, 168, 195, 153, 143, 92, 112, 170, 170, 130, 58, 82, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "782bb295af37": {
-      "v": [181, 143, 173, 65, 152, 35, 168, 173, 152, 127, 81, 98, 154, 154, 41, 53, 81, 152, 215],
+    "781f0798eb78": {
+      "v": [182, 168, 195, 121, 168, 40, 168, 195, 144, 143, 73, 125, 170, 170, 40, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--suit-ink": 13
+      }
+    },
+    "782bb295af37": {
+      "v": [197, 159, 189, 75, 168, 40, 184, 189, 168, 143, 93, 112, 170, 170, 46, 58, 93, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "78871f860bea": {
-      "v": [173, 152, 179, 65, 152, 35, 196, 179, 138, 127, 74, 111, 110, 154, 36, 53, 58, 152, 215],
+      "v": [189, 168, 195, 75, 168, 40, 212, 195, 154, 143, 85, 125, 124, 170, 41, 58, 66, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "79e9d2243306": {
-      "v": [172, 126, 179, 35, 152, 35, 152, 179, 128, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
+      "v": [188, 142, 195, 40, 168, 40, 168, 195, 144, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "7bea87ba3818": {
-      "v": [181, 152, 161, 35, 152, 35, 152, 161, 128, 0, 97, 98, 154, 31, 56, 53, 35, 152, 215],
+      "v": [197, 168, 177, 40, 168, 40, 168, 177, 144, 0, 111, 112, 170, 35, 64, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "7c1cbb3e8d85": {
-      "v": [175, 206, 179, 113, 152, 35, 182, 179, 128, 127, 60, 98, 154, 154, 36, 53, 35, 152, 215],
+    "7df7f7abd224": {
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 150, 143, 93, 112, 51, 170, 41, 58, 88, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "7dd355fc2bcb": {
-      "v": [174, 204, 179, 34, 152, 35, 182, 179, 128, 127, 62, 98, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 129,
-        "--chip-h": 90,
-        "--chip-step": 151,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 59,
-        "--strip-w": 99
-      }
-    },
-    "80672104c322": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 133, 127, 81, 98, 110, 154, 56, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "81e3df0fee84": {
-      "v": [181, 152, 194, 35, 152, 35, 152, 194, 128, 127, 78, 98, 154, 154, 41, 53, 35, 152, 215],
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 144, 143, 90, 112, 170, 170, 46, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "829b679d53f9": {
-      "v": [174, 204, 179, 34, 152, 35, 182, 179, 128, 127, 62, 111, 154, 154, 36, 53, 35, 152, 215],
+    "8734415e768d": {
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 149, 143, 85, 125, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 129,
-        "--chip-h": 90,
-        "--chip-step": 147,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 53,
-        "--strip-w": 70
-      }
-    },
-    "847c6dcd0c6a": {
-      "v": [166, 152, 179, 107, 152, 35, 152, 179, 128, 127, 64, 111, 154, 154, 35, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--suit-ink": 13
-      }
-    },
-    "857d6d9ae211": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 133, 127, 74, 111, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-step": 147,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 53,
-        "--strip-w": 70
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-step": 164,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--n": 136,
+        "--strip-w": 80
       }
     },
     "87cacfc7bc45": {
-      "v": [160, 152, 178, 65, 152, 35, 198, 178, 138, 127, 82, 111, 110, 154, 36, 53, 77, 152, 215],
+      "v": [176, 168, 194, 75, 168, 40, 214, 194, 154, 143, 94, 125, 124, 170, 41, 58, 89, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "8844fa4bcdd0": {
-      "v": [173, 152, 185, 65, 199, 83, 152, 179, 128, 127, 90, 98, 154, 122, 36, 53, 71, 203, 215],
+      "v": [189, 168, 201, 75, 215, 95, 168, 195, 144, 143, 103, 112, 170, 137, 41, 58, 82, 219, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "88a685a8a089": {
-      "v": [181, 144, 173, 65, 152, 35, 187, 173, 138, 127, 82, 111, 110, 154, 115, 53, 77, 152, 215],
+      "v": [197, 160, 189, 75, 168, 40, 203, 189, 154, 143, 94, 125, 124, 170, 130, 58, 89, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
-      }
-    },
-    "88f0cdb49925": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 128, 127, 64, 111, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--suit-ink": 12
-      }
-    },
-    "89aeb46823ff": {
-      "v": [164, 152, 179, 107, 152, 35, 152, 179, 152, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
       }
     },
     "8a6dc44097a5": {
-      "v": [173, 152, 179, 65, 152, 35, 196, 179, 145, 127, 75, 98, 154, 154, 36, 53, 58, 152, 215],
+      "v": [189, 168, 195, 75, 168, 40, 212, 195, 161, 143, 86, 112, 170, 170, 41, 58, 66, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "8afe95edc923": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 128, 127, 87, 111, 154, 154, 36, 53, 93, 152, 215],
+    "8a7f57c4320d": {
+      "v": [189, 168, 195, 139, 168, 40, 212, 195, 149, 143, 73, 125, 124, 170, 41, 58, 52, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--suit-ink": 12
       }
     },
-    "8bf7e3345c07": {
-      "v": [181, 152, 194, 35, 152, 35, 152, 194, 128, 127, 78, 98, 154, 154, 35, 53, 35, 152, 215],
+    "8a934df08e87": {
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 144, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 26,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 53
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--charge-dist": 26,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--gap": 146,
+        "--lean": 62,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 58,
+        "--ux": 58,
+        "--uy": 24
+      }
+    },
+    "8f99e853a6f5": {
+      "v": [190, 220, 195, 39, 168, 40, 198, 195, 144, 143, 71, 125, 170, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 145,
+        "--chip-h": 103,
+        "--chip-step": 164,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--n": 136,
+        "--strip-w": 80
+      }
+    },
+    "90657884a206": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 150, 143, 93, 112, 129, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "91f960b40c3f": {
-      "v": [181, 152, 157, 35, 152, 35, 152, 157, 128, 127, 78, 98, 154, 33, 102, 53, 35, 152, 215],
+      "v": [197, 168, 173, 40, 168, 40, 168, 173, 144, 143, 90, 112, 170, 38, 116, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "91ff5dbe90d9": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 128, 0, 99, 98, 154, 74, 116, 53, 37, 152, 215],
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 144, 0, 113, 112, 170, 85, 131, 58, 42, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
+      }
+    },
+    "92bfc4cef892": {
+      "v": [197, 168, 210, 120, 148, 105, 168, 189, 144, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "9478c8320de6": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 128, 127, 88, 111, 154, 154, 104, 53, 35, 152, 215],
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 144, 143, 101, 125, 170, 170, 118, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
-      }
-    },
-    "964bd25a1be7": {
-      "v": [181, 152, 194, 35, 152, 35, 152, 194, 128, 127, 74, 98, 154, 154, 40, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "977511f8b5fd": {
-      "v": [165, 152, 179, 107, 152, 35, 152, 179, 128, 127, 64, 111, 154, 154, 35, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--suit-ink": 12
       }
     },
     "97b4b76982f1": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 133, 127, 81, 98, 110, 154, 56, 53, 35, 152, 215],
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 149, 143, 93, 112, 124, 170, 64, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "9a285881018e": {
-      "v": [173, 152, 179, 65, 152, 35, 196, 179, 133, 127, 69, 98, 110, 154, 36, 53, 51, 152, 215],
+    "9873d7f57186": {
+      "v": [191, 227, 195, 127, 168, 40, 198, 195, 144, 143, 68, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "9ac91eeb9157": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 134, 127, 81, 98, 114, 154, 36, 53, 35, 152, 215],
+    "999c7f9d178c": {
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 144, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "9ab548968081": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 144, 143, 85, 125, 170, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "9cdef28d1b2e": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 168, 143, 93, 112, 124, 170, 41, 58, 108, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "9cf8895f5c96": {
-      "v": [183, 152, 179, 35, 152, 35, 152, 179, 133, 127, 81, 98, 154, 154, 36, 53, 81, 152, 215],
+      "v": [199, 168, 195, 40, 168, 40, 168, 195, 149, 143, 93, 112, 170, 170, 41, 58, 93, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "9d1cb2a8c02f": {
-      "v": [181, 152, 157, 35, 152, 35, 152, 157, 128, 127, 65, 98, 154, 154, 36, 53, 35, 152, 215],
+    "9ec12910333b": {
+      "v": [191, 225, 195, 120, 168, 40, 198, 195, 144, 143, 123, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "9d6ac5aa5ab9": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 128, 127, 69, 111, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 146,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "a002afbccc67": {
-      "v": [181, 152, 158, 35, 153, 44, 152, 157, 202, 127, 63, 111, 154, 27, 36, 53, 105, 203, 215],
+      "v": [197, 168, 174, 40, 169, 49, 168, 173, 218, 143, 72, 125, 170, 31, 41, 58, 119, 219, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "a54279db7085": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 128, 127, 81, 98, 154, 154, 36, 53, 35, 152, 135],
+    "a2a076c639e4": {
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 144, 143, 90, 112, 170, 170, 40, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--charge-dist": 25,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--gap": 69,
+        "--lean": 62,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 60,
+        "--ux": 59,
+        "--uy": 23
       }
     },
-    "a677c8751264": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 128, 127, 78, 98, 154, 154, 36, 53, 50, 152, 215],
+    "a586d866af2c": {
+      "v": [197, 168, 177, 40, 168, 40, 183, 177, 144, 143, 100, 125, 170, 170, 41, 58, 106, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "a69d4cba9a1b": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 133, 127, 74, 111, 55, 154, 36, 53, 51, 152, 215],
+    "a717124b97be": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 150, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "a8534a55ee81": {
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 149, 143, 85, 125, 63, 170, 41, 58, 56, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "a894c1b5b563": {
-      "v": [181, 152, 194, 124, 152, 35, 152, 194, 128, 127, 69, 111, 154, 154, 36, 53, 125, 152, 215],
+      "v": [197, 168, 210, 140, 168, 40, 168, 210, 144, 143, 79, 125, 170, 170, 41, 58, 141, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "ab08fc3feb9c": {
-      "v": [173, 152, 179, 65, 152, 35, 196, 179, 128, 127, 82, 98, 154, 154, 36, 53, 85, 152, 215],
+    "a8b917bb7886": {
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 149, 143, 85, 125, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-step": 162,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--n": 24,
+        "--strip-w": 80
       }
     },
-    "ad4290662090": {
-      "v": [181, 152, 194, 106, 132, 92, 152, 173, 128, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
+    "ad295bc3de58": {
+      "v": [197, 168, 173, 40, 168, 40, 168, 173, 144, 143, 75, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "ad5d6f4f7961": {
-      "v": [181, 144, 173, 65, 152, 35, 187, 173, 133, 127, 82, 111, 110, 154, 36, 25, 77, 152, 215],
+    "b4039c1a12dc": {
+      "v": [189, 168, 195, 75, 168, 40, 212, 195, 144, 143, 94, 112, 170, 170, 41, 58, 97, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "add6d143cf50": {
-      "v": [181, 152, 161, 35, 152, 35, 167, 161, 128, 127, 87, 111, 154, 154, 36, 53, 93, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "b052d388945c": {
-      "v": [175, 205, 179, 106, 152, 35, 182, 179, 128, 127, 109, 98, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 130,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "b4be3e94bb6f": {
-      "v": [173, 152, 179, 65, 152, 35, 163, 179, 133, 127, 69, 98, 114, 154, 36, 53, 45, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "b758613f13a7": {
-      "v": [181, 144, 173, 65, 152, 35, 187, 173, 133, 127, 82, 111, 110, 154, 36, 53, 77, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "b7d7d2120d4e": {
-      "v": [181, 152, 180, 35, 153, 44, 152, 179, 202, 127, 75, 98, 154, 154, 36, 53, 105, 152, 215],
+      "v": [197, 168, 196, 40, 169, 49, 168, 195, 218, 143, 86, 112, 170, 170, 41, 58, 119, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "b8bffd83a551": {
-      "v": [181, 152, 157, 35, 152, 35, 152, 157, 128, 127, 63, 111, 154, 27, 36, 53, 94, 203, 215],
+      "v": [197, 168, 173, 40, 168, 40, 168, 173, 144, 143, 72, 125, 170, 31, 41, 58, 107, 219, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "bdf0385e3d39": {
-      "v": [181, 152, 195, 65, 199, 83, 152, 157, 138, 127, 81, 111, 110, 154, 36, 53, 77, 152, 215],
+    "bdeb1fce86dd": {
+      "v": [197, 160, 189, 75, 168, 40, 203, 189, 149, 143, 94, 125, 124, 170, 41, 58, 89, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "bdf0385e3d39": {
+      "v": [197, 168, 211, 75, 215, 95, 168, 173, 154, 143, 93, 125, 124, 170, 41, 58, 89, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "bea5284b577a": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 133, 127, 81, 98, 100, 154, 115, 53, 35, 152, 215],
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 149, 143, 93, 112, 114, 170, 130, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "bf8a8012f771": {
-      "v": [175, 208, 179, 113, 152, 35, 182, 179, 128, 127, 60, 98, 154, 154, 36, 53, 35, 152, 215],
+    "c0d7eb34dad2": {
+      "v": [189, 168, 195, 75, 168, 40, 212, 195, 149, 143, 79, 112, 124, 170, 41, 58, 56, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "c214e404f39d": {
-      "v": [181, 152, 194, 35, 152, 35, 152, 194, 128, 127, 63, 98, 154, 154, 36, 53, 38, 152, 215],
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 144, 143, 72, 112, 170, 170, 41, 58, 43, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "c28a0d24839f": {
-      "v": [181, 152, 161, 35, 152, 35, 152, 161, 128, 0, 97, 98, 154, 31, 57, 53, 35, 152, 215],
+      "v": [197, 168, 177, 40, 168, 40, 168, 177, 144, 0, 111, 112, 170, 35, 65, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "c2e4c55b33b4": {
-      "v": [181, 143, 173, 65, 152, 35, 188, 173, 133, 127, 81, 98, 110, 154, 103, 53, 100, 152, 215],
+      "v": [197, 159, 189, 75, 168, 40, 204, 189, 149, 143, 93, 112, 124, 170, 117, 58, 114, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
-      }
-    },
-    "c3d1902a5e5c": {
-      "v": [175, 212, 179, 106, 152, 35, 182, 179, 128, 127, 109, 98, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 130,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "c44acd8c0fb5": {
-      "v": [181, 152, 173, 65, 152, 35, 152, 173, 133, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 24,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--n": 53
       }
     },
     "c51b674f22b2": {
-      "v": [181, 152, 194, 124, 152, 35, 152, 194, 128, 127, 78, 111, 154, 154, 36, 53, 61, 152, 215],
+      "v": [197, 168, 210, 140, 168, 40, 168, 210, 144, 143, 90, 125, 170, 170, 41, 58, 70, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
+      }
+    },
+    "c684b59e93e1": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 168, 143, 93, 112, 129, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "c6e5629ceeda": {
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 149, 143, 93, 112, 114, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "c76b0fb4b06b": {
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 144, 143, 90, 112, 170, 170, 40, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--charge-dist": 27,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--gap": 81,
+        "--lean": 87,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 37,
+        "--ux": 59,
+        "--uy": 23
       }
     },
     "ca89d9b1e9c0": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 201, 127, 75, 98, 154, 154, 115, 53, 35, 152, 215],
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 217, 143, 86, 112, 170, 170, 130, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "cf1488adf64d": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 128, 127, 74, 111, 154, 154, 36, 53, 35, 152, 215],
+    "caeaf9685e9c": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 149, 143, 93, 112, 129, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "d02481c5fc79": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 152, 127, 81, 98, 110, 154, 36, 53, 95, 152, 215],
+    "cc31b2cd6d83": {
+      "v": [190, 220, 195, 120, 168, 40, 192, 195, 144, 143, 123, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 146,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "d0dacc2dc899": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 134, 127, 81, 98, 46, 154, 36, 53, 76, 152, 215],
+    "cdb48e932683": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 144, 143, 73, 125, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--suit-ink": 13
+      }
+    },
+    "ce25c9eac7c9": {
+      "v": [189, 168, 195, 75, 168, 40, 212, 195, 149, 143, 79, 112, 129, 170, 41, 58, 50, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "d39306be2856": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 133, 127, 81, 98, 92, 154, 56, 53, 35, 152, 215],
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 149, 143, 93, 112, 105, 170, 64, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "d6d623b060a2": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 152, 127, 81, 98, 114, 154, 36, 53, 35, 152, 215],
+    "d4ea2e87e606": {
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 144, 143, 85, 112, 170, 170, 45, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "d9501e11cb77": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 133, 127, 81, 98, 154, 154, 52, 53, 65, 152, 215],
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 149, 143, 93, 112, 170, 170, 57, 58, 75, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "dc31819d83fc": {
-      "v": [181, 152, 179, 35, 152, 35, 152, 179, 133, 127, 81, 98, 114, 154, 36, 53, 35, 152, 215],
+    "da452fa4e83b": {
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 149, 143, 93, 112, 63, 170, 130, 58, 53, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "db1b9bf4d34e": {
+      "v": [185, 168, 189, 139, 168, 40, 168, 189, 144, 143, 61, 125, 170, 170, 41, 58, 54, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--charge-dist": 26,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--gap": 146,
+        "--lean": 62,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 58,
+        "--ux": 58,
+        "--uy": 24
+      }
+    },
+    "db4b0d56f314": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 149, 143, 93, 112, 124, 170, 64, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "dc14c6162f9d": {
+      "v": [193, 168, 195, 121, 168, 40, 168, 195, 144, 143, 73, 125, 170, 170, 40, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--suit-ink": 2
       }
     },
     "dd806c9e9674": {
-      "v": [181, 143, 184, 42, 200, 84, 188, 173, 133, 127, 81, 98, 110, 154, 43, 53, 100, 152, 215],
+      "v": [197, 159, 200, 47, 216, 96, 204, 189, 149, 143, 93, 112, 124, 170, 48, 58, 114, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "df6ead2f4f28": {
-      "v": [181, 152, 157, 35, 152, 35, 152, 157, 152, 127, 65, 98, 154, 154, 36, 53, 35, 152, 215],
+    "e021997186d5": {
+      "v": [191, 227, 195, 120, 168, 40, 198, 195, 144, 143, 123, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 146,
+        "--charge-dist": 26,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--gap": 146,
+        "--lean": 62,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 58,
+        "--ux": 58,
+        "--uy": 24
       }
     },
-    "e165b2a9aa5c": {
-      "v": [181, 152, 194, 35, 152, 35, 152, 194, 152, 127, 74, 98, 154, 154, 36, 53, 39, 152, 215],
+    "e0e60ea20659": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 152, 143, 85, 125, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
-      }
-    },
-    "e28c2f805654": {
-      "v": [181, 152, 173, 35, 152, 35, 152, 173, 128, 127, 81, 98, 154, 154, 36, 53, 35, 152, 215],
-      "vars": {
-        "--aspect": 29,
-        "--back": 214,
-        "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "e7e84bdfd869": {
-      "v": [181, 143, 173, 87, 152, 35, 190, 173, 128, 127, 81, 98, 154, 154, 36, 53, 89, 152, 215],
+      "v": [197, 159, 189, 100, 168, 40, 206, 189, 144, 143, 93, 112, 170, 170, 41, 58, 102, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "e829d7a4692f": {
-      "v": [181, 152, 193, 65, 199, 83, 152, 194, 152, 127, 74, 111, 110, 154, 115, 53, 58, 152, 215],
+      "v": [197, 168, 209, 75, 215, 95, 168, 210, 168, 143, 85, 125, 124, 170, 130, 58, 66, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
     "e8fe5db7ab6e": {
-      "v": [181, 143, 173, 67, 152, 35, 191, 173, 133, 127, 81, 98, 110, 154, 101, 53, 100, 152, 215],
+      "v": [197, 159, 189, 77, 168, 40, 207, 189, 149, 143, 93, 112, 124, 170, 115, 58, 114, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "ea882c2e0f52": {
-      "v": [173, 152, 179, 123, 152, 35, 196, 179, 133, 127, 64, 111, 110, 154, 36, 53, 47, 152, 215],
+    "e9a5606daa2f": {
+      "v": [197, 171, 189, 75, 168, 40, 186, 189, 149, 143, 93, 112, 63, 170, 41, 58, 133, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130,
-        "--suit-ink": 2
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "ee48f0f9939e": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 144, 143, 90, 112, 170, 170, 41, 58, 55, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
     "f013b70bd342": {
-      "v": [173, 152, 179, 124, 152, 35, 152, 179, 128, 127, 69, 111, 154, 154, 36, 53, 125, 152, 215],
+      "v": [189, 168, 195, 140, 168, 40, 168, 195, 144, 143, 79, 125, 170, 170, 41, 58, 141, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
       }
     },
-    "f0430007d05f": {
-      "v": [174, 204, 179, 86, 152, 35, 182, 179, 128, 127, 91, 98, 154, 154, 36, 53, 35, 152, 215],
+    "f1f74df24816": {
+      "v": [197, 168, 189, 40, 168, 40, 168, 189, 149, 143, 85, 125, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 91,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-step": 163,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--n": 58,
+        "--strip-w": 80
       }
     },
-    "fb79fa4403e7": {
-      "v": [174, 204, 179, 106, 152, 35, 176, 179, 128, 127, 109, 98, 154, 154, 36, 53, 35, 152, 215],
+    "f2841eb5361b": {
+      "v": [191, 228, 195, 120, 168, 40, 198, 195, 144, 143, 123, 112, 170, 170, 41, 58, 40, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 130,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 146,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
       }
     },
-    "fba58cef3c4b": {
-      "v": [175, 211, 179, 113, 152, 35, 182, 179, 128, 127, 60, 98, 154, 154, 36, 53, 35, 152, 215],
+    "f64a0029fac3": {
+      "v": [189, 168, 195, 139, 168, 40, 212, 195, 149, 143, 73, 125, 124, 170, 41, 58, 52, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19,
-        "--card-w": 131,
-        "--chip-h": 90,
-        "--chip-w": 129,
-        "--fan-overlap": 23,
-        "--fly-ms": 96,
-        "--mid-w": 130
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--suit-ink": 2
+      }
+    },
+    "f6a199bd10db": {
+      "v": [191, 227, 195, 127, 168, 40, 178, 195, 144, 143, 68, 112, 170, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "fa556813a49e": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 150, 143, 93, 112, 124, 170, 41, 58, 108, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "fadd0dc24141": {
+      "v": [191, 224, 195, 127, 168, 40, 198, 195, 144, 143, 68, 112, 170, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "fbb69658e33e": {
+      "v": [197, 168, 189, 75, 168, 40, 168, 189, 149, 143, 93, 112, 170, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--charge-dist": 25,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 30,
+        "--fly-ms": 110,
+        "--gap": 69,
+        "--lean": 62,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 60,
+        "--ux": 59,
+        "--uy": 23
       }
     },
     "fd9a5ce75a7c": {
-      "v": [181, 152, 194, 35, 152, 35, 152, 194, 128, 127, 73, 98, 154, 154, 36, 53, 119, 152, 215],
+      "v": [197, 168, 210, 40, 168, 40, 168, 210, 144, 143, 84, 112, 170, 170, 41, 58, 134, 168, 231],
       "vars": {
-        "--aspect": 29,
-        "--back": 214,
+        "--aspect": 33,
+        "--back": 230,
         "--back-colour": 19
+      }
+    },
+    "fe21d7509a92": {
+      "v": [190, 220, 195, 98, 168, 40, 198, 195, 144, 143, 104, 112, 170, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 104,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "ff0c0f077b2b": {
+      "v": [197, 168, 189, 75, 168, 40, 168, 189, 149, 143, 93, 112, 103, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--charge-dist": 26,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--gap": 146,
+        "--lean": 62,
+        "--mid-w": 146,
+        "--n": 58,
+        "--tempo": 58,
+        "--ux": 58,
+        "--uy": 24
+      }
+    },
+    "ff52bad3c907": {
+      "v": [190, 220, 195, 127, 168, 40, 198, 195, 144, 143, 68, 112, 170, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146
+      }
+    },
+    "ff6e8510c2b2": {
+      "v": [197, 168, 195, 40, 168, 40, 168, 195, 144, 143, 73, 125, 170, 170, 41, 58, 40, 168, 231],
+      "vars": {
+        "--aspect": 33,
+        "--back": 230,
+        "--back-colour": 19,
+        "--beat-aftermath": 109,
+        "--beat-charge": 74,
+        "--beat-fx-out": 99,
+        "--beat-sparkle": 110,
+        "--beat-strike": 128,
+        "--beat-vibrate": 138,
+        "--card-w": 147,
+        "--chip-h": 103,
+        "--chip-w": 145,
+        "--fan-overlap": 24,
+        "--fly-ms": 110,
+        "--mid-w": 146,
+        "--suit-ink": 12
       }
     }
   },
@@ -1672,16 +2316,16 @@
       "changes": {
         "#app": "d9501e11cb77",
         "#endgameScreen h1": "c28a0d24839f",
-        "#tableScreen": "d6d623b060a2",
+        "#tableScreen": "c684b59e93e1",
         "#toast": "12732254b743",
-        ".actions": "6dcc813e83f6",
-        ".actions .btn-primary": "ad5d6f4f7961",
-        ".badge": "22fe8c2926df",
+        ".actions": "da452fa4e83b",
+        ".actions .btn-primary": "5cf07a733498",
+        ".badge": "8a7f57c4320d",
         ".badge.dim": null,
-        ".badge.trump": "22fe8c2926df",
-        ".badge.trump .suit": "88f0cdb49925",
-        ".badge.trump::before": "977511f8b5fd",
-        ".briscola": "e28c2f805654",
+        ".badge.trump": "8a7f57c4320d",
+        ".badge.trump .suit": "ff6e8510c2b2",
+        ".badge.trump::before": "52b09e9eb64c",
+        ".briscola": "999c7f9d178c",
         ".briscola.gone": null,
         ".btn": "88a685a8a089",
         ".btn-block": "88a685a8a089",
@@ -1690,38 +2334,38 @@
         ".btn-primary": "88a685a8a089",
         ".btn-secondary": "78871f860bea",
         ".btn-sm": "78871f860bea",
-        ".btn:disabled": "ad5d6f4f7961",
-        ".card": "fb79fa4403e7",
+        ".btn:disabled": "5cf07a733498",
+        ".card": "cc31b2cd6d83",
         ".card .rank": null,
         ".card .rank.br": null,
         ".card-box": "782bb295af37",
         ".card-box.prose p": "4117b9a2a6af",
         ".card-box.resume": "782bb295af37",
         ".card.arriving": null,
-        ".card.back": "fb79fa4403e7",
+        ".card.back": "cc31b2cd6d83",
         ".card.face": null,
         ".card.glyph .suit": null,
         ".card.glyph.suit-B .rank": null,
         ".card.glyph.suit-C .rank": null,
         ".card.glyph.suit-D .rank": null,
         ".card.glyph.suit-S .rank": null,
-        ".card.mid": "fb79fa4403e7",
+        ".card.mid": "cc31b2cd6d83",
         ".card.playable": null,
         ".card.selected": null,
         ".card.tiny": null,
         ".chip": null,
         ".code-input": "8844fa4bcdd0",
-        ".conn-dot": "89aeb46823ff",
+        ".conn-dot": "0382b92cceae",
         ".conn-dot.off": null,
         ".conn-dot.on": null,
-        ".desk-only": "63c333b3be5e",
+        ".desk-only": "1ec15b5a7bcf",
         ".empty-note": "fd9a5ce75a7c",
         ".empty-note.left": "fd9a5ce75a7c",
         ".field": "bea5284b577a",
         ".field-label": "c214e404f39d",
-        ".hand": "d0dacc2dc899",
-        ".hand-area": "3b25b5110b85",
-        ".hand-header": "a69d4cba9a1b",
+        ".hand": "7df7f7abd224",
+        ".hand-area": "0868545ec262",
+        ".hand-header": "a8534a55ee81",
         ".hand.active .card": null,
         ".hand.hidden-cards .card": null,
         ".hand.inert": null,
@@ -1730,21 +2374,21 @@
         ".history-detail dt": null,
         ".history-row .who": null,
         ".history-row > summary": null,
-        ".icon-btn": "ab08fc3feb9c",
+        ".icon-btn": "b4039c1a12dc",
         ".masthead .subtitle": "91f960b40c3f",
         ".menu-list": "0853d024d03f",
         ".mode-btn": "f013b70bd342",
         ".mode-btn.active": "f013b70bd342",
         ".mode-switch": "dd806c9e9674",
-        ".my-taken": "964bd25a1be7",
-        ".my-tricks": "857d6d9ae211",
+        ".my-taken": "d4ea2e87e606",
+        ".my-tricks": "f1f74df24816",
         ".my-tricks .card.chip": null,
         ".opp-strip": null,
         ".overlay": "61049a550572",
         ".overlay.curtain": "61049a550572",
         ".overlay.curtain .btn-ghost": "e829d7a4692f",
         ".overlay.curtain .sheet": "e7e84bdfd869",
-        ".pile-label": "640664053d7a",
+        ".pile-label": "60890314f549",
         ".play": null,
         ".play .card": null,
         ".play .card.taking": null,
@@ -1767,46 +2411,46 @@
         ".score-list": "97b4b76982f1",
         ".score-row": null,
         ".score-row .who": null,
-        ".score-strip": "dc31819d83fc",
-        ".seat": "d02481c5fc79",
-        ".seat .conn-dot": "89aeb46823ff",
-        ".seat-cards": "67d10e318e6a",
-        ".seat-name": "12de4259d240",
-        ".seat-taken": "52ff1fb86f24",
+        ".score-strip": "caeaf9685e9c",
+        ".seat": "9cdef28d1b2e",
+        ".seat .conn-dot": "0382b92cceae",
+        ".seat-cards": "5a6ce02f6f63",
+        ".seat-name": "e0e60ea20659",
+        ".seat-taken": "6eaa2f4abda9",
         ".seat-taken .card.chip": null,
         ".seat.to-move .seat-name::before": null,
-        ".seat[data-pos=\"left\"]": "d02481c5fc79",
-        ".seat[data-pos=\"right\"]": "d02481c5fc79",
-        ".seat[data-pos=\"top\"]": "44a903ce2ca6",
-        ".seats": "5ddcd3b55e06",
+        ".seat[data-pos=\"left\"]": "9cdef28d1b2e",
+        ".seat[data-pos=\"right\"]": "9cdef28d1b2e",
+        ".seat[data-pos=\"top\"]": "fa556813a49e",
+        ".seats": "a717124b97be",
         ".sheet": "e7e84bdfd869",
         ".sheet-sub": "81e3df0fee84",
         ".sheet-title": "9478c8320de6",
-        ".slot": "2e1b87a7edd7",
-        ".slot.empty::before": "65481e4202f0",
-        ".status-line": "a677c8751264",
-        ".stock": "e28c2f805654",
-        ".stock .card.back": "fb79fa4403e7",
-        ".stock-area": "06200b977939",
+        ".slot": "1d74abfd4aeb",
+        ".slot.empty::before": "0f15dd177d36",
+        ".status-line": "ee48f0f9939e",
+        ".stock": "999c7f9d178c",
+        ".stock .card.back": "cc31b2cd6d83",
+        ".stock-area": "c6e5629ceeda",
         ".stock.empty": null,
         ".tab-btn": "453c9e62cdf2",
         ".tab-btn.active": "453c9e62cdf2",
         ".tab-submenu": "4a3a382d96ef",
         ".tabbar": "e8fe5db7ab6e",
-        ".table-center": "6f1c66c31d40",
-        ".topbar": "dc31819d83fc",
-        ".topbar .badges": "80672104c322",
-        ".trick": "2a54857f42da",
+        ".table-center": "e9a5606daa2f",
+        ".topbar": "caeaf9685e9c",
+        ".topbar .badges": "db4b0d56f314",
+        ".trick": "ff0c0f077b2b",
         ".trick-cards": null,
         ".trick-cards .who": null,
         ".trick.drop": null,
         ".trick.drop-ready": null,
-        ".trick:empty::before": "437090cec122",
-        ".waiting-note": "e165b2a9aa5c",
+        ".trick:empty::before": "64f407d35ae0",
+        ".waiting-note": "5aebd31969cf",
         ":root": "542c711759e4",
         "body": "79e9d2243306",
         "h1": "7bea87ba3818",
-        "input[type=\"text\"]": "76a6b552da48",
+        "input[type=\"text\"]": "07278f916f0d",
         "label": "08012b00254a",
         "select": "5c1fec3de207"
       }
@@ -1826,7 +2470,8 @@
       "name": "04 host: waiting for the opponent",
       "changes": {
         ".tab-btn": "453c9e62cdf2",
-        ".tabbar": "e8fe5db7ab6e"
+        ".tabbar": "e8fe5db7ab6e",
+        "input[type=\"text\"]": "76a6b552da48"
       }
     },
     {
@@ -1838,34 +2483,34 @@
     {
       "name": "06 local: dealt, curtain up",
       "changes": {
-        "#tableScreen": "9ac91eeb9157",
-        ".badge": "622779fadda7",
-        ".badge.trump": "622779fadda7",
-        ".badge.trump .suit": "2d50132f8f3d",
-        ".badge.trump::before": "847c6dcd0c6a",
-        ".card": "f0430007d05f",
-        ".card.back": "f0430007d05f",
-        ".card.face": "082100fc7887",
-        ".card.tiny": "f0430007d05f",
-        ".hand.hidden-cards .card": "3bd9b2004d08",
-        ".hand.inert": "d0dacc2dc899",
-        ".my-tricks": "4de80316b63c",
+        "#tableScreen": "90657884a206",
+        ".badge": "0eea05e65aa9",
+        ".badge.trump": "0eea05e65aa9",
+        ".badge.trump .suit": "cdb48e932683",
+        ".badge.trump::before": "781f0798eb78",
+        ".card": "fe21d7509a92",
+        ".card.back": "fe21d7509a92",
+        ".card.face": "5197f73285e6",
+        ".card.tiny": "fe21d7509a92",
+        ".hand.hidden-cards .card": "ff52bad3c907",
+        ".hand.inert": "7df7f7abd224",
+        ".my-tricks": "a8b917bb7886",
         ".overlay": "9cf8895f5c96",
         ".overlay.curtain": "9cf8895f5c96",
         ".overlay.curtain .btn-ghost": "0a67a9eaaa76",
-        ".sc-name": "9d6ac5aa5ab9",
-        ".sc-points": "8afe95edc923",
-        ".sc-tricks": "9d1cb2a8c02f",
-        ".score-cell": "b4be3e94bb6f",
-        ".score-cell.mine": "b4be3e94bb6f",
+        ".sc-name": "439811a53f25",
+        ".sc-points": "0141db7a0db7",
+        ".sc-tricks": "ad295bc3de58",
+        ".score-cell": "37c6f39b39d8",
+        ".score-cell.mine": "37c6f39b39d8",
         ".slot.empty::before": null
       }
     },
     {
       "name": "07 local: dealt, my hand",
       "changes": {
-        ".card.playable": "fba58cef3c4b",
-        ".hand.active .card": "fba58cef3c4b",
+        ".card.playable": "9873d7f57186",
+        ".hand.active .card": "9873d7f57186",
         ".hand.hidden-cards .card": null,
         ".hand.inert": null,
         ".overlay": "61049a550572",
@@ -1875,37 +2520,37 @@
     {
       "name": "08 local: a card lifted",
       "changes": {
-        ".actions .btn-primary": "b758613f13a7",
+        ".actions .btn-primary": "bdeb1fce86dd",
         ".btn:disabled": null,
-        ".card.playable": "52ec42c9bbef",
-        ".card.selected": "52ec42c9bbef",
-        ".hand.active .card": "52ec42c9bbef"
+        ".card.playable": "f6a199bd10db",
+        ".card.selected": "f6a199bd10db",
+        ".hand.active .card": "f6a199bd10db"
       }
     },
     {
       "name": "09 local: a card played, curtain for the other seat",
       "changes": {
-        ".actions .btn-primary": "ad5d6f4f7961",
-        ".btn:disabled": "ad5d6f4f7961",
+        ".actions .btn-primary": "5cf07a733498",
+        ".btn:disabled": "5cf07a733498",
         ".card.playable": null,
         ".card.selected": null,
         ".hand.active .card": null,
-        ".hand.hidden-cards .card": "3bd9b2004d08",
-        ".hand.inert": "d0dacc2dc899",
+        ".hand.hidden-cards .card": "ff52bad3c907",
+        ".hand.inert": "7df7f7abd224",
         ".overlay": "9cf8895f5c96",
         ".overlay.curtain": "9cf8895f5c96",
-        ".play": "136c24533c51",
-        ".play .card": "36790eccb115",
-        ".play .who": "3403f6a3f6e2",
-        ".score-cell": "06386f2822d1",
+        ".play": "8a934df08e87",
+        ".play .card": "e021997186d5",
+        ".play .who": "db1b9bf4d34e",
+        ".score-cell": "ce25c9eac7c9",
         ".trick:empty::before": null
       }
     },
     {
       "name": "10 local: the second seat to play",
       "changes": {
-        ".card.playable": "bf8a8012f771",
-        ".hand.active .card": "bf8a8012f771",
+        ".card.playable": "fadd0dc24141",
+        ".hand.active .card": "fadd0dc24141",
         ".hand.hidden-cards .card": null,
         ".hand.inert": null,
         ".overlay": "61049a550572",
@@ -1916,29 +2561,30 @@
       "name": "11 local: trick taken, curtain for the winner",
       "changes": {
         ".card.playable": null,
-        ".chip": "829b679d53f9",
+        ".chip": "0a9cc3e46f76",
         ".hand.active .card": null,
-        ".hand.hidden-cards .card": "3bd9b2004d08",
-        ".hand.inert": "d0dacc2dc899",
-        ".my-tricks": "857d6d9ae211",
-        ".my-tricks .card.chip": "829b679d53f9",
+        ".hand.hidden-cards .card": "ff52bad3c907",
+        ".hand.inert": "7df7f7abd224",
+        ".my-tricks": "f1f74df24816",
+        ".my-tricks .card.chip": "0a9cc3e46f76",
         ".overlay": "9cf8895f5c96",
         ".overlay.curtain": "9cf8895f5c96",
         ".play": null,
         ".play .card": null,
         ".play .who": null,
-        ".sc-points": "add6d143cf50",
-        ".score-cell": "b4be3e94bb6f",
-        ".score-cell.leading .sc-points": "add6d143cf50",
-        ".seat-taken .card.chip": "829b679d53f9",
-        ".trick:empty::before": "437090cec122"
+        ".sc-points": "a586d866af2c",
+        ".score-cell": "37c6f39b39d8",
+        ".score-cell.leading .sc-points": "a586d866af2c",
+        ".seat-taken .card.chip": "0a9cc3e46f76",
+        ".trick": "1ac15dc1b6c9",
+        ".trick:empty::before": "c76b0fb4b06b"
       }
     },
     {
       "name": "12 local: after the first trick",
       "changes": {
-        ".card.playable": "55240df46b01",
-        ".hand.active .card": "55240df46b01",
+        ".card.playable": "5b13e7855e82",
+        ".hand.active .card": "5b13e7855e82",
         ".hand.hidden-cards .card": null,
         ".hand.inert": null,
         ".overlay": "61049a550572",
@@ -1965,27 +2611,29 @@
     {
       "name": "16 game over: result sheet",
       "changes": {
-        ".briscola": "a54279db7085",
-        ".briscola.gone": "a54279db7085",
-        ".card": "7dd355fc2bcb",
-        ".card.back": "7dd355fc2bcb",
-        ".card.face": "141a2f2051f8",
-        ".card.mid": "141a2f2051f8",
+        ".briscola": "6ce7377b8a0f",
+        ".briscola.gone": "6ce7377b8a0f",
+        ".card": "2ebebc8c37fc",
+        ".card.back": "2ebebc8c37fc",
+        ".card.face": "7651e7da1646",
+        ".card.mid": "7651e7da1646",
         ".card.playable": null,
         ".card.tiny": null,
-        ".chip": "7dd355fc2bcb",
+        ".chip": "2ebebc8c37fc",
         ".hand.active .card": null,
-        ".hand.inert": "d0dacc2dc899",
-        ".my-tricks": "6b45d04feea2",
-        ".my-tricks .card.chip": "3a69c924f4a7",
-        ".score-cell": "06386f2822d1",
+        ".hand.inert": "7df7f7abd224",
+        ".my-tricks": "8734415e768d",
+        ".my-tricks .card.chip": "8f99e853a6f5",
+        ".score-cell": "ce25c9eac7c9",
         ".score-row": "24b163d56226",
         ".score-row .who": "338c0e8cf52b",
-        ".seat-taken .card.chip": "7dd355fc2bcb",
-        ".slot.empty::before": "65481e4202f0",
-        ".stock": "ad4290662090",
+        ".seat-taken .card.chip": "2ebebc8c37fc",
+        ".slot.empty::before": "0f15dd177d36",
+        ".stock": "92bfc4cef892",
         ".stock .card.back": null,
-        ".stock.empty": "ad4290662090"
+        ".stock.empty": "92bfc4cef892",
+        ".trick": "1fb4b0bd48cd",
+        ".trick:empty::before": "a2a076c639e4"
       }
     },
     {
@@ -1995,59 +2643,59 @@
     {
       "name": "18 play again: curtain up for the new deal",
       "changes": {
-        ".badge": "22fe8c2926df",
-        ".badge.trump": "22fe8c2926df",
-        ".badge.trump .suit": "88f0cdb49925",
-        ".badge.trump::before": "977511f8b5fd",
-        ".briscola": "e28c2f805654",
+        ".badge": "8a7f57c4320d",
+        ".badge.trump": "8a7f57c4320d",
+        ".badge.trump .suit": "ff6e8510c2b2",
+        ".badge.trump::before": "52b09e9eb64c",
+        ".briscola": "999c7f9d178c",
         ".briscola.gone": null,
-        ".card": "f0430007d05f",
-        ".card.back": "f0430007d05f",
-        ".card.face": "c3d1902a5e5c",
-        ".card.mid": "fb79fa4403e7",
-        ".card.tiny": "f0430007d05f",
+        ".card": "fe21d7509a92",
+        ".card.back": "fe21d7509a92",
+        ".card.face": "f2841eb5361b",
+        ".card.mid": "cc31b2cd6d83",
+        ".card.tiny": "fe21d7509a92",
         ".chip": null,
-        ".hand.hidden-cards .card": "3bd9b2004d08",
-        ".my-tricks": "4de80316b63c",
+        ".hand.hidden-cards .card": "ff52bad3c907",
+        ".my-tricks": "a8b917bb7886",
         ".my-tricks .card.chip": null,
         ".overlay": "9cf8895f5c96",
         ".overlay.curtain": "9cf8895f5c96",
-        ".sc-points": "8afe95edc923",
+        ".sc-points": "0141db7a0db7",
         ".score-cell.leading .sc-points": null,
         ".seat-taken .card.chip": null,
         ".slot.empty::before": null,
-        ".stock": "e28c2f805654",
-        ".stock .card.back": "fb79fa4403e7",
+        ".stock": "999c7f9d178c",
+        ".stock .card.back": "cc31b2cd6d83",
         ".stock.empty": null
       }
     },
     {
       "name": "19 local 3p: curtain up",
       "changes": {
-        ".badge": "622779fadda7",
-        ".badge.trump": "622779fadda7",
-        ".badge.trump .suit": "2d50132f8f3d",
-        ".badge.trump::before": "847c6dcd0c6a",
-        ".card.face": "36ab3961e8b1",
+        ".badge": "0eea05e65aa9",
+        ".badge.trump": "0eea05e65aa9",
+        ".badge.trump .suit": "cdb48e932683",
+        ".badge.trump::before": "781f0798eb78",
+        ".card.face": "9ec12910333b",
         ".overlay.curtain .btn-ghost": "e829d7a4692f",
-        ".sc-tricks": "df6ead2f4f28",
-        ".score-cell": "9a285881018e",
-        ".score-cell.mine": "65da9242a300",
-        ".seat": "44a903ce2ca6",
-        ".seat-name": "cf1488adf64d",
-        ".seat-taken": "4834db9edefc",
-        ".seat[data-pos=\"left\"]": "44a903ce2ca6",
-        ".seat[data-pos=\"right\"]": "44a903ce2ca6",
-        ".seat[data-pos=\"top\"]": "d02481c5fc79",
-        ".trick": "c44acd8c0fb5",
-        ".trick:empty::before": "4270f7930e0b"
+        ".sc-tricks": "144682be85b2",
+        ".score-cell": "c0d7eb34dad2",
+        ".score-cell.mine": "69e4ac0d411e",
+        ".seat": "fa556813a49e",
+        ".seat-name": "9ab548968081",
+        ".seat-taken": "74cd5eefa0b2",
+        ".seat[data-pos=\"left\"]": "fa556813a49e",
+        ".seat[data-pos=\"right\"]": "fa556813a49e",
+        ".seat[data-pos=\"top\"]": "9cdef28d1b2e",
+        ".trick": "3a24c187133d",
+        ".trick:empty::before": "5c7422515ac9"
       }
     },
     {
       "name": "20 local 3p: dealt",
       "changes": {
-        ".card.playable": "7c1cbb3e8d85",
-        ".hand.active .card": "7c1cbb3e8d85",
+        ".card.playable": "7545daa71f3a",
+        ".hand.active .card": "7545daa71f3a",
         ".hand.hidden-cards .card": null,
         ".hand.inert": null,
         ".overlay": "61049a550572",
@@ -2057,22 +2705,22 @@
     {
       "name": "21 local 4p: dealt, the team score",
       "changes": {
-        ".badge": "ea882c2e0f52",
-        ".badge.trump": "ea882c2e0f52",
-        ".badge.trump .suit": "2dbdafa15584",
-        ".badge.trump::before": "054cd1e1a9d6",
-        ".card.face": "b052d388945c",
-        ".card.playable": "66c7f7a96d86",
-        ".hand.active .card": "66c7f7a96d86",
-        ".seat[data-pos=\"top\"]": "44a903ce2ca6",
-        ".trick": "07c96250fb40",
-        ".trick:empty::before": "8bf7e3345c07"
+        ".badge": "f64a0029fac3",
+        ".badge.trump": "f64a0029fac3",
+        ".badge.trump .suit": "41138c22d370",
+        ".badge.trump::before": "dc14c6162f9d",
+        ".card.face": "03662ad3b627",
+        ".card.playable": "271b7d0755bf",
+        ".hand.active .card": "271b7d0755bf",
+        ".seat[data-pos=\"top\"]": "fa556813a49e",
+        ".trick": "fbb69658e33e",
+        ".trick:empty::before": "5c13dd9bdd12"
       }
     },
     {
       "name": "22 home: after the games",
       "changes": {
-        "#tableScreen": "d6d623b060a2"
+        "#tableScreen": "c684b59e93e1"
       }
     }
   ]
