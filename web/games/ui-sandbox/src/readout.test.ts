@@ -1,0 +1,194 @@
+// The readout's text over a reading: the device line, the bar's state from the corners, the map
+// and the media rows.
+import { describe, expect, test } from 'vitest';
+
+import type { FrameReading } from '../../../shared/edge/screen.ts';
+import { safeAreaMap } from '../../../shared/lib/safeArea.ts';
+import { EXAMPLES, exampleById, exampleReport } from './examples.ts';
+import { drawMap, mapRows } from './mapSvg.ts';
+import { BAR_COPY, barOf, matchedDevice, readoutLines, type Readout } from './readout.ts';
+
+const reading: FrameReading = {
+  inputs: { screen: { width: 393, height: 852 }, dpr: 3, notch: 59 },
+  insets: { top: 0, right: 59, bottom: 21, left: 59 },
+  mode: 'browser',
+  orientation: 'landscape',
+  viewport: { width: 852, height: 343 },
+  full: { width: 852, height: 393 },
+  radius: 55,
+  reach: { tl: false, tr: false, br: true, bl: true },
+  corners: { tl: 0, tr: 0, br: 55, bl: 55 },
+};
+const map = safeAreaMap({
+  corners: reading.corners,
+  cut: { length: 126, island: true },
+  type: 'landscape-primary',
+  insets: reading.insets,
+  viewport: { width: 852, height: 343 },
+  full: reading.full,
+});
+const readout: Readout = {
+  reading,
+  type: 'landscape-primary',
+  typeForced: false,
+  visual: { width: 852, height: 343, scale: 1 },
+  units: { svh: 343, dvh: 343, lvh: 393, vw: 852 },
+  media: [
+    ['LANDSCAPE_PHONE', true],
+    ['hover none', false],
+  ],
+  map,
+  flipped: false,
+  frameOn: true,
+};
+
+describe('readout', () => {
+  test('barOf: installed none; every corner hidden; top pair square top; bottom pair square bottom; else unknown', () => {
+    const all = { tl: true, tr: true, br: true, bl: true };
+    expect(barOf('standalone', all)).toBe('none');
+    expect(barOf('browser', all)).toBe('hidden');
+    expect(barOf('browser', reading.reach)).toBe('top');
+    expect(barOf('browser', { tl: true, tr: true, br: false, bl: false })).toBe('bottom');
+    expect(barOf('browser', { tl: false, tr: false, br: false, bl: false })).toBe('unknown');
+    expect(Object.keys(BAR_COPY)).toHaveLength(5);
+  });
+
+  test('the lines: the matched row, the bar at the top, the corners, the map, the media', () => {
+    expect(matchedDevice(reading)?.id).toBe('iphone-393x852');
+    const lines = readoutLines(readout);
+    expect(lines[0]).toContain('iphone-393x852');
+    expect(lines[1]).toContain('126pt island');
+    expect(lines).toContain(BAR_COPY.top);
+    expect(lines.find((l) => l.startsWith('reaches'))).toBe(
+      'reaches tl square  tr square  br 55  bl 55',
+    );
+    expect(lines.find((l) => l.startsWith('cut side'))).toContain(
+      'cut side left  at 83.5-209.5 (126)',
+    );
+    expect(lines.find((l) => l.startsWith('safe left'))).toContain(', ');
+    expect(lines.filter((l) => l.startsWith('match'))).toHaveLength(1);
+    const unknown = readoutLines({
+      ...readout,
+      reading: { ...reading, inputs: null, viewport: null, full: null },
+      type: null,
+      typeForced: true,
+      visual: null,
+      frameOn: false,
+      flipped: true,
+      map: safeAreaMap({
+        ...map,
+        corners: reading.corners,
+        cut: null,
+        type: 'portrait-primary',
+        insets: reading.insets,
+        viewport: { width: 1, height: 1 },
+        full: null,
+      }),
+    });
+    expect(unknown[0]).toContain('unknown: heuristic');
+    expect(unknown.find((l) => l.startsWith('display-mode'))).toContain(
+      'type unavailable (forced by ?type=)',
+    );
+    expect(unknown.find((l) => l.startsWith('frame'))).toBe('frame off  flip on');
+    expect(unknown.find((l) => l.startsWith('cut side'))).toBe('cut side none  ear 0');
+  });
+
+  test('the examples: nine ids, the fallback, the report over measured boxes', () => {
+    expect(EXAMPLES.map((e) => e.id)).toEqual([
+      'cover',
+      'side',
+      'sides',
+      'top',
+      'strips',
+      'board',
+      'rail',
+      'ears',
+      'gutters',
+    ]);
+    expect(exampleById('rail').label).toContain('(g)');
+    const viewport = { width: 852, height: 343 };
+    const r = exampleReport(
+      [
+        { name: 'content', rect: { left: 70, top: 11, width: 700, height: 300 }, fixed: false },
+        { name: 'rail', rect: { left: 800, top: 60, width: 44, height: 200 }, fixed: true },
+        { name: 'ear1', rect: { left: 7, top: 10, width: 44, height: 60 }, fixed: true },
+      ],
+      viewport,
+      map,
+      false,
+    );
+    expect(r.fits).toBe(true);
+    expect(r.gaps).toEqual({ top: 11, left: 70, right: 82, bottom: 32 });
+    expect(r.placements).toEqual(['rail: right segment 1', 'ear1: left segment 1']);
+    expect(r.lines[0]).toBe('fits without scroll');
+    const bad = exampleReport(
+      [
+        { name: 'x', rect: { left: -2, top: 0, width: 10, height: 10 }, fixed: false },
+        { name: 'over', rect: { left: 7, top: 200, width: 44, height: 44 }, fixed: true },
+      ],
+      viewport,
+      map,
+      true,
+    );
+    expect(bad.fits).toBe(false);
+    expect(bad.lines[0]).toBe('SCROLLS');
+    expect(bad.placements[0]).toContain('OVER AN ARC OR THE CUT');
+    const none = exampleReport([], viewport, map, false);
+    expect(none.lines).toContain('uses no map segment');
+    expect(none.lines[1]).toContain('top -');
+    expect(
+      exampleReport(
+        [{ name: 'x', rect: { left: 0, top: 0, width: 10, height: 400 }, fixed: false }],
+        viewport,
+        map,
+        false,
+      ).lines[0],
+    ).toBe('a box leaves the viewport');
+  });
+
+  test('the SVG: the glass, four arcs where the corners round, the hatched cut, one green rect per segment; the table one row per variable', () => {
+    const svg = drawMap(map, { width: 852, height: 343 }, reading.corners);
+    expect(svg).toContain('class="glass"');
+    expect((svg.match(/class="arc"/g) ?? []).length).toBe(2);
+    expect(svg).toContain('class="cut"');
+    expect((svg.match(/class="seg"/g) ?? []).length).toBe(5);
+    const noCut = drawMap(
+      { ...map, cut: null, cutEdge: 'none' },
+      { width: 852, height: 343 },
+      { tl: 0, tr: 0, br: 0, bl: 0 },
+    );
+    expect(noCut).not.toContain('class="cut"');
+    expect(noCut).not.toContain('class="arc"');
+    const notch = drawMap(
+      safeAreaMap({
+        corners: reading.corners,
+        cut: { length: 209, island: false },
+        type: 'landscape-secondary',
+        insets: reading.insets,
+        viewport: { width: 852, height: 343 },
+        full: reading.full,
+      }),
+      { width: 852, height: 343 },
+      reading.corners,
+    );
+    expect(notch).toContain('rx="6"');
+    ['portrait-primary', 'portrait-secondary'].forEach((type) => {
+      const up = drawMap(
+        safeAreaMap({
+          corners: reading.corners,
+          cut: { length: 126, island: true },
+          type: type as 'portrait-primary',
+          insets: { top: 59, right: 0, bottom: 34, left: 0 },
+          viewport: { width: 393, height: 852 },
+          full: { width: 393, height: 852 },
+        }),
+        { width: 393, height: 852 },
+        reading.corners,
+      );
+      expect(up).toContain('class="cut"');
+    });
+    expect(mapRows({ '--a': '1px', '--b': 'left' })).toBe(
+      '<tr><td>--a</td><td>1px</td></tr><tr><td>--b</td><td>left</td></tr>',
+    );
+  });
+});

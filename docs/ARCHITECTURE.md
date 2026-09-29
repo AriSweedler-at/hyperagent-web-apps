@@ -110,6 +110,13 @@ and tests that prove it land before the code they protect.
 
 `dist/` is gitignored. The repo root holds no HTML once `web/` exists.
 
+UI Sandbox (`web/games/ui-sandbox/`, docs/design/ui-sandbox.md) is a tool page, not a game: a
+`TOOLS` row in `tools/games.ts` (a title and the `window.__uiSandbox` hook), a plain `index.html` on
+the shell's frame and the shell's edge modules, no engine, no reducer, no sessions. It reads the
+frame (`web/shared/edge/screen.ts`), writes the safe-area map (`web/shared/lib/safeArea.ts`) on the
+root, and lays out nine coloured-box examples, two of them notch-aware; the `site` suite owns its
+tests and its device sweep (`e2e/ui-sandbox.spec.ts`).
+
 ## Module boundaries and contracts
 
 Enforced by `eslint-plugin-import-x` `no-restricted-paths` zones, `import-x/no-cycle`, and

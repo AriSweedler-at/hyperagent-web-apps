@@ -85,6 +85,12 @@ describe('createOrientationLock', () => {
     // A second hold (the reducer only asks once per loss, but the adapter is honest either way).
     await expect(lock.hold()).resolves.toBe(true);
     expect(f.calls).toEqual(['request', 'lock:landscape', 'lock:landscape']);
+    // UI Sandbox's portrait mode asks for the mirror.
+    const upright = fakes();
+    await expect(
+      createOrientationLock(upright.doc, upright.screen, 'portrait').hold(),
+    ).resolves.toBe(true);
+    expect(upright.calls).toEqual(['request', 'lock:portrait']);
   });
 
   test('hold resolves false and throws nothing when the screen refuses the lock (a tablet, desktop Chromium), when fullscreen is denied (no activation: the lock is not even asked), and when either API is missing (an iPhone)', async () => {

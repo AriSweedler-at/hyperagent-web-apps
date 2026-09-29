@@ -15,7 +15,14 @@ import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 
 import { PUBLIC_DIR as BUDDY_DIR } from '../../tools/buddy-frames.ts';
-import { ALIASES, GAMES, LEGACY_GAMES, REGISTRY, SHELL_GAMES } from '../../tools/games.ts';
+import {
+  ALIASES,
+  GAMES,
+  LEGACY_GAMES,
+  REGISTRY,
+  SHELL_GAMES,
+  TOOL_NAMES,
+} from '../../tools/games.ts';
 import { isManifestGame, shippedFiles } from '../../tools/icons.ts';
 import { OWN_SHEET, SHEETS_MAX, isShellGame } from './classes.ts';
 import {
@@ -247,15 +254,20 @@ describeDist('dist parity with legacy/ and web/', (root) => {
     );
     // The classic ICE loader went with the last legacy page (step 13); it is bundled now.
     expect(files).not.toContain('shared/ice.js');
-    // games/ holds one folder per game and one per alias (tools/games.ts ALIASES), nothing else;
-    // an alias folder is its stub alone, never a bundle or a map (it is not a game page).
+    // games/ holds one folder per game, one per alias (tools/games.ts ALIASES) and one per tool
+    // page (TOOLS), nothing else; an alias folder is its stub alone, never a bundle or a map.
     const folders = [
       ...new Set(
         files.filter((file) => file.startsWith('games/')).map((file) => file.split('/')[1]),
       ),
     ];
     expect(folders.sort()).toEqual(
-      [...GAMES, ...Object.keys(ALIASES), ...ASSET_FOLDERS.map(({ folder }) => folder)].sort(),
+      [
+        ...GAMES,
+        ...Object.keys(ALIASES),
+        ...TOOL_NAMES,
+        ...ASSET_FOLDERS.map(({ folder }) => folder),
+      ].sort(),
     );
     ASSET_FOLDERS.forEach(({ folder, under }) => {
       const held = files.filter((file) => file.startsWith(`games/${folder}/`));
