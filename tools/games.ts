@@ -252,6 +252,8 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
     title: 'Sheshbesh — backgammon',
     hook: 'window.__backgammon',
     suite: 'backgammon',
+    // The table flows, the geometry oracle and the device sweep (e2e/backgammon-devices.spec.ts:
+    // the catalogue's phones one context each, docs/design/devices.md).
     specs: ['**/backgammon-*.spec.ts'],
     storage: { saveKey: 'backgammonMP_v1', prefix: 'backgammon_' },
     debug: 0,

@@ -3,12 +3,13 @@
 // style through dom.ts, the one custom property the boot writes back (`--screen-corner`, the
 // trim's corner radius, on `documentElement` so it beats the theme's `:root` fallback), and the
 // `?probe=1` readout (docs/ARCHITECTURE.md "Documented test hooks"): a small fixed panel of the
-// same numbers and the board's box, for a look at a real phone. The notch is read off the theme's
+// same numbers, the matched catalogue id (or `unknown (heuristic)` where the insets stand in) and
+// the board's box, for a look at a real phone. The notch is read off the theme's
 // own fallback (`--screen-corner: max(env(safe-area-inset-top), -left, -right)`): a theme that
 // declares the property opts in, one that does not reads as an empty string and nothing is
 // written. `env()` is substituted in the computed value, so the string is `47px` or, unsimplified,
 // `max(47px, 0px, 0px)`; the largest length in it is the notch either way.
-import { cornerRadius, deviceOf, type DeviceInputs, type ScreenSize } from '../lib/devices.ts';
+import { cornerRadius, deviceLabel, type DeviceInputs, type ScreenSize } from '../lib/devices.ts';
 import {
   appendHtml,
   byId,
@@ -108,7 +109,6 @@ const probeLines = (
   corner: number | null,
 ): string => {
   const inputs = readDevice(doc, win);
-  const device = inputs === null ? null : deviceOf(inputs);
   const rulers = RULERS.map(([name]) => {
     const el = queryIn(probe, `[data-ruler="${name}"]`);
     return `${name} ${el === null ? '?' : px(rectOf(el).height)}`;
@@ -121,7 +121,7 @@ const probeLines = (
     rulers.slice(0, 3).join('  '),
     rulers.slice(3).join('  '),
     `notch ${inputs?.notch === null || inputs === null ? '?' : px(inputs.notch)}  mode ${mode}`,
-    `device ${device?.models ?? 'unknown'}  corner ${corner === null ? 'env()' : `${px(corner)}px`}`,
+    `device ${deviceLabel(inputs)}  corner ${corner === null ? 'env()' : `${px(corner)}px`}`,
     `board ${b === null ? 'none' : `${px(b.left)},${px(b.top)} ${px(b.width)}x${px(b.height)}`}`,
     '(tap to dismiss)',
   ].join('\n');

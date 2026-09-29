@@ -101,7 +101,10 @@ body {
   background-blend-mode: multiply, normal;
 }
 #app {
-  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  /* The home indicator's band, read through the same `--inset-b` the sideways block declares: the
+     one seam a measurement (tools/shell-emulate.ts) overrides, upright as sideways. */
+  --inset-b: env(safe-area-inset-bottom, 0px);
+  padding: 12px 12px calc(12px + var(--inset-b));
 }
 /* The trim (the owner: "green style trim in the background at the border of the window"): a quiet
    olive band along the viewport's edge with a gold hairline on its inner side, fixed and inert.
@@ -142,7 +145,7 @@ body::before {
   /* Wider gutters keep the topbar and the controls 6px off the wider band; the desktop's
      --chrome-h budget (190px) already has the room. */
   #app {
-    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+    padding: 16px 16px calc(16px + var(--inset-b));
   }
 }
 /* GFS Didot for the title and the room code only (design §1 Theme); Cardo everywhere else. */

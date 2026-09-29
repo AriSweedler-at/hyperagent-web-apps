@@ -20,6 +20,7 @@ import {
   layoutFor,
   rowOrder,
   type Area,
+  type Insets,
   type Layout,
 } from '../../web/games/backgammon/src/ui/board/layout.ts';
 import type { Box } from './boxes.ts';
@@ -249,12 +250,19 @@ export const expectFits = (g: BoardGeometry, scrolls: boolean, when: string): vo
  * measures it with a container unit, the twin computes it): its top edge stands exactly the
  * padding and the chrome above under the viewport's top, its bottom edge exactly the padding and
  * the chrome below over the viewport's bottom (`boardRoom`: 39 and 11 with the rail inset-free, 39
- * and 61 with the rows; headless reports no insets), so no parchment shows beyond the gaps the
- * chrome owns. Upright and on the desktop the board is a clamp of the viewport, not its filler.
+ * and 61 with the rows; headless reports no insets, and a page stood on a catalogued phone by the
+ * emulator's seam passes its `insets`: 39 and 27 over a 21px home indicator), so no parchment
+ * shows beyond the gaps the chrome owns. Upright and on the desktop the board is a clamp of the
+ * viewport, not its filler.
  */
-export const expectFillsRoom = (g: BoardGeometry, when: string): void => {
+export const expectFillsRoom = (g: BoardGeometry, when: string, insets?: Insets): void => {
   if (layoutOf(g) !== 'landscape') return;
-  const room = boardRoom({ width: g.width, height: g.height, coarse: g.coarse });
+  const room = boardRoom({
+    width: g.width,
+    height: g.height,
+    coarse: g.coarse,
+    ...(insets === undefined ? {} : { insets }),
+  });
   expect(
     Math.abs(g.board.y - room.top),
     `${when}: the board's top is ${String(g.board.y)}, not ${String(room.top)}`,
@@ -266,17 +274,18 @@ export const expectFillsRoom = (g: BoardGeometry, when: string): void => {
   ).toBeLessThanOrEqual(TOL);
 };
 
-/** The whole oracle for one state of the table. */
+/** The whole oracle for one state of the table; `insets` where the page stands on an emulated phone (e2e/backgammon-devices.spec.ts). */
 export const expectBoardGeometry = (
   g: BoardGeometry,
   seat: 0 | 1,
   scrolls: boolean,
   when: string,
+  insets?: Insets,
 ): void => {
   expectPointsTiled(g, when);
   expectRowOrder(g, seat, when);
   expectStacks(g, when);
   expectTargets(g, when);
   expectFits(g, scrolls, when);
-  if (!scrolls) expectFillsRoom(g, when);
+  if (!scrolls) expectFillsRoom(g, when, insets);
 };

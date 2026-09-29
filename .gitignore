@@ -5,6 +5,8 @@
 
 # build and test output. dist/ is anchored to the root: test/dist/ holds the dist guards.
 /dist/
+# the screenshot sheets `npm run shots` writes (tools/shell-emulate.ts render --all): look, never commit
+/shots/
 node_modules
 coverage/
 playwright-report/
