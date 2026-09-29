@@ -233,3 +233,28 @@ ios/DiceClip/Shared/BuddyScreen.swift           the clip's screen: the session, 
 ios/DiceClip/Shared/RootScreen.swift            the two tabs (Dice, Buddy) and the URL routing (/clip/dice, /clip/rps)
 ios/DiceClip/DiceActivity/MoodActivityWidget.swift   the second ActivityConfiguration (§5), compiled into both extensions
 ```
+
+## 10. The web game
+
+The page at `web/games/rps/` (`rps-web-entry`; games.sweedler.com/rps/), the first solo page: a
+game with no seats, no room and no shell, registered in `tools/games.ts` `SOLO` beside `REGISTRY`
+(a `Game` is keyed into the room codes, the online drivers and the style oracle, none of which a
+reaction game has) and run by the same two CI matrix jobs as a game (`tools/ci/suites.ts` `rps`).
+
+| Piece | Where | What |
+|---|---|---|
+| Rules | `src/engine/engine.ts` | §2 as pure functions: `verdict`, `apply`, `applyRound`, `canTechUp`, `techUp`, `reset`, `moodOf`; `engine.test.ts` is §6 as table tests, so this and the Swift model are held to one table. |
+| Stored shape | `src/engine/codec.ts` | `{ v: 1, counter, windowMs, prestige, recentWins, best }` under localStorage `rps_progress` (D4). Every field is bounded by the rules (counter −5…5, window 200…1000, at most five wins); a refused or unreadable save reads as the start, never a state the engine could not reach. `v` is bumped with a migration when a field changes meaning. |
+| The round | `src/ui/state.ts` | The reducer of §3: `idle → scrolling → armed → verdict`, the intents (`go`, `scroll/tick`, `resolve`, `tap`, `timeout`, `stop`, `techUp`, `reset`) and the effects the edge runs (named timers, cues, the save). The draws (the scroll's length, the computer's hand) and the clock readings (`performance.now()` at the resolve and at the tap) arrive inside the intents, so a test scripts a round and the e2e rigs one. |
+| The paint | `src/ui/render.ts` | The counter (signed) and its static face (the first frame of the band's set, from the sheet at `background-position: 0 0`, 2×), the animated buddy (the band's loop at 3×; a hop once between neighbouring bands, in reverse on the way down, then the new loop; reduced motion swaps the loop at once), the computer's hand, the window bar, the verdict with the reaction, Tech up with its cost, Stop while a next round is pending, Reset behind a confirm, `#islandSlot` empty for the pairing row (§8). |
+| The buddy | `src/ui/buddy.ts` | The manifest's numbers (`web/public/games/rps/buddy/buddy.json`) spelled in the page, pinned to the file by `buddy.test.ts`; sheets are reached as `./buddy/<set>.png`, so both origins serve them. |
+| Sound and haptics | `src/ui/sound.ts`, `src/fx.ts` | The shared cue player over this page's table: the resolve is `start` with the owner's 30 ms buzz, the verdicts `good`/`neutral`/`bad`, Tech up `great`, Reset `undo`. A phone starts muted; the resolve still buzzes 30 ms when sound is off (`main.ts`), since the haptic is a game signal, not a sound. |
+| Boot | `main.ts` | The adapters (localStorage, the clock, `Math.random` or `window.__rng`, Web Audio, vibration), the timers, the keyboard (1/2/3 or r/p/s the hands, Space or Enter Go), and the hook `window.__rps` (`app`, `dispatch`, `progress()`, `mood()`, `rig({ computer, scrollMs })`). |
+
+What differs from the clip and why: the clip (`ios/DiceClip/`) holds no game and no `Progress`;
+the page holds both and is the source of truth (D1). The page's sheets play at the manifest's frame
+rate (D6); the clip steps one frame per push. The face on the page is a frame of the buddy's own
+set rather than the clip's `mouthCurvature` smiley, so the page and the island show one character.
+The resolve's buzz is 30 ms (the owner's word) where §3 said 40. The next round starts by itself
+1.4 s after a verdict unless Stop was pressed or Tech up is on offer (§3 step 1). Posting the score
+to the Worker (§3 step 6, §8 step 5) is the island lane's; the page leaves `#islandSlot` for it.

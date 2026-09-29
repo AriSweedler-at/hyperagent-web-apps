@@ -17,7 +17,7 @@
 import { accessSync, constants } from 'node:fs';
 import { delimiter, join } from 'node:path';
 
-import { GAMES, PAGE_TITLES, TOOL_NAMES, type PageName } from '../../tools/games.ts';
+import { GAMES, PAGE_TITLES, SOLO_PAGES, TOOL_NAMES, type PageName } from '../../tools/games.ts';
 
 export type Project = 'pages' | 'proxy';
 export type { PageName };
@@ -116,6 +116,8 @@ export const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/gin-scorer.spec.ts',
   '**/gin-sound-font.spec.ts',
   '**/gin-stories.spec.ts',
+  // The reaction game: the page's clock and a rigged round, about the page alone.
+  '**/rps.spec.ts',
   '**/shell-glossary.spec.ts',
   '**/shell-home.spec.ts',
   // The sessions' silence watch is a timer, the same on either origin.
@@ -235,8 +237,8 @@ export const LEGACY_ALIASES: Readonly<Record<string, string>> = {
   'legacy/shared/ice.js': 'legacy/shared/ice.js',
 };
 
-/** Every page smoke opens: the landing page, then the games as tools/games.ts lists them, then the tool pages. */
-export const PAGES: ReadonlyArray<PageName> = ['landing', ...GAMES, ...TOOL_NAMES];
+/** Every page smoke opens: the landing page, then the games, the solo pages and the tool pages as tools/games.ts lists them. */
+export const PAGES: ReadonlyArray<PageName> = ['landing', ...GAMES, ...SOLO_PAGES, ...TOOL_NAMES];
 
 export const EXPECTED_TITLES: Readonly<Record<PageName, string>> = PAGE_TITLES;
 

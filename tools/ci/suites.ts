@@ -16,7 +16,15 @@
 // (each row's `suite`, `specs` and `shell`: dry-round-2.md I6), so a fourth game registers there
 // and adds one SUITES row. Node builtins only (games.ts imports a type alone), so `node
 // --experimental-strip-types tools/ci/affected.ts` runs before `npm ci` in CI.
-import { GAMES, REGISTRY, type Game, type GameSuite } from '../games.ts';
+import {
+  GAMES,
+  REGISTRY,
+  SOLO,
+  SOLO_PAGES,
+  type Game,
+  type GameSuite,
+  type SoloPage,
+} from '../games.ts';
 import { matchesAny } from './glob.ts';
 
 export type { GameSuite };
@@ -62,26 +70,33 @@ const ONLINE_SPEC_NAMES: ReadonlyArray<string> = ['shell-online.spec.ts', 'shell
 const ONLINE_SPECS: ReadonlyArray<string> = ONLINE_SPEC_NAMES.map((name) => `**/${name}`);
 
 /**
- * The game each game suite tests: REGISTRY's `suite` column read backwards. It is the folder under
- * web/games/ the suite's rules name and the `@<game>` tag its describes of a shared spec carry.
+ * The folder each game suite tests: REGISTRY's and SOLO's `suite` columns read backwards. It is
+ * the folder under web/games/ the suite's rules name and, for a game, the `@<game>` tag its
+ * describes of a shared spec carry. A solo page (tools/games.ts SOLO_PAGES) has a suite of the
+ * same shape and rides the same two matrix jobs, with no shared spec and no tag.
  */
-const GAME_OF: Readonly<Record<GameSuite, Game>> = Object.fromEntries(
-  GAMES.map((game) => [REGISTRY[game].suite, game]),
-) as Record<GameSuite, Game>;
+const FOLDER_OF: Readonly<Record<GameSuite, Game | SoloPage>> = Object.fromEntries([
+  ...GAMES.map((game) => [REGISTRY[game].suite, game]),
+  ...SOLO_PAGES.map((page) => [SOLO[page].suite, page]),
+]) as Record<GameSuite, Game | SoloPage>;
+
+const isSoloPage = (folder: Game | SoloPage): folder is SoloPage =>
+  (SOLO_PAGES as ReadonlyArray<string>).includes(folder);
 
 /**
  * A game suite's Playwright half, read off its registry row (dry-round-2.md I6): the game's own
  * specs (`specs`), then the shell specs for a row with `shell` or the two online specs for a row
  * without (every game has a describe in those two: H1), its `@<game>` tag and the other games'
- * tags, so each game's e2e job plays its own describes alone.
+ * tags, so each game's e2e job plays its own describes alone. A solo page's is its own specs.
  */
 const gameE2e = (suite: GameSuite): E2eSpec => {
-  const game = GAME_OF[suite];
-  const row = REGISTRY[game];
+  const folder = FOLDER_OF[suite];
+  if (isSoloPage(folder)) return { files: [...SOLO[folder].specs], otherTags: [] };
+  const row = REGISTRY[folder];
   return {
     files: [...row.specs, ...(row.shell === undefined ? ONLINE_SPECS : SHELL_SPECS)],
-    tag: `@${game}`,
-    otherTags: GAMES.filter((g) => g !== game).map((g) => `@${g}`),
+    tag: `@${folder}`,
+    otherTags: GAMES.filter((g) => g !== folder).map((g) => `@${g}`),
   };
 };
 
@@ -704,6 +719,52 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
     // Briscola's own specs and its describes of the shell specs (`@briscola`; the others' left out).
     e2e: gameE2e('briscola'),
   },
+  rps: {
+    // The reaction game (docs/design/rps-island.md): a solo page on the matrix jobs like a game.
+    unit: ['web/games/rps/**/*.test.ts'],
+    standalone: [],
+    browser: false,
+    needsBuild: false,
+    coverage: {
+      include: [
+        'web/games/rps/src/engine/**/*.ts',
+        'web/games/rps/src/storage.ts',
+        'web/games/rps/src/fx.ts',
+        'web/games/rps/src/ui/state.ts',
+        'web/games/rps/src/ui/buddy.ts',
+        'web/games/rps/src/ui/sound.ts',
+      ],
+      // Measured at the page's landing (lines/functions/statements/branches): the engine
+      // 96.2/100/96.8/93.0 over the design's vectors (§6; the unreached lines are the exhaustive
+      // switch's `never` arm), the reducer 95.0/100/96.0/92.1 over state.test.ts's scripted rounds
+      // (the same arm), the codec, storage, fx, the buddy table and the cue table each 100 on every
+      // metric. The paint (ui/render.ts) and main.ts have no unit test: e2e/rps.spec.ts drives them.
+      thresholds: {
+        'web/games/rps/src/engine/**': { lines: 95, functions: 95, statements: 95, branches: 90 },
+        'web/games/rps/src/storage.ts': { lines: 95, functions: 95, statements: 95, branches: 90 },
+        'web/games/rps/src/fx.ts': { lines: 95, functions: 95, statements: 95, branches: 90 },
+        'web/games/rps/src/ui/state.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 90,
+        },
+        'web/games/rps/src/ui/buddy.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 90,
+        },
+        'web/games/rps/src/ui/sound.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+          branches: 90,
+        },
+      },
+    },
+    e2e: gameE2e('rps'),
+  },
   site: {
     unit: [
       // Which theme.css declares which token, across all three games.
@@ -787,14 +848,17 @@ export type Rule = Readonly<{ globs: ReadonlyArray<string>; runs: Selection; why
  * names its suite on its tools/games.ts REGISTRY row and adds its SUITES row; ci.yml is not edited.
  */
 export const isGameSuite = (suite: Suite): suite is GameSuite =>
-  (Object.keys(GAME_OF) as ReadonlyArray<string>).includes(suite);
+  (Object.keys(FOLDER_OF) as ReadonlyArray<string>).includes(suite);
 
 /** The game suites in job order: the values of the two matrix jobs' `strategy.matrix.suite`. */
 export const GAME_SUITES: ReadonlyArray<GameSuite> = SUITE_NAMES.filter(isGameSuite);
 
-/** The rows every game gets: its folder, its parity oracles, its specs and its style goldens. */
+/** The rows every game gets: its folder, its parity oracles, its specs and its style goldens. A solo page's specs are its row's, spelled whole. */
 const gameRules = (game: GameSuite): ReadonlyArray<Rule> => {
-  const folder = GAME_OF[game];
+  const folder = FOLDER_OF[game];
+  const ownSpecs = isSoloPage(folder)
+    ? SOLO[folder].specs.map((glob) => glob.replace(/^\*\*\//, 'e2e/'))
+    : [`e2e/${game}-*.spec.ts`];
   return [
     {
       globs: [`web/games/${folder}/**`],
@@ -802,7 +866,7 @@ const gameRules = (game: GameSuite): ReadonlyArray<Rule> => {
       why: `the page is built into dist and smoked, tokens/ratchet/the class contract read every game, and tools/games.test.ts pins the registry against the games' storage keys`,
     },
     { globs: [`test/parity/${game}.*`], runs: [game], why: `${game}'s legacy oracles` },
-    { globs: [`e2e/${game}-*.spec.ts`], runs: [e2eJob(game)], why: `${game}'s own specs` },
+    { globs: ownSpecs, runs: [e2eJob(game)], why: `${game}'s own specs` },
     {
       globs: [`test/fixtures/styles/${folder}.*`],
       runs: ['e2e-site'],
@@ -937,6 +1001,7 @@ export const RULES: ReadonlyArray<Rule> = [
     runs: ['briscola'],
     why: 'the briscola wire goldens (self-recorded: protocol.test.ts pins them)',
   },
+  ...gameRules('rps'),
   {
     globs: ['test/parity/ice.legacy.test.ts', 'test/parity/roomCode.legacy.test.ts'],
     runs: ['shared'],

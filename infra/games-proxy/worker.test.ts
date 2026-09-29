@@ -5,8 +5,8 @@ import { describe, expect, test, vi } from 'vitest';
 
 import {
   ALIASES as REGISTRY_ALIASES,
-  GAMES,
   LANDING_HREFS,
+  LANDING_PAGES,
   SHELL_GAMES,
   TOOL_NAMES,
 } from '../../tools/games.ts';
@@ -647,7 +647,7 @@ describe('shortHref: a landing href to the short URL on this origin', () => {
       expect(mapped.kind, href).toBe('redirect');
       expect(shortHref(href), href).toBe(mapped.path);
     });
-    expect(LANDING_HREFS.map(shortHref)).toEqual(GAMES.map((game) => `/${game}/`));
+    expect(LANDING_HREFS.map(shortHref)).toEqual(LANDING_PAGES.map((page) => `/${page}/`));
   });
 });
 
@@ -664,9 +664,9 @@ describe('shortenLandingLinks: the committed landing page (web/index.html)', () 
   test('the cards then point at the short URLs in registry order; the icons and the source link are untouched', () => {
     const before = hrefsIn(landing);
     const after = hrefsIn(shortenLandingLinks(landing));
-    // The cards, then the landing page's tools line (tools/games.ts TOOLS: UI Sandbox).
+    // The cards (the games, then the solo pages), then the landing page's tools line (tools/games.ts TOOLS: UI Sandbox).
     expect(after.filter((href) => href.startsWith('/'))).toEqual([
-      ...GAMES.map((game) => `/${game}/`),
+      ...LANDING_PAGES.map((page) => `/${page}/`),
       ...TOOL_NAMES.map((tool) => `/${tool}/`),
     ]);
     expect(after.filter((href) => !href.startsWith('/'))).toEqual(

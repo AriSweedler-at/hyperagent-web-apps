@@ -19,7 +19,7 @@ export type { Game };
  * of its own e2e specs. A game's row names its suite (dry-round-2.md I6), and a name here without
  * a suites.ts row is a type error there.
  */
-export type GameSuite = 'gin' | 'fidice' | 'backgammon' | 'briscola';
+export type GameSuite = 'gin' | 'fidice' | 'backgammon' | 'briscola' | 'rps';
 
 /**
  * The tool pages (docs/design/ui-sandbox.md): built and smoked like a game (a folder under
@@ -36,8 +36,17 @@ export const TOOLS: Readonly<Record<ToolName, ToolSpec>> = {
 };
 export const TOOL_NAMES: ReadonlyArray<ToolName> = Object.keys(TOOLS) as ReadonlyArray<ToolName>;
 
-/** The pages smoke opens: every game, every tool page and the landing page. */
-export type PageName = Game | ToolName | 'landing';
+/**
+ * The solo pages (docs/design/rps-island.md D1): a page under web/games/<name>/ with a suite, a
+ * hook, a landing card and the dist guards' checks, but no seats, no room code and no shell, so it
+ * is not a `Game` (ROOM_CODE, the online drivers and the computed-style oracle key on that union).
+ * The reaction game is the first. A name here without a SOLO row is a type error.
+ */
+export type SoloPage = 'rps';
+export const SOLO_PAGES: ReadonlyArray<SoloPage> = ['rps'];
+
+/** The pages smoke opens: every game, every solo page, every tool page and the landing page. */
+export type PageName = Game | SoloPage | ToolName | 'landing';
 
 /** One game's row: every fact about it the harness reads. */
 export type GameSpec = Readonly<{
@@ -326,9 +335,69 @@ export const REGISTRY: Readonly<Record<Game, GameSpec>> = {
 /** Every game the site builds, in the order the landing page lists them: REGISTRY's row order. */
 export const GAMES: ReadonlyArray<Game> = Object.keys(REGISTRY) as ReadonlyArray<Game>;
 
+/** One solo page's row: what the harness reads of it (a GameSpec without the shell and the peer). */
+export type SoloSpec = Readonly<{
+  /** `<title>` of the page, as e2e/smoke.spec.ts expects it and the dist guards find it. */
+  title: string;
+  /** The documented test hook the page exposes once its boot finished (docs/ARCHITECTURE.md "Documented test hooks"). */
+  hook: string;
+  /** The page's test suite (tools/ci/suites.ts): its folder name. */
+  suite: GameSuite;
+  /** The page's own e2e specs, as Playwright globs; no shared spec drives a solo page. */
+  specs: ReadonlyArray<string>;
+  /** The ids the built page must carry (test/dist/dist-parity.test.ts). */
+  pageShape: Readonly<{ ids: ReadonlyArray<string> }>;
+}>;
+
+/** The solo pages, one row each, in the order the landing page lists them after the games. */
+export const SOLO: Readonly<Record<SoloPage, SoloSpec>> = {
+  rps: {
+    title: 'Rock Paper Scissors',
+    hook: 'window.__rps',
+    suite: 'rps',
+    specs: ['**/rps.spec.ts'],
+    // The page's fixed ids (web/games/rps/src/ui/render.ts IDS): the score, the table, the three
+    // hands, the controls, and the empty slot the island pairing row mounts into (rps-island.md §8).
+    pageShape: {
+      ids: [
+        'app',
+        'buddy',
+        'counterFace',
+        'counter',
+        'prestige',
+        'windowMs',
+        'best',
+        'computerHand',
+        'windowBar',
+        'verdict',
+        'reaction',
+        'hands',
+        'rockBtn',
+        'paperBtn',
+        'scissorsBtn',
+        'goBtn',
+        'stopBtn',
+        'techUpBtn',
+        'techUpCost',
+        'status',
+        'islandSlot',
+        'resetBtn',
+        'soundBtn',
+      ],
+    },
+  },
+};
+
+/** Every page with a landing card, in card order: the games, then the solo pages. */
+export const LANDING_PAGES: ReadonlyArray<Game | SoloPage> = [...GAMES, ...SOLO_PAGES];
+
 /** One value per game, read off its row (the cast: Object.fromEntries widens the keys to string). */
 const perGame = <T>(pick: (spec: GameSpec) => T): Readonly<Record<Game, T>> =>
   Object.fromEntries(GAMES.map((game) => [game, pick(REGISTRY[game])])) as Record<Game, T>;
+
+/** One value per solo page, read off its row. */
+const perSolo = <T>(pick: (spec: SoloSpec) => T): Readonly<Record<SoloPage, T>> =>
+  Object.fromEntries(SOLO_PAGES.map((page) => [page, pick(SOLO[page])])) as Record<SoloPage, T>;
 
 /** The games with a frozen legacy page under legacy/<g>/index.html (the oracle source, never served). */
 export const LEGACY_GAMES: ReadonlyArray<Game> = ['gin-rummy', 'fidice'];
@@ -338,6 +407,7 @@ export const PAGE_TITLES: Readonly<Record<PageName, string>> = {
   landing: "Ari's web apps",
   ...perGame((spec) => spec.title),
   ...(Object.fromEntries(TOOL_NAMES.map((t) => [t, TOOLS[t].title])) as Record<ToolName, string>),
+  ...perSolo((spec) => spec.title),
 };
 
 /** The documented test hook each page exposes once its boot finished (docs/ARCHITECTURE.md "Documented test hooks"). */
@@ -346,8 +416,14 @@ export const HOOKS: Readonly<Record<Game | ToolName, string>> = {
   ...(Object.fromEntries(TOOL_NAMES.map((t) => [t, TOOLS[t].hook])) as Record<ToolName, string>),
 };
 
-/** The landing page's card links, relative to the site root, in GAMES order. */
-export const LANDING_HREFS: ReadonlyArray<string> = GAMES.map((game) => `games/${game}/`);
+/** The hook of every page but the landing: the games', the tools' and the solo pages' (e2e/smoke.spec.ts polls it). */
+export const PAGE_HOOKS: Readonly<Record<Exclude<PageName, 'landing'>, string>> = {
+  ...HOOKS,
+  ...perSolo((spec) => spec.hook),
+};
+
+/** The landing page's card links, relative to the site root, in LANDING_PAGES order (the games, then the solo pages). */
+export const LANDING_HREFS: ReadonlyArray<string> = LANDING_PAGES.map((page) => `games/${page}/`);
 /** The landing page's tools line, `a.tool` links after the cards, in TOOL_NAMES order. */
 export const LANDING_TOOL_HREFS: ReadonlyArray<string> = TOOL_NAMES.map((t) => `games/${t}/`);
 

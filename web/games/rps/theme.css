@@ -1,0 +1,370 @@
+/* Rock Paper Scissors (docs/design/rps-island.md §3): a solo reaction game, portrait-first and
+   thumb-reachable. The shared tokens and primitives are imported here rather than linked from the
+   page, so this page's sheet is its own and the four games' shared CSS chunk is untouched
+   (test/dist/dist-parity.test.ts holds that chunk to one file). The look is the landing page's
+   quiet dark card on this page's own tokens; the buddy's band colours the accent
+   (`#app[data-mood]`, the manifest's `colour` per band). The buddy and the face are the manifest's
+   sheets (web/public/games/rps/buddy/) played with `steps()`; `--frames` and `--ms` come from the
+   paint (src/ui/render.ts), the sizes are integer multiples of 24 so the pixels stay crisp. */
+@import '../../shared/styles/tokens.css';
+@import '../../shared/styles/base.css';
+
+:root {
+  --bg: #0f1115;
+  --card: #181b22;
+  --card-2: #20242d;
+  --accent: #f2e6a8;
+  --accent-dark: #d9cc8a;
+  --gold: #e0b35a;
+  --text: #e8e6e1;
+  --muted: #9a9891;
+  --danger: #f87171;
+  --go: #c2d06d;
+  --go-text: #10281a;
+  --radius: 16px;
+  --felt: var(--bg);
+  --font-body: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: ui-monospace, Menlo, monospace;
+  --line: #262a33;
+  --hand: 72px;
+}
+#app[data-mood='verySad'] {
+  --accent: #3b6fd6;
+}
+#app[data-mood='sad'] {
+  --accent: #6c9bea;
+}
+#app[data-mood='neutral'] {
+  --accent: #f2e6a8;
+}
+#app[data-mood='happy'] {
+  --accent: #f5cd3b;
+}
+#app[data-mood='veryHappy'] {
+  --accent: #ffd200;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 var(--font-body);
+  -webkit-tap-highlight-color: transparent;
+}
+#app {
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  display: flex;
+  flex-direction: column;
+}
+.bar {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  padding: 8px 12px 0;
+}
+.back,
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 22px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.back:hover,
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--card);
+}
+.titles {
+  text-align: center;
+}
+.titles h1 {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+.titles .sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px 16px 24px;
+  flex: 1;
+}
+
+/* The score: the buddy, the counter with its static face, the three small facts. */
+.score {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'buddy tally'
+    'buddy meta';
+  align-items: center;
+  column-gap: 16px;
+  padding: 12px 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.buddy,
+.face {
+  display: inline-block;
+  flex: none;
+  image-rendering: pixelated;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+}
+.buddy {
+  grid-area: buddy;
+  width: 72px;
+  height: 72px;
+  animation: play calc(var(--frames) * var(--ms) * 1ms) steps(var(--frames)) infinite;
+}
+.buddy.hop {
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+.buddy.back {
+  animation-direction: reverse;
+}
+@keyframes play {
+  to {
+    background-position: calc(var(--frames) * -72px) 0;
+  }
+}
+.face {
+  width: 48px;
+  height: 48px;
+}
+.tally {
+  grid-area: tally;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.counter {
+  font: 700 2.4rem/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.meta {
+  grid-area: meta;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.meta .dot {
+  margin: 0 4px;
+}
+
+/* The table: the computer's hand over the window bar, the verdict under it. */
+.table {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.computer {
+  width: 132px;
+  height: 132px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--card-2);
+  font-size: 72px;
+  line-height: 1;
+  color: var(--muted);
+  border: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+.computer.scrolling {
+  color: var(--text);
+}
+.computer.armed {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.window {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--card-2);
+  overflow: hidden;
+}
+.window-bar {
+  height: 100%;
+  width: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.window-bar.run {
+  animation: shrink var(--window-ms) linear forwards;
+}
+.window-bar.still {
+  transform: scaleX(1);
+  opacity: 0.6;
+}
+@keyframes shrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+.verdict {
+  margin: 0;
+  min-height: 1.4em;
+  font-weight: 600;
+}
+.verdict[data-outcome='win'] {
+  color: var(--go);
+}
+.verdict[data-outcome='loss'],
+.verdict[data-outcome='timeout'] {
+  color: var(--danger);
+}
+.reaction {
+  margin: 0;
+  min-height: 1.2em;
+  color: var(--muted);
+  font: 0.95rem/1.2 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The three hands: thumb-height, the width shared three ways. */
+.hands {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.hand {
+  height: var(--hand);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--card);
+  font-size: 36px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    transform 0.08s,
+    border-color 0.15s;
+}
+.hand:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.hand:not(:disabled) {
+  border-color: var(--accent);
+}
+.hand:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+.btn {
+  min-height: 52px;
+  padding: 0 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text);
+  font: 600 1.05rem/1 var(--font-body);
+  cursor: pointer;
+}
+/* The call to action (docs/ARCHITECTURE.md "Calls to action"): every start is the olive green. */
+.btn-go {
+  background: var(--go);
+  color: var(--go-text);
+  border-color: transparent;
+}
+.btn-tech {
+  background: var(--accent);
+  color: #1f2430;
+  border-color: transparent;
+}
+.btn-tech small {
+  font-weight: 500;
+  opacity: 0.8;
+  margin-left: 6px;
+}
+.status {
+  margin: 0;
+  min-height: 1.2em;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+#islandSlot:empty {
+  display: none;
+}
+.foot {
+  margin-top: auto;
+  text-align: center;
+}
+.link-btn {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  text-decoration: underline;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 12px;
+  cursor: pointer;
+}
+.link-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@media (min-width: 600px) {
+  .computer {
+    width: 160px;
+    height: 160px;
+    font-size: 88px;
+  }
+  .hand {
+    height: 84px;
+    font-size: 42px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .buddy,
+  .window-bar.run {
+    animation: none;
+  }
+  .window-bar.run {
+    transform: scaleX(1);
+    opacity: 0.6;
+  }
+  .hand,
+  .computer {
+    transition: none;
+  }
+}

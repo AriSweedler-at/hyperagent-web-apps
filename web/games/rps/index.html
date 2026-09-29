@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Rock Paper Scissors</title>
+    <meta
+      name="description"
+      content="Rock paper scissors against the clock: the computer's hand stops, you beat it before the bar runs out."
+    />
+    <link rel="icon" href="../../shared/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="../../shared/favicon.ico" />
+    <link rel="stylesheet" href="./theme.css" />
+  </head>
+  <body>
+    <div id="app" data-mood="neutral">
+      <header class="bar">
+        <span class="back" aria-hidden="true"></span>
+        <div class="titles">
+          <h1>Rock Paper Scissors</h1>
+          <p class="sub">beat the clock</p>
+        </div>
+        <button
+          id="soundBtn"
+          class="icon-btn"
+          type="button"
+          aria-label="Sound"
+          aria-pressed="false"
+        >
+          🔊
+        </button>
+      </header>
+      <main>
+        <section class="score" aria-live="polite">
+          <div id="buddy" class="buddy" role="img" aria-label="Your buddy"></div>
+          <div class="tally">
+            <span id="counterFace" class="face" aria-hidden="true"></span>
+            <span id="counter" class="counter">0</span>
+          </div>
+          <p class="meta">
+            <span id="prestige">No prestige yet</span>
+            <span class="dot">·</span>
+            <span id="windowMs">Window 1000 ms</span>
+            <span class="dot">·</span>
+            <span id="best">No best yet</span>
+          </p>
+        </section>
+        <section class="table">
+          <div id="computerHand" class="computer" aria-label="The computer's hand">?</div>
+          <div class="window" aria-hidden="true"><div id="windowBar" class="window-bar"></div></div>
+          <p id="verdict" class="verdict">
+            Tap Go. When the hand stops, beat it before the bar runs out.
+          </p>
+          <p id="reaction" class="reaction"></p>
+        </section>
+        <section id="hands" class="hands" aria-label="Your hand">
+          <button id="rockBtn" class="hand" type="button" data-hand="rock" disabled>✊</button>
+          <button id="paperBtn" class="hand" type="button" data-hand="paper" disabled>✋</button>
+          <button id="scissorsBtn" class="hand" type="button" data-hand="scissors" disabled>
+            ✌️
+          </button>
+        </section>
+        <section class="controls">
+          <button id="goBtn" class="btn btn-go" type="button">Go</button>
+          <button id="stopBtn" class="btn" type="button" hidden>Stop</button>
+          <button id="techUpBtn" class="btn btn-tech" type="button" hidden>
+            Tech up <small id="techUpCost"></small>
+          </button>
+          <p id="status" class="status"></p>
+        </section>
+        <div id="islandSlot"></div>
+        <footer class="foot">
+          <button id="resetBtn" class="link-btn" type="button">Reset progress</button>
+        </footer>
+      </main>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
