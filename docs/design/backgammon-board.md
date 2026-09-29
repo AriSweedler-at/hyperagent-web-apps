@@ -284,6 +284,21 @@ and 10px from 900px, with one `--gold` hairline on its inner side, at `z-index: 
 positioned thing (overlays 50, flyers 60, the toast 100); `#app`'s gutters (12px, 16px from 900px)
 keep the board and every control clear of it. No pattern: the meander stays the frame's alone.
 
+The trim's corners follow the screen's (the owner: "the green border hugs the real screen's
+border"). Under `viewport-fit=cover` the band reaches the glass, and a notched iPhone's rounded
+corners would clip a square one, so `body::before` carries `border-radius: var(--screen-corner)`;
+the inset hairline follows the padding box's smaller radius (41px inside a 47px corner) and the
+10px desktop band inherits the same rule. No CSS or JS API exposes the display's corner radius;
+the safe-area insets track it on a notched iPhone within a few pixels (X/XS/11 Pro: inset 44pt,
+radius about 39; 12/13/14: 47/47; 14 Pro/15/16: 59/about 55; 16 Pro: 62/62), so a `:root` rule
+beside the trim declares `--screen-corner` as the largest of the top, left and right insets, an
+approximation, not a measurement. The bottom inset is the home indicator's band (34pt upright,
+21pt sideways), unrelated to the corner, and is left out. The SE, a desktop, headless Chromium
+and Android Chrome in a tab (whose toolbar owns the page's top corners) read 0 and keep square
+corners; an Android phone in fullscreen with a display cutout rounds by the cutout's depth. `env()`
+cannot be overridden in a headless probe, so the value goes through the custom property, which a
+probe sets on `body`.
+
 ### 3.7 Highlight states
 
 | Class / attr | On | Rule |
