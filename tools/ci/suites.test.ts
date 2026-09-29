@@ -684,6 +684,11 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   ['the Worker', ['infra/games-proxy/worker.ts'], ['site', 'e2e-site', 'harness']],
   ['the TURN worker', ['infra/turn-worker/worker.js', 'infra/turn-worker/wrangler.toml'], []],
   [
+    'the Dice App Clip',
+    ['ios/DiceClip/Shared/DiceRoller.swift', 'ios/DiceClip/DiceClip.xcodeproj/project.pbxproj'],
+    [],
+  ],
+  [
     'the transport contract',
     ['test/integration/transport.integration.test.ts', 'test/integration/harness.html'],
     ['shared-integration'],

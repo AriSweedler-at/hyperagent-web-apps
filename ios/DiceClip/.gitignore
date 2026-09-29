@@ -1,0 +1,4 @@
+# swift test's build folder and Xcode's per-user state; DerivedData lives outside the checkout.
+DiceModel/.build/
+xcuserdata/
+DerivedData/

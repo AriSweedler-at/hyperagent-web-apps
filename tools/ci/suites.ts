@@ -830,9 +830,12 @@ export const RULES: ReadonlyArray<Rule> = [
       'tools/hooks-verify.sh',
       // No test touches Cloudflare (issue #19): the TURN worker is deployed by hand.
       'infra/turn-worker/**',
+      // The Dice App Clip (ios/DiceClip/README.md): Swift, an Xcode project and its plists, built by
+      // Xcode alone; no web test reads it, so a Swift-only change runs the check job and nothing else.
+      'ios/**',
     ],
     runs: 'nothing',
-    why: 'prose, hooks and the hand-deployed worker: only the check job reads them',
+    why: 'prose, hooks, the hand-deployed worker and the iOS sources: only the check job reads them',
   },
   {
     // The coin game (dry-round-2.md F3): imported by its own test and, later, the shared shell's

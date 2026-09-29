@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The parent app's Info.plist: the two Live Activity keys. Every CFBundle* key comes from the
+     build settings (GENERATE_INFOPLIST_FILE and INFOPLIST_KEY_* in the project). -->
+<plist version="1.0">
+<dict>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<false/>
+</dict>
+</plist>

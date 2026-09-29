@@ -29,6 +29,10 @@ test/fixtures/styles/*.json
 # Deployed by hand with wrangler and outside the migration ("unchanged" in docs/ARCHITECTURE.md).
 infra/turn-worker/
 
+# The Dice App Clip (ios/DiceClip/README.md): Swift, a hand-written Xcode project, plists,
+# entitlements and asset-catalog JSON. Xcode owns their shape; the web toolchain never reads them.
+/ios/
+
 # Hand-formatted specs; Prettier would reflow their tables.
 docs/
 # Cut from the legacy pages (legacy/fidice/index.html by tools/legacy/debundle-fidice.ts, step 6;
