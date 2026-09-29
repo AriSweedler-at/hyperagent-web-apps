@@ -809,3 +809,87 @@ describe('fetch handler: landing links', () => {
       },
     ));
 });
+
+describe('the island scoreboard routes ride the Worker (rps-push.ts; its own tests cover the routes)', () => {
+  /** A Map-backed RPS_PAIRS binding, enough for the routing rows. */
+  const memoryStore = (): NonNullable<Env['RPS_PAIRS']> => {
+    const rows = new Map<string, string>();
+    return {
+      get: (key) => Promise.resolve(rows.get(key) ?? null),
+      put: (key, value) => {
+        rows.set(key, value);
+        return Promise.resolve();
+      },
+      delete: (key) => {
+        rows.delete(key);
+        return Promise.resolve();
+      },
+    };
+  };
+  const configured: Env = {
+    RPS_PAIRS: memoryStore(),
+    APNS_TEAM_ID: 'TEAM123456',
+    APNS_KEY_ID: 'KEY1234567',
+    APNS_AUTH_KEY: 'unused: no push is sent by these rows',
+  };
+
+  test('/api/rps/* never reaches the upstream: 503 without the bindings, whatever the method', () =>
+    withUpstream(noUpstream, async () => {
+      const pair = await worker.fetch(
+        new Request(`${ORIGIN}/api/rps/pair`, { method: 'POST', body: '{}' }),
+      );
+      expect(pair.status).toBe(503);
+      expect(await pair.json()).toEqual({ error: 'island pushes not configured' });
+      expect(
+        (await get('/api/rps/pair/abcd1234', { UPSTREAM: 'http://127.0.0.1:4173' })).status,
+      ).toBe(503);
+      expect((await get('/api/rps/mood')).status).toBe(503);
+    }));
+
+  test('with the bindings the routes answer: a pair is taken and paired flips; a mood for an unknown session is 404', () =>
+    withUpstream(noUpstream, async () => {
+      expect(await (await get('/api/rps/pair/abcd1234', configured)).json()).toEqual({
+        paired: false,
+      });
+      const pair = await worker.fetch(
+        new Request(`${ORIGIN}/api/rps/pair`, {
+          method: 'POST',
+          body: JSON.stringify({
+            session: 'abcd1234',
+            token: 'a'.repeat(64),
+            bundle: 'com.sweedler.games.dice.Clip',
+          }),
+        }),
+        configured,
+      );
+      expect(pair.status).toBe(204);
+      const paired = await get('/api/rps/pair/abcd1234', configured);
+      expect(paired.status).toBe(200);
+      expect(await paired.json()).toEqual({ paired: true });
+      const mood = await worker.fetch(
+        new Request(`${ORIGIN}/api/rps/mood`, {
+          method: 'POST',
+          body: JSON.stringify({
+            session: 'zzzz9999',
+            counter: 0,
+            prestige: 0,
+            band: 'neutral',
+            at: 1,
+          }),
+        }),
+        configured,
+      );
+      expect(mood.status).toBe(404);
+    }));
+
+  test('the routes are same-origin: no CORS header; the proxy paths around them are untouched', () =>
+    withUpstream(upstreamEcho, async () => {
+      const paired = await get('/api/rps/pair/abcd1234', configured);
+      expect(paired.headers.get('access-control-allow-origin')).toBeNull();
+      // Only the /api/rps/ prefix is the Worker's: a neighbour is a game path like any other.
+      expect(await (await get('/api/rpsx/pair')).text()).toBe(
+        `${GH}/hyperagent-web-apps/games/api/rpsx/pair`,
+      );
+      expect(await (await get('/api/rps')).text()).toBe(`${GH}/hyperagent-web-apps/games/api/rps`);
+    }));
+});

@@ -5,3 +5,26 @@ compatibility_date = "2025-01-01"
 # Reverse proxy for the GitHub Pages site at https://games.sweedler.com (custom domain on the
 # sweedler.com zone). Path mapping is documented at the top of worker.ts.
 routes = [{ pattern = "games.sweedler.com", custom_domain = true }]
+
+# The island scoreboard (docs/ARCHITECTURE.md "The island scoreboard", rps-push.ts): /api/rps/*
+# pairs the RPS game with the Dice clip's Live Activity and pushes each round's mood through APNs.
+# Without the binding or a secret the routes answer 503 and the proxy is untouched.
+[vars]
+# api.push.apple.com serves App Store and TestFlight builds; api.sandbox.push.apple.com serves
+# Xcode (development) builds. A pair whose token came from the other environment is a
+# BadDeviceToken. Override per deploy with `wrangler deploy --var APNS_HOST:…` if needed.
+APNS_HOST = "api.push.apple.com"
+
+# session -> {token, bundle, at}, 24 h TTL. The binding is commented out so `wrangler deploy`
+# works before the namespace exists (the /api/rps/* routes answer 503 until it is bound). To turn
+# the island scoreboard on: create it once with
+#   wrangler kv namespace create RPS_PAIRS
+# then uncomment the three lines below and paste the id it prints over the placeholder.
+# [[kv_namespaces]]
+# binding = "RPS_PAIRS"
+# id = "REPLACE_WITH_THE_ID_WRANGLER_PRINTS"
+
+# Secrets, set from this directory with `wrangler secret put <NAME>` (never in this file):
+#   APNS_TEAM_ID   the 10-character Team ID (the provider token's `iss`)
+#   APNS_KEY_ID    the 10-character Key ID of the APNs auth key (the provider token's `kid`)
+#   APNS_AUTH_KEY  the AuthKey_<KEY_ID>.p8 file's text, the PEM block included

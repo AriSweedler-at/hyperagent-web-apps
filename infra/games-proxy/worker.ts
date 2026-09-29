@@ -12,6 +12,10 @@
 //   /favicon.ico -> .../hyperagent-web-apps/shared/favicon.ico (the one icon the site ships; browsers
 //                   and bookmarks ask the origin root for it)
 //   /hyperagent-web-apps/… passes through unchanged.
+//   /api/rps/…   -> this Worker's own routes (rps-push.ts): the island scoreboard's pairing and
+//                   mood pushes, answered before any proxy path and never sent upstream. They need
+//                   the RPS_PAIRS KV binding and the APNS_* secrets (wrangler.toml); without them
+//                   they answer 503 and the proxy is untouched.
 // Only the slash-terminated prefixes are special: /games, /shared and /hyperagent-web-apps without
 // a trailing slash fall into the /XXX rule. worker.test.ts pins every row of this table.
 // A page fetched with `?join=CODE` (an invite link) has its Open Graph head rewritten to name the
@@ -21,10 +25,13 @@
 // Playwright `proxy` project), which has none, and both pages are this repo's own markup.
 // The upstream origin is env.UPSTREAM (default https://arisweedler-at.github.io) so the same
 // handler can front a local dist server in tests (tools/proxy-dev.ts).
-// Deploy with `npx wrangler deploy` from this directory (wrangler bundles TypeScript natively).
+// Deploy with `npx wrangler deploy` from this directory (wrangler bundles TypeScript natively: this
+// file and its one sibling import; nothing outside infra/games-proxy/ is imported).
 // The TURN Worker's ALLOWED_ORIGINS must include https://games.sweedler.com.
 // Types: `Request`, `Response`, `Headers`, `URL` and `fetch` are the globals @types/node declares
 // (tsconfig.node.json); on Cloudflare they are the same WHATWG interfaces.
+
+import { handleRps, isRpsPath, type RpsEnv } from './rps-push.ts';
 
 export const DEFAULT_UPSTREAM = 'https://arisweedler-at.github.io';
 
@@ -38,8 +45,11 @@ const SITE = '/hyperagent-web-apps';
  */
 export const ALIASES: Readonly<Record<string, string>> = { sheshbesh: 'backgammon' };
 
-/** The Worker's bindings (wrangler.toml `[vars]`, or what tools/proxy-dev.ts passes). */
-export type Env = Readonly<{ UPSTREAM?: string }>;
+/**
+ * The Worker's bindings (wrangler.toml `[vars]`, the KV namespace and the secrets, or what
+ * tools/proxy-dev.ts passes): the upstream origin, and the island scoreboard's (rps-push.ts RpsEnv).
+ */
+export type Env = Readonly<{ UPSTREAM?: string }> & RpsEnv;
 
 /**
  * What the Worker does with a pathname on this origin: `fetch` names the upstream pathname to
@@ -238,6 +248,12 @@ export type Handler = Readonly<{
 const handler: Handler = {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // The Worker's own routes come first: nothing under /api/rps/ is ever proxied. The global
+    // fetch is read here, at call time, so a test's stub of it is the one Apple's request meets.
+    if (isRpsPath(url.pathname))
+      return handleRps(request, env ?? {}, { fetchFn: fetch, now: () => Date.now() });
+
     const upstream = env?.UPSTREAM ?? DEFAULT_UPSTREAM;
     const mapped = mapPath(url.pathname);
 
