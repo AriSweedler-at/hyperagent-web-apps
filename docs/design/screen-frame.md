@@ -144,8 +144,10 @@ One flag and three tokens.
 - Nothing else: no `body::before`, no padding arithmetic, no corner rule. Backgammon (the trim,
   docs/design/backgammon-board.md §3.6): `--frame-band: 6px` (10px from 900px),
   `--frame-color: var(--olive)`, `--frame-hairline: var(--gold)`, `--frame-gap: 5px` (so its
-  gutters stay the 12px and 16px its board arithmetic counts), and one `#app { padding-top }` of
-  its own upright (§7).
+  gutters stay the 12px and 16px its board arithmetic counts). Its upright table fits whatever the
+  rule leaves: `#app` is a size container at the table and the board reads the room as `100cqh`
+  (backgammon-board.md §3.1), so a notch of any depth, or a phone the catalogue has never seen,
+  costs the game no arithmetic.
 
 ## 6. Validation
 
@@ -171,8 +173,9 @@ One flag and three tokens.
   a `kind` check.
 - `safe-area-max-inset-*` and any future radius API: swap the fallback and the table's role when
   one ships.
-- Backgammon upright keeps its top gutter at 12px (16 from 900px) over the shell's
-  `max(clearance, inset-top)`: its portrait table budget counts 12 and the notch's 47-62px pushed
-  the controls past the foot (the emulator's `clear` check). Sizing the upright board for the
-  notch's zone is its own change; the shell's rule stands for every other side and every other
-  game.
+- The rule stands on every side of every game, and a game's floors are its own to fit under it:
+  backgammon upright measures the room (§5) and its 44px point floor holds only in its scroll
+  tier, so the four smallest notched iPhones installed get 39.8-43.7px rows (backgammon-board.md
+  §3.1, §3.10). A scroll tier that read the room would need a threshold no media query can spell
+  (`env()` is not a media feature): a compact chrome tier under the notch, or a class the boot
+  sets, is the follow-up if those rows must be 44.

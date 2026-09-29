@@ -10,7 +10,10 @@
 // catalogue's radius where the reach rule says the corner is the screen's, 0 where a bar owns it
 // (`judge`, the emulator's own verdict). Last, the frame probe (docs/design/screen-frame.md §6): the
 // iPhone 12 class upright standalone and sideways in a tab with the bar up, the page as it loads,
-// the four radii and #app's clearance off the insets read straight off the computed styles. Each device's board is attached to the report
+// the four radii and #app's clearance off the insets read straight off the computed styles; then,
+// upright standalone, the table sat at: the controls row ends over the home indicator's band where
+// the twin says (`uprightFoot`), the board is the twin's height, and nothing scrolls (the room
+// under the notch, backgammon-board.md §3.1). Each device's board is attached to the report
 // (`playwright show-report` shows them); no video. The iPads (the desktop template sideways) and
 // the unsupported SE 1st gen are left to the twin's sweep in layout.test.ts. Page-only (site.ts
 // PAGE_ONLY_SPECS): about the page, not the origin.
@@ -19,11 +22,18 @@ import { expect, test } from '@playwright/test';
 import {
   DICE_STILL,
   SEED_SCRIPT,
+  TOL,
   judge,
   seamScript,
   twinOf,
   type Measured,
 } from '../tools/shell-emulate.ts';
+import {
+  uprightBoardHeight,
+  uprightFoot,
+  uprightPadding,
+  uprightScrolls,
+} from '../web/games/backgammon/src/ui/board/layout.ts';
 import {
   CORNER_KEYS,
   DEVICES,
@@ -164,9 +174,28 @@ type FrameMeasure = Readonly<{
   corners: Readonly<Record<string, number>>;
   padding: Readonly<{ top: number; right: number; bottom: number; left: number }>;
 }>;
+/** The table upright: the controls row's foot and the board's height in the viewport, and whether anything scrolls. */
+const TABLE_MEASURE = `(() => {
+  const r = (id) => document.getElementById(id).getBoundingClientRect();
+  const fits = (id) => { const el = document.getElementById(id); return el.scrollHeight <= el.clientHeight + 1; };
+  return {
+    foot: r('controls').bottom,
+    boardHeight: r('board').height,
+    scrolls: document.documentElement.scrollHeight > innerHeight + 1,
+    appFits: fits('app'),
+    tableFits: fits('tableScreen'),
+  };
+})()`;
+type TableMeasure = Readonly<{
+  foot: number;
+  boardHeight: number;
+  scrolls: boolean;
+  appFits: boolean;
+  tableFits: boolean;
+}>;
 
 PROBES.forEach(({ e, standalone }) => {
-  test(`frame probe, ${emulationName(e)}: the corners are ${CORNER_KEYS.map((k) => String(e.corners[k])).join('/')}px and #app clears the band by 5px or stands past the inset`, async ({
+  test(`frame probe, ${emulationName(e)}: the corners are ${CORNER_KEYS.map((k) => String(e.corners[k])).join('/')}px and #app clears the band by 5px or stands past the inset${standalone ? '; at the table the controls end over the indicator and nothing scrolls' : ''}`, async ({
     browser,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'pages', 'about the page, not the origin');
@@ -212,6 +241,43 @@ PROBES.forEach(({ e, standalone }) => {
               left: Math.max(clear, e.insets.left),
             },
       );
+      if (!standalone) return;
+      // Upright installed: the table fits the room the paddings leave (the notch above, the home
+      // indicator below). The twin's viewport carries the top inset; `coarse` for the touch context.
+      const vp = {
+        width: e.viewport.width,
+        height: e.viewport.height,
+        coarse: true,
+        insets: {
+          top: e.insets.top,
+          left: e.insets.left,
+          right: e.insets.right,
+          bottom: e.insets.bottom,
+        },
+      };
+      expect(uprightScrolls(vp), 'the probe is a fitting viewport').toBe(false);
+      await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
+      await page.locator('#p1NameInput').fill('Ari');
+      await page.locator('#p2NameInput').fill('Ethan');
+      await page.locator('#localBtn').click();
+      await expect(page.locator('#tableScreen')).toBeVisible();
+      const gate = page.locator('#turnGate');
+      if (await gate.isVisible()) await page.locator('#turnGateKeepBtn').click();
+      await expect(page.locator('#curtainOverlay')).toBeVisible();
+      const t = await page.evaluate<TableMeasure>(TABLE_MEASURE);
+      // The controls row ends at or over the bottom padding (the indicator's 34px band), exactly
+      // where the twin puts it (the 2px of slack over the band), and the board is the twin's.
+      const pad = uprightPadding(vp);
+      expect(t.foot, 'the controls end under the bottom padding').toBeLessThanOrEqual(
+        e.viewport.height - pad.bottom + TOL,
+      );
+      expect(Math.abs(t.foot - uprightFoot(vp))).toBeLessThanOrEqual(TOL);
+      expect(Math.abs(t.boardHeight - uprightBoardHeight(vp))).toBeLessThanOrEqual(TOL);
+      expect({ scrolls: t.scrolls, appFits: t.appFits, tableFits: t.tableFits }).toEqual({
+        scrolls: false,
+        appFits: true,
+        tableFits: true,
+      });
     } finally {
       await context.close();
     }

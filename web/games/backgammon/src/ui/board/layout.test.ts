@@ -14,6 +14,7 @@ import {
   boardRoom,
   chromeHeight,
   LANDSCAPE_MAX_HEIGHT,
+  PHONE_GEOMETRY,
   PHONE_TEMPLATE,
   POINT_AREAS,
   RAIL_MIN_WIDTH,
@@ -37,6 +38,11 @@ import {
   stackExtent,
   stackStep,
   templateOf,
+  uprightBoardHeight,
+  uprightFoot,
+  uprightPadding,
+  uprightRoom,
+  uprightScrolls,
   visibleOf,
   type Area,
   type Cell,
@@ -442,6 +448,73 @@ describe('the sizes', () => {
     expect(pointWidth({ width: 2000, height: 1400 })).toBe(72);
   });
 
+  test("upright: the room under the shell's paddings decides the row; the 44px floor is the scroll tier's (at most 805px tall)", () => {
+    const upright = (width: number, height: number, top: number, bottom: number): Viewport => ({
+      width,
+      height,
+      coarse: true,
+      insets: { top, left: 0, right: 0, bottom },
+    });
+    // A tab or headless, no insets: 12px paddings, an 820px room, 47px rows, a 672px board and the
+    // controls ending at 830 (the 12 and the 2px of slack under them): what the viewport arithmetic gave.
+    const tab: Viewport = { width: 390, height: 844 };
+    expect(uprightPadding(tab)).toEqual({ top: 12, bottom: 12 });
+    expect(uprightRoom(tab)).toBe(820);
+    expect(uprightScrolls(tab)).toBe(false);
+    expect(pointWidth(tab)).toBeCloseTo(47, 5);
+    expect(uprightBoardHeight(tab)).toBeCloseTo(672, 5);
+    expect(uprightFoot(tab)).toBeCloseTo(830, 5);
+    expect(PHONE_GEOMETRY.chromeIn + PHONE_GEOMETRY.slack).toBe(148);
+    // Installed on an iPhone 12: the notch's 47 and the indicator's 34 leave 763; 42.25px rows, a
+    // 615px board, the controls ending at 808, 2px over the band. (Before: 47px rows under a 47px
+    // padding, the controls 19px into the band and clipped.)
+    const iphone12 = upright(390, 844, 47, 34);
+    expect(uprightPadding(iphone12)).toEqual({ top: 47, bottom: 34 });
+    expect(uprightRoom(iphone12)).toBe(763);
+    expect(uprightScrolls(iphone12)).toBe(false);
+    expect(pointWidth(iphone12)).toBeCloseTo(42.25, 5);
+    expect(uprightBoardHeight(iphone12)).toBeCloseTo(615, 5);
+    expect(uprightFoot(iphone12)).toBeCloseTo(808, 5);
+    expect(uprightFoot(iphone12)).toBeLessThanOrEqual(844 - 34);
+    // The sweep's other installed cases: 393x852 (59/34) 41.92, 430x932 (59/34) 48.58, 375x812
+    // (44/34) 39.83, the 12 mini (50/34) 39.33, 402x874 (62/34) 43.5; each fills its room to the slack.
+    const installed: ReadonlyArray<readonly [Viewport, number]> = [
+      [upright(393, 852, 59, 34), (852 - 93 - 256) / 12],
+      [upright(430, 932, 59, 34), (932 - 93 - 256) / 12],
+      [upright(375, 812, 44, 34), (812 - 78 - 256) / 12],
+      [upright(375, 812, 50, 34), (812 - 84 - 256) / 12],
+      [upright(402, 874, 62, 34), (874 - 96 - 256) / 12],
+    ];
+    installed.forEach(([vp, pw]) => {
+      expect(pointWidth(vp)).toBeCloseTo(pw, 5);
+      expect(vp.height - uprightPadding(vp).bottom - uprightFoot(vp)).toBeCloseTo(
+        PHONE_GEOMETRY.slack,
+        5,
+      );
+    });
+    // The SE installed (no insets) and every notched phone in a tab (the bar's height off the
+    // viewport) are the scroll tier: 44px rows, whatever the paddings, and the document scrolls.
+    const se = upright(375, 667, 0, 0);
+    expect(uprightPadding(se)).toEqual({ top: 12, bottom: 12 });
+    expect(uprightScrolls(se)).toBe(true);
+    expect(pointWidth(se)).toBe(44);
+    expect(uprightBoardHeight(se)).toBe(636);
+    expect(pointWidth(upright(390, 750, 0, 34))).toBe(44);
+    expect(uprightScrolls(upright(390, 750, 0, 34))).toBe(true);
+    // A notched phone's tab with the bar hidden, over the tier: the indicator's 34 still counts
+    // (44.67 at 430x838; the 420x912 Air's 818 leaves 772, 43 rows).
+    expect(pointWidth(upright(430, 838, 0, 34))).toBeCloseTo((838 - 46 - 256) / 12, 5);
+    expect(pointWidth(upright(420, 818, 0, 34))).toBeCloseTo(43, 5);
+    // The tier's edge: 805 scrolls at 44; 806 fits with the room's 43.83 (the floor's board and
+    // the chrome need 806, the slack eaten), 808 with 44 exactly.
+    expect(uprightScrolls({ width: 390, height: 805 })).toBe(true);
+    expect(pointWidth({ width: 390, height: 805 })).toBe(44);
+    expect(uprightScrolls({ width: 390, height: 806 })).toBe(false);
+    expect(pointWidth({ width: 390, height: 806 })).toBeCloseTo(43.83, 2);
+    expect(pointWidth({ width: 390, height: 808 })).toBeCloseTo(44, 5);
+    expect(pointWidth({ width: 390, height: 1400 })).toBe(PHONE_GEOMETRY.maxPointW);
+  });
+
   test('five drawn, the rest a badge; the coin step spares the label corner', () => {
     expect([visibleOf(0), visibleOf(3), visibleOf(5), visibleOf(7)]).toEqual([0, 3, 5, 5]);
     // Phone at 390x844: 175px points, 40.42px checkers -> 28.6px steps, five coins in 155px.
@@ -466,6 +539,82 @@ describe('the sizes', () => {
     expect(stackExtent(5, coin(44), stackStep(90, coin(44), spare))).toBeLessThanOrEqual(
       90 - spare,
     );
+  });
+});
+
+/**
+ * The upright sweep: every device upright in every mode (a tab twice, standalone, fullscreen),
+ * the insets the catalogue reports (the notch above once installed, the indicator below), through
+ * the twin. At most 805px tall the tier scrolls with 44px rows; above it the board and the chrome
+ * fill the room to the 2px of slack, the controls end over the bottom padding, and the row is 44
+ * or more everywhere but the cases named (`UNDER_44`: the four smallest notched classes installed
+ * and the UNVERIFIED Air's tab with the bar hidden, 39.3-43.5px), never under 39. The 1024-wide
+ * iPad upright is the desktop layout, by width.
+ */
+const UNDER_44: ReadonlySet<string> = new Set([
+  'iphone-375x812-x portrait standalone',
+  'iphone-375x812-x portrait fullscreen',
+  'iphone-375x812-mini portrait standalone',
+  'iphone-375x812-mini portrait fullscreen',
+  'iphone-390x844 portrait standalone',
+  'iphone-390x844 portrait fullscreen',
+  'iphone-393x852 portrait standalone',
+  'iphone-393x852 portrait fullscreen',
+  'iphone-402x874 portrait standalone',
+  'iphone-402x874 portrait fullscreen',
+  'iphone-420x912-air portrait browser bar-hidden',
+]);
+describe('the device sweep upright: the table fits the room the shell leaves on every phone, every mode', () => {
+  const upright = (e: Emulation): Viewport => ({
+    width: e.viewport.width,
+    height: e.viewport.height,
+    coarse: true,
+    insets: {
+      top: e.insets.top,
+      left: e.insets.left,
+      right: e.insets.right,
+      bottom: e.insets.bottom,
+    },
+  });
+  const cases = DEVICES.flatMap((d) => emulationsOf(d).filter((e) => e.orientation === 'portrait'));
+
+  test('the sweep covers every device in every upright case: three modes, the tab twice', () => {
+    expect(cases).toHaveLength(DEVICES.length * 4);
+  });
+
+  test.each(cases.map((e) => [emulationName(e), e] as const))('%s', (name, e) => {
+    const vp = upright(e);
+    if (vp.width >= 900) {
+      expect(layoutFor(vp), 'a 1024-wide iPad upright is the desktop layout').toBe('desktop');
+      return;
+    }
+    expect(layoutFor(vp)).toBe('phone');
+    const g = PHONE_GEOMETRY;
+    const pad = uprightPadding(vp);
+    expect(pad).toEqual({
+      top: Math.max(g.clearance, e.insets.top),
+      bottom: Math.max(g.clearance, e.insets.bottom),
+    });
+    const pw = pointWidth(vp);
+    if (uprightScrolls(vp)) {
+      expect(pw).toBe(g.minPointW);
+      expect(uprightBoardHeight(vp)).toBe(636);
+      return;
+    }
+    // Fills: the controls end over the bottom padding, the slack under them, unless the 64px cap holds the board short.
+    const spare = vp.height - pad.bottom - uprightFoot(vp);
+    if (pw < g.maxPointW) expect(spare).toBeCloseTo(g.slack, 5);
+    else expect(spare).toBeGreaterThanOrEqual(g.slack);
+    expect(uprightRoom(vp) - g.chromeIn - g.slack).toBeCloseTo(
+      uprightBoardHeight(vp) + (spare - g.slack),
+      5,
+    );
+    if (UNDER_44.has(name)) {
+      expect(pw, `${name}: ${String(pw)}px rows`).toBeLessThan(g.minPointW);
+      expect(pw).toBeGreaterThanOrEqual(39);
+    } else {
+      expect(pw, `${name}: ${String(pw)}px rows`).toBeGreaterThanOrEqual(g.minPointW);
+    }
   });
 });
 
