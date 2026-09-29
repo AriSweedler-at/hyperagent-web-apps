@@ -8,7 +8,14 @@ import { NOW, runIntents } from '../../../../../test/shared/engine-helpers.ts';
 import { createStore, type StorageLike } from '../../../../shared/edge/storage.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { DEFAULT_LOCAL_NAMES, flipped, gateOpen } from '../../../../shared/ui/shell.ts';
-import { actorOf, applyAction, MESSAGES, viewFor, withPosition } from '../engine/index.ts';
+import {
+  actorOf,
+  applyAction,
+  canEndTurn,
+  MESSAGES,
+  viewFor,
+  withPosition,
+} from '../engine/index.ts';
 import type { Dice, Seat, State, View } from '../engine/index.ts';
 import { connectingMsg } from '../net/guest.ts';
 import { OPENING_MSG, handoffMsg } from '../net/host.ts';
@@ -171,6 +178,8 @@ const nextTap = (app: App): Intent | null => {
   if (!v.isMyTurn) return null;
   if (v.phase === 'toRoll') return { type: 'roll/click' };
   if (v.phase === 'cubeOffered') return { type: 'take/click' };
+  // Pass-and-play holds the turn once the dice are used up (design §1 "Turn end"): End turn.
+  if (canEndTurn(v)) return { type: 'done/click' };
   const sel = effectiveSelection(app.table.selected, v);
   if (sel === null) {
     const [first] = sourcesOf(v);
@@ -963,22 +972,29 @@ describe('the table', () => {
     expect(pending.chains.map((c) => c.via)).toEqual([[6], [9]]);
     expect(opened.effects).toEqual([{ type: 'fx', cue: 'tap' }]);
     expect(game(opened.app).played).toEqual([]);
-    // The quiet order: both moves, the turn ends, the curtain names Dark.
-    const chosen = run(opened.app, { type: 'chip/tap', index: 1 });
-    const g = game(chosen.app);
-    expect(g.lastPlay).toEqual([
+    // The quiet order: both moves; the dice are used up and the turn is held for End turn
+    // (design §1 "Turn end"), the curtain down; End turn flips it and the curtain names Dark.
+    const played = run(opened.app, { type: 'chip/tap', index: 1 });
+    expect(game(played.app).played).toEqual([
       { from: 12, to: 9, die: 3, hit: false },
       { from: 9, to: 3, die: 6, hit: false },
     ]);
-    expect(g).toMatchObject({ turn: 1, phase: 'toRoll' });
+    expect(game(played.app)).toMatchObject({ turn: 0, phase: 'moving' });
+    expect(played.app.table).toMatchObject({ pending: null, selected: null, curtain: null });
+    expect(cues(played.effects)).toEqual(['place', 'place']);
+    const chosen = run(played.app, { type: 'done/click' });
+    const g = game(chosen.app);
+    expect(g.lastPlay).toEqual(game(played.app).played);
+    expect(g).toMatchObject({ turn: 1, phase: 'toRoll', played: [] });
     expect(chosen.app.table).toMatchObject({ pending: null, selected: null, curtain: 1 });
-    expect(cues(chosen.effects)).toEqual(['yourTurn', 'place', 'place']);
+    // The flip animates nothing again: the moves were shown as they were played.
+    expect(cues(chosen.effects)).toEqual(['yourTurn']);
     // The hitting order: the curtain rises for Bob with no toast yet (Ann still holds the phone);
     // Bob's reveal toasts him the hit in his own numbering (Ann's 7 is his 18).
-    const hit = run(opened.app, { type: 'chip/tap', index: 0 });
+    const hit = run(opened.app, { type: 'chip/tap', index: 0 }, { type: 'done/click' });
     expect(game(hit.app).lastPlay.map((m) => m.hit)).toEqual([true, false]);
     expect(toasts(hit.effects)).toEqual([]);
-    expect(cues(hit.effects)).toEqual(['yourTurn', 'hit', 'place']);
+    expect(cues(hit.effects)).toEqual(['hit', 'place', 'yourTurn']);
     expect(toasts(run(hit.app, { type: 'curtain/reveal' }).effects)).toEqual([
       [hitMsg('Ann', [18]), null],
     ]);
@@ -999,13 +1015,17 @@ describe('the table', () => {
 describe('the hit toast in pass-and-play', () => {
   /** A Dark blot on Light's 5-point (Dark's 20); Light rolls 3-1 and hits with the 3 from the 8. */
   const BLOT_ON_5 = 'L: 24:2 13:5 8:3 6:5 | D: 24:2 13:5 8:3 6:4 20:1 | bar 0/0 | off 0/0';
-  /** Light hits 8/5* with the 3, then covers 6/5 with the 1: the turn flips to Dark. */
+  /** Light hits 8/5* with the 3, then covers 6/5 with the 1 and ends the turn: it flips to Dark. */
   const hitTurn = (start: App): Step => {
     const first = run(start, { type: 'point/tap', point: 7 }, { type: 'point/tap', point: 4 });
     expect(game(first.app).played).toEqual([{ from: 7, to: 4, die: 3, hit: true }]);
     const second = run(first.app, { type: 'point/tap', point: 5 }, { type: 'point/tap', point: 4 });
-    expect(game(second.app)).toMatchObject({ turn: 1, phase: 'toRoll' });
-    return second;
+    // The dice are used up, the turn held for End turn: Ann still holds the phone, nothing flipped.
+    expect(game(second.app)).toMatchObject({ turn: 0, phase: 'moving' });
+    expect(second.app.table.curtain).toBeNull();
+    const ended = run(second.app, { type: 'done/click' });
+    expect(game(ended.app)).toMatchObject({ turn: 1, phase: 'toRoll' });
+    return { app: ended.app, effects: [...second.effects, ...ended.effects] };
   };
 
   test('a hit on the first of two taps: nothing at the flip, the toast on the reveal, once', () => {
@@ -1156,7 +1176,7 @@ describe('the dice, the bar, the tray and a drag', () => {
       { type: 'checker/dragOver', over: 3 },
       { type: 'checker/dragEnd' },
     );
-    expect(game(combined.app).lastPlay.map((m) => m.die)).toEqual([6, 3]);
+    expect(game(combined.app).played.map((m) => m.die)).toEqual([6, 3]);
     // The tray drop spends the exact die when one matches, else the largest (`moveTo`).
     const tray = run(
       at(BOTH_SUFFICE, 0, [6, 5]),
@@ -1747,9 +1767,14 @@ describe('what changed between two views', () => {
     expect(newMovesBetween(null, v1)).toEqual([]);
     const two = run(one.app, { type: 'point/tap', point: 9 }, { type: 'point/tap', point: 3 });
     const v2 = view(two.app);
-    // The turn flipped: the finished play beyond what v1 saw, from either seat's view.
+    // The dice are used up and the turn held (design §1 "Turn end"): the second move is this turn's tail.
     expect(newMovesBetween(v1, v2)).toEqual([{ from: 9, to: 3, die: 6, hit: false }]);
-    expect(newMovesBetween(v0, viewFor(game(two.app), 0))).toEqual(game(two.app).lastPlay);
+    expect(newMovesBetween(v0, viewFor(game(two.app), 0))).toEqual(game(two.app).played);
+    // End turn flips it: nothing new to the seat that watched the moves, the whole play to one that saw none.
+    const ended = run(two.app, { type: 'done/click' });
+    expect(newMovesBetween(v2, view(ended.app))).toEqual([]);
+    expect(newMovesBetween(v0, viewFor(game(ended.app), 0))).toEqual(game(ended.app).lastPlay);
+    expect(game(ended.app).lastPlay).toHaveLength(2);
     const undone = view(run(one.app, { type: 'undo/click' }).app);
     expect(newMovesBetween(v1, undone)).toEqual([]);
     const other = view(local());

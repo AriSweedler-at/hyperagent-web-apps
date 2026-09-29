@@ -60,6 +60,13 @@ export const viewFor = (state: State, seat: Seat): View => {
   };
 };
 
+/**
+ * End turn is on offer: my held turn (`manualTurnEnd`, `moving`, no move left to make). Derived,
+ * not a View key, so a `state` frame's shape is what it was; the painters and the e2e read it here.
+ */
+export const canEndTurn = (view: View): boolean =>
+  view.isMyTurn && view.phase === 'moving' && view.options.manualTurnEnd && view.legal.length === 0;
+
 /** Every action the viewer may send now (the replay policy and the `__backgammon` hook use it). */
 export const legalActions = (view: View): ReadonlyArray<Action> => {
   if (view.phase === 'over') return view.matchOver ? [] : [{ type: 'next' }];
@@ -75,7 +82,8 @@ export const legalActions = (view: View): ReadonlyArray<Action> => {
         to: m.to,
         die: m.die,
       }));
-      return view.canUndo ? [...moves, { type: 'undo' }] : moves;
+      const undoable: ReadonlyArray<Action> = view.canUndo ? [...moves, { type: 'undo' }] : moves;
+      return canEndTurn(view) ? [...undoable, { type: 'done' }] : undoable;
     }
     case 'cubeOffered':
       return [{ type: 'take' }, { type: 'pass' }];

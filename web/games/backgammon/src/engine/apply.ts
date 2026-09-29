@@ -2,8 +2,10 @@
 // flow, the cube and Crawford, undo, the actor and refusal order): `applyAction(state, seat, action, rng,
 // now)` returns a new State or a refusal worded for the player, never mutates, never throws, and
 // is the single entry the local reducer and the online host share. A move is legal iff
-// `legalMoves` offers it; the turn ends by itself when nothing extends `played` (no `done`
-// action); a roll nobody can play passes the turn at once; a double is answered in
+// `legalMoves` offers it; the turn ends by itself when nothing extends `played`, unless the
+// match's `manualTurnEnd` option holds it for `done` (End turn: the mover stays in `moving` with
+// no legal move and may still undo); a roll nobody can play passes the turn at once either way
+// (nothing to think over, nothing to undo); a double is answered in
 // `cubeOffered`; `next` starts the following game of the match. The rng is read only by `roll`
 // and by `next` (the opening roll); the clock stamps every log entry.
 import { err, ok, type Result } from '../../../../shared/lib/result.ts';
@@ -51,6 +53,7 @@ export const MESSAGES = {
   CANT_DOUBLE_NOW: "You can't double after rolling.",
   NO_DOUBLE_PENDING: 'No double to answer.',
   ANSWER_DOUBLE: 'Answer the double first.',
+  MOVES_LEFT: 'Play your dice first.',
 } as const;
 
 type Applied = Result<State, string>;
@@ -71,6 +74,14 @@ export const canDouble = (state: State, seat: Seat): boolean =>
   !state.match.isCrawfordGame &&
   (state.cube.owner === null || state.cube.owner === seat) &&
   state.cube.value < CUBE_MAX;
+
+/**
+ * The turn is held for End turn: `manualTurnEnd`, the mover in `moving` with nothing left to
+ * play (the dice used up, or the rest unplayable). Never with nothing played: a roll with no move
+ * passes the turn inside `roll` (R14), option or not.
+ */
+export const turnHeld = (state: State): boolean =>
+  state.options.manualTurnEnd && state.phase === 'moving' && legalMoves(state).length === 0;
 
 /** The next cube face; 64 is the cap (`canDouble` refuses before this is reached). */
 const DOUBLED: Readonly<Record<CubeValue, CubeValue>> = {
@@ -227,7 +238,10 @@ const roll = (state: State, seat: Seat, rng: Rng, now: Now): Applied => {
   );
 };
 
-/** R12/R13: only a move `legalMoves` offers; the game ends at fifteen off, the turn when nothing extends. */
+/**
+ * R12/R13: only a move `legalMoves` offers; the game ends at fifteen off, the turn when nothing
+ * extends, or, under `manualTurnEnd`, the turn is held in `moving` for `done`.
+ */
 const move = (state: State, seat: Seat, action: Move, now: Now): Applied => {
   const key = moveKey(action);
   if (!legalMoves(state).some((m) => moveKey(m) === key)) return err(MESSAGES.ILLEGAL_MOVE);
@@ -257,8 +271,18 @@ const move = (state: State, seat: Seat, action: Move, now: Now): Applied => {
       ),
     );
   const next: State = { ...state, phase: 'moving', board, played };
-  return ok(legalMoves(next).length === 0 ? endTurn(next, seat, board, played, at) : next);
+  return ok(
+    legalMoves(next).length === 0 && !state.options.manualTurnEnd
+      ? endTurn(next, seat, board, played, at)
+      : next,
+  );
 };
+
+/** End turn: the held turn flips exactly as the automatic end did (the same log lines, `lastPlay`, `turnStart`). */
+const done = (state: State, seat: Seat, now: Now): Applied =>
+  turnHeld(state)
+    ? ok(endTurn(state, seat, state.board, state.played, now()))
+    : err(MESSAGES.MOVES_LEFT);
 
 /** R26: back to the board the dice were rolled on; the dice stay, nothing is logged. */
 const undo = (state: State): Applied =>
@@ -306,6 +330,8 @@ const toRollPhase = (state: State, seat: Seat, action: Action, rng: Rng, now: No
       return err(MESSAGES.ROLL_FIRST);
     case 'undo':
       return err(MESSAGES.NOTHING_TO_UNDO);
+    case 'done':
+      return err(MESSAGES.ROLL_FIRST);
     case 'take':
     case 'pass':
       return err(MESSAGES.NO_DOUBLE_PENDING);
@@ -320,6 +346,8 @@ const movingPhase = (state: State, seat: Seat, action: Action, now: Now): Applie
       return move(state, seat, action, now);
     case 'undo':
       return undo(state);
+    case 'done':
+      return done(state, seat, now);
     case 'roll':
       return err(MESSAGES.ALREADY_ROLLED);
     case 'double':
@@ -341,6 +369,7 @@ const cubePhase = (state: State, seat: Seat, action: Action, now: Now): Applied 
     case 'roll':
     case 'move':
     case 'undo':
+    case 'done':
     case 'double':
       return err(MESSAGES.ANSWER_DOUBLE);
     case 'next':

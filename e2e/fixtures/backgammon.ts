@@ -12,6 +12,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import {
+  canEndTurn,
   createGame,
   parsePosition,
   POINT_INDICES,
@@ -190,6 +191,22 @@ export const bgMove = async (page: Page, from: Place, to: Place): Promise<View> 
   return requireBoard(page);
 };
 
+/**
+ * End turn (design §1 "Turn end"): pass-and-play holds the turn once the dice are used up, with
+ * `#doneBtn` "End turn" beside Undo; the tap flips the turn (the curtain then rises for the other
+ * seat, or the phone simply shows them with the curtain off). Resolves with the view after the flip.
+ */
+export const bgEndTurn = async (page: Page): Promise<View> => {
+  const before = await requireBoard(page);
+  if (!canEndTurn(before)) throw new Error('End turn is not on offer');
+  const done = page.locator('#doneBtn');
+  await expect(done).toBeVisible();
+  await expect(done).toHaveText('End turn');
+  await done.click();
+  await expect.poll(async () => (await readBoard(page))?.turn).not.toBe(before.turn);
+  return requireBoard(page);
+};
+
 /** Undo the turn so far (`#undoBtn` enabled): the board is back at the roll, nothing played. */
 export const bgUndo = async (page: Page): Promise<View> => {
   const undo = page.locator('#undoBtn');
@@ -200,12 +217,17 @@ export const bgUndo = async (page: Page): Promise<View> => {
 };
 
 /**
- * Play the rolled turn out, the engine's first legal move each time, until the curtain rises for
- * the other seat (pass and play). A roll with no move (a forfeited turn, R14) needs no tap: the
- * curtain rises by itself after the beat, so the caller awaits it.
+ * Play the rolled turn out, the engine's first legal move each time, then End turn (pass-and-play
+ * holds the turn once the dice are used up, design §1 "Turn end"), until the curtain rises for
+ * the other seat. A roll with no move (a forfeited turn, R14) needs no tap: the curtain rises by
+ * itself after the beat, so the caller awaits it.
  */
 export const bgPlayTurn = async (page: Page): Promise<void> => {
   const v = await requireBoard(page);
+  if (canEndTurn(v)) {
+    await bgEndTurn(page);
+    return;
+  }
   const [first] = v.legal;
   if (first === undefined) return;
   await bgMove(page, ownPlace(v, first.from), ownPlace(v, first.to));
@@ -260,7 +282,8 @@ const stamp = (): number => Date.now();
 /**
  * A `State` for `bgSetup`: a fresh match between `names` (seed 1 decides its opening, which the
  * position then replaces) at the given position, turn and dice, under `variant` (portes) to
- * `matchLength` (5), with `score` already on the board when given.
+ * `matchLength` (5), with `score` already on the board when given. Pass-and-play's match, so the
+ * turn is held for End turn as the page's own Start deals it (design §1 "Turn end").
  */
 export const bgPosition = (p: Position): State => {
   const variant = p.variant ?? 'portes';
@@ -270,7 +293,7 @@ export const bgPosition = (p: Position): State => {
       { id: 'p1', name: names[0] },
       { id: 'p2', name: names[1] },
     ],
-    { matchLength: p.matchLength ?? 5, rotation: [variant] },
+    { matchLength: p.matchLength ?? 5, rotation: [variant], manualTurnEnd: true },
     mulberry32(1),
     stamp,
   );

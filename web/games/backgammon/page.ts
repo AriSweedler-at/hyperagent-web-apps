@@ -491,8 +491,9 @@ const blocks: ShellBlocks = {
             <span class="pips" id="pipsMe">167</span>
           </div>
           <button class="btn btn-secondary btn-sm" id="undoBtn" disabled>Undo</button>
-          <!-- Reserved (design §1 "Turn end"): the turn ends by itself; hidden in every state. -->
-          <button class="btn btn-secondary btn-sm hidden" id="doneBtn">Done</button>
+          <!-- "End turn" (design §1 "Turn end"): pass-and-play holds the turn once the dice are used
+               up, and this ends it; the in-game call to action (btn-primary), hidden everywhere else. -->
+          <button class="btn btn-primary btn-sm hidden" id="doneBtn">End turn</button>
           <!-- The roll slot (design §3.2): the mini dice, the wait note and the result chip share
                one box; the roll itself is the modal's (#rollOverlay, in the board). -->
           <div class="roll-slot">

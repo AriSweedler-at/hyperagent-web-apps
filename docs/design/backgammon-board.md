@@ -28,7 +28,7 @@ the rules by rule (`rules R13`).
 | Which die | `.die.dead` when no maximal play uses a die; tap a die to force it (`die/pick`, targets recomputed for that die alone, the status line confirms "playing the 6"). |
 | Status line | Always names what is left ("3-1 · play both dice", "6-5 · the 6 cannot be played", "6-1 · enter from the bar", "Last move: the turn ends when you play it"), the dice in words in a visually hidden span. |
 | Stacks | Five checkers drawn; a count badge on the top visible checker from the sixth on; the point label stays. |
-| Turn end | No `done` action: the turn ends by itself when no maximal play extends what was played (rules R13); `#doneBtn` is reserved and hidden in every state. |
+| Turn end | Online the turn ends by itself when no maximal play extends what was played (rules R13). Pass-and-play (the owner, 2026-09-28: "After I finish a turn in pass-and-play, it's very jarring. It immediately tells me to swap the phone over. I should be able to hit 'end turn' ... think about my next move, or consider undoing stuff") deals its match with `options.manualTurnEnd`: the mover then stays in `moving` with no legal move once the dice are used up (or the rest is unplayable), Undo still on, and `#doneBtn` "End turn" (`btn-primary`, beside Undo; sideways, over Undo in the rail) sends `done`, which flips the turn with the automatic end's exact bookkeeping (`endTurn`: the log lines, `lastPlay`, `turnStart`). A roll with no move still passes by itself (R14: nothing to think over, nothing to undo); fifteen off still ends the game at once. The status line reads "Dice used — End turn, or Undo" ("6-5 · the 5 cannot be played — End turn, or Undo"), and the last playable move's "Last move: then End turn, or Undo". `canEndTurn(view)` (engine/view.ts) is derived, so the `state` frame's shape is unchanged; the decoder reads a missing `manualTurnEnd` as false. Online keeps the automatic end (a follow-up: the option there too). |
 | Hit toast | "Kapará. {name} hit you on your {n}-point." for the player hit, in their own numbering, from the moves (`played[i].hit`, `lastPlay`), never from log text. Online it fires as the opponent's hit moves arrive; in pass-and-play when the phone reaches the player hit (§4.9). |
 | Accessibility | Every tap target ≥ 44px on the phone (the geometry e2e asserts it), a painted `aria-label` per place, Enter/Space on a focused place is its tap, Escape closes the sheet or the tray. |
 | Theme | "Subtle but recognizable": a parchment page (a CC0 photo of real medieval parchment, mirror-tiled, under a cream multiply; §3.11), the home shell in a rich aegean blue with nacre text and a gold hairline, olive-wood board, gold elsewhere only as a hairline, one low-contrast meander line on the frame, an olive trim along the window's edge. The dark checker a deep-blue disc with a fine blue ring (the eye motif as a subtle inner ring, never a literal eye); the light one a pale disc with a soft sheen. Checkers, dice and frame are CSS only, no images. GFS Didot for the title and the room code, Cardo for everything else, both from Google Fonts. |
@@ -496,15 +496,21 @@ destination: one tap per move, never zero. If `v.playsTotal === 1` the destinati
 passes the turn inside `roll`: the status reads "6-6 · no move — turn passes", the reducer sets
 `noMoveUntil = now + NO_MOVE_MS (1200)` (a `startTimer` effect) and keeps the position visible;
 `noMove/elapsed` lets the curtain rise (local) or the state settle (online). Turn end is the
-engine's: the `move` that completes the maximal play flips `turn` (R7/R13). When exactly one
-playable die remains the status line reads "Last move: the turn ends when you play it".
+engine's: online the `move` that completes the maximal play flips `turn` (R7/R13), and when
+exactly one playable die remains the status line reads "Last move: the turn ends when you play
+it". Pass-and-play holds it instead (§1 "Turn end", `options.manualTurnEnd`): the completing move
+leaves the mover in `moving` with `legal === []`, the status reads "Dice used — End turn, or Undo",
+`#doneBtn` "End turn" shows beside Undo (`done/click` → `applyAction(done)`), and the curtain rises
+only on the flip; the last playable move's line reads "Last move: then End turn, or Undo". A roll
+with no move (R14) is never held: the beat above runs as it does online.
 
 ### 4.6 Undo
 
 `#undoBtn` "Undo": enabled when `phase === 'moving'`, my turn, `played.length > 0`; disabled, not
 hidden (the controls row keeps its shape). `undo/click` → `applyAction(undo)` (R26): board back to
-`turnStart`, `played = []`; host-applied online. `flightsBetween` yields the reversed flights. The
-last die of a turn cannot be undone; the status line said so before the tap.
+`turnStart`, `played = []`; host-applied online. `flightsBetween` yields the reversed flights. Online
+the last die of a turn cannot be undone; the status line said so before the tap. In pass-and-play
+the whole turn stays undoable until End turn (§1 "Turn end"): the held turn is still `moving`.
 
 ### 4.7 The roll modal, the tumble and the roll slot
 

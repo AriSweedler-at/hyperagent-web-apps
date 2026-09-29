@@ -52,10 +52,11 @@ const chromeIn = (css: string): ReadonlyArray<Rows> =>
 
 /**
  * The chrome grid's cells as designed (design §3.1 landscape; 1-based, as `parseAreas` reports
- * them): five rows of six; one strip over the board holding the opponent's strip, the badge, the
- * status line, my strip and the roll slot; the board four rows by five columns under it; the
- * rail's four slots down the last column, the first two rows tall (the menu reaches up into the
- * strip's row), Undo at the board's foot.
+ * them): six rows of six; one strip over the board holding the opponent's strip, the badge, the
+ * status line, my strip and the roll slot; the board five rows by five columns under it; the
+ * rail's five slots down the last column, the first two rows tall (the menu reaches up into the
+ * strip's row), End turn (rail4, an empty row while the button is hidden; design §1 "Turn end")
+ * over Undo at the board's foot.
  */
 const CHROME_CELLS: Readonly<Record<string, Cell>> = {
   opp: { row: 1, col: 1, rowSpan: 1, colSpan: 1 },
@@ -64,10 +65,11 @@ const CHROME_CELLS: Readonly<Record<string, Cell>> = {
   me: { row: 1, col: 4, rowSpan: 1, colSpan: 1 },
   slot: { row: 1, col: 5, rowSpan: 1, colSpan: 1 },
   rail1: { row: 1, col: 6, rowSpan: 2, colSpan: 1 },
-  board: { row: 2, col: 1, rowSpan: 4, colSpan: 5 },
+  board: { row: 2, col: 1, rowSpan: 5, colSpan: 5 },
   rail2: { row: 3, col: 6, rowSpan: 1, colSpan: 1 },
   rail3: { row: 4, col: 6, rowSpan: 1, colSpan: 1 },
   rail4: { row: 5, col: 6, rowSpan: 1, colSpan: 1 },
+  rail5: { row: 6, col: 6, rowSpan: 1, colSpan: 1 },
 };
 
 const LAYOUTS: ReadonlyArray<Layout> = ['phone', 'desktop'];
@@ -85,10 +87,10 @@ describeDist('backgammon board grid', (root) => {
     expect(templates[1]).toHaveLength(2);
   });
 
-  test('the sideways chrome grid: one declaration, five rows of six, every name one rectangle, the cells as designed', () => {
+  test('the sideways chrome grid: one declaration, six rows of six, every name one rectangle, the cells as designed', () => {
     expect(chrome).toHaveLength(1);
     const rows = chrome[0] ?? [];
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(6);
     rows.forEach((row) => {
       expect(row).toHaveLength(6);
     });

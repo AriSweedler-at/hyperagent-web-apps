@@ -12,6 +12,7 @@ import {
   CUBE_MAX,
   POINT_INDICES,
   afterMove,
+  canEndTurn,
   chainsFrom as chainsOnBoard,
   diceText,
   expandDice,
@@ -477,15 +478,23 @@ const deadStatus = (v: View, dead: ReadonlyArray<Die>, playable: number): string
     ? `only ${COUNT_WORDS[playable] ?? String(playable)} of the four can be played`
     : `the ${String(dead[0])} cannot be played`;
 
+/** The held turn (design §1 "Turn end"): `Dice used — End turn, or Undo`, or `6-5 · the 5 cannot be played — End turn, or Undo`. */
+const heldStatus = (v: View): string =>
+  `${v.movesLeft.length === 0 ? 'Dice used' : `${rollOf(v)} · ${deadStatus(v, v.movesLeft, v.played.length)}`} — End turn, or Undo`;
+
 const movingStatus = (v: View, pending: Pending | null, picked: Die | null): string => {
   if (pending !== null) return pendingStatus(v, pending);
+  if (canEndTurn(v)) return heldStatus(v);
   const roll = rollOf(v);
   if (picked !== null) return `${roll} · playing the ${String(picked)}`;
   const dead = deadDice(v);
   const playable = v.plays[0]?.length ?? 0;
   if (v.board.bar[v.me.idx] > 0) return `${roll} · enter from the bar`;
   if (dead.length > 0 && v.played.length === 0) return `${roll} · ${deadStatus(v, dead, playable)}`;
-  if (playable === 1) return 'Last move: the turn ends when you play it';
+  if (playable === 1)
+    return v.options.manualTurnEnd
+      ? 'Last move: then End turn, or Undo'
+      : 'Last move: the turn ends when you play it';
   if (v.canBearOff[v.me.idx]) return `${roll} · bear off`;
   if (v.played.length === 0)
     return `${roll} · play ${v.movesLeft.length === 2 ? 'both dice' : 'all four'}`;

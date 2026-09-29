@@ -2309,16 +2309,17 @@ label {
   }
 }
 /* From 714px wide: the rail. #tableScreen becomes a grid of six columns (the board over five, the
-   rail) and five rows (one strip, four the board spans and the rail's buttons divide);
+   rail) and six rows (one strip, five the board spans and the rail's buttons divide);
    `display: contents` on .topbar and .controls makes their children the grid's items. The strip
    (the owner, 2026-09-28: "WAY too much padding around the board's top and bottom ... The names &
    scores are great, but they can live on the same Y-axis value") holds, left to right, the
    opponent's strip (their colour, name, pips), the badge, the status line, my strip and the roll
    slot: the chrome above and below the board is 40px, not 80, and the points are 20px longer.
-   Rows two to five: the menu (spanning up into the strip), the sound button, the free middle the
-   turn arrow hangs in off the board's right edge, Undo at the board's foot. 714 is the narrowest
-   viewport that stands the rail beside a 44px-floor board with no insets: 13 x 44 + the 44px tray
-   + the 16px frame + two 16px edges + the 44px rail + its 6px gap. */
+   Rows two to six: the menu (spanning up into the strip), the sound button, the free middle the
+   turn arrow hangs in off the board's right edge, End turn (pass-and-play's held turn; its row is
+   empty while the button is hidden), Undo at the board's foot. 714 is the narrowest viewport that
+   stands the rail beside a 44px-floor board with no insets: 13 x 44 + the 44px tray + the 16px
+   frame + two 16px edges + the 44px rail + its 6px gap. */
 @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) and (min-width: 714px) {
   /* 6px above the strip and below the board (the base block's 12 each), the home indicator kept:
      at the table only, so the sideways home and the match-over screen keep the base block's 24. */
@@ -2355,13 +2356,14 @@ label {
     grid-template-columns: var(--name-w) auto minmax(0, 1fr) var(--name-w) var(--slot-w) var(
         --rail-w
       );
-    grid-template-rows: var(--strip-h) auto auto minmax(0, 1fr) auto;
+    grid-template-rows: var(--strip-h) auto auto minmax(0, 1fr) auto auto;
     grid-template-areas:
       'opp   badge status me    slot  rail1'
       'board board board  board board rail1'
       'board board board  board board rail2'
       'board board board  board board rail3'
-      'board board board  board board rail4';
+      'board board board  board board rail4'
+      'board board board  board board rail5';
     gap: var(--gap);
     align-items: center;
   }
@@ -2449,8 +2451,13 @@ label {
     grid-area: rail2;
   }
   #undoBtn,
-  #doneBtn,
   #chipCancelBtn {
+    grid-area: rail5;
+    align-self: end;
+  }
+  /* End turn stands over Undo in the rail, the same vertical 44px button (its label is longer, so
+     its padding is shorter: the pair must fit the 304px floor above the bottom strip). */
+  #doneBtn {
     grid-area: rail4;
     align-self: end;
   }
@@ -2462,6 +2469,9 @@ label {
     width: var(--rail-w);
     min-height: 44px;
     padding: 4px 0;
+  }
+  #doneBtn {
+    padding: 8px 0;
   }
   /* The die-chip tray floats over the board's bottom edge instead of replacing a strip. */
   #controls.choosing #moveChips {

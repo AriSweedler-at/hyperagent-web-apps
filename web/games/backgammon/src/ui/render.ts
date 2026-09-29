@@ -47,6 +47,7 @@ import {
 } from '../../../../shared/edge/dom.ts';
 import {
   POINT_INDICES,
+  canEndTurn,
   matchWinner,
   rulesOf,
   type Die,
@@ -521,8 +522,8 @@ const paintControls = (doc: DocumentLike, app: App, v: View): void => {
   const over = v.phase === 'over';
   // Disabled, not hidden: the controls row keeps its shape (design §4.6).
   setDisabled(requireId(doc, 'undoBtn'), !(mine && v.canUndo));
-  // Reserved (design §1 "Turn end"): the turn ends by itself.
-  toggleClass(requireId(doc, 'doneBtn'), 'hidden', true);
+  // "End turn" (design §1 "Turn end"): pass-and-play's held turn, beside Undo; hidden everywhere else.
+  toggleClass(requireId(doc, 'doneBtn'), 'hidden', !(mine && canEndTurn(v)));
   // The roll is the modal's (`paintRoll`); the slot shows the mini dice while I move.
   toggleClass(requireId(doc, 'diceMini'), 'hidden', !(mine && v.phase === 'moving'));
   const wait = requireId(doc, 'waitNote');

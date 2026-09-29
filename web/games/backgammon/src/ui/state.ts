@@ -43,12 +43,15 @@ import {
   isShellEffect,
   isShellIntent,
   localBroadcast,
+  localNamesOf,
+  localPlayers,
   lockSideways,
   pure,
   readHome as shellReadHome,
   reduceShell,
   resumeFor as shellResumeFor,
   saveFor as shellSaveFor,
+  startLocal,
   step,
   toast,
   withShell,
@@ -72,6 +75,7 @@ import { ok, type Result } from '../../../../shared/lib/result.ts';
 import {
   actorOf,
   applyAction,
+  canEndTurn,
   createGame,
   isShippedVariant,
   moveTo,
@@ -327,7 +331,7 @@ export type TableIntent =
   /** `#rollModalBtn` (design §4.7) and `#dice` before the roll. */
   | Readonly<{ type: 'roll/click' }>
   | Readonly<{ type: 'undo/click' }>
-  /** `#doneBtn` is reserved (R13: the turn ends by itself); the intent is accepted and ignored. */
+  /** `#doneBtn` "End turn": the held turn of pass-and-play (`manualTurnEnd`) ends; ignored otherwise. */
   | Readonly<{ type: 'done/click' }>
   | Readonly<{ type: 'double/click' }>
   | Readonly<{ type: 'take/click' }>
@@ -619,7 +623,11 @@ const commit = (app: App, moves: ReadonlyArray<Move>, ctx: Context): Step =>
 const rematch = (app: App, game: State, ctx: Context): Step => {
   const fresh = createGame(
     game.players,
-    { matchLength: game.options.matchLength, rotation: game.options.rotation },
+    {
+      matchLength: game.options.matchLength,
+      rotation: game.options.rotation,
+      manualTurnEnd: game.options.manualTurnEnd,
+    },
     ctx.rng,
     ctx.now,
   );
@@ -839,8 +847,8 @@ const tableIntent = (app: App, intent: TableIntent, ctx: Context): Step => {
     case 'undo/click':
       return v?.canUndo === true ? act(app, [{ type: 'undo' }], ctx) : pure(app);
     case 'done/click':
-      // Reserved (design §1 "Turn end"): the turn ends by itself; `#doneBtn` is hidden in every state.
-      return pure(app);
+      // Design §1 "Turn end": End turn flips the held turn (pass-and-play); nowhere else is it on offer.
+      return v !== null && canEndTurn(v) ? act(app, [{ type: 'done' }], ctx) : pure(app);
     case 'double/click':
       return v?.canDouble === true ? act(app, [{ type: 'double' }], ctx) : pure(app);
     case 'take/click':
@@ -1009,9 +1017,31 @@ const hostLeft = (app: App, v: View, ctx: Context): Step => {
   );
 };
 
+/**
+ * The pass-and-play start, over the shell's own case (which seats the same pair and deals the
+ * same match): the game is dealt with `manualTurnEnd` (design §1 "Turn end"; the owner,
+ * 2026-09-28), which the shell's `engine.create` cannot know, since `host/click` deals through
+ * the same adapter and online keeps the automatic end.
+ */
+const localStart = (
+  app: App,
+  intent: Readonly<{ p1: string; p2: string }> & Backgammon['Raw'],
+  ctx: Context,
+): Step => {
+  const opts = BACKGAMMON_SHELL.opts.parse(intent, app.shell.opts);
+  const game = createGame(
+    localPlayers(intent.p1, intent.p2, localNamesOf(BACKGAMMON_SHELL)),
+    { matchLength: opts.matchLength, rotation: [opts.variant], manualTurnEnd: true },
+    ctx.rng,
+    ctx.now,
+  );
+  return startLocal(withShell(app, { opts }), game, ctx, BACKGAMMON);
+};
+
 export const reduce = (app: App, intent: Intent, ctx: Context): Step => {
   const v = app.shell.view;
   if (intent.type === 'guest/lost' && v?.matchOver === true) return hostLeft(app, v, ctx);
+  if (intent.type === 'local/click') return localStart(app, intent, ctx);
   return isShellIntent(intent)
     ? reduceShell(app, intent, ctx, BACKGAMMON)
     : tableIntent(app, intent, ctx);

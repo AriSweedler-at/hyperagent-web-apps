@@ -102,6 +102,24 @@ describe('rejections', () => {
     expect(failureOf(decodeBoard({ ...json.board, bar: [0] }))).toBe('$.bar: expected array of 2');
   });
 
+  test('`options.manualTurnEnd` (End turn) reads false when absent, so every earlier save and frame stays valid', () => {
+    const options = json['options'] as Record<string, unknown>;
+    const { manualTurnEnd: dropped, ...legacy } = options;
+    expect(dropped).toBe(false);
+    const read = decodeState({ ...json, options: legacy });
+    expect(read.ok && read.value.options).toEqual({ ...legacy, manualTurnEnd: false });
+    // Once read, the key is written: a save re-encodes with it, in the wire order (last).
+    expect(read.ok && Object.keys(read.value.options).at(-1)).toBe('manualTurnEnd');
+    const on = decodeState({ ...json, options: { ...options, manualTurnEnd: true } });
+    expect(on.ok && on.value.options.manualTurnEnd).toBe(true);
+    expect(on.ok && JSON.stringify(on.value.options)).toBe(
+      JSON.stringify({ ...options, manualTurnEnd: true }),
+    );
+    expect(bad({ options: { ...options, manualTurnEnd: 'yes' } })).toBe(
+      '$.options.manualTurnEnd: expected boolean',
+    );
+  });
+
   test('dice, variants, rotations and the reserved words', () => {
     expect(bad({ dice: [7, 1] })).toBe('$.dice[0]: expected one of 1 | 2 | 3 | 4 | 5 | 6');
     expect(bad({ variant: 'plakoto' })).toBe('$.variant: expected one of "portes" | "backgammon"');
@@ -143,7 +161,7 @@ describe('rejections', () => {
 
   test('actions: the type decides the keys; nothing else is accepted', () => {
     // The taggedUnion table has one case per ACTION_TYPES entry, in its order (D5): every entry
-    // decodes, and a refused type names all seven in that order.
+    // decodes, and a refused type names all eight in that order.
     ACTION_TYPES.forEach((type) => {
       const input = type === 'move' ? { type, from: 7, to: 4, die: 3 } : { type };
       const r = decodeAction({ ...input, extra: 1 });
@@ -163,7 +181,7 @@ describe('rejections', () => {
       '$.die: expected one of 1 | 2 | 3 | 4 | 5 | 6',
     );
     expect(failureOf(decodeAction({ type: 'resign', level: 2 }))).toBe(
-      '$.type: expected one of "roll" | "move" | "undo" | "double" | "take" | "pass" | "next"',
+      '$.type: expected one of "roll" | "move" | "undo" | "double" | "take" | "pass" | "next" | "done"',
     );
     expect(failureOf(decodeAction('roll'))).toBe('$: expected object');
   });

@@ -27,7 +27,8 @@
         "rotation": ["portes"],
         "jacoby": false,
         "beavers": false,
-        "automaticDoubles": false
+        "automaticDoubles": false,
+        "manualTurnEnd": false
       },
       "variant": "portes",
       "gameNo": 1,
@@ -142,7 +143,8 @@
         "rotation": ["portes"],
         "jacoby": false,
         "beavers": false,
-        "automaticDoubles": false
+        "automaticDoubles": false,
+        "manualTurnEnd": false
       },
       "variant": "portes",
       "gameNo": 1,
@@ -725,7 +727,8 @@
         "rotation": ["backgammon"],
         "jacoby": false,
         "beavers": false,
-        "automaticDoubles": false
+        "automaticDoubles": false,
+        "manualTurnEnd": false
       },
       "variant": "backgammon",
       "gameNo": 1,
@@ -846,7 +849,8 @@
         "rotation": ["backgammon"],
         "jacoby": false,
         "beavers": false,
-        "automaticDoubles": false
+        "automaticDoubles": false,
+        "manualTurnEnd": false
       },
       "variant": "backgammon",
       "gameNo": 1,
@@ -992,7 +996,8 @@
         "rotation": ["portes"],
         "jacoby": false,
         "beavers": false,
-        "automaticDoubles": false
+        "automaticDoubles": false,
+        "manualTurnEnd": false
       },
       "variant": "portes",
       "gameNo": 1,

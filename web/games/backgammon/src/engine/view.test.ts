@@ -6,9 +6,9 @@ import { describe, expect, test } from 'vitest';
 import { epoch as now, must } from '../../../../../test/shared/engine-helpers.ts';
 import { applyAction } from './apply.ts';
 import { createGame, withPosition } from './setup.ts';
-import { PLAYERS, START, pos, scripted } from './test-helpers.ts';
+import { PLAYERS, START, mv, pos, scripted } from './test-helpers.ts';
 import { PLAYS_CAP, type Seat, type State } from './types.ts';
-import { legalActions, viewFor } from './view.ts';
+import { canEndTurn, legalActions, viewFor } from './view.ts';
 
 const western = createGame(PLAYERS, { rotation: ['backgammon'] }, scripted(3, 1), now);
 
@@ -149,5 +149,44 @@ describe('legalActions', () => {
     expect(legalActions(viewFor({ ...over, match: { ...over.match, score: [0, 5] } }, 1))).toEqual(
       [],
     );
+  });
+});
+
+describe('canEndTurn (design §1 "Turn end")', () => {
+  const held = createGame(
+    PLAYERS,
+    { rotation: ['portes'], manualTurnEnd: true },
+    scripted(3, 1),
+    now,
+  );
+  const start = withPosition(held, pos(START), 0, [3, 1]);
+  const two = ['8/5', '6/5'].reduce(
+    (s, t) => must(applyAction(s, 0, { type: 'move', ...mv(0, t) }, scripted(), now)),
+    start,
+  );
+
+  test('on for the mover of a held turn alone; legalActions offers undo and done, no move', () => {
+    expect(two).toMatchObject({ phase: 'moving', turn: 0 });
+    const v0 = viewFor(two, 0);
+    expect(canEndTurn(v0)).toBe(true);
+    expect(v0).toMatchObject({ legal: [], plays: [], playsTotal: 0, canUndo: true, movesLeft: [] });
+    expect(legalActions(v0)).toEqual([{ type: 'undo' }, { type: 'done' }]);
+    expect(canEndTurn(viewFor(two, 1))).toBe(false);
+    expect(legalActions(viewFor(two, 1))).toEqual([]);
+    // Mid-turn, and before the roll, End turn is off.
+    expect(canEndTurn(viewFor(start, 0))).toBe(false);
+    expect(legalActions(viewFor(start, 0)).some((a) => a.type === 'done')).toBe(false);
+    expect(canEndTurn(viewFor(withPosition(held, pos(START), 0, null), 0))).toBe(false);
+  });
+
+  test('never without the option: the turn flipped instead, and the View carries no new key', () => {
+    const auto = ['8/5', '6/5'].reduce(
+      (s, t) => must(applyAction(s, 0, { type: 'move', ...mv(0, t) }, scripted(), now)),
+      withPosition(western, pos(START), 0, [3, 1]),
+    );
+    expect(auto.phase).toBe('toRoll');
+    expect(canEndTurn(viewFor(auto, 0))).toBe(false);
+    expect(canEndTurn(viewFor(auto, 1))).toBe(false);
+    expect(Object.keys(viewFor(two, 0))).toEqual(Object.keys(viewFor(western, 0)));
   });
 });

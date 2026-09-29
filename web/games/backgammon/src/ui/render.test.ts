@@ -12,7 +12,7 @@ import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { recentGamesHtml } from '../../../../shared/ui/recentGames.ts';
 import { viewFor, withPosition } from '../engine/index.ts';
 import type { Dice, Seat, State, View } from '../engine/index.ts';
-import { pos } from '../engine/test-helpers.ts';
+import { pos, START } from '../engine/test-helpers.ts';
 import { backgammonPage, type BackgammonPage } from './page.fake.ts';
 import {
   HIT_TOAST_PREFIX,
@@ -373,11 +373,45 @@ describe('the table', () => {
     expect(p.get(pt(5)).hasClass('hit')).toBe(false);
     expect(p.get('dice').text()).toContain('class="die die-3 used"');
     expect(p.get('undoBtn').disabled()).toBe(false);
-    expect(p.get('statusText').text()).toBe('Last move: the turn ends when you play it');
+    expect(p.get('statusText').text()).toBe('Last move: then End turn, or Undo');
     const undone = run(moved, { type: 'undo/click' }).app;
     paint(p.doc, undone);
     expect(p.get(pt(8)).attr('data-key')).toBe('L3');
     expect(p.get('undoBtn').disabled()).toBe(true);
+  });
+
+  test('End turn (design §1 "Turn end"): hidden mid-turn and online, the primary button beside Undo once pass-and-play`s dice are used up, the status says so, the tap flips the turn', () => {
+    const p = page();
+    const rolled = at(START, 0, [3, 1]);
+    paint(p.doc, rolled);
+    expect(p.get('doneBtn').hidden()).toBe(true);
+    // The markup's class and label ("End turn") are the page's own; the e2e reads the label.
+    expect(p.get('doneBtn').hasClass('btn-primary')).toBe(true);
+    // 8/5 with the 3, then 6/5 with the 1 (the taps take absolute indices: own n is n - 1 for Light).
+    const one = run(rolled, { type: 'point/tap', point: 7 }, { type: 'point/tap', point: 4 }).app;
+    paint(p.doc, one);
+    expect(p.get('doneBtn').hidden()).toBe(true);
+    expect(p.get('statusText').text()).toBe('Last move: then End turn, or Undo');
+    const held = run(one, { type: 'point/tap', point: 5 }, { type: 'point/tap', point: 4 }).app;
+    expect(game(held)).toMatchObject({ phase: 'moving', turn: 0 });
+    paint(p.doc, held);
+    expect(p.get('doneBtn').hidden()).toBe(false);
+    expect(p.get('undoBtn').disabled()).toBe(false);
+    expect(p.get('statusText').text()).toBe('Dice used — End turn, or Undo');
+    expect(p.get('curtainOverlay').hidden()).toBe(true);
+    expect(p.get('diceMini').hidden()).toBe(false);
+    // The tap: the turn flips, the curtain rises for Bob, the button goes with the mover's controls.
+    const ended = run(held, { type: 'done/click' }).app;
+    expect(game(ended)).toMatchObject({ phase: 'toRoll', turn: 1 });
+    paint(p.doc, ended);
+    expect(p.get('doneBtn').hidden()).toBe(true);
+    expect(p.get('curtainOverlay').hidden()).toBe(false);
+    expect(p.get('undoBtn').disabled()).toBe(true);
+    // Online the host keeps the automatic end (the option is off in its match): the same position
+    // without the option never shows the button, whatever the painter is handed.
+    const offline = { ...game(held), options: { ...game(held).options, manualTurnEnd: false } };
+    paint(p.doc, withView(held, viewFor(offline, 0)));
+    expect(p.get('doneBtn').hidden()).toBe(true);
   });
 
   test('a checker on the bar is the derived sole source (`selected auto`); a hit marks the point', () => {

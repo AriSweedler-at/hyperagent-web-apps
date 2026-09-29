@@ -17,6 +17,7 @@
 import type { Page } from '@playwright/test';
 
 import {
+  bgEndTurn,
   bgMove,
   bgPosition,
   bgSetup,
@@ -27,6 +28,7 @@ import {
   requireBoard,
   type Viewport,
 } from './fixtures/backgammon.ts';
+import { TOL } from './fixtures/geometry.ts';
 import { reveal } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
@@ -360,7 +362,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('.flyer, .arriving')).toHaveCount(0);
     });
 
-    test('pass-and-play: the last move of a turn paints cold, since the board flips to the next seat', async ({
+    test('pass-and-play: the last move of a turn flies on the mover`s own board; End turn flips it cold to the next seat', async ({
       player,
       project,
     }) => {
@@ -370,18 +372,71 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       const v = await seated(page, 0);
       await bgMove(page, 8, 5);
       await trackFlights(page);
-      // The 1: 6/5 ends the turn; the curtain rises for Dark and the board is Dark's frame.
-      const next = await bgMove(page, 6, 5);
+      // The 1: 6/5 uses the dice up; the turn is held for End turn (design §1 "Turn end"), so the
+      // move flies on Light's own board like any other and the board stays Light's frame.
+      const held = await bgMove(page, 6, 5);
+      expect(held.turn).toBe(0);
+      expect(held.me.idx).toBe(0);
+      await expect(page.locator('#doneBtn')).toBeVisible();
+      await expect(page.locator('#curtainOverlay')).toBeHidden();
+      await expect.poll(() => landedFlights(page)).toBe(1);
+      // End turn: the curtain rises for Dark and the board is Dark's frame, painted cold: no clone
+      // crossed the flipped board (it would have landed on the mirrored point, design §3.9); the
+      // moved coins simply stand on Light's 5-point, none hidden.
+      const next = await bgEndTurn(page);
       expect(next.turn).toBe(1);
       expect(next.me.idx).toBe(1);
       await expect(page.locator('#curtainOverlay')).toBeVisible();
       await expect(page.locator('#board')).toHaveAttribute('data-seat', '1');
       await page.waitForTimeout(300);
-      // No clone crossed the flipped board (it would have landed on the mirrored point, design
-      // §3.9); the moved coins simply stand on Light's 5-point, none hidden.
-      expect(await flightsOf(page)).toEqual([]);
+      expect((await flightsOf(page)).length).toBe(1);
       await expect(page.locator(`#${ownPointId(v, 5)} .checker`)).toHaveCount(2);
       await expect(page.locator('.flyer, .checker.arriving, .checker.settling')).toHaveCount(0);
+    });
+
+    test('End turn (design §1 "Turn end"): hidden mid-turn, the primary button beside Undo once the dice are used up, 44px, inside the viewport, never over Undo; Undo takes it away', async ({
+      player,
+      project,
+    }) => {
+      const { page } = player;
+      await bgStartLocal(page, pagePath(project, 'backgammon'), vp);
+      await reveal(page);
+      await seated(page, 0);
+      const done = page.locator('#doneBtn');
+      const undo = page.locator('#undoBtn');
+      await expect(done).toBeHidden();
+      await bgMove(page, 8, 5);
+      await expect(done).toBeHidden();
+      await bgMove(page, 6, 5);
+      await expect(done).toBeVisible();
+      await expect(done).toHaveText('End turn');
+      await expect(done).toHaveClass(/\bbtn-primary\b/);
+      await expect(undo).toBeEnabled();
+      const [doneBox, undoBox] = await Promise.all([
+        rectOf(page, '#doneBtn'),
+        rectOf(page, '#undoBtn'),
+      ]);
+      // A 44px tap target (design §6) that stays on the screen, never over Undo.
+      expect(Math.min(doneBox.w, doneBox.h)).toBeGreaterThanOrEqual(44 - TOL);
+      expect(doneBox.x).toBeGreaterThanOrEqual(0);
+      expect(doneBox.y).toBeGreaterThanOrEqual(0);
+      expect(doneBox.x + doneBox.w).toBeLessThanOrEqual(vp.width + TOL);
+      expect(doneBox.y + doneBox.h).toBeLessThanOrEqual(vp.height + TOL);
+      const overlap =
+        doneBox.x < undoBox.x + undoBox.w &&
+        undoBox.x < doneBox.x + doneBox.w &&
+        doneBox.y < undoBox.y + undoBox.h &&
+        undoBox.y < doneBox.y + doneBox.h;
+      expect(overlap).toBe(false);
+      // Undo takes the whole turn back and the button goes; the moves again bring it back.
+      await undo.click();
+      await expect.poll(async () => (await requireBoard(page)).played.length).toBe(0);
+      await expect(done).toBeHidden();
+      await bgMove(page, 8, 5);
+      await bgMove(page, 6, 5);
+      await expect(done).toBeVisible();
+      await bgEndTurn(page);
+      await expect(done).toBeHidden();
     });
 
     test('a stack of five takes a sixth in place: the coins keep their elements, the top one takes the badge, nothing flashes', async ({
@@ -487,7 +542,10 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       // over it). The arrow recolours to Dark's checker (still near: the mover is the viewer) and
       // the lit tray is Dark's; Light's is plain again.
       await bgMove(page, 8, 5);
-      const next = await bgMove(page, 6, 5);
+      await bgMove(page, 6, 5);
+      // The dice used, the turn is held (design §1 "Turn end"): the arrow is still Light's.
+      await expect(arrow).toHaveAttribute('data-seat', '0');
+      const next = await bgEndTurn(page);
       expect(next.turn).toBe(1);
       await expect(arrow).toHaveAttribute('data-seat', '1');
       await expect(arrow).toHaveAttribute('data-side', 'near');
