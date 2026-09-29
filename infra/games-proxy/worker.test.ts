@@ -55,6 +55,21 @@ describe('mapPath: the mapping table in the file header', () => {
     ['/sheshbesh/', '/hyperagent-web-apps/games/backgammon/'],
     ['/sheshbesh/app-abc123.js', '/hyperagent-web-apps/games/backgammon/app-abc123.js'],
     ['/sheshbesh/deep/er/file.js', '/hyperagent-web-apps/games/backgammon/deep/er/file.js'],
+    // The installable manifest and its icons (tools/icons.ts) ride the game's folder, under the
+    // game's name and its alias alike: `./`-relative in the head and in the manifest itself.
+    [
+      '/backgammon/manifest.webmanifest',
+      '/hyperagent-web-apps/games/backgammon/manifest.webmanifest',
+    ],
+    ['/backgammon/icons/icon-192.png', '/hyperagent-web-apps/games/backgammon/icons/icon-192.png'],
+    [
+      '/sheshbesh/manifest.webmanifest',
+      '/hyperagent-web-apps/games/backgammon/manifest.webmanifest',
+    ],
+    [
+      '/sheshbesh/icons/maskable-512.png',
+      '/hyperagent-web-apps/games/backgammon/icons/maskable-512.png',
+    ],
     // Only the whole first segment is an alias.
     ['/sheshbeshx/', '/hyperagent-web-apps/games/sheshbeshx/'],
     ['/shesh/', '/hyperagent-web-apps/games/shesh/'],

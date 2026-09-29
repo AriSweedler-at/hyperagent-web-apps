@@ -18,7 +18,7 @@
 > `pointWidth`, `pointLength`, `RAIL_MIN_WIDTH` 714); the geometry e2e runs sideways at 844x390 and
 > 667x375 on the touch fixture; the 390x844 and 1280x800 goldens are byte-identical. Numbers and
 > screenshots: the PR. Still open: what Safari and Chrome leave sideways on a real device (§7 PR 0,
-> the plan's G1); the installable manifest (§6.4: no); the per-seat flip (§6.7: out of scope); the
+> the plan's G1); the per-seat flip (§6.7: out of scope); the
 > viewport-meta and `touch-action` cleanups (a follow-up: a tap-heavy board could regress on
 > double-tap zoom). The portrait gate (D) landed the same day as the shell's (shared-shell.md
 > §6.6). **The Android lock (C-lite, §5C) landed 2026-09-28** as the shell's `orientationLock`
@@ -31,7 +31,18 @@
 > lock on leave and cancel; the rotation hint (§6.6) is silent while the lock is held and due at
 > the loss. The e2e stubs both APIs and reads their calls back; the real fullscreen, its Android
 > "swipe down to exit" hint on every entry, and the rotation itself stay a device check for the
-> owner (§7 PR 3). The manifest (PR 4) stays out.
+> owner (§7 PR 3). **The manifest (PR 4) landed 2026-09-29**: web/public/games/backgammon/
+> manifest.webmanifest (`display: fullscreen`, `orientation: landscape`: an installed Android app, a
+> WebAPK, opens sideways with no JS, the one OS-enforced hold of §5C; iOS ignores both members, and a
+> Home Screen site there rotates as ever), linked from the head with `<link rel="manifest">` and a
+> `theme-color` meta; `start_url`, `scope` and the three icons (192 and 512 `any`, a full-bleed 512
+> `maskable`, rendered by tools/icons.ts from web/games/backgammon/assets/icon*.svg: the splash's
+> quiet mark, no text) are `./`-relative to the manifest, so they resolve on both origins; its
+> colours are the theme's `--bg` and `--accent`. test/dist/manifest.test.ts pins the members, each
+> PNG's size and both origins' resolution (the Worker's table has the rows). Vite leaves the head's
+> relative href to the public/ file as written (the favicon links are the precedent; §5C's
+> UNVERIFIED is closed). Left to the owner: the install itself on an Android phone (Chrome's menu,
+> "Install app"), then opening it sideways.
 
 Synthesized 2026-09-25 from the four sweeps in this folder: `platform-apis.md` (612 lines), `how-games-do-it.md` (460), `board-games-web.md` (159), `our-page.md` (183), plus `shots/` and `shots/measurements.json`. The repo was measured at 25cb36c (main), research only. Every URL below was fetched by a sweep on 2026-09-25; the date in parentheses is the one the page states. UNVERIFIED marks a claim no sweep confirmed from a fetched page.
 
@@ -147,7 +158,7 @@ Curtain flow (`state.ts:928-946`): `viewer` raises `curtain = seat` on every tur
 - Curtain: its Roll tap doubles as the re-entry gesture after an exit (above); fullscreen also removes the address bar, which is the one-screen win on Android.
 - Desktop untouched: gate on `(pointer: coarse)` or `navigator.maxTouchPoints > 0`; desktop Chrome's `lock()` always rejects and the catch absorbs it.
 - Code: a shell effect beside the wake lock: `web/shared/ui/shell.ts:386,427,810,1382,1389`, `web/shared/ui/shellEffects.ts:37`, `web/shared/edge/boot.ts:393,456-458` (a `createOrientationLock(docLike, screenLike)`); a manifest needs `web/games/backgammon/page.ts` `blocks.head` (:71-98) + `node --experimental-strip-types tools/shell-markup.ts --write`, a `manifest.webmanifest` emitted `./`-relative, and icons.
-- Tests: `web/shared/ui/shell.test.ts`, `web/games/backgammon/src/ui/state.test.ts`; for the manifest `test/dist/shell-markup.test.ts`, `asset-urls.test.ts`, `check-dist-paths.test.ts` and smoke ("fails on any failed request"); Vite's `renderBuiltUrl` handling of `link[rel=manifest]` is UNVERIFIED. One e2e can cover the wiring: `page.addInitScript` ("evaluated after the document was created but before any of its scripts were run", https://playwright.dev/docs/api/class-page#page-add-init-script) stubs `document.documentElement.requestFullscreen` and `screen.orientation.lock` to record calls, then asserts both are called inside the Start tap and the curtain tap and released on leave; only the real fullscreen and rotation stay manual.
+- Tests: `web/shared/ui/shell.test.ts`, `web/games/backgammon/src/ui/state.test.ts`; for the manifest `test/dist/shell-markup.test.ts`, `asset-urls.test.ts`, `check-dist-paths.test.ts` and smoke ("fails on any failed request"); Vite leaves the `link[rel=manifest]` href to the public/ file as written (verified 2026-09-29 in the build: dist keeps `./manifest.webmanifest`; `renderBuiltUrl` sees only resolved assets). One e2e can cover the wiring: `page.addInitScript` ("evaluated after the document was created but before any of its scripts were run", https://playwright.dev/docs/api/class-page#page-add-init-script) stubs `document.documentElement.requestFullscreen` and `screen.orientation.lock` to record calls, then asserts both are called inside the Start tap and the curtain tap and released on leave; only the real fullscreen and rotation stay manual.
 - Risks: a back gesture or swipe exits fullscreen and silently unlocks (spec: exiting fullscreen runs the fully-unlock steps) and nothing re-locks before the next tap; Android shows a "swipe down to exit" hint on entry; `display: fullscreen` hides all system UI in the installed app; Android tablets may report lock unsupported; nothing can lock before the first tap.
 
 ### D. A portrait gate on the table screen only

@@ -15,6 +15,7 @@ import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 
 import { ALIASES, GAMES, LEGACY_GAMES, REGISTRY, SHELL_GAMES } from '../../tools/games.ts';
+import { isManifestGame, shippedFiles } from '../../tools/icons.ts';
 import { OWN_SHEET, SHEETS_MAX, isShellGame } from './classes.ts';
 import {
   ALIAS_PAGES,
@@ -56,11 +57,19 @@ describeDist('dist parity with legacy/ and web/', (root) => {
       expect(
         files.filter((file) => new RegExp(`^shared/assets/${game}-[\\w-]+\\.css$`).test(file)),
       ).toHaveLength(1);
-      // The page, its bundle and the map, and for a shell game the link-preview splash Vite copies
-      // from web/public/games/<g>/ (docs/design/link-previews.md §2); nothing else.
+      // The page, its bundle and the map, for a shell game the link-preview splash Vite copies from
+      // web/public/games/<g>/ (docs/design/link-previews.md §2) and, for a game that installs
+      // (tools/icons.ts MANIFEST_GAMES), its manifest and icons from the same folder; nothing else.
       const splash = isShellGame(game) ? [`games/${game}/splash.png`] : [];
+      const installable = isManifestGame(game) ? shippedFiles(game) : [];
       expect(files.filter((file) => file.startsWith(`games/${game}/`)).sort()).toEqual(
-        [`games/${game}/index.html`, bundles[0] ?? '', `${bundles[0] ?? ''}.map`, ...splash].sort(),
+        [
+          `games/${game}/index.html`,
+          bundles[0] ?? '',
+          `${bundles[0] ?? ''}.map`,
+          ...splash,
+          ...installable,
+        ].sort(),
       );
     });
 
@@ -98,7 +107,14 @@ describeDist('dist parity with legacy/ and web/', (root) => {
       // The site's one icon (web/public/shared/favicon.*), linked by every page.
       const icons = references.filter((value) => value.includes('/favicon.'));
       expect(icons).toEqual(['../../shared/favicon.svg', '../../shared/favicon.ico']);
-      const relative = references.filter((value) => !icons.includes(value));
+      // An installable game's manifest (tools/icons.ts MANIFEST_GAMES), linked from the head like the
+      // icon and copied from web/public/games/<g>/ as written (checked below with the rest); the icons
+      // it names are the manifest's references, not the page's (test/dist/manifest.test.ts follows them).
+      const manifests = references.filter((value) => value.endsWith('.webmanifest'));
+      expect(manifests).toEqual(isManifestGame(game) ? ['./manifest.webmanifest'] : []);
+      const relative = references.filter(
+        (value) => !icons.includes(value) && !manifests.includes(value),
+      );
       expect(relative[0]).toMatch(/^\.\/app-[\w-]+\.js$/);
       const sheets = relative.filter((value) => value.endsWith('.css'));
       expect(relative.slice(-sheets.length)).toEqual(sheets);
