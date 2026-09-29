@@ -167,7 +167,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#rollModalBtn')).toContainText('Buen mazal!');
       await expect(page.locator('#rollModalBtn small')).toHaveText('roll');
       await expect(page.locator('#dice .die.blank')).toHaveCount(2);
-      await expect(page.locator('#statusText')).toHaveText('Your turn. Buen mazal!');
+      await expect(page.locator('#statusText')).toHaveText('Buen mazal! Roll');
       const v = await bgRoll(page);
       await expect(page.locator('#dice .die.blank')).toHaveCount(0);
       // Every point the engine lets move wears `can-move`, and nothing else does (design §7).
@@ -227,7 +227,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(four).toHaveAttribute('data-die', '6+3?');
       await four.click();
       await expect(page.locator('#controls')).toHaveClass(/\bchoosing\b/);
-      await expect(page.locator('#statusText')).toHaveText('13 · 6+3 reaches 4 two ways');
+      await expect(page.locator('#statusText')).toHaveText('6+3 to 4, two ways');
       const chips = page.locator('#moveChips .chip');
       await expect(chips).toHaveCount(2);
       await expect(chips.nth(0)).toHaveAttribute('data-dice', '6+3');
@@ -244,7 +244,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#doneBtn')).toHaveText('End turn');
       await expect(page.locator('#doneBtn')).toHaveClass(/\bbtn-primary\b/);
       await expect(page.locator('#undoBtn')).toBeEnabled();
-      await expect(page.locator('#statusText')).toHaveText('Dice used — End turn, or Undo');
+      await expect(page.locator('#statusText')).toHaveText('Dice used · End turn');
       await expect(page.locator('#curtainOverlay')).toBeHidden();
       expect((await requireBoard(page)).board.bar).toEqual([0, 1]);
       // End turn: the turn is Bob's, his checker on the bar, the curtain up for him.
@@ -274,7 +274,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(chips.nth(0)).toHaveAttribute('data-dice', '6');
       await expect(chips.nth(1)).toHaveAttribute('data-dice', '5');
       await expect(chips.nth(0)).toHaveAttribute('data-to', 'off');
-      await expect(page.locator('#statusText')).toHaveText('4 · either die bears off');
+      await expect(page.locator('#statusText')).toHaveText('Either die bears off');
       // The ✕ closes the tray; the tap opens it again, and a chip spends its die.
       await page.locator('#chipCancelBtn').click();
       await expect(page.locator('#controls')).not.toHaveClass(/\bchoosing\b/);
@@ -295,7 +295,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       // A look at the table: the sheet closes and the Result chip brings it back.
       await page.locator('#rsPeekBtn').click();
       await expect(page.locator('#resultOverlay')).toBeHidden();
-      await expect(page.locator('#statusText')).toHaveText('Ann wins 2 points · gammon');
+      await expect(page.locator('#statusText')).toHaveText('Ann wins 2');
       await page.locator('#resultChipBtn').click();
       await expect(page.locator('#resultOverlay')).toBeVisible();
       await expect(page.locator('#gameBadge')).toHaveText('Game 1 · 2–0 · to 5');
@@ -388,7 +388,7 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#rollOverlay')).toBeVisible();
       await expect(page.locator('#rollModalSub')).toHaveText('Double, or roll to start your turn');
       await expect(page.locator('#doubleBtn')).toBeVisible();
-      await expect(page.locator('#statusText')).toHaveText('Your turn. Double or roll');
+      await expect(page.locator('#statusText')).toHaveText('Double or roll');
       await page.locator('#doubleBtn').click();
       // Pass-and-play: the curtain first, then the offer for the other seat.
       const offered = await bgCurtain(page);

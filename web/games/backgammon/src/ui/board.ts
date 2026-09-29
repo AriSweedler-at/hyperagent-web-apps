@@ -33,6 +33,20 @@ import {
   type To,
   type View,
 } from '../engine/index.ts';
+import {
+  count,
+  COUNT_WORDS,
+  countWord,
+  cube,
+  die,
+  name,
+  pair,
+  place,
+  points,
+  render,
+  roll,
+  type Template,
+} from './copy.ts';
 
 // ---- places, ids and the viewer's frame ----------------------------------------------------------
 
@@ -436,7 +450,7 @@ export const chipsHtml = (chips: ReadonlyArray<Chip>): string =>
     )
     .join('');
 
-// ---- the status line (design §1 "Status line", §2.4 "The copy", §4.5, §4.10) ---------------------
+// ---- the status line (design §1 "Status line", §2.4 "The copy budget", §4.5, §4.10) ----------------
 
 /** The die-chip tray as the reducer holds it (design §4.1 `Table.pending`). */
 export type Pending = Readonly<{ from: Place; to: To; chains: ReadonlyArray<Chain> }>;
@@ -448,11 +462,68 @@ export type StatusOpts = Readonly<{
   picked?: Die | null;
 }>;
 export const PLAIN_STATUS: StatusOpts = { pending: null, noMoveShown: false };
-/** The line while the dice tumble (design §4.7): the roll is not named before the faces settle. */
-export const ROLLING_STATUS = 'Rolling…';
 
-const rollOf = (v: View): string => (v.dice === null ? '' : diceText(v.dice));
-const COUNT_WORDS: ReadonlyArray<string> = ['none', 'one', 'two', 'three', 'four'];
+/**
+ * Every line `#statusText` can show, as a template of literal text and capped blocks (ui/copy.ts):
+ * the worst case of each (the literals plus the caps) fits the strip's status column sideways,
+ * 20 characters at the rail's floor (copy-budget.ts `SLOTS.stripStatus`; copy-budget.test.ts
+ * checks each template with no input at all), so no roll, cube, count or name can push a line
+ * past it. A name's cap is what the template's words leave it (`name(6)` in "Konst… to move ·
+ * 6-5"); the voice is plain, the roll says what it is, the held turn says what to do.
+ */
+export const STATUS_TEMPLATES = {
+  /** While the dice tumble (design §4.7): the roll is not named before the faces settle. */
+  rolling: (): Template => ['Rolling…'],
+  yourRoll: (): Template => ['Buen mazal! Roll'],
+  yourDoubleOrRoll: (): Template => ['Double or roll'],
+  oppToRoll: (opp: string): Template => [name(12, opp), ' to roll'],
+  oppMayDouble: (opp: string): Template => [name(9, opp), ' may double'],
+  oppToMove: (opp: string, dice: Dice | null): Template => [
+    name(6, opp),
+    ' to move · ',
+    roll(dice),
+  ],
+  oppToAnswer: (opp: string): Template => [name(10, opp), ' to answer'],
+  offered: (opp: string, to: number): Template => [name(6, opp), ' doubles to ', cube(to)],
+  won: (winner: string, p: number): Template => [name(11, winner), ' wins ', points(p)],
+  /** The forfeited roll (R14): the roll, and that the turn passes. */
+  passes: (dice: Dice | null): Template => [roll(dice), ' · turn passes'],
+  playing: (dice: Dice | null, d: Die): Template => [roll(dice), ' · playing the ', die(d)],
+  enter: (dice: Dice | null): Template => [roll(dice), ' · enter from bar'],
+  dead: (dice: Dice | null, d: Die): Template => [roll(dice), ' · the ', die(d), ' is dead'],
+  partlyDead: (dice: Dice | null, playable: number): Template => [
+    roll(dice),
+    ' · ',
+    countWord(playable),
+    ' can play',
+  ],
+  /** One die left (it was "Last move: the turn ends when you play it", cut on the owner's phone). */
+  lastMove: (dice: Dice | null): Template => [roll(dice), ' · last move'],
+  bearOff: (dice: Dice | null): Template => [roll(dice), ' · bear off'],
+  playBoth: (dice: Dice | null): Template => [roll(dice), ' · play both dice'],
+  playAllFour: (dice: Dice | null): Template => [roll(dice), ' · play all four'],
+  movesLeft: (dice: Dice | null, n: number): Template => [
+    roll(dice),
+    ' · ',
+    count(n),
+    ' moves left',
+  ],
+  /** The held turn (design §1 "Turn end"): what stops the dice, then the button to press. */
+  diceUsed: (): Template => ['Dice used · End turn'],
+  heldDead: (d: Die): Template => [die(d), ' is dead · End turn'],
+  /** The tray open (design §4.3, §4.4): the chain's dice and its end; both dice bearing off. */
+  twoWays: (dice: ReadonlyArray<Die>, to: string): Template => [
+    pair(dice),
+    ' to ',
+    place(to),
+    ', two ways',
+  ],
+  eitherOff: (): Template => ['Either die bears off'],
+};
+const T = STATUS_TEMPLATES;
+
+/** The line while the dice tumble (design §4.7). */
+export const ROLLING_STATUS = render(T.rolling());
 
 /** The opponent's `canDouble` (the view carries only mine): R19 evaluated for their seat. */
 const mayDouble = (v: View, seat: Seat): boolean =>
@@ -466,79 +537,76 @@ const mayDouble = (v: View, seat: Seat): boolean =>
 const placeName = (v: View, place: From | To): string =>
   place === 'bar' ? 'bar' : place === 'off' ? 'off' : String(ownPoint(v, place));
 
-/** `13 · 6+3 reaches 4 two ways` (design §2.4); `4 · either die bears off` (§4.4). */
-const pendingStatus = (v: View, pending: Pending): string => {
-  const from = placeName(v, pending.from);
-  if (pending.chains.every((c) => c.moves.length === 1)) return `${from} · either die bears off`;
-  const dice = pending.chains[0]?.moves.map((m) => String(m.die)).join('+') ?? '';
-  return `${from} · ${dice} reaches ${placeName(v, pending.to)} two ways`;
-};
+/** `6+3 to 4, two ways` (design §2.4); `Either die bears off` (§4.4). */
+const pendingStatus = (v: View, pending: Pending): Template =>
+  pending.chains.every((c) => c.moves.length === 1)
+    ? T.eitherOff()
+    : T.twoWays(pending.chains[0]?.moves.map((m) => m.die) ?? [], placeName(v, pending.to));
+
+const isDouble = (v: View): boolean => v.dice !== null && v.dice[0] === v.dice[1];
 
 /** Which dice are dead, said once, before the first move of the turn. */
-const deadStatus = (v: View, dead: ReadonlyArray<Die>, playable: number): string =>
-  v.dice !== null && v.dice[0] === v.dice[1]
-    ? `only ${COUNT_WORDS[playable] ?? String(playable)} of the four can be played`
-    : `the ${String(dead[0])} cannot be played`;
+const deadStatus = (v: View, dead: Die, playable: number): Template =>
+  isDouble(v) ? T.partlyDead(v.dice, playable) : T.dead(v.dice, dead);
 
-/** The held turn (design §1 "Turn end"): `Dice used — End turn, or Undo`, or `6-5 · the 5 cannot be played — End turn, or Undo`. */
-const heldStatus = (v: View): string =>
-  `${v.movesLeft.length === 0 ? 'Dice used' : `${rollOf(v)} · ${deadStatus(v, v.movesLeft, v.played.length)}`} — End turn, or Undo`;
+/** The held turn (design §1 "Turn end"): `Dice used · End turn`, or `5 is dead · End turn`. */
+const heldStatus = (v: View): Template => {
+  const [left] = v.movesLeft;
+  return left === undefined ? T.diceUsed() : T.heldDead(left);
+};
 
-const movingStatus = (v: View, pending: Pending | null, picked: Die | null): string => {
+const movingStatus = (v: View, pending: Pending | null, picked: Die | null): Template => {
   if (pending !== null) return pendingStatus(v, pending);
   if (canEndTurn(v)) return heldStatus(v);
-  const roll = rollOf(v);
-  if (picked !== null) return `${roll} · playing the ${String(picked)}`;
-  const dead = deadDice(v);
+  if (picked !== null) return T.playing(v.dice, picked);
+  const [dead] = deadDice(v);
   const playable = v.plays[0]?.length ?? 0;
-  if (v.board.bar[v.me.idx] > 0) return `${roll} · enter from the bar`;
-  if (dead.length > 0 && v.played.length === 0) return `${roll} · ${deadStatus(v, dead, playable)}`;
-  // One die left: `5-2 · last move` (15 characters, inside the strip's budget sideways; it was
-  // "Last move: the turn ends when you play it", 41, cut to "Last move: the turn ends when…" on
-  // the owner's phone). The held turn's line, or the flip, says what follows.
-  if (playable === 1) return `${roll} · last move`;
-  if (v.canBearOff[v.me.idx]) return `${roll} · bear off`;
+  if (v.board.bar[v.me.idx] > 0) return T.enter(v.dice);
+  if (dead !== undefined && v.played.length === 0) return deadStatus(v, dead, playable);
+  if (playable === 1) return T.lastMove(v.dice);
+  if (v.canBearOff[v.me.idx]) return T.bearOff(v.dice);
   if (v.played.length === 0)
-    return `${roll} · play ${v.movesLeft.length === 2 ? 'both dice' : 'all four'}`;
-  return `${roll} · ${String(playable)} moves left`;
+    return v.movesLeft.length === 2 ? T.playBoth(v.dice) : T.playAllFour(v.dice);
+  return T.movesLeft(v.dice, playable);
 };
 
-/** The forfeited roll (R14): `6-6 · no move — turn passes`, `4-2 · no entry — turn passes`. */
-const noMoveStatus = (v: View): string => {
-  const roller = v.lastAction?.seat ?? null;
-  const entering = roller !== null && v.board.bar[roller] > 0;
-  return `${rollOf(v)} · ${entering ? 'no entry' : 'no move'} — turn passes`;
-};
+/** The game over: the winner and the points; the result sheet (`resultText`) tells the rest. */
+const overStatus = (v: View): Template =>
+  v.result === null ? [] : T.won(v.players[v.result.winner].name, v.result.points);
 
-/** `#statusText`: what is left to do, pinned strings (design §7). */
-export const statusText = (v: View, opts: StatusOpts = PLAIN_STATUS): string => {
+/** The template behind `#statusText` (design §7 pins the strings): what is left to do. */
+export const statusTemplate = (v: View, opts: StatusOpts = PLAIN_STATUS): Template => {
   const opp = v.opp.name;
-  if (v.phase === 'over') return resultText(v).title;
+  if (v.phase === 'over') return overStatus(v);
   if (opts.noMoveShown && v.lastAction?.kind === 'noMove' && v.dice !== null)
-    return noMoveStatus(v);
+    return T.passes(v.dice);
   if (!v.isMyTurn) {
     switch (v.phase) {
       case 'toRoll':
-        return mayDouble(v, v.opp.idx) ? `${opp} may double` : `${opp} is rolling…`;
+        return mayDouble(v, v.opp.idx) ? T.oppMayDouble(opp) : T.oppToRoll(opp);
       case 'moving':
-        return `${opp} to move · ${rollOf(v)}`;
+        return T.oppToMove(opp, v.dice);
       case 'cubeOffered':
-        return `${opp} is answering the double`;
+        return T.oppToAnswer(opp);
       case 'opening':
-        return '';
+        return [];
     }
   }
   switch (v.phase) {
     case 'toRoll':
-      return v.canDouble ? 'Your turn. Double or roll' : 'Your turn. Buen mazal!';
+      return v.canDouble ? T.yourDoubleOrRoll() : T.yourRoll();
     case 'moving':
       return movingStatus(v, opts.pending, opts.picked ?? null);
     case 'cubeOffered':
-      return `${opp} doubles to ${String(v.cube.value * 2)}. Take or pass?`;
+      return T.offered(opp, v.cube.value * 2);
     case 'opening':
-      return '';
+      return [];
   }
 };
+
+/** `#statusText`: what is left to do, pinned strings (design §7). */
+export const statusText = (v: View, opts: StatusOpts = PLAIN_STATUS): string =>
+  render(statusTemplate(v, opts));
 
 // ---- the turn just finished: the curtain's line and the hit toast -----------------------------------
 

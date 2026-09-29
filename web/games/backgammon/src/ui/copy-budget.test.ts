@@ -1,13 +1,12 @@
-// Every status line fits its slot (copy-budget.ts; design §2.4 "The copy"): the producers'
-// inputs are enumerated with the engine's own positions (every branch of `statusText`, both
-// seats, names at the shell's NAME_MAX) and each line is measured against the strip's budget
-// sideways (the mover's own lines: the roll modal, the moves, the tray, the held turn, the
-// forfeited roll) or the portrait line's (the lines that carry the opponent's name, which the
-// strip beside them shows anyway: their sideways brief is a follow-up). A line over budget fails
-// with the slot, the text, the numbers, the producer and the input, and what to do. `STRIP_DEBT`
-// is the ratchet: the lines that overflowed the strip when the budget was introduced, spelled
-// exactly, so a copywriter's new line or a longer edit of one of these fails, and one that comes
-// under budget must leave the list.
+// Every status line fits its slot (copy-budget.ts, copy.ts; design §2.4 "The copy budget"), two
+// ways. Statically: every template in `STATUS_TEMPLATES` (board.ts) has a worst case, its literals
+// plus its blocks' caps, and each is held to the strip's budget sideways with no runtime input at
+// all, so a copywriter's longer line, or a wider cap, fails here naming the template. Then by
+// enumeration: the producers' inputs with the engine's own positions (every branch of `statusText`,
+// both seats, names at the shell's NAME_MAX), the mover's lines and the opponent's alike, each
+// measured against the strip (sideways `#statusLine` is one element online and pass-and-play, so the
+// opponent's lines land in the same 20 characters). A line over budget fails with the slot, the
+// text, the numbers, the producer and the input, and what to do.
 import { describe, expect, test } from 'vitest';
 
 import { now } from '../../../../../test/shared/engine-helpers.ts';
@@ -15,6 +14,7 @@ import { NAME_MAX } from '../../../../shared/lib/protocol.ts';
 import {
   applyAction,
   createGame,
+  CUBE_MAX,
   viewFor,
   withPosition,
   type Action,
@@ -27,13 +27,23 @@ import {
   type View,
 } from '../engine/index.ts';
 import { mv, pos, scripted, START } from '../engine/test-helpers.ts';
-import { PLAIN_STATUS, ROLLING_STATUS, statusText, targetsOf, type Pending } from './board.ts';
+import {
+  PLAIN_STATUS,
+  ROLLING_STATUS,
+  STATUS_TEMPLATES,
+  statusText,
+  targetsOf,
+  type Pending,
+} from './board.ts';
+import { name, render, worstCase, type Template } from './copy.ts';
 import {
   BADGE_MAX_WIDTH,
   budget,
   overBudget,
   overBudgetMessage,
   SLOTS,
+  templateOverBudgetMessage,
+  templatesOverBudget,
   type CopyLine,
 } from './copy-budget.ts';
 
@@ -165,23 +175,37 @@ const namedLines = (): ReadonlyArray<CopyLine> =>
     ];
   });
 
+const T = STATUS_TEMPLATES;
+const LONG_NAME = LONG[0].name;
 /**
- * The strip's debt when the budget was introduced (2026-09-28): the mover's lines that were over
- * it, kept exactly as they read. Shorten one and remove it here; lengthen one and the test fails.
+ * Every template at its widest input: a name at NAME_MAX, a double, the cube's top, the most
+ * points a game pays. The record's keys are the templates', so a new template must be sampled here.
  */
-const STRIP_DEBT: ReadonlySet<string> = new Set([
-  'Your turn. Buen mazal!',
-  'Your turn. Double or roll',
-  '6-1 · enter from the bar',
-  '6-5 · the 6 cannot be played',
-  '4-4 · only three of the four can be played',
-  '13 · 6+3 reaches 4 two ways',
-  '4 · either die bears off',
-  'Dice used — End turn, or Undo',
-  '6-5 · the 6 cannot be played — End turn, or Undo',
-  '6-6 · no move — turn passes',
-  '6-6 · no entry — turn passes',
-]);
+const SAMPLES: Readonly<Record<keyof typeof STATUS_TEMPLATES, Template>> = {
+  rolling: T.rolling(),
+  yourRoll: T.yourRoll(),
+  yourDoubleOrRoll: T.yourDoubleOrRoll(),
+  oppToRoll: T.oppToRoll(LONG_NAME),
+  oppMayDouble: T.oppMayDouble(LONG_NAME),
+  oppToMove: T.oppToMove(LONG_NAME, [6, 6]),
+  oppToAnswer: T.oppToAnswer(LONG_NAME),
+  offered: T.offered(LONG_NAME, CUBE_MAX),
+  won: T.won(LONG_NAME, 3 * CUBE_MAX),
+  passes: T.passes([6, 6]),
+  playing: T.playing([6, 6], 6),
+  enter: T.enter([6, 6]),
+  dead: T.dead([6, 5], 6),
+  partlyDead: T.partlyDead([4, 4], 3),
+  lastMove: T.lastMove([6, 6]),
+  bearOff: T.bearOff([6, 6]),
+  playBoth: T.playBoth([6, 5]),
+  playAllFour: T.playAllFour([6, 6]),
+  movesLeft: T.movesLeft([6, 6], 3),
+  diceUsed: T.diceUsed(),
+  heldDead: T.heldDead(6),
+  twoWays: T.twoWays([6, 5], 'off'),
+  eitherOff: T.eitherOff(),
+};
 
 describe('the budget table', () => {
   test('the strip holds 20 characters at its narrowest, the portrait line 49; the badge at its widest is 140px', () => {
@@ -201,39 +225,68 @@ describe('the budget table', () => {
     );
     expect(overBudget(SLOTS.stripStatus, [line('x', '5-2 · last move')])).toEqual([]);
   });
+
+  test("a template's message names it, spells its shape and its worst case, and says what to do", () => {
+    const wordy: Template = [name(8, LONG_NAME), ' is answering the double'];
+    expect(templateOverBudgetMessage(SLOTS.stripStatus, 'oppToAnswer', wordy)).toBe(
+      `#statusLine template "oppToAnswer" ({name:8} is answering the double) can reach 32 characters; the slot holds 20 at its narrowest (sideways, the rail at its 780x304 floor with the badge at its widest (140px): 142px at 7.1px per character). Shorten its words or a block's cap in src/ui/board.ts (STATUS_TEMPLATES), or widen the slot in theme.css and the budget table (src/ui/copy-budget.ts).`,
+    );
+    expect(
+      templatesOverBudget(SLOTS.stripStatus, { wordy, fits: T.oppToAnswer(LONG_NAME) }).map(
+        (o) => o.name,
+      ),
+    ).toEqual(['wordy']);
+  });
 });
 
-describe('every status line fits its slot', () => {
-  test("the mover's lines fit the strip sideways (the owner's last-move line among them); the debt list is exact", () => {
+describe('every status template fits the strip', () => {
+  test("each template's worst case is within the strip's 20 characters, with no input at all", () => {
+    const over = templatesOverBudget(SLOTS.stripStatus, SAMPLES);
+    expect(over.map((o) => o.message).join('\n\n')).toBe('');
+  });
+
+  test('at the widest input every template renders within its worst case, and a clipped name ends in …', () => {
+    Object.entries(SAMPLES).forEach(([key, t]) => {
+      expect(render(t).length, `${key}: "${render(t)}"`).toBeLessThanOrEqual(worstCase(t));
+    });
+    expect(render(SAMPLES.oppToMove)).toBe('Konst… to move · 6-6');
+    expect(render(SAMPLES.oppToRoll)).toBe('Konstantino… to roll');
+    expect(render(SAMPLES.offered)).toBe('Konst… doubles to 64');
+    expect(render(SAMPLES.won)).toBe('Konstantin… wins 192');
+    expect(render(SAMPLES.twoWays)).toBe('6+5 to off, two ways');
+  });
+});
+
+describe('every status line fits the strip sideways', () => {
+  test("the mover's lines, the owner's last-move line among them", () => {
     const lines = moverLines();
     expect(lines.length).toBe(27);
     const over = overBudget(SLOTS.stripStatus, lines);
-    const fresh = over.filter((o) => !STRIP_DEBT.has(o.line.text));
-    expect(fresh.map((o) => o.message).join('\n\n')).toBe('');
-    // The ratchet: a debt line that fits now, or that no producer makes any more, leaves the list.
-    const seen = new Set(over.map((o) => o.line.text));
-    const stale = [...STRIP_DEBT].filter((t) => !seen.has(t));
-    expect(
-      stale
-        .map(
-          (t) =>
-            `"${t}" is in STRIP_DEBT but no longer over the strip's budget: remove it from copy-budget.test.ts`,
-        )
-        .join('\n'),
-    ).toBe('');
+    expect(over.map((o) => o.message).join('\n\n')).toBe('');
     // The line the owner saw cut: `3-1 · last move`, in every mode and for both seats.
     lines
       .filter((l) => l.input.startsWith("phase 'moving', one die left"))
       .forEach((l) => {
         expect(l.text).toMatch(/^\d-\d · last move$/u);
       });
+    // The forfeited roll says the roll and that the turn passes.
+    lines
+      .filter((l) => l.input.startsWith('the forfeited roll'))
+      .forEach((l) => {
+        expect(l.text).toMatch(/^\d-\d · turn passes$/u);
+      });
   });
 
-  test("the opponent's lines with a 20-character name fit the portrait status line", () => {
+  test("the opponent's lines with a 20-character name fit the strip too (the name clipped), and the portrait line", () => {
     const lines = namedLines();
     expect(lines.length).toBe(11);
-    expect(lines.every((l) => l.text.includes('Konstantinopoulos'))).toBe(true);
-    const over = overBudget(SLOTS.portraitStatus, lines);
-    expect(over.map((o) => o.message).join('\n\n')).toBe('');
+    expect(lines.every((l) => l.text.startsWith('Konst'))).toBe(true);
+    expect(lines.every((l) => l.text.includes('…'))).toBe(true);
+    expect(
+      overBudget(SLOTS.stripStatus, lines)
+        .map((o) => o.message)
+        .join('\n\n'),
+    ).toBe('');
+    expect(overBudget(SLOTS.portraitStatus, lines)).toEqual([]);
   });
 });

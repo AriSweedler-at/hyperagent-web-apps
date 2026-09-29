@@ -638,7 +638,7 @@ const measuredPxPerChar = (page: Page): Promise<Readonly<{ body: number; badge: 
     const fontOf = (sel) => { const cs = getComputedStyle(document.querySelector(sel)); return cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; };
     const widest = (sel, lines) => { c.font = fontOf(sel); return Math.max(...lines.map((t) => c.measureText(t).width / t.length)); };
     return {
-      body: widest('#statusText', ['Dice used — End turn, or Undo', 'Your turn. Buen mazal!', '3-1 · last move', '6-5 · the 6 cannot be played', 'Konstantinopoulos XX is rolling…']),
+      body: widest('#statusText', ['Dice used · End turn', 'Buen mazal! Roll', '3-1 · last move', '6-5 · the 6 is dead', 'Konstantino… to roll', 'Konst… to move · 6-5', 'Either die bears off']),
       badge: widest('#gameBadge', ['Game 13 · 6–6 · to 7', 'Game 1 · 0–0 · to 5']),
     };
   })()`);

@@ -8,7 +8,9 @@
 // pinned by e2e/backgammon-table-ux.spec.ts within 10%. copy-budget.test.ts enumerates every
 // producer's inputs and checks each line against its slot; this table is the one place to edit
 // when a slot's width changes (theme.css moves, the table follows, the test says which line no
-// longer fits).
+// longer fits). The lines themselves are templates of literal text and capped blocks (ui/copy.ts):
+// `templatesOverBudget` holds each template's worst case to its slot with no runtime input at all.
+import { shape, worstCase, type Template } from './copy.ts';
 
 /**
  * Px per character of the theme's fonts, measured with canvas `measureText` on the served page
@@ -84,3 +86,23 @@ export const overBudget = (
   lines
     .filter((line) => line.text.length > budget(slot))
     .map((line) => ({ line, message: overBudgetMessage(slot, line) }));
+
+/**
+ * The failure message when a template can overflow its slot: the template's name and shape (its
+ * literals, `{kind:cap}` for each block), its worst case, the budget with its derivation, and
+ * what to do (fewer words or a smaller cap in the template, or widen the slot).
+ */
+export const templateOverBudgetMessage = (slot: Slot, templateName: string, t: Template): string =>
+  `${slot.id} template "${templateName}" (${shape(t)}) can reach ${String(worstCase(t))} characters; the slot holds ${String(budget(slot))} at its narrowest (${slot.where}: ${String(slot.widthPx)}px at ${String(slot.pxPerChar)}px per character). Shorten its words or a block's cap in src/ui/board.ts (STATUS_TEMPLATES), or widen the slot in theme.css and the budget table (src/ui/copy-budget.ts).`;
+
+/** The templates whose worst case overflows `slot`, each with its message; empty when every one fits. */
+export const templatesOverBudget = (
+  slot: Slot,
+  templates: Readonly<Record<string, Template>>,
+): ReadonlyArray<Readonly<{ name: string; message: string }>> =>
+  Object.entries(templates)
+    .filter((entry: readonly [string, Template]) => worstCase(entry[1]) > budget(slot))
+    .map((entry: readonly [string, Template]) => ({
+      name: entry[0],
+      message: templateOverBudgetMessage(slot, entry[0], entry[1]),
+    }));
