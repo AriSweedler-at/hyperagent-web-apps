@@ -130,14 +130,40 @@ what does not fit, and vitest has no layout, so each slot's room is a character 
 the narrowest viewport the design gives it over the theme font's px per character, measured once on
 the served page with canvas `measureText` (`PX_PER_CHAR`: the status line's 0.95rem Cardo reaches
 7.1px per character on a lowercase line, the badge's bold 0.8rem 6.0) and pinned by the table-ux e2e
-within 10%. The table: `stripStatus`, `#statusLine` sideways in the rail at its 780x304 floor with the
-badge at its widest (`Game 13 · 6–6 · to 7`, 140px): 780 − 2 × 16 − (44 + 6) − 2 × 160 − 72 − 4 × 6 −
-140 = 142px, 20 characters; `portraitStatus`, the 390px phone less #app's 24 and the line's 12 of
-padding, 354px, 49 characters. Sideways `#statusLine` is one element online and pass-and-play, so the
-opponent's lines land in the same 20 characters as the mover's. The known limit: the rows scheme (the
-SE's 667, a 640x360 Android) leaves the strip's status 72-100px, 10-14 characters, where a 20-character
-line still ellipsizes; widening that slot is a theme.css change (the screen-frame lane's), and the
-table here follows it.
+within 10%. The narrowest phone each way is the table's floor (`MINI_SIDEWAYS`, `PHONE_UPRIGHT`): the
+rail scheme's is not the 780px viewport but the 12/13 mini sideways, 812 wide with a 50px notch inset
+a side, which `--edge` takes for both gutters (the audit's second run, 2026-09-30: the status line lost
+7px there with the 16px edges the table assumed); upright the 375px classes. The table: `stripStatus`,
+`#statusLine` sideways on the mini with the badge at its widest (`Game 13 · 6–6 · to 7`, 140px): 812 −
+2 × 50 − (44 + 6) − 2 × 142 − 72 − 4 × 6 − 140 = 142px, 20 characters (the name columns went from 160
+to 142px for it); `portraitStatus`, 375 less #app's 24, the badge beside it on its row, the 8px gap and
+the line's 12 of padding, 191px, 26 characters. Sideways `#statusLine` is one element online and
+pass-and-play, so the opponent's lines land in the same 20 characters as the mover's. The known limit:
+the rows scheme (the SE's 667, a 640x360 Android) keeps its 132px columns and leaves the strip's status
+109px at 667, 15 characters, where a 20-character line still ellipsizes.
+
+**The name slots** (`#oppName`, `#myName`; the owner, 2026-09-28: "the top of the names & such overlap
+the green border ... Do not grandfather them. Fix them"; the audit's second run: `#oppName` by 25px on
+the 375px phones upright, where "Ari" showed as "A"). `render.ts` `paintName` writes each slot as the
+copy layer's `name` block in `NAME_CAP` characters (`copy-budget.ts`: the narrowest name slot's budget,
+9), the whole name in `title` when the slot shows less and in `aria-label` always, so a name at the
+shell's NAME_MAX (20) never overflows a slot; `Konstantinopoulos XX` shows `Konstant…`. The slot rows,
+at `PX_PER_CHAR.name` 9.0 (bold 0.95rem Cardo over 20-character names with a capital a word, 8.0-8.6;
+a name of wide letters alone, `Mohammed…` at 11.4, can still meet the slot's own ellipsis): `stripOppName`,
+the rail's 142px column less the 10px disc, the 9px connection dot (online), the pips (3ch, 24) and
+three 6px gaps, 81px, 9 characters; `stripMyName`, 96px, 10; `uprightOppName`, the 375 topbar row (351)
+less the badge's column (140 at its widest; the menu and handoff buttons under it are 94), the sound
+button (44) and two 8px gaps, then the strip's 12px disc, connection dot, pips and three 8px gaps, 82px,
+9; `uprightMyName`, the controls row less
+Undo (62), the roll slot (120) and two 10px gaps, then the disc, the pips and two 8px gaps, 97px, 10.
+Upright the room comes from the strip grid (§3.2): the badge stands on the status line's row, not the
+topbar's, and the roll slot's minimum is 120px, not 168. `copy-budget.test.ts` pins the rows, the cap,
+and that the capped name fits every slot while the uncapped one fits none; `render.test.ts` the slot's
+text, `title` and `aria-label`; the table-ux e2e the bold px per character and, sideways at every
+catalogued rail width, that both capped names stand inside their columns. Left: the rows scheme's
+online opponent (132px column, 71px for the name, 7 characters) and the upright controls row with End
+turn shown beside Undo (pass-and-play, the dice used: the row has 54px for my strip at 375) can still
+ellipsize a capped name.
 
 **The building blocks** (`ui/copy.ts`). A status line is a template: literal text and blocks. A block
 is an interpolated value clipped to a cap, the widest it can be in characters, derived from the
@@ -333,8 +359,15 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
 `body.fixed-screen` and `#app` are the viewport's height with `overflow: hidden`; `#tableScreen` a
 column flex with 8px gaps; `.topbar` 44px; `.status-line` 22px with `min-height: 1.35em` so it
 never collapses; `#board { flex: 0 0 auto }`; `.controls` 56px with `.roll-slot { min-width:
-168px; min-height: 54px }` so the mini dice, the wait note and the result chip share one box (one
-height in every phase, gin's rule; the roll itself is the modal's, §4.7). `.desk-only` hides below 900px (rules and
+120px; min-height: 54px }` so the mini dice, the wait note and the result chip share one box (one
+height in every phase, gin's rule; the roll itself is the modal's, §4.7). On a phone upright
+(`(max-width: 899px) and (min-height: 501px)`, the upright grid block) the same rows are a grid of
+three columns, and `.topbar` spans the first two rows as a subgrid, so it stays one box for the
+geometry oracle while its children take the cells: the menu row, the opponent's strip and the
+sound button on the first row, `#gameBadge` at the start of the second (2px paddings, an 18px
+line: 22px like the status line) and `.status-line` right-aligned over the rest. The heights are
+the flex column's (44, 22, the board, 56; the tight tier's 44), so `--chrome-in` holds; the
+opponent's name has 151px of strip at 375 instead of none (§2.4 "The name slots"). `.desk-only` hides below 900px (rules and
 history live in `#menuOverlay` on the phone). `#controls.choosing` hides the me-strip, Undo,
 Double and the roll slot and shows `#moveChips` and `#chipCancelBtn`: the tray takes the row
 without changing its height.

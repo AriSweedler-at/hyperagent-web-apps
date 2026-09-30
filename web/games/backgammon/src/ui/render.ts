@@ -95,6 +95,8 @@ import {
   type Target,
   ROLLING_STATUS,
 } from './board.ts';
+import { name as cappedName } from './copy.ts';
+import { NAME_CAP } from './copy-budget.ts';
 import { bindDrag } from './board/dragger.ts';
 import { flyMoves } from './board/fly.ts';
 import {
@@ -227,8 +229,21 @@ export const connDotClass = (app: App): string => shellConnDotClass(connDotView(
 export const gameBadgeText = (v: View): string =>
   `Game ${String(v.gameNo)} · ${String(v.match.score[0])}–${String(v.match.score[1])} · to ${String(v.match.length)}`;
 
+/**
+ * A name slot (`#oppName`, `#myName`; design §2.4 "The name slots"): the name as the copy layer's
+ * `name` block in `NAME_CAP` characters, so a name at the shell's NAME_MAX never overflows the
+ * narrowest slot the theme gives it (copy-budget.ts `NAME_SLOTS`); the whole name stays in `title`
+ * when the slot shows less, and in `aria-label` always.
+ */
+const paintName = (el: Element, full: string): void => {
+  const shown = cappedName(NAME_CAP, full).text;
+  setText(el, shown);
+  setAttr(el, 'title', shown === full ? null : full);
+  setAttr(el, 'aria-label', full);
+};
+
 const paintOpponent = (doc: DocumentLike, app: App, v: View): void => {
-  setText(requireId(doc, 'oppName'), v.opp.name);
+  paintName(requireId(doc, 'oppName'), v.opp.name);
   // The disc before the name wears the seat's checker (theme.css `.seat-dot[data-seat]`): in
   // pass-and-play the seats swap with the mover, and the disc follows the name.
   setAttr(requireId(doc, 'oppSeatDot'), 'data-seat', String(v.opp.idx));
@@ -516,7 +531,7 @@ export const waitNoteText = (v: View): string =>
     : `Waiting for ${v.opp.name}…`;
 
 const paintControls = (doc: DocumentLike, app: App, v: View): void => {
-  setText(requireId(doc, 'myName'), v.me.name);
+  paintName(requireId(doc, 'myName'), v.me.name);
   setAttr(requireId(doc, 'mySeatDot'), 'data-seat', String(v.me.idx));
   setHtml(requireId(doc, 'pipsMe'), trustedHtml(pipHtml(v.pips[v.me.idx])));
   const mine = v.isMyTurn && app.table.curtain === null;

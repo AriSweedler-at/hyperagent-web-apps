@@ -39,6 +39,8 @@ import { name, render, worstCase, type Template } from './copy.ts';
 import {
   BADGE_MAX_WIDTH,
   budget,
+  NAME_CAP,
+  NAME_SLOTS,
   overBudget,
   overBudgetMessage,
   SLOTS,
@@ -201,11 +203,47 @@ const SAMPLES: Readonly<Record<keyof typeof STATUS_TEMPLATES, Template>> = {
 };
 
 describe('the budget table', () => {
-  test('the strip holds 20 characters at its narrowest, the portrait line 49; the badge at its widest is 140px', () => {
+  test('the strip holds 20 characters at its narrowest (the mini sideways), the portrait line 26 beside the badge; the badge at its widest is 140px', () => {
     expect(BADGE_MAX_WIDTH).toBe(140);
+    // 812 - 2 x 50 - 50 - 2 x 142 - 72 - 24 - 140.
     expect(SLOTS.stripStatus.widthPx).toBe(142);
     expect(budget(SLOTS.stripStatus)).toBe(20);
-    expect(budget(SLOTS.portraitStatus)).toBe(49);
+    // 375 - 24 - 140 - 8 - 12.
+    expect(SLOTS.portraitStatus.widthPx).toBe(191);
+    expect(budget(SLOTS.portraitStatus)).toBe(26);
+  });
+
+  test('the name slots: 81px sideways for the opponent with the connection dot (9 characters), 96 for me; 82 and 97 upright at 375; the cap is the narrowest, 9', () => {
+    expect(NAME_SLOTS.map((s) => [s.id, s.widthPx, budget(s)])).toEqual([
+      ['#oppName', 81, 9],
+      ['#myName', 96, 10],
+      ['#oppName', 82, 9],
+      ['#myName', 97, 10],
+    ]);
+    expect(NAME_CAP).toBe(9);
+    // A name at NAME_MAX, capped, fits every name slot: the check `paintName` (render.ts) relies on.
+    const capped = name(NAME_CAP, LONG_NAME).text;
+    expect(capped).toBe('Konstant…');
+    expect(LONG_NAME.length).toBe(NAME_MAX);
+    NAME_SLOTS.forEach((slot) => {
+      expect(
+        overBudget(slot, [
+          { text: capped, producer: 'src/ui/render.ts (paintName)', input: 'a name at NAME_MAX' },
+        ]),
+      ).toEqual([]);
+    });
+    // Uncapped, the same name overflows every one of them: the cap is what holds.
+    NAME_SLOTS.forEach((slot) => {
+      expect(
+        overBudget(slot, [
+          {
+            text: LONG_NAME,
+            producer: 'src/ui/render.ts (paintName)',
+            input: 'a name at NAME_MAX',
+          },
+        ]).length,
+      ).toBe(1);
+    });
   });
 
   test('the message names the slot, the text and its length, the budget and its derivation, the producer, the input and what to do', () => {
@@ -214,7 +252,7 @@ describe('the budget table', () => {
       line("phase 'moving', one die left", 'Last move: the turn ends when you play it'),
     );
     expect(msg).toBe(
-      `#statusLine copy "Last move: the turn ends when you play it" is 41 characters; the slot holds 20 at its narrowest (sideways, the rail at its 780x304 floor with the badge at its widest (140px): 142px at 7.1px per character). Shorten it in src/ui/board.ts (statusText) (phase 'moving', one die left) or widen the slot in theme.css and the budget table (src/ui/copy-budget.ts).`,
+      `#statusLine copy "Last move: the turn ends when you play it" is 41 characters; the slot holds 20 at its narrowest (sideways, the rail on the mini (812x375, 50px insets) with the badge at its widest (140px): 142px at 7.1px per character). Shorten it in src/ui/board.ts (statusText) (phase 'moving', one die left) or widen the slot in theme.css and the budget table (src/ui/copy-budget.ts).`,
     );
     expect(overBudget(SLOTS.stripStatus, [line('x', '5-2 · last move')])).toEqual([]);
   });
@@ -222,7 +260,7 @@ describe('the budget table', () => {
   test("a template's message names it, spells its shape and its worst case, and says what to do", () => {
     const wordy: Template = [name(8, LONG_NAME), ' is answering the double'];
     expect(templateOverBudgetMessage(SLOTS.stripStatus, 'oppToAnswer', wordy)).toBe(
-      `#statusLine template "oppToAnswer" ({name:8} is answering the double) can reach 32 characters; the slot holds 20 at its narrowest (sideways, the rail at its 780x304 floor with the badge at its widest (140px): 142px at 7.1px per character). Shorten its words or a block's cap in src/ui/board.ts (STATUS_TEMPLATES), or widen the slot in theme.css and the budget table (src/ui/copy-budget.ts).`,
+      `#statusLine template "oppToAnswer" ({name:8} is answering the double) can reach 32 characters; the slot holds 20 at its narrowest (sideways, the rail on the mini (812x375, 50px insets) with the badge at its widest (140px): 142px at 7.1px per character). Shorten its words or a block's cap in src/ui/board.ts (STATUS_TEMPLATES), or widen the slot in theme.css and the budget table (src/ui/copy-budget.ts).`,
     );
     expect(
       templatesOverBudget(SLOTS.stripStatus, { wordy, fits: T.oppToAnswer(LONG_NAME) }).map(

@@ -2096,6 +2096,78 @@ label {
   }
 }
 
+/* ---------- the table upright: the two strip rows as one grid (design §2.4 "The name slots", §3.2) ---------- */
+/* Upright, the topbar's flex row left the opponent's name no room on a 375px phone: the menu and
+   handoff buttons, the badge and the sound button took 302 of its 351px, and "Ari" showed as "A"
+   (the space audit, 2026-09-30: `#oppName` by 25px on the X, the mini and the SE, 10 on the 12).
+   So the badge leaves the topbar's row for the status line's: #tableScreen is a grid of three
+   columns (the buttons' `auto` at each end, the strip between) and the topbar spans the first two
+   rows as a subgrid, so it stays one box (the geometry oracle reads `#tableScreen .topbar` upright,
+   e2e/fixtures/backgammon-geometry.ts) while its children sit in the grid's cells: the menu row,
+   the opponent's strip and the sound button on the first row, the badge at the start of the
+   second, where the status line takes the rest, right-aligned as it is sideways. The rows keep
+   their heights (44, 22, the board, 56; the tight tier's 44) so `--chrome-in` and its twin
+   (ui/board/layout.ts `uprightChromeIn`) do not move: the badge wears the strip's 2px paddings
+   and an 18px line, 22px like the status line. The opponent's strip then has 151px at 375 beside the
+   badge's column (82 for the name online, 97 pass-and-play; it had none), and the roll slot's minimum drops from 168 to 120px
+   (a double's four mini dice are 100, the Result chip 66) so my strip has 149 (97 for the name,
+   with Undo's 62). copy-budget.ts spells the same arithmetic as the name slots' rows. */
+@media (max-width: 899px) and (min-height: 501px) {
+  #tableScreen {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto auto;
+    align-content: start;
+    /* The tight tier's `gap: 4px` (the geometry section) is the rows'; the columns keep the row's 8. */
+    column-gap: 8px;
+  }
+  .topbar {
+    display: grid;
+    grid-area: 1 / 1 / 3 / 4;
+    grid-template-columns: subgrid;
+    grid-template-rows: subgrid;
+    justify-content: normal;
+    height: auto;
+    /* A subgrid lays its items out in the parent's gutters, but Chromium counts the subgrid's own
+       gap in its intrinsic height: with the topbar's 8px while the tight tier's rows stood 4 apart
+       it measured 44 + 8 + 22 and the 4px spilt into the two rows put Undo 2px into the home
+       indicator's band on every notched phone installed (the audit, 2026-09-30); with 0 it
+       measured 66 and the rows came out 42 and 22. Inherited, the gap is the parent's in both
+       tiers and the rows are their items' (44, 22). */
+    gap: inherit;
+  }
+  .topbar > .row.tight:first-child {
+    grid-area: 1 / 1;
+  }
+  .topbar > .opp-strip {
+    grid-area: 1 / 2;
+  }
+  .topbar > .row.tight:last-child {
+    grid-area: 1 / 3;
+  }
+  #gameBadge {
+    grid-area: 2 / 1;
+    justify-self: start;
+    align-self: center;
+    padding: 2px 10px;
+    line-height: 18px;
+    font-variant-numeric: tabular-nums;
+  }
+  .status-line {
+    grid-area: 2 / 2 / 3 / 4;
+    text-align: right;
+  }
+  #board {
+    grid-area: 3 / 1 / 4 / 4;
+  }
+  .controls {
+    grid-area: 4 / 1 / 5 / 4;
+  }
+  .roll-slot {
+    min-width: 120px;
+  }
+}
+
 /* ---------- a phone held sideways (design backgammon-landscape.md; §3.1, §3.3, §3.10) ---------- */
 /* The flat board on a phone in landscape. The query is the phone's shape, never its width: a Pixel 8
    (915x412) and every Pro Max (926 to 956 wide) are 900px wide sideways and fell into the desktop
@@ -2175,12 +2247,17 @@ label {
        column moved 2.5px when the seats swapped between "Ann" and "Bob" under the next curtain,
        and the frame oracle reads the strip in every phase): a longer name ellipsizes. The roll
        slot is `--slot-w` in every phase (the two 22px mini dice, 48px; the Result chip, 66: `.btn-sm`'s
-       12px paddings round the word), so the status column stands still. The rail keeps 160 and 72
-       (the badge and the slot leave the status line 152px at the 780px floor, 216 at 844); the rows
+       12px paddings round the word), so the status column stands still. The rail keeps 142 and 72:
+       the name column is what leaves the status line its 20 characters (142px, copy-budget.ts
+       `SLOTS.stripStatus`) on the narrowest catalogued rail class, the 12/13 mini sideways, 812px
+       wide with 50px of notch inset a side (`--edge` 50: 812 - 100 - 50 - 2 x 142 - 72 - 24 - 140
+       = 142; it was 160, and the line lost a word there). The column holds a name of 9 characters
+       (render.ts caps it, copy-budget.ts `NAME_CAP`, the whole name in `title`): 142 less the
+       disc, the connection dot, the pips and three gaps is 81px, nine bold characters. The rows
        block under 714px re-tunes both. */
     --strip-h: 24px;
     --gap: 6px;
-    --name-w: 160px;
+    --name-w: 142px;
     --slot-w: 72px;
     display: grid;
     /* Between the columns `--gap`; between the rows the strip's `--air` (#app's, above): the

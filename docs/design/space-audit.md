@@ -309,3 +309,28 @@ both screens, their own `LIMITS` rows (a home may leave 40% below its last card,
 needs a catalogued `Device`, so this is a second case type through the judge, the drive, the sheet
 and the rows); the sandbox's other examples; the iPads by default once a desktop layout has its
 own limits.
+
+### Closed by backgammon-clip-fixes
+
+The backgammon `clip` items above (the 20 screens of the second run), 2026-09-30:
+
+- `#oppName` by 25px on the 375px phones upright and 10 on the 390 (the `kept` board): not a long
+  name but no slot at all. The topbar's flex row gave the menu and handoff buttons, the badge and
+  the sound button 302 of the row's 351px, so "Ari" showed as "A". The badge now stands on the
+  status line's row (theme.css, the upright grid block: `#tableScreen` a three-column grid, the
+  topbar a subgrid over the first two rows so the geometry oracle's box stands; design §3.2), which
+  gives the opponent's strip 151px at 375 (82 for the name online), and the roll slot's minimum drops from 168 to 120px so
+  my strip has 149. The rows keep their heights: `--chrome-in` and the emulator's upright numbers
+  do not move.
+- `#statusLine` by 7px sideways on the mini: the budget table's floor was the 780px viewport with
+  16px edges, but the mini is 812 wide with a 50px notch inset a side, which `--edge` takes for both
+  gutters, 106px of status instead of the table's 142. The rail's name columns are 142px (were 160):
+  the status line holds its 20 characters on the mini exactly, and the table derives the slot from
+  the mini (`MINI_SIDEWAYS`), not the floor.
+- Names in general (the owner: "cap the width of interpolated information & use that as a building
+  block"): `render.ts` writes `#oppName` and `#myName` as the copy layer's `name` block in
+  `NAME_CAP` characters (9, the narrowest name slot's budget over four slot rows in
+  copy-budget.ts), the whole name in `title` and `aria-label`, so a 20-character name never
+  overflows a slot (design §2.4 "The name slots").
+- `targets` 4 (the X and the mini standalone and fullscreen upright, 41.3-41.8px rows): the room's
+  limit, as #193 documented; left as is.

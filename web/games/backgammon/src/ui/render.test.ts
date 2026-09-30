@@ -46,6 +46,8 @@ import {
   waitNoteText,
 } from './render.ts';
 import { aboutHtml } from './about.ts';
+import { name } from './copy.ts';
+import { NAME_CAP } from './copy-budget.ts';
 import { rulesItemsHtml } from './rules.ts';
 import { SCREENS, initialApp, reduce, type App, type HomeSnapshot, type Intent } from './state.ts';
 
@@ -740,6 +742,36 @@ describe('the table', () => {
     expect(rollTitle({ ...app, shell: { ...app.shell, role: 'host' } }, v)).toBe('Your turn');
     expect(rollSub(v)).toBe('Roll to start your turn');
     expect(rollSub({ ...v, canDouble: true })).toBe('Double, or roll to start your turn');
+  });
+
+  test('the name slots (design §2.4): a name past NAME_CAP shows its first graphemes and `…` with the whole name in title and aria-label; a short one shows whole, no title', () => {
+    const p = page();
+    const long = 'Konstantinopoulos XX';
+    const app = revealed(
+      run(
+        initialApp,
+        { type: 'home/init', home },
+        { type: 'local/click', p1: long, p2: 'Bob', matchLength: '5', variant: 'portes' },
+      ).app,
+    );
+    paint(p.doc, app);
+    const v = view(app);
+    const slots = [
+      { el: p.get('oppName'), full: v.opp.name },
+      { el: p.get('myName'), full: v.me.name },
+    ];
+    expect(slots.map((s) => s.full).sort()).toEqual(['Bob', long]);
+    slots.forEach(({ el, full }) => {
+      expect(el.attr('aria-label')).toBe(full);
+      if (full === long) {
+        expect(el.text()).toBe(name(NAME_CAP, long).text);
+        expect(el.text()).toBe('Konstant…');
+        expect(el.attr('title')).toBe(long);
+      } else {
+        expect(el.text()).toBe('Bob');
+        expect(el.attr('title')).toBeNull();
+      }
+    });
   });
 });
 
