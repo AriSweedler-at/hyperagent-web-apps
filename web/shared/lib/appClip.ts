@@ -7,6 +7,10 @@
 // origin served the page, so the emulated proxy links to the same address the live one does. The
 // session id's alphabet and shape are here too, so the page (which mints one) and the Worker
 // (which validates `[A-Za-z0-9]{8}`) agree; the random bytes come from the edge.
+// Below the pairing's names, the dice's (docs/design/ui-sandbox.md §7, the `sizer-island-dice`
+// lane): the owner's two ids with their placeholders and `isConfigured`, the AASA document, the
+// dice URL with a roll, and the gate the sandbox's "Roll in the Island" button obeys.
+import type { Device } from './devices.ts';
 
 /** The clip's bundle id (infra/games-proxy/rps-push.ts CLIP_BUNDLE spells the same for the Worker). */
 export const CLIP_BUNDLE_ID = 'com.sweedler.games.dice.Clip';
@@ -68,3 +72,114 @@ export const rpsClipUrl = (session: string): string => clipUrl('rps', [['session
  */
 export const smartAppBanner = (argument: string): string =>
   `app-id=${APP_STORE_ID}, app-clip-bundle-id=${CLIP_BUNDLE_ID}, app-clip-display=card, app-argument=${argument}`;
+
+// ---- The dice: what only the owner can fill, and what turns on when they do -------------------------
+
+/** `APP_STORE_ID`'s value until App Store Connect assigns the real one (README step 3). */
+export const APP_STORE_ID_PLACEHOLDER = '0000000000';
+/**
+ * The owner's Apple team id (README step 1: Membership details), the AASA's prefix. PLACEHOLDER
+ * until the owner fills it; `isConfigured` is false while either id is its placeholder.
+ */
+export const TEAM_ID = 'TEAMID';
+export const TEAM_ID_PLACEHOLDER = 'TEAMID';
+/** The parent app's bundle id: the clip's less `.Clip` (README "What is here"); the AASA's `applinks` names it. */
+export const APP_BUNDLE_ID = 'com.sweedler.games.dice';
+
+/** The two ids the site's rules read, as one value: the constants above, or a filled pair a test hands in. */
+export type ClipIds = Readonly<{ appStoreId: string; teamId: string }>;
+export const CLIP_IDS: ClipIds = { appStoreId: APP_STORE_ID, teamId: TEAM_ID };
+
+/**
+ * True once both ids are real. Then, and not before: the sandbox emits the Smart App Banner, the
+ * AASA must be in the tree (test/dist/aasa.test.ts) and the sandbox's button may open the clip.
+ */
+export const isConfigured = (ids: ClipIds = CLIP_IDS): boolean =>
+  ids.appStoreId !== APP_STORE_ID_PLACEHOLDER && ids.teamId !== TEAM_ID_PLACEHOLDER;
+
+/** The Smart App Banner's `content` for a filled pair (`smartAppBanner` spells the constants'), or null unconfigured. */
+export const bannerContent = (argument: string, ids: ClipIds = CLIP_IDS): string | null =>
+  isConfigured(ids)
+    ? `app-id=${ids.appStoreId}, app-clip-bundle-id=${CLIP_BUNDLE_ID}, app-clip-display=card, app-argument=${argument}`
+    : null;
+
+/**
+ * Apple's association file on the host (README step 6): JSON with no extension, served from the
+ * site's root with no redirect. web/public/.well-known/ holds it once configured; the Worker maps
+ * the directory (infra/games-proxy/worker.ts) and stamps `application/json` on it.
+ */
+export const AASA_PATH = '/.well-known/apple-app-site-association';
+export type AppSiteAssociation = Readonly<{
+  appclips: Readonly<{ apps: ReadonlyArray<string> }>;
+  applinks: Readonly<{
+    details: ReadonlyArray<
+      Readonly<{
+        appIDs: ReadonlyArray<string>;
+        components: ReadonlyArray<Readonly<{ '/': string }>>;
+      }>
+    >;
+  }>;
+}>;
+/** The clip's app id in Apple's `TEAMID.bundle` form. */
+export const clipAppId = (ids: ClipIds = CLIP_IDS): string => `${ids.teamId}.${CLIP_BUNDLE_ID}`;
+/**
+ * The AASA document: `appclips` names the clip; `applinks` hands `/clip/*` to the full app once
+ * installed (README step 6, both blocks). Null unconfigured: the guard asserts the file's absence
+ * then, so Apple never reads a placeholder team id.
+ */
+export const appSiteAssociation = (ids: ClipIds = CLIP_IDS): AppSiteAssociation | null =>
+  isConfigured(ids)
+    ? {
+        appclips: { apps: [clipAppId(ids)] },
+        applinks: {
+          details: [
+            { appIDs: [`${ids.teamId}.${APP_BUNDLE_ID}`], components: [{ '/': '/clip/*' }] },
+          ],
+        },
+      }
+    : null;
+
+// ---- A roll ----------------------------------------------------------------------------------------
+
+export type Die = 1 | 2 | 3 | 4 | 5 | 6;
+/** Two dice, the first for the island's leading side. */
+export type Roll = readonly [Die, Die];
+/** The query the clip reads: `?roll=a,b`, a literal comma (README "A roll from the web"). */
+export const ROLL_PARAM = 'roll';
+/** What the sandbox shows before the first tap: the Xcode scheme's own `?roll=3,5`. */
+export const INITIAL_ROLL: Roll = [3, 5];
+
+/** A die from one random byte: the residue mod 6 plus one (a hair of bias, as `sessionFrom`). */
+const dieFrom = (byte: number): Die => ((byte % 6) + 1) as Die;
+/** A roll from two random bytes (the edge's `crypto.getRandomValues`); a missing byte is a 1. */
+export const rollFrom = (bytes: ReadonlyArray<number>): Roll => [
+  dieFrom(bytes[0] ?? 0),
+  dieFrom(bytes[1] ?? 0),
+];
+/** The dice experience with a roll: `https://games.sweedler.com/clip/dice?roll=3,5`. */
+export const diceClipUrl = (roll: Roll): string =>
+  `${clipUrl('dice')}?${ROLL_PARAM}=${String(roll[0])},${String(roll[1])}`;
+
+// ---- The gate --------------------------------------------------------------------------------------
+
+/**
+ * An iPhone whose catalogue row has the Dynamic Island (web/shared/lib/devices.ts ISLAND: the 14
+ * Pro and Pro Max, every 15, 16 and 17, the Air). An Android hole is an island in the catalogue
+ * too and never qualifies: the clip is iPhone-only (README "Hardware").
+ */
+export const islandIphone = (device: Device | null): boolean =>
+  device !== null && device.kind === 'iphone' && device.cut?.island === true;
+
+/** The one-line reasons under a disabled "Roll in the Island" (the owner: "disable the call to action green button unless the phone supports it"). */
+export const GATE_REASONS = {
+  hardware: 'Needs an iPhone with the Dynamic Island (14 Pro or later).',
+  unpublished: 'The Dice App Clip is not published yet.',
+} as const;
+export type ClipGate = Readonly<{ enabled: boolean; reason: string | null }>;
+/** Enabled only for an island iPhone with a configured clip; otherwise the reason, hardware first. */
+export const clipGate = (device: Device | null, ids: ClipIds = CLIP_IDS): ClipGate =>
+  !islandIphone(device)
+    ? { enabled: false, reason: GATE_REASONS.hardware }
+    : isConfigured(ids)
+      ? { enabled: true, reason: null }
+      : { enabled: false, reason: GATE_REASONS.unpublished };

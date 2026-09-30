@@ -10,6 +10,7 @@ import {
   emulationFor,
   type Emulation,
 } from '../web/shared/lib/devices.ts';
+import { GATE_REASONS } from '../web/shared/lib/appClip.ts';
 import { EDGES } from '../web/shared/lib/safeArea.ts';
 import {
   CLEARANCE,
@@ -287,6 +288,8 @@ describe('the sandbox: explain, the map and the verdict', () => {
       placements: [],
       railButtons: 0,
       ears: 0,
+      dice: 0,
+      cta: null,
       scrollHeight: h,
     };
     return {
@@ -311,6 +314,14 @@ describe('the sandbox: explain, the map and the verdict', () => {
           ),
         },
         gutters: base,
+        // The island row, unconfigured: two seats, in the ears where both fit, the link held.
+        dice: {
+          ...base,
+          dice: 2,
+          cta: { enabled: false, reason: GATE_REASONS.unpublished },
+          placements:
+            ears === 2 ? [`die1: ${map.cutEdge} segment 1`, `die2: ${map.cutEdge} segment 2`] : [],
+        },
       },
     };
   };
@@ -332,7 +343,7 @@ describe('the sandbox: explain, the map and the verdict', () => {
     expect(up).toContain('(g) rail: hidden (no free segment)  (h) ears: 0');
   });
 
-  test('judgeSandbox: a page that agrees with the module passes the eight checks; each disagreement fails its own', () => {
+  test('judgeSandbox: a page that agrees with the module passes the nine checks; each disagreement fails its own', () => {
     const m = agreeing(primary);
     const v = judgeSandbox(primary, m);
     expect(v.checks.map((c) => c.name)).toEqual([
@@ -344,6 +355,7 @@ describe('the sandbox: explain, the map and the verdict', () => {
       'rail',
       'ears',
       'scroll',
+      'dice',
     ]);
     expect(v.checks[4]?.detail).toBe(
       "every example at the room's edge: top 11 right 59 bottom 21 left 59",
@@ -415,6 +427,37 @@ describe('the sandbox: explain, the map and the verdict', () => {
         examples: { ...ex, board: { ...ex.board, scrollHeight: m.inner.h + 30 } },
       }).checks[7]?.detail,
     ).toBe('scrolls: board');
+    // (j): a seat missing, a seat over the arc where the ears hold both, a link live where the
+    // gate holds it or held for another reason, each fails the dice check alone.
+    expect(failing({ examples: { ...ex, dice: { ...ex.dice, dice: 1 } } })).toEqual(['dice']);
+    expect(
+      failing({
+        examples: {
+          ...ex,
+          dice: {
+            ...ex.dice,
+            placements: ['die1: left segment 1', 'die2: left OVER AN ARC OR THE CUT'],
+          },
+        },
+      }),
+    ).toEqual(['dice']);
+    expect(
+      failing({
+        examples: { ...ex, dice: { ...ex.dice, cta: { enabled: true, reason: '' } } },
+      }),
+    ).toEqual(['dice']);
+    expect(
+      failing({
+        examples: {
+          ...ex,
+          dice: { ...ex.dice, cta: { enabled: false, reason: GATE_REASONS.hardware } },
+        },
+      }),
+    ).toEqual(['dice']);
+    expect(failing({ examples: { ...ex, dice: { ...ex.dice, cta: null } } })).toEqual(['dice']);
+    expect(judgeSandbox(primary, m).checks[8]?.detail).toBe(
+      `(j) 2 seats in the ears; link held: ${GATE_REASONS.unpublished}`,
+    );
     // Upright in a tab: no free side, no ears; a rail or an ear shown fails.
     const up = agreeing(upright);
     expect(judgeSandbox(upright, up).pass).toBe(true);
@@ -449,10 +492,10 @@ describe('the sandbox: explain, the map and the verdict', () => {
         },
       }).checks[4],
     ).toMatchObject({ name: 'fills', pass: false, detail: 'cover bottom 34 (room 11)' });
-    expect(SANDBOX_EXAMPLES).toEqual(['cover', 'board', 'rail', 'ears', 'gutters']);
+    expect(SANDBOX_EXAMPLES).toEqual(['cover', 'board', 'rail', 'ears', 'gutters', 'dice']);
   });
 
-  test('the sheet holds both games: a sandbox card with its five pictures, the device line and the cut, under its own heading; the counts per game and overall', () => {
+  test('the sheet holds both games: a sandbox card with its six pictures, the device line and the cut, under its own heading; the counts per game and overall', () => {
     const e = emulationFor(iphone12, 'landscape', 'browser', 'shown');
     const fm = fitting(e);
     const board = {
@@ -481,9 +524,11 @@ describe('the sandbox: explain, the map and the verdict', () => {
     expect(html).toContain('Backgammon · 1 of 1 pass');
     expect(html).toContain('UI Sandbox · 1 of 1 pass');
     expect(html.match(/<section class="card/g)).toHaveLength(2);
-    expect(html.match(/<img /g)).toHaveLength(4 + 5);
+    expect(html.match(/<img /g)).toHaveLength(4 + 6);
     expect(html).toContain('src="s--ears.png"');
     expect(html).toContain('(h) buttons in the ears');
+    expect(html).toContain('src="s--dice.png"');
+    expect(html).toContain('(j) dice in the island');
     expect(html).toContain(
       '<p class="device">device iphone-393x852  iPhone 14 Pro, 15, 15 Pro, 16</p>',
     );

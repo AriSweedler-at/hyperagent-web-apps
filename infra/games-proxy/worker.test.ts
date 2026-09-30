@@ -10,9 +10,11 @@ import {
   SHELL_GAMES,
   TOOL_NAMES,
 } from '../../tools/games.ts';
+import { AASA_PATH as CLIP_AASA_PATH } from '../../web/shared/lib/appClip.ts';
 import { JOIN_PARAM as INVITE_PARAM } from '../../web/shared/lib/invite.ts';
 import { ROOM_CODE } from '../../web/shared/lib/roomCode.ts';
 import worker, {
+  AASA_PATH,
   ALIASES,
   DEFAULT_UPSTREAM,
   type Env,
@@ -91,6 +93,15 @@ describe('mapPath: the mapping table in the file header', () => {
     ['/shared', '/hyperagent-web-apps/games/shared'],
     ['/hyperagent-web-apps', '/hyperagent-web-apps/games/hyperagent-web-apps'],
     ['/favicon.ico', '/hyperagent-web-apps/shared/favicon.ico'],
+    // The well-known directory is the tree's own (web/public/.well-known/): Apple's association
+    // file for the Dice App Clip, and whatever else RFC 8615 brings.
+    [
+      '/.well-known/apple-app-site-association',
+      '/hyperagent-web-apps/.well-known/apple-app-site-association',
+    ],
+    ['/.well-known/other', '/hyperagent-web-apps/.well-known/other'],
+    // Without its slash the dot-directory is a game name like any other (the quirk above).
+    ['/.well-known', '/hyperagent-web-apps/games/.well-known'],
   ])('%s is fetched from upstream %s', (pathname, upstreamPath) => {
     expect(mapPath(pathname)).toEqual({ kind: 'fetch', path: upstreamPath });
   });
@@ -108,6 +119,11 @@ describe('mapPath: the mapping table in the file header', () => {
     ['/games/sheshbesh', '/sheshbesh'],
   ])('%s redirects to %s on this origin', (pathname, shortPath) => {
     expect(mapPath(pathname)).toEqual({ kind: 'redirect', path: shortPath });
+  });
+
+  test('AASA_PATH is the path web/shared/lib/appClip.ts spells for the site', () => {
+    expect(AASA_PATH).toBe(CLIP_AASA_PATH);
+    expect(mapPath(AASA_PATH)).toEqual({ kind: 'fetch', path: `/hyperagent-web-apps${AASA_PATH}` });
   });
 
   test('ALIASES is the map tools/games.ts spells for the Pages origin', () => {
@@ -199,6 +215,36 @@ describe('fetch handler', () => {
         `${GH}/hyperagent-web-apps/shared/ice.js`,
       );
     }));
+
+  test('the AASA comes back as application/json whatever the upstream said; a miss keeps its type', () =>
+    withUpstream(
+      (req) =>
+        new Request(req).url.endsWith(AASA_PATH)
+          ? new Response('{"appclips":{"apps":[]}}', {
+              status: 200,
+              headers: { 'content-type': 'application/octet-stream' },
+            })
+          : new Response('nope', { status: 404, headers: { 'content-type': 'text/plain' } }),
+      async () => {
+        const hit = await get(AASA_PATH);
+        expect(hit.status).toBe(200);
+        expect(hit.headers.get('content-type')).toBe('application/json');
+        expect(await hit.text()).toBe('{"appclips":{"apps":[]}}');
+        const miss = await get('/.well-known/other');
+        expect(miss.status).toBe(404);
+        expect(miss.headers.get('content-type')).toBe('text/plain');
+      },
+    ));
+
+  test('a 404 for the AASA keeps the upstream type: nothing is stamped on a miss', () =>
+    withUpstream(
+      () => new Response('nope', { status: 404, headers: { 'content-type': 'text/plain' } }),
+      async () => {
+        const miss = await get(AASA_PATH);
+        expect(miss.status).toBe(404);
+        expect(miss.headers.get('content-type')).toBe('text/plain');
+      },
+    ));
 
   test('/hyperagent-web-apps/… passes through', () =>
     withUpstream(upstreamEcho, async () => {

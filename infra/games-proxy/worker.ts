@@ -11,6 +11,10 @@
 //   /shared/…    -> .../hyperagent-web-apps/shared/…       (assets loaded relatively by game pages)
 //   /favicon.ico -> .../hyperagent-web-apps/shared/favicon.ico (the one icon the site ships; browsers
 //                   and bookmarks ask the origin root for it)
+//   /.well-known/… -> .../hyperagent-web-apps/.well-known/…  (Apple's app-site association for the
+//                   Dice App Clip, web/shared/lib/appClip.ts AASA_PATH: the tree's dot-directory,
+//                   which web/public/.nojekyll lets Pages serve; the AASA itself is answered as
+//                   application/json, the type Apple requires and an extensionless file never gets)
 //   /hyperagent-web-apps/… passes through unchanged.
 //   /api/rps/…   -> this Worker's own routes (rps-push.ts): the island scoreboard's pairing and
 //                   mood pushes, answered before any proxy path and never sent upstream. They need
@@ -45,6 +49,15 @@ const SITE = '/hyperagent-web-apps';
  */
 export const ALIASES: Readonly<Record<string, string>> = { sheshbesh: 'backgammon' };
 
+/** The site's dot-directory for the well-known URIs (RFC 8615), served from the tree's own. */
+const WELL_KNOWN = '/.well-known/';
+/**
+ * Apple's association file (web/shared/lib/appClip.ts AASA_PATH; worker.test.ts pins the two
+ * equal): JSON with no extension, which the upstream serves as a plain octet stream, so the type is
+ * set here. Not imported from there: wrangler deploys this file alone.
+ */
+export const AASA_PATH = `${WELL_KNOWN}apple-app-site-association`;
+
 /**
  * The Worker's bindings (wrangler.toml `[vars]`, the KV namespace and the secrets, or what
  * tools/proxy-dev.ts passes): the upstream origin, and the island scoreboard's (rps-push.ts RpsEnv).
@@ -67,6 +80,7 @@ export const mapPath = (pathname: string): Mapped => {
   }
   if (pathname.startsWith('/shared/')) return { kind: 'fetch', path: SITE + pathname };
   if (pathname === '/favicon.ico') return { kind: 'fetch', path: `${SITE}/shared/favicon.ico` };
+  if (pathname.startsWith(WELL_KNOWN)) return { kind: 'fetch', path: SITE + pathname };
   const [, first = '', ...rest] = pathname.split('/');
   const game = ALIASES[first];
   if (game !== undefined) {
@@ -275,6 +289,9 @@ const handler: Handler = {
 
     const response = await fetch(proxyReq);
     const headers = rewriteLocation(response.headers, target, url.origin);
+    // The AASA found: Apple reads it only as application/json (the upstream says octet-stream).
+    if (url.pathname === AASA_PATH && response.status === 200)
+      headers.set('content-type', 'application/json');
 
     // A GET for a page this origin rewrites (the landing page's links, an invite's preview): the
     // body changes, so the upstream's length and encoding no longer describe it. HEAD has no body

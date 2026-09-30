@@ -12,15 +12,24 @@
 // documented hook `window.__uiSandbox` (docs/ARCHITECTURE.md "Documented test hooks") exposes the
 // reading, the map, the settings and the last example report for the emulator and the specs;
 // `?type=<orientation type>` overrides `screen.orientation.type`, which no emulator can set.
+// Example (j) (docs/design/ui-sandbox.md §7) is the one that leaves the page: "Roll in the Island"
+// is a plain link to the Dice App Clip's URL with a roll, enabled by web/shared/lib/appClip.ts
+// `clipGate` (an island iPhone, a published clip); the two mock dice tumble on the tap and show the
+// roll the link carried. When the clip is configured (or `?clip=on` pretends it is), the boot puts
+// Apple's Smart App Banner meta in the head; unconfigured, nothing is emitted.
 import {
+  addClass,
   appendHtml,
   closestFrom,
   dataOf,
   hasAttr,
   listen,
   nextFrame,
+  preventDefault,
   queryAllIn,
+  queryIn,
   readChecked,
+  removeClass,
   readRootStyle,
   readValue,
   rectOf,
@@ -41,6 +50,18 @@ import { createOrientationLock } from '../../shared/edge/orientation.ts';
 import { applyFrame, notchOf, watchFrame, type FrameReading } from '../../shared/edge/screen.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
 import {
+  CLIP_IDS,
+  INITIAL_ROLL,
+  SMART_APP_BANNER_META,
+  bannerContent,
+  clipGate,
+  clipUrl,
+  diceClipUrl,
+  rollFrom,
+  type ClipGate,
+  type Roll,
+} from '../../shared/lib/appClip.ts';
+import {
   flipMap,
   isOrientationType,
   safeAreaMap,
@@ -48,9 +69,11 @@ import {
   type OrientationType,
   type SafeAreaMap,
 } from '../../shared/lib/safeArea.ts';
+import { pipsMarkup } from './src/dice.ts';
 import {
   EXAMPLES,
   NO_ROOM,
+  diceLine,
   exampleById,
   exampleReport,
   type ExampleReport,
@@ -63,6 +86,8 @@ import { drawMap, mapRows } from './src/mapSvg.ts';
 import { MEDIA_QUERIES, matchedDevice, readoutText, type Readout } from './src/readout.ts';
 import {
   BAND_MAX,
+  PRETEND_CLIP_IDS,
+  clipPretendedFrom,
   exampleIdOf,
   nextExampleId,
   overridesFrom,
@@ -82,6 +107,11 @@ const store = browserStore();
 const query = new URLSearchParams(location.search);
 const forcedType = query.get('type');
 const lockOf = (which: 'landscape' | 'portrait') => createOrientationLock(doc, screen, which);
+/** The clip's ids the page runs on: the constants, or the pretence under `?clip=on`. */
+const clipIds = clipPretendedFrom(location.search) ? PRETEND_CLIP_IDS : CLIP_IDS;
+const randomBytes = (count: number): ReadonlyArray<number> => [
+  ...crypto.getRandomValues(new Uint8Array(count)),
+];
 
 let settings: Settings = { ...readSettings(store), ...overridesFrom(location.search) };
 let reading: FrameReading = applyFrame(doc, win);
@@ -98,6 +128,9 @@ let gateDismissed = false;
 let landscapePhone = false;
 let portraitPhone = false;
 let locked = false;
+/** Example (j): the roll the dice show, and the one the link carries for the next tap. */
+let shownRoll: Roll = INITIAL_ROLL;
+let pendingRoll: Roll = rollFrom(randomBytes(2));
 let screenShown: Screen = isScreen(query.get('screen')) ? (query.get('screen') as Screen) : 'info';
 
 /** `screen.orientation` as a browser without it (Safari before 16.4) reads: optional, its members too. */
@@ -162,6 +195,9 @@ const writeMap = (): void => {
     'data-ears',
     String(map.cutEdge === 'none' ? 0 : map.edges[map.cutEdge].length),
   );
+  // Example (j)'s hatch and seats branch on these two: the cut on the page, and it an island.
+  setAttr(doc.documentElement, 'data-cut', map.cut === null ? null : '1');
+  setAttr(doc.documentElement, 'data-island', map.cut !== null && map.island ? '1' : null);
 };
 
 // ---- the readout -------------------------------------------------------------------------------
@@ -231,6 +267,45 @@ const roomOf = (): Room =>
       }
     : NO_ROOM;
 
+// ---- example (j): the dice and the clip's link -------------------------------------------------
+
+const gateNow = (): ClipGate => clipGate(matchedDevice(reading), clipIds);
+
+/** The two dice show `shownRoll`; the link carries `pendingRoll` where the gate opens, else no href, `aria-disabled` and the reason. */
+const paintDice = (stage: Element): void => {
+  const btn = queryIn(stage, '#islandRollBtn');
+  if (btn === null) return;
+  const gate = gateNow();
+  setAttr(btn, 'aria-disabled', gate.enabled ? null : 'true');
+  setAttr(btn, 'href', gate.enabled ? diceClipUrl(pendingRoll) : null);
+  setAttr(btn, 'data-roll', `${String(pendingRoll[0])},${String(pendingRoll[1])}`);
+  const reason = queryIn(stage, '[data-note="dice"]');
+  if (reason !== null) setText(reason, gate.reason ?? '');
+  queryAllIn(stage, '.die').forEach((die, i) => {
+    const face = shownRoll[i === 0 ? 0 : 1];
+    setAttr(die, 'data-face', String(face));
+    setAttr(die, 'aria-label', `die ${i === 0 ? 'one' : 'two'} shows ${String(face)}`);
+    setHtml(die, pipsMarkup(face));
+  });
+};
+
+/** A tap on the live link: the link opens the roll it carried; here the dice tumble and then show it, and the next roll is minted. */
+const rollDice = (): void => {
+  shownRoll = pendingRoll;
+  pendingRoll = rollFrom(randomBytes(2));
+  const stage = requireId(doc, 'stage');
+  const dice = queryAllIn(stage, '.die');
+  dice.forEach((die) => {
+    addClass(die, 'tumble');
+  });
+  setTimeout(() => {
+    dice.forEach((die) => {
+      removeClass(die, 'tumble');
+    });
+    paintDice(stage);
+  }, 450);
+};
+
 const paintExample = (): void => {
   const stage = requireId(doc, 'stage');
   const example = exampleById(settings.example);
@@ -238,11 +313,20 @@ const paintExample = (): void => {
     setAttr(stage, 'data-example', example.id);
     setHtml(stage, example.markup);
   }
+  if (example.id === 'dice') paintDice(stage);
   const viewport = reading.viewport ?? { width: 0, height: 0 };
   const boxes = measureBoxes(stage);
   const scrolls = doc.documentElement.scrollHeight > win.innerHeight + 1;
   report = exampleReport(boxes, viewport, map, scrolls, roomOf());
-  setText(requireId(doc, 'report'), [example.label, example.blurb, ...report.lines].join('\n'));
+  setText(
+    requireId(doc, 'report'),
+    [
+      example.label,
+      example.blurb,
+      ...report.lines,
+      ...(example.id === 'dice' ? [diceLine(map), gateNow().reason ?? 'the clip: ready'] : []),
+    ].join('\n'),
+  );
   const railNote = stage.querySelector<HTMLElement>('[data-note="rail"]');
   if (railNote !== null)
     setText(
@@ -397,6 +481,15 @@ listen(requireId(doc, 'previewInfoBtn'), 'click', () => {
   setHidden(rep, !open);
   setAttr(requireId(doc, 'previewInfoBtn'), 'aria-expanded', String(open));
 });
+// (j)'s link lives in the stage's markup, so the stage listens: a live link opens (the browser's
+// own navigation, in the tap's gesture, so iOS shows the App Clip card) and the dice tumble; a
+// held one does nothing.
+listen(requireId(doc, 'stage'), 'click', (e) => {
+  const link = closestFrom(e, '#islandRollBtn');
+  if (link === null) return;
+  if (hasAttr(link, 'href')) rollDice();
+  else preventDefault(e);
+});
 listen(requireId(doc, 'turnGateKeepBtn'), 'click', () => {
   gateDismissed = true;
   repaint();
@@ -443,6 +536,13 @@ watchFrame(doc, win, repaint);
 orientationOf(win.screen)?.addEventListener?.('change', () => {
   nextFrame(repaint);
 });
+// The Smart App Banner (Apple, "Supporting invocations from your website"): once the clip is
+// configured, and not before. Safari reads the tag off the document; that it honours one a module
+// script adds is UNVERIFIED on a phone (ui-sandbox.md §7): if no card shows, the tag moves into
+// index.html.
+const banner = bannerContent(clipUrl('dice'), clipIds);
+if (banner !== null)
+  appendHtml(doc.head, trustedHtml(`<meta name="${SMART_APP_BANNER_META}" content="${banner}">`));
 repaint();
 
 // The documented hook (docs/ARCHITECTURE.md "Documented test hooks").
@@ -454,6 +554,14 @@ Object.assign(window, {
     report: (): ExampleReport | null => report,
     readout: (): string => readoutText(readout()),
     device: (): string | null => matchedDevice(reading)?.id ?? null,
+    gate: (): ClipGate => gateNow(),
+    dice: (): Readonly<{ shown: Roll; pending: Roll }> => ({
+      shown: shownRoll,
+      pending: pendingRoll,
+    }),
+    roll: (): void => {
+      rollDice();
+    },
     show: (s: Screen): void => {
       screenShown = s;
       repaint();

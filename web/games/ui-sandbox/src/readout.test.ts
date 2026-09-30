@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest';
 
 import type { FrameReading } from '../../../shared/edge/screen.ts';
 import { safeAreaMap } from '../../../shared/lib/safeArea.ts';
-import { EXAMPLES, exampleById, exampleReport } from './examples.ts';
+import { EXAMPLES, diceLine, exampleById, exampleReport } from './examples.ts';
 import { drawMap, mapRows } from './mapSvg.ts';
 import { BAR_COPY, barOf, matchedDevice, readoutLines, type Readout } from './readout.ts';
 
@@ -104,7 +104,12 @@ describe('readout', () => {
       'rail',
       'ears',
       'gutters',
+      'dice',
     ]);
+    expect(exampleById('dice').label).toBe('(j) Dice in the Dynamic Island');
+    expect(exampleById('dice').markup.markup).toContain('id="islandRollBtn"');
+    expect(exampleById('dice').markup.markup).toContain('target="_blank"');
+    expect(exampleById('dice').markup.markup.match(/class="die"/g)).toHaveLength(2);
     expect(exampleById('rail').label).toContain('(g)');
     const viewport = { width: 852, height: 343 };
     const r = exampleReport(
@@ -238,5 +243,45 @@ describe('readout', () => {
     expect(mapRows({ '--a': '1px', '--b': 'left' })).toBe(
       '<tr><td>--a</td><td>1px</td></tr><tr><td>--b</td><td>left</td></tr>',
     );
+  });
+});
+
+describe('diceLine: where example (j) seats its dice, for the report', () => {
+  test('two ears on a vertical edge: one seat each; under 44px: flanking the cut; a horizontal cut edge: along it; no cut on the page: the corners', () => {
+    expect(diceLine(map)).toBe('dice: one seat in each ear of the island on the left');
+    const notch = safeAreaMap({
+      corners: { tl: 0, tr: 0, br: 47.33, bl: 47.33 },
+      cut: { length: 209, island: false },
+      type: 'landscape-secondary',
+      insets: { top: 0, right: 47, bottom: 21, left: 47 },
+      viewport: { width: 844, height: 340 },
+      full: { width: 844, height: 390 },
+    });
+    expect(notch.edges.right).toHaveLength(0);
+    expect(diceLine(notch)).toBe(
+      'dice: the ears beside this notch are under 44px: the seats flank the cut and overlap the arcs',
+    );
+    const upright = safeAreaMap({
+      corners: { tl: 55, tr: 55, br: 55, bl: 55 },
+      cut: { length: 126, island: true },
+      type: 'portrait-primary',
+      insets: { top: 59, right: 0, bottom: 34, left: 0 },
+      viewport: { width: 393, height: 852 },
+      full: { width: 393, height: 852 },
+    });
+    expect(upright.cutEdge).toBe('top');
+    expect(diceLine(upright)).toBe(
+      'dice: the cut is on the top edge: the seats flank it along that edge',
+    );
+    const underBar = safeAreaMap({
+      corners: { tl: 0, tr: 0, br: 0, bl: 0 },
+      cut: { length: 126, island: true },
+      type: 'portrait-primary',
+      insets: { top: 0, right: 0, bottom: 0, left: 0 },
+      viewport: { width: 393, height: 660 },
+      full: { width: 393, height: 852 },
+    });
+    expect(underBar.cut).toBeNull();
+    expect(diceLine(underBar)).toContain('the seats sit in the top corners');
   });
 });

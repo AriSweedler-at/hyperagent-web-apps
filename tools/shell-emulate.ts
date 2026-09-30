@@ -21,7 +21,7 @@
 //                             home, the curtain, the roll modal and the board; the sandbox: the
 //                             preview screen under each orientation type (both landscapes through
 //                             the page's `?type=`, since no emulator sets `screen.orientation.type`)
-//                             with examples (a), (f), (g), (h) and (i), the readout's device line
+//                             with examples (a), (f), (g), (h), (i) and (j), the readout's device line
 //                             under the shots; `--all` sweeps every device x orientation x mode (the
 //                             tab twice: bar shown and hidden) into a folder with an index.html
 //                             contact sheet; a `.png` --out shoots the board (or example (h)) alone
@@ -104,6 +104,7 @@ import {
   type Insets,
   type Orientation,
 } from '../web/shared/lib/devices.ts';
+import { clipGate } from '../web/shared/lib/appClip.ts';
 import {
   EDGES,
   lengthOf,
@@ -716,8 +717,8 @@ export const judge = (e: Emulation, m: Measured): Verdict => {
 
 // ---- UI Sandbox: the measurement and the verdict ---------------------------------------------------
 
-/** The layout examples shot and measured per sandbox case (src/examples.ts ids): (a), (f), (g), (h), (i). */
-export const SANDBOX_EXAMPLES = ['cover', 'board', 'rail', 'ears', 'gutters'] as const;
+/** The layout examples shot and measured per sandbox case (src/examples.ts ids): (a), (f), (g), (h), (i), (j). */
+export const SANDBOX_EXAMPLES = ['cover', 'board', 'rail', 'ears', 'gutters', 'dice'] as const;
 export type SandboxExample = (typeof SANDBOX_EXAMPLES)[number];
 export const EXAMPLE_LABELS: Readonly<Record<SandboxExample, string>> = {
   cover: '(a) one box',
@@ -725,6 +726,7 @@ export const EXAMPLE_LABELS: Readonly<Record<SandboxExample, string>> = {
   rail: '(g) rail on the free side',
   ears: '(h) buttons in the ears',
   gutters: '(i) symmetric gutters',
+  dice: '(j) dice in the island',
 };
 
 /** One example as the page reports it (`__uiSandbox.report()`), plus what is visible and the document's height. */
@@ -738,6 +740,10 @@ export type ExampleMeasure = Readonly<{
   railButtons: number;
   /** Visible `.ear` (example (h)). */
   ears: number;
+  /** Visible `.die-ear` (example (j)): the two seats. */
+  dice: number;
+  /** Example (j)'s link: live (an href, no `aria-disabled`) or held, with the reason under it; null off that example. */
+  cta: Readonly<{ enabled: boolean; reason: string }> | null;
   scrollHeight: number;
 }>;
 export type SandboxMeasured = Readonly<{
@@ -776,6 +782,16 @@ const SANDBOX_EXAMPLE = `(() => {
     placements: rep === null ? [] : rep.placements,
     railButtons: count('.edge-rail .sq-btn'),
     ears: count('.ear'),
+    dice: count('.die-ear'),
+    cta: (() => {
+      const link = document.getElementById('islandRollBtn');
+      if (link === null) return null;
+      const note = document.querySelector('[data-note="dice"]');
+      return {
+        enabled: link.getAttribute('aria-disabled') !== 'true' && link.hasAttribute('href'),
+        reason: note === null ? '' : (note.textContent ?? ''),
+      };
+    })(),
     scrollHeight: document.documentElement.scrollHeight,
   };
 })()`;
@@ -789,7 +805,10 @@ const SANDBOX_EXAMPLE = `(() => {
  * within a pixel of the clearance or that side's inset, whichever is more, as shell.css pads
  * `#app`; the page's own `fills` agrees); (g)'s three buttons sit in the free side's first segment
  * (or the rail is hidden where the map names none); (h) shows exactly the map's ears, none over an
- * arc or the cut; no example scrolls the document.
+ * arc or the cut; no example scrolls the document; (j) shows its two seats, both inside the ears
+ * where the map holds two, and its link obeys `clipGate` for the matched row (held with the
+ * hardware reason on every phone but an island iPhone, with the unpublished one there until the
+ * clip is configured).
  */
 export const judgeSandbox = (c: SandboxCase, m: SandboxMeasured): Verdict => {
   const e = c.e;
@@ -868,6 +887,19 @@ export const judgeSandbox = (c: SandboxCase, m: SandboxMeasured): Verdict => {
       scrolling.length === 0
         ? `no scroll in ${String(m.inner.h)}`
         : `scrolls: ${scrolling.join(', ')}`,
+  });
+  const dice = m.examples.dice;
+  const seated = wanted === 2;
+  const overDice = seated ? dice.placements.filter((p) => p.includes('OVER')) : [];
+  const gate = clipGate(sandboxMatch(e));
+  const gateAgrees =
+    dice.cta !== null &&
+    dice.cta.enabled === gate.enabled &&
+    dice.cta.reason === (gate.reason ?? '');
+  checks.push({
+    name: 'dice',
+    pass: dice.dice === 2 && overDice.length === 0 && gateAgrees,
+    detail: `(j) ${String(dice.dice)} seats${seated ? ` in the ears${overDice.length === 0 ? '' : `; ${overDice.join('; ')}`}` : ' (no pair of ears: flanking the cut or in the corners)'}; link ${dice.cta === null ? 'MISSING' : dice.cta.enabled ? 'live' : `held: ${dice.cta.reason}`}${gateAgrees ? '' : `, the gate says ${gate.enabled ? 'live' : `held: ${gate.reason ?? ''}`}`}`,
   });
   return { pass: checks.every((k) => k.pass), checks };
 };
@@ -974,7 +1006,7 @@ h2.game{font-size:16px;margin:24px 0 8px;border-bottom:1px solid #d9d4c7}
 .device{margin:6px 0 0;font:12px/1.4 ui-monospace,Menlo,monospace;color:#444}
 </style></head><body>
 <h1>Shell screenshot sheet · ${esc(stamp)} · ${String(passed)} of ${String(cards.length)} cases pass</h1>
-<p>Every phone the shell knows (web/shared/lib/devices.ts), each orientation and display mode, a browser tab twice (bar shown, then hidden), at the device's pixel ratio. Backgammon: the home, the first curtain, the roll modal and the rolled board. UI Sandbox: the preview screen under each orientation type (both landscapes: the cut on the left, then on the right) around examples (a), (f), (g), (h) and (i), the readout's device line under the shots. Look, then decide.</p>
+<p>Every phone the shell knows (web/shared/lib/devices.ts), each orientation and display mode, a browser tab twice (bar shown, then hidden), at the device's pixel ratio. Backgammon: the home, the first curtain, the roll modal and the rolled board. UI Sandbox: the preview screen under each orientation type (both landscapes: the cut on the left, then on the right) around examples (a), (f), (g), (h), (i) and (j), the readout's device line under the shots. Look, then decide.</p>
 ${boards.length === 0 ? '' : `<h2 class="game">Backgammon · ${String(boards.filter((c) => c.verdict.pass).length)} of ${String(boards.length)} pass</h2>\n${boards.map(card).join('\n')}`}
 ${sandboxes.length === 0 ? '' : `<h2 class="game">UI Sandbox · ${String(sandboxes.filter((c) => c.verdict.pass).length)} of ${String(sandboxes.length)} pass</h2>\n${sandboxes.map(sandboxCard).join('\n')}`}
 </body></html>
@@ -1101,7 +1133,8 @@ export const driveSandbox = async (
     const rail = await example('rail');
     const ears = await example('ears');
     const gutters = await example('gutters');
-    return { ...head, examples: { cover, board, rail, ears, gutters } };
+    const dice = await example('dice');
+    return { ...head, examples: { cover, board, rail, ears, gutters, dice } };
   } finally {
     await context.close();
   }
