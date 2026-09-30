@@ -449,3 +449,52 @@ web/games/briscola/theme.css on the bucket layer (docs/design/layout-buckets.md)
   property.
 
 The fourth run, `--baseline` the third's report: 117 of 117 cases pass, 234 of 234 screens, no failures (78 of 117 and 195 of 234 before); 60 screens moved: the 36 sideways `used` FAIL→ok and the 56 sideways `scroll` tier→ok, the SE's upright `scroll` tier→ok, the 3 desktop tables' `used` FAIL→ok. The sheet: shots/space-audit/briscola/index.html (copied to the burst's live/space-audit-4/briscola/)..
+
+### Closed by space-audit-gin
+
+The gin-rummy items above (the second run: 0 of 112 cases, 0 of 224 screens; after #197 0 of 112,
+101 of 224), 2026-09-30, on the bucket layer (docs/design/layout-buckets.md) in gin's theme alone;
+the third run (117 cases: the 112 phone cases and the five desktop windows) is 105 of 117 cases and
+222 of 234 screens (the 12 left are the home column, argued below):
+
+- Sideways (`used` 47, `scroll` 56 as `tier`): `phone-sideways` and `phone-sideways-short` lay the
+  table out for the wide, short room (theme.css, the buckets section): the topbar across the top
+  with its controls in the corners, one band of three (the opponent's strip at the left, 1.15 of the
+  room to the status banner's 1, the piles in the middle at the hand's card size, the status at the
+  right), the last action on its own line across the width (376-500px tall) or dropped (up to 375),
+  and the hand across the bottom in one row of eleven (`--column-wide: none` at the table, the
+  runs of seven and more span their length), the actions row beneath at 44px. The card is
+  `(room - chrome) / 2.88`, 36px the floor and 54 the cap: 47px on the 12 class (844x390), 42 on
+  the SE (667x375). Nothing scrolls from 337px of room (the short bucket) or 361 (the taller);
+  under 337 (the X, the mini, the SE and the Galaxy in a tab with the bar shown: 304-325px) the
+  page scrolls to the actions row, gin's short-sideways tier, 4 cases `tier`. The home sideways
+  keeps a column, 640px (was 480): a form reads no better wider; 8-17% a side, within the 25%.
+- Desktop (`desktop`, `desktop-wide`; the five windows are new to this run): the table takes the
+  room to 1600px (`min(100%, 1600px)`: 8% of felt a side at 1920) in the same band of three with the
+  last action's row, one row of eleven cards up to 96px (`(100vw - 64px) / 11 - 6`: 70 at 900, 81
+  at 1024, 96 from 1200) and piles 1.2 cards up to 120. Under 900px wide a fine pointer keeps the
+  phone layout (the laptop tier's 900 gate stands), since a `desktop` window can be any width.
+  The home keeps the shell's 480px column: 37.5% a side at 1920 (the 40% limit), and 47.6% below
+  its last card at 1920x1080, 1 `used` FAIL left as is: a three-card form is as tall as its cards
+  (below).
+- `targets` (every table screen): `#discardsBtn` 36 -> 44 (`.pile-peek`), `#arrangeBtn` 20 -> 44
+  tall (`.arrange-btn`: the button is the 44px box and its 20px pill is a `::before` behind the
+  text, so the header's fixed 24px line and the pill's look stand); the `::after` hit area is gone,
+  the box is the target. The 1280x800 and 390x844 goldens re-recorded for these two and for the
+  `--card-w` token's new spelling.
+- The 390x844 tab with the bar shown (`gutter` 1 after #197: the actions row under the home
+  indicator): the table's height budget reads the room, `100dvh - var(--head) - var(--foot)`
+  (`--head`/`--foot`: the gutter or the inset, as shell.css pads #app), and the upright scroll tier
+  is `(max-height: 680px)`, not 661: the foot's 34px indicator where the gutter is 16 lifts the
+  bound 18px (390x664: 618px of room for a 630px floor). Between 661 and 680 with no inset the
+  content fits and the tier changes nothing. The 12 class and the 14 Pro in a tab with the bar shown
+  now scroll 9-16px to the actions row (`tier`), as the SE, the X and the mini did.
+- Home `used` (the column ends 30.8-36.8% above the bottom on the tall phones upright standalone
+  and fullscreen, 12 cases; 47.6% at 1920x1080): left as is, a design choice. The home is a form
+  of three cards (name, host, join) under the masthead and the tabs; it ends where the form ends.
+  Spreading three boxes over a 956px phone puts 100px of felt between each, and a taller last card
+  would be padding. If the owner wants the allowance met, the fix is content (a fourth card: recent
+  games, or the rules' first lines), not spacing: a follow-up.
+- `clip` (new, the third run's first pass): `#lastAction` cut by 48-165px in the status column on
+  every sideways and desktop table, `#oppName` by 23px on the SE sideways. The last action's own
+  row and the wider opponent column above; a second pass reads clean.

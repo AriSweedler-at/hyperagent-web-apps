@@ -31,6 +31,9 @@
        the foot) or the safe-area inset where that is more; the shell's `--frame-inset-*` is the one
        seam (the emulator writes it), so no `env()` here. On :root as the frame's tokens are. */
     --gutter: 12px; --gutter-bottom: 16px;
+    /* The room's head and foot: what shell.css's unframed rule pads #app by (the gutter or the inset,
+       whichever is more), so the table's height budget below reads the room, not the viewport. */
+    --head: max(var(--gutter), var(--frame-inset-top, 0px)); --foot: max(var(--gutter-bottom), var(--frame-inset-bottom, 0px));
   }
   html, body { background: var(--felt); }
   h1 { font-size: 1.35rem; margin: 6px 0 2px; letter-spacing: 0.4px; }
@@ -66,9 +69,11 @@
        card + 6px slot padding. Height: everything that is not a card measures 451px (28 #app padding,
        five 8px gaps, 54 topbar, 49 opp-strip, 61 status banner, 16 last-action, 51 of pile chrome,
        152 of hand chrome), the piles 1.44 x --pile-w (121 at most) and the two rows 2.88 x --card-w;
-       so (100dvh - 572px) / 2.88 keeps two rows and the piles on a short phone, with 40px the floor
-       (375x667: 40px cards, 67px piles, 662 of the 667px used). Off the table the :root sizes apply. */
-    --card-w: clamp(40px, min(calc((100vw - 80px) / 6), calc((100dvh - 572px) / 2.88)), 54px);
+       so (room - 544px) / 2.88 keeps two rows and the piles on a short phone, with 40px the floor
+       (375x667: 40px cards, 67px piles, 662 of the 667px used), where the room is the viewport less
+       #app's head and foot (28px with no inset; the foot's 34px home indicator eats 18 more). Off the
+       table the :root sizes apply. */
+    --card-w: clamp(40px, min(calc((100vw - 80px) / 6), calc((100dvh - var(--head) - var(--foot) - 544px) / 2.88)), 54px);
     --pile-w: clamp(64px, 10dvh, 84px);
     display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; gap: 8px;
   }
@@ -92,8 +97,8 @@
   .table-center { position: relative; display: flex; justify-content: center; gap: 26px; padding: 10px 0 4px; flex-shrink: 0; }
   /* The peek at the discarded cards sits beside the discard pile, absolutely, so both piles keep
      their centred boxes: half the pile gap, then the pile's whole min-width (`.pile` above), then a
-     margin. */
-  .pile-peek { position: absolute; top: 50%; transform: translateY(-50%); left: calc(50% + 13px + max(var(--pile-w) + 24px, 92px) + 6px); width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.15); background: var(--card-2); color: var(--text); font-size: 1rem; cursor: pointer; }
+     margin. 44px: a tap's size (docs/design/space-audit.md §3 TARGET_MIN). */
+  .pile-peek { position: absolute; top: 50%; transform: translateY(-50%); left: calc(50% + 13px + max(var(--pile-w) + 24px, 92px) + 6px); width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.15); background: var(--card-2); color: var(--text); font-size: 1rem; cursor: pointer; }
   .pile-peek:disabled { opacity: 0.4; cursor: default; }
   /* min-width: the box is the card's, not the label's, so "Stock · 9" and "Stock · 31" are one width;
      the 92px floor is wider than "STOCK · 30" at the 64px pile floor, where the card alone is not. */
@@ -147,12 +152,15 @@
   .hand-header .dw { color: var(--gold); white-space: nowrap; flex-shrink: 0; }
   .hand-header .dw.tappable-dw { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
   .hand-header .dw .alt-badge { background: rgba(251,191,36,0.2); border-radius: 999px; padding: 2px 7px; margin-left: 5px; font-size: 0.78rem; }
-  /* A 20px pill inside the fixed 24px header; ::after widens the hit area to 44px. The enabled state
-     is the cue that the hand is not in the engine's arrangement (docs/design/gin-arrangement-and-discards.md §5). */
-  .arrange-btn { position: relative; flex-shrink: 0; margin: 0 8px; padding: 0 9px; height: 20px; line-height: 18px; border-radius: 999px; font: inherit; font-size: 0.72rem; font-weight: 700; color: var(--text); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); cursor: pointer; }
-  .arrange-btn::after { content: ""; position: absolute; inset: -12px -6px; }
+  /* A 44px button (a tap's size; the audit measures the box, not a pseudo-element's hit area) that
+     draws as a 20px pill inside the fixed 24px header: the button is its own stacking context and
+     the pill its ::before, behind the text (z-index -1 paints under in-flow content). The enabled
+     state is the cue that the hand is not in the engine's arrangement (docs/design/gin-arrangement-and-discards.md §5). */
+  .arrange-btn { position: relative; isolation: isolate; flex-shrink: 0; margin: 0 8px; padding: 0 9px; height: 44px; min-width: 44px; line-height: 44px; border-radius: 999px; font: inherit; font-size: 0.72rem; font-weight: 700; color: var(--text); background: none; border: 0; cursor: pointer; }
+  .arrange-btn::before { content: ""; position: absolute; inset: 12px 0; z-index: -1; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); }
   .arrange-btn:disabled { opacity: 0.35; cursor: default; }
-  .arrange-btn.due { border-color: rgba(74,222,128,0.7); color: var(--accent); }
+  .arrange-btn.due { color: var(--accent); }
+  .arrange-btn.due::before { border-color: rgba(74,222,128,0.7); }
   /* Eleven fixed cells: ten cards and the ghost draw slot, or eleven cards once a draw is accepted.
      Six columns fit a phone (two rows); 14px of top padding is room for the lift and the dot. A meld
      is one grid item (.group.nK) spanning its length, so it never splits across rows; dense flow lets a
@@ -215,17 +223,99 @@
      615.7px). Above the bound this block would change nothing (`min-height: 100dvh` keeps the hand
      anchored to the bottom), so a phone in landscape (844x390), an iPhone SE with Safari's toolbar
      (375x553) or a 360x640 Android with the URL bar shown scroll to the actions row. */
-  @media (max-height: 661px) {
-    body.fixed-screen, body.fixed-screen #app { height: auto; max-height: none; overflow: visible; }
-    body.fixed-screen #app { min-height: 100dvh; }
-    #tableScreen { overflow: visible; }
+  /* 680, not 661: the bound is the room's, and a phone in a tab with the bar shown can carry a 34px
+     home indicator where the foot's gutter is 16 (the 12 class at 390x664: 618px of room for 630),
+     so the tier reaches 18px higher; between 661 and 680 with no inset the content fits and the block
+     changes nothing. Upright only: sideways the bucket block below lays the table out to fit. */
+  @media (max-height: 680px) {
+    body.fixed-screen:not([data-layout^="phone-sideways"]), body.fixed-screen:not([data-layout^="phone-sideways"]) #app { height: auto; max-height: none; overflow: visible; }
+    body.fixed-screen:not([data-layout^="phone-sideways"]) #app { min-height: 100dvh; }
+    body:not([data-layout^="phone-sideways"]) #tableScreen { overflow: visible; }
   }
   /* A third row (render.ts writes the phone's row count to #hand[data-rows]) needs one more row at
      the 40px floor: 661 + 74.6px. A phone whose height fits only two scrolls to the actions row. */
   @media (max-height: 736px) and (max-width: 899px) {
-    body.fixed-screen:has(#hand[data-rows="3"]), body.fixed-screen:has(#hand[data-rows="3"]) #app { height: auto; max-height: none; overflow: visible; }
-    body.fixed-screen:has(#hand[data-rows="3"]) #app { min-height: 100dvh; }
-    body.fixed-screen:has(#hand[data-rows="3"]) #tableScreen { overflow: visible; }
+    body.fixed-screen:not([data-layout^="phone-sideways"]):has(#hand[data-rows="3"]), body.fixed-screen:not([data-layout^="phone-sideways"]):has(#hand[data-rows="3"]) #app { height: auto; max-height: none; overflow: visible; }
+    body.fixed-screen:not([data-layout^="phone-sideways"]):has(#hand[data-rows="3"]) #app { min-height: 100dvh; }
+    body.fixed-screen:not([data-layout^="phone-sideways"]):has(#hand[data-rows="3"]) #tableScreen { overflow: visible; }
+  }
+
+  /* ---------- the layout buckets (docs/design/layout-buckets.md) ---------- */
+  /* The boot writes the bucket on <body data-layout>; upright on a phone (`phone-upright`) is the
+     layout above, untouched. Sideways on a phone (`phone-sideways`, and `phone-sideways-short` under
+     it, so the prefix selector reads both) the table lays out for a wide, short room: the topbar
+     across the top with its controls in the corners, then one band of three (the opponent's strip at
+     the left, the piles in the middle, the status banner at the right), the last action on one line
+     across the width (its own row, so the sentence is never cut: the audit's `clip`; the short
+     bucket drops it for the room), and the hand across the bottom in one row of eleven, the actions
+     row beneath; the column is the room's (`--column-wide: none`, shell.css's bucket rule) and
+     nothing scrolls (the tiers above are upright's). The home keeps a column, 640px wide: a form
+     reads no better wider. */
+  body[data-layout^="phone-sideways"] { --column-wide: 640px; }
+  body[data-layout^="phone-sideways"].fixed-screen { --column-wide: none; }
+  body[data-layout^="phone-sideways"] #tableScreen {
+    /* Height: what is not a card is `--chrome` past #app's head and foot: 44 topbar, 36 of pile
+       chrome, 105 of hand chrome (12 padding, 24 header, 10 hand padding, 9 of row, 44 actions and
+       6 margin), the 6px gaps, and the 16px last action where it shows (225px with it, 203 without);
+       the piles are the hand's size (1.44c) and the hand one row (1.44c), so (room - chrome) / 2.88,
+       with 36px the floor (the short tier below scrolls under it) and 54 the cap. Width: eleven cells
+       of c + 6 inside the room, (100vw - 40px) / 11 - 6. The opponent's column is wider than the
+       status's (1.15 to 1): the strip holds a name, ten tiny cards and a count on one line. */
+    --card-w: clamp(36px, min(calc((100vw - 40px) / 11 - 6px), calc((100dvh - var(--head) - var(--foot) - var(--chrome)) / 2.88)), 54px);
+    --pile-w: var(--card-w);
+    display: grid; grid-template-columns: minmax(0, 1.15fr) auto minmax(0, 1fr); gap: 6px 10px; overflow: hidden;
+  }
+  /* 376-500px tall: the last action has its row (chrome 225: the floor's 36px cards need 361). */
+  body[data-layout="phone-sideways"] #tableScreen { --chrome: 225px; grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-areas: "topbar topbar topbar" "opp piles status" "last last last" "hand hand hand"; }
+  body[data-layout="phone-sideways"] .last-action { grid-area: last; }
+  /* Up to 375px tall: no last action (chrome 203: the floor needs 337, the tier scrolls under it),
+     and the opponent's tiny cards overlap 16px, not 14, so the strip fits the SE's 667px room. */
+  body[data-layout="phone-sideways-short"] #tableScreen { --chrome: 203px; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "topbar topbar topbar" "opp piles status" "hand hand hand"; }
+  body[data-layout="phone-sideways-short"] .last-action { display: none; }
+  body[data-layout="phone-sideways-short"] .opp-strip { padding: 8px 10px; }
+  body[data-layout="phone-sideways-short"] .opp-cards .card.tiny + .card.tiny { margin-left: -16px; }
+  body[data-layout^="phone-sideways"] .topbar { grid-area: topbar; }
+  body[data-layout^="phone-sideways"] .opp-strip { grid-area: opp; align-self: center; }
+  /* 50px of padding a side: the peek's box (44 + 6 of margin past the discard) stays inside the
+     column and the piles stay centred in it. */
+  body[data-layout^="phone-sideways"] .table-center { grid-area: piles; align-self: center; padding: 0 50px; }
+  body[data-layout^="phone-sideways"] .status-banner { grid-area: status; align-self: center; }
+  body[data-layout^="phone-sideways"] .hand-area { grid-area: hand; margin-top: 0; padding: 6px; }
+  body[data-layout^="phone-sideways"] .hand { grid-template-columns: repeat(11, calc(var(--card-w) + 6px)); padding: 8px 0 2px; }
+  body[data-layout^="phone-sideways"] .group.n7 { grid-column: span 7; grid-row: auto; }
+  body[data-layout^="phone-sideways"] .group.n8 { grid-column: span 8; grid-row: auto; }
+  body[data-layout^="phone-sideways"] .group.n9 { grid-column: span 9; grid-row: auto; }
+  body[data-layout^="phone-sideways"] .group.n10 { grid-column: span 10; grid-row: auto; }
+  body[data-layout^="phone-sideways"] .group.n11 { grid-column: span 11; grid-row: auto; }
+  body[data-layout^="phone-sideways"] .actions { min-height: 44px; margin-top: 6px; }
+  body[data-layout^="phone-sideways"] .actions .btn { min-height: 44px; padding-top: 10px; padding-bottom: 10px; }
+  /* Under the short bucket's floor (36px cards: 337px; the X, the mini, the SE and the Galaxy in a
+     tab with the bar shown, 304-325px) the page scrolls to the actions row, as the upright tiers do. */
+  @media (max-height: 336px) {
+    body[data-layout="phone-sideways-short"].fixed-screen, body[data-layout="phone-sideways-short"].fixed-screen #app { height: auto; max-height: none; overflow: visible; }
+    body[data-layout="phone-sideways-short"].fixed-screen #app { min-height: 100dvh; }
+    body[data-layout="phone-sideways-short"] #tableScreen { overflow: visible; }
+  }
+  /* Desktop (`desktop`, `desktop-wide`: a fine pointer at any width, so the laptop tier's 900px keeps
+     a narrow window on the phone layout): the home keeps the shell's 480px column (a form), the
+     table takes the room up to 1600px wide (1920x1080: 8% of felt a side) in the same band of three,
+     with one row of eleven cards up to 96px and piles 1.2 times a card up to 120, the last action on
+     its own row. The height budget (289px of chrome and 3.17c of cards) binds only under 600px; the
+     width binds first in every audited window. */
+  @media (min-width: 900px) {
+    body[data-layout^="desktop"].fixed-screen #app { max-width: min(100%, 1600px); }
+    body[data-layout^="desktop"] #tableScreen {
+      --card-w: clamp(40px, min(calc((100vw - 64px) / 11 - 6px), calc((100dvh - var(--head) - var(--foot) - 261px) / 3.17)), 96px);
+      --pile-w: clamp(84px, calc(var(--card-w) * 1.2), 120px);
+      display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto;
+      grid-template-areas: "topbar topbar topbar" "opp piles status" "last last last" "hand hand hand"; gap: 10px 24px;
+    }
+    body[data-layout^="desktop"] .topbar { grid-area: topbar; }
+    body[data-layout^="desktop"] .opp-strip { grid-area: opp; align-self: center; }
+    body[data-layout^="desktop"] .table-center { grid-area: piles; align-self: center; padding: 0 60px; }
+    body[data-layout^="desktop"] .status-banner { grid-area: status; align-self: center; }
+    body[data-layout^="desktop"] .last-action { grid-area: last; }
+    body[data-layout^="desktop"] .hand-area { grid-area: hand; margin-top: 0; }
   }
 
   /* ---------- cards ---------- */

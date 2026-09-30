@@ -104,8 +104,9 @@ test('tokens.css is a single :root of custom properties and nothing else', () =>
 test('gin theme.css redeclares no shared name: tokens.css is the single source of its palette', () => {
   const gin = rootNames(GIN_THEME);
   expect(gin.filter((name) => SHARED.includes(name))).toEqual([]);
-  // The four card sizes, and the column's gutter the shell's unframed rule reads (shell.css
-  // `:where(body:not([data-frame])) #app`; 12px a side, 16 at the foot).
+  // The four card sizes, the column's gutter the shell's unframed rule reads (shell.css
+  // `:where(body:not([data-frame])) #app`; 12px a side, 16 at the foot), and the head/foot the
+  // upright card budget reads: the gutter or the safe-area inset, whichever is more (PR #202).
   expect(gin, 'the gin-only layout tokens stay').toEqual([
     '--card-w',
     '--mini-w',
@@ -113,6 +114,8 @@ test('gin theme.css redeclares no shared name: tokens.css is the single source o
     '--tiny-w',
     '--gutter',
     '--gutter-bottom',
+    '--head',
+    '--foot',
   ]);
 });
 
