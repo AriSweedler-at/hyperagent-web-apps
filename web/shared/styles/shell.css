@@ -671,6 +671,16 @@ details.history-row > .history-detail dd {
   background: var(--fill);
   color: var(--ink-on-fill);
 }
+/* A finger's target (Apple HIG, Material; the audit's `targets` rule, tools/space-audit/judge.ts
+   `TARGET_MIN`): `.icon-btn` and `.btn-sm` stand at 44px always; the tab bar's and the mode
+   switch's buttons, 37-42px by their type alone, reach it on a touch screen. A fine pointer keeps
+   the type's height, so the goldens (a fine pointer) record what they did. */
+@media (any-pointer: coarse) {
+  .tab-btn,
+  .mode-btn {
+    min-height: 44px;
+  }
+}
 
 ::-webkit-scrollbar {
   width: 0;
