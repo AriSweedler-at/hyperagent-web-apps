@@ -21,6 +21,7 @@ import {
   nextFrame,
   queryAllIn,
   readChecked,
+  readRootStyle,
   readValue,
   rectOf,
   requireId,
@@ -37,7 +38,7 @@ import {
 } from '../../shared/edge/dom.ts';
 import { LANDSCAPE_PHONE, PORTRAIT_PHONE, watchMedia } from '../../shared/edge/media.ts';
 import { createOrientationLock } from '../../shared/edge/orientation.ts';
-import { applyFrame, watchFrame, type FrameReading } from '../../shared/edge/screen.ts';
+import { applyFrame, notchOf, watchFrame, type FrameReading } from '../../shared/edge/screen.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
 import {
   flipMap,
@@ -49,10 +50,12 @@ import {
 } from '../../shared/lib/safeArea.ts';
 import {
   EXAMPLES,
+  NO_ROOM,
   exampleById,
   exampleReport,
   type ExampleReport,
   type MeasuredBox,
+  type Room,
 } from './src/examples.ts';
 import { wrongWay, type PlayOrientation } from '../../shared/ui/shell.ts';
 import { GATE_COPY, paintGate } from '../../shared/ui/shellPaint.ts';
@@ -60,10 +63,11 @@ import { drawMap, mapRows } from './src/mapSvg.ts';
 import { MEDIA_QUERIES, matchedDevice, readoutText, type Readout } from './src/readout.ts';
 import {
   BAND_MAX,
+  exampleIdOf,
+  nextExampleId,
   overridesFrom,
   readSettings,
   writeSetting,
-  type ExampleId,
   type Settings,
 } from './src/settings.ts';
 
@@ -215,6 +219,18 @@ const measureBoxes = (stage: Element): ReadonlyArray<MeasuredBox> =>
     return { name: dataOf(el, 'box') ?? '', rect, fixed: hasAttr(el, 'data-fixed') };
   });
 
+/** A root custom property in px (`--frame-band`, `--frame-hairline-w`, `--frame-gap`: what the shell pads `#app` by), 0 where unreadable. */
+const rootPx = (prop: string): number => notchOf(readRootStyle(doc, win, prop)) ?? 0;
+
+/** The room the shell leaves the example: the frame's clearance and the insets it pads by (shell.css `:where(body[data-frame]) #app`); nothing with the frame off, when `#app` has no padding. */
+const roomOf = (): Room =>
+  settings.frame
+    ? {
+        clearance: rootPx('--frame-band') + rootPx('--frame-hairline-w') + rootPx('--frame-gap'),
+        insets: reading.insets,
+      }
+    : NO_ROOM;
+
 const paintExample = (): void => {
   const stage = requireId(doc, 'stage');
   const example = exampleById(settings.example);
@@ -225,7 +241,7 @@ const paintExample = (): void => {
   const viewport = reading.viewport ?? { width: 0, height: 0 };
   const boxes = measureBoxes(stage);
   const scrolls = doc.documentElement.scrollHeight > win.innerHeight + 1;
-  report = exampleReport(boxes, viewport, map, scrolls);
+  report = exampleReport(boxes, viewport, map, scrolls, roomOf());
   setText(requireId(doc, 'report'), [example.label, example.blurb, ...report.lines].join('\n'));
   const railNote = stage.querySelector<HTMLElement>('[data-note="rail"]');
   if (railNote !== null)
@@ -366,11 +382,15 @@ listen(requireId(doc, 'flipChk'), 'change', () => {
   update('flip', readChecked(requireId(doc, 'flipChk')));
 });
 const pickExample = (e: Readonly<Event>): void => {
-  const v = targetValueOf(e);
-  if (EXAMPLES.some((x) => x.id === v)) update('example', v as ExampleId);
+  const id = exampleIdOf(targetValueOf(e));
+  if (id !== null) update('example', id);
 };
 listen(requireId(doc, 'exampleSel'), 'change', pickExample);
 listen(requireId(doc, 'previewExampleSel'), 'change', pickExample);
+// Next: the example after this one, the first after the last, into both dropdowns and the store.
+listen(requireId(doc, 'previewNextBtn'), 'click', () => {
+  update('example', nextExampleId(settings.example));
+});
 listen(requireId(doc, 'previewInfoBtn'), 'click', () => {
   const rep = requireId(doc, 'report');
   const open = hasAttr(rep, 'hidden');

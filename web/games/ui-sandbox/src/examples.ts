@@ -5,9 +5,12 @@
 // free side between the arcs, the buttons in the cut side's ears) through the safe-area map's
 // custom properties alone (theme.css positions them off `--safe-free-*` and `--safe-<edge>-*`),
 // so a half turn of the phone moves them live with no game code. Pure: markup as data, and the
-// report over the boxes the boot measured.
+// report over the boxes the boot measured, with the fill rule (the owner, 2026-09-29: "it doesn't
+// use all the screen real-estate ... it should fill up the screen"): the flowing boxes' outer
+// edges sit where the shell's padding puts them, the frame's clearance or the safe-area inset on
+// that side, whichever is more (shell.css `:where(body[data-frame]) #app`), within a pixel.
 import { safeHtml, type Rect, type SafeHtml } from '../../../shared/edge/dom.ts';
-import type { ViewportSize } from '../../../shared/lib/devices.ts';
+import type { Insets, ViewportSize } from '../../../shared/lib/devices.ts';
 import {
   EDGES,
   insideSegments,
@@ -97,9 +100,27 @@ export const exampleById = (id: ExampleId): Example => EXAMPLES.find((e) => e.id
 /** A measured box: its name and its rect in the viewport. */
 export type MeasuredBox = Readonly<{ name: string; rect: Rect; fixed: boolean }>;
 
+/** The room the shell leaves an example: the frame's clearance (band + hairline + gap; 0 with the frame off) and the four insets. */
+export type Room = Readonly<{ clearance: number; insets: Insets }>;
+/** No frame, no insets: the boxes reach the viewport's edge. */
+export const NO_ROOM: Room = { clearance: 0, insets: { top: 0, right: 0, bottom: 0, left: 0 } };
+/** Where each edge of the flowing boxes must sit: the clearance or that side's inset, whichever is more. */
+export const roomEdges = (room: Room): Readonly<Record<Edge, number>> => ({
+  top: Math.max(room.clearance, room.insets.top),
+  right: Math.max(room.clearance, room.insets.right),
+  bottom: Math.max(room.clearance, room.insets.bottom),
+  left: Math.max(room.clearance, room.insets.left),
+});
+/** One pixel: the slack a box edge may leave beyond the room's (a sub-pixel flex rounding). */
+export const FILL_SLACK = 1;
+
 export type ExampleReport = Readonly<{
   /** No document scroll: every box inside the viewport. */
   fits: boolean;
+  /** Every edge of the flowing boxes within `FILL_SLACK` of the room's edge (and no scroll). */
+  fills: boolean;
+  /** The room's edge per side: the clearance or the inset. */
+  room: Readonly<Record<Edge, number>>;
   /** The least gap from the flowing boxes to each viewport edge. */
   gaps: Readonly<Record<Edge, number>>;
   /** The map segments the fixed boxes sit in (`left 1`, `right 2`), or `over an arc or the cut`. */
@@ -120,12 +141,13 @@ const placementOf = (map: SafeAreaMap, b: MeasuredBox, viewport: ViewportSize): 
   return `${b.name}: ${vertical} ${inside ? `segment ${String(index + 1)}` : 'OVER AN ARC OR THE CUT'}`;
 };
 
-/** The report over the boxes the boot measured (`getBoundingClientRect` through dom.ts). */
+/** The report over the boxes the boot measured (`getBoundingClientRect` through dom.ts) against the room the shell left them. */
 export const exampleReport = (
   boxes: ReadonlyArray<MeasuredBox>,
   viewport: ViewportSize,
   map: SafeAreaMap,
   scrolls: boolean,
+  room: Room = NO_ROOM,
 ): ExampleReport => {
   const flowing = boxes.filter((b) => !b.fixed);
   const gaps: Record<Edge, number> = {
@@ -145,14 +167,29 @@ export const exampleReport = (
       b.rect.left + b.rect.width <= viewport.width + 0.5,
   );
   const fits = inside && !scrolls;
+  const want = roomEdges(room);
+  const off = EDGES.filter((e) => !(Math.abs(gaps[e] - want[e]) <= FILL_SLACK));
+  const fills = flowing.length > 0 && !scrolls && off.length === 0;
+  const held = EDGES.filter((e) => room.insets[e] > room.clearance);
   const placements = boxes.filter((b) => b.fixed).map((b) => placementOf(map, b, viewport));
   return {
     fits,
+    fills,
+    room: want,
     gaps,
     placements,
     lines: [
       fits ? 'fits without scroll' : scrolls ? 'SCROLLS' : 'a box leaves the viewport',
       `gaps to the edge: ${EDGES.map((e) => `${e} ${Number.isFinite(gaps[e]) ? px(gaps[e]) : '-'}`).join('  ')}`,
+      fills
+        ? 'fills the room the frame leaves'
+        : flowing.length === 0
+          ? 'no flowing box to fill the room'
+          : `SHORT OF THE FRAME: ${off.map((e) => `${e} ${Number.isFinite(gaps[e]) ? px(gaps[e] - want[e]) : '-'}px (room ${px(want[e])})`).join('  ')}`,
+      ...held.map(
+        (e) =>
+          `${e} held off by the ${px(room.insets[e])}px inset (the notch, the status bar or the home indicator), not the frame`,
+      ),
       ...(placements.length === 0 ? ['uses no map segment'] : placements),
     ],
   };

@@ -10,12 +10,14 @@ import {
   emulationFor,
   type Emulation,
 } from '../web/shared/lib/devices.ts';
+import { EDGES } from '../web/shared/lib/safeArea.ts';
 import {
   CLEARANCE,
   DESKTOP_SCROLL_MAX_HEIGHT,
   PHONE_SCROLL_MAX_HEIGHT,
   SANDBOX_EXAMPLES,
   SANDBOX_PHONES,
+  bottomBarOf,
   casesFor,
   explainSandboxText,
   explainText,
@@ -122,20 +124,45 @@ describe('the command line', () => {
     expect(typesOf('landscape')).toEqual(['landscape-primary', 'landscape-secondary']);
     expect(typesOf('portrait')).toEqual(['portrait-primary']);
     const all = sandboxCasesFor(parseEmulateArgs(['check', '--all']));
-    // 8 emulations per phone: 4 upright (x1 type) + 4 sideways (x2 types) = 12.
-    expect(all).toHaveLength(14 * 12);
+    // 8 emulations per phone: 4 upright (x1 type) + 4 sideways (x2 types) = 12, plus Safari's
+    // bottom-bar variant of the upright tab on every notched iPhone.
+    const notched = SANDBOX_PHONES.filter((d) => d.kind === 'iphone' && d.insets.portrait.top > 0);
+    expect(notched.length).toBeGreaterThan(0);
+    expect(all).toHaveLength(14 * 12 + notched.length);
     const names = all.map(sandboxName);
     expect(names).toContain('iphone-393x852 landscape browser bar-shown landscape-secondary');
     expect(names).toContain('iphone-393x852 landscape fullscreen landscape-primary');
     expect(names).toContain('iphone-393x852 portrait browser bar-shown portrait-primary');
+    expect(names).toContain(
+      'iphone-393x852 portrait browser bar-shown bar-bottom portrait-primary',
+    );
+    expect(names).not.toContain(
+      'iphone-375x667-se portrait browser bar-shown bar-bottom portrait-primary',
+    );
     expect(names.some((n) => n.startsWith('ipad'))).toBe(false);
     const upright = sandboxCasesFor(
       parseEmulateArgs(['check', '--all', '--orientation', 'portrait']),
     );
-    expect(upright).toHaveLength(14 * 4);
+    expect(upright).toHaveLength(14 * 4 + notched.length);
     expect(upright.every((c) => c.type === 'portrait-primary')).toBe(true);
     const one = sandboxCasesFor(parseEmulateArgs(['explain', '--device', 'iphone-390x844']));
     expect(one.map((c) => c.type)).toEqual(['landscape-primary', 'landscape-secondary']);
+    // One notched phone upright in a tab: the catalogue's case (the bar at the top) and the variant.
+    const tab = sandboxCasesFor(
+      parseEmulateArgs(['explain', '--device', 'iphone-390x844', '--orientation', 'portrait']),
+    );
+    expect(tab.map(sandboxName)).toEqual([
+      'iphone-390x844 portrait browser bar-shown portrait-primary',
+      'iphone-390x844 portrait browser bar-shown bar-bottom portrait-primary',
+    ]);
+    expect(tab[0]?.e.insets).toEqual({ top: 0, right: 0, bottom: 34, left: 0 });
+    expect(tab[1]?.e.insets).toEqual({ top: 47, right: 0, bottom: 0, left: 0 });
+    expect(tab[1]?.e.viewport).toEqual(tab[0]?.e.viewport);
+    // No side inset proves an edge: every corner is the browser's; the notch still names the row.
+    expect(tab[1]?.e.corners).toEqual({ tl: 0, tr: 0, br: 0, bl: 0 });
+    expect(tab[1]?.e.notch).toBe(47);
+    expect(tab[1] === undefined ? null : sandboxMap(tab[1]).cutEdge).toBe('top');
+    expect(bottomBarOf(emulationFor(iphone12, 'portrait', 'browser', 'shown')).insets.top).toBe(47);
   });
 
   test('casesFor: --all is every supported device x orientation x mode, the tab twice, narrowed by the filters; --device is one case with landscape/browser/shown defaults', () => {
@@ -253,7 +280,9 @@ describe('the sandbox: explain, the map and the verdict', () => {
     const h = c.e.viewport.height;
     const base: ExampleMeasure = {
       fits: true,
-      gaps: { top: 11, right: 70, bottom: 32, left: 70 },
+      fills: true,
+      // At the room's edge: the clearance or the inset, whichever is more.
+      gaps: Object.fromEntries(EDGES.map((k) => [k, Math.max(CLEARANCE, c.e.insets[k])])),
       placements: [],
       railButtons: 0,
       ears: 0,
@@ -302,7 +331,7 @@ describe('the sandbox: explain, the map and the verdict', () => {
     expect(up).toContain('(g) rail: hidden (no free segment)  (h) ears: 0');
   });
 
-  test('judgeSandbox: a page that agrees with the module passes the seven checks; each disagreement fails its own', () => {
+  test('judgeSandbox: a page that agrees with the module passes the eight checks; each disagreement fails its own', () => {
     const m = agreeing(primary);
     const v = judgeSandbox(primary, m);
     expect(v.checks.map((c) => c.name)).toEqual([
@@ -310,10 +339,14 @@ describe('the sandbox: explain, the map and the verdict', () => {
       'device',
       'map',
       'fits',
+      'fills',
       'rail',
       'ears',
       'scroll',
     ]);
+    expect(v.checks[4]?.detail).toBe(
+      "every example at the room's edge: top 11 right 59 bottom 21 left 59",
+    );
     expect(v.pass, JSON.stringify(v.checks)).toBe(true);
     const failing = (patch: Partial<SandboxMeasured>): ReadonlyArray<string> =>
       judgeSandbox(primary, { ...m, ...patch })
@@ -327,7 +360,28 @@ describe('the sandbox: explain, the map and the verdict', () => {
     expect(failing({ examples: { ...ex, cover: { ...ex.cover, fits: false } } })).toEqual(['fits']);
     expect(
       failing({ examples: { ...ex, cover: { ...ex.cover, gaps: { ...ex.cover.gaps, top: 9 } } } }),
-    ).toEqual(['fits']);
+    ).toEqual(['fits', 'fills']);
+    // A box short of the frame by more than a pixel (the 480px column sideways) fails the fill
+    // alone, on that example and edge; so does the page's own verdict disagreeing.
+    const wide = failing({
+      examples: {
+        ...ex,
+        board: { ...ex.board, gaps: { ...ex.board.gaps, left: 193, right: 193 } },
+      },
+    });
+    expect(wide).toEqual(['fills']);
+    expect(
+      judgeSandbox(primary, {
+        ...m,
+        examples: { ...ex, board: { ...ex.board, gaps: { ...ex.board.gaps, left: 193 } } },
+      }).checks[4]?.detail,
+    ).toBe('board left 193 (room 59)');
+    expect(
+      failing({ examples: { ...ex, cover: { ...ex.cover, gaps: { ...ex.cover.gaps, top: 12 } } } }),
+    ).toEqual([]);
+    expect(failing({ examples: { ...ex, gutters: { ...ex.gutters, fills: false } } })).toEqual([
+      'fills',
+    ]);
     expect(failing({ examples: { ...ex, rail: { ...ex.rail, railButtons: 2 } } })).toEqual([
       'rail',
     ]);
@@ -358,7 +412,7 @@ describe('the sandbox: explain, the map and the verdict', () => {
       judgeSandbox(primary, {
         ...m,
         examples: { ...ex, board: { ...ex.board, scrollHeight: m.inner.h + 30 } },
-      }).checks[6]?.detail,
+      }).checks[7]?.detail,
     ).toBe('scrolls: board');
     // Upright in a tab: no free side, no ears; a rail or an ear shown fails.
     const up = agreeing(upright);
@@ -367,14 +421,33 @@ describe('the sandbox: explain, the map and the verdict', () => {
       judgeSandbox(upright, {
         ...up,
         examples: { ...up.examples, rail: { ...up.examples.rail, railButtons: 3 } },
-      }).checks[4],
+      }).checks[5],
     ).toMatchObject({ name: 'rail', pass: false });
     expect(
       judgeSandbox(upright, {
         ...up,
         examples: { ...up.examples, ears: { ...up.examples.ears, ears: 2 } },
-      }).checks[5],
+      }).checks[6],
     ).toMatchObject({ name: 'ears', pass: false });
+    // Safari's bottom bar upright: the room's top is the 47px inset, the bottom the 11px frame.
+    const bottomBar: SandboxCase = {
+      e: bottomBarOf(emulationFor(island, 'portrait', 'browser', 'shown')),
+      type: 'portrait-primary',
+      variant: 'bar-bottom',
+    };
+    const bb = agreeing(bottomBar);
+    expect(island.insets.portrait.top).toBe(59);
+    expect(bb.examples.cover.gaps).toEqual({ top: 59, right: 11, bottom: 11, left: 11 });
+    expect(judgeSandbox(bottomBar, bb).checks[4]).toMatchObject({ name: 'fills', pass: true });
+    expect(
+      judgeSandbox(bottomBar, {
+        ...bb,
+        examples: {
+          ...bb.examples,
+          cover: { ...bb.examples.cover, gaps: { ...bb.examples.cover.gaps, bottom: 34 } },
+        },
+      }).checks[4],
+    ).toMatchObject({ name: 'fills', pass: false, detail: 'cover bottom 34 (room 11)' });
     expect(SANDBOX_EXAMPLES).toEqual(['cover', 'board', 'rail', 'ears', 'gutters']);
   });
 

@@ -4,9 +4,12 @@
 // through the shell's prefs (web/shared/edge/prefs.ts `textPref`), a bad or missing value the
 // default. Pure but for the Store handed in; the query (`?example=`, `?frame=`, `?mode=`, `?flip=`)
 // overrides a run without storing (the emulator's hook, docs/ARCHITECTURE.md "Documented test hooks").
+// `?example=` takes an id or its letter (`a`-`i`, the dropdown's order), and `nextExampleId` is the
+// preview's Next button (the owner, 2026-09-29: "a 'next' button so you can cycle through them").
 import { textPref, type TextPref } from '../../../shared/edge/prefs.ts';
 import type { Store } from '../../../shared/edge/storage.ts';
 import { integer, literal, refine, string, type Decoder } from '../../../shared/lib/json.ts';
+import { err, ok } from '../../../shared/lib/result.ts';
 
 export const ORIENTATION_MODES = ['auto', 'landscape', 'portrait'] as const;
 export type OrientationMode = (typeof ORIENTATION_MODES)[number];
@@ -22,6 +25,22 @@ export const EXAMPLE_IDS = [
   'gutters',
 ] as const;
 export type ExampleId = (typeof EXAMPLE_IDS)[number];
+/** The letters the labels wear, `(a)` to `(i)`, one per id in order. */
+export const EXAMPLE_LETTERS: ReadonlyArray<string> = EXAMPLE_IDS.map((_, i) =>
+  String.fromCharCode('a'.charCodeAt(0) + i),
+);
+/** An example's letter, `a` for the first. */
+export const letterOf = (id: ExampleId): string => EXAMPLE_LETTERS[EXAMPLE_IDS.indexOf(id)] ?? 'a';
+/** The example after this one in the dropdown's order, the first after the last. */
+export const nextExampleId = (id: ExampleId): ExampleId =>
+  EXAMPLE_IDS[(EXAMPLE_IDS.indexOf(id) + 1) % EXAMPLE_IDS.length] ?? EXAMPLE_IDS[0];
+/** An id or a letter (`a`-`i`, either case) to the id; null for anything else. */
+export const exampleIdOf = (raw: string): ExampleId | null => {
+  const asId = EXAMPLE_IDS.find((id) => id === raw);
+  if (asId !== undefined) return asId;
+  const at = EXAMPLE_LETTERS.indexOf(raw.toLowerCase());
+  return at === -1 ? null : (EXAMPLE_IDS[at] ?? null);
+};
 const ON_OFF = ['on', 'off'] as const;
 type OnOff = (typeof ON_OFF)[number];
 
@@ -117,9 +136,18 @@ export const writeSetting = <K extends SettingKey>(
   void store.writeText(KEYS[key], text);
 };
 
+/** An example id or its letter, as the query spells it. */
+const decodeExample: Decoder<ExampleId> = (input) => {
+  const id = typeof input === 'string' ? exampleIdOf(input) : null;
+  return id === null
+    ? err({ path: [], expected: `an example id (${EXAMPLE_IDS.join(', ')}) or a letter a-i` })
+    : ok(id);
+};
+
 /**
- * The query's overrides: `?example=<id>`, `?frame=on|off`, `?mode=auto|landscape|portrait`,
- * `?flip=on|off`, `?band=<0-12>`; a value the decoder refuses is ignored. Not stored.
+ * The query's overrides: `?example=<id or letter a-i>`, `?frame=on|off`,
+ * `?mode=auto|landscape|portrait`, `?flip=on|off`, `?band=<0-12>`; a value the decoder refuses is
+ * ignored. Not stored.
  */
 export const overridesFrom = (search: string): Partial<Settings> => {
   const q = new URLSearchParams(search);
@@ -129,7 +157,7 @@ export const overridesFrom = (search: string): Partial<Settings> => {
     const d = decoder(raw);
     return d.ok ? d.value : undefined;
   };
-  const ex = pick('example', literal(...EXAMPLE_IDS));
+  const ex = pick('example', decodeExample);
   const fr = pick('frame', decodeOnOff);
   const mo = pick('mode', literal(...ORIENTATION_MODES));
   const fl = pick('flip', decodeOnOff);

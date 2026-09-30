@@ -88,6 +88,8 @@ its three tokens (band 0-12px, colour, hairline) written on the root live; the l
 flip. Stored under `uiSandbox_mode`, `_frame`, `_band`, `_color`, `_hairline`, `_example`, `_flip`.
 The query overrides a run without storing: `?example=rail&frame=off&mode=portrait&flip=on&band=3`,
 `?screen=preview`, `?type=landscape-secondary` (the orientation type no emulator can set).
+`?example=` takes an id or its letter, `a` to `i` in the dropdown's order (`settings.ts`
+`exampleIdOf`), so `?example=g` is the rail.
 
 The gate is the shell's, not the page's own: the markup is `gateMarkup`'s block (the same ids and
 classes, shell.css's z-index and glyph, the texts shipped empty), the decision is
@@ -106,11 +108,29 @@ Each a plain flex or grid of coloured boxes with their measured size, inside the
 strip + content; (e) two strips; (f) backgammon's shape (strip + 13-column grid + 44px rail); (g) a
 rail of three 44px buttons on the free side, at the glass inside the band, between the arcs
 (`--safe-free-*`); (h) one 44px button in each ear of the cut's side (`--safe-<side>-*`), shown
-only where an ear fits, the note saying why otherwise; (i) today's symmetric gutters. The Report
-button prints whether the example fits without scroll, its gaps to the frame and which map
-segments its fixed boxes use (`OVER AN ARC OR THE CUT` where one is misplaced). A half turn of the
-phone (landscape-primary to -secondary) moves (g) and (h) across live: the `change` of
-`screen.orientation` repaints.
+only where an ear fits, the note saying why otherwise; (i) today's symmetric gutters. Every box
+wears a 2px line in the frame's accent, drawn inside its edge (an outline, so no measurement
+moves), so its extent reads against the band in either orientation. The Report button prints
+whether the example fits without scroll, its gaps to the frame, whether it fills the room (below)
+and which map segments its fixed boxes use (`OVER AN ARC OR THE CUT` where one is misplaced); the
+Next button beside it advances to the next example, (i) wrapping to (a), into both dropdowns and
+the stored preference (`settings.ts` `nextExampleId`). A half turn of the phone (landscape-primary
+to -secondary) moves (g) and (h) across live: the `change` of `screen.orientation` repaints.
+
+The fill rule (the owner, 2026-09-29: "when it's vertical ... it doesn't use all the screen
+real-estate ... When holding landscape ... it should fill up the screen"): the flowing boxes' outer
+edges sit where the shell's padding puts them, on each side the frame's clearance (band + hairline
++ gap, 11px at the defaults) or that side's safe-area inset, whichever is more (shell.css
+`:where(body[data-frame]) #app`), within one pixel (`examples.ts` `roomEdges`, `FILL_SLACK`); with
+the frame off, at the viewport's edge. The report's `fills` and its line say so, and where an inset
+is the larger the report names it: upright under the notch in a Safari tab with the bar at the
+bottom, the box starts at the 47px inset and the line reads `top held off by the 47px inset (the
+notch, the status bar or the home indicator), not the frame`; the other three edges reach the
+frame. Sideways the shell's 480px phone column (shell.css `#app { max-width: 480px }`, every shell
+page's upright column) would leave the example in a centred column with dark gutters (458px in 844
+at the first look), so the sandbox lifts it on the preview screen alone (theme.css
+`body[data-screen='preview'] #app { max-width: none }`); the Info and Settings screens keep the
+column, and no shell rule moves (the games' computed-style goldens stand).
 
 ## 6. Emulation and regression
 
@@ -122,19 +142,31 @@ each at the device's viewport, screen, pixel ratio and insets (`seamScript`): 14
 cases. Per case: the frame's four corners equal the catalogue's per the reach rule;
 `__uiSandbox.device()` equals the emulated row; `__uiSandbox.map()` deep-equals `safeAreaMap` over
 the case; example (a) fits without scroll and keeps 11px (band + hairline + gap) inside every edge;
-(g)'s three buttons sit in the free side's segment; (h) shows exactly as many ears as the map
-holds, none over an arc or the cut. A screenshot of (h) is attached per case.
+(a) and (f) fill the room (§5's rule: each edge within a pixel of the clearance or the inset, the
+page's `fills` true, no scroll, the 2px border on every flowing box); (g)'s three buttons sit in
+the free side's segment; (h) shows exactly as many ears as the map holds, none over an arc or the
+cut. A screenshot of (h) is attached per case. Then seven Safari upright cases the catalogue does
+not spell, built through the same seam: for the 390x844 and the 393x852, a tab with the address
+bar at the bottom (the top inset the notch's, 47 or 59, the bottom 0: `tools/shell-emulate.ts`
+`bottomBarOf`), the bar hidden (top 0, the home indicator 34), installed (both); and the SE 375x667
+in a tab (none). Per case all nine examples fill the room and the report names the inset that
+holds an edge off; `?example=b` picks by letter; Next from (i) wraps to (a) in both dropdowns and
+`uiSandbox_example`.
 
 `tools/shell-emulate.ts --game ui-sandbox` (`list`, `explain`, `render`, `check`; a sweep without
 `--game` takes backgammon and the sandbox both, so `npm run shots` renders the two into one contact
 sheet under gitignored `shots/<stamp>/index.html`): the same phones x every emulation (both
 orientations x the three display modes, the tab twice) x the orientation types (both landscapes,
-the one portrait) = 168 cases, the spec's 56 among them. `render` shoots the preview screen around
-examples (a), (f), (g), (h) and (i) per case and puts the readout's device line under the shots;
-`check` (`judgeSandbox`, pure, tools/shell-emulate.test.ts) asserts what the spec asserts: `corner`,
-`device`, `map`, `fits`, `rail`, `ears`, `scroll`, one summary table per game, `--json` for the
-report, exit 1 on any failure. `explain --game ui-sandbox` prints the map a case must produce (the
-cut's side and span, the ear, every edge's segments, where (g) and (h) land) with no browser.
+the one portrait) = 168 cases, the spec's 56 among them, plus Safari's bottom-bar variant of the
+upright tab on every notched iPhone (`bar-bottom` in the case's name, `bottomBarOf`: the top inset
+the notch's, the bottom 0, every corner the browser's since no side inset proves an edge). `render`
+shoots the preview screen around examples (a), (f), (g), (h) and (i) per case and puts the
+readout's device line under the shots; `check` (`judgeSandbox`, pure, tools/shell-emulate.test.ts)
+asserts what the spec asserts: `corner`, `device`, `map`, `fits`, `fills` (every rendered example's
+edges within a pixel of the clearance or the inset, the page's own `fills` agreeing), `rail`,
+`ears`, `scroll`, one summary table per game, `--json` for the report, exit 1 on any failure.
+`explain --game ui-sandbox` prints the map a case must produce (the cut's side and span, the ear,
+every edge's segments, where (g) and (h) land) with no browser.
 
 ### From a user's screenshot to a passing test
 

@@ -124,7 +124,6 @@ body[data-screen='preview'] #menu {
 }
 #mapSvg {
   width: 100%;
-  max-width: 480px;
   height: auto;
   display: block;
   background: #000;
@@ -206,6 +205,13 @@ body[data-screen='preview'] #menu {
 }
 
 /* ---- preview ---- */
+/* The preview is the screen a game gets, so the shell's phone column (shell.css `#app { max-width:
+   480px }`, the Info and Settings screens keep it) lifts here alone: sideways the example fills the
+   room the frame leaves instead of a centred 480px column with dark gutters (the owner, 2026-09-29:
+   "when holding landscape ... it should fill up the screen"). */
+body[data-screen='preview'] #app {
+  max-width: none;
+}
 #previewScreen {
   position: relative;
 }
