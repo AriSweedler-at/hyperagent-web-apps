@@ -227,6 +227,15 @@ body[data-screen='preview'] #menu {
   gap: 2px;
   min-height: 0;
 }
+/* Every box wears a 2px line in the frame's accent, drawn inside its edge (an outline, so no
+   measurement moves): the eye sees the box's extent against the band in either orientation
+   (the owner, 2026-09-29: "have both versions add a border around the box"). */
+#stage .box,
+#stage .grid13,
+#stage .gutters {
+  outline: 2px solid var(--frame-color);
+  outline-offset: -2px;
+}
 .box {
   position: relative;
   display: flex;
@@ -419,52 +428,12 @@ body[data-screen='preview'] #menu {
 }
 
 /* ---- the gate and the toast ---- */
-.gate {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* The turn gate is the shell's (shell.css: #turnGate at z 90, .turn-glyph one stroke in --accent;
+   web/shared/ui/shellPaint.ts paintGate shows it and writes its words); the scrim and the accent
+   are the page's, as a game's theme paints them. */
+#turnGate {
+  --accent: var(--frame-color);
   background: rgba(0, 0, 0, 0.82);
-  padding: 20px;
-}
-.gate[hidden] {
-  display: none;
-}
-.gate-card {
-  max-width: 360px;
-  text-align: center;
-}
-.gate-glyph {
-  width: 42px;
-  height: 70px;
-  margin: 0 auto 14px;
-  border: 2px solid var(--frame-color);
-  border-radius: 8px;
-  animation: sandbox-turn 1.6s ease-in-out infinite alternate;
-}
-body[data-gate='upright'] .gate-glyph {
-  animation-direction: alternate-reverse;
-}
-@keyframes sandbox-turn {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(90deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .gate-glyph {
-    animation: none;
-  }
-}
-.gate-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-top: 12px;
 }
 .toast {
   position: fixed;

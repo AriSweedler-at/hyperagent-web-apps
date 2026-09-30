@@ -299,6 +299,38 @@ export const GATE_KEEP_ID = 'turnGateKeepBtn';
 export const GATE_GO_ID = 'turnGateGoBtn';
 /** Every overlay the gate covers: each `.overlay` in the body wherever it sits (page.html places every sheet and the curtain as body children; one nested deeper would only be set inert under an inert parent, harmless), the gate itself filtered out below. */
 const OVERLAYS = '.overlay';
+/** The gate's two texts (`#turnGateTitle`, `#turnGateSub`), written by `paintGate` where a page's words follow its orientation live. */
+const GATE_TITLE_ID = 'turnGateTitle';
+const GATE_SUB_ID = 'turnGateSub';
+
+/** The gate's words: the title, the line under it, the lock's button and the dismissal (web/shared/markup/shell.ts `GateCopy`, the same four). */
+export type GateWords = Readonly<{
+  title: string;
+  sub: string;
+  goLabel: string;
+  keepLabel: string;
+}>;
+
+/**
+ * The gate's words per way a game plays (shell.ts `PlayOrientation`): sideways, backgammon's
+ * title and buttons (its page carries its own line under the title, about the board); upright, the
+ * mirror. A page whose markup carries its words (backgammon's `gateMarkup(...)`) passes none to
+ * `paintGate`; a page whose way changes live (UI Sandbox's orientation setting) passes the row.
+ */
+export const GATE_COPY: Readonly<Record<'landscape' | 'portrait', GateWords>> = {
+  landscape: {
+    title: 'Turn your phone sideways',
+    sub: 'This layout is made for landscape. Turn the phone, or keep it upright.',
+    goLabel: 'Go sideways',
+    keepLabel: 'Play upright',
+  },
+  portrait: {
+    title: 'Turn your phone upright',
+    sub: 'This layout is made for portrait. Turn the phone, or keep it sideways.',
+    goLabel: 'Go upright',
+    keepLabel: 'Play sideways',
+  },
+};
 
 /**
  * `#turnGate` ("Turn your phone sideways") over the table and the curtain on a phone held upright
@@ -320,11 +352,31 @@ const OVERLAYS = '.overlay';
  * (a blur on an unfocused element does nothing, so this is "if focus is inside the gate"). Every
  * other paint leaves focus alone. `canLock` (shell.ts `Ctx.canLock`, the boot's device fact) shows
  * `#turnGateGoBtn`, the Android lock's tap (docs/design/backgammon-landscape.md §5C): a web page
- * cannot lock an iPhone, so its gate keeps the one control and the copy's own advice.
+ * cannot lock an iPhone, so its gate keeps the one control and the copy's own advice. `words`
+ * (`GATE_COPY[orientation]`) writes the four texts on every paint for a page whose way changes
+ * live (UI Sandbox); left out, the markup's words stand (backgammon's page carries its own).
  */
-export const paintGate = (doc: PageLike, open: boolean, canLock = false): void => {
+export const paintGate = (
+  doc: PageLike,
+  open: boolean,
+  canLock = false,
+  words?: GateWords,
+): void => {
   const gate = byId(doc, GATE_ID);
   if (gate === null) return;
+  if (words !== undefined) {
+    (
+      [
+        [GATE_TITLE_ID, words.title],
+        [GATE_SUB_ID, words.sub],
+        [GATE_GO_ID, words.goLabel],
+        [GATE_KEEP_ID, words.keepLabel],
+      ] as const
+    ).forEach(([id, text]) => {
+      const el = byId(doc, id);
+      if (el !== null) setText(el, text);
+    });
+  }
   const wasOpen = !hasClass(gate, 'hidden');
   toggleClass(gate, 'hidden', !open);
   const app = byId(doc, 'app');

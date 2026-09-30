@@ -95,23 +95,28 @@
       </section>
     </div>
 
-    <!-- The turn gate of the sandbox's own: sideways or upright, per the orientation mode. -->
+    <!-- TURN GATE: the shell's block (web/shared/markup/shell.ts gateMarkup: the same ids and classes,
+         shell.css z-index 90 and the glyph), painted by main.ts through the shell's paintGate with
+         GATE_COPY's words for the orientation setting, so the texts ship empty. -->
     <div
       id="turnGate"
-      class="gate"
-      hidden
+      class="overlay hidden"
       role="dialog"
       aria-modal="true"
       aria-labelledby="turnGateTitle"
     >
-      <div class="gate-card">
-        <div class="gate-glyph" aria-hidden="true"></div>
-        <h2 id="turnGateTitle"></h2>
-        <p id="turnGateSub"></p>
-        <div class="gate-actions">
-          <button type="button" id="turnGateGoBtn" class="btn" hidden></button>
-          <button type="button" id="turnGateKeepBtn" class="btn ghost"></button>
+      <div class="sheet centered">
+        <div class="turn-glyph" aria-hidden="true">
+          <svg viewBox="0 0 64 64" focusable="false">
+            <rect x="18" y="8" width="20" height="48" rx="4" />
+            <path d="M46 14a26 26 0 0 1 0 36" />
+            <path d="M39 43l7 7 7-7" />
+          </svg>
         </div>
+        <div class="sheet-title" id="turnGateTitle"></div>
+        <div class="sheet-sub" id="turnGateSub"></div>
+        <button class="btn btn-go btn-block hidden" id="turnGateGoBtn"></button>
+        <button class="btn btn-ghost btn-block btn-sm" id="turnGateKeepBtn"></button>
       </div>
     </div>
     <div id="toast" class="toast" hidden></div>

@@ -529,6 +529,8 @@ type Options = Readonly<{
   hooks?: (log: Log) => NonNullable<BootConfig<Fake, App, Extra>['hooks']>;
   /** The config carries a shell config: with `orientation: 'landscape'` (backgammon), or without it (a game that stays upright). */
   sideways?: boolean;
+  /** The shell config spells this orientation outright (`portrait`: UI Sandbox`s mirror; `any`: either way), over `sideways`. */
+  orientation?: 'landscape' | 'portrait' | 'any';
   /** The page carries the turn gate (`gateMarkup`), as a page that plays sideways does. */
   gated?: boolean;
   /** The window has a `screen` whose `orientation.lock` is a function (true: Android's Chromium family) or is absent (false: an iPhone); undefined, no `screen` at all. */
@@ -964,11 +966,15 @@ const bootPage = (options: Options = {}) => {
       },
     },
     ...(options.hooks === undefined ? {} : { hooks: options.hooks(log) }),
-    ...(options.sideways === undefined
+    ...(options.sideways === undefined && options.orientation === undefined
       ? {}
       : {
           shell: {
-            ...(options.sideways ? { orientation: 'landscape' as const } : {}),
+            ...(options.orientation !== undefined
+              ? { orientation: options.orientation }
+              : options.sideways === true
+                ? { orientation: 'landscape' as const }
+                : {}),
             engine: { over: (view: View) => view.seat === 9 },
             // The far seat's flip reads who holds the phone off the view (shell.ts `flipped`).
             local: { holder: (view: View) => (view.seat === 1 ? 1 : 0) },
@@ -1622,5 +1628,35 @@ describe('bootShell', () => {
     expect(b.boot.toast).toBeDefined();
     // Without the harness's seeded rng the boot draws from Math.random.
     expect(bootPage({ unseeded: true }).boot.rng).toBe(Math.random);
+  });
+});
+
+describe("a game that plays upright (`orientation: 'portrait'`, UI Sandbox's mirror) and one that plays either way (`'any'`)", () => {
+  test('upright: both predicates are watched, the gate paints on a phone held sideways, Go upright asks for fullscreen then the portrait lock; any: nothing is watched, no gate, no listener', async () => {
+    const b = bootPage({ coarse: true, orientation: 'portrait', gated: true, lock: true });
+    const PORTRAIT = '(any-pointer: coarse) and (orientation: portrait) and (max-width: 500px)';
+    const LANDSCAPE = '(any-pointer: coarse) and (orientation: landscape) and (max-height: 500px)';
+    expect(b.log.queries.slice(-2)).toEqual([PORTRAIT, LANDSCAPE]);
+    // The fake window answers every query alike (coarse: both predicates "match"), so the shell
+    // holds landscapePhone true and the upright game's gate opens at the table.
+    b.boot.dispatch({ type: 'render' });
+    expect(b.p.get('turnGate').hidden()).toBe(false);
+    expect(b.p.get('app').attr('inert')).toBe('');
+    expect(b.p.get('turnGateGoBtn').hidden()).toBe(false);
+    b.p.get('turnGateGoBtn').fire('click');
+    expect(b.log.intents.at(-1)).toEqual({ type: 'gate/turn' });
+    await settle();
+    expect(b.log.locks).toEqual(['request', 'lock:portrait']);
+    expect(b.log.listeners.map(([type]) => type)).toContain('fullscreenchange');
+    // Either way: as a game without the key (no `lock`, so no `screen`: the frame's own
+    // `fullscreenchange` watcher stays out of the listeners read below).
+    const any = bootPage({ coarse: true, orientation: 'any', gated: true });
+    expect(any.log.queries).not.toContain(PORTRAIT);
+    expect(any.log.queries).not.toContain(LANDSCAPE);
+    any.boot.dispatch({ type: 'render' });
+    expect(any.p.get('turnGate').hidden()).toBe(true);
+    expect(any.p.get('app').attr('inert')).toBeNull();
+    expect(any.p.get('turnGateKeepBtn').listenerTypes()).toEqual([]);
+    expect(any.log.listeners.map(([type]) => type)).not.toContain('fullscreenchange');
   });
 });

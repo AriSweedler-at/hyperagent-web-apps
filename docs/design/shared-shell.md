@@ -614,6 +614,15 @@ the mechanism that asks for the turn of the phone is the shell's (2026-09-28, th
 'play in landscape mechanism' as its needed for lots"). A game opts in with one flag and keeps only
 its board CSS and its layout twin:
 
+0. **The setting** is `ShellConfig.orientation: 'landscape' | 'portrait' | 'any'` (absent is
+   `'any'`: gin, briscola, fidice; nothing below applies). `'portrait'` is the mirror of everything
+   below with the two phone predicates swapped (`shell.ts` `wrongWay`: the gate on
+   `landscapePhone`, the hint on `portraitPhone`, the lock to `screen.orientation.lock('portrait')`
+   through the boot's `createOrientationLock(doc, screen, plays)`), with `GATE_COPY.portrait`'s
+   words ("Turn your phone upright", "Go upright", "Play sideways") and `ROTATION_HINT_UPRIGHT_MSG`;
+   UI Sandbox's portrait mode is its one user (docs/design/ui-sandbox.md §4), through `wrongWay`,
+   `paintGate(doc, open, canLock, GATE_COPY[orientation])` and the lock adapter, since it has no
+   App. The items below spell the sideways case as backgammon plays it.
 1. **`ShellConfig.orientation: 'landscape'`** (`web/games/<g>/src/shellConfig.ts`). With it,
    `bootShell` (`web/shared/edge/boot.ts`, handed the config as `BootConfig.shell`) watches the two
    phone predicates of `web/shared/edge/media.ts`, `PORTRAIT_PHONE` and `LANDSCAPE_PHONE`, into the
