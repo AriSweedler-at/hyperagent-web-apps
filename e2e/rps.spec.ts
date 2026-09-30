@@ -43,7 +43,7 @@ type Stored = Readonly<{
 const SEEDED: Stored = {
   v: 1,
   counter: 4,
-  windowMs: 1000,
+  windowMs: 2500,
   prestige: 0,
   recentWins: [300, 310, 320, 330],
   best: 300,
@@ -132,7 +132,7 @@ VIEWPORTS.forEach(([name, width, height]) => {
 
     // The saved progress paints: +4, happy, the buddy on its happy loop, the island slot empty.
     await expectScore(page, '+4', 'happy', 'happy');
-    await expect(page.locator('#windowMs')).toHaveText('Window 1000 ms');
+    await expect(page.locator('#windowMs')).toHaveText('Window 2500 ms');
     await expect(page.locator('#islandSlot')).toBeEmpty();
     // Thumb-reachable: every hand is a 44 px+ target inside the screen, and the buttons too.
     const boxes = await Promise.all(
@@ -161,10 +161,10 @@ VIEWPORTS.forEach(([name, width, height]) => {
     // 1. A win at 350 ms: +5, very happy, the fifth fast win, Tech up on offer (so no auto next).
     await round(page, 'scissors', 'rock', 350);
     await expect(page.locator('#verdict')).toHaveText('You win');
-    const win = await shownReaction(page, 350, 1000);
+    const win = await shownReaction(page, 350, 2500);
     await expectScore(page, '+5', 'veryHappy', 'very-happy');
     await expect(page.locator('#techUpBtn')).toBeVisible();
-    await expect(page.locator('#techUpCost')).toHaveText('1000 → 750 ms');
+    await expect(page.locator('#techUpCost')).toHaveText('2500 → 1875 ms');
     await expect(page.locator('#stopBtn')).toBeHidden();
     expect(await stored(page)).toEqual({
       ...SEEDED,
@@ -176,17 +176,17 @@ VIEWPORTS.forEach(([name, width, height]) => {
     await expect(page.locator('#goBtn')).toBeVisible();
     await expect(page.locator('#techUpBtn')).toBeVisible();
 
-    // 2. Tech up: window 750, counter 0, prestige 1, the wins cleared, the best kept.
+    // 2. Tech up: window 1875, counter 0, prestige 1, the wins cleared, the best kept.
     await page.locator('#techUpBtn').click();
     await expectScore(page, '0', 'neutral', 'neutral');
-    await expect(page.locator('#windowMs')).toHaveText('Window 750 ms');
+    await expect(page.locator('#windowMs')).toHaveText('Window 1875 ms');
     await expect(page.locator('#prestige')).toHaveText('Prestige 1');
     await expect(page.locator('#best')).toHaveText('Best 300 ms');
     await expect(page.locator('#techUpBtn')).toBeHidden();
     expect(await stored(page)).toEqual({
       v: 1,
       counter: 0,
-      windowMs: 750,
+      windowMs: 1875,
       prestige: 1,
       recentWins: [],
       best: 300,
@@ -195,31 +195,31 @@ VIEWPORTS.forEach(([name, width, height]) => {
     // 3. A tie: nothing moves, and the next round is pending (Stop shows).
     await round(page, 'paper', 'paper', 200);
     await expect(page.locator('#verdict')).toHaveText('Tie');
-    await shownReaction(page, 200, 750);
+    await shownReaction(page, 200, 1875);
     await expectScore(page, '0', 'neutral', 'neutral');
     await expect(page.locator('#stopBtn')).toBeVisible();
     expect((await stored(page))?.counter).toBe(0);
-    expect((await stored(page))?.windowMs).toBe(750);
+    expect((await stored(page))?.windowMs).toBe(1875);
 
-    // 4. A loss at 300 ms: −1, still neutral, the window slows to 825.
+    // 4. A loss at 300 ms: −1, still neutral, the window slows to 2063.
     await round(page, 'rock', 'scissors', 300);
     await expect(page.locator('#verdict')).toHaveText('You lose');
-    await shownReaction(page, 300, 750);
+    await shownReaction(page, 300, 1875);
     await expectScore(page, '−1', 'neutral', 'neutral');
-    await expect(page.locator('#windowMs')).toHaveText('Window 825 ms');
-    expect(await stored(page)).toMatchObject({ counter: -1, windowMs: 825, prestige: 1 });
+    await expect(page.locator('#windowMs')).toHaveText('Window 2063 ms');
+    expect(await stored(page)).toMatchObject({ counter: -1, windowMs: 2063, prestige: 1 });
 
-    // 5. A timeout: no tap within 825 ms is a loss, −2 and sad, the window 908; the hands disarm.
-    await round(page, 'rock', null, 826);
+    // 5. A timeout: no tap within 2063 ms is a loss, −2 and sad, the window 2269; the hands disarm.
+    await round(page, 'rock', null, 2064);
     await expect(page.locator('#verdict')).toHaveText('Too slow');
-    await expect(page.locator('#reaction')).toHaveText('No tap within 825 ms');
+    await expect(page.locator('#reaction')).toHaveText('No tap within 2063 ms');
     await expectScore(page, '−2', 'sad', 'sad');
-    await expect(page.locator('#windowMs')).toHaveText('Window 908 ms');
+    await expect(page.locator('#windowMs')).toHaveText('Window 2269 ms');
     await expect(page.locator('#rockBtn')).toBeDisabled();
     expect(await stored(page)).toEqual({
       v: 1,
       counter: -2,
-      windowMs: 908,
+      windowMs: 2269,
       prestige: 1,
       recentWins: [],
       best: 300,
@@ -236,10 +236,10 @@ VIEWPORTS.forEach(([name, width, height]) => {
 test('Reset progress asks first, then starts over', async ({ phone, project }) => {
   test.skip(project !== 'pages', 'about the page, not the origin');
   const { page } = phone;
-  await seedStorage(page, { ...SEEDED, counter: -5, windowMs: 238, prestige: 3 });
+  await seedStorage(page, { ...SEEDED, counter: -5, windowMs: 251, prestige: 3 });
   await page.goto(pagePath(project, 'rps'));
   await expectScore(page, '−5', 'verySad', 'very-sad');
-  await expect(page.locator('#status')).toHaveText('As fast as it gets: 238 ms.');
+  await expect(page.locator('#status')).toHaveText('As fast as it gets: 251 ms.');
   // Dismissed: nothing changes.
   page.once('dialog', (dialog) => void dialog.dismiss());
   await page.locator('#resetBtn').click();
@@ -248,13 +248,13 @@ test('Reset progress asks first, then starts over', async ({ phone, project }) =
   page.once('dialog', (dialog) => void dialog.accept());
   await page.locator('#resetBtn').click();
   await expectScore(page, '0', 'neutral', 'neutral');
-  await expect(page.locator('#windowMs')).toHaveText('Window 1000 ms');
+  await expect(page.locator('#windowMs')).toHaveText('Window 2500 ms');
   await expect(page.locator('#prestige')).toHaveText('No prestige yet');
   await expect(page.locator('#best')).toHaveText('No best yet');
   expect(await stored(page)).toEqual({
     v: 1,
     counter: 0,
-    windowMs: 1000,
+    windowMs: 2500,
     prestige: 0,
     recentWins: [],
     best: null,

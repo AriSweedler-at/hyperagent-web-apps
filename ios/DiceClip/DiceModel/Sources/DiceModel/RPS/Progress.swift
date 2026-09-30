@@ -5,8 +5,8 @@
 
 /// Everything that persists between rounds.
 public struct Progress: Codable, Hashable, Sendable {
-    /// The window every fresh game and every Reset starts at, in ms.
-    public static let baseWindowMs = 1000
+    /// The window every fresh game and every Reset starts at, in ms: the owner's first level, 2.5 seconds.
+    public static let baseWindowMs = 2500
     /// The window never drops below this; a tech up that would is never offered ("too fast").
     public static let floorWindowMs = 200
     /// The counter's range.

@@ -72,7 +72,7 @@ describe('the round', () => {
     expect(step.effects).toEqual([
       { kind: 'cancel', id: 'scroll' },
       { kind: 'cue', cue: 'resolve' },
-      { kind: 'timer', id: 'window', ms: 1000 },
+      { kind: 'timer', id: 'window', ms: 2500 },
     ]);
     // A resolve that is not preceded by a scroll is ignored.
     expect(reduce(start, { type: 'resolve', computer: 'rock', at: 1 }).app).toBe(start);
@@ -86,7 +86,7 @@ describe('the round', () => {
       player: 'rock',
       outcome: 'win',
       reactionMs: 350,
-      windowMs: 1000,
+      windowMs: 2500,
     });
     expect(step.app.progress).toEqual({
       ...INITIAL_PROGRESS,
@@ -107,18 +107,18 @@ describe('the round', () => {
     const tie = reduce(armed(start, 'paper'), { type: 'tap', hand: 'paper', at: 1200 }).app;
     expect(tie.phase).toMatchObject({ outcome: 'tie', reactionMs: 200 });
     expect(tie.progress).toEqual(INITIAL_PROGRESS);
-    const fast = initialApp({ ...INITIAL_PROGRESS, windowMs: 750 });
+    const fast = initialApp({ ...INITIAL_PROGRESS, windowMs: 1875 });
     const loss = reduce(armed(fast, 'paper'), { type: 'tap', hand: 'rock', at: 1300 }).app;
     expect(loss.phase).toMatchObject({ outcome: 'loss' });
-    expect(loss.progress).toEqual({ ...INITIAL_PROGRESS, counter: -1, windowMs: 825 });
+    expect(loss.progress).toEqual({ ...INITIAL_PROGRESS, counter: -1, windowMs: 2063 });
   });
 
   test('a late tap is a timeout (the boundary counts), and so is the window timer', () => {
-    const late = reduce(armed(start, 'scissors'), { type: 'tap', hand: 'rock', at: 2001 }).app;
-    expect(late.phase).toMatchObject({ outcome: 'timeout', player: 'rock', reactionMs: 1001 });
+    const late = reduce(armed(start, 'scissors'), { type: 'tap', hand: 'rock', at: 3501 }).app;
+    expect(late.phase).toMatchObject({ outcome: 'timeout', player: 'rock', reactionMs: 2501 });
     expect(late.progress.counter).toBe(-1);
-    const boundary = reduce(armed(start, 'scissors'), { type: 'tap', hand: 'rock', at: 2000 }).app;
-    expect(boundary.phase).toMatchObject({ outcome: 'win', reactionMs: 1000 });
+    const boundary = reduce(armed(start, 'scissors'), { type: 'tap', hand: 'rock', at: 3500 }).app;
+    expect(boundary.phase).toMatchObject({ outcome: 'win', reactionMs: 2500 });
     const step = reduce(armed(start, 'scissors'), { type: 'timeout' });
     expect(step.app.phase).toEqual({
       kind: 'verdict',
@@ -126,7 +126,7 @@ describe('the round', () => {
       player: null,
       outcome: 'timeout',
       reactionMs: null,
-      windowMs: 1000,
+      windowMs: 2500,
     });
     expect(step.effects).toContainEqual({ kind: 'cue', cue: 'timeout' });
     expect(step.app.progress.counter).toBe(-1);
@@ -151,7 +151,7 @@ describe('the round', () => {
 describe('Tech up and Reset', () => {
   const eligible: Progress = {
     counter: 4,
-    windowMs: 1000,
+    windowMs: 2500,
     prestige: 0,
     recentWins: [300, 300, 300, 300],
     best: 300,
@@ -174,7 +174,7 @@ describe('Tech up and Reset', () => {
     const taken = reduce(step.app, { type: 'techUp' });
     expect(taken.app.progress).toEqual({
       counter: 0,
-      windowMs: 750,
+      windowMs: 1875,
       prestige: 1,
       recentWins: [],
       best: 300,
@@ -193,7 +193,7 @@ describe('Tech up and Reset', () => {
   });
 
   test('Reset: the start, every timer cancelled, the cue and the save', () => {
-    const deep = initialApp({ ...eligible, counter: -5, windowMs: 238, prestige: 3 });
+    const deep = initialApp({ ...eligible, counter: -5, windowMs: 251, prestige: 3 });
     const step = reduce(armed(deep, 'rock'), { type: 'reset' });
     expect(step.app.progress).toEqual(INITIAL_PROGRESS);
     expect(step.app.phase).toEqual({ kind: 'idle' });
@@ -209,10 +209,10 @@ describe('Tech up and Reset', () => {
 });
 
 describe('the draws', () => {
-  test('the scroll length is uniform in 0.8 … 2.0 s, the hand uniform over the three', () => {
-    expect(drawScrollMs(() => 0)).toBe(800);
-    expect(drawScrollMs(() => 0.5)).toBe(1400);
-    expect(drawScrollMs(() => 0.999999)).toBe(2000);
+  test('the scroll length is uniform in 0.65 … 1.6 s, the hand uniform over the three', () => {
+    expect(drawScrollMs(() => 0)).toBe(650);
+    expect(drawScrollMs(() => 0.5)).toBe(1125);
+    expect(drawScrollMs(() => 0.999999)).toBe(1600);
     expect(drawHand(() => 0)).toBe('rock');
     expect(drawHand(() => 0.34)).toBe('paper');
     expect(drawHand(() => 0.67)).toBe('scissors');
