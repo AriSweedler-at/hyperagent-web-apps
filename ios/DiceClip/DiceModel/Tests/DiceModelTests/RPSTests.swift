@@ -52,7 +52,7 @@ struct OutcomeTests {
     func pairs() {
         for player in Hand.allCases {
             for computer in Hand.allCases {
-                let verdict = Outcome.verdict(player: player, computer: computer, reactionMs: 100, windowMs: 1000)
+                let verdict = Outcome.verdict(player: player, computer: computer, reactionMs: 100, windowMs: 2500)
                 if player == computer {
                     #expect(verdict == .tie)
                 } else if player.beats == computer {
@@ -66,11 +66,11 @@ struct OutcomeTests {
 
     @Test("a tap at the window counts, one later or none is a timeout")
     func boundary() {
-        #expect(Outcome.verdict(player: .rock, computer: .scissors, reactionMs: 1000, windowMs: 1000) == .win)
-        #expect(Outcome.verdict(player: .rock, computer: .scissors, reactionMs: 1001, windowMs: 1000) == .timeout)
-        #expect(Outcome.verdict(player: .rock, computer: .rock, reactionMs: 1001, windowMs: 1000) == .timeout)
-        #expect(Outcome.verdict(player: nil, computer: .rock, reactionMs: nil, windowMs: 1000) == .timeout)
-        #expect(Outcome.verdict(player: .paper, computer: .rock, reactionMs: nil, windowMs: 1000) == .timeout)
+        #expect(Outcome.verdict(player: .rock, computer: .scissors, reactionMs: 2500, windowMs: 2500) == .win)
+        #expect(Outcome.verdict(player: .rock, computer: .scissors, reactionMs: 2501, windowMs: 2500) == .timeout)
+        #expect(Outcome.verdict(player: .rock, computer: .rock, reactionMs: 2501, windowMs: 2500) == .timeout)
+        #expect(Outcome.verdict(player: nil, computer: .rock, reactionMs: nil, windowMs: 2500) == .timeout)
+        #expect(Outcome.verdict(player: .paper, computer: .rock, reactionMs: nil, windowMs: 2500) == .timeout)
     }
 }
 
@@ -111,20 +111,20 @@ struct ProgressTests {
     /// The §6 verdict-and-window vectors: from `window` and counter 0, the round's outcome, the
     /// counter's move, and the window after.
     @Test("the design's verdict vectors", arguments: [
-        (1000, Hand?.some(.rock), Hand.scissors, Int?.some(350), Outcome.win, 1, 1000),
-        (1000, .rock, .paper, 350, .loss, -1, 1000),
-        (1000, .paper, .paper, 350, .tie, 0, 1000),
-        (1000, .rock, .scissors, 1000, .win, 1, 1000),
-        (1000, .rock, .scissors, 1001, .timeout, -1, 1000),
-        (750, .scissors, .paper, 700, .win, 1, 750),
-        (750, .scissors, .rock, 300, .loss, -1, 825),
-        (750, nil, .rock, nil, .timeout, -1, 825),
-        (750, .paper, .rock, 751, .timeout, -1, 825),
-        (825, .rock, .paper, 10, .loss, -1, 908),
-        (908, .rock, .paper, 10, .loss, -1, 999),
-        (999, .rock, .paper, 100, .loss, -1, 1000),
-        (238, .rock, .scissors, 238, .win, 1, 238),
-        (238, .rock, .scissors, 239, .timeout, -1, 262),
+        (2500, Hand?.some(.rock), Hand.scissors, Int?.some(350), Outcome.win, 1, 2500),
+        (2500, .rock, .paper, 350, .loss, -1, 2500),
+        (2500, .paper, .paper, 350, .tie, 0, 2500),
+        (2500, .rock, .scissors, 2500, .win, 1, 2500),
+        (2500, .rock, .scissors, 2501, .timeout, -1, 2500),
+        (1875, .scissors, .paper, 1700, .win, 1, 1875),
+        (1875, .scissors, .rock, 300, .loss, -1, 2063),
+        (1875, nil, .rock, nil, .timeout, -1, 2063),
+        (1875, .paper, .rock, 1876, .timeout, -1, 2063),
+        (2063, .rock, .paper, 10, .loss, -1, 2269),
+        (2269, .rock, .paper, 10, .loss, -1, 2496),
+        (2496, .rock, .paper, 100, .loss, -1, 2500),
+        (251, .rock, .scissors, 251, .win, 1, 251),
+        (251, .rock, .scissors, 252, .timeout, -1, 276),
     ])
     func vectors(window: Int, player: Hand?, computer: Hand, reaction: Int?, outcome: Outcome, delta: Int, after: Int) {
         let verdict = Outcome.verdict(player: player, computer: computer, reactionMs: reaction, windowMs: window)
@@ -142,10 +142,10 @@ struct ProgressTests {
         #expect(stillTop.counter == 5)
         #expect(stillTop.recentWins == [300, 300, 300, 300, 250])
         #expect(stillTop.best == 250)
-        let bottom = Progress(counter: -5, windowMs: 750)
+        let bottom = Progress(counter: -5, windowMs: 1875)
         let stillBottom = bottom.apply(outcome: .loss, reactionMs: 100)
         #expect(stillBottom.counter == -5)
-        #expect(stillBottom.windowMs == 825)
+        #expect(stillBottom.windowMs == 2063)
     }
 
     @Test("wins record the last five reactions and the best; ties and losses record nothing")
@@ -156,7 +156,7 @@ struct ProgressTests {
         #expect(p.best == 100)
         #expect(p.counter == 5)
         let tied = p.apply(outcome: .tie, reactionMs: 50)
-        #expect(tied.recentWins == p.recentWins && tied.best == 100 && tied.windowMs == 1000)
+        #expect(tied.recentWins == p.recentWins && tied.best == 100 && tied.windowMs == 2500)
         let lost = p.apply(outcome: .loss, reactionMs: 50)
         #expect(lost.recentWins == p.recentWins && lost.best == 100)
     }
@@ -172,20 +172,20 @@ struct ProgressTests {
             p.recentWins = [1, 1, 1, 1, 1]
         }
         windows.append(p.windowMs)
-        #expect(windows == [1000, 750, 563, 422, 317, 238])
-        #expect(p.prestige == 5)
+        #expect(windows == [2500, 1875, 1406, 1055, 791, 593, 445, 334, 251])
+        #expect(p.prestige == 8)
         #expect(p.isAtFloor)
-        #expect(p.techUpWindowMs == 179)
+        #expect(p.techUpWindowMs == 188)
     }
 
     /// The §6 tech-up eligibility vectors.
     @Test("the design's tech-up vectors", arguments: [
-        (1000, 5, [700, 720, 740, 760, 780], true),
-        (1000, 5, [700, 720, 760, 780, 800], false),
-        (1000, 4, [100, 100, 100, 100, 100], false),
-        (1000, 5, [100, 100, 100, 100], false),
-        (317, 5, [200, 210, 230, 240, 250], true),
-        (238, 5, [100, 100, 100, 100, 100], false),
+        (2500, 5, [1700, 1750, 1800, 1850, 1900], true),
+        (2500, 5, [1700, 1750, 1900, 1950, 2000], false),
+        (2500, 4, [100, 100, 100, 100, 100], false),
+        (2500, 5, [100, 100, 100, 100], false),
+        (334, 5, [200, 210, 240, 245, 250], true),
+        (251, 5, [100, 100, 100, 100, 100], false),
     ])
     func techUpVectors(window: Int, counter: Int, wins: [Int], offered: Bool) {
         let p = Progress(counter: counter, windowMs: window, recentWins: wins)
@@ -201,18 +201,18 @@ struct ProgressTests {
 
     @Test("taking a tech up shrinks the window, clears the counter and the wins, keeps the best")
     func techUp() {
-        let p = Progress(counter: 5, windowMs: 1000, prestige: 0, recentWins: [700, 720, 740, 760, 780], best: 300)
+        let p = Progress(counter: 5, windowMs: 2500, prestige: 0, recentWins: [1700, 1750, 1800, 1850, 1900], best: 300)
         let next = p.techUp()
-        #expect(next == Progress(counter: 0, windowMs: 750, prestige: 1, recentWins: [], best: 300))
-        let notOffered = Progress(counter: 4, windowMs: 1000, recentWins: [1, 1, 1, 1, 1])
+        #expect(next == Progress(counter: 0, windowMs: 1875, prestige: 1, recentWins: [], best: 300))
+        let notOffered = Progress(counter: 4, windowMs: 2500, recentWins: [1, 1, 1, 1, 1])
         #expect(notOffered.techUp() == notOffered)
     }
 
     @Test("reset is a fresh game, the best included")
     func reset() {
-        let p = Progress(counter: -3, windowMs: 317, prestige: 4, recentWins: [1, 2, 3], best: 90)
+        let p = Progress(counter: -3, windowMs: 791, prestige: 4, recentWins: [1, 2, 3], best: 90)
         #expect(p.reset() == .fresh)
-        #expect(Progress.fresh == Progress(counter: 0, windowMs: 1000, prestige: 0, recentWins: [], best: nil))
+        #expect(Progress.fresh == Progress(counter: 0, windowMs: 2500, prestige: 0, recentWins: [], best: nil))
     }
 
     @Test("the moods by counter follow the bands")
@@ -226,8 +226,8 @@ struct ProgressTests {
     func codable() throws {
         for p in [
             Progress.fresh,
-            Progress(counter: 5, windowMs: 563, prestige: 2, recentWins: [300, 310, 320, 330, 340], best: 210),
-            Progress(counter: -5, windowMs: 1000, prestige: 0, recentWins: [], best: nil),
+            Progress(counter: 5, windowMs: 1406, prestige: 2, recentWins: [300, 310, 320, 330, 340], best: 210),
+            Progress(counter: -5, windowMs: 2500, prestige: 0, recentWins: [], best: nil),
         ] {
             let data = try JSONEncoder().encode(p)
             #expect(try JSONDecoder().decode(Progress.self, from: data) == p)

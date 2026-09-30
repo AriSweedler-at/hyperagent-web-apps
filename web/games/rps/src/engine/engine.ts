@@ -3,9 +3,10 @@
 // between rounds (the counter, the window, the prestige, the last five winning reactions, the
 // best). Pure and DOM-free: the page's reducer (../ui/state.ts) calls these with the times the edge
 // read off `performance.now()`, and the Swift model (`DiceModel/RPS/`) implements the same table,
-// proved against the same vectors, so the island and the page agree. Every number the owner did not
-// say (the base window, the 10% and 25% steps, the 200 ms floor, five wins, the median) is the
-// design's assumption (§2), spelled once here.
+// proved against the same vectors, so the island and the page agree. The base window is the owner's
+// (2026-09-30: "make the first 'level' of rps be 2.5 seconds"); every number he did not say (the 10%
+// and 25% steps, the 200 ms floor, five wins, the median) is the design's assumption (§2), spelled
+// once here.
 
 /** The three hands, in the order the computer's scroll cycles them (§3 step 2). */
 export type Hand = 'rock' | 'paper' | 'scissors';
@@ -26,8 +27,8 @@ export type Mood = 'verySad' | 'sad' | 'neutral' | 'happy' | 'veryHappy';
 
 export const COUNTER_MIN = -5;
 export const COUNTER_MAX = 5;
-/** The window the game starts at, and never exceeds. */
-export const BASE_WINDOW_MS = 1000;
+/** The window the game starts at, and never exceeds: the owner's first level, 2.5 seconds. */
+export const BASE_WINDOW_MS = 2500;
 /** Under this the next Tech up is never offered: "eventually it will become too fast". */
 export const MIN_WINDOW_MS = 200;
 /** A loss slows the game by this factor, a Tech up speeds it by that one (the owner's 10% and 25%). */

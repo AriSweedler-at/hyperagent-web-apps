@@ -12,7 +12,9 @@ for neutral, bright yellow for happy)". And on 2026-09-29: "the game can run in 
 the island scoreboard can lag. That's fine. [...] you will need to animate the face moving around
 in different levels of emotion (bouncing, walking, sulking) and animate the transitions between.
 Use pixel art [...] This game should be playable from an android phone, they just wont see the
-buddy in the bar." The code's comments cite this document by section (`design §8`). Everything in
+buddy in the bar." And on 2026-09-30: "make the first 'level' of rps be 2.5 seconds. Slightly
+reduce the rolling time on the computer's attack. You lose 1 point for a loss or for not tapping. A
+tie remains a tie." The code's comments cite this document by section (`design §8`). Everything in
 §2 the owner did not say is an assumption chosen so the two halves agree; the PR lists them for
 him to confirm.
 
@@ -35,31 +37,31 @@ him to confirm.
 | Counter | −5 … +5, starts at 0 | Clamped: a win at +5 stays +5, a loss at −5 stays −5. |
 | Hands | ✊ rock, ✋ paper, ✌️ scissors | Rock beats scissors, scissors beats paper, paper beats rock. |
 | Win | +1 | The player's hand beats the computer's, tapped within the window. |
-| Tie | 0 | Same hand, tapped within the window. |
-| Loss | −1 | The computer's hand beats the player's, tapped within the window. |
-| Timeout | −1, a loss | No tap by the end of the window, or a tap later than the window (`reactionMs > windowMs`). A tap at exactly the window counts. |
-| Window | starts at 1000 ms (the base) | The time allowed between the resolve and the tap. |
-| A loss slows the game | `window = min(1000, round(window × 1.10))` | Timeouts count. Ties and wins leave the window alone. Never above the base. |
+| A loss or no tap | −1 | The owner (2026-09-30): "You lose 1 point for a loss or for not tapping." A loss: the computer's hand beats the player's, tapped within the window. No tap (the engine's `timeout`): none by the end of the window, or one later than the window (`reactionMs > windowMs`); a tap at exactly the window counts. Both slow the window alike. |
+| A tie | nothing | "A tie remains a tie": same hand, tapped within the window; the counter, the window and the recent wins stay. |
+| Window | starts at 2500 ms (the base) | The time allowed between the resolve and the tap: the owner's first level, 2.5 seconds (2026-09-30; it was 1000 ms). |
+| A loss slows the game | `window = min(2500, round(window × 1.10))` | Timeouts count. Ties and wins leave the window alone. Never above the base. |
 | Recent wins | the reaction ms of the last five wins, oldest first | Ties, losses and timeouts record nothing. |
 | Fast enough | `median(recentWins) ≤ 0.75 × window` with five recorded | The median of five sorted values is the third. |
 | Tech up offered | counter = +5, fast enough, and `round(window × 0.75) ≥ 200` | All three at once. |
 | Tech up taken | `window = round(window × 0.75)`, counter 0, prestige +1, recent wins cleared | `best` is kept. |
-| The floor ("too fast") | the window never drops below 200 ms | From the base the windows run 1000 → 750 → 563 → 422 → 317 → 238; the next step (179) is under the floor, so at 238 ms Tech up is never offered and prestige tops out at 5. |
+| The floor ("too fast") | the window never drops below 200 ms | From the base the windows run 2500 → 1875 → 1406 → 1055 → 791 → 593 → 445 → 334 → 251; the next step (188) is under the floor, so at 251 ms Tech up is never offered and prestige tops out at 8. |
 | Best | the fastest winning reaction ever, in ms | Shown on the page; survives a tech up; cleared by Reset alone. |
-| Reset progress | counter 0, window 1000, prestige 0, recent wins [], best none | Behind a confirm. |
+| Reset progress | counter 0, window 2500, prestige 0, recent wins [], best none | Behind a confirm. |
 | Persists | the whole `Progress`: counter, windowMs, prestige, recentWins, best | Saved after every round, tech up and reset (D4). |
 
-Rounding is schoolbook (`Math.round`, `.rounded()`: halves away from zero): 750 × 1.10 = 825;
-825 × 1.10 = 907.5 → 908; 908 × 1.10 = 998.8 → 999; 999 × 1.10 → 1000 (the cap). 1000 × 0.75 = 750;
-750 × 0.75 = 562.5 → 563; 563 × 0.75 = 422.25 → 422; 422 × 0.75 = 316.5 → 317; 317 × 0.75 = 237.75 → 238;
-238 × 0.75 = 178.5 → 179 < 200.
+Rounding is schoolbook (`Math.round`, `.rounded()`: halves away from zero): 1875 × 1.10 = 2062.5 →
+2063; 2063 × 1.10 = 2269.3 → 2269; 2269 × 1.10 = 2495.9 → 2496; 2496 × 1.10 → 2500 (the cap).
+2500 × 0.75 = 1875; 1875 × 0.75 = 1406.25 → 1406; 1406 × 0.75 = 1054.5 → 1055; 1055 × 0.75 = 791.25
+→ 791; 791 × 0.75 = 593.25 → 593; 593 × 0.75 = 444.75 → 445; 445 × 0.75 = 333.75 → 334;
+334 × 0.75 = 250.5 → 251; 251 × 0.75 = 188.25 → 188 < 200.
 
 ## 3. A round (the web page)
 
 | Step | What happens |
 |---|---|
 | 1. Go | The player taps Go; after a verdict the next round starts by itself 1.4 s later unless the player stopped, or Tech up is on offer (then the game waits for Go or Tech up). |
-| 2. Scroll | A duration is drawn uniformly in 0.8 … 2.0 s. The shown hand cycles ✊ → ✋ → ✌️ every 80 ms. Taps do nothing. |
+| 2. Scroll | A duration is drawn uniformly in 0.65 … 1.6 s (the owner, 2026-09-30: "slightly reduce the rolling time on the computer's attack"; it was 0.8 … 2.0 s). The shown hand cycles ✊ → ✋ → ✌️ every 80 ms. Taps do nothing. |
 | 3. Resolve | The computer's hand is drawn uniformly at random (independent of where the scroll stopped). At once: a short beep (`AudioContext`), `navigator.vibrate(40)` where it exists (not iOS Safari), and `performance.now()` is taken. The three buttons arm. A window countdown bar shrinks. |
 | 4. Tap | The player taps ✊, ✋ or ✌️. Reaction = now − resolve instant, in whole ms. A `setTimeout` set to the window fires a timeout when no tap came. |
 | 5. Verdict | `verdict(player, computer, reactionMs, windowMs)` (§2), then `apply(progress, outcome, reactionMs)`. The page shows the verdict, the reaction in ms, the new counter and the static face above the computer's hand, Tech up when offered. `Progress` is saved. |
@@ -114,34 +116,34 @@ Verdicts and windows (`Outcome.verdict` then `Progress.apply` from the given win
 
 | Window | Player | Computer | Reaction ms | Outcome | Δ counter | Window after |
 |---|---|---|---|---|---|---|
-| 1000 | ✊ | ✌️ | 350 | win | +1 | 1000 |
-| 1000 | ✊ | ✋ | 350 | loss | −1 | 1000 (the cap) |
-| 1000 | ✋ | ✋ | 350 | tie | 0 | 1000 |
-| 1000 | ✊ | ✌️ | 1000 | win | +1 | 1000 (the boundary counts) |
-| 1000 | ✊ | ✌️ | 1001 | timeout | −1 | 1000 |
-| 750 | ✌️ | ✋ | 700 | win | +1 | 750 |
-| 750 | ✌️ | ✊ | 300 | loss | −1 | 825 |
-| 750 | none | ✊ | none | timeout | −1 | 825 |
-| 750 | ✋ | ✊ | 751 | timeout | −1 | 825 |
-| 825 | ✊ | ✋ | 10 | loss | −1 | 908 |
-| 908 | ✊ | ✋ | 10 | loss | −1 | 999 |
-| 999 | ✊ | ✋ | 100 | loss | −1 | 1000 |
-| 238 | ✊ | ✌️ | 238 | win | +1 | 238 |
-| 238 | ✊ | ✌️ | 239 | timeout | −1 | 262 |
+| 2500 | ✊ | ✌️ | 350 | win | +1 | 2500 |
+| 2500 | ✊ | ✋ | 350 | loss | −1 | 2500 (the cap) |
+| 2500 | ✋ | ✋ | 350 | tie | 0 | 2500 |
+| 2500 | ✊ | ✌️ | 2500 | win | +1 | 2500 (the boundary counts) |
+| 2500 | ✊ | ✌️ | 2501 | timeout | −1 | 2500 |
+| 1875 | ✌️ | ✋ | 1700 | win | +1 | 1875 |
+| 1875 | ✌️ | ✊ | 300 | loss | −1 | 2063 |
+| 1875 | none | ✊ | none | timeout | −1 | 2063 |
+| 1875 | ✋ | ✊ | 1876 | timeout | −1 | 2063 |
+| 2063 | ✊ | ✋ | 10 | loss | −1 | 2269 |
+| 2269 | ✊ | ✋ | 10 | loss | −1 | 2496 |
+| 2496 | ✊ | ✋ | 100 | loss | −1 | 2500 |
+| 251 | ✊ | ✌️ | 251 | win | +1 | 251 |
+| 251 | ✊ | ✌️ | 252 | timeout | −1 | 276 |
 
 Tech up eligibility (`canTechUp`):
 
 | Window | Counter | Recent wins | Offered | Why |
 |---|---|---|---|---|
-| 1000 | 5 | 700, 720, 740, 760, 780 | yes | median 740 ≤ 750; next 750 ≥ 200 |
-| 1000 | 5 | 700, 720, 760, 780, 800 | no | median 760 > 750 |
-| 1000 | 4 | 100, 100, 100, 100, 100 | no | counter under 5 |
-| 1000 | 5 | 100, 100, 100, 100 | no | fewer than five wins recorded |
-| 317 | 5 | 200, 210, 230, 240, 250 | yes | median 230 ≤ 237.75; next 238 ≥ 200 |
-| 238 | 5 | 100, 100, 100, 100, 100 | no | next 179 < 200: too fast |
+| 2500 | 5 | 1700, 1750, 1800, 1850, 1900 | yes | median 1800 ≤ 1875; next 1875 ≥ 200 |
+| 2500 | 5 | 1700, 1750, 1900, 1950, 2000 | no | median 1900 > 1875 |
+| 2500 | 4 | 100, 100, 100, 100, 100 | no | counter under 5 |
+| 2500 | 5 | 100, 100, 100, 100 | no | fewer than five wins recorded |
+| 334 | 5 | 200, 210, 240, 245, 250 | yes | median 240 ≤ 250.5; next 251 ≥ 200 |
+| 251 | 5 | 100, 100, 100, 100, 100 | no | next 188 < 200: too fast |
 
-Taking Tech up at window 1000, counter 5, prestige 0, best 300: window 750, counter 0, prestige 1,
-recent wins empty, best 300. Reset from any state: window 1000, counter 0, prestige 0, recent wins
+Taking Tech up at window 2500, counter 5, prestige 0, best 300: window 1875, counter 0, prestige 1,
+recent wins empty, best 300. Reset from any state: window 2500, counter 0, prestige 0, recent wins
 empty, best none.
 
 Moods by counter: −5 very sad; −4, −3, −2 sad; −1, 0, 1 neutral; 2, 3, 4 happy; 5 very happy.
@@ -244,7 +246,7 @@ reaction game has) and run by the same two CI matrix jobs as a game (`tools/ci/s
 | Piece | Where | What |
 |---|---|---|
 | Rules | `src/engine/engine.ts` | §2 as pure functions: `verdict`, `apply`, `applyRound`, `canTechUp`, `techUp`, `reset`, `moodOf`; `engine.test.ts` is §6 as table tests, so this and the Swift model are held to one table. |
-| Stored shape | `src/engine/codec.ts` | `{ v: 1, counter, windowMs, prestige, recentWins, best }` under localStorage `rps_progress` (D4). Every field is bounded by the rules (counter −5…5, window 200…1000, at most five wins); a refused or unreadable save reads as the start, never a state the engine could not reach. `v` is bumped with a migration when a field changes meaning. |
+| Stored shape | `src/engine/codec.ts` | `{ v: 1, counter, windowMs, prestige, recentWins, best }` under localStorage `rps_progress` (D4). Every field is bounded by the rules (counter −5…5, window 200…2500, at most five wins); a refused or unreadable save reads as the start, never a state the engine could not reach. A save from before the 2.5 s base (2026-09-30; window 1000 or under) is inside the bounds and plays on at its old window, every loss adding 10% back up to 2500. `v` is bumped with a migration when a field changes meaning. |
 | The round | `src/ui/state.ts` | The reducer of §3: `idle → scrolling → armed → verdict`, the intents (`go`, `scroll/tick`, `resolve`, `tap`, `timeout`, `stop`, `techUp`, `reset`) and the effects the edge runs (named timers, cues, the save). The draws (the scroll's length, the computer's hand) and the clock readings (`performance.now()` at the resolve and at the tap) arrive inside the intents, so a test scripts a round and the e2e rigs one. |
 | The paint | `src/ui/render.ts` | The counter (signed) and its static face (the first frame of the band's set, from the sheet at `background-position: 0 0`, 2×), the animated buddy (the band's loop at 3×; a hop once between neighbouring bands, in reverse on the way down, then the new loop; reduced motion swaps the loop at once), the computer's hand, the window bar, the verdict with the reaction, Tech up with its cost, Stop while a next round is pending, Reset behind a confirm, `#islandSlot` empty for the pairing row (§8). |
 | The buddy | `src/ui/buddy.ts` | The manifest's numbers (`web/public/games/rps/buddy/buddy.json`) spelled in the page, pinned to the file by `buddy.test.ts`; sheets are reached as `./buddy/<set>.png`, so both origins serve them. |

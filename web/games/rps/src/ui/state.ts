@@ -19,8 +19,8 @@ import type { Cue } from './sound.ts';
 /** The shown hand changes this often while the computer scrolls (§3 step 2). */
 export const SCROLL_TICK_MS = 80;
 /** The scroll's length is drawn uniformly in this range (§3 step 2). */
-export const SCROLL_MIN_MS = 800;
-export const SCROLL_MAX_MS = 2000;
+export const SCROLL_MIN_MS = 650;
+export const SCROLL_MAX_MS = 1600;
 /** After a verdict the next round starts by itself this much later (§3 step 1). */
 export const NEXT_ROUND_MS = 1400;
 
@@ -81,7 +81,7 @@ export const initialApp = (progress: Progress): App => ({
 const ALL_TIMERS: ReadonlyArray<TimerId> = ['scroll', 'resolve', 'window', 'next'];
 const cancelAll: ReadonlyArray<Effect> = ALL_TIMERS.map((id) => ({ kind: 'cancel', id }));
 
-/** A scroll length, uniform in 0.8 … 2.0 s (§3 step 2). */
+/** A scroll length, uniform in 0.65 … 1.6 s (§3 step 2). */
 export const drawScrollMs = (rng: Rng): number =>
   Math.round(SCROLL_MIN_MS + rng() * (SCROLL_MAX_MS - SCROLL_MIN_MS));
 
