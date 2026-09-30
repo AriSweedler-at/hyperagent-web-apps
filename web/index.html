@@ -9,48 +9,32 @@
 <style>
   :root{--bg:#0f1115;--fg:#e8e6e1;--muted:#9a9891;--card:#181b22;--line:#262a33;--accent:#e0b35a}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  main{max-width:720px;margin:0 auto;padding:64px 24px 96px}
-  h1{font-size:2rem;letter-spacing:-.02em;margin:0 0 .25em}
-  p.lede{color:var(--muted);margin:0 0 40px}
-  .grid{display:grid;gap:16px}
-  a.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;color:inherit;text-decoration:none;transition:border-color .15s,transform .15s}
+  body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  main{max-width:960px;margin:0 auto;padding:28px 16px 32px}
+  h1{font-size:1.5rem;letter-spacing:-.02em;margin:0 0 .15em}
+  p.lede{color:var(--muted);margin:0 0 20px;font-size:.95rem}
+  .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  a.card{display:flex;align-items:center;min-height:44px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;color:inherit;text-decoration:none;transition:border-color .15s,transform .15s}
   a.card:hover{border-color:var(--accent);transform:translateY(-1px)}
-  a.card h2{margin:0 0 6px;font-size:1.2rem}
-  a.card span{color:var(--muted);font-size:.95rem}
-  p.tools{margin:28px 0 0;color:var(--muted);font-size:.9rem}
+  a.card h2{margin:0;font-size:1rem;font-weight:600;line-height:1.3}
+  p.tools{margin:20px 0 0;color:var(--muted);font-size:.9rem}
   p.tools a{color:var(--fg)}
-  footer{margin-top:56px;color:var(--muted);font-size:.85rem}
+  footer{margin-top:24px;color:var(--muted);font-size:.8rem}
   footer a{color:var(--muted)}
 </style>
 </head>
 <body>
 <main>
   <h1>Ari's web apps</h1>
-  <p class="lede">Single-file browser games. Nothing to install — open one on your phone and play.</p>
+  <p class="lede">Single-file browser games. Nothing to install.</p>
   <div class="grid">
-    <a class="card" href="games/gin-rummy/">
-      <h2>🃏 Gin Rummy</h2>
-      <span>Two-player Gin Rummy. Play online with a 4-letter room code, pass-and-play on one phone, or just keep score for a game with real cards.</span>
-    </a>
-    <a class="card" href="games/fidice/">
-      <h2>🎲 Fidice</h2>
-      <span>One-cup liar's dice, Kezar Lake rules.</span>
-    </a>
-    <a class="card" href="games/backgammon/">
-      <h2>⚅⚄ Sheshbesh</h2>
-      <span>Backgammon, portes or Western rules, on one phone passed between two players.</span>
-    </a>
-    <a class="card" href="games/briscola/">
-      <h2>🃏 Briscola</h2>
-      <span>The Italian trick-taking game for two, three or four, with a running score and Italian card packs: online with a room code, or on one phone passed around the table.</span>
-    </a>
-    <a class="card" href="games/rps/">
-      <h2>✊✋✌️ Rock Paper Scissors</h2>
-      <span>Beat the clock: the computer's hand stops, you answer before the bar runs out. A pixel buddy keeps your score, from −5 to +5; tech up when you are fast enough.</span>
-    </a>
+    <a class="card" href="games/gin-rummy/"><h2>🃏 Gin Rummy</h2></a>
+    <a class="card" href="games/fidice/"><h2>🎲 Fidice</h2></a>
+    <a class="card" href="games/backgammon/"><h2>⚅⚄ Sheshbesh</h2></a>
+    <a class="card" href="games/briscola/"><h2>🃏 Briscola</h2></a>
+    <a class="card" href="games/rps/"><h2>✊✋✌️ Rock Paper Scissors</h2></a>
   </div>
-  <p class="tools">Tools: <a class="tool" href="games/ui-sandbox/">UI Sandbox</a> — what your phone tells a page about its screen, and how the shell's frame and safe-area map answer.</p>
+  <p class="tools">Tools: <a class="tool" href="games/ui-sandbox/">UI Sandbox</a></p>
   <footer>Source: <a href="https://github.com/AriSweedler-at/hyperagent-web-apps">github.com/AriSweedler-at/hyperagent-web-apps</a></footer>
 </main>
 </body>
