@@ -776,6 +776,7 @@ const CHANGES: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyAr
   ['a shared stylesheet', ['web/shared/styles/tokens.css'], EVERYTHING],
   ['a shared test alone', ['web/shared/edge/prefs.test.ts'], EVERYTHING],
   ['a harness tool', ['tools/serve-dist.ts'], EVERYTHING],
+  ['the space audit', ['tools/space-audit.ts', 'tools/space-audit/judge.test.ts'], ['harness']],
   ['the registry', ['tools/games.ts'], EVERYTHING],
   ['this table', ['tools/ci/suites.ts'], EVERYTHING],
   ['a shared e2e fixture', ['e2e/fixtures/two-players.ts'], EVERYTHING],
