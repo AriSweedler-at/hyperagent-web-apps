@@ -11,6 +11,7 @@
 import { textPref, type TextPref } from '../../../shared/edge/prefs.ts';
 import type { Store } from '../../../shared/edge/storage.ts';
 import type { ClipIds } from '../../../shared/lib/appClip.ts';
+import { BUCKETS, type Bucket } from '../../../shared/lib/layout.ts';
 import { integer, literal, refine, string, type Decoder } from '../../../shared/lib/json.ts';
 import { err, ok } from '../../../shared/lib/result.ts';
 
@@ -47,6 +48,9 @@ export const exampleIdOf = (raw: string): ExampleId | null => {
 };
 const ON_OFF = ['on', 'off'] as const;
 type OnOff = (typeof ON_OFF)[number];
+/** The preview's bucket switcher (docs/design/layout-buckets.md §4): the page's own bucket, or one forced. */
+export type LayoutChoice = 'auto' | Bucket;
+export const LAYOUT_CHOICES: ReadonlyArray<LayoutChoice> = ['auto', ...BUCKETS];
 
 export type Settings = Readonly<{
   mode: OrientationMode;
@@ -58,6 +62,8 @@ export type Settings = Readonly<{
   hairline: boolean;
   example: ExampleId;
   flip: boolean;
+  /** The layout bucket forced on the body and the stage (`auto`: the one the viewport earns). */
+  layout: LayoutChoice;
 }>;
 export type SettingKey = keyof Settings;
 export const SETTING_KEYS: ReadonlyArray<SettingKey> = [
@@ -68,6 +74,7 @@ export const SETTING_KEYS: ReadonlyArray<SettingKey> = [
   'hairline',
   'example',
   'flip',
+  'layout',
 ];
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -78,6 +85,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hairline: true,
   example: 'cover',
   flip: false,
+  layout: 'auto',
 };
 
 export const BAND_MAX = 12;
@@ -90,6 +98,7 @@ export const KEYS: Readonly<Record<SettingKey, string>> = {
   hairline: 'uiSandbox_hairline',
   example: 'uiSandbox_example',
   flip: 'uiSandbox_flip',
+  layout: 'uiSandbox_layout',
 };
 
 const decodeOnOff: Decoder<OnOff> = literal(...ON_OFF);
@@ -112,6 +121,7 @@ const color = textPref(KEYS.color, decodeColor);
 const hairline = textPref(KEYS.hairline, decodeOnOff);
 const example = textPref(KEYS.example, literal(...EXAMPLE_IDS));
 const flip = textPref(KEYS.flip, decodeOnOff);
+const layout = textPref(KEYS.layout, literal(...LAYOUT_CHOICES));
 
 const readOr = <T>(pref: TextPref<T>, store: Store, fallback: T): T => {
   const read = pref.read(store);
@@ -127,6 +137,7 @@ export const readSettings = (store: Store): Settings => ({
   hairline: bool(readOr(hairline, store, onOff(DEFAULT_SETTINGS.hairline))),
   example: readOr(example, store, DEFAULT_SETTINGS.example),
   flip: bool(readOr(flip, store, onOff(DEFAULT_SETTINGS.flip))),
+  layout: readOr(layout, store, DEFAULT_SETTINGS.layout),
 });
 
 /** One setting to the store, as its bare string. */
@@ -157,8 +168,8 @@ export const PRETEND_CLIP_IDS: ClipIds = { appStoreId: '1234567890', teamId: 'PR
 
 /**
  * The query's overrides: `?example=<id or letter a-j>`, `?frame=on|off`,
- * `?mode=auto|landscape|portrait`, `?flip=on|off`, `?band=<0-12>`; a value the decoder refuses is
- * ignored. Not stored.
+ * `?mode=auto|landscape|portrait`, `?flip=on|off`, `?band=<0-12>`, `?layout=auto|<bucket>` (the
+ * seven of web/shared/lib/layout.ts `BUCKETS`); a value the decoder refuses is ignored. Not stored.
  */
 export const overridesFrom = (search: string): Partial<Settings> => {
   const q = new URLSearchParams(search);
@@ -173,11 +184,13 @@ export const overridesFrom = (search: string): Partial<Settings> => {
   const mo = pick('mode', literal(...ORIENTATION_MODES));
   const fl = pick('flip', decodeOnOff);
   const ba = pick('band', decodeBand);
+  const la = pick('layout', literal(...LAYOUT_CHOICES));
   return {
     ...(ex === undefined ? {} : { example: ex }),
     ...(fr === undefined ? {} : { frame: bool(fr) }),
     ...(mo === undefined ? {} : { mode: mo }),
     ...(fl === undefined ? {} : { flip: bool(fl) }),
     ...(ba === undefined ? {} : { band: ba }),
+    ...(la === undefined ? {} : { layout: la }),
   };
 };

@@ -5,6 +5,7 @@
 // the boot gathers the numbers, this file spells them.
 import { LANDSCAPE_PHONE, PORTRAIT_PHONE } from '../../../shared/edge/media.ts';
 import type { FrameReading } from '../../../shared/edge/screen.ts';
+import { BUCKETS, BUCKET_MEDIA, type Bucket } from '../../../shared/lib/layout.ts';
 import {
   CORNER_KEYS,
   deviceOf,
@@ -19,10 +20,11 @@ import {
   type SafeAreaMap,
 } from '../../../shared/lib/safeArea.ts';
 
-/** The media queries the panel reports, the shell's two first. */
+/** The media queries the panel reports, the shell's two first, then the seven layout buckets' (web/shared/lib/layout.ts `BUCKET_MEDIA`). */
 export const MEDIA_QUERIES: ReadonlyArray<readonly [name: string, query: string]> = [
   ['LANDSCAPE_PHONE', LANDSCAPE_PHONE],
   ['PORTRAIT_PHONE', PORTRAIT_PHONE],
+  ...BUCKETS.map((b) => [`bucket ${b}`, BUCKET_MEDIA[b]] as const),
   ['any-pointer coarse', '(any-pointer: coarse)'],
   ['pointer coarse', '(pointer: coarse)'],
   ['hover none', '(hover: none)'],
@@ -69,6 +71,8 @@ export type Readout = Readonly<{
   map: SafeAreaMap;
   flipped: boolean;
   frameOn: boolean;
+  /** The body's `data-layout` (docs/design/layout-buckets.md), and whether the switcher or `?layout=` forced it. */
+  layout: Readonly<{ bucket: Bucket | null; forced: boolean }>;
 }>;
 
 const px = (n: number): string => String(Math.round(n * 100) / 100);
@@ -99,6 +103,7 @@ export const readoutLines = (r: Readout): ReadonlyArray<string> => {
     BAR_COPY[bar],
     `reaches ${CORNER_KEYS.map((k) => `${k} ${f.reach[k] ? px(f.corners[k]) : 'square'}`).join('  ')}`,
     `frame ${r.frameOn ? 'on' : 'off'}  flip ${r.flipped ? 'on' : 'off'}`,
+    `layout ${r.layout.bucket ?? 'unknown'}${r.layout.forced ? ' (forced by the switcher or ?layout=)' : ''}`,
     `cut side ${r.map.cutEdge}${r.map.cut === null ? (r.map.cutEdge === 'none' ? '' : ' (off the page)') : `  at ${segmentText(r.map.cut)}`}  ear ${px(r.map.ear)}`,
     ...EDGES.map(
       (edge) =>

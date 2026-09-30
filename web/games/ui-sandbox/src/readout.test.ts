@@ -6,7 +6,14 @@ import type { FrameReading } from '../../../shared/edge/screen.ts';
 import { safeAreaMap } from '../../../shared/lib/safeArea.ts';
 import { EXAMPLES, diceLine, exampleById, exampleReport } from './examples.ts';
 import { drawMap, mapRows } from './mapSvg.ts';
-import { BAR_COPY, barOf, matchedDevice, readoutLines, type Readout } from './readout.ts';
+import {
+  BAR_COPY,
+  MEDIA_QUERIES,
+  barOf,
+  matchedDevice,
+  readoutLines,
+  type Readout,
+} from './readout.ts';
 
 const reading: FrameReading = {
   inputs: { screen: { width: 393, height: 852 }, dpr: 3, notch: 59 },
@@ -40,6 +47,7 @@ const readout: Readout = {
   map,
   flipped: false,
   frameOn: true,
+  layout: { bucket: 'phone-sideways-short', forced: false },
 };
 
 describe('readout', () => {
@@ -90,6 +98,18 @@ describe('readout', () => {
       'type unavailable (forced by ?type=)',
     );
     expect(unknown.find((l) => l.startsWith('frame'))).toBe('frame off  flip on');
+    expect(lines.find((l) => l.startsWith('layout'))).toBe('layout phone-sideways-short');
+    expect(
+      readoutLines({ ...readout, layout: { bucket: 'desktop', forced: true } }).find((l) =>
+        l.startsWith('layout'),
+      ),
+    ).toBe('layout desktop (forced by the switcher or ?layout=)');
+    expect(
+      readoutLines({ ...readout, layout: { bucket: null, forced: false } }).find((l) =>
+        l.startsWith('layout'),
+      ),
+    ).toBe('layout unknown');
+    expect(MEDIA_QUERIES.filter(([n]) => n.startsWith('bucket '))).toHaveLength(7);
     expect(unknown.find((l) => l.startsWith('cut side'))).toBe('cut side none  ear 0');
   });
 

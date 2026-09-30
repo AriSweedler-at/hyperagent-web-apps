@@ -38,6 +38,7 @@ import {
   setChecked,
   setHidden,
   setHtml,
+  setStyle,
   setRootStyle,
   setText,
   setValue,
@@ -47,7 +48,13 @@ import {
 } from '../../shared/edge/dom.ts';
 import { LANDSCAPE_PHONE, PORTRAIT_PHONE, watchMedia } from '../../shared/edge/media.ts';
 import { createOrientationLock } from '../../shared/edge/orientation.ts';
-import { applyFrame, notchOf, watchFrame, type FrameReading } from '../../shared/edge/screen.ts';
+import {
+  applyFrame,
+  applyLayout,
+  notchOf,
+  watchFrame,
+  type FrameReading,
+} from '../../shared/edge/screen.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
 import {
   CLIP_IDS,
@@ -61,6 +68,7 @@ import {
   type ClipGate,
   type Roll,
 } from '../../shared/lib/appClip.ts';
+import { REPRESENTATIVE, bucketNamed } from '../../shared/lib/layout.ts';
 import {
   flipMap,
   isOrientationType,
@@ -85,6 +93,7 @@ import { GATE_COPY, paintGate } from '../../shared/ui/shellPaint.ts';
 import { drawMap, mapRows } from './src/mapSvg.ts';
 import { MEDIA_QUERIES, matchedDevice, readoutText, type Readout } from './src/readout.ts';
 import {
+  LAYOUT_CHOICES,
   BAND_MAX,
   PRETEND_CLIP_IDS,
   clipPretendedFrom,
@@ -161,6 +170,26 @@ const typeForMap = (): OrientationType =>
 
 // ---- the frame's tokens and the map ------------------------------------------------------------
 
+/**
+ * The layout bucket (docs/design/layout-buckets.md §4): the viewport's own on the body as the boot
+ * writes it for a game (screen.ts `applyLayout`), or the switcher's forced one, with the stage
+ * sized to that bucket's representative viewport (as far as the screen allows) so the examples
+ * lay out for it.
+ */
+const paintLayout = (): void => {
+  const stage = requireId(doc, 'stage');
+  if (settings.layout === 'auto') {
+    applyLayout(doc, win);
+    setAttr(stage, 'data-forced', null);
+    return;
+  }
+  setAttr(doc.body, 'data-layout', settings.layout);
+  const rep = REPRESENTATIVE[settings.layout];
+  setAttr(stage, 'data-forced', settings.layout);
+  setStyle(stage, '--stage-w', `${String(rep.width)}px`);
+  setStyle(stage, '--stage-h', `${String(rep.height)}px`);
+};
+
 const paintFrame = (): void => {
   setAttr(doc.body, 'data-frame', settings.frame ? '' : null);
   setRootStyle(doc, '--frame-band', `${String(settings.band)}px`);
@@ -231,6 +260,7 @@ const readout = (): Readout => ({
   map,
   flipped: hasAttr(doc.body, 'data-flip'),
   frameOn: hasAttr(doc.body, 'data-frame'),
+  layout: { bucket: bucketNamed(dataOf(doc.body, 'layout')), forced: settings.layout !== 'auto' },
 });
 
 const paintInfo = (): void => {
@@ -407,11 +437,13 @@ const paintSettings = (): void => {
   setValue(requireId(doc, 'exampleSel'), settings.example);
   setValue(requireId(doc, 'previewExampleSel'), settings.example);
   setChecked(requireId(doc, 'flipChk'), settings.flip);
+  setValue(requireId(doc, 'previewLayoutSel'), settings.layout);
 };
 
 const repaint = (): void => {
   reading = applyFrame(doc, win);
   paintFrame();
+  paintLayout();
   map = computeMap();
   writeMap();
   paintScreen();
@@ -471,6 +503,19 @@ const pickExample = (e: Readonly<Event>): void => {
 };
 listen(requireId(doc, 'exampleSel'), 'change', pickExample);
 listen(requireId(doc, 'previewExampleSel'), 'change', pickExample);
+// The bucket switcher: `auto`, or one of the seven forced on the body and the stage.
+appendHtml(
+  requireId(doc, 'previewLayoutSel'),
+  trustedHtml(
+    LAYOUT_CHOICES.map(
+      (c) => `<option value="${c}">${c === 'auto' ? 'layout: auto' : c}</option>`,
+    ).join(''),
+  ),
+);
+listen(requireId(doc, 'previewLayoutSel'), 'change', (e) => {
+  const choice = LAYOUT_CHOICES.find((c) => c === targetValueOf(e));
+  if (choice !== undefined) update('layout', choice);
+});
 // Next: the example after this one, the first after the last, into both dropdowns and the store.
 listen(requireId(doc, 'previewNextBtn'), 'click', () => {
   update('example', nextExampleId(settings.example));
