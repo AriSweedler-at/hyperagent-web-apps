@@ -3,7 +3,18 @@
 import { describe, expect, test } from 'vitest';
 
 import { createStore, type StorageLike } from '../../../shared/edge/storage.ts';
-import { DEFAULT_SETTINGS, KEYS, overridesFrom, readSettings, writeSetting } from './settings.ts';
+import {
+  DEFAULT_SETTINGS,
+  EXAMPLE_IDS,
+  EXAMPLE_LETTERS,
+  KEYS,
+  exampleIdOf,
+  letterOf,
+  nextExampleId,
+  overridesFrom,
+  readSettings,
+  writeSetting,
+} from './settings.ts';
 
 const memory = (): StorageLike => {
   const m = new Map<string, string>();
@@ -57,5 +68,20 @@ describe('settings', () => {
     });
     expect(overridesFrom('?example=nope&band=40&mode=x')).toEqual({});
     expect(overridesFrom('')).toEqual({});
+    // The letters: `(a)` to `(i)` in the dropdown's order, either case.
+    expect(overridesFrom('?example=b')).toEqual({ example: 'side' });
+    expect(overridesFrom('?example=I')).toEqual({ example: 'gutters' });
+    expect(overridesFrom('?example=j')).toEqual({});
+  });
+
+  test('the letters a-i name the nine in order; Next wraps from the last to the first', () => {
+    expect(EXAMPLE_LETTERS).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']);
+    expect(EXAMPLE_IDS.map(letterOf)).toEqual(EXAMPLE_LETTERS);
+    expect(EXAMPLE_LETTERS.map(exampleIdOf)).toEqual(EXAMPLE_IDS);
+    expect(exampleIdOf('rail')).toBe('rail');
+    expect(exampleIdOf('G')).toBe('rail');
+    expect(exampleIdOf('')).toBeNull();
+    expect(exampleIdOf('z')).toBeNull();
+    expect(EXAMPLE_IDS.map(nextExampleId)).toEqual([...EXAMPLE_IDS.slice(1), EXAMPLE_IDS[0]]);
   });
 });

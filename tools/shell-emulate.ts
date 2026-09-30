@@ -84,19 +84,23 @@ import {
   emulationFor,
   emulationName,
   emulationsOf,
+  cornerRadius,
   cornersOf,
+  reachOf,
   screenFor,
   type Bar,
   type Corners,
   type Device,
   type DisplayMode,
   type Emulation,
+  type Insets,
   type Orientation,
 } from '../web/shared/lib/devices.ts';
 import {
   EDGES,
   lengthOf,
   safeAreaMap,
+  type Edge,
   type OrientationType,
   type SafeAreaMap,
   type Segment,
@@ -211,8 +215,41 @@ export const gamesFor = (args: EmulateArgs): ReadonlyArray<GameName> =>
 
 // ---- UI Sandbox's cases ----------------------------------------------------------------------------
 
-/** One sandbox case: the emulation and the `screen.orientation.type` the page is told (`?type=`), which puts the cut on the left or the right sideways. */
-export type SandboxCase = Readonly<{ e: Emulation; type: OrientationType }>;
+/** A sandbox-only variant of a catalogue case: Safari's tab upright with the address bar at the bottom. */
+export type SandboxVariant = 'bar-bottom';
+/** One sandbox case: the emulation and the `screen.orientation.type` the page is told (`?type=`), which puts the cut on the left or the right sideways; `variant` names a Safari case the catalogue's emulations do not spell. */
+export type SandboxCase = Readonly<{
+  e: Emulation;
+  type: OrientationType;
+  variant?: SandboxVariant;
+}>;
+
+/**
+ * Safari upright with the address bar at the bottom (iOS 15+'s default, UNVERIFIED for the insets
+ * on a phone; the owner's first look, 2026-09-29): the page reaches the top under the status bar,
+ * so the top inset is the notch's, and the bar owns the bottom, so that inset is 0. The reach rule
+ * then squares every corner (no side inset proves an edge). The catalogue's tab case upright has
+ * the top at 0 (`insetsFor`), the bar at the top.
+ */
+export const bottomBarOf = (e: Emulation): Emulation => {
+  const insets: Insets = { top: e.device.insets.portrait.top, right: 0, bottom: 0, left: 0 };
+  const notch = insets.top;
+  const corner = cornerRadius({ screen: e.device.screen, dpr: e.device.dpr, notch }) ?? 0;
+  const reach = reachOf({
+    mode: e.mode,
+    insets,
+    viewport: e.viewport,
+    full: screenFor(e.device, e.orientation),
+  });
+  return { ...e, insets, notch, corner, reach, corners: cornersOf(corner, reach) };
+};
+/** The variant applies to an iPhone with a notch, upright in a tab with the bar shown. */
+const bottomBarApplies = (e: Emulation): boolean =>
+  e.orientation === 'portrait' &&
+  e.mode === 'browser' &&
+  e.bar === 'shown' &&
+  e.device.kind === 'iphone' &&
+  e.device.insets.portrait.top > 0;
 
 /** The orientation types a case is rendered under: both landscapes (the cut on the left, then on the right), the one portrait. */
 export const typesOf = (o: Orientation): ReadonlyArray<OrientationType> =>
@@ -223,10 +260,17 @@ export const SANDBOX_PHONES: ReadonlyArray<Device> = DEVICES.filter(
   (d) => d.kind !== 'ipad' && d.supported,
 );
 
-/** The sandbox's cases for an invocation: `casesFor`'s emulations over the phones, each under its orientation types; e2e/ui-sandbox.spec.ts's 56 (sideways bar-up twice, sideways fullscreen, upright bar-up) are among `--all`'s. */
+/** The sandbox's cases for an invocation: `casesFor`'s emulations over the phones, each under its orientation types, plus Safari's bottom-bar variant of every notched iPhone's upright tab; e2e/ui-sandbox.spec.ts's 56 (sideways bar-up twice, sideways fullscreen, upright bar-up) are among `--all`'s. */
 export const sandboxCasesFor = (args: EmulateArgs): ReadonlyArray<SandboxCase> => {
   const withTypes = (es: ReadonlyArray<Emulation>): ReadonlyArray<SandboxCase> =>
-    es.flatMap((e) => typesOf(e.orientation).map((type) => ({ e, type })));
+    es.flatMap((e) =>
+      typesOf(e.orientation).flatMap((type): ReadonlyArray<SandboxCase> => [
+        { e, type },
+        ...(bottomBarApplies(e)
+          ? [{ e: bottomBarOf(e), type, variant: 'bar-bottom' as const }]
+          : []),
+      ]),
+    );
   if (args.all)
     return withTypes(
       SANDBOX_PHONES.flatMap((d) => emulationsOf(d).filter((e) => narrowed(args, e))),
@@ -234,8 +278,9 @@ export const sandboxCasesFor = (args: EmulateArgs): ReadonlyArray<SandboxCase> =
   return withTypes(casesFor(args));
 };
 
-/** A sandbox case's name: the emulation's, then the type. */
-export const sandboxName = (c: SandboxCase): string => `${emulationName(c.e)} ${c.type}`;
+/** A sandbox case's name: the emulation's, the variant where there is one, then the type. */
+export const sandboxName = (c: SandboxCase): string =>
+  `${emulationName(c.e)}${c.variant === undefined ? '' : ` ${c.variant}`} ${c.type}`;
 
 /** The row the page can tell for a case: upright in a tab the notch reads 0, so two classes on one screen part by their pixel ratio alone. */
 export const sandboxMatch = (e: Emulation): Device | null =>
@@ -523,6 +568,8 @@ export type Verdict = Readonly<{ pass: boolean; checks: ReadonlyArray<Check> }>;
 export const TOL = 0.5;
 /** The trim's 6px band, its 1px hairline and the 4px of air the content keeps off it. */
 export const CLEARANCE = 11;
+/** One pixel: what a sandbox box's edge may leave beyond the room's (web/games/ui-sandbox/src/examples.ts FILL_SLACK). */
+export const FILL_SLACK = 1;
 
 /**
  * The invariants over a measurement (pure): the frame's four corners are the catalogue's radius
@@ -619,6 +666,8 @@ export const EXAMPLE_LABELS: Readonly<Record<SandboxExample, string>> = {
 /** One example as the page reports it (`__uiSandbox.report()`), plus what is visible and the document's height. */
 export type ExampleMeasure = Readonly<{
   fits: boolean;
+  /** The page's own fill verdict (`exampleReport.fills`): every flowing edge at the room's. */
+  fills: boolean;
   gaps: Readonly<Record<string, number>>;
   placements: ReadonlyArray<string>;
   /** Visible `.edge-rail .sq-btn` (example (g)). */
@@ -658,6 +707,7 @@ const SANDBOX_EXAMPLE = `(() => {
   const count = (sel) => Array.from(document.querySelectorAll(sel)).filter(shown).length;
   return {
     fits: rep !== null && rep.fits,
+    fills: rep !== null && rep.fills,
     gaps: rep === null ? {} : rep.gaps,
     placements: rep === null ? [] : rep.placements,
     railButtons: count('.edge-rail .sq-btn'),
@@ -671,9 +721,11 @@ const SANDBOX_EXAMPLE = `(() => {
  * the CLI and the spec agree case for case: the frame's four corners are the catalogue's radius
  * where the reach rule says the corner is the screen's and 0 elsewhere; the page matched the
  * emulated row; the map the page wrote equals the module's; example (a) fits without scroll and
- * keeps 11px inside every edge; (g)'s three buttons sit in the free side's first segment (or the
- * rail is hidden where the map names none); (h) shows exactly the map's ears, none over an arc or
- * the cut; no example scrolls the document.
+ * keeps 11px inside every edge; every example fills the room the frame leaves (each flowing edge
+ * within a pixel of the clearance or that side's inset, whichever is more, as shell.css pads
+ * `#app`; the page's own `fills` agrees); (g)'s three buttons sit in the free side's first segment
+ * (or the rail is hidden where the map names none); (h) shows exactly the map's ears, none over an
+ * arc or the cut; no example scrolls the document.
  */
 export const judgeSandbox = (c: SandboxCase, m: SandboxMeasured): Verdict => {
   const e = c.e;
@@ -707,6 +759,22 @@ export const judgeSandbox = (c: SandboxCase, m: SandboxMeasured): Verdict => {
     name: 'fits',
     pass: cover.fits && tight.length === 0,
     detail: `(a) ${cover.fits ? 'fits' : 'DOES NOT FIT'}; gaps ${gaps.map(([k, g]) => `${k} ${px(g)}`).join(' ')}`,
+  });
+  const room = EDGES.map((edge) => [edge, Math.max(CLEARANCE, e.insets[edge])] as const);
+  const gapOf = (x: SandboxExample, edge: Edge): number => m.examples[x].gaps[edge] ?? Infinity;
+  const short = SANDBOX_EXAMPLES.flatMap((x) =>
+    room
+      .filter(([edge, want]) => !(Math.abs(gapOf(x, edge) - want) <= FILL_SLACK))
+      .map(([edge, want]) => `${x} ${edge} ${px(gapOf(x, edge))} (room ${px(want)})`),
+  );
+  const disagree = SANDBOX_EXAMPLES.filter((x) => !m.examples[x].fills);
+  checks.push({
+    name: 'fills',
+    pass: short.length === 0 && disagree.length === 0,
+    detail:
+      short.length === 0 && disagree.length === 0
+        ? `every example at the room's edge: ${room.map(([k, w]) => `${k} ${px(w)}`).join(' ')}`
+        : [...short, ...disagree.map((x) => `${x}: the page says it does not fill`)].join('; '),
   });
   const free = freeSideOf(expected);
   const freeSegment = free !== null && expected.edges[free].length > 0;
@@ -1125,6 +1193,7 @@ const check = async (browser: Browser, site: string, args: EmulateArgs): Promise
       case: r.name,
       emulation: r.c.e,
       type: r.c.type,
+      variant: r.c.variant ?? null,
       map: sandboxMap(r.c),
       measured: r.measured,
       verdict: r.verdict,

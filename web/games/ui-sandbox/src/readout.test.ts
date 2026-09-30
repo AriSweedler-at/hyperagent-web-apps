@@ -121,6 +121,54 @@ describe('readout', () => {
     expect(r.gaps).toEqual({ top: 11, left: 70, right: 82, bottom: 32 });
     expect(r.placements).toEqual(['rail: right segment 1', 'ear1: left segment 1']);
     expect(r.lines[0]).toBe('fits without scroll');
+    // No room given: the boxes should reach the viewport's edge, and these do not.
+    expect(r.fills).toBe(false);
+    expect(r.room).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+    expect(r.lines[2]).toBe(
+      'SHORT OF THE FRAME: top 11px (room 0)  right 82px (room 0)  bottom 32px (room 0)  left 70px (room 0)',
+    );
+    // The room sideways on an island phone: 11px of frame, the side insets 59 and the home indicator 21.
+    const room = { clearance: 11, insets: { top: 0, right: 59, bottom: 21, left: 59 } };
+    const full = exampleReport(
+      [
+        {
+          name: 'content',
+          rect: { left: 59, top: 11, width: 852 - 118, height: 343 - 32 },
+          fixed: false,
+        },
+      ],
+      viewport,
+      map,
+      false,
+      room,
+    );
+    expect(full.fills).toBe(true);
+    expect(full.room).toEqual({ top: 11, right: 59, bottom: 21, left: 59 });
+    expect(full.lines[2]).toBe('fills the room the frame leaves');
+    expect(full.lines[3]).toBe(
+      'right held off by the 59px inset (the notch, the status bar or the home indicator), not the frame',
+    );
+    expect(full.lines[4]).toContain('bottom held off by the 21px inset');
+    expect(full.lines[5]).toContain('left held off by the 59px inset');
+    // A pixel of slack passes; two do not; a box past the room (into the inset) fails too.
+    const shifted = (dx: number, dw: number): boolean =>
+      exampleReport(
+        [
+          {
+            name: 'content',
+            rect: { left: 59 + dx, top: 11, width: 852 - 118 + dw, height: 343 - 32 },
+            fixed: false,
+          },
+        ],
+        viewport,
+        map,
+        false,
+        room,
+      ).fills;
+    expect(shifted(1, -1)).toBe(true);
+    expect(shifted(2, -2)).toBe(false);
+    expect(shifted(-3, 3)).toBe(false);
+    expect(shifted(0, 40)).toBe(false);
     const bad = exampleReport(
       [
         { name: 'x', rect: { left: -2, top: 0, width: 10, height: 10 }, fixed: false },
