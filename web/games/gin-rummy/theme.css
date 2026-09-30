@@ -58,6 +58,14 @@
   label { letter-spacing: 0.5px; }
   .room-code { letter-spacing: 0.35em; font-weight: 800; padding-left: 0.35em; }
   .empty-note { font-size: 0.85rem; padding: 8px 0; }
+  /* The fourth card, #homeRecent (page.ts `homeExtra`; docs/design/space-audit.md §5 "Closed by
+     gin-home-column-bottom"): the recent games in the card's own frame, so the shared slot's rule
+     (shell.css .recent-games) loses its divider; the fresh player's three lines read muted under
+     the card's label, their numbers in the accent, the button to the rules the shell's 44px. */
+  .home-recent { margin-top: 0; border-top: none; padding-top: 0; }
+  .how-it-goes { margin: 8px 0 12px; padding-left: 1.3em; color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
+  .how-it-goes li { margin: 3px 0; }
+  .how-it-goes li::marker { color: var(--accent); font-weight: 700; }
 
   /* ---------- table ---------- */
   /* While at the table the page never scrolls (shell.css's `body.fixed-screen` rule): the card sizes

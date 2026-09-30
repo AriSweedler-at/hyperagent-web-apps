@@ -3,7 +3,8 @@
 // the victor. p1 on the device should be considered the user, so those games get shown as
 // victories or losses"): `#recentGames`, the slot every shell page carries under `#historyList`
 // (web/shared/markup/shell/sheets.html; HISTORY_IDS.recent), painted from the shell state's
-// `recentGames` (web/shared/ui/shell.ts, read at `home/init`, the game that just ended put first)
+// `recentGames` (web/shared/ui/shell.ts, read at `home/init`, the game that just ended put first;
+// `paintRecentGamesInto` paints the same lines into a slot of a game's own, gin's home card)
 // as one line per game, newest first: the local date and time, the two names, the game's own
 // score and W, L or D from the user's seat. Keyed through the keyed slot on the list's length and
 // newest clock, so the sheet's other repaints leave it alone; nothing for an empty list (the slot
@@ -46,13 +47,20 @@ export const recentGamesHtml = (games: ReadonlyArray<RecentGame>): SafeHtml =>
     : safeHtml`<h3 class="recent-games-title">${RECENT_GAMES_TITLE}</h3><ol class="recent-games-list">${games.map(recentGameHtml)}</ol>`;
 
 /**
- * Paint `#recentGames` from the list through the keyed slot (keyed.ts): rebuilt only when a game
- * was added (or the list read anew at `home/init`), so the sheet's other repaints leave it be.
+ * Paint the slot `id` from the list through the keyed slot (keyed.ts): rebuilt only when a game
+ * was added (or the list read anew at `home/init`), so the page's other repaints leave it be. The
+ * slot is the history sheet's `#recentGames` (`paintRecentGames`) or a game's own: gin's home card
+ * `#homeRecentList` (web/games/gin-rummy/src/ui/home.ts `paintHomeRecent`, the newest five).
  */
+export const paintRecentGamesInto = (
+  doc: DocumentLike,
+  id: string,
+  games: ReadonlyArray<RecentGame>,
+): void => {
+  ensureKeyed(requireId(doc, id), recentGamesKey(games), () => recentGamesHtml(games).markup);
+};
+
+/** `#recentGames`, the history sheet's slot under its list, painted from the whole list. */
 export const paintRecentGames = (doc: DocumentLike, games: ReadonlyArray<RecentGame>): void => {
-  ensureKeyed(
-    requireId(doc, HISTORY_IDS.recent),
-    recentGamesKey(games),
-    () => recentGamesHtml(games).markup,
-  );
+  paintRecentGamesInto(doc, HISTORY_IDS.recent, games);
 };

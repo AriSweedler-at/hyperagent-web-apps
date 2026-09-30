@@ -3,9 +3,12 @@
 import { describe, expect, test } from 'vitest';
 
 import { fakeTarget } from '../../../../shared/edge/page.fake.ts';
+import type { RecentGame } from '../../../../shared/lib/recentGames.ts';
+import { recentGamesHtml } from '../../../../shared/ui/recentGames.ts';
 import { mulberry32 } from '../../../../shared/lib/rng.ts';
 import { createGame } from '../engine/index.ts';
 import {
+  HOME_RECENT_MAX,
   bindHome,
   blocksCodeInput,
   fillNameInputs,
@@ -183,6 +186,44 @@ describe('paintHome', () => {
     });
     expect(html).toContain('<option value="random">');
     expect(html.match(/<option /g)).toHaveLength(PRESETS.length + 1);
+  });
+});
+
+describe('the fourth card (page.ts homeExtra)', () => {
+  const AT = 1_700_000_000_000;
+  /** `n` finished games, newest first, as the shell state holds them. */
+  const games = (n: number): ReadonlyArray<RecentGame> =>
+    Array.from({ length: n }, (_, i) => ({
+      at: AT - i * 60_000,
+      mode: 'local',
+      players: ['Ann', 'Bob'],
+      score: `${String(100 + i)}–7`,
+      winner: 0,
+      outcome: 'win',
+    }));
+
+  test('paintHome: How it goes while the device remembers no game; the newest five listed through the keyed slot once it does', () => {
+    const p = page();
+    paintHome(p.doc, initialApp);
+    expect(p.get('homeRecentList').attr('data-key')).toBe('-');
+    expect(p.get('homeRecentList').text()).toBe('');
+    expect(p.get('homeHowTo').hasClass('hidden')).toBe(false);
+    const six = games(6);
+    paintHome(p.doc, { ...initialApp, shell: { ...initialApp.shell, recentGames: six } });
+    expect(p.get('homeRecentList').attr('data-key')).toBe(`5:${String(AT)}`);
+    expect(p.get('homeRecentList').text()).toBe(recentGamesHtml(six.slice(0, 5)).markup);
+    expect(p.get('homeHowTo').hasClass('hidden')).toBe(true);
+    expect(HOME_RECENT_MAX).toBe(5);
+  });
+
+  test('bindHome: Read the rules opens the Rules tab through the tab intent', () => {
+    const p = page();
+    const intents: Intent[] = [];
+    bindHome(p.doc, (i) => {
+      intents.push(i);
+    });
+    p.get('homeRulesBtn').fire('click');
+    expect(intents).toEqual([{ type: 'tab/set', tab: 'rules' }]);
   });
 });
 

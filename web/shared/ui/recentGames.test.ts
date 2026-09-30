@@ -13,6 +13,7 @@ import {
   RECENT_GAMES_TITLE,
   formatWhen,
   paintRecentGames,
+  paintRecentGamesInto,
   recentGameHtml,
   recentGamesHtml,
   recentGamesKey,
@@ -99,6 +100,17 @@ describe('paintRecentGames', () => {
     expect(slot.text()).toBe(recentGamesHtml([loss, win]).markup);
     paintRecentGames(page.doc, []);
     expect(slot.attr('data-key')).toBe('-');
+    expect(slot.text()).toBe('');
+  });
+
+  test('paintRecentGamesInto paints any slot by id, the history slot untouched', () => {
+    const slot = fakeEl(HISTORY_IDS.recent, { classes: ['recent-games'] });
+    const own = fakeEl('homeRecentList', { classes: ['recent-games'] });
+    const page = fakePage([slot, own]);
+    paintRecentGamesInto(page.doc, 'homeRecentList', [loss, win]);
+    expect(own.attr('data-key')).toBe(`2:${String(AT + 60_000)}`);
+    expect(own.text()).toBe(recentGamesHtml([loss, win]).markup);
+    expect(slot.attr('data-key')).toBeNull();
     expect(slot.text()).toBe('');
   });
 });

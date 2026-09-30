@@ -84,6 +84,10 @@ export const normalise = (html: string): string =>
     // history of 2026-09-25): the slot and whatever it lists are new, so the block is dropped
     // (its rows spell no `</div>`, so the first one closes the slot).
     .replace(/<div class="recent-games" id="recentGames">[\s\S]*?<\/div>/g, '')
+    // The home's fourth card (page.ts `homeExtra`; docs/design/space-audit.md §5 "Closed by
+    // gin-home-column-bottom"): the recent games or "How it goes", markup the legacy never had,
+    // dropped from its comment to the marker that closes it.
+    .replace(/<!-- The fourth card[\s\S]*?<!-- \/recent -->/g, '')
     // A hidden curtain keeps the text of its last showing, and the new page shows one the legacy
     // never had: a knock hands the phone to the defender to lay off (§7b). Unseen, it is blanked.
     .replace(

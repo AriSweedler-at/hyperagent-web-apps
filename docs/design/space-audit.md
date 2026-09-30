@@ -673,3 +673,40 @@ and the windows on the sheet. `npm run audit:space -- --game <g> --device tablet
   the tablet cases, limits and sheet group added); `npm run test:briscola` (1146); briscola-geometry
   e2e (10) at offset 13200; the briscola style goldens `--check`. §2's "the iPads reach the audit
   through `--device`" is superseded by this section.
+
+### Closed by gin-home-column-bottom
+
+The gin home's band (the space-audit-gin section above: 12 phone cases and the 1920x1080 window over
+the 30% below the last card; "the fix is content, not spacing"), 2026-09-30, by the owner's call: a
+fourth card. Run: `npm run audit:space -- --game gin-rummy --serve`, 141 cases (112 phones, 24
+iPads, 5 windows), 139 of 141 cases and 280 of 282 screens (was 105 of 117 and 222 of 234 on the
+third run's cases; the tablet run after #208 counted 14 more home cases over, below). The sheet:
+`live/gin-home/` beside `live/space-audit-4/`.
+
+- **The card.** Under Join, `#homeRecent` (gin's `page.ts`, the new `homeExtra` block of
+  `web/shared/markup/shell.ts`: the one block a page may leave out, placed after the mode panels in
+  `#playPanel`; the other three pages compose byte for byte). It lists the finished games this
+  device remembers (`web/shared/ui/recentGames.ts` `paintRecentGamesInto`, the shared lines at
+  `#homeRecentList`, the newest five, keyed so a repaint with the same list leaves it be; painted at
+  every paint from the shell state, which `home/init` reads and a game's end prepends to), and while
+  it remembers none shows "How it goes" (three lines: ten cards each; draw and discard; knock or go
+  gin) with "Read the rules", the Rules tab through the tab intent. The audit's profile remembers
+  none, so its shots are the "How it goes" face, the taller of the two on a fresh device (five
+  lines of games run about as tall). Styled in gin's theme to match the three cards: the label
+  row, the muted lines with accent numerals, the shell's 44px button; the shared slot's divider is
+  off inside the card. The parity oracle drops the card as it drops the sandbox.
+- **Home `used`, phones.** Every phone case passes: below the last card 0% on the 12 class and the
+  X/mini upright standalone, 1.8% (15.8px) on the 414x896 class, 6% (57.8px) on the 440x956 class
+  (was 30.8-36.8% on these 12). The sideways homes are the column as before (8-17% a side).
+- **Home `used`, desktop.** 1920x1080: 26.1% below (was 47.6%), within the 40%; 37.5% a side as
+  before. The other four windows pass as before.
+- **Home `used`, iPads.** 12 of 14 of the tablet-buckets section's over-limit home cases are
+  within the 40% now: the 9th upright standalone and fullscreen 20.8% (was 43.6%), the Air upright
+  and the Pro sideways within it. Left: the Pro upright standalone and fullscreen, 555px, 40.7%
+  below (was 55.4-57.7%), 0.7 points over, 2 cases `used` FAIL. The tablet home arrangement that
+  section names (the masthead beside the cards, or the cards two abreast) stands as the follow-up;
+  a taller card for the sake of 10px would be padding.
+- Goldens: `--check --game gin-rummy` clean at 390x844 and 1280x800 (the pinned selectors' first
+  matches are the cards above the new one), so none re-recorded. No audit limit changed.
+- Gates: typecheck; prettier and eslint on the touched files; `npm run test:shared` (74 files,
+  1051) and `npm run test:gin`; gin-local e2e (2) at offset 13500; the goldens check; the audit.
