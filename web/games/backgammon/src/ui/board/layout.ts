@@ -28,6 +28,14 @@ export type Cell = Readonly<{ row: number; col: number; rowSpan: number; colSpan
  */
 export type Insets = Readonly<{ top?: number; left: number; right: number; bottom: number }>;
 /**
+ * Sideways, the short side the safe-area map names free of the cut (web/shared/lib/safeArea.ts
+ * `--safe-free-side`, written on the root by src/safeArea.ts): `left` or `right` on a catalogued
+ * notched phone (landscape-primary puts the cut on the left, so the right is free), `none` where
+ * no cut is known (an SE, an unknown phone, headless). The rail stands on the free side, hugging
+ * the trim; with `none` it stands on the right inside that side's inset. Absent: `none`.
+ */
+export type FreeSide = 'left' | 'right' | 'none';
+/**
  * What the CSS keys on: the viewport, whether the pointer is coarse (`(any-pointer: coarse)`; a
  * finger, false in every desktop context and in headless without `hasTouch`) and the insets.
  */
@@ -36,6 +44,7 @@ export type Viewport = Readonly<{
   height: number;
   coarse?: boolean;
   insets?: Insets;
+  freeSide?: FreeSide;
 }>;
 
 /** theme.css lays the board flat from this width (`@media (min-width: 900px)`). */
@@ -133,9 +142,12 @@ export const DESKTOP_GEOMETRY = {
  * strip and its air, 50px of chrome above and below inset-free, 50 beside, plus the edges) and the
  * rows (a 44px button row under the board with the air over it: `chromeIn` 76, 98px above and
  * below, nothing beside but the edges). `chromeAbove` is the chrome's share over the board (the
- * strip and its air in both), the rest sits under it. The edge is one number for both sides, the
- * larger inset or 16px. The CSS measures the board's room (`#tableScreen` is a size container,
- * `#board` reads `100cqh`); the twin computes the same from the viewport's height less the chrome.
+ * strip and its air in both), the rest sits under it. The board's edge is the larger inset or
+ * 16px (`edgeOf`, both sides with the rows); the rail's side (`railEdgeOf`) is the trim's
+ * clearance, `railEdge` 11, where the map names it free of the cut, else the larger of that and
+ * the insets (theme.css `--edge` and `--edge-rail`). The CSS measures the board's room
+ * (`#tableScreen` is a size container, `#board` reads `100cqh`); the twin computes the same from
+ * the viewport's height less the chrome.
  */
 const STRIP_H = 24;
 const AIR = 4;
@@ -155,6 +167,8 @@ const TRIM = FRAME_BAND.phone + HAIRLINE;
 const BTN_H = 44;
 export const LANDSCAPE_GEOMETRY = {
   minEdge: 16,
+  /** The rail's gutter where its side is free of the cut: the trim's band, its hairline and the air (`--pad-t`). */
+  railEdge: TRIM + AIR,
   stripH: STRIP_H,
   air: AIR,
   rail: {
@@ -186,11 +200,26 @@ export const LANDSCAPE_GEOMETRY = {
 const clamp = (lo: number, x: number, hi: number): number => Math.min(hi, Math.max(lo, x));
 const schemeOf = (vp: Viewport) =>
   vp.width >= RAIL_MIN_WIDTH ? LANDSCAPE_GEOMETRY.rail : LANDSCAPE_GEOMETRY.rows;
-/** `--edge`: the gutter on each side sideways, `max(16px, inset-l, inset-r)`. */
+/** `--edge`: the board's gutter sideways (both gutters with the rows), `max(16px, inset-l, inset-r)`. */
 export const edgeOf = (vp: Viewport): number =>
   Math.max(LANDSCAPE_GEOMETRY.minEdge, vp.insets?.left ?? 0, vp.insets?.right ?? 0);
-/** `--chrome-w` sideways: both edges and, with the rail, the rail and its gap (82px inset-free; 32 with the rows). */
-export const chromeWidth = (vp: Viewport): number => 2 * edgeOf(vp) + schemeOf(vp).beside;
+/** The side the rail stands on: the free side the map names, else the right. */
+export const railSideOf = (vp: Viewport): 'left' | 'right' =>
+  vp.freeSide === 'left' ? 'left' : 'right';
+/**
+ * `--edge-rail`: the rail's gutter, the trim's clearance (11px) where the map names the rail's
+ * side free of the cut (the inset there is the other side's mirror on iOS, no hardware), else the
+ * larger of that and the insets (no cut known: the rail keeps inside the inset).
+ */
+export const railEdgeOf = (vp: Viewport): number =>
+  vp.freeSide === 'left' || vp.freeSide === 'right'
+    ? LANDSCAPE_GEOMETRY.railEdge
+    : Math.max(LANDSCAPE_GEOMETRY.railEdge, vp.insets?.left ?? 0, vp.insets?.right ?? 0);
+/** `--chrome-w` sideways: with the rail the board's edge, the rail's, the rail and its gap (77px inset-free; 108 on an iPhone 12 with the map); with the rows both edges (32). */
+export const chromeWidth = (vp: Viewport): number =>
+  schemeOf(vp) === LANDSCAPE_GEOMETRY.rail
+    ? edgeOf(vp) + railEdgeOf(vp) + LANDSCAPE_GEOMETRY.rail.beside
+    : 2 * edgeOf(vp);
 /** #app's vertical paddings upright, the shell's rule: `max(clearance, inset)` above and below (12 and 12 in a tab or headless; 47 and 34 on an iPhone 12 installed). */
 export const uprightPadding = (vp: Viewport): Readonly<{ top: number; bottom: number }> => ({
   top: Math.max(PHONE_GEOMETRY.clearance, vp.insets?.top ?? 0),

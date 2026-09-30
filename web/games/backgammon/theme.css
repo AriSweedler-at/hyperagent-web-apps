@@ -2212,9 +2212,10 @@ label {
     max-width: none;
     --air: 4px;
     --pad-t: calc(7px + var(--air));
-    --pad-v: calc(var(--pad-t) + max(var(--pad-t), 6px + var(--inset-b)));
+    --pad-b: max(var(--pad-t), 6px + var(--inset-b));
+    --pad-v: calc(var(--pad-t) + var(--pad-b));
     padding-top: var(--pad-t);
-    padding-bottom: max(var(--pad-t), 6px + var(--inset-b));
+    padding-bottom: var(--pad-b);
   }
   #tableScreen {
     /* The two blocks below set --chrome-h and --chrome-w: what the chrome takes above and below the
@@ -2259,6 +2260,16 @@ label {
     --gap: 6px;
     --name-w: 142px;
     --slot-w: 72px;
+    /* Each item's column is a variable holding its area's name (`grid-column: opp` is the lines
+       `opp-start / opp-end`): the rail block below moves the rail to the first column by setting
+       these to numbers, so the two chrome grids stay the two `grid-template-areas` strings
+       test/dist/backgammon-grid.test.ts pins and no third string is written. */
+    --col-opp: opp;
+    --col-badge: badge;
+    --col-status: status;
+    --col-me: me;
+    --col-slot: slot;
+    --col-board: board;
     display: grid;
     /* Between the columns `--gap`; between the rows the strip's `--air` (#app's, above): the
        board stands under the strip by the air the strip stands under the hairline, and the rows
@@ -2293,9 +2304,11 @@ label {
   }
   #tableScreen .opp-strip {
     grid-area: opp;
+    grid-column: var(--col-opp);
   }
   #tableScreen .me-strip {
     grid-area: me;
+    grid-column: var(--col-me);
     justify-content: flex-end;
   }
   #tableScreen .opp-strip .pips,
@@ -2310,12 +2323,14 @@ label {
   /* The badge keeps one width as the score changes: tabular figures. */
   #gameBadge {
     grid-area: badge;
+    grid-column: var(--col-badge);
     padding: 2px 10px;
     line-height: normal;
     font-variant-numeric: tabular-nums;
   }
   .status-line {
     grid-area: status;
+    grid-column: var(--col-status);
     text-align: right;
     padding: 0;
     height: auto;
@@ -2355,11 +2370,13 @@ label {
   }
   #board {
     grid-area: board;
+    grid-column: var(--col-board);
   }
   /* The slot at the strip's end: the mini dice while I move; the wait note is the status line's
      message already, so it stays hidden here. */
   .roll-slot {
     grid-area: slot;
+    grid-column: var(--col-slot);
     min-width: 0;
     min-height: 0;
     width: var(--slot-w);
@@ -2393,6 +2410,7 @@ label {
   /* The die-chip tray floats over the board's bottom edge instead of replacing a strip. */
   #controls.choosing #moveChips {
     grid-area: board;
+    grid-column: var(--col-board);
     align-self: end;
     justify-self: center;
     margin-bottom: 14px;
@@ -2640,10 +2658,57 @@ label {
    hangs in off the board's right edge, End turn (pass-and-play's held turn; its row is empty while
    the button is hidden), Undo at the board's foot. 714 is the narrowest viewport that stands the
    rail beside a 44px-floor board with no insets: 13 x 44 + the 44px tray + the 16px frame + two
-   16px edges + the 44px rail + its 6px gap. */
+   16px edges + the 44px rail + its 6px gap (the rail's edge is 11 now, below: 44.4px points there).
+   The rail's side and its gutter (the owner, 2026-09-28: the side buttons "should happily squish
+   up to the edge of the screen ... they should actually be notch-aware ... when I rotate it 180
+   degrees, instead of leaving that 'notch aware' area on one side, it should expand to fill that
+   space ... leave that quarter circleish area untouched. But use the space between those 2
+   quarter circles on the non-notch side"): the safe-area map (web/shared/lib/safeArea.ts, which
+   src/safeArea.ts writes on the root as `data-free-side` and the `--safe-*` segments;
+   docs/design/ui-sandbox.md §3) names the short side without the cut. The rail stands on that
+   side, hugging the trim between the corner arcs; the board's gutter on the cut's side is the
+   inset. The far seat's half turn (`body[data-flip]`, shell.css) reads every side mirrored, so the
+   rail keeps the screen's free side while the body is upside down. The ears beside the cut (the
+   space above and below the notch) are not used yet. */
 @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) and (min-width: 714px) {
+  /* The gutters at the table, one a side: the board's keeps `--edge` (the cut's inset, or 16px);
+     the rail's, `--edge-rail`, is the frame's clearance (`--pad-t`: the band, the hairline and the
+     air) where the map names the rail's side free, else the larger of that and the insets (no cut
+     known, an unknown phone: the rail keeps inside the inset as before, 11px off the trim without
+     one). The rail is on the right unless the map puts it left: the left free (no flip), or the
+     right free under the flip. */
+  body.fixed-screen #app {
+    --edge-rail: max(var(--pad-t), var(--inset-l), var(--inset-r));
+    padding-left: var(--edge);
+    padding-right: var(--edge-rail);
+  }
+  :root[data-free-side='right'] body.fixed-screen:not([data-flip='1']) #app,
+  :root[data-free-side='left'] body.fixed-screen[data-flip='1'] #app {
+    --edge-rail: var(--pad-t);
+  }
+  :root[data-free-side='left'] body.fixed-screen:not([data-flip='1']) #app,
+  :root[data-free-side='right'] body.fixed-screen[data-flip='1'] #app {
+    --edge-rail: var(--pad-t);
+    padding-left: var(--edge-rail);
+    padding-right: var(--edge);
+  }
   #tableScreen {
     --rail-w: 44px;
+    /* The rail's column (the sixth; the first when the rail is left), and where the arrow and the
+       cube hang off the board (its right edge; its left when the rail is left). */
+    --col-rail: 6;
+    --hang: calc(100% + var(--gap));
+    --hang-l: var(--hang);
+    --hang-r: auto;
+    --cube-l: calc(var(--hang) + 5px);
+    --cube-r: auto;
+    /* The rail's run along its edge, from the viewport's top: the right edge between its corner
+       arcs (the map's `--safe-right-*`; the whole edge where no map was written), or the free
+       side's segment where the map names one (below); under the flip the run is mirrored through
+       the viewport's centre (the body's top is the screen's bottom). The menu's top margin and
+       Undo's bottom margin keep the rail's two ends inside it. */
+    --rail-from: var(--safe-right-from, 0px);
+    --rail-to: var(--safe-right-to, 100dvh);
     /* 104px: five coins at a 12px step. The point yields half of what the home indicator adds to
        #app's paddings past their 22px (96 with the 21px one: a 10px step), so 2 x floor + 16 +
        --chrome-h stays 274px at any inset and the `max-height: 273px` fallback at the end lifts
@@ -2652,9 +2717,10 @@ label {
     --point-len-min: calc(104px - (var(--pad-v) - 22px) / 2);
     /* #app's paddings, the strip, its air: 50px inset-free, 66 with a 21px home indicator. */
     --chrome-h: calc(var(--pad-v) + var(--strip-h) + var(--air));
-    /* The two gutters (16px or the inset), the rail and its gap: 82px without insets, 144 with the
-       iPhone 12's, 168 on the 852x393 class: 54, 49.2 and 48px points. */
-    --chrome-w: calc(2 * var(--edge) + var(--rail-w) + var(--gap));
+    /* The board's gutter (16px or the inset), the rail's (11, or the inset with no map), the rail
+       and its gap: 77px without insets, 108 with the iPhone 12's, 120 on the 852x393 class: 54.4,
+       52 and 51.7px points (82, 144 and 168 before the rail hugged the trim). */
+    --chrome-w: calc(var(--edge) + var(--edge-rail) + var(--rail-w) + var(--gap));
     /* The strips and the slot their fixed widths, the badge its content's (tabular figures), the
        status line what is left: every item of the strip keeps one box through a game (the frame
        oracle reads them in every phase). */
@@ -2670,26 +2736,72 @@ label {
       'board board board  board board rail4'
       'board board board  board board rail5';
   }
+  :root[data-free-side='left'] body:not([data-flip='1']) #tableScreen,
+  :root[data-free-side='right'] body:not([data-flip='1']) #tableScreen {
+    --rail-from: var(--safe-free-from);
+    --rail-to: var(--safe-free-to);
+  }
+  :root[data-free-side='left'] body[data-flip='1'] #tableScreen,
+  :root[data-free-side='right'] body[data-flip='1'] #tableScreen {
+    --rail-from: calc(100dvh - var(--safe-free-to));
+    --rail-to: calc(100dvh - var(--safe-free-from));
+  }
+  :root[data-free-side='none'] body[data-flip='1'] #tableScreen {
+    --rail-from: calc(100dvh - var(--safe-left-to, 100dvh));
+    --rail-to: calc(100dvh - var(--safe-left-from, 0px));
+  }
+  /* The rail on the left: its column first, the strip's five and the board after it. Every item
+     keeps its row (the area name's), the columns alone are overridden; the arrow and the cube hang
+     off the board's left edge. */
+  :root[data-free-side='left'] body:not([data-flip='1']) #tableScreen,
+  :root[data-free-side='right'] body[data-flip='1'] #tableScreen {
+    grid-template-columns:
+      var(--rail-w) var(--name-w) auto minmax(0, 1fr) var(--name-w)
+      var(--slot-w);
+    --col-rail: 1;
+    --col-opp: 2;
+    --col-badge: 3;
+    --col-status: 4;
+    --col-me: 5;
+    --col-slot: 6;
+    --col-board: 2 / 7;
+    --hang-l: auto;
+    --hang-r: var(--hang);
+    --cube-l: auto;
+    --cube-r: calc(var(--hang) + 5px);
+  }
   .topbar > .row.tight {
     flex-direction: column;
     gap: var(--gap);
     align-self: start;
+    grid-column: var(--col-rail);
   }
+  /* The menu, the rail's top, stands down from the screen's top by what the rail's run starts
+     under it (a corner arc: 48px under a 55px radius, 0 on a square corner or where the arc ends
+     over the strip). */
   .topbar > .row.tight:first-child {
     grid-area: rail1;
+    grid-column: var(--col-rail);
+    margin-top: max(0px, calc(var(--rail-from) - var(--pad-t)));
   }
   .topbar > .row.tight:last-child {
     grid-area: rail2;
+    grid-column: var(--col-rail);
   }
+  /* Undo (the tray's cancel in its cell), the rail's foot, stands up from the screen's bottom by
+     what the run ends over it. */
   #undoBtn,
   #chipCancelBtn {
     grid-area: rail5;
+    grid-column: var(--col-rail);
     align-self: end;
+    margin-bottom: max(0px, calc(100dvh - var(--rail-to) - var(--pad-b)));
   }
   /* End turn stands over Undo in the rail, the same vertical 44px button (its label is longer, so
      its padding is shorter: the pair must fit the 304px floor above the bottom strip). */
   #doneBtn {
     grid-area: rail4;
+    grid-column: var(--col-rail);
     align-self: end;
   }
   /* Undo stands at the board's foot, 44.8px tall (the word and 4px each end; it was 60.8 with 12px,
@@ -2706,8 +2818,8 @@ label {
   }
   /* Hung in the rail's free middle, 40px so a 47px checker's glyph never crosses the rail's edge. */
   .turn-arrow {
-    right: auto;
-    left: calc(100% + var(--gap));
+    right: var(--hang-r);
+    left: var(--hang-l);
     width: 40px;
     height: 40px;
     transform: translateY(-50%) scaleY(1) rotate(0deg);
@@ -2726,7 +2838,8 @@ label {
     /* `grid-area: auto`: placed, an absolutely positioned child of a grid takes its area as its
        containing block, and the bar's half would be the 100%. */
     grid-area: auto;
-    left: calc(100% + var(--gap) + 5px);
+    left: var(--cube-l);
+    right: var(--cube-r);
     top: 50%;
     margin: 26px 0 0;
     align-self: auto;

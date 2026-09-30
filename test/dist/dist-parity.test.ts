@@ -242,25 +242,39 @@ describeDist('dist parity with legacy/ and web/', (root) => {
   });
 
   test('every module page preloads the chunk all of them share and links the stylesheet all of them share; a chunk under shared/assets/ is preloaded by two pages at least', () => {
-    // A game's own CSS is `<game>-[hash].css`; everything else under shared/assets/ is shared.
-    const own = GAMES.map((game) => `/${game}-`);
-    const shared = (game: string, ext: string): ReadonlyArray<string> =>
-      referencesIn(`games/${game}/index.html`, readDist(root, `games/${game}/index.html`))
+    // Every module page under games/ in dist: the games, the solo pages (rps) and the tool pages
+    // (tools/games.ts SOLO_PAGES, TOOL_NAMES; one whose page is not built is skipped), since
+    // Rolldown splits a chunk for any two pages that import it, a solo or tool page counting as
+    // much as a game's (rps and the sandbox share the App Clip module; backgammon's rail and the
+    // sandbox the safe-area map).
+    const pages: ReadonlyArray<string> = [
+      ...GAMES,
+      ...[...SOLO_PAGES, ...TOOL_NAMES].filter((page) =>
+        existsSync(resolve(root.dir, `games/${page}/index.html`)),
+      ),
+    ];
+    // A page's own CSS is `<page>-[hash].css`; everything else under shared/assets/ is shared.
+    const own = pages.map((page) => `/${page}-`);
+    const shared = (page: string, ext: string): ReadonlyArray<string> =>
+      referencesIn(`games/${page}/index.html`, readDist(root, `games/${page}/index.html`))
         .map(({ value }) => value)
         .filter((value) => new RegExp(`^\\.\\./\\.\\./shared/assets/[\\w-]+\\.${ext}$`).test(value))
         .filter((value) => !own.some((prefix) => value.includes(prefix)));
-    const chunks = Object.fromEntries(GAMES.map((game) => [game, shared(game, 'js')]));
+    const chunks = Object.fromEntries(pages.map((page) => [page, shared(page, 'js')]));
     const preloadedBy = (chunk: string): ReadonlyArray<string> =>
-      GAMES.filter((game) => chunks[game]?.includes(chunk) === true);
-    // PeerJS and the shared edges every page imports (steps 9 and 12) are one chunk for all three.
-    const common = Object.values(chunks)
-      .flat()
-      .filter((chunk) => preloadedBy(chunk).length === GAMES.length);
+      pages.filter((page) => chunks[page]?.includes(chunk) === true);
+    // PeerJS and the shared edges every game imports (steps 9 and 12) are one chunk for all the
+    // games (a solo or tool page need not carry it).
+    const common = GAMES.flatMap((game) => chunks[game] ?? []).filter((chunk) =>
+      GAMES.every((game) => chunks[game]?.includes(chunk) === true),
+    );
     expect(new Set(common).size).toBeGreaterThanOrEqual(1);
     // Rolldown splits a module out of the bundles only when more than one page imports it (the DOM
     // edge, web/shared/edge/dom.ts, became such a chunk when backgammon joined gin in painting
-    // through it; fidice has its own vdom), so a chunk preloaded by one page alone is a split gone
-    // wrong: that page's code has left its bundle.
+    // through it; fidice has its own vdom; web/shared/lib/safeArea.ts when backgammon's rail joined
+    // the sandbox in reading the safe-area map), so a chunk preloaded by one page alone is a split
+    // gone wrong: that page's code has left its bundle. A chunk shared by a game and a solo or tool
+    // page counts: all are module pages of the one build.
     [...new Set(Object.values(chunks).flat())].forEach((chunk) => {
       expect(preloadedBy(chunk).length, chunk).toBeGreaterThanOrEqual(2);
     });

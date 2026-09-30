@@ -25,6 +25,9 @@ import {
   boardLayout,
   chromeWidth,
   edgeOf,
+  railEdgeOf,
+  railSideOf,
+  type FreeSide,
   layoutFor,
   ownOf,
   parseAreas,
@@ -307,42 +310,69 @@ describe('the sizes', () => {
   });
 
   test('landscape widths: 13 points, the tray and the frame in what the edges and the rail leave', () => {
-    // Inset-free (headless): two 16px edges, the 44px rail and its 6px gap leave 702px at 844: 54px points.
-    expect(chromeWidth({ width: 844, height: 390, coarse: true })).toBe(82);
-    expect(pointWidth({ width: 844, height: 390, coarse: true })).toBeCloseTo(54, 5);
-    // A notched iPhone: the edge is the inset (47, 59, 62), both sides, so 144 / 168 / 174 of chrome.
-    const notched = (width: number, height: number, inset: number) => ({
+    // Inset-free (headless, no map): the board's 16px edge, the rail's 11 (the trim's clearance),
+    // the 44px rail and its 6px gap leave 707px at 844: 54.4px points.
+    expect(chromeWidth({ width: 844, height: 390, coarse: true })).toBe(77);
+    expect(pointWidth({ width: 844, height: 390, coarse: true })).toBeCloseTo(707 / 13, 5);
+    // A notched iPhone with the map: the board's edge is the inset (47, 59, 62), the rail hugs the
+    // trim on the free side at 11, so 108 / 120 / 123 of chrome (144 / 168 / 174 when both sides
+    // kept the inset).
+    const notched = (
+      width: number,
+      height: number,
+      inset: number,
+      freeSide: FreeSide = 'right',
+    ) => ({
       width,
       height,
       coarse: true,
       insets: { left: inset, right: inset, bottom: 21 },
+      freeSide,
     });
     expect(edgeOf(notched(844, 390, 47))).toBe(47);
-    expect(chromeWidth(notched(844, 390, 47))).toBe(144);
-    expect(pointWidth(notched(844, 390, 47))).toBeCloseTo(49.23, 2);
-    expect(pointWidth(notched(852, 393, 59))).toBeCloseTo(48, 5);
-    expect(pointWidth(notched(956, 440, 62))).toBeCloseTo(55.54, 2);
-    // Android reports one side only: the larger inset is the edge on both sides, so the board stays centred.
+    expect(railEdgeOf(notched(844, 390, 47))).toBe(11);
+    expect(railSideOf(notched(844, 390, 47))).toBe('right');
+    expect(chromeWidth(notched(844, 390, 47))).toBe(108);
+    expect(pointWidth(notched(844, 390, 47))).toBeCloseTo(676 / 13, 2);
+    expect(pointWidth(notched(852, 393, 59))).toBeCloseTo(672 / 13, 5);
+    expect(pointWidth(notched(956, 440, 62))).toBeCloseTo(773 / 13, 2);
+    // The left free (landscape-secondary): the rail moves left, the numbers are the same.
+    expect(railSideOf(notched(844, 390, 47, 'left'))).toBe('left');
+    expect(chromeWidth(notched(844, 390, 47, 'left'))).toBe(108);
+    // No cut known (an unknown notched phone): the rail keeps inside the inset, both gutters 47.
+    const unknown = { ...notched(844, 390, 47), freeSide: 'none' as const };
+    expect(railEdgeOf(unknown)).toBe(47);
+    expect(railSideOf(unknown)).toBe('right');
+    expect(chromeWidth(unknown)).toBe(144);
+    const { width, height, coarse, insets } = notched(844, 390, 47);
+    expect(chromeWidth({ width, height, coarse, insets })).toBe(144);
+    // Android reports one side only: the larger inset is the board's edge whichever side the
+    // cutout is on (the cut's side is the board's); with the map the rail hugs the trim.
     const cutout = {
       width: 844,
       height: 390,
       coarse: true,
       insets: { left: 30, right: 0, bottom: 0 },
+      freeSide: 'right' as const,
     };
     expect(edgeOf(cutout)).toBe(30);
-    expect(chromeWidth(cutout)).toBe(110);
-    expect(pointWidth(cutout)).toBeCloseTo(51.85, 2);
-    // A Pixel 8 sideways: 59.5px points from 915.
-    expect(pointWidth({ width: 915, height: 412, coarse: true })).toBeCloseTo(59.46, 2);
+    expect(chromeWidth(cutout)).toBe(91);
+    expect(pointWidth(cutout)).toBeCloseTo(693 / 13, 2);
+    // A Pixel 8 sideways, no map: 59.85px points from 915.
+    expect(pointWidth({ width: 915, height: 412, coarse: true })).toBeCloseTo(778 / 13, 2);
     // The rows scheme under RAIL_MIN_WIDTH: the edges alone (32px): 44.2 on the SE, the 44px floor at 640.
     expect(chromeWidth({ width: 667, height: 375, coarse: true })).toBe(32);
     expect(pointWidth({ width: 667, height: 375, coarse: true })).toBeCloseTo(44.23, 2);
     expect(pointWidth({ width: 640, height: 360, coarse: true })).toBe(
       LANDSCAPE_GEOMETRY.minPointW,
     );
-    // The threshold: at 714 the rail stands beside a board exactly at the floor; one under, the rows are wider.
+    // The threshold, kept at the two-16px-edges number: at 714 the rail stands beside a board a
+    // hair over the floor (44.38px points with the rail's 11px edge); one under, the rows are wider.
     expect(RAIL_MIN_WIDTH).toBe(13 * 44 + 44 + 16 + 2 * 16 + 44 + 6);
-    expect(pointWidth({ width: RAIL_MIN_WIDTH, height: 390, coarse: true })).toBeCloseTo(44, 5);
+    expect(pointWidth({ width: RAIL_MIN_WIDTH, height: 390, coarse: true })).toBeCloseTo(
+      (RAIL_MIN_WIDTH - 77 - 60) / 13,
+      5,
+    );
     expect(pointWidth({ width: RAIL_MIN_WIDTH - 1, height: 390, coarse: true })).toBeCloseTo(
       47.77,
       2,
