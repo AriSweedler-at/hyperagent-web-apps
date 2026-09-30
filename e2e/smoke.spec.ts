@@ -108,3 +108,58 @@ Object.entries(ALIASES).forEach(([alias, game]) => {
     expect(watched.failures(), 'failed requests').toEqual([]);
   });
 });
+
+// The landing page fits a phone without scrolling and keeps fitting once four more games join
+// the grid (web/index.html: one tile per game, an emoji and a name, no blurb, two columns at a
+// phone's width). One context of the spec's own per phone: a touch viewport with the project's
+// baseURL passed by hand, as e2e/backgammon-devices.spec.ts does. The next four games are counted
+// before they exist: the tallest tile is cloned four times into the grid and the page must still
+// not scroll, so a new game is a new card and never a redesign.
+const PHONES: ReadonlyArray<{ name: string; width: number; height: number }> = [
+  { name: '390x844', width: 390, height: 844 },
+  { name: '360x780', width: 360, height: 780 },
+];
+/** How far the document overruns the viewport: `<= 0` is a page that never scrolls. */
+const SCROLL_OVERRUN = 'document.documentElement.scrollHeight - window.innerHeight';
+/** The grid's column count as laid out, and the shortest tile: two columns of 44px targets on a phone. */
+const GRID_SHAPE = `(() => {
+  const grid = document.querySelector('.grid');
+  const columns = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+  const heights = [...document.querySelectorAll('a.card')].map((card) => card.offsetHeight);
+  return { columns, shortest: Math.min(...heights) };
+})()`;
+/** Clone the tallest tile four times into the grid (the next four games) and count the cards. */
+const FOUR_MORE_GAMES = `(() => {
+  const grid = document.querySelector('.grid');
+  const cards = [...document.querySelectorAll('a.card')];
+  const tallest = cards.reduce((a, b) => (b.offsetHeight > a.offsetHeight ? b : a));
+  for (let i = 0; i < 4; i += 1) grid.append(tallest.cloneNode(true));
+  return document.querySelectorAll('a.card').length;
+})()`;
+
+PHONES.forEach(({ name, width, height }) => {
+  test(`landing: fits ${name} without scrolling, four more games included`, async ({
+    browser,
+    project,
+  }) => {
+    const context = await browser.newContext({
+      baseURL: baseUrl(project),
+      viewport: { width, height },
+      isMobile: true,
+      hasTouch: true,
+    });
+    const page = await context.newPage();
+    try {
+      await page.goto(pagePath(project, 'landing'));
+      await expect(page.locator('a.card')).toHaveCount(LANDING_PAGES.length);
+      const shape = await page.evaluate<{ columns: number; shortest: number }>(GRID_SHAPE);
+      expect(shape.columns, 'two columns on a phone').toBe(2);
+      expect(shape.shortest, 'every tile a 44px target').toBeGreaterThanOrEqual(44);
+      expect(await page.evaluate<number>(SCROLL_OVERRUN), 'as shipped').toBeLessThanOrEqual(0);
+      expect(await page.evaluate<number>(FOUR_MORE_GAMES)).toBe(LANDING_PAGES.length + 4);
+      expect(await page.evaluate<number>(SCROLL_OVERRUN), 'four more games').toBeLessThanOrEqual(0);
+    } finally {
+      await context.close();
+    }
+  });
+});
