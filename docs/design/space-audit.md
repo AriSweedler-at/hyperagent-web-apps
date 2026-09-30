@@ -498,7 +498,6 @@ the third run (117 cases: the 112 phone cases and the five desktop windows) is 1
 - `clip` (new, the third run's first pass): `#lastAction` cut by 48-165px in the status column on
   every sideways and desktop table, `#oppName` by 23px on the SE sideways. The last action's own
   row and the wider opponent column above; a second pass reads clean.
-||||||| parent of f6365e5a (fix(fidice): Sideways the table fits without a scroll: the wood beside the seats and the talk, the steps' help behind a tap, the seat cards one line)
 
 ### Closed by fidice-sideways-fold
 
