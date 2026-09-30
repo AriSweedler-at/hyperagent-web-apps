@@ -44,8 +44,30 @@ describe('storage', () => {
       best: 350,
     };
     writeProgress(store, progress);
-    expect(JSON.parse(map.get('rps_progress') ?? '')).toEqual({ v: 1, ...progress });
+    expect(JSON.parse(map.get('rps_progress') ?? '')).toEqual({ v: 2, ...progress });
     expect(readProgress(store)).toEqual(progress);
+  });
+
+  test('a version-1 save (the 1000 ms base) reads rescaled to the 2500 ms base, the rest kept', () => {
+    const { map, store } = memory();
+    map.set(
+      'rps_progress',
+      JSON.stringify({
+        v: 1,
+        counter: 3,
+        windowMs: 750,
+        prestige: 1,
+        recentWins: [400, 350],
+        best: 350,
+      }),
+    );
+    expect(readProgress(store)).toEqual({
+      counter: 3,
+      windowMs: 1875,
+      prestige: 1,
+      recentWins: [400, 350],
+      best: 350,
+    });
   });
 
   test('a refused or unreadable save reads as the start (never a state the engine could not reach)', () => {

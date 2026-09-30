@@ -2,7 +2,7 @@
 // model (ios/DiceClip/DiceModel/Sources/DiceModel/RPS, `swift test`) are held to one table.
 import { describe, expect, test } from 'vitest';
 
-import { decodeProgress, encodeProgress } from './codec.ts';
+import { decodeProgress, encodeProgress, rescaleV1Window } from './codec.ts';
 import {
   INITIAL_PROGRESS,
   apply,
@@ -191,7 +191,7 @@ describe('reset and moods', () => {
 });
 
 describe('the stored shape (D4)', () => {
-  test('round-trips every field under version 1', () => {
+  test('round-trips every field under version 2', () => {
     const progress: Progress = {
       counter: -3,
       windowMs: 1406,
@@ -200,7 +200,7 @@ describe('the stored shape (D4)', () => {
       best: 210,
     };
     const stored = encodeProgress(progress);
-    expect(stored).toEqual({ v: 1, ...progress });
+    expect(stored).toEqual({ v: 2, ...progress });
     expect(decodeProgress(JSON.parse(JSON.stringify(stored)))).toEqual({
       ok: true,
       value: progress,
@@ -211,26 +211,33 @@ describe('the stored shape (D4)', () => {
     });
   });
 
-  test('a save from before the 2.5 s base (window 1000, the old base) still reads and plays on', () => {
-    const old = { ...encodeProgress(INITIAL_PROGRESS), windowMs: 1000 };
-    expect(decodeProgress(old)).toEqual({
-      ok: true,
-      value: { ...INITIAL_PROGRESS, windowMs: 1000 },
+  test('a version-1 save (the 1000 ms base) is rescaled: the window × 2.5, rounded, capped at the base; the rest kept', () => {
+    const v1 = (windowMs: number) => ({
+      v: 1,
+      counter: -3,
+      windowMs,
+      prestige: 2,
+      recentWins: [300, 310, 320],
+      best: 210,
     });
-    expect(slowedWindow(1000)).toBe(1100);
-  });
-
-  test('a save from before the 2.5 s base (window 1000, the old base) still reads and plays on', () => {
-    const old = { ...encodeProgress(INITIAL_PROGRESS), windowMs: 1000 };
-    expect(decodeProgress(old)).toEqual({
+    expect(decodeProgress(v1(1000))).toEqual({
       ok: true,
-      value: { ...INITIAL_PROGRESS, windowMs: 1000 },
+      value: { counter: -3, windowMs: 2500, prestige: 2, recentWins: [300, 310, 320], best: 210 },
     });
-    expect(slowedWindow(1000)).toBe(1100);
+    // The ladder is multiplicative, so a v1 player lands on the same rung down: 750 → 1875.
+    expect([750, 563, 422, 238, 200].map(rescaleV1Window)).toEqual([1875, 1408, 1055, 595, 500]);
+    expect(decodeProgress(v1(563))).toMatchObject({ ok: true, value: { windowMs: 1408 } });
+    // A v1 window past its own base still lands under the cap; v1's other bounds still hold.
+    expect(decodeProgress(v1(1200))).toMatchObject({ ok: true, value: { windowMs: 2500 } });
+    expect(decodeProgress({ ...v1(750), counter: 9 }).ok).toBe(false);
+    // Nothing is written back as v1: a decoded v1 save re-encodes under the current version.
+    const read = decodeProgress(v1(750));
+    expect(read.ok && encodeProgress(read.value).v).toBe(2);
   });
 
   test.each([
-    ['another version', { ...encodeProgress(INITIAL_PROGRESS), v: 2 }],
+    ['another version', { ...encodeProgress(INITIAL_PROGRESS), v: 3 }],
+    ['no version', { counter: 0, windowMs: 2500, prestige: 0, recentWins: [], best: null }],
     ['a counter past the clamp', { ...encodeProgress(INITIAL_PROGRESS), counter: 9 }],
     ['a window under the floor', { ...encodeProgress(INITIAL_PROGRESS), windowMs: 100 }],
     ['a window over the base', { ...encodeProgress(INITIAL_PROGRESS), windowMs: 2600 }],
