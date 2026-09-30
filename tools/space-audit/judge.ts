@@ -9,9 +9,12 @@
 // its box), `targets` (every control 44px on a touch emulation), `frame` (`data-frame` on
 // backgammon alone) and `gutter` (content 4px off every edge of an unframed page, and no text under
 // the notch or the home indicator). The thresholds are LIMITS below, one row per screen kind, a
-// comment per number.
-import type { Emulation, Insets } from '../../web/shared/lib/devices.ts';
-import type { Check, Verdict } from '../shell-emulate.ts';
+// comment per number. Two outcomes beside ok and FAIL, grey on the sheet: `tier` (the document
+// scrolls where the page's own theme means it to: backgammon's twin, or a `fixed-screen` body the
+// theme lifted) and `gate` (the phone is held the way the page gates against, so the turn gate is
+// the screen: only its standing is judged).
+import type { Emulation, Insets, Orientation } from '../../web/shared/lib/devices.ts';
+import { twinOf } from '../shell-emulate.ts';
 
 /** The pages the audit drives: the four games, the solo page and the tool (tools/games.ts PAGE_HOOKS). */
 export type PageId = 'gin-rummy' | 'fidice' | 'briscola' | 'backgammon' | 'rps' | 'ui-sandbox';
@@ -28,7 +31,15 @@ export const FRAMED: ReadonlyArray<PageId> = ['backgammon', 'ui-sandbox'];
 
 /** What a screen is for, which picks its LIMITS row. */
 export type ScreenKind = 'home' | 'table' | 'tool';
-export type Screen = Readonly<{ id: string; kind: ScreenKind }>;
+export type Screen = Readonly<{
+  id: string;
+  kind: ScreenKind;
+  /**
+   * The player dismissed the turn gate and kept the phone the way the page gates against
+   * (backgammon's "Play upright"): the screen is judged as a table in full, not as a gate.
+   */
+  kept?: boolean;
+}>;
 
 export type Side = 'top' | 'right' | 'bottom' | 'left';
 export const SIDES: ReadonlyArray<Side> = ['top', 'right', 'bottom', 'left'];
@@ -49,8 +60,24 @@ export type Measured = Readonly<{
   scrollWidth: number;
   /** `body.fixed-screen`: the shell's table state (shell.css: 100dvh, overflow hidden). */
   fixedScreen: boolean;
+  /**
+   * A `fixed-screen` body whose computed `overflow-y` is `visible`: the theme's own scroll tier
+   * lifted the fixed screen (gin's and backgammon's theme.css `body.fixed-screen { height: auto;
+   * overflow: visible }` under their short-viewport media queries), so a document scroll is meant.
+   */
+  lifted: boolean;
   /** `body[data-frame]`. */
   frame: boolean;
+  /** `body[data-plays]` (web/shared/markup/shell.ts `bodyAttrsOf`): the way the page plays; null where it plays either way. */
+  plays: Orientation | null;
+  /** The shell's turn gate (`#turnGate`, shellPaint.ts `paintGate`) is shown. */
+  gate: boolean;
+  /**
+   * `document.fullscreenElement` is set: the shell's Android lock is held (shell.ts `lockSideways`;
+   * Chromium's emulated phone grants it), the page turned the phone and no gate is due; the case's
+   * viewport cannot follow the turn, so what stands under it is not a phone's screen.
+   */
+  locked: boolean;
   /** `#app`'s computed padding: the shell's clearance on a framed page, the theme's gutter elsewhere. */
   pad: Sides;
   /** `--gutter` on `#app` in px where the theme declares one; null where none does (the table's default stands). */
@@ -119,6 +146,65 @@ export type Record_ = Readonly<{
   m: Measured;
 }>;
 
+/** A column's outcome: `ok` and `FAIL` count; `tier` and `gate` are by design, grey on the sheet, and pass. */
+export type Outcome = 'ok' | 'FAIL' | 'tier' | 'gate';
+export const OUTCOMES: ReadonlyArray<Outcome> = ['ok', 'FAIL', 'tier', 'gate'];
+/** One column of one screen: shell-emulate's `Check` with the outcome spelled out. */
+export type AuditCheck = Readonly<{
+  name: string;
+  pass: boolean;
+  outcome: Outcome;
+  detail: string;
+}>;
+export type AuditVerdict = Readonly<{ pass: boolean; checks: ReadonlyArray<AuditCheck> }>;
+/** The six columns, in the table's order. */
+export const COLUMNS: ReadonlyArray<string> = [
+  'used',
+  'scroll',
+  'clip',
+  'targets',
+  'frame',
+  'gutter',
+];
+
+const checkOf = (name: string, pass: boolean, detail: string): AuditCheck => ({
+  name,
+  pass,
+  outcome: pass ? 'ok' : 'FAIL',
+  detail,
+});
+/** A column not judged on this screen, by design: passes, grey. */
+const byDesign = (name: string, outcome: 'tier' | 'gate', detail: string): AuditCheck => ({
+  name,
+  pass: true,
+  outcome,
+  detail,
+});
+
+/**
+ * The phone is held the way the page gates against (`data-plays` names the other orientation) on
+ * a screen past the home, and the player did not keep it: the turn gate is the screen. A kept
+ * screen under the Android lock is one too: the lock turned the phone, there was no gate to keep,
+ * and the upright board under it is the emulation's, not a phone's.
+ */
+export const gatedOf = (r: Record_): boolean =>
+  r.m.plays !== null &&
+  r.m.plays !== r.e.orientation &&
+  r.screen.kind !== 'home' &&
+  (r.screen.kept !== true || r.m.locked);
+
+/**
+ * Why the document scrolls by design here, or null: backgammon's twin (tools/shell-emulate.ts
+ * `twinOf`: theme.css §3.10's upright tier at most 805px tall, the landscape floor sideways),
+ * else the theme lifted the fixed screen (`lifted`).
+ */
+export const tierOf = (r: Record_): string | null =>
+  r.page === 'backgammon' && twinOf(r.e).scrolls
+    ? `the twin says ${r.e.orientation === 'portrait' ? 'the §3.10 upright tier' : 'under the landscape floor'}`
+    : r.m.lifted
+      ? 'the theme lifts fixed-screen here'
+      : null;
+
 const pct = (n: number): string => `${String(Math.round(n * 1000) / 10)}%`;
 const px = (n: number): string => String(Math.round(n * 10) / 10);
 
@@ -162,59 +248,90 @@ export const sidesText = (inner: Measured['inner'], empty: Sides): string =>
 /**
  * The six checks over one record. `used`: every side's empty fraction within the screen kind's
  * limit. `scroll`: never wider than the viewport; taller only where the kind may and the body is
- * not `fixed-screen`. `clip`: no nowrap overflow. `targets`: all 44px. `frame`: the attribute on
- * backgammon alone. `gutter`: on an unframed page every gap at least the gutter (the theme's
- * `--gutter`, else 4px) on a side with no inset (a side with one is the inset's rule below); on
- * every page no text box crosses an inset band.
+ * not `fixed-screen`, or where the page's tier means it (`tier`). `clip`: no nowrap overflow.
+ * `targets`: all 44px. `frame`: the attribute on backgammon alone. `gutter`: on an unframed page
+ * every gap at least the gutter (the theme's `--gutter`, else 4px) on a side with no inset (a side
+ * with one is the inset's rule below); on every page no text box crosses an inset band. Under a
+ * gate (`gatedOf`) `used` is the gate standing, `frame` is judged, the other four are `gate`.
  */
-export const judge = (r: Record_): Verdict => {
+export const judge = (r: Record_): AuditVerdict => {
   const { m, e, page, screen } = r;
+  const wantFrame = FRAMED.includes(page);
+  const frame = checkOf(
+    'frame',
+    m.frame === wantFrame,
+    `data-frame ${m.frame ? 'present' : 'absent'}, ${wantFrame ? 'wanted' : 'not wanted'} on ${page}`,
+  );
+  if (gatedOf(r)) {
+    const held = e.orientation === 'portrait' ? 'upright' : 'sideways';
+    // The gate, or the Android lock in its place (the page turned the phone; the emulated viewport stays).
+    const stands = checkOf(
+      'used',
+      m.gate || m.locked,
+      m.gate
+        ? `the turn gate stands: the page plays ${String(m.plays)}, the phone is ${held}`
+        : m.locked
+          ? `the Android lock is held: the page turned the phone ${String(m.plays)} (the emulated viewport stays ${held})`
+          : `the page plays ${String(m.plays)} and no turn gate stands ${held}`,
+    );
+    const under = m.gate
+      ? `not judged: the turn gate is the screen ${held}`
+      : `not judged: the Android lock turned the phone; the ${held} viewport is the emulation's`;
+    return {
+      pass: stands.pass && frame.pass,
+      checks: [
+        stands,
+        byDesign('scroll', 'gate', under),
+        byDesign('clip', 'gate', under),
+        byDesign('targets', 'gate', under),
+        frame,
+        byDesign('gutter', 'gate', under),
+      ],
+    };
+  }
   const limits = LIMITS[screen.kind];
   const gaps = gapsOf(m.inner, m.used);
   const room = roomOf(m.pad, e.insets);
   const empty = emptyOf(gaps, room);
   const over = SIDES.filter((s) => fractionOf(m.inner, s, empty[s]) > limits.emptyMax[s] + 1e-9);
-  const used: Check = {
-    name: 'used',
-    pass: m.used !== null && over.length === 0,
-    detail:
-      m.used === null
+  // A gate standing the way the page plays is a bug, not a screen: the audit is looking at a sheet.
+  const used = checkOf(
+    'used',
+    m.used !== null && over.length === 0 && !m.gate,
+    m.gate
+      ? `a turn gate stands although the page plays ${String(m.plays)} and the phone is held so`
+      : m.used === null
         ? 'nothing painted under #app'
         : `empty ${sidesText(m.inner, empty)}${over.length === 0 ? '' : `; over the ${screen.kind} limit: ${over.join(', ')}`} (room t/r/b/l ${SIDES.map((s) => px(room[s])).join('/')})`,
-  };
+  );
   const wide = m.scrollWidth > m.inner.w + SCROLL_SLACK;
   const tall = m.scrollHeight > m.inner.h + SCROLL_SLACK;
   const mayScroll = limits.mayScroll && !m.fixedScreen;
-  const scroll: Check = {
-    name: 'scroll',
-    pass: !wide && (!tall || mayScroll),
-    detail: `${String(m.scrollWidth)}x${String(m.scrollHeight)} in ${String(m.inner.w)}x${String(m.inner.h)}${
-      wide ? '; scrolls sideways' : ''
-    }${tall ? (mayScroll ? '; scrolls down (allowed here)' : `; scrolls down on a ${m.fixedScreen ? 'fixed-screen' : screen.kind} screen`) : ''}`,
-  };
-  const clip: Check = {
-    name: 'clip',
-    pass: m.clipped.length === 0,
-    detail:
-      m.clipped.length === 0
-        ? 'no one-line slot clips'
-        : m.clipped.map((c) => `${c.sel} by ${px(c.over)}px`).join(', '),
-  };
+  const tier = tall && !mayScroll && !wide ? tierOf(r) : null;
+  const size = `${String(m.scrollWidth)}x${String(m.scrollHeight)} in ${String(m.inner.w)}x${String(m.inner.h)}`;
+  const scroll: AuditCheck =
+    tier === null
+      ? checkOf(
+          'scroll',
+          !wide && (!tall || mayScroll),
+          `${size}${wide ? '; scrolls sideways' : ''}${tall ? (mayScroll ? '; scrolls down (allowed here)' : `; scrolls down on a ${m.fixedScreen ? 'fixed-screen' : screen.kind} screen`) : ''}`,
+        )
+      : byDesign('scroll', 'tier', `${size}; scrolls down by design: ${tier}`);
+  const clip = checkOf(
+    'clip',
+    m.clipped.length === 0,
+    m.clipped.length === 0
+      ? 'no one-line slot clips'
+      : m.clipped.map((c) => `${c.sel} by ${px(c.over)}px`).join(', '),
+  );
   const small = m.targets.filter((t) => Math.min(t.w, t.h) < TARGET_MIN - TOL);
-  const targets: Check = {
-    name: 'targets',
-    pass: small.length === 0,
-    detail:
-      small.length === 0
-        ? `${String(m.targets.length)} targets, all ${String(TARGET_MIN)}px`
-        : small.map((t) => `${t.sel} ${px(t.w)}x${px(t.h)}`).join(', '),
-  };
-  const wantFrame = FRAMED.includes(page);
-  const frame: Check = {
-    name: 'frame',
-    pass: m.frame === wantFrame,
-    detail: `data-frame ${m.frame ? 'present' : 'absent'}, ${wantFrame ? 'wanted' : 'not wanted'} on ${page}`,
-  };
+  const targets = checkOf(
+    'targets',
+    small.length === 0,
+    small.length === 0
+      ? `${String(m.targets.length)} targets, all ${String(TARGET_MIN)}px`
+      : small.map((t) => `${t.sel} ${px(t.w)}x${px(t.h)}`).join(', '),
+  );
   const gutter = m.gutterToken ?? GUTTER;
   // While the document scrolls, content at the bottom edge or crossing the bottom band is below
   // the fold, not against the glass or under the home indicator (the `scroll` column owns an
@@ -224,10 +341,10 @@ export const judge = (r: Record_): Verdict => {
     ? []
     : edges.filter((s) => e.insets[s] <= 0 && m.used !== null && gaps[s] < gutter - TOL);
   const hits = tall ? m.underInset.filter((h) => h.side !== 'bottom') : m.underInset;
-  const gutterCheck: Check = {
-    name: 'gutter',
-    pass: tight.length === 0 && hits.length === 0,
-    detail: [
+  const gutterCheck = checkOf(
+    'gutter',
+    tight.length === 0 && hits.length === 0,
+    [
       wantFrame
         ? "framed: the emulator's `clear` holds the band's clearance"
         : tight.length === 0
@@ -237,7 +354,7 @@ export const judge = (r: Record_): Verdict => {
         ? `nothing under an inset${tall ? ' (the bottom band skipped: the document scrolls)' : ''}`
         : `under the inset: ${hits.map((h) => `${h.sel} (${h.side})`).join(', ')}`,
     ].join('; '),
-  };
-  const checks: ReadonlyArray<Check> = [used, scroll, clip, targets, frame, gutterCheck];
+  );
+  const checks: ReadonlyArray<AuditCheck> = [used, scroll, clip, targets, frame, gutterCheck];
   return { pass: checks.every((c) => c.pass), checks };
 };

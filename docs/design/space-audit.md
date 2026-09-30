@@ -34,7 +34,11 @@ pass-and-play start (the switch, two names, Start, the curtain lifted; backgammo
 its roll modal rolled, the dice still) for gin, fidice (the shell path, `?shell=1`), briscola and
 backgammon; the armed round after Go for rps; the preview screen around example (a) for UI Sandbox
 (its home is the Info screen). A screen the drive cannot reach fails every column with the reason
-and stops the case.
+and stops the case. A page that plays one way (`<body data-plays>`, `ShellConfig.orientation`;
+backgammon plays sideways) held the other way stops at the shell's turn gate: that is its `table`
+screen upright, judged as a gate (below). Backgammon then adds a third screen upright only, `kept`:
+the gate dismissed with "Play upright" and the board rolled, the player's opt-out, judged as a table
+with the tier the theme intends (a second run since 2026-09-30; 56 more screens on its 224).
 
 **Measurement** (one page-side script, `measureScript`): the viewport and the document's size; the
 body's `fixed-screen` and `data-frame`; `#app`'s computed padding and its `--gutter` where a theme
@@ -44,7 +48,10 @@ something: a text node of its own, media or a control, a fill, an image, a shado
 surface covering 95% of the viewport both ways is a backdrop, not content); every `white-space:
 nowrap` element wider than its box; every control's box (`button`, `a[href]`, inputs, selects,
 `[role=button]`, the shell's `.btn .icon-btn .tab-btn .mode-btn .chip`); every text-bearing box
-crossing one of the case's inset bands.
+crossing one of the case's inset bands; the body's `data-plays`; whether a `fixed-screen` body's
+computed `overflow-y` is `visible` (`lifted`: the theme's own scroll tier took the fixed screen
+away, as gin's and backgammon's theme.css do under their short-viewport queries); whether the turn
+gate (`#turnGate`) is shown.
 
 **The room.** Per side, what the shell's padding or the inset takes, whichever is more
 (`roomOf`). Content may end at the room and waste nothing. The empty screen per side is the gap
@@ -52,33 +59,45 @@ from the viewport's edge to the used union's edge beyond the room, never negativ
 px and as a fraction of the viewport's height (top, bottom) or width (left, right).
 
 **The judge** (`judge`, pure over one record: the page, the screen, the emulation, the
-measurement), six checks, one column each in the `check` table:
+measurement), six checks, one column each in the `check` table. Each column's outcome is one of
+four: `ok` and `FAIL` count; `tier` and `gate` pass and print grey on the sheet: the page means it.
 
 | column    | rule                                                                                                                                                                                                                                                                                                                                                   |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `used`    | every side's empty fraction within the screen kind's limit (§3)                                                                                                                                                                                                                                                                                        |
-| `scroll`  | the document never wider than the viewport; taller only on a screen kind that may scroll and a body that is not `fixed-screen` (one px is rounding)                                                                                                                                                                                                    |
+| `used`    | every side's empty fraction within the screen kind's limit (§3); under a gate (below), that the turn gate stands                                                                                                                                                                                                                                       |
+| `scroll`  | the document never wider than the viewport; taller only on a screen kind that may scroll and a body that is not `fixed-screen` (one px is rounding); taller where the page's tier means it is `tier`: backgammon's twin (`twinOf(e).scrolls`: §3.10's upright tier at most 805px tall, the landscape floor sideways) or a `lifted` fixed-screen body |
 | `clip`    | no nowrap element wider than its box                                                                                                                                                                                                                                                                                                                   |
 | `targets` | every control at least 44px each way (the shell's `.icon-btn` and `.btn-sm` floor)                                                                                                                                                                                                                                                                     |
 | `frame`   | `data-frame` on backgammon and on UI Sandbox (the frame's own demo), on no other page                                                                                                                                                                                                                                                                  |
 | `gutter`  | on an unframed page the content at least 4px (the theme's `--gutter` where one exists; none does today) off every edge that has no inset (a framed page's clearance is shell-emulate's `clear`); on every page no text box under an inset band; while the document scrolls the bottom edge and band are skipped (below the fold is not under the glass) |
 
+**The gate** (`gatedOf`): the body's `data-plays` names the other orientation, the screen is past
+the home and the player did not keep the phone (`Screen.kept`). The turn gate is the screen: `used`
+is the gate standing (a missing gate is the failure, there), `frame` is judged as ever, and
+`scroll`, `clip`, `targets` and `gutter` are `gate`. A gate standing the way the page plays fails
+`used` on a plain screen: the audit is looking at a sheet, not a table.
+
 **Output.** Per page under `shots/space-audit/<page>/` (gitignored with the rest of `shots/`): a PNG
 per case x screen at the device's pixel ratio, `index.html` (the contact sheet: one card per case in
 `npm run shots`'s layout in the sandbox's dark palette; per screen the picture, the empty px and
 fraction per side, the room and `#app`'s padding, the document against the viewport, the six checks,
-red where one fails; the device line under each card) and `report.json` (every record, every
-verdict, the totals). On stdout one `check` table per page (shell-emulate's `summaryTable`: one row
-per case x screen, the six columns, `pass`/`FAIL`), the totals per page and a combined
-`shots/space-audit/report.json`. Exit 1 on any failure.
+red where one fails, grey with a `tier` or `gate` badge where the page means it; the device line
+under each card) and `report.json` (every record, every verdict with its outcomes, the totals). On
+stdout one `check` table per page (`tools/space-audit/rows.ts` `checkTable`: one row per case x
+screen, the six columns, `ok`/`FAIL`/`tier`/`gate`, `pass`/`FAIL` last), the totals per page and a
+combined `shots/space-audit/report.json`. Exit 1 on any failure.
 
 **Running it.** `npm run build`, then `npm run audit:space` (all six pages, one after another;
 minutes: four cases run at once, `--jobs`; six processes with `--game` and distinct `--port`s run
 the pages side by side in about four minutes), or `npm run audit:space -- --game gin-rummy --device
 iphone-390x844 --mode standalone`. `--url <site>` audits a served site instead of dist/; `--port`
-fixes the local server's port (0, a free one, by default); `--out` moves the folder. The pure parts
-(the judge, the room arithmetic, the command line, the cases, the sheet, the totals) are
-`tools/space-audit/judge.test.ts`'s, in the harness suite; the drive is proved by running it.
+fixes the local server's port (0, a free one, by default); `--out` moves the folder. `--baseline
+<page report.json>` (an earlier run's, the first run's `pass`-only checks included) prints, instead
+of the check table, only the rows whose outcome moved in any column (`scroll FAIL→tier`), so a
+per-game lane sees what its change moved and nothing else. The pure parts (the judge, the room
+arithmetic, the tiers and the gate, the command line, the cases, the sheet, the rows, the diff, the
+totals) are `tools/space-audit/judge.test.ts`'s, in the harness suite; the drive is proved by
+running it.
 
 ## 3. The thresholds and why
 
@@ -100,11 +119,14 @@ which feeds the shell's `--frame-inset-*` and `--inset-*` alone. A `gutter` fail
 is UNVERIFIED on a phone; the fix that makes it visible to the audit and the emulator alike is to
 read the shell's variables instead of `env()`.
 
-What the judge does not know: a page's own scroll tiers. Backgammon's theme scrolls upright by
-design under 806px tall (theme.css §3.10; shell-emulate's twin says `scrolls`), gin's under its
-short-phone tier (theme.css: `body.fixed-screen { height: auto }` where two rows and the piles do
-not fit); the audit's `scroll` column reads `fixed-screen` alone and flags both. A second pass
-should read each page's tier (backgammon's through `twinOf(e).scrolls`) before failing the row.
+What the judge reads of the page's intent (the second pass, 2026-09-30): the scroll tiers, through
+backgammon's twin (`twinOf(e).scrolls`: theme.css §3.10, at most 805px tall upright; the landscape
+floor sideways, under which no catalogued phone falls) and through the measured `lifted` (a
+`fixed-screen` body whose theme set `overflow: visible`: gin's `(max-height: 661px)` and its
+three-row `(max-height: 736px)` tiers, backgammon's two), both `tier`; and the way the page plays,
+through `data-plays`, so the orientation it gates against is judged by its gate (§2). The tier
+read is the page's own CSS as applied, not a table that could drift from it; the twin is the model
+the emulator already checks the page against.
 
 ## 4. The first run
 
@@ -122,6 +144,28 @@ the rebase is the per-game rows' first step), 14 phones x 8 cases x 2 screens pe
 
 The `frame` column is clean everywhere: backgammon and the sandbox carry `data-frame`, no other
 page does. No screen failed to be reached.
+
+### 4.1 The second run
+
+2026-09-30, over dist/ built from 0b92447b (#193's tight tier and #194's sandbox in), with the
+judge as §2 now describes it (the tiers, the gate, the Android lock), each page run with
+`--baseline` the first run's report. `tier` and `gate` are outcomes, not failures, and are counted
+apart; backgammon has a third screen upright (`kept`), so 280 screens.
+
+| page       | cases pass | screens pass | failures per column                          | by design                        |
+| ---------- | ---------- | ------------ | -------------------------------------------- | -------------------------------- |
+| gin-rummy  | 0 of 112   | 0 of 224     | used 60, targets 224, gutter 84              | scroll tier 60 (was FAIL 60)     |
+| fidice     | 0 of 112   | 0 of 224     | targets 224, gutter 224                      | none (no change)                 |
+| briscola   | 13 of 112  | 101 of 224   | used 36, gutter 87                           | scroll tier 57 (was FAIL 57)     |
+| backgammon | 92 of 112  | 260 of 280   | clip 20, targets 4                           | gate 56 + 8 kept, scroll tier 22 |
+| rps        | 5 of 112   | 74 of 224    | used 60, scroll 74, gutter 129               | none (no change)                 |
+| ui-sandbox | 0 of 112   | 112 of 224   | targets 112                                  | none (no change)                 |
+
+What moved against the first run: gin's and briscola's `scroll` columns are clean (every one of
+their scrolls is a theme's tier, read as `lifted`); backgammon's upright `table` rows are the gate's
+(and on the Android rows the lock's), its `kept` rows carry the §3.10 tier and the upright board's
+real findings; nothing else changed, the sandbox's `targets` after #194 included. The `--baseline`
+diff printed exactly those rows and no other.
 
 ## 5. Findings per game
 
@@ -141,10 +185,13 @@ scroll the page's own theme intends (§3).
   on every home screen (`targets`, gin 112 and fidice 112 cases). Real; briscola's are 44.
 - Sideways, every upright game is the shell's 480px column centred in an 812-956px viewport: the
   table leaves 17-18% empty a side (`used`, 36 cases each for gin and briscola, 56 for rps) and the
-  column runs 612-828px tall in a 375-440px viewport on a `fixed-screen` body (`scroll`, 56 sideways
-  cases each). Real, and the largest finding: an upright game held sideways either gates and locks
-  as backgammon does (`ShellConfig.orientation: 'portrait'`, the sandbox's mirror) or lays its
-  table out for landscape.
+  column runs 612-828px tall in a 375-440px viewport (`scroll`, 56 sideways cases each). The second
+  run reads the scroll as the themes mean it: gin's `(max-height: 661px)` and briscola's
+  `(max-height: 638px) and (max-width: 899px)` tiers lift the fixed screen there, so their 56 are
+  `tier`; rps has no fixed screen and no tier, so its 56 stand. The empty sides are Real either
+  way, and the largest finding: an upright game held sideways either gates and locks as backgammon
+  does (`ShellConfig.orientation: 'portrait'`, the sandbox's mirror) or lays its table out for
+  landscape.
 
 **gin-rummy** (0 of 112):
 
@@ -152,8 +199,10 @@ scroll the page's own theme intends (§3).
   (24 cases; the XR/XS Max 34.8%, the 12 30.8%): over the owner's 30% by 1-5 points, so either
   the last card sits higher than it need or the allowance is a point low. Real, marginal.
 - Table controls under 44px: `#discardsBtn` 36x36, `#arrangeBtn` 67x20, every case. Real.
-- Table `scroll` 60: 56 sideways (above) and 4 upright on the SE and the Galaxy, where gin's own
-  short-phone tier lifts `fixed-screen` (theme.css `body.fixed-screen { height: auto }`). Tier.
+- Table `scroll` 60: 56 sideways (above) and 4 upright (the SE in a tab, bar shown and hidden; the
+  X and the mini in a tab with the bar shown, at the three-row tier), where gin's own short-phone
+  tiers lift `fixed-screen` (theme.css `body.fixed-screen { height: auto; overflow: visible }`).
+  Tier: the second run marks all 60 `tier` (`lifted`); gin's `scroll` column is clean.
 - Table `gutter` 60: 44 upright with the topbar under the notch (shell-wide, Real) and 20 with the
   actions row (`button.btn (bottom)`) under the home indicator. env(): gin pads the bottom
   `calc(16px + env(safe-area-inset-bottom))`, which the seam cannot feed.
@@ -175,28 +224,38 @@ scroll the page's own theme intends (§3).
   42px tall and `#btnConfigSolo` 36px wide. Real (the restyle's list).
 - `used` and `scroll` pass on every case: the full-width legacy layout fills both ways.
 
-**briscola** (9 of 112):
+**briscola** (9 of 112 in the first run; 13 of 112 in the second):
 
 - Table `gutter` 63: `#playBtn` and `#deckBtn` under the home indicator on every notched phone
   upright and sideways (env(): briscola pads `calc(12px + env(safe-area-inset-bottom))`), and the
   topbar under the notch upright standalone and fullscreen (shell-wide, Real).
-- Table `used` 36 and `scroll` 57 (56 sideways: shell-wide; 1 upright on the SE in a tab with the
-  bar shown, 375x553, where three cards and the trick do not fit: Real, the short-phone budget).
-- Every control is 44px; nothing clips. The nine passing cases are the notch-free Galaxy and the
-  SE in a tab upright.
+- Table `used` 36 (sideways: shell-wide) and `scroll` 57 (56 sideways; 1 upright on the SE in a
+  tab with the bar shown, 375x553). Tier, all 57: briscola's theme scrolls by design under 638px
+  tall on a phone ("the document scrolls instead of clipping the actions row"; `--card-w` floored
+  at 72px makes a 639px column), which the second run reads as `lifted`. The SE's 553px is that
+  tier, not a budget miss.
+- Every control is 44px; nothing clips. The passing cases are the notch-free Galaxy and the SE in a
+  tab upright, plus the four the tier read freed.
 
-**backgammon** (73 of 112; the framed page):
+**backgammon** (73 of 112 in the first run; 92 of 112 in the second, 260 of 280 screens; the
+framed page, the one that plays sideways):
 
-- `scroll` 26, all upright, every viewport 805px tall or less (the tabs on every iPhone, the SE
-  and the Galaxy in every mode): the §3.10 tier the theme intends. Tier; the judge should read the
-  twin (§3).
-- `clip` 24: `#oppName` by 25px on the 375-wide phones upright (the X, the mini: 16 cases) and
-  `#statusLine` by 4px sideways in a tab (4 cases). Real: the seat's name slot is 25px short of
-  "Ethan" at 375px, and the status line one word over at the narrowest sideways viewport.
-- `targets` 9 upright: the points 39.3-43px tall on the X (39.8), the mini (39.3), the 12 (42.3),
-  the 14 Pro class (41.9) standalone and fullscreen, and the Air with the bar hidden (43). Real
-  against 74fd551a; #193 ("upright under the notch the chrome tightens so the rows reach 44px")
-  landed after this run and may close it: re-run first.
+- Upright the `table` screen is the turn gate (§2): it stands on every iPhone row (48 cases; the
+  drive drops `screen.orientation.lock` there, as no iPhone browser has one) and on the Android
+  rows the shell's lock is held instead (8 cases, `locked`: the page turned the phone, which the
+  emulated viewport cannot follow), so `used` passes on all 56 and the four other columns are
+  `gate`. The 8 Android `kept` rows are the lock's too.
+- `scroll` 26 upright in the first run: now `tier` 22 on the `kept` board (the twin's §3.10 tier
+  at most 805px tall: every iPhone tab, the SE in every mode), the 4 Galaxy rows under the lock.
+  Clean.
+- `clip` 24 → 20: `#oppName` on the kept board by 25px on the 375-wide phones upright (the X, the
+  mini, the SE: 12 cases) and by 10px on the 390-wide 12 (4 cases, new against 74fd551a: the tight
+  tier's narrower chrome), and `#statusLine` by 7px sideways on the mini in every mode (4 cases; 4px
+  in a tab before). Real: the seat's name slot is short of "Ethan" at 375-390px, the status line a
+  word over at the narrowest sideways viewport.
+- `targets` 9 → 4: #193's tight tier reaches 44px on the 12, the 14 Pro class and the Air; the X
+  (41.8) and the mini (41.3) standalone and fullscreen are still short, the 375-wide room under the
+  notch being 12px less than the tier's arithmetic assumes. Real.
 - `used`, `frame` and `gutter` pass on every case: the framed board fills its room both ways.
 
 **rps** (5 of 112):
@@ -214,13 +273,19 @@ scroll the page's own theme intends (§3).
   (Real: sideways the top inset is 0 on a phone too, so the bar meets the glass; a 4px gutter).
 - Every control is 44px; nothing clips.
 
-**ui-sandbox** (0 of 112; one finding):
+**ui-sandbox** (0 of 112; one finding, unchanged after #194):
 
 - The preview's controls (`#previewExampleSel`, `#previewNextBtn`, `#previewInfoBtn`) are 32px
   tall (`targets`, every case). Real, a tool's: 44px, or exempt tooling from the rule.
 - `used`, `scroll`, `frame` and `gutter` pass on every case: example (a) fills the room within 2%
   on every phone, both ways.
 
-**The audit itself** (what the second pass teaches it): the pages' scroll tiers (§3); a
-`ShellConfig.orientation` read so a gated orientation is judged by its gate and not its table;
-the sandbox's other examples; the iPads by default once a desktop layout has its own limits.
+**The audit itself.** The second pass (this document's §2-§3 as they stand) taught it the pages'
+scroll tiers, the way a page plays and the turn gate, the Android lock in the gate's place, and a
+`--baseline` diff. Left: desktop cases (the owner, 2026-09-30: "There's also desktop": fine-pointer
+windows of 900x700, 1024x768, 1280x800, 1440x900 and 1920x1080 in `browser` mode with no insets,
+both screens, their own `LIMITS` rows (a home may leave 40% below its last card, a table at most
+10% a side, targets 32px with a fine pointer) and a `desktop` group on the sheets; an `Emulation`
+needs a catalogued `Device`, so this is a second case type through the judge, the drive, the sheet
+and the rows); the sandbox's other examples; the iPads by default once a desktop layout has its
+own limits.

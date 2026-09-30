@@ -7,15 +7,21 @@
 // stood up in Playwright Chromium at the device's viewport, screen and pixel ratio with the insets
 // through the shell's seam (tools/shell-emulate.ts `seamScript`) and one seed for every deal, then
 // measured by one page-side script (`measureScript`) and judged by one pure function
-// (tools/space-audit/judge.ts). Output per page under shots/space-audit/<page>/ (gitignored): a
-// PNG per screen, index.html (tools/space-audit/sheet.ts) and report.json; a `check` table per page
-// on stdout (shell-emulate's `summaryTable`: one row per case x screen, the six columns) and a
-// combined report.json with the totals; exit 1 on any failure.
+// (tools/space-audit/judge.ts). A page that plays one way (`data-plays`) held the other way stops
+// at the shell's turn gate: that screen is judged as a gate; backgammon adds a `kept` screen
+// upright, the gate dismissed with "Play upright", judged as a table. Output per page under
+// shots/space-audit/<page>/ (gitignored): a PNG per screen, index.html (tools/space-audit/sheet.ts)
+// and report.json; a `check` table per page on stdout (tools/space-audit/rows.ts `checkTable`: one
+// row per case x screen, the six columns, ok/FAIL/tier/gate) and a combined report.json with the
+// totals; exit 1 on any failure.
 //   npm run audit:space [-- --game <page>] [--device <id>] [--orientation ..] [--mode ..] [--bar ..]
 //                       [--url <site> | --serve] [--out <dir>] [--port <n>] [--jobs <n>]
+//                       [--baseline <page report.json>]
 // `--serve` (the default without `--url`) serves dist/ (run `npm run build` first) on `--port`
-// (0: a free one); `--jobs` cases run at once (4). The pure parts are tools/space-audit/judge.test.ts's.
-import { mkdirSync, writeFileSync } from 'node:fs';
+// (0: a free one); `--jobs` cases run at once (4); `--baseline` prints, instead of the check table,
+// only the rows whose outcome moved against that earlier report. The pure parts are
+// tools/space-audit/judge.test.ts's.
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -39,15 +45,25 @@ import {
 import type { OrientationType } from '../web/shared/lib/safeArea.ts';
 import { PAGES_BASE_PATH } from '../e2e/fixtures/site.ts';
 import { PAGE_HOOKS } from './games.ts';
-import {
-  DICE_STILL,
-  SEED_SCRIPT,
-  seamScript,
-  summaryTable,
-  type Verdict,
-} from './shell-emulate.ts';
+import { DICE_STILL, SEED_SCRIPT, seamScript } from './shell-emulate.ts';
 import { startServer } from './serve-dist.ts';
-import { PAGE_IDS, judge, type Measured, type PageId, type Screen } from './space-audit/judge.ts';
+import {
+  COLUMNS,
+  PAGE_IDS,
+  judge,
+  type AuditVerdict,
+  type Measured,
+  type PageId,
+  type Screen,
+} from './space-audit/judge.ts';
+import {
+  changedRows,
+  changesTable,
+  checkTable,
+  rowsOf,
+  rowsOfReport,
+  type Row,
+} from './space-audit/rows.ts';
 import { cardPasses, sheetHtml, type AuditCard, type ScreenResult } from './space-audit/sheet.ts';
 
 export type AuditArgs = Readonly<{
@@ -60,6 +76,8 @@ export type AuditArgs = Readonly<{
   out: string;
   port: number;
   jobs: number;
+  /** An earlier page report.json: print the rows whose outcomes moved, not the whole table. */
+  baseline: string | null;
 }>;
 
 const oneOf = <T extends string>(
@@ -95,6 +113,7 @@ export const parseAuditArgs = (argv: ReadonlyArray<string>): AuditArgs => {
       out: { type: 'string', default: 'shots/space-audit' },
       port: { type: 'string' },
       jobs: { type: 'string' },
+      baseline: { type: 'string' },
     },
   });
   const device = values.device ?? null;
@@ -112,6 +131,7 @@ export const parseAuditArgs = (argv: ReadonlyArray<string>): AuditArgs => {
     out: values.out,
     port: count('port', values.port, 0),
     jobs: Math.max(1, count('jobs', values.jobs, 4)),
+    baseline: values.baseline ?? null,
   };
 };
 
@@ -153,7 +173,8 @@ export const TARGET_SELECTOR =
  * the viewport both ways is a backdrop, not content), clipped to the viewport; every nowrap
  * element wider than its box; every control's box; every text-bearing box crossing one of the
  * case's inset bands (the page cannot read the insets here: headless reports 0, so the case's are
- * spliced in).
+ * spliced in); the body's `data-plays`; whether a `fixed-screen` body's computed `overflow-y` is
+ * `visible` (the theme's scroll tier lifted it); whether the turn gate (`#turnGate`) is shown.
  */
 export const measureScript = (e: Emulation): string => `(() => {
   const TOL = 0.5;
@@ -182,12 +203,19 @@ export const measureScript = (e: Emulation): string => `(() => {
   const appStyle = app === null ? null : cs(app);
   const pad = appStyle === null ? { top: 0, right: 0, bottom: 0, left: 0 } : { top: px(appStyle.paddingTop), right: px(appStyle.paddingRight), bottom: px(appStyle.paddingBottom), left: px(appStyle.paddingLeft) };
   const gutterRaw = appStyle === null ? '' : appStyle.getPropertyValue('--gutter').trim();
+  const fixedScreen = document.body.classList.contains('fixed-screen');
+  const plays = document.body.getAttribute('data-plays');
+  const gateEl = document.getElementById('turnGate');
   return {
     inner: { w: W, h: H },
     scrollHeight: document.documentElement.scrollHeight,
     scrollWidth: document.documentElement.scrollWidth,
-    fixedScreen: document.body.classList.contains('fixed-screen'),
+    fixedScreen,
+    lifted: fixedScreen && cs(document.body).overflowY === 'visible',
     frame: document.body.hasAttribute('data-frame'),
+    plays: plays === 'landscape' || plays === 'portrait' ? plays : null,
+    gate: gateEl !== null && shown(gateEl),
+    locked: document.fullscreenElement !== null,
     pad,
     gutterToken: gutterRaw === '' ? null : px(gutterRaw),
     used,
@@ -201,7 +229,8 @@ export const measureScript = (e: Emulation): string => `(() => {
 
 /** What a screen's reach gets: the page's URL for this case and the case. */
 type Reach = (page: Page, url: string, e: Emulation) => Promise<void>;
-type ScreenDrive = Screen & Readonly<{ reach: Reach }>;
+/** A screen and how to reach it; `only` keeps it to one orientation (backgammon's `kept` is upright's). */
+type ScreenDrive = Screen & Readonly<{ reach: Reach; only?: Orientation }>;
 type PageDrive = Readonly<{
   /** The page's path under the site root, with any query the audited path needs. */
   path: string;
@@ -234,15 +263,28 @@ const home =
     await settle(page);
   };
 
-/** The shell's pass-and-play start (e2e/fixtures/shell.ts `startLocal`): the switch, two names, Start; the table up; backgammon's turn gate kept. */
-const shellLocal = async (page: Page): Promise<void> => {
+/**
+ * The shell's pass-and-play start (e2e/fixtures/shell.ts `startLocal`): the switch, two names,
+ * Start; the table up. Where the turn gate stands (a page that plays sideways, the phone upright)
+ * the drive stops there and says so: that screen is the gate's, judged as one.
+ */
+const shellLocal = async (page: Page): Promise<'gate' | 'table'> => {
   await page.locator('#playModeSwitch .mode-btn[data-mode="local"]').click();
   await page.locator('#p1NameInput').fill('Ari');
   await page.locator('#p2NameInput').fill('Ethan');
   await page.locator('#localBtn').click();
   await page.locator('#tableScreen').waitFor({ state: 'visible' });
-  const gate = page.locator('#turnGate');
-  if (await gate.isVisible()) await page.locator('#turnGateKeepBtn').click();
+  return (await page.locator('#turnGate').isVisible()) ? 'gate' : 'table';
+};
+/** backgammon's rolled board from the lifted curtain: the roll modal rolled, the dice still. */
+const rolledBoard = async (page: Page): Promise<void> => {
+  await reveal(page);
+  await page.locator('#rollOverlay').waitFor({ state: 'visible' });
+  await page.locator('#rollModalBtn').click();
+  await page.locator('#board[data-rolled="1"]').waitFor();
+  await page.locator('#rollOverlay').waitFor({ state: 'hidden' });
+  await page.waitForFunction(DICE_STILL);
+  await settle(page);
 };
 /** The curtain is up; the seat behind it taps; it goes. */
 const reveal = async (page: Page): Promise<void> => {
@@ -315,16 +357,29 @@ const PAGES: Readonly<Record<PageId, PageDrive>> = {
       {
         id: 'table',
         kind: 'table',
-        // shell-emulate's drive: the curtain, the roll modal, the rolled board with the dice still.
+        // Sideways, shell-emulate's drive: the curtain, the roll modal, the rolled board with the
+        // dice still. Upright the turn gate stands over the table and the curtain: the screen.
         reach: async (page) => {
-          await shellLocal(page);
-          await reveal(page);
-          await page.locator('#rollOverlay').waitFor({ state: 'visible' });
-          await page.locator('#rollModalBtn').click();
-          await page.locator('#board[data-rolled="1"]').waitFor();
-          await page.locator('#rollOverlay').waitFor({ state: 'hidden' });
-          await page.waitForFunction(DICE_STILL);
-          await settle(page);
+          if ((await shellLocal(page)) === 'gate') {
+            await settle(page);
+            return;
+          }
+          await rolledBoard(page);
+        },
+      },
+      {
+        id: 'kept',
+        kind: 'table',
+        kept: true,
+        only: 'portrait',
+        // The player's opt-out: "Play upright" dismisses the gate; the board rolled as sideways.
+        // Where no gate stood (the `table` screen reached the board) the board is already up.
+        reach: async (page) => {
+          const gate = page.locator('#turnGate');
+          if (!(await gate.isVisible())) return;
+          await page.locator('#turnGateKeepBtn').click();
+          await gate.waitFor({ state: 'hidden' });
+          await rolledBoard(page);
         },
       },
     ],
@@ -367,9 +422,14 @@ const PAGES: Readonly<Record<PageId, PageDrive>> = {
   },
 };
 
-/** The screens a page is audited on, in the order the drive reaches them. */
-export const screensOf = (page: PageId): ReadonlyArray<Screen> =>
-  PAGES[page].screens.map(({ id, kind }) => ({ id, kind }));
+/** The screens a page is audited on, in the order the drive reaches them; held `orientation`, only that way's (every screen when null). */
+export const screensOf = (
+  page: PageId,
+  orientation: Orientation | null = null,
+): ReadonlyArray<Screen> =>
+  PAGES[page].screens
+    .filter((s) => orientation === null || s.only === undefined || s.only === orientation)
+    .map(({ id, kind, kept }) => (kept === undefined ? { id, kind } : { id, kind, kept }));
 
 // ---- the drive -----------------------------------------------------------------------------------
 
@@ -377,11 +437,12 @@ const fileNameOf = (e: Emulation, screen: string): string =>
   `${emulationName(e).replace(/\s+/g, '_')}--${screen}.png`;
 
 /** A verdict for a screen the drive never reached: every column fails with the reason. */
-const failed = (reason: string): Verdict => ({
+const failed = (reason: string): AuditVerdict => ({
   pass: false,
-  checks: ['used', 'scroll', 'clip', 'targets', 'frame', 'gutter'].map((name) => ({
+  checks: COLUMNS.map((name) => ({
     name,
     pass: false,
+    outcome: 'FAIL',
     detail: `not reached: ${reason}`,
   })),
 });
@@ -391,7 +452,11 @@ const unmeasured = (e: Emulation): Measured => ({
   scrollHeight: 0,
   scrollWidth: 0,
   fixedScreen: false,
+  lifted: false,
   frame: false,
+  plays: null,
+  gate: false,
+  locked: false,
   pad: { top: 0, right: 0, bottom: 0, left: 0 },
   gutterToken: null,
   used: null,
@@ -425,13 +490,15 @@ export const driveCase = async (
   });
   await context.addInitScript({ content: SEED_SCRIPT });
   await context.addInitScript({ content: seamScript(e) });
+  if (e.device.kind !== 'android') await context.addInitScript({ content: NO_LOCK_SCRIPT });
   const page = await context.newPage();
   page.setDefaultTimeout(15_000);
   type Acc = Readonly<{ done: ReadonlyArray<ScreenResult>; stopped: boolean }>;
   const one = async (prev: Promise<Acc>, s: ScreenDrive): Promise<Acc> => {
     const { done, stopped } = await prev;
     const picture = fileNameOf(e, s.id);
-    const screen: Screen = { id: s.id, kind: s.kind };
+    const screen: Screen =
+      s.kept === undefined ? { id: s.id, kind: s.kind } : { id: s.id, kind: s.kind, kept: s.kept };
     if (stopped)
       return {
         done: [
@@ -462,12 +529,22 @@ export const driveCase = async (
     }
   };
   try {
-    const { done } = await row.screens.reduce(one, Promise.resolve({ done: [], stopped: false }));
+    const screens = row.screens.filter((s) => s.only === undefined || s.only === e.orientation);
+    const { done } = await screens.reduce(one, Promise.resolve({ done: [], stopped: false }));
     return { e, screens: done };
   } finally {
     await context.close();
   }
 };
+
+/**
+ * No `screen.orientation.lock` on an iPhone or iPad row, as no browser there has one (shell.ts
+ * `canLock`; e2e/backgammon-gate.spec.ts's `absent`): Chromium's emulated phone has the function
+ * and grants it, so without this the shell's Android lock would take the upright table into
+ * fullscreen and no turn gate would ever stand. An Android row keeps Chromium's: the lock is held
+ * there as on the phone, and the judge reads it (`locked`).
+ */
+const NO_LOCK_SCRIPT = `Object.defineProperty(ScreenOrientation.prototype, 'lock', { value: undefined, configurable: true });`;
 
 const chunk = <T>(items: ReadonlyArray<T>, n: number): ReadonlyArray<ReadonlyArray<T>> =>
   Array.from({ length: Math.ceil(items.length / n) }, (_, i) => items.slice(i * n, (i + 1) * n));
@@ -541,13 +618,14 @@ const siteUrl = async (args: AuditArgs): Promise<Served> => {
   return { url: `${running.url}${PAGES_BASE_PATH}`, close: running.close };
 };
 
-/** One page: every case driven, the pictures, the sheet and the report written, the check table printed; the totals. */
+/** One page: every case driven, the pictures, the sheet and the report written, the check table (or, against a baseline, the changed rows) printed; the totals. */
 const auditPage = async (
   browser: Browser,
   site: string,
   args: AuditArgs,
   page: PageId,
   stamp: string,
+  baseline: ReadonlyArray<Row> | null,
 ): Promise<PageTotals> => {
   const dir = resolve(args.out, page);
   mkdirSync(dir, { recursive: true });
@@ -570,19 +648,23 @@ const auditPage = async (
       2,
     )}\n`,
   );
-  console.log(`\n${page}`);
+  const rows = rowsOf(cards);
+  console.log(`\n${page}${baseline === null ? '' : ` against ${String(args.baseline)}`}`);
   console.log(
-    summaryTable(
-      cards.flatMap((c) =>
-        c.screens.map((s) => [`${emulationName(c.e)} ${s.screen.id}`, s.verdict] as const),
-      ),
-    ),
+    baseline === null ? checkTable(rows) : changesTable(changedRows(baseline, rows), rows.length),
   );
   console.log(`sheet -> ${resolve(dir, 'index.html')}\n`);
   return totalsOf(cards);
 };
 
+/** `--baseline`'s rows, read once; null without the option. */
+const baselineRows = (args: AuditArgs): ReadonlyArray<Row> | null =>
+  args.baseline === null
+    ? null
+    : rowsOfReport(JSON.parse(readFileSync(resolve(args.baseline), 'utf8')) as unknown);
+
 const run = async (args: AuditArgs): Promise<number> => {
+  const baseline = baselineRows(args);
   const served = await siteUrl(args);
   const browser = await chromium.launch();
   const stamp = stampNow();
@@ -591,7 +673,7 @@ const run = async (args: AuditArgs): Promise<number> => {
     const totals = await pages.reduce<Promise<Readonly<Record<string, PageTotals>>>>(
       async (prev, page) => ({
         ...(await prev),
-        [page]: await auditPage(browser, served.url, args, page, stamp),
+        [page]: await auditPage(browser, served.url, args, page, stamp, baseline),
       }),
       Promise.resolve({}),
     );

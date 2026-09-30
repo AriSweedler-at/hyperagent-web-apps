@@ -1,10 +1,12 @@
 // The space audit's pure parts (docs/design/space-audit.md): the judge over a measured record, one
 // table row per rule (a full table, a wasted side, a clipped slot, a small target, a frame on the
-// wrong page, a box under the notch), the room and empty-side arithmetic, the command line, the
-// cases and the sheet. The drive itself is proved by `npm run audit:space`.
+// wrong page, a box under the notch, a scroll the page's tier means, the turn gate standing), the
+// room and empty-side arithmetic, the command line, the cases, the sheet, the check table and the
+// diff against a baseline. The drive itself is proved by `npm run audit:space`.
 import { describe, expect, test } from 'vitest';
 
 import { deviceById, emulationFor, type Emulation } from '../../web/shared/lib/devices.ts';
+import { twinOf } from '../shell-emulate.ts';
 import { PHONES, casesFor, pagesFor, parseAuditArgs, screensOf, totalsOf } from '../space-audit.ts';
 import {
   FRAMED,
@@ -16,12 +18,16 @@ import {
   emptyOf,
   fractionOf,
   gapsOf,
+  gatedOf,
   judge,
   roomOf,
+  tierOf,
   type Measured,
+  type Outcome,
   type PageId,
   type Screen,
 } from './judge.ts';
+import { changedRows, changesTable, checkTable, rowsOf, rowsOfReport } from './rows.ts';
 import { cardPasses, deviceLine, sheetHtml } from './sheet.ts';
 
 const iphone12 = deviceById('iphone-390x844');
@@ -46,7 +52,11 @@ const full = (e: Emulation, page: PageId = 'briscola'): Measured => {
     scrollHeight: h,
     scrollWidth: w,
     fixedScreen: true,
+    lifted: false,
     frame: FRAMED.includes(page),
+    plays: page === 'backgammon' ? 'landscape' : null,
+    gate: false,
+    locked: false,
     pad,
     gutterToken: null,
     used: {
@@ -65,6 +75,13 @@ const failing = (m: Measured, e: Emulation, screen = TABLE, page: PageId = 'bris
   judge({ page, screen, e, m })
     .checks.filter((c) => !c.pass)
     .map((c) => c.name);
+/** The outcome per column, `used scroll clip targets frame gutter`. */
+const outcomes = (
+  m: Measured,
+  e: Emulation,
+  screen = TABLE,
+  page: PageId = 'briscola',
+): ReadonlyArray<Outcome> => judge({ page, screen, e, m }).checks.map((c) => c.outcome);
 
 describe('the room and the empty sides', () => {
   test('the room is the padding or the inset, whichever is more', () => {
@@ -230,6 +247,115 @@ describe('the judge, one row per rule', () => {
       failing({ ...m, fixedScreen: true, scrollHeight: m.inner.h + 200 }, upright, HOME),
     ).toEqual(['scroll']);
   });
+  test('every column is ok or FAIL on a plain table, and the ok/FAIL outcome follows pass', () => {
+    expect(outcomes(full(sideways), sideways)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
+    const m = { ...full(sideways), clipped: [{ sel: '#x', over: 3 }] };
+    expect(outcomes(m, sideways)).toEqual(['ok', 'ok', 'FAIL', 'ok', 'ok', 'ok']);
+  });
+  test("a scroll the theme means (a lifted fixed-screen body) is `tier`, grey, and passes; a scroll it doesn't is FAIL", () => {
+    const seTab = emulationFor(se, 'portrait', 'browser', 'shown');
+    const m = { ...full(seTab, 'gin-rummy'), scrollHeight: seTab.viewport.height + 200 };
+    expect(outcomes(m, seTab, TABLE, 'gin-rummy')[1]).toBe('FAIL');
+    const lifted = { ...m, lifted: true };
+    const v = judge({ page: 'gin-rummy', screen: TABLE, e: seTab, m: lifted });
+    expect(v.pass).toBe(true);
+    expect(v.checks[1]?.outcome).toBe('tier');
+    expect(v.checks[1]?.detail).toContain('the theme lifts fixed-screen here');
+    // A sideways scroll is never a tier.
+    expect(outcomes({ ...lifted, scrollWidth: m.inner.w + 3 }, seTab, TABLE, 'gin-rummy')[1]).toBe(
+      'FAIL',
+    );
+    // Nor does the lift excuse a screen that fits: no scroll, no tier.
+    expect(
+      outcomes({ ...full(seTab, 'gin-rummy'), lifted: true }, seTab, TABLE, 'gin-rummy')[1],
+    ).toBe('ok');
+  });
+  test("backgammon's upright tier is the twin's (§3.10: at most 805px tall), read on the kept board", () => {
+    const kept: Screen = { id: 'kept', kind: 'table', kept: true };
+    // The 12 upright standalone: 844 tall, above the tier; in a tab with the bar shown, under it.
+    const tab = emulationFor(iphone12, 'portrait', 'browser', 'shown');
+    expect(twinOf(upright).scrolls).toBe(false);
+    expect(twinOf(tab).scrolls).toBe(true);
+    const tall = (e: Emulation): Measured => ({
+      ...full(e, 'backgammon'),
+      scrollHeight: e.viewport.height + 100,
+    });
+    expect(tierOf({ page: 'backgammon', screen: kept, e: tab, m: tall(tab) })).toContain(
+      'the §3.10 upright tier',
+    );
+    expect(tierOf({ page: 'backgammon', screen: kept, e: upright, m: tall(upright) })).toBeNull();
+    expect(outcomes(tall(tab), tab, kept, 'backgammon')[1]).toBe('tier');
+    expect(outcomes(tall(upright), upright, kept, 'backgammon')[1]).toBe('FAIL');
+    // Sideways no catalogued phone is under the landscape floor: a scroll there is a failure.
+    expect(outcomes(tall(sideways), sideways, TABLE, 'backgammon')[1]).toBe('FAIL');
+  });
+  test('the turn gate: upright on a page that plays sideways, the gate standing is the whole judgement', () => {
+    const gate = { ...full(upright, 'backgammon'), gate: true };
+    expect(gatedOf({ page: 'backgammon', screen: TABLE, e: upright, m: gate })).toBe(true);
+    expect(gatedOf({ page: 'backgammon', screen: HOME, e: upright, m: gate })).toBe(false);
+    expect(gatedOf({ page: 'backgammon', screen: TABLE, e: sideways, m: gate })).toBe(false);
+    expect(
+      gatedOf({ page: 'backgammon', screen: { ...TABLE, kept: true }, e: upright, m: gate }),
+    ).toBe(false);
+    // Under the gate nothing else is judged: a short, clipped, small-target board passes.
+    const messy = {
+      ...gate,
+      scrollHeight: upright.viewport.height + 300,
+      clipped: [{ sel: '#oppName', over: 25 }],
+      targets: [{ sel: '.point', w: 44, h: 39 }],
+      underInset: [{ sel: '#statusLine', side: 'top' as const }],
+    };
+    const v = judge({ page: 'backgammon', screen: TABLE, e: upright, m: messy });
+    expect(v.pass).toBe(true);
+    expect(v.checks.map((c) => c.outcome)).toEqual(['ok', 'gate', 'gate', 'gate', 'ok', 'gate']);
+    expect(v.checks[0]?.detail).toContain('the turn gate stands');
+    // The frame is still judged under the gate.
+    expect(failing({ ...messy, frame: false }, upright, TABLE, 'backgammon')).toEqual(['frame']);
+    // A missing gate is the failure, on `used`.
+    const none = judge({
+      page: 'backgammon',
+      screen: TABLE,
+      e: upright,
+      m: { ...gate, gate: false },
+    });
+    expect(none.pass).toBe(false);
+    expect(none.checks.map((c) => c.outcome)).toEqual([
+      'FAIL',
+      'gate',
+      'gate',
+      'gate',
+      'ok',
+      'gate',
+    ]);
+    expect(none.checks[0]?.detail).toContain('no turn gate stands upright');
+    // A gate standing the way the page plays is a bug on `used`, the rest judged as usual.
+    expect(
+      failing({ ...full(sideways, 'backgammon'), gate: true }, sideways, TABLE, 'backgammon'),
+    ).toEqual(['used']);
+    // A page that plays either way (no data-plays) is never gated.
+    expect(gatedOf({ page: 'briscola', screen: TABLE, e: upright, m: full(upright) })).toBe(false);
+  });
+  test("the Android lock in the gate's place: the page turned the phone, so `used` passes and a kept screen under it is a gate too", () => {
+    const locked = { ...full(upright, 'backgammon'), locked: true };
+    const v = judge({ page: 'backgammon', screen: TABLE, e: upright, m: locked });
+    expect(v.pass).toBe(true);
+    expect(v.checks[0]?.detail).toContain('the Android lock is held');
+    expect(v.checks[1]?.detail).toContain('the Android lock turned the phone');
+    const kept: Screen = { id: 'kept', kind: 'table', kept: true };
+    expect(gatedOf({ page: 'backgammon', screen: kept, e: upright, m: locked })).toBe(true);
+    expect(outcomes(locked, upright, kept, 'backgammon')).toEqual([
+      'ok',
+      'gate',
+      'gate',
+      'gate',
+      'ok',
+      'gate',
+    ]);
+    // The lock the way the page plays changes nothing: sideways is judged as a table.
+    expect(
+      failing({ ...full(sideways, 'backgammon'), locked: true }, sideways, TABLE, 'backgammon'),
+    ).toEqual([]);
+  });
   test('the limits: a table 8% a side, a home 10/25/30/25, the tool 2%', () => {
     expect(LIMITS.table.emptyMax).toEqual({ top: 0.08, right: 0.08, bottom: 0.08, left: 0.08 });
     expect(LIMITS.home.emptyMax).toEqual({ top: 0.1, right: 0.25, bottom: 0.3, left: 0.25 });
@@ -257,7 +383,11 @@ describe('the command line and the cases', () => {
     expect(parseAuditArgs(['--serve', '--port', '16373', '--jobs', '2'])).toMatchObject({
       port: 16373,
       jobs: 2,
+      baseline: null,
     });
+    expect(parseAuditArgs(['--baseline', 'shots/space-audit/rps/report.json']).baseline).toBe(
+      'shots/space-audit/rps/report.json',
+    );
   });
   test('every phone x eight cases by default; --device one phone; the filters narrow', () => {
     expect(PHONES.every((d) => d.kind !== 'ipad' && d.supported)).toBe(true);
@@ -282,14 +412,21 @@ describe('the command line and the cases', () => {
       PHONES.length * 2,
     );
   });
-  test('every page has a home-kind screen first and a second screen', () => {
+  test('every page has a home-kind screen first and a second screen; backgammon a third, upright only: the gate kept', () => {
     PAGE_IDS.forEach((page) => {
-      const screens = screensOf(page);
+      const screens = screensOf(page, 'landscape');
       expect(screens[0]?.kind).toBe('home');
       expect(screens).toHaveLength(2);
     });
     expect(screensOf('ui-sandbox')[1]).toEqual({ id: 'preview', kind: 'tool' });
     expect(screensOf('backgammon')[1]).toEqual({ id: 'table', kind: 'table' });
+    expect(screensOf('backgammon', 'portrait')).toEqual([
+      { id: 'home', kind: 'home' },
+      { id: 'table', kind: 'table' },
+      { id: 'kept', kind: 'table', kept: true },
+    ]);
+    expect(screensOf('backgammon', 'landscape')).toHaveLength(2);
+    expect(screensOf('gin-rummy', 'portrait')).toHaveLength(2);
   });
 });
 
@@ -335,5 +472,171 @@ describe('the sheet and the totals', () => {
     expect(html).toContain('<li class="bad"><b>clip</b> #x by 3px</li>');
     expect(html).toContain('iphone-390x844_landscape_standalone'.replace(/_/g, ' '));
     expect(html).toContain('<img src="a.png"');
+  });
+  test('the sheet: a tier or gate column is grey with its badge, the screen passes', () => {
+    const gate = judge({
+      page: 'backgammon',
+      screen: TABLE,
+      e: upright,
+      m: { ...full(upright, 'backgammon'), gate: true },
+    });
+    const html = sheetHtml(
+      'backgammon',
+      [
+        {
+          e: upright,
+          screens: [
+            {
+              screen: TABLE,
+              measured: full(upright, 'backgammon'),
+              verdict: gate,
+              picture: 'g.png',
+            },
+          ],
+        },
+      ],
+      '20260930-1300',
+    );
+    expect(html).toContain('1 of 1 cases pass');
+    expect(html).toContain('<li class="grey"><b>scroll</b>');
+    expect(html).toContain('<span class="badge grey">gate</span>');
+    expect(html).not.toContain('class="grey"><b>used</b>');
+  });
+});
+
+describe('the check table and the diff against a baseline', () => {
+  const gateV = judge({
+    page: 'backgammon',
+    screen: TABLE,
+    e: upright,
+    m: { ...full(upright, 'backgammon'), gate: true },
+  });
+  const okV = judge({
+    page: 'backgammon',
+    screen: TABLE,
+    e: sideways,
+    m: full(sideways, 'backgammon'),
+  });
+  const cards = [
+    {
+      e: upright,
+      screens: [
+        { screen: TABLE, measured: full(upright, 'backgammon'), verdict: gateV, picture: 'a.png' },
+      ],
+    },
+    {
+      e: sideways,
+      screens: [
+        { screen: TABLE, measured: full(sideways, 'backgammon'), verdict: okV, picture: 'b.png' },
+      ],
+    },
+  ];
+  test('the rows carry the case, the screen and an outcome per column; the table prints them', () => {
+    const rows = rowsOf(cards);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toEqual({
+      case: 'iphone-390x844 portrait standalone',
+      screen: 'table',
+      outcomes: {
+        used: 'ok',
+        scroll: 'gate',
+        clip: 'gate',
+        targets: 'gate',
+        frame: 'ok',
+        gutter: 'gate',
+      },
+    });
+    const table = checkTable(rows);
+    expect(table.split('\n')[0]).toMatch(
+      /^case\s+used\s+scroll\s+clip\s+targets\s+frame\s+gutter\s+result$/,
+    );
+    expect(table).toContain(
+      'iphone-390x844 portrait standalone table  ok       gate     gate     gate     ok       gate     pass',
+    );
+    expect(table).toContain('2 of 2 screens pass');
+  });
+  test("a first-run report (checks with `pass` alone) reads as ok/FAIL rows; a file that isn't one names what is missing", () => {
+    const report = {
+      cases: [
+        {
+          case: 'iphone-390x844 portrait standalone',
+          screens: [
+            {
+              screen: { id: 'table', kind: 'table' },
+              verdict: {
+                pass: false,
+                checks: [
+                  { name: 'used', pass: true, detail: '' },
+                  { name: 'scroll', pass: false, detail: '' },
+                  { name: 'clip', pass: false, detail: '' },
+                  { name: 'targets', pass: true, detail: '' },
+                  { name: 'frame', pass: true, detail: '' },
+                  { name: 'gutter', pass: true, detail: '' },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(rowsOfReport(report)[0]?.outcomes).toEqual({
+      used: 'ok',
+      scroll: 'FAIL',
+      clip: 'FAIL',
+      targets: 'ok',
+      frame: 'ok',
+      gutter: 'ok',
+    });
+    expect(() => rowsOfReport({ stamp: 'x', pages: {} })).toThrow(/no `cases` list/);
+    expect(() => rowsOfReport({ cases: [{ case: 'a', screens: [{ screen: {} }] }] })).toThrow(
+      /screen 0: no screen id or checks/,
+    );
+  });
+  test('the diff lists the rows whose outcome moved, per column, and a new row from `new`', () => {
+    const before = [
+      {
+        case: 'iphone-390x844 portrait standalone',
+        screen: 'table',
+        outcomes: {
+          used: 'ok',
+          scroll: 'FAIL',
+          clip: 'FAIL',
+          targets: 'ok',
+          frame: 'ok',
+          gutter: 'ok',
+        } as const,
+      },
+      {
+        case: 'iphone-390x844 landscape standalone',
+        screen: 'table',
+        outcomes: {
+          used: 'ok',
+          scroll: 'ok',
+          clip: 'ok',
+          targets: 'ok',
+          frame: 'ok',
+          gutter: 'ok',
+        } as const,
+      },
+    ];
+    const after = rowsOf(cards);
+    const changed = changedRows(before, after);
+    expect(changed).toHaveLength(1);
+    expect(changed[0]?.changes).toEqual([
+      { name: 'scroll', from: 'FAIL', to: 'gate' },
+      { name: 'clip', from: 'FAIL', to: 'gate' },
+      { name: 'targets', from: 'ok', to: 'gate' },
+      { name: 'gutter', from: 'ok', to: 'gate' },
+    ]);
+    const text = changesTable(changed, after.length);
+    expect(text).toContain('scroll FAIL→gate, clip FAIL→gate, targets ok→gate, gutter ok→gate');
+    expect(text).toContain('1 of 2 screens changed against the baseline');
+    expect(changesTable([], 2)).toBe('no verdict changed against the baseline (2 screens)');
+    // A row the baseline never had: every column from `new`.
+    const fresh = changedRows([], after.slice(1));
+    expect(fresh[0]?.changes.every((c) => c.from === null)).toBe(true);
+    expect(changesTable(fresh, 1)).toContain('used new→ok');
+    // Nothing moved: the same rows twice.
+    expect(changedRows(after, after)).toEqual([]);
   });
 });
