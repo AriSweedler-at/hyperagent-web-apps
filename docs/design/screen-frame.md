@@ -175,7 +175,10 @@ One flag and three tokens.
   one ships.
 - The rule stands on every side of every game, and a game's floors are its own to fit under it:
   backgammon upright measures the room (§5) and its 44px point floor holds only in its scroll
-  tier, so the four smallest notched iPhones installed get 39.8-43.7px rows (backgammon-board.md
-  §3.1, §3.10). A scroll tier that read the room would need a threshold no media query can spell
-  (`env()` is not a media feature): a compact chrome tier under the notch, or a class the boot
-  sets, is the follow-up if those rows must be 44.
+  tier. Under the notch it answers with a tight chrome tier (backgammon-board.md §3.1): a
+  container query on `#app`'s room (`@container room (max-height: 783px)`, since `env()` is not a
+  media feature and no boot class is needed) gives 24px of chrome back, so the 390x844 and
+  393x852 classes installed get 44px rows (44.25, 43.92) and the 375x812 class the best its room
+  allows (41.33-41.83). The band is 6px on a phone sideways at any width (a Pixel 8 is 915 wide),
+  so the theme's 10px-from-900px band is the desktop's alone and the sideways strip clears the
+  hairline by its 4px of air.

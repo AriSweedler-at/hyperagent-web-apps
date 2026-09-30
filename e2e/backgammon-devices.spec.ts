@@ -9,11 +9,13 @@
 // tap target 44px, the strip 4px inside the frame's hairline and the frame's four corners the
 // catalogue's radius where the reach rule says the corner is the screen's, 0 where a bar owns it
 // (`judge`, the emulator's own verdict). Last, the frame probe (docs/design/screen-frame.md §6): the
-// iPhone 12 class upright standalone and sideways in a tab with the bar up, the page as it loads,
-// the four radii and #app's clearance off the insets read straight off the computed styles; then,
-// upright standalone, the table sat at: the controls row ends over the home indicator's band where
-// the twin says (`uprightFoot`), the board is the twin's height, and nothing scrolls (the room
-// under the notch, backgammon-board.md §3.1). Each device's board is attached to the report
+// 390x844, 393x852 and 375x812 classes upright standalone and the 390x844 sideways in a tab with
+// the bar up, the page as it loads, the four radii and #app's clearance off the insets read
+// straight off the computed styles; then, upright standalone, the table sat at: the controls row
+// ends over the home indicator's band where the twin says (`uprightFoot`), the board is the twin's
+// height, the tight tier holds where the twin says (`uprightTight`: 4px gaps, a 44px controls row,
+// 44px rows on the two larger classes and the best the room allows on the 375x812), and nothing
+// scrolls (the room under the notch, backgammon-board.md §3.1). Each device's board is attached to the report
 // (`playwright show-report` shows them); no video. The iPads (the desktop template sideways) and
 // the unsupported SE 1st gen are left to the twin's sweep in layout.test.ts. Page-only (site.ts
 // PAGE_ONLY_SPECS): about the page, not the origin.
@@ -21,6 +23,7 @@ import { expect, test } from '@playwright/test';
 
 import {
   DICE_STILL,
+  MEASURE,
   SEED_SCRIPT,
   TOL,
   judge,
@@ -29,10 +32,13 @@ import {
   type Measured,
 } from '../tools/shell-emulate.ts';
 import {
+  PHONE_GEOMETRY,
+  pointWidth,
   uprightBoardHeight,
   uprightFoot,
   uprightPadding,
   uprightScrolls,
+  uprightTight,
 } from '../web/games/backgammon/src/ui/board/layout.ts';
 import {
   CORNER_KEYS,
@@ -54,29 +60,6 @@ const CASES: ReadonlyArray<Emulation> = PHONES.flatMap((d) => [
   emulationFor(d, 'landscape', 'browser', 'shown'),
   emulationFor(d, 'landscape', 'fullscreen'),
 ]);
-
-/** The emulator's measurement, read off the page as tools/shell-emulate.ts reads it. */
-const MEASURE = `(() => {
-  const rect = (el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; };
-  const shown = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
-  const board = document.getElementById('board');
-  const sels = ['#statusLine', '#tableScreen .opp-strip', '#gameBadge', '#tableScreen .me-strip', '#tableScreen .roll-slot', '#menuBtn', '#soundBtn'];
-  const frame = Object.fromEntries(sels.map((sel) => { const el = document.querySelector(sel); return [sel, el !== null && shown(el) ? rect(el) : null]; }));
-  const targets = Array.from(document.querySelectorAll('#tableScreen .point, #tableScreen .bar, #tableScreen .off, #dice .die, #tableScreen .btn, #tableScreen .icon-btn, #tableScreen .chip')).filter(shown).map((el) => { const r = rect(el); return { sel: el.id !== '' ? '#' + el.id : '.' + String(el.className).split(' ')[0], w: r.w, h: r.h }; });
-  return {
-    inner: { w: innerWidth, h: innerHeight },
-    scrollHeight: document.documentElement.scrollHeight,
-    board: board === null ? null : rect(board),
-    frame,
-    targets,
-    corners: (() => { const cs = getComputedStyle(document.body, '::before'); const r = (v) => parseFloat(v) || 0; return { tl: r(cs.borderTopLeftRadius), tr: r(cs.borderTopRightRadius), br: r(cs.borderBottomRightRadius), bl: r(cs.borderBottomLeftRadius) }; })(),
-    rootCorners: ['tl', 'tr', 'br', 'bl'].map((k) => getComputedStyle(document.documentElement).getPropertyValue('--frame-corner-' + k).trim()).filter((v) => v !== '').join('/'),
-    fullscreen: document.fullscreenElement !== null,
-    screen: [screen.width, screen.height],
-    dpr: devicePixelRatio,
-    coarse: matchMedia('(any-pointer: coarse)').matches,
-  };
-})()`;
 
 CASES.forEach((e) => {
   test(`${emulationName(e)}: the board fills its room, the frame's corners are ${CORNER_KEYS.map((k) => String(e.corners[k])).join('/')}px, nothing clips`, async ({
@@ -153,9 +136,19 @@ CASES.forEach((e) => {
  * off the composed page as it loads, no table sat at: the frame is the shell's, not the board's.
  */
 const iphone12 = deviceById('iphone-390x844');
-if (iphone12 === null) throw new Error('iphone-390x844 missing from the catalogue');
+const iphone15 = deviceById('iphone-393x852');
+const iphoneX = deviceById('iphone-375x812-x');
+if (iphone12 === null || iphone15 === null || iphoneX === null)
+  throw new Error('a probe`s row is missing from the catalogue');
+/**
+ * Upright standalone, three classes: the 390x844 and 393x852 the tight tier brings to 44px rows
+ * (44.25 and 43.92, the judge's half-pixel), and the 375x812 X it cannot (41.83: the best its
+ * 734px of room allows; layout.ts `uprightTight`); sideways, the 390x844 in a tab with the bar up.
+ */
 const PROBES: ReadonlyArray<Readonly<{ e: Emulation; standalone: boolean }>> = [
   { e: emulationFor(iphone12, 'portrait', 'standalone'), standalone: true },
+  { e: emulationFor(iphone15, 'portrait', 'standalone'), standalone: true },
+  { e: emulationFor(iphoneX, 'portrait', 'standalone'), standalone: true },
   { e: emulationFor(iphone12, 'landscape', 'browser', 'shown'), standalone: false },
 ];
 /** `body::before`'s band and radii, #app's four paddings, all in px. */
@@ -174,12 +167,15 @@ type FrameMeasure = Readonly<{
   corners: Readonly<Record<string, number>>;
   padding: Readonly<{ top: number; right: number; bottom: number; left: number }>;
 }>;
-/** The table upright: the controls row's foot and the board's height in the viewport, and whether anything scrolls. */
+/** The table upright: the controls row's foot and height, #tableScreen's gap, a point row's height (`--point-w`, the row the finger lands on), the board's height, and whether anything scrolls. */
 const TABLE_MEASURE = `(() => {
   const r = (id) => document.getElementById(id).getBoundingClientRect();
   const fits = (id) => { const el = document.getElementById(id); return el.scrollHeight <= el.clientHeight + 1; };
   return {
     foot: r('controls').bottom,
+    controlsHeight: r('controls').height,
+    gap: parseFloat(getComputedStyle(document.getElementById('tableScreen')).rowGap) || 0,
+    pointW: r('point-1').height,
     boardHeight: r('board').height,
     scrolls: document.documentElement.scrollHeight > innerHeight + 1,
     appFits: fits('app'),
@@ -188,6 +184,9 @@ const TABLE_MEASURE = `(() => {
 })()`;
 type TableMeasure = Readonly<{
   foot: number;
+  controlsHeight: number;
+  gap: number;
+  pointW: number;
   boardHeight: number;
   scrolls: boolean;
   appFits: boolean;
@@ -273,6 +272,22 @@ PROBES.forEach(({ e, standalone }) => {
       );
       expect(Math.abs(t.foot - uprightFoot(vp))).toBeLessThanOrEqual(TOL);
       expect(Math.abs(t.boardHeight - uprightBoardHeight(vp))).toBeLessThanOrEqual(TOL);
+      // The tight tier (theme.css `@container room (max-height: 783px)`): under 784px of room the
+      // three gaps are 4 and the controls 44, else 8 and 56; the row is the twin's, and 44 (to
+      // the judge's half-pixel) wherever the twin says the room holds it.
+      const tight = uprightTight(vp);
+      expect({ controls: t.controlsHeight, gap: t.gap }, `tight tier ${String(tight)}`).toEqual(
+        tight ? { controls: 44, gap: 4 } : { controls: 56, gap: 8 },
+      );
+      const pw = pointWidth(vp);
+      expect(
+        Math.abs(t.pointW - pw),
+        `rows ${String(t.pointW)}px, the twin ${String(pw)}`,
+      ).toBeLessThanOrEqual(TOL);
+      if (pw >= PHONE_GEOMETRY.minPointW - TOL)
+        expect(t.pointW, '44px rows where the tier reaches them').toBeGreaterThanOrEqual(
+          PHONE_GEOMETRY.minPointW - TOL,
+        );
       expect({ scrolls: t.scrolls, appFits: t.appFits, tableFits: t.tableFits }).toEqual({
         scrolls: false,
         appFits: true,

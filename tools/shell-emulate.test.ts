@@ -63,6 +63,7 @@ const fitting = (e: Emulation): Measured => {
     corners: e.corners,
     rootCorners: CORNER_KEYS.map((k) => `${String(e.corners[k])}px`).join('/'),
     fullscreen: false,
+    band: 6,
     screen: [e.screen.width, e.screen.height],
     dpr: e.dpr,
     coarse: true,

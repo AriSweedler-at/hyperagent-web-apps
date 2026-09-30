@@ -128,6 +128,15 @@ body {
     --frame-band: 10px;
   }
 }
+/* A phone held sideways is a phone at any width (a Pixel 8 is 915 wide, a Pro Max 932): the
+   6px band, so the strip's row, which the sideways table stands 4px under the band and its
+   hairline (`--pad-t`, 7px and the air), stands 4px under them there too, not on the hairline
+   (2026-09-29, the equal-air lane's finding). ui/board/layout.ts `frameBand` is the twin. */
+@media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+  :root {
+    --frame-band: 6px;
+  }
+}
 /* GFS Didot for the title and the room code only (design §1 Theme); Cardo everywhere else. */
 h1 {
   font-family: var(--serif-display);
@@ -672,10 +681,11 @@ label {
      --point-w is (820 - 148 - 48 - 44 - 16) / 12 = 47px and the board 672px; installed,
      (763 - 256) / 12 = 42.25 and the board 615, the controls ending 2px over the indicator's
      band. No floor here: a floor the room cannot hold pushed the controls under the band on every
-     notched phone installed (2026-09-29, the emulator's `clear` sweep); the four smallest classes
-     get 39.8-43.7px rows, each still 147-152px long. The 44px floor is the scroll fallback's
-     alone (`@media (max-height: 805px)` at the end of this section), where the document scrolls.
-     ui/board/layout.ts `uprightRoom`, `pointWidth` and `uprightFoot` are the twin. */
+     notched phone installed (2026-09-29, the emulator's `clear` sweep). Under 784px of room (the
+     floor's board and this chrome) the tight tier (`@container room`, after the roll slot below)
+     gives 24px of chrome back instead. The 44px floor is the scroll fallback's alone (`@media
+     (max-height: 805px)` at the end of this section), where the document scrolls.
+     ui/board/layout.ts `uprightRoom`, `uprightChromeIn`, `pointWidth` and `uprightFoot` are the twin. */
   --chrome-in: 148px;
   --bar-w: 48px;
   --off-h: 44px;
@@ -709,7 +719,9 @@ label {
    the roll sheet and the arrow are #board's), so the layout containment this brings moves nothing. */
 @media (max-width: 899px) and (min-height: 501px) {
   body.fixed-screen #app {
-    container-type: size;
+    /* Named, so the tight tier's `@container room` below reads this box and no other (sideways
+       #tableScreen is a size container of its own). */
+    container: room / size;
   }
 }
 @media (min-width: 900px) {
@@ -856,6 +868,31 @@ label {
   justify-content: flex-end;
   min-width: 168px;
   min-height: 54px;
+}
+/* The tight tier (the owner, 2026-09-29: "still way too much blank space above and below the
+   board"; the four smallest notched classes installed had 39.3-43.5px rows). Under 784px of room
+   (the 44px floor's board, 636, and the full chrome, 148) the chrome inside the screen gives 24px
+   back: the three gaps 8 -> 4 and the controls row 56 -> 44 (its buttons' own height; the roll
+   slot's 54 with it), `--chrome-in` 124. A container query, not a media query: #app is the size
+   container `room` at the table upright (the geometry section) and its content box is the room
+   itself, the viewport less the notch and the home indicator, which no media query can read
+   (`env()` is not a media feature). So 390x844 installed gets 44.25px rows (was 42.25), 393x852
+   43.92 (41.92), 402x874 45.5, the Air's tab with the bar hidden 45; the 375x812 class stays
+   short, 41.83 (X) and 41.33 (12 mini): 44px rows need 98px of chrome under its notch and the
+   topbar, the status line and the controls are 110 before any gap. Off by construction where
+   the document scrolls (the 805px fallback drops the container: a query with no container is
+   false) and sideways (#app is no container there). layout.ts `uprightTight`, `TIGHT_UNDER`. */
+@container room (max-height: 783px) {
+  #tableScreen {
+    --chrome-in: 124px;
+    gap: 4px;
+  }
+  .controls {
+    height: 44px;
+  }
+  .roll-slot {
+    min-height: 44px;
+  }
 }
 .wait-note {
   color: var(--muted);
@@ -2022,7 +2059,8 @@ label {
    of clipping the controls row; the board itself can be scrolled from (touch-action: none is
    scoped to .checker). The query reads the viewport, not the room: a media query cannot read
    `env()`, so an installed phone's insets do not move it, and above it the room decides the
-   point width (the geometry section). */
+   point width (the geometry section; the tight tier's container query is false here, the
+   container dropped below, so the chrome keeps its 148 and the document always scrolls). */
 @media (max-height: 805px) and (max-width: 899px) {
   body.fixed-screen,
   body.fixed-screen #app {
@@ -2091,9 +2129,10 @@ label {
      token), so the two are equal by construction, not by two numbers kept in step (the owner,
      2026-09-28: "equal padding above and below the text ... Don't do hacky pixel pushing stuff";
      the row was 4px under the hairline and 6px over the board). `--pad-t`, 11px, is the trim's
-     6px band and its 1px hairline (the sum is spelled: the shell's frame tokens read 10px from
-     900px wide, which a Pixel 8 sideways is) plus the air (the owner: "the top of the names &
-     such overlap the green border"), and the same stands below the board, or 6px over the home
+     6px band and its 1px hairline (the `:root` rule under the frame tokens keeps the band 6px
+     sideways at any width, where the shell's own token reads 10px from 900px wide, which a Pixel
+     8 sideways is) plus the air (the owner: "the top of the names & such overlap the green
+     border"), and the same stands below the board, or 6px over the home
      indicator where there is one (its 21px band clears the trim by itself). At the table only, so
      the sideways home and the match-over screen keep the base padding's 12 each. `--pad-v` is the
      pair, for the board's arithmetic below. */

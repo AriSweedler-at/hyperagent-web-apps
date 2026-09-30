@@ -89,12 +89,17 @@ export const stackExtent = (count: number, checkerD: number, step: number): numb
  * the floor's board and the inset-free chrome need 806, and the media query reads the viewport,
  * so the insets do not move it); above it the room decides, capped at 64, and there is no floor: a
  * floor the room cannot hold would push the controls under the indicator's band, which was the
- * notch's defect. The four smallest notched classes installed get 39.8-43.7px rows, each still
- * 147-152px long (the tap target is the whole row).
+ * notch's defect. Under `TIGHT_UNDER` of room (784: the floor's board and the full chrome) the
+ * tight tier holds instead (theme.css `@container room (max-height: 783px)`, a container query
+ * because the container's box is the room itself): the three gaps 4 and the controls 44, so the
+ * chrome is `tightChromeIn` (122) and 390x844 and 393x852 installed get 44.25 and 43.92px rows;
+ * the 375x812 class, whose room under the notch cannot hold 44, gets 41.83 (X) and 41.33 (mini),
+ * each row still 147px long (the tap target is the whole row).
  */
 export const PHONE_GEOMETRY = {
   clearance: 12,
   chromeIn: 146,
+  tightChromeIn: 122,
   slack: 2,
   barW: 48,
   offH: 44,
@@ -134,8 +139,18 @@ export const DESKTOP_GEOMETRY = {
  */
 const STRIP_H = 24;
 const AIR = 4;
-/** The trim's 6px band and its 1px hairline (theme.css spells the 7 in `--pad-t` too). */
-const TRIM = 7;
+/**
+ * The trim's band (shell.css `--frame-band`, theme.css's tokens): the phone's 6px upright and
+ * sideways at any width (a Pixel 8 sideways is 915 wide and the theme's landscape `:root` rule
+ * keeps it 6), the desktop's 10 from 900px. `frameBand` is the twin of that pair of rules.
+ */
+export const FRAME_BAND = { phone: 6, desktop: 10 } as const;
+export const frameBand = (vp: Viewport): number =>
+  layoutFor(vp) === 'desktop' ? FRAME_BAND.desktop : FRAME_BAND.phone;
+/** The band's 1px hairline (shell.css `--frame-hairline-w`). */
+const HAIRLINE = 1;
+/** The trim's 6px band and its 1px hairline sideways (theme.css spells the 7 in `--pad-t` too). */
+const TRIM = FRAME_BAND.phone + HAIRLINE;
 /** The rows scheme's button row under the board (`--btn-h`). */
 const BTN_H = 44;
 export const LANDSCAPE_GEOMETRY = {
@@ -189,6 +204,28 @@ export const uprightRoom = (vp: Viewport): number => {
 /** The upright scroll tier (design §3.10): at most 805px tall the document scrolls and the board takes the 44px floor; the CSS's media query reads the viewport, so the insets do not move it. */
 export const uprightScrolls = (vp: Viewport): boolean =>
   vp.height <= PHONE_GEOMETRY.scrollMaxHeight;
+/**
+ * The room under which the tight tier holds: what the 44px floor's board (twelve rows, the bar
+ * band, the off row, the frame: 636) and the full chrome with its slack (148) need, 784; theme.css
+ * `@container room (max-height: 783px)`.
+ */
+export const TIGHT_UNDER =
+  PHONE_GEOMETRY.chromeIn +
+  PHONE_GEOMETRY.slack +
+  PHONE_GEOMETRY.barW +
+  PHONE_GEOMETRY.offH +
+  PHONE_GEOMETRY.frame +
+  PHONE_GEOMETRY.rows * PHONE_GEOMETRY.minPointW;
+/**
+ * The tight tier is in force: the viewport fits (in the scroll tier #app is no container, so the
+ * query is false) and the room is under `TIGHT_UNDER`. Every notched iPhone installed but the
+ * 430x932 and 440x956 classes; a 390x844 tab with the bar hidden; never headless at 390x844.
+ */
+export const uprightTight = (vp: Viewport): boolean =>
+  !uprightScrolls(vp) && uprightRoom(vp) < TIGHT_UNDER;
+/** `--chrome-in` less the slack: the chrome inside the screen upright, 146, or the tight tier's 122. */
+export const uprightChromeIn = (vp: Viewport): number =>
+  uprightTight(vp) ? PHONE_GEOMETRY.tightChromeIn : PHONE_GEOMETRY.chromeIn;
 /** `--point-w` in px for a viewport: 47 at 390x844, 53.5 at 1280x800, 54 at 844x390 on a phone. */
 export const pointWidth = (viewport: Viewport): number => {
   const { width, height } = viewport;
@@ -197,7 +234,8 @@ export const pointWidth = (viewport: Viewport): number => {
     const g = PHONE_GEOMETRY;
     if (uprightScrolls(viewport)) return g.minPointW;
     return Math.min(
-      (uprightRoom(viewport) - g.chromeIn - g.slack - g.barW - g.offH - g.frame) / g.rows,
+      (uprightRoom(viewport) - uprightChromeIn(viewport) - g.slack - g.barW - g.offH - g.frame) /
+        g.rows,
       g.maxPointW,
     );
   }
@@ -228,7 +266,7 @@ export const uprightBoardHeight = (vp: Viewport): number => {
  * height less the bottom padding: the devices e2e's standalone probe reads it off the page.
  */
 export const uprightFoot = (vp: Viewport): number =>
-  uprightPadding(vp).top + PHONE_GEOMETRY.chromeIn + uprightBoardHeight(vp);
+  uprightPadding(vp).top + uprightChromeIn(vp) + uprightBoardHeight(vp);
 /** `#app`'s two vertical paddings at the table sideways: 11 and `max(11, 6 + inset-b)` in both schemes. */
 export const paddingOf = (vp: Viewport): Readonly<{ top: number; bottom: number }> => {
   const s = schemeOf(vp);
