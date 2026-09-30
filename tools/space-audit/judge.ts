@@ -12,7 +12,9 @@
 // comment per number. Two outcomes beside ok and FAIL, grey on the sheet: `tier` (the document
 // scrolls where the page's own theme means it to: backgammon's twin, or a `fixed-screen` body the
 // theme lifted) and `gate` (the phone is held the way the page gates against, so the turn gate is
-// the screen: only its standing is judged).
+// the screen: only its standing is judged). Three case types: a phone's emulation (`LIMITS`), an
+// iPad's (`isTablet`: `TABLET_LIMITS`, the desktop's room rules with a finger's target) and a
+// desktop window (`isDesktop`: `DESKTOP_LIMITS`, a 32px target).
 import {
   NO_INSETS,
   emulationName,
@@ -34,6 +36,13 @@ export type DesktopWindow = Readonly<{ kind: 'desktop'; viewport: ViewportSize }
 export type AuditCase = Emulation | DesktopWindow;
 /** An emulation has no `kind` of its own (its device's is nested), so the field alone tells a window. */
 export const isDesktop = (c: AuditCase): c is DesktopWindow => 'kind' in c;
+/**
+ * The third case type (docs/design/space-audit.md §5 "Closed by briscola-tablet-buckets"): a
+ * catalogued iPad's emulation. A touch screen the size of a monitor (768-1366px a side, no notch,
+ * Safari's one toolbar in a tab), so it keeps a finger's 44px target and takes `TABLET_LIMITS`, the
+ * desktop's room rules; the layout buckets call it `tablet-upright` and `tablet-sideways`.
+ */
+export const isTablet = (c: AuditCase): c is Emulation => !isDesktop(c) && c.device.kind === 'ipad';
 /** A case's name in the table and the file names: `iphone-390x844 landscape browser bar-shown`, or `desktop 1280x800`. */
 export const caseName = (c: AuditCase): string =>
   isDesktop(c)
@@ -172,15 +181,28 @@ export const DESKTOP_LIMITS: Readonly<Record<ScreenKind, Limits>> = {
   table: { emptyMax: { top: 0.1, right: 0.1, bottom: 0.1, left: 0.1 }, mayScroll: false },
   tool: LIMITS.tool,
 };
-/** The limits for a screen on a case: a phone's `LIMITS`, a window's `DESKTOP_LIMITS`. */
+/**
+ * The iPads' thresholds: the desktop's room rules (a home may leave 40% empty below and beside its
+ * column: the shell's 480px column centred on the iPad Pro sideways, 1366 wide, leaves 32.4% a side,
+ * and its cards end well above the foot of a 1024-1366px screen; a table fills to within a tenth on
+ * every side, a centred table with room beside it, not a phone column stretched), spelled apart
+ * from `DESKTOP_LIMITS` because the target stays a finger's (`TARGET_MIN`, not the desktop's 32).
+ */
+export const TABLET_LIMITS: Readonly<Record<ScreenKind, Limits>> = {
+  home: DESKTOP_LIMITS.home,
+  table: DESKTOP_LIMITS.table,
+  tool: LIMITS.tool,
+};
+/** The limits for a screen on a case: a phone's `LIMITS`, an iPad's `TABLET_LIMITS`, a window's `DESKTOP_LIMITS`. */
 export const limitsFor = (kind: ScreenKind, c: AuditCase): Limits =>
-  isDesktop(c) ? DESKTOP_LIMITS[kind] : LIMITS[kind];
+  isDesktop(c) ? DESKTOP_LIMITS[kind] : isTablet(c) ? TABLET_LIMITS[kind] : LIMITS[kind];
 /** Half a pixel: the rounding between two reads of one layout. */
 export const TOL = 0.5;
 /** A finger's target (Apple HIG, Material): the shell's `.icon-btn` and `.btn-sm` floor. */
 export const TARGET_MIN = 44;
 /** A mouse's target on a desktop window: the shell's small buttons (`.btn.small`, a 32px select) are a click's size. */
 export const TARGET_MIN_DESKTOP = 32;
+/** A window's 32; a phone's or an iPad's 44 (an iPad is fingers too). */
 export const targetMinFor = (c: AuditCase): number =>
   isDesktop(c) ? TARGET_MIN_DESKTOP : TARGET_MIN;
 /** The air an unframed page keeps off the glass, where its theme names no `--gutter`: shell.css's `--frame-gap`. */

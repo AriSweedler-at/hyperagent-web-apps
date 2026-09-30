@@ -297,25 +297,31 @@
     body[data-layout="phone-sideways-short"] #tableScreen { overflow: visible; }
   }
   /* Desktop (`desktop`, `desktop-wide`: a fine pointer at any width, so the laptop tier's 900px keeps
-     a narrow window on the phone layout): the home keeps the shell's 480px column (a form), the
+     a narrow window on the phone layout), and an iPad sideways (`tablet-sideways`, 1024-1366 wide: a
+     desktop-sized touch screen; docs/design/space-audit.md §5 "Closed by briscola-tablet-buckets": the
+     480px column left 8-18.5% of the screen a side there): the home keeps the shell's 480px column (a form), the
      table takes the room up to 1600px wide (1920x1080: 8% of felt a side) in the same band of three,
      with one row of eleven cards up to 96px and piles 1.2 times a card up to 120, the last action on
      its own row. The height budget (289px of chrome and 3.17c of cards) binds only under 600px; the
      width binds first in every audited window. */
+  /* An iPad upright (`tablet-upright`, 768-1024 wide): the phone's layout on the laptop tier's 860px column
+     (the cards stay under their 54px cap, the hand's rows spread); the 480px column left 18.8-20.7% a side on
+     the 9th and the Air, the Pro at 1024 is on the 860 already (8%). */
+  body[data-layout="tablet-upright"].fixed-screen #app { max-width: 860px; }
   @media (min-width: 900px) {
-    body[data-layout^="desktop"].fixed-screen #app { max-width: min(100%, 1600px); }
-    body[data-layout^="desktop"] #tableScreen {
+    body:is([data-layout^="desktop"], [data-layout="tablet-sideways"]).fixed-screen #app { max-width: min(100%, 1600px); }
+    body:is([data-layout^="desktop"], [data-layout="tablet-sideways"]) #tableScreen {
       --card-w: clamp(40px, min(calc((100vw - 64px) / 11 - 6px), calc((100dvh - var(--head) - var(--foot) - 261px) / 3.17)), 96px);
       --pile-w: clamp(84px, calc(var(--card-w) * 1.2), 120px);
       display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto;
       grid-template-areas: "topbar topbar topbar" "opp piles status" "last last last" "hand hand hand"; gap: 10px 24px;
     }
-    body[data-layout^="desktop"] .topbar { grid-area: topbar; }
-    body[data-layout^="desktop"] .opp-strip { grid-area: opp; align-self: center; }
-    body[data-layout^="desktop"] .table-center { grid-area: piles; align-self: center; padding: 0 60px; }
-    body[data-layout^="desktop"] .status-banner { grid-area: status; align-self: center; }
-    body[data-layout^="desktop"] .last-action { grid-area: last; }
-    body[data-layout^="desktop"] .hand-area { grid-area: hand; margin-top: 0; }
+    body:is([data-layout^="desktop"], [data-layout="tablet-sideways"]) .topbar { grid-area: topbar; }
+    body:is([data-layout^="desktop"], [data-layout="tablet-sideways"]) .opp-strip { grid-area: opp; align-self: center; }
+    body:is([data-layout^="desktop"], [data-layout="tablet-sideways"]) .table-center { grid-area: piles; align-self: center; padding: 0 60px; }
+    body:is([data-layout^="desktop"], [data-layout="tablet-sideways"]) .status-banner { grid-area: status; align-self: center; }
+    body:is([data-layout^="desktop"], [data-layout="tablet-sideways"]) .last-action { grid-area: last; }
+    body:is([data-layout^="desktop"], [data-layout="tablet-sideways"]) .hand-area { grid-area: hand; margin-top: 0; }
   }
 
   /* ---------- cards ---------- */

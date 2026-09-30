@@ -16,9 +16,11 @@
 // totals; exit 1 on any failure. A second case type joins every default run: the desktop windows
 // (`DESKTOP_WINDOWS`: a fine pointer, no touch, no seam, a browser tab at five sizes), judged by
 // `DESKTOP_LIMITS` and a 32px target, grouped last on the sheet; `--device desktop` runs them alone,
-// and any of `--device <phone>`, `--orientation`, `--mode`, `--bar` leaves them out. Every case's
+// and any of `--device <phone>`, `--orientation`, `--mode`, `--bar` leaves them out. A third joins
+// too: the catalogued iPads (`TABLETS`: the same eight cases as a phone, judged by `TABLET_LIMITS`
+// with a finger's target), grouped between; `--device tablet` runs them alone. Every case's
 // screens report the layout bucket the page put itself in (`data-layout`, docs/design/layout-buckets.md).
-//   npm run audit:space [-- --game <page>] [--device <id>|desktop] [--orientation ..] [--mode ..] [--bar ..]
+//   npm run audit:space [-- --game <page>] [--device <id>|tablet|desktop] [--orientation ..] [--mode ..] [--bar ..]
 //                       [--url <site> | --serve] [--out <dir>] [--port <n>] [--jobs <n>]
 //                       [--baseline <page report.json>]
 // `--serve` (the default without `--url`) serves dist/ (run `npm run build` first) on `--port`
@@ -126,9 +128,9 @@ export const parseAuditArgs = (argv: ReadonlyArray<string>): AuditArgs => {
     },
   });
   const device = values.device ?? null;
-  if (device !== null && device !== DESKTOP && deviceById(device) === null)
+  if (device !== null && device !== DESKTOP && device !== TABLET && deviceById(device) === null)
     throw new Error(
-      `--device ${device} is not in the catalogue (or \`${DESKTOP}\`); shell-emulate \`list\` prints the ids`,
+      `--device ${device} is not in the catalogue (or \`${TABLET}\`, \`${DESKTOP}\`); shell-emulate \`list\` prints the ids`,
     );
   return {
     game: oneOf('game', values.game, PAGE_IDS),
@@ -144,10 +146,21 @@ export const parseAuditArgs = (argv: ReadonlyArray<string>): AuditArgs => {
   };
 };
 
-/** The phones: every supported row but the iPads (the owner's ask names phones; the iPads reach the audit through `--device`). */
+/** The phones: every supported row but the iPads. */
 export const PHONES: ReadonlyArray<(typeof DEVICES)[number]> = DEVICES.filter(
   (d) => d.kind !== 'ipad' && d.supported,
 );
+/**
+ * The tablets: the catalogued iPads (docs/design/space-audit.md §5 "Closed by
+ * briscola-tablet-buckets"; before it they reached the audit through `--device` alone, so no
+ * tablet bucket had a number). Each runs the same eight cases as a phone, judged by
+ * judge.ts `TABLET_LIMITS`, grouped between the phones and the windows on the sheet.
+ */
+export const TABLETS: ReadonlyArray<(typeof DEVICES)[number]> = DEVICES.filter(
+  (d) => d.kind === 'ipad' && d.supported,
+);
+/** `--device tablet`: the iPads alone (the filters narrow them as they do a phone's). */
+export const TABLET = 'tablet';
 /** `--device desktop`: the desktop windows alone. */
 export const DESKTOP = 'desktop';
 const window_ = (width: number, height: number): DesktopWindow => ({
@@ -181,13 +194,14 @@ const desktopsFor = (args: AuditArgs): ReadonlyArray<DesktopWindow> =>
     ? DESKTOP_WINDOWS
     : [];
 
-/** The cases: `--device`'s eight (or the one the filters pick), else every phone's, narrowed by the filters; then the desktop windows (`desktopsFor`). */
+/** The cases: `--device`'s eight (or the one the filters pick), `--device tablet`'s iPads, else every phone's and every iPad's, narrowed by the filters; then the desktop windows (`desktopsFor`). */
 export const casesFor = (args: AuditArgs): ReadonlyArray<AuditCase> => {
   if (args.device === DESKTOP) return DESKTOP_WINDOWS;
-  const device = args.device === null ? null : deviceById(args.device);
+  const device = args.device === null || args.device === TABLET ? null : deviceById(args.device);
   if (device !== null && args.orientation !== null && args.mode !== null)
     return [emulationFor(device, args.orientation, args.mode, args.bar ?? 'shown')];
-  const rows = device === null ? PHONES : [device];
+  const rows =
+    args.device === TABLET ? TABLETS : device === null ? [...PHONES, ...TABLETS] : [device];
   return [
     ...rows.flatMap((d) => emulationsOf(d).filter((e) => narrowed(args, e))),
     ...desktopsFor(args),

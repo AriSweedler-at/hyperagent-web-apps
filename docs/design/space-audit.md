@@ -619,3 +619,57 @@ the PR's.
   660 and 9 past 720 (0 from 672 to 718): the transient state between the tap and the pairing, the
   net's. The audit's 117 cases see none of it but the tier change (the XR class and the Galaxy in a
   tab, 682 and 700, join the short tier): re-run after the change, 117/117, 234/234 screens.
+
+### Closed by briscola-tablet-buckets
+
+The tablet buckets (`tablet-upright`, `tablet-sideways`; docs/design/layout-buckets.md §6),
+2026-09-30, for every unframed game. The owner: "The briscola game can be played vertical or
+horizontal. Most games can be. And it shouldn't be that hard to make a thin layer on top to display
+differently for different buckets of screen sizing." Until this row the iPads reached the audit
+through `--device <ipad>` alone (§2), so no tablet bucket had a number, and every game kept the
+shell's 480px column on them. Now the three catalogued iPads (768x1024, 820x1180, 1024x1366) are
+default cases (the same eight as a phone; `TABLETS`, `--device tablet` runs them alone), judged by
+`TABLET_LIMITS` (the desktop's room rules, home 40% below and beside, table a tenth a side, with a
+finger's 44px target: an iPad is a touch screen the size of a monitor) and grouped between the phones
+and the windows on the sheet. `npm run audit:space -- --game <g> --device tablet` before and after
+(24 cases, 48 screens per game; tabs bar shown and hidden, standalone, fullscreen):
+
+- **Briscola.** Before: the table on the 9th and the Air upright was the 480px column, 144-170px a
+  side (18.8-20.7%); the Pro upright and every iPad sideways were on the ≥900px desktop tier's 1000px
+  column, 12px a side on the 9th sideways, 90 (7.6%) on the Air, 183 (13.4%) on the Pro sideways
+  (1366 wide). Both tablet buckets now take the desktop table's 1100px (`body[data-layout^='tablet']
+  .fixed-screen #app`): the tenth was the choice between the desktop table and the phone's sideways
+  corners-and-bands grid, and the grid's cards cap at 110px from 417px tall, so on a 698-1024px room
+  it would be half empty felt while the desktop tier already lays the Pro out; upright the 9th and
+  the Air stretch the phone's column (the cards keep their height budget, the hand's felt takes the
+  slack). After: every table 0% a side on the 9th and the Air upright and the 9th sideways, 40px
+  (3.4%) on the Air sideways, 133px (9.7%) on the Pro sideways; 20 of 24 cases, 44 of 48 screens.
+- **Gin.** Before: the table was 82-253px a side (8% on the 9th sideways and the Pro upright, 13.6%
+  on the Air sideways, 18.5% on the Pro sideways, 18.8-20.7% on the 9th and the Air upright).
+  `tablet-sideways` joins the desktop grid (the band of three, one row of eleven, under the same
+  `@media (min-width: 900px)`), `tablet-upright` takes the laptop tier's 860px column with the phone's
+  layout (the cards under their 54px cap). After: every table 0% a side sideways and on the 9th and
+  the Air upright, 82px (8%) on the Pro upright; 10 of 24 cases, 34 of 48 screens (the home, below).
+- **Fidice.** The table's column was 1200px on the tablets already (`body[data-layout^="tablet"]
+  .fixed-screen`); it filled every room but the Pro upright, where the 1062px game screen left
+  234-304px of sky (18.1-22.3%) under it. The desktop's fill-to-the-foot rule now reaches the
+  tablets. After: every table 0% a side (83px, 6.1%, on the Pro sideways), `tier` where the theme
+  lifts the fixed screen (the 9th and the Air both ways, the Pro sideways: the 1062-1489px screen
+  scrolls by design); 18 of 24 cases, 42 of 48 screens.
+- **RPS.** `tablet-sideways` was the wide grid already (0.4-0.9% a side). Upright the column left
+  156-288px a side (20.3-28.1%); `tablet-upright` keeps the column at nine tenths of the width
+  (`body[data-layout='tablet-upright'] #app { max-width: min(100%, 90vw) }`), since its `cqh` budget
+  fills the height (14px, 1.1-1.5%, below on every iPad). After: 24 of 24 cases, 48 of 48 screens.
+- **Left: the home on the tallest screens.** Every game keeps the shell's 480px column for its home
+  on the iPads (a form reads no better wider): within the 40% beside it everywhere (144px, 18.8%, on
+  the 9th upright to 443-449px, 32.4-32.8%, on the Pro sideways), over the 40% below it where the
+  screen is tallest. Briscola: the Pro upright, 538-608px (41.5-44.5%), 4 cases. Fidice: the Pro
+  upright 591-661px (45.6-48.4%) and the Air upright standalone and fullscreen 475px (40.3%), 6
+  cases. Gin, whose home is shorter: the 9th upright standalone and fullscreen 446px (43.6%), the Air
+  upright 532-602px (47.9-51%), the Pro upright 718-788px (55.4-57.7%) and the Pro sideways
+  standalone and fullscreen 446px (43.6%), 14 cases. A tablet home arrangement (the masthead beside
+  the cards, or the cards two abreast) is a follow-up; the numbers stand here until it lands.
+- Gates: typecheck; prettier and eslint on the touched files; the harness suite's judge tests (35,
+  the tablet cases, limits and sheet group added); `npm run test:briscola` (1146); briscola-geometry
+  e2e (10) at offset 13200; the briscola style goldens `--check`. §2's "the iPads reach the audit
+  through `--device`" is superseded by this section.

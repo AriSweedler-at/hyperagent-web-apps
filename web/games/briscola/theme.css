@@ -2339,15 +2339,23 @@ body[data-layout^='phone-sideways'] .actions .btn-primary.grow {
   min-width: 0;
 }
 
-/* A desktop window: the column widens with the window, so a table leaves at most a tenth a side
-   (the audit's desktop limit): 1100px below 1440 wide (90px a side at 1280), 82% of the window from
-   1440 (130px a side at 1440, 173 at 1920). On the wide bucket the cards grow with the height too:
+/* A desktop window, and an iPad either way (`tablet-upright`, `tablet-sideways`; docs/design/space-audit.md
+   §5 "Closed by briscola-tablet-buckets"): the column widens with the window, so a table leaves at most a
+   tenth a side (the audit's desktop limit, the tablets' too): 1100px below 1440 wide (90px a side at 1280;
+   on the iPad Pro sideways, 1366, 133px a side; on the 9th and the Air, 768-1180 wide either way, the
+   16px gutters alone: the 480px column left 144-170px a side upright, the ≥900px tier's 1000px 183 on the
+   Pro sideways), 82% of the window from 1440 (130px a side at 1440, 173 at 1920). An iPad sideways is a
+   desktop-sized touch screen, so it takes the desktop table above rather than the phone's corners-and-bands
+   grid, whose cards cap at 110px from 417px tall and would leave a 698-1024px room half empty felt; upright
+   the 9th and the Air stretch the phone's column (the cards keep their height budget), the Pro is on the
+   ≥900px tier already. The home keeps the shell's column on every iPad (a form reads no better wider). On the wide bucket the cards grow with the height too:
    the budget is the 392px of chrome (the desktop's 378 with the 16px gutters, and 6px of rounding)
    over a hand card and a mid card (1.62 card heights), capped at 200px (a 326px card with the
    deck's pack), so a 1440x900 window's cards fill its height and the hand's felt takes what a
    taller window leaves; the Play row stops growing at 720px so a button never runs the width of a
    monitor. */
-body[data-layout='desktop'].fixed-screen #app {
+body[data-layout='desktop'].fixed-screen #app,
+body[data-layout^='tablet'].fixed-screen #app {
   max-width: 1100px;
 }
 body[data-layout='desktop-wide'].fixed-screen #app {

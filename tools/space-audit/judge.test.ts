@@ -10,6 +10,7 @@ import { twinOf } from '../shell-emulate.ts';
 import {
   DESKTOP_WINDOWS,
   PHONES,
+  TABLETS,
   casesFor,
   pagesFor,
   parseAuditArgs,
@@ -23,6 +24,7 @@ import {
   LIMITS,
   PAGE_IDS,
   SIDES,
+  TABLET_LIMITS,
   TARGET_MIN,
   TARGET_MIN_DESKTOP,
   caseName,
@@ -32,6 +34,7 @@ import {
   gatedOf,
   insetsOf,
   isDesktop,
+  isTablet,
   judge,
   limitsFor,
   orientationOf,
@@ -488,12 +491,24 @@ describe('the command line and the cases', () => {
       'shots/space-audit/rps/report.json',
     );
   });
-  test('every phone x eight cases plus the five desktop windows by default; --device one phone (no windows) or desktop (the windows alone); the filters narrow and leave the windows out', () => {
+  test('every phone and every iPad x eight cases plus the five desktop windows by default; --device one phone (no windows), tablet (the iPads alone) or desktop (the windows alone); the filters narrow and leave the windows out', () => {
     expect(PHONES.every((d) => d.kind !== 'ipad' && d.supported)).toBe(true);
+    expect(TABLETS.every((d) => d.kind === 'ipad' && d.supported)).toBe(true);
+    expect(TABLETS.map((d) => d.id)).toEqual(['ipad-768x1024', 'ipad-820x1180', 'ipad-1024x1366']);
     const all = casesFor(parseAuditArgs([]));
-    expect(all).toHaveLength(PHONES.length * 8 + DESKTOP_WINDOWS.length);
+    expect(all).toHaveLength((PHONES.length + TABLETS.length) * 8 + DESKTOP_WINDOWS.length);
     expect(all.slice(-DESKTOP_WINDOWS.length)).toEqual(DESKTOP_WINDOWS);
+    // The phones first, then the iPads, then the windows: the sheet's order.
+    expect(all.slice(0, PHONES.length * 8).some(isTablet)).toBe(false);
+    expect(all.slice(PHONES.length * 8, -DESKTOP_WINDOWS.length).every(isTablet)).toBe(true);
     expect(casesFor(parseAuditArgs(['--device', 'desktop']))).toEqual(DESKTOP_WINDOWS);
+    const tablets = casesFor(parseAuditArgs(['--device', 'tablet']));
+    expect(tablets).toHaveLength(TABLETS.length * 8);
+    expect(tablets.every(isTablet)).toBe(true);
+    expect(
+      casesFor(parseAuditArgs(['--device', 'tablet', '--orientation', 'portrait'])),
+    ).toHaveLength(TABLETS.length * 4);
+    expect(() => parseAuditArgs(['--device', 'laptop'])).toThrow(/tablet.*desktop/);
     expect(casesFor(parseAuditArgs(['--orientation', 'landscape'])).some(isDesktop)).toBe(false);
     expect(casesFor(parseAuditArgs(['--device', 'iphone-390x844']))).toHaveLength(8);
     expect(
@@ -512,8 +527,43 @@ describe('the command line and the cases', () => {
       ),
     ).toEqual([emulationFor(iphone12, 'landscape', 'browser', 'shown')]);
     expect(casesFor(parseAuditArgs(['--mode', 'browser', '--bar', 'hidden']))).toHaveLength(
-      PHONES.length * 2,
+      (PHONES.length + TABLETS.length) * 2,
     );
+  });
+  test('the tablet cases (docs/design/space-audit.md §5 "Closed by briscola-tablet-buckets"): an iPad is a touch screen the size of a monitor, so it takes the desktop room rules (home 40% below and beside, table 10% a side) and keeps a finger\'s 44px target; a phone and a window are neither', () => {
+    const ipad = deviceById('ipad-768x1024');
+    if (ipad === null) throw new Error('row missing');
+    const flat: Emulation = emulationFor(ipad, 'landscape', 'standalone');
+    const tall: Emulation = emulationFor(ipad, 'portrait', 'browser', 'shown');
+    [flat, tall].forEach((e) => {
+      expect(isTablet(e)).toBe(true);
+      expect(isDesktop(e)).toBe(false);
+      expect(targetMinFor(e)).toBe(TARGET_MIN);
+      expect(limitsFor('home', e)).toBe(TABLET_LIMITS.home);
+      expect(limitsFor('table', e)).toBe(TABLET_LIMITS.table);
+      expect(limitsFor('tool', e)).toBe(LIMITS.tool);
+    });
+    expect(TABLET_LIMITS.home).toBe(DESKTOP_LIMITS.home);
+    expect(TABLET_LIMITS.table).toBe(DESKTOP_LIMITS.table);
+    expect(isTablet(sideways)).toBe(false);
+    expect(isTablet(laptop)).toBe(false);
+    expect(caseName(flat)).toBe('ipad-768x1024 landscape standalone');
+    // The shell's 480px column centred on the iPad sideways: 144px a side of 1024 (14.1%) is a home
+    // within the tablet's 40%; a table at the same width fails the tenth, as it does on a window.
+    const column = (screen: Screen): Measured => ({
+      ...full(flat),
+      used: { x: 272, y: 12, w: 480, h: flat.viewport.height - 24 },
+      fixedScreen: screen.kind === 'table',
+    });
+    expect(failing(column(HOME), flat, HOME)).toEqual([]);
+    expect(failing(column(TABLE), flat, TABLE)).toEqual(['used']);
+    // A control of 40px is a failure on an iPad, as on a phone (a window's 32 would pass it).
+    expect(failing({ ...full(flat), targets: [{ sel: '#x', w: 40, h: 40 }] }, flat, TABLE)).toEqual(
+      ['targets'],
+    );
+    expect(
+      failing({ ...full(laptop), targets: [{ sel: '#x', w: 40, h: 40 }] }, laptop, TABLE),
+    ).toEqual([]);
   });
   test('every page has a home-kind screen first and a second screen; backgammon a third, upright only: the gate kept', () => {
     PAGE_IDS.forEach((page) => {
@@ -584,7 +634,38 @@ describe('the sheet and the totals', () => {
       '20260930-1400',
     );
     expect(html).toContain('<h2 class="group">Phones <small>· 1 of 2 pass</small></h2>');
+    expect(html).not.toContain('Tablets');
     expect(html).toContain('<h2 class="group">Desktop windows <small>· 1 of 1 pass</small></h2>');
+    // An iPad's card lands in its own group between the two.
+    const ipad = deviceById('ipad-768x1024');
+    if (ipad === null) throw new Error('row missing');
+    const flat: Emulation = emulationFor(ipad, 'landscape', 'standalone');
+    const three = sheetHtml(
+      'briscola',
+      [
+        ...cards,
+        {
+          e: flat,
+          screens: [
+            {
+              screen: TABLE,
+              measured: full(flat),
+              verdict: judge({ page: 'briscola', screen: TABLE, e: flat, m: full(flat) }),
+              picture: 't.png',
+            },
+          ],
+        },
+        {
+          e: laptop,
+          screens: [{ screen: TABLE, measured: full(laptop), verdict: win, picture: 'd.png' }],
+        },
+      ],
+      '20260930-1400',
+    );
+    expect(three).toContain('<h2 class="group">Tablets <small>· 1 of 1 pass</small></h2>');
+    expect(three.indexOf('Tablets')).toBeGreaterThan(three.indexOf('iphone-390x844 landscape'));
+    expect(three.indexOf('Desktop windows')).toBeGreaterThan(three.indexOf('Tablets'));
+    expect(three).toContain('ipad-768x1024 · iPad (9th), mini · 1024x768 @2x');
     expect(html.indexOf('Desktop windows')).toBeGreaterThan(
       html.indexOf('iphone-390x844 landscape'),
     );
