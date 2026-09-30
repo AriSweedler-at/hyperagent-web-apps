@@ -2136,12 +2136,14 @@ details.history-row > .history-detail dt {
    left holds the status line and the score cells; the felt band with the stock and the trick fills
    the middle; the hand runs across the bottom with my name and chips at its left and the round's
    actions (Play, the deck) at its right. The page never scrolls: the card width is the height
-   budget (rows 44, the band's 30px of labels and caption chips, the hand's 16px of padding, two
-   8px gaps, #app's 12px top gutter and its foot, the 12px gutter or the home indicator's inset)
-   over a hand card and a mid card at half its width (1.5 card heights); 64px on the X in a tab
-   (325 tall), 87px on the 12 class standalone (390), 104px on the Pro Max (440); floored at 56px
-   so nothing clips, capped at 110px. The stock's labels stand beside the stock rather than under
-   it, so the band is a mid card and its chips tall. Every control keeps the shell's 44px. */
+   budget (rows 44, the band's 40px of captions under the fan (the `.who` chip and the card's name,
+   as upright) and its 8px of padding, the hand's 16px of padding, two 8px gaps, #app's 12px top
+   gutter and its foot, the 12px gutter or the home indicator's inset) over a hand card and a mid
+   card at half its width (1.5 card heights); 72px on the X in a tab (325 tall), 93px on the SE
+   (375), 99px on the 12 class standalone (390), 110px (the cap) from 417 tall; floored at 56px.
+   The first hand played sideways (PR briscola-sideways-play) had the band 26px over a mid card:
+   the card names under the fan printed in cream past the felt's edge and vanished. The stock's
+   labels stand beside the stock rather than under it. Every control keeps the shell's 44px. */
 body[data-layout^='phone-sideways'] {
   /* The home: backgammon's landscape column (shell.css), the online cards three abreast below. */
   --column-wide: 820px;
@@ -2176,7 +2178,7 @@ body[data-layout^='phone-sideways'].fixed-screen #app {
 body[data-layout^='phone-sideways'] #tableScreen {
   --card-w: clamp(
     56px,
-    calc((100dvh - 118px - max(12px, var(--frame-inset-bottom, 0px))) * var(--aspect) / 1.5),
+    calc((100dvh - 136px - max(12px, var(--frame-inset-bottom, 0px))) * var(--aspect) / 1.5),
     110px
   );
   --mid-w: calc(var(--card-w) * 0.5);
@@ -2193,6 +2195,11 @@ body[data-layout^='phone-sideways'] #tableScreen {
 }
 body[data-layout^='phone-sideways'] #tableScreen > .topbar {
   display: contents;
+}
+/* The three rows are grid items now, not a stack: the shell's `.row + .row { margin-top: 10px }`
+   would hang the badge and the sound button 5px under the menu (the first hand played sideways). */
+body[data-layout^='phone-sideways'] .topbar > .row + .row {
+  margin-top: 0;
 }
 body[data-layout^='phone-sideways'] .topbar > .row:first-child {
   grid-area: menu;
@@ -2224,11 +2231,14 @@ body[data-layout^='phone-sideways'] .seat-name {
 body[data-layout^='phone-sideways'] .seat-taken {
   align-self: center;
 }
+/* Two lines are always reserved: "Bob takes the trick · 13 points" wraps in the sidebar while a
+   turn's line does not, and the score cells below must not jump through the beat. */
 body[data-layout^='phone-sideways'] .status-line {
   text-align: left;
   font-size: 0.85rem;
   padding: 0 4px;
   height: auto;
+  min-height: calc(2 * 1.25 * 0.85rem);
   line-height: 1.25;
   white-space: normal;
   overflow: visible;
@@ -2247,11 +2257,18 @@ body[data-layout^='phone-sideways'] .score-cell {
   padding: 4px 10px;
   flex-wrap: wrap;
 }
+/* The short tier's sidebar is 150px: "Ann (you) · 50 · 6 tricks" does not fit one line and the name
+   was cut to "Ann (…"; the tricks count takes the cell's second line instead. */
+body[data-layout='phone-sideways-short'] .sc-tricks {
+  flex-basis: 100%;
+}
+/* The band is what the rows leave: a mid card, the fan's 40px of captions (the upright `.trick`
+   height) and 4px of felt above and below, so the card names print on the felt. */
 body[data-layout^='phone-sideways'] .table-center {
   height: auto;
   min-height: 0;
   align-items: center;
-  padding: 8px 12px;
+  padding: 4px 12px;
 }
 body[data-layout^='phone-sideways'] .stock-area {
   display: grid;
@@ -2275,9 +2292,6 @@ body[data-layout^='phone-sideways'] .stock-area > #stockCount {
 body[data-layout^='phone-sideways'] .stock-area > #briscolaName {
   grid-area: name;
   align-self: start;
-}
-body[data-layout^='phone-sideways'] .trick {
-  height: calc(var(--mid-w) / var(--aspect) + 26px);
 }
 body[data-layout^='phone-sideways'] .hand-area {
   display: grid;

@@ -541,3 +541,19 @@ table talk, Finish, Leave) stacked in one column. What folded:
   class measures 437px in 390-420 (417 on the XR/Max at 896 wide), the X class 484 in 375, the Galaxy
   432 in 360, the SE 495 in 375 and 325 in a tab, and the bar-shown short bucket (304-370px tall)
   on every phone but the 440. `used`, `clip`, `targets`, `frame` and `gutter` ok on every screen.
+
+### Closed by briscola-sideways-play
+
+- A whole hand played sideways in the emulator with real touch events at 844x390 and 667x375
+  (2026-09-30: the finger's drag to the trick, the clash, the flights to the seat's strip and the
+  hand, the draw's tap, the result), over dist/ built from 734ece4e: the grid, the drag and the
+  beat held; the fan's card names printed in cream past the felt's edge (the band was a mid card
+  and 26px, the captions hang 38px under a card), the score cells jumped 17px while a two-line
+  "takes the trick" status showed, and the SE's 150px sidebar cut "Ann (you)" to "Ann (…". In
+  web/games/briscola/theme.css: the sideways `--card-w` budget is 136px of chrome (the upright
+  captions' 40px and 8px of felt in the band; 99px cards at 390, 93 at 375), the sideways `.trick`
+  override is gone, the status line reserves two lines, and the short tier's tricks count takes the
+  cell's second line. Pinned: `expectSidewaysGrid` and the sideways clamp's twin
+  (`sidewaysCardWidth`) in e2e/briscola-geometry.spec.ts at both buckets on a touch context, a
+  finger's drag (CDP touch events, `touchDragCard`) to the settled trick and the result sheet in
+  e2e/briscola-local.spec.ts. Real, closed.

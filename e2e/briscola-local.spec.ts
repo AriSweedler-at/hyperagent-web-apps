@@ -23,7 +23,11 @@
 // switches the pack live (Italian "di" to English "of") and refuses a stranger with one line, and a
 // tap on the briscola opens the card view with the card large and named. The deals come from the
 // seeded `Math.random` every player context installs (e2e/fixtures/seed.ts), which main.ts reads
-// as `window.__rng ?? Math.random`.
+// as `window.__rng ?? Math.random`. Sideways (a touch context at 844x390, `phone-sideways`): a
+// finger's drag (Chromium's touch events) lights the trick, its ghost is over the trick at the
+// release, the card lands inside the trick's box and is played, the beat settles with nothing in
+// the air and the chips in the strips, and a seated position's last three tricks bring the result
+// sheet up over the grid with every button a finger wide and nothing scrolling.
 import type { Page } from '@playwright/test';
 
 import {
@@ -44,6 +48,7 @@ import {
   briscolaReveal,
   briscolaSetup,
   briscolaStartLocal,
+  briscolaStartSideways,
   clearCues,
   closeHistory,
   cuesOf,
@@ -58,12 +63,15 @@ import {
   playedCues,
   readEvents,
   requireView,
+  expectTargets,
   spyFx,
+  tableGeometry,
+  touchDragCard,
   trickShown,
   type Viewport,
 } from './fixtures/briscola.ts';
 import { cardName as packName, langByName } from '../web/shared/lib/lang/packs.ts';
-import { DESKTOP, PHONE } from './fixtures/geometry.ts';
+import { DESKTOP, PHONE, PHONE_LANDSCAPE } from './fixtures/geometry.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
 
@@ -842,5 +850,78 @@ test.describe('desktop card tip', () => {
     const before = await transform();
     await page.locator('#briscola .card').hover();
     await expect.poll(transform).not.toBe(before);
+  });
+});
+
+test.describe('sideways', () => {
+  test('a finger drags a card to the trick at 844x390 (touch): the trick lights, the ghost is over it, the card lands in its box and is played; the beat settles with nothing in the air; the last three tricks bring the result sheet up, its buttons a finger wide', async ({
+    phone,
+    project,
+  }) => {
+    const { page } = phone;
+    await briscolaStartSideways(page, pagePath(project, 'briscola'), PHONE_LANDSCAPE);
+    await briscolaReveal(page);
+    const v = await requireView(page);
+    const cardId = FIRST_LEGAL(v);
+    const trick = page.locator('#trick');
+    const ghost = page.locator('.drag-ghost');
+    await touchDragCard(page, cardId, async () => {
+      // Held over the trick: the card is lifted, the trick lit and taking the drop, the ghost's
+      // centre inside the trick's box.
+      await expect(page.locator(`#hand .card[data-card="${cardId}"]`)).toHaveClass(/\bdragging\b/);
+      await expect(trick).toHaveClass(DROP);
+      const g = await ghost.boundingBox();
+      const t = await trick.boundingBox();
+      if (g === null || t === null) throw new Error('the ghost or the trick has no box');
+      const centre = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
+      expect(centre.x).toBeGreaterThan(t.x);
+      expect(centre.x).toBeLessThan(t.x + t.width);
+      expect(centre.y).toBeGreaterThan(t.y);
+      expect(centre.y).toBeLessThan(t.y + t.height);
+    });
+    // Released: the card is the fan's, inside the trick's box; the ghost and the marks are gone.
+    expect(await trickShown(page)).toEqual([[cardId, String(v.me.idx)]]);
+    const laid = await page.locator(`#trick .card[data-card="${cardId}"]`).boundingBox();
+    const box = await trick.boundingBox();
+    if (laid === null || box === null) throw new Error('the laid card or the trick has no box');
+    expect(laid.x).toBeGreaterThanOrEqual(box.x - 8);
+    expect(laid.y).toBeGreaterThanOrEqual(box.y - 8);
+    expect(laid.x + laid.width).toBeLessThanOrEqual(box.x + box.width + 8);
+    expect(laid.y + laid.height).toBeLessThanOrEqual(box.y + box.height + 8);
+    await expect(ghost).toHaveCount(0);
+    await expect(trick).not.toHaveClass(/\bdrop-ready\b/);
+    expect(await heldCards(page)).not.toContain(cardId);
+    // The other seat completes the trick; the beat (the clash, the flights, the draw's tap) runs
+    // in the grid and settles: nothing in the air, the winner's one chip in its strip, the strip
+    // as wide as the sideways twin says.
+    const one = await playTrick(page);
+    expect(one.trickNo).toBe(1);
+    expect(one.tricks.reduce((a, b) => a + b, 0)).toBe(1);
+    await expectChips(page, one);
+    await expect(page.locator('#hand .card')).toHaveCount(3);
+    // The end of the hand: the upright spec's position (Ann's bastoni over Bob's small coppe, spade
+    // the trump) played out; the result sheet stands over the grid, every button a finger wide,
+    // and the page still does not scroll.
+    const state = briscolaPosition({
+      hands: [
+        ['AB', '3B', 'RB'],
+        ['2C', '4C', '5C'],
+      ],
+      trumpCard: '7S',
+      leader: 0,
+    });
+    await briscolaSetup(page, state);
+    await playTrick(page);
+    await playTrick(page);
+    const over = await playTrick(page);
+    expect(over.phase).toBe('over');
+    expect(over.sides).toEqual([96, 24]);
+    await expect(page.locator('#resultOverlay')).toBeVisible();
+    await expect(page.locator('#rsScore .score-row')).toHaveText([/^Ann\s*96$/, /^Bob\s*24$/]);
+    await expect(page.locator('#rsReplayBtn')).toBeEnabled();
+    const g = await tableGeometry(page);
+    expect(g.layout).toBe('phone-sideways');
+    expectTargets(g, 'result sheet');
+    expect(g.fits.document, 'the document scrolls under the result sheet').toBe(true);
   });
 });

@@ -29,6 +29,7 @@ import {
 } from '../../web/games/briscola/src/engine/index.ts';
 import {
   CHIP_H,
+  SIDEWAYS_GEOMETRY,
   STRIP_WIDTHS,
   briscolaBox,
   cardWidth,
@@ -36,11 +37,20 @@ import {
   fits,
   layoutFor,
   sameAspect,
+  sidewaysCardWidth,
   stripWidth,
 } from '../../web/games/briscola/src/ui/layout.ts';
+import { bucketOf, type Bucket } from '../../web/shared/lib/layout.ts';
 import { mulberry32 } from '../../web/shared/lib/rng.ts';
 import type { Box } from './boxes.ts';
-import { TOL, fitsScript, frameScript, type Frame, type Viewport } from './geometry.ts';
+import {
+  PHONE_LANDSCAPE,
+  TOL,
+  fitsScript,
+  frameScript,
+  type Frame,
+  type Viewport,
+} from './geometry.ts';
 import {
   TABLE_FULL_MSG,
   hostRoomMsg,
@@ -132,6 +142,37 @@ export const briscolaStartLocal = (
     }
   });
 
+/** An iPhone SE held sideways, inset-free: the `phone-sideways-short` bucket (web/shared/lib/layout.ts SHORT_MAX_HEIGHT). */
+export const PHONE_SIDEWAYS_SHORT: Viewport = { width: 667, height: 375 };
+/** The two sideways buckets by their representative viewport (PHONE_LANDSCAPE is the 12 class, `phone-sideways`). */
+export const SIDEWAYS_VIEWPORTS: Readonly<Record<string, Viewport>> = {
+  'phone-sideways': PHONE_LANDSCAPE,
+  'phone-sideways-short': PHONE_SIDEWAYS_SHORT,
+};
+
+/** The bucket a touch context at `viewport` lands in (the boot's `bucketOf` over a phone's pointer facts). */
+export const bucketAt = (viewport: Viewport): Bucket =>
+  bucketOf({ width: viewport.width, height: viewport.height, fine: false, hover: false });
+
+/** The bucket the boot wrote on `<body data-layout>` (web/shared/edge/screen.ts `applyLayout`). */
+export const expectBucket = (page: Page, bucket: Bucket): Promise<void> =>
+  expect(page.locator('body')).toHaveAttribute('data-layout', bucket);
+
+/**
+ * Start pass and play with the phone held sideways: `briscolaStartLocal` at a wide viewport on a
+ * touch context (the `phone` fixture, e2e/fixtures/two-players.ts: `hasTouch`, so the boot's
+ * pointer facts read as a phone's), then the bucket the viewport lands in is on the body.
+ */
+export const briscolaStartSideways = async (
+  page: Page,
+  url: string,
+  viewport: Viewport,
+  names: LocalNames = LOCAL_NAMES[2],
+): Promise<void> => {
+  await briscolaStartLocal(page, url, viewport, names);
+  await expectBucket(page, bucketAt(viewport));
+};
+
 /** What the curtain says (design §5.1, ui/local.ts `curtainText`). */
 export type Curtain = Readonly<{ title: string; sub: string; last: string; button: string }>;
 export const briscolaCurtain = async (page: Page): Promise<Curtain> => {
@@ -184,6 +225,44 @@ export const playCard = async (page: Page, cardId: string): Promise<void> => {
   const play = page.locator('#playBtn');
   await expect(play).toBeEnabled();
   await play.click();
+  await expect(page.locator(`#trick .card[data-card="${cardId}"]`)).toHaveCount(1);
+};
+
+/**
+ * Drag the hand card `cardId` to the trick as a finger does: Chromium's own touch events through
+ * the CDP (`Input.dispatchTouchEvent`), which the browser turns into the pointer events the shared
+ * drag kernel listens to (web/shared/edge/drag.ts) once `touch-action` allows (theme.css `#hand
+ * .card { touch-action: none }`), so a drag the page would scroll away on a phone fails here too.
+ * The finger crosses in eight moves; `overTrick` runs with it held over the trick, before the
+ * release. Resolves once the fan shows the card.
+ */
+export const touchDragCard = async (
+  page: Page,
+  cardId: string,
+  overTrick?: () => Promise<void>,
+): Promise<void> => {
+  const card = page.locator(`#hand .card[data-card="${cardId}"]`);
+  await expect(card).toHaveClass(/\bplayable\b/);
+  const from = await card.boundingBox();
+  const to = await page.locator('#trick').boundingBox();
+  if (from === null || to === null) throw new Error('the card or the trick has no box');
+  const a = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+  const b = { x: to.x + to.width / 2, y: to.y + to.height / 2 };
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [a] });
+  const steps = 8;
+  const move = async (i: number): Promise<void> => {
+    if (i > steps) return;
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: a.x + ((b.x - a.x) * i) / steps, y: a.y + ((b.y - a.y) * i) / steps }],
+    });
+    return move(i + 1);
+  };
+  await move(1);
+  if (overTrick !== undefined) await overTrick();
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
   await expect(page.locator(`#trick .card[data-card="${cardId}"]`)).toHaveCount(1);
 };
 
@@ -312,10 +391,12 @@ export const expectChips = async (page: Page, v: View): Promise<void> => {
   await expect(page.locator('.chip.arriving')).toHaveCount(0);
   // The row is as wide as the twin says for that many chips: one chip, then a step more per chip
   // (the CSS's min()/max() over `--n` agrees with layout.ts chipStep).
-  const measured = await page.evaluate<Readonly<{ w: number; width: number; aspect: number }>>(
-    `(() => ({ w: document.getElementById('myTricks').getBoundingClientRect().width, width: window.innerWidth, aspect: Number(getComputedStyle(document.getElementById('tableScreen')).getPropertyValue('--aspect')) }))()`,
+  const measured = await page.evaluate<
+    Readonly<{ w: number; width: number; aspect: number; layout: string | null }>
+  >(
+    `(() => ({ w: document.getElementById('myTricks').getBoundingClientRect().width, width: window.innerWidth, aspect: Number(getComputedStyle(document.getElementById('tableScreen')).getPropertyValue('--aspect')), layout: document.body.getAttribute('data-layout') }))()`,
   );
-  const predicted = stripWidth(mine, STRIP_WIDTHS[layoutFor(measured.width)].mine, measured.aspect);
+  const predicted = stripWidth(mine, myStripWidth(measured), measured.aspect);
   expect(
     Math.abs(measured.w - predicted),
     `#myTricks is ${String(measured.w)} wide for ${String(mine)} chips, the twin says ${String(predicted)}`,
@@ -505,6 +586,8 @@ export type Fits = Readonly<{
 export type TableGeometry = Readonly<{
   width: number;
   height: number;
+  /** The bucket on `<body data-layout>` (docs/design/layout-buckets.md); null before the boot wrote one. */
+  layout: string | null;
   /** `--aspect` as `#tableScreen` carries it (the pack's). */
   aspect: number;
   players: number;
@@ -534,12 +617,17 @@ export type TableGeometry = Readonly<{
 
 /** The frame around the cards: one box each, in every phase (design §5.6 `expectSameFrame`). */
 export const FRAME_SELECTORS: ReadonlyArray<string> = [
+  '#tableScreen',
   '#tableScreen .topbar',
+  '#menuBtn',
+  '#trumpBadge',
+  '#soundBtn',
   '#seats',
   '#tableCenter',
   '#scoreStrip',
   '#statusLine',
   '.hand-area',
+  '.hand-header',
   '#actions',
 ];
 /** What a finger may land on at the table: every button shown, and a held card's slot. */
@@ -573,6 +661,7 @@ const geometryScript = (quick: boolean): string => `(async () => {
   const one = (sel) => { const el = document.querySelector(sel); return el === null ? null : rect(el); };
   return {
     width: window.innerWidth, height: window.innerHeight,
+    layout: document.body.getAttribute('data-layout'),
     aspect: Number(getComputedStyle(screen).getPropertyValue('--aspect')),
     players: Number(document.getElementById('seats').getAttribute('data-players')),
     hand: rect(document.getElementById('hand')),
@@ -611,7 +700,15 @@ const disjoint = (a: Rect, b: Rect): boolean =>
   a.y + a.h <= b.y + TOL ||
   b.y + b.h <= a.y + TOL;
 const centreX = (r: Rect): number => r.x + r.w / 2;
+const centreY = (r: Rect): number => r.y + r.h / 2;
 const same = (a: number, b: number, tol = TOL): boolean => Math.abs(a - b) <= tol;
+
+/** The phone is held sideways (either tier): the theme's `body[data-layout^='phone-sideways']` grid is on. */
+const sideways = (g: Pick<TableGeometry, 'layout'>): boolean =>
+  g.layout?.startsWith('phone-sideways') === true;
+/** `--strip-w` of my taken strip for the layout shown: the sideways grid's own, else the width tier's. */
+const myStripWidth = (g: Pick<TableGeometry, 'layout' | 'width'>): number =>
+  sideways(g) ? SIDEWAYS_GEOMETRY.stripMine : STRIP_WIDTHS[layoutFor(g.width)].mine;
 
 /** The three slots inside `#hand`, one size, disjoint and in increasing x; every held card in its slot (a lifted one in the hand area). */
 export const expectHandLaid = (g: TableGeometry, when: string): void => {
@@ -657,7 +754,9 @@ export const expectCardShapes = (g: TableGeometry, when: string): void => {
       `${when}: ${name} is not ${String(g.aspect)} (${String(box.w / box.h)})`,
     ).toBe(true);
   });
-  const predicted = cardWidth({ width: g.width, height: g.height }, g.aspect);
+  const predicted = sideways(g)
+    ? sidewaysCardWidth(g.height, g.aspect)
+    : cardWidth({ width: g.width, height: g.height }, g.aspect);
   g.handCards.forEach((c) => {
     expect(
       same(c.box.w, predicted, 1),
@@ -741,7 +840,7 @@ export const expectStrips = (g: TableGeometry, when: string): void => {
     if (cell !== undefined)
       expect(inside(s.box, cell, 1), `${when}: strip ${s.id} outside its cell`).toBe(true);
     expect(s.chips, `${when}: ${s.id} shows ${String(s.count)} tricks`).toHaveLength(s.count);
-    const stripW = STRIP_WIDTHS[layout][mine ? 'mine' : 'seat'];
+    const stripW = mine ? myStripWidth(g) : STRIP_WIDTHS[layout].seat;
     expect(
       s.box.w,
       `${when}: strip ${s.id} is ${String(s.box.w)} wide, more than ${String(stripW)}`,
@@ -780,15 +879,108 @@ export const expectTargets = (g: TableGeometry, when: string): void => {
   expect(small, `${when}: targets under 44px`).toEqual([]);
 };
 
-/** No scroll where the twin says the column fits; under the fallback the document alone scrolls, with the actions reachable. */
+/** No scroll where the twin says the column fits (sideways the grid always does); under the fallback the document alone scrolls, with the actions reachable. */
 export const expectFits = (g: TableGeometry, when: string): void => {
-  const scrolls = !fits({ width: g.width, height: g.height }, g.aspect);
+  const scrolls = !sideways(g) && !fits({ width: g.width, height: g.height }, g.aspect);
   expect(g.fits, `${when}: overflow`).toEqual({
     document: !scrolls,
     app: true,
     tableScreen: true,
     actionsReachable: true,
   });
+};
+
+/**
+ * The sideways grid (theme.css "A phone sideways"; the frame's boxes): the menu in the table's
+ * top-left corner and the sound button at its right edge, the seats' row and the trump badge on
+ * the same 44px top row between them, left to right; the sidebar (the status line over the score
+ * cells) left of the band; the band under the top row and over the hand, the hand area across
+ * the bottom to the table's foot and right edge; my name left of the hand and the actions right
+ * of it, all inside the hand area; the trick inside the band on its middle line, the fan centred
+ * on the trick; and nothing scrolls.
+ */
+export const expectSidewaysGrid = (g: TableGeometry, when: string): void => {
+  const box = (sel: string): Rect => {
+    const b = g.frame[sel];
+    if (b === null || b === undefined) throw new Error(`${when}: ${sel} has no box`);
+    return b;
+  };
+  const screen = box('#tableScreen');
+  const menu = box('#menuBtn');
+  const seats = box('#seats');
+  const badge = box('#trumpBadge');
+  const sound = box('#soundBtn');
+  const status = box('#statusLine');
+  const score = box('#scoreStrip');
+  const band = box('#tableCenter');
+  const handArea = box('.hand-area');
+  const header = box('.hand-header');
+  const actions = box('#actions');
+  const topRow: Rect = { x: screen.x, y: screen.y, w: screen.w, h: 44 };
+  expect(
+    same(menu.x, screen.x) && same(menu.y, screen.y),
+    `${when}: the menu is not top-left`,
+  ).toBe(true);
+  expect(
+    same(sound.x + sound.w, screen.x + screen.w),
+    `${when}: the sound is not at the right edge`,
+  ).toBe(true);
+  [menu, seats, badge, sound].forEach((b, i) => {
+    expect(inside(b, topRow), `${when}: top-row item ${String(i)} is off the 44px row`).toBe(true);
+  });
+  expect(
+    menu.x + menu.w <= seats.x + TOL && seats.x + seats.w <= badge.x + TOL,
+    `${when}: menu, seats, badge are not left to right`,
+  ).toBe(true);
+  expect(badge.x + badge.w <= sound.x + TOL, `${when}: the badge is not left of the sound`).toBe(
+    true,
+  );
+  expect(status.y >= menu.y + menu.h - TOL, `${when}: the status is not under the menu`).toBe(true);
+  expect(status.y + status.h <= score.y + TOL, `${when}: the score is not under the status`).toBe(
+    true,
+  );
+  expect(
+    status.x + status.w <= band.x + TOL && score.x + score.w <= band.x + TOL,
+    `${when}: the sidebar is not left of the band`,
+  ).toBe(true);
+  expect(band.y >= seats.y + seats.h - TOL, `${when}: the band is not under the top row`).toBe(
+    true,
+  );
+  expect(band.y + band.h <= handArea.y + TOL, `${when}: the band is not over the hand`).toBe(true);
+  expect(
+    same(band.x, handArea.x) && same(band.x + band.w, screen.x + screen.w),
+    `${when}: the band does not span the hand's columns`,
+  ).toBe(true);
+  expect(
+    same(handArea.y + handArea.h, screen.y + screen.h) &&
+      same(handArea.x + handArea.w, screen.x + screen.w),
+    `${when}: the hand area is not across the table's foot`,
+  ).toBe(true);
+  expect(
+    inside(header, handArea) && inside(g.hand, handArea) && inside(actions, handArea),
+    `${when}: the hand row's parts leave the hand area`,
+  ).toBe(true);
+  expect(header.x + header.w <= g.hand.x + TOL, `${when}: my name is not left of the hand`).toBe(
+    true,
+  );
+  expect(
+    g.hand.x + g.hand.w <= actions.x + TOL,
+    `${when}: the actions are not right of the hand`,
+  ).toBe(true);
+  expect(inside(g.trick, band, 1), `${when}: the trick leaves the band`).toBe(true);
+  expect(
+    same(centreY(g.trick), centreY(band), 1),
+    `${when}: the trick is off the band's middle line`,
+  ).toBe(true);
+  if (g.plays.length > 0 && !g.clash) {
+    const left = Math.min(...g.plays.map((p) => p.box.x));
+    const right = Math.max(...g.plays.map((p) => p.box.x + p.box.w));
+    expect(
+      same((left + right) / 2, centreX(g.trick), 2),
+      `${when}: the fan is off the trick's centre`,
+    ).toBe(true);
+  }
+  expect(g.fits.document, `${when}: the document scrolls`).toBe(true);
 };
 
 /** The whole oracle for one state of the table. */
