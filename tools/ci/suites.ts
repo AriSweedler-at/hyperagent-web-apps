@@ -926,6 +926,14 @@ export const RULES: ReadonlyArray<Rule> = [
     why: 'the shared replay driver and test scaffolding: the coin self-test and both engines drive games through them',
   },
   {
+    // The space audit (docs/design/space-audit.md): a Playwright tool no suite imports, run by hand
+    // (`npm run audit:space`); its pure judge's test is the harness suite's, so a change here runs
+    // that alone. Above the `tools/**` row, which would run everything.
+    globs: ['tools/space-audit.ts', 'tools/space-audit/**'],
+    runs: ['harness'],
+    why: 'the space audit tool: its judge test is harness; the audit itself runs by hand',
+  },
+  {
     globs: [
       // The harness drives every suite: the two origins, the extractors, the drivers, the registry.
       'tools/**',
