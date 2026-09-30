@@ -22,13 +22,13 @@ the rules by rule (`rules R13`).
 | Q12 | Toast | Gin's: `TOAST_MS 2600`, one restarting timer, `#toast` last in the body. |
 | Board | One DOM: 24 direct children `#point-1..#point-24` of `#board` in absolute order plus `#barTop #dice #cube #barBottom #offLight #offDark`; placement by two `grid-template-areas` strings (phone, desktop) whose area names are own numbers; the seat perspective is `data-own` on each point and `data-seat` on `#board`. |
 | Chirality | Home bottom-right on the phone (own checkers run clockwise there, counter-clockwise on the desktop). The alternative is one grid string and two selectors. |
-| Geometry | `--point-w` 47px at 390x844, checkers 40px, a 27.6px coin step; below 806px tall the document scrolls instead of clipping; `touch-action: none` on `.checker` only. |
+| Geometry | `--point-w` 47px at 390x844, checkers 40px, a 27.6px coin step; under 784px of room (a notched phone installed) the tight tier gives 24px of chrome back so the rows reach 44 (§3.1); below 806px tall the document scrolls instead of clipping; `touch-action: none` on `.checker` only. |
 | Input | Tap-to-move, one tap per move, the sole legal source auto-selected (`.selected.auto`, ring without lift); drag through gin's dragger reshaped (`ui/board/dragger.ts`). |
-| Ambiguity | A die-chip tray in the controls row (`#moveChips`, 56px chips labelled with the dice as digits and the destination) only when a choice exists: a bear-off both dice suffice for, or two orders of a combined move whose intermediates differ. The trays always name the die they will spend (`data-die` "6", "6·5"). |
+| Ambiguity | A die-chip tray in the controls row (`#moveChips`, 56px chips labelled with the dice as digits and the destination) only when a choice exists: a bear-off both dice suffice for, or two orders of a combined move whose intermediates differ. A bear-off both dice suffice for is one tap and spends the smaller die, the disc naming it (`data-die` "5", §4.4); a combined move's disc names its dice ("6+3", "6+3?" when the tap opens the tray). |
 | Which die | `.die.dead` when no maximal play uses a die; tap a die to force it (`die/pick`, targets recomputed for that die alone, the status line confirms "playing the 6"). |
-| Status line | Always names what is left ("3-1 · play both dice", "6-5 · the 6 cannot be played", "6-1 · enter from the bar", "3-1 · last move"), the dice in words in a visually hidden span. Every line is budgeted against its slot (§2.4 "The copy budget"). |
+| Status line | Always names what is left ("3-1 · play both dice", "6-5 · the 6 is dead", "6-1 · enter from bar", "3-1 · last move"; `STATUS_TEMPLATES`, board.ts), the dice in words in a visually hidden span. Every line is budgeted against its slot (§2.4 "The copy budget"). |
 | Stacks | Five checkers drawn; a count badge on the top visible checker from the sixth on; the point label stays. |
-| Turn end | Online the turn ends by itself when no maximal play extends what was played (rules R13). Pass-and-play (the owner, 2026-09-28: "After I finish a turn in pass-and-play, it's very jarring. It immediately tells me to swap the phone over. I should be able to hit 'end turn' ... think about my next move, or consider undoing stuff") deals its match with `options.manualTurnEnd`: the mover then stays in `moving` with no legal move once the dice are used up (or the rest is unplayable), Undo still on, and `#doneBtn` "End turn" (`btn-primary`, beside Undo; sideways, over Undo in the rail) sends `done`, which flips the turn with the automatic end's exact bookkeeping (`endTurn`: the log lines, `lastPlay`, `turnStart`). A roll with no move still passes by itself (R14: nothing to think over, nothing to undo); fifteen off still ends the game at once. The status line reads "Dice used — End turn, or Undo" ("6-5 · the 5 cannot be played — End turn, or Undo"), and the last playable move's "3-1 · last move" (it was "Last move: then End turn, or Undo", cut sideways). `canEndTurn(view)` (engine/view.ts) is derived, so the `state` frame's shape is unchanged; the decoder reads a missing `manualTurnEnd` as false. Online keeps the automatic end (a follow-up: the option there too). |
+| Turn end | Online the turn ends by itself when no maximal play extends what was played (rules R13). Pass-and-play (the owner, 2026-09-28: "After I finish a turn in pass-and-play, it's very jarring. It immediately tells me to swap the phone over. I should be able to hit 'end turn' ... think about my next move, or consider undoing stuff") deals its match with `options.manualTurnEnd`: the mover then stays in `moving` with no legal move once the dice are used up (or the rest is unplayable), Undo still on, and `#doneBtn` "End turn" (`btn-primary`, beside Undo; sideways, over Undo in the rail) sends `done`, which flips the turn with the automatic end's exact bookkeeping (`endTurn`: the log lines, `lastPlay`, `turnStart`). A roll with no move still passes by itself (R14: nothing to think over, nothing to undo); fifteen off still ends the game at once. The status line reads "Dice used · End turn" ("5 is dead · End turn" when the rest is unplayable; `diceUsed`, `heldDead`), and the last playable move's "3-1 · last move" (it was "Last move: then End turn, or Undo", cut sideways). `canEndTurn(view)` (engine/view.ts) is derived, so the `state` frame's shape is unchanged; the decoder reads a missing `manualTurnEnd` as false. Online keeps the automatic end (a follow-up: the option there too). |
 | Hit toast | "Kapará. {name} hit you on your {n}-point." for the player hit, in their own numbering, from the moves (`played[i].hit`, `lastPlay`), never from log text. Online it fires as the opponent's hit moves arrive; in pass-and-play when the phone reaches the player hit (§4.9). |
 | Accessibility | Every tap target ≥ 44px on the phone (the geometry e2e asserts it), a painted `aria-label` per place, Enter/Space on a focused place is its tap, Escape closes the sheet or the tray. |
 | Theme | "Subtle but recognizable": a parchment page (a CC0 photo of real medieval parchment, mirror-tiled, under a cream multiply; §3.11), the home shell in a rich aegean blue with nacre text and a gold hairline, olive-wood board, gold elsewhere only as a hairline, one low-contrast meander line on the frame, an olive trim along the window's edge. The dark checker a deep-blue disc with a fine blue ring (the eye motif as a subtle inner ring, never a literal eye); the light one a pale disc with a soft sheen. Checkers, dice and frame are CSS only, no images. GFS Didot for the title and the room code, Cardo for everything else, both from Google Fonts. |
@@ -108,8 +108,8 @@ Plain English except the three strings (Q11).
 | Host waiting (`#hostWaitStatus`) | Waiting for your opponent to join · code **ABCD**; `#startGameBtn` "Start the match" |
 | Guest waiting | Joining ABCD… / Connected — waiting for Ari to start |
 | Roll modal | title "Your turn" (pass-and-play: "{name} — your turn", the cue that the phone changed hands, the only one with the curtain off), sub "Roll to start your turn" / "Double, or roll to start your turn" (Western, the cube on offer), the button Buen mazal! `<small>roll</small>`, `#doubleBtn` "Double" beside it |
-| Status line | §1 "Status line"; every line a template of literal text and capped blocks (`STATUS_TEMPLATES`, board.ts; "The copy budget" below), at most 20 characters; while the dice tumble: "Rolling…" (`ROLLING_STATUS`, the roll is not named before the faces settle, §4.7); the tray open: "6+3 to 4, two ways", "Either die bears off"; a die picked: "6-4 · playing the 6"; a forfeited roll: "6-6 · turn passes" |
-| Target discs | one die: `3`; a combined move: `6+3`, `3+3`, three or four of a double `3×3`, `3×4`; `?` when the tap opens the tray; both dice bearing off: `6·5` |
+| Status line | §1 "Status line"; every line a template of literal text and capped blocks (`STATUS_TEMPLATES`, board.ts; "The copy budget" below), at most 20 characters; while the dice tumble: "Rolling…" (`ROLLING_STATUS`, the roll is not named before the faces settle, §4.7); the tray open: "6+3 to 4, two ways" (`twoWays`; a bear-off both dice suffice for opens no tray, §4.4); a die picked: "6-4 · playing the 6"; a forfeited roll: "6-6 · turn passes" |
+| Target discs | one die: `3`; a combined move: `6+3`, `3+3`, three or four of a double `3×3`, `3×4`; `?` when the tap opens the tray; a bear-off both dice suffice for: the smaller die alone, `5` (§4.4) |
 | Die chips | line one the dice as digits `6·3`, line two the landing `→ 4 via 7, hits` / `→ 4 via 10` / `→ off`; the whole as the chip's `aria-label` |
 | Curtain | title "Pass the phone to {name}", sub by phase: `toRoll` "Your turn. Roll when you have the phone." / with `canDouble` "Your turn. Double, or roll." / `cubeOffered` "{doubler} doubles to {v}" / else "Your turn."; `#curtainLast` the turn just finished ("Ari moved 8/5* 6/5 · Ari hit you on your 20-point": the hits in the incoming player's own numbering, the notation the mover's), a forfeited roll as logged, or before any turn the opening roll ("Ari rolled 6, Jeff rolled 4 — Ari starts"; "— Ari plays 6-4" in Western); button by phase, and it only reveals: `toRoll` → "{name} — your turn" (the roll modal follows), `moving` (the Western opening) → "{name} — play 6-3", `cubeOffered` → "{name} — answer", `over` → "{name} — look"; handoff "Continue online" |
 | Hit toast | Kapará. {name} hit you on your {n}-point. · two hits in one turn: "… on your 20-point and your 5-point." |
@@ -192,12 +192,23 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   clearance, or the notch and the home indicator once installed), so the board fills exactly what
   the chrome leaves whatever the insets: 47px points and a 672px board at 390x844 in a tab or
   headless (820 - 256, over 12; the same 47 the viewport arithmetic gave, so the goldens stand);
-  42.25 and 615 on an iPhone 12 installed (47 and 34 leave 763), the controls ending 2px over the
-  indicator's band; 41.9 on the 393x852 class (59/34), 48.6 on 430x932, 39.8 on 375x812 (44/34).
-  No floor above the scroll tier: the 44px floor the CSS held before (2026-09-29) pushed the
-  controls under the band on every notched phone installed, so the four smallest classes
-  (375x812, 390x844, 393x852, 402x874) take 39.8-43.7px rows, each 147-152px long (§6: the tap
-  target is the whole row); the floor is the scroll tier's alone (§3.10). `--checker-d 0.86
+  installed the room is what the notch and the indicator leave (763 on an iPhone 12: 47 and 34)
+  and the controls end 2px over the indicator's band. No floor above the scroll tier: the 44px
+  floor the CSS held before (2026-09-29) pushed the controls under the band on every notched
+  phone installed; the floor is the scroll tier's alone (§3.10). Instead, the tight tier (the
+  owner: "still way too much blank space above and below the board"): under 784px of room, what
+  the floor's board (636) and the full chrome (148) need, `@container room (max-height: 783px)`
+  gives 24px of chrome back (the three gaps 8 → 4, the controls row 56 → 44, `--chrome-in` 124),
+  a container query because the room is `#app`'s content box (`container: room / size`), which no
+  media query can read (`env()` is not a media feature). So installed: 44.25px rows and a 639px
+  board on 390x844 (42.25 and 615 before), 43.92 on 393x852 (59/34; 41.9 before), 45.5 on
+  402x874, 48.6 on 430x932 with the full chrome (839 of room); the 375x812 class stays short at
+  41.83 (X, 44/34) and 41.33 (12 mini, 50/34), the best its room allows (44px rows need 98px of
+  chrome; the topbar, the status line and the controls are 110 before any gap), each row still
+  147px long (§6: the tap target is the whole row). Off by construction where the document
+  scrolls (§3.10 drops the container) and sideways (`#app` is no container there). layout.ts
+  `uprightTight`, `TIGHT_UNDER`, `uprightChromeIn` are the twin; the devices e2e's standalone
+  probes read it on the 390x844, 393x852 and 375x812 classes. `--checker-d 0.86
   point-w`, `--arrow-col checker-d + 6px` (the turn arrow's column, `#board { margin-left }`,
   46px), `--point-len min((100vw - 40px - arrow-col) / 2, 220px)` (152px), `--stack-step
   min(checker-d, (point-len - checker-d - 20px) / 4)` (five coins fit with the label corner
@@ -393,13 +404,16 @@ window") is the shell's screen frame (docs/design/screen-frame.md), dressed by t
 says `frame: true`, so the composed `<body>` carries `data-frame` and shell.css draws
 `body[data-frame]::before`, a fixed, inert band along the viewport's edge with a hairline on its
 inner side, at `z-index: 0` under every positioned thing (overlays 50, flyers 60, the toast 100);
-theme.css sets `--frame-band: 6px` (10px from 900px), `--frame-color: var(--olive)`,
+theme.css sets `--frame-band: 6px` (10px from 900px, except a phone held sideways, which keeps
+6 at any width: a Pixel 8 is 915 wide, and the sideways table's `--pad-t` counts the 6px band and
+its hairline; layout.ts `frameBand` is the twin), `--frame-color: var(--olive)`,
 `--frame-hairline: var(--gold)` and `--frame-gap: 5px`, so the shell's clearance rule pads `#app`
 by 12px (16px from 900px), or the safe-area inset where that is more, on every side, and the board
 and every control stay clear of the band. The theme counts none of it: the upright table measures
 the room the paddings leave and fits it (§3.1: `#app` a size container at the table, the board's
-row from `100cqh`; the devices e2e's standalone probe sits at the table on the iPhone 12 class
-and reads the controls ending 2px over the indicator's band with nothing scrolling), as the
+row from `100cqh`, the tight tier under 784px of room; the devices e2e's standalone probes sit
+at the table on the 390x844, 393x852 and 375x812 classes and read the controls ending 2px over
+the indicator's band, the tier's 4px gaps and 44px controls, and nothing scrolling), as the
 sideways table has since 2026-09-28. No pattern: the meander stays the frame's alone.
 
 The trim's corners follow the screen's (the owner: "the green border hugs the real screen's
@@ -530,7 +544,9 @@ this board, and the board takes the 44px floor outright (`#tableScreen { --point
 `#app` drops its size container, since contained it could not grow past the viewport); the
 desktop's floor is 646px (`max-height: 645px`). The query reads the viewport: a media query cannot
 read `env()`, so an installed phone's insets do not move the tier, and above it the room decides
-the row (§3.1), with no floor. The board itself can be scrolled from: `touch-action: none` is
+the row (§3.1), with no floor but the tight tier's 24px of chrome given back under 784px of room
+(a container query, since it reads the room: `@container room (max-height: 783px)`; false here
+by construction, the container dropped, so the scroll tier keeps the full chrome). The board itself can be scrolled from: `touch-action: none` is
 scoped to `.checker`. A phone held sideways (§3.1 landscape) matches both of those fallbacks and is pinned
 again by its own block, which comes later (`100dvh`, the shell's pin and the trim's box); it has
 its own floors and fallbacks, under the landscape query: with the rail 2 x 104 + 16 + 50 = 274px,
@@ -596,7 +612,7 @@ exact from `board` and `movesLeft` without the capped `plays`. `targetsOf` group
 `to` reached by exactly one chain of length 1 is a `target` with `data-die = die`; one reached only
 by chains of length ≥ 2 a `target-2` with `data-die` the dice joined (`6+3`, `3×3`), marked `?`
 when the chains differ in `hits`; `'off'` reached by two length-1 moves with different dice is a
-`target` with `data-die = "6·5"` that opens the tray.
+`target` with `data-die` the smaller die (§4.4): one tap, no tray.
 
 ### 4.2 Tap-to-move
 
@@ -679,7 +695,7 @@ engine's: online the `move` that completes the maximal play flips `turn` (R7/R13
 exactly one playable die remains the status line reads "3-1 · last move" (the owner, 2026-09-28: "Last
 move: the turn ends when you play it", 41 characters, was cut to "Last move: the turn ends when…" in
 the strip; the line is 15 now and the copy budget of §2.4 keeps it so). Pass-and-play holds it instead (§1 "Turn end", `options.manualTurnEnd`): the completing move
-leaves the mover in `moving` with `legal === []`, the status reads "Dice used — End turn, or Undo",
+leaves the mover in `moving` with `legal === []`, the status reads "Dice used · End turn" ("5 is dead · End turn" when the die left cannot play),
 `#doneBtn` "End turn" shows beside Undo (`done/click` → `applyAction(done)`), and the curtain rises
 only on the flip; the last playable move's line reads "3-1 · last move" in this mode too. A roll
 with no move (R14) is never held: the beat above runs as it does online.
