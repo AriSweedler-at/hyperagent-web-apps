@@ -227,6 +227,17 @@ body[data-screen='preview'] #app {
 #stage[data-example='board'] {
   flex-direction: column;
 }
+/* The bucket switcher forced a bucket (main.ts `paintLayout`; docs/design/layout-buckets.md §4):
+   the stage stands for that bucket's representative viewport, as large as the screen allows,
+   centred, its edge dashed so the emulated viewport reads as one. */
+#stage[data-forced] {
+  flex: 0 1 auto;
+  width: min(100%, var(--stage-w));
+  height: min(100%, var(--stage-h));
+  align-self: center;
+  margin: auto 0;
+  outline: 1px dashed var(--muted);
+}
 #stage .board-row {
   flex: 1;
   display: flex;

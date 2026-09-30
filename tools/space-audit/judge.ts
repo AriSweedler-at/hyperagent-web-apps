@@ -13,8 +13,37 @@
 // scrolls where the page's own theme means it to: backgammon's twin, or a `fixed-screen` body the
 // theme lifted) and `gate` (the phone is held the way the page gates against, so the turn gate is
 // the screen: only its standing is judged).
-import type { Emulation, Insets, Orientation } from '../../web/shared/lib/devices.ts';
+import {
+  NO_INSETS,
+  emulationName,
+  type Emulation,
+  type Insets,
+  type Orientation,
+  type ViewportSize,
+} from '../../web/shared/lib/devices.ts';
 import { twinOf } from '../shell-emulate.ts';
+
+/**
+ * The second case type (docs/design/space-audit.md §5 "The desktop cases"; the owner: "There's
+ * also desktop"): a desktop window, a fine pointer with no touch, no safe-area insets and no seam,
+ * a browser tab at the size a laptop or a monitor shows a game. Judged by `DESKTOP_LIMITS` and a
+ * 32px target, and named `desktop 1280x800` in the table.
+ */
+export type DesktopWindow = Readonly<{ kind: 'desktop'; viewport: ViewportSize }>;
+/** One case: a catalogued phone's emulation, or a desktop window. */
+export type AuditCase = Emulation | DesktopWindow;
+/** An emulation has no `kind` of its own (its device's is nested), so the field alone tells a window. */
+export const isDesktop = (c: AuditCase): c is DesktopWindow => 'kind' in c;
+/** A case's name in the table and the file names: `iphone-390x844 landscape browser bar-shown`, or `desktop 1280x800`. */
+export const caseName = (c: AuditCase): string =>
+  isDesktop(c)
+    ? `desktop ${String(c.viewport.width)}x${String(c.viewport.height)}`
+    : emulationName(c);
+/** The case's insets: a phone's, none on a desktop window. */
+export const insetsOf = (c: AuditCase): Insets => (isDesktop(c) ? NO_INSETS : c.insets);
+/** The way the case is held: a desktop window by its shape (every one of the audit's is wider than tall). */
+export const orientationOf = (c: AuditCase): Orientation =>
+  isDesktop(c) ? (c.viewport.width > c.viewport.height ? 'landscape' : 'portrait') : c.orientation;
 
 /** The pages the audit drives: the four games, the solo page and the tool (tools/games.ts PAGE_HOOKS). */
 export type PageId = 'gin-rummy' | 'fidice' | 'briscola' | 'backgammon' | 'rps' | 'ui-sandbox';
@@ -78,6 +107,8 @@ export type Measured = Readonly<{
    * viewport cannot follow the turn, so what stands under it is not a phone's screen.
    */
   locked: boolean;
+  /** `body[data-layout]` (web/shared/lib/layout.ts; screen.ts `applyLayout`): the bucket the page put itself in, reported per case so a per-game row has a target; null where none is written. */
+  layout: string | null;
   /** `#app`'s computed padding: the shell's clearance on a framed page, the theme's gutter elsewhere. */
   pad: Sides;
   /** `--gutter` on `#app` in px where the theme declares one; null where none does (the table's default stands). */
@@ -129,10 +160,29 @@ export const LIMITS: Readonly<Record<ScreenKind, Limits>> = {
     mayScroll: false,
   },
 };
+/**
+ * The desktop windows' thresholds, one row per screen kind: a home screen's column may leave 40%
+ * empty below its last card and beside it (the shell's 480px column centred in a 1920px window
+ * leaves 37.5% a side); a table fills to within a tenth of the window on every side (a centred
+ * board with room for side panels, not a phone column stretched: the owner, "There's also
+ * desktop"); the tool's 2% stands.
+ */
+export const DESKTOP_LIMITS: Readonly<Record<ScreenKind, Limits>> = {
+  home: { emptyMax: { top: 0.1, right: 0.4, bottom: 0.4, left: 0.4 }, mayScroll: true },
+  table: { emptyMax: { top: 0.1, right: 0.1, bottom: 0.1, left: 0.1 }, mayScroll: false },
+  tool: LIMITS.tool,
+};
+/** The limits for a screen on a case: a phone's `LIMITS`, a window's `DESKTOP_LIMITS`. */
+export const limitsFor = (kind: ScreenKind, c: AuditCase): Limits =>
+  isDesktop(c) ? DESKTOP_LIMITS[kind] : LIMITS[kind];
 /** Half a pixel: the rounding between two reads of one layout. */
 export const TOL = 0.5;
 /** A finger's target (Apple HIG, Material): the shell's `.icon-btn` and `.btn-sm` floor. */
 export const TARGET_MIN = 44;
+/** A mouse's target on a desktop window: the shell's small buttons (`.btn.small`, a 32px select) are a click's size. */
+export const TARGET_MIN_DESKTOP = 32;
+export const targetMinFor = (c: AuditCase): number =>
+  isDesktop(c) ? TARGET_MIN_DESKTOP : TARGET_MIN;
 /** The air an unframed page keeps off the glass, where its theme names no `--gutter`: shell.css's `--frame-gap`. */
 export const GUTTER = 4;
 /** A document one pixel taller than the viewport is rounding, not a scroll. */
@@ -142,7 +192,7 @@ export const SCROLL_SLACK = 1;
 export type Record_ = Readonly<{
   page: PageId;
   screen: Screen;
-  e: Emulation;
+  e: AuditCase;
   m: Measured;
 }>;
 
@@ -189,7 +239,7 @@ const byDesign = (name: string, outcome: 'tier' | 'gate', detail: string): Audit
  */
 export const gatedOf = (r: Record_): boolean =>
   r.m.plays !== null &&
-  r.m.plays !== r.e.orientation &&
+  r.m.plays !== orientationOf(r.e) &&
   r.screen.kind !== 'home' &&
   (r.screen.kept !== true || r.m.locked);
 
@@ -199,7 +249,7 @@ export const gatedOf = (r: Record_): boolean =>
  * else the theme lifted the fixed screen (`lifted`).
  */
 export const tierOf = (r: Record_): string | null =>
-  r.page === 'backgammon' && twinOf(r.e).scrolls
+  r.page === 'backgammon' && !isDesktop(r.e) && twinOf(r.e).scrolls
     ? `the twin says ${r.e.orientation === 'portrait' ? 'the §3.10 upright tier' : 'under the landscape floor'}`
     : r.m.lifted
       ? 'the theme lifts fixed-screen here'
@@ -262,8 +312,9 @@ export const judge = (r: Record_): AuditVerdict => {
     m.frame === wantFrame,
     `data-frame ${m.frame ? 'present' : 'absent'}, ${wantFrame ? 'wanted' : 'not wanted'} on ${page}`,
   );
+  const insets = insetsOf(e);
   if (gatedOf(r)) {
-    const held = e.orientation === 'portrait' ? 'upright' : 'sideways';
+    const held = orientationOf(e) === 'portrait' ? 'upright' : 'sideways';
     // The gate, or the Android lock in its place (the page turned the phone; the emulated viewport stays).
     const stands = checkOf(
       'used',
@@ -289,9 +340,9 @@ export const judge = (r: Record_): AuditVerdict => {
       ],
     };
   }
-  const limits = LIMITS[screen.kind];
+  const limits = limitsFor(screen.kind, e);
   const gaps = gapsOf(m.inner, m.used);
-  const room = roomOf(m.pad, e.insets);
+  const room = roomOf(m.pad, insets);
   const empty = emptyOf(gaps, room);
   const over = SIDES.filter((s) => fractionOf(m.inner, s, empty[s]) > limits.emptyMax[s] + 1e-9);
   // A gate standing the way the page plays is a bug, not a screen: the audit is looking at a sheet.
@@ -324,12 +375,13 @@ export const judge = (r: Record_): AuditVerdict => {
       ? 'no one-line slot clips'
       : m.clipped.map((c) => `${c.sel} by ${px(c.over)}px`).join(', '),
   );
-  const small = m.targets.filter((t) => Math.min(t.w, t.h) < TARGET_MIN - TOL);
+  const targetMin = targetMinFor(e);
+  const small = m.targets.filter((t) => Math.min(t.w, t.h) < targetMin - TOL);
   const targets = checkOf(
     'targets',
     small.length === 0,
     small.length === 0
-      ? `${String(m.targets.length)} targets, all ${String(TARGET_MIN)}px`
+      ? `${String(m.targets.length)} targets, all ${String(targetMin)}px${isDesktop(e) ? ' (a mouse)' : ''}`
       : small.map((t) => `${t.sel} ${px(t.w)}x${px(t.h)}`).join(', '),
   );
   const gutter = m.gutterToken ?? GUTTER;
@@ -339,7 +391,7 @@ export const judge = (r: Record_): AuditVerdict => {
   const edges = tall ? SIDES.filter((s) => s !== 'bottom') : SIDES;
   const tight = wantFrame
     ? []
-    : edges.filter((s) => e.insets[s] <= 0 && m.used !== null && gaps[s] < gutter - TOL);
+    : edges.filter((s) => insets[s] <= 0 && m.used !== null && gaps[s] < gutter - TOL);
   const hits = tall ? m.underInset.filter((h) => h.side !== 'bottom') : m.underInset;
   const gutterCheck = checkOf(
     'gutter',

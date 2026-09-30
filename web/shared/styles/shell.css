@@ -54,6 +54,19 @@ body {
   display: flex;
   flex-direction: column;
 }
+/* The column is a bucket rule (docs/design/layout-buckets.md §3; the boot writes the bucket on
+   `<body data-layout>`, web/shared/edge/screen.ts `applyLayout` over web/shared/lib/layout.ts):
+   `phone-upright` keeps the 480px column above; every other bucket (a phone sideways, a tablet,
+   a desktop window) reads the theme's `--column-wide`, so a game that lays its screens out per
+   bucket names `none` there (`:root { --column-wide: none }`, or under one bucket alone:
+   `body[data-layout="phone-sideways"] { --column-wide: none }`) and `#app` takes the full width
+   the gutters or the frame leave; a game that has not adopted keeps its column everywhere, since
+   a phone's column stretched across a laptop is worse than a phone's column. Read with a
+   fallback and declared nowhere, as `--gutter` is (test/tokens.test.ts). `:where()` keeps #app's
+   own specificity, so a theme's own `#app { max-width }` (fidice's `none`) still wins. */
+:where(body[data-layout]:not([data-layout='phone-upright'])) #app {
+  max-width: var(--column-wide, 480px);
+}
 h1 {
   text-align: center;
 }

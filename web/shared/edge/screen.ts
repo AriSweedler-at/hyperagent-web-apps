@@ -26,6 +26,7 @@ import {
   type ScreenSize,
   type ViewportSize,
 } from '../lib/devices.ts';
+import { LAYOUT_ATTR, bucketOf, type Bucket, type LayoutInputs } from '../lib/layout.ts';
 import {
   appendHtml,
   byId,
@@ -37,6 +38,7 @@ import {
   rectOf,
   removeElement,
   safeHtml,
+  setAttr,
   setRootStyle,
   setText,
   stopPropagation,
@@ -212,6 +214,42 @@ export const watchFrame = (
   win.addEventListener?.('orientationchange', later);
   win.visualViewport?.addEventListener('resize', later);
   doc.addEventListener('fullscreenchange', later);
+};
+
+// ---- the layout bucket (docs/design/layout-buckets.md; web/shared/lib/layout.ts) ----------------
+
+/**
+ * The bucket's inputs off the page: the viewport and the two pointer facts (`(any-pointer: fine)`,
+ * `(hover: hover)`); null without a viewport to read (a fake window). A window without
+ * `matchMedia` answers both false, so a bare page is judged a touch device by its size alone.
+ */
+export const readLayout = (win: ScreenWindowLike): LayoutInputs | null => {
+  const viewport = readViewport(win);
+  if (viewport === null) return null;
+  const matches = (q: string): boolean => win.matchMedia?.(q).matches === true;
+  return { ...viewport, fine: matches('(any-pointer: fine)'), hover: matches('(hover: hover)') };
+};
+
+/**
+ * Write the bucket on `<body data-layout>` (CONTRACT.md: the attribute a theme's
+ * `body[data-layout="phone-sideways"]` reads), or leave the body as it is where the page has no
+ * viewport to read (the boot test's window), so a forced attribute stands. The bucket written.
+ */
+export const applyLayout = (doc: ScreenDocumentLike, win: ScreenWindowLike): Bucket | null => {
+  const inputs = readLayout(win);
+  if (inputs === null) return null;
+  const bucket = bucketOf(inputs);
+  setAttr(doc.body, `data-${LAYOUT_ATTR}`, bucket);
+  return bucket;
+};
+
+/** Re-read on what moves a bucket: the window's `resize` and `orientationchange` (a turn of the phone, a window dragged), a frame later so the viewport has settled. */
+export const watchLayout = (win: ScreenWindowLike, onChange: () => void): void => {
+  const later = (): void => {
+    nextFrame(onChange);
+  };
+  win.addEventListener?.('resize', later);
+  win.addEventListener?.('orientationchange', later);
 };
 
 /** `?probe=1` in the page's query: the readout is asked for. */

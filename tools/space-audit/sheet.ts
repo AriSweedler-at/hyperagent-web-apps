@@ -5,13 +5,17 @@
 // `#e8e6e1` ink, the frame's olive accent, green for a pass, `#b3261e` where a rule fails and the
 // muted grey for a column by design: `tier`, `gate`). The device line under each shot is the
 // readout's first line as the sandbox spells it: the row, the models, the viewport at its pixel ratio.
-import { emulationName, type Emulation } from '../../web/shared/lib/devices.ts';
+import type { Emulation } from '../../web/shared/lib/devices.ts';
 import {
   SIDES,
+  caseName,
   emptyOf,
   gapsOf,
+  insetsOf,
+  isDesktop,
   roomOf,
   sidesText,
+  type AuditCase,
   type AuditVerdict,
   type Measured,
   type PageId,
@@ -25,8 +29,8 @@ export type ScreenResult = Readonly<{
   verdict: AuditVerdict;
   picture: string;
 }>;
-/** One case's card: the emulation and every screen in the order the drive reached them. */
-export type AuditCard = Readonly<{ e: Emulation; screens: ReadonlyArray<ScreenResult> }>;
+/** One case's card: the case (a phone's emulation or a desktop window) and every screen in the order the drive reached them. */
+export type AuditCard = Readonly<{ e: AuditCase; screens: ReadonlyArray<ScreenResult> }>;
 
 const esc = (s: string): string =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c);
@@ -37,6 +41,13 @@ export const cardPasses = (c: AuditCard): boolean => c.screens.every((s) => s.ve
 /** The readout's device line for a case: `iphone-390x844 · iPhone 12, ... · 390x844 @3x · insets t/r/b/l 0/47/21/47`. */
 export const deviceLine = (e: Emulation): string =>
   `${e.device.id} · ${e.device.models} · ${String(e.viewport.width)}x${String(e.viewport.height)} @${String(e.dpr)}x · insets t/r/b/l ${String(e.insets.top)}/${String(e.insets.right)}/${String(e.insets.bottom)}/${String(e.insets.left)}${e.device.verified ? '' : ' · UNVERIFIED row'}`;
+/** The line for any case: the device line, or a desktop window's (`desktop 1280x800 · a fine pointer, no touch, no insets · 1280x800 @1x`). */
+export const caseLine = (c: AuditCase): string =>
+  isDesktop(c)
+    ? `${caseName(c)} · a fine pointer, no touch, no insets · ${String(c.viewport.width)}x${String(c.viewport.height)} @1x`
+    : deviceLine(c);
+/** The card's heading: the models, or `Desktop window`. */
+const modelsOf = (c: AuditCase): string => (isDesktop(c) ? 'Desktop window' : c.device.models);
 
 /** A column's class: red where it fails, grey where it is by design, plain where it passes. */
 const classOf = (o: AuditVerdict['checks'][number]['outcome']): string =>
@@ -56,16 +67,18 @@ const designBadges = (v: AuditVerdict): string =>
     .map((o) => ` <span class="badge grey">${esc(o)}</span>`)
     .join('');
 
-const screenHtml = (e: Emulation, s: ScreenResult): string => {
+const screenHtml = (e: AuditCase, s: ScreenResult): string => {
   const m = s.measured;
-  const empty = emptyOf(gapsOf(m.inner, m.used), roomOf(m.pad, e.insets));
+  const insets = insetsOf(e);
+  const empty = emptyOf(gapsOf(m.inner, m.used), roomOf(m.pad, insets));
   const usedFails = s.verdict.checks.some((k) => k.name === 'used' && !k.pass);
   return `<div class="screen ${s.verdict.pass ? 'pass' : 'fail'}">
-<figure><img src="${esc(s.picture)}" alt="${esc(`${emulationName(e)} ${s.screen.id}`)}" loading="lazy"><figcaption>${esc(s.screen.id)} <small>(${esc(s.screen.kind)}${s.screen.kept === true ? ', kept' : ''})</small> <span class="badge">${s.verdict.pass ? 'pass' : 'FAIL'}</span>${designBadges(s.verdict)}</figcaption></figure>
+<figure><img src="${esc(s.picture)}" alt="${esc(`${caseName(e)} ${s.screen.id}`)}" loading="lazy"><figcaption>${esc(s.screen.id)} <small>(${esc(s.screen.kind)}${s.screen.kept === true ? ', kept' : ''})</small> <span class="badge">${s.verdict.pass ? 'pass' : 'FAIL'}</span>${designBadges(s.verdict)}</figcaption></figure>
 <dl>
 <dt>empty per side</dt><dd class="${usedFails ? 'bad' : ''}">${esc(sidesText(m.inner, empty))}</dd>
-<dt>room t/r/b/l</dt><dd>${SIDES.map((k) => String(Math.round(Math.max(m.pad[k], e.insets[k]) * 10) / 10)).join('/')} (#app pad ${SIDES.map((k) => String(Math.round(m.pad[k] * 10) / 10)).join('/')})</dd>
+<dt>room t/r/b/l</dt><dd>${SIDES.map((k) => String(Math.round(Math.max(m.pad[k], insets[k]) * 10) / 10)).join('/')} (#app pad ${SIDES.map((k) => String(Math.round(m.pad[k] * 10) / 10)).join('/')})</dd>
 <dt>document</dt><dd>${String(m.scrollWidth)}x${String(m.scrollHeight)} in ${String(m.inner.w)}x${String(m.inner.h)}${m.fixedScreen ? ' · fixed-screen' : ''}${m.frame ? ' · data-frame' : ''}</dd>
+<dt>bucket</dt><dd>${esc(m.layout ?? 'none written')}</dd>
 </dl>
 <ul class="checks">${checksHtml(s.verdict)}</ul>
 </div>`;
@@ -75,14 +88,21 @@ const screenHtml = (e: Emulation, s: ScreenResult): string => {
 export const sheetHtml = (page: PageId, cards: ReadonlyArray<AuditCard>, stamp: string): string => {
   const passed = cards.filter(cardPasses).length;
   const card = (c: AuditCard): string => {
-    const name = emulationName(c.e);
+    const name = caseName(c.e);
     const pass = cardPasses(c);
     return `<section class="card ${pass ? 'pass' : 'fail'}" id="${esc(name.replace(/[^a-z0-9]+/gi, '-'))}">
-<h2>${esc(c.e.device.models)} <small>${esc(name)}</small> <span class="badge">${pass ? 'pass' : 'FAIL'}</span></h2>
+<h2>${esc(modelsOf(c.e))} <small>${esc(name)}</small> <span class="badge">${pass ? 'pass' : 'FAIL'}</span></h2>
 <div class="pics">${c.screens.map((s) => screenHtml(c.e, s)).join('')}</div>
-<p class="device">${esc(deviceLine(c.e))}</p>
+<p class="device">${esc(caseLine(c.e))}</p>
 </section>`;
   };
+  // Two groups: the phones, then the desktop windows under their own heading (each heading only where the other group is present too).
+  const phones = cards.filter((c) => !isDesktop(c.e));
+  const desktops = cards.filter((c) => isDesktop(c.e));
+  const group = (title: string, group: ReadonlyArray<AuditCard>): string =>
+    group.length === 0
+      ? ''
+      : `${phones.length > 0 && desktops.length > 0 ? `<h2 class="group">${esc(title)} <small>· ${String(group.filter(cardPasses).length)} of ${String(group.length)} pass</small></h2>\n` : ''}${group.map(card).join('\n')}`;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Space audit · ${esc(page)} · ${esc(stamp)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -105,10 +125,12 @@ dl{display:grid;grid-template-columns:max-content 1fr;gap:2px 12px;margin:8px 0;
 .checks{list-style:none;padding:0;margin:0;font-size:12px}.checks li{padding:1px 0}.checks li::before{content:"✓ ";color:var(--green)}.checks li.bad{color:var(--red)}.checks li.bad::before{content:"✗ "}
 .checks li.grey{color:var(--muted)}.checks li.grey::before{content:"– ";color:var(--muted)}.checks li.grey i{font-style:normal;padding:0 5px;border-radius:8px;background:var(--line)}
 .device{margin:6px 0 0;font:12px/1.4 ui-monospace,Menlo,monospace;color:var(--muted)}
+h2.group{font-size:16px;margin:24px 0 10px;padding-top:12px;border-top:1px solid var(--line)}h2.group small{font-weight:normal;color:var(--muted)}
 </style></head><body>
 <h1>Space audit · ${esc(page)} <small>· ${esc(stamp)} · ${String(passed)} of ${String(cards.length)} cases pass</small></h1>
-<p class="lead">Every catalogued phone (web/shared/lib/devices.ts), each orientation and display mode, a browser tab twice (bar shown, then hidden), at the device's pixel ratio. Per screen: the empty screen beyond the room on each side (px and the fraction of the viewport), the document against the viewport, and the six rules (docs/design/space-audit.md); red where one fails, grey where the page means it (a scroll tier, the turn gate). The olive line is the picture's edge, not the frame. Look, then decide.</p>
-${cards.map(card).join('\n')}
+<p class="lead">Every catalogued phone (web/shared/lib/devices.ts), each orientation and display mode, a browser tab twice (bar shown, then hidden), at the device's pixel ratio; then the desktop windows (a fine pointer, no touch, no insets; docs/design/space-audit.md §5), judged by their own limits. Per screen: the layout bucket the page put itself in (docs/design/layout-buckets.md), the empty screen beyond the room on each side (px and the fraction of the viewport), the document against the viewport, and the six rules (docs/design/space-audit.md); red where one fails, grey where the page means it (a scroll tier, the turn gate). The olive line is the picture's edge, not the frame. Look, then decide.</p>
+${group('Phones', phones)}
+${group('Desktop windows', desktops)}
 </body></html>
 `;
 };

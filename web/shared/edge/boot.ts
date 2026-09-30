@@ -71,7 +71,15 @@ import {
 import { bindJargon, revealRule } from './glossary.ts';
 import { joinCodeFrom, withoutJoin } from './invite.ts';
 import { LANDSCAPE_PHONE, PORTRAIT_PHONE, watchMedia, type MediaQueryListLike } from './media.ts';
-import { applyFrame, framed, probeAsked, renderProbe, watchFrame } from './screen.ts';
+import {
+  applyFrame,
+  applyLayout,
+  framed,
+  probeAsked,
+  renderProbe,
+  watchFrame,
+  watchLayout,
+} from './screen.ts';
 import { createOrientationLock, type OrientationLock } from './orientation.ts';
 import { reducedMotion } from './motion.ts';
 import { browserNetDeps } from './netDeps.ts';
@@ -782,6 +790,15 @@ export const bootShell = <
       applyFrame(doc, win);
     });
   }
+  // The layout bucket (docs/design/layout-buckets.md; web/shared/lib/layout.ts): the viewport and
+  // the pointer into one of seven names on `<body data-layout>`, for every page (a theme lays its
+  // screens out per bucket: `body[data-layout="phone-sideways"] .table { ... }`), and again on
+  // every resize and turn of the phone (screen.ts `watchLayout`). A window without a viewport (the
+  // boot test's) writes nothing, so a forced attribute stands.
+  applyLayout(doc, win);
+  watchLayout(win, () => {
+    applyLayout(doc, win);
+  });
   if (probeAsked(win.location.search)) renderProbe(doc, win);
   cfg.hooks?.render?.(ctx);
   cfg.paint.bindAll(doc, dispatch);

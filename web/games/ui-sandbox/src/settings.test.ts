@@ -41,6 +41,7 @@ describe('settings', () => {
     writeSetting(store, 'hairline', false);
     writeSetting(store, 'example', 'ears');
     writeSetting(store, 'flip', true);
+    writeSetting(store, 'layout', 'phone-sideways');
     expect(readSettings(store)).toEqual({
       mode: 'portrait',
       frame: false,
@@ -49,11 +50,14 @@ describe('settings', () => {
       hairline: false,
       example: 'ears',
       flip: true,
+      layout: 'phone-sideways',
     });
     store.writeText(KEYS.band, '99');
     store.writeText(KEYS.color, 'olive');
     store.writeText(KEYS.mode, 'sideways');
+    store.writeText(KEYS.layout, 'phone');
     const s = readSettings(store);
+    expect(s.layout).toBe('auto');
     expect(s.band).toBe(6);
     expect(s.color).toBe(DEFAULT_SETTINGS.color);
     expect(s.mode).toBe('auto');
@@ -67,7 +71,8 @@ describe('settings', () => {
       flip: true,
       band: 3,
     });
-    expect(overridesFrom('?example=nope&band=40&mode=x')).toEqual({});
+    expect(overridesFrom('?example=nope&band=40&mode=x&layout=phone')).toEqual({});
+    expect(overridesFrom('?layout=desktop-wide')).toEqual({ layout: 'desktop-wide' });
     expect(overridesFrom('')).toEqual({});
     // The letters: `(a)` to `(j)` in the dropdown's order, either case.
     expect(overridesFrom('?example=b')).toEqual({ example: 'side' });

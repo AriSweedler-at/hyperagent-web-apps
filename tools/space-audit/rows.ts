@@ -2,8 +2,7 @@
 // table stdout prints (shell-emulate's `summaryTable` shape, the four outcomes spelled out), and
 // the diff against a baseline `report.json` (`--baseline`): the rows whose outcome changed in any
 // column, so a per-game lane sees what its change moved and nothing else.
-import { emulationName } from '../../web/shared/lib/devices.ts';
-import { COLUMNS, OUTCOMES, type AuditCheck, type Outcome } from './judge.ts';
+import { COLUMNS, OUTCOMES, caseName, type AuditCheck, type Outcome } from './judge.ts';
 import type { AuditCard } from './sheet.ts';
 
 /** One row: the case's name, the screen's id and the outcome per column. */
@@ -25,7 +24,7 @@ const outcomesOf = (
 export const rowsOf = (cards: ReadonlyArray<AuditCard>): ReadonlyArray<Row> =>
   cards.flatMap((c) =>
     c.screens.map((s) => ({
-      case: emulationName(c.e),
+      case: caseName(c.e),
       screen: s.screen.id,
       outcomes: outcomesOf(s.verdict.checks),
     })),
