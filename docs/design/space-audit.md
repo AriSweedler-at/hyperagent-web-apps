@@ -557,3 +557,65 @@ table talk, Finish, Leave) stacked in one column. What folded:
   (`sidewaysCardWidth`) in e2e/briscola-geometry.spec.ts at both buckets on a touch context, a
   finger's drag (CDP touch events, `touchDragCard`) to the settled trick and the result sheet in
   e2e/briscola-local.spec.ts. Real, closed.
+
+### Closed by space-audit-rps
+
+The rps items above (30 of 117 cases in the third run's baseline: `scroll` 84, `used` 65, `gutter`
+57), 2026-09-30, on the bucket layer (docs/design/layout-buckets.md) and the page's own theme
+(rps-island.md §10 "The layout"). After the layout, 113 of 117 cases (230 of 234 screens): `scroll` 0, `gutter` 0, `used` 4, all
+four the 16 class (402x874) sideways at 8.009% empty a side, where the theme paid the side insets
+twice (`html, body { padding: 0 <inset> }`: 124px a side); with the insets on the body alone that
+class passes 4 of 4 (`--device iphone-402x874 --orientation landscape`), and the full fourth run is
+the PR's.
+
+- `scroll` 84 → 0. The page had no height budget: the 480px column ran 719px tall idle and 756 in
+  play (both Again and Stop show after a verdict, 52px each, stacked) against rooms of 553-839px
+  upright and 304-419 sideways. `#app` is now the viewport less the insets (`height: 100dvh`, the
+  insets as padding) and a size container, so the hand, the three hands, the paddings and the gaps
+  are `cqh` clamps of the room; the controls share one row; a short tier under 669px of room
+  (`@container room (max-height: 668px)`: the SE in every mode, the X, 12 and 16 classes in a tab
+  with the bar shown) seats the three facts beside the tally and the reaction beside the verdict.
+  Measured on the SE in a tab with the bar shown (375x553): the idle column ends 10px above the
+  foot, the play column 43; the XR class in a tab (682px, the first regular room) has 35px. No
+  `fixed-screen` class and no tier: the audit reads every row `ok`, none `tier`.
+- `used` 65 → 0. Sideways the page was the 480px column centred in 667-956px (17-18% empty a side,
+  56 play cases), and on the desktop windows the same column in 900-1920px. main.ts writes the
+  bucket (`applyLayout`, `watchLayout`) and the theme lays out every bucket but the two upright ones
+  as three columns: the score and the foot, the table with the hand beside the verdict and the
+  controls under it, the three hands stacked under the right thumb; `#app` takes the width the
+  insets leave, 8px in. On the desktop buckets `#app` pads `6vh 8vw` (within the table's tenth), the
+  table stretches to the room and the hands are a row across the bottom. The Pixel's home sideways
+  (25.1-25.5%, the threshold nit) is gone with the column: the home is the same wide grid.
+- `gutter` 57 → 0. The 57 were an artefact of the scroll: the drive clicked Go below the fold, the
+  document scrolled, and the header's boxes were clipped to y=0. With no scroll the bar's 4px of top
+  air stands sideways (`gutter` reads 4px as the floor; `--gutter` is not declared, by design).
+- Nothing clips; every control is 44px on the phones and 44 or more on the windows (a click's 32).
+- Left for a follow-up (drafts/space-audit-rps-followups.md): the tablet buckets (not in the
+  default run) take the wide grid with the hands stretched to a third of a 768px room; a cap or a
+  tablet arrangement is theirs. The desktop-wide table card at 1920 is 1257px wide for a 200px hand
+  and a one-line verdict: the tenth rule fills it, a side panel (history, the keyboard hints) would
+  earn the room.
+- The island row, found by CI (2026-09-30, the same PR; rps-island.md §10 "The layout", §11). The
+  row (`#islandSlot`: the send button, or a state line with its links) had no place in the budget
+  above: the audit runs against the pages origin, where the probe finds no Worker and the row stays
+  empty, so none of the 117 cases sees it. e2e/rps.spec.ts on `proxy` does, on the 16 class in a
+  tab without the insets (393x672: the regular tier's floor, a room the audit's own 16-class tab case
+  never has, since its 34px inset makes 638, short-tier). On the Linux runner's fallback font
+  (DejaVu Sans, wider than the Mac's system font) the facts, the Tech up hint and the Tech up label
+  each wrap to two lines, and the paired screen ran some 40px past the room; `main`'s last track was
+  `minmax(0, 1fr)`, so it collapsed to nothing and the foot, `align-self: end`, was drawn up over
+  the row: Reset progress took every tap meant for Send buddy home until the 90 s timeout, on both
+  attempts. On a Mac the same screen fit by 0-5px, so the lane's local run passed. Three changes:
+  the row moved into the foot (the send button and the state line whole lines, the links on one line
+  with Reset progress: the paired state costs 67px where it cost 114, the waiting state 115 where it
+  cost 154); the foot's track is `1fr`, whose automatic minimum is the foot's own height, so an
+  outgrown column overflows into `#app`'s `overflow-y: auto` net rather than over the row; and the
+  short tier's ceiling is 720px of room (was 669), where the regular column holds the row idle under
+  a wide font (measured with Verdana as a stand-in: 718 holds it with no air, 672 was 12px over; the
+  short tier at 672 holds idle, waiting and paired alike). The spec now pins the paired screen with
+  Tech up on offer at 393x672: both links inside the viewport, apart, nothing scrolls. Left: the
+  waiting state (the state line over three links: Open the clip again, Send buddy home, Reset
+  progress) wraps the links to two lines under a wide font and runs 13px past the 638 room, 2 past
+  660 and 9 past 720 (0 from 672 to 718): the transient state between the tap and the pairing, the
+  net's. The audit's 117 cases see none of it but the tier change (the XR class and the Galaxy in a
+  tab, 682 and 700, join the short tier): re-run after the change, 117/117, 234/234 screens.
