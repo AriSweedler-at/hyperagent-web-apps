@@ -250,7 +250,7 @@ export const expectFits = (g: BoardGeometry, scrolls: boolean, when: string): vo
  * measures it with a container unit, the twin computes it): its top edge stands exactly the
  * padding and the chrome above under the viewport's top, its bottom edge exactly the padding and
  * the chrome below over the viewport's bottom (`boardRoom`: 39 and 11 with the rail inset-free, 39
- * and 61 with the rows; headless reports no insets, and a page stood on a catalogued phone by the
+ * and 59 with the rows; headless reports no insets, and a page stood on a catalogued phone by the
  * emulator's seam passes its `insets`: 39 and 27 over a 21px home indicator), so no parchment
  * shows beyond the gaps the chrome owns. Upright and on the desktop the board is a clamp of the
  * viewport, not its filler.

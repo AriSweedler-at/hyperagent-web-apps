@@ -221,13 +221,13 @@ describe('list and explain', () => {
     expect(t).toMatchObject({
       layout: 'landscape',
       scheme: 'rows',
-      pointLen: 104.5,
+      pointLen: 105.5,
       scrolls: false,
     });
     const se1 = deviceById('iphone-320x568-se1');
     if (se1 === null) throw new Error('row missing');
     const short = twinOf(emulationFor(se1, 'landscape', 'browser', 'shown'));
-    expect(short).toMatchObject({ scheme: 'rows', pointLen: 90, scrolls: true, floorHeight: 296 });
+    expect(short).toMatchObject({ scheme: 'rows', pointLen: 90, scrolls: true, floorHeight: 294 });
     expect(explainText(emulationFor(se1, 'landscape', 'browser', 'shown'))).toContain('SCROLLS');
   });
 });
