@@ -19,6 +19,7 @@ import {
   PHONE_GEOMETRY,
   PHONE_TEMPLATE,
   ROW_HEIGHTS,
+  SIDEWAYS_GEOMETRY,
   STRIP_WIDTHS,
   areaOrder,
   bandHeight,
@@ -38,6 +39,7 @@ import {
   layoutFor,
   midWidth,
   relativeOf,
+  sidewaysCardWidth,
   sameAspect,
   seatCells,
   stockAreaWidth,
@@ -73,6 +75,26 @@ describe('the card clamps (theme.css #tableScreen --card-w)', () => {
   test('a short phone floors at 72px: the height budget (91px * aspect) is under the floor', () => {
     expect(cardWidth(PHONE_SHORT)).toBe(PHONE_GEOMETRY.minCardW);
     expect(cardWidth({ width: 390, height: 720 })).toBeCloseTo(144 * DEFAULT_ASPECT, 3);
+  });
+
+  test('sideways the card is the height budget over 1.5 card heights: 99px on the 12 class, 93 on the SE, the floor under 285, the cap from 417', () => {
+    // The band's captions (40px) and felt (8px) are in the 136px of chrome: the first hand played
+    // sideways had 118 and the card names under the fan printed past the felt's edge.
+    expect(SIDEWAYS_GEOMETRY.chromeH).toBe(136);
+    const napoletane = 51 / 83;
+    expect(sidewaysCardWidth(390, napoletane)).toBeCloseTo(99.1, 1);
+    expect(sidewaysCardWidth(375, napoletane)).toBeCloseTo(93.0, 1);
+    expect(sidewaysCardWidth(325, napoletane)).toBeCloseTo(72.5, 1);
+    expect(sidewaysCardWidth(284, napoletane)).toBe(SIDEWAYS_GEOMETRY.minCardW);
+    expect(sidewaysCardWidth(417, napoletane)).toBe(SIDEWAYS_GEOMETRY.maxCardW);
+    // What the budget buys: a hand card and a half-width mid card fill the height that is not chrome.
+    [325, 375, 390, 414, 440].forEach((height) => {
+      const w = sidewaysCardWidth(height, napoletane);
+      const stacked = cardHeight(w, napoletane) * SIDEWAYS_GEOMETRY.cardHeights;
+      expect(stacked, String(height)).toBeLessThanOrEqual(
+        height - SIDEWAYS_GEOMETRY.chromeH - SIDEWAYS_GEOMETRY.foot + 0.01,
+      );
+    });
   });
 
   test('the column fits both design viewports at every shipped aspect, and the short phone at the floor', () => {

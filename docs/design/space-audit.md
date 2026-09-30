@@ -498,47 +498,22 @@ the third run (117 cases: the 112 phone cases and the five desktop windows) is 1
 - `clip` (new, the third run's first pass): `#lastAction` cut by 48-165px in the status column on
   every sideways and desktop table, `#oppName` by 23px on the SE sideways. The last action's own
   row and the wider opponent column above; a second pass reads clean.
-||||||| parent of f6365e5a (fix(fidice): Sideways the table fits without a scroll: the wood beside the seats and the talk, the steps' help behind a tap, the seat cards one line)
 
-### Closed by fidice-sideways-fold
 
-The sideways table's `tier` above (the follow-ups draft, item 1), 2026-09-30, on the shell path
-(`?shell=1`) alone, in `web/games/fidice/theme.css` under `body[data-layout^="phone-sideways"]`
-(the `phone-sideways` and `phone-sideways-short` buckets, docs/design/layout-buckets.md), so the
-upright buckets, the desktop windows and the old page (the goldens, 0 differences) are as they were.
-The measured game screen sideways was 1111-1332px tall in a 304-440px viewport (the space-audit-4
-sheet), not the ~520px the draft guessed: the seat cards, the wood (the turn bar, the bid, the two
-zones, the two steps with their paragraphs and the bid picker) and the side (the round panel, the
-table talk, Finish, Leave) stacked in one column. What folded:
+||||||| parent of 30e32a9a (fix(briscola): Sideways a played hand keeps its card names on the felt, its score cells still and its corner buttons level; the grid and a finger's drag are pinned)
 
-- The game screen is two columns: the wood at the left; the seats, the round panel, the table talk
-  and the host's Finish at the right (`.stack` is `display: contents`, as on the wide desktop; the
-  side is 240px, 26% of a narrow phone: a notched iPhone sideways has 750px between its insets). The screen, the mount and the game screen are flex columns
-  to the foot and the wood stretches over the side's two rows, so the room is filled (`used`).
-- The wood is three columns where they fit, two on the 667px SE: the two dice zones stacked at the
-  left (a fixed 226px: the cup, five 32px dice and the zone's padding on one line, the zones' asides
-  folded), `auto-fit` step tracks of 132px or more (the call or shuffle step first, the bid step in
-  the last track, or under the shuffle when there are two), the turn bar over every track but the
-  last and the bid card in the last (its label and value; the bidder's line folded, the dice a size
-  down). Where the steps are away every card spans the wood, as before.
-- The steps' explanatory paragraphs fold behind a tap on the step's title (`body.fidice-help`,
-  `src/ui/helpFold.ts`: one delegated listener the shell boot binds on `#fidiceTable`; the class
-  lives on the body for the page's session, outside the vdom's root, so the legacy view's
-  re-renders keep it, and the legacy view itself is untouched: test/parity/fidice.view.test.ts pins
-  its tree and handlers to the legacy page's). A "?" ring on the title says there is more.
-- The seat cards are one line each (the status line and my "(you)" folded: the turn bar names the
-  holder, the dot the connection, the accent border me; three seats or more in two columns), the
-  cup badge kept inside the card's right edge (a phone without a side inset would have it within
-  12px of the glass).
-- The table talk is a strip of its two newest lines (a scrolling strip's clipped lines still stand
-  under the bottom inset for the audit's `gutter`; the history sheet holds the whole log). "Leave
-  table" hides: the topbar's ↺ is the same leave. The "You're bidding" box shows once a hand is
-  picked.
-- After: 117 of 117 cases, 234 of 234 screens, no row regressed; `scroll` moved tier→ok on 13 table
-  screens (the 428x926, 430x932 and 440x956 iPhones in every mode but one, the Pixel with the bar
-  hidden, standalone and fullscreen): the game screen sideways is 378-440px tall where it was
-  1111-1332. The tier stands on the rest: the wood holds one step track under 915px between the
-  insets (the `auto-fit` count comes out at one where the arithmetic says two; open), so the 390-420
-  class measures 437px in 390-420 (417 on the XR/Max at 896 wide), the X class 484 in 375, the Galaxy
-  432 in 360, the SE 495 in 375 and 325 in a tab, and the bar-shown short bucket (304-370px tall)
-  on every phone but the 440. `used`, `clip`, `targets`, `frame` and `gutter` ok on every screen.
+### Closed by briscola-sideways-play
+
+- A whole hand played sideways in the emulator with real touch events at 844x390 and 667x375
+  (2026-09-30: the finger's drag to the trick, the clash, the flights to the seat's strip and the
+  hand, the draw's tap, the result), over dist/ built from 734ece4e: the grid, the drag and the
+  beat held; the fan's card names printed in cream past the felt's edge (the band was a mid card
+  and 26px, the captions hang 38px under a card), the score cells jumped 17px while a two-line
+  "takes the trick" status showed, and the SE's 150px sidebar cut "Ann (you)" to "Ann (…". In
+  web/games/briscola/theme.css: the sideways `--card-w` budget is 136px of chrome (the upright
+  captions' 40px and 8px of felt in the band; 99px cards at 390, 93 at 375), the sideways `.trick`
+  override is gone, the status line reserves two lines, and the short tier's tricks count takes the
+  cell's second line. Pinned: `expectSidewaysGrid` and the sideways clamp's twin
+  (`sidewaysCardWidth`) in e2e/briscola-geometry.spec.ts at both buckets on a touch context, a
+  finger's drag (CDP touch events, `touchDragCard`) to the settled trick and the result sheet in
+  e2e/briscola-local.spec.ts. Real, closed.

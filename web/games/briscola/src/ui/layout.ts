@@ -87,6 +87,30 @@ export const cardWidth = (viewport: Viewport, aspect: number = DEFAULT_ASPECT): 
 };
 export const cardHeight = (cardW: number, aspect: number = DEFAULT_ASPECT): number =>
   cardW / aspect;
+/**
+ * theme.css `body[data-layout^='phone-sideways'] #tableScreen` (the phone held sideways, both
+ * tiers; docs/design/layout-buckets.md): `--card-w: clamp(56px, (100dvh - 136px - max(12px,
+ * inset)) * aspect / 1.5, 110px)`. `chromeH` is everything in the height that is not a card (the
+ * 44px top row, the band's 40px of captions under the fan and its 8px of felt, the hand's 16px of
+ * padding, two 8px gaps, #app's 12px top gutter); `foot` is the least the bottom gutter takes (the
+ * home indicator's inset when larger); the mid card is half a hand card (`midRatio`), so the two
+ * stack 1.5 card heights (`cardHeights`). `stripMine` is my taken strip's `--strip-w` there.
+ */
+export const SIDEWAYS_GEOMETRY = {
+  chromeH: 136,
+  foot: 12,
+  minCardW: 56,
+  maxCardW: 110,
+  midRatio: 0.5,
+  cardHeights: 1.5,
+  tinyW: 20,
+  stripMine: 120,
+} as const;
+/** `--card-w` sideways for a viewport `height` tall (inset-free) and a pack's aspect: 99.1 at 390 (the 12 class), 93.0 at 375 (the SE), the 56 floor under 285, the 110 cap from 417. */
+export const sidewaysCardWidth = (height: number, aspect: number = DEFAULT_ASPECT): number => {
+  const g = SIDEWAYS_GEOMETRY;
+  return clamp(g.minCardW, ((height - g.chromeH - g.foot) * aspect) / g.cardHeights, g.maxCardW);
+};
 export const midWidth = (cardW: number): number => cardW * MID_RATIO;
 export const tinyWidth = (layout: Layout): number =>
   layout === 'phone' ? PHONE_GEOMETRY.tinyW : DESKTOP_GEOMETRY.tinyW;

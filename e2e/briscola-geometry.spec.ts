@@ -9,20 +9,32 @@
 // left to right and rising in z; the taken strips hold a chip per trick inside their cells, the
 // winner's one chip after the first trick; every tap target is at least 44px on a phone; nothing scrolls
 // where the twin says the column fits; and the frame around the cards (topbar, seats, centre band,
-// strip, status line, hand area, actions) keeps the boxes it had at the start.
+// strip, status line, hand area, actions) keeps the boxes it had at the start. Sideways, on a
+// touch context at the 12 class (844x390, `phone-sideways`) and the SE (667x375, `phone-sideways-
+// short`), the same oracle holds through a trick whose first card a finger drags to the trick, the
+// card as wide as the sideways budget says, and the corners-and-bands grid is in place
+// (`expectSidewaysGrid`: menu top-left, seats and badge on the top row, sound top-right, the
+// sidebar left of the band, the hand across the bottom, the trick centred in the band, no scroll).
 import {
   LOCAL_NAMES,
+  SIDEWAYS_VIEWPORTS,
   briscolaCurtain,
   briscolaReveal,
   briscolaStartLocal,
+  briscolaStartSideways,
+  expectSidewaysGrid,
   expectTableGeometry,
   playCard,
   playTrick,
   requireView,
+  revealIfUp,
   tableGeometry,
+  touchDragCard,
   FIRST_LEGAL,
+  type TableGeometry,
   type Viewport,
 } from './fixtures/briscola.ts';
+import { sidewaysCardWidth } from '../web/games/briscola/src/ui/layout.ts';
 import { DESKTOP, PHONE, expectSameFrame, type Frame } from './fixtures/geometry.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
@@ -131,6 +143,52 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
       await expect(page.locator('#seatR2')).toBeVisible();
       await expect(page.locator('#seatR1')).toBeHidden();
       await expect(page.locator('#seatR3')).toBeHidden();
+    });
+  });
+});
+
+test.describe('sideways', () => {
+  Object.entries(SIDEWAYS_VIEWPORTS).forEach(([bucket, vp]) => {
+    test(`${bucket} (${String(vp.width)}x${String(vp.height)}, touch): the corners-and-bands grid holds through a trick a finger starts, the card is the sideways budget's, nothing scrolls, targets are 44px, the fan is centred in the band`, async ({
+      phone,
+      project,
+    }) => {
+      const { page } = phone;
+      await briscolaStartSideways(page, pagePath(project, 'briscola'), vp);
+      const start = await tableGeometry(page);
+      expect(start.layout).toBe(bucket);
+      expectTableGeometry(start, 'curtain');
+      expectSidewaysGrid(start, 'curtain');
+      const check = async (when: string): Promise<TableGeometry> => {
+        const g = await tableGeometry(page);
+        expectTableGeometry(g, when);
+        expectSidewaysGrid(g, when);
+        expectSameFrame(g.frame, start.frame, when);
+        return g;
+      };
+      await briscolaReveal(page);
+      const revealed = await check('revealed');
+      expect(revealed.handCards).toHaveLength(3);
+      // The card is the sideways budget's (a hand card and a half-width mid card in the height the
+      // chrome leaves), not the upright column's third of the width.
+      const [firstCard] = revealed.handCards;
+      expect(firstCard?.box.w).toBeCloseTo(sidewaysCardWidth(vp.height, revealed.aspect), 0);
+
+      // The first card goes by a finger's drag; it lands inside the trick's box.
+      const v = await requireView(page);
+      const first = FIRST_LEGAL(v);
+      await touchDragCard(page, first);
+      const played = await check('one played');
+      expect(played.plays).toHaveLength(1);
+      const [laid] = played.plays;
+      expect(laid?.id).toBe(first);
+      await briscolaCurtain(page);
+
+      // The other seat completes the trick; the beat runs in the grid and settles; the winner reveals.
+      await playTrick(page);
+      await check('settled');
+      await revealIfUp(page);
+      await check('winner revealed');
     });
   });
 });

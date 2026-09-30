@@ -111,7 +111,11 @@ last from `#briscola` turned upright when `trumpTaken`; a clone is fixed at the 
 `transition-duration`/`-delay` inline so the reducer's timers and the glide agree, `arriving` hides
 the destination until the transition ends (a fallback timer removes a stuck clone), `MAX_LIVE_FLYERS`
 culls a burst. Durations `HOLD_MS 900 / FLY_MS 320 / DRAW_MS 260 / DRAW_GAP_MS 160`;
-`prefers-reduced-motion` makes every flight 1 ms and the hold 300 ms.
+`prefers-reduced-motion` makes every flight 1 ms and the hold 300 ms. Every target is an element
+measured at launch, never a position, so the same plans fly in every layout bucket: sideways
+(theme.css `body[data-layout^='phone-sideways']`) the fan's cards go up to the seat's chip on the
+44px top row and the drawn back down to the hand's slot along the bottom, as a hand played at
+844x390 and 667x375 with touch showed (space-audit.md §5 "Closed by briscola-sideways-play").
 
 ## 3. CSS (`theme.css`)
 
