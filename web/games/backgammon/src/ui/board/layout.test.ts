@@ -14,6 +14,7 @@ import {
   boardRoom,
   chromeHeight,
   LANDSCAPE_MAX_HEIGHT,
+  FRAME_BAND,
   PHONE_GEOMETRY,
   PHONE_TEMPLATE,
   POINT_AREAS,
@@ -38,10 +39,14 @@ import {
   stackExtent,
   stackStep,
   templateOf,
+  TIGHT_UNDER,
+  frameBand,
   uprightBoardHeight,
+  uprightChromeIn,
   uprightFoot,
   uprightPadding,
   uprightRoom,
+  uprightTight,
   uprightScrolls,
   visibleOf,
   type Area,
@@ -472,55 +477,96 @@ describe('the sizes', () => {
     expect(pointWidth(tab)).toBeCloseTo(47, 5);
     expect(uprightBoardHeight(tab)).toBeCloseTo(672, 5);
     expect(uprightFoot(tab)).toBeCloseTo(830, 5);
+    expect(uprightTight(tab)).toBe(false);
+    expect(uprightChromeIn(tab)).toBe(146);
     expect(PHONE_GEOMETRY.chromeIn + PHONE_GEOMETRY.slack).toBe(148);
-    // Installed on an iPhone 12: the notch's 47 and the indicator's 34 leave 763; 42.25px rows, a
-    // 615px board, the controls ending at 808, 2px over the band. (Before: 47px rows under a 47px
-    // padding, the controls 19px into the band and clipped.)
+    // The tight tier's threshold: the floor's board (636) and the full chrome (148), 784 of room.
+    expect(TIGHT_UNDER).toBe(784);
+    expect(PHONE_GEOMETRY.tightChromeIn + PHONE_GEOMETRY.slack).toBe(124);
+    // Installed on an iPhone 12: the notch's 47 and the indicator's 34 leave 763, under 784, so
+    // the tight tier holds: 122 of chrome, 44.25px rows, a 639px board, the controls ending at
+    // 808, 2px over the band. (Before the tier: 42.25px rows and a 615px board in 146 of chrome;
+    // before the room was measured: 47px rows under a 47px padding, the controls 19px into the
+    // band and clipped.)
     const iphone12 = upright(390, 844, 47, 34);
     expect(uprightPadding(iphone12)).toEqual({ top: 47, bottom: 34 });
     expect(uprightRoom(iphone12)).toBe(763);
     expect(uprightScrolls(iphone12)).toBe(false);
-    expect(pointWidth(iphone12)).toBeCloseTo(42.25, 5);
-    expect(uprightBoardHeight(iphone12)).toBeCloseTo(615, 5);
+    expect(uprightTight(iphone12)).toBe(true);
+    expect(uprightChromeIn(iphone12)).toBe(122);
+    expect(pointWidth(iphone12)).toBeCloseTo(44.25, 5);
+    expect(uprightBoardHeight(iphone12)).toBeCloseTo(639, 5);
     expect(uprightFoot(iphone12)).toBeCloseTo(808, 5);
     expect(uprightFoot(iphone12)).toBeLessThanOrEqual(844 - 34);
-    // The sweep's other installed cases: 393x852 (59/34) 41.92, 430x932 (59/34) 48.58, 375x812
-    // (44/34) 39.83, the 12 mini (50/34) 39.33, 402x874 (62/34) 43.5; each fills its room to the slack.
-    const installed: ReadonlyArray<readonly [Viewport, number]> = [
-      [upright(393, 852, 59, 34), (852 - 93 - 256) / 12],
-      [upright(430, 932, 59, 34), (932 - 93 - 256) / 12],
-      [upright(375, 812, 44, 34), (812 - 78 - 256) / 12],
-      [upright(375, 812, 50, 34), (812 - 84 - 256) / 12],
-      [upright(402, 874, 62, 34), (874 - 96 - 256) / 12],
+    // The sweep's other installed cases: 393x852 (59/34) 43.92 tight, 430x932 (59/34) 48.58 with
+    // the full chrome (839 of room), 375x812 (44/34) 41.83 and the 12 mini (50/34) 41.33 tight (the
+    // best 734 and 728 of room allow), 402x874 (62/34) 45.5 tight; each fills its room to the slack.
+    const installed: ReadonlyArray<readonly [Viewport, number, boolean]> = [
+      [upright(393, 852, 59, 34), (852 - 93 - 232) / 12, true],
+      [upright(430, 932, 59, 34), (932 - 93 - 256) / 12, false],
+      [upright(375, 812, 44, 34), (812 - 78 - 232) / 12, true],
+      [upright(375, 812, 50, 34), (812 - 84 - 232) / 12, true],
+      [upright(402, 874, 62, 34), (874 - 96 - 232) / 12, true],
     ];
-    installed.forEach(([vp, pw]) => {
+    installed.forEach(([vp, pw, tight]) => {
+      expect(uprightTight(vp)).toBe(tight);
       expect(pointWidth(vp)).toBeCloseTo(pw, 5);
       expect(vp.height - uprightPadding(vp).bottom - uprightFoot(vp)).toBeCloseTo(
         PHONE_GEOMETRY.slack,
         5,
       );
     });
+    expect(pointWidth(upright(393, 852, 59, 34))).toBeCloseTo(43.92, 2);
+    expect(pointWidth(upright(375, 812, 44, 34))).toBeCloseTo(41.83, 2);
+    expect(pointWidth(upright(375, 812, 50, 34))).toBeCloseTo(41.33, 2);
     // The SE installed (no insets) and every notched phone in a tab (the bar's height off the
     // viewport) are the scroll tier: 44px rows, whatever the paddings, and the document scrolls.
     const se = upright(375, 667, 0, 0);
     expect(uprightPadding(se)).toEqual({ top: 12, bottom: 12 });
     expect(uprightScrolls(se)).toBe(true);
+    // The scroll tier drops the container, so the tight tier's query is false however small the room.
+    expect(uprightTight(se)).toBe(false);
+    expect(uprightChromeIn(se)).toBe(146);
     expect(pointWidth(se)).toBe(44);
     expect(uprightBoardHeight(se)).toBe(636);
     expect(pointWidth(upright(390, 750, 0, 34))).toBe(44);
     expect(uprightScrolls(upright(390, 750, 0, 34))).toBe(true);
-    // A notched phone's tab with the bar hidden, over the tier: the indicator's 34 still counts
-    // (44.67 at 430x838; the 420x912 Air's 818 leaves 772, 43 rows).
+    expect(uprightTight(upright(390, 750, 0, 34))).toBe(false);
+    // A notched phone's tab with the bar hidden, over the scroll tier: the indicator's 34 still
+    // counts (44.67 at 430x838 with the full chrome, 792 of room; the 420x912 Air's 818 leaves
+    // 772, tight, 45 rows: 43 before the tier).
+    expect(uprightTight(upright(430, 838, 0, 34))).toBe(false);
     expect(pointWidth(upright(430, 838, 0, 34))).toBeCloseTo((838 - 46 - 256) / 12, 5);
-    expect(pointWidth(upright(420, 818, 0, 34))).toBeCloseTo(43, 5);
-    // The tier's edge: 805 scrolls at 44; 806 fits with the room's 43.83 (the floor's board and
-    // the chrome need 806, the slack eaten), 808 with 44 exactly.
+    expect(uprightTight(upright(420, 818, 0, 34))).toBe(true);
+    expect(pointWidth(upright(420, 818, 0, 34))).toBeCloseTo(45, 5);
+    // The tiers' edges: 805 scrolls at 44 (the full chrome); 806 fits with 782 of room, tight,
+    // 45.83 (43.83 before the tier); 807 tight at 45.92; 808 has 784 of room, the full chrome and
+    // 44 exactly. The tier's two arms meet at the floor: the full chrome never gives under 44 where
+    // it holds, the tight chrome never under 43.9 on a catalogued phone.
     expect(uprightScrolls({ width: 390, height: 805 })).toBe(true);
+    expect(uprightTight({ width: 390, height: 805 })).toBe(false);
     expect(pointWidth({ width: 390, height: 805 })).toBe(44);
     expect(uprightScrolls({ width: 390, height: 806 })).toBe(false);
-    expect(pointWidth({ width: 390, height: 806 })).toBeCloseTo(43.83, 2);
+    expect(uprightTight({ width: 390, height: 806 })).toBe(true);
+    expect(pointWidth({ width: 390, height: 806 })).toBeCloseTo(45.83, 2);
+    expect(uprightTight({ width: 390, height: 807 })).toBe(true);
+    expect(pointWidth({ width: 390, height: 807 })).toBeCloseTo(45.92, 2);
+    expect(uprightTight({ width: 390, height: 808 })).toBe(false);
     expect(pointWidth({ width: 390, height: 808 })).toBeCloseTo(44, 5);
+    expect(uprightTight({ width: 390, height: 1400 })).toBe(false);
     expect(pointWidth({ width: 390, height: 1400 })).toBe(PHONE_GEOMETRY.maxPointW);
+  });
+
+  test('frameBand: the phone`s 6px upright and sideways at any width (the theme`s landscape :root rule), the desktop`s 10 from 900px; the sideways trim counts 7', () => {
+    expect(FRAME_BAND).toEqual({ phone: 6, desktop: 10 });
+    expect(frameBand({ width: 390, height: 844 })).toBe(6);
+    expect(frameBand({ width: 844, height: 390, coarse: true })).toBe(6);
+    // A Pixel 8 and a Pro Max sideways are over 900 wide: still a phone, still 6.
+    expect(frameBand({ width: 915, height: 412, coarse: true })).toBe(6);
+    expect(frameBand({ width: 932, height: 430, coarse: true })).toBe(6);
+    expect(frameBand({ width: 915, height: 412 })).toBe(10);
+    expect(frameBand({ width: 1280, height: 800 })).toBe(10);
+    expect(LANDSCAPE_GEOMETRY.rail.padTop).toBe(FRAME_BAND.phone + 1 + LANDSCAPE_GEOMETRY.air);
   });
 
   test('five drawn, the rest a badge; the coin step spares the label corner', () => {
@@ -554,24 +600,20 @@ describe('the sizes', () => {
  * The upright sweep: every device upright in every mode (a tab twice, standalone, fullscreen),
  * the insets the catalogue reports (the notch above once installed, the indicator below), through
  * the twin. At most 805px tall the tier scrolls with 44px rows; above it the board and the chrome
- * fill the room to the 2px of slack, the controls end over the bottom padding, and the row is 44
- * or more everywhere but the cases named (`UNDER_44`: the four smallest notched classes installed
- * and the UNVERIFIED Air's tab with the bar hidden, 39.3-43.5px), never under 39. The 1024-wide
- * iPad upright is the desktop layout, by width.
+ * fill the room to the 2px of slack, the controls end over the bottom padding, the tight tier
+ * holds under 784 of room (every notched class installed but the two largest, and the Air's tab
+ * with the bar hidden), and the row is 44 or more (to the judge's half-pixel: 393x852 installed is
+ * 43.92) everywhere but the cases named (`UNDER_44`: the 375x812 class installed, whose room under
+ * the notch cannot hold 44, 41.33-41.83px). The 1024-wide iPad upright is the desktop layout, by width.
  */
 const UNDER_44: ReadonlySet<string> = new Set([
   'iphone-375x812-x portrait standalone',
   'iphone-375x812-x portrait fullscreen',
   'iphone-375x812-mini portrait standalone',
   'iphone-375x812-mini portrait fullscreen',
-  'iphone-390x844 portrait standalone',
-  'iphone-390x844 portrait fullscreen',
-  'iphone-393x852 portrait standalone',
-  'iphone-393x852 portrait fullscreen',
-  'iphone-402x874 portrait standalone',
-  'iphone-402x874 portrait fullscreen',
-  'iphone-420x912-air portrait browser bar-hidden',
 ]);
+/** The tier's half-pixel (tools/shell-emulate.ts `TOL`): what the `targets` check calls 44. */
+const HALF = 0.5;
 describe('the device sweep upright: the table fits the room the shell leaves on every phone, every mode', () => {
   const upright = (e: Emulation): Viewport => ({
     width: e.viewport.width,
@@ -609,19 +651,23 @@ describe('the device sweep upright: the table fits the room the shell leaves on 
       expect(uprightBoardHeight(vp)).toBe(636);
       return;
     }
+    // The tier: tight under 784 of room, the chrome 122 there and 146 above.
+    const tight = uprightRoom(vp) < TIGHT_UNDER;
+    expect(uprightTight(vp)).toBe(tight);
+    expect(uprightChromeIn(vp)).toBe(tight ? g.tightChromeIn : g.chromeIn);
     // Fills: the controls end over the bottom padding, the slack under them, unless the 64px cap holds the board short.
     const spare = vp.height - pad.bottom - uprightFoot(vp);
     if (pw < g.maxPointW) expect(spare).toBeCloseTo(g.slack, 5);
     else expect(spare).toBeGreaterThanOrEqual(g.slack);
-    expect(uprightRoom(vp) - g.chromeIn - g.slack).toBeCloseTo(
+    expect(uprightRoom(vp) - uprightChromeIn(vp) - g.slack).toBeCloseTo(
       uprightBoardHeight(vp) + (spare - g.slack),
       5,
     );
     if (UNDER_44.has(name)) {
-      expect(pw, `${name}: ${String(pw)}px rows`).toBeLessThan(g.minPointW);
-      expect(pw).toBeGreaterThanOrEqual(39);
+      expect(pw, `${name}: ${String(pw)}px rows`).toBeLessThan(g.minPointW - HALF);
+      expect(pw).toBeGreaterThanOrEqual(41);
     } else {
-      expect(pw, `${name}: ${String(pw)}px rows`).toBeGreaterThanOrEqual(g.minPointW);
+      expect(pw, `${name}: ${String(pw)}px rows`).toBeGreaterThanOrEqual(g.minPointW - HALF);
     }
   });
 });
