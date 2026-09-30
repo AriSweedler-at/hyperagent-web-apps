@@ -27,6 +27,7 @@ import {
   type DocumentLike,
   type PageLike,
 } from '../../../../shared/edge/dom.ts';
+import type { RecentGame } from '../../../../shared/lib/recentGames.ts';
 import {
   bindClearDefault,
   bindHomeShell,
@@ -35,6 +36,7 @@ import {
   paintHomeShell,
   shellIntents,
 } from '../../../../shared/ui/home.ts';
+import { paintRecentGamesInto } from '../../../../shared/ui/recentGames.ts';
 import { PRESETS } from '../sandbox.ts';
 import {
   HOME_TABS,
@@ -103,10 +105,36 @@ const paintSandbox = (doc: DocumentLike, app: App): void => {
   setText(requireId(doc, 'sbError'), app.table.sandbox.error ?? '');
 };
 
-/** The tabs and panels, the play mode, the submenu's `force-open`, and the resume box (the shell's view, labelled by gin's `resumeLabel`); then the sandbox. */
+/**
+ * The fourth card (page.ts `homeExtra`; docs/design/space-audit.md §5 "Closed by
+ * gin-home-column-bottom"): the recent games' slot, the fresh player's "How it goes" and its button
+ * to the Rules tab. Gin's alone, so not in SHELL_IDS (the other pages carry no such card).
+ */
+export const HOME_RECENT_IDS = {
+  list: 'homeRecentList',
+  howTo: 'homeHowTo',
+  rules: 'homeRulesBtn',
+} as const;
+
+/** How many finished games the home card lists: the newest five; the history sheet lists them all. */
+export const HOME_RECENT_MAX = 5;
+
+/**
+ * The card's two faces: the newest games through the shared painter (keyed on the count and the
+ * newest clock, so a repaint with the same list leaves it alone), or "How it goes" while the
+ * device remembers none. The shell state's `recentGames` is read at `home/init` and gains the game
+ * that just ended first, so painting from it covers both moments.
+ */
+export const paintHomeRecent = (doc: DocumentLike, games: ReadonlyArray<RecentGame>): void => {
+  paintRecentGamesInto(doc, HOME_RECENT_IDS.list, games.slice(0, HOME_RECENT_MAX));
+  toggleClass(requireId(doc, HOME_RECENT_IDS.howTo), 'hidden', games.length > 0);
+};
+
+/** The tabs and panels, the play mode, the submenu's `force-open`, and the resume box (the shell's view, labelled by gin's `resumeLabel`); then the sandbox and the fourth card. */
 export const paintHome = (doc: DocumentLike, app: App): void => {
   paintHomeShell(doc, homeView(app.shell, resumeLabel), { tabs: HOME_TABS, modes: PLAY_MODES });
   paintSandbox(doc, app);
+  paintHomeRecent(doc, app.shell.recentGames);
 };
 
 /**
@@ -163,13 +191,18 @@ const bindSandbox = (doc: PageLike, dispatch: (intent: Intent) => void): void =>
  * shell's under the shared intents, with the target score each start button reads beside the names.
  */
 export const bindHome = (doc: PageLike, dispatch: (intent: Intent) => void): void => {
+  const intents = shellIntents<Gin>();
   bindHomeShell(doc, dispatch, {
     tabs: HOME_TABS,
     startOptions: {
       host: (d) => ({ target: readValue(requireId(d, 'targetInput')) }),
       local: (d) => ({ target: readValue(requireId(d, 'localTargetInput')) }),
     },
-    intents: shellIntents<Gin>(),
+    intents,
+  });
+  // "Read the rules" on the fourth card: the Rules tab, through the intent its tab button dispatches.
+  listenId(doc, HOME_RECENT_IDS.rules, 'click', () => {
+    dispatch(intents.tabSet('rules'));
   });
   bindScorerNames(doc, dispatch);
   bindSandbox(doc, dispatch);

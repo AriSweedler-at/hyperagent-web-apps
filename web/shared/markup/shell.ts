@@ -143,6 +143,14 @@ export type ShellBlocks = Readonly<{
   /** `#playPanel` after `#localModeContent` (gin's sandbox panel). */
   playExtra: string;
   /**
+   * `#playPanel`'s last child, after the mode panels: gin's fourth card `#homeRecent` (the recent
+   * games, or "How it goes" for a fresh player), which fills the band a three-card form leaves under
+   * itself on a tall phone (docs/design/space-audit.md §5 "Closed by gin-home-column-bottom"). The
+   * one block a page may leave out: absent it is '', and '' drops the line, so a page without one
+   * composes byte for byte as before.
+   */
+  homeExtra?: string;
+  /**
    * The seat list under `#hostWaitStatus` (`#seatList`, shellPaint.ts SEAT_LIST_IDS: an N-seat
    * page's, docs/design/n-seat-sessions.md §7; '' for a two-seat page, whose room has one seat to list).
    */
@@ -362,7 +370,7 @@ export const renderShell = (templates: ShellTemplates, page: ShellPage): Result<
   const declared: Values = { ...page.copy, ...page.notes, ...page.look };
   // The composer's own slot beside the page's: page.html's `<body{{bodyAttrs}}>`.
   const slots: Values = { ...declared, bodyAttrs: bodyAttrsOf(page) };
-  const own: Values = page.blocks;
+  const own: Values = { homeExtra: '', ...page.blocks };
   const inner: ReadonlyArray<Inner> = INNER.map((name) => ({
     name,
     filled: fillTemplate(name, templates[name], slots, own),

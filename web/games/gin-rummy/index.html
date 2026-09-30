@@ -114,6 +114,22 @@
         <button class="btn btn-go btn-block" id="sbStartBtn">Deal the map</button>
         <div class="empty-note" style="text-align:left; padding:8px 2px 0;">A pass-and-play game dealt exactly as written above: both hands, the discard pile, the stock. From the console: <code>__gin.sandbox(map)</code>.</div>
       </div><!-- /sandbox -->
+
+      <!-- The fourth card (docs/design/space-audit.md §5 "Closed by gin-home-column-bottom"): the finished
+           games this device remembers (web/shared/ui/recentGames.ts at #homeRecentList through ui/home.ts,
+           the newest five), or for a fresh player how a hand goes and the way to the rules. -->
+      <div class="card-box" id="homeRecent">
+        <div class="recent-games home-recent" id="homeRecentList"></div>
+        <div id="homeHowTo">
+          <label>How it goes</label>
+          <ol class="how-it-goes">
+            <li>Ten cards each; the rest is the stock, its top card turned up.</li>
+            <li>On your turn, draw from the stock or take the discard, then discard one.</li>
+            <li>Knock with ten or fewer points of deadwood, or go gin with none.</li>
+          </ol>
+          <button class="btn btn-secondary btn-block btn-sm" id="homeRulesBtn">Read the rules</button>
+        </div>
+      </div><!-- /recent -->
     </div>
 
     <!-- RULES TAB -->

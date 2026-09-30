@@ -78,6 +78,7 @@ const blocks: ShellBlocks = {
   hostFields: '  <button id="hostBtn">{{hostLabel}}</button>',
   localFields: '  <input id="p1NameInput">\n  <input id="p2NameInput">',
   playExtra: '',
+  homeExtra: '',
   hostWaitList: '',
   guestWaitList: '',
   guestSeatName: '',
@@ -153,6 +154,19 @@ describe('renderShell', () => {
     expect(rendered.value).toContain('<i>btn-gold</i>');
     expect(rendered.value).toContain('<i> style="margin-top:8px;"</i>');
     expect(rendered.value).toContain('<i></i>');
+  });
+
+  test('homeExtra is the one block a page may leave out: absent it composes as empty; set, it follows playExtra', () => {
+    const { homeExtra, ...bare } = blocks;
+    expect(homeExtra).toBe('');
+    expect(renderShell(templates, { ...page, blocks: bare })).toEqual(rendered);
+    const extra = renderShell(templates, {
+      ...page,
+      blocks: { ...blocks, playExtra: '  <p></p>', homeExtra: '  <div id="homeRecent"></div>' },
+    });
+    expect(extra.ok).toBe(true);
+    if (!extra.ok) return;
+    expect(extra.value).toContain('  <p></p>\n  <div id="homeRecent"></div>\n');
   });
 
   test("the inner partials lose their file's final newline; page.html keeps its own", () => {
