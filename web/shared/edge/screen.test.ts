@@ -10,14 +10,17 @@ import { deviceLabel, type Insets } from '../lib/devices.ts';
 import {
   FRAME_INSETS,
   applyFrame,
+  applyLayout,
   frameCornerProp,
   framed,
   notchOf,
   probeAsked,
   readFrame,
   readInsets,
+  readLayout,
   readMode,
   watchFrame,
+  watchLayout,
   type ScreenDocumentLike,
   type ScreenWindowLike,
 } from './screen.ts';
@@ -48,6 +51,8 @@ type Options = Readonly<{
   bare?: boolean;
   /** No `matchMedia` (the boot test's window). */
   noMedia?: boolean;
+  /** `matchMedia` answers these pointer queries true (`(any-pointer: fine)`, `(hover: hover)`); none, a phone. */
+  pointer?: ReadonlyArray<string>;
 }>;
 
 const fake = (o: Options = {}): Fake => {
@@ -69,8 +74,16 @@ const fake = (o: Options = {}): Fake => {
         fn(new Event(type));
       });
     };
+  const attrs = new Map<string, string>(o.frame === true ? [['data-frame', '']] : []);
   const body = {
-    hasAttribute: (name: string) => name === 'data-frame' && o.frame === true,
+    hasAttribute: (name: string) => attrs.has(name),
+    getAttribute: (name: string) => attrs.get(name) ?? null,
+    setAttribute: (name: string, value: string) => {
+      attrs.set(name, value);
+    },
+    removeAttribute: (name: string) => {
+      attrs.delete(name);
+    },
   } as unknown as HTMLElement;
   const doc: ScreenDocumentLike = {
     documentElement: {
@@ -95,7 +108,9 @@ const fake = (o: Options = {}): Fake => {
       ? {}
       : {
           matchMedia: (query: string) => ({
-            matches: (o.modes ?? []).some((m) => query === `(display-mode: ${m})`),
+            matches:
+              (o.modes ?? []).some((m) => query === `(display-mode: ${m})`) ||
+              (o.pointer ?? []).includes(query),
           }),
         }),
     ...(o.blind === true
@@ -345,6 +360,74 @@ describe('the watcher', () => {
         calls.push(2);
       });
       expect(bare.listeners).toEqual(['doc:fullscreenchange']);
+    } finally {
+      if (real === undefined) delete g.requestAnimationFrame;
+      else g.requestAnimationFrame = real;
+    }
+  });
+});
+
+describe('the layout bucket (docs/design/layout-buckets.md)', () => {
+  test('readLayout: the viewport and the two pointer facts; null without a viewport; a window without matchMedia answers both false', () => {
+    const phone = fake({ viewport: { width: 844, height: 390 } });
+    expect(readLayout(phone.win)).toEqual({ width: 844, height: 390, fine: false, hover: false });
+    const laptop = fake({
+      viewport: { width: 1280, height: 800 },
+      pointer: ['(any-pointer: fine)', '(hover: hover)'],
+    });
+    expect(readLayout(laptop.win)).toEqual({ width: 1280, height: 800, fine: true, hover: true });
+    const touchLaptop = fake({
+      viewport: { width: 1280, height: 800 },
+      pointer: ['(hover: hover)'],
+    });
+    expect(readLayout(touchLaptop.win)?.hover).toBe(true);
+    expect(readLayout(fake().win)).toBeNull();
+    const noMedia = fake({ viewport: { width: 390, height: 844 }, noMedia: true });
+    expect(readLayout(noMedia.win)).toEqual({ width: 390, height: 844, fine: false, hover: false });
+  });
+
+  test('applyLayout: the bucket on <body data-layout>, re-read as the viewport changes; nothing written without a viewport', () => {
+    const f = fake({ viewport: { width: 844, height: 390 } });
+    expect(applyLayout(f.doc, f.win)).toBe('phone-sideways');
+    expect(f.doc.body.getAttribute('data-layout')).toBe('phone-sideways');
+    const turned = fake({ viewport: { width: 390, height: 844 } });
+    expect(applyLayout(turned.doc, turned.win)).toBe('phone-upright');
+    const wide = fake({
+      viewport: { width: 1920, height: 1080 },
+      pointer: ['(any-pointer: fine)', '(hover: hover)'],
+    });
+    expect(applyLayout(wide.doc, wide.win)).toBe('desktop-wide');
+    const bare = fake();
+    expect(applyLayout(bare.doc, bare.win)).toBeNull();
+    expect(bare.doc.body.hasAttribute('data-layout')).toBe(false);
+  });
+
+  test('watchLayout: resize and orientationchange, a frame later; nothing on a bare window', () => {
+    const f = fake({ viewport: { width: 844, height: 390 } });
+    const calls: number[] = [];
+    const frames: (() => void)[] = [];
+    const g = globalThis as { requestAnimationFrame?: (fn: () => void) => number };
+    const real = g.requestAnimationFrame;
+    g.requestAnimationFrame = (fn) => {
+      frames.push(fn);
+      return frames.length;
+    };
+    try {
+      watchLayout(f.win, () => {
+        calls.push(1);
+      });
+      expect(f.listeners).toEqual(['win:resize', 'win:orientationchange']);
+      f.fire('win:orientationchange');
+      expect(calls).toEqual([]);
+      frames.forEach((fn) => {
+        fn();
+      });
+      expect(calls).toEqual([1]);
+      const bare = fake({ bare: true });
+      watchLayout(bare.win, () => {
+        calls.push(2);
+      });
+      expect(bare.listeners).toEqual([]);
     } finally {
       if (real === undefined) delete g.requestAnimationFrame;
       else g.requestAnimationFrame = real;

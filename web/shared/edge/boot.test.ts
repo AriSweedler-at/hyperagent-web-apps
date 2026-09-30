@@ -541,6 +541,8 @@ type Options = Readonly<{
   flip?: boolean;
   /** The window's `screen` has this size in CSS points (with `getComputedStyle` answering shell.css's `--frame-inset-top`, `-left` and `-right` with `notch`, `-bottom` with 0): the device catalogue's inputs (screen.ts). */
   screenSize?: Readonly<{ width: number; height: number; notch: string }>;
+  /** The window has a viewport (`innerWidth x innerHeight`) and a recording `addEventListener`: the layout bucket's inputs (screen.ts `applyLayout`, `watchLayout`). */
+  viewport?: Readonly<{ width: number; height: number }>;
 }>;
 
 type Log = Readonly<{
@@ -576,6 +578,8 @@ type Log = Readonly<{
   locks: string[];
   /** Every `--property` the boot wrote on the root's inline style (screen.ts `applyFrame`: the four `--frame-corner-*`). */
   rootStyles: (readonly [string, string])[];
+  /** Every window listener the boot bound (screen.ts `watchLayout`: `resize`, `orientationchange`), by type. */
+  winListeners: Map<string, (e: Readonly<Event>) => void>;
 }>;
 
 /** One booted page: what the boot was given, and everything it touched, recorded. */
@@ -632,6 +636,7 @@ const bootPage = (options: Options = {}) => {
     fallbacks: [],
     locks: [],
     rootStyles: [],
+    winListeners: new Map(),
   };
   /** The page is in fullscreen (the fake `requestFullscreen`/`exitFullscreen` flip it; a test flips it for a back gesture). */
   const fullscreen = { on: false };
@@ -697,6 +702,15 @@ const bootPage = (options: Options = {}) => {
       }),
     ...(options.unseeded === true ? {} : { __rng: mulberry32(7) }),
     ...(options.audio === true ? { AudioContext: FakeAudioContext } : {}),
+    ...(options.viewport === undefined
+      ? {}
+      : {
+          innerWidth: options.viewport.width,
+          innerHeight: options.viewport.height,
+          addEventListener: (type: string, fn: (e: Readonly<Event>) => void) => {
+            log.winListeners.set(type, fn);
+          },
+        }),
     ...(options.lock === undefined && options.screenSize === undefined
       ? {}
       : {
@@ -1096,6 +1110,37 @@ describe('bootShell', () => {
     ).toEqual(corners('0px', '0px', '0px', '0px'));
     expect(bootPage({ lock: false }).log.rootStyles).toEqual([]);
     expect(bootPage().log.rootStyles).toEqual([]);
+  });
+
+  test('the layout bucket (screen.ts `applyLayout`, web/shared/lib/layout.ts): a 844x390 viewport whose matchMedia answers no query is a phone sideways on <body data-layout>, one that answers every query (a pointer that is fine and hovers) a desktop; a resize re-reads it a frame later; a window without a viewport writes nothing', () => {
+    const phone = bootPage({ viewport: { width: 844, height: 390 }, coarse: false });
+    expect(phone.p.doc.body.getAttribute('data-layout')).toBe('phone-sideways');
+    expect(phone.log.queries).toContain('(any-pointer: fine)');
+    expect(phone.log.queries).toContain('(hover: hover)');
+    expect([...phone.log.winListeners.keys()]).toEqual(['resize', 'orientationchange']);
+    // The phone turns: the viewport swaps, the listener fires, the bucket follows on the next frame.
+    const frames: (() => void)[] = [];
+    const g = globalThis as { requestAnimationFrame?: (fn: () => void) => number };
+    const real = g.requestAnimationFrame;
+    g.requestAnimationFrame = (fn) => {
+      frames.push(fn);
+      return frames.length;
+    };
+    try {
+      Object.assign(phone.win, { innerWidth: 390, innerHeight: 844 });
+      phone.log.winListeners.get('orientationchange')?.(new Event('orientationchange'));
+      expect(phone.p.doc.body.getAttribute('data-layout')).toBe('phone-sideways');
+      frames.forEach((fn) => {
+        fn();
+      });
+      expect(phone.p.doc.body.getAttribute('data-layout')).toBe('phone-upright');
+    } finally {
+      if (real === undefined) delete g.requestAnimationFrame;
+      else g.requestAnimationFrame = real;
+    }
+    const laptop = bootPage({ viewport: { width: 1280, height: 800 }, coarse: true });
+    expect(laptop.p.doc.body.getAttribute('data-layout')).toBe('desktop');
+    expect(bootPage().p.doc.body.hasAttribute('data-layout')).toBe(false);
   });
 
   test("the reducer's ctx says whether this device can lock its rotation (shell.ts `Ctx.canLock`, the rotation hint's test): `screen.orientation.lock` a function on a device with no pointer that hovers says yes; no such function, a pointer that hovers (a touchscreen laptop), no `matchMedia`, or no `screen` at all, says no", () => {
