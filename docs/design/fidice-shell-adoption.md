@@ -128,6 +128,16 @@ reaches the page for the soak; `bootShell` reads `win.__rng` (boot.ts:463) as th
 | M11      | `docs(fidice): The adoption as landed`                                                                | `docs/ARCHITECTURE.md:75, 131, 144, 162, 623-624` (`__fidice` = the shared hook + `act`, `view`, `setup`), `MANIFEST.json` + `fidice.api.ts` headers, `dry-round-2.md` H6, `n-seat-sessions.md` fidice row, this document's §4 as landed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Changes: none.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | ~150          | -                                                                                                                                                      |
 
 Order: M0 -> M1 -> M2 ‖ M3 -> M4 -> M5 -> GATE (the soak) -> **M6** -> M7 -> M8 ‖ M9 ‖ M10 -> M11.
+
+A step of the restyle landed ahead of M6 (fidice-sideways-fold, 2026-09-30; docs/design/space-audit.md
+§5 "Closed by fidice-sideways-fold"): sideways on a phone the shell path's table fits without a scroll
+where the viewport allows, by folding the legacy copy in `theme.css` under
+`body[data-layout^="phone-sideways"]` alone: the game screen two columns (the wood; the seats, the
+round panel, the table talk and Finish), the wood two or three columns (the dice zones stacked; the
+steps side by side), the steps' paragraphs behind a tap on the title (`src/ui/helpFold.ts`, a body
+class the shell boot binds; the legacy view untouched, its parity oracle standing), the seat cards
+one line each, the table talk its two newest lines. The M7 rewrite of the table inherits these folds
+as its sideways shape.
 The flip is M6; the deletions are M6 (shell, net, shell view) and M7 (vdom, `uiOf`, `scenarios.ts`).
 Scaffolding the plan adds and M6/M7 delete: the two boots, `MARKUP_GAMES`, `PAGE_QUERY` and
 `gamePath`'s query half, `LINKS_SHELL_CSS`, `uiOf` (~150 lines). The M3 replay oracle is the one test
