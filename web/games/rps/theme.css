@@ -368,3 +368,23 @@ main {
     transition: none;
   }
 }
+
+/* The island row (src/island.ts, docs/design/rps-island.md §11): the link dressed as the start button, the state under it. */
+#islandSlot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+.island-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  text-decoration: none;
+  text-align: center;
+}
+.island-open,
+.island-home {
+  padding: 8px;
+}

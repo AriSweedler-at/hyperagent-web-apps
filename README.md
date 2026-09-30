@@ -390,6 +390,7 @@ npx wrangler deploy
 
 The path mapping is the table at the top of `worker.ts`; `worker.test.ts` pins every row and
 `tools/proxy-dev.ts` runs the same handler locally.
+The island scoreboard's owner steps are ios/DiceClip/README.md's checklist: the App Clip experience at `https://games.sweedler.com/clip/rps` (the page's "Send buddy to your island" button links there, on this origin alone, on an iPhone with a Dynamic Island), the AASA, the `RPS_PAIRS` namespace and the `APNS_*` secrets, and the App Store id for `web/shared/lib/appClip.ts`.
 
 **turn.sweedler.com.** `infra/turn-worker/worker.js`, plain JavaScript deployed by hand: see
 "Online play".
