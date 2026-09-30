@@ -607,14 +607,21 @@ Object.entries(VIEWPORTS).forEach(([name, vp]) => {
 const LONG_NAMES = ['Konstantinopoulos XX', 'Konstantinopoulos YY'] as const;
 
 type GlyphBox = Readonly<{ sel: string; top: number; bottom: number; centre: number }>;
+type StripGlyphs = Readonly<{
+  trims: boolean;
+  rowCentre: number;
+  hairline: number;
+  boardTop: number;
+  items: ReadonlyArray<GlyphBox>;
+}>;
 /**
  * Each strip item's glyph box: its border box less its block paddings, which under
  * `text-box: trim-both cap alphabetic` (theme.css, the landscape block) is the letters' own box,
- * cap height to baseline; and whether the browser trims at all.
+ * cap height to baseline; whether the browser trims at all; the row's centre; the trim's hairline
+ * (the frame's inner edge: shell.css's `--frame-band` and `--frame-hairline-w` from the viewport's
+ * top) and the board's top edge, the air's two far ends.
  */
-const stripGlyphs = (
-  page: Page,
-): Promise<Readonly<{ trims: boolean; rowCentre: number; items: ReadonlyArray<GlyphBox> }>> =>
+const stripGlyphs = (page: Page): Promise<StripGlyphs> =>
   page.evaluate(`(() => {
     const sels = ['.opp-strip .name', '.opp-strip .pips', '#gameBadge', '#statusLine', '.me-strip .name', '.me-strip .pips'];
     const items = sels.map((sel) => {
@@ -625,10 +632,12 @@ const stripGlyphs = (
       const bottom = r.bottom - parseFloat(cs.paddingBottom);
       return { sel, top, bottom, centre: (top + bottom) / 2 };
     });
-    const app = getComputedStyle(document.getElementById('app'));
+    const root = getComputedStyle(document.documentElement);
+    const hairline = parseFloat(root.getPropertyValue('--frame-band')) + parseFloat(root.getPropertyValue('--frame-hairline-w'));
+    const boardTop = document.getElementById('board').getBoundingClientRect().top;
     const screen = document.getElementById('tableScreen').getBoundingClientRect();
     const rowCentre = screen.top + parseFloat(getComputedStyle(document.getElementById('tableScreen')).getPropertyValue('--strip-h')) / 2;
-    return { trims: CSS.supports('text-box-trim', 'trim-both'), rowCentre, items };
+    return { trims: CSS.supports('text-box-trim', 'trim-both'), rowCentre, hairline, boardTop, items };
   })()`);
 
 /** The widest px per character the status line's font reaches over the copy it shows, and the badge's over its widest text. */
@@ -644,13 +653,15 @@ const measuredPxPerChar = (page: Page): Promise<Readonly<{ body: number; badge: 
   })()`);
 
 const SIDEWAYS: Readonly<Record<string, Viewport>> = {
+  'rail, 844x390': { width: 844, height: 390 },
   'rail floor': { width: 780, height: 304 },
+  'rows, the SE': { width: 667, height: 375 },
   'rows, 640 wide': { width: 640, height: 360 },
 };
 
 Object.entries(SIDEWAYS).forEach(([name, vp]) => {
   test.describe(`sideways, ${name}`, () => {
-    test('the strip centres its glyphs on the row and shares a baseline; the last-move line fits the status slot; px per character is as the budget table says', async ({
+    test('the strip centres its glyphs on the row and shares a baseline, as far under the trim as over the board; the last-move line fits the status slot; px per character is as the budget table says', async ({
       phone,
       project,
     }) => {
@@ -681,7 +692,7 @@ Object.entries(SIDEWAYS).forEach(([name, vp]) => {
       within(px.badge, PX_PER_CHAR.badge, 'badge');
       expect('3-1 · last move'.length).toBeLessThanOrEqual(budget(SLOTS.stripStatus));
       // The strip's text is centred by the browser (theme.css, the landscape block): every item's
-      // glyph box is centred on the 22px row within half a pixel, and the same-size items (the
+      // glyph box is centred on the 24px row within half a pixel, and the same-size items (the
       // names, the pips, the status) share one baseline; the badge's smaller type is centred too.
       const strip = await stripGlyphs(page);
       expect(strip.trims, 'the harness Chromium trims text boxes (text-box-trim)').toBe(true);
@@ -689,6 +700,20 @@ Object.entries(SIDEWAYS).forEach(([name, vp]) => {
         expect(
           Math.abs(it.centre - strip.rowCentre),
           `${it.sel}'s glyph box is centred at ${it.centre.toFixed(2)}, the row at ${strip.rowCentre.toFixed(2)}`,
+        ).toBeLessThanOrEqual(0.5);
+      });
+      // And the air is the same on both sides of the letters (the owner, 2026-09-28: "equal padding
+      // above and below the text ... get the browser to do this the right way"): the row stands
+      // `--air` under the trim's hairline and the board `--air` under the row (one token, theme.css
+      // `body.fixed-screen #app` and `#tableScreen { row-gap }`), so from the hairline to each glyph
+      // box's top is what from its bottom to the board's top edge is, within half a pixel, in both
+      // schemes.
+      strip.items.forEach((it) => {
+        const above = it.top - strip.hairline;
+        const below = strip.boardTop - it.bottom;
+        expect(
+          Math.abs(above - below),
+          `${it.sel}: ${above.toFixed(2)}px from the hairline to the letters, ${below.toFixed(2)} from the letters to the board`,
         ).toBeLessThanOrEqual(0.5);
       });
       const baselines = strip.items.filter((it) => it.sel !== '#gameBadge').map((it) => it.bottom);

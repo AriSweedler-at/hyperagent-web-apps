@@ -109,7 +109,7 @@ describe('the landscape predicate is spelled once', () => {
     );
     const nested = nestedMediaLists(bg);
     expect(nested.map((n) => n.list)).toEqual(mediaLists(bg));
-    const tiers = nested.filter((n) => n.list.includes('273px') || n.list.includes('295px'));
+    const tiers = nested.filter((n) => n.list.includes('273px') || n.list.includes('293px'));
     expect(tiers.length).toBeGreaterThanOrEqual(1);
     tiers.forEach((tier) => {
       const inner = tier.enclosing.at(-1) ?? '';
