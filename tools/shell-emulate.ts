@@ -60,6 +60,7 @@ import { chromium, type Browser, type Page } from '@playwright/test';
 
 import {
   LANDSCAPE_GEOMETRY,
+  PHONE_GEOMETRY,
   RAIL_MIN_WIDTH,
   boardRoom,
   chromeHeight,
@@ -69,6 +70,13 @@ import {
   paddingOf,
   pointLength,
   pointWidth,
+  uprightBoardHeight,
+  uprightChromeIn,
+  uprightFoot,
+  uprightPadding,
+  uprightRoom,
+  uprightScrolls,
+  uprightTight,
   type Layout,
   type Viewport,
 } from '../web/games/backgammon/src/ui/board/layout.ts';
@@ -348,12 +356,17 @@ export const listText = (): string => {
   return [head, ...rows].join('\n');
 };
 
-/** The twin's viewport for a case: coarse pointer, the case's side and bottom insets. */
+/** The twin's viewport for a case: coarse pointer, the case's four insets (the top one is the notch upright once installed, what the upright room is short by). */
 export const twinViewport = (e: Emulation): Viewport => ({
   width: e.viewport.width,
   height: e.viewport.height,
   coarse: true,
-  insets: { left: e.insets.left, right: e.insets.right, bottom: e.insets.bottom },
+  insets: {
+    top: e.insets.top,
+    left: e.insets.left,
+    right: e.insets.right,
+    bottom: e.insets.bottom,
+  },
 });
 
 /**
@@ -362,12 +375,24 @@ export const twinViewport = (e: Emulation): Viewport => ({
  * (`@media (max-height: 805px) and (max-width: 899px)`, `(max-height: 645px) and (min-width: 900px)`).
  * Sideways the tier is the landscape floor's own height (`floorHeight` below).
  */
-export const PHONE_SCROLL_MAX_HEIGHT = 805;
+export const PHONE_SCROLL_MAX_HEIGHT: number = PHONE_GEOMETRY.scrollMaxHeight;
 export const DESKTOP_SCROLL_MAX_HEIGHT = 645;
 
-/** What the twin says of a case: the layout and, sideways, every number the CSS computes. */
+/** The upright numbers (layout.ts `uprightRoom` and the rest): #app's paddings, the room they leave, the tier and its chrome, the board and where the controls end. */
+export type UprightTwin = Readonly<{
+  padding: Readonly<{ top: number; bottom: number }>;
+  room: number;
+  /** The tight tier holds (under 784 of room, the viewport fitting): the chrome 122, not 146. */
+  tight: boolean;
+  chromeIn: number;
+  boardH: number;
+  foot: number;
+}>;
+/** What the twin says of a case: the layout and, sideways or upright, every number the CSS computes. */
 export type Twin = Readonly<{
   layout: Layout;
+  /** The phone layout's numbers; null sideways and on the desktop template. */
+  upright: UprightTwin | null;
   scheme: 'rail' | 'rows' | null;
   edge: number;
   chromeW: number;
@@ -393,6 +418,17 @@ export const twinOf = (e: Emulation): Twin => {
   const floorHeight = 2 * floor + LANDSCAPE_GEOMETRY.frame + chromeH;
   return {
     layout,
+    upright:
+      layout === 'phone'
+        ? {
+            padding: uprightPadding(vp),
+            room: uprightRoom(vp),
+            tight: uprightTight(vp),
+            chromeIn: uprightChromeIn(vp),
+            boardH: uprightBoardHeight(vp),
+            foot: uprightFoot(vp),
+          }
+        : null,
     scheme: layout === 'landscape' ? (vp.width >= RAIL_MIN_WIDTH ? 'rail' : 'rows') : null,
     edge: edgeOf(vp),
     chromeW: chromeWidth(vp),
@@ -407,7 +443,7 @@ export const twinOf = (e: Emulation): Twin => {
       layout === 'landscape'
         ? vp.height < floorHeight
         : layout === 'phone'
-          ? vp.height <= PHONE_SCROLL_MAX_HEIGHT
+          ? uprightScrolls(vp)
           : vp.height <= DESKTOP_SCROLL_MAX_HEIGHT,
   };
 };
@@ -437,6 +473,7 @@ export const explainText = (e: Emulation): string => {
       `  point-len ${px(t.pointLen)} (floor ${px(t.floor)}; the floor holds under ${px(t.floorHeight)}px)  board ${px(2 * t.pointLen + LANDSCAPE_GEOMETRY.frame)} tall${t.scrolls ? '  SCROLLS (under the floor)' : ''}`,
     );
   }
+  if (t.upright !== null) lines.push(...uprightLines(e, t));
   if (e.mode === 'browser') {
     const other = emulationFor(d, e.orientation, e.mode, e.bar === 'shown' ? 'hidden' : 'shown');
     const ot = twinOf(other);
@@ -444,11 +481,28 @@ export const explainText = (e: Emulation): string => {
       `  bar ${other.bar}: viewport ${String(other.viewport.width)}x${String(other.viewport.height)}${
         ot.layout === 'landscape'
           ? `  point-len ${px(ot.pointLen)}  board ${px(2 * ot.pointLen + LANDSCAPE_GEOMETRY.frame)} tall${ot.scrolls ? '  SCROLLS' : ''}`
-          : `  layout ${ot.layout}`
+          : ot.upright !== null
+            ? `  room ${px(ot.upright.room)}  point-w ${px(ot.pointW)}${ot.upright.tight ? ' (tight tier)' : ''}${ot.scrolls ? '  SCROLLS' : ''}`
+            : `  layout ${ot.layout}`
       }`,
     );
   }
   return lines.join('\n');
+};
+
+/** `explain`'s upright lines: the paddings and the room, the tier and its chrome, the row, the board and where the controls end (over the bottom padding by the slack where the viewport fits; the 805px tier scrolls at the 44px floor). */
+const uprightLines = (e: Emulation, t: Twin): ReadonlyArray<string> => {
+  const u = t.upright;
+  if (u === null) return [];
+  const over = e.viewport.height - u.padding.bottom - u.foot;
+  return [
+    `  padding ${px(u.padding.top)}/${px(u.padding.bottom)}  room ${px(u.room)}  chrome-in ${px(u.chromeIn)}${u.tight ? ' (tight tier: gaps 4, controls 44)' : ''}  point-w ${px(t.pointW)}${t.pointW < 44 - TOL ? ' UNDER 44' : ''}`,
+    `  board ${px(u.boardH)} tall  controls end at ${px(u.foot)}${
+      t.scrolls
+        ? `  SCROLLS (the 805px tier: the 44px floor, ${px(-over)}px past the viewport)`
+        : ` (${px(over)}px over the bottom padding)`
+    }`,
+  ];
 };
 
 /** `explain --game ui-sandbox`: one case's safe-area map, from the same module the page runs, and where examples (g) and (h) land. */
@@ -530,12 +584,15 @@ export type Measured = Readonly<{
   rootCorners: string;
   /** `document.fullscreenElement` is set: the page asked for fullscreen (the Android lock at the table, which Chromium's emulated phone grants), so every corner is the screen's whatever the case's mode. */
   fullscreen: boolean;
+  /** `body::before`'s computed border width: the band the frame draws (6 on a phone; the theme's 10 from 900px wide is the desktop's, and a phone sideways keeps 6), what the clearance is counted from. */
+  band: number;
   screen: readonly [number, number];
   dpr: number;
   coarse: boolean;
 }>;
 
-const MEASURE = `(() => {
+/** The measurement, read off the page in one evaluate: the emulator's `check` and the devices e2e (which imports it) read the same numbers. */
+export const MEASURE = `(() => {
   const rect = (el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; };
   const shown = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
   const board = document.getElementById('board');
@@ -556,6 +613,7 @@ const MEASURE = `(() => {
     corners: (() => { const cs = getComputedStyle(document.body, '::before'); const r = (v) => parseFloat(v) || 0; return { tl: r(cs.borderTopLeftRadius), tr: r(cs.borderTopRightRadius), br: r(cs.borderBottomRightRadius), bl: r(cs.borderBottomLeftRadius) }; })(),
     rootCorners: ['tl', 'tr', 'br', 'bl'].map((k) => getComputedStyle(document.documentElement).getPropertyValue('--frame-corner-' + k).trim()).filter((v) => v !== '').join('/'),
     fullscreen: document.fullscreenElement !== null,
+    band: parseFloat(getComputedStyle(document.body, '::before').borderTopWidth) || 0,
     screen: [screen.width, screen.height],
     dpr: devicePixelRatio,
     coarse: matchMedia('(any-pointer: coarse)').matches,
@@ -566,8 +624,12 @@ export type Check = Readonly<{ name: string; pass: boolean; detail: string }>;
 export type Verdict = Readonly<{ pass: boolean; checks: ReadonlyArray<Check> }>;
 /** Half a pixel: the rounding between two reads of one layout. */
 export const TOL = 0.5;
+/** The hairline (1px) and the 4px of air the content keeps off it: what the clearance adds to the band. */
+export const HAIRLINE_AIR = 5;
+/** The clearance for a band: the band, its hairline and the air; 11 on a phone's 6px band, 15 on a 10px one (which a phone sideways over 900 wide drew until the theme kept it 6 there). */
+export const clearanceOf = (band: number): number => band + HAIRLINE_AIR;
 /** The trim's 6px band, its 1px hairline and the 4px of air the content keeps off it. */
-export const CLEARANCE = 11;
+export const CLEARANCE = clearanceOf(6);
 /** One pixel: what a sandbox box's edge may leave beyond the room's (web/games/ui-sandbox/src/examples.ts FILL_SLACK). */
 export const FILL_SLACK = 1;
 
@@ -616,20 +678,22 @@ export const judge = (e: Emulation, m: Measured): Verdict => {
     });
   }
   const boxes = [...Object.values(m.frame), board].filter((b): b is Box => b !== null);
+  // Off the band the page drew, not the phone's 6 assumed: a 10px band wants 15.
+  const clearance = clearanceOf(m.band);
   const tight = boxes.filter(
     (b) =>
-      b.x < CLEARANCE - TOL ||
-      b.y < CLEARANCE - TOL ||
-      b.x + b.w > m.inner.w - CLEARANCE + TOL ||
-      (!t.scrolls && b.y + b.h > m.inner.h - CLEARANCE + TOL),
+      b.x < clearance - TOL ||
+      b.y < clearance - TOL ||
+      b.x + b.w > m.inner.w - clearance + TOL ||
+      (!t.scrolls && b.y + b.h > m.inner.h - clearance + TOL),
   );
   checks.push({
     name: 'clear',
     pass: tight.length === 0,
     detail:
       tight.length === 0
-        ? `${String(boxes.length)} boxes ${String(CLEARANCE)}px off the edge`
-        : `${String(tight.length)} within ${String(CLEARANCE)}px of the edge`,
+        ? `${String(boxes.length)} boxes ${String(clearance)}px off the edge (band ${px(m.band)})`
+        : `${String(tight.length)} within ${String(clearance)}px of the edge (band ${px(m.band)})`,
   });
   const scrolls = m.scrollHeight > m.inner.h + 1;
   checks.push({
