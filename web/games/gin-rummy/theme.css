@@ -27,9 +27,12 @@
        web/shared/styles/tokens.css, with these values. */
     /* default (off-table) card sizes: the result sheet and the meld chooser; #tableScreen sets its own --card-w and --pile-w */
     --card-w: 50px; --mini-w: 34px; --pile-w: 84px; --tiny-w: 22px;
+    /* The column's gutter, read by shell.css's unframed rule as #app's padding (12px a side, 16 at
+       the foot) or the safe-area inset where that is more; the shell's `--frame-inset-*` is the one
+       seam (the emulator writes it), so no `env()` here. On :root as the frame's tokens are. */
+    --gutter: 12px; --gutter-bottom: 16px;
   }
   html, body { background: var(--felt); }
-  #app { padding: 12px 12px calc(16px + env(safe-area-inset-bottom)); }
   h1 { font-size: 1.35rem; margin: 6px 0 2px; letter-spacing: 0.4px; }
   .subtitle { font-size: 0.85rem; margin-bottom: 14px; }
   .card-box { border: 1px solid rgba(255,255,255,0.05); }
@@ -370,7 +373,7 @@
 
   /* ---------- voice input FAB ---------- */
   .voice-fab {
-    position: fixed; right: max(18px, calc(50vw - 240px + 18px)); bottom: calc(96px + env(safe-area-inset-bottom));
+    position: fixed; right: max(18px, calc(50vw - 240px + 18px)); bottom: calc(96px + var(--frame-inset-bottom));
     width: 58px; height: 58px; border-radius: 50%; border: none; z-index: 35;
     background: linear-gradient(135deg, var(--gold), #f59e0b); color: #3a2a00; font-size: 1.5rem;
     box-shadow: 0 6px 18px rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center;

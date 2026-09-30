@@ -23,6 +23,7 @@ const BRISCOLA_THEME = resolve(WEB, 'games', 'briscola', 'theme.css');
 const GIN_THEME = resolve(WEB, 'games', 'gin-rummy', 'theme.css');
 const FIDICE_THEME = resolve(WEB, 'games', 'fidice', 'theme.css');
 const BACKGAMMON_THEME = resolve(WEB, 'games', 'backgammon', 'theme.css');
+const RPS_THEME = resolve(WEB, 'games', 'rps', 'theme.css');
 const SHELL_CSS = resolve(WEB, 'shared', 'styles', 'shell.css');
 
 /** The palette: gin's names, in tokens.css order; every theme resolves them. */
@@ -103,11 +104,15 @@ test('tokens.css is a single :root of custom properties and nothing else', () =>
 test('gin theme.css redeclares no shared name: tokens.css is the single source of its palette', () => {
   const gin = rootNames(GIN_THEME);
   expect(gin.filter((name) => SHARED.includes(name))).toEqual([]);
+  // The four card sizes, and the column's gutter the shell's unframed rule reads (shell.css
+  // `:where(body:not([data-frame])) #app`; 12px a side, 16 at the foot).
   expect(gin, 'the gin-only layout tokens stay').toEqual([
     '--card-w',
     '--mini-w',
     '--pile-w',
     '--tiny-w',
+    '--gutter',
+    '--gutter-bottom',
   ]);
 });
 
@@ -144,5 +149,28 @@ test('shell.css reads every shell token and declares no custom property of its o
       (block.match(/--[\w-]+\s*:/g) ?? []).filter((d) => !isFrame(d)),
       'a :root with more than the frame',
     ).toEqual([]);
+  });
+});
+
+/**
+ * The safe-area insets reach a page through one seam (shell.css "the screen frame"; rps declares the
+ * same four on its own :root, its page linking tokens.css and base.css alone): `env()` is read only
+ * as the value of a `--frame-inset-<side>` declaration, and every rule pads by `var(--frame-inset-*)`,
+ * so a measurement that writes the four inline (tools/shell-emulate.ts `seamScript`) moves every
+ * gutter, toast and watermark as a phone's notch would. Backgammon's theme keeps its own documented
+ * `--inset-*` seam for the board's geometry and is not held here.
+ */
+test('the shell and the unframed themes read the safe-area insets through the shell`s seam alone', () => {
+  const seam =
+    /^\s*--frame-inset-(?:top|right|bottom|left):\s*env\(safe-area-inset-(?:top|right|bottom|left),\s*0px\);\s*$/;
+  [SHELL_CSS, GIN_THEME, BRISCOLA_THEME, FIDICE_THEME, RPS_THEME].forEach((path) => {
+    const stray = stripComments(readFileSync(path, 'utf8'))
+      .split('\n')
+      .filter((line) => line.includes('env(safe-area-inset-') && !seam.test(line));
+    expect(stray, path).toEqual([]);
+  });
+  const shell = stripComments(readFileSync(SHELL_CSS, 'utf8'));
+  ['top', 'right', 'bottom', 'left'].forEach((side) => {
+    expect(shell, `--frame-inset-${side}`).toContain(`var(--frame-inset-${side})`);
   });
 });

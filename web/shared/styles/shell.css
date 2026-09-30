@@ -279,6 +279,33 @@ body[data-frame]::before {
     max(var(--frame-clear), var(--frame-inset-bottom))
     max(var(--frame-clear), var(--frame-inset-left));
 }
+/* The unframed page's clearance (docs/design/shared-shell.md §6.7; the space audit's `gutter` rule,
+   docs/design/space-audit.md §5): the theme's gutter, or the safe-area inset where that is more,
+   so nothing sits under the notch or the home indicator in a tab, installed or fullscreen. The
+   gutter is the theme's `--gutter` on `:root` (gin's and briscola's 12px; a side of its own as
+   `--gutter-<side>`, gin's 16px foot), 0 where a theme names none (fidice, whose header and main
+   pad themselves; the sandbox with its frame off), so without an inset nothing moves and the
+   goldens stand. Read with fallbacks and declared nowhere: this file declares no property but the
+   frame's (test/tokens.test.ts), and the audit reads the same `--gutter` off `#app`, where it
+   inherits (tools/space-audit/judge.ts `gutterToken`). The insets are the four `--frame-inset-*` above:
+   `env()` on a phone, the seam's inline values in a measurement, live on every page that links
+   this file with nothing for the boot to write (it writes the corners alone, under `data-frame`).
+   Top and bottom are #app's, where the column always spans the screen. The sides are the body's,
+   below: the column is 480px centred in a sideways phone's 812-956px, and a side inset (47-62px
+   at the notch, both sides on iOS) padded into the column would take 70-100px of it for a notch it
+   never reaches; on the body the column centres in the room the notch leaves and keeps its
+   gutter, and a full-bleed page (fidice) clears the notch with it. `:where()` keeps #app's own
+   specificity, as the framed rule does, so a theme's later `#app { padding }` still wins. */
+:where(body:not([data-frame])) #app {
+  padding: max(var(--gutter-top, var(--gutter, 0px)), var(--frame-inset-top))
+    var(--gutter-right, var(--gutter, 0px))
+    max(var(--gutter-bottom, var(--gutter, 0px)), var(--frame-inset-bottom))
+    var(--gutter-left, var(--gutter, 0px));
+}
+body:not([data-frame]) {
+  padding-right: var(--frame-inset-right);
+  padding-left: var(--frame-inset-left);
+}
 
 /* ---------- overlays and sheets ---------- */
 /* Each theme paints the overlay's scrim and the sheet's edge (gin a gold border, backgammon a shadow) and radius. */
@@ -500,7 +527,7 @@ details.history-row > .history-detail dd {
 #toast {
   position: fixed;
   left: 50%;
-  bottom: calc(24px + env(safe-area-inset-bottom));
+  bottom: calc(24px + var(--frame-inset-bottom));
   transform: translateX(-50%) translateY(20px);
   font-weight: 700;
   padding: 12px 16px;
@@ -643,6 +670,16 @@ details.history-row > .history-detail dd {
 .mode-btn.active {
   background: var(--fill);
   color: var(--ink-on-fill);
+}
+/* A finger's target (Apple HIG, Material; the audit's `targets` rule, tools/space-audit/judge.ts
+   `TARGET_MIN`): `.icon-btn` and `.btn-sm` stand at 44px always; the tab bar's and the mode
+   switch's buttons, 37-42px by their type alone, reach it on a touch screen. A fine pointer keeps
+   the type's height, so the goldens (a fine pointer) record what they did. */
+@media (any-pointer: coarse) {
+  .tab-btn,
+  .mode-btn {
+    min-height: 44px;
+  }
 }
 
 ::-webkit-scrollbar {

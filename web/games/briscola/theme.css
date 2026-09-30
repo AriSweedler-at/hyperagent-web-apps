@@ -17,6 +17,10 @@
    the layout is designed for [0.50, 0.62]. web/games/briscola/src/ui/layout.ts is the pure twin of
    the clamps, the seat cells and the briscola's rotated box. Prettier formats this file. */
 :root {
+  /* The column's gutter: shell.css's unframed rule pads #app by it, or by the safe-area inset where
+     that is more, through the shell's `--frame-inset-*` (the emulator's seam), so no `env()` here;
+     16px from 900px, below. On :root as the frame's tokens are. */
+  --gutter: 12px;
   /* The thirteen shared names, on this game's palette (design §5.3; --go and --go-text: the call
      to action, docs/ARCHITECTURE.md "Calls to action"). */
   --bg: #ede3d1;
@@ -93,7 +97,6 @@ body {
 #app {
   position: relative;
   z-index: 1;
-  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
 }
 /* The trim (backgammon's rule in this palette): a quiet deep-water band along the viewport's edge
    with a sand hairline on its inner side, fixed and inert, at z-index 0 under #app and every
@@ -111,8 +114,8 @@ body::before {
   body::before {
     border-width: 10px;
   }
-  #app {
-    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  :root {
+    --gutter: 16px;
   }
 }
 /* The one motif (design §3; the owner: "turtles ... Subtle motifs"): a honu, a line-drawn green sea
@@ -124,7 +127,7 @@ body::after {
   content: '';
   position: fixed;
   right: 20px;
-  bottom: calc(20px + env(safe-area-inset-bottom));
+  bottom: calc(20px + var(--frame-inset-bottom));
   width: 112px;
   height: 112px;
   z-index: 0;
@@ -752,7 +755,7 @@ details.history-row > .history-detail dt {
    other screen, and the desktop table, keep the foot. */
 @media (max-width: 899px) {
   body.fixed-screen #toast {
-    top: calc(12px + env(safe-area-inset-top));
+    top: calc(12px + var(--frame-inset-top));
     bottom: auto;
     transform: translateX(-50%) translateY(-20px);
   }
