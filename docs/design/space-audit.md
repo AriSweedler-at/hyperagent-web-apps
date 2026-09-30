@@ -280,6 +280,26 @@ framed page, the one that plays sideways):
 - `used`, `scroll`, `frame` and `gutter` pass on every case: example (a) fills the room within 2%
   on every phone, both ways.
 
+**Closed by shell-unframed-insets** (the shell's inset rule; docs/design/shared-shell.md §6.7):
+
+- The unframed shell's inset padding: `:where(body:not([data-frame])) #app` pads the top and the foot
+  by the theme's `--gutter` (gin and briscola 12px, gin's foot 16, briscola 16 from 900px; fidice 0)
+  or the safe-area inset where that is more, and `body:not([data-frame])` carries the side insets,
+  so the `h1` and the topbar clear the notch installed and fullscreen on every shell page and the
+  sideways column keeps its width (a side inset padded into a 480px column centred in 812-956px
+  would take 70-100px of it for a notch it never reaches). Fidice's home and legacy table clear
+  the insets with it; its column stays the restyle's.
+- The `env()` findings: gin's and briscola's foot rows, briscola's raised toast and watermark, gin's
+  voice button and rps's four sides now read the shell's `--frame-inset-*` (rps declares the four on
+  its own `:root`), so the seam feeds them and the audit judges them as Real; the shell's own toast
+  reads the same. `test/tokens.test.ts` holds that no other `env(safe-area-inset-*)` read exists
+  in the shell or the four unframed themes.
+- `.tab-btn` and `.mode-btn` reach 44px under `(any-pointer: coarse)`; the goldens (a fine pointer)
+  record the type's height as before.
+- Still open from the shell-wide list: the sideways 480px column (`used` and `scroll` sideways on
+  every upright game), the owner's decision between the shell's portrait gate and a landscape
+  layout; and rps's sideways header within 4px of the top (its gutter is 0 by design).
+
 **The audit itself.** The second pass (this document's §2-§3 as they stand) taught it the pages'
 scroll tiers, the way a page plays and the turn gate, the Android lock in the gate's place, and a
 `--baseline` diff. Left: desktop cases (the owner, 2026-09-30: "There's also desktop": fine-pointer

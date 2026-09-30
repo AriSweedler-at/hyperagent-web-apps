@@ -744,8 +744,23 @@ A game that wants a band along the screen's edge (backgammon's trim) says `frame
 (`web/shared/edge/screen.ts` `applyFrame`, gated on the attribute) writes the four corner radii
 from the device catalogue and the edge-reach rule, live as the browser's bar shows and hides. The
 theme dresses it with `--frame-band`, `--frame-color` and `--frame-hairline` on `:root` (and
-`--frame-gap` for the air) and draws nothing of its own. A page without the flag is untouched byte
-for byte. The rule, the research and the validation: docs/design/screen-frame.md.
+`--frame-gap` for the air) and draws nothing of its own. A page without the flag gets no band and no
+corners. The rule, the research and the validation: docs/design/screen-frame.md.
+
+A page without the flag still clears the notch and the home indicator (the space audit's first run,
+docs/design/space-audit.md §5: the `h1` and the topbar sat under the notch installed and fullscreen).
+shell.css pads the unframed `#app` at the top and the foot by the theme's gutter or the safe-area
+inset where that is more (`max(var(--gutter-<side>, var(--gutter, 0px)), var(--frame-inset-<side>))`),
+and the body by the side insets, so the 480px column centres in the room a sideways notch leaves
+instead of padding for a notch 166px away, and a full-bleed page (fidice) clears it too. A theme
+names its gutter as `--gutter` on `:root` (gin and briscola 12px; briscola 16 from 900px) and a side
+of its own as `--gutter-<side>` (gin's 16px foot); a theme that names none (fidice) has 0, so without
+an inset nothing moves. The four `--frame-inset-*` on shell.css's `:root` are the only `env()` read
+(rps, which links tokens.css and base.css alone, declares the same four), and every other read,
+the toast's foot, briscola's watermark and raised toast, gin's voice button, goes through them, so
+the emulator's seam (tools/shell-emulate.ts `seamScript`, which writes the four inline) moves
+everything a phone's insets would and the audit can prove it; test/tokens.test.ts holds the rule.
+On a touch screen (`any-pointer: coarse`) the tab bar's and the mode switch's buttons reach 44px.
 
 ## 7. Risks
 
