@@ -92,7 +92,8 @@ const rowWidth = PHONE_UPRIGHT.width - 2 * PHONE_UPRIGHT.gutter;
  * upright, what the badge beside it on its row and the 8px gap leave, less its 12px of padding.
  * The name slots: sideways a name column less the disc, the connection dot (the opponent's,
  * online), the pips and the gaps between them; upright the opponent's strip is the topbar row less
- * the buttons and the gaps, my strip the controls row less Undo, the roll slot and the gaps. The
+ * the badge's column (the badge at its widest stands under the menu row) and the sound button's,
+ * my strip the controls row less Undo, the roll slot and the gaps. The
  * rows scheme (the SE's 667, a 640x360 Android) keeps its 132px columns and 109px of status: the
  * design's documented limit (§2.4), where a line or an online opponent's name past it ellipsizes.
  */
@@ -123,15 +124,17 @@ export const SLOTS = {
   },
   uprightOppName: {
     id: '#oppName',
+    // The first column is the badge's (140px at its widest; the menu and handoff buttons under it
+    // are 94), the third the sound button's.
     widthPx:
       rowWidth -
-      (2 * UPRIGHT.iconBtn + UPRIGHT.tightGap) -
+      BADGE_MAX_WIDTH -
       UPRIGHT.iconBtn -
       2 * UPRIGHT.gap -
       (UPRIGHT.seatDot + UPRIGHT.connDot + UPRIGHT.pips + 3 * UPRIGHT.stripGap),
     pxPerChar: PX_PER_CHAR.name,
     where:
-      'the 375px phone upright, the topbar row with the menu, handoff and sound buttons and the connection dot',
+      "the 375px phone upright, the topbar row beside the badge's column and the sound button, with the connection dot",
   },
   uprightMyName: {
     id: '#myName',

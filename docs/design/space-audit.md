@@ -319,7 +319,7 @@ The backgammon `clip` items above (the 20 screens of the second run), 2026-09-30
   the sound button 302 of the row's 351px, so "Ari" showed as "A". The badge now stands on the
   status line's row (theme.css, the upright grid block: `#tableScreen` a three-column grid, the
   topbar a subgrid over the first two rows so the geometry oracle's box stands; design §3.2), which
-  gives the opponent's strip 197px at 375, and the roll slot's minimum drops from 168 to 120px so
+  gives the opponent's strip 151px at 375 (82 for the name online), and the roll slot's minimum drops from 168 to 120px so
   my strip has 149. The rows keep their heights: `--chrome-in` and the emulator's upright numbers
   do not move.
 - `#statusLine` by 7px sideways on the mini: the budget table's floor was the 780px viewport with

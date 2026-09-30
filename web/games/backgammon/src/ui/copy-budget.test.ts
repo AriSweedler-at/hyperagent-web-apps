@@ -213,11 +213,11 @@ describe('the budget table', () => {
     expect(budget(SLOTS.portraitStatus)).toBe(26);
   });
 
-  test('the name slots: 81px sideways for the opponent with the connection dot (9 characters), 96 for me; 128 and 97 upright at 375; the cap is the narrowest, 9', () => {
+  test('the name slots: 81px sideways for the opponent with the connection dot (9 characters), 96 for me; 82 and 97 upright at 375; the cap is the narrowest, 9', () => {
     expect(NAME_SLOTS.map((s) => [s.id, s.widthPx, budget(s)])).toEqual([
       ['#oppName', 81, 9],
       ['#myName', 96, 10],
-      ['#oppName', 128, 14],
+      ['#oppName', 82, 9],
       ['#myName', 97, 10],
     ]);
     expect(NAME_CAP).toBe(9);

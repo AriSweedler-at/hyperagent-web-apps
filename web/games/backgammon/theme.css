@@ -2108,8 +2108,8 @@ label {
    second, where the status line takes the rest, right-aligned as it is sideways. The rows keep
    their heights (44, 22, the board, 56; the tight tier's 44) so `--chrome-in` and its twin
    (ui/board/layout.ts `uprightChromeIn`) do not move: the badge wears the strip's 2px paddings
-   and an 18px line, 22px like the status line. The opponent's strip then has 197px at 375 (128
-   for the name online, 145 pass-and-play), and the roll slot's minimum drops from 168 to 120px
+   and an 18px line, 22px like the status line. The opponent's strip then has 151px at 375 beside the
+   badge's column (82 for the name online, 97 pass-and-play; it had none), and the roll slot's minimum drops from 168 to 120px
    (a double's four mini dice are 100, the Result chip 66) so my strip has 149 (97 for the name,
    with Undo's 62). copy-budget.ts spells the same arithmetic as the name slots' rows. */
 @media (max-width: 899px) and (min-height: 501px) {
@@ -2118,6 +2118,8 @@ label {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-rows: auto auto auto auto;
     align-content: start;
+    /* The tight tier's `gap: 4px` (the geometry section) is the rows'; the columns keep the row's 8. */
+    column-gap: 8px;
   }
   .topbar {
     display: grid;
@@ -2126,6 +2128,13 @@ label {
     grid-template-rows: subgrid;
     justify-content: normal;
     height: auto;
+    /* A subgrid lays its items out in the parent's gutters, but Chromium counts the subgrid's own
+       gap in its intrinsic height: with the topbar's 8px while the tight tier's rows stood 4 apart
+       it measured 44 + 8 + 22 and the 4px spilt into the two rows put Undo 2px into the home
+       indicator's band on every notched phone installed (the audit, 2026-09-30); with 0 it
+       measured 66 and the rows came out 42 and 22. Inherited, the gap is the parent's in both
+       tiers and the rows are their items' (44, 22). */
+    gap: inherit;
   }
   .topbar > .row.tight:first-child {
     grid-area: 1 / 1;

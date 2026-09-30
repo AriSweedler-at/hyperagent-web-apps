@@ -152,8 +152,9 @@ at `PX_PER_CHAR.name` 9.0 (bold 0.95rem Cardo over 20-character names with a cap
 a name of wide letters alone, `Mohammed…` at 11.4, can still meet the slot's own ellipsis): `stripOppName`,
 the rail's 142px column less the 10px disc, the 9px connection dot (online), the pips (3ch, 24) and
 three 6px gaps, 81px, 9 characters; `stripMyName`, 96px, 10; `uprightOppName`, the 375 topbar row (351)
-less the menu and handoff buttons (44 + 6 + 44), the sound button (44) and two 8px gaps, then the strip's
-12px disc, connection dot, pips and three 8px gaps, 128px, 14; `uprightMyName`, the controls row less
+less the badge's column (140 at its widest; the menu and handoff buttons under it are 94), the sound
+button (44) and two 8px gaps, then the strip's 12px disc, connection dot, pips and three 8px gaps, 82px,
+9; `uprightMyName`, the controls row less
 Undo (62), the roll slot (120) and two 10px gaps, then the disc, the pips and two 8px gaps, 97px, 10.
 Upright the room comes from the strip grid (§3.2): the badge stands on the status line's row, not the
 topbar's, and the roll slot's minimum is 120px, not 168. `copy-budget.test.ts` pins the rows, the cap,
@@ -366,7 +367,7 @@ geometry oracle while its children take the cells: the menu row, the opponent's 
 sound button on the first row, `#gameBadge` at the start of the second (2px paddings, an 18px
 line: 22px like the status line) and `.status-line` right-aligned over the rest. The heights are
 the flex column's (44, 22, the board, 56; the tight tier's 44), so `--chrome-in` holds; the
-opponent's name has 197px of strip at 375 instead of none (§2.4 "The name slots"). `.desk-only` hides below 900px (rules and
+opponent's name has 151px of strip at 375 instead of none (§2.4 "The name slots"). `.desk-only` hides below 900px (rules and
 history live in `#menuOverlay` on the phone). `#controls.choosing` hides the me-strip, Undo,
 Double and the roll slot and shows `#moveChips` and `#chipCancelBtn`: the tray takes the row
 without changing its height.
