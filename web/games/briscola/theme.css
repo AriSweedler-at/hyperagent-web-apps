@@ -1600,6 +1600,10 @@ details.history-row > .history-detail dt {
     --card-w: clamp(80px, calc((100dvh - 542px) * var(--aspect)), 132px);
     --tiny-w: 30px;
     grid-template-columns: minmax(0, 1fr) 200px;
+    /* Five rows here (the phone's template names six): the hand is the last and takes the slack, as
+       it does upright; the space audit's desktop windows (2026-09-30) found the phone's sixth 1fr
+       row empty under the hand, 8-32% of the window. */
+    grid-template-rows: auto auto auto auto 1fr;
     grid-template-areas:
       'top top'
       'seats seats'
@@ -2062,7 +2066,12 @@ details.history-row > .history-detail dt {
 /* ---------- short viewports ---------- */
 /* With --card-w floored at 72px the phone column is 639px (layout.ts columnHeight at the floor);
    below that the document scrolls instead of clipping the actions row (touch-action: none stays
-   scoped to the hand's cards, so the page can still be scrolled from the table). */
+   scoped to the hand's cards, so the page can still be scrolled from the table). Upright
+   (`phone-upright`: the X class in a tab with the bar shown is 632 tall, the SE 553) the chrome
+   tightens first: the seats row 66px on 18px backs, 6px gaps, the score strip 40, the hand's slack
+   gone, the actions row 4px under the hand; 364px in all, so the card width is the height budget
+   over a hand card and a mid card (1.62 card heights): 86px at 632, 60 at 553, floored at 58 (the
+   column then fits from 546px; the lift stays for anything shorter). */
 @media (max-height: 638px) and (max-width: 899px) {
   body.fixed-screen,
   body.fixed-screen #app {
@@ -2075,6 +2084,25 @@ details.history-row > .history-detail dt {
   }
   #tableScreen {
     overflow: visible;
+  }
+  body[data-layout='phone-upright'] #tableScreen {
+    --card-w: clamp(58px, calc((100dvh - 364px) * var(--aspect) / 1.62), 124px);
+    --tiny-w: 18px;
+    gap: 6px;
+  }
+  body[data-layout='phone-upright'] .seats {
+    height: 66px;
+  }
+  body[data-layout='phone-upright'] .score-strip {
+    height: 40px;
+  }
+  body[data-layout='phone-upright'] .hand {
+    padding-top: 0;
+    min-height: calc(var(--card-w) / var(--aspect));
+  }
+  body[data-layout='phone-upright'] .actions {
+    margin-top: 4px;
+    height: 48px;
   }
 }
 /* The desktop floors at 80px cards (628px); shorter windows scroll too. */
@@ -2091,4 +2119,231 @@ details.history-row > .history-detail dt {
   #tableScreen {
     overflow: visible;
   }
+}
+
+/* ---------- the buckets (docs/design/layout-buckets.md; docs/design/space-audit.md §5 "Closed by space-audit-briscola") ----------
+   The boot writes the bucket on `<body data-layout>`; the rules below lay the table out for the
+   ones the 480px column served badly: a phone sideways (the space audit's third run: the column
+   centred in an 812-956px viewport, 14-20% of the screen empty a side, the document 612-621px tall
+   in a 304-440px viewport and scrolling), and a wide desktop window (the 1000px column at 1440 and
+   1920 wide leaves 15-24% a side and 18-32% below). Upright, the phone keeps the column above. */
+
+/* A phone sideways (`phone-sideways` and its short tier, `phone-sideways-short`; the attribute's
+   prefix catches both). The table is a corners-and-bands grid over the same six children: the
+   topbar's three rows become grid items (`display: contents`), so the menu sits in the top-left
+   corner, the opponents' seats run along the top as one 44px row (each seat one line: name,
+   dot, backs, chips), the trump badge and the sound button take the top-right; a sidebar down the
+   left holds the status line and the score cells; the felt band with the stock and the trick fills
+   the middle; the hand runs across the bottom with my name and chips at its left and the round's
+   actions (Play, the deck) at its right. The page never scrolls: the card width is the height
+   budget (rows 44, the band's 30px of labels and caption chips, the hand's 16px of padding, two
+   8px gaps, #app's 12px top gutter and its foot, the 12px gutter or the home indicator's inset)
+   over a hand card and a mid card at half its width (1.5 card heights); 64px on the X in a tab
+   (325 tall), 87px on the 12 class standalone (390), 104px on the Pro Max (440); floored at 56px
+   so nothing clips, capped at 110px. The stock's labels stand beside the stock rather than under
+   it, so the band is a mid card and its chips tall. Every control keeps the shell's 44px. */
+body[data-layout^='phone-sideways'] {
+  /* The home: backgammon's landscape column (shell.css), the online cards three abreast below. */
+  --column-wide: 820px;
+}
+body[data-layout^='phone-sideways'] #onlineModeContent {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.1fr) minmax(0, 1.1fr);
+  column-gap: 12px;
+  align-items: start;
+  margin-bottom: 12px;
+}
+body[data-layout^='phone-sideways'] #onlineModeContent > .card-box {
+  margin-bottom: 0;
+}
+body[data-layout^='phone-sideways'] #onlineModeContent .row {
+  flex-wrap: wrap;
+}
+body[data-layout^='phone-sideways'] #onlineModeContent .row > * {
+  flex-basis: 100%;
+}
+/* The table takes the whole width and the fixed screen back from the short-viewport lift below. */
+body[data-layout^='phone-sideways'].fixed-screen,
+body[data-layout^='phone-sideways'].fixed-screen #app {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+body[data-layout^='phone-sideways'].fixed-screen #app {
+  max-width: none;
+  min-height: 0;
+}
+body[data-layout^='phone-sideways'] #tableScreen {
+  --card-w: clamp(
+    56px,
+    calc((100dvh - 118px - max(12px, var(--frame-inset-bottom, 0px))) * var(--aspect) / 1.5),
+    110px
+  );
+  --mid-w: calc(var(--card-w) * 0.5);
+  --tiny-w: 20px;
+  grid-template-columns: minmax(150px, 22%) minmax(0, 1fr) auto auto;
+  grid-template-rows: 44px auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'menu seats badges sound'
+    'status center center center'
+    'score center center center'
+    'score hand hand hand';
+  gap: 8px;
+  overflow: hidden;
+}
+body[data-layout^='phone-sideways'] #tableScreen > .topbar {
+  display: contents;
+}
+body[data-layout^='phone-sideways'] .topbar > .row:first-child {
+  grid-area: menu;
+}
+body[data-layout^='phone-sideways'] .topbar > .badges {
+  grid-area: badges;
+  justify-content: flex-end;
+}
+body[data-layout^='phone-sideways'] .topbar > .row:last-child {
+  grid-area: sound;
+}
+body[data-layout^='phone-sideways'] .seats {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  height: 44px;
+  min-width: 0;
+}
+body[data-layout^='phone-sideways'] .seat {
+  grid-template-columns: auto auto auto auto;
+  grid-template-areas: 'name dot cards taken';
+  row-gap: 0;
+  padding: 0 4px;
+}
+body[data-layout^='phone-sideways'] .seat-name {
+  max-width: 9ch;
+}
+body[data-layout^='phone-sideways'] .seat-taken {
+  align-self: center;
+}
+body[data-layout^='phone-sideways'] .status-line {
+  text-align: left;
+  font-size: 0.85rem;
+  padding: 0 4px;
+  height: auto;
+  line-height: 1.25;
+  white-space: normal;
+  overflow: visible;
+}
+body[data-layout^='phone-sideways'] .score-strip {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+body[data-layout^='phone-sideways'] .score-cell {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 4px 10px;
+  flex-wrap: wrap;
+}
+body[data-layout^='phone-sideways'] .table-center {
+  height: auto;
+  min-height: 0;
+  align-items: center;
+  padding: 8px 12px;
+}
+body[data-layout^='phone-sideways'] .stock-area {
+  display: grid;
+  grid-template-columns: calc(var(--mid-w) * 1.05 + var(--mid-w) / var(--aspect) / 2) auto;
+  grid-template-rows: 1fr 1fr;
+  grid-template-areas:
+    'stock label'
+    'stock name';
+  column-gap: 10px;
+  row-gap: 0;
+  align-items: start;
+  width: auto;
+}
+body[data-layout^='phone-sideways'] .stock {
+  grid-area: stock;
+}
+body[data-layout^='phone-sideways'] .stock-area > #stockCount {
+  grid-area: label;
+  align-self: end;
+}
+body[data-layout^='phone-sideways'] .stock-area > #briscolaName {
+  grid-area: name;
+  align-self: start;
+}
+body[data-layout^='phone-sideways'] .trick {
+  height: calc(var(--mid-w) / var(--aspect) + 26px);
+}
+body[data-layout^='phone-sideways'] .hand-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: 'header hand actions';
+  align-items: center;
+  column-gap: 12px;
+  padding: 8px 12px;
+  min-height: 0;
+}
+body[data-layout^='phone-sideways'] .hand-header {
+  grid-area: header;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  height: auto;
+  padding: 0;
+  min-width: 0;
+}
+body[data-layout^='phone-sideways'] .hand-header .my-taken {
+  margin-left: 0;
+}
+body[data-layout^='phone-sideways'] .my-tricks {
+  --strip-w: 120px;
+  align-self: flex-start;
+}
+body[data-layout^='phone-sideways'] .hand {
+  grid-area: hand;
+  flex: none;
+  padding: 0;
+  min-height: calc(var(--card-w) / var(--aspect));
+}
+body[data-layout^='phone-sideways'] .actions {
+  grid-area: actions;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  row-gap: 8px;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+body[data-layout^='phone-sideways'] .actions .btn-primary.grow {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* A desktop window: the column widens with the window, so a table leaves at most a tenth a side
+   (the audit's desktop limit): 1100px below 1440 wide (90px a side at 1280), 82% of the window from
+   1440 (130px a side at 1440, 173 at 1920). On the wide bucket the cards grow with the height too:
+   the budget is the 392px of chrome (the desktop's 378 with the 16px gutters, and 6px of rounding)
+   over a hand card and a mid card (1.62 card heights), capped at 200px (a 326px card with the
+   deck's pack), so a 1440x900 window's cards fill its height and the hand's felt takes what a
+   taller window leaves; the Play row stops growing at 720px so a button never runs the width of a
+   monitor. */
+body[data-layout='desktop'].fixed-screen #app {
+  max-width: 1100px;
+}
+body[data-layout='desktop-wide'].fixed-screen #app {
+  max-width: min(1600px, 82vw);
+}
+body[data-layout='desktop-wide'] #tableScreen {
+  --card-w: clamp(80px, calc((100dvh - 392px) * var(--aspect) / 1.62), 200px);
+}
+body[data-layout='desktop-wide'] .actions {
+  width: min(100%, 720px);
+  margin-left: auto;
+  margin-right: auto;
 }

@@ -398,3 +398,54 @@ old boot writes none, so the old page keeps its full-bleed header and its golden
 - After: 117 of 117 cases, 234 of 234 screens (`tier` 116 table screens; `used`, `clip`, `targets`,
   `frame`, `gutter` ok on every screen). The desktop windows: the home a 480px column centred
   (37.5% a side at 1920, within the 40%), the table 1200-1560px with 8-9% a side.
+
+### Closed by space-audit-briscola
+
+The briscola items above and the third run's 39 `used` failures (78 of 117 cases, 195 of 234
+screens, over dist/ built from c9dee516 with the desktop windows in), 2026-09-30, all in
+web/games/briscola/theme.css on the bucket layer (docs/design/layout-buckets.md):
+
+- Table `used` 36 sideways (the shell's 480px column centred in 667-896px: 14.0% empty a side on
+  the SE, 15.8-17.4% on the X, the mini, the 12 class and the 16 Pro, 19.2-19.6% on the XR class
+  and the Galaxy; `scroll` tier on all 56: a 612-621px document in 304-440px): under
+  `body[data-layout^='phone-sideways']` the table is a corners-and-bands grid over the same six
+  children. The topbar's three rows become grid items (`display: contents`), so the menu sits
+  top-left, the opponents' seats run along the top as one 44px row (a seat one line: name, dot,
+  20px backs, chips), the trump badge and the sound button top-right; a sidebar down the left
+  (`minmax(150px, 22%)`) holds the status line (wrapping, so it never clips) and the score cells;
+  the felt band with the stock, its labels beside it, and the trick fills the middle; the hand runs
+  across the bottom, my name and chips at its left, Play and the deck at its right (wrapping when
+  the corner is narrow). `--card-w` is the height budget (44 + the band's 30 + the hand's 16 + two
+  8px gaps + the 12px top gutter + the foot's 12px or inset) over a hand card and a half-width mid
+  card: 64px on the X in a tab, 81 standalone, 87 on the 12 class, 104 on the Pro Max; floored at
+  56, capped at 110. The fixed screen is taken back from the short-viewport lift, so nothing
+  scrolls; `--column-wide: none` for the table through the theme's own `#app` rule. Every
+  control keeps 44px. The home takes backgammon's 820px landscape column with the three online
+  cards abreast (the shell's landscape home rules are keyed on `data-plays`, so the theme spells
+  the card grid). Real, closed: the 56 sideways tables pass `used`, `scroll`, `clip`, `targets` and
+  `gutter`.
+- Table `used` 3 desktop (1280x800: 10.9% a side; 1440x900: 15.3% a side, 18.2% below; 1920x1080:
+  24% a side, 31.9% below): `body[data-layout='desktop'].fixed-screen #app` is 1100px wide (90px a
+  side at 1280, 7%) and `desktop-wide` 82% of the window (130px a side at 1440, 173 at 1920, 9%);
+  on the wide bucket the cards grow with the height (the budget over 392px of chrome and 1.62 card
+  heights, capped at 200px) and the Play row stops at 720px. The empty foot was a bug the audit
+  found, not the card cap: the desktop grid named five areas over the phone template's six rows, so
+  the sixth `1fr` row stood empty under the hand; it now names five, and the hand's felt takes the
+  slack as it does upright. Real, closed.
+- Table `scroll` tier 1 upright (the SE in a tab with the bar shown, 375x553: a 612px document):
+  under the theme's `(max-height: 638px)` block, `body[data-layout='phone-upright']` tightens the
+  chrome (seats 66px on 18px backs, 6px gaps, score 40, the hand's 14px slack gone, the actions 4px
+  under the hand: 364px in all) and the card width is the budget over 1.62 card heights, floored at
+  58: 60px cards at 553, 86 at 632 (the X class in a tab, which scrolled 2px). The lift stays for
+  anything under 546px; no catalogued phone is. Tier → ok on the 5 rows.
+- The first pass of the sideways layout (the fourth run's first sheet) found two things the
+  arithmetic did not: `#statusLine` clipped by 2-6px in the 150px sidebar on the 375-wide phones
+  (12 screens), fixed by letting the line wrap; and Play overlapping the third hand card on the X,
+  where Play's 96px minimum and the deck button outgrew the corner, fixed by dropping the minimum
+  and letting the row wrap. A 1440x900 `gutter` failure (the column 8px over the foot) was the
+  desktop budget's 378 counted with 12px gutters; it is 392 now.
+- Goldens unchanged (`--check --game briscola`, 0 differences): the tool's fine-pointer context puts
+  both viewports in `desktop`, where the only bucket rule is the column's `max-width`, not a pinned
+  property.
+
+The fourth run, `--baseline` the third's report: 117 of 117 cases pass, 234 of 234 screens, no failures (78 of 117 and 195 of 234 before); 60 screens moved: the 36 sideways `used` FAIL→ok and the 56 sideways `scroll` tier→ok, the SE's upright `scroll` tier→ok, the 3 desktop tables' `used` FAIL→ok. The sheet: shots/space-audit/briscola/index.html (copied to the burst's live/space-audit-4/briscola/)..
