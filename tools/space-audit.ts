@@ -13,8 +13,12 @@
 // shots/space-audit/<page>/ (gitignored): a PNG per screen, index.html (tools/space-audit/sheet.ts)
 // and report.json; a `check` table per page on stdout (tools/space-audit/rows.ts `checkTable`: one
 // row per case x screen, the six columns, ok/FAIL/tier/gate) and a combined report.json with the
-// totals; exit 1 on any failure.
-//   npm run audit:space [-- --game <page>] [--device <id>] [--orientation ..] [--mode ..] [--bar ..]
+// totals; exit 1 on any failure. A second case type joins every default run: the desktop windows
+// (`DESKTOP_WINDOWS`: a fine pointer, no touch, no seam, a browser tab at five sizes), judged by
+// `DESKTOP_LIMITS` and a 32px target, grouped last on the sheet; `--device desktop` runs them alone,
+// and any of `--device <phone>`, `--orientation`, `--mode`, `--bar` leaves them out. Every case's
+// screens report the layout bucket the page put itself in (`data-layout`, docs/design/layout-buckets.md).
+//   npm run audit:space [-- --game <page>] [--device <id>|desktop] [--orientation ..] [--mode ..] [--bar ..]
 //                       [--url <site> | --serve] [--out <dir>] [--port <n>] [--jobs <n>]
 //                       [--baseline <page report.json>]
 // `--serve` (the default without `--url`) serves dist/ (run `npm run build` first) on `--port`
@@ -35,7 +39,6 @@ import {
   ORIENTATIONS,
   deviceById,
   emulationFor,
-  emulationName,
   emulationsOf,
   type Bar,
   type DisplayMode,
@@ -50,8 +53,14 @@ import { startServer } from './serve-dist.ts';
 import {
   COLUMNS,
   PAGE_IDS,
+  caseName,
+  insetsOf,
+  isDesktop,
   judge,
+  orientationOf,
+  type AuditCase,
   type AuditVerdict,
+  type DesktopWindow,
   type Measured,
   type PageId,
   type Screen,
@@ -117,9 +126,9 @@ export const parseAuditArgs = (argv: ReadonlyArray<string>): AuditArgs => {
     },
   });
   const device = values.device ?? null;
-  if (device !== null && deviceById(device) === null)
+  if (device !== null && device !== DESKTOP && deviceById(device) === null)
     throw new Error(
-      `--device ${device} is not in the catalogue; shell-emulate \`list\` prints the ids`,
+      `--device ${device} is not in the catalogue (or \`${DESKTOP}\`); shell-emulate \`list\` prints the ids`,
     );
   return {
     game: oneOf('game', values.game, PAGE_IDS),
@@ -139,19 +148,50 @@ export const parseAuditArgs = (argv: ReadonlyArray<string>): AuditArgs => {
 export const PHONES: ReadonlyArray<(typeof DEVICES)[number]> = DEVICES.filter(
   (d) => d.kind !== 'ipad' && d.supported,
 );
+/** `--device desktop`: the desktop windows alone. */
+export const DESKTOP = 'desktop';
+const window_ = (width: number, height: number): DesktopWindow => ({
+  kind: 'desktop',
+  viewport: { width, height },
+});
+/**
+ * The desktop windows (docs/design/space-audit.md §5; web/shared/lib/layout.ts `desktop` and
+ * `desktop-wide`): a narrow half-screen window (900x700), the smallest standard window (1024x768),
+ * the goldens' laptop (1280x800, e2e/fixtures/geometry.ts `DESKTOP`), a 13-inch MacBook Air's
+ * default (1440x900) and a 1080p monitor (1920x1080). Each a fine pointer with no touch and no
+ * insets, in a browser tab.
+ */
+export const DESKTOP_WINDOWS: ReadonlyArray<DesktopWindow> = [
+  window_(900, 700),
+  window_(1024, 768),
+  window_(1280, 800),
+  window_(1440, 900),
+  window_(1920, 1080),
+];
 
 const narrowed = (args: AuditArgs, e: Emulation): boolean =>
   (args.orientation === null || e.orientation === args.orientation) &&
   (args.mode === null || e.mode === args.mode) &&
   (args.bar === null || e.mode !== 'browser' || e.bar === args.bar);
 
-/** The cases: `--device`'s eight (or the one the filters pick), else every phone's, narrowed by the filters. */
-export const casesFor = (args: AuditArgs): ReadonlyArray<Emulation> => {
+/** The desktop windows join a run with no filter at all, or `--device desktop` (a filter names a phone's way of being held, which no window has). */
+const desktopsFor = (args: AuditArgs): ReadonlyArray<DesktopWindow> =>
+  args.device === DESKTOP ||
+  (args.device === null && args.orientation === null && args.mode === null && args.bar === null)
+    ? DESKTOP_WINDOWS
+    : [];
+
+/** The cases: `--device`'s eight (or the one the filters pick), else every phone's, narrowed by the filters; then the desktop windows (`desktopsFor`). */
+export const casesFor = (args: AuditArgs): ReadonlyArray<AuditCase> => {
+  if (args.device === DESKTOP) return DESKTOP_WINDOWS;
   const device = args.device === null ? null : deviceById(args.device);
   if (device !== null && args.orientation !== null && args.mode !== null)
     return [emulationFor(device, args.orientation, args.mode, args.bar ?? 'shown')];
   const rows = device === null ? PHONES : [device];
-  return rows.flatMap((d) => emulationsOf(d).filter((e) => narrowed(args, e)));
+  return [
+    ...rows.flatMap((d) => emulationsOf(d).filter((e) => narrowed(args, e))),
+    ...desktopsFor(args),
+  ];
 };
 
 /** The pages an invocation audits: `--game`'s, else all six. */
@@ -173,12 +213,13 @@ export const TARGET_SELECTOR =
  * the viewport both ways is a backdrop, not content), clipped to the viewport; every nowrap
  * element wider than its box; every control's box; every text-bearing box crossing one of the
  * case's inset bands (the page cannot read the insets here: headless reports 0, so the case's are
- * spliced in); the body's `data-plays`; whether a `fixed-screen` body's computed `overflow-y` is
- * `visible` (the theme's scroll tier lifted it); whether the turn gate (`#turnGate`) is shown.
+ * spliced in); the body's `data-plays` and `data-layout` (the bucket, docs/design/layout-buckets.md);
+ * whether a `fixed-screen` body's computed `overflow-y` is `visible` (the theme's scroll tier
+ * lifted it); whether the turn gate (`#turnGate`) is shown.
  */
-export const measureScript = (e: Emulation): string => `(() => {
+export const measureScript = (e: AuditCase): string => `(() => {
   const TOL = 0.5;
-  const insets = ${JSON.stringify(e.insets)};
+  const insets = ${JSON.stringify(insetsOf(e))};
   const W = innerWidth, H = innerHeight;
   const app = document.getElementById('app');
   const cs = (el) => getComputedStyle(el);
@@ -214,6 +255,7 @@ export const measureScript = (e: Emulation): string => `(() => {
     lifted: fixedScreen && cs(document.body).overflowY === 'visible',
     frame: document.body.hasAttribute('data-frame'),
     plays: plays === 'landscape' || plays === 'portrait' ? plays : null,
+    layout: document.body.getAttribute('data-layout'),
     gate: gateEl !== null && shown(gateEl),
     locked: document.fullscreenElement !== null,
     pad,
@@ -228,7 +270,7 @@ export const measureScript = (e: Emulation): string => `(() => {
 // ---- the pages and their screens --------------------------------------------------------------
 
 /** What a screen's reach gets: the page's URL for this case and the case. */
-type Reach = (page: Page, url: string, e: Emulation) => Promise<void>;
+type Reach = (page: Page, url: string, e: AuditCase) => Promise<void>;
 /** A screen and how to reach it; `only` keeps it to one orientation (backgammon's `kept` is upright's). */
 type ScreenDrive = Screen & Readonly<{ reach: Reach; only?: Orientation }>;
 type PageDrive = Readonly<{
@@ -412,7 +454,7 @@ const PAGES: Readonly<Record<PageId, PageDrive>> = {
         // The preview screen around example (a) under the case's primary orientation type.
         reach: async (page, url, e) => {
           const type: OrientationType =
-            e.orientation === 'landscape' ? 'landscape-primary' : 'portrait-primary';
+            orientationOf(e) === 'landscape' ? 'landscape-primary' : 'portrait-primary';
           await page.goto(`${url}?screen=preview&example=cover&type=${type}`);
           await hookReady(page, PAGE_HOOKS['ui-sandbox']);
           await settle(page);
@@ -433,8 +475,8 @@ export const screensOf = (
 
 // ---- the drive -----------------------------------------------------------------------------------
 
-const fileNameOf = (e: Emulation, screen: string): string =>
-  `${emulationName(e).replace(/\s+/g, '_')}--${screen}.png`;
+const fileNameOf = (e: AuditCase, screen: string): string =>
+  `${caseName(e).replace(/\s+/g, '_')}--${screen}.png`;
 
 /** A verdict for a screen the drive never reached: every column fails with the reason. */
 const failed = (reason: string): AuditVerdict => ({
@@ -447,7 +489,7 @@ const failed = (reason: string): AuditVerdict => ({
   })),
 });
 /** An empty measurement for a screen the drive never reached (the sheet still prints the card). */
-const unmeasured = (e: Emulation): Measured => ({
+const unmeasured = (e: AuditCase): Measured => ({
   inner: { w: e.viewport.width, h: e.viewport.height },
   scrollHeight: 0,
   scrollWidth: 0,
@@ -455,6 +497,7 @@ const unmeasured = (e: Emulation): Measured => ({
   lifted: false,
   frame: false,
   plays: null,
+  layout: null,
   gate: false,
   locked: false,
   pad: { top: 0, right: 0, bottom: 0, left: 0 },
@@ -467,30 +510,36 @@ const unmeasured = (e: Emulation): Measured => ({
 
 /**
  * One case of one page: a context at the device (viewport, screen, pixel ratio, touch, mobile),
- * the seed and the seam installed, then each screen reached, shot and measured in order. A screen
- * the drive cannot reach (a timeout, a missing control) fails every column with the reason and
- * stops the case there.
+ * the seed and the seam installed (a desktop window: the viewport alone, a fine pointer, no seam),
+ * then each screen reached, shot and measured in order. A screen the drive cannot reach (a
+ * timeout, a missing control) fails every column with the reason and stops the case there.
  */
 export const driveCase = async (
   browser: Browser,
   site: string,
   pageId: PageId,
-  e: Emulation,
+  e: AuditCase,
   dir: string,
 ): Promise<AuditCard> => {
   const row = PAGES[pageId];
   const [path = '', query = ''] = row.path.split('?');
   const url = `${site}${path}${query === '' ? '' : `?${query}`}`;
-  const context = await browser.newContext({
-    viewport: { width: e.viewport.width, height: e.viewport.height },
-    screen: { width: e.screen.width, height: e.screen.height },
-    deviceScaleFactor: e.dpr,
-    isMobile: true,
-    hasTouch: true,
-  });
+  const context = await browser.newContext(
+    isDesktop(e)
+      ? { viewport: { width: e.viewport.width, height: e.viewport.height } }
+      : {
+          viewport: { width: e.viewport.width, height: e.viewport.height },
+          screen: { width: e.screen.width, height: e.screen.height },
+          deviceScaleFactor: e.dpr,
+          isMobile: true,
+          hasTouch: true,
+        },
+  );
   await context.addInitScript({ content: SEED_SCRIPT });
-  await context.addInitScript({ content: seamScript(e) });
-  if (e.device.kind !== 'android') await context.addInitScript({ content: NO_LOCK_SCRIPT });
+  if (!isDesktop(e)) {
+    await context.addInitScript({ content: seamScript(e) });
+    if (e.device.kind !== 'android') await context.addInitScript({ content: NO_LOCK_SCRIPT });
+  }
   const page = await context.newPage();
   page.setDefaultTimeout(15_000);
   type Acc = Readonly<{ done: ReadonlyArray<ScreenResult>; stopped: boolean }>;
@@ -529,7 +578,8 @@ export const driveCase = async (
     }
   };
   try {
-    const screens = row.screens.filter((s) => s.only === undefined || s.only === e.orientation);
+    const orientation = orientationOf(e);
+    const screens = row.screens.filter((s) => s.only === undefined || s.only === orientation);
     const { done } = await screens.reduce(one, Promise.resolve({ done: [], stopped: false }));
     return { e, screens: done };
   } finally {
@@ -631,7 +681,8 @@ const auditPage = async (
   mkdirSync(dir, { recursive: true });
   const cards = await pooled(casesFor(args), args.jobs, async (e) => {
     const card = await driveCase(browser, site, page, e, dir);
-    console.log(`${cardPasses(card) ? 'pass' : 'FAIL'}  ${page} ${emulationName(e)}`);
+    const bucket = card.screens[0]?.measured.layout ?? 'no bucket';
+    console.log(`${cardPasses(card) ? 'pass' : 'FAIL'}  ${page} ${caseName(e)}  [${bucket}]`);
     return card;
   });
   writeFileSync(resolve(dir, 'index.html'), sheetHtml(page, cards, stamp));
@@ -642,7 +693,7 @@ const auditPage = async (
         page,
         stamp,
         totals: totalsOf(cards),
-        cases: cards.map((c) => ({ case: emulationName(c.e), emulation: c.e, screens: c.screens })),
+        cases: cards.map((c) => ({ case: caseName(c.e), emulation: c.e, screens: c.screens })),
       },
       null,
       2,

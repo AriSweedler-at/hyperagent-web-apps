@@ -7,28 +7,45 @@ import { describe, expect, test } from 'vitest';
 
 import { deviceById, emulationFor, type Emulation } from '../../web/shared/lib/devices.ts';
 import { twinOf } from '../shell-emulate.ts';
-import { PHONES, casesFor, pagesFor, parseAuditArgs, screensOf, totalsOf } from '../space-audit.ts';
 import {
+  DESKTOP_WINDOWS,
+  PHONES,
+  casesFor,
+  pagesFor,
+  parseAuditArgs,
+  screensOf,
+  totalsOf,
+} from '../space-audit.ts';
+import {
+  DESKTOP_LIMITS,
   FRAMED,
   GUTTER,
   LIMITS,
   PAGE_IDS,
   SIDES,
   TARGET_MIN,
+  TARGET_MIN_DESKTOP,
+  caseName,
   emptyOf,
   fractionOf,
   gapsOf,
   gatedOf,
+  insetsOf,
+  isDesktop,
   judge,
+  limitsFor,
+  orientationOf,
   roomOf,
+  targetMinFor,
   tierOf,
+  type AuditCase,
   type Measured,
   type Outcome,
   type PageId,
   type Screen,
 } from './judge.ts';
 import { changedRows, changesTable, checkTable, rowsOf, rowsOfReport } from './rows.ts';
-import { cardPasses, deviceLine, sheetHtml } from './sheet.ts';
+import { cardPasses, caseLine, deviceLine, sheetHtml } from './sheet.ts';
 
 const iphone12 = deviceById('iphone-390x844');
 const se = deviceById('iphone-375x667-se');
@@ -41,10 +58,16 @@ const upright: Emulation = emulationFor(iphone12, 'portrait', 'standalone');
 const TABLE: Screen = { id: 'table', kind: 'table' };
 const HOME: Screen = { id: 'home', kind: 'home' };
 
+/** The goldens' laptop window, the audit's third desktop case. */
+const laptop: AuditCase = DESKTOP_WINDOWS[2] ?? {
+  kind: 'desktop',
+  viewport: { width: 1280, height: 800 },
+};
+
 /** A table screen that fills its room on `e`: an unframed page padded 12px, the content at the room's edge. */
-const full = (e: Emulation, page: PageId = 'briscola'): Measured => {
+const full = (e: AuditCase, page: PageId = 'briscola'): Measured => {
   const pad = { top: 12, right: 12, bottom: 12, left: 12 };
-  const room = roomOf(pad, e.insets);
+  const room = roomOf(pad, insetsOf(e));
   const w = e.viewport.width;
   const h = e.viewport.height;
   return {
@@ -55,6 +78,7 @@ const full = (e: Emulation, page: PageId = 'briscola'): Measured => {
     lifted: false,
     frame: FRAMED.includes(page),
     plays: page === 'backgammon' ? 'landscape' : null,
+    layout: isDesktop(e) ? 'desktop' : null,
     gate: false,
     locked: false,
     pad,
@@ -71,14 +95,14 @@ const full = (e: Emulation, page: PageId = 'briscola'): Measured => {
   };
 };
 
-const failing = (m: Measured, e: Emulation, screen = TABLE, page: PageId = 'briscola') =>
+const failing = (m: Measured, e: AuditCase, screen = TABLE, page: PageId = 'briscola') =>
   judge({ page, screen, e, m })
     .checks.filter((c) => !c.pass)
     .map((c) => c.name);
 /** The outcome per column, `used scroll clip targets frame gutter`. */
 const outcomes = (
   m: Measured,
-  e: Emulation,
+  e: AuditCase,
   screen = TABLE,
   page: PageId = 'briscola',
 ): ReadonlyArray<Outcome> => judge({ page, screen, e, m }).checks.map((c) => c.outcome);
@@ -356,6 +380,81 @@ describe('the judge, one row per rule', () => {
       failing({ ...full(sideways, 'backgammon'), locked: true }, sideways, TABLE, 'backgammon'),
     ).toEqual([]);
   });
+  test('the desktop cases (docs/design/space-audit.md §5): five windows, named and landscape, no insets; their own limits (home 40% below and beside, table 10% a side, no scroll) and a 32px target; no gate and no twin tier on a window', () => {
+    expect(DESKTOP_WINDOWS.map(caseName)).toEqual([
+      'desktop 900x700',
+      'desktop 1024x768',
+      'desktop 1280x800',
+      'desktop 1440x900',
+      'desktop 1920x1080',
+    ]);
+    DESKTOP_WINDOWS.forEach((w) => {
+      expect(isDesktop(w)).toBe(true);
+      expect(orientationOf(w)).toBe('landscape');
+      expect(insetsOf(w)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+      expect(targetMinFor(w)).toBe(TARGET_MIN_DESKTOP);
+      expect(limitsFor('table', w)).toBe(DESKTOP_LIMITS.table);
+    });
+    expect(isDesktop(sideways)).toBe(false);
+    expect(orientationOf(sideways)).toBe('landscape');
+    expect(insetsOf(sideways)).toEqual(sideways.insets);
+    expect(targetMinFor(sideways)).toBe(TARGET_MIN);
+    expect(limitsFor('home', sideways)).toBe(LIMITS.home);
+    expect(DESKTOP_LIMITS.home.emptyMax).toEqual({ top: 0.1, right: 0.4, bottom: 0.4, left: 0.4 });
+    expect(DESKTOP_LIMITS.table).toEqual({
+      emptyMax: { top: 0.1, right: 0.1, bottom: 0.1, left: 0.1 },
+      mayScroll: false,
+    });
+    // A full table on the laptop passes; its `targets` detail names the mouse.
+    const ok = judge({ page: 'briscola', screen: TABLE, e: laptop, m: full(laptop) });
+    expect(ok.pass).toBe(true);
+    expect(ok.checks.find((c) => c.name === 'targets')?.detail).toContain('32px (a mouse)');
+    // A 36px control: a click's size on the window, short of a finger on the phone.
+    const small = { ...full(laptop), targets: [{ sel: '#x', w: 36, h: 36 }] };
+    expect(failing(small, laptop)).toEqual([]);
+    expect(
+      failing({ ...full(sideways), targets: [{ sel: '#x', w: 36, h: 36 }] }, sideways),
+    ).toEqual(['targets']);
+    // 11.3% empty above and below (beyond the 12px pad: 8.2% on the phone, 9.8% on the window): within
+    // the window's tenth, over the phone's 8%. Top and bottom, since sideways the notch's 47px room
+    // would swallow a side's band.
+    const bands = (e: AuditCase): Measured => {
+      const m = full(e);
+      const dy = Math.round(m.inner.h * 0.113);
+      return {
+        ...m,
+        used: { x: m.used?.x ?? 0, y: dy, w: m.used?.w ?? 0, h: m.inner.h - 2 * dy },
+      };
+    };
+    expect(failing(bands(laptop), laptop)).toEqual([]);
+    expect(failing(bands(sideways), sideways)).toEqual(['used']);
+    // A home column ending 35% above the bottom: within the window's 40%, over the phone's 30%.
+    const shortHome = (e: AuditCase): Measured => {
+      const m = full(e);
+      return {
+        ...m,
+        fixedScreen: false,
+        used: {
+          x: m.used?.x ?? 0,
+          y: m.used?.y ?? 0,
+          w: m.used?.w ?? 0,
+          h: Math.round(m.inner.h * 0.6),
+        },
+      };
+    };
+    expect(failing(shortHome(laptop), laptop, HOME)).toEqual([]);
+    expect(failing(shortHome(upright), upright, HOME)).toEqual(['used']);
+    // Backgammon on a window: the page plays landscape, the window is landscape, no gate; no twin tier.
+    const bg = full(laptop, 'backgammon');
+    expect(gatedOf({ page: 'backgammon', screen: TABLE, e: laptop, m: bg })).toBe(false);
+    expect(tierOf({ page: 'backgammon', screen: TABLE, e: laptop, m: bg })).toBeNull();
+    expect(
+      tierOf({ page: 'backgammon', screen: TABLE, e: laptop, m: { ...bg, lifted: true } }),
+    ).toBe('the theme lifts fixed-screen here');
+    // The bucket is reported per screen.
+    expect(full(laptop).layout).toBe('desktop');
+  });
+
   test('the limits: a table 8% a side, a home 10/25/30/25, the tool 2%', () => {
     expect(LIMITS.table.emptyMax).toEqual({ top: 0.08, right: 0.08, bottom: 0.08, left: 0.08 });
     expect(LIMITS.home.emptyMax).toEqual({ top: 0.1, right: 0.25, bottom: 0.3, left: 0.25 });
@@ -389,9 +488,13 @@ describe('the command line and the cases', () => {
       'shots/space-audit/rps/report.json',
     );
   });
-  test('every phone x eight cases by default; --device one phone; the filters narrow', () => {
+  test('every phone x eight cases plus the five desktop windows by default; --device one phone (no windows) or desktop (the windows alone); the filters narrow and leave the windows out', () => {
     expect(PHONES.every((d) => d.kind !== 'ipad' && d.supported)).toBe(true);
-    expect(casesFor(parseAuditArgs([]))).toHaveLength(PHONES.length * 8);
+    const all = casesFor(parseAuditArgs([]));
+    expect(all).toHaveLength(PHONES.length * 8 + DESKTOP_WINDOWS.length);
+    expect(all.slice(-DESKTOP_WINDOWS.length)).toEqual(DESKTOP_WINDOWS);
+    expect(casesFor(parseAuditArgs(['--device', 'desktop']))).toEqual(DESKTOP_WINDOWS);
+    expect(casesFor(parseAuditArgs(['--orientation', 'landscape'])).some(isDesktop)).toBe(false);
     expect(casesFor(parseAuditArgs(['--device', 'iphone-390x844']))).toHaveLength(8);
     expect(
       casesFor(parseAuditArgs(['--device', 'ipad-820x1180', '--orientation', 'landscape'])),
@@ -458,10 +561,39 @@ describe('the sheet and the totals', () => {
     });
     expect(cards.map(cardPasses)).toEqual([true, false]);
   });
-  test('the device line is the row, the models, the viewport and the insets', () => {
+  test('the device line is the row, the models, the viewport and the insets; a window says so', () => {
     expect(deviceLine(sideways)).toBe(
       'iphone-390x844 · iPhone 12, 12 Pro, 13, 13 Pro, 14, 16e · 844x390 @3x · insets t/r/b/l 0/47/21/47',
     );
+    expect(caseLine(sideways)).toBe(deviceLine(sideways));
+    expect(caseLine(laptop)).toBe(
+      'desktop 1280x800 · a fine pointer, no touch, no insets · 1280x800 @1x',
+    );
+  });
+  test('the sheet groups the desktop windows after the phones under their own heading, and prints the bucket per screen', () => {
+    const win = judge({ page: 'briscola', screen: TABLE, e: laptop, m: full(laptop) });
+    const html = sheetHtml(
+      'briscola',
+      [
+        ...cards,
+        {
+          e: laptop,
+          screens: [{ screen: TABLE, measured: full(laptop), verdict: win, picture: 'd.png' }],
+        },
+      ],
+      '20260930-1400',
+    );
+    expect(html).toContain('<h2 class="group">Phones <small>· 1 of 2 pass</small></h2>');
+    expect(html).toContain('<h2 class="group">Desktop windows <small>· 1 of 1 pass</small></h2>');
+    expect(html.indexOf('Desktop windows')).toBeGreaterThan(
+      html.indexOf('iphone-390x844 landscape'),
+    );
+    expect(html).toContain('<h2>Desktop window <small>desktop 1280x800</small>');
+    expect(html).toContain('<dt>bucket</dt><dd>desktop</dd>');
+    expect(html).toContain('<dt>bucket</dt><dd>none written</dd>');
+    // Phones alone: no group heading.
+    expect(sheetHtml('briscola', cards, '20260930-1200')).not.toContain('class="group"');
+    expect(rowsOf([{ e: laptop, screens: [] }])).toEqual([]);
   });
   test('the sheet: dark, one card per case, red where a rule fails, the tally in the heading', () => {
     const html = sheetHtml('briscola', cards, '20260930-1200');
