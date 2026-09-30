@@ -11,7 +11,7 @@
    DOM in two grid templates, three layouts (§3.3): the phone stands it on end (twelve rows of
    two points, a bar band, an off row); the desktop, from 900px, and a phone held sideways (a
    coarse pointer, landscape, under 500px tall: docs/design/backgammon-landscape.md) lay it flat
-   (two rows of thirteen; sideways the chrome is one 22px strip over the board, names with their
+   (two rows of thirteen; sideways the chrome is one 24px strip over the board, names with their
    colour discs, the badge, the status and the roll slot in a row, and the buttons in a 44px rail
    beside it from 714px wide, in a 44px row under it below). The flat template is written once: of the eleven `(min-width: 900px)`
    blocks, the eight that place and stack the board (the turn arrow, #board's template, the seam,
@@ -2069,7 +2069,7 @@ label {
    tray rules are shared, never copied; this block and the three after it, last in the file,
    re-tune the sizes and pin the table where the two fallbacks above would have let it scroll.
    This block reflows the chrome into
-   one 22px text strip over the board (the grid's shared rules are here); the next two place the
+   one 24px text strip over the board (the grid's shared rules are here); the next two place the
    buttons, in a 44px rail beside the board from 714px wide and in a 44px row under it below.
    ui/board/layout.ts `layoutFor`, `pointWidth` and `pointLength` are the arithmetic's twin. */
 @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
@@ -2086,16 +2086,24 @@ label {
     --edge: max(16px, var(--inset-l), var(--inset-r));
     padding: 12px var(--edge) calc(12px + var(--inset-b));
   }
-  /* 11px above the strip (the trim's 6px band and its hairline, then 4px of air: the owner,
-     2026-09-28: "the top of the names & such overlap the green border") and the same below the
-     board, or 6px over the home indicator where there is one (its 21px band clears the trim by
-     itself). At the table only, so the sideways home and the match-over screen keep the base
-     padding's 12 each. `--pad-v` is the pair, for the board's arithmetic below. */
+  /* The strip's air, `--air`: what stands between the trim's hairline and the strip's row above
+     it, and between the row and the board below it (#tableScreen's `row-gap` reads the same
+     token), so the two are equal by construction, not by two numbers kept in step (the owner,
+     2026-09-28: "equal padding above and below the text ... Don't do hacky pixel pushing stuff";
+     the row was 4px under the hairline and 6px over the board). `--pad-t`, 11px, is the trim's
+     6px band and its 1px hairline (the sum is spelled: the shell's frame tokens read 10px from
+     900px wide, which a Pixel 8 sideways is) plus the air (the owner: "the top of the names &
+     such overlap the green border"), and the same stands below the board, or 6px over the home
+     indicator where there is one (its 21px band clears the trim by itself). At the table only, so
+     the sideways home and the match-over screen keep the base padding's 12 each. `--pad-v` is the
+     pair, for the board's arithmetic below. */
   body.fixed-screen #app {
     max-width: none;
-    --pad-v: calc(11px + max(11px, 6px + var(--inset-b)));
-    padding-top: 11px;
-    padding-bottom: max(11px, 6px + var(--inset-b));
+    --air: 4px;
+    --pad-t: calc(7px + var(--air));
+    --pad-v: calc(var(--pad-t) + max(var(--pad-t), 6px + var(--inset-b)));
+    padding-top: var(--pad-t);
+    padding-bottom: max(var(--pad-t), 6px + var(--inset-b));
   }
   #tableScreen {
     /* The two blocks below set --chrome-h and --chrome-w: what the chrome takes above and below the
@@ -2119,7 +2127,7 @@ label {
     --arrow-col: 0px;
     overflow: hidden;
     container-type: size;
-    /* The chrome grid (the two blocks below set its template): one 22px strip over the board
+    /* The chrome grid (the two blocks below set its template): one 24px strip over the board
        (the owner, 2026-09-28: "WAY too much padding around the board's top and bottom ... The
        names & scores are great, but they can live on the same Y-axis value") holding, left to
        right, the opponent's strip (their colour, name, pips), the badge, the status line, my strip
@@ -2131,12 +2139,16 @@ label {
        12px paddings round the word), so the status column stands still. The rail keeps 160 and 72
        (the badge and the slot leave the status line 152px at the 780px floor, 216 at 844); the rows
        block under 714px re-tunes both. */
-    --strip-h: 22px;
+    --strip-h: 24px;
     --gap: 6px;
     --name-w: 160px;
     --slot-w: 72px;
     display: grid;
-    gap: var(--gap);
+    /* Between the columns `--gap`; between the rows the strip's `--air` (#app's, above): the
+       board stands under the strip by the air the strip stands under the hairline, and the rows
+       scheme's button row stands under the board by the same. */
+    column-gap: var(--gap);
+    row-gap: var(--air);
     align-items: center;
   }
   .topbar,
@@ -2198,15 +2210,15 @@ label {
      below the text ... Don't do hacky pixel pushing stuff"): every item is content-sized (the
      portrait status line's `height: 22px; line-height: 22px` and the badge's
      `line-height: var(--strip-h)` are dropped above) and the grid's `align-items: center` places
-     it in the 22px row. `text-box: trim-both cap alphabetic` makes each text box the letters' own,
+     it in the 24px row. `text-box: trim-both cap alphabetic` makes each text box the letters' own,
      cap height to baseline, instead of the font's content area, whose ascent (15px at 15.2px
      Cardo) outweighs its descent (6px) and sat the glyphs 0.7px high, with the 22px line-height's
      half-leading rounding them a further 1px high on the status line; the same-size items then
      share one baseline. `overflow: hidden` (the names' and the status line's ellipsis) clips at
      the padding box, so those trimmed boxes carry 0.3em of symmetric padding, the descenders' and
-     accents' room (10.5px of letters and 9px of padding stay under the row); the badge's pill
-     gets 6px round its 8.8px letters. A browser without the trim keeps the content-area layout
-     above. */
+     accents' room (10.5px of letters and 9px of padding stay under the 24px row); the badge's
+     pill gets 6px round its 8.8px letters. A browser without the trim keeps the content-area
+     layout above. */
   @supports (text-box-trim: trim-both) {
     #tableScreen .opp-strip .name,
     #tableScreen .me-strip .name,
@@ -2240,6 +2252,11 @@ label {
   }
   .roll-slot .wait-note {
     display: none;
+  }
+  /* The mini dice, 22px in the 24px slot, sit at the row's centre as the text does (the slot's
+     `flex-start` is the Result chip's, which hangs down out of the strip). */
+  .roll-slot .dice-mini {
+    align-self: center;
   }
   /* A double's four mini dice (100px at 22) inside the 72px slot: 16px faces at 2px gaps, 70px. */
   .roll-slot .dice-mini:has(.die:nth-child(4)) {
@@ -2382,7 +2399,7 @@ label {
      what is left of its containing block past `left`, half the screen); `--edge` is out of reach
      too, so the safe area is read again. It slides in from above as it slid in from below. */
   #toast {
-    top: calc(11px + 22px + 6px);
+    top: calc(11px + 24px + 4px);
     bottom: auto;
     left: 0;
     right: 0;
@@ -2517,8 +2534,8 @@ label {
        the pin exactly where the floor stops fitting; a media query cannot read env(), so the
        floor meets it instead. */
     --point-len-min: calc(104px - (var(--pad-v) - 22px) / 2);
-    /* #app's paddings, the strip, its gap: 50px inset-free, 66 with a 21px home indicator. */
-    --chrome-h: calc(var(--pad-v) + var(--strip-h) + var(--gap));
+    /* #app's paddings, the strip, its air: 50px inset-free, 66 with a 21px home indicator. */
+    --chrome-h: calc(var(--pad-v) + var(--strip-h) + var(--air));
     /* The two gutters (16px or the inset), the rail and its gap: 82px without insets, 144 with the
        iPhone 12's, 168 on the 852x393 class: 54, 49.2 and 48px points. */
     --chrome-w: calc(2 * var(--edge) + var(--rail-w) + var(--gap));
@@ -2604,9 +2621,9 @@ label {
    board at the 44px floor, so the buttons take a 44px row under the board instead: the menu and the
    sound button at its left, Undo and End turn at its right (End turn at its own width, the call to
    action in the corner a thumb reaches; it was a 506px bar across the phone's controls row), the
-   same strip as the rail's over the board. The chrome above and below is 100px (it was the phone's
+   same strip as the rail's over the board. The chrome above and below is 98px (it was the phone's
    170: a 44px topbar, the 22px status line and a 56px controls row with their gaps), so the SE's
-   points are 129.5px long, not 94.5. The six columns serve both rows: the opponent's strip spans the
+   points are 130.5px long, not 94.5. The six columns serve both rows: the opponent's strip spans the
    menu's 44px and the rest of its width, the sound button starts the second column, Undo ends my
    strip's column and End turn the slot's, 92px here ("End turn" is 82: 10 to spare); the names'
    columns are 132px (the badge, 124px, and the slot leave the status line 131px at 667, 104 at
@@ -2617,12 +2634,12 @@ label {
     --name-w: 132px;
     --slot-w: 92px;
     /* 90px, less half of what the home indicator adds to the paddings (as the rail's floor above),
-       so 2 x floor + 16 + --chrome-h stays 296px and the `max-height: 295px` fallback is exact at
+       so 2 x floor + 16 + --chrome-h stays 294px and the `max-height: 293px` fallback is exact at
        any inset. */
     --point-len-min: calc(90px - (var(--pad-v) - 22px) / 2);
-    /* #app's paddings, the strip, the button row, their two gaps: 100px inset-free, 116 with a 21px
-       home indicator. */
-    --chrome-h: calc(var(--pad-v) + var(--strip-h) + var(--gap) + var(--btn-h) + var(--gap));
+    /* #app's paddings, the strip, the button row, the air over and under the board: 98px
+       inset-free, 114 with a 21px home indicator. */
+    --chrome-h: calc(var(--pad-v) + var(--strip-h) + var(--air) + var(--btn-h) + var(--air));
     --chrome-w: calc(2 * var(--edge));
     grid-template-columns:
       44px calc(var(--name-w) - 44px - var(--gap)) auto minmax(0, 1fr) var(--name-w)
@@ -2666,13 +2683,13 @@ label {
   }
 }
 /* Where the floors do not fit the document scrolls (the rule of §3.10): under 274px with the rail
-   (2 x 104 + 16 + 50), under 296px with the rows (2 x 90 + 16 + 100; an SE with Safari's toolbar,
+   (2 x 104 + 16 + 50), under 294px with the rows (2 x 90 + 16 + 98; an SE with Safari's toolbar,
    325px, fits: it scrolled under the phone's 170px of chrome); the floors give up half of what the
    bottom inset adds, so both numbers hold with a home indicator. The two short-phone tiers nest
    under the phone predicate (LANDSCAPE_PHONE, spelled once outside), so the dist pin reads one
    landscape query here and the tiers stay two height bounds. */
 @media (any-pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
-  @media (max-height: 273px), (max-height: 295px) and (max-width: 713px) {
+  @media (max-height: 273px), (max-height: 293px) and (max-width: 713px) {
     body.fixed-screen,
     body.fixed-screen #app {
       height: auto;

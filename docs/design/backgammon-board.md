@@ -234,7 +234,7 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   (point-len - checker-d - 18px) / 4)` (the desktop's 15px base offset and 3px at the tip
   spared), `--die-s 44px`, `--arrow-col 0`.
   Two schemes by width. From 714px (13 x 44 + 44 + 16 + 2 x 16 + 44 + 6) the rail: `#tableScreen`
-  is a grid of six columns and five rows, `.topbar` and `.controls` `display: contents`, one 22px
+  is a grid of six columns and five rows, `.topbar` and `.controls` `display: contents`, one 24px
   strip above the board (the owner, 2026-09-28: "WAY too much padding around the board's top and
   bottom ... The names & scores are great, but they can live on the same Y-axis value") holding,
   left to right, the opponent's strip (disc, name, pips), the badge, the status line, my strip and
@@ -253,24 +253,31 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   the browser (the owner, 2026-09-28: "equal padding above and below the text ... Don't do hacky
   pixel pushing stuff"): every item is content-sized (the portrait status line's `height: 22px;
   line-height: 22px` and the badge's `line-height: var(--strip-h)` are dropped sideways) and the
-  grid's `align-items: center` places it in the 22px row; under `@supports (text-box-trim:
+  grid's `align-items: center` places it in the 24px row; under `@supports (text-box-trim:
   trim-both)`, `text-box: trim-both cap alphabetic` on the names, the pips, the badge and the status
   line makes each text box the letters' own (cap height to baseline) instead of the font's content
   area, whose 15px ascent outweighs its 6px descent at 15.2px and sat the glyphs 0.7px high (a further
   1px on the status line from the 22px line-height's half-leading); the names and the status line
   carry 0.3em of symmetric padding, the descenders' room past `overflow: hidden`, the badge's pill 6px.
-  Measured at 844x390 and 780x304: every glyph box centred at y = 22.0 (the row's centre; they were
-  20.8-21.6), the names, pips and status on one baseline (27.23). The row itself stands 4px under the
-  trim's hairline and 6px over the board (#app's 11px and `--gap`), so the air above the letters is
-  9.8px and below 11.8: making those equal means `--strip-h: 24px` with a 4px row gap (the rail's
-  arithmetic unchanged, the rows' `chromeIn` 78 → 76) or 13px of padding, a follow-up. While the die-chip tray is
+  The air on both sides of the row is one token, `--air` (4px), declared on `body.fixed-screen
+  #app` and read twice: the padding over the row is `--pad-t: 7px + air` (11; the trim's 6px band
+  and its hairline, spelled since the shell's frame tokens read 10px from 900px wide) and the
+  grid's `row-gap: var(--air)` puts the board the same under the row (the columns keep `--gap`
+  6px), so the letters, centred in the 24px row, stand as far under the hairline as over the board
+  (the owner, 2026-09-28: "equal padding above and below the text ... Don't do hacky pixel pushing
+  stuff, get the browser to do this the right way"; the row was 22px, 4px under the hairline and 6px
+  over the board, the air above the letters 9.8px and below 11.8). Measured at 844x390, 780x304 and
+  667x375: every glyph box centred at y = 23.0 (the row's centre), the names, pips and status on one
+  baseline (28.2), hairline to cap and cap to board 10.7-10.8px each for the names, the pips and the
+  status, 11.6 and 11.6 for the badge's smaller type (they were 9.8 and 11.8); the 22px mini dice
+  `align-self: center` in the 24px slot. While the die-chip tray is
   open my strip and the slot stay shown (the base rule hides them: the tray took the controls row).
-  `body.fixed-screen #app` pads 11px above (the trim's 6px band and its hairline, 4px of air: the
-  owner, 2026-09-28, "the top of the names & such overlap the green border") and `max(11px, 6px +
-  inset-b)` below (the home indicator's 21px band clears the trim by itself) in both schemes (the
-  base block's 12 each stay on the sideways home and the match-over screen); `--pad-v` is the pair
-  (22 inset-free, 38 with a 21px home indicator); `--chrome-w 2 edge + 44px + 6px` (82 inset-free,
-  144 on an iPhone 12), `--chrome-h pad-v + 22 + 6` (50; 66 with the home indicator), floor
+  `body.fixed-screen #app` pads `--pad-t` above (the owner, 2026-09-28, "the top of the names & such
+  overlap the green border") and `max(pad-t, 6px + inset-b)` below (the home indicator's 21px band
+  clears the trim by itself) in both schemes (the base block's 12 each stay on the sideways home
+  and the match-over screen); `--pad-v` is the pair (22 inset-free, 38 with a 21px home indicator);
+  `--chrome-w 2 edge + 44px + 6px` (82 inset-free, 144 on an iPhone 12), `--chrome-h pad-v + 24 +
+  4` (50; 66 with the home indicator), floor
   `--point-len-min 104px - (pad-v - 22px) / 2` (96 with the home indicator: 2 x floor + 16 +
   chrome-h is 274 at any inset). The cube hangs 6px under the arrow (`margin-top: 26px`), clear of
   Undo from the 274 floor up (3px on the floor's 208px board with a home indicator). Under 714px (the
@@ -280,11 +287,11 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   stretched it to 506px across the phone's controls row), the tray's cancel in Undo's cell; the
   grid is six columns (`44px calc(name-w - 44px - gap) auto minmax(0, 1fr) name-w slot-w`: the
   opponent's strip spans the menu's column and the next, the sound button starts the second, Undo
-  ends my strip's column and End turn the slot's) by three rows (`22px minmax(0, 1fr) 44px`), with
+  ends my strip's column and End turn the slot's) by three rows (`24px minmax(0, 1fr) 44px`), with
   `--name-w 132px` and `--slot-w 92px` ("End turn" is 82; the badge, 124, and the slot leave the
-  status line 131px at 667, 104 at 640); `--chrome-w 2 edge`, `--chrome-h pad-v + 22 + 6 + 44 +
-  6` (100; it was the phone's 170), floor `90px - (pad-v - 22px) / 2` (2 x floor + 16 + chrome-h is
-  296 at any inset), the arrow hidden: 129.5px points on the SE (94.5 before), 104.5 with Safari's
+  status line 131px at 667, 104 at 640); `--chrome-w 2 edge`, `--chrome-h pad-v + 24 + 4 + 44 +
+  4` (98; it was the phone's 170), floor `90px - (pad-v - 22px) / 2` (2 x floor + 16 + chrome-h is
+  294 at any inset), the arrow hidden: 130.5px points on the SE (94.5 before), 105.5 with Safari's
   toolbar up (it scrolled before). The roll sheet shrinks to 12px paddings, 44px dice and a 48px button, drops
   its sub line, keeps its title to one line (a long name ellipsizes) and stands Western's Double
   beside the roll button: 168px with any name, inside the shortest board (196 at 640x360, 203 at
@@ -527,12 +534,12 @@ the row (§3.1), with no floor. The board itself can be scrolled from: `touch-ac
 scoped to `.checker`. A phone held sideways (§3.1 landscape) matches both of those fallbacks and is pinned
 again by its own block, which comes later (`100dvh`, the shell's pin and the trim's box); it has
 its own floors and fallbacks, under the landscape query: with the rail 2 x 104 + 16 + 50 = 274px,
-so under `(max-height: 273px)` the document scrolls; with the rows 2 x 90 + 16 + 100 = 296px, so
-under `(max-height: 295px) and (max-width: 713px)` it scrolls (an SE with Safari's toolbar up,
+so under `(max-height: 273px)` the document scrolls; with the rows 2 x 90 + 16 + 98 = 294px, so
+under `(max-height: 293px) and (max-width: 713px)` it scrolls (an SE with Safari's toolbar up,
 325px, fits since the button row replaced the phone's 170px of chrome). Both floors give up half
 of what the bottom inset adds to `#app`'s paddings (`--point-len-min: calc(104px - (var(--pad-v)
 - 22px) / 2)`, 90 likewise; `pointLength` mirrors both), so 2 x floor + 16 + chrome-h is 274 /
-296px at any inset and the fallbacks, which cannot read `env()`, lift exactly where the floor
+294px at any inset and the fallbacks, which cannot read `env()`, lift exactly where the floor
 stops fitting: 96px points at 812x274 with a 21px home indicator, a 208px board. Under a fallback
 `#tableScreen` drops its size container (`container-type: normal`) and the board takes the floor
 outright, so the board's own height, not a measured room, sets the document's scroll.
