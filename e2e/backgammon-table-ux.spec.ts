@@ -29,7 +29,12 @@ import {
   type Viewport,
 } from './fixtures/backgammon.ts';
 import { TOL } from './fixtures/geometry.ts';
-import { PX_PER_CHAR, SLOTS, budget } from '../web/games/backgammon/src/ui/copy-budget.ts';
+import {
+  NAME_CAP,
+  PX_PER_CHAR,
+  SLOTS,
+  budget,
+} from '../web/games/backgammon/src/ui/copy-budget.ts';
 import { reveal } from './fixtures/shell.ts';
 import { pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
@@ -640,8 +645,14 @@ const stripGlyphs = (page: Page): Promise<StripGlyphs> =>
     return { trims: CSS.supports('text-box-trim', 'trim-both'), rowCentre, hairline, boardTop, items };
   })()`);
 
-/** The widest px per character the status line's font reaches over the copy it shows, and the badge's over its widest text. */
-const measuredPxPerChar = (page: Page): Promise<Readonly<{ body: number; badge: number }>> =>
+/**
+ * The widest px per character the status line's font reaches over the copy it shows, the badge's
+ * over its widest text, and a name slot's bold over 20-character names with a capital a word and
+ * their clipped forms (copy-budget.ts `PX_PER_CHAR`).
+ */
+const measuredPxPerChar = (
+  page: Page,
+): Promise<Readonly<{ body: number; badge: number; name: number }>> =>
   page.evaluate(`(() => {
     const c = document.createElement('canvas').getContext('2d');
     const fontOf = (sel) => { const cs = getComputedStyle(document.querySelector(sel)); return cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; };
@@ -649,11 +660,14 @@ const measuredPxPerChar = (page: Page): Promise<Readonly<{ body: number; badge: 
     return {
       body: widest('#statusText', ['Dice used · End turn', 'Buen mazal! Roll', '3-1 · last move', '6-5 · the 6 is dead', 'Konstantino… to roll', 'Konst… to move · 6-5', 'Either die bears off']),
       badge: widest('#gameBadge', ['Game 13 · 6–6 · to 7', 'Game 1 · 0–0 · to 5']),
+      name: widest('#oppName', ['Konstantinopoulos XX', 'Mohammed Abdullah Al', 'Konstanti…', 'Ethan']),
     };
   })()`);
 
+/** The rail's floor is the mini (812x375 with 50px insets, copy-budget.ts `MINI_SIDEWAYS`); the harness has no insets, so its 812 stands with 16px edges and the audit holds the inset case. */
 const SIDEWAYS: Readonly<Record<string, Viewport>> = {
   'rail, 844x390': { width: 844, height: 390 },
+  'rail, the mini': { width: 812, height: 375 },
   'rail floor': { width: 780, height: 304 },
   'rows, the SE': { width: 667, height: 375 },
   'rows, 640 wide': { width: 640, height: 360 },
@@ -690,7 +704,23 @@ Object.entries(SIDEWAYS).forEach(([name, vp]) => {
       };
       within(px.body, PX_PER_CHAR.body, 'body');
       within(px.badge, PX_PER_CHAR.badge, 'badge');
+      within(px.name, PX_PER_CHAR.name, 'name');
       expect('3-1 · last move'.length).toBeLessThanOrEqual(budget(SLOTS.stripStatus));
+      // The names at NAME_MAX stand capped in their columns (render.ts `paintName`), the whole name in `title`.
+      const names = await page.evaluate<
+        ReadonlyArray<Readonly<{ text: string; title: string | null; fits: boolean }>>
+      >(
+        `(() => ['oppName', 'myName'].map((id) => { const el = document.getElementById(id); return { text: el.textContent, title: el.getAttribute('title'), fits: el.scrollWidth <= el.clientWidth }; }))()`,
+      );
+      names.forEach((n) => {
+        expect(n.text.length).toBeLessThanOrEqual(NAME_CAP);
+        expect(n.text.endsWith('…')).toBe(true);
+        expect(LONG_NAMES).toContain(n.title);
+        expect(
+          n.fits,
+          `${n.text} overflows its column at ${String(vp.width)}x${String(vp.height)}`,
+        ).toBe(true);
+      });
       // The strip's text is centred by the browser (theme.css, the landscape block): every item's
       // glyph box is centred on the 24px row within half a pixel, and the same-size items (the
       // names, the pips, the status) share one baseline; the badge's smaller type is centred too.
