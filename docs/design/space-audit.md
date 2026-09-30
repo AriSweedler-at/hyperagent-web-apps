@@ -353,3 +353,48 @@ The backgammon `clip` items above (the 20 screens of the second run), 2026-09-30
   overflows a slot (design §2.4 "The name slots").
 - `targets` 4 (the X and the mini standalone and fullscreen upright, 41.3-41.8px rows): the room's
   limit, as #193 documented; left as is.
+
+### Closed by space-audit-fidice
+
+The fidice items above (the shell path, `?shell=1`; 0 of 112 in the second run, 0 of 117 with the
+five desktop windows at c9dee516: `targets` 229, `gutter` 234, `used` 1), 2026-09-30. Every rule is
+in `web/games/fidice/theme.css` under `body[data-layout]`: the shared boot writes the bucket, the
+old boot writes none, so the old page keeps its full-bleed header and its goldens
+(`test/fixtures/styles/fidice.*.json`, 0 differences) until M6 deletes it.
+
+- The home hugging the glass, the table within 4px of the top and the sides (`gutter` on every
+  screen): fidice's `#app { max-width: none; margin: 0 }` was the old path's and now reads
+  `body:not([data-layout]) #app`, so the shell path keeps the shell's 480px column, and the theme
+  names the shell's gutter (`--gutter: 12px`, `--gutter-bottom: 16px`, gin's foot): shell.css pads
+  `#app` by the gutter or the inset. The header is not kept full-bleed: the shell page has no
+  `header`; its masthead, tab bar and mode switch sit in the column as on gin, on fidice's palette.
+  One more rule made the foot real: fidice's body is a flex column of the viewport's height, so the
+  shell's `#app` shrank to 100dvh and a home taller than the screen overflowed it, the document
+  ending at the last card's margin (the Galaxy 360x700 in a tab: a 701px document, 11px of air);
+  `#app { flex-shrink: 0 }` and the page scrolls to the foot.
+- The legacy table cut at the fold (88 bottom-band hits upright, the same sideways): the shell's
+  fixed screen clipped a 900-1300px game screen at 100dvh with no way down to Roll and Bid. Lifted
+  the way gin's tier is (`body[data-layout].fixed-screen { height: auto; overflow: visible }`, in
+  every bucket), so the page scrolls to the foot and the audit reads the table's scroll as `tier`
+  on 116 of 117 table screens (the 1920x1080 window fits: the wood fills its room to the foot,
+  `.table { flex: 1 }` on the desktop buckets, where the second fixed run left 12.8% under it).
+- The topbar's five controls in two stacked rows: fidice had no `.topbar` rule (each theme owns
+  its own); it is gin's flex row, the two tight rows at the ends, over `#fidiceTable`.
+- Controls under 44px (`#rollCupCb` 13x13, `#btnRoll` 42, `#btnPlaceBid` 40, the `.btn-ghost` 30,
+  `#btnLeaveGame` 32, `#nameInput` 42, `#btnConfigSolo` 36 wide): every `button`, `select` and
+  text `input` is at least 44px on a phone or tablet bucket and 32px on a desktop one
+  (`TARGET_MIN`, `TARGET_MIN_DESKTOP`), the gear is a 44px square, and the toggles' checkboxes are
+  drawn (a lake-blue outline, a white tick when on) inside a 44px hit area whose negative margins
+  keep the label's flow at 24px, so the box is the target and not a 13px UA control.
+- The buckets (docs/design/layout-buckets.md): the home keeps the shell's column everywhere; the
+  table takes `--column-wide: none` sideways on a phone, 1200px (the legacy `main`'s cap) on a tablet
+  or a desktop window and 1560px on a wide desktop, where `.stack` is `display: contents` and the
+  seats become a third column beside the wood and the table talk (the spectator screen's own
+  three-column shape). Sideways the wood itself splits (`#tableEl` a two-column grid: the two dice
+  zones at the left, the two steps at the right, the turn bar and the bid across both; every card
+  spans when the steps are away), and the seat cards are a wrapping row. The sideways table still
+  scrolls (tier): the game screen is ~520px in a 390px viewport, and a no-scroll sideways table is
+  the restyle's (the follow-ups draft, item 1).
+- After: 117 of 117 cases, 234 of 234 screens (`tier` 116 table screens; `used`, `clip`, `targets`,
+  `frame`, `gutter` ok on every screen). The desktop windows: the home a 480px column centred
+  (37.5% a side at 1920, within the 40%), the table 1200-1560px with 8-9% a side.
