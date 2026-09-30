@@ -147,6 +147,16 @@ VIEWPORTS.forEach(([name, width, height]) => {
       expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(height);
       expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
     });
+    // One fixed screen (rps-island.md §10 "The layout"): the page put itself in the upright bucket
+    // (main.ts writes `data-layout`, docs/design/layout-buckets.md) and nothing scrolls, neither
+    // the document nor `#app` inside it.
+    await expect(page.locator('body')).toHaveAttribute('data-layout', 'phone-upright');
+    expect(
+      await page.evaluate<boolean>(
+        `document.documentElement.scrollHeight <= innerHeight &&
+         document.getElementById('app').scrollHeight <= document.getElementById('app').clientHeight`,
+      ),
+    ).toBe(true);
 
     // 1. A win at 350 ms: +5, very happy, the fifth fast win, Tech up on offer (so no auto next).
     await round(page, 'scissors', 'rock', 350);
@@ -291,6 +301,15 @@ const sessionOfLink = async (page: Page): Promise<string> => {
 const pushes = async (apns: string): Promise<ReadonlyArray<ApnsPush>> =>
   (await (await fetch(`${apns}/pushes`)).json()) as ReadonlyArray<ApnsPush>;
 type ContentState = Readonly<{ counter: number; prestige: number; band: string; at: number }>;
+type Box = Readonly<{ x: number; y: number; width: number; height: number }>;
+/** The paired screen in one read: the viewport, whether anything scrolls, the two foot links' boxes. */
+type PairedScreen = Readonly<{
+  width: number;
+  height: number;
+  scrolls: boolean;
+  home: Box;
+  reset: Box;
+}>;
 const contentState = (push: ApnsPush | undefined): ContentState =>
   (JSON.parse(push?.body ?? '{}') as Readonly<{ aps: Readonly<{ 'content-state': ContentState }> }>)
     .aps['content-state'];
@@ -371,6 +390,44 @@ test.describe('the island row', () => {
       // `at` is the page's clock at the save, in seconds.
       const pageNow = await page.evaluate<number>('Date.now()');
       expect(Math.abs(state.at - Math.floor(pageNow / 1000))).toBeLessThanOrEqual(1);
+
+      // The paired row in the fixed screen (rps-island.md §10 "The layout": the foot holds it). This
+      // is the tab's 393 × 672 room with Tech up on offer and its hint under the buttons, the tallest
+      // paired screen: Send buddy home and Reset progress share the foot's line, each inside the
+      // viewport, the two apart, and nothing scrolls. (CI's wider fallback font once wrapped the
+      // column past the room; the foot's track collapsed and Reset progress, drawn up over the row,
+      // took every tap meant for Send buddy home until the test timed out.) One read of the page
+      // once the post has landed: the row is repainted on every island event, so a box read across
+      // the reply could hold a detached element.
+      await expect.poll(() => page.evaluate<boolean>('window.__rps.island().inflight')).toBe(false);
+      const screen = await page.evaluate<PairedScreen>(`(() => {
+        const box = (sel) => {
+          const r = document.querySelector(sel).getBoundingClientRect();
+          return { x: r.x, y: r.y, width: r.width, height: r.height };
+        };
+        const app = document.getElementById('app');
+        return {
+          width: innerWidth,
+          height: innerHeight,
+          scrolls: document.documentElement.scrollHeight > innerHeight || app.scrollHeight > app.clientHeight,
+          home: box('#islandSlot [data-island="home"]'),
+          reset: box('#resetBtn'),
+        };
+      })()`);
+      const inside = (b: Box): boolean =>
+        b.x >= 0 && b.y >= 0 && b.x + b.width <= screen.width && b.y + b.height <= screen.height;
+      const apart = (a: Box, b: Box): boolean =>
+        a.x + a.width <= b.x ||
+        b.x + b.width <= a.x ||
+        a.y + a.height <= b.y ||
+        b.y + b.height <= a.y;
+      expect(screen.width, 'the tab room').toBe(393);
+      expect(inside(screen.home), `Send buddy home inside ${JSON.stringify(screen)}`).toBe(true);
+      expect(inside(screen.reset), `Reset progress inside ${JSON.stringify(screen)}`).toBe(true);
+      expect(apart(screen.home, screen.reset), `the two apart ${JSON.stringify(screen)}`).toBe(
+        true,
+      );
+      expect(screen.scrolls, 'the paired screen scrolls').toBe(false);
 
       // Send buddy home: the button again on a fresh session (remembered), the old one unreachable.
       await slot(page).locator('[data-island="home"]').click();

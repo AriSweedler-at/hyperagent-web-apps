@@ -19,7 +19,7 @@ import {
   type NavigatorLike,
 } from '../../shared/edge/fx.ts';
 import { reducedMotion } from '../../shared/edge/motion.ts';
-import { readDevice } from '../../shared/edge/screen.ts';
+import { applyLayout, readDevice, watchLayout } from '../../shared/edge/screen.ts';
 import { createSampleCache } from '../../shared/edge/sound.ts';
 import {
   browserStore,
@@ -314,6 +314,16 @@ const boot = (): void => {
   } else {
     requireId(doc, 'islandSlot');
   }
+
+  // The layout bucket on `<body data-layout>` (docs/design/layout-buckets.md §3; theme.css lays the
+  // wide grid out for every bucket but the upright ones), as the shell's boot writes it for a game,
+  // kept live over a turn of the phone or a window dragged.
+  const screenDoc = doc as unknown as Parameters<typeof applyLayout>[0];
+  const screenWin = win as unknown as Parameters<typeof applyLayout>[1];
+  applyLayout(screenDoc, screenWin);
+  watchLayout(screenWin, () => {
+    applyLayout(screenDoc, screenWin);
+  });
 
   paintSound(doc, fx.enabled());
   paint(doc, app, options);

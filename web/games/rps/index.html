@@ -48,10 +48,12 @@
         <section class="table">
           <div id="computerHand" class="computer" aria-label="The computer's hand">?</div>
           <div class="window" aria-hidden="true"><div id="windowBar" class="window-bar"></div></div>
-          <p id="verdict" class="verdict">
-            Tap Go. When the hand stops, beat it before the bar runs out.
-          </p>
-          <p id="reaction" class="reaction"></p>
+          <div class="call">
+            <p id="verdict" class="verdict">
+              Tap Go. When the hand stops, beat it before the bar runs out.
+            </p>
+            <p id="reaction" class="reaction"></p>
+          </div>
         </section>
         <section id="hands" class="hands" aria-label="Your hand">
           <button id="rockBtn" class="hand" type="button" data-hand="rock" disabled>✊</button>
@@ -68,8 +70,8 @@
           </button>
           <p id="status" class="status"></p>
         </section>
-        <div id="islandSlot"></div>
         <footer class="foot">
+          <div id="islandSlot"></div>
           <button id="resetBtn" class="link-btn" type="button">Reset progress</button>
         </footer>
       </main>

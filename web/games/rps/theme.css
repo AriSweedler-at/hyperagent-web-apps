@@ -1,11 +1,26 @@
-/* Rock Paper Scissors (docs/design/rps-island.md §3): a solo reaction game, portrait-first and
-   thumb-reachable. The shared tokens and primitives are imported here rather than linked from the
-   page, so this page's sheet is its own and the four games' shared CSS chunk is untouched
-   (test/dist/dist-parity.test.ts holds that chunk to one file). The look is the landing page's
-   quiet dark card on this page's own tokens; the buddy's band colours the accent
+/* Rock Paper Scissors (docs/design/rps-island.md §3, §10 "The layout"): a solo reaction game,
+   portrait-first and thumb-reachable. The shared tokens and primitives are imported here rather
+   than linked from the page, so this page's sheet is its own and the four games' shared CSS chunk
+   is untouched (test/dist/dist-parity.test.ts holds that chunk to one file). The look is the
+   landing page's quiet dark card on this page's own tokens; the buddy's band colours the accent
    (`#app[data-mood]`, the manifest's `colour` per band). The buddy and the face are the manifest's
    sheets (web/public/games/rps/buddy/) played with `steps()`; `--frames` and `--ms` come from the
-   paint (src/ui/render.ts), the sizes are integer multiples of 24 so the pixels stay crisp. */
+   paint (src/ui/render.ts), the frame's size is the sheet's `--px` here, an integer multiple of 24
+   per bucket so the pixels stay crisp.
+
+   The layout is one fixed screen (docs/design/space-audit.md §5 "Closed by space-audit-rps"): `#app`
+   is the viewport less the insets and a size container named `room`, so every part with a size of
+   its own (the computer's hand, the three hands, the paddings and gaps) is a `cqh` clamp of the
+   room's height and the page never scrolls: upright down to the SE in a tab with the bar shown
+   (375x553), sideways down to the Galaxy's 780x304. Two arrangements by layout bucket
+   (docs/design/layout-buckets.md; the boot writes `<body data-layout>`, main.ts): upright the column
+   (the score, the table, the hands, the controls, the foot pinned to the bottom: the island row and
+   Reset progress, their links on one line), with a short tier under 720px of room
+   (`@container room`) that seats the facts beside the tally and the reaction beside the verdict;
+   every other bucket (a phone sideways, a tablet sideways, a desktop window)
+   three columns: the score and the foot, the table with the controls under it, the three hands
+   stacked under one thumb, the hand and the verdict side by side in the table; the desktop buckets
+   spread the grid to a tenth of the window's edges with bigger buttons and a larger buddy. */
 @import '../../shared/styles/tokens.css';
 @import '../../shared/styles/base.css';
 
@@ -26,7 +41,6 @@
   --font-body: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-display: ui-monospace, Menlo, monospace;
   --line: #262a33;
-  --hand: 72px;
   /* The safe-area insets under the shell's names (shell.css declares the same four on its :root;
      this page links tokens.css and base.css alone): the one seam a measurement overrides
      (tools/shell-emulate.ts `seamScript` writes them inline), so the audit can prove the notch
@@ -35,6 +49,18 @@
   --frame-inset-right: env(safe-area-inset-right, 0px);
   --frame-inset-bottom: env(safe-area-inset-bottom, 0px);
   --frame-inset-left: env(safe-area-inset-left, 0px);
+  /* The height budget of the upright column (the wide grid resets what differs). `cqh` is `#app`'s
+     content box, the viewport less the insets; each clamp's floor is the shortest catalogued room's
+     share, its ceiling the design size: the hand 132px from a 777px room, the buttons 72 from 720. */
+  --computer: clamp(88px, 17cqh, 132px);
+  --hand: clamp(52px, 10cqh, 72px);
+  --hand-glyph: 36px;
+  --btn-h: clamp(44px, 7cqh, 52px);
+  --gap: clamp(8px, 1.6cqh, 14px);
+  --card-pad: clamp(8px, 1.6cqh, 12px);
+  --table-gap: clamp(6px, 1.2cqh, 10px);
+  --bar-air: clamp(4px, 1cqh, 8px);
+  --side: 16px;
 }
 #app[data-mood='verySad'] {
   --accent: #3b6fd6;
@@ -58,23 +84,32 @@ body {
   color: var(--text);
   font: 16px/1.45 var(--font-body);
   -webkit-tap-highlight-color: transparent;
-  /* The side insets are the body's, as on the shell's unframed pages (shell.css): the column centres
-     in the room the notch leaves sideways instead of padding for a notch it never reaches. */
+}
+/* The side insets are the body's alone, as on the shell's unframed pages (shell.css): the room the
+   notch leaves sideways is what `#app` fills. (On `html` too they were paid twice: 124px a side on
+   the 16 class, which tipped the audit's 8% on that phone alone.) */
+body {
   padding: 0 var(--frame-inset-right) 0 var(--frame-inset-left);
 }
+/* The fixed screen: the viewport tall, the insets as padding, so the content box is the room and
+   `cqh` reads it. Nothing scrolls by design; `overflow-y: auto` is the net under a viewport the
+   catalogue has never seen, not a budget. */
 #app {
-  min-height: 100dvh;
+  height: 100dvh;
   max-width: 480px;
   margin: 0 auto;
   padding: var(--frame-inset-top) 0 var(--frame-inset-bottom);
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow-y: auto;
+  container-type: size;
+  container-name: room;
 }
 .bar {
   display: grid;
   grid-template-columns: 44px 1fr 44px;
   align-items: center;
-  padding: 8px 12px 0;
+  padding: var(--bar-air) 12px 0;
 }
 .back,
 .icon-btn {
@@ -109,16 +144,30 @@ body {
   color: var(--muted);
   font-size: 0.85rem;
 }
+/* The column: the score, the table, the hands, the controls, the foot (the island row and Reset
+   progress). The slack a tall phone leaves sits above the foot, which stays at the bottom edge as it
+   always has. The foot's track is `1fr`, never `minmax(0, 1fr)`: its automatic minimum is the foot's
+   own height, so a column that outgrows the room (a wide fallback font wrapping the facts and the
+   status on an island iPhone in a tab, 672px of room) overflows into `#app`'s net below, where the
+   collapsed track drew the foot up over the island row's links (CI, e2e/rps.spec.ts: Reset progress
+   took the tap meant for Send buddy home). */
 main {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 8px 16px 24px;
-  flex: 1;
+  display: grid;
+  grid-template-areas:
+    'score'
+    'table'
+    'hands'
+    'controls'
+    'foot';
+  grid-template-rows: auto auto auto auto 1fr;
+  gap: var(--gap);
+  padding: 6px var(--side) var(--gap);
+  min-height: 0;
 }
 
 /* The score: the buddy, the counter with its static face, the three small facts. */
 .score {
+  grid-area: score;
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-areas:
@@ -126,23 +175,27 @@ main {
     'buddy meta';
   align-items: center;
   column-gap: 16px;
-  padding: 12px 16px;
+  padding: var(--card-pad) 16px;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
+/* A sheet of `--frames` frames, each `--px` square: the element is one frame, the sheet is laid
+   across it `--frames` wide, and the animation steps the position a frame at a time. */
 .buddy,
 .face {
   display: inline-block;
   flex: none;
+  width: var(--px);
+  height: var(--px);
   image-rendering: pixelated;
   background-repeat: no-repeat;
   background-position: 0 0;
+  background-size: calc(var(--frames) * var(--px)) var(--px);
 }
 .buddy {
+  --px: 72px;
   grid-area: buddy;
-  width: 72px;
-  height: 72px;
   animation: play calc(var(--frames) * var(--ms) * 1ms) steps(var(--frames)) infinite;
 }
 .buddy.hop {
@@ -154,12 +207,11 @@ main {
 }
 @keyframes play {
   to {
-    background-position: calc(var(--frames) * -72px) 0;
+    background-position: calc(var(--frames) * var(--px) * -1) 0;
   }
 }
 .face {
-  width: 48px;
-  height: 48px;
+  --px: 48px;
 }
 .tally {
   grid-area: tally;
@@ -181,27 +233,38 @@ main {
 .meta .dot {
   margin: 0 4px;
 }
+/* A fact breaks between facts, never inside one ("No best yet" stays whole). */
+.meta span:not(.dot) {
+  white-space: nowrap;
+}
 
-/* The table: the computer's hand over the window bar, the verdict under it. */
+/* The table: the computer's hand over the window bar, the verdict with its reaction under it. */
 .table {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 18px 16px 14px;
+  grid-area: table;
+  display: grid;
+  grid-template-areas:
+    'hand'
+    'window'
+    'call';
+  justify-items: center;
+  align-content: center;
+  gap: var(--table-gap);
+  padding: calc(var(--card-pad) + 2px) 16px var(--card-pad);
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   text-align: center;
 }
 .computer {
-  width: 132px;
-  height: 132px;
+  grid-area: hand;
+  width: var(--computer);
+  height: var(--computer);
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: var(--card-2);
-  font-size: 72px;
+  /* The glyph is the circle's: 72px in a 132px hand. */
+  font-size: calc(var(--computer) * 0.545);
   line-height: 1;
   color: var(--muted);
   border: 2px solid transparent;
@@ -215,6 +278,7 @@ main {
   border-color: var(--accent);
 }
 .window {
+  grid-area: window;
   width: 100%;
   height: 8px;
   border-radius: 4px;
@@ -243,6 +307,16 @@ main {
     transform: scaleX(0);
   }
 }
+/* The call: the verdict and the reaction, one under the other in the column, side by side where
+   the room is short or wide. */
+.call {
+  grid-area: call;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--table-gap);
+  width: 100%;
+}
 .verdict {
   margin: 0;
   min-height: 1.4em;
@@ -265,6 +339,7 @@ main {
 
 /* The three hands: thumb-height, the width shared three ways. */
 .hands {
+  grid-area: hands;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
@@ -274,7 +349,7 @@ main {
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--card);
-  font-size: 36px;
+  font-size: var(--hand-glyph);
   line-height: 1;
   cursor: pointer;
   transition:
@@ -292,14 +367,18 @@ main {
   transform: scale(0.96);
 }
 
+/* The controls: the buttons share one row (Go alone; Again beside Stop; Again beside Tech up), the
+   status line under them. */
 .controls {
+  grid-area: controls;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 8px;
   align-items: stretch;
 }
 .btn {
-  min-height: 52px;
+  flex: 1 1 120px;
+  min-height: var(--btn-h);
   padding: 0 20px;
   border-radius: var(--radius);
   border: 1px solid var(--line);
@@ -325,19 +404,33 @@ main {
   margin-left: 6px;
 }
 .status {
+  flex: 1 1 100%;
   margin: 0;
   min-height: 1.2em;
   text-align: center;
   color: var(--muted);
   font-size: 0.85rem;
 }
-#islandSlot:empty {
-  display: none;
-}
+/* The foot: the island row (src/island.ts, mounted in `#islandSlot`) and Reset progress share one
+   wrapping flex row, the slot's children laid out as the foot's own (`display: contents`): the send
+   button and the state line each take a whole line, the links (Open the clip again, Send buddy home,
+   Reset progress) share one, wrapping where they must. So the row costs the column one line of
+   status over the foot's own row, not a row of its own plus a gap: the tab room of an island iPhone
+   (672px, the regular tier's floor) holds the paired state with the Tech up hint on two lines. */
 .foot {
-  margin-top: auto;
+  grid-area: foot;
+  align-self: end;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
   text-align: center;
 }
+#islandSlot {
+  display: contents;
+}
+/* 44px tall (the thumb's target) and 8px to a side, so three links share the foot's line. */
 .link-btn {
   background: none;
   border: 0;
@@ -345,7 +438,7 @@ main {
   text-decoration: underline;
   font: inherit;
   font-size: 0.85rem;
-  padding: 12px;
+  padding: 12px 8px;
   cursor: pointer;
 }
 .link-btn:disabled {
@@ -353,17 +446,229 @@ main {
   cursor: default;
 }
 
-@media (min-width: 600px) {
-  .computer {
-    width: 160px;
-    height: 160px;
-    font-size: 88px;
+/* ---- The short upright tier: under 720px of room (the SE in every mode; every phone in a tab with
+   the bar shown, the island iPhones' 638-718 among them; the 440x956 class in a tab, 742px, and the
+   standalone and fullscreen rooms, 759px up, are the regular rooms). The facts stand beside the
+   tally in a third column, the reaction beside the verdict, the paddings and the gaps at their
+   floors: 553px holds the whole play screen with the hand at 100px. The ceiling is where the
+   regular column holds the island row idle (the send button over the Reset link, 95px) under a wide
+   fallback font: 718px of room holds it with no air to spare, 672 is 12px over (measured with
+   Verdana for the Linux runner's DejaVu Sans; the two wrap the facts and the Tech up hint alike).
+   Sideways the room is under 720 too, but the wide grid below outranks these rules. ---- */
+@container room (max-height: 719px) {
+  .bar {
+    padding-top: 4px;
   }
-  .hand {
-    height: 84px;
-    font-size: 42px;
+  main {
+    padding-top: 4px;
+  }
+  .score {
+    grid-template-columns: auto auto 1fr;
+    grid-template-areas: 'buddy tally meta';
+    column-gap: 12px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .meta {
+    margin: 0;
+    justify-self: end;
+    text-align: right;
+  }
+  .meta .dot {
+    display: none;
+  }
+  .meta span:not(.dot) {
+    display: block;
+  }
+  .table {
+    padding-top: var(--card-pad);
+  }
+  .call {
+    flex-flow: row wrap;
+    justify-content: center;
+    column-gap: 10px;
+    row-gap: 0;
+  }
+  .window {
+    height: 6px;
   }
 }
+
+/* ---- The wide grid: every bucket but the two upright ones (a phone sideways, short or not; a
+   tablet sideways; a desktop window). Three columns under the bar: the score with the foot under
+   it, the table with the controls under it, the three hands stacked under one thumb at the right
+   edge; in the table the hand at the left, the verdict and the window bar beside it. `#app` takes
+   the whole width the insets leave. `body[data-layout]:not(...)` outranks the column's rules and
+   the short tier's, whatever their order. ---- */
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) {
+  /* The hand's clamp is of the room's height: the floor (304px) gives 109px, 367px the full 132. */
+  --computer: clamp(88px, 36cqh, 132px);
+  --side: 8px;
+  --btn-h: 44px;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) #app {
+  max-width: none;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .bar {
+  padding-top: 4px;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) main {
+  /* The score's floor is the buddy beside the face and a two-digit counter (200px); the hands' a
+     44px thumb target with air (132px); the table takes what is left first. */
+  grid-template-columns: minmax(200px, 1fr) minmax(0, 2fr) minmax(132px, 0.8fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'score table    hands'
+    'foot  controls hands';
+  gap: 6px 8px;
+  padding: 4px var(--side) 6px;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .score {
+  align-self: start;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'buddy tally'
+    'meta  meta';
+  column-gap: 10px;
+  padding: 8px 12px;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .meta {
+  margin: 6px 0 0;
+  justify-self: start;
+  text-align: left;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .meta .dot {
+  display: none;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright'])
+  .meta
+  span:not(.dot) {
+  display: block;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .table {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'hand call'
+    'hand window';
+  align-items: center;
+  align-content: center;
+  justify-items: stretch;
+  column-gap: 12px;
+  row-gap: 8px;
+  padding: 6px 12px;
+  text-align: left;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .call {
+  flex-flow: row wrap;
+  justify-content: flex-start;
+  align-items: baseline;
+  align-self: end;
+  column-gap: 10px;
+  row-gap: 0;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .window {
+  align-self: start;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .reaction {
+  /* Beside the hand the reaction has 130-180px: "No tap within 1000 ms" in two lines, not three. */
+  font-size: 0.85rem;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .hands {
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  min-height: 0;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .hand {
+  height: auto;
+  min-height: 44px;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .controls {
+  align-self: start;
+  gap: 4px 8px;
+}
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .foot {
+  align-self: start;
+}
+
+/* ---- The desktop buckets (a fine pointer; the audit's 900x700 to 1920x1080 windows): the grid
+   spread to within a tenth of the window's edges (`#app`'s padding), the score at the left, the
+   table beside it stretched to the room (a stage, the hand centred), the controls under the table,
+   the three hands a row across the bottom like keys (1, 2, 3 are theirs), the buddy at 4x and 5x,
+   the hand up to 200px, the glyphs and the counter larger. A click's target is 32px; every control
+   here is 44 or more. ---- */
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) {
+  --computer: clamp(132px, 26cqh, 200px);
+  --hand: clamp(96px, 16cqh, 160px);
+  --hand-glyph: 52px;
+  --btn-h: 52px;
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) #app {
+  padding: calc(var(--frame-inset-top) + 6vh) 8vw calc(var(--frame-inset-bottom) + 6vh);
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) main {
+  grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'score table'
+    'foot  table'
+    '.     controls'
+    'hands hands';
+  gap: 12px 16px;
+  padding: 8px 0 0;
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) .hands {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: none;
+  gap: 12px;
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) .hand {
+  height: var(--hand);
+  min-height: 96px;
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) .score {
+  padding: 12px 16px;
+  column-gap: 14px;
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) .buddy {
+  --px: 96px;
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) .counter {
+  font-size: 3rem;
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) .meta {
+  font-size: 0.95rem;
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) .table {
+  padding: 16px 20px;
+  column-gap: 24px;
+  row-gap: 12px;
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) .verdict {
+  font-size: 1.2rem;
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) .window {
+  height: 10px;
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) .reaction {
+  font-size: 1rem;
+}
+body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) .controls {
+  gap: 8px 12px;
+}
+body[data-layout][data-layout='desktop-wide'] {
+  --hand-glyph: 60px;
+}
+body[data-layout][data-layout='desktop-wide'] .buddy {
+  --px: 120px;
+}
+body[data-layout][data-layout='desktop-wide'] .face {
+  --px: 72px;
+}
+body[data-layout][data-layout='desktop-wide'] .counter {
+  font-size: 3.4rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .buddy,
   .window-bar.run {
@@ -379,22 +684,17 @@ main {
   }
 }
 
-/* The island row (src/island.ts, docs/design/rps-island.md §11): the link dressed as the start button, the state under it. */
-#islandSlot {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: center;
+/* The island row (src/island.ts, docs/design/rps-island.md §11) in the foot: the link dressed as the
+   start button on a line of its own (Try again likewise), the state line the same (`.status` is a
+   whole flex line), the links on the foot's line beside Reset progress. */
+.island-send,
+.island-retry {
+  flex: 1 1 100%;
 }
 .island-send {
   display: flex;
   align-items: center;
   justify-content: center;
-  align-self: stretch;
   text-decoration: none;
   text-align: center;
-}
-.island-open,
-.island-home {
-  padding: 8px;
 }
