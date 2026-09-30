@@ -83,8 +83,11 @@ body {
   color: var(--text);
   font: 16px/1.45 var(--font-body);
   -webkit-tap-highlight-color: transparent;
-  /* The side insets are the body's, as on the shell's unframed pages (shell.css): the column centres
-     in the room the notch leaves sideways instead of padding for a notch it never reaches. */
+}
+/* The side insets are the body's alone, as on the shell's unframed pages (shell.css): the room the
+   notch leaves sideways is what `#app` fills. (On `html` too they were paid twice: 124px a side on
+   the 16 class, which tipped the audit's 8% on that phone alone.) */
+body {
   padding: 0 var(--frame-inset-right) 0 var(--frame-inset-left);
 }
 /* The fixed screen: the viewport tall, the insets as padding, so the content box is the room and
