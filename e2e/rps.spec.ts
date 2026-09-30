@@ -32,7 +32,7 @@ const GLYPH: Readonly<Record<Hand, string>> = { rock: '✊', paper: '✋', sciss
 /** The page's key and its versioned shape (web/games/rps/src/engine/codec.ts). */
 const KEY = 'rps_progress';
 type Stored = Readonly<{
-  v: 1;
+  v: 2;
   counter: number;
   windowMs: number;
   prestige: number;
@@ -41,7 +41,7 @@ type Stored = Readonly<{
 }>;
 /** +4 with four fast wins saved: the next fast win is the fifth, at +5, and Tech up is offered. */
 const SEEDED: Stored = {
-  v: 1,
+  v: 2,
   counter: 4,
   windowMs: 2500,
   prestige: 0,
@@ -184,7 +184,7 @@ VIEWPORTS.forEach(([name, width, height]) => {
     await expect(page.locator('#best')).toHaveText('Best 300 ms');
     await expect(page.locator('#techUpBtn')).toBeHidden();
     expect(await stored(page)).toEqual({
-      v: 1,
+      v: 2,
       counter: 0,
       windowMs: 1875,
       prestige: 1,
@@ -217,7 +217,7 @@ VIEWPORTS.forEach(([name, width, height]) => {
     await expect(page.locator('#windowMs')).toHaveText('Window 2269 ms');
     await expect(page.locator('#rockBtn')).toBeDisabled();
     expect(await stored(page)).toEqual({
-      v: 1,
+      v: 2,
       counter: -2,
       windowMs: 2269,
       prestige: 1,
@@ -252,7 +252,7 @@ test('Reset progress asks first, then starts over', async ({ phone, project }) =
   await expect(page.locator('#prestige')).toHaveText('No prestige yet');
   await expect(page.locator('#best')).toHaveText('No best yet');
   expect(await stored(page)).toEqual({
-    v: 1,
+    v: 2,
     counter: 0,
     windowMs: 2500,
     prestige: 0,
