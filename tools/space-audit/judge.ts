@@ -216,12 +216,13 @@ export const judge = (r: Record_): Verdict => {
     detail: `data-frame ${m.frame ? 'present' : 'absent'}, ${wantFrame ? 'wanted' : 'not wanted'} on ${page}`,
   };
   const gutter = m.gutterToken ?? GUTTER;
+  // While the document scrolls, content at the bottom edge or crossing the bottom band is below
+  // the fold, not against the glass or under the home indicator (the `scroll` column owns an
+  // unintended scroll): the bottom counts only where the screen ends at the viewport.
+  const edges = tall ? SIDES.filter((s) => s !== 'bottom') : SIDES;
   const tight = wantFrame
     ? []
-    : SIDES.filter((s) => e.insets[s] <= 0 && m.used !== null && gaps[s] < gutter - TOL);
-  // While the document scrolls, a box crossing the bottom band is content below the fold, not
-  // text under the home indicator (the `scroll` column owns an unintended scroll): the bottom band
-  // counts only where the screen ends at the viewport.
+    : edges.filter((s) => e.insets[s] <= 0 && m.used !== null && gaps[s] < gutter - TOL);
   const hits = tall ? m.underInset.filter((h) => h.side !== 'bottom') : m.underInset;
   const gutterCheck: Check = {
     name: 'gutter',

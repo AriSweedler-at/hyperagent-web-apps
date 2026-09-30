@@ -25,7 +25,8 @@ import {
 import { cardPasses, deviceLine, sheetHtml } from './sheet.ts';
 
 const iphone12 = deviceById('iphone-390x844');
-if (iphone12 === null) throw new Error('row missing');
+const se = deviceById('iphone-375x667-se');
+if (iphone12 === null || se === null) throw new Error('rows missing');
 /** Sideways standalone: the notch's 47 on both sides, 21 below. */
 const sideways: Emulation = emulationFor(iphone12, 'landscape', 'standalone');
 /** Upright standalone: 47 above, 34 below. */
@@ -167,6 +168,22 @@ describe('the judge, one row per rule', () => {
     expect(
       failing({ ...m, underInset: [{ sel: 'h1', side: 'top' as const }] }, upright, HOME),
     ).toEqual(['gutter']);
+    // The same for content reaching the fold, on the SE (no inset: the bottom is the gutter's
+    // edge): no gutter while the document scrolls, a gutter failure once it ends at the viewport.
+    const seUp = emulationFor(se, 'portrait', 'standalone');
+    const flat = full(seUp);
+    const used = flat.used;
+    if (used === null) throw new Error('used');
+    const toFold = {
+      ...flat,
+      fixedScreen: false,
+      scrollHeight: seUp.viewport.height + 400,
+      used: { ...used, h: seUp.viewport.height - used.y },
+    };
+    expect(failing(toFold, seUp, HOME)).toEqual([]);
+    expect(failing({ ...toFold, scrollHeight: seUp.viewport.height }, seUp, HOME)).toEqual([
+      'gutter',
+    ]);
   });
   test('a frame on the wrong page, none on backgammon; the sandbox demos it', () => {
     expect(failing(full(sideways, 'ui-sandbox'), sideways, TABLE, 'ui-sandbox')).toEqual([]);
