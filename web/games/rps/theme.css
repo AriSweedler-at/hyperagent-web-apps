@@ -494,6 +494,13 @@ main {
   }
 }
 
+/* An iPad upright (`tablet-upright`, 768-1024 wide; docs/design/space-audit.md §5 "Closed by
+   briscola-tablet-buckets"): the same column, nine tenths of the width (the `cqh` budget above fills the
+   height already, 1.1-1.5% below on every iPad); the 480px column left 20-28% of the screen a side. */
+body[data-layout='tablet-upright'] #app {
+  max-width: min(100%, 90vw);
+}
+
 /* ---- The wide grid: every bucket but the two upright ones (a phone sideways, short or not; a
    tablet sideways; a desktop window). Three columns under the bar: the score with the foot under
    it, the table with the controls under it, the three hands stacked under one thumb at the right

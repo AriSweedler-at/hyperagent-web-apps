@@ -436,11 +436,13 @@ body[data-layout="desktop-wide"].fixed-screen{--column-wide:1560px}
 body[data-layout="desktop-wide"] .game{grid-template-columns:260px minmax(0,1fr) 340px}
 body[data-layout="desktop-wide"] .game>.stack{display:contents}
 body[data-layout="desktop-wide"] .game .seats{grid-template-columns:1fr;align-content:start}
-/* A desktop window taller than the game screen (1920x1080: the screen is 930px): the wood fills the room to the foot,
-   as a table does, instead of a strip of sky under it (the audit's table row: at most a tenth of the window empty a side). */
-body[data-layout^="desktop"] #tableScreen,body[data-layout^="desktop"] #fidiceTable,body[data-layout^="desktop"] #screen-game{flex:1;display:flex;flex-direction:column}
-body[data-layout^="desktop"] .game{flex:1}
-body[data-layout^="desktop"] .game>.stack>.table{flex:1}
+/* A desktop window taller than the game screen (1920x1080: the screen is 930px), and an iPad (the Pro upright, 1024x1296-1366:
+   the screen is 1062px, 18-22% of sky under it; docs/design/space-audit.md §5 "Closed by briscola-tablet-buckets"): the wood
+   fills the room to the foot, as a table does, instead of a strip of sky under it (the audit's table row: at most a tenth of
+   the window empty a side). */
+body:is([data-layout^="desktop"], [data-layout^="tablet"]) #tableScreen,body:is([data-layout^="desktop"], [data-layout^="tablet"]) #fidiceTable,body:is([data-layout^="desktop"], [data-layout^="tablet"]) #screen-game{flex:1;display:flex;flex-direction:column}
+body:is([data-layout^="desktop"], [data-layout^="tablet"]) .game{flex:1}
+body:is([data-layout^="desktop"], [data-layout^="tablet"]) .game>.stack>.table{flex:1}
 /* ---------- Sideways on a phone: the table fits without a scroll (docs/design/space-audit.md §5 "Closed by
    fidice-sideways-fold"; a step of the restyle, docs/design/fidice-shell-adoption.md §4 M6) ----------
    The legacy game screen stacked is 1100-1330px in a 305-440px viewport, so its copy folds. The game screen is two

@@ -119,3 +119,34 @@ judged by `DESKTOP_LIMITS` (a home may leave 40% empty below and beside its colu
 within a tenth on every side; no scroll, no clipping) and a 32px target (a click's size), grouped
 last on the sheets and named `desktop 1280x800` in the check table. Every case, phone or window,
 reports the bucket the page put itself in (`data-layout`), so a per-game row has a target per case.
+
+## 6. The tablets
+
+The two tablet buckets (`tablet-upright`, `tablet-sideways`: the catalogued iPads, 768-1024 wide
+upright, 1024-1366 sideways) are default cases of the space audit since briscola-tablet-buckets
+(docs/design/space-audit.md §5 "Closed by briscola-tablet-buckets"; before it they reached the audit
+through `--device <ipad>` alone and no tablet bucket had a number). An iPad is a touch screen the
+size of a monitor: the audit judges it by the desktop's room rules (`TABLET_LIMITS`: a home may
+leave 40% empty below and beside its column, a table fills to within a tenth on every side) with a
+finger's 44px target, groups it between the phones and the windows on the sheet, and `--device
+tablet` runs the three iPads alone. The 480px column, which every game kept on the iPads until
+then, leaves 14-27% of a table a side there, so each game names the bucket's layout:
+
+- **Briscola.** Both tablet buckets take the desktop table (theme.css: `body[data-layout^='tablet']
+  .fixed-screen #app { max-width: 1100px }`, the desktop's own value): sideways an iPad is a desktop-
+  sized touch screen and its ≥900px tier already lays the table out for it, while the phone's
+  corners-and-bands grid caps its cards at 110px from 417px tall and would leave a 698-1024px room
+  half empty felt; upright the 9th and the Air stretch the phone's column (the cards keep their
+  height budget) and the Pro is on the ≥900px tier already. The home keeps the shell's column.
+- **Gin.** `tablet-sideways` joins the desktop grid (the band of three and one row of eleven, under the
+  same `@media (min-width: 900px)`); `tablet-upright` takes the laptop tier's 860px column with the
+  phone's layout (the cards stay under their 54px cap).
+- **Fidice.** The table's column was 1200px on the tablets already; the desktop's fill-to-the-foot
+  rule now reaches them, so the wood fills the Pro upright's room instead of a strip of sky.
+- **RPS.** `tablet-sideways` was the wide grid already; `tablet-upright` keeps the column at nine
+  tenths of the width, since its `cqh` budget fills the height on every iPad.
+
+The home of every game keeps the shell's 480px column on the iPads (a form reads no better wider):
+within the 40% beside it everywhere, over the 40% below it on the tallest screens (the iPad Pro
+upright at 1296-1366px tall, gin's shorter home on the Air and the 9th too); a tablet home
+arrangement is left, with the numbers in space-audit.md §5.

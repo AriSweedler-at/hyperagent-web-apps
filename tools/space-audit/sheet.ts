@@ -13,6 +13,7 @@ import {
   gapsOf,
   insetsOf,
   isDesktop,
+  isTablet,
   roomOf,
   sidesText,
   type AuditCase,
@@ -96,13 +97,15 @@ export const sheetHtml = (page: PageId, cards: ReadonlyArray<AuditCard>, stamp: 
 <p class="device">${esc(caseLine(c.e))}</p>
 </section>`;
   };
-  // Two groups: the phones, then the desktop windows under their own heading (each heading only where the other group is present too).
-  const phones = cards.filter((c) => !isDesktop(c.e));
+  // Three groups: the phones, the tablets, then the desktop windows, each under its own heading (the headings only where more than one group is present).
+  const phones = cards.filter((c) => !isDesktop(c.e) && !isTablet(c.e));
+  const tablets = cards.filter((c) => isTablet(c.e));
   const desktops = cards.filter((c) => isDesktop(c.e));
+  const present = [phones, tablets, desktops].filter((g) => g.length > 0).length;
   const group = (title: string, group: ReadonlyArray<AuditCard>): string =>
     group.length === 0
       ? ''
-      : `${phones.length > 0 && desktops.length > 0 ? `<h2 class="group">${esc(title)} <small>· ${String(group.filter(cardPasses).length)} of ${String(group.length)} pass</small></h2>\n` : ''}${group.map(card).join('\n')}`;
+      : `${present > 1 ? `<h2 class="group">${esc(title)} <small>· ${String(group.filter(cardPasses).length)} of ${String(group.length)} pass</small></h2>\n` : ''}${group.map(card).join('\n')}`;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Space audit · ${esc(page)} · ${esc(stamp)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -128,8 +131,9 @@ dl{display:grid;grid-template-columns:max-content 1fr;gap:2px 12px;margin:8px 0;
 h2.group{font-size:16px;margin:24px 0 10px;padding-top:12px;border-top:1px solid var(--line)}h2.group small{font-weight:normal;color:var(--muted)}
 </style></head><body>
 <h1>Space audit · ${esc(page)} <small>· ${esc(stamp)} · ${String(passed)} of ${String(cards.length)} cases pass</small></h1>
-<p class="lead">Every catalogued phone (web/shared/lib/devices.ts), each orientation and display mode, a browser tab twice (bar shown, then hidden), at the device's pixel ratio; then the desktop windows (a fine pointer, no touch, no insets; docs/design/space-audit.md §5), judged by their own limits. Per screen: the layout bucket the page put itself in (docs/design/layout-buckets.md), the empty screen beyond the room on each side (px and the fraction of the viewport), the document against the viewport, and the six rules (docs/design/space-audit.md); red where one fails, grey where the page means it (a scroll tier, the turn gate). The olive line is the picture's edge, not the frame. Look, then decide.</p>
+<p class="lead">Every catalogued phone (web/shared/lib/devices.ts), each orientation and display mode, a browser tab twice (bar shown, then hidden), at the device's pixel ratio; then the catalogued iPads the same way, judged by the desktop's room rules with a finger's target; then the desktop windows (a fine pointer, no touch, no insets; docs/design/space-audit.md §5), judged by their own limits. Per screen: the layout bucket the page put itself in (docs/design/layout-buckets.md), the empty screen beyond the room on each side (px and the fraction of the viewport), the document against the viewport, and the six rules (docs/design/space-audit.md); red where one fails, grey where the page means it (a scroll tier, the turn gate). The olive line is the picture's edge, not the frame. Look, then decide.</p>
 ${group('Phones', phones)}
+${group('Tablets', tablets)}
 ${group('Desktop windows', desktops)}
 </body></html>
 `;
