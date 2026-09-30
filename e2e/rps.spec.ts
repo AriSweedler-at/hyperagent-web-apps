@@ -5,12 +5,26 @@
 // wins saved offers Tech up (§2), Tech up is taken, then a tie, a loss and a timeout; after each the
 // counter, the band and the saved `rps_progress` are what the vectors say (§6). Twice: an iPhone
 // (390 × 844) and an Android phone (360 × 800), both touch contexts, so the three hands are
-// thumb-height and inside the screen on either.
-import type { Page } from '@playwright/test';
+// thumb-height and inside the screen on either; on `pages` alone, since they are about the page.
+// Then the island row (§11), which is about the origin: on `proxy` (games.sweedler.com emulated,
+// the real Worker over the harness's stubs) an iPhone with a Dynamic Island sees the button, pairs
+// through a POST the clip would make, plays a round and the stub APNs takes the push; an Android
+// phone there sees no row; on `pages` (no Worker) the same iPhone sees none either.
+import type { Browser, BrowserContext, Page } from '@playwright/test';
 
 import { PAGE_TITLES } from '../tools/games.ts';
-import { pagePath } from './fixtures/site.ts';
+import { startProxy, type ApnsPush } from '../tools/proxy-dev.ts';
+import {
+  APP_STORE_ID,
+  CLIP_BUNDLE_ID,
+  CLIP_ORIGIN,
+  SMART_APP_BANNER_META,
+} from '../web/shared/lib/appClip.ts';
+import { deviceById, emulationFor } from '../web/shared/lib/devices.ts';
+import { ALLOWED_FAILURES } from './fixtures/offline.ts';
+import { LOCAL_HOST, PAGES_ORIGIN, baseUrl, pagePath } from './fixtures/site.ts';
 import { expect, test } from './fixtures/two-players.ts';
+import { watchPage } from './fixtures/watch.ts';
 
 type Hand = 'rock' | 'paper' | 'scissors';
 const GLYPH: Readonly<Record<Hand, string>> = { rock: '✊', paper: '✋', scissors: '✌️' };
@@ -104,6 +118,7 @@ VIEWPORTS.forEach(([name, width, height]) => {
     phone,
     project,
   }) => {
+    test.skip(project !== 'pages', 'about the page, not the origin');
     const { page } = phone;
     await page.setViewportSize({ width, height });
     await seedStorage(page, SEEDED);
@@ -209,6 +224,7 @@ VIEWPORTS.forEach(([name, width, height]) => {
 });
 
 test('Reset progress asks first, then starts over', async ({ phone, project }) => {
+  test.skip(project !== 'pages', 'about the page, not the origin');
   const { page } = phone;
   await seedStorage(page, { ...SEEDED, counter: -5, windowMs: 238, prestige: 3 });
   await page.goto(pagePath(project, 'rps'));
@@ -232,5 +248,181 @@ test('Reset progress asks first, then starts over', async ({ phone, project }) =
     prestige: 0,
     recentWins: [],
     best: null,
+  });
+});
+
+// ---- The island row (docs/design/rps-island.md §11) ----------------------------------------------
+
+/** The catalogue class with a Dynamic Island the spec stands on: iPhone 14 Pro, 15, 15 Pro, 16 (393 × 852). */
+const ISLAND_IPHONE = 'iphone-393x852';
+/** The 360-wide Android class (Galaxy S23): a hole in the glass, never a row. */
+const ANDROID = 'android-360x780-galaxy';
+/** What the clip would post: a 64-hex activity push token. */
+const FAKE_TOKEN = 'ab'.repeat(32);
+const SESSION_SHAPE = /^[a-z0-9]{8}$/;
+
+/** A context standing on a catalogue device upright in a tab with the bar up (as e2e/ui-sandbox.spec.ts does). */
+const deviceContext = (browser: Browser, id: string, baseURL: string): Promise<BrowserContext> => {
+  const device = deviceById(id);
+  if (device === null) throw new Error(`no catalogue row ${id}`);
+  const e = emulationFor(device, 'portrait', 'browser', 'shown');
+  return browser.newContext({
+    baseURL,
+    viewport: e.viewport,
+    screen: e.screen,
+    deviceScaleFactor: e.dpr,
+    isMobile: true,
+    hasTouch: true,
+  });
+};
+
+const slot = (page: Page) => page.locator('#islandSlot');
+const banner = (page: Page) => page.locator(`meta[name="${SMART_APP_BANNER_META}"]`);
+const islandKind = (page: Page): Promise<string> =>
+  page.evaluate<string>('window.__rps.island().kind');
+const sessionStored = (page: Page): Promise<string | null> =>
+  page.evaluate<string | null>('sessionStorage.getItem("rps_session")');
+/** The session in the send link's href. */
+const sessionOfLink = async (page: Page): Promise<string> => {
+  const href = (await slot(page).locator('a[data-island="send"]').getAttribute('href')) ?? '';
+  return new URL(href).searchParams.get('session') ?? '';
+};
+/** Every push the stub APNs took (tools/proxy-dev.ts `startApnsStub`), oldest first. */
+const pushes = async (apns: string): Promise<ReadonlyArray<ApnsPush>> =>
+  (await (await fetch(`${apns}/pushes`)).json()) as ReadonlyArray<ApnsPush>;
+type ContentState = Readonly<{ counter: number; prestige: number; band: string; at: number }>;
+const contentState = (push: ApnsPush | undefined): ContentState =>
+  (JSON.parse(push?.body ?? '{}') as Readonly<{ aps: Readonly<{ 'content-state': ContentState }> }>)
+    .aps['content-state'];
+
+test.describe('the island row', () => {
+  test('an island iPhone on games.sweedler.com: the button, the pairing, the round pushed to the island, the buddy sent home', async ({
+    browser,
+    project,
+  }) => {
+    test.skip(project !== 'proxy', "the Worker is the proxy origin's");
+    // A proxy of this spec's own (the same Worker and stubs as the harness's), so the stub APNs's
+    // address is known here; the page is served from it.
+    const proxy = await startProxy({ host: LOCAL_HOST, port: 0, upstream: PAGES_ORIGIN });
+    const context = await deviceContext(browser, ISLAND_IPHONE, `${proxy.url}/`);
+    try {
+      // The clip's URL is the live host's; here it lands on a stub so the tap never leaves the machine.
+      await context.route(`${CLIP_ORIGIN}/**`, (route) =>
+        route.fulfill({ status: 200, contentType: 'text/html', body: '<title>clip</title>' }),
+      );
+      const page = await context.newPage();
+      const watched = watchPage(page, ALLOWED_FAILURES);
+      await seedStorage(page, SEEDED);
+      await page.clock.install({ time: new Date('2026-09-29T12:00:00Z') });
+      await page.goto(pagePath('proxy', 'rps'));
+      await expect.poll(() => page.evaluate<string>('typeof window.__rps')).toBe('object');
+      await page.clock.pauseAt(new Date('2026-09-29T12:00:05Z'));
+
+      // The probe found the Worker: the button, a plain link to the clip carrying the session,
+      // the session in sessionStorage, and the Smart App Banner naming the clip and that URL.
+      const send = slot(page).locator('a[data-island="send"]');
+      await expect(send).toHaveText('Send buddy to your island');
+      await expect(send).toHaveAttribute('target', '_blank');
+      const session = await sessionOfLink(page);
+      expect(session).toMatch(SESSION_SHAPE);
+      const href = `${CLIP_ORIGIN}/clip/rps?session=${session}`;
+      await expect(send).toHaveAttribute('href', href);
+      expect(await sessionStored(page)).toBe(session);
+      await expect(banner(page)).toHaveAttribute(
+        'content',
+        `app-id=${APP_STORE_ID}, app-clip-bundle-id=${CLIP_BUNDLE_ID}, app-clip-display=card, app-argument=${href}`,
+      );
+
+      // The tap opens the clip in a new tab; the row says the buddy is on its way and polls.
+      const [popup] = await Promise.all([context.waitForEvent('page'), send.click()]);
+      await popup.close();
+      await expect(slot(page)).toContainText('Buddy is on its way…');
+      expect(await islandKind(page)).toBe('waiting');
+      expect(await pushes(proxy.apns)).toEqual([]);
+
+      // The clip pairs: its POST with the activity's token. The page's next poll, 3 s later on
+      // its clock, sees it; paired, the page syncs the island with the saved +4 at once.
+      const paired = await fetch(`${proxy.url}/api/rps/pair`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ session, token: FAKE_TOKEN, bundle: CLIP_BUNDLE_ID }),
+      });
+      expect(paired.status).toBe(204);
+      await page.clock.runFor(3000);
+      await expect(slot(page)).toContainText('Buddy is in your island');
+      await expect.poll(async () => (await pushes(proxy.apns)).length).toBe(1);
+      const sync = (await pushes(proxy.apns))[0];
+      expect(sync?.token).toBe(FAKE_TOKEN);
+      expect(sync?.headers['apns-topic']).toBe(`${CLIP_BUNDLE_ID}.push-type.liveactivity`);
+      expect(sync?.headers['apns-push-type']).toBe('liveactivity');
+      expect(contentState(sync)).toMatchObject({ counter: 4, prestige: 0, band: 'happy' });
+
+      // The Worker spaces pushes 2 s apart on its own clock (rps-push.ts PUSH_INTERVAL_MS): wait it
+      // out, then a win at 350 ms: +5, very happy, the mood posted and pushed to the island.
+      await page.waitForTimeout(2_100);
+      await round(page, 'scissors', 'rock', 350);
+      await expect(page.locator('#verdict')).toHaveText('You win');
+      await expectScore(page, '+5', 'veryHappy', 'very-happy');
+      await expect.poll(async () => (await pushes(proxy.apns)).length).toBe(2);
+      const push = (await pushes(proxy.apns))[1];
+      expect(push?.token).toBe(FAKE_TOKEN);
+      const state = contentState(push);
+      expect(state).toMatchObject({ counter: 5, prestige: 0, band: 'veryHappy' });
+      // `at` is the page's clock at the save, in seconds.
+      const pageNow = await page.evaluate<number>('Date.now()');
+      expect(Math.abs(state.at - Math.floor(pageNow / 1000))).toBeLessThanOrEqual(1);
+
+      // Send buddy home: the button again on a fresh session (remembered), the old one unreachable.
+      await slot(page).locator('[data-island="home"]').click();
+      await expect(slot(page).locator('a[data-island="send"]')).toHaveText(
+        'Send buddy to your island',
+      );
+      const fresh = await sessionOfLink(page);
+      expect(fresh).toMatch(SESSION_SHAPE);
+      expect(fresh).not.toBe(session);
+      expect(await sessionStored(page)).toBe(fresh);
+      expect(await islandKind(page)).toBe('idle');
+      expect(watched.errors(), 'uncaught exceptions').toEqual([]);
+    } finally {
+      await context.close();
+      await proxy.close();
+    }
+  });
+
+  test('an Android phone on games.sweedler.com: no row, no banner', async ({
+    browser,
+    project,
+  }) => {
+    test.skip(project !== 'proxy', "the Worker is the proxy origin's");
+    const context = await deviceContext(browser, ANDROID, baseUrl('proxy'));
+    try {
+      const page = await context.newPage();
+      await page.goto(pagePath('proxy', 'rps'));
+      await expect.poll(() => page.evaluate<string>('typeof window.__rps')).toBe('object');
+      expect(await islandKind(page)).toBe('off');
+      await expect(slot(page)).toBeEmpty();
+      await expect(banner(page)).toHaveCount(0);
+      expect(await sessionStored(page)).toBeNull();
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('an island iPhone on GitHub Pages: no Worker, so no row and the banner taken back', async ({
+    browser,
+    project,
+  }) => {
+    test.skip(project !== 'pages', 'the origin without a Worker');
+    const context = await deviceContext(browser, ISLAND_IPHONE, baseUrl('pages'));
+    try {
+      const page = await context.newPage();
+      await page.goto(pagePath('pages', 'rps'));
+      await expect.poll(() => page.evaluate<string>('typeof window.__rps')).toBe('object');
+      await expect.poll(() => islandKind(page)).toBe('off');
+      await expect(slot(page)).toBeEmpty();
+      await expect(banner(page)).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
   });
 });

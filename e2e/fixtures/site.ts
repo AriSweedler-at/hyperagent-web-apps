@@ -116,8 +116,6 @@ export const PAGE_ONLY_SPECS: ReadonlyArray<string> = [
   '**/gin-scorer.spec.ts',
   '**/gin-sound-font.spec.ts',
   '**/gin-stories.spec.ts',
-  // The reaction game: the page's clock and a rigged round, about the page alone.
-  '**/rps.spec.ts',
   '**/shell-glossary.spec.ts',
   '**/shell-home.spec.ts',
   // The sessions' silence watch is a timer, the same on either origin.
