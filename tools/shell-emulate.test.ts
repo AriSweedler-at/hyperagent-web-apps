@@ -212,7 +212,8 @@ describe('list and explain', () => {
       'tl 47.33  tr 47.33  br 47.33  bl 47.33',
     );
     expect(text).toContain('layout landscape (rail)');
-    expect(text).toContain('edge 47  chrome-w 144');
+    // The rail hugs the trim on the free side (the right under landscape-primary): 47 + 11 + 50.
+    expect(text).toContain('edge 47  rail 11 right  chrome-w 108');
     expect(text).toContain('padding 11/27  chrome-h 66  room above/below 39/27');
     // (340 - 66 - 16) / 2 = 129; bar hidden: (390 - 66 - 16) / 2 = 154.
     expect(text).toContain('point-len 129 (floor 96;');

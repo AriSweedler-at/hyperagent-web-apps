@@ -251,10 +251,31 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   (max-height: 500px)`, the phone's shape and never its width, since a Pixel 8 and every Pro Max
   are 900px wide sideways; `any-pointer`, since `(pointer: coarse)` was seen to flip after mouse
   clicks in the harness; docs/design/backgammon-landscape.md; the blocks at the end of theme.css):
-  `#app` reads the safe area into `--inset-l/r/b` and pads both sides by one `--edge max(16px,
+  `#app` reads the safe area into `--inset-l/r/b`; the board's gutter is `--edge max(16px,
   inset-l, inset-r)` (iOS reports both sides at the notch's depth, Android the cutout's side only,
-  so one edge keeps the board centred and the leftmost point out of the back-swipe band; `#app`'s
-  480px cap is lifted at the table); `--off-w 44px`, `--off-h 0`, `--bar-w = --point-w`,
+  so the larger inset is the cut's side whichever it is, and 16px keeps the leftmost point out of
+  the back-swipe band; `#app`'s 480px cap is lifted at the table), both sides with the rows. With
+  the rail the gutters are one a side (the owner, 2026-09-28: the side buttons "should happily
+  squish up to the edge of the screen ... they should actually be notch-aware ... use the space
+  between those 2 quarter circles on the non-notch side"): `src/safeArea.ts` writes the safe-area
+  map (web/shared/lib/safeArea.ts, ui-sandbox.md §3: the cut's side from `screen.orientation.type`,
+  landscape-primary on the left; the corner arcs spared) on the root as `data-free-side` and the
+  `--safe-*` segments, and the rail stands on the free side hugging the trim at `--edge-rail`
+  (`--pad-t`, 11px: the band, the hairline and the air; the inset there is the other side's mirror,
+  no hardware) between the corner arcs (the menu's `margin-top` and Undo's `margin-bottom` keep the
+  rail's ends inside `--rail-from`/`--rail-to`, the free side's segment, or the right edge's own
+  with no map; 48px under a 55px radius, 0 on a square corner), while the board's gutter on the
+  cut's side is the inset. With no cut known (`none`: an SE, an unknown phone, headless) the rail
+  stands on the right at `max(11px, inset)`. A half turn of the phone moves the rail live
+  (`screen.orientation`'s `change` rewrites the map; the grid reads the variables), and the far
+  seat's flip (`body[data-flip]`) reads every side mirrored, so the rail keeps the screen's free
+  side while the body is upside down. The rail on the left is the same `grid-template-areas`
+  string with the columns overridden: every strip item's `grid-column` reads a `--col-*` variable
+  holding its area's name (`grid-column: opp` is `opp-start / opp-end`), the rail's items
+  `--col-rail` (6, or 1), the board `--col-board` (`board`, or `2 / 7`), and the arrow and the cube
+  hang off the board's other edge (`--hang-l/r`, `--cube-l/r`), so the dist grid pin keeps its two
+  strings. The ears beside the cut (the space above and below the notch, the map's
+  `--safe-left-top` and the rest) are a follow-up. `--off-w 44px`, `--off-h 0`, `--bar-w = --point-w`,
   `--point-w clamp(44px, (100vw - chrome-w - 44px - 16px) / 13, 64px)` (twelve points, the bar, the
   tray and the frame in what the chrome leaves beside the board); the point length is measured,
   not computed from a viewport unit: `#tableScreen` is a size container (`container-type: size`)
@@ -313,8 +334,8 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   overlap the green border") and `max(pad-t, 6px + inset-b)` below (the home indicator's 21px band
   clears the trim by itself) in both schemes (the base block's 12 each stay on the sideways home
   and the match-over screen); `--pad-v` is the pair (22 inset-free, 38 with a 21px home indicator);
-  `--chrome-w 2 edge + 44px + 6px` (82 inset-free, 144 on an iPhone 12), `--chrome-h pad-v + 24 +
-  4` (50; 66 with the home indicator), floor
+  `--chrome-w edge + edge-rail + 44px + 6px` (77 inset-free, 108 on an iPhone 12 with the map, 144
+  with no cut known), `--chrome-h pad-v + 24 + 4` (50; 66 with the home indicator), floor
   `--point-len-min 104px - (pad-v - 22px) / 2` (96 with the home indicator: 2 x floor + 16 +
   chrome-h is 274 at any inset). The cube hangs 6px under the arrow (`margin-top: 26px`), clear of
   Undo from the 274 floor up (3px on the floor's 208px board with a home indicator). Under 714px (the
@@ -346,13 +367,15 @@ shell's start buttons: docs/ARCHITECTURE.md "Calls to action"). Game tokens, onl
   inside the 88dvh cap from the 264 floor up), the curtain sheet stands "Continue online" beside
   the reveal button at 14px paddings, and the match-over screen is two columns the viewport tall
   (the games card scrolling inside), so Rematch is on screen at the floor; `.desk-only` and
-  `#handoffBtn` stay hidden (the menu and the curtain carry them). 54 x 162 at 844x390 inset-free,
-  49.2 x 154 on an iPhone 12 with its 47/47/21 insets, 48 x 155.5 on the 852x393 class, 44.2 x
-  129.5 on an SE; the board's edges stand 39px under the viewport's top and 11 over its bottom
+  `#handoffBtn` stay hidden (the menu and the curtain carry them). 54.4 x 162 at 844x390 inset-free,
+  52 x 154 on an iPhone 12 with its 47/47/21 insets and the map, 51.7 x 155.5 on the 852x393 class,
+  44.2 x 129.5 on an SE; the board's edges stand 39px under the viewport's top and 11 over its bottom
   with the rail (27 over a home indicator), 39 and 61 with the rows (`boardRoom`; the geometry
   e2e's `expectFillsRoom` pins both at 844x390 and 667x375 in every phase). `layoutFor(vp)`,
-  `pointWidth`, `paddingOf`, `chromeHeight`, `pointLength`, `boardRoom`, `RAIL_MIN_WIDTH` and
-  `LANDSCAPE_GEOMETRY` in `ui/board/layout.ts` are the twin.
+  `pointWidth`, `paddingOf`, `chromeHeight`, `pointLength`, `boardRoom`, `edgeOf`, `railEdgeOf`,
+  `railSideOf` (over `Viewport.freeSide`), `RAIL_MIN_WIDTH` and `LANDSCAPE_GEOMETRY` in
+  `ui/board/layout.ts` are the twin; the emulator and the devices e2e pass the free side the map
+  gives the case's cut under its orientation type (`--type landscape-secondary` turns the phone).
 
 ### 3.2 The screen's vertical structure
 
@@ -394,7 +417,8 @@ abs + 1`, for seat 1 `own = 24 − abs`. `ui/board/layout.ts` is the pure twin o
 (a typo in either string is otherwise silent); the landscape chrome grid on `#tableScreen` is a
 third `grid-template-areas` in the file, which the test tells apart by its naming no place (only
 the board's rows name `barTop`) and pins cell by cell against `CHROME_CELLS` (a misspelt or moved
-name there tears the sideways table as silently). On the phone the centred cube sits at the dice
+name there tears the sideways table as silently); the rail on the left (§3.1) is that string with
+every item's `grid-column` overridden through the `--col-*` variables, not a third string. On the phone the centred cube sits at the dice
 area's inner end (two 44px dice and the 26px cube fill the 116px area, so the dice start flush) and
 an owned cube moves into its owner's bar half; on the desktop `#cube` spans the bar column and
 `align-self` follows `data-owner="far|none|near"`, clearing two bar checkers.

@@ -11,6 +11,7 @@
 // (the documented test hook, design Q5) beyond the shared ones, and its shell config (`shell`:
 // its `orientation: 'landscape'` has the boot watch the phone's orientation and paint the turn
 // gate; docs/design/shared-shell.md "Playing sideways", docs/design/backgammon-landscape.md §5D).
+// After the boot, the safe-area map on the root (src/safeArea.ts): the rail's side sideways.
 import { bootShell } from '../../shared/edge/boot.ts';
 import { realClock } from '../../shared/edge/clock.ts';
 import { browserStore } from '../../shared/edge/storage.ts';
@@ -22,6 +23,7 @@ import { isGuestFrame } from './src/protocol.ts';
 import { STORAGE_KEYS, soundEnabled } from './src/storage.ts';
 import { fillNameInputs, fillP2NameInput, setCodeInput } from './src/ui/home.ts';
 import { bindAll, paint, paintSound, toastMarks } from './src/ui/render.ts';
+import { watchSafeArea } from './src/safeArea.ts';
 import {
   BACKGAMMON,
   guestContextOf,
@@ -69,3 +71,4 @@ bootShell<Backgammon, App>({
     }),
   },
 });
+watchSafeArea(document, window);

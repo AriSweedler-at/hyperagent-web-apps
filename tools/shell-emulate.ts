@@ -70,6 +70,8 @@ import {
   paddingOf,
   pointLength,
   pointWidth,
+  railEdgeOf,
+  railSideOf,
   uprightBoardHeight,
   uprightChromeIn,
   uprightFoot,
@@ -77,6 +79,7 @@ import {
   uprightRoom,
   uprightScrolls,
   uprightTight,
+  type FreeSide,
   type Layout,
   type Viewport,
 } from '../web/games/backgammon/src/ui/board/layout.ts';
@@ -107,6 +110,7 @@ import {
 import { clipGate } from '../web/shared/lib/appClip.ts';
 import {
   EDGES,
+  ORIENTATION_TYPES,
   lengthOf,
   safeAreaMap,
   type Edge,
@@ -134,6 +138,13 @@ export type EmulateArgs = Readonly<{
   serve: boolean;
   out: string | null;
   json: string | null;
+  /**
+   * `--type`: the `screen.orientation.type` backgammon's page is told sideways (the seam defines
+   * it on `ScreenOrientation.prototype`, since no emulator sets it): `landscape-secondary` turns
+   * the phone the other way, the cut on the right, the rail to the left (theme.css's rail block,
+   * docs/design/backgammon-board.md §3.1); null leaves Chromium's own, `landscape-primary`.
+   */
+  type: OrientationType | null;
 }>;
 
 const COMMANDS: ReadonlyArray<Command> = ['list', 'explain', 'render', 'check'];
@@ -164,6 +175,7 @@ export const parseEmulateArgs = (argv: ReadonlyArray<string>): EmulateArgs => {
       serve: { type: 'boolean', default: false },
       out: { type: 'string' },
       json: { type: 'string' },
+      type: { type: 'string' },
     },
   });
   const command = oneOf('command', positionals[0] ?? 'list', COMMANDS);
@@ -184,6 +196,7 @@ export const parseEmulateArgs = (argv: ReadonlyArray<string>): EmulateArgs => {
     serve: values.serve,
     out: values.out ?? null,
     json: values.json ?? null,
+    type: oneOf('type', values.type, ORIENTATION_TYPES),
   };
 };
 
@@ -357,8 +370,27 @@ export const listText = (): string => {
   return [head, ...rows].join('\n');
 };
 
-/** The twin's viewport for a case: coarse pointer, the case's four insets (the top one is the notch upright once installed, what the upright room is short by). */
-export const twinViewport = (e: Emulation): Viewport => ({
+/**
+ * The side the safe-area map names free of the cut for a case (web/shared/lib/safeArea.ts
+ * `--safe-free-side`, what backgammon's ui/safeArea.ts writes on the page): sideways, the short
+ * side opposite the cut under the orientation type (Chromium's `landscape-primary` without
+ * `--type`: the cut on the left, the right free); `none` upright or without a catalogued cut.
+ */
+export const freeSideOfCase = (e: Emulation, type: OrientationType | null): FreeSide => {
+  if (e.orientation !== 'landscape') return 'none';
+  const map = safeAreaMap({
+    corners: e.corners,
+    cut: e.device.cut,
+    type: type ?? 'landscape-primary',
+    insets: e.insets,
+    viewport: { width: e.viewport.width, height: e.viewport.height },
+    full: { width: e.screen.width, height: e.screen.height },
+  });
+  return map.cutEdge === 'left' ? 'right' : map.cutEdge === 'right' ? 'left' : 'none';
+};
+
+/** The twin's viewport for a case: coarse pointer, the case's four insets (the top one is the notch upright once installed, what the upright room is short by) and the rail's free side under the orientation type. */
+export const twinViewport = (e: Emulation, type: OrientationType | null = null): Viewport => ({
   width: e.viewport.width,
   height: e.viewport.height,
   coarse: true,
@@ -368,6 +400,7 @@ export const twinViewport = (e: Emulation): Viewport => ({
     right: e.insets.right,
     bottom: e.insets.bottom,
   },
+  freeSide: freeSideOfCase(e, type),
 });
 
 /**
@@ -396,6 +429,9 @@ export type Twin = Readonly<{
   upright: UprightTwin | null;
   scheme: 'rail' | 'rows' | null;
   edge: number;
+  /** The rail's gutter and side (layout.ts `railEdgeOf`, `railSideOf`); null with the rows. */
+  railEdge: number | null;
+  railSide: 'left' | 'right' | null;
   chromeW: number;
   pointW: number;
   padding: Readonly<{ top: number; bottom: number }>;
@@ -409,8 +445,8 @@ export type Twin = Readonly<{
   scrolls: boolean;
 }>;
 
-export const twinOf = (e: Emulation): Twin => {
-  const vp = twinViewport(e);
+export const twinOf = (e: Emulation, type: OrientationType | null = null): Twin => {
+  const vp = twinViewport(e, type);
   const layout = layoutFor(vp);
   const s = vp.width >= RAIL_MIN_WIDTH ? LANDSCAPE_GEOMETRY.rail : LANDSCAPE_GEOMETRY.rows;
   const padding = paddingOf(vp);
@@ -432,6 +468,8 @@ export const twinOf = (e: Emulation): Twin => {
         : null,
     scheme: layout === 'landscape' ? (vp.width >= RAIL_MIN_WIDTH ? 'rail' : 'rows') : null,
     edge: edgeOf(vp),
+    railEdge: s === LANDSCAPE_GEOMETRY.rail ? railEdgeOf(vp) : null,
+    railSide: s === LANDSCAPE_GEOMETRY.rail ? railSideOf(vp) : null,
     chromeW: chromeWidth(vp),
     pointW: pointWidth(vp),
     padding,
@@ -469,7 +507,7 @@ export const explainText = (e: Emulation): string => {
   ];
   if (t.layout === 'landscape') {
     lines.push(
-      `  edge ${px(t.edge)}  chrome-w ${px(t.chromeW)}  point-w ${px(t.pointW)}`,
+      `  edge ${px(t.edge)}${t.railEdge === null ? '' : `  rail ${px(t.railEdge)} ${t.railSide ?? ''}`}  chrome-w ${px(t.chromeW)}  point-w ${px(t.pointW)}`,
       `  padding ${px(t.padding.top)}/${px(t.padding.bottom)}  chrome-h ${px(t.chromeH)}  room above/below ${px(t.room.top)}/${px(t.room.bottom)}`,
       `  point-len ${px(t.pointLen)} (floor ${px(t.floor)}; the floor holds under ${px(t.floorHeight)}px)  board ${px(2 * t.pointLen + LANDSCAPE_GEOMETRY.frame)} tall${t.scrolls ? '  SCROLLS (under the floor)' : ''}`,
     );
@@ -532,9 +570,12 @@ export const explainSandboxText = (c: SandboxCase): string => {
 
 // ---- the page ----------------------------------------------------------------------------------
 
-/** The init script for a case: the four insets on the root (shell.css's `--frame-inset-*`, what the boot reads for the frame) and on `#app` (the theme's `--inset-*` seam), before the boot reads either. */
-export const seamScript = (e: Emulation): string => `(() => {
+/** The init script for a case: the four insets on the root (shell.css's `--frame-inset-*`, what the boot reads for the frame) and on `#app` (the theme's `--inset-*` seam), before the boot reads either; with a `type`, `screen.orientation.type` answers it (a getter on the prototype: `lock` and `change` stay the browser's). */
+export const seamScript = (e: Emulation, type: OrientationType | null = null): string => `(() => {
   const insets = ${JSON.stringify(e.insets)};
+  const type = ${JSON.stringify(type)};
+  if (type !== null && typeof ScreenOrientation !== 'undefined')
+    Object.defineProperty(ScreenOrientation.prototype, 'type', { get: () => type, configurable: true });
   const apply = () => {
     const root = document.documentElement;
     if (root === null) return false;
@@ -641,8 +682,8 @@ export const FILL_SLACK = 1;
  * box and the board clear the band by 4px; no document scroll above the floor (and the floor's
  * scroll under it); every tap target 44px on a phone.
  */
-export const judge = (e: Emulation, m: Measured): Verdict => {
-  const t = twinOf(e);
+export const judge = (e: Emulation, m: Measured, type: OrientationType | null = null): Verdict => {
+  const t = twinOf(e, type);
   const checks: Check[] = [];
   // The page in fullscreen (the Android lock, granted by Chromium's emulated phone at the table
   // while the viewport stays the case's) is the screen's on every corner, whatever the case's mode.
@@ -1050,6 +1091,7 @@ export const driveCase = async (
   url: string,
   e: Emulation,
   pictures: Readonly<Record<string, string>> | null,
+  type: OrientationType | null = null,
 ): Promise<Measured> => {
   const context = await browser.newContext({
     viewport: { width: e.viewport.width, height: e.viewport.height },
@@ -1059,7 +1101,7 @@ export const driveCase = async (
     hasTouch: true,
   });
   await context.addInitScript({ content: SEED_SCRIPT });
-  await context.addInitScript({ content: seamScript(e) });
+  await context.addInitScript({ content: seamScript(e, type) });
   const page = await context.newPage();
   const pic = (state: string): string | null => pictures?.[state] ?? null;
   try {
@@ -1198,13 +1240,14 @@ const renderBoards = async (
         : dir === null
           ? null
           : Object.fromEntries(STATES.map((s) => [s, resolve(dir, fileNameOf(e, s))]));
-    const measured = await driveCase(browser, url, e, pictures);
-    const verdict = judge(e, measured);
-    console.log(`${verdict.pass ? 'pass' : 'FAIL'}  ${emulationName(e)}`);
+    const measured = await driveCase(browser, url, e, pictures, args.type);
+    const verdict = judge(e, measured, args.type);
+    const name = `${emulationName(e)}${args.type === null ? '' : ` ${args.type}`}`;
+    console.log(`${verdict.pass ? 'pass' : 'FAIL'}  ${name}`);
     return {
-      name: emulationName(e),
+      name,
       e,
-      twin: twinOf(e),
+      twin: twinOf(e, args.type),
       measured,
       verdict,
       pictures: Object.fromEntries(STATES.map((s) => [s, fileNameOf(e, s)])),

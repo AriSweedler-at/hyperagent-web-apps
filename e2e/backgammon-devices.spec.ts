@@ -26,6 +26,7 @@ import {
   MEASURE,
   SEED_SCRIPT,
   TOL,
+  freeSideOfCase,
   judge,
   seamScript,
   twinOf,
@@ -50,19 +51,30 @@ import {
   emulationName,
   type Emulation,
 } from '../web/shared/lib/devices.ts';
+import type { OrientationType } from '../web/shared/lib/safeArea.ts';
 import { bgRoll } from './fixtures/backgammon.ts';
 import { boardGeometry, expectBoardGeometry } from './fixtures/backgammon-geometry.ts';
 import { reveal } from './fixtures/shell.ts';
 import { baseUrl, pagePath } from './fixtures/site.ts';
 
 const PHONES = DEVICES.filter((d) => d.kind !== 'ipad' && d.supported);
-const CASES: ReadonlyArray<Emulation> = PHONES.flatMap((d) => [
-  emulationFor(d, 'landscape', 'browser', 'shown'),
-  emulationFor(d, 'landscape', 'fullscreen'),
-]);
+/**
+ * Both ways round (the owner, 2026-09-28: "when I rotate it 180 degrees ... it should expand to
+ * fill that space"): `landscape-primary` (Chromium's own; the cut on the left, the rail on the
+ * right) and `landscape-secondary` (the seam tells the page; the cut on the right, the rail on the
+ * left), the twin's free side following (tools/shell-emulate.ts `freeSideOfCase`).
+ */
+const TYPES: ReadonlyArray<OrientationType> = ['landscape-primary', 'landscape-secondary'];
+type Case = Readonly<{ e: Emulation; type: OrientationType }>;
+const CASES: ReadonlyArray<Case> = PHONES.flatMap((d) =>
+  TYPES.flatMap((type) => [
+    { e: emulationFor(d, 'landscape', 'browser', 'shown'), type },
+    { e: emulationFor(d, 'landscape', 'fullscreen'), type },
+  ]),
+);
 
-CASES.forEach((e) => {
-  test(`${emulationName(e)}: the board fills its room, the frame's corners are ${CORNER_KEYS.map((k) => String(e.corners[k])).join('/')}px, nothing clips`, async ({
+CASES.forEach(({ e, type }) => {
+  test(`${emulationName(e)} ${type}: the board fills its room, the frame's corners are ${CORNER_KEYS.map((k) => String(e.corners[k])).join('/')}px, nothing clips`, async ({
     browser,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'pages', 'about the page, not the origin');
@@ -81,7 +93,7 @@ CASES.forEach((e) => {
     // bind"), which the oracle's target rule does not know; one seed keeps the sweep off doubles,
     // as the geometry spec's seeding does.
     await context.addInitScript({ content: SEED_SCRIPT });
-    await context.addInitScript({ content: seamScript(e) });
+    await context.addInitScript({ content: seamScript(e, type) });
     const page = await context.newPage();
     try {
       await page.goto(pagePath('pages', 'backgammon'));
@@ -97,7 +109,12 @@ CASES.forEach((e) => {
       // transitions alone): read once it has run out, as a finger would.
       await page.waitForFunction(DICE_STILL);
 
-      const twin = twinOf(e);
+      const twin = twinOf(e, type);
+      // The page wrote the map: the rail's side is the free side the twin computes for the type.
+      await expect(page.locator(':root')).toHaveAttribute(
+        'data-free-side',
+        freeSideOfCase(e, type),
+      );
       const g = await boardGeometry(page);
       const seat = Number(g.seat) as 0 | 1;
       // The oracle, `expectFillsRoom` among it, where the viewport fits; under the floor (the bar
@@ -109,7 +126,7 @@ CASES.forEach((e) => {
       });
 
       const measured = await page.evaluate<Measured>(MEASURE);
-      const verdict = judge(e, measured);
+      const verdict = judge(e, measured, type);
       await testInfo.attach(`${emulationName(e)} board`, {
         body: await page.screenshot(),
         contentType: 'image/png',

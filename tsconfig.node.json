@@ -120,6 +120,8 @@
     "web/games/*/src/stories/boot.ts",
     "web/games/gin-rummy/src/stories/catalogue.test.ts",
     "web/games/backgammon/src/ui/board/fly*.ts",
+    // The safe-area map's writer (over web/shared/edge/screen.ts and dom.ts): the web project's alone.
+    "web/games/backgammon/src/safeArea*.ts",
     "web/games/briscola/src/ui/motion*.ts",
     "web/games/briscola/src/ui/history.test.ts"
   ]
