@@ -9,15 +9,40 @@ import { expect, test } from 'vitest';
 import {
   AASA_PATH,
   CLIP_BUNDLE_ID,
+  CLIP_PATHS,
+  type ClipExperience,
   SMART_APP_BANNER_META,
   TEAM_ID,
   appSiteAssociation,
+  bannerContent,
+  clipUrl,
   isConfigured,
 } from '../../web/shared/lib/appClip.ts';
 import { describeDist, distHasFile, readDist } from './dist.ts';
 
 /** The file's path in the tree: the URL path less its leading slash. */
 const AASA_FILE = AASA_PATH.slice(1);
+
+/** The two experiences, each with a landing page of its own in the tree (web/public/clip/<name>/). */
+const EXPERIENCES: ReadonlyArray<ClipExperience> = ['dice', 'rps'];
+/** An experience's page in the tree: its URL path less the slash, then the folder's page. */
+const clipPage = (experience: ClipExperience): string =>
+  `${CLIP_PATHS[experience].slice(1)}/index.html`;
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * The banner tag as the page must carry it once configured: the meta's name and its exact
+ * `content`, in Prettier's self-closing form, whatever line breaks Prettier puts between the
+ * attributes (the content is longer than a line).
+ */
+const bannerTag = (experience: ClipExperience): RegExp | null => {
+  const content = bannerContent(clipUrl(experience));
+  return content === null
+    ? null
+    : new RegExp(
+        `<meta\\s+name="${SMART_APP_BANNER_META}"\\s+content="${escapeRegExp(content)}"\\s*/>`,
+      );
+};
+const BANNER_OPENING = new RegExp(`<meta\\s+name="${SMART_APP_BANNER_META}"`);
 
 describeDist('the Dice App Clip: the AASA and the banner', (root) => {
   test('.nojekyll is in the tree, so GitHub Pages serves the dot-directory the AASA lives in', () => {
@@ -43,5 +68,39 @@ describeDist('the Dice App Clip: the AASA and the banner', (root) => {
 
   test('the sandbox page ships no static Smart App Banner: the boot emits one once configured', () => {
     expect(readDist(root, 'games/ui-sandbox/index.html')).not.toContain(SMART_APP_BANNER_META);
+  });
+
+  // The invocation URLs land on a page each (infra/games-proxy/worker.ts CLIP_PREFIX serves them):
+  // static HTML with no build step, so the banner is pasted by hand over a placeholder comment once
+  // the ids are filled, and these rows demand the paste then, byte for byte.
+  test('EXPERIENCES is every CLIP_PATHS key', () => {
+    expect(Object.keys(CLIP_PATHS)).toEqual(EXPERIENCES);
+  });
+
+  EXPERIENCES.forEach((experience) => {
+    test(`${CLIP_PATHS[experience]} lands on a page of the tree's own, with a title`, () => {
+      expect(distHasFile(root, clipPage(experience)), `web/public/${clipPage(experience)}`).toBe(
+        true,
+      );
+      expect(readDist(root, clipPage(experience))).toMatch(/<title>[^<]+<\/title>/);
+    });
+
+    test(
+      isConfigured()
+        ? `configured: the ${experience} page carries the Smart App Banner for its invocation URL`
+        : `unconfigured: the ${experience} page carries no Smart App Banner, only its placeholder comment`,
+      () => {
+        const html = readDist(root, clipPage(experience));
+        const tag = bannerTag(experience);
+        if (tag === null) {
+          expect(html).not.toMatch(BANNER_OPENING);
+          return;
+        }
+        expect(
+          html,
+          `paste the banner over the placeholder in web/public/${clipPage(experience)}`,
+        ).toMatch(tag);
+      },
+    );
   });
 });

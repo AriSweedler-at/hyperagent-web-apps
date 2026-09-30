@@ -15,6 +15,11 @@
 //                   Dice App Clip, web/shared/lib/appClip.ts AASA_PATH: the tree's dot-directory,
 //                   which web/public/.nojekyll lets Pages serve; the AASA itself is answered as
 //                   application/json, the type Apple requires and an extensionless file never gets)
+//   /clip/NAME   -> .../hyperagent-web-apps/clip/NAME/       (the Dice App Clip's invocation URLs,
+//   /clip/NAME/…    web/shared/lib/appClip.ts CLIP_PATHS: each lands on a page of the tree's own,
+//                   web/public/clip/NAME/index.html, for a phone without the clip. Apple has the
+//                   URL without a slash, so that spelling fetches the folder's page in one request,
+//                   the query kept: no upstream slash redirect to pay)
 //   /hyperagent-web-apps/… passes through unchanged.
 //   /api/rps/…   -> this Worker's own routes (rps-push.ts): the island scoreboard's pairing and
 //                   mood pushes, answered before any proxy path and never sent upstream. They need
@@ -57,6 +62,12 @@ const WELL_KNOWN = '/.well-known/';
  * set here. Not imported from there: wrangler deploys this file alone.
  */
 export const AASA_PATH = `${WELL_KNOWN}apple-app-site-association`;
+/**
+ * The Dice App Clip's invocation URLs (web/shared/lib/appClip.ts CLIP_PATHS, `/clip/dice` and
+ * `/clip/rps`; worker.test.ts pins each under this prefix): every one lands on the tree's own page
+ * for it, web/public/clip/<name>/index.html. Not imported from there: wrangler deploys this file alone.
+ */
+export const CLIP_PREFIX = '/clip/';
 
 /**
  * The Worker's bindings (wrangler.toml `[vars]`, the KV namespace and the secrets, or what
@@ -81,6 +92,12 @@ export const mapPath = (pathname: string): Mapped => {
   if (pathname.startsWith('/shared/')) return { kind: 'fetch', path: SITE + pathname };
   if (pathname === '/favicon.ico') return { kind: 'fetch', path: `${SITE}/shared/favicon.ico` };
   if (pathname.startsWith(WELL_KNOWN)) return { kind: 'fetch', path: SITE + pathname };
+  if (pathname.startsWith(CLIP_PREFIX)) {
+    // `/clip/<name>` as Apple has it, no slash: the folder's page in one request, the query kept.
+    const rest = pathname.slice(CLIP_PREFIX.length);
+    const folder = rest !== '' && !rest.includes('/') ? `${pathname}/` : pathname;
+    return { kind: 'fetch', path: SITE + folder };
+  }
   const [, first = '', ...rest] = pathname.split('/');
   const game = ALIASES[first];
   if (game !== undefined) {

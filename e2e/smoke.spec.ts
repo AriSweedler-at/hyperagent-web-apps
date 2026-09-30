@@ -6,6 +6,7 @@
 // the landing page with its `games/XXX/` hrefs already rewritten to /XXX/ (worker.ts "Landing
 // links"), so a click never takes the /games/XXX -> /XXX redirect, which stays for old links.
 import { ALIASES, LANDING_HREFS, LANDING_PAGES, PAGE_HOOKS } from '../tools/games.ts';
+import { CLIP_PATHS, type ClipExperience } from '../web/shared/lib/appClip.ts';
 import { gameQuery } from './fixtures/player.ts';
 import {
   EXPECTED_TITLES,
@@ -105,6 +106,43 @@ Object.entries(ALIASES).forEach(([alias, game]) => {
     await expect.poll(() => new URL(page.url()).pathname).toBe(expected);
     await expect(page).toHaveTitle(titleOf(game));
     await page.waitForLoadState('networkidle');
+    expect(watched.failures(), 'failed requests').toEqual([]);
+  });
+});
+
+// The Dice App Clip's invocation URLs (web/shared/lib/appClip.ts CLIP_PATHS) land on a page of the
+// tree's own (web/public/clip/<name>/): on the proxy as Apple registers them, no trailing slash,
+// in one request with the query kept (the Worker fetches the folder's page itself, worker.ts
+// CLIP_PREFIX); on Pages as the folder under the mount. A phone without the clip reads what the
+// clip does, and the roll or the session the link carried.
+const CLIP_LANDINGS: ReadonlyArray<{
+  experience: ClipExperience;
+  query: string;
+  title: string;
+  shown: string;
+}> = [
+  { experience: 'dice', query: 'roll=3,5', title: 'Dice in the Island', shown: '3 and 5' },
+  {
+    experience: 'rps',
+    query: 'session=abcd1234',
+    title: 'Your buddy in the island',
+    shown: 'abcd1234',
+  },
+];
+
+CLIP_LANDINGS.forEach(({ experience, query, title, shown }) => {
+  test(`clip: ${CLIP_PATHS[experience]} lands on its page`, async ({ player, project }) => {
+    const { page, watched } = player;
+    const folder = CLIP_PATHS[experience].slice(1);
+    const response = await page.goto(
+      project === 'proxy' ? `${folder}?${query}` : `${folder}/?${query}`,
+    );
+    expect(response?.status()).toBe(200);
+    expect(response?.request().redirectedFrom(), 'a redirect hop before the page').toBeNull();
+    await expect(page).toHaveTitle(title);
+    await expect(page.locator('[data-clip="value"]')).toHaveText(shown);
+    await page.waitForLoadState('networkidle');
+    expect(watched.errors(), 'uncaught exceptions').toEqual([]);
     expect(watched.failures(), 'failed requests').toEqual([]);
   });
 });

@@ -10,12 +10,13 @@ import {
   SHELL_GAMES,
   TOOL_NAMES,
 } from '../../tools/games.ts';
-import { AASA_PATH as CLIP_AASA_PATH } from '../../web/shared/lib/appClip.ts';
+import { AASA_PATH as CLIP_AASA_PATH, CLIP_PATHS } from '../../web/shared/lib/appClip.ts';
 import { JOIN_PARAM as INVITE_PARAM } from '../../web/shared/lib/invite.ts';
 import { ROOM_CODE } from '../../web/shared/lib/roomCode.ts';
 import worker, {
   AASA_PATH,
   ALIASES,
+  CLIP_PREFIX,
   DEFAULT_UPSTREAM,
   type Env,
   JOIN_PARAM,
@@ -102,6 +103,16 @@ describe('mapPath: the mapping table in the file header', () => {
     ['/.well-known/other', '/hyperagent-web-apps/.well-known/other'],
     // Without its slash the dot-directory is a game name like any other (the quirk above).
     ['/.well-known', '/hyperagent-web-apps/games/.well-known'],
+    // The Dice App Clip's invocation URLs land on the tree's own pages (web/public/clip/<name>/):
+    // spelled without a slash, as Apple registers them, the folder's page is fetched in one request.
+    ['/clip/dice', '/hyperagent-web-apps/clip/dice/'],
+    ['/clip/dice/', '/hyperagent-web-apps/clip/dice/'],
+    ['/clip/rps', '/hyperagent-web-apps/clip/rps/'],
+    ['/clip/rps/', '/hyperagent-web-apps/clip/rps/'],
+    ['/clip/dice/index.html', '/hyperagent-web-apps/clip/dice/index.html'],
+    ['/clip/', '/hyperagent-web-apps/clip/'],
+    // Without its slash the prefix is a game name like any other (the quirk above).
+    ['/clip', '/hyperagent-web-apps/games/clip'],
   ])('%s is fetched from upstream %s', (pathname, upstreamPath) => {
     expect(mapPath(pathname)).toEqual({ kind: 'fetch', path: upstreamPath });
   });
@@ -126,6 +137,17 @@ describe('mapPath: the mapping table in the file header', () => {
     expect(mapPath(AASA_PATH)).toEqual({ kind: 'fetch', path: `/hyperagent-web-apps${AASA_PATH}` });
   });
 
+  test('every CLIP_PATHS experience (web/shared/lib/appClip.ts) sits under CLIP_PREFIX and fetches its folder page, slash or no slash', () => {
+    Object.values(CLIP_PATHS).forEach((clipPath) => {
+      expect(clipPath.startsWith(CLIP_PREFIX)).toBe(true);
+      expect(mapPath(clipPath)).toEqual({
+        kind: 'fetch',
+        path: `/hyperagent-web-apps${clipPath}/`,
+      });
+      expect(mapPath(`${clipPath}/`)).toEqual(mapPath(clipPath));
+    });
+  });
+
   test('ALIASES is the map tools/games.ts spells for the Pages origin', () => {
     expect(ALIASES).toEqual(REGISTRY_ALIASES);
     expect(ALIASES).toEqual({ sheshbesh: 'backgammon' });
@@ -148,7 +170,7 @@ describe('unmapPath: upstream pathname back to this origin', () => {
     expect(unmapPath('relative/path')).toBe('/relative/path');
   });
 
-  test.each(['/', '/gin-rummy/', '/fidice/app.js', '/shared/ice.js'])(
+  test.each(['/', '/gin-rummy/', '/fidice/app.js', '/shared/ice.js', '/clip/dice/'])(
     'round-trips %s through mapPath',
     (pathname) => {
       const mapped = mapPath(pathname);
@@ -271,6 +293,16 @@ describe('fetch handler', () => {
     withUpstream(upstreamEcho, async () => {
       expect(await (await get('/fidice/?room=abc&x=1')).text()).toBe(
         `${GH}/hyperagent-web-apps/games/fidice/?room=abc&x=1`,
+      );
+    }));
+
+  test('a clip invocation URL lands on its page in one request, the query kept', () =>
+    withUpstream(upstreamEcho, async () => {
+      const dice = await get('/clip/dice?roll=3,5');
+      expect(dice.status).toBe(200);
+      expect(await dice.text()).toBe(`${GH}/hyperagent-web-apps/clip/dice/?roll=3,5`);
+      expect(await (await get('/clip/rps?session=abcd1234')).text()).toBe(
+        `${GH}/hyperagent-web-apps/clip/rps/?session=abcd1234`,
       );
     }));
 

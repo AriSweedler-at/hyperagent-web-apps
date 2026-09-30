@@ -338,3 +338,10 @@ with Apple, and `target="_blank"` opens it in Safari; on the site that path is a
 Worker's default rule (`/clip/dice` -> `games/clip/dice`), so a phone without the clip cached sees
 a 404 rather than the card. A page there (or a Worker row sending `/clip/*` to the sandbox on
 example (j)) carrying the same banner meta is a follow-up row.
+
+Landed since (the `clip-landing-pages` lane): `web/public/clip/dice/` and `web/public/clip/rps/`
+are those pages, static HTML on the sandbox's tokens, served at `/clip/dice` and `/clip/rps` by a
+Worker row (`CLIP_PREFIX`: with or without the slash, the query kept, one request), each showing
+the roll or the session the link carries and a link back; the banner meta is a documented
+placeholder comment in each until the ids are filled, and `test/dist/aasa.test.ts` demands it,
+byte for byte, once they are.

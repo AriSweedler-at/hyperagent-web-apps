@@ -207,6 +207,9 @@ Everything only the account holder can do, in order. Nothing here was attempted 
    `<meta name="apple-itunes-app" content="app-id=APPLE_ID, app-clip-bundle-id=com.sweedler.games.dice.Clip, app-clip-display=card">`
    plus an `og:image` for the Messages card ([Supporting invocations from your website][supporting]).
    `APPLE_ID` is the number from step 3. The banner shows the clip card in Safari on iOS 15+.
+   The pages are in the tree (`web/public/clip/dice/index.html`, and `clip/rps/index.html` for the
+   buddy), served at the invocation URLs by the Worker: paste the tag over the placeholder comment
+   in each (`bannerContent(clipUrl(name))` spells it), and `npm run test:site` checks the paste.
 8. **TestFlight.** After the upload, TestFlight > the build > App Clip section: "you can configure
    up to three different App Clip experiences for testing" ([Testing the launch
    experience][testing]); testers launch the clip from the TestFlight app. Before any upload, a
