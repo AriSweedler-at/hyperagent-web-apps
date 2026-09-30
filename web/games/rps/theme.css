@@ -14,9 +14,10 @@
    room's height and the page never scrolls: upright down to the SE in a tab with the bar shown
    (375x553), sideways down to the Galaxy's 780x304. Two arrangements by layout bucket
    (docs/design/layout-buckets.md; the boot writes `<body data-layout>`, main.ts): upright the column
-   (the score, the table, the hands, the controls, the foot pinned to the bottom), with a short tier
-   under 669px of room (`@container room`) that seats the facts beside the tally and the reaction
-   beside the verdict; every other bucket (a phone sideways, a tablet sideways, a desktop window)
+   (the score, the table, the hands, the controls, the foot pinned to the bottom: the island row and
+   Reset progress, their links on one line), with a short tier under 720px of room
+   (`@container room`) that seats the facts beside the tally and the reaction beside the verdict;
+   every other bucket (a phone sideways, a tablet sideways, a desktop window)
    three columns: the score and the foot, the table with the controls under it, the three hands
    stacked under one thumb, the hand and the verdict side by side in the table; the desktop buckets
    spread the grid to a tenth of the window's edges with bigger buttons and a larger buddy. */
@@ -143,8 +144,13 @@ body {
   color: var(--muted);
   font-size: 0.85rem;
 }
-/* The column: the score, the table, the hands, the controls, the island row, the foot. The slack a
-   tall phone leaves sits above the foot, which stays at the bottom edge as it always has. */
+/* The column: the score, the table, the hands, the controls, the foot (the island row and Reset
+   progress). The slack a tall phone leaves sits above the foot, which stays at the bottom edge as it
+   always has. The foot's track is `1fr`, never `minmax(0, 1fr)`: its automatic minimum is the foot's
+   own height, so a column that outgrows the room (a wide fallback font wrapping the facts and the
+   status on an island iPhone in a tab, 672px of room) overflows into `#app`'s net below, where the
+   collapsed track drew the foot up over the island row's links (CI, e2e/rps.spec.ts: Reset progress
+   took the tap meant for Send buddy home). */
 main {
   display: grid;
   grid-template-areas:
@@ -152,9 +158,8 @@ main {
     'table'
     'hands'
     'controls'
-    'island'
     'foot';
-  grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto 1fr;
   gap: var(--gap);
   padding: 6px var(--side) var(--gap);
   min-height: 0;
@@ -406,17 +411,26 @@ main {
   color: var(--muted);
   font-size: 0.85rem;
 }
-#islandSlot {
-  grid-area: island;
-}
-#islandSlot:empty {
-  display: none;
-}
+/* The foot: the island row (src/island.ts, mounted in `#islandSlot`) and Reset progress share one
+   wrapping flex row, the slot's children laid out as the foot's own (`display: contents`): the send
+   button and the state line each take a whole line, the links (Open the clip again, Send buddy home,
+   Reset progress) share one, wrapping where they must. So the row costs the column one line of
+   status over the foot's own row, not a row of its own plus a gap: the tab room of an island iPhone
+   (672px, the regular tier's floor) holds the paired state with the Tech up hint on two lines. */
 .foot {
   grid-area: foot;
   align-self: end;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
   text-align: center;
 }
+#islandSlot {
+  display: contents;
+}
+/* 44px tall (the thumb's target) and 8px to a side, so three links share the foot's line. */
 .link-btn {
   background: none;
   border: 0;
@@ -424,7 +438,7 @@ main {
   text-decoration: underline;
   font: inherit;
   font-size: 0.85rem;
-  padding: 12px;
+  padding: 12px 8px;
   cursor: pointer;
 }
 .link-btn:disabled {
@@ -432,12 +446,16 @@ main {
   cursor: default;
 }
 
-/* ---- The short upright tier: under 669px of room (the SE in every mode; the X class, the 12 class
-   and the 16 class in a tab with the bar shown; the XR class in a tab, 682px, is the first regular
-   room). The facts stand beside the tally in a third column, the reaction beside the verdict, the
-   paddings and the gaps at their floors: 553px holds the whole play screen with the hand at 100px.
-   Sideways the room is under 669 too, but the wide grid below outranks these rules. ---- */
-@container room (max-height: 668px) {
+/* ---- The short upright tier: under 720px of room (the SE in every mode; every phone in a tab with
+   the bar shown, the island iPhones' 638-718 among them; the 440x956 class in a tab, 742px, and the
+   standalone and fullscreen rooms, 759px up, are the regular rooms). The facts stand beside the
+   tally in a third column, the reaction beside the verdict, the paddings and the gaps at their
+   floors: 553px holds the whole play screen with the hand at 100px. The ceiling is where the
+   regular column holds the island row idle (the send button over the Reset link, 95px) under a wide
+   fallback font: 718px of room holds it with no air to spare, 672 is 12px over (measured with
+   Verdana for the Linux runner's DejaVu Sans; the two wrap the facts and the Tech up hint alike).
+   Sideways the room is under 720 too, but the wide grid below outranks these rules. ---- */
+@container room (max-height: 719px) {
   .bar {
     padding-top: 4px;
   }
@@ -498,11 +516,10 @@ body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-uprigh
   /* The score's floor is the buddy beside the face and a two-digit counter (200px); the hands' a
      44px thumb target with air (132px); the table takes what is left first. */
   grid-template-columns: minmax(200px, 1fr) minmax(0, 2fr) minmax(132px, 0.8fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
-    'score  table    hands'
-    'island controls hands'
-    'foot   controls hands';
+    'score table    hands'
+    'foot  controls hands';
   gap: 6px 8px;
   padding: 4px var(--side) 6px;
 }
@@ -570,7 +587,7 @@ body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-uprigh
   align-self: start;
   gap: 4px 8px;
 }
-body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) #islandSlot {
+body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .foot {
   align-self: start;
 }
 
@@ -593,10 +610,10 @@ body[data-layout]:is([data-layout='desktop'], [data-layout='desktop-wide']) main
   grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto auto;
   grid-template-areas:
-    'score  table'
-    'island table'
-    'foot   controls'
-    'hands  hands';
+    'score table'
+    'foot  table'
+    '.     controls'
+    'hands hands';
   gap: 12px 16px;
   padding: 8px 0 0;
 }
@@ -667,22 +684,17 @@ body[data-layout][data-layout='desktop-wide'] .counter {
   }
 }
 
-/* The island row (src/island.ts, docs/design/rps-island.md §11): the link dressed as the start button, the state under it. */
-#islandSlot {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: center;
+/* The island row (src/island.ts, docs/design/rps-island.md §11) in the foot: the link dressed as the
+   start button on a line of its own (Try again likewise), the state line the same (`.status` is a
+   whole flex line), the links on the foot's line beside Reset progress. */
+.island-send,
+.island-retry {
+  flex: 1 1 100%;
 }
 .island-send {
   display: flex;
   align-items: center;
   justify-content: center;
-  align-self: stretch;
   text-decoration: none;
   text-align: center;
-}
-.island-open,
-.island-home {
-  padding: 8px;
 }

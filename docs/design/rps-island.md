@@ -266,14 +266,30 @@ the paddings and gaps) a `cqh` clamp of the room's height, so the page never scr
 to the SE in a tab with the bar shown (375x553) and sideways down to the Galaxy's 780x304. The boot
 writes the layout bucket on `<body data-layout>` (`applyLayout`, `watchLayout`; docs/design/layout-buckets.md)
 and the theme lays out per bucket: upright the column as before (the score, the table, the hands,
-the controls in one row, the foot pinned to the bottom), with a short tier under 669px of room
+the controls in one row, the foot pinned to the bottom), with a short tier under 720px of room
 (`@container room`) that seats the three facts beside the tally and the reaction beside the verdict;
-a phone sideways three columns under the bar, the score and the Reset link at the left, the table in
-the middle with the hand beside the verdict and the window bar and the controls under it, the three
+a phone sideways three columns under the bar, the score and the foot at the left, the table in the
+middle with the hand beside the verdict and the window bar and the controls under it, the three
 hands stacked under the right thumb; a desktop window the same grid spread to within a tenth of the
 window's edges, the table stretched to the room, the hands a row of keys across the bottom, the
 buddy at 4x (5x from 1440px wide). The sprite scale is the theme's (`--px` on `.buddy` and `.face`,
 an integer multiple of 24 per bucket); the paint sets only the sheet, `--frames` and `--ms`.
+
+The foot holds the island row (§11) with Reset progress: `#islandSlot` is a child of the
+`<footer>` laid out as the foot's own (`display: contents`), the send button and the state line each
+a whole line, the links (Open the clip again, Send buddy home) on one line with Reset progress. So
+the paired state costs the column one line of status over the foot's own row (67px), not a row of
+its own plus a gap (114), and the foot's grid track is `1fr` (its automatic minimum), never
+`minmax(0, 1fr)`: a column that outgrows the room overflows into `#app`'s net below rather than the
+collapsed track drawing the foot up over the row's links. The short tier's ceiling is where the
+regular column holds the row idle (the send button over the Reset link, 95px) under a wide fallback
+font: 718px of room holds it with no air to spare, 672 is 12px over (measured with Verdana standing
+in for the Linux runner's DejaVu Sans; both wrap the facts and the Tech up hint to two lines where
+the Mac's system font keeps one). Every phone in a tab with the bar shown is short-tier, the island
+iPhones' 638-718px rooms among them; the 440x956 class in a tab (742) and the standalone and
+fullscreen rooms (759 up) are regular. The audit never sees the row (it runs against the pages
+origin, where the probe finds no Worker); e2e/rps.spec.ts on `proxy` does, and pins the paired
+screen (below).
 
 ## 11. From the game to the island
 
@@ -293,4 +309,4 @@ be playable from an android phone, they just wont see the buddy in the bar."
 | The post | Every save (a verdict, Tech up, Reset: the reducer's `save` effect) posts `{session, counter, prestige, band, at}` to `/api/rps/mood`, `at` in unix seconds. Fire-and-forget: one post in flight; a round that lands meanwhile is kept (the latest wins) and posted 2 s after the reply (`FLUSH_MS`, the Worker's own spacing). A 404 means the Worker forgot the pair: back to `waiting`, polling. A 429 (two pushes under 2 s) and any other reply are let go; the next round carries the score. |
 | Send buddy home | Ends the session on this side: a fresh id replaces the paired one (remembered), the timers stop, the row shows the button again. The island's activity is not told; it ends by itself (§8 step 8) or from the clip's own screen. |
 | The states | `off` → `probing` → `idle` ⇄ `waiting` → `stalled` (retry → `waiting`) → `paired`; `home` from any shown state → `idle`. A pure reducer (`reduceIsland`, table-tested in island.test.ts); main.ts runs its effects: `poll` and `post` over `fetch`, `timer`/`cancel` over the page's named timers (`island/poll`, `island/flush`), `remember` over sessionStorage, `sync` as a `round` event. `window.__rps.island()` reads the state. |
-| Tests | island.test.ts: the gate over the whole catalogue, the probe's three answers, the poll on a scripted clock, the post's body, the in-flight rule, the 404, the row per state and the one delegated listener. e2e/rps.spec.ts on `proxy` (the spec starts a proxy-dev of its own, so the stub APNs is reachable): an emulated 393 × 852 iPhone sees the button and the banner, taps it, is paired by the clip's POST with a fake token, is synced (+4), plays a win and the stub's push carries `{counter: 5, band: veryHappy}` to that token; an emulated Galaxy sees no row; on `pages` the same iPhone sees no row and no banner. |
+| Tests | island.test.ts: the gate over the whole catalogue, the probe's three answers, the poll on a scripted clock, the post's body, the in-flight rule, the 404, the row per state and the one delegated listener. e2e/rps.spec.ts on `proxy` (the spec starts a proxy-dev of its own, so the stub APNs is reachable): an emulated 393 × 852 iPhone in a tab (393 × 672, no insets) sees the button and the banner, taps it, is paired by the clip's POST with a fake token, is synced (+4), plays a win and the stub's push carries `{counter: 5, band: veryHappy}` to that token; paired with Tech up on offer (the tallest paired screen), Send buddy home and Reset progress are each inside the viewport, apart, and nothing scrolls (§10 "The layout": the foot); then Send buddy home. An emulated Galaxy sees no row; on `pages` the same iPhone sees no row and no banner. |
