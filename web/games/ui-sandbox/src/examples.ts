@@ -9,7 +9,10 @@
 // use all the screen real-estate ... it should fill up the screen"): the flowing boxes' outer
 // edges sit where the shell's padding puts them, the frame's clearance or the safe-area inset on
 // that side, whichever is more (shell.css `:where(body[data-frame]) #app`), within a pixel.
+// Example (j) (docs/design/ui-sandbox.md §7) is the one with a call to action: the Dice App Clip's
+// "Roll in the Island", a plain link the boot enables through web/shared/lib/appClip.ts `clipGate`.
 import { safeHtml, type Rect, type SafeHtml } from '../../../shared/edge/dom.ts';
+import { INITIAL_ROLL } from '../../../shared/lib/appClip.ts';
 import type { Insets, ViewportSize } from '../../../shared/lib/devices.ts';
 import {
   EDGES,
@@ -17,6 +20,7 @@ import {
   type Edge,
   type SafeAreaMap,
 } from '../../../shared/lib/safeArea.ts';
+import { dieMarkup } from './dice.ts';
 import type { ExampleId } from './settings.ts';
 
 export type Example = Readonly<{
@@ -39,7 +43,7 @@ const COVER: Example = {
   markup: box('content', 'fill'),
 };
 
-/** The nine, in the dropdown's order. */
+/** The ten, in the dropdown's order. */
 export const EXAMPLES: ReadonlyArray<Example> = [
   COVER,
   {
@@ -93,7 +97,31 @@ export const EXAMPLES: ReadonlyArray<Example> = [
       "The games' current sideways layout: one gutter as wide as the larger side inset on both sides, whichever side the cut is on.",
     markup: safeHtml`<div class="gutters" data-box="gutters">${box('content', 'fill')}<b class="box-size" data-size></b></div>`,
   },
+  {
+    id: 'dice',
+    label: '(j) Dice in the Dynamic Island',
+    blurb:
+      'A web page cannot draw in the island; the Dice App Clip can. The island hatched, a mock die in each ear beside it (`--safe-<side>-*`; without ears, where they would be), and "Roll in the Island", live only on an island iPhone once the clip is published.',
+    markup: safeHtml`${box('content', 'fill')}<div class="island-cut" aria-hidden="true"></div><div class="die-ear die-1" data-box="die1" data-fixed>${dieMarkup('one', INITIAL_ROLL[0])}</div><div class="die-ear die-2" data-box="die2" data-fixed>${dieMarkup('two', INITIAL_ROLL[1])}</div><div class="island-cta"><a class="btn btn-go" id="islandRollBtn" target="_blank" rel="noopener" aria-disabled="true">Roll in the Island</a><p class="island-reason" data-note="dice"></p></div>`,
+  },
 ];
+
+/**
+ * Where example (j)'s dice sit, for the report (the owner: "without an island the dice sit where
+ * the ears would be and the Report says why"): in the two ears where both fit; flanking the cut on
+ * its edge where an ear is under 44px (a notch phone) or the edge is horizontal; in the top
+ * corners where no cut is on the page.
+ */
+export const diceLine = (map: SafeAreaMap): string => {
+  const vertical = map.cutEdge === 'left' || map.cutEdge === 'right';
+  return map.cut === null
+    ? 'dice: no cut on this page (whole glass, or the cut is under the browser bar): the seats sit in the top corners'
+    : vertical && map.edges[map.cutEdge].length === 2
+      ? `dice: one seat in each ear of the ${map.island ? 'island' : 'notch'} on the ${map.cutEdge}`
+      : vertical
+        ? `dice: the ears beside this ${map.island ? 'island' : 'notch'} are under 44px: the seats flank the cut and overlap the arcs`
+        : `dice: the cut is on the ${map.cutEdge} edge: the seats flank it along that edge`;
+};
 
 export const exampleById = (id: ExampleId): Example => EXAMPLES.find((e) => e.id === id) ?? COVER;
 

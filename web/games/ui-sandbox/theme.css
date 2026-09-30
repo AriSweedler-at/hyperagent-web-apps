@@ -268,20 +268,38 @@ body[data-screen='preview'] #app {
   background: var(--box-3);
   font-size: 11px;
 }
+/* The measured size is the box's big text (the owner, 2026-09-30: "when you display the pixel
+   sizes of the screen ... make that text take up as much space as it can"): each box is a size
+   container and the label's type is a fifth of the box's inline size or three quarters of its
+   block size, whichever binds, never under 14px and never wrapped, so the digits fill about
+   four fifths of a wide box, a strip keeps a 16px line, and a rail's runs down it (cqi and cqb
+   follow the rail's vertical writing mode). Centred by its own transform, so its rect is the text's
+   (e2e/ui-sandbox.spec.ts measures it against the box). The name moves to the top-left corner. */
+#stage .box,
+#stage .grid13,
+#stage .gutters {
+  container-type: size;
+}
 .box-name {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 11px;
   font-weight: 600;
   opacity: 0.85;
 }
 .box-size {
   position: absolute;
-  right: 3px;
-  bottom: 2px;
-  font:
-    10px/1 ui-monospace,
-    Menlo,
-    monospace;
-  color: rgba(255, 255, 255, 0.8);
-  writing-mode: horizontal-tb;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: max(14px, min(18cqi, 75cqb));
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
 }
 .grid13 {
   position: relative;
@@ -376,6 +394,189 @@ body[data-screen='preview'] #app {
 :root[data-notch-side='left'][data-ears='0'] .ear,
 :root[data-notch-side='right'][data-ears='0'] .ear,
 :root[data-ears='1'] .ear-2 {
+  display: none;
+}
+/* On (j) the size label steps back so the call to action reads over it. */
+#stage[data-example='dice'] .box-size {
+  opacity: 0.25;
+}
+/* (j) the dice in the Dynamic Island (docs/design/ui-sandbox.md §7). The island hatched where the
+   map puts the cut (37px deep, 11px in from the glass, as mapSvg.ts draws it), on the cut's edge,
+   only for an island on the page (main.ts writes `data-island` and `data-cut` on the root). */
+.island-cut {
+  position: fixed;
+  display: none;
+  z-index: 4;
+  border: 1px dashed #999;
+  border-radius: 14px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.28) 0 2px,
+    transparent 2px 6px
+  );
+  pointer-events: none;
+}
+:root[data-island='1'][data-notch-side='left'] .island-cut,
+:root[data-island='1'][data-notch-side='right'] .island-cut {
+  display: block;
+  width: 37px;
+  top: var(--safe-cut-from);
+  height: calc(var(--safe-cut-to) - var(--safe-cut-from));
+}
+:root[data-island='1'][data-notch-side='left'] .island-cut {
+  left: 11px;
+}
+:root[data-island='1'][data-notch-side='right'] .island-cut {
+  right: 11px;
+}
+:root[data-island='1'][data-notch-side='top'] .island-cut {
+  display: block;
+  height: 37px;
+  top: 11px;
+  left: var(--safe-cut-from);
+  width: calc(var(--safe-cut-to) - var(--safe-cut-from));
+}
+/* The two 44px seats: one in each ear where both fit (centred in the segment); else flanking the
+   cut's span on its edge with the 6px cut margin (a notch phone's ear is under 44px, so the seat
+   overlaps the arc and the report says so); else, no cut on the page, the two top corners inside
+   the room. Every rule is scoped by `data-cut` so no two set the same side. */
+.die-ear {
+  position: fixed;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(79, 157, 90, 0.18);
+  outline: 1px dashed var(--green);
+  z-index: 5;
+}
+:root[data-cut='1'][data-notch-side='left'] .die-ear {
+  left: calc(var(--frame-band) + var(--frame-hairline-w));
+}
+:root[data-cut='1'][data-notch-side='right'] .die-ear {
+  right: calc(var(--frame-band) + var(--frame-hairline-w));
+}
+:root[data-cut='1'][data-notch-side='left'] .die-1,
+:root[data-cut='1'][data-notch-side='right'] .die-1 {
+  top: calc(var(--safe-cut-from) - 50px);
+}
+:root[data-cut='1'][data-notch-side='left'] .die-2,
+:root[data-cut='1'][data-notch-side='right'] .die-2 {
+  top: calc(var(--safe-cut-to) + 6px);
+}
+:root[data-cut='1'][data-notch-side='left'][data-ears='2'] .die-1 {
+  top: calc((var(--safe-left-from) + var(--safe-left-to)) / 2 - 22px);
+}
+:root[data-cut='1'][data-notch-side='left'][data-ears='2'] .die-2 {
+  top: calc((var(--safe-left-2-from) + var(--safe-left-2-to)) / 2 - 22px);
+}
+:root[data-cut='1'][data-notch-side='right'][data-ears='2'] .die-1 {
+  top: calc((var(--safe-right-from) + var(--safe-right-to)) / 2 - 22px);
+}
+:root[data-cut='1'][data-notch-side='right'][data-ears='2'] .die-2 {
+  top: calc((var(--safe-right-2-from) + var(--safe-right-2-to)) / 2 - 22px);
+}
+:root[data-cut='1'][data-notch-side='top'] .die-ear,
+:root[data-cut='1'][data-notch-side='bottom'] .die-ear {
+  top: calc(var(--frame-band) + var(--frame-hairline-w));
+}
+:root[data-cut='1'][data-notch-side='bottom'] .die-ear {
+  top: auto;
+  bottom: calc(var(--frame-band) + var(--frame-hairline-w));
+}
+:root[data-cut='1'][data-notch-side='top'] .die-1,
+:root[data-cut='1'][data-notch-side='bottom'] .die-1 {
+  left: calc(var(--safe-cut-from) - 50px);
+}
+:root[data-cut='1'][data-notch-side='top'] .die-2,
+:root[data-cut='1'][data-notch-side='bottom'] .die-2 {
+  left: calc(var(--safe-cut-to) + 6px);
+}
+:root:not([data-cut='1']) .die-ear {
+  top: max(var(--frame-clear, 0px), var(--frame-inset-top));
+}
+:root:not([data-cut='1']) .die-1 {
+  left: max(var(--frame-clear, 0px), var(--frame-inset-left));
+}
+:root:not([data-cut='1']) .die-2 {
+  right: max(var(--frame-clear, 0px), var(--frame-inset-right));
+}
+/* A die: a 3x3 grid of pips, no image. A roll tumbles it for half a second. */
+.die {
+  width: 36px;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: 8px;
+  background: #f4f1ea;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+}
+.die .pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1b1f26;
+  place-self: center;
+}
+.die.tumble {
+  animation: tumble 0.45s ease-in-out;
+}
+@keyframes tumble {
+  0% {
+    transform: rotate(0) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(0.7);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .die.tumble {
+    animation: none;
+  }
+}
+/* The call to action, centred over the content: the shell's green .btn-go as a link (the clip's
+   card needs a real navigation), greyed with its reason under it while the gate holds it. */
+.island-cta {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 84%;
+  text-align: center;
+  z-index: 6;
+}
+.island-cta .btn-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.island-cta .btn-go[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.island-reason {
+  margin: 0;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.7);
+  color: var(--ink);
+  font-size: 12px;
+  border-radius: 6px;
+}
+.island-reason:empty {
   display: none;
 }
 .edge-note {

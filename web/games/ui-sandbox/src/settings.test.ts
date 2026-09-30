@@ -8,6 +8,7 @@ import {
   EXAMPLE_IDS,
   EXAMPLE_LETTERS,
   KEYS,
+  clipPretendedFrom,
   exampleIdOf,
   letterOf,
   nextExampleId,
@@ -68,14 +69,20 @@ describe('settings', () => {
     });
     expect(overridesFrom('?example=nope&band=40&mode=x')).toEqual({});
     expect(overridesFrom('')).toEqual({});
-    // The letters: `(a)` to `(i)` in the dropdown's order, either case.
+    // The letters: `(a)` to `(j)` in the dropdown's order, either case.
     expect(overridesFrom('?example=b')).toEqual({ example: 'side' });
     expect(overridesFrom('?example=I')).toEqual({ example: 'gutters' });
-    expect(overridesFrom('?example=j')).toEqual({});
+    expect(overridesFrom('?example=j')).toEqual({ example: 'dice' });
+    expect(overridesFrom('?example=k')).toEqual({});
+    // `?clip=on` alone pretends the clip is published; it is no setting and is never stored.
+    expect(clipPretendedFrom('?clip=on')).toBe(true);
+    expect(clipPretendedFrom('?clip=off')).toBe(false);
+    expect(clipPretendedFrom('')).toBe(false);
+    expect(overridesFrom('?clip=on')).toEqual({});
   });
 
-  test('the letters a-i name the nine in order; Next wraps from the last to the first', () => {
-    expect(EXAMPLE_LETTERS).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']);
+  test('the letters a-j name the ten in order; Next wraps from the last to the first', () => {
+    expect(EXAMPLE_LETTERS).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']);
     expect(EXAMPLE_IDS.map(letterOf)).toEqual(EXAMPLE_LETTERS);
     expect(EXAMPLE_LETTERS.map(exampleIdOf)).toEqual(EXAMPLE_IDS);
     expect(exampleIdOf('rail')).toBe('rail');
