@@ -145,6 +145,28 @@ the rebase is the per-game rows' first step), 14 phones x 8 cases x 2 screens pe
 The `frame` column is clean everywhere: backgammon and the sandbox carry `data-frame`, no other
 page does. No screen failed to be reached.
 
+### 4.1 The second run
+
+2026-09-30, over dist/ built from 0b92447b (#193's tight tier and #194's sandbox in), with the
+judge as §2 now describes it (the tiers, the gate, the Android lock), each page run with
+`--baseline` the first run's report. `tier` and `gate` are outcomes, not failures, and are counted
+apart; backgammon has a third screen upright (`kept`), so 280 screens.
+
+| page       | cases pass | screens pass | failures per column                          | by design                        |
+| ---------- | ---------- | ------------ | -------------------------------------------- | -------------------------------- |
+| gin-rummy  | 0 of 112   | 0 of 224     | used 60, targets 224, gutter 84              | scroll tier 60 (was FAIL 60)     |
+| fidice     | 0 of 112   | 0 of 224     | targets 224, gutter 224                      | none (no change)                 |
+| briscola   | 13 of 112  | 101 of 224   | used 36, gutter 87                           | scroll tier 57 (was FAIL 57)     |
+| backgammon | 92 of 112  | 260 of 280   | clip 20, targets 4                           | gate 56 + 8 kept, scroll tier 22 |
+| rps        | 5 of 112   | 74 of 224    | used 60, scroll 74, gutter 129               | none (no change)                 |
+| ui-sandbox | 0 of 112   | 112 of 224   | targets 112                                  | none (no change)                 |
+
+What moved against the first run: gin's and briscola's `scroll` columns are clean (every one of
+their scrolls is a theme's tier, read as `lifted`); backgammon's upright `table` rows are the gate's
+(and on the Android rows the lock's), its `kept` rows carry the §3.10 tier and the upright board's
+real findings; nothing else changed, the sandbox's `targets` after #194 included. The `--baseline`
+diff printed exactly those rows and no other.
+
 ## 5. Findings per game
 
 The list the per-game rows act on. "Real" is a finding the emulation stands behind; "env()" is one
@@ -215,18 +237,25 @@ scroll the page's own theme intends (§3).
 - Every control is 44px; nothing clips. The passing cases are the notch-free Galaxy and the SE in a
   tab upright, plus the four the tier read freed.
 
-**backgammon** (73 of 112; the framed page):
+**backgammon** (73 of 112 in the first run; 92 of 112 in the second, 260 of 280 screens; the
+framed page, the one that plays sideways):
 
-- `scroll` 26, all upright, every viewport 805px tall or less (the tabs on every iPhone, the SE
-  and the Galaxy in every mode): the §3.10 tier the theme intends. Tier; the judge should read the
-  twin (§3).
-- `clip` 24: `#oppName` by 25px on the 375-wide phones upright (the X, the mini: 16 cases) and
-  `#statusLine` by 4px sideways in a tab (4 cases). Real: the seat's name slot is 25px short of
-  "Ethan" at 375px, and the status line one word over at the narrowest sideways viewport.
-- `targets` 9 upright: the points 39.3-43px tall on the X (39.8), the mini (39.3), the 12 (42.3),
-  the 14 Pro class (41.9) standalone and fullscreen, and the Air with the bar hidden (43). Real
-  against 74fd551a; #193 ("upright under the notch the chrome tightens so the rows reach 44px")
-  landed after this run and may close it: re-run first.
+- Upright the `table` screen is the turn gate (§2): it stands on every iPhone row (48 cases; the
+  drive drops `screen.orientation.lock` there, as no iPhone browser has one) and on the Android
+  rows the shell's lock is held instead (8 cases, `locked`: the page turned the phone, which the
+  emulated viewport cannot follow), so `used` passes on all 56 and the four other columns are
+  `gate`. The 8 Android `kept` rows are the lock's too.
+- `scroll` 26 upright in the first run: now `tier` 22 on the `kept` board (the twin's §3.10 tier
+  at most 805px tall: every iPhone tab, the SE in every mode), the 4 Galaxy rows under the lock.
+  Clean.
+- `clip` 24 → 20: `#oppName` on the kept board by 25px on the 375-wide phones upright (the X, the
+  mini, the SE: 12 cases) and by 10px on the 390-wide 12 (4 cases, new against 74fd551a: the tight
+  tier's narrower chrome), and `#statusLine` by 7px sideways on the mini in every mode (4 cases; 4px
+  in a tab before). Real: the seat's name slot is short of "Ethan" at 375-390px, the status line a
+  word over at the narrowest sideways viewport.
+- `targets` 9 → 4: #193's tight tier reaches 44px on the 12, the 14 Pro class and the Air; the X
+  (41.8) and the mini (41.3) standalone and fullscreen are still short, the 375-wide room under the
+  notch being 12px less than the tier's arithmetic assumes. Real.
 - `used`, `frame` and `gutter` pass on every case: the framed board fills its room both ways.
 
 **rps** (5 of 112):
