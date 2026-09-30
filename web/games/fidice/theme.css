@@ -441,12 +441,79 @@ body[data-layout="desktop-wide"] .game .seats{grid-template-columns:1fr;align-co
 body[data-layout^="desktop"] #tableScreen,body[data-layout^="desktop"] #fidiceTable,body[data-layout^="desktop"] #screen-game{flex:1;display:flex;flex-direction:column}
 body[data-layout^="desktop"] .game{flex:1}
 body[data-layout^="desktop"] .game>.stack>.table{flex:1}
-/* Sideways on a phone: the game screen is one column (the legacy 900px rule) and the table itself splits, the dice
-   zones at the left and the two steps at the right of the same wood, the turn bar and the bid across both; when the steps
-   are away (not my turn, the reveal, the game over) every card spans the table. */
-body[data-layout^="phone-sideways"] #tableEl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-content:start}
+/* ---------- Sideways on a phone: the table fits without a scroll (docs/design/space-audit.md §5 "Closed by
+   fidice-sideways-fold"; a step of the restyle, docs/design/fidice-shell-adoption.md §4 M6) ----------
+   The legacy game screen stacked is 1100-1330px in a 305-440px viewport, so its copy folds. The game screen is two
+   columns: the wood at the left; the seats, the round panel, the table talk and the host's Finish at the right (the
+   `.stack` is display: contents, as on the wide desktop; the side is 240px, 26% of a narrow phone: a notched iPhone sideways
+   has 750px between its insets). The wood is three columns where they fit (226 + 2x132 + the gaps: the X class's 724px between its
+   insets is the narrowest that holds them) and two on the 667px SE: the two dice zones stacked at the left (226px: the
+   cup, five 32px dice and the zone's padding on one line; `auto-fit` counts a track by its max, so the zone is fixed),
+   then `auto-fit` step tracks of 132px or more, the call or
+   shuffle step in the first and the bid step in the last (`-2`: the third track, or under the shuffle when there are
+   two), the turn bar over every track but the last and the bid card in the last; where the steps are away (not my
+   turn, the reveal, the game over) every card spans the wood. The folds: the steps' explanatory
+   paragraphs sit behind a tap on the step's title (`body.fidice-help`, src/ui/helpFold.ts, bound by the shell boot); the seat
+   cards are one line each (the status line and my "(you)" folded: the turn bar names the holder, the dot the
+   connection, the accent border me; three seats or more in two columns); the bid card keeps its label and value (the
+   bidder's line folded, the dice a size down); the zones' h3 keep their names (the aside folded); the "You're
+   bidding" box shows once a hand is picked; the table talk is a strip of its two newest lines (a scrolling strip's clipped lines still stand under the
+   bottom inset for the audit, and the history sheet holds the whole log); "Leave table" hides
+   (the topbar's ↺ is the same leave). The round panel's padding and the talk heading's size are the vdom's inline
+   styles, hence the two !important. */
+body[data-layout^="phone-sideways"] .topbar{margin-bottom:6px}
+/* The room filled (the audit's table row: at most 8% of the viewport empty a side): the screen, the mount and the game
+   screen are flex columns to the foot, as on a desktop window, and the wood stretches over both of the side's rows. */
+body[data-layout^="phone-sideways"] #tableScreen,body[data-layout^="phone-sideways"] #fidiceTable,body[data-layout^="phone-sideways"] #screen-game{flex:1;display:flex;flex-direction:column}
+body[data-layout^="phone-sideways"] .game{flex:1;display:grid;grid-template-columns:minmax(0,1fr) min(240px,26%);grid-template-rows:auto 1fr;gap:8px 10px;align-items:start}
+body[data-layout^="phone-sideways"] .game>.stack{display:contents}
+body[data-layout^="phone-sideways"] .game .seats{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:6px;overflow:visible;padding:0}
+body[data-layout^="phone-sideways"] .game .seats:has(> .seat:nth-child(3)){display:grid;grid-template-columns:1fr 1fr}
+body[data-layout^="phone-sideways"] .game .table{grid-column:1;grid-row:1 / span 2;align-self:stretch;padding:10px;gap:8px;border-radius:16px;min-height:0}
+body[data-layout^="phone-sideways"] .game .side{grid-column:2;grid-row:2;gap:8px}
+body[data-layout^="phone-sideways"] .game .seat{flex:none;max-width:none;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:5px 10px;min-height:34px}
+body[data-layout^="phone-sideways"] .game .seat .nm{font-size:14px}
+body[data-layout^="phone-sideways"] .game .seat .status,body[data-layout^="phone-sideways"] .game .seat.me .nm>.small.muted:last-child{display:none}
+/* The cup badge stays inside the card's right edge: the card sits at the gutter, and a phone without a side inset (the Galaxy, the Pixel) would have the badge within 12px of the glass. */
+body[data-layout^="phone-sideways"] .game .seat .cupbadge{top:-9px;right:4px;font-size:18px}
+body[data-layout^="phone-sideways"] .game .side>.panel{padding:0 !important;background:none;box-shadow:none;border-top:0}
+body[data-layout^="phone-sideways"] .game .side>h3.muted{font-size:11px !important;margin:-2px 0}
+body[data-layout^="phone-sideways"] .game .side .log{max-height:none;overflow:visible;padding:6px 8px;gap:3px;font-size:12px;border-radius:10px}
+body[data-layout^="phone-sideways"] .game .side .log div{padding:3px 6px}
+body[data-layout^="phone-sideways"] .game .side .log>div:nth-last-child(n+3){display:none}
+body[data-layout^="phone-sideways"] .game .side #btnLeaveGame{display:none}
+body[data-layout^="phone-sideways"] #tableEl{display:grid;grid-template-columns:226px repeat(auto-fit,minmax(132px,1fr));grid-auto-flow:row dense;gap:8px;align-content:start}
 body[data-layout^="phone-sideways"] #tableEl>*{grid-column:1 / -1}
-body[data-layout^="phone-sideways"] #tableEl:has(#actions) #zoneTable,body[data-layout^="phone-sideways"] #tableEl:has(#actions) #zoneCup{grid-column:1}
-body[data-layout^="phone-sideways"] #tableEl #actions{grid-column:2;grid-row:3 / span 2}
-body[data-layout^="phone-sideways"] .game .seats{display:flex;flex-wrap:wrap;gap:8px}
-body[data-layout^="phone-sideways"] .game .seat{flex:1 1 150px;max-width:260px}
+body[data-layout^="phone-sideways"] #tableEl>.turnbar{grid-column:1 / -2;padding:8px 12px;font-size:14px;display:grid;place-items:center}
+body[data-layout^="phone-sideways"] #tableEl>.bidcard{grid-column:-2;flex-direction:column;align-items:flex-start;gap:4px;padding:6px 10px;border-left-width:4px}
+body[data-layout^="phone-sideways"] #tableEl>.bidcard .lbl{font-size:11px}
+body[data-layout^="phone-sideways"] #tableEl>.bidcard .val{font-size:18px;line-height:1.15}
+body[data-layout^="phone-sideways"] #tableEl>.bidcard .who{display:none}
+body[data-layout^="phone-sideways"] #tableEl>.bidcard .die.sm{width:20px;height:20px;border-radius:5px}
+body[data-layout^="phone-sideways"] #tableEl>.bidcard .dice{gap:4px}
+body[data-layout^="phone-sideways"] #tableEl:has(#actions)>#zoneTable,body[data-layout^="phone-sideways"] #tableEl:has(#actions)>#zoneCup{grid-column:1}
+body[data-layout^="phone-sideways"] #tableEl .zone{padding:8px;gap:6px}
+body[data-layout^="phone-sideways"] #tableEl .zone h3{font-size:12px}
+body[data-layout^="phone-sideways"] #tableEl .zone h3 .small{display:none}
+body[data-layout^="phone-sideways"] #tableEl .zone .dice{gap:4px;min-height:32px;flex-wrap:nowrap}
+body[data-layout^="phone-sideways"] #tableEl .zone .die{width:32px;height:32px;border-radius:8px}
+body[data-layout^="phone-sideways"] #tableEl .cup-visual{gap:6px}
+body[data-layout^="phone-sideways"] #tableEl .cup-icon{font-size:28px}
+body[data-layout^="phone-sideways"] #tableEl #actions{display:contents}
+body[data-layout^="phone-sideways"] #tableEl #actions>.step{grid-column:2}
+body[data-layout^="phone-sideways"] #tableEl #actions>#stepShuffle:first-child{grid-row:span 2}
+body[data-layout^="phone-sideways"] #tableEl #actions>#stepBid{grid-column:-2;grid-row:span 2}
+body[data-layout^="phone-sideways"] #tableEl .step{padding:8px 10px;gap:6px}
+body[data-layout^="phone-sideways"] #tableEl .step h4{font-size:15px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+body[data-layout^="phone-sideways"] #tableEl .step h4 .num{flex:none}
+body[data-layout^="phone-sideways"] #tableEl .step h4::after{content:"?";margin-left:auto;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--lake-light);color:var(--lake);font-family:Nunito;font-size:12px;display:grid;place-items:center;flex:none}
+body[data-layout^="phone-sideways"]:not(.fidice-help) #tableEl .step p{display:none}
+body[data-layout^="phone-sideways"].fidice-help #tableEl .step h4::after{background:var(--lake);color:#fff}
+body[data-layout^="phone-sideways"] #tableEl .step .row{gap:8px}
+body[data-layout^="phone-sideways"] #tableEl .step .toggle{font-size:12px}
+body[data-layout^="phone-sideways"] #tableEl .bidpick{gap:8px}
+body[data-layout^="phone-sideways"] #tableEl .bidsearch input{font-size:14px;padding:9px 12px}
+body[data-layout^="phone-sideways"] #tableEl .bidsel{padding:6px 10px;min-height:44px;gap:8px}
+body[data-layout^="phone-sideways"] #tableEl .bidsel:not(:has(.val)){display:none}
+body[data-layout^="phone-sideways"] #tableEl .bidsel .val{font-size:16px}
+body[data-layout^="phone-sideways"] #tableEl .bidlist{max-height:min(300px,55vh)}

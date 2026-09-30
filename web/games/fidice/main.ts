@@ -28,6 +28,7 @@ import { GuestSession as ShellGuestSession } from './src/net/shell/guest.ts';
 import { HostSession as ShellHostSession } from './src/net/shell/host.ts';
 import { isGuestFrame } from './src/protocol.ts';
 import { STORAGE_KEYS, soundEnabled } from './src/storage.ts';
+import { bindHelpFold } from './src/ui/helpFold.ts';
 import { fillNameInputs, fillP2NameInput, setCodeInput } from './src/ui/home.ts';
 import { bindAll, paint, paintSound, renderAbout, renderRules } from './src/ui/render.ts';
 import {
@@ -165,11 +166,14 @@ const bootShellPath = (): void => {
         if (url !== null) history.replaceState(null, '', url);
       },
       // The dice faces' styles (the old boot injects the same), then the rules into both slots and
-      // the About copy (ui/rules.ts, ui/about.ts), once, before any paint.
+      // the About copy (ui/rules.ts, ui/about.ts), once, before any paint; and the steps' help
+      // fold on the table's mount (ui/helpFold.ts: sideways on a phone the theme folds the steps'
+      // paragraphs behind a tap on the step's title).
       render: () => {
         injectDiceStyles();
         renderRules(document);
         renderAbout(document);
+        bindHelpFold(document);
       },
       // `act` through the reducer; `view` my view; `setup` seats a position for e2e (pass the
       // phone only: the shell's `position/load` over the engine's decoder).
