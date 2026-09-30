@@ -762,6 +762,20 @@ the emulator's seam (tools/shell-emulate.ts `seamScript`, which writes the four 
 everything a phone's insets would and the audit can prove it; test/tokens.test.ts holds the rule.
 On a touch screen (`any-pointer: coarse`) the tab bar's and the mode switch's buttons reach 44px.
 
+### 6.8 The layout buckets: how a game lays out per screen size
+
+The owner (2026-09-28): "it shouldn't be that hard to make a thin layer on top to display
+differently for different buckets of screen sizing." The layer is docs/design/layout-buckets.md:
+`web/shared/lib/layout.ts` names seven buckets (`phone-upright`, `phone-sideways`,
+`phone-sideways-short`, `tablet-upright`, `tablet-sideways`, `desktop`, `desktop-wide`) from the
+viewport and the pointer, the boot writes the one in force on `<body data-layout>` and keeps it
+live on every resize and turn (`web/shared/edge/screen.ts` `applyLayout`, `watchLayout`), the same
+predicates are `@media` strings (`BUCKET_MEDIA`) for a theme that prefers pure CSS, and shell.css's
+480px column is a bucket rule: `phone-upright` keeps it, every other bucket reads the theme's
+`--column-wide` (480px until a theme names `none`), so a game adopts with one token and the goldens
+of the others stand. UI Sandbox prints the bucket and forces one on its preview; the space audit
+reports it per case and drives the desktop windows as a second case type.
+
 ## 7. Risks
 
 | # | Risk | Where it bites | Mitigation in the plan |

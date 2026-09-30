@@ -280,6 +280,25 @@ framed page, the one that plays sideways):
 - `used`, `scroll`, `frame` and `gutter` pass on every case: example (a) fills the room within 2%
   on every phone, both ways.
 
+**Landed by shell-layout-buckets** (docs/design/layout-buckets.md; the desktop cases of "The audit
+itself" above):
+
+- The second case type: the five desktop windows (`tools/space-audit.ts` `DESKTOP_WINDOWS`: 900x700,
+  1024x768, 1280x800, 1440x900, 1920x1080; a fine pointer, no touch, no seam, a browser tab) join
+  every default run after the phones and run alone under `--device desktop`; any of `--device
+  <phone>`, `--orientation`, `--mode`, `--bar` leaves them out. The judge reads them through
+  `DESKTOP_LIMITS` (home 10% above, 40% below and beside; table 10% a side, no scroll; the tool's 2%)
+  and a 32px target (`TARGET_MIN_DESKTOP`), no gate (a window is landscape, backgammon plays
+  landscape) and no twin tier. The sheet groups them last under "Desktop windows" with their own
+  tally; the check table names them `desktop 1280x800`.
+- The bucket per case: `measureScript` reads `body[data-layout]` (the boot's, web/shared/lib/layout.ts)
+  into `Measured.layout`, the sheet prints it per screen (`bucket`), the per-case console line carries
+  it in brackets and report.json keeps it, so a per-game row knows which bucket each case lands in
+  before it lays out for one.
+- Briscola's sideways layout (the worked example the ask names) is handed to `space-audit-briscola`:
+  the layer is in, the theme's rules under `body[data-layout="phone-sideways"]` and `--column-wide:
+  none` are that row's, and the third run's counts are recorded there.
+
 **Closed by shell-unframed-insets** (the shell's inset rule; docs/design/shared-shell.md §6.7):
 
 - The unframed shell's inset padding: `:where(body:not([data-frame])) #app` pads the top and the foot
