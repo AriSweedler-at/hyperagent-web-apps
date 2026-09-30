@@ -42,8 +42,11 @@ body{font-family:'Nunito',system-ui,sans-serif;color:var(--ink);min-height:100%;
 body::before{content:"";position:fixed;left:0;right:0;bottom:0;height:32vh;pointer-events:none;z-index:0;opacity:.8;
   background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 420' preserveAspectRatio='none'><g fill='%238fb3a0' opacity='.55'><path d='M0 260 L40 180 L80 260 L110 150 L150 260 L190 200 L230 260 L270 120 L320 260 L350 190 L390 260 L430 140 L480 260 L520 200 L560 260 L600 110 L650 260 L690 190 L730 260 L770 150 L820 260 L860 210 L900 260 L940 130 L990 260 L1030 190 L1070 260 L1110 160 L1160 260 L1200 200 L1200 420 L0 420Z'/></g><g fill='%231f4d3a' opacity='.9'><path d='M0 300 L30 230 L60 300 L90 200 L125 300 L160 250 L195 300 L230 170 L275 300 L305 240 L340 300 L380 190 L425 300 L460 250 L500 300 L540 160 L590 300 L625 240 L660 300 L700 200 L745 300 L780 255 L815 300 L855 180 L905 300 L940 245 L975 300 L1015 210 L1060 300 L1095 250 L1130 300 L1170 190 L1200 260 L1200 420 L0 420Z'/></g><path fill='%232b6f9e' d='M0 300 L1200 300 L1200 420 L0 420Z'/><g stroke='%237fbde0' stroke-width='3' fill='none' opacity='.8' stroke-linecap='round'><path d='M60 330 q20 -8 40 0 t40 0'/><path d='M320 355 q20 -8 40 0 t40 0 t40 0'/><path d='M640 335 q20 -8 40 0 t40 0'/><path d='M900 365 q20 -8 40 0 t40 0 t40 0'/><path d='M180 390 q20 -8 40 0 t40 0'/><path d='M1040 395 q20 -8 40 0 t40 0'/><path d='M500 400 q20 -8 40 0 t40 0'/></g></svg>") center bottom / 100% 100% no-repeat}
 header,main{position:relative;z-index:1}
-/* shell.css caps #app at 480px as a 100dvh flex column; the vdom's mount stays a plain block so main keeps its 1200px. */
-#app{max-width:none;margin:0;min-height:auto;display:block}
+/* shell.css caps #app at 480px as a 100dvh flex column; on the old path the vdom's mount stays a plain block so main
+   keeps its 1200px. The shared boot writes the layout bucket on <body data-layout> (web/shared/edge/screen.ts
+   `applyLayout`) and the old boot writes none, so `body:not([data-layout])` is the old path: the shell path keeps the
+   shell's column, its gutter and its buckets (the section at the foot of this file). */
+body:not([data-layout]) #app{max-width:none;margin:0;min-height:auto;display:block}
 h1,h2,h3,.brand{font-family:'Fredoka',sans-serif;letter-spacing:.2px;margin:0}
 button{font-family:inherit;font-size:15px;font-weight:700;border:0;border-radius:12px;padding:10px 16px;cursor:pointer;transition:transform .08s,box-shadow .12s,background .12s}
 button:active{transform:translateY(1px)}
@@ -382,3 +385,68 @@ main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:22px 18px 40px}
   .handoff{min-height:60vh;padding:20px}
   .cfg-grid{grid-template-columns:1fr}
 }
+
+/* ---------- the shell path (docs/design/fidice-shell-adoption.md M4; docs/design/space-audit.md §5 "Closed by
+   space-audit-fidice") ----------
+   `body[data-layout]` is the shell path (the shared boot writes the bucket, web/shared/lib/layout.ts; the old boot
+   writes none), so nothing below reaches the old page or its goldens (test/fixtures/styles/fidice.*.json). The shell's
+   design language on fidice's own palette: the 12px gutter gin and briscola keep (shell.css pads #app by the gutter or
+   the safe-area inset, whichever is more), a finger's 44px on every control of a touch bucket and a mouse's 32px on a
+   desktop one (tools/space-audit/judge.ts TARGET_MIN, TARGET_MIN_DESKTOP), the table's scroll tier, and the column per
+   bucket (`--column-wide`, shell.css). The foot is gin's 16px: where a home screen is within a pixel of its viewport's
+   height the document does not count as scrolling (judge.ts SCROLL_SLACK) and the last card's air is measured at the
+   fold, so the foot carries 4px more than the 12px the judge asks of it. */
+body[data-layout]{--gutter:12px;--gutter-bottom:16px}
+/* The body above is a flex column of the viewport's height (html,body{height:100%}), so shell.css's #app, its flex
+   item, shrank to 100dvh and a home taller than the screen overflowed it: the document ended at the last card's margin
+   and the foot's air was never in the page. The item keeps its content's height and the page scrolls to the foot. */
+body[data-layout] #app{flex-shrink:0}
+/* The table's topbar (the shell's five controls in two tight rows, page.ts `table`): the two rows at the ends, as gin's. */
+body[data-layout] .topbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+body[data-layout] .topbar .row{flex-wrap:nowrap;gap:6px}
+/* Targets: a mouse's 32px everywhere on this path, a finger's 44px on a phone or a tablet (the bucket is the pointer's
+   family, layout.ts `isDesktop`). The strategy gear (#btnConfigSolo) is a square. */
+body[data-layout] button,body[data-layout] select,body[data-layout] input:not([type=checkbox]):not([type=radio]){min-height:32px}
+body[data-layout^="phone"] button,body[data-layout^="tablet"] button,
+body[data-layout^="phone"] select,body[data-layout^="tablet"] select,
+body[data-layout^="phone"] input:not([type=checkbox]):not([type=radio]),body[data-layout^="tablet"] input:not([type=checkbox]):not([type=radio]){min-height:44px}
+body[data-layout^="phone"] #btnConfigSolo,body[data-layout^="tablet"] #btnConfigSolo{min-width:44px}
+/* The toggles' checkboxes (#rollCupCb and #rollHiddenCb at the table, #watchCb in the lobby): the UA's 13px box is the
+   smallest control on the page, so the box is drawn (a lake-blue outline, filled with a white tick when on) inside a
+   44px hit area whose negative margins keep the label's flow at the 24px the drawing takes. */
+body[data-layout] .toggle input[type=checkbox]{appearance:none;-webkit-appearance:none;width:44px;height:44px;margin:-10px;padding:0;border:0;border-radius:12px;flex:none;cursor:pointer;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='1.5' y='1.5' width='21' height='21' rx='6' fill='%23fff' stroke='%237fbde0' stroke-width='2'/></svg>") center/24px 24px no-repeat}
+body[data-layout] .toggle input[type=checkbox]:checked{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='1.5' y='1.5' width='21' height='21' rx='6' fill='%232b6f9e' stroke='%232b6f9e' stroke-width='2'/><path d='M6.5 12.5l3.5 3.5 7.5-8' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>")}
+body[data-layout] .toggle input[type=checkbox]:focus{box-shadow:none}
+body[data-layout] .toggle input[type=checkbox]:focus-visible{outline:3px solid var(--lake-light);outline-offset:-7px}
+/* The table's scroll tier: the legacy game screen (#screen-game in #fidiceTable) is the turn bar, the bid, the two dice
+   zones, the two steps and the table talk, 900-1300px tall in every bucket, so the shell's fixed screen (shell.css
+   `body.fixed-screen`: 100dvh, overflow hidden) would cut it at the fold with no way down to Roll and Bid. Lifted the way
+   gin's short-viewport tier is (its theme.css `@media (max-height: 661px)`), on this path in every bucket: the page
+   scrolls to the foot and the audit reads the scroll as `tier` (judge.ts `lifted`). The gutter's max(12px, inset)
+   at #app's foot keeps the last control clear of the home indicator where the screen ends at the fold. */
+body[data-layout].fixed-screen,body[data-layout].fixed-screen #app{height:auto;max-height:none;overflow:visible}
+body[data-layout].fixed-screen #app{min-height:100dvh}
+/* The column per bucket (docs/design/layout-buckets.md §3): the home keeps the shell's 480px column everywhere (a
+   phone's cards, centred on a laptop with the shoreline around them); the table (`fixed-screen`) takes the room a phone
+   sideways leaves, the legacy main's 1200px on a tablet or a desktop window, and 1560px on a wide desktop, where the
+   seats become a third column beside the table and the table talk (the spectator screen's own three-column shape). */
+body[data-layout^="phone-sideways"].fixed-screen{--column-wide:none}
+body[data-layout^="tablet"].fixed-screen,body[data-layout="desktop"].fixed-screen{--column-wide:1200px}
+body[data-layout="desktop-wide"].fixed-screen{--column-wide:1560px}
+body[data-layout="desktop-wide"] .game{grid-template-columns:260px minmax(0,1fr) 340px}
+body[data-layout="desktop-wide"] .game>.stack{display:contents}
+body[data-layout="desktop-wide"] .game .seats{grid-template-columns:1fr;align-content:start}
+/* A desktop window taller than the game screen (1920x1080: the screen is 930px): the wood fills the room to the foot,
+   as a table does, instead of a strip of sky under it (the audit's table row: at most a tenth of the window empty a side). */
+body[data-layout^="desktop"] #tableScreen,body[data-layout^="desktop"] #fidiceTable,body[data-layout^="desktop"] #screen-game{flex:1;display:flex;flex-direction:column}
+body[data-layout^="desktop"] .game{flex:1}
+body[data-layout^="desktop"] .game>.stack>.table{flex:1}
+/* Sideways on a phone: the game screen is one column (the legacy 900px rule) and the table itself splits, the dice
+   zones at the left and the two steps at the right of the same wood, the turn bar and the bid across both; when the steps
+   are away (not my turn, the reveal, the game over) every card spans the table. */
+body[data-layout^="phone-sideways"] #tableEl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-content:start}
+body[data-layout^="phone-sideways"] #tableEl>*{grid-column:1 / -1}
+body[data-layout^="phone-sideways"] #tableEl:has(#actions) #zoneTable,body[data-layout^="phone-sideways"] #tableEl:has(#actions) #zoneCup{grid-column:1}
+body[data-layout^="phone-sideways"] #tableEl #actions{grid-column:2;grid-row:3 / span 2}
+body[data-layout^="phone-sideways"] .game .seats{display:flex;flex-wrap:wrap;gap:8px}
+body[data-layout^="phone-sideways"] .game .seat{flex:1 1 150px;max-width:260px}
