@@ -259,6 +259,22 @@ The resolve's buzz is 30 ms (the owner's word) where §3 said 40. The next round
 1.4 s after a verdict unless Stop was pressed or Tech up is on offer (§3 step 1). Posting the score
 to the Worker (§3 step 6, §8 step 5) is the island lane's; the page leaves `#islandSlot` for it.
 
+**The layout** (`theme.css`; the space audit's rps row, docs/design/space-audit.md §5 "Closed by
+space-audit-rps"). One fixed screen: `#app` is the viewport less the safe-area insets and a size
+container named `room`, every part with a size of its own (the computer's hand, the three hands,
+the paddings and gaps) a `cqh` clamp of the room's height, so the page never scrolls, upright down
+to the SE in a tab with the bar shown (375x553) and sideways down to the Galaxy's 780x304. The boot
+writes the layout bucket on `<body data-layout>` (`applyLayout`, `watchLayout`; docs/design/layout-buckets.md)
+and the theme lays out per bucket: upright the column as before (the score, the table, the hands,
+the controls in one row, the foot pinned to the bottom), with a short tier under 669px of room
+(`@container room`) that seats the three facts beside the tally and the reaction beside the verdict;
+a phone sideways three columns under the bar, the score and the Reset link at the left, the table in
+the middle with the hand beside the verdict and the window bar and the controls under it, the three
+hands stacked under the right thumb; a desktop window the same grid spread to within a tenth of the
+window's edges, the table stretched to the room, the hands a row of keys across the bottom, the
+buddy at 4x (5x from 1440px wide). The sprite scale is the theme's (`--px` on `.buddy` and `.face`,
+an integer multiple of 24 per bucket); the paint sets only the sheet, `--frames` and `--ms`.
+
 ## 11. From the game to the island
 
 The last mile (`web/games/rps/src/island.ts`, wired in `main.ts`; the clip names in

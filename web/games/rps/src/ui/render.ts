@@ -29,7 +29,7 @@ import {
   type Hand,
   type Outcome,
 } from '../engine/engine.ts';
-import { FRAME_PX, LOOPS, SET_OF, hopBetween, hopMs, sheetUrl, type BuddySet } from './buddy.ts';
+import { LOOPS, SET_OF, hopBetween, hopMs, sheetUrl, type BuddySet } from './buddy.ts';
 import { autoNext, type App, type Intent } from './state.ts';
 
 /** The page's ids, as index.html carries them (tools/games.ts SOLO pins them in the built page). */
@@ -62,10 +62,6 @@ export const HAND_BUTTON_IDS: Readonly<Record<Hand, string>> = {
   scissors: 'scissorsBtn',
 };
 
-/** The face's scale (2×) and the buddy's (3×): integer multiples keep the pixels crisp. */
-export const FACE_PX = FRAME_PX * 2;
-export const BUDDY_PX = FRAME_PX * 3;
-
 export const VERDICT_COPY: Readonly<Record<Outcome, string>> = {
   win: 'You win',
   tie: 'Tie',
@@ -88,10 +84,13 @@ export type PaintOptions = Readonly<{
   afterHop: (ms: number, fn: () => void) => void;
 }>;
 
-/** A sheet onto an element at `px` per frame: the CSS plays it with `steps(var(--frames))`. */
-const paintSheet = (el: Element, sheet: string, frames: number, ms: number, px: number): void => {
+/**
+ * A sheet onto an element: the CSS sizes it `--frames` frames wide at the element's own `--px` per
+ * frame (theme.css `.buddy`, `.face`: the scale is the layout bucket's, 3x and 2x on a phone, up
+ * to 5x and 3x on a wide desktop window) and plays it with `steps(var(--frames))`.
+ */
+const paintSheet = (el: Element, sheet: string, frames: number, ms: number): void => {
   setStyle(el, 'background-image', `url(${sheetUrl(sheet)})`);
-  setStyle(el, 'background-size', `${String(frames * px)}px ${String(px)}px`);
   setStyle(el, '--frames', String(frames));
   setStyle(el, '--ms', String(ms));
 };
@@ -99,7 +98,7 @@ const paintSheet = (el: Element, sheet: string, frames: number, ms: number, px: 
 const paintLoop = (buddy: Element, set: BuddySet): void => {
   const loop = LOOPS[set];
   removeClass(buddy, 'hop', 'back');
-  paintSheet(buddy, loop.sheet, loop.frames, loop.ms, BUDDY_PX);
+  paintSheet(buddy, loop.sheet, loop.frames, loop.ms);
   setAttr(buddy, 'data-set', set);
 };
 
@@ -117,7 +116,7 @@ const paintBuddy = (doc: DocumentLike, app: App, options: PaintOptions): void =>
     paintLoop(buddy, set);
     return;
   }
-  paintSheet(buddy, hop.hop.sheet, hop.hop.frames, hop.hop.ms, BUDDY_PX);
+  paintSheet(buddy, hop.hop.sheet, hop.hop.frames, hop.hop.ms);
   addClass(buddy, 'hop');
   toggleClass(buddy, 'back', hop.reverse);
   setAttr(buddy, 'data-set', set);
@@ -134,7 +133,7 @@ const paintScore = (doc: DocumentLike, app: App): void => {
   setText(requireId(doc, IDS.counter), signed(progress.counter));
   setAttr(requireId(doc, IDS.app), 'data-mood', mood);
   const face = requireId(doc, IDS.face);
-  paintSheet(face, loop.sheet, loop.frames, loop.ms, FACE_PX);
+  paintSheet(face, loop.sheet, loop.frames, loop.ms);
   setAttr(face, 'data-set', set);
   setText(
     requireId(doc, IDS.prestige),

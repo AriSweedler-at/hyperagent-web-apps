@@ -147,6 +147,16 @@ VIEWPORTS.forEach(([name, width, height]) => {
       expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(height);
       expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
     });
+    // One fixed screen (rps-island.md §10 "The layout"): the page put itself in the upright bucket
+    // (main.ts writes `data-layout`, docs/design/layout-buckets.md) and nothing scrolls, neither
+    // the document nor `#app` inside it.
+    await expect(page.locator('body')).toHaveAttribute('data-layout', 'phone-upright');
+    expect(
+      await page.evaluate<boolean>(
+        `document.documentElement.scrollHeight <= innerHeight &&
+         document.getElementById('app').scrollHeight <= document.getElementById('app').clientHeight`,
+      ),
+    ).toBe(true);
 
     // 1. A win at 350 ms: +5, very happy, the fifth fast win, Tech up on offer (so no auto next).
     await round(page, 'scissors', 'rock', 350);
