@@ -577,7 +577,7 @@ body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-uprigh
   align-self: start;
 }
 body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .reaction {
-  /* Beside the hand the reaction has 130-180px: "No tap within 1000 ms" in two lines, not three. */
+  /* Beside the hand the reaction has 130-180px: "No tap within 2500 ms" in two lines, not three. */
   font-size: 0.85rem;
 }
 body[data-layout]:not([data-layout='phone-upright'], [data-layout='tablet-upright']) .hands {

@@ -14,9 +14,6 @@ public enum Outcome: String, CaseIterable, Codable, Hashable, Sendable {
         }
     }
 
-    /// A loss or a timeout: the outcomes that slow the window (design §2 "A loss slows the game").
-    public var slowsTheWindow: Bool { self == .loss || self == .timeout }
-
     /// The verdict of one round. `player` nil or `reactionMs` nil: no tap came. A tap at exactly the
     /// window counts; one later is a timeout.
     public static func verdict(player: Hand?, computer: Hand, reactionMs: Int?, windowMs: Int) -> Outcome {

@@ -2,9 +2,11 @@
 // model (ios/DiceClip/DiceModel/Sources/DiceModel/RPS, `swift test`) are held to one table.
 import { describe, expect, test } from 'vitest';
 
-import { decodeProgress, encodeProgress, rescaleV1Window } from './codec.ts';
+import { decodeProgress, encodeProgress } from './codec.ts';
 import {
   INITIAL_PROGRESS,
+  LADDER,
+  MAX_PRESTIGE,
   apply,
   applyRound,
   atFloor,
@@ -13,9 +15,9 @@ import {
   moodOf,
   nextWindow,
   reset,
-  slowedWindow,
   techUp,
   verdict,
+  windowFor,
   type Hand,
   type Outcome,
   type Progress,
@@ -25,6 +27,15 @@ const at = (windowMs: number, counter = 0): Progress => ({
   ...INITIAL_PROGRESS,
   windowMs,
   counter,
+});
+
+/** The progress at a level with the counter where the vectors put it. */
+const level = (prestige: number, counter: number, extra: Partial<Progress> = {}): Progress => ({
+  ...INITIAL_PROGRESS,
+  prestige,
+  windowMs: windowFor(prestige),
+  counter,
+  ...extra,
 });
 
 describe('the hands', () => {
@@ -50,14 +61,11 @@ describe('verdicts and windows (§6, the first table)', () => {
     [2500, 'rock', 'scissors', 2500, 'win', 1, 2500],
     [2500, 'rock', 'scissors', 2501, 'timeout', -1, 2500],
     [1875, 'scissors', 'paper', 1700, 'win', 1, 1875],
-    [1875, 'scissors', 'rock', 300, 'loss', -1, 2063],
-    [1875, null, 'rock', null, 'timeout', -1, 2063],
-    [1875, 'paper', 'rock', 1876, 'timeout', -1, 2063],
-    [2063, 'rock', 'paper', 10, 'loss', -1, 2269],
-    [2269, 'rock', 'paper', 10, 'loss', -1, 2496],
-    [2496, 'rock', 'paper', 100, 'loss', -1, 2500],
+    [1875, 'scissors', 'rock', 300, 'loss', -1, 1875],
+    [1875, null, 'rock', null, 'timeout', -1, 1875],
+    [1875, 'paper', 'rock', 1876, 'timeout', -1, 1875],
     [251, 'rock', 'scissors', 251, 'win', 1, 251],
-    [251, 'rock', 'scissors', 252, 'timeout', -1, 276],
+    [251, 'rock', 'scissors', 252, 'timeout', -1, 251],
   ];
   test.each(ROWS)(
     'window %i, %s vs %s at %s ms: %s, counter %i, window %i',
@@ -65,6 +73,7 @@ describe('verdicts and windows (§6, the first table)', () => {
       expect(verdict(player, computer, reactionMs, windowMs)).toBe(outcome);
       const round = applyRound(at(windowMs), player, computer, reactionMs);
       expect(round.outcome).toBe(outcome);
+      expect(round.dropped).toBe(false);
       expect(round.progress.counter).toBe(delta);
       expect(round.progress.windowMs).toBe(after);
     },
@@ -81,22 +90,77 @@ describe('verdicts and windows (§6, the first table)', () => {
     expect(apply(wins, 'tie', 50)).toEqual(wins);
   });
 
-  test('clamping: a win at +5 stays +5 and still records; a loss at −5 stays −5 and still slows', () => {
+  test('clamping: a win at +5 stays +5 and still records; a loss at −5 with no level to lose stays −5, the window 2500', () => {
     const top = apply(at(2500, 5), 'win', 300);
     expect(top.counter).toBe(5);
     expect(top.recentWins).toEqual([300]);
     expect(top.best).toBe(300);
-    const bottom = apply(at(1875, -5), 'loss', 10);
-    expect(bottom.counter).toBe(-5);
-    expect(bottom.windowMs).toBe(2063);
-    expect(apply(at(1875, -5), 'timeout', null).windowMs).toBe(2063);
+    const bottom = apply(at(2500, -5), 'loss', 10);
+    expect(bottom).toEqual(at(2500, -5));
+    expect(apply(at(2500, -5), 'timeout', null)).toEqual(at(2500, -5));
   });
 
-  test('the rounding chain of §2: up by 10% to the cap, down by 25% to the floor', () => {
-    expect([1875, 2063, 2269, 2496].map(slowedWindow)).toEqual([2063, 2269, 2496, 2500]);
-    expect([2500, 1875, 1406, 1055, 791, 593, 445, 334, 251].map(nextWindow)).toEqual([
-      1875, 1406, 1055, 791, 593, 445, 334, 251, 188,
-    ]);
+  test("the ladder of §2: the base stepped by 25% to the floor; the window is the level's", () => {
+    expect(LADDER).toEqual([2500, 1875, 1406, 1055, 791, 593, 445, 334, 251]);
+    expect(MAX_PRESTIGE).toBe(8);
+    expect(LADDER.map(nextWindow)).toEqual([1875, 1406, 1055, 791, 593, 445, 334, 251, 188]);
+    expect([0, 1, 8].map(windowFor)).toEqual([2500, 1875, 251]);
+    // Out of the ladder reads as its nearer end.
+    expect(windowFor(-1)).toBe(2500);
+    expect(windowFor(9)).toBe(251);
+  });
+});
+
+describe('the down prestige (§2, §6 "Down a level")', () => {
+  test("a loss at −4 with a level to lose: prestige −1, the previous level's window, counter 0, the wins cleared, the best kept", () => {
+    const before = level(1, -4, { recentWins: [900, 950], best: 300 });
+    const round = applyRound(before, 'rock', 'paper', 300);
+    expect(round.outcome).toBe('loss');
+    expect(round.dropped).toBe(true);
+    expect(round.progress).toEqual({
+      counter: 0,
+      windowMs: 2500,
+      prestige: 0,
+      recentWins: [],
+      best: 300,
+    });
+  });
+
+  test('a timeout drops the same way; from prestige 2 the window is 1875, not the base', () => {
+    const round = applyRound(level(2, -4, { best: 210 }), null, 'rock', null);
+    expect(round.outcome).toBe('timeout');
+    expect(round.dropped).toBe(true);
+    expect(round.progress).toEqual({
+      counter: 0,
+      windowMs: 1875,
+      prestige: 1,
+      recentWins: [],
+      best: 210,
+    });
+  });
+
+  test('a loss at −3 moves the counter alone, whatever the level', () => {
+    const before = level(3, -3, { recentWins: [500], best: 400 });
+    expect(apply(before, 'loss', 100)).toEqual({ ...before, counter: -4 });
+    expect(apply(before, 'timeout', null)).toEqual({ ...before, counter: -4 });
+  });
+
+  test('a loss already at −5 (a save from before the rule) drops when there is a level to lose', () => {
+    expect(apply(level(1, -5), 'loss', 100)).toEqual(level(0, 0));
+    expect(applyRound(level(1, -5), 'rock', 'paper', 100).dropped).toBe(true);
+  });
+
+  test('at prestige 0 the counter stays at −5: nothing lower exists', () => {
+    const round = applyRound(level(0, -5), 'rock', 'paper', 100);
+    expect(round.dropped).toBe(false);
+    expect(round.progress).toEqual(level(0, -5));
+  });
+
+  test('a drop recovers exactly the level the Tech up left: up and down the ladder round-trips', () => {
+    const up = techUp(level(3, 5, { recentWins: [1, 1, 1, 1, 1], best: 1 }));
+    expect(up).toEqual(level(4, 0, { best: 1 }));
+    const down = [1, 2, 3, 4, 5].reduce((p) => apply(p, 'loss', 10), up);
+    expect(down).toEqual(level(3, 0, { best: 1 }));
   });
 });
 
@@ -143,14 +207,14 @@ describe('Tech up (§6, the second table)', () => {
   });
 
   test('the floor: at 251 ms the game is as fast as it gets and prestige tops out at 8', () => {
-    const ladder = [2500, 1875, 1406, 1055, 791, 593, 445, 334, 251];
-    expect(ladder.map((windowMs) => atFloor(at(windowMs)))).toEqual([
-      ...ladder.slice(0, -1).map(() => false),
+    expect(LADDER.map((windowMs) => atFloor(at(windowMs)))).toEqual([
+      ...LADDER.slice(0, -1).map(() => false),
       true,
     ]);
-    const climbed = ladder
-      .slice(0, -1)
-      .reduce((p) => techUp({ ...p, counter: 5, recentWins: [1, 1, 1, 1, 1] }), INITIAL_PROGRESS);
+    const climbed = LADDER.slice(0, -1).reduce(
+      (p) => techUp({ ...p, counter: 5, recentWins: [1, 1, 1, 1, 1] }),
+      INITIAL_PROGRESS,
+    );
     expect(climbed.windowMs).toBe(251);
     expect(climbed.prestige).toBe(8);
     expect(canTechUp({ ...climbed, counter: 5, recentWins: [1, 1, 1, 1, 1] })).toBe(false);
@@ -211,24 +275,39 @@ describe('the stored shape (D4)', () => {
     });
   });
 
-  test('a version-1 save (the 1000 ms base) is rescaled: the window × 2.5, rounded, capped at the base; the rest kept', () => {
-    const v1 = (windowMs: number) => ({
+  test("a v2 save's window snaps to its level: 2063 at prestige 1 (slowed under the old rule) reads as 1875", () => {
+    const slowed = { v: 2, counter: -1, windowMs: 2063, prestige: 1, recentWins: [], best: 300 };
+    expect(decodeProgress(slowed)).toEqual({
+      ok: true,
+      value: { counter: -1, windowMs: 1875, prestige: 1, recentWins: [], best: 300 },
+    });
+    expect(decodeProgress({ ...slowed, windowMs: 2500, prestige: 0 })).toMatchObject({
+      ok: true,
+      value: { windowMs: 2500 },
+    });
+    expect(decodeProgress({ ...slowed, windowMs: 276, prestige: 8 })).toMatchObject({
+      ok: true,
+      value: { windowMs: 251 },
+    });
+  });
+
+  test("a version-1 save (the 1000 ms base) lands on its level: the window is the prestige's rung, the rest kept", () => {
+    const v1 = (windowMs: number, prestige = 2) => ({
       v: 1,
       counter: -3,
       windowMs,
-      prestige: 2,
+      prestige,
       recentWins: [300, 310, 320],
       best: 210,
     });
-    expect(decodeProgress(v1(1000))).toEqual({
+    expect(decodeProgress(v1(563))).toEqual({
       ok: true,
-      value: { counter: -3, windowMs: 2500, prestige: 2, recentWins: [300, 310, 320], best: 210 },
+      value: { counter: -3, windowMs: 1406, prestige: 2, recentWins: [300, 310, 320], best: 210 },
     });
-    // The ladder is multiplicative, so a v1 player lands on the same rung down: 750 → 1875.
-    expect([750, 563, 422, 238, 200].map(rescaleV1Window)).toEqual([1875, 1408, 1055, 595, 500]);
-    expect(decodeProgress(v1(563))).toMatchObject({ ok: true, value: { windowMs: 1408 } });
-    // A v1 window past its own base still lands under the cap; v1's other bounds still hold.
-    expect(decodeProgress(v1(1200))).toMatchObject({ ok: true, value: { windowMs: 2500 } });
+    expect(decodeProgress(v1(750, 1))).toMatchObject({ ok: true, value: { windowMs: 1875 } });
+    expect(decodeProgress(v1(1000, 0))).toMatchObject({ ok: true, value: { windowMs: 2500 } });
+    // A v1 window past its own base still reads; v1's other bounds still hold.
+    expect(decodeProgress(v1(1200))).toMatchObject({ ok: true, value: { windowMs: 1406 } });
     expect(decodeProgress({ ...v1(750), counter: 9 }).ok).toBe(false);
     // Nothing is written back as v1: a decoded v1 save re-encodes under the current version.
     const read = decodeProgress(v1(750));
@@ -241,6 +320,7 @@ describe('the stored shape (D4)', () => {
     ['a counter past the clamp', { ...encodeProgress(INITIAL_PROGRESS), counter: 9 }],
     ['a window under the floor', { ...encodeProgress(INITIAL_PROGRESS), windowMs: 100 }],
     ['a window over the base', { ...encodeProgress(INITIAL_PROGRESS), windowMs: 2600 }],
+    ['a prestige past the ladder', { ...encodeProgress(INITIAL_PROGRESS), prestige: 9 }],
     ['six recent wins', { ...encodeProgress(INITIAL_PROGRESS), recentWins: [1, 2, 3, 4, 5, 6] }],
     ['a negative best', { ...encodeProgress(INITIAL_PROGRESS), best: -1 }],
     ['not an object', 'progress'],
