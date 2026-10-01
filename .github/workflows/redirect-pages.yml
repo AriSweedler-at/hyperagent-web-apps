@@ -1,0 +1,54 @@
+# Turns this repository's GitHub Pages into redirects to games.sweedler.com (docs/MIGRATION.md
+# step 16; docs/design/repo-migration.md §5.2 and §5.7). The site moved to AriSweedler/games and
+# games.sweedler.com proxies that repository's Pages; the old Pages URLs under
+# https://arisweedler-at.github.io/hyperagent-web-apps/ are still out there in links, bookmarks and
+# the games' own `?join=` invites, so this deploys redirect/ over them: a stub at the old landing,
+# at /games/ and at every /games/<g>/ (the sheshbesh alias and ui-sandbox included), each a meta
+# refresh plus a `location.replace` to the same page on games.sweedler.com, query and hash kept,
+# and a visible link for a browser that follows neither. redirect/ is outside the build: nothing
+# under it is tested, served by `npm run serve` or copied into dist/. Dispatched by hand, once,
+# after the proxy points at the new origin (`gh workflow run redirect-pages.yml`); it never runs
+# on a push. The `if` pins it to this repository, so the history carried into the new one (or a
+# fork) can never deploy the stubs over a real site. It shares ci.yml's `pages` concurrency group,
+# since both deploy the same Pages site; ci.yml's `deploy` would put the real site back on the
+# next push to main, which is why the repository is archived right after this runs (D9).
+name: Redirect Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  redirect:
+    if: github.repository == 'AriSweedler-at/hyperagent-web-apps'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      # upload-pages-artifact tars the folder, so .nojekyll rides along (upload-artifact would drop it).
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: redirect
+      - id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Redirected URLs
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          {
+            echo "## Redirecting"
+            echo "- ${PAGE_URL} and every games/<g>/ under it now forward to https://games.sweedler.com/"
+          } >> "$GITHUB_STEP_SUMMARY"
