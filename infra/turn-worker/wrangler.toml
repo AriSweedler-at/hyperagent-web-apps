@@ -1,6 +1,10 @@
 name = "hyperagent-web-apps-turn"
+# The name is the Worker's identity: the custom domain below and the secrets hang off it. Never
+# rename it without moving the domain, since a rename makes a new Worker.
 main = "worker.js"
 compatibility_date = "2025-01-01"
+# The personal "Sweedler Family" account (the sweedler.com zone's too): pins the deploy target.
+account_id = "703785c2d2a7bdc97432fa2833a2397d"
 
 # Served at https://turn.sweedler.com (custom domain on the sweedler.com zone) and on the
 # account's workers.dev subdomain.
@@ -8,7 +12,8 @@ routes = [{ pattern = "turn.sweedler.com", custom_domain = true }]
 
 [vars]
 # Comma-separated list of origins allowed to fetch credentials. Empty = allow any origin.
-ALLOWED_ORIGINS = "https://arisweedler-at.github.io,https://games.sweedler.com"
+# Two Pages origins while the games move repos: the -at one goes once the old site only redirects.
+ALLOWED_ORIGINS = "https://arisweedler-at.github.io,https://arisweedler.github.io,https://games.sweedler.com"
 # Credential lifetime in seconds (300–86400). A game session should fit inside it.
 TTL_SECONDS = "7200"
 
