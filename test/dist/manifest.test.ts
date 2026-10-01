@@ -3,7 +3,7 @@
 // the manifest is what makes an installed Android app (a WebAPK) open fullscreen and sideways with
 // no JS: `display: fullscreen`, `orientation: landscape` (iOS ignores both members). Everything the
 // manifest names is `./`-relative to the manifest itself, so start_url, scope and every icon resolve
-// on both origins (docs/ARCHITECTURE.md "Two origins"): under /hyperagent-web-apps/games/<g>/ on
+// on both origins (docs/ARCHITECTURE.md "Two origins"): under /games/games/<g>/ on
 // github.io and, through the Worker's real mapPath, under /<g>/ and the game's alias on
 // games.sweedler.com. Each icon is the PNG tools/icons.ts rendered, at the size its `sizes` row
 // declares (the IHDR is read, so a re-rendered icon of another size fails here), one of them

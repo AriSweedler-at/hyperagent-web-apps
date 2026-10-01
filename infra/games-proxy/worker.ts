@@ -1,30 +1,36 @@
 // Cloudflare Worker serving the GitHub Pages site at https://games.sweedler.com.
-//   /            -> arisweedler-at.github.io/hyperagent-web-apps/
-//   /XXX         -> .../hyperagent-web-apps/games/XXX      (short game URLs)
-//   /ALIAS/…     -> .../hyperagent-web-apps/games/GAME/…   (ALIASES: a game's second name, served in
+//   /            -> arisweedler.github.io/games/
+//   /XXX         -> .../games/games/XXX      (short game URLs)
+//   /ALIAS/…     -> .../games/games/GAME/…   (ALIASES: a game's second name, served in
 //                   place so the address bar keeps /ALIAS/)
 //   /ALIAS       -> 301 to /ALIAS/                          (this origin's slash redirect: the
 //                   upstream's would land on /GAME/)
 //   /games/XXX   -> 301 to /XXX                            (links already out there; /games/ALIAS too.
 //                   The landing page itself is served with its `games/XXX/` hrefs rewritten to
 //                   /XXX/, "Landing links" below, so a click from it never takes this hop.)
-//   /shared/…    -> .../hyperagent-web-apps/shared/…       (assets loaded relatively by game pages)
-//   /favicon.ico -> .../hyperagent-web-apps/shared/favicon.ico (the one icon the site ships; browsers
+//   /shared/…    -> .../games/shared/…       (assets loaded relatively by game pages)
+//   /favicon.ico -> .../games/shared/favicon.ico (the one icon the site ships; browsers
 //                   and bookmarks ask the origin root for it)
-//   /.well-known/… -> .../hyperagent-web-apps/.well-known/…  (Apple's app-site association for the
+//   /.well-known/… -> .../games/.well-known/…  (Apple's app-site association for the
 //                   Dice App Clip, web/shared/lib/appClip.ts AASA_PATH: the tree's dot-directory,
 //                   which web/public/.nojekyll lets Pages serve; the AASA itself is answered as
 //                   application/json, the type Apple requires and an extensionless file never gets)
-//   /clip/NAME   -> .../hyperagent-web-apps/clip/NAME/       (the Dice App Clip's invocation URLs,
+//   /clip/NAME   -> .../games/clip/NAME/       (the Dice App Clip's invocation URLs,
 //   /clip/NAME/…    web/shared/lib/appClip.ts CLIP_PATHS: each lands on a page of the tree's own,
 //                   web/public/clip/NAME/index.html, for a phone without the clip. Apple has the
 //                   URL without a slash, so that spelling fetches the folder's page in one request,
 //                   the query kept: no upstream slash redirect to pay)
-//   /hyperagent-web-apps/… passes through unchanged.
+//   /hyperagent-web-apps/games/XXX -> 301 to /XXX     (the site's mount before docs/MIGRATION.md
+//   /hyperagent-web-apps/…         -> 301 to /         step 16, for links out there: a game's long
+//                   form to its short URL, anything else to the landing page; never fetched)
 //   /api/rps/…   -> this Worker's own routes (rps-push.ts): the island scoreboard's pairing and
 //                   mood pushes, answered before any proxy path and never sent upstream. They need
 //                   the RPS_PAIRS KV binding and the APNS_* secrets (wrangler.toml); without them
 //                   they answer 503 and the proxy is untouched.
+// The upstream mount is the repo's name, /games (GitHub Pages serves a project site under it), and
+// the tree keeps its games/ folder, so a game page's upstream path doubles the segment,
+// /games/games/XXX; this origin never shows it (docs/design/repo-migration.md D3: no flatten
+// inside the move).
 // Only the slash-terminated prefixes are special: /games, /shared and /hyperagent-web-apps without
 // a trailing slash fall into the /XXX rule. worker.test.ts pins every row of this table.
 // A page fetched with `?join=CODE` (an invite link) has its Open Graph head rewritten to name the
@@ -32,7 +38,7 @@
 // Two rewrites of a page body, then, both plain string rewrites over the buffered page rather than
 // HTMLRewriter: the handler also runs in node (worker.test.ts, tools/proxy-dev.ts behind the
 // Playwright `proxy` project), which has none, and both pages are this repo's own markup.
-// The upstream origin is env.UPSTREAM (default https://arisweedler-at.github.io) so the same
+// The upstream origin is env.UPSTREAM (default https://arisweedler.github.io) so the same
 // handler can front a local dist server in tests (tools/proxy-dev.ts).
 // Deploy with `npx wrangler deploy` from this directory (wrangler bundles TypeScript natively: this
 // file and its one sibling import; nothing outside infra/games-proxy/ is imported).
@@ -42,9 +48,16 @@
 
 import { handleRps, isRpsPath, type RpsEnv } from './rps-push.ts';
 
-export const DEFAULT_UPSTREAM = 'https://arisweedler-at.github.io';
+export const DEFAULT_UPSTREAM = 'https://arisweedler.github.io';
 
-const SITE = '/hyperagent-web-apps';
+/** The site's mount on the upstream: the repo's name, which GitHub Pages serves a project site under. */
+const SITE = '/games';
+/**
+ * The mount the site had before docs/MIGRATION.md step 16 (the repo's old name). Links out there
+ * under it are redirected, never fetched: a game's long form to its short URL, anything else to
+ * the landing page.
+ */
+const LEGACY_SITE = '/hyperagent-web-apps';
 
 /**
  * A game's second URL name -> the game folder it stands for (`/sheshbesh/` is the backgammon page).
@@ -85,7 +98,11 @@ export type Mapped =
 /** Pure mapping from a pathname on this origin to what the Worker does with it. */
 export const mapPath = (pathname: string): Mapped => {
   if (pathname === '/' || pathname === '') return { kind: 'fetch', path: `${SITE}/` };
-  if (pathname.startsWith(`${SITE}/`)) return { kind: 'fetch', path: pathname };
+  if (pathname.startsWith(`${LEGACY_SITE}/`)) {
+    const legacyGames = `${LEGACY_SITE}/games`;
+    const path = pathname.startsWith(`${legacyGames}/`) ? pathname.slice(legacyGames.length) : '/';
+    return { kind: 'redirect', path };
+  }
   if (pathname.startsWith('/games/')) {
     return { kind: 'redirect', path: pathname.slice('/games'.length) };
   }
@@ -109,7 +126,7 @@ export const mapPath = (pathname: string): Mapped => {
 
 /**
  * Pure inverse used for upstream redirects: an upstream pathname becomes the short pathname on
- * this origin (/hyperagent-web-apps/games/XXX -> /XXX, /hyperagent-web-apps/YYY -> /YYY). It knows
+ * this origin (/games/games/XXX -> /XXX, /games/YYY -> /YYY). It knows
  * no alias: a redirect the upstream sends under /ALIAS/ lands on /GAME/, which is why /ALIAS alone
  * is redirected here and never fetched.
  */
@@ -223,9 +240,11 @@ const LANDING = `${SITE}/`;
 
 /**
  * The spellings of "under the site's games/" an href can carry, as the landing page resolves
- * them: relative to it, `/`-rooted on this origin, or the long form under the site prefix.
+ * them: the long form under the site prefix, relative to it, or `/`-rooted on this origin. The
+ * long form comes first: the mount is named games, so `/games/` is its prefix and would match it
+ * one segment short.
  */
-const GAMES_PREFIXES: ReadonlyArray<string> = ['games/', './games/', '/games/', `${SITE}/games/`];
+const GAMES_PREFIXES: ReadonlyArray<string> = [`${SITE}/games/`, 'games/', './games/', '/games/'];
 
 /**
  * An href as the landing page spells it -> the short URL on this origin: `games/<name>/…` in any

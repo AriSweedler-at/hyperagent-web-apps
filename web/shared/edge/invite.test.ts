@@ -11,8 +11,7 @@ const reference = (search: string): { join: string | null; rest: string } => {
 };
 
 /** The harness's hook query (e2e/fixtures/player.ts `gameQuery`) with an invite appended, as the handoff spec opens the page. */
-const HOOKS =
-  'peer=127.0.0.1%3A9000&ice=http%3A%2F%2F127.0.0.1%3A4173%2Fhyperagent-web-apps%2Fe2e-ice.json';
+const HOOKS = 'peer=127.0.0.1%3A9000&ice=http%3A%2F%2F127.0.0.1%3A4173%2Fgames%2Fe2e-ice.json';
 
 const SEARCHES: ReadonlyArray<string> = [
   '',

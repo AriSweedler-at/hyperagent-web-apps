@@ -214,6 +214,33 @@ Gin's inline classic scripts depend on execution order (`window.GinEngine`, `win
   (`nightly.yml`, the `?ice-policy=relay` hook, `E2E_TARGET=live`, `npm run test:live` and the
   README rewrite) in #17. Deviations for each are recorded below.
 
+### 16. Move to the personal repo: the site mounts at `/games/` (2026-10-01)
+
+- Goal: the repository moves from `AriSweedler-at/hyperagent-web-apps` to `AriSweedler/games`
+  (docs/design/repo-migration.md, approach A): GitHub Pages stays the origin, now
+  `https://arisweedler.github.io/games/`; the games.sweedler.com Worker is retargeted; every
+  games.sweedler.com URL is unchanged, no DNS or TLS change, no downtime. The tree goes
+  origin-agnostic first, in the old repo: `PAGES_BASE_PATH` is `/games/` (`e2e/fixtures/site.ts`,
+  the one place the harness names the mount; the lint ban and `npm run serve` follow it); the
+  Worker's `DEFAULT_UPSTREAM` is the personal account's Pages and its `SITE` is `/games`, so a game
+  page's upstream path doubles the segment, `/games/games/<g>/` (the mount is the repo's name and
+  the tree keeps its `games/` folder: D3, no flatten inside the move; games.sweedler.com never
+  shows it); the old mount is redirected, never served (`/hyperagent-web-apps/games/<x>` 301 to
+  `/<x>`, anything else under it 301 to `/`: D4); the landing footer and the buddy's source links
+  name the new repository; `nightly.yml` takes an `origin` input (`E2E_DEPLOYED_ORIGIN`) so the
+  deployed run can be aimed at the new Pages before the old ones go dark. The TURN list
+  (`infra/turn-worker/wrangler.toml` `ALLOWED_ORIGINS` gains `https://arisweedler.github.io` and
+  loses the old origin once the move is done: D11) and both Workers' `wrangler.toml` move to the
+  personal Cloudflare account in the sibling change; the owner deploys both by hand, TURN before
+  the flip. Last, the old repo's Pages get redirect stubs (query and hash kept) to
+  games.sweedler.com from a `workflow_dispatch`-only workflow, and the old repo is archived (D9).
+  The lockfile and the package name are not touched.
+- Proves: `npm run check` green in the old repo; `worker.test.ts` pins every row of the new table
+  and the legacy redirects; the dist guards resolve every reference under `/games/` on both
+  origins; the `pages` smoke plays under the new mount; after the flip,
+  `curl -I https://games.sweedler.com/hyperagent-web-apps/games/fidice/` is a 301 to `/fidice/`.
+- Rollback: revert the PR; the deployed Workers change only when redeployed by hand.
+
 ## After the migration (roadmap, not scheduled here)
 
 Extract the generic host/client session and `shared/ui` screen builders from fidice and adapt gin

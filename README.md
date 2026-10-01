@@ -1,4 +1,4 @@
-# hyperagent-web-apps
+# games
 
 Four browser games, Gin Rummy, Fidice (one-cup liar's dice), Sheshbesh (backgammon: portes or
 Western rules) and Briscola (the Italian trick-taking game for two, three or four), written in
@@ -12,14 +12,14 @@ pages got here.
 
 ## Play
 
-| Game                         | GitHub Pages                                                           | games.sweedler.com                                                               | Source                  |
-| ---------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------- |
-| Gin Rummy                    | https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/  | https://games.sweedler.com/gin-rummy/                                            | `web/games/gin-rummy/`  |
-| Fidice (one-cup liar's dice) | https://arisweedler-at.github.io/hyperagent-web-apps/games/fidice/     | https://games.sweedler.com/fidice/                                               | `web/games/fidice/`     |
-| Sheshbesh (backgammon)       | https://arisweedler-at.github.io/hyperagent-web-apps/games/backgammon/ | https://games.sweedler.com/backgammon/ and https://games.sweedler.com/sheshbesh/ | `web/games/backgammon/` |
-| Briscola                     | https://arisweedler-at.github.io/hyperagent-web-apps/games/briscola/   | https://games.sweedler.com/briscola/                                             | `web/games/briscola/`   |
-| Rock Paper Scissors          | https://arisweedler-at.github.io/hyperagent-web-apps/games/rps/        | https://games.sweedler.com/rps/                                                  | `web/games/rps/`        |
-| UI Sandbox (a tool, no game) | https://arisweedler-at.github.io/hyperagent-web-apps/games/ui-sandbox/ | https://games.sweedler.com/ui-sandbox/                                           | `web/games/ui-sandbox/` |
+| Game                         | GitHub Pages                                          | games.sweedler.com                                                               | Source                  |
+| ---------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------- |
+| Gin Rummy                    | https://arisweedler.github.io/games/games/gin-rummy/  | https://games.sweedler.com/gin-rummy/                                            | `web/games/gin-rummy/`  |
+| Fidice (one-cup liar's dice) | https://arisweedler.github.io/games/games/fidice/     | https://games.sweedler.com/fidice/                                               | `web/games/fidice/`     |
+| Sheshbesh (backgammon)       | https://arisweedler.github.io/games/games/backgammon/ | https://games.sweedler.com/backgammon/ and https://games.sweedler.com/sheshbesh/ | `web/games/backgammon/` |
+| Briscola                     | https://arisweedler.github.io/games/games/briscola/   | https://games.sweedler.com/briscola/                                             | `web/games/briscola/`   |
+| Rock Paper Scissors          | https://arisweedler.github.io/games/games/rps/        | https://games.sweedler.com/rps/                                                  | `web/games/rps/`        |
+| UI Sandbox (a tool, no game) | https://arisweedler.github.io/games/games/ui-sandbox/ | https://games.sweedler.com/ui-sandbox/                                           | `web/games/ui-sandbox/` |
 
 Both origins serve the same `dist/`. `games.sweedler.com` is the Cloudflare Worker in
 `infra/games-proxy/`: `/gin-rummy/`, `/fidice/`, `/backgammon/` and `/briscola/` are the short URLs, `/games/<name>/`
@@ -81,7 +81,7 @@ npm run test:gin        # one suite (shared, shared-integration, gin, fidice, ba
 | `npm run test:e2e`                                   | build, then Playwright: every spec in `e2e/` on both emulated origins                                                                                                                                                                                                                                                                                                                            |
 | `npm run test:e2e:<suite>`                           | one suite's specs (`gin`, `fidice`, `backgammon`, `briscola`, `site`), both origins; extra arguments pass through                                                                                                                                                                                                                                                                                |
 | `npm run test:deployed`                              | the `@online` and `@relay` specs with the deployed Pages page as the subject, every server local; nightly                                                                                                                                                                                                                                                                                        |
-| `npm run serve`                                      | GitHub Pages emulation: `dist/` at http://127.0.0.1:4173/hyperagent-web-apps/                                                                                                                                                                                                                                                                                                                    |
+| `npm run serve`                                      | GitHub Pages emulation: `dist/` at http://127.0.0.1:4173/games/                                                                                                                                                                                                                                                                                                                                  |
 | `npm run shots`                                      | build, then `tools/shell-emulate.ts render --all --serve`: every phone the shell knows, each orientation and display mode (a tab twice: bar shown, bar hidden), four screenshots each at the device's pixel ratio and an `index.html` contact sheet under `shots/<yyyymmdd-hhmm>/` (gitignored); see "Look before you ship"                                                                      |
 | `tools/shell-emulate.ts <command>`                   | `node --experimental-strip-types tools/shell-emulate.ts list \| explain \| render \| check`: the device catalogue (`web/shared/lib/devices.ts`) as a table; one case's numbers from the same modules the page runs; a render; the invariants (the trim's corner, the board's fill, the 4px clearance, the scroll tier, 44px targets) with a summary table and a JSON report, exit 1 on a failure |
 | `npm run audit:space`                                | `tools/space-audit.ts`: every page x every catalogued phone x orientation x display mode, the home and the table shot and measured, six rules (docs/design/space-audit.md) as a check table per page, dark contact sheets under `shots/space-audit/<page>/index.html` and a report.json; `-- --game <page>` narrows; `npm run build` first                                                       |
@@ -99,7 +99,7 @@ Git hooks are plain files in `.githooks/`: `pre-commit` chains to the owner's te
 `npm run check`, as does a checkout with no `origin/main`). `npm ci` installs them through
 `prepare`; run `npm run hooks` again if `core.hooksPath` was changed.
 
-`package-lock.json` is written behind Airtable's Socket Firewall registry and is committed exactly
+`package-lock.json` is written behind the Socket Firewall (sfw) registry and is committed exactly
 as npm produces it; never rewrite it. CI installs through `.github/actions/npm-ci`, which points the
 runner's copy of the lockfile at the public registry, installs through Socket Firewall Free (`sfw
 npm ci`) so CI installs are scanned, and restores the file; the integrity hashes are verified either
@@ -205,7 +205,7 @@ The pyramid, bottom up (`docs/ARCHITECTURE.md` "Testing pyramid" has the full li
    before. By hand: `gh workflow run nightly.yml`.
 9. **Nightly** (`.github/workflows/nightly.yml`, 09:23 UTC or `gh workflow run nightly.yml`):
    `npm run test:deployed` (`E2E_TARGET=deployed`) runs the same `@online` and `@relay` specs with
-   the deployed page, https://arisweedler-at.github.io/hyperagent-web-apps/, as the subject: the
+   the deployed page, https://arisweedler.github.io/games/, as the subject: the
    `pages` project's baseURL is that origin, and the page is opened with the same `?peer=` and
    `?ice=` hooks, naming the PeerServer, ICE lists and coturn the harness started on the runner
    (the build only feeds the serve-dist that hosts the lists). A public https page reaching
@@ -334,7 +334,7 @@ changes, and the proxy needs nothing (`docs/ARCHITECTURE.md` "Conventions for sm
    `specs`. The shared host session seats up to four guests (`docs/design/n-seat-sessions.md`); the
    two-seat games keep every byte, and `players` is still host and guest.
 9. The proxy needs nothing: the Worker's catch-all maps `games.sweedler.com/<g>/` to
-   `/hyperagent-web-apps/games/<g>/`.
+   `/games/games/<g>/`.
 
 The existing files a game edits, verified by `grep -rl backgammon` over the tree at `9bf1548`
 (every other file naming a game is a comment, that game's own folder or a test of it):

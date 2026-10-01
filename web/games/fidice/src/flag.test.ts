@@ -66,8 +66,8 @@ describe('legacyInviteUrl', () => {
       '/fidice/?join=ABCDE',
     );
     expect(
-      legacyInviteUrl({ pathname: '/games/fidice/', search: '?shell=1', hash: '#join=K7Q2M' }),
-    ).toBe('/games/fidice/?shell=1&join=K7Q2M');
+      legacyInviteUrl({ pathname: '/fidice/index.html', search: '?shell=1', hash: '#join=K7Q2M' }),
+    ).toBe('/fidice/index.html?shell=1&join=K7Q2M');
   });
 
   test('any other hash is left alone: none, a rule deep link, a watch link (D6), a code of the wrong shape', () => {

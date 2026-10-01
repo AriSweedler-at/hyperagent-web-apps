@@ -2,7 +2,7 @@
 
 Target shape for this repo: two browser games (Gin Rummy, Fidice) as strict, functional
 TypeScript, built by Vite, tested by vitest and Playwright, deployed to GitHub Pages by
-GitHub Actions, reachable at both `https://arisweedler-at.github.io/hyperagent-web-apps/`
+GitHub Actions, reachable at both `https://arisweedler.github.io/games/`
 and `https://games.sweedler.com/`. `docs/MIGRATION.md` is the ordered path from today's
 two single-file pages to this layout. The refactor is behaviour-preserving: wire messages,
 peer-id prefixes, room-code alphabets, localStorage keys and rendered DOM stay identical,
@@ -259,9 +259,10 @@ setting: Settings > Pages > Source = GitHub Actions. Nothing generated is commit
 ## Two origins
 
 Every URL Vite writes is document-relative because `base` is `'./'`. From
-`/hyperagent-web-apps/games/fidice/` a page requests `./app-x.js` and `../../shared/assets/y.js`;
+`/games/games/fidice/` (the mount is the repo's name, `/games/`, and the tree keeps its `games/`
+folder: docs/MIGRATION.md step 16) a page requests `./app-x.js` and `../../shared/assets/y.js`;
 from `/fidice/` on games.sweedler.com the same strings resolve to `/fidice/app-x.js` (mapped by
-the Worker's catch-all to `/hyperagent-web-apps/games/fidice/app-x.js`) and `/shared/assets/y.js`
+the Worker's catch-all to `/games/games/fidice/app-x.js`) and `/shared/assets/y.js`
 (mapped by its `/shared/` rule). No JS computes a base path; share links already use
 `location.origin + location.pathname`. Nothing may be emitted to a root `/assets/`. Guards:
 
@@ -270,17 +271,17 @@ the Worker's catch-all to `/hyperagent-web-apps/games/fidice/app-x.js`) and `/sh
 2. `test/dist/check-dist-paths.test.ts`: resolves each reference against both bases, feeds the
    proxy-origin path through `mapPath()` exported from `infra/games-proxy/worker.ts`, and asserts
    the target exists in dist.
-3. `no-restricted-syntax` bans string literals starting with `/hyperagent-web-apps` or `/shared`.
+3. `no-restricted-syntax` bans string literals starting with `/games/` or `/shared/`.
 4. Playwright runs every spec on project `pages` (`tools/serve-dist.ts`, dist mounted at
-   `/hyperagent-web-apps/` on :4173) and project `proxy` (`tools/proxy-dev.ts` on :8787 running the
+   `/games/` on :4173) and project `proxy` (`tools/proxy-dev.ts` on :8787 running the
    real `worker.ts` fetch handler with `UPSTREAM=http://127.0.0.1:4173`).
 
 **Landing links.** `web/index.html` is one page for both origins and links its cards relatively
 (`games/<name>/`, `tools/games.ts` `LANDING_HREFS`). On Pages that resolves in place; on
 games.sweedler.com it would resolve to `/games/<name>/`, a 301 to `/<name>/`, so every click paid a
 hop and the browser recorded the long form first, which is what players then copied and shared. The
-Worker therefore rewrites the landing page's hrefs as it serves `/` (and its long form
-`/hyperagent-web-apps/`): `shortHref` turns `games/<name>/…` in any spelling (`./games/`,
+Worker therefore rewrites the landing page's hrefs as it serves `/` (its long forms, `/games/` and
+the old mount's root, redirect there): `shortHref` turns `games/<name>/…` in any spelling (`./games/`,
 `/games/`, the site prefix; with or without a slash, query or fragment) into `/<name>/…`, the path
 `mapPath` redirects `/games/<name>/…` to, and leaves every other href (another host, `shared/`, a
 fragment) alone; `shortenLandingLinks` applies it to every `href="…"` of the buffered page, a string
@@ -366,7 +367,7 @@ Base for all `.ts`: `tseslint.configs.strictTypeChecked` + `stylisticTypeChecked
 `WhileStatement`, `DoWhileStatement` ("no raw loops: use map/filter/reduce/flatMap/Array.from or
 a named algorithm in *.algorithms.ts"); `TSEnumDeclaration`, `TSParameterProperty`,
 `TSModuleDeclaration` (unsupported by Node type stripping, and enums are not erasable);
-`LabeledStatement`; `Literal[value=/^\/(hyperagent-web-apps|shared)\//]` ("no absolute site paths");
+`LabeledStatement`; `Literal[value=/^\/(games|shared)\//]` ("no absolute site paths");
 `MemberExpression[object.name=Math][property.name=random]` outside `main.ts` and `web/shared/edge`
 ("inject Rng").
 
@@ -481,7 +482,7 @@ Which change runs what: a game's folder runs that game's unit and e2e jobs, `sit
 build, lint and test configs run everything; docs run only `check` (the table in
 `tools/ci/suites.ts`, pinned by `tools/ci/suites.test.ts` together with `ci.yml`'s job list).
 Installs in every job use the composite action `.github/actions/npm-ci`. The owner's npm registry is
-Airtable's Socket Firewall in registry mode, so `package-lock.json` records that host in every
+the Socket Firewall (sfw) registry, so `package-lock.json` records that host in every
 `resolved` URL and is committed exactly as written; it is never rewritten. Runners cannot
 authenticate to the firewall, so the action rewrites the runner's checked-out copy of the lockfile
 to the public registry (host and the firewall's `/npm/` path prefix; npm's `replace-registry-host`
@@ -491,8 +492,9 @@ verified against what is downloaded either way. `nightly.yml` (`cron 23 9 * * *`
 `workflow_dispatch`; by hand `gh workflow run nightly.yml`) installs Chromium and coturn through
 the same two composite actions as `e2e` (so does `stories-baselines.yml`, Chromium alone) and runs
 `npm run test:deployed` (`E2E_TARGET=deployed npm run test:e2e -- --grep "@online|@relay"`): the
-`pages` project's baseURL is the deployed origin `https://arisweedler-at.github.io` (`e2e/fixtures/site.ts`
-`DEPLOYED_PAGES_ORIGIN`, `baseUrl()`), there is no `proxy` project (`PROJECTS`), proxy-dev is not
+`pages` project's baseURL is the deployed origin `https://arisweedler.github.io` (`e2e/fixtures/site.ts`
+`DEPLOYED_PAGES_ORIGIN`, or a dispatch's `origin` input through `E2E_DEPLOYED_ORIGIN`; `baseUrl()`),
+there is no `proxy` project (`PROJECTS`), proxy-dev is not
 started, and the deployed page is opened with the same `?peer=` and `?ice=` hooks as the emulated
 one, naming the PeerServer, the ICE lists on serve-dist (the build's only role) and the coturn on
 the runner. Chromium's Local Network Access asks before a public https page reaches 127.0.0.1, so
@@ -813,7 +815,7 @@ Step 3 (two-peer e2e against the legacy pages):
   `E2E_BROKER=cloud` leaves it out and drops `?peer=` so nightly.yml's `broker` job meets on
   0.peerjs.com.
 - `tools/serve-dist.ts` takes `--base` and `--alias` on the command line instead of hard-coding
-  `/hyperagent-web-apps/`: the lint ban on absolute site paths applies to tools too, and the one
+  `/games/`: the lint ban on absolute site paths applies to tools too, and the one
   place the harness names the mount point is `e2e/fixtures/site.ts`.
 - `tsconfig.node.json` sets `allowJs` and lists `infra/games-proxy/worker.js` so
   `tools/proxy-dev.ts` imports the Worker's default export with the types its JSDoc declares;

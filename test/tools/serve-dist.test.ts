@@ -39,7 +39,8 @@ describe('routeFor', () => {
   });
   test('anything outside the mount is not found', () => {
     expect(routeFor('/', BASE, {})).toEqual({ kind: 'notFound' });
-    expect(routeFor('/games/fidice/', BASE, {})).toEqual({ kind: 'notFound' });
+    // The proxy origin's short URL is outside the Pages mount.
+    expect(routeFor('/fidice/', BASE, {})).toEqual({ kind: 'notFound' });
   });
   test('the mount root is the directory itself with a trailing slash', () => {
     expect(routeFor(BASE, BASE, {})).toEqual({ kind: 'path', relPath: '.', trailingSlash: true });

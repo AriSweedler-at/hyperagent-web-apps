@@ -107,7 +107,7 @@
   "license": {
     "name": "original",
     "author": "drawn in this repository by tools/buddy-frames.ts",
-    "source": "https://github.com/AriSweedler-at/hyperagent-web-apps/blob/main/tools/buddy-frames.ts",
+    "source": "https://github.com/AriSweedler/games/blob/main/tools/buddy-frames.ts",
     "note": "Original pixel art, no third-party assets; see LICENSES.md beside this file."
   }
 }
