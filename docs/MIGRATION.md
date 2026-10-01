@@ -240,6 +240,16 @@ Gin's inline classic scripts depend on execution order (`window.GinEngine`, `win
   origins; the `pages` smoke plays under the new mount; after the flip,
   `curl -I https://games.sweedler.com/hyperagent-web-apps/games/fidice/` is a 301 to `/fidice/`.
 - Rollback: revert the PR; the deployed Workers change only when redeployed by hand.
+- Old Pages: `.github/workflows/redirect-pages.yml` (`workflow_dispatch` only, pinned to the old
+  repository by its `if`) publishes `redirect/` over the old repo's GitHub Pages: a stub at the
+  old landing, at `/hyperagent-web-apps/games/` and at every `/hyperagent-web-apps/games/<g>/`
+  (the sheshbesh alias and ui-sandbox included), each a meta refresh plus `location.replace` to
+  the same page on games.sweedler.com, query and hash kept, and a visible link. `redirect/` is
+  outside the build: no test reads it and `dist/` never contains it. The owner dispatches it by
+  hand, once, after games.sweedler.com proxies the new origin (`gh workflow run
+  redirect-pages.yml`); until then the old Pages keep serving the real site. ci.yml's `deploy`
+  would put the site back on the next push to the old `main`, so the repository is archived
+  right after (D9).
 
 ## After the migration (roadmap, not scheduled here)
 
