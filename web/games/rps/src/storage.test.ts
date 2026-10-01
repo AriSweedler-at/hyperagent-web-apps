@@ -38,7 +38,7 @@ describe('storage', () => {
     expect(readProgress(store)).toEqual(INITIAL_PROGRESS);
     const progress: Progress = {
       counter: 3,
-      windowMs: 750,
+      windowMs: 1875,
       prestige: 1,
       recentWins: [400, 350],
       best: 350,
@@ -48,7 +48,7 @@ describe('storage', () => {
     expect(readProgress(store)).toEqual(progress);
   });
 
-  test('a version-1 save (the 1000 ms base) reads rescaled to the 2500 ms base, the rest kept', () => {
+  test("a version-1 save (the 1000 ms base) reads at its level's window on the 2500 ms base, the rest kept", () => {
     const { map, store } = memory();
     map.set(
       'rps_progress',

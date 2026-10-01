@@ -31,7 +31,7 @@ export type Phase =
   | Readonly<{ kind: 'scrolling'; shown: Hand }>
   /** The hand is shown, the clock runs, the buttons are armed. */
   | Readonly<{ kind: 'armed'; computer: Hand; resolvedAt: number }>
-  /** The round is over; the next starts by itself unless stopped or a Tech up waits. `windowMs` is the window the round was played to (a loss has already slowed the progress's). */
+  /** The round is over; the next starts by itself unless stopped or a Tech up waits. `windowMs` is the window the round was played to (a drop has already moved the progress's); `dropped` when the round cost a level (§2 the down prestige). */
   | Readonly<{
       kind: 'verdict';
       computer: Hand;
@@ -39,6 +39,7 @@ export type Phase =
       outcome: Outcome;
       reactionMs: number | null;
       windowMs: number;
+      dropped: boolean;
     }>;
 
 export type App = Readonly<{
@@ -101,7 +102,7 @@ const still = (app: App): Step => ({ app, effects: [] });
 
 /** A round's end: the verdict phase, its cue, the save, and the next round's timer unless it waits. */
 const settle = (app: App, computer: Hand, player: Hand | null, reactionMs: number | null): Step => {
-  const { outcome, progress } = applyRound(app.progress, player, computer, reactionMs);
+  const { outcome, progress, dropped } = applyRound(app.progress, player, computer, reactionMs);
   const next: App = {
     ...app,
     progress,
@@ -113,6 +114,7 @@ const settle = (app: App, computer: Hand, player: Hand | null, reactionMs: numbe
       outcome,
       reactionMs,
       windowMs: app.progress.windowMs,
+      dropped,
     },
   };
   return {

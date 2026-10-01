@@ -2,8 +2,8 @@
 // DOM edge, and the buttons bound to intents. The counter and its static face (the first frame of
 // the band's set, drawn from the sheet), the animated buddy (the band's loop; a hop between
 // neighbouring bands when the band changes, played once then the new loop), the computer's hand,
-// the window bar, the verdict with the reaction, Tech up with what it costs when eligible, Stop
-// while a next round is pending, the sound button.
+// the window bar, the verdict with the reaction, Tech up with what it costs when eligible (and
+// "Down a level" when a round cost one), Stop while a next round is pending, the sound button.
 import {
   addClass,
   listenId,
@@ -19,7 +19,6 @@ import {
   type Element,
 } from '../../../../shared/edge/dom.ts';
 import {
-  BASE_WINDOW_MS,
   HANDS,
   HAND_GLYPH,
   atFloor,
@@ -71,7 +70,12 @@ export const VERDICT_COPY: Readonly<Record<Outcome, string>> = {
 
 export const IDLE_COPY = 'Tap Go. When the hand stops, beat it before the bar runs out.';
 export const RESET_CONFIRM =
-  'Reset progress? The counter, the speed, the prestige and the best all start over.';
+  'Reset progress? The counter, the prestige with its speed, and the best all start over.';
+/** The status line when a round cost a level (§2 the down prestige): one line, like the Tech up moment. */
+export const downALevelCopy = (windowMs: number): string =>
+  `Down a level: the counter resets, and you have ${String(windowMs)} ms again.`;
+/** The status line under the base level: how a level is lost. */
+export const DROP_HINT = 'Fall to −5 and you drop a level.';
 
 /** The counter, signed: `+3`, `0`, `−2` (a real minus, as the island shows it). */
 export const signed = (n: number): string =>
@@ -200,13 +204,15 @@ const paintControls = (doc: DocumentLike, app: App): void => {
   const status = requireId(doc, IDS.status);
   setText(
     status,
-    offer
-      ? 'Tech up: the counter resets, and you have 25% less time.'
-      : atFloor(progress)
-        ? `As fast as it gets: ${String(progress.windowMs)} ms.`
-        : progress.windowMs < BASE_WINDOW_MS
-          ? `Every loss adds 10% back to the window.`
-          : '',
+    phase.kind === 'verdict' && phase.dropped
+      ? downALevelCopy(progress.windowMs)
+      : offer
+        ? 'Tech up: the counter resets, and you have 25% less time.'
+        : atFloor(progress)
+          ? `As fast as it gets: ${String(progress.windowMs)} ms.`
+          : progress.prestige > 0
+            ? DROP_HINT
+            : '',
   );
   setDisabled(requireId(doc, IDS.resetBtn), busy);
 };

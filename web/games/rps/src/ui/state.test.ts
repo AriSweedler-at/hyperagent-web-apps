@@ -87,6 +87,7 @@ describe('the round', () => {
       outcome: 'win',
       reactionMs: 350,
       windowMs: 2500,
+      dropped: false,
     });
     expect(step.app.progress).toEqual({
       ...INITIAL_PROGRESS,
@@ -103,14 +104,60 @@ describe('the round', () => {
     ]);
   });
 
-  test('a tie leaves the progress; a loss is −1 and slows the window', () => {
+  test('a tie leaves the progress; a loss is −1 and leaves the window', () => {
     const tie = reduce(armed(start, 'paper'), { type: 'tap', hand: 'paper', at: 1200 }).app;
     expect(tie.phase).toMatchObject({ outcome: 'tie', reactionMs: 200 });
     expect(tie.progress).toEqual(INITIAL_PROGRESS);
-    const fast = initialApp({ ...INITIAL_PROGRESS, windowMs: 1875 });
+    const fast = initialApp({ ...INITIAL_PROGRESS, windowMs: 1875, prestige: 1 });
     const loss = reduce(armed(fast, 'paper'), { type: 'tap', hand: 'rock', at: 1300 }).app;
-    expect(loss.phase).toMatchObject({ outcome: 'loss' });
-    expect(loss.progress).toEqual({ ...INITIAL_PROGRESS, counter: -1, windowMs: 2063 });
+    expect(loss.phase).toMatchObject({ outcome: 'loss', dropped: false });
+    expect(loss.progress).toEqual({
+      ...INITIAL_PROGRESS,
+      counter: -1,
+      windowMs: 1875,
+      prestige: 1,
+    });
+  });
+
+  test('the fifth point down with a level to lose drops it: the verdict says so, the window is the level below, the next round still comes', () => {
+    const edge = initialApp({
+      ...INITIAL_PROGRESS,
+      counter: -4,
+      windowMs: 1406,
+      prestige: 2,
+      best: 300,
+    });
+    const step = reduce(armed(edge, 'paper'), { type: 'tap', hand: 'rock', at: 1300 });
+    expect(step.app.phase).toEqual({
+      kind: 'verdict',
+      computer: 'paper',
+      player: 'rock',
+      outcome: 'loss',
+      reactionMs: 300,
+      windowMs: 1406,
+      dropped: true,
+    });
+    expect(step.app.progress).toEqual({
+      counter: 0,
+      windowMs: 1875,
+      prestige: 1,
+      recentWins: [],
+      best: 300,
+    });
+    expect(step.effects).toEqual([
+      { kind: 'cancel', id: 'window' },
+      { kind: 'cue', cue: 'loss' },
+      { kind: 'save' },
+      { kind: 'timer', id: 'next', ms: NEXT_ROUND_MS },
+    ]);
+    // A timeout drops the same way; at the base level −5 is simply −5.
+    const out = reduce(armed(edge, 'paper'), { type: 'timeout' }).app;
+    expect(out.phase).toMatchObject({ outcome: 'timeout', dropped: true });
+    expect(out.progress).toMatchObject({ counter: 0, prestige: 1, windowMs: 1875 });
+    const floor = initialApp({ ...INITIAL_PROGRESS, counter: -4 });
+    const stuck = reduce(armed(floor, 'paper'), { type: 'timeout' }).app;
+    expect(stuck.phase).toMatchObject({ dropped: false });
+    expect(stuck.progress).toEqual({ ...INITIAL_PROGRESS, counter: -5 });
   });
 
   test('a late tap is a timeout (the boundary counts), and so is the window timer', () => {
@@ -127,6 +174,7 @@ describe('the round', () => {
       outcome: 'timeout',
       reactionMs: null,
       windowMs: 2500,
+      dropped: false,
     });
     expect(step.effects).toContainEqual({ kind: 'cue', cue: 'timeout' });
     expect(step.app.progress.counter).toBe(-1);

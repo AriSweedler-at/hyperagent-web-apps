@@ -2,8 +2,9 @@
 // clock (`page.clock`: the scroll, the window and the reaction time are all timers and
 // `performance.now()` readings, so a round is played to the millisecond), rigged through the
 // documented hook `window.__rps.rig` so the computer's hand is known. A win at +4 with four fast
-// wins saved offers Tech up (§2), Tech up is taken, then a tie, a loss and a timeout; after each the
-// counter, the band and the saved `rps_progress` are what the vectors say (§6). Twice: an iPhone
+// wins saved offers Tech up (§2), Tech up is taken, then a tie, a loss and a timeout (neither moves
+// the window: a loss only costs a point, §2); after each the counter, the band and the saved
+// `rps_progress` are what the vectors say (§6). Twice: an iPhone
 // (390 × 844) and an Android phone (360 × 800), both touch contexts, so the three hands are
 // thumb-height and inside the screen on either; on `pages` alone, since they are about the page.
 // Then the island row (§11), which is about the origin: on `proxy` (games.sweedler.com emulated,
@@ -201,25 +202,26 @@ VIEWPORTS.forEach(([name, width, height]) => {
     expect((await stored(page))?.counter).toBe(0);
     expect((await stored(page))?.windowMs).toBe(1875);
 
-    // 4. A loss at 300 ms: −1, still neutral, the window slows to 2063.
+    // 4. A loss at 300 ms: −1, still neutral, the window stays 1875 (a loss never slows the game).
     await round(page, 'rock', 'scissors', 300);
     await expect(page.locator('#verdict')).toHaveText('You lose');
     await shownReaction(page, 300, 1875);
     await expectScore(page, '−1', 'neutral', 'neutral');
-    await expect(page.locator('#windowMs')).toHaveText('Window 2063 ms');
-    expect(await stored(page)).toMatchObject({ counter: -1, windowMs: 2063, prestige: 1 });
+    await expect(page.locator('#windowMs')).toHaveText('Window 1875 ms');
+    await expect(page.locator('#status')).toHaveText('Fall to −5 and you drop a level.');
+    expect(await stored(page)).toMatchObject({ counter: -1, windowMs: 1875, prestige: 1 });
 
-    // 5. A timeout: no tap within 2063 ms is a loss, −2 and sad, the window 2269; the hands disarm.
-    await round(page, 'rock', null, 2064);
+    // 5. A timeout: no tap within 1875 ms is a loss, −2 and sad, the window still 1875; the hands disarm.
+    await round(page, 'rock', null, 1876);
     await expect(page.locator('#verdict')).toHaveText('Too slow');
-    await expect(page.locator('#reaction')).toHaveText('No tap within 2063 ms');
+    await expect(page.locator('#reaction')).toHaveText('No tap within 1875 ms');
     await expectScore(page, '−2', 'sad', 'sad');
-    await expect(page.locator('#windowMs')).toHaveText('Window 2269 ms');
+    await expect(page.locator('#windowMs')).toHaveText('Window 1875 ms');
     await expect(page.locator('#rockBtn')).toBeDisabled();
     expect(await stored(page)).toEqual({
       v: 2,
       counter: -2,
-      windowMs: 2269,
+      windowMs: 1875,
       prestige: 1,
       recentWins: [],
       best: 300,
@@ -236,7 +238,7 @@ VIEWPORTS.forEach(([name, width, height]) => {
 test('Reset progress asks first, then starts over', async ({ phone, project }) => {
   test.skip(project !== 'pages', 'about the page, not the origin');
   const { page } = phone;
-  await seedStorage(page, { ...SEEDED, counter: -5, windowMs: 251, prestige: 3 });
+  await seedStorage(page, { ...SEEDED, counter: -5, windowMs: 251, prestige: 8 });
   await page.goto(pagePath(project, 'rps'));
   await expectScore(page, '−5', 'verySad', 'very-sad');
   await expect(page.locator('#status')).toHaveText('As fast as it gets: 251 ms.');

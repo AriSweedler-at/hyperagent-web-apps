@@ -1,7 +1,8 @@
-// The player's progress and every rule that moves it: the clamped counter, the window a loss
-// slows and a tech up shrinks, the last five winning reactions that decide "fast enough", the
-// floor under which Tech up is never offered, the best reaction, and Reset. Pure and Codable: the
-// clip keeps it in UserDefaults, the web page in localStorage (docs/design/rps-island.md §2).
+// The player's progress and every rule that moves it: the clamped counter, the ladder of windows a
+// tech up climbs and a down prestige falls, the last five winning reactions that decide "fast
+// enough", the floor under which Tech up is never offered, the best reaction, and Reset. Pure and
+// Codable: the clip keeps it in UserDefaults, the web page in localStorage
+// (docs/design/rps-island.md §2).
 
 /// Everything that persists between rounds.
 public struct Progress: Codable, Hashable, Sendable {
@@ -13,14 +14,24 @@ public struct Progress: Codable, Hashable, Sendable {
     public static let counterRange = -5...5
     /// How many winning reactions "fast enough" is judged on.
     public static let recentWinsKept = 5
-    /// A loss or a timeout multiplies the window by this (then caps it at the base).
-    public static let slowFactor = 1.10
     /// A tech up multiplies the window by this.
     public static let techUpFactor = 0.75
     /// The median of the recent wins must be at most this fraction of the window: "25% faster".
     public static let fastEnoughFactor = 0.75
+    /// The window of every level, prestige 0 upward: the base stepped by 25% until the next step
+    /// would be under the floor (design §2): 2500, 1875, 1406, 1055, 791, 593, 445, 334, 251.
+    public static let ladder: [Int] = {
+        var windows = [baseWindowMs]
+        while scaled(windows[windows.count - 1], by: techUpFactor) >= floorWindowMs {
+            windows.append(scaled(windows[windows.count - 1], by: techUpFactor))
+        }
+        return windows
+    }()
+    /// The top of the ladder: at this prestige Tech up is never offered.
+    public static var maxPrestige: Int { ladder.count - 1 }
 
     public var counter: Int
+    /// Always `windowFor(prestige:)`; kept so the saves and the island read it without the ladder.
     public var windowMs: Int
     public var prestige: Int
     /// The reaction ms of the last five wins, oldest first; ties, losses and timeouts record nothing.
@@ -40,25 +51,39 @@ public struct Progress: Codable, Hashable, Sendable {
     /// A fresh game: counter 0, the base window, no prestige, no wins, no best.
     public static let fresh = Progress()
 
+    /// The window a level plays to (design §2): a function of the prestige alone, so a level lost
+    /// recovers exactly the level's window. Out of the ladder reads as its nearer end.
+    public static func windowFor(prestige: Int) -> Int {
+        ladder[min(max(prestige, 0), maxPrestige)]
+    }
+
     /// The face the counter shows (design §4).
     public var mood: Mood { Mood(counter: counter) }
 
     // MARK: A round
 
     /// The progress after a round that ended `outcome` with the player's reaction (nil on a timeout
-    /// with no tap). The counter clamps to its range; a loss or timeout slows the window; a win
-    /// records its reaction and may set the best (design §2, §6).
+    /// with no tap). The counter clamps to its range; a win records its reaction and may set the
+    /// best; a loss or a timeout never touches the window, except that reaching −5 with a level to
+    /// lose drops the level (design §2, §6).
     public func apply(outcome: Outcome, reactionMs: Int?) -> Progress {
         var next = self
         next.counter = min(max(counter + outcome.delta, Self.counterRange.lowerBound), Self.counterRange.upperBound)
-        if outcome.slowsTheWindow {
-            next.windowMs = min(Self.baseWindowMs, Self.scaled(windowMs, by: Self.slowFactor))
-        }
         if outcome == .win, let reactionMs {
             next.recentWins = Array((recentWins + [reactionMs]).suffix(Self.recentWinsKept))
             next.best = min(best ?? reactionMs, reactionMs)
         }
-        return next
+        return next.dropsLevel ? next.atLevel(prestige - 1) : next
+    }
+
+    /// The down prestige (design §2, the owner's "-5 'down prestige'"): the counter at −5 with a
+    /// level to lose. Nobody chooses it, so unlike Tech up it is not offered: it is the round's
+    /// result. At prestige 0 nothing lower exists and the counter stays at −5.
+    public var dropsLevel: Bool { counter <= Self.counterRange.lowerBound && prestige > 0 }
+
+    /// The progress at `prestige` with the counter and the wins fresh: a level entered, up or down; the best kept.
+    func atLevel(_ prestige: Int) -> Progress {
+        Progress(counter: 0, windowMs: Self.windowFor(prestige: prestige), prestige: prestige, recentWins: [], best: best)
     }
 
     // MARK: Tech up
@@ -87,11 +112,11 @@ public struct Progress: Codable, Hashable, Sendable {
         counter == Self.counterRange.upperBound && isFastEnough && !isAtFloor
     }
 
-    /// Take the tech up: the window shrinks, the counter and the recent wins clear, prestige climbs;
-    /// the best stays. When it is not on offer, nothing changes.
+    /// Take the tech up: the next level's window, the counter and the recent wins clear, prestige
+    /// climbs; the best stays. When it is not on offer, nothing changes.
     public func techUp() -> Progress {
         guard canTechUp else { return self }
-        return Progress(counter: 0, windowMs: techUpWindowMs, prestige: prestige + 1, recentWins: [], best: best)
+        return atLevel(prestige + 1)
     }
 
     /// Reset progress: everything back to fresh, the best included.

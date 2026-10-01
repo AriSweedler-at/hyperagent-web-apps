@@ -1,6 +1,6 @@
 // The reaction game's tests, one suite per type, carrying every rule and every vector of
 // docs/design/rps-island.md §2 and §6: the hands' cycle and beats, the verdict at the window's
-// boundary, the five bands, the clamped counter, the window's slow-down and cap, the tech-up
+// boundary, the five bands, the clamped counter, the ladder and the down prestige, the tech-up
 // eligibility (median, counter, five wins, the floor), the tech up itself, Reset, and the Codable
 // round-trip the clip's UserDefaults and the web's localStorage rely on.
 import Foundation
@@ -39,13 +39,12 @@ struct HandTests {
 
 @Suite("Outcome")
 struct OutcomeTests {
-    @Test("the deltas are +1, 0, −1, −1 and only losses slow the window")
+    @Test("the deltas are +1, 0, −1, −1")
     func deltas() {
         #expect(Outcome.win.delta == 1)
         #expect(Outcome.tie.delta == 0)
         #expect(Outcome.loss.delta == -1)
         #expect(Outcome.timeout.delta == -1)
-        #expect(Outcome.allCases.filter(\.slowsTheWindow) == [.loss, .timeout])
     }
 
     @Test("the verdict of every pair of hands inside the window")
@@ -117,14 +116,11 @@ struct ProgressTests {
         (2500, .rock, .scissors, 2500, .win, 1, 2500),
         (2500, .rock, .scissors, 2501, .timeout, -1, 2500),
         (1875, .scissors, .paper, 1700, .win, 1, 1875),
-        (1875, .scissors, .rock, 300, .loss, -1, 2063),
-        (1875, nil, .rock, nil, .timeout, -1, 2063),
-        (1875, .paper, .rock, 1876, .timeout, -1, 2063),
-        (2063, .rock, .paper, 10, .loss, -1, 2269),
-        (2269, .rock, .paper, 10, .loss, -1, 2496),
-        (2496, .rock, .paper, 100, .loss, -1, 2500),
+        (1875, .scissors, .rock, 300, .loss, -1, 1875),
+        (1875, nil, .rock, nil, .timeout, -1, 1875),
+        (1875, .paper, .rock, 1876, .timeout, -1, 1875),
         (251, .rock, .scissors, 251, .win, 1, 251),
-        (251, .rock, .scissors, 252, .timeout, -1, 276),
+        (251, .rock, .scissors, 252, .timeout, -1, 251),
     ])
     func vectors(window: Int, player: Hand?, computer: Hand, reaction: Int?, outcome: Outcome, delta: Int, after: Int) {
         let verdict = Outcome.verdict(player: player, computer: computer, reactionMs: reaction, windowMs: window)
@@ -142,10 +138,42 @@ struct ProgressTests {
         #expect(stillTop.counter == 5)
         #expect(stillTop.recentWins == [300, 300, 300, 300, 250])
         #expect(stillTop.best == 250)
-        let bottom = Progress(counter: -5, windowMs: 1875)
+        let bottom = Progress(counter: -5, windowMs: 2500)
         let stillBottom = bottom.apply(outcome: .loss, reactionMs: 100)
         #expect(stillBottom.counter == -5)
-        #expect(stillBottom.windowMs == 2063)
+        #expect(stillBottom.windowMs == 2500)
+        #expect(stillBottom.prestige == 0)
+    }
+
+    /// The §6 down-prestige vectors: a level with a counter, a loss or a timeout, the progress after.
+    @Test("the design's down-prestige vectors", arguments: [
+        (1, -4, Outcome.loss, DiceModel.Progress(counter: 0, windowMs: 2500, prestige: 0, recentWins: [], best: 300), true),
+        (2, -4, .timeout, Progress(counter: 0, windowMs: 1875, prestige: 1, recentWins: [], best: 300), true),
+        (3, -3, .loss, Progress(counter: -4, windowMs: 1055, prestige: 3, recentWins: [900], best: 300), false),
+        (1, -5, .loss, Progress(counter: 0, windowMs: 2500, prestige: 0, recentWins: [], best: 300), true),
+        (0, -5, .loss, Progress(counter: -5, windowMs: 2500, prestige: 0, recentWins: [900], best: 300), false),
+    ])
+    func downPrestige(prestige: Int, counter: Int, outcome: Outcome, after: DiceModel.Progress, dropped: Bool) {
+        let before = Progress(counter: counter, windowMs: Progress.windowFor(prestige: prestige), prestige: prestige,
+                              recentWins: [900], best: 300)
+        let next = before.apply(outcome: outcome, reactionMs: outcome == .timeout ? nil : 100)
+        #expect(next == after)
+        #expect((next.prestige < before.prestige) == dropped)
+    }
+
+    @Test("the ladder: the base stepped by 25% to the floor; the window is the level's; a drop recovers it exactly")
+    func ladder() {
+        #expect(Progress.ladder == [2500, 1875, 1406, 1055, 791, 593, 445, 334, 251])
+        #expect(Progress.maxPrestige == 8)
+        #expect(Progress.windowFor(prestige: 0) == 2500)
+        #expect(Progress.windowFor(prestige: 8) == 251)
+        #expect(Progress.windowFor(prestige: -1) == 2500)
+        #expect(Progress.windowFor(prestige: 9) == 251)
+        let up = Progress(counter: 5, windowMs: 1055, prestige: 3, recentWins: [1, 1, 1, 1, 1], best: 1).techUp()
+        #expect(up == Progress(counter: 0, windowMs: 791, prestige: 4, recentWins: [], best: 1))
+        var down = up
+        for _ in 0..<5 { down = down.apply(outcome: .loss, reactionMs: 10) }
+        #expect(down == Progress(counter: 0, windowMs: 1055, prestige: 3, recentWins: [], best: 1))
     }
 
     @Test("wins record the last five reactions and the best; ties and losses record nothing")
