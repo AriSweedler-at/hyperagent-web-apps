@@ -1,9 +1,9 @@
 // Static server for the browser harness (docs/ARCHITECTURE.md "Two origins"): mounts a directory
-// at a base path so local URLs match GitHub Pages (`/hyperagent-web-apps/games/fidice/` on :4173).
+// at a base path so local URLs match GitHub Pages (`/games/games/fidice/` on :4173).
 // The directory is dist/ (the output of `npm run build`), so the harness exercises exactly what
 // Pages serves. An alias publishes one file from anywhere on disk under a path inside the mount
 // (the e2e ICE fixture); alias targets are resolved against the working directory, not the root.
-//   node --experimental-strip-types tools/serve-dist.ts --base /hyperagent-web-apps/ \
+//   node --experimental-strip-types tools/serve-dist.ts --base /games/ \
 //     --alias e2e-ice.json=e2e/fixtures/e2e-ice.json [--root dist] [--host 127.0.0.1] [--port 4173]
 // Like GitHub Pages, a directory URL without its trailing slash redirects to it, and every response
 // carries `Access-Control-Allow-Origin: *` so the proxy origin can fetch the ICE fixture.
@@ -18,7 +18,7 @@ import { parseArgs } from 'node:util';
 export type ServeOptions = Readonly<{
   /** Absolute path of the directory to mount. */
   root: string;
-  /** URL path prefix with leading and trailing slash, e.g. `/hyperagent-web-apps/`. */
+  /** URL path prefix with leading and trailing slash, e.g. `/games/`. */
   base: string;
   host: string;
   port: number;
@@ -237,8 +237,7 @@ export const parseServeArgs = (argv: ReadonlyArray<string>): ServeOptions => {
     },
     strict: true,
   });
-  if (values.base === undefined)
-    throw new Error('--base is required, e.g. --base /hyperagent-web-apps/');
+  if (values.base === undefined) throw new Error('--base is required, e.g. --base /games/');
   const port = Number(values.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535)
     throw new Error(`--port must be 0..65535, got: ${values.port}`);

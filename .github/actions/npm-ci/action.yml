@@ -1,6 +1,6 @@
 # Install dependencies on a GitHub runner from a lockfile written behind Socket Firewall.
 #
-# The developer's npm registry is Airtable's Socket Firewall (registry mode), so package-lock.json
+# The developer's npm registry is the Socket Firewall (sfw) registry, so package-lock.json
 # records https://sfw.security.shadowbox.cloud/npm/<name>/-/<file>.tgz as the "resolved" URL of
 # every package. The committed lockfile is kept exactly as the firewall wrote it. Runners have no
 # credentials for that host, so this action points the RUNNER'S CHECKED-OUT COPY of the lockfile at

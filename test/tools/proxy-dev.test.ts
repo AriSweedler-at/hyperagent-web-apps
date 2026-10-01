@@ -1,7 +1,7 @@
 // tools/proxy-dev.ts is the `proxy` origin of the browser harness: the real Worker handler from
 // infra/games-proxy/worker.ts fronting tools/serve-dist.ts. These tests run the two together and
 // pin the behaviours the specs rely on: short URLs, the /games/ redirect, upstream redirects
-// rewritten to this origin, /shared/ mapping, passthrough and byte-identical page bodies.
+// rewritten to this origin, /shared/ mapping, the long forms' redirects and byte-identical page bodies.
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { PAGES_BASE_PATH } from '../../e2e/fixtures/site.ts';
@@ -62,7 +62,7 @@ describe('proxy in front of serve-dist', () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toContain("<title>Ari's web apps</title>");
   });
-  test('/games/XXX redirects to the short URL on this origin, keeping the query', async () => {
+  test('a /games/XXX link redirects to the short URL on this origin, keeping the query', async () => {
     const response = await fetch(`${proxy.url}/games/gin-rummy/?peer=x`, { redirect: 'manual' });
     expect(response.status).toBe(301);
     expect(response.headers.get('location')).toBe(`${proxy.url}/gin-rummy/?peer=x`);
@@ -78,10 +78,13 @@ describe('proxy in front of serve-dist', () => {
     expect(response.headers.get('content-type')).toBe('text/javascript; charset=utf-8');
     expect(await response.text()).toContain('window.HyperIce');
   });
-  test('full site paths pass through unchanged', async () => {
-    const response = await fetch(`${proxy.url}${PAGES_BASE_PATH}games/fidice/`);
-    expect(response.status).toBe(200);
-    expect(await response.text()).toContain('<title>Fidice');
+  test('the Pages long form on this origin is a redirect, a segment per hop, down to the short URL', async () => {
+    const hop = await fetch(`${proxy.url}${PAGES_BASE_PATH}games/fidice/`, { redirect: 'manual' });
+    expect(hop.status).toBe(301);
+    expect(hop.headers.get('location')).toBe(`${proxy.url}/games/fidice/`);
+    const landed = await fetch(`${proxy.url}${PAGES_BASE_PATH}games/fidice/`);
+    expect(landed.url).toBe(`${proxy.url}/fidice/`);
+    expect(await landed.text()).toContain('<title>Fidice');
   });
   test('unknown short paths are 404 from upstream', async () => {
     expect((await fetch(`${proxy.url}/nope/`)).status).toBe(404);

@@ -35,7 +35,7 @@
     "check:affected": "npm run typecheck && npm run lint && npm run test:affected",
     "test:affected": "node --experimental-strip-types tools/ci/run-affected.ts",
     "affected": "node --experimental-strip-types tools/ci/affected.ts",
-    "serve": "node --experimental-strip-types tools/serve-dist.ts --root dist --base /hyperagent-web-apps/ --alias e2e-ice.json=e2e/fixtures/e2e-ice.json",
+    "serve": "node --experimental-strip-types tools/serve-dist.ts --root dist --base /games/ --alias e2e-ice.json=e2e/fixtures/e2e-ice.json",
     "shots": "npm run build && node --experimental-strip-types tools/shell-emulate.ts render --all --serve",
     "audit:space": "node --experimental-strip-types tools/space-audit.ts",
     "proxy:dev": "node --experimental-strip-types tools/proxy-dev.ts --upstream http://127.0.0.1:4173",

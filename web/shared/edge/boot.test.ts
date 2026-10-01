@@ -83,8 +83,7 @@ const pageAt = (
 };
 
 /** The harness's hook query (e2e/fixtures/player.ts `gameQuery`), which the rewrite must keep. */
-const HOOKS =
-  'peer=127.0.0.1%3A9000&ice=http%3A%2F%2F127.0.0.1%3A4173%2Fhyperagent-web-apps%2Fe2e-ice.json';
+const HOOKS = 'peer=127.0.0.1%3A9000&ice=http%3A%2F%2F127.0.0.1%3A4173%2Fgames%2Fe2e-ice.json';
 
 describe('applyInviteLink', () => {
   test('no join: nothing dispatched, the address bar untouched', () => {

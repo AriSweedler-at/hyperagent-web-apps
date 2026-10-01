@@ -1,5 +1,5 @@
 // The two emulated origins (docs/ARCHITECTURE.md "Two origins") and where each page lives on them.
-// `pages` mirrors GitHub Pages: the site under /hyperagent-web-apps/ on tools/serve-dist.ts.
+// `pages` mirrors GitHub Pages: the site under /games/ on tools/serve-dist.ts.
 // `proxy` mirrors games.sweedler.com: short game URLs on tools/proxy-dev.ts, which runs the real
 // Worker against the pages origin. Both serve dist/, the only build tree since docs/MIGRATION.md
 // step 13 cut the last page over. `E2E_TARGET=deployed` (the nightly, .github/workflows/nightly.yml)
@@ -22,9 +22,13 @@ import { GAMES, PAGE_TITLES, SOLO_PAGES, TOOL_NAMES, type PageName } from '../..
 export type Project = 'pages' | 'proxy';
 export type { PageName };
 
-/** The GitHub Pages mount point. The one place the harness may name it (see the lint ban). */
+/**
+ * The GitHub Pages mount point: the repo's name (a project site is served under it), so a game
+ * page sits at /games/games/<g>/ there (docs/MIGRATION.md step 16). The one place the harness
+ * may name it (see the lint ban).
+ */
 // eslint-disable-next-line no-restricted-syntax -- this is the mount point itself, not a URL a page emits
-export const PAGES_BASE_PATH = '/hyperagent-web-apps/';
+export const PAGES_BASE_PATH = '/games/';
 
 /** `E2E_PORT_OFFSET`, parsed once: unset or empty is 0; anything but a non-negative integer is a mistake. */
 const portOffset = (): number => {
@@ -50,7 +54,18 @@ export const LOCAL_HOST = '127.0.0.1';
 export const PAGES_ORIGIN = `http://${LOCAL_HOST}:${String(PORTS.pages)}`;
 export const PROXY_ORIGIN = `http://${LOCAL_HOST}:${String(PORTS.proxy)}`;
 /** The deployed GitHub Pages origin, the `pages` project's under `E2E_TARGET=deployed`. */
-export const DEPLOYED_PAGES_ORIGIN = 'https://arisweedler-at.github.io';
+export const DEPLOYED_PAGES_ORIGIN = 'https://arisweedler.github.io';
+/** The site's mount on the deployed origin; the emulation (`npm run serve`) mirrors it, so one constant serves both. */
+export const DEPLOYED_BASE_PATH = PAGES_BASE_PATH;
+/**
+ * The deployed origin a run plays: `E2E_DEPLOYED_ORIGIN` when set and not empty (nightly.yml's
+ * `origin` input, for another account's Pages while the site moves), else DEPLOYED_PAGES_ORIGIN.
+ * A trailing slash is dropped so the mount joins it cleanly.
+ */
+export const deployedOrigin = (): string => {
+  const raw = process.env['E2E_DEPLOYED_ORIGIN'];
+  return raw === undefined || raw === '' ? DEPLOYED_PAGES_ORIGIN : raw.replace(/\/$/, '');
+};
 
 export type Target = 'local' | 'deployed';
 /**
@@ -78,7 +93,9 @@ export const PROJECTS: ReadonlyArray<Project> = isDeployed() ? ['pages'] : ['pag
 export const baseUrl = (project: Project): string =>
   project === 'proxy'
     ? `${PROXY_ORIGIN}/`
-    : `${isDeployed() ? DEPLOYED_PAGES_ORIGIN : PAGES_ORIGIN}${PAGES_BASE_PATH}`;
+    : isDeployed()
+      ? `${deployedOrigin()}${DEPLOYED_BASE_PATH}`
+      : `${PAGES_ORIGIN}${PAGES_BASE_PATH}`;
 
 /**
  * Specs about the page alone, not its origin (the hand's geometry and flows, the stories, the

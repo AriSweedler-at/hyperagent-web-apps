@@ -1,7 +1,7 @@
 // Build (docs/ARCHITECTURE.md "Build and serve", "Two origins"). `web/` is the Vite root and the
 // public URL tree; every page is an entry found by globbing web/**/index.html, so a new game is
 // picked up by its folder. `base: './'` makes every emitted URL document-relative, which is what
-// lets the same dist serve from /hyperagent-web-apps/ on github.io and from / on
+// lets the same dist serve from /games/ on github.io and from / on
 // games.sweedler.com. Output naming keeps a page's own JS beside it and everything shared under
 // shared/assets/, the prefix the proxy Worker already maps. Every page is Vite's since
 // docs/MIGRATION.md step 13 cut the last legacy page over; legacy/ is test fixtures only

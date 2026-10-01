@@ -33,7 +33,7 @@
 # must be "GitHub Actions" (README "Deploy"). Chromium is restored from actions/cache by Playwright
 # version (.github/actions/playwright-chromium); dependency installs go through
 # .github/actions/npm-ci, which points the runner's copy of the lockfile at the public registry
-# (the committed one names Airtable's Socket Firewall) and scans the install. nightly.yml plays the
+# (the committed one names the Socket Firewall (sfw) registry) and scans the install. nightly.yml plays the
 # online and relay-forced specs against the deployed page, and through the public broker, every
 # night and reports each on its own pinned issue. A pull request's runs share one concurrency
 # group, so a push cancels the run of the head it replaces; a push to main or a dispatch is grouped

@@ -92,7 +92,7 @@ const erasableSyntaxBans = [
   { selector: 'LabeledStatement', message: 'no labels' },
 ];
 const absolutePathBan = {
-  selector: 'Literal[value=/^\\/(hyperagent-web-apps|shared)\\//]',
+  selector: 'Literal[value=/^\\/(games|shared)\\//]',
   message:
     'no absolute site paths: every URL must be document-relative so both origins resolve it (docs/ARCHITECTURE.md "Two origins")',
 };

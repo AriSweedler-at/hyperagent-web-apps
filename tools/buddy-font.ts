@@ -455,7 +455,7 @@ export const nameStrings = (
 ): ReadonlyArray<Readonly<{ id: number; text: string }>> => [
   {
     id: 0,
-    text: 'Original pixel art from the hyperagent-web-apps repository (tools/buddy-frames.ts); the font by tools/buddy-font.ts.',
+    text: 'Original pixel art from the games repository (tools/buddy-frames.ts); the font by tools/buddy-font.ts.',
   },
   { id: 1, text: fontName },
   { id: 2, text: 'Regular' },

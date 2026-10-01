@@ -1,6 +1,6 @@
 // Guard 2 of docs/ARCHITECTURE.md "Two origins": every relative reference in dist HTML/CSS is
 // resolved from the document's URL on both origins. On the Pages origin the document sits under
-// /hyperagent-web-apps/; on the proxy origin it sits at the short URL the Worker gives it
+// /games/; on the proxy origin it sits at the short URL the Worker gives it
 // (unmapPath), and the resolved path is fed through the Worker's real mapPath(), redirects
 // followed, to reach an upstream path. Either way the target must be a file in the tree (or a
 // directory holding index.html). Runs on dist/ after the build (npm run test:site).

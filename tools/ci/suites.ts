@@ -785,8 +785,10 @@ export const SUITES: Readonly<Record<Suite, SuiteSpec>> = {
     needsBuild: true,
     coverage: {
       include: ['infra/games-proxy/worker.ts', 'infra/games-proxy/rps-push.ts'],
-      // The Worker's table tests over a stubbed global fetch. Measured: 100/100/100/96.7. The
-      // island routes over a Map-backed store and a captured fetch, the same floor.
+      // The Worker's table tests over a stubbed global fetch. Measured: 100/100/100/96.7;
+      // 100/100/100/97.4 when docs/MIGRATION.md step 16 moved the mount to /games/ and added the
+      // old mount's two redirect branches, both pinned. The island routes over a Map-backed store
+      // and a captured fetch, the same floor.
       thresholds: {
         'infra/games-proxy/worker.ts': { lines: 95, functions: 95, statements: 95, branches: 93 },
         'infra/games-proxy/rps-push.ts': { lines: 95, functions: 95, statements: 95, branches: 93 },

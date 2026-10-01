@@ -1,5 +1,5 @@
 // Browser harness (docs/ARCHITECTURE.md "Testing pyramid", "Two origins"). Two projects: `pages`
-// (GitHub Pages emulated by tools/serve-dist.ts, dist/ under /hyperagent-web-apps/ on :4173) and
+// (GitHub Pages emulated by tools/serve-dist.ts, dist/ under /games/ on :4173) and
 // `proxy` (games.sweedler.com emulated by tools/proxy-dev.ts on :8787, running the real Worker
 // against :4173). A spec about an origin (the smoke test, the two-peer games, the resume, the
 // handoff's invite link, the relay-forced games) runs on both; a spec about the page alone (the

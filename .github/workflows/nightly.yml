@@ -1,6 +1,6 @@
 # Plays the deployed page every night (docs/MIGRATION.md step 15, docs/ARCHITECTURE.md "CI").
 # ci.yml proves the code on emulated origins; this proves the bytes GitHub Pages actually serves at
-# https://arisweedler-at.github.io/hyperagent-web-apps/ still play: the @online specs (gin
+# https://arisweedler.github.io/games/ still play: the @online specs (gin
 # join/deal/turn, gin resume/rejoin, fidice lobby/start, backgammon join/roll/move, resume and the
 # pass-and-play handoff) and the @relay specs (all three games with
 # ?ice-policy=relay, every candidate through the relay) open the deployed pages with the same hooks
@@ -17,14 +17,20 @@
 # name: never in ci-ok, red 18 of 23 runs on the public broker's timeouts, and the one job that
 # kept every run "in progress" some six minutes after the gate was green. Here a regression shows
 # the next morning, on its own issue labelled `broker`, so its red cannot keep the `nightly`
-# issue open and hide a deployed-page failure. By hand:
-#   gh workflow run nightly.yml
+# issue open and hide a deployed-page failure. By hand, optionally naming another deployed origin
+# (E2E_DEPLOYED_ORIGIN, e2e/fixtures/site.ts `deployedOrigin`; the default is DEPLOYED_PAGES_ORIGIN):
+#   gh workflow run nightly.yml [-f origin=https://<account>.github.io]
 name: Nightly
 
 on:
   schedule:
     - cron: '23 9 * * *'
   workflow_dispatch:
+    inputs:
+      origin:
+        description: 'The deployed Pages origin to play (E2E_DEPLOYED_ORIGIN); empty is the default in e2e/fixtures/site.ts'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -63,6 +69,8 @@ jobs:
       - name: Briscola engine invariants over 1000 seeded matches
         run: BRISCOLA_REPLAY_GAMES=1000 npm run test:briscola -- web/games/briscola/src/engine/replay
       - name: Online and relay-forced specs against the deployed page
+        env:
+          E2E_DEPLOYED_ORIGIN: ${{ inputs.origin }}
         run: npm run test:deployed
       - name: Upload Playwright report
         if: failure()

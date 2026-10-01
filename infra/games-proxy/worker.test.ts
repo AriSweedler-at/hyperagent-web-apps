@@ -30,7 +30,9 @@ import worker, {
 } from './worker.ts';
 
 const ORIGIN = 'https://games.sweedler.com';
-const GH = 'https://arisweedler-at.github.io';
+const GH = 'https://arisweedler.github.io';
+/** The site's mount before docs/MIGRATION.md step 16: redirected, never fetched. */
+const LEGACY = '/hyperagent-web-apps';
 
 /** A stand-in upstream: the Worker always hands `fetch` a Request, never a bare URL. */
 type Upstream = (req: Request) => Response;
@@ -57,62 +59,47 @@ const get = (path: string, env?: Env): Promise<Response> =>
 
 describe('mapPath: the mapping table in the file header', () => {
   test.each([
-    ['/', '/hyperagent-web-apps/'],
-    ['', '/hyperagent-web-apps/'],
-    ['/gin-rummy', '/hyperagent-web-apps/games/gin-rummy'],
-    ['/gin-rummy/', '/hyperagent-web-apps/games/gin-rummy/'],
-    ['/fidice/app-abc123.js', '/hyperagent-web-apps/games/fidice/app-abc123.js'],
+    ['/', '/games/'],
+    ['', '/games/'],
+    ['/gin-rummy', '/games/games/gin-rummy'],
+    ['/gin-rummy/', '/games/games/gin-rummy/'],
+    ['/fidice/app-abc123.js', '/games/games/fidice/app-abc123.js'],
     // An alias is served in place: the page and its assets come from the game's folder.
-    ['/sheshbesh/', '/hyperagent-web-apps/games/backgammon/'],
-    ['/sheshbesh/app-abc123.js', '/hyperagent-web-apps/games/backgammon/app-abc123.js'],
-    ['/sheshbesh/deep/er/file.js', '/hyperagent-web-apps/games/backgammon/deep/er/file.js'],
+    ['/sheshbesh/', '/games/games/backgammon/'],
+    ['/sheshbesh/app-abc123.js', '/games/games/backgammon/app-abc123.js'],
+    ['/sheshbesh/deep/er/file.js', '/games/games/backgammon/deep/er/file.js'],
     // The installable manifest and its icons (tools/icons.ts) ride the game's folder, under the
     // game's name and its alias alike: `./`-relative in the head and in the manifest itself.
-    [
-      '/backgammon/manifest.webmanifest',
-      '/hyperagent-web-apps/games/backgammon/manifest.webmanifest',
-    ],
-    ['/backgammon/icons/icon-192.png', '/hyperagent-web-apps/games/backgammon/icons/icon-192.png'],
-    [
-      '/sheshbesh/manifest.webmanifest',
-      '/hyperagent-web-apps/games/backgammon/manifest.webmanifest',
-    ],
-    [
-      '/sheshbesh/icons/maskable-512.png',
-      '/hyperagent-web-apps/games/backgammon/icons/maskable-512.png',
-    ],
+    ['/backgammon/manifest.webmanifest', '/games/games/backgammon/manifest.webmanifest'],
+    ['/backgammon/icons/icon-192.png', '/games/games/backgammon/icons/icon-192.png'],
+    ['/sheshbesh/manifest.webmanifest', '/games/games/backgammon/manifest.webmanifest'],
+    ['/sheshbesh/icons/maskable-512.png', '/games/games/backgammon/icons/maskable-512.png'],
     // Only the whole first segment is an alias.
-    ['/sheshbeshx/', '/hyperagent-web-apps/games/sheshbeshx/'],
-    ['/shesh/', '/hyperagent-web-apps/games/shesh/'],
-    ['/shared/ice.js', '/hyperagent-web-apps/shared/ice.js'],
-    ['/shared/assets/chunk-1.js', '/hyperagent-web-apps/shared/assets/chunk-1.js'],
-    ['/hyperagent-web-apps/', '/hyperagent-web-apps/'],
-    ['/hyperagent-web-apps/games/fidice/', '/hyperagent-web-apps/games/fidice/'],
-    ['/hyperagent-web-apps/shared/ice.js', '/hyperagent-web-apps/shared/ice.js'],
+    ['/sheshbeshx/', '/games/games/sheshbeshx/'],
+    ['/shesh/', '/games/games/shesh/'],
+    ['/shared/ice.js', '/games/shared/ice.js'],
+    ['/shared/assets/chunk-1.js', '/games/shared/assets/chunk-1.js'],
     // Only slash-terminated prefixes are special; these quirks are preserved on purpose.
-    ['/games', '/hyperagent-web-apps/games/games'],
-    ['/shared', '/hyperagent-web-apps/games/shared'],
-    ['/hyperagent-web-apps', '/hyperagent-web-apps/games/hyperagent-web-apps'],
-    ['/favicon.ico', '/hyperagent-web-apps/shared/favicon.ico'],
+    ['/games', '/games/games/games'],
+    ['/shared', '/games/games/shared'],
+    [LEGACY, `/games/games${LEGACY}`],
+    ['/favicon.ico', '/games/shared/favicon.ico'],
     // The well-known directory is the tree's own (web/public/.well-known/): Apple's association
     // file for the Dice App Clip, and whatever else RFC 8615 brings.
-    [
-      '/.well-known/apple-app-site-association',
-      '/hyperagent-web-apps/.well-known/apple-app-site-association',
-    ],
-    ['/.well-known/other', '/hyperagent-web-apps/.well-known/other'],
+    ['/.well-known/apple-app-site-association', '/games/.well-known/apple-app-site-association'],
+    ['/.well-known/other', '/games/.well-known/other'],
     // Without its slash the dot-directory is a game name like any other (the quirk above).
-    ['/.well-known', '/hyperagent-web-apps/games/.well-known'],
+    ['/.well-known', '/games/games/.well-known'],
     // The Dice App Clip's invocation URLs land on the tree's own pages (web/public/clip/<name>/):
     // spelled without a slash, as Apple registers them, the folder's page is fetched in one request.
-    ['/clip/dice', '/hyperagent-web-apps/clip/dice/'],
-    ['/clip/dice/', '/hyperagent-web-apps/clip/dice/'],
-    ['/clip/rps', '/hyperagent-web-apps/clip/rps/'],
-    ['/clip/rps/', '/hyperagent-web-apps/clip/rps/'],
-    ['/clip/dice/index.html', '/hyperagent-web-apps/clip/dice/index.html'],
-    ['/clip/', '/hyperagent-web-apps/clip/'],
+    ['/clip/dice', '/games/clip/dice/'],
+    ['/clip/dice/', '/games/clip/dice/'],
+    ['/clip/rps', '/games/clip/rps/'],
+    ['/clip/rps/', '/games/clip/rps/'],
+    ['/clip/dice/index.html', '/games/clip/dice/index.html'],
+    ['/clip/', '/games/clip/'],
     // Without its slash the prefix is a game name like any other (the quirk above).
-    ['/clip', '/hyperagent-web-apps/games/clip'],
+    ['/clip', '/games/games/clip'],
   ])('%s is fetched from upstream %s', (pathname, upstreamPath) => {
     expect(mapPath(pathname)).toEqual({ kind: 'fetch', path: upstreamPath });
   });
@@ -123,18 +110,31 @@ describe('mapPath: the mapping table in the file header', () => {
     ['/games/fidice/app.js', '/fidice/app.js'],
     ['/games/', '/'],
     // /ALIAS without its slash is redirected here, not fetched: the upstream's slash redirect would
-    // come back as /hyperagent-web-apps/games/backgammon/ and unmapPath would send the player to
+    // come back as /games/games/backgammon/ and unmapPath would send the player to
     // /backgammon/. /games/ALIAS is a landing-style link like any other.
     ['/sheshbesh', '/sheshbesh/'],
     ['/games/sheshbesh/', '/sheshbesh/'],
     ['/games/sheshbesh', '/sheshbesh'],
+    // The upstream's long form spelled on this origin: a segment off per hop; nothing links to it.
+    ['/games/games/gin-rummy/', '/games/gin-rummy/'],
+    // The site's mount before docs/MIGRATION.md step 16: a game's long form goes to its short URL
+    // (an alias too), anything else under it to the landing page; nothing is fetched.
+    [`${LEGACY}/games/gin-rummy/`, '/gin-rummy/'],
+    [`${LEGACY}/games/gin-rummy`, '/gin-rummy'],
+    [`${LEGACY}/games/fidice/app.js`, '/fidice/app.js'],
+    [`${LEGACY}/games/sheshbesh/`, '/sheshbesh/'],
+    [`${LEGACY}/games/`, '/'],
+    [`${LEGACY}/`, '/'],
+    [`${LEGACY}/shared/ice.js`, '/'],
+    [`${LEGACY}/games`, '/'],
+    [`${LEGACY}/index.html`, '/'],
   ])('%s redirects to %s on this origin', (pathname, shortPath) => {
     expect(mapPath(pathname)).toEqual({ kind: 'redirect', path: shortPath });
   });
 
   test('AASA_PATH is the path web/shared/lib/appClip.ts spells for the site', () => {
     expect(AASA_PATH).toBe(CLIP_AASA_PATH);
-    expect(mapPath(AASA_PATH)).toEqual({ kind: 'fetch', path: `/hyperagent-web-apps${AASA_PATH}` });
+    expect(mapPath(AASA_PATH)).toEqual({ kind: 'fetch', path: `/games${AASA_PATH}` });
   });
 
   test('every CLIP_PATHS experience (web/shared/lib/appClip.ts) sits under CLIP_PREFIX and fetches its folder page, slash or no slash', () => {
@@ -142,7 +142,7 @@ describe('mapPath: the mapping table in the file header', () => {
       expect(clipPath.startsWith(CLIP_PREFIX)).toBe(true);
       expect(mapPath(clipPath)).toEqual({
         kind: 'fetch',
-        path: `/hyperagent-web-apps${clipPath}/`,
+        path: `/games${clipPath}/`,
       });
       expect(mapPath(`${clipPath}/`)).toEqual(mapPath(clipPath));
     });
@@ -156,11 +156,13 @@ describe('mapPath: the mapping table in the file header', () => {
 
 describe('unmapPath: upstream pathname back to this origin', () => {
   test.each([
-    ['/hyperagent-web-apps/games/gin-rummy/', '/gin-rummy/'],
-    ['/hyperagent-web-apps/games/', '/'],
-    ['/hyperagent-web-apps/', '/'],
-    ['/hyperagent-web-apps/shared/ice.js', '/shared/ice.js'],
-    ['/hyperagent-web-apps', '/hyperagent-web-apps'],
+    ['/games/games/gin-rummy/', '/gin-rummy/'],
+    ['/games/games/', '/'],
+    ['/games/', '/'],
+    ['/games/shared/ice.js', '/shared/ice.js'],
+    // The mount without its slash, and the old mount, are outside the site: unchanged.
+    ['/games', '/games'],
+    [`${LEGACY}/games/gin-rummy/`, `${LEGACY}/games/gin-rummy/`],
     ['/elsewhere', '/elsewhere'],
   ])('%s becomes %s', (upstreamPath, shortPath) => {
     expect(unmapPath(upstreamPath)).toBe(shortPath);
@@ -183,21 +185,19 @@ describe('unmapPath: upstream pathname back to this origin', () => {
     const mapped = mapPath('/sheshbesh/');
     expect(mapped.kind).toBe('fetch');
     expect(unmapPath(mapped.path)).toBe('/backgammon/');
-    expect(unmapPath('/hyperagent-web-apps/games/backgammon/')).toBe('/backgammon/');
+    expect(unmapPath('/games/games/backgammon/')).toBe('/backgammon/');
   });
 });
 
 describe('fetch handler', () => {
   test('/ serves the Pages site root', () =>
     withUpstream(upstreamEcho, async () => {
-      expect(await (await get('/')).text()).toBe(`${GH}/hyperagent-web-apps/`);
+      expect(await (await get('/')).text()).toBe(`${GH}/games/`);
     }));
 
   test('/XXX/ serves games/XXX/', () =>
     withUpstream(upstreamEcho, async () => {
-      expect(await (await get('/gin-rummy/')).text()).toBe(
-        `${GH}/hyperagent-web-apps/games/gin-rummy/`,
-      );
+      expect(await (await get('/gin-rummy/')).text()).toBe(`${GH}/games/games/gin-rummy/`);
     }));
 
   test('/games/XXX/ redirects to the short URL without calling upstream', () =>
@@ -210,10 +210,10 @@ describe('fetch handler', () => {
   test('/ALIAS/ serves the game page in place, query and all, and its assets from the game folder', () =>
     withUpstream(upstreamEcho, async () => {
       expect(await (await get('/sheshbesh/?join=ABCD')).text()).toBe(
-        `${GH}/hyperagent-web-apps/games/backgammon/?join=ABCD`,
+        `${GH}/games/games/backgammon/?join=ABCD`,
       );
       expect(await (await get('/sheshbesh/app-abc.js')).text()).toBe(
-        `${GH}/hyperagent-web-apps/games/backgammon/app-abc.js`,
+        `${GH}/games/games/backgammon/app-abc.js`,
       );
     }));
 
@@ -233,9 +233,7 @@ describe('fetch handler', () => {
 
   test('/shared/ice.js reaches the shared directory, not games/shared', () =>
     withUpstream(upstreamEcho, async () => {
-      expect(await (await get('/shared/ice.js')).text()).toBe(
-        `${GH}/hyperagent-web-apps/shared/ice.js`,
-      );
+      expect(await (await get('/shared/ice.js')).text()).toBe(`${GH}/games/shared/ice.js`);
     }));
 
   test('the AASA comes back as application/json whatever the upstream said; a miss keeps its type', () =>
@@ -268,11 +266,15 @@ describe('fetch handler', () => {
       },
     ));
 
-  test('/hyperagent-web-apps/… passes through', () =>
-    withUpstream(upstreamEcho, async () => {
-      expect(await (await get('/hyperagent-web-apps/games/fidice/')).text()).toBe(
-        `${GH}/hyperagent-web-apps/games/fidice/`,
-      );
+  test("the old mount is redirected without calling upstream: a game's long form to its short URL, the query kept, anything else to /", () =>
+    withUpstream(noUpstream, async () => {
+      const game = await get(`${LEGACY}/games/fidice/?join=ABCDE`);
+      expect(game.status).toBe(301);
+      expect(game.headers.get('Location')).toBe(`${ORIGIN}/fidice/?join=ABCDE`);
+      const root = await get(`${LEGACY}/`);
+      expect(root.status).toBe(301);
+      expect(root.headers.get('Location')).toBe(`${ORIGIN}/`);
+      expect((await get(`${LEGACY}/shared/ice.js`)).headers.get('Location')).toBe(`${ORIGIN}/`);
     }));
 
   test('upstream trailing-slash redirect is rewritten back to this origin', () =>
@@ -280,7 +282,7 @@ describe('fetch handler', () => {
       () =>
         new Response(null, {
           status: 301,
-          headers: { Location: `${GH}/hyperagent-web-apps/games/gin-rummy/` },
+          headers: { Location: `${GH}/games/games/gin-rummy/` },
         }),
       async () => {
         const res = await get('/gin-rummy');
@@ -292,7 +294,7 @@ describe('fetch handler', () => {
   test('the query string is forwarded to upstream', () =>
     withUpstream(upstreamEcho, async () => {
       expect(await (await get('/fidice/?room=abc&x=1')).text()).toBe(
-        `${GH}/hyperagent-web-apps/games/fidice/?room=abc&x=1`,
+        `${GH}/games/games/fidice/?room=abc&x=1`,
       );
     }));
 
@@ -300,27 +302,27 @@ describe('fetch handler', () => {
     withUpstream(upstreamEcho, async () => {
       const dice = await get('/clip/dice?roll=3,5');
       expect(dice.status).toBe(200);
-      expect(await dice.text()).toBe(`${GH}/hyperagent-web-apps/clip/dice/?roll=3,5`);
+      expect(await dice.text()).toBe(`${GH}/games/clip/dice/?roll=3,5`);
       expect(await (await get('/clip/rps?session=abcd1234')).text()).toBe(
-        `${GH}/hyperagent-web-apps/clip/rps/?session=abcd1234`,
+        `${GH}/games/clip/rps/?session=abcd1234`,
       );
     }));
 
   test('without env the upstream is GitHub Pages', () =>
     withUpstream(upstreamEcho, async () => {
       expect(DEFAULT_UPSTREAM).toBe(GH);
-      expect(await (await get('/', undefined)).text()).toBe(`${GH}/hyperagent-web-apps/`);
-      expect(await (await get('/', {})).text()).toBe(`${GH}/hyperagent-web-apps/`);
+      expect(await (await get('/', undefined)).text()).toBe(`${GH}/games/`);
+      expect(await (await get('/', {})).text()).toBe(`${GH}/games/`);
     }));
 
   test('env.UPSTREAM replaces the upstream origin (tools/proxy-dev.ts fronting a dist server)', () =>
     withUpstream(upstreamEcho, async () => {
       const env = { UPSTREAM: 'http://127.0.0.1:4173' };
       expect(await (await get('/gin-rummy/', env)).text()).toBe(
-        'http://127.0.0.1:4173/hyperagent-web-apps/games/gin-rummy/',
+        'http://127.0.0.1:4173/games/games/gin-rummy/',
       );
       expect(await (await get('/shared/ice.js', env)).text()).toBe(
-        'http://127.0.0.1:4173/hyperagent-web-apps/shared/ice.js',
+        'http://127.0.0.1:4173/games/shared/ice.js',
       );
     }));
 
@@ -329,7 +331,7 @@ describe('fetch handler', () => {
       () =>
         new Response(null, {
           status: 301,
-          headers: { Location: 'http://127.0.0.1:4173/hyperagent-web-apps/games/fidice/' },
+          headers: { Location: 'http://127.0.0.1:4173/games/games/fidice/' },
         }),
       async () => {
         const res = await get('/fidice', { UPSTREAM: 'http://127.0.0.1:4173' });
@@ -352,7 +354,7 @@ describe('fetch handler', () => {
       () =>
         new Response(null, {
           status: 301,
-          headers: { Location: `${GH}/hyperagent-web-apps/shared/?a=1` },
+          headers: { Location: `${GH}/games/shared/?a=1` },
         }),
       async () => {
         const res = await get('/shared');
@@ -688,7 +690,7 @@ describe('shortHref: a landing href to the short URL on this origin', () => {
     // The other spellings of the same folder.
     ['./games/gin-rummy/', '/gin-rummy/'],
     ['/games/gin-rummy/', '/gin-rummy/'],
-    ['/hyperagent-web-apps/games/gin-rummy/', '/gin-rummy/'],
+    ['/games/games/gin-rummy/', '/gin-rummy/'],
     // Without the slash (the upstream's slash redirect then lands on /<name>/: one hop, no /games/
     // in it), with a query, a fragment, a file.
     ['games/gin-rummy', '/gin-rummy'],
@@ -705,9 +707,9 @@ describe('shortHref: a landing href to the short URL on this origin', () => {
     'shared/favicon.svg',
     './shared/favicon.ico',
     '/shared/ice.js',
-    'https://github.com/AriSweedler-at/hyperagent-web-apps',
+    'https://github.com/AriSweedler/games',
     // An absolute URL names its origin on purpose.
-    'https://arisweedler-at.github.io/hyperagent-web-apps/games/gin-rummy/',
+    'https://arisweedler.github.io/games/games/gin-rummy/',
     '#top',
     'mailto:ari@example.com',
     '',
@@ -766,9 +768,9 @@ const LANDING_PAGE = `<!DOCTYPE html>
 <a class="card" href="games/briscola/">Briscola</a>
 <a href="games/sheshbesh/">the alias</a>
 <a href="/games/gin-rummy">rooted, no slash</a>
-<a href="/hyperagent-web-apps/games/gin-rummy/?join=TNJQ">the long form</a>
+<a href="/games/games/gin-rummy/?join=TNJQ">the long form</a>
 <a href="shared/README.md">not a game</a>
-<a href="https://github.com/AriSweedler-at/hyperagent-web-apps">source</a>
+<a href="https://github.com/AriSweedler/games">source</a>
 </body>
 </html>
 `;
@@ -787,7 +789,7 @@ const SHORTENED = `<!DOCTYPE html>
 <a href="/gin-rummy">rooted, no slash</a>
 <a href="/gin-rummy/?join=TNJQ">the long form</a>
 <a href="shared/README.md">not a game</a>
-<a href="https://github.com/AriSweedler-at/hyperagent-web-apps">source</a>
+<a href="https://github.com/AriSweedler/games">source</a>
 </body>
 </html>
 `;
@@ -819,15 +821,16 @@ describe('fetch handler: landing links', () => {
       expect(res.headers.get('etag')).toBe('"page-2"');
     }));
 
-  test('the long form of the landing page, /hyperagent-web-apps/, is rewritten the same way', () =>
-    withUpstream(pageUpstream(LANDING_PAGE), async () => {
-      expect(await (await get('/hyperagent-web-apps/')).text()).toBe(SHORTENED);
+  test('the long forms of the landing page, /games/ and the old mount, redirect to / and are never fetched', () =>
+    withUpstream(noUpstream, async () => {
+      expect((await get('/games/')).headers.get('Location')).toBe(`${ORIGIN}/`);
+      expect((await get(`${LEGACY}/`)).headers.get('Location')).toBe(`${ORIGIN}/`);
     }));
 
   test('the landing page is fetched from upstream as before: the rewrite is on the way back', () =>
     withUpstream(
       (req) => {
-        expect(req.url).toBe(`${GH}/hyperagent-web-apps/`);
+        expect(req.url).toBe(`${GH}/games/`);
         return pageUpstream(LANDING_PAGE)(req);
       },
       async () => {
@@ -965,9 +968,7 @@ describe('the island scoreboard routes ride the Worker (rps-push.ts; its own tes
       const paired = await get('/api/rps/pair/abcd1234', configured);
       expect(paired.headers.get('access-control-allow-origin')).toBeNull();
       // Only the /api/rps/ prefix is the Worker's: a neighbour is a game path like any other.
-      expect(await (await get('/api/rpsx/pair')).text()).toBe(
-        `${GH}/hyperagent-web-apps/games/api/rpsx/pair`,
-      );
-      expect(await (await get('/api/rps')).text()).toBe(`${GH}/hyperagent-web-apps/games/api/rps`);
+      expect(await (await get('/api/rpsx/pair')).text()).toBe(`${GH}/games/games/api/rpsx/pair`);
+      expect(await (await get('/api/rps')).text()).toBe(`${GH}/games/games/api/rps`);
     }));
 });

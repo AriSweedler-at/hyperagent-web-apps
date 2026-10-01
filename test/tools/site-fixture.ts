@@ -19,7 +19,7 @@ const FILES: ReadonlyArray<readonly [string, string]> = [
 ];
 
 export const stageSite = (): StagedSite => {
-  const root = mkdtempSync(resolve(tmpdir(), 'hyperagent-site-'));
+  const root = mkdtempSync(resolve(tmpdir(), 'games-site-'));
   FILES.forEach(([from, to]) => {
     const target = resolve(root, to);
     mkdirSync(dirname(target), { recursive: true });
